@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–312 |
-|   6. Comparison | 313–350 |
-|   7. Requests | 351–362 |
-| Constants & data dependencies | 363–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–378 |
-| Test vectors | 379–387 |
-| Provenance | 388–392 |
-| Open questions | 393–407 |
+|   5. d2rs export | 190–351 |
+|   6. Comparison | 352–401 |
+|   7. Requests | 402–413 |
+| Constants & data dependencies | 414–417 |
+| Randomness | 418–421 |
+| Edge cases & original bugs | 422–429 |
+| Test vectors | 430–438 |
+| Provenance | 439–443 |
+| Open questions | 444–458 |
 <!-- /index -->
 
 ## Summary
@@ -251,7 +251,8 @@ composition, through `d2-client` only (game logic untouched).
    with (those items write no row): `DrawLine` for a line, `DrawBox` for
    the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
    = the color (`blend-modes.md` §8 r1–r2), `at` = `pass9` (§6 r5),
-   every other column `-`. The
+   every other column `-`. A pass-4 pool cel (§11.6) is a cel row as
+   any other, with `at` = `pools` (§6 r5 revision). The
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
@@ -290,7 +291,8 @@ composition, through `d2-client` only (game logic untouched).
 14. A unit cel row's `dir` (and its `sprites.tsv` key) is the cel
    context's direction of §2 r3: the unit's `dir64` after the snap of
    `render/unit-composite.md` §3 r4 (`UnitPose::dir64`, kept per drawn
-   unit in `WorldFrame::unit_dirs`), not the file direction of the frame
+   unit in `WorldFrame::unit_dirs` by the unit's draw slot, not by GUID:
+   GUIDs repeat across unit types, revision 2026-10-09), not the file direction of the frame
    set (§6 r3 maps several `dir64` to one file direction). Other cel
    rows keep the frame set's direction.
 15. A composite slot whose component request succeeds but whose file is
@@ -309,6 +311,43 @@ composition, through `d2-client` only (game logic untouched).
    left, top, `mode` = its colour (the item's colour row; `?` without
    the colour rows), every other column `-`; one row per rectangle
    (revision 2026-10-09, `a1-panel-cube`: the item tints).
+17. A listed unit whose body fails the COF box pre-test
+   (`render/unit-composite.md` §4, inside the unit draw `0x00471EC0`)
+   is still a unit draw call: its `unit` row at its draw key, no cel row
+   (`WorldFrame::unit_calls` with no file; revision 2026-10-09,
+   `a1-panel-inventory` row 128: the torch 2:9 at X = 920).
+18. A UI cel's `op` is the 1.14d wrapper its draw names
+   (`ui::draw::CelCall`, kept per UI draw in `WorldFrame::ui_calls`):
+   `CelDrawEx` for the globes' row window (`ui/control-panel.md` §3),
+   `CelDrawColor` for the skill icons and every font glyph,
+   `CelDrawClipped` for the automap's cells (not yet set by d2rs: its
+   automap cels export as `CelDraw`), else `CelDraw` (revision
+   2026-10-09, measured: the wrapper names of the recorded scenes'
+   `ui/`, `font`, `spells` and `automap` cels). World cels keep r3.
+19. `--at-tick N,M,...` (strictly increasing) dumps several frames in
+   one run, each the first drawn frame at or after its tick (r13), into
+   `DIR/tick-<N>`; one tick keeps `DIR` itself. `--dump-image` also
+   writes the composed index frame of r8 as `frame.png`: an 8-bit
+   palettized PNG, the index bytes as they are, the frame palette as
+   `PLTE` (the form of `record_frames.py`'s captures), so a pixel view
+   compares indices, not converted colours. The image is rendered game
+   art: it is written only where the caller points `DIR`
+   (`tools/sidebyside/build.py` points it outside the repository,
+   CLAUDE.md rule 1), never under `facts/` (revision 2026-10-09,
+   q-tool-side-by-side).
+20. `play --sound-log FILE` writes every call of the sound request entry
+   (`audio/triggers.md` §1 r1: 1.14d `0x004B9A00`; d2rs
+   `SoundSystem::request`) at its entry, rejected calls (id < 1, volume
+   0) included, in call order: a `# sound-log v1` line, a column row,
+   then `tick sound_tick id unit_type guid delay flags offset` per call
+   (`-` for no unit). `tick` is the server tick of the audio frame that
+   made the call, `sound_tick` the sound tick (`0x007BC9BC`). The 1.14d
+   side is `record_frames.py --sounds`: a `{"k": "sound"}` record per
+   entry hit with the recorder's frame, `[0x007BC9BC]`, ECX, EDX's type
+   (+0x00) and GUID (+0x0C), the three stack words and the return
+   address (`audio/triggers.md` Checks, "request log"). The two logs
+   compare as the sequence of (tick, id, unit, delay, flags, offset)
+   (revision 2026-10-09, q-tool-side-by-side).
 
 ### 6. Comparison
 
@@ -347,6 +386,18 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    measured so far are `0x0047368E` (rain lines) and `0x00473585`
    (snow lines, Harrogath), both in the particle draw; settled by a
    scene recorded with the lightning flash (REC-510).
+   *Revision (2026-10-09, q-scenes-compare):* pass 4's environment
+   pools (`draw-order-2.md` §11.6: the splash and bubble cels,
+   `0x00473C00` → `0x00473A70`) are left out too: on the 1.14d side a
+   `CelDraw` row whose `at` is in [`0x00473A70`, `0x00473C00`), on the
+   d2rs side a row whose `at` is `pools` (§5 r10). Their spawns draw on
+   the local player's seed (§11.5), which the idle cursor steps once per
+   drawn frame on wall-clock time (`ui/panels-3.md` §23 r8), so they
+   are no more reproducible than the rain (`a3-town-kurast-docks` rows
+   97–99: three cels at `0x00473BD0`, d2rs's other splashes).
+   PROVISIONAL (REC-708): `0x00473BD0` is the pool draw's only call
+   site; settled by a recording of a water floor in the rain with the
+   call sites of every pool cel.
 
 ### 7. Requests
 

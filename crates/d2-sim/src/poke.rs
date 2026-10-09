@@ -12,14 +12,17 @@
 //! | [`PokeFile`] | a `poke 1` file (§2) |
 //! | [`apply`], [`apply_op`], [`apply_line`] | resolve the references on the current state and run the directive on a [`WorldSim`] game (§5) |
 //! | [`spawn_monster`] | the call sequences of a `spawn` step (`scenario.md` §3.1 rule 2) |
+//! | [`GotoTarget`], [`GotoWalk`], [`goto_step`] | the `goto` walk, one step per tick (§6) |
+//! | [`msg_values`] | `msg`: its values with the references resolved (§5 rule 3; the bytes are the host side's, `d2-client::app::poke`) |
 //!
 //! References (`scenario.md` §3 rule 3, §1 rule 1 here) are resolved by
 //! [`apply`] on the state it is called on: the callers call it between
 //! ticks t − 1 and t (§5 rule 2), so that is the state after tick t − 1.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
+use crate::drlg::DrlgRoomId;
 use crate::game::Game;
 use crate::items::{ItemGame, ItemRequest, ItemTables};
 use crate::missiles::param_flags as pf;
@@ -28,7 +31,8 @@ use crate::monsters::init::{self, InitHost as _};
 use crate::monsters::population::{placement, preset, spawn as pop_spawn};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemSpawn};
-use crate::wiring::path::place::level_warp;
+use crate::wiring::path::act_change;
+use crate::wiring::path::place::{level_warp, place_unit};
 use crate::wiring::path::PathCtx;
 use crate::wiring::worldgen::dispatch::WorldSim;
 use crate::wiring::worldgen::WorldPending;
@@ -66,6 +70,16 @@ pub enum UnitArg {
     Waypoint(u32),
     /// `<type>/<guid>`.
     Guid { ty: u8, guid: u32 },
+}
+
+/// A value of `msg` (§1 `msg`): a number, the player's position ± N, or
+/// a unit (its GUID).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MsgArg {
+    Num(u32),
+    /// `@x±N` / `@y±N` (never [`Coord::Num`]).
+    Pos(Coord),
+    Unit(UnitArg),
 }
 
 /// One directive (§1 rule 2 table; optional arguments `None` when not
@@ -111,6 +125,14 @@ pub enum Directive {
         x: Coord,
         y: Coord,
     },
+    /// d2rs-own test aid (`poke.md` §1 `hop`): one move of at most
+    /// [`HOP`] sub-tiles per axis toward (x, y), the first free spot of
+    /// [`hop_candidates`] from the unit's current position.
+    Hop {
+        unit: UnitArg,
+        x: Coord,
+        y: Coord,
+    },
     Warp {
         level: u32,
         tile: Option<u32>,
@@ -138,10 +160,46 @@ pub enum Directive {
     Freeze {
         seconds: u32,
     },
+    Goto(GotoTarget),
+    /// One C→S game message through the local client's sender (§1 `msg`):
+    /// the id's fields in layout order.
+    Msg {
+        id: u8,
+        args: Vec<MsgArg>,
+    },
+}
+
+/// The target of a `goto` (§6 rule 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GotoTarget {
+    /// `preset <level>`: the goal level; `None` for `unit` (the player's
+    /// level at the first step).
+    pub preset: Option<u32>,
+    /// Unit type: 1 monster or 2 object.
+    pub ty: u8,
+    /// Class (`monstats` / `objects` row).
+    pub class: u32,
+}
+
+/// Steps after which a `goto` walk ends `failed` (§6 rule 3.4).
+pub const GOTO_MAX_STEPS: u32 = 400;
+
+/// The state a runner keeps between the steps of one `goto` (§6 rule 2).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GotoWalk {
+    /// The goal level, fixed at the first step.
+    pub goal: Option<u32>,
+    /// DRLG rooms seen: (level id, tile x, tile y).
+    pub seen: BTreeSet<(u32, i32, i32)>,
+    /// DRLG rooms the player cannot stand in (no free cell, or the
+    /// placement refused or landed elsewhere): the search avoids them.
+    pub blocked: BTreeSet<(u32, i32, i32)>,
+    /// Steps run so far.
+    pub steps: u32,
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 12] = [
+pub const KEYWORDS: [&str; 15] = [
     "object",
     "superunique",
     "missile",
@@ -149,11 +207,14 @@ pub const KEYWORDS: [&str; 12] = [
     "seed-unit",
     "time",
     "pos",
+    "hop",
     "warp",
     "item",
     "stat",
     "state",
     "freeze",
+    "goto",
+    "msg",
 ];
 
 impl Directive {
@@ -167,11 +228,14 @@ impl Directive {
             Self::SeedUnit { .. } => "seed-unit",
             Self::Time { .. } => "time",
             Self::Pos { .. } => "pos",
+            Self::Hop { .. } => "hop",
             Self::Warp { .. } => "warp",
             Self::Item { .. } => "item",
             Self::Stat { .. } => "stat",
             Self::State { .. } => "state",
             Self::Freeze { .. } => "freeze",
+            Self::Goto(_) => "goto",
+            Self::Msg { .. } => "msg",
         }
     }
 }
@@ -373,6 +437,29 @@ impl fmt::Display for UnitArg {
     }
 }
 
+impl fmt::Display for MsgArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Num(v) => write!(f, "{v}"),
+            Self::Pos(c) => c.fmt(f),
+            Self::Unit(u) => u.fmt(f),
+        }
+    }
+}
+
+/// One `msg` value token: `@x±N` / `@y±N`, a unit reference, or a
+/// number (u32). Which values the id takes is the host side's check
+/// (§5 rule 3: the layouts are transport knowledge, not the sim's).
+fn msg_arg(t: &str) -> Result<MsgArg, String> {
+    if t.starts_with("@x") || t.starts_with("@y") {
+        return coord(t).map(MsgArg::Pos);
+    }
+    if t.starts_with('@') || t.contains('/') {
+        return unit_arg(t).map(MsgArg::Unit);
+    }
+    num(t).map(MsgArg::Num)
+}
+
 // ---- directives -----------------------------------------------------------
 
 /// Parses one directive from its tokens (keyword first; §1). Errors name
@@ -494,6 +581,14 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 y: coord(a[2])?,
             }
         }
+        "hop" => {
+            let a = exact(3, "<ref> <x> <y>")?;
+            Directive::Hop {
+                unit: unit_arg(a[0])?,
+                x: coord(a[1])?,
+                y: coord(a[2])?,
+            }
+        }
         "warp" => {
             let usage = "<level> [tile <n>]";
             let (a, rest) = fixed(1, usage)?;
@@ -572,6 +667,34 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 seconds: ranged(a[0], 0, 3600, "seconds")?,
             }
         }
+        "goto" => {
+            let usage = "unit [<type>:]<class> | preset <level> [<type>:]<class>";
+            let (preset, id) = match args {
+                ["unit", id] => (None, *id),
+                ["preset", lv, id] => (Some(ranged(lv, 0, 0xFFFF, "level id")?), *id),
+                _ => return Err(format!("`goto {usage}`")),
+            };
+            let (ty, class) = match id.split_once(':') {
+                Some((t, c)) => (ranged(t, 1, 2, "goto unit type (1 monster, 2 object)")?, c),
+                None => (1, id),
+            };
+            Directive::Goto(GotoTarget {
+                preset,
+                ty: ty as u8,
+                class: ranged(class, 0, 0xFFFF, "class")?,
+            })
+        }
+        "msg" => {
+            let Some((id, vals)) = args.split_first() else {
+                return Err("`msg` needs an id: `msg <id> <value>...`".into());
+            };
+            let id = ranged(id, 1, 0x70, "msg id")? as u8;
+            let args = vals
+                .iter()
+                .map(|t| msg_arg(t))
+                .collect::<Result<Vec<_>, _>>()?;
+            Directive::Msg { id, args }
+        }
         k => {
             return Err(format!(
                 "unknown directive {k:?}: one of {}",
@@ -622,7 +745,7 @@ impl fmt::Display for Directive {
             Self::SeedGame { lo, hi } => write!(f, " {lo} {hi}")?,
             Self::SeedUnit { unit, lo, hi } => write!(f, " {unit} {lo} {hi}")?,
             Self::Time { period, ticks } => write!(f, " {period} {ticks}")?,
-            Self::Pos { unit, x, y } => write!(f, " {unit} {x} {y}")?,
+            Self::Pos { unit, x, y } | Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
             Self::Warp { level, tile } => {
                 write!(f, " {level}")?;
                 if let Some(t) = tile {
@@ -654,6 +777,16 @@ impl fmt::Display for Directive {
                 write!(f, " {unit} {state} {}", if *on { "on" } else { "off" })?
             }
             Self::Freeze { seconds } => write!(f, " {seconds}")?,
+            Self::Goto(t) => match t.preset {
+                Some(l) => write!(f, " preset {l} {}:{}", t.ty, t.class)?,
+                None => write!(f, " unit {}:{}", t.ty, t.class)?,
+            },
+            Self::Msg { id, args } => {
+                write!(f, " {id}")?;
+                for a in args {
+                    write!(f, " {a}")?;
+                }
+            }
         }
         Ok(())
     }
@@ -804,10 +937,16 @@ pub enum PokeResult {
     Ok(Option<u32>),
     /// The game's own function refused (placement, class check, no room).
     Failed,
+    /// `failed` with why (the record's `note`), e.g. `msg` dropped by the
+    /// client sender's duplicate filter.
+    FailedWith(String),
     /// A reference matched no unit: the reference as written.
     Unresolved(String),
     /// This side cannot run the directive: why.
     Gap(String),
+    /// A `goto` step that did not land yet (§6 rule 3.3): run the next
+    /// step after the next tick.
+    Pending,
 }
 
 impl PokeResult {
@@ -815,9 +954,10 @@ impl PokeResult {
     pub fn code(&self) -> &'static str {
         match self {
             Self::Ok(_) => "ok",
-            Self::Failed => "failed",
+            Self::Failed | Self::FailedWith(_) => "failed",
             Self::Unresolved(_) => "unresolved",
             Self::Gap(_) => "gap",
+            Self::Pending => "pending",
         }
     }
 
@@ -917,6 +1057,42 @@ pub fn resolve_unit<X: WorldPending>(
     found.ok_or_else(|| u.to_string())
 }
 
+/// Largest move of a `hop` per axis (sub-tiles): a `pos` reaches only the
+/// unit's room and its neighbours (`poke.md` §1 `hop`).
+pub const HOP: i32 = 16;
+
+/// The spots a `hop` from `from` by `step` tries, best first: rings of
+/// radius 0, 2, 4, 7 around the full step, then around the half step, then
+/// a sidestep of 8 to either side across the step.
+pub fn hop_candidates(from: (i32, i32), step: (i32, i32)) -> Vec<(i32, i32)> {
+    const DIRS: [(i32, i32); 8] = [
+        (1, 1),
+        (1, 0),
+        (0, 1),
+        (-1, 0),
+        (0, -1),
+        (-1, -1),
+        (1, -1),
+        (-1, 1),
+    ];
+    let ring = |(x, y): (i32, i32), out: &mut Vec<(i32, i32)>| {
+        out.push((x, y));
+        for r in [2, 4, 7] {
+            out.extend(DIRS.iter().map(|&(dx, dy)| (x + r * dx, y + r * dy)));
+        }
+    };
+    let (fx, fy) = from;
+    let (sx, sy) = step;
+    let mut out = Vec::with_capacity(66);
+    ring((fx + sx, fy + sy), &mut out);
+    ring((fx + sx / 2, fy + sy / 2), &mut out);
+    let (px, py) = (sy.signum() * 8, -sx.signum() * 8);
+    out.push((fx + px, fy + py));
+    out.push((fx - px, fy - py));
+    out.retain(|&(x, y)| x >= 0 && y >= 0 && (x, y) != from);
+    out
+}
+
 /// The room holding (x, y): the room of a point from `near` (the
 /// unit's room and its neighbours, `0x00463740`).
 fn room_near<X: WorldPending>(
@@ -997,6 +1173,39 @@ pub fn apply_line<X: WorldPending>(
     Ok(apply_op(game, sim, env, &op))
 }
 
+/// The `gap` note of `msg` where the runner has no host (§5 rule 3).
+pub const MSG_GAP: &str = "msg needs the host's client queue";
+
+/// The values of a `msg` directive with its references resolved on the
+/// current state (§5 rule 3): positions from the player's path, units
+/// as their GUID. `Err`: the reference that matched no unit.
+pub fn msg_values<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    env: &Env<'_>,
+    args: &[MsgArg],
+) -> Result<Vec<i64>, String> {
+    msg_values_with(args, |a| match a {
+        MsgArg::Num(v) => Ok(i64::from(v)),
+        MsgArg::Pos(c) => resolve_coord(c, sim, env).map(i64::from),
+        MsgArg::Unit(u) => {
+            let id = resolve_unit(u, game, sim, env)?;
+            guid_of(game, id)
+                .map(i64::from)
+                .ok_or_else(|| u.to_string())
+        }
+    })
+}
+
+/// [`msg_values`] with the references resolved by `resolve` (a position
+/// to its sub-tile, a unit to its GUID; `Err` the reference).
+pub fn msg_values_with(
+    args: &[MsgArg],
+    resolve: impl FnMut(MsgArg) -> Result<i64, String>,
+) -> Result<Vec<i64>, String> {
+    args.iter().copied().map(resolve).collect()
+}
+
 fn run<X: WorldPending>(
     game: &mut Game,
     sim: &mut WorldSim<X>,
@@ -1012,17 +1221,38 @@ fn run<X: WorldPending>(
             };
             // Allocator 0x00555230 with type 2, flags 1 (add), mode as
             // given (default 0), with the monster state lent (an InitFn
-            // may spawn monsters, edge case 2).
-            let req = crate::units::lifecycle::AllocRequest {
-                ty: UnitType::Object,
-                class: *class,
-                room: Some(room),
-                add: true,
-                fixed_guid: None,
-                mode: mode.unwrap_or(0),
-                allied: false,
-            };
-            let u = sim.lend(|a| a.with(game, |g, v| v.allocate(g, &req, x, y)));
+            // may spawn monsters, edge case 2): the creation the game's
+            // own objects go through (`View::create_object`, as the
+            // population and the quests), so the per-kind init
+            // (`objects.md` §3: control record, InitFn) runs on the
+            // allocation's room and (x, y) before `SUNIT_Add`
+            // (`units.md` §3.1 steps 7–8). A game without object state,
+            // a mode beyond a byte or a class past the objects rows: the
+            // bare allocation (the init dispatch's own checks decide).
+            let class = *class;
+            let mode = mode.unwrap_or(0);
+            let u = sim.lend(|a| {
+                a.with(game, |g, v| match u8::try_from(mode) {
+                    Ok(m)
+                        if v.h.objects.is_some()
+                            && class <= u32::from(crate::world::objects::CLASS_BOUND) =>
+                    {
+                        v.create_object(g, room, class, x, y, m)
+                    }
+                    _ => {
+                        let req = crate::units::lifecycle::AllocRequest {
+                            ty: UnitType::Object,
+                            class,
+                            room: Some(room),
+                            add: true,
+                            fixed_guid: None,
+                            mode,
+                            allied: false,
+                        };
+                        v.allocate(g, &req, x, y)
+                    }
+                })
+            });
             created(game, u)
         }
         Directive::Superunique { row, x, y } => {
@@ -1109,18 +1339,51 @@ fn run<X: WorldPending>(
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
             PokeResult::Ok(None)
         }
+        Directive::Hop { unit, x, y } => {
+            let u = resolve_unit(*unit, game, sim, env)?;
+            let (tx, ty) = (c(*x, sim)?, c(*y, sim)?);
+            if !sim.action.sys.hooks.path_has(u) {
+                return Ok(PokeResult::Failed);
+            }
+            let from = sim.action.sys.hooks.path_position(u);
+            let (dx, dy) = (tx - from.0, ty - from.1);
+            if dx.abs() <= 1 && dy.abs() <= 1 {
+                return Ok(PokeResult::Ok(None));
+            }
+            let step = (dx.clamp(-HOP, HOP), dy.clamp(-HOP, HOP));
+            for (cx, cy) in hop_candidates(from, step) {
+                let Some(room) = room_near(game, sim, u, cx, cy) else {
+                    continue;
+                };
+                let errors = sim.action.sys.hooks.errors.len();
+                sim.lend(|a| {
+                    a.with(game, |g, v| {
+                        PathCtx::of(v, g).teleport(u, Some(room), cx, cy)
+                    })
+                });
+                if sim.action.sys.hooks.path_position(u) != from {
+                    return Ok(PokeResult::Ok(None));
+                }
+                // a refused spot (blocked): try the next; the refusal is the probe's
+                sim.action.sys.hooks.errors.truncate(errors);
+            }
+            PokeResult::Failed
+        }
         Directive::Warp { level, tile } => {
             let player = env.player;
             let tile = tile.unwrap_or(0);
+            // `0x0053AEC0` (`waypoints.md` §7 rule 5): the same-act warp,
+            // else the act change `0x0053ACC0` (§11).
             let r = sim.lend(|a| {
                 a.with(game, |g, v| {
                     level_warp(PathCtx::of(v, g), player, *level, tile)
+                        .unwrap_or_else(|| act_change::run(PathCtx::of(v, g), player, *level, tile))
                 })
             });
-            match r {
-                Some(true) => PokeResult::Ok(None),
-                Some(false) => PokeResult::Failed,
-                None => PokeResult::Gap("warp to another act: level_warp has no act change".into()),
+            if r {
+                PokeResult::Ok(None)
+            } else {
+                PokeResult::Failed
             }
         }
         Directive::Item {
@@ -1185,7 +1448,176 @@ fn run<X: WorldPending>(
             }
         }
         Directive::Freeze { .. } => PokeResult::Ok(None),
+        Directive::Goto(t) => goto_step(game, sim, env, t, &mut GotoWalk::default()),
+        // §5 rule 3: the message goes through the host's client sender;
+        // a runner without one cannot run it.
+        Directive::Msg { .. } => PokeResult::Gap(MSG_GAP.into()),
     })
+}
+
+/// The level id of the room holding unit `u`.
+fn unit_level<X: WorldPending>(game: &Game, sim: &WorldSim<X>, u: UnitId) -> Option<u32> {
+    let room = game.lists.unit(u)?.room()?;
+    sim.action.sys.hooks.drlg.level_id(game, room)
+}
+
+/// One step of a `goto` walk (§6 rule 3): `Pending` until the target is
+/// found and the player placed next to it (`Ok` with the target's GUID)
+/// or the walk ends `Failed`. `walk` is the state the runner keeps
+/// between steps (a fresh one for a new `goto`).
+pub fn goto_step<X: WorldPending>(
+    game: &mut Game,
+    sim: &mut WorldSim<X>,
+    env: &Env<'_>,
+    t: &GotoTarget,
+    walk: &mut GotoWalk,
+) -> PokeResult {
+    let player = env.player;
+    walk.steps += 1;
+    if walk.steps > GOTO_MAX_STEPS {
+        return PokeResult::Failed;
+    }
+    let Some(here) = unit_level(game, sim, player) else {
+        return PokeResult::Failed;
+    };
+    let goal = *walk.goal.get_or_insert(t.preset.unwrap_or(here));
+    // Rule 3.1: the warp to a preset's level, at the first step only.
+    if walk.steps == 1 && here != goal {
+        let warp = Directive::Warp {
+            level: goal,
+            tile: None,
+        };
+        return match apply(game, sim, env, &warp) {
+            PokeResult::Ok(_) => PokeResult::Pending,
+            _ => PokeResult::Failed,
+        };
+    }
+    // Rule 3.2: the first unit of the target's type and class in the goal
+    // level, ascending GUID.
+    let ty = UnitType::ALL[usize::from(t.ty)];
+    let mut found: Vec<(u32, UnitId)> = game
+        .lists
+        .units_of_type(ty)
+        .into_iter()
+        .filter(|&u| {
+            sim.action
+                .sys
+                .units
+                .get(u)
+                .is_some_and(|r| r.class == t.class)
+        })
+        .filter(|&u| unit_level(game, sim, u) == Some(goal))
+        .filter_map(|u| guid_of(game, u).map(|g| (g, u)))
+        .collect();
+    found.sort_unstable();
+    if let Some(&(guid, target)) = found.first() {
+        let Some(room) = game.lists.unit(target).and_then(|e| e.room()) else {
+            return PokeResult::Failed;
+        };
+        let (x, y) = sim.action.sys.hooks.path_position(target);
+        let placed = sim.lend(|a| {
+            a.with(game, |g, v| {
+                place_unit(PathCtx::of(v, g), player, Some(room), x, y, false, false)
+            })
+        });
+        return if placed {
+            PokeResult::Ok(Some(guid))
+        } else {
+            PokeResult::Failed
+        };
+    }
+    // Rule 3.3: mark what is seen, then one hop towards the nearest room
+    // of the goal level not seen.
+    let Some(room) = game.lists.unit(player).and_then(|e| e.room()) else {
+        return PokeResult::Failed;
+    };
+    let hop = {
+        let Some((d, cur)) = sim.action.sys.hooks.drlg.drlg_room(game, room) else {
+            return PokeResult::Failed;
+        };
+        let key = |r: DrlgRoomId| {
+            let dr = d.room(r);
+            (d.level(dr.level).id, dr.rect.x, dr.rect.y)
+        };
+        let near = |r: DrlgRoomId| d.room(r).near().unwrap_or(&[]).to_vec();
+        walk.seen.insert(key(cur));
+        for n in near(cur) {
+            if d.room(n).active().is_some() {
+                walk.seen.insert(key(n));
+            }
+        }
+        // Breadth first over the near arrays, in their stored order.
+        let mut parent: BTreeMap<DrlgRoomId, DrlgRoomId> = BTreeMap::new();
+        let mut queue = VecDeque::from([cur]);
+        let mut done = BTreeSet::from([cur]);
+        let mut goal_room = None;
+        while let Some(r) = queue.pop_front() {
+            let (lv, _, _) = key(r);
+            if lv == goal && !walk.seen.contains(&key(r)) {
+                goal_room = Some(r);
+                break;
+            }
+            for n in near(r) {
+                if !walk.blocked.contains(&key(n)) && done.insert(n) {
+                    parent.insert(n, r);
+                    queue.push_back(n);
+                }
+            }
+        }
+        let Some(mut h) = goal_room else {
+            return PokeResult::Failed;
+        };
+        while let Some(&p) = parent.get(&h) {
+            if p == cur {
+                break;
+            }
+            h = p;
+        }
+        let Some(a) = d.room(h).active() else {
+            return PokeResult::Failed;
+        };
+        // The free cell of H nearest its centre (first found on a tie).
+        let r = a.subtiles;
+        let (cx, cy) = (r.x + r.w / 2, r.y + r.h / 2);
+        let mut best: Option<(i64, i32, i32)> = None;
+        for y in r.y..r.y + r.h {
+            for x in r.x..r.x + r.w {
+                let free = a
+                    .collision
+                    .get(x, y)
+                    .is_some_and(|m| m & crate::path::collision::masks::PLAYER_MOVE == 0);
+                let d2 = i64::from(x - cx).pow(2) + i64::from(y - cy).pow(2);
+                if free && best.is_none_or(|(b, _, _)| d2 < b) {
+                    best = Some((d2, x, y));
+                }
+            }
+        }
+        (key(h), a.id, best.map(|(_, x, y)| (x, y)))
+    };
+    let (hkey, hroom, cell) = hop;
+    let Some((x, y)) = cell else {
+        walk.seen.insert(hkey);
+        walk.blocked.insert(hkey);
+        return PokeResult::Pending;
+    };
+    let placed = sim.lend(|a| {
+        a.with(game, |g, v| {
+            place_unit(PathCtx::of(v, g), player, Some(hroom), x, y, false, false)
+        })
+    });
+    // A refused hop, or one that left the player outside H, marks H seen
+    // (rule 3.3).
+    let landed = placed
+        && game
+            .lists
+            .unit(player)
+            .and_then(|e| e.room())
+            .is_some_and(|r| r == hroom);
+    if !landed {
+        walk.blocked.insert(hkey);
+        walk.seen.insert(hkey);
+    }
+    PokeResult::Pending
 }
 
 /// Item creation `0x00558D90` with spawn mode 3 (ground), init flags 1,
@@ -1315,6 +1747,8 @@ mod tests {
     /// One line of every directive, with every optional argument and
     /// every reference form.
     const ALL: &[&str] = &[
+        "goto unit 1:156",
+        "goto preset 107 2:376",
         "object 119 100 200",
         "object 119 @x+5 @y-3 mode 1",
         "superunique 3 @x @y+10",
@@ -1326,6 +1760,7 @@ mod tests {
         "seed-unit @wp#1 1 2",
         "time 5 1024",
         "pos @player @x+3 @y",
+        "hop @player 5100 @y-40",
         "warp 3",
         "warp 3 tile 2",
         "item hp1 @x @y",
@@ -1335,6 +1770,10 @@ mod tests {
         "state @player 1 on",
         "state 1/9 2 off",
         "freeze 3",
+        "msg 1 @x+2 @y",
+        "msg 6 1 @1",
+        "msg 60 36 1 4294967295",
+        "msg 96",
     ];
 
     // Covers: specs/tools/poke.md §1 r1, §1 r2, §3 r2
@@ -1362,6 +1801,32 @@ mod tests {
                 .to_string(),
             "item rin 1 2 quality magic ilvl 5"
         );
+        // `goto`: the type defaults to 1 and is written out.
+        assert_eq!(
+            parse_directive_text("goto unit 5").unwrap().to_string(),
+            "goto unit 1:5"
+        );
+        assert_eq!(
+            parse_directive_text("goto preset 107 376")
+                .unwrap()
+                .to_string(),
+            "goto preset 107 1:376"
+        );
+    }
+
+    // Covers: specs/tools/poke.md §1 r1
+    #[test]
+    fn hop_tries_the_full_step_first_then_the_half_then_a_sidestep() {
+        let c = hop_candidates((100, 100), (16, -16));
+        assert_eq!(c[0], (116, 84), "the full step itself first");
+        assert_eq!(c[1], (118, 86), "then its ring, radius 2 first");
+        assert_eq!(c.len(), 25 + 25 + 2);
+        assert_eq!(c[25], (108, 92), "then the half step");
+        assert_eq!(c[50], (92, 92), "then a sidestep across the step");
+        assert_eq!(c[51], (108, 108));
+        // never the start itself, never a negative coordinate
+        let c = hop_candidates((3, 3), (0, -2));
+        assert!(!c.contains(&(3, 3)) && c.iter().all(|&(x, y)| x >= 0 && y >= 0));
     }
 
     // Covers: specs/tools/poke.md §2 r5
@@ -1389,6 +1854,16 @@ mod tests {
             ("warp 3 tile", "warp <level>"),
             ("missile 1 2 3 4 5 skill 1", "unexpected"),
             ("freeze 3601", "seconds"),
+            ("goto unit 3:5", "goto unit type"),
+            ("goto preset 2", "goto unit"),
+            ("goto here 5", "goto unit"),
+            ("goto unit 1:x", "bad number"),
+            ("msg", "needs an id"),
+            ("msg 0 1", "msg id 0"),
+            ("msg 0x71", "msg id 113"),
+            ("msg 0x01 @z 1", "a unit is"),
+            ("msg 0x01 -1 2", "bad number"),
+            ("msg 0x01 @x+0 2", "zero offset"),
             ("", "empty"),
         ] {
             let e = parse_directive_text(line).unwrap_err();
@@ -1434,11 +1909,47 @@ mod tests {
         }
     }
 
+    // Covers: specs/tools/poke.md §5 r3
+    #[test]
+    fn msg_references_resolve_to_positions_and_guids() {
+        // Player at (100, 200); `@1` (the first monster) has GUID 42.
+        let resolve = |a: MsgArg| match a {
+            MsgArg::Num(v) => Ok(i64::from(v)),
+            MsgArg::Pos(Coord::X(d)) => Ok(100 + i64::from(d)),
+            MsgArg::Pos(Coord::Y(d)) => Ok(200 + i64::from(d)),
+            MsgArg::Pos(Coord::Num(_)) => unreachable!(),
+            MsgArg::Unit(UnitArg::Nth { ty: 1, .. }) => Ok(42),
+            MsgArg::Unit(u) => Err(u.to_string()),
+        };
+        let values = |line: &str| {
+            let Directive::Msg { args, .. } = parse_directive_text(line).unwrap() else {
+                panic!("{line}");
+            };
+            msg_values_with(&args, resolve)
+        };
+        assert_eq!(values("msg 0x01 @x+2 @y-201").unwrap(), [102, -1]);
+        assert_eq!(values("msg 0x06 0x1 @1").unwrap(), [1, 42]);
+        assert_eq!(values("msg 0x60").unwrap(), [] as [i64; 0]);
+        assert_eq!(values("msg 0x06 1 @3").unwrap_err(), "@3");
+        // The token decides the kind: position, unit, number.
+        assert_eq!(
+            parse_directive_text("msg 2 1 1/77 ").unwrap(),
+            Directive::Msg {
+                id: 2,
+                args: vec![
+                    MsgArg::Num(1),
+                    MsgArg::Unit(UnitArg::Guid { ty: 1, guid: 77 })
+                ],
+            }
+        );
+    }
+
     #[test]
     fn results_name_their_code() {
         assert_eq!(PokeResult::Ok(Some(3)).code(), "ok");
         assert_eq!(PokeResult::Ok(Some(3)).guid(), Some(3));
         assert_eq!(PokeResult::Failed.code(), "failed");
+        assert_eq!(PokeResult::FailedWith("x".into()).code(), "failed");
         assert_eq!(PokeResult::Unresolved("@1".into()).code(), "unresolved");
         assert_eq!(PokeResult::Gap("x".into()).guid(), None);
     }

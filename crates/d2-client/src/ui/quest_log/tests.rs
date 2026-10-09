@@ -106,13 +106,13 @@ fn resets() {
     log.last = [7; ENTRY_COUNT];
     log.den = 3;
     log.latch = 2;
-    log.selected = 4;
+    log.selected = Some(4);
     log.reset_status();
     assert!(log.status.iter().all(|&s| s == 0) && log.last.iter().all(|&s| s == 0));
     assert_eq!(log.den, 3);
     log.status = [7; ENTRY_COUNT];
     log.reset_game();
-    assert_eq!((log.den, log.latch, log.selected), (0, 0, 0));
+    assert_eq!((log.den, log.latch, log.selected), (0, 0, Some(0)));
     assert!(log.status.iter().all(|&s| s == 0));
 }
 
@@ -223,11 +223,23 @@ fn tab_open_selection() {
         log.open_tab(0, false, &p, None, false, &gate(false)),
         Some(5)
     );
+    // (§3 r3: the remembered slot still wins on the call that resets; the
+    // slots are cleared after the selection was made.)
     assert_eq!(
         log.open_tab(0, true, &p, None, false, &gate(false)),
-        Some(1)
+        Some(5)
     );
     assert_eq!(log.remembered, [None; 5]);
+    assert_eq!(log.selected, Some(5));
+    assert_eq!(
+        log.open_tab(0, false, &p, None, false, &gate(false)),
+        Some(1)
+    );
+    // A refused Act V tab: selection none, remembered untouched.
+    log.remembered[2] = Some(3);
+    assert_eq!(log.open_tab(4, true, &p, None, false, &gate(false)), None);
+    assert_eq!(log.selected, None);
+    assert_eq!(log.remembered[2], Some(3));
     // No changed row and no state 0: the clicked slot, else the first state 3.
     let mut log = QuestLog::new();
     log.status[3] = 1;
@@ -491,27 +503,32 @@ fn status_zero_rows() {
 #[test]
 fn just_completed_animation() {
     let mut a = IconAnim::default();
+    // The first draw only stamps.
+    let e = a.step(1, 5000, true);
+    assert_eq!((e.frame, e.sound, e.acknowledge), (0, false, None));
+    assert_eq!((a.stamp, a.counter), (5000, 0));
     // Not more than 100 ms: no step.
-    let e = a.step(1, 100, true);
-    assert_eq!((e.frame, e.sound), (0, false));
-    let e = a.step(1, 101, true);
-    assert_eq!((e.frame, e.sound, e.acknowledge), (1, true, None));
-    // Counter reaches 1 only once.
-    let e = a.step(1, 150, true);
-    assert_eq!((e.frame, e.sound), (1, false));
-    let mut t = 101;
-    let mut last = e;
-    for _ in 0..30 {
-        t += 101;
-        last = a.step(1, t, true);
-        if last.acknowledge.is_some() {
-            break;
-        }
-    }
-    assert_eq!((last.frame, last.acknowledge), (24, Some(1)));
+    let e = a.step(1, 5100, true);
+    assert_eq!((e.frame, e.sound, a.counter), (0, false, 0));
+    // The frame is the counter before the step; the sound is the step's.
+    let e = a.step(1, 5101, true);
+    assert_eq!((e.frame, e.sound, a.counter), (0, true, 1));
+    let e = a.step(1, 5150, true);
+    assert_eq!((e.frame, e.sound, e.acknowledge), (1, false, None));
+    // With counter 24 a stepping draw still shows frame 24 and does not
+    // acknowledge; the next draw does.
+    let mut c = IconAnim {
+        counter: 24,
+        stamp: 1000,
+    };
+    let e = c.step(7, 1200, true);
+    assert_eq!((e.frame, e.acknowledge, c.counter), (24, None, 25));
+    let e = c.step(7, 1201, true);
+    assert_eq!((e.frame, e.acknowledge), (24, Some(7)));
     // No sound without the expansion.
     let mut b = IconAnim::default();
-    assert!(!b.step(1, 500, false).sound);
+    b.step(1, 500, false);
+    assert!(!b.step(1, 700, false).sound);
     // 0x004A2760: set P.12 and send for every state-0 row.
     let p = QuestFlags::new().with(1, 0x2001);
     let rows = [row(1, 0, &p, None), row(2, 1, &QuestFlags::new(), None)];

@@ -28,6 +28,8 @@ mod rooms;
 #[cfg(test)]
 mod sound;
 #[cfg(test)]
+mod travel;
+#[cfg(test)]
 mod waypoints;
 
 use std::collections::BTreeMap;
@@ -84,9 +86,14 @@ pub struct TestPending {
     pub reach: Option<crate::wiring::action::ObjectReach>,
     /// Defenders `may_attack` denies (default: everyone but oneself).
     pub peaceful: Vec<UnitId>,
+    /// What `object_quest_record` answers (the portal's quest gate).
+    pub quest_record: bool,
 }
 
 impl Pending for TestPending {
+    fn object_quest_record(&self, _: UnitId) -> bool {
+        self.quest_record
+    }
     fn anim_name(&self, _: UnitId, ty: UnitType, _: u32, mode: u32) -> Option<[u8; 8]> {
         self.names.get(&(ty, mode)).copied()
     }
@@ -181,6 +188,21 @@ impl Pending for TestPending {
     ) {
         h.x.log.push(format!("sequence frame {}", unit.0));
     }
+    fn monster_attack_skill(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) {
+        h.x.log.push(format!("attack skill {}", unit.0));
+    }
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) {
+        h.x.log.push(format!("attack strike {} {moving}", unit.0));
+    }
     fn unit_event(
         &mut self,
         event: u8,
@@ -229,6 +251,8 @@ impl Pending for TestPending {
 /// Rooms per level id; floor grids, with a missile-barrier tile column.
 struct Types {
     rooms: BTreeMap<u32, Vec<TileRect>>,
+    /// Preset units by the room's tile origin (`rooms.md` §8 rule 6).
+    presets: BTreeMap<(i32, i32), Vec<crate::drlg::seams::PresetUnit>>,
 }
 
 impl LevelTypes for Types {
@@ -245,6 +269,11 @@ impl LevelTypes for Types {
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
+    }
+
+    fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<crate::drlg::seams::PresetUnit> {
+        let r = drlg.room(room).rect;
+        self.presets.get(&(r.x, r.y)).cloned().unwrap_or_default()
     }
 
     /// One floor pass: every cell a floor, edges linked; room-local tile
@@ -382,6 +411,7 @@ fn tables() -> ActionTables {
         levels: vec![blank::<Levels>(); 150],
         skill_modes: vec![[0; 8]],
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 
@@ -420,16 +450,37 @@ impl Fx {
     }
 
     /// The rooms of `rooms` (level id, rect) streamed in order.
+    /// A level of another act than act 0 gets its act's DRLG (same init
+    /// seed, every level of `rooms` a preset level of type 1).
     pub fn with_rooms(rooms: &[(u32, TileRect)]) -> Self {
-        let data = drlg_data();
+        Self::with_presets(rooms, BTreeMap::new())
+    }
+
+    /// [`Self::with_rooms`], the rooms' preset units by tile origin.
+    pub fn with_presets(
+        rooms: &[(u32, TileRect)],
+        presets: BTreeMap<(i32, i32), Vec<crate::drlg::seams::PresetUnit>>,
+    ) -> Self {
+        let mut data = drlg_data();
         let mut by_level: BTreeMap<u32, Vec<TileRect>> = BTreeMap::new();
         for &(l, r) in rooms {
             by_level.entry(l).or_default().push(r);
+            data.levels[l as usize].drlg_type = 2;
+            data.levels[l as usize].level_type = 1;
         }
-        let mut types = Types { rooms: by_level };
-        let drlg = Drlg::create(0, INIT, 0, 0, false, &data, &mut types).expect("drlg");
+        let mut types = Types {
+            rooms: by_level,
+            presets,
+        };
         let mut dungeon = crate::drlg::Dungeon::default();
-        dungeon.acts[0] = Some(drlg);
+        let mut acts = vec![0u8];
+        acts.extend(rooms.iter().map(|r| crate::drlg::act_of_level(r.0)));
+        acts.sort_unstable();
+        acts.dedup();
+        for &act in &acts {
+            let drlg = Drlg::create(act, INIT, 0, 0, false, &data, &mut types).expect("drlg");
+            dungeon.acts[usize::from(act)] = Some(drlg);
+        }
         let world = DrlgWorld {
             dungeon,
             data: Arc::new(data),
@@ -444,7 +495,9 @@ impl Fx {
         );
         let mut sim = ActionSim::new(crate::stats::tests::data(), unit_data(), hooks);
         let mut game = Game::new();
-        game.lists.ensure_act(0).unwrap();
+        for &act in &acts {
+            game.lists.ensure_act(act).unwrap();
+        }
         let mut active = Vec::new();
         let levels: Vec<u32> = {
             let mut v: Vec<u32> = rooms.iter().map(|r| r.0).collect();
@@ -452,10 +505,11 @@ impl Fx {
             v
         };
         for id in levels {
+            let act = crate::drlg::act_of_level(id);
             let r = sim
                 .hooks()
                 .drlg
-                .with_act(0, &mut game.lists, |d, svc| {
+                .with_act(act, &mut game.lists, |d, svc| {
                     let l = d.get_or_alloc_level(svc.data, svc.types, id)?;
                     d.generate_level(svc.data, svc.types, l)?;
                     let mut out = Vec::new();

@@ -8,6 +8,7 @@
 
 use crate::combat::{CombatEntry, CombatWorld, DamageRecord, RoomKind};
 use crate::game::Game;
+use crate::missiles::damage::SetupWorld;
 use crate::rng::Seed;
 use crate::skills::{SkillEntry, SkillUnits};
 use crate::stats::key_layer;
@@ -332,7 +333,23 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn overlay(&mut self, u: UnitId, id: i32) {
         self.v.h.x.overlay(u, id);
     }
+    /// `0x00623F50(unit)` (`skills/bodies.md` §2.6 "anim refresh"):
+    /// the speed (+0x4C) of the unit's current mode recomputed
+    /// ([`ActionHooks::rate_refresh`]: a shape state changes the draw
+    /// identity, a stat fill the rate stats), then the host's hook.
     fn refresh_anim_rate(&mut self, u: UnitId) {
+        let speed = {
+            let sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            self.v.h.rate_refresh(&sim, u)
+        };
+        if let (Some(s), Some(r)) = (speed, self.v.units.get_mut(u)) {
+            r.anim.speed = s;
+        }
         self.v.h.x.refresh_anim_rate(u);
     }
     fn set_last_attacker(&mut self, d: UnitId, a: UnitId) {
@@ -370,5 +387,31 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     /// `damage.md` §7.1 ([`super::reaction::reaction`]).
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut DamageRecord) {
         super::reaction::reaction(self, a, d, record);
+    }
+}
+
+/// `missiles/damage.md` §1 step 6 and §2 on the unit records; the item
+/// queries go to [`Pending`].
+impl<X: Pending> SetupWorld for CombatView<'_, X> {
+    /// A player's attack weapon `0x00623990(owner, 1)`; a monster with an
+    /// inventory: `0x00622830` (both [`Pending::attack_weapon`]).
+    fn setup_weapon(&self, owner: UnitId) -> Option<UnitId> {
+        match self.ty(owner) {
+            UnitType::Player => self.v.h.x.attack_weapon(owner),
+            UnitType::Monster if self.v.h.x.has_inventory(owner) => self.v.h.x.attack_weapon(owner),
+            _ => None,
+        }
+    }
+    fn has_inventory(&self, u: UnitId) -> bool {
+        self.v.h.x.has_inventory(u)
+    }
+    fn two_handed(&self, item: UnitId) -> bool {
+        self.v.h.x.item_two_handed(item)
+    }
+    fn set_layer_stat(&mut self, u: UnitId, stat: u16, layer: u16, value: i32) {
+        self.v.stats.unit_set(&mut *self.v.h, u, stat, value, layer);
+    }
+    fn dual_wield_toggle(&mut self, owner: UnitId) {
+        self.v.h.x.dual_wield_toggle(owner);
     }
 }

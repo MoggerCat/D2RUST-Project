@@ -623,6 +623,7 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
         levels: Vec::new(),
         skill_modes: Vec::new(),
         overlay_count: 0,
+        monequip: Vec::new(),
     };
     let mut hooks = ActionHooks::new(
         Arc::new(tables),
@@ -930,6 +931,7 @@ fn inv_tables(items: &[([u8; 4], u16, u8, u8)], n_types: usize, equiv: EquivMatr
         ],
         equiv,
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 
@@ -1096,6 +1098,7 @@ fn empty_action_tables() -> ActionTables {
         levels: Vec::new(),
         skill_modes: Vec::new(),
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 
@@ -1531,6 +1534,7 @@ mod trade {
             levels: Vec::new(),
             skill_modes: Vec::new(),
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),

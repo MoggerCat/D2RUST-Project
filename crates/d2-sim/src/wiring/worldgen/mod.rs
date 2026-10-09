@@ -76,6 +76,9 @@ pub enum WorldgenError {
     Preset(PresetError),
     Maze(MazeError),
     Outdoor(OutdoorError),
+    /// The warp tile preset found no lvlwarp record (fatal in the
+    /// original, `sim/path-placement.md` §12.1 rule 1).
+    Warp(crate::path::place_seams::PlaceError),
     /// A maze level allocated while the maze generator runs (level id).
     MazeBusy(u32),
     /// The population state was needed while population held it.
@@ -116,6 +119,9 @@ pub trait WorldPending: Pending {
     }
     /// `0x00544E80`: the quest hook of a new boss.
     fn boss_quest_hook(&mut self, boss: UnitId) {}
+    /// `0x00545B50`: the quest hook of a preset superunique
+    /// (`monsters/init.md` §20.1).
+    fn quest_preset_boss(&mut self, unit: UnitId) {}
     /// A monster the host placed from a level's preset list
     /// (`HOST_MONSTER_PRESET`, REC-130) exists.
     fn host_monster_created(&mut self, unit: UnitId, class: u32) {}

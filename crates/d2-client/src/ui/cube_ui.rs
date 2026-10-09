@@ -117,10 +117,21 @@ impl Panel for CubeUi {
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
                 look: HORADRIC_LOOK,
+                call: crate::ui::draw::CelCall::Draw,
             }));
         }
         if anim.grid_visible() {
             let g = sh.items.cube_grid(&sh.config.screen);
+            // Spec: specs/ui/inventory.md §4 (placement tint).
+            sh.items.draw_placement_tint(
+                ctx.world,
+                &sh.tables.files,
+                &g,
+                crate::ui::panels::cube_items::CUBE_PAGE,
+                sh.mouse,
+                sh.config.screen.h,
+                out,
+            );
             sh.items
                 .draw_cube(ctx.world, &sh.tables.files, &g, sh.mouse, out);
         }

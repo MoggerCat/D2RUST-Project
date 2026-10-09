@@ -186,6 +186,64 @@ fn init_host_state_reaches_the_action_systems() {
     assert_eq!(info.difficulty, 2);
     assert_eq!(fx.sim.world.pop_info.difficulty, 2);
     assert_eq!(fx.sim.action.sys.hooks.ai_info.difficulty, 2);
-    // The alignment value goes to its pending provider (`0x005543B0`).
+    // The alignment value goes to its pending provider (`0x005543B0`)
+    // and into the unit's state-105 list (stat 172; `combat/hit.md`
+    // §7.1), which the monster's 0xAA sends.
     assert_eq!(fx.sim.action.sys.hooks.x.log, [format!("align {} 1", u.0)]);
+    let st = &fx.sim.action.sys.stats;
+    let l = st
+        .unit_list(u)
+        .and_then(|r| st.list_of_state(r, 105))
+        .expect("state-105 list");
+    assert_eq!(st.base(l, 172, 0), 1);
+    assert!(st.has_state(u, 105));
+}
+
+// Covers: specs/monsters/population.md §9; specs/world/quests-act2-2.md §2 r1
+#[test]
+fn a_lent_world_spawns_like_population() {
+    // `MonsterWorld::spawn_at` (a quest's `0x005B2F20` from inside a timer
+    // event or tick hook, world lent): the same unit as population's own
+    // `place_at` (seed draws, position, monster data). Recorded:
+    // `act-travel-lut-ama.check`, start Jerhyn's unit seed (REC-733).
+    let run = |lent: bool| {
+        let mut fx = Fx::new(isle_ds1s());
+        let (a, _) = isle(&mut fx);
+        fx.sim.create_regions();
+        let u = if lent {
+            let game = &mut fx.game;
+            fx.sim.lend(|act| {
+                let s = &mut act.sys;
+                let mut sim = crate::units::hooks::Sim {
+                    game,
+                    units: &mut s.units,
+                    stats: &mut s.stats,
+                    data: &s.data,
+                };
+                s.hooks
+                    .with_monster_world(|w, h| {
+                        w.spawn_at(&mut sim, h, a, 40010, 40010, 0, 1, -1, 0)
+                    })
+                    .flatten()
+                    .flatten()
+            })
+        } else {
+            fx.sim.population(&mut fx.game, |cx| {
+                crate::monsters::population::placement::place_at(
+                    cx, a, None, 40010, 40010, 0, 1, -1, 0,
+                )
+                .unit()
+            })
+        }
+        .expect("placed");
+        fx.assert_clean();
+        let r = fx.sim.action.sys.units.get(u).unwrap();
+        let seed = (r.seed, r.init_seed);
+        let pos = fx.sim.action.sys.hooks.path_position(u);
+        let md = fx.sim.world.monsters.get(u).is_some();
+        (seed, pos, md, fx.sim.action.sys.hooks.game_seed)
+    };
+    let direct = run(false);
+    assert!(direct.2, "type init ran");
+    assert_eq!(run(true), direct);
 }

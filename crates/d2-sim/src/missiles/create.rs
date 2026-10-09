@@ -113,6 +113,7 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
     if !matches!(owner_ty, UnitType::Player | UnitType::Monster) {
         return None;
     }
+    crate::cov!(Missile, p.class, 0);
     // Step 2.
     let (x, y) = if p.flags & pf::POSITION != 0 {
         (p.x, p.y)
@@ -256,7 +257,11 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
         d.level = p.level as i16;
     }
     // Step 23.
-    cx.world.damage_setup(game, owner, p.origin, m, p.level);
+    let skill = i32::from(cx.store.get_mut(m)?.skill);
+    let bits = cx
+        .world
+        .damage_setup(game, owner, p.origin, m, skill, p.level);
+    cx.store.get_mut(m)?.flags |= bits;
     // Step 24.
     cx.store.get_mut(m)?.owner = Some(owner_ref);
     cx.world.set_unit_flag(m, unit_flag::IS_VALID_TARGET, false);

@@ -93,10 +93,9 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         v: &mut View<'_, X>,
         call: QuestObjectCall,
     ) -> Option<ObjectRoute> {
-        let out = self.on_world(game, v, LoanCall::Route(&call));
-        match out {
-            QuestObjectRun::Ran => None,
-            QuestObjectRun::HandBack(r) => Some(r),
+        match self.on_world(game, v, LoanCall::Route(&call)) {
+            LoanOut::Run(QuestObjectRun::HandBack(r)) => Some(r),
+            _ => None,
         }
     }
 
@@ -109,6 +108,24 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         to: u32,
     ) {
         self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
+    }
+
+    fn npc_wants_interact(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        player: UnitId,
+        npc: UnitId,
+        class: u16,
+        interact: bool,
+    ) -> bool {
+        let call = LoanCall::NpcWantsInteract {
+            player,
+            npc,
+            class,
+            interact,
+        };
+        self.on_world(game, v, call) == LoanOut::Active(true)
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
@@ -125,7 +142,7 @@ impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R
         game: &mut Game,
         v: &mut View<'_, X>,
         call: LoanCall<'_>,
-    ) -> QuestObjectRun {
+    ) -> LoanOut {
         let h = &mut *v.h;
         let mut fields = GameFields::from_action(
             h.game_seed,
@@ -165,6 +182,21 @@ enum LoanCall<'c> {
     Route(&'c QuestObjectCall),
     /// Quest event 3 CHANGEDLEVEL (`world/quests.md` §4.1).
     ChangedLevel { player: UnitId, from: u32, to: u32 },
+    /// The quest active test (`world/quests.md` §6.4).
+    NpcWantsInteract {
+        player: UnitId,
+        npc: UnitId,
+        class: u16,
+        interact: bool,
+    },
+}
+
+/// What a [`LoanCall`] gave back.
+#[derive(Debug, PartialEq, Eq)]
+enum LoanOut {
+    Run(QuestObjectRun),
+    /// The active test's answer.
+    Active(bool),
 }
 
 /// `call` on [`HostQuests`] over `econ` and `rest`, with the host's
@@ -175,16 +207,25 @@ fn on_host<'e, X: Pending, R: QuestRest>(
     quests: &mut QuestControl,
     inv: Option<&'e mut dyn QuestInventory<ActionHooks<X>>>,
     call: LoanCall<'_>,
-) -> QuestObjectRun {
+) -> LoanOut {
     let inner = EconomyQuests::new(econ, rest);
     let mut w = HostQuests::new(inner);
     w.inventory = inv;
     match call {
-        LoanCall::Route(c) => run(quests, &mut w, c),
+        LoanCall::Route(c) => LoanOut::Run(run(quests, &mut w, c)),
         LoanCall::ChangedLevel { player, from, to } => {
             quests.changed_level(&mut w, player, from, to);
-            QuestObjectRun::Ran
+            LoanOut::Run(QuestObjectRun::Ran)
         }
+        // The set not picked (the fatal 0x7F4) answers false.
+        LoanCall::NpcWantsInteract {
+            player,
+            npc,
+            class,
+            interact,
+        } => LoanOut::Active(
+            quests.npc_wants_interact(&mut w, player, npc, class, interact) == Ok(true),
+        ),
     }
 }
 
@@ -383,6 +424,7 @@ fn init<W: QuestWorld>(
         x: c.x,
         y: c.y,
     });
+    w.set_init_point(c.room.map(|room| (object, c.x, c.y, room)));
     match n {
         4 => act1::q5::object_init(ctl, w, object),
         23 => act3::tome_init(ctl, w, object),
@@ -427,8 +469,16 @@ fn init<W: QuestWorld>(
         7 => act1::q4::gibbet_init(ctl, w, object),
         9 => act1::q4::tree_init(ctl, w, object),
         15 => act1::malus_init(ctl, w, object),
-        18 => act2::q4::start_jerhyn_init(ctl, w, object),
-        19 => act2::q4::palace_jerhyn_init(ctl, w, object),
+        18 => {
+            if let Some(at) = at {
+                act2::q4::start_jerhyn_init(ctl, w, at);
+            }
+        }
+        19 => {
+            if let Some(at) = at {
+                act2::q4::palace_jerhyn_init(ctl, w, object, at);
+            }
+        }
         20 => act2::q3::altar_init(ctl, w, object),
         21 => act2::q6::orifice_init(ctl, w, object),
         29 => act2::q4::portal_init(ctl, w, object),
@@ -457,6 +507,7 @@ fn init<W: QuestWorld>(
         // 31–33 and 70: `ret`.
         _ => {}
     }
+    w.set_init_point(None);
     QuestObjectRun::Ran
 }
 

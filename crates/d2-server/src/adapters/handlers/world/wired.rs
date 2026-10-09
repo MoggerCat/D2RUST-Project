@@ -121,6 +121,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     pub(super) inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The store items a purchase took, their 0x9C action 12 sent with
+    /// the next tick's unit work (`vendors.md` §7.1 rule 10: "next frame").
+    pub(super) taken_sent: Vec<(UnitId, Vec<u8>)>,
     /// The messages the systems sent so far, in production order
     /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
     /// `sim/intents-events.md` §1 r3).
@@ -200,6 +203,7 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            taken_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
             arriving: false,
@@ -404,12 +408,17 @@ fn flush_taken<X: Pending, R: TradeRest>(
     inv: Option<&mut InvParts>,
 ) -> Vec<(UnitId, Vec<u8>)> {
     let taken = std::mem::take(&mut desk.state.taken);
+    // A freed unit is no longer shown in the store.
+    desk.state.shown.retain(|u| !taken.contains(u));
     let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
         return Vec::new();
     };
     let mut d = parts.desk(&mut *desk.econ);
     for item in taken {
         let _ = d.send_item_world(player, item, STORE_TAKEN_ACTION, 0);
+        // The taken unit is gone from the unit list in the same tick
+        // (1.14d, `items-vendor-akara-buy` frame 24).
+        d.free(item);
     }
     inv_take_sent(&mut d)
         .into_iter()
@@ -547,7 +556,7 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
     /// parts come back after `f`; `f` must not use them through `self`
     /// (it gets only the action world). Hooks that already hold a quest
     /// host keep it.
-    fn lend_quests<D: ActionEvents, T>(
+    pub fn lend_quests<D: ActionEvents, T>(
         &mut self,
         events: &mut D,
         f: impl FnOnce(&mut ActionWorld<S>, &mut D) -> T,
@@ -612,6 +621,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         Self: WorldHost<D>,
         D::X: Outbox,
     {
+        self.inv_sent.append(&mut self.taken_sent);
+        self.collect_sent(events);
         self.arrivals(game, events);
         self.collect_sent(events);
         self.item_arrivals(game, events);
@@ -952,13 +963,15 @@ where
             let mut inv = inv;
             let mut w = InvVendors::new(inner, inv.as_deref_mut());
             let out = call.call(tables, &mut records, &mut w);
-            let mut sent = std::mem::take(&mut w.sent);
+            let sent = std::mem::take(&mut w.sent);
             drop(w);
             desk.state.vendors = records;
-            sent.extend(flush_taken(desk, inv));
-            (out, sent)
+            let taken = flush_taken(desk, inv);
+            ((out, taken), sent)
         });
         self.inv_sent.extend(sent);
+        self.taken_sent.extend(out.1);
+        let out = out.0;
         Some(out)
     }
 
@@ -972,7 +985,13 @@ where
     ) -> Option<C::Out> {
         let difficulty = events.action().hooks().ai_info.difficulty;
         let run = HostWaypointRun { call, difficulty };
-        let out = WorldHost::<D>::waypoints(&mut self.action, game, events, run);
+        // The act change of a travel builds the new act and its objects:
+        // a quest object's init runs inside its allocation on the lent
+        // quest parts (Lut Gholein's start Jerhyn, `quests-act2-2.md` §2
+        // item 1; recorded `act-travel-lut-ama.check`), as in `objects`.
+        let out = self.lend_quests(events, |a, ev| WorldHost::<D>::waypoints(a, game, ev, run));
+        let sent = self.desk(game, events, quest_objects);
+        self.inv_sent.extend(sent);
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
@@ -1016,11 +1035,6 @@ where
         self.start_item_walk(game, events, walk);
     }
 
-    /// The Town Portal pair on the action wiring (REC-117).
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        WorldHost::<D>::town_portal(&mut self.action, game, events, player)
-    }
-
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick
@@ -1047,6 +1061,16 @@ where
     /// The quest routes queued outside a lent call (a quest call's own
     /// allocations, [`quest_objects`]), before the tick's sends are taken;
     /// then the quest events (PROVISIONAL, REC-129).
+    fn session_work(&mut self, game: &mut Game, events: &mut D) {
+        // The monster init of a hireling the calls allocate needs the
+        // lent world (`units.md` §3.1 step 7).
+        events.lend_world(|a| {
+            self.hireling_calls(game, a);
+            self.pet_follows(game, a);
+            self.collect_sent(a);
+        });
+    }
+
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         // Each step's sends join the outbox before the next step runs
         // (production order, `seams/sim-server.md` §2.2).

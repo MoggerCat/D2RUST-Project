@@ -361,6 +361,9 @@ pub struct OriginalUi {
     /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
     /// handed to the root ([`Self::flush_hooks`]).
     hook_intents: Vec<super::ClientIntent>,
+    /// The key mode `0x007A7418` and its keep-key-up flag
+    /// (`ui/controls.md` §4.1 r1, r5), moved by the open / close hooks.
+    key_mode: (u8, bool),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -399,9 +402,16 @@ impl OriginalUi {
         tables.files.extend(npc_talk::socket_files());
         tables.files.extend(cursor_files());
         tables.files.extend(skill_tree_ui::icon_files());
+        // `control-panel.md` §9 r9 (REC-519 settled) and §11 r1: the game
+        // entry set-up `0x00456970` opens the mini panel (state 0x15) and
+        // then the help button (0x22). d2rs-own: no registry, so neither
+        // `Mini Panel` nor `Help Menu` is set at the start.
+        let mut states = UiStates::new()?;
+        states.force(UI_MINI_PANEL, true);
+        states.force(crate::ui::panels::control::buttons::UI_HELP_BUTTON, true);
         let shared = Shared {
             tables,
-            states: UiStates::new()?,
+            states,
             config,
             inv_areas,
             facts: Facts {
@@ -455,6 +465,8 @@ impl OriginalUi {
             shop: shop_ui::SharedShop::default(),
             npcm: Default::default(),
             hook_intents: Vec::new(),
+            // Game start `0x0046AC70`: mode 1.
+            key_mode: (1, false),
         })
     }
 
@@ -635,7 +647,19 @@ impl OriginalUi {
     /// are matched in (`ui/inventory.md` §2 r1), set by the host each frame.
     pub fn set_palette(&mut self, palette: &d2_formats::palette::Palette) {
         let p: Vec<[u8; 3]> = palette.colors.iter().map(|c| [c.r, c.g, c.b]).collect();
-        self.shared.borrow_mut().items.tint_colors = super::inv_grid::tint_indices(&p);
+        let mut sh = self.shared.borrow_mut();
+        sh.items.tint_colors = super::inv_grid::tint_indices(&p);
+        // `control-panel.md` §4 r2: the stamina bar's colours.
+        use super::panels::control::globes::StaminaColor;
+        let n = |c: StaminaColor| super::inv_grid::nearest_index(&p, c.rgb());
+        sh.hud.stamina_colors = match (
+            n(StaminaColor::Red),
+            n(StaminaColor::Gold),
+            n(StaminaColor::Blue),
+        ) {
+            (Some(r), Some(g), Some(b)) => Some([r, g, b]),
+            _ => None,
+        };
     }
 
     /// The frame's local-player position and shake (the world view's
@@ -713,7 +737,12 @@ impl OriginalUi {
         self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
-            self.track_grid_hover(world, p);
+            // d2rs-own (PROVISIONAL, REC-707): a move or a press tracks
+            // the hover; a release does not, so a use press's cleared
+            // hover holds until the mouse moves (`a1-panel-cube` row 25).
+            if matches!(e, UiEvent::CursorMoved(_) | UiEvent::Press { .. }) {
+                self.track_grid_hover(world, p);
+            }
         }
     }
 
@@ -1082,6 +1111,7 @@ impl OriginalUi {
             }
             r
         };
+        self.track_key_mode(start);
         let closed: Vec<u8> = self.outcome.effects[start..]
             .iter()
             .filter_map(|e| match e {
@@ -1093,6 +1123,36 @@ impl OriginalUi {
             self.close_hook(u, own != Some(u));
         }
         r
+    }
+
+    /// The key mode after the open / close hooks of `effects[start..]`
+    /// (`ui/controls.md` §4.1 r5, `key_mode_for`), in effect order.
+    fn track_key_mode(&mut self, start: usize) {
+        use crate::controls::original::{key_mode_for, KeyModeEvent};
+        let events: Vec<KeyModeEvent> = self.outcome.effects[start..]
+            .iter()
+            .filter_map(|e| match e {
+                UiEffect::Opened(u) => Some(KeyModeEvent::UiOpen(*u)),
+                UiEffect::Closed(u) => Some(KeyModeEvent::UiClose(*u)),
+                _ => None,
+            })
+            .collect();
+        for ev in events {
+            let open = |u: u8| self.shared.borrow().states.is_open(u);
+            if let Some(m) = key_mode_for(ev, &open) {
+                self.key_mode = m;
+            }
+        }
+    }
+
+    /// The key mode now: 0 while the key-config screen is open (§4.1 r5:
+    /// it opens in mode 0, key-up not kept), else the hooks' mode.
+    pub fn key_mode(&self) -> u8 {
+        if self.controls_open() {
+            0
+        } else {
+            self.key_mode.0
+        }
     }
 
     /// The cursor jump the pending effects ask for (§4.3,
@@ -1173,6 +1233,9 @@ fn is_click(e: UiEvent) -> bool {
 
 const EMPTY: Rect = Rect::new(0, 0, 0, 0);
 
+/// The mini panel's state (`ui/control-panel.md` §9).
+const UI_MINI_PANEL: u8 = 0x15;
+
 /// Inventory (ui 1, §9.3): art, the gold line and gold button (§9.6,
 /// `panels-2.md` §21 r1: the local player's full stat 14, drawn with the
 /// fonts bound as the character values are) and the close button.
@@ -1211,6 +1274,16 @@ impl Panel for InventoryUi {
         sh.items
             .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            // `inventory.md` §4: the placement tint under the items.
+            sh.items.draw_placement_tint(
+                ctx.world,
+                &sh.tables.files,
+                &l.grid,
+                0,
+                sh.mouse,
+                sh.config.screen.h,
+                out,
+            );
             sh.items
                 .draw_items(ctx.world, &sh.tables.files, &l, sh.mouse, out);
         }
@@ -1269,7 +1342,8 @@ impl Panel for InventoryUi {
                 sh.outputs.extend(out);
             }
             None => {
-                // Right press: use the item under the mouse (REC-117).
+                // Right press: use the item under the mouse (`0x00487740`,
+                // `items/use.md` Inputs).
                 if let UiEvent::Press {
                     button: PointerButton::Right,
                     at,

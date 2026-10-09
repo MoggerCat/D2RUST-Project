@@ -36,20 +36,20 @@
 |   3. Size, collision pattern, footprint mask | 209–249 |
 |   4. Collision queries | 250–330 |
 |   5. Footprints | 331–383 |
-|   6. Moving a footprint | 384–416 |
-|   7. Nearest free point (`0x0064DEA0`) | 417–481 |
-|   8. Coarse free-box search (`0x0064E840`) | 482–514 |
-|   9. Floor drop placement (`0x00555DA0`) | 515–537 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 538–602 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 603–651 |
-|   12. Warp tiles and warp arrival | 652–712 |
-|   13. Where a joining character stands at tick 0 | 713–774 |
-| Constants & data dependencies | 775–793 |
-| Randomness | 794–803 |
-| Edge cases & original bugs | 804–839 |
-| Test vectors | 840–877 |
-| Provenance | 878–918 |
-| Open questions | 919–1002 |
+|   6. Moving a footprint | 384–422 |
+|   7. Nearest free point (`0x0064DEA0`) | 423–487 |
+|   8. Coarse free-box search (`0x0064E840`) | 488–520 |
+|   9. Floor drop placement (`0x00555DA0`) | 521–543 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 544–610 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 611–659 |
+|   12. Warp tiles and warp arrival | 660–720 |
+|   13. Where a joining character stands at tick 0 | 721–782 |
+| Constants & data dependencies | 783–801 |
+| Randomness | 802–811 |
+| Edge cases & original bugs | 812–847 |
+| Test vectors | 848–885 |
+| Provenance | 886–926 |
+| Open questions | 927–1010 |
 <!-- /index -->
 
 ## Summary
@@ -413,6 +413,12 @@ Remove (`0x00649560(unit, force)`), returns whether it cleared:
      hint); a non-zero point without a room is a fatal assert;
    - movement reset (pathing §9.7). `0x00650BE0` wraps it and sets the
      point count to 0.
+   Call forms (asm): `0x00650910` EAX = path; stack room, then (x, y)
+   packed in one u32 (x low word, y high word). `0x00650BE0`: all on
+   the stack, [ESP+4] path, unit (not read), room, x, y (low words
+   used); `ret 0x14`; it packs (x, y), calls `0x00650910`, and on a
+   non-zero result sets path +0x28 := 0 and returns 1, else 0 (callers
+   e.g. `0x00554F5C`).
 
 ### 7. Nearest free point (`0x0064DEA0`)
 
@@ -538,7 +544,9 @@ query is a single cell against 0x3E01.
 ### 10. Placing a unit at a point (`0x00554EA0`)
 
 `0x00554EA0(game, unit, room, x, y, exact, alt flag)` (D2MOO
-`sub_6FCBDFE0`), result 1 placed / 0 not:
+`sub_6FCBDFE0`), result 1 placed / 0 not. Call form (asm; caller
+`0x0053AF97`): ECX game, EDX unit; stack [ESP+4] room, x, y, exact,
+alt; `ret 0x14`; EAX 1 / 0.
 
 1. Unit null or without path → fatal assert. There is no type test:
    unit +0x2C goes to the dynamic teleport `0x00650BE0` (rule 4)

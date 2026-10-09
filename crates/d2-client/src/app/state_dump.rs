@@ -24,7 +24,22 @@
 //! drain; its result is a `poke` line between the two snapshots (the
 //! record `poke.py` writes on 1.14d) and a line on stderr.
 //!
-//! Output: header, snaps (and poke lines), footer (§1). Two runs with the same arguments
+//! Input (`specs/tools/scenario-diff.md` §2 r4, §3 r8): `--input SCRIPT`,
+//! the shared frame-anchored form (`frame F; click X Y; hold X Y N; move X
+//! Y`), runs at the same point as the pokes, after them: each due step's
+//! pointer events go through the bridge's world-click dispatcher
+//! ([`Headless`]); its log lines go to stderr and the footer notes.
+//!
+//! Sends (`specs/tools/scenario-diff.md` §2 `at … send`): each `--send
+//! "<f> <Name> <field>=<value>..."` or `--send "<f> hex <byte>..."` is
+//! injected through the bridge ([`Bridge::inject`]: references resolved
+//! on the server game, bytes handed to the transport send after the
+//! duplicate filter, `specs/tools/scenario.md` §4 r2 (a)) at the same
+//! point, after the pokes and the input, in command-line order; each
+//! result is a `send` line (bytes or unresolved), a line on stderr and a
+//! footer note.
+//!
+//! Output: header, snaps (and poke / send lines), footer (§1). Two runs with the same arguments
 //! write the same bytes but for the header's `date`. Not game logic: the
 //! clock and the date are this binary's (CLAUDE.md rule 6 binds
 //! `d2-sim`, which only reads here).
@@ -40,10 +55,14 @@ use d2_sim::debug::state;
 
 use super::play_start::{self, CliStart};
 use super::poke::{self as pokes, Entry, When};
+use super::send::{self as sends, SendEntry};
 use super::server_thread::ThreadLink;
 use super::single_player::{self, Character, GameData, Link};
+use crate::bridge::predict::PredictLink;
 use crate::bridge::state::StateSource;
 use crate::bridge::Bridge;
+use crate::world_view::input_script::{self, Headless};
+use d2_sim::poke::{Directive, GotoWalk, PokeOp, PokeResult};
 
 /// Milliseconds the clock advances per step: one server tick (25 Hz).
 pub const STEP_MS: u32 = 40;
@@ -86,6 +105,15 @@ pub struct DumpArgs {
     pub date: Option<String>,
     /// `--poke "<f> <directive> <args>..."` (repeatable): absolute frames.
     pub pokes: Vec<Entry>,
+    /// `--input SCRIPT`: the shared frame-anchored input (scenario-diff.md §2 r4).
+    pub input: Option<Vec<input_script::Step>>,
+    /// `--send "<f> <Name|hex> ..."` (repeatable): scripted C→S messages.
+    pub sends: Vec<SendEntry>,
+    /// `--packets FILE`: also record the packets (`specs/tools/packets-trace.md`).
+    pub packets: Option<PathBuf>,
+    /// `--rng FILE`: also record every RNG draw ([`super::rng_dump`];
+    /// needs the `rng-trace` feature).
+    pub rng: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -100,6 +128,10 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         game_dir: None,
         date: None,
         pokes: Vec::new(),
+        input: None,
+        sends: Vec::new(),
+        packets: None,
+        rng: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -118,9 +150,20 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--every" => a.every = value()?.parse().context("--every")?,
             "--out" => out = Some(PathBuf::from(value()?)),
             "--game-dir" => a.game_dir = Some(PathBuf::from(value()?)),
+            "--packets" => a.packets = Some(PathBuf::from(value()?)),
+            "--rng" => a.rng = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--send" => a
+                .sends
+                .push(sends::parse_send_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--input" => {
+                let steps = input_script::parse(value()?)
+                    .and_then(|s| Headless::new(s.clone()).map(|_| s))
+                    .map_err(|e| anyhow::anyhow!("--input: {e}"))?;
+                a.input = Some(steps);
+            }
             "--date" => {
                 let v = value()?.clone();
                 if !is_date(&v) {
@@ -182,6 +225,14 @@ pub struct DumpGame {
     pub start_flags: Option<u32>,
     /// The `--poke` entries, in command-line order.
     pub pokes: Vec<Entry>,
+    /// The `--input` steps.
+    pub input: Option<Vec<input_script::Step>>,
+    /// The `--send` entries, in command-line order.
+    pub sends: Vec<SendEntry>,
+    /// `--packets FILE` ([`super::packet_dump`]).
+    pub packets: Option<PathBuf>,
+    /// `--rng FILE` ([`super::rng_dump`]).
+    pub rng: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -215,6 +266,10 @@ impl DumpGame {
             hardcore,
             start_flags: start.start_flags,
             pokes: args.pokes.clone(),
+            input: args.input.clone(),
+            sends: args.sends.clone(),
+            packets: args.packets.clone(),
+            rng: args.rng.clone(),
         })
     }
 }
@@ -240,9 +295,12 @@ pub struct RunInfo {
 /// What the dump knows it does not match, beyond the unit fields: the
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
-    "client: headless bridge (no UI, input, prediction or visibility art); the only C->S \
-     messages are 0x67 and the model's own answers (0x6B, 0x5F), so a run where the 1.14d \
-     client sends anything else differs from the first such tick",
+    "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
+     the model's own answers (0x6B, 0x5F), the --send messages and the --input clicks (world-click dispatcher \
+     with the play preview's hover pick, the local player at the play preview's walk \
+     prediction, held repeat once per server frame; keys: belt 1-4, run lock, weapon swap, \
+     speech only), so a run \
+     where the 1.14d client sends anything else differs from the first such tick",
 ];
 
 /// Runs `game` for `ticks` server ticks and writes the `state-1` lines to
@@ -257,16 +315,30 @@ pub fn dump<W: Write>(
     let every = every.max(1);
     let ms = Arc::new(AtomicU32::new(START_MS));
     let client_data = ClientData::of(&game.data)?;
-    let (mut link, _started) = single_player::start_with(
+    let speeds = single_player::walk_speeds(&game.data, &game.character)?;
+    let mut rng = match &game.rng {
+        Some(p) => Some(super::rng_dump::RngDump::create(p, info, game.seed)?),
+        None => None,
+    };
+    let (mut link, _started) = super::rng_dump::start_with(
         game.data,
         game.seed,
         game.character.clone(),
         StepClock(ms.clone()),
+        rng.is_some(),
     )?;
     if game.hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
-    let (fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
+    let mut packets = match &game.packets {
+        Some(p) => Some(super::packet_dump::PacketDump::create(
+            &mut link, p, info, game.seed,
+        )?),
+        None => None,
+    };
+    let (mut fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
+    // `q`: the players' quest records, kept by the app's rest (StateSource below)
+    fields.extend(state::HOST_FIELDS.iter().map(|k| (*k).to_owned()));
     gaps.extend(RUN_GAPS.iter().map(|g| (*g).to_owned()));
     let header = state::Header {
         side: "d2rs".into(),
@@ -280,6 +352,8 @@ pub fn dump<W: Write>(
     };
     writeln!(out, "{}", header.to_json_line())?;
 
+    let link = PredictLink::new(link);
+    let tap = link.tap();
     let mut bridge = Bridge::new(link)?;
     client_data.install(&mut bridge);
     let mut request = single_player::create_request_for(&game.character);
@@ -292,14 +366,49 @@ pub fn dump<W: Write>(
     // The frame the last tick ran (0: none yet) and the pokes still to run.
     let mut last_frame = 0i32;
     let mut pending = game.pokes;
+    let mut walking: Vec<(Entry, GotoWalk)> = Vec::new();
+    let mut input = match game.input {
+        Some(s) => Some(
+            Headless::new(s)
+                .map_err(anyhow::Error::msg)?
+                .with_prediction(tap, speeds),
+        ),
+        None => None,
+    };
+    let mut input_notes = Vec::new();
+    let mut to_send = game.sends;
+    let mut send_notes = Vec::new();
     while ran < ticks {
-        run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
+        run_due_pokes(&mut bridge, &mut pending, &mut walking, last_frame, out)?;
+        if let Some(h) = input.as_mut() {
+            for l in h.apply(&mut bridge, last_frame)? {
+                eprintln!("input: {l}");
+                input_notes.push(format!("input: {l}"));
+            }
+        }
+        run_due_sends(&mut bridge, &mut to_send, last_frame, out, &mut send_notes)?;
         if !std::mem::replace(&mut first, false) {
             ms.fetch_add(STEP_MS, Ordering::SeqCst);
         }
         bridge.set_now(ms.load(Ordering::SeqCst));
+        let t0 = super::perf::enabled().then(std::time::Instant::now);
         let report = bridge.frame()?;
+        if let Some(t0) = t0 {
+            super::perf::record_bridge_frame(t0, report.ticked);
+        }
         bridge.take_outputs();
+        if let Some(h) = input.as_mut() {
+            for l in h.after_frame(&mut bridge, report.ticked)? {
+                eprintln!("input: {l}");
+                input_notes.push(format!("input: {l}"));
+            }
+        }
+        if let Some(p) = packets.as_mut() {
+            p.drain()?;
+        }
+        if let Some(r) = rng.as_mut() {
+            r.drain(&mut bridge)?;
+        }
         if !report.ticked {
             idle += 1;
             if idle > MAX_IDLE_STEPS {
@@ -319,9 +428,38 @@ pub fn dump<W: Write>(
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
+    notes.extend(input_notes);
+    notes.extend(send_notes);
+    for e in &to_send {
+        eprintln!(
+            "send: not reached in {ran} ticks: frame {} {}",
+            e.frame,
+            e.text()
+        );
+        notes.push(format!("send not reached: frame {} {}", e.frame, e.text()));
+    }
+    if let Some(n) = input.as_ref().map(Headless::pending).filter(|&n| n > 0) {
+        eprintln!("input: {n} step(s) not reached in {ran} ticks");
+        notes.push(format!("input: {n} step(s) not reached"));
+    }
     for e in &pending {
         eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
         notes.push(format!("poke not reached: {:?} {}", e.when, e.op));
+    }
+    // A `goto` still walking at the end is `failed` (`poke.md` §6 r4).
+    for (i, (e, w)) in walking.iter().enumerate() {
+        let f = last_frame + 1;
+        let r = d2_sim::poke::PokeResult::Failed;
+        let line = pokes::record_line_steps(f, i, &e.op, &r, Some(w.steps));
+        eprintln!("poke: goto not finished in {ran} ticks: {line}");
+        notes.push(format!("goto not finished: {}", e.op));
+        writeln!(out, "{line}")?;
+    }
+    if let Some(p) = packets {
+        p.finish(&notes)?;
+    }
+    if let Some(r) = rng {
+        r.finish(&notes)?;
     }
     writeln!(out, "{}", state::footer_line(snaps, &notes))?;
     out.flush()?;
@@ -334,6 +472,7 @@ pub fn dump<W: Write>(
 fn run_due_pokes<W: Write>(
     bridge: &mut Bridge<DumpLink>,
     pending: &mut Vec<Entry>,
+    walking: &mut Vec<(Entry, GotoWalk)>,
     last_frame: i32,
     out: &mut W,
 ) -> Result<()> {
@@ -341,26 +480,98 @@ fn run_due_pokes<W: Write>(
         .into_iter()
         .partition(|e| pokes::due_after(e.when, None).is_some_and(|f| last_frame >= f));
     *pending = later;
-    for (i, e) in due.iter().enumerate() {
+    // `goto` walks step first, then the pokes due now (`poke.md` §6).
+    let due = std::mem::take(walking)
+        .into_iter()
+        .map(|(e, w)| (e, Some(w)))
+        .chain(due.into_iter().map(|e| (e, None)));
+    for (i, (e, walk)) in due.enumerate() {
         // state-dump takes absolute --poke frames only (never a Tick entry)
-        let When::Frame(f) = e.when else { continue };
-        let r = bridge.poke(&e.op)?;
-        let line = pokes::record_line(f, i, &e.op, &r);
+        let When::Frame(at) = e.when else { continue };
+        let (r, steps) = match (&e.op, walk) {
+            (PokeOp::Directive(Directive::Goto(t)), w) => {
+                let (r, w) = bridge.goto_step(*t, w.unwrap_or_default())?;
+                if r == PokeResult::Pending {
+                    walking.push((e, w));
+                    continue;
+                }
+                (r, Some(w.steps))
+            }
+            _ => (bridge.poke(&e.op)?, None),
+        };
+        // a walk's record carries the frame of its last step
+        let f = if steps.is_some() { last_frame + 1 } else { at };
+        let line = pokes::record_line_steps(f, i, &e.op, &r, steps);
         eprintln!("poke: before frame {f}: {}: {line}", e.op);
         writeln!(out, "{line}")?;
     }
     Ok(())
 }
 
+/// Injects every pending `--send` due after `last_frame` (f − 1 ≤
+/// `last_frame`) through the bridge, in order, writing a `send` line each,
+/// printing it to stderr and keeping it for the footer notes.
+fn run_due_sends<W: Write>(
+    bridge: &mut Bridge<DumpLink>,
+    pending: &mut Vec<SendEntry>,
+    last_frame: i32,
+    out: &mut W,
+    notes: &mut Vec<String>,
+) -> Result<()> {
+    let (due, later): (Vec<SendEntry>, Vec<SendEntry>) = std::mem::take(pending)
+        .into_iter()
+        .partition(|e| last_frame >= e.frame - 1);
+    *pending = later;
+    for (i, e) in due.iter().enumerate() {
+        let r = bridge.inject(&e.msg)?;
+        let line = sends::record_line(e.frame, i, &e.text(), &r);
+        eprintln!("send: before frame {}: {line}", e.frame);
+        notes.push(format!("send: {line}"));
+        writeln!(out, "{line}")?;
+    }
+    Ok(())
+}
+
 /// The server thread's snapshot, taken on the server thread between two
-/// frames (`state-snapshot.md` §3 r1).
+/// frames (`state-snapshot.md` §3 r1), with each player's `q`: the quest
+/// record of the game's difficulty from the rest's per-player quests
+/// (`AppRest::quests`, `world/quests.md` §1.4). Reads only.
 impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
     type Error = super::server_thread::ThreadStopped;
     fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
         self.with(|l| {
             let sim = &l.host().game;
-            state::snapshot_world(&sim.game, &sim.events)
+            let mut s = state::snapshot_world(&sim.game, &sim.events);
+            if let Some(inv) = sim.world.inventory.as_ref() {
+                overlay_item_places(&mut s, &inv.state);
+            }
+            let d = usize::from(state::difficulty_world(&sim.events)).min(2);
+            for (id, q) in &sim.world.rest.quests {
+                if let Some(e) = sim.game.lists.unit(*id) {
+                    s.set_quests(e.guid, state::quest_words(&q.flags[d]));
+                }
+            }
+            s
         })
+    }
+}
+
+/// An item in an inventory has a static path on 1.14d whose x, y are its
+/// place (the cell of a page, the belt slot, the body location) and whose
+/// direction is 0 (`items-load-mixed` against 1.14d, frame 2; `state-
+/// snapshot.md` §2). d2rs keeps the place in the inventory model, not in
+/// a path record, so the export reads it there.
+fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::inventory::InvState) {
+    use d2_sim::items::moves::mode;
+    for u in snap.units.iter_mut().filter(|u| u.ut == 4 && u.x.is_none()) {
+        let placed = inv.items.values().find(|d| {
+            d.guid == u.g && matches!(d.mode, mode::STORED | mode::EQUIPPED | mode::BELT)
+        });
+        if let Some(d) = placed {
+            u.x = u32::try_from(d.x).ok();
+            u.y = u32::try_from(d.y).ok();
+            u.d = Some(0);
+        }
     }
 }
 
@@ -374,6 +585,7 @@ struct ClientData {
     class_skills: Vec<[u16; 10]>,
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
+    player_anims: super::anim_names::ClientPlayerAnims,
 }
 
 impl ClientData {
@@ -392,6 +604,7 @@ impl ClientData {
                 single_player::client_monster_anims(archives, &mut u)?;
                 u
             },
+            player_anims: single_player::client_player_anims(data)?,
         })
     }
 
@@ -403,6 +616,7 @@ impl ClientData {
         b.set_class_skills(self.class_skills);
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
+        b.set_player_anims(Arc::new(self.player_anims));
         b.set_high_light_quality(true);
     }
 }
@@ -433,8 +647,9 @@ pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
     dump(game, args.ticks, args.every, &info, &mut w)
 }
 
-/// The link the dump's bridge runs on.
-pub type DumpLink = ThreadLink<Link<StepClock>>;
+/// The link the dump's bridge runs on: the server thread inside the
+/// walk-recording [`PredictLink`] (`--input`'s click position).
+pub type DumpLink = PredictLink<ThreadLink<Link<StepClock>>>;
 
 #[cfg(test)]
 mod tests {
@@ -463,13 +678,26 @@ mod tests {
             "g",
             "--date",
             "2026-10-09",
+            "--packets",
+            "p.jsonl",
             "--poke",
             "4 spawn 19 @x+3 @y+3 normal",
             "--poke",
             "4 seed-unit @1:19 0x12345678 666",
+            "--input",
+            "frame 10; click 600 300",
+            "--send",
+            "7 InteractWithEntity type=1 id=@1:148",
+            "--send",
+            "7 hex 2f 00 00 00 00 09 00 00 00",
         ]))
         .unwrap();
         let pokes = a.pokes.clone();
+        let sends = a.sends.clone();
+        assert_eq!(sends.len(), 2);
+        assert_eq!(sends[0].frame, 7);
+        assert_eq!(sends[0].text(), "InteractWithEntity type=1 id=@1:148");
+        assert_eq!(sends[1].text(), "hex 2f 00 00 00 00 09 00 00 00");
         assert_eq!(pokes.len(), 2);
         assert_eq!(pokes[0].when, When::Frame(4));
         assert_eq!(pokes[1].op.to_string(), "seed-unit @1:19 305419896 666");
@@ -485,6 +713,10 @@ mod tests {
                 game_dir: Some("g".into()),
                 date: Some("2026-10-09".into()),
                 pokes,
+                input: Some(input_script::parse("frame 10; click 600 300").unwrap()),
+                sends,
+                packets: Some("p.jsonl".into()),
+                rng: None,
             }
         );
         assert!(parse_args(&args(&[
@@ -497,11 +729,24 @@ mod tests {
         ]))
         .is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--poke", "3 nope"])).is_err());
+        for bad in ["0 Walk x=1 y=2", "3 Walk x=1", "3 Nope a=1", "3 hex 1"] {
+            assert!(
+                parse_args(&args(&["--ticks", "1", "--out", "o", "--send", bad])).is_err(),
+                "{bad}"
+            );
+        }
         assert!(parse_args(&args(&["--out", "o"])).is_err(), "no --ticks");
         assert!(parse_args(&args(&["--ticks", "1"])).is_err(), "no --out");
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--every", "0"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--date", "9.10.26"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
+        // the shared input form only (scenario-diff.md §3 r8)
+        for bad in ["click 1 2", "frame 2; wait 3", "frame 2; key i", "frame 0"] {
+            assert!(
+                parse_args(&args(&["--ticks", "1", "--out", "o", "--input", bad])).is_err(),
+                "{bad}"
+            );
+        }
     }
 
     // Covers: specs/tools/poke.md §2 r6
@@ -519,6 +764,16 @@ mod tests {
         assert_eq!(
             pokes::record_line(5, 1, &op, &PokeResult::Unresolved("@1:19".into())),
             r#"{"k":"poke","f":5,"frame":4,"i":1,"d":"seed-unit","r":"unresolved","note":"@1:19","src":"seed-unit @1:19 1 2"}"#
+        );
+        let op = pokes::parse_poke_arg("6 msg 0x01 @x+2 @y").unwrap().op;
+        assert_eq!(
+            pokes::record_line(
+                6,
+                0,
+                &op,
+                &PokeResult::FailedWith("duplicate filter".into())
+            ),
+            r#"{"k":"poke","f":6,"frame":5,"i":0,"d":"msg","r":"failed","note":"duplicate filter","src":"msg 1 @x+2 @y"}"#
         );
     }
 

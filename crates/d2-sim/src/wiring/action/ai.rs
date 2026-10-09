@@ -16,8 +16,9 @@ use crate::monsters::ai::{
 };
 use crate::rng::Seed;
 use crate::stats::stat;
+use crate::units::hooks::Sim;
 use crate::units::record::flags;
-use crate::units::{RoomId, UnitId};
+use crate::units::{RoomId, UnitId, UnitType};
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
@@ -26,6 +27,44 @@ use crate::world::objects::Dispatch;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
+
+impl<X: Pending> View<'_, X> {
+    /// `0x00588E10` (`quests-act5.md` §4.10): a dead (mode 12) prison
+    /// door (class 434) among the units of the rooms adjacent to `u`'s
+    /// room (the room itself included).
+    fn dead_prison_door_near(&self, game: &Game, u: UnitId) -> bool {
+        use crate::path::collision::CollisionRooms;
+        let Some(room) = game.lists.unit(u).and_then(|e| e.room()) else {
+            return false;
+        };
+        let d = &self.h.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .flat_map(|r| game.lists.room_units(r))
+            .any(|m| {
+                self.units.get(m).is_some_and(|r| {
+                    r.ty == crate::units::UnitType::Monster && r.class == 434 && r.mode == 12
+                })
+            })
+    }
+    /// A monster's class and its monstats `interact` flag (flags byte
+    /// +0xD bit 1, `ai.md` §5.3); `None` for a non-monster.
+    fn npc_interact(&self, unit: UnitId) -> Option<(u16, bool)> {
+        let r = self
+            .units
+            .get(unit)
+            .filter(|r| r.ty == crate::units::UnitType::Monster)?;
+        let class = u16::try_from(r.class).ok()?;
+        let interact = self
+            .h
+            .tables
+            .combat
+            .monstats
+            .get(usize::from(class))
+            .is_some_and(|m| m.interact);
+        Some((class, interact))
+    }
+}
 
 impl<X: Pending> AiUnits for View<'_, X> {
     fn seed(&mut self, unit: UnitId) -> &mut Seed {
@@ -98,7 +137,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.set_base(unit, stat::HITPOINTS, life);
     }
     fn ai_state(&self, unit: UnitId) -> u32 {
-        self.h.x.ai_state(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m.ai_state,
+            None => self.h.x.ai_state(unit),
+        }
     }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
@@ -231,10 +273,19 @@ impl<X: Pending> AiModes for View<'_, X> {
             None => self.change_mode(game, unit, mode, target),
         }
     }
-    /// The anim mode (unit +0x10) without a mode change.
-    fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {
-        if let Some(r) = self.units.get_mut(unit) {
-            r.mode = u32::from(mode);
+    /// `0x00624690(unit, mode)` (`units.md` §4.1): no mode start.
+    fn set_anim_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8) {
+        let r = {
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::modes::write_mode(&mut sim, &mut *self.h, unit, u32::from(mode))
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
         }
     }
     /// The path step count: the stop distance `0x00649070` (`ai.md`
@@ -278,8 +329,10 @@ impl<X: Pending> AiModes for View<'_, X> {
         self.monster_set_mode(game, unit, MODE_GETHIT);
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
-    /// with path step count 1, as the walks to coordinates (`ai.md` §7.2);
-    /// no point → no request, false.
+    /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
+    /// No point (k ≤ 0 or t on the unit) → the request is still made, at
+    /// the unit's own cell (§7.5 rule 8, REC-665): no path, neutral, and
+    /// the think at f + `aidel`.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -291,9 +344,7 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         let at = self.h.path_position(unit);
         let to = self.h.path_position(target);
-        let Some((x, y)) = crate::monsters::ai::radius_point(at, to, a, b) else {
-            return false;
-        };
+        let (x, y) = crate::monsters::ai::radius_point(at, to, a, b).unwrap_or(at);
         AiModes::set_path_steps(self, unit, 1);
         self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
@@ -363,8 +414,11 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.units_line_blocked(game, a, b, LINE_MASK_AI)
             .unwrap_or_else(|| self.h.x.line_blocked(game, a, b))
     }
-    fn in_melee_range(&self, _: &Game, a: UnitId, b: UnitId) -> bool {
-        self.h.x.in_melee_range(a, b, 0)
+    fn in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
+        match self.monster_in_melee_range(game, a, b) {
+            Some(r) => r,
+            None => self.h.x.in_melee_range(a, b, 0),
+        }
     }
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
         self.h.x.can_reach_directly(game, unit, target)
@@ -373,7 +427,12 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.h.x.find_spot(game, unit)
     }
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
-        self.h.x.last_dead(game, room)
+        match self.h.last_dead.get(&room) {
+            Some(ring) => ring.slots.map(|s| {
+                s.and_then(|(u, guid)| game.lists.unit(u).filter(|e| e.guid == guid).map(|_| u))
+            }),
+            None => self.h.x.last_dead(game, room),
+        }
     }
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         self.h.x.footprint_ok(game, class, room, x, y)
@@ -409,14 +468,16 @@ impl<X: Pending> AiTargets for View<'_, X> {
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
-    /// list order) keeping the nearest within 15; "close" when it is
-    /// nearer than 4; the unit itself when none.
-    /// PROVISIONAL (`ai.md` §5.3, REC-500): the callback's distance is
-    /// read as the no-size distance `0x005DC530` between the two
-    /// positions, "within 15" as ≤ 15 and a tie keeps the first found;
-    /// settled by a recording of an NPC with a player at 15 / 16 and two
-    /// players at equal distance.
+    /// list order) with the callback `0x005DDE80`: d := the full-size
+    /// distance `0x005DC380` (the NPC's size subtracted per axis, clamped
+    /// at 0); d > 15 → skip. An NPC without the monstats `interact` flag
+    /// takes the first such player; with it, the quest active test
+    /// (`world/quests.md` §6.4, [`AiSummons::npc_wants_interact`], which
+    /// sends 0x8A on true) runs for each such player in scan order and
+    /// the first true is taken. Taking stops the scan. "Close" when d < 4;
+    /// the unit itself when none.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
+        use crate::monsters::ai::AiSummons as _;
         use crate::path::collision::CollisionRooms;
         let Some(room) = game.lists.unit(unit).and_then(|e| e.room()) else {
             return (unit, false);
@@ -430,22 +491,27 @@ impl<X: Pending> AiTargets for View<'_, X> {
         }
         let players = super::dying::client_players(game);
         let at = self.h.path_position(unit);
-        let mut best: Option<(UnitId, i32)> = None;
+        let size = self.path_size(unit);
+        let interact = self.npc_interact(unit).is_some_and(|(_, i)| i);
+        let mut scan = Vec::new();
         for r in rooms {
-            for p in game.lists.room_units(r) {
-                if !players.contains(&p) {
-                    continue;
-                }
-                let dist = crate::monsters::ai::distance_no_size(at, self.h.path_position(p));
-                if dist <= 15 && best.is_none_or(|(_, b)| dist < b) {
-                    best = Some((p, dist));
-                }
+            scan.extend(
+                game.lists
+                    .room_units(r)
+                    .into_iter()
+                    .filter(|p| players.contains(p)),
+            );
+        }
+        for p in scan {
+            let dist = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(p));
+            if dist > 15 {
+                continue;
+            }
+            if !interact || self.npc_wants_interact(game, p, unit) {
+                return (p, dist < 4);
             }
         }
-        match best {
-            Some((p, dist)) => (p, dist < 4),
-            None => (unit, false),
-        }
+        (unit, false)
     }
     fn find_door(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.find_door(game, unit)
@@ -749,14 +815,37 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
         self.h.x.ai_kill(game, unit, killer);
     }
+    /// The unit leaves its room and is removed (`0x00555600`, `units.md`
+    /// §3.2: the caged barbarians at their portal, Baal at the stairs);
+    /// every player is told (S→C 0x0A), as the quest host's removal.
     fn remove_unit(&mut self, game: &mut Game, unit: UnitId) {
-        self.h.x.ai_remove_unit(game, unit);
+        let Some((ty, guid)) = game.lists.unit(unit).map(|u| (u.ty as u8, u.guid)) else {
+            return self.h.x.ai_remove_unit(game, unit);
+        };
+        let msg = crate::units::messages::remove_unit(ty, guid);
+        for p in game.lists.units_of_type(crate::units::UnitType::Player) {
+            self.h.x.send(p, &msg);
+        }
+        self.remove(game, unit);
     }
     fn link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {
         self.h.x.ai_link_clone(game, unit, clone);
     }
+    /// `0x00574370` on the lent monster world (`init.md` §27); without
+    /// one, the host's answer.
     fn reinit_class(&mut self, game: &mut Game, unit: UnitId, class: i32, mode: u8) {
-        self.h.x.ai_reinit_class(game, unit, class, mode);
+        let mut sim = Sim {
+            game,
+            units: self.units,
+            stats: self.stats,
+            data: self.data,
+        };
+        let done = self
+            .h
+            .with_monster_world(|w, h| w.reinit(&mut sim, h, unit, class, u32::from(mode)));
+        if done.is_none() {
+            self.h.x.ai_reinit_class(sim.game, unit, class, mode);
+        }
     }
     fn change_class_list(&mut self, game: &mut Game, unit: UnitId, class: i32) {
         self.h.x.ai_change_class_list(game, unit, class);
@@ -776,8 +865,21 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         self.h.x.ai_wisp_find(game, unit)
     }
+    /// Wave `w` (0..=4) is superunique 61 + w (Baal Subject 1..5, the
+    /// table `0x006E3528`; hcIdx map `0x00586B30` = identity, as
+    /// `quests-act4.md` §5.4): its class from the drop tables'
+    /// `superuniques` row, the mapped id `0x00659B80(2, ·)` = row +
+    /// the `monstats` count (`quests-helpers.md` §2 r1). No drop tables
+    /// or row: the host's answer (`Pending::ai_wave`).
     fn wave(&self, w: i32) -> Option<(i32, i32)> {
-        self.h.x.ai_wave(w)
+        let row = 61 + w;
+        let found = (0..=4).contains(&w).then_some(()).and_then(|_| {
+            let d = self.h.object_drops.as_ref()?;
+            let su = d.tables.superuniques.get(row as usize)?;
+            let count = self.h.tables.combat.monstats.len() as i32;
+            Some((row + count, su.class as i32))
+        });
+        found.or_else(|| self.h.x.ai_wave(w))
     }
     fn clear_room_portal_flag(&mut self, game: &mut Game, room: Option<RoomId>) {
         self.h.x.ai_clear_room_portal_flag(game, room);
@@ -791,6 +893,69 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
+    /// from the quest control's published states
+    /// ([`Pending::quest_rescue`]); the calls with an effect queued for
+    /// it ([`Pending::queue_quest_event`]); `0x00588E10` read here. Other
+    /// hooks keep the default.
+    fn quest_hook(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        player: Option<UnitId>,
+        hook: crate::monsters::ai::QuestHook,
+    ) -> bool {
+        use super::QuestEvent;
+        use crate::monsters::ai::QuestHook;
+        let guid = game.lists.unit(unit).map_or(0, |e| e.guid);
+        match hook {
+            QuestHook::WussieLeaving => self.h.x.quest_rescue(guid).0,
+            QuestHook::WussieLeave => {
+                self.h.x.queue_quest_event(QuestEvent::WussieLeft { guid });
+                false
+            }
+            QuestHook::WussieCanRescue => self.dead_prison_door_near(game, player.unwrap_or(unit)),
+            QuestHook::WussieRescue => {
+                if let Some(player) = player {
+                    self.h
+                        .x
+                        .queue_quest_event(QuestEvent::WussieRescue { player, unit });
+                }
+                false
+            }
+            QuestHook::WussieWait => {
+                self.h.x.queue_quest_event(QuestEvent::WussieWait);
+                false
+            }
+            _ => false,
+        }
+    }
+    /// `0x00588D60`: the group's portal when spawned and existing.
+    fn rescue_portal(&mut self, game: &mut Game, unit: UnitId) -> Option<Option<UnitId>> {
+        let guid = game.lists.unit(unit)?.guid;
+        let portal = self.h.x.quest_rescue(guid).1?;
+        let o = game
+            .lists
+            .find_unit(crate::units::UnitType::Object, portal)?;
+        Some(Some(o))
+    }
+    /// The quest active test `0x00544590(game, player, npc)`
+    /// (`world/quests.md` §6.4) on the game's quest control, lent to the
+    /// hooks while the tick runs ([`super::ActionHooks::quest_host`]):
+    /// true when an active function wants the player to talk to `unit`
+    /// (and 8A 01 <GUID> was sent). No lent control (a host without
+    /// quests): false, no send.
+    fn npc_wants_interact(&mut self, game: &mut Game, player: UnitId, unit: UnitId) -> bool {
+        let Some((class, interact)) = self.npc_interact(unit) else {
+            return false;
+        };
+        let Some(mut host) = self.h.quest_host.take() else {
+            return false;
+        };
+        let r = host.npc_wants_interact(game, self, player, unit, class, interact);
+        self.h.quest_host = Some(host);
+        r
+    }
     /// `0x00646CA0(unit, calc, skill, level)`: the calc column on the
     /// unit (`data/calc-expressions.md`, `skills/levels.md`).
     fn skill_calc(
@@ -832,5 +997,64 @@ impl<X: Pending> AiSummons for View<'_, X> {
         let rows = self.h.hireling_ai.rows.as_ref()?;
         let i = rows.row_at(self.data.expansion, u32::try_from(id).ok()?, level)?;
         rows.rows.get(i).map(|r| r.ai_row())
+    }
+}
+
+impl<X: Pending> View<'_, X> {
+    /// `0x00622C40(a, b, 0)` (`combat/hit.md` §7.2) for a monster `a`
+    /// with the path provider and a monstats2 row: reach `MeleeRng` + 1
+    /// against the unit distance `0x00641530` (`pathing.md` §9.5), then
+    /// the collision line (mask 0x804). `None`: not answerable here (the
+    /// host answers).
+    ///
+    /// PROVISIONAL (hit.md §7.3 step 3, REC-1110): `MeleeRng` 255 reads
+    /// the unit's weapon class in its current mode; monsters carry no
+    /// weapon here, so it is reach 0.
+    fn monster_in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> Option<bool> {
+        let paths = self.h.paths.as_ref()?;
+        let t = &self.h.tables.combat;
+        let class = self
+            .units
+            .get(a)
+            .filter(|r| r.ty == UnitType::Monster)?
+            .class;
+        let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
+        let rng = t.monstats2.get(usize::from(ex))?.meleerng;
+        let reach = if rng == 255 { 0 } else { i32::from(rng) };
+        let dist = |a: UnitId, b: UnitId| {
+            let pt = |u: UnitId| {
+                let (x, y) = self.h.path_position(u);
+                crate::path::Point { x, y }
+            };
+            crate::path::walk::geom::unit_distance(
+                &paths.tables,
+                pt(a),
+                self.path_size(a),
+                pt(b),
+                self.path_size(b),
+            )
+        };
+        // Step 2: the tentacle classes.
+        let tentacle = self
+            .units
+            .get(b)
+            .filter(|r| r.ty == UnitType::Monster)
+            .and_then(|r| {
+                t.monstats
+                    .get(usize::try_from(r.class).ok()?)
+                    .map(|m| m.baseid)
+            });
+        if matches!(tentacle, Some(258 | 261)) && reach + 8 > dist(a, b) {
+            return Some(true);
+        }
+        // Step 3.
+        let d = dist(a, b);
+        if d <= 0 {
+            return Some(true);
+        }
+        if reach + 1 < d {
+            return Some(false);
+        }
+        Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))
     }
 }

@@ -422,6 +422,8 @@ impl ShopUi {
         let price = move |_t: u8| prices.get(guid).unwrap_or(0);
         let env = ClickEnv {
             cursor_item: items::cursor_item(world).is_some(),
+            // A gamble buy sends transaction 2: the handlers at
+            // 0x004B3D40 / 0x004B42B0 write it (PC 1, REC-729 settled).
             gamble_shop: st.gamble,
             repair_all_button_on: repair_all,
             repair_button_on: st.repair_mode,
@@ -491,7 +493,8 @@ fn store_tip_ctx<'a>(
     crate::ui::item_tip_build::TipCtx {
         mode: if st.repair_mode { 4 } else { 1 },
         own_item: false,
-        gamble: st.gamble,
+        // The same global [0x007C0DB0] (ui/item-tips.md inputs): always 0.
+        gamble: false,
         price,
         ..base
     }

@@ -444,6 +444,16 @@ pub fn delete_thinks(game: &mut Game, unit: UnitId) {
     game.timers.cancel_unit_events(unit, EVENT_THINK, None);
 }
 
+/// `0x005738D0(game, unit)`, the last call of the monster death
+/// clean-up `0x005A6520` (`sim/units.md` §4.6 rule 1.2, "What keeps a
+/// dead monster dead"): cancel the unit's type-2 (think) events, then
+/// its type-3 (stat regeneration) events, any argument.
+pub fn cancel_think_and_regen(game: &mut Game, unit: UnitId) {
+    delete_thinks(game, unit);
+    game.timers
+        .cancel_unit_events(unit, crate::tick::events::event::STAT_REGEN, None);
+}
+
 /// The first pending think's expire frame (D2MOO
 /// `EVENT_GetEventFrame`), 0 when none.
 pub fn pending_think(game: &Game, unit: UnitId) -> i32 {
@@ -695,7 +705,7 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         return;
     }
     if INLINE.get(ended as usize) == Some(&1) {
-        cx.world.set_anim_mode(unit, mode::NEUTRAL);
+        cx.world.set_anim_mode(game, unit, mode::NEUTRAL);
         if !frozen(cx, unit) {
             think(game, cx, unit);
         }
@@ -812,6 +822,7 @@ pub fn think<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: Uni
     }
     // The prechecks may have reinstalled the AI: call the current one.
     let f = cx.store.control(unit).map_or(function, |c| c.function);
+    crate::cov!(MonsterAi, f, class);
     run_function(game, cx, f, unit, &p);
 }
 

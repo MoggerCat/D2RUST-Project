@@ -545,6 +545,7 @@ fn levels() -> Vec<LevelRow> {
         draw_edges: false,
         rain: false,
         mud: false,
+        critters: Default::default(),
         ambient: Default::default(),
     };
     (v[40].pal, v[40].act) = (1, 1);
@@ -594,6 +595,7 @@ fn join_level_comes_from_the_room_of_the_0x15_placement() {
         local_at: None,
         unit_tables: None,
         motion_offsets: Default::default(),
+        motion_shadow_offsets: Default::default(),
         weather: None,
     };
     m.recv(&assign_player(0, 0)).hex("0b 00 01 00 00 00");

@@ -1,0 +1,30 @@
+check 1
+# Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
+# the Worldstone Chamber portal (object 563) in the Throne of Destruction (level 131).
+# The player warps there before frame 4, then is moved along a path with
+# pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
+# 1.14d (PC 1, Windows, -seed 1234): ut 2 cl 563: GUID 71 at (15090, 5005), mode 1, with no quest progress; created when its room
+# is populated (the player's room becomes adjacent), not at level load.
+# Table: docs/handoff/pc1-day3-c.md "Round 2 — placement". Spec: specs/tools/scenario-diff.md.
+name milestone-worldstone-portal
+save MilBaal --class sor --expansion --act 4
+seed 1234
+ticks 87
+seconds 240
+channels state
+at 4 poke warp 131
+at 12 poke pos @player 15103 5203
+at 15 poke pos @player 15103 5193
+at 18 poke pos @player 15102 5182
+at 21 poke pos @player 15102 5172
+at 24 poke pos @player 15102 5162
+at 27 poke pos @player 15102 5152
+at 30 poke pos @player 15102 5142
+at 33 poke pos @player 15101 5131
+at 36 poke pos @player 15101 5121
+at 39 poke pos @player 15101 5111
+at 42 poke pos @player 15101 5101
+at 45 poke pos @player 15101 5091
+at 48 poke pos @player 15100 5080
+at 51 poke pos @player 15100 5070
+at 54 poke pos @player 15100 5060

@@ -1,13 +1,14 @@
 // Spec: specs/render/unit-composite.md §8; specs/skills/bodies-2b.md §8.11
 //! Leap's arc and Whirlwind's spin in the play preview, headless on the
 //! user's install (`real_rig`): the barbarian's own `skills` rows, her
-//! `charstats` speeds. Provisional parts: REC-275 in `docs/HANDOFF.md` §7.
+//! `charstats` speeds. Expected values: the REC-275 recordings
+//! (`facts/client/anim/a1-cold-plains-leap-bar.tsv`,
+//! `a1-cold-plains-whirlwind-bar.tsv`); open parts REC-702..704.
 
 mod real_rig;
 
 mod app_support;
 
-use d2_client::app::play::add_walk;
 use d2_client::app::single_player;
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::BridgeResource;
@@ -30,7 +31,6 @@ fn speeds() -> Speeds {
 
 fn rig_with_walk(skills: &[usize]) -> Rig {
     let mut r = Rig::new("barbarian", skills);
-    add_walk(&mut r.app, r.tap.clone(), Some(speeds()));
     r.leave_town();
     r.strengthen();
     r
@@ -90,26 +90,38 @@ fn the_leap_draw_height_follows_the_timed_arc_frame_by_frame() {
     assert_eq!(offsets(&r), None, "the arc ends on landing");
 }
 
-// Covers: specs/skills/bodies-2b.md §8.11
+// Covers: specs/skills/sequences.md §3, §4
+/// The whirl draws its sequence (`seqnum` 10, A1 0, 1, 2, 3, 3, 4, 5, 6)
+/// then loops A1 3, 4, 5, 6, one per update
+/// (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`), and leaves
+/// mode 18 at the end of its path.
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
-fn whirlwind_shows_its_skill_mode_while_it_spins() {
+fn whirlwind_draws_its_sequence_while_it_spins() {
     let mut r = rig_with_walk(&[WHIRLWIND]);
     r.select_right(WHIRLWIND);
     r.right_click_point(8, 0);
-    // Whirlwind's mode: its client row's `anim` (the install's `skills`).
-    let anim = single_player::client_skill_rows(app_support::live().archives.as_ref()).unwrap()
-        [WHIRLWIND]
-        .anim;
-    let mut spun = false;
-    for _ in 0..60 {
+    let mut frames = Vec::new();
+    for _ in 0..80 {
         r.step(1);
-        let w = r.app.world();
-        spun |= w
-            .resource::<SkillMotion>()
-            .spinning()
-            .is_some_and(|(_, m)| m == u32::from(anim));
+        if let Some((_, mode, f)) = r.app.world().resource::<SkillMotion>().drawn() {
+            assert_eq!(mode, 7, "drawn mode A1");
+            if frames.last() != Some(&f) || frames.len() < 4 {
+                frames.push(f);
+            }
+        }
     }
-    assert!(spun, "spin mode {anim} shown ({})", r.errors());
-    assert_eq!(r.app.world().resource::<SkillMotion>().spinning(), None);
+    assert!(
+        frames.len() >= 8,
+        "the whirl ran ({frames:?}; {})",
+        r.errors()
+    );
+    assert_eq!(&frames[..4], &[0, 1, 2, 3], "{frames:?}");
+    assert!(
+        frames[4..]
+            .windows(2)
+            .all(|w| w[1] == if w[0] == 6 { 3 } else { w[0] + 1 }),
+        "the loop over A1 3..6: {frames:?}"
+    );
+    assert_eq!(r.app.world().resource::<SkillMotion>().drawn(), None);
 }

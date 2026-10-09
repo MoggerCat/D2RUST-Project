@@ -1,0 +1,16 @@
+check 1
+# Battle Orders (self cast): ScnBar (expansion Barbarian, level 30, every skill at 20, right
+# skill 149), -seed 1234; warp to the Blood Moor (level 2; variant
+# blood-moor-empty: no monster population there) before frame 4,
+# no target monster; then one right click at client pixel (330, 300), before frame 20's drain. Compares the cast
+# (mode, states, stats), its effects on the player and the
+# draws. Area F2 (q-diff-skills-2). Spec: specs/tools/scenario-diff.md.
+name bar-battle-orders
+save ScnBar --class bar --expansion --level 30 --all-skills 20 --right-skill 149
+seed 1234
+ticks 70
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+input frame 20; rclick 330 300

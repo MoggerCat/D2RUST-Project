@@ -140,6 +140,7 @@ pub fn empty_action_tables() -> ActionTables {
         levels: Vec::new(),
         skill_modes: Vec::new(),
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 
@@ -852,6 +853,7 @@ pub fn inv_tables(
         ],
         equiv,
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

@@ -47,12 +47,28 @@ Input script: `;`-separated commands, run in order once the player is in
 a level: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`
 (left button down S seconds), `waitticks N` (wait N server ticks of the recorder, not seconds),
 `mark NAME` (note `autostart: mark NAME ticks=N` in the recording's notes), `key K [S]` (K: a letter or digit, or
-ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `shot
+ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `text T`
+(WM_CHAR for each character of T), `char N` (one WM_CHAR with code N),
+`state [LABEL]` (log the launcher mode 0x74C704 and the player level),
+`close` (post WM_CLOSE to the game window), `wstr PTR OFF [LABEL]` (log
+the UTF-16 text at [PTR] + OFF, e.g. the create screen's name box: `wstr
+0x77934C 0x5C`, `ui/text.md` §15 r5), `shot
 NAME` (PNG of the client area into the shot directory), `goto T C[,C..]
 [S DX DY]` (walk to the nearest unit of type T and one of the classes C,
 −1 = any class, and click it), `units T` (log GUID, class, client and
-screen point of every client unit of type T), `end` (stop the
-recording; the game is killed). X, Y are client pixels (800x600 window).
+screen point of every client unit of type T), `clickunit T C[,C..]|*
+[DX DY]` / `rclickunit ...` (click the unit of type T and one of the
+classes C, `*` = any class but not in mode 0 or 12, whose drawn point is
+nearest the window centre, at that point + (DX, DY), default (0, -8); no
+walking), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
+Frame-anchored steps (specs/tools/scenario-diff.md §2 rule 4): `frame F`
+waits for the tick-return stop 0x0052FD1E of game frame F - 1 (game
++0xA8); the steps after it are posted while the game is stopped there, so
+the window takes them before frame F's drain. After a `frame` step,
+click / rclick / key post all their messages at once, `clickunit` / `rclickunit` post the cursor
+at the stop of F - 1 and the click at the stop of F (the hover frame), and `hold X Y N`
+holds N frames (up posted at the stop of frame F + N - 1). Needs a
+recorder that calls `AutoStart.attach` (record_state, record_frames, poke).
 """
 
 import argparse
@@ -71,13 +87,15 @@ if os.name == "nt":
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-TOOL = "trace-recorder autostart 0.2.0"
+TOOL = "trace-recorder autostart 0.3.0"
 GAME_MODE = 0x74C704      # launcher mode: 4 menu, 1 client
 MENU_LOOP = 0x72DDD4      # menu message-loop flag
 NEXT_MODE = 0x7795E8      # mode the menu routine returns
 PLAYER = 0x7A6A70         # client player unit
 U_PATH = 0x2C
-DEFAULT_AFTER = 6.0       # seconds before leaving the menu (the main menu must be up)
+# seconds before leaving the menu (the main menu must be up); D2_AUTO_AFTER
+# overrides the default (scenario-diff.md §4: suite.py sets the measured minimum)
+DEFAULT_AFTER = float(os.environ.get("D2_AUTO_AFTER") or 6.0)
 
 
 def game_args(char, seed=None, extra=("-w", "-ns")):
@@ -150,13 +168,20 @@ def vk_code(k):
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
               "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
-              "units": (1, 1), "end": (0, 0)}
+              "units": (1, 1), "char": (1, 1), "state": (0, 1), "close": (0, 0), "wstr": (2, 3),
+              "end": (0, 0), "frame": (1, 1)}
+TICK_RET = 0x0052FD1E            # tick return, ESI = game (poke.py, original-hooks-spawn.md §5 r2)
+TICK_RET_BYTES = bytes.fromhex("8B7618")
+G_FRAME = 0xA8                   # game frame (tick.md §2)
 
 
 def parse_script(text):
     """Script text -> list of (op, args); unknown commands and wrong
-    argument counts are errors before the game starts."""
+    argument counts are errors before the game starts. After a `frame F`
+    step (scenario-diff.md §2 rule 4) `hold X Y N` holds N frames and is
+    returned as ("holdf", [X, Y, N]); frames must not go back."""
     out = []
+    framed, last = False, 0
     for raw in (text or "").split(";"):
         w = raw.split()
         if not w:
@@ -167,6 +192,19 @@ def parse_script(text):
         lo, hi = SCRIPT_OPS[op]
         if not lo <= len(a) <= hi:
             raise ValueError(f"input script: {op} takes {lo}..{hi} arguments: {raw.strip()!r}")
+        if op == "frame":
+            f = int(a[0], 0)
+            if f < 1 or f < last:
+                raise ValueError(f"input script: frame {f} is below 1 or before frame {last}")
+            framed, last = True, f
+            out.append(("frame", [f]))
+            continue
+        if op == "hold" and framed:
+            v = [int(x, 0) for x in a]
+            if v[2] < 1:
+                raise ValueError(f"input script: hold needs N >= 1 frames: {raw.strip()!r}")
+            out.append(("holdf", v))
+            continue
         if op == "text":
             a = [raw.strip()[4:].strip()]
         elif op == "key":
@@ -176,10 +214,31 @@ def parse_script(text):
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
                  + [float(x) for x in a[2:3]] + [int(x, 0) for x in a[3:]])
-        elif op not in ("shot", "dumpdrlg", "mark"):
+        elif op == "wstr":
+            a = [int(a[0], 0), int(a[1], 0)] + a[2:]
+        elif op not in ("shot", "dumpdrlg", "mark", "state", "close"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
     return out
+
+
+def read_wstr(mem, ptr, off, limit=64):
+    """The NUL-ended UTF-16 text at [ptr] + off (at most `limit` units):
+    (text, True), or ("", False) when [ptr] is null or unreadable."""
+    try:
+        base = mem.read_u32(ptr)
+        if not base:
+            return "", False
+        units = []
+        while len(units) < limit:
+            w = mem.read_u32(base + off + 2 * len(units))
+            for u in (w & 0xFFFF, w >> 16):
+                if u == 0 or len(units) >= limit:
+                    return "".join(map(chr, units)), True
+                units.append(u)
+        return "".join(map(chr, units)), True
+    except OSError:
+        return "", False
 
 
 def client_px(mem, unit):
@@ -206,8 +265,10 @@ def screen_of(mem, unit):
     # process has it; else the player-centred projection of camera.md
     ox = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A520C)))[0]
     oy = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A5208)))[0]
+    # (camera.md §4: drawn at X = px - cx_u, Y = py - cy_u + 8 in open mode 0; the same
+    # point as the player-centred projection below)
     if (ox, oy) != (0, 0) and abs(ox - pp[0]) < 1000 and abs(oy - pp[1]) < 1000:
-        return (up[0] - ox, up[1] - oy)
+        return (up[0] - ox, up[1] - oy + 8)
     return (up[0] - pp[0] + VIEW_W // 2, up[1] - pp[1] + VIEW_H // 2 - 8)
 
 
@@ -254,6 +315,8 @@ def drlg_dump(mem, label=""):
                        "jungle_clearings": mem.read_u32(lv + 0x1B8),
                        "jungle_blocks": mem.read_u32(lv + 0x1BC),
                        "warp_centres": mem.read_u32(lv + 0x228)})
+        if label.startswith("rooms") and label[5:].isdigit() and int(label[5:]) == levels[-1]["id"]:
+            levels[-1]["room_list"] = room_list(mem, lv)
         ids = mem.read_u32(lv + 0x1BC)      # Act III jungles: pointer to the block ids
         if ids and 76 <= levels[-1]["id"] <= 78:   # (outdoor-act3-act5.md §2.8; 2 x 6 blocks)
             levels[-1]["jungle_blocks"] = [mem.read_u32(ids + 4 * i) for i in range(12)]
@@ -261,6 +324,34 @@ def drlg_dump(mem, label=""):
         n += 1
     r["levels"] = sorted(levels, key=lambda x: x["id"])
     return r
+
+
+def room_list(mem, lv):
+    """`dumpdrlg rooms<id>`: the level's DRLG rooms (`drlg/rooms.md` §1: first
+    room level +0x10, next +0x24, tile x / y / w / h +0x34..+0x40, type +0x48,
+    preset data +0x20 whose +0x00 is the lvlprest index, preset units +0x5C;
+    unit record `drlg/preset.md` §1: +0x00 mode, +0x04 class, +0x08 x, +0x0C
+    next, +0x14 type, +0x18 y, room-relative sub-tiles). Client copy: rooms
+    the client never built may have no preset units yet."""
+    out, room, n = [], mem.read_u32(lv + 0x10), 0
+    while room and n < 2000:
+        rt = mem.read_u32(room + 0x48)
+        rec = {"rect": [mem.read_u32(room + o) for o in (0x34, 0x38, 0x3C, 0x40)], "type": rt}
+        pm = mem.read_u32(room + 0x20)
+        if rt == 2 and pm:
+            rec["lvlprest"] = mem.read_u32(pm)
+        units, u, k = [], mem.read_u32(room + 0x5C), 0
+        while u and k < 200:
+            units.append([mem.read_u32(u + 0x14), mem.read_u32(u + 4), mem.read_u32(u + 8),
+                          mem.read_u32(u + 0x18), mem.read_u32(u)])
+            u = mem.read_u32(u + 0x0C)
+            k += 1
+        if units:
+            rec["units"] = units      # [type, class, x, y, mode]
+        out.append(rec)
+        room = mem.read_u32(room + 0x24)
+        n += 1
+    return out
 
 
 def nearest(mem, utype, cls):
@@ -312,6 +403,82 @@ class AutoStart:
         self.played = []          # (seconds after launch, op, args), for the notes / selftest
         self.shots = []           # screenshot threads
         self.dumps = []           # dumpdrlg records
+        self.wait_frame = None    # a `frame F` step waits for the tick return of frame F - 1
+        self.anchor = None        # F of the last `frame` step run (framed mode)
+        self.stop_frame = None    # game +0xA8 at the last tick-return stop seen
+        self.attached = False     # attach() called: tick-return stops reach on_tick_return
+        self.framed_log = []      # (F, stop frame, op, args): the frame-anchored steps posted
+
+    def has_frames(self):
+        return any(op == "frame" for op, _ in self.script)
+
+    def attach(self, rec):
+        """Route the recorder's 0x0052FD1E stops (ESI = game) to
+        on_tick_return. Shares the stop with poke.py's PokeLayer: arms the
+        address only when nobody did (one INT3 per address), wraps
+        rec.handle after the recorder's own handler (record_state takes its
+        snapshot of frame F - 1 first). Call before rec.run()."""
+        rt = sys.modules.get("record_tick")
+        if rt is None:
+            import record_tick as rt
+        if TICK_RET not in rt.EXPECT:
+            rt.EXPECT[TICK_RET] = TICK_RET_BYTES
+        if getattr(rec, "h_process", None) and TICK_RET not in rec.bp_orig:
+            if rec.read(TICK_RET, 3) != TICK_RET_BYTES:
+                raise RuntimeError("unexpected code at 0x0052FD1E: not the 1.14d Game.exe?")
+            rec.arm(TICK_RET)
+        orig, auto = rec.handle, self
+
+        def handle(addr, ctx):
+            r = orig(addr, ctx)
+            if addr == TICK_RET and getattr(rec, "game", None) in (None, ctx.Esi):
+                frame = struct.unpack("<i", rec.read(ctx.Esi + G_FRAME, 4))[0]
+                auto.on_tick_return(rec, frame)
+            return r
+
+        rec.handle = handle
+        self.attached = True
+
+    def on_tick_return(self, mem, frame):
+        """The game is stopped at the tick return of `frame` (game +0xA8):
+        a `frame F` step with F - 1 <= frame runs now, and every step after
+        it up to the next `frame` / hold / timed step is posted while the
+        game is stopped, so the window takes the messages before frame F's
+        drain."""
+        self.stop_frame = frame
+        if self.done:
+            return
+        if self.arrived_at is None:
+            if self.forced_at is None:
+                return
+            lv = player_level(mem)
+            if lv is None:
+                return
+            self.arrived_at, self.level = self.clock() - self.t0, lv
+            self.log(f"autostart: player in level {lv} at the stop of frame {frame}, "
+                     f"position {player_pos(mem)}, act init seed {act_init_seed(mem)}")
+            self.runner = self.run(mem)
+            self.wake = self.clock()
+            self._advance(mem)
+        while not self.done and self.wait_frame is not None and frame >= self.wait_frame - 1:
+            f = self.wait_frame
+            if frame > f - 1:
+                self.log(f"autostart: frame {f} late: posted at the stop of frame {frame}")
+            self.anchor, self.wait_frame = f, None
+            self._advance(mem)
+
+    def _advance(self, mem):
+        """Run the script until it waits (seconds, or a frame)."""
+        while not self.done and self.wait_frame is None:
+            try:
+                y = next(self.runner)
+            except StopIteration:
+                self.runner = iter(())
+                self.wake = float("inf")
+                return
+            if y:
+                self.wake = self.clock() + y
+                return
 
     def log(self, msg):
         self._log(msg)
@@ -358,9 +525,12 @@ class AutoStart:
             self.arrived_at, self.level = el, lv
             self.log(f"autostart: player in level {lv} at {el:.1f}s, position {player_pos(mem)}, "
                      f"act init seed {act_init_seed(mem)}")
+            if self.has_frames() and not self.attached:
+                self.log("autostart: `frame` steps need a tick-return recorder "
+                         "(record_state, record_frames, poke): they never run here")
             self.runner = self.run(mem)
             self.wake = now
-        while not self.done and now >= self.wake:
+        while not self.done and now >= self.wake and self.wait_frame is None:
             try:
                 self.wake = now + next(self.runner)
             except StopIteration:
@@ -393,11 +563,25 @@ class AutoStart:
         yield 0.25     # held across at least one game frame (a click shorter than a frame can be lost)
         self.send(mem, up, 0, lparam(x, y))
 
+    def posted(self, op, a):
+        """Logs a frame-anchored step (framed mode): frame F, the stop."""
+        self.framed_log.append((self.anchor, self.stop_frame, op, a))
+        self.log(f"autostart: frame {self.anchor}: {op} {' '.join(str(x) for x in a)} "
+                 f"posted at the stop of frame {self.stop_frame}")
+
     def run(self, mem, script=None):
-        """The script as a generator: each yield is the seconds to wait."""
+        """The script as a generator: each yield is the seconds to wait
+        (0 after a `frame` / framed `hold` step set wait_frame: the next
+        tick-return stop resumes it). In framed mode (after a `frame`
+        step) pointer and key steps post all their messages at once.
+        `script` runs another step list (the menu script) instead."""
         for op, a in (self.script if script is None else script):
             self.played.append((round(self.clock() - self.t0, 2), op, a))
-            if op == "wait":
+            framed = self.anchor is not None
+            if op == "frame":
+                self.wait_frame = a[0]
+                yield 0
+            elif op == "wait":
                 yield a[0]
             elif op == "waitticks":
                 # server ticks of the recorder (its `ticks` counter), not wall-clock seconds:
@@ -410,9 +594,33 @@ class AutoStart:
                 self.log(f"autostart: mark {a[0]} ticks={getattr(mem, 'ticks', 0)}")
             elif op == "move":
                 self.send(mem, WM_MOUSEMOVE, 0, lparam(*a))
+                if framed:
+                    self.posted(op, a)
+            elif op in ("click", "rclick") and framed:
+                down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) if op == "rclick"
+                                else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
+                self.send(mem, WM_MOUSEMOVE, 0, lparam(a[0], a[1]))
+                self.send(mem, down, mk, lparam(a[0], a[1]))
+                self.send(mem, up, 0, lparam(a[0], a[1]))
+                self.posted(op, a)
             elif op in ("click", "rclick"):
                 yield from self.click(mem, a[0], a[1], op == "rclick")
                 yield 0.05
+            elif op == "holdf":
+                self.send(mem, WM_MOUSEMOVE, 0, lparam(a[0], a[1]))
+                self.send(mem, WM_LBUTTONDOWN, MK_LBUTTON, lparam(a[0], a[1]))
+                self.posted("hold", a)
+                self.wait_frame = self.anchor + a[2]
+                yield 0
+                self.send(mem, WM_LBUTTONUP, 0, lparam(a[0], a[1]))
+                self.posted("release", a[:2])
+            elif op == "key" and framed:
+                sc = user32.MapVirtualKeyW(a[0], 0) if os.name == "nt" else 0
+                self.send(mem, WM_KEYDOWN, a[0], 1 | sc << 16)
+                if 0x30 <= a[0] <= 0x5A:
+                    self.send(mem, WM_CHAR, a[0] | 0x20 if a[0] >= 0x41 else a[0], 1 | sc << 16)
+                self.send(mem, WM_KEYUP, a[0], 1 | sc << 16 | 3 << 30)
+                self.posted(op, a[:1])
             elif op == "hold":
                 self.send(mem, WM_MOUSEMOVE, 0, lparam(a[0], a[1]))
                 self.send(mem, WM_LBUTTONDOWN, MK_LBUTTON, lparam(a[0], a[1]))
@@ -458,8 +666,26 @@ class AutoStart:
                 else:
                     x, y = screen_of(mem, best[1])
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
-                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
-                    yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
+                    x, y = x + dx, y + dy
+                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x}, {y})")
+                    if framed:
+                        # scenario-diff.md §2 rule 4.5: the hover frame. The cursor is posted at
+                        # the stop of frame F - 1, the press and release at the stop of frame F
+                        # (the client picks the hovered unit while drawing, 0x00467A10: a press
+                        # posted with its move is a point click, measured 2026-10-09)
+                        down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON)
+                                        if op == "rclickunit"
+                                        else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
+                        self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
+                        self.posted(op, a + [x, y])
+                        self.wait_frame = self.anchor + 1
+                        yield 0
+                        self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
+                        self.send(mem, down, mk, lparam(x, y))
+                        self.send(mem, up, 0, lparam(x, y))
+                        self.posted("rclick" if op == "rclickunit" else "click", [x, y])
+                    else:
+                        yield from self.click(mem, x, y, op == "rclickunit")
             elif op == "units":
                 rows = []
                 for u in units_of(mem, a[0]):
@@ -470,6 +696,23 @@ class AutoStart:
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)
                 self.log("autostart: dumpdrlg " + json.dumps(rec, separators=(",", ":")))
+            elif op == "char":
+                self.send(mem, WM_CHAR, a[0], 1)
+                yield 0.03
+            elif op == "wstr":
+                txt, ok = read_wstr(mem, a[0], a[1])
+                self.log(f"autostart: wstr {a[2] if len(a) > 2 else ''} [{a[0]:#x}]+{a[1]:#x} = "
+                         f"{json.dumps(txt) if ok else None}")
+            elif op == "close":
+                self.send(mem, WM_CLOSE, 0, 0)
+                self.log(f"autostart: WM_CLOSE posted at {self.clock() - self.t0:.1f}s")
+            elif op == "state":
+                try:
+                    mode = mem.read_u32(GAME_MODE)
+                except OSError:
+                    mode = None
+                self.log(f"autostart: state {a[0] if a else ''} at {self.clock() - self.t0:.1f}s: "
+                         f"launcher mode {mode}, player level {player_level(mem)}")
             elif op == "end":
                 limit = self.clock() + 5     # let pending screenshots finish (never join:
                 while any(t.is_alive() for t in self.shots) and self.clock() < limit:
@@ -553,7 +796,7 @@ def setup(a, game_args_list):
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP = 0x200, 0x201, 0x202
 WM_RBUTTONDOWN, WM_RBUTTONUP = 0x204, 0x205
-WM_KEYDOWN, WM_KEYUP, WM_CHAR = 0x100, 0x101, 0x102
+WM_KEYDOWN, WM_KEYUP, WM_CHAR, WM_CLOSE = 0x100, 0x101, 0x102, 0x10
 MK_LBUTTON, MK_RBUTTON = 1, 2
 
 if os.name == "nt":  # import stays possible elsewhere (CI runs the selftest)
@@ -578,6 +821,8 @@ if os.name == "nt":  # import stays possible elsewhere (CI runs the selftest)
     gdi32.SelectObject.argtypes = [W.HDC, W.HGDIOBJ]
     gdi32.DeleteObject.argtypes = [W.HGDIOBJ]
     gdi32.DeleteDC.argtypes = [W.HDC]
+    gdi32.BitBlt.argtypes = [W.HDC, C.c_int, C.c_int, C.c_int, C.c_int, W.HDC, C.c_int, C.c_int,
+                             W.DWORD]
     gdi32.GetDIBits.argtypes = [W.HDC, W.HBITMAP, W.UINT, W.UINT, C.c_void_p, C.c_void_p, W.UINT]
     kernel32.GetProcessId.argtypes = [W.HANDLE]
     kernel32.GetProcessId.restype = W.DWORD
@@ -637,6 +882,9 @@ def screenshot_png(hwnd, path):
     bih = _BIH(C.sizeof(_BIH), w, -h, 1, 24, 0, stride * h, 0, 0, 0, 0)
     buf = (C.c_ubyte * (stride * h))()
     gdi32.GetDIBits(mdc, bmp, 0, h, buf, C.byref(bih), 0)
+    if not any(bytes(buf)):              # Wine: PrintWindow of the DirectDraw window is black;
+        gdi32.BitBlt(mdc, 0, 0, w, h, hdc, 0, 0, 0x00CC0020)   # copy the window's pixels
+        gdi32.GetDIBits(mdc, bmp, 0, h, buf, C.byref(bih), 0)
     gdi32.DeleteObject(bmp)
     gdi32.DeleteDC(mdc)
     user32.ReleaseDC(hwnd, hdc)
@@ -792,6 +1040,24 @@ def selftest():
     x, y = sent[-1][3] & 0xFFFF, sent[-1][3] >> 16
     # player client px: ((5000-4000)*32, (5000+4000)*16) / camera.md §2 shifts
     assert (x, y) == (400 + (3 - 1) * 16, 292 + (3 + 1) * 8 - 8), (x, y)
+    # the drawn camera (unit origin cx_u = P_x - 400, cy_u = P_y - 300 + 16): the same point
+    pcx, pcy = (5000 - 4000) * 16, (5000 + 4000) * 8
+    before = screen_of(m, obj)
+    m.m.update({0x7A520C: pcx - 400, 0x7A5208: pcy - 300 + 16})
+    assert screen_of(m, obj) == before, (screen_of(m, obj), before)
+    m.m.update({0x7A520C: 0, 0x7A5208: 0})
+    assert parse_script("frame 3; clickunit 1 19,0x14; rclickunit 2 * 3 -12") == [
+        ("frame", [3]), ("clickunit", [1, "19,0x14"]), ("rclickunit", [2, "*", 3, -12])]
+    # framed clickunit: posted at once at the stop of frame F - 1
+    sent.clear()
+    s4 = AutoStart(after=0, script="frame 3; clickunit 2 119", log=lambda x: None, clock=Clock())
+    s4.send = lambda mem, msg, wp, lp: sent.append((msg, wp, lp))
+    s4.anchor, s4.stop_frame = 3, 2
+    list(s4.run(m, [("clickunit", [2, "119"])]))
+    assert [(msg, wp) for msg, wp, _ in sent] == [
+        (WM_MOUSEMOVE, 0), (WM_MOUSEMOVE, 0), (WM_LBUTTONDOWN, MK_LBUTTON), (WM_LBUTTONUP, 0)], sent
+    assert s4.wait_frame == 4                                  # the click waited for frame 4
+    assert sent[0][2] == lparam(400 + 2 * 16, 292 + 4 * 8 - 8)
     m.m[obj + U_CLASS] = 120                                   # perturbation: wrong class is not found
     assert nearest(m, 2, (119,)) is None
     m.m[GAME_MODE] = 1                                         # not in the menu: never forced
@@ -800,29 +1066,81 @@ def selftest():
     s3 = AutoStart(after=0, script="waitlevel 9 1", log=lambda x: None, clock=Clock())
     s3.clock.t = 0
     drive(s3, m, s3.clock, 0.5)                                # forced? mode is 1: no
+    class WMem:
+        def __init__(self, m):
+            self.m = m
+
+        def read_u32(self, a):
+            return self.m.get(a, 0)
+    wm = WMem({0x77934C: 0x6000, 0x6000 + 0x5C: ord("a") | ord("b") << 16, 0x6000 + 0x60: ord("-")})
+    assert read_wstr(wm, 0x77934C, 0x5C) == ("ab-", True)
+    assert read_wstr(wm, 0x1234, 0) == ("", False)
+    assert parse_script("char 45; state x; close; wstr 0x77934C 0x5C n") == [
+        ("char", [45]), ("state", ["x"]), ("close", []), ("wstr", [0x77934C, 0x5C, "n"])]
     assert png_rgb(1, 1, [b"\1\2\3"]).startswith(b"\x89PNG")
+    # frame-anchored steps (scenario-diff.md §2 rule 4): parsing
+    assert parse_script("frame 10; click 600 300; hold 1 2 3; frame 20; key r; hold 3 4 1") == [
+        ("frame", [10]), ("click", [600, 300]), ("holdf", [1, 2, 3]), ("frame", [20]),
+        ("key", [ord("R")]), ("holdf", [3, 4, 1])]
+    assert parse_script("hold 1 2 1.5") == [("hold", [1, 2, 1.5])]          # seconds before `frame`
+    for bad in ("frame 0", "frame 5; frame 4", "frame", "frame 3; hold 1 2 0", "frame 3; hold 1 2 .5"):
+        try:
+            parse_script(bad)
+            raise AssertionError(f"accepted {bad!r}")
+        except ValueError:
+            pass
+    # posting at the tick-return stops: each step at the stop of frame F - 1
+    m4 = Mem()
+    clk4 = Clock()
+    s4 = AutoStart(after=0, script="frame 10; click 600 300; hold 1 2 3; frame 20; key r; "
+                   "frame 20; move 5 6", log=lambda x: None, clock=clk4)
+    s4.attached = True
+    sent4 = []
+    s4.send = lambda mem, msg, wp, lp: sent4.append((s4.stop_frame, msg, wp, lp))
+    s4.poll(m4)                                                # menu left
+    m4.m.update({PLAYER: 0x1000, 0x1000 + U_PATH: 0x2000, 0x2000 + 0x1C: 0x3000,
+                 0x3000 + 0x10: 0x4000, 0x4000 + 0x58: 0x5000, 0x5000 + 0x1D0: 1})
+    for f in range(1, 30):
+        s4.on_tick_return(m4, f)
+        clk4.t += 0.04
+        s4.poll(m4)                                            # the time loop never runs a framed step
+    got = [(f, msg, wp) for f, msg, wp, _ in sent4]
+    assert got == [(9, WM_MOUSEMOVE, 0), (9, WM_LBUTTONDOWN, MK_LBUTTON), (9, WM_LBUTTONUP, 0),
+                   (9, WM_MOUSEMOVE, 0), (9, WM_LBUTTONDOWN, MK_LBUTTON),
+                   (12, WM_LBUTTONUP, 0),                      # hold 3 frames: up before frame 13
+                   (19, WM_KEYDOWN, ord("R")), (19, WM_CHAR, ord("r")), (19, WM_KEYUP, ord("R")),
+                   (19, WM_MOUSEMOVE, 0)], got
+    assert sent4[1][3] == lparam(600, 300) and sent4[-1][3] == lparam(5, 6)
+    assert [x[:2] for x in s4.framed_log] == [(10, 9), (10, 9), (13, 12), (20, 19), (20, 19)]
+    # a late stop: the step runs at the first stop at or after F - 1, noted
+    s5 = AutoStart(after=0, script="frame 3; click 1 1", log=lambda x: None, clock=Clock())
+    s5.attached, s5.forced_at = True, 0.0
+    s5.send = lambda *a: None
+    s5.on_tick_return(m4, 7)
+    assert s5.framed_log == [(3, 7, "click", [1, 1])]
     # waitticks waits on the recorder's tick counter (not the clock); mark notes the tick
     notes = []
-    s4 = AutoStart(after=0, script="waitticks 3; mark m1; end", log=notes.append, clock=Clock())
+    s6 = AutoStart(after=0, script="waitticks 3; mark m1; end", log=notes.append, clock=Clock())
     m.m[GAME_MODE] = 4
     m.ticks = 10
-    s4.send = lambda *a: None
+    s6.send = lambda *a: None
     for i in range(40):
-        s4.clock.t += 0.1
-        s4.poll(m)
-    assert not s4.done and not any("mark" in n for n in notes), notes
+        s6.clock.t += 0.1
+        s6.poll(m)
+    assert not s6.done and not any("mark" in n for n in notes), notes
     m.ticks = 12
-    s4.clock.t += 0.1
-    s4.poll(m)
-    assert not s4.done, "waitticks 3 ended at 2 ticks"
+    s6.clock.t += 0.1
+    s6.poll(m)
+    assert not s6.done, "waitticks 3 ended at 2 ticks"
     m.ticks = 13
     for i in range(5):
-        s4.clock.t += 0.1
-        s4.poll(m)
-    assert any(n == "autostart: mark m1 ticks=13" for n in notes) and s4.done, notes
+        s6.clock.t += 0.1
+        s6.poll(m)
+    assert any(n == "autostart: mark m1 ticks=13" for n in notes) and s6.done, notes
     print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
           "arrival from the player chain, click / text timing, waitlevel, goto projection "
-          "(camera.md), wrong class not found, end")
+          "(camera.md), wrong class not found, end; frame steps posted at the tick-return stop "
+          "of frame F - 1 (click, framed hold, key, move), late stop noted")
 
 
 def main():

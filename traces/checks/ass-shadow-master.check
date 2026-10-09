@@ -1,0 +1,17 @@
+check 1
+# Shadow Master summon: ScnAss (expansion, level 30, every skill at 20, right skill 279),
+# -seed 1234; warp to the Blood Moor (level 2; variant
+# blood-moor-empty: no monster population there) before frame 4
+# (no target monster: the monster AI out of town differs, area B), then one right click at client pixel (330, 300), before frame 20's
+# drain. Compares the cast (mode, states, stats), its missiles' or
+# summons' effects and the draws. Area F2 (q-diff-skills-2).
+# Spec: specs/tools/scenario-diff.md.
+name ass-shadow-master
+save ScnAss --class ass --expansion --level 30 --all-skills 20 --right-skill 279
+seed 1234
+ticks 70
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+input frame 20; rclick 330 300

@@ -103,6 +103,9 @@ fn a_name_not_in_the_file_gets_the_default_record() {
         .names
         .insert((UnitType::Player, 7), *b"SOA1HTH\0");
     let p = fx.spawn(UnitType::Player, 1, fx.a, 10, 10);
+    // A loaded player's attack rate (`d2s-load.md` §2 post-load: stat 68
+    // = 100; `units.md` §4.7 step 8 reads it in mode 7).
+    fx.stats(p, &[(68, 100)]);
     animate(&mut fx, p, 7);
     // §3: frames 2048, speed 256, no events → only the end, at
     // f + 2048.
@@ -229,6 +232,32 @@ fn a_killing_missile_runs_the_kill_and_gives_experience() {
     assert_eq!(fx.sim.hooks().mode_target, None);
     assert_eq!(fx.stat(p, EXPERIENCE), 100);
     fx.assert_clean();
+}
+
+/// `units.md` §4.6 rule 1.2 ("What keeps a dead monster dead"): the
+/// death clean-up's `0x005738D0` cancels the monster's pending think
+/// (type 2) and regeneration (type 3) events, so a think scheduled
+/// before the kill never runs on the dead unit (the playthrough's
+/// "killed monsters stand back up").
+// Covers: specs/sim/units.md §4.6 r1
+#[test]
+fn the_death_start_cancels_the_pending_think_and_regeneration() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    let f0 = fx.game.frame;
+    for ev in [event::AI_THINK, event::STAT_REGEN] {
+        fx.game
+            .schedule_event(m, u32::from(ev), f0 + 15, None, 0, 0)
+            .unwrap();
+    }
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    let f = fx.game.frame;
+    assert_eq!(fx.timers(m), [(event::END_ANIM, f + 4)]);
 }
 
 /// `hirelings.md` §8 rule 1: the kill (flag 1) queues the killed monster
@@ -938,4 +967,139 @@ fn a_hit_puts_the_monster_into_get_hit_or_marks_it_soft() {
         crate::wiring::action::reaction::reaction(w, p, m, &mut rec);
     });
     assert_ne!(fx.sim.sys.units.get(m).unwrap().flags & 0x8000, 0);
+}
+
+fn react(fx: &mut Fx, a: UnitId, d: UnitId, result: u16) {
+    let mut rec = crate::combat::DamageRecord {
+        result,
+        total: 2000,
+        ..Default::default()
+    };
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, a, d, &mut rec);
+    });
+}
+
+/// `damage.md` §7.1 steps 4.4 and 4.5: a block result puts a monster
+/// whose class has BL into mode 6; a class without BL, Diablo, or a soft
+/// block does not change mode. A knockback result on a class with KB
+/// enters mode 13; without KB it turns into get-hit (step 4.1).
+// Covers: specs/combat/damage.md §7.1 r4
+#[test]
+fn a_monster_blocks_and_is_knocked_back() {
+    use crate::combat::result;
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    react(&mut fx, p, m, result::HIT | result::BLOCK);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 6, "BL");
+
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    react(
+        &mut fx,
+        p,
+        m,
+        result::HIT | result::BLOCK | result::SOFT_HIT,
+    );
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 1, "soft block");
+
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.sim.hooks().x.missing_modes = vec![6];
+    react(&mut fx, p, m, result::HIT | result::BLOCK);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 1, "no BL mode");
+
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    react(&mut fx, p, m, result::HIT | result::KNOCKBACK);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 13, "KB");
+
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.sim.hooks().x.missing_modes = vec![13];
+    react(&mut fx, p, m, result::HIT | result::KNOCKBACK);
+    assert_eq!(
+        fx.sim.sys.units.get(m).unwrap().mode,
+        monster_mode::GH,
+        "KB without the mode → get-hit"
+    );
+}
+
+/// `damage.md` §7.1 step 5.3: a player's block result requests BL (mode
+/// 9) and stamps stat 95 with the frame, at most once per
+/// `fasterblockrate / 8 + 15` frames; a soft block does nothing.
+// Covers: specs/combat/damage.md §7.1 r5
+#[test]
+fn a_player_blocks_once_per_block_window() {
+    use crate::combat::result;
+    const LAST_BLOCK: u16 = 95;
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let (p, m) = kill_setup(&mut fx);
+    fx.stats(p, &[(102, 16), (LAST_BLOCK, 0)]);
+    // Window: 16 / 8 + 15 = 17 frames.
+    fx.game.frame = 17;
+    react(&mut fx, m, p, result::HIT | result::BLOCK);
+    assert_eq!(
+        fx.sim.sys.stats.unit_total(p, LAST_BLOCK, 0),
+        0,
+        "17 - 0 ≤ 17"
+    );
+    fx.game.frame = 18;
+    react(
+        &mut fx,
+        m,
+        p,
+        result::HIT | result::BLOCK | result::SOFT_HIT,
+    );
+    assert_eq!(fx.sim.sys.stats.unit_total(p, LAST_BLOCK, 0), 0, "soft");
+    react(&mut fx, m, p, result::HIT | result::BLOCK);
+    assert_eq!(fx.sim.sys.stats.unit_total(p, LAST_BLOCK, 0), 18);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 9, "BL");
+    fx.game.frame = 18 + 17;
+    react(&mut fx, m, p, result::HIT | result::WEAPON_BLOCK);
+    assert_eq!(
+        fx.sim.sys.stats.unit_total(p, LAST_BLOCK, 0),
+        18,
+        "inside the window"
+    );
+    fx.game.frame = 18 + 18;
+    react(&mut fx, m, p, result::HIT | result::WEAPON_BLOCK);
+    assert_eq!(fx.sim.sys.stats.unit_total(p, LAST_BLOCK, 0), 36);
+}
+
+/// `damage.md` §7.1 steps 5.5 and 5.6: a knockback result requests KB
+/// (mode 19); a get-hit the get-hit test lets through requests GH (mode
+/// 4), a small one is soft.
+// Covers: specs/combat/damage.md §7.1 r5
+#[test]
+fn a_player_is_knocked_back_or_gets_hit() {
+    use crate::combat::result;
+    let setup = || {
+        let mut fx = Fx::new();
+        fx.sim.hooks().enable_paths().expect("embedded tables");
+        let (p, m) = kill_setup(&mut fx);
+        fx.stats(p, &[(st::MAXHP, 2560), (st::HITPOINTS, 2560)]);
+        (fx, p, m)
+    };
+    let (mut fx, p, m) = setup();
+    react(&mut fx, m, p, result::HIT | result::KNOCKBACK);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 19, "KB");
+
+    let (mut fx, p, m) = setup();
+    react(&mut fx, m, p, result::HIT | result::GET_HIT);
+    assert_eq!(fx.sim.sys.units.get(p).unwrap().mode, 4, "GH");
+
+    let (mut fx, p, m) = setup();
+    let mut rec = crate::combat::DamageRecord {
+        result: result::HIT | result::GET_HIT,
+        total: 100,
+        ..Default::default()
+    };
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::reaction(w, m, p, &mut rec);
+    });
+    let r = fx.sim.sys.units.get(p).unwrap();
+    assert_eq!(r.mode, 1);
+    assert_ne!(r.flags & 0x8000, 0, "soft hit");
 }

@@ -16,6 +16,7 @@ pub mod bodies_ext;
 pub mod bodies_ext2;
 pub mod catalogue;
 mod create;
+pub mod damage;
 mod flight;
 mod hit;
 pub mod init_cb;

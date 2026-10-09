@@ -88,7 +88,9 @@ use d2_server::adapters::handlers::world::{
     preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
     WiredWorld, WorldHost,
 };
-use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
+use d2_server::adapters::session::{
+    initial_portal_flags, load_new_character_with_items, load_save, GameSetup,
+};
 use d2_server::adapters::session_flow::{
     create_flags, CharacterLoader, CreateGame, Loaded, SessionFlow,
 };
@@ -181,9 +183,11 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
 /// for the game's difficulty has 0x80 gives its saved map seed
 /// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
-/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
-/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
-/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+/// PROVISIONAL (REC-291 -> q-fix-new-char-seed): 1.14d draws a fresh
+/// seed for a new character (`time_value`, `rng.md` §5.2; measured: two
+/// new characters got 0x63a0b0fd and 0x07013cee,
+/// `traces/frontend/frontend-menus/frontend-0005.json`); d2rs keeps the
+/// fixed default so dev runs and draw dumps stay reproducible.
 pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
     if let Some(n) = fixed {
         return n;
@@ -205,6 +209,9 @@ pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
 pub const GAME_TYPE: u8 = 3;
 /// Duriel's Lair (`levels` row 73, act 1).
 pub const DURIELS_LAIR: u32 = 73;
+/// Durance of Hate levels 1 and 2 (`quests.md` §8.2).
+pub const DURANCE_1: u32 = 100;
+pub const DURANCE_2: u32 = 101;
 /// Duriel's `monstats` row.
 pub const DURIEL_CLASS: u32 = 211;
 /// Izual's `monstats` row and the quest chain his death links
@@ -464,7 +471,7 @@ pub enum BuildError {
     Archives { dir: String, message: String },
     /// No game directory given: the game plays only on the user's own
     /// files (`$D2_GAME_DIR`, or `--native DIR`).
-    #[error("no game files: set D2_GAME_DIR to a Diablo II 1.14d install")]
+    #[error("no game files: put d2-client.exe in the Diablo II 1.14d folder (next to d2data.mpq), pass --game-dir <folder>, or set D2_GAME_DIR")]
     NoGameDir,
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
@@ -497,6 +504,9 @@ pub struct LocalSeams {
     /// The players and monsters of [`Self::sides`] that are dying or dead
     /// (player modes 0 / 17, monster modes 0 / 12), for the target search.
     pub down: std::collections::BTreeSet<UnitId>,
+    /// The unit size (`0x00620510`, the path record's) of the units of
+    /// [`Self::sides`], for the full-size distance of the target search.
+    pub sizes: BTreeMap<UnitId, i32>,
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
@@ -528,6 +538,22 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The quest records' not-intro bytes by chain, published by the quest
+    /// control once per tick (`Pending::publish_not_intro`): the not-intro
+    /// test `0x005444B0` of population and the missile bodies.
+    pub not_intro: BTreeMap<u8, bool>,
+    /// The caged barbarians' group states by GUID (counting, portal
+    /// GUID), published by the quest control once per tick
+    /// (`Pending::publish_rescue`).
+    pub rescue: BTreeMap<u32, (bool, Option<u32>)>,
+    /// The Durance of Hate warp check's answer
+    /// (`Pending::set_durance_open`, q-play-act3); level 100 stays closed
+    /// while it is `true`.
+    pub durance_closed: bool,
+    /// The Golden Bird's +0x00 and the Gidbinn altar's point while Ormus
+    /// may activate it (`Pending::set_act3_npc_answers`, q-play-act3).
+    pub alkor_bird: bool,
+    pub ormus_altar: Option<(i32, i32)>,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -541,16 +567,22 @@ impl LocalSeams {
             .map(|&(ty, allied, _)| ty == UnitType::Player || allied)
     }
 
-    /// PROVISIONAL (REC-279; d2rs-own, unverified): the good units'
-    /// target search (`ai.md` §5.2 step 4, scan 5 within 35, and
-    /// `0x005DDC30`, scan 6 + `0x005DD510`; the scan callbacks' bodies
-    /// are not written). The nearest monster of the other side that is
-    /// not dying or dead, by the no-size distance (`ai.md` §6,
-    /// `0x005DC530`), closer than `range`; ties: the lower unit id. No
-    /// line test, no alternative targets.
-    fn nearest_foe(&self, unit: UnitId, range: i32) -> Option<(UnitId, i32)> {
+    /// The good units' target search: the nearest monster of the other
+    /// side that is not dying or dead, closer than `range`; ties: the
+    /// lower unit id. `full_size`: by the full-size distance (`ai.md` §6
+    /// `0x005DC380`, the scanner's size from [`Self::sizes`]), as the scan
+    /// 6 callback `0x005DCBD0` (`ai.md` §5.3 rule 2); else by the no-size
+    /// distance (`0x005DC530`).
+    ///
+    /// PROVISIONAL (REC-279 part 2; d2rs-own, unverified): the ranges are
+    /// settled (`ai.md` §5.2 step 4: 35; §5.3 scan 6: full-size < 49), but
+    /// the scan 6 filter `0x005DC970`, the `nThreat` main / alternative
+    /// classes, the line test (mask 4) and `0x005DD510` are not applied
+    /// here, nor the scan 5 callback `0x005DCA70`.
+    fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
         let &(_, _, at) = self.sides.get(&unit)?;
         let side = self.player_side(unit)?;
+        let size = self.sizes.get(&unit).copied().unwrap_or(0);
         self.sides
             .iter()
             .filter(|&(&u, &(ty, ..))| {
@@ -560,8 +592,12 @@ impl LocalSeams {
                     && !self.down.contains(&u)
             })
             .map(|(&u, &(_, _, p))| {
-                let (dx, dy) = ((at.0 - p.0).abs(), (at.1 - p.1).abs());
-                (u, (2 * dx.max(dy) + dx.min(dy)) / 2)
+                let d = if full_size {
+                    d2_sim::monsters::ai::distance_full_size(at, size, p)
+                } else {
+                    d2_sim::monsters::ai::distance_no_size(at, p)
+                };
+                (u, d)
             })
             .filter(|&(_, d)| d < range)
             .min_by_key(|&(u, d)| (d, u))
@@ -573,8 +609,15 @@ impl LocalSeams {
 /// answered here).
 const PREVIEW_MELEE_RANGE: i32 = 2;
 
-/// The good units' search range (`ai.md` §5.2 step 4: scan 5 within 35).
+/// The good units' main search range (`ai.md` §5.2 step 4: scan 5
+/// within 35).
 const GOOD_SEARCH_RANGE: i32 = 35;
+
+/// The `0x005DDC30` search window (`ai.md` §5.3, scan 6 callback
+/// `0x005DCBD0` rule 2): candidates at full-size distance < 49 (0x31);
+/// each caller gates its own distance (the Hireable think: < 25,
+/// `ai-bodies-6.md` §7 step 8).
+const SECONDARY_SEARCH_RANGE: i32 = 49;
 
 /// The play host's seam refresh (`SimGame::set_host_sync`): the players
 /// and monsters with their allied flag (`UnitLists`), for
@@ -606,15 +649,23 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
         .flat_map(|e| e.nodes.iter().map(|n| n.guid as u32))
         .collect();
     let mut sides = BTreeMap::new();
+    let mut sizes = BTreeMap::new();
     for ty in [UnitType::Player, UnitType::Monster] {
         for u in game.lists.units_of_type(ty) {
             if let Some(e) = game.lists.unit(u) {
                 let pet = ty == UnitType::Monster && pets.contains(&e.guid);
                 sides.insert(u, (ty, e.allied || pet, hooks.path_position(u)));
+                let size = hooks.paths.as_ref().and_then(|p| p.record(u));
+                let size = match size {
+                    Some(d2_sim::path::UnitPath::Dynamic(d)) => d.unit_size,
+                    _ => 0,
+                };
+                sizes.insert(u, size);
             }
         }
     }
     hooks.x.sides = sides;
+    hooks.x.sizes = sizes;
     let mut units = BTreeMap::new();
     for ty in [UnitType::Player, UnitType::Monster] {
         for u in game.lists.units_of_type(ty) {
@@ -737,14 +788,81 @@ impl Pending for LocalSeams {
                 // unverified, REC-246: the made-up chain has both exits).
                 || (source == d2_sim::world::quests::act5::q5::SUMMIT
                     && matches!(level, 118 | 128)
-                    && self.summit_closed),
+                    && self.summit_closed)
+                // `0x005BBFA0` (`quests.md` §8.2): Durance of Hate 1 waits
+                // for the Compelling Orb, except from Durance 2.
+                || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
     }
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
     }
+    /// `0x005444B0` (`quests.md` §2.3): no record with the chain → true.
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        self.not_intro.get(&chain).copied().unwrap_or(true)
+    }
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {
+        self.not_intro = records.iter().copied().collect();
+    }
+    /// d2rs-own, unverified (REC-799): the prisoner AI's hooks with an
+    /// effect run on the quest control after the tick.
+    fn queue_quest_event(&mut self, e: d2_sim::wiring::action::QuestEvent) {
+        self.quest_events.push(e);
+    }
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        self.rescue.get(&guid).copied().unwrap_or((false, None))
+    }
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {
+        self.rescue = barbarians.iter().map(|&(g, c, p)| (g, (c, p))).collect();
+    }
+    /// d2rs-own, unverified (REC-796): Tyrael's spawn runs on the quest
+    /// control after the tick, not inside the missile body.
+    fn missile_spawn_tyrael(
+        &mut self,
+        room: Option<d2_sim::units::RoomId>,
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    ) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::SpawnTyrael {
+                room,
+                missile,
+                x,
+                y,
+            });
+    }
     fn set_lair_open(&mut self, open: bool) {
         self.lair_open = open;
+    }
+    fn set_durance_open(&mut self, open: bool) {
+        self.durance_closed = !open;
+    }
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {
+        self.alkor_bird = alkor_bird;
+        self.ormus_altar = ormus_altar;
+    }
+    /// `0x005BAD20` (`ai-bodies.md` §9.9 alkor): the published answer.
+    fn alkor_bird(&mut self, _: &mut Game) -> bool {
+        self.alkor_bird
+    }
+    /// `0x005BAD40`: queued for the quest control (REC-781, d2rs-own,
+    /// unverified: after the tick, as REC-129); the published answer
+    /// drops at once so the same tick reads it cleared.
+    fn alkor_reset(&mut self, _: &mut Game) {
+        self.alkor_bird = false;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::AlkorReset);
+    }
+    /// `0x005B9CA0` (§9.9 ormus): the published altar point.
+    fn ormus_altar(&mut self, _: &mut Game) -> Option<(i32, i32)> {
+        self.ormus_altar
+    }
+    /// `0x005B9CD0`: queued as [`Self::alkor_reset`] (REC-781).
+    fn ormus_set_altar_mode(&mut self, _: &mut Game) {
+        self.ormus_altar = None;
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::OrmusAltar);
     }
     /// C→S 0x44 (`quests-act2-2.md` §3.2): queued for the quest control
     /// (REC-167, d2rs-own, unverified: it runs after the tick, not inside
@@ -815,8 +933,25 @@ impl Pending for LocalSeams {
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::monster_attack_skill(h, sim, unit);
+    }
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) {
+        skill_events::monster_attack_strike(h, sim, unit, moving);
+    }
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId, mode: u32) {
+        skill_events::monster_mode_damage(h, sim, unit, mode);
+    }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
+    }
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::passive_refresh_all(h, sim, unit);
     }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
@@ -873,8 +1008,9 @@ impl Pending for LocalSeams {
     fn item_max_stack(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).max_stack
     }
-    fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
-        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
+    fn anim_name(&self, unit: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        let weapon = self.weapons.cof_class(unit);
+        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode, weapon)
     }
     fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
         super::anim_names::anim_rate(speed)
@@ -918,11 +1054,7 @@ impl Pending for LocalSeams {
         self.monsters.class_has_mode(class, mode)
     }
     fn used_skill(&self, unit: UnitId) -> Option<d2_sim::skills::SkillEntry> {
-        let monster = self
-            .sides
-            .get(&unit)
-            .is_some_and(|s| s.0 == UnitType::Monster);
-        self.monsters.used_skill(unit, monster)
+        self.monsters.used_skill(unit)
     }
     // d2rs-own, unverified (preview, q-a2-charge-jab; REC-274): a monster
     // has no skill list, so its used entry's flags and params (Charge's
@@ -941,15 +1073,15 @@ impl Pending for LocalSeams {
         d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
     /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
-    /// within 35 (PROVISIONAL REC-279).
+    /// within 35 (`ai.md` §5.2 step 4), no-size distance.
     fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe(unit, GOOD_SEARCH_RANGE)
+        self.nearest_foe(unit, GOOD_SEARCH_RANGE, false)
     }
-    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] within 35, with the
-    /// preview's melee flag (PROVISIONAL REC-279); none: distance
-    /// 0x7FFFFFFF.
+    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
+    /// < 49 (`ai.md` §5.3 scan 6), with the preview's melee flag; none:
+    /// distance 0x7FFFFFFF.
     fn secondary_target(&mut self, _: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        match self.nearest_foe(unit, GOOD_SEARCH_RANGE) {
+        match self.nearest_foe(unit, SECONDARY_SEARCH_RANGE, true) {
             Some((t, d)) => (Some(t), d, self.in_melee_range(unit, t, 0)),
             None => (None, 0x7FFF_FFFF, false),
         }
@@ -994,10 +1126,13 @@ impl Pending for LocalSeams {
     }
     /// `0x00623660`, the operate entry's interact range (`objects.md`
     /// §7.1 rule 3): no written spec gives its test.
-    // PROVISIONAL (world/objects.md §7.1 r3; REC-94): in range. The
-    // preview client sends C→S 0x13 only on arrival
-    // (`world_view/interact.rs`); the §7.3 r3–r4 approach is
-    // `Pending::object_approach`'s default (operate).
+    /// Measured (REC-94, `facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client polls
+    /// `0x00623660(P, O)` every frame of the walk and sends C→S 0x13 on
+    /// the first frame it returns 1 (waypoint 119 at sub-tile offset
+    /// (4, 3), stash 267 at (3, 1)); both server calls of that 0x13
+    /// (`0x00548B7D`, `0x00584597`) then return 1. So "in range" holds
+    /// for every 0x13 the client sends; the test's own formula is not
+    /// modelled (`docs/handoff/pc1-data.md` Step 4).
     fn object_in_range(&self, _: &Game, _: UnitId, _: UnitId) -> bool {
         true
     }
@@ -1014,6 +1149,25 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x005444B0` (population's preset swaps, `population.md` §11.3):
+    /// the quest control's published answer.
+    fn quest_flag(&self, flag: u8) -> bool {
+        Pending::quest_not_intro(self, flag)
+    }
+    /// `0x00544E80` from special monster creation: queued for the quest
+    /// control (the Golden Bird's boss choice, `quests-act3.md` §6.2).
+    /// PROVISIONAL (REC-780, d2rs-own, unverified): it runs after the tick,
+    /// as the other queued quest events (REC-129), not inside the creation.
+    fn boss_quest_hook(&mut self, boss: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::BossCreated { unit: boss });
+    }
+    /// `0x00545B50` (`monsters/init.md` §20.1): queued as
+    /// [`Self::boss_quest_hook`] (REC-780).
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::PresetBoss { unit });
+    }
     /// A host-placed monster of a level's preset list
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
@@ -1114,6 +1268,22 @@ fn load_world_files(files: &GameFiles, levels: &LevelTables) -> Result<WorldFile
     )?)
 }
 
+/// `ExpField.D2` (`path-placement.md` §7.3): the walk-back field the floor
+/// drop of items, monsters' and chests' alike, tests its spots with.
+fn load_expfield(files: &GameFiles) -> Result<Arc<d2_sim::path::search::ExpField>, BuildError> {
+    use d2_sim::path::search::ExpField;
+    let err = |m: String| BuildError::Tables(format!("{}: {m}", ExpField::PATH));
+    let path = CanonicalPath::new(ExpField::PATH).map_err(|e| err(e.to_string()))?;
+    match files.read_native(&path) {
+        Some(Ok(NativeAsset::ExpField(f))) => ExpField::from_cells(f.height, f.width, f.cells)
+            .map(Arc::new)
+            .ok_or_else(|| err("cell count does not match its header".into())),
+        Some(Ok(_)) => Err(err("wrong kind".into())),
+        Some(Err(e)) => Err(err(e.to_string())),
+        None => Err(err("in no archive".into())),
+    }
+}
+
 /// Everything the game reads from the user's files, loaded up front.
 #[derive(Debug)]
 pub struct LiveData {
@@ -1131,6 +1301,9 @@ pub struct LiveData {
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
     pub save: SaveData,
+    /// The floor drop's walk-back field (`data\global\ExpField.D2`,
+    /// `path-placement.md` §7.3), set on the path provider of every game.
+    pub expfield: Arc<d2_sim::path::search::ExpField>,
     /// The archive set itself (the client's other readers: sounds).
     pub archives: Arc<GameFiles>,
 }
@@ -1152,6 +1325,7 @@ impl LiveData {
             Some(Err(e)) => return Err(BuildError::Tables(format!("AnimData.d2: {e}"))),
             None => return Err(BuildError::Tables("AnimData.d2: in no archive".into())),
         };
+        let expfield = load_expfield(&archives)?;
         let tables = GameTables::from_loaded(bins, anim)?;
         let levels = LevelTables::from_fixed(&tables.fixed)?;
         let files = load_world_files(&archives, &levels)?;
@@ -1163,6 +1337,7 @@ impl LiveData {
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
+            expfield,
             archives,
         })
     }
@@ -1418,6 +1593,11 @@ pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
                     b: d.blue,
                 }
             }),
+            critters: crate::bridge::world::Critters {
+                cmon: [l.cmon1, l.cmon2, l.cmon3, l.cmon4].map(|c| c as i16),
+                cpct: [l.cpct1, l.cpct2, l.cpct3, l.cpct4].map(|c| c as i16),
+                camt: [l.camt4, 0, 0, 0],
+            },
             pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
@@ -1506,6 +1686,24 @@ pub fn client_skill_rows(archives: &dyn TableFiles) -> Result<Vec<SkillRow>, Bui
         .ok_or_else(|| BuildError::Tables("skills not loaded".to_owned()))?;
     let rows: Vec<Skills> = decode_all(table).map_err(|e| BuildError::Tables(e.to_string()))?;
     Ok(rows.iter().map(super::skill_rest::skill_row).collect())
+}
+
+/// The client player update's animation lookup
+/// ([`super::anim_names::ClientPlayerAnims`]): the user's `AnimData.d2`,
+/// the art's token tables and the items tables.
+pub fn client_player_anims(
+    data: &GameData,
+) -> Result<super::anim_names::ClientPlayerAnims, BuildError> {
+    let GameData::Live(d) = data;
+    let looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+        .map_err(BuildError::Tables)?;
+    let inv = InvTables::from_fixed(&d.tables.fixed)
+        .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?;
+    Ok(super::anim_names::ClientPlayerAnims::new(
+        Arc::new(looks),
+        Arc::new(d.tables.anim.clone()),
+        &inv,
+    ))
 }
 
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
@@ -1599,6 +1797,8 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
             c.no_aura = m.noaura;
+            c.min_grp = m.mingrp;
+            c.max_grp = m.maxgrp;
             c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
@@ -1724,6 +1924,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             colorpri: s.colorpri,
             colorshift: s.colorshift,
             light_rgb: (s.light_r, s.light_g, s.light_b),
+            meleeonly: s.meleeonly,
         })
         .collect();
     Ok(UnitRows {
@@ -1779,6 +1980,7 @@ pub fn client_monster_anims(
                 d2_sim::units::UnitType::Monster,
                 class as u32,
                 mode as u32,
+                0,
             );
             *a = match key {
                 Some(k) => anim.record(&k).ok().map(|rec| (rec.frames, rec.speed)),
@@ -1924,6 +2126,13 @@ pub fn build_with(
     )));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
+    // The hireling calls (save restore, join follow, act change;
+    // `hirelings-2.md` §19) run on the wired host, which holds the
+    // hireling lists when the game has `hireling.txt`; without the queue
+    // a saved hireling is never restored (`hirelings.md` §10).
+    if parts.hirelings.is_some() {
+        hooks.hireling_calls = Some(Vec::new());
+    }
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
     // stamina and position sent to the client at the end of each tick.
     hooks.enable_vitals_sync();
@@ -1935,6 +2144,11 @@ pub fn build_with(
     hooks
         .enable_paths()
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
+    // The floor drop's walk-back field (`path-placement.md` §7.3): monster
+    // and chest drops search their spot with it (`treasure.md` §7 step 2).
+    if let Some(paths) = hooks.paths.as_mut() {
+        paths.field = Some(d.expfield.clone());
+    }
     // The inactive store (`units.md` §3.3–§3.4): a room the tick frees
     // keeps its units' records, and its next build restores them.
     hooks.enable_inactive_store();
@@ -2054,10 +2268,9 @@ pub fn build_with(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
-    // A new character carries the Horadric Cube (d2rs-own, unverified,
-    // REC-244): charstats gives none, and the preview has no Act II quest
-    // reward path yet.
-    world.start_extra = vec![*b"box "];
+    // No extra start items: a new character gets the charstats slots only
+    // (REC-244 settled: 1.14d gives an Amazon stub 8 start items, Wine
+    // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
     s.set_host_sync(sync_seams);
@@ -2098,6 +2311,11 @@ fn loader(
             // the save's or the start items and the act's DRLG.
             let p = v.allocate(g, &req, 0, 0)?;
             v.init_player_seed(p);
+            // `combat/hit.md` §7.1: a player is good (2), its state-105
+            // list there before its first 0xAA (`intents-events.md`
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-732): the
+            // original's call site in the join is not identified.
+            v.set_alignment(g, p, 2);
             Some(p)
         }) else {
             s.events
@@ -2185,9 +2403,22 @@ fn loader(
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((mut entry, report)) => {
+                    // The skill section's assigns turn the passive states on
+                    // with their stat lists (`d2s-load.md` §2 "skills",
+                    // before the items).
+                    s.events.action.passive_refresh_all(&mut s.game, player);
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
+                    // The saved hireling (`d2s.md` §1 load order: the
+                    // player's items, the corpses, then the hireling,
+                    // `hirelings.md` §10): its roomless allocation draws
+                    // its unit seed before game entry populates the rooms
+                    // (`hirelings-2.md` §16 rule 3), and the monster init
+                    // of that allocation (`units.md` §3.1 step 7, its
+                    // component and stat rolls) needs the lent world.
+                    let (game, world) = (&mut s.game, &mut s.world);
+                    s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
@@ -2195,6 +2426,17 @@ fn loader(
                         &save.header.hotkeys,
                         &s.world.item_guids(player),
                     );
+                    // `d2s-load.md` §8 rules 1–2: a full save's record
+                    // (the join's 0x5F and 0x23 pair, `intents-events.md`
+                    // §8.2 rules 3.3, 3.7). A stub's is the loader's.
+                    if entry.record.is_none() {
+                        let portals = s.events.action.sys.hooks.drlg.data.portal_levels();
+                        entry.record = Some(super::save_gaps::loaded_record(
+                            &save.header.mouse[..2],
+                            &s.world.item_guids(player),
+                            initial_portal_flags(&portals),
+                        ));
+                    }
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report
@@ -2443,5 +2685,58 @@ mod new_character_tests {
         assert_eq!(r.char_name[9..], [0; 7]);
         assert_eq!(r.flags, CREATE_FLAGS_EXPANSION);
         assert_eq!(r.game_type, GAME_TYPE);
+    }
+}
+
+#[cfg(test)]
+mod target_search_tests {
+    use super::*;
+
+    /// An allied monster (a hireling) of size `size` at (100, 100) and one
+    /// hostile monster at (x, 100).
+    fn seams(x: i32, size: i32) -> LocalSeams {
+        let mut s = LocalSeams::default();
+        s.sides
+            .insert(UnitId(1), (UnitType::Monster, true, (100, 100)));
+        s.sides
+            .insert(UnitId(2), (UnitType::Monster, false, (x, 100)));
+        s.sizes.insert(UnitId(1), size);
+        s
+    }
+
+    // Covers: specs/monsters/ai.md §5.3 r2, §6
+    #[test]
+    fn the_secondary_search_window_is_full_size_distance_below_49() {
+        let mut g = Game::default();
+        // Size 0: the full-size distance is the axis distance; 48 is
+        // found, 49 is not.
+        assert_eq!(
+            seams(148, 0).secondary_target(&mut g, UnitId(1)),
+            (Some(UnitId(2)), 48, false)
+        );
+        assert_eq!(
+            seams(149, 0).secondary_target(&mut g, UnitId(1)),
+            (None, 0x7FFF_FFFF, false)
+        );
+        // The scanner's size comes off each axis: 51 - 3 = 48.
+        assert_eq!(
+            seams(151, 3).secondary_target(&mut g, UnitId(1)).0,
+            Some(UnitId(2))
+        );
+        assert_eq!(seams(152, 3).secondary_target(&mut g, UnitId(1)).0, None);
+    }
+
+    // Covers: specs/monsters/ai.md §5.2 r4
+    #[test]
+    fn the_good_main_search_stays_within_35() {
+        let mut g = Game::default();
+        assert_eq!(
+            seams(134, 0).good_target_search(&mut g, UnitId(1), false),
+            Some((UnitId(2), 34))
+        );
+        assert_eq!(
+            seams(135, 0).good_target_search(&mut g, UnitId(1), false),
+            None
+        );
     }
 }

@@ -7,9 +7,12 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use crate::buffers::{ClientBuffers, Inbox, QueueError};
+use crate::buffers::{ClientBuffers, Inbox, QueueError, Tapped};
 use crate::dispatch::{process_game_message, ClientRecord, DispatchError, Outcome};
-use crate::seams::{ClientId, Clock, Intents, MessageSink, MessageSizes, SessionHandler, Tick};
+use crate::packets::{PacketEvent, PacketObserver};
+use crate::seams::{
+    ClientId, Clock, Intents, MessageSink, MessageSizes, PlayerLookup, SessionHandler, Tick,
+};
 use crate::transport::{Classified, DuplicateFilter, Queue, SendError, ServerQueues};
 
 /// Ticks per second (`tick.md` §1 rule 1; global `0x00731014`).
@@ -139,6 +142,9 @@ pub struct Host<G, S, H, C> {
     inboxes: BTreeMap<ClientId, Inbox>,
     filters: BTreeMap<ClientId, DuplicateFilter>,
     last_flush: Option<u32>,
+    /// The packet recorder (`specs/tools/packets-trace.md` §2); `None` by
+    /// default. It only reads: the game runs the same with or without it.
+    packets: Option<Box<dyn PacketObserver + Send>>,
 }
 
 impl<G, S, H, C> Host<G, S, H, C>
@@ -162,6 +168,48 @@ where
             inboxes: BTreeMap::new(),
             filters: BTreeMap::new(),
             last_flush: None,
+            packets: None,
+        }
+    }
+
+    /// Installs (or with `None` removes) the packet recorder
+    /// (`packets-trace.md` §2): from now on every message the host moves
+    /// is also reported to it, in order. The game is not changed.
+    pub fn set_packet_observer(&mut self, observer: Option<Box<dyn PacketObserver + Send>>) {
+        self.buffers.set_tap(observer.is_some());
+        self.packets = observer;
+    }
+
+    /// Reports one event to the recorder, if any.
+    fn note(&mut self, ev: PacketEvent<'_>) {
+        if let Some(p) = self.packets.as_mut() {
+            p.packet(ev);
+        }
+    }
+
+    /// Reports what the buffers' tap saw since the last call (queued
+    /// messages, direct sends, flushed buffers), in order.
+    fn note_tap(&mut self) {
+        let Some(p) = self.packets.as_mut() else {
+            return;
+        };
+        for t in self.buffers.take_tap() {
+            p.packet(match &t {
+                Tapped::Queued(client, msg) => PacketEvent::S2c {
+                    client: *client,
+                    msg,
+                },
+                Tapped::Direct(client, msg) => PacketEvent::Net {
+                    client: *client,
+                    msg,
+                    direct: true,
+                },
+                Tapped::Flushed(client, msg) => PacketEvent::Net {
+                    client: *client,
+                    msg,
+                    direct: false,
+                },
+            });
         }
     }
 
@@ -194,21 +242,26 @@ where
         msg: &[u8],
     ) -> Result<Option<Classified>, SendError> {
         let now = self.clock.now_ms();
+        self.note(PacketEvent::ClientSend { client, msg });
         let filter = self.filters.entry(client).or_default();
         if !filter.pass(msg, now)? {
             return Ok(None);
         }
+        self.note(PacketEvent::ClientOut { client, msg });
         self.queues.send(&self.sizes, client, msg).map(Some)
     }
 
     /// System-message senders (§2.1 rule 2): no filter.
     pub fn send_system(&mut self, client: ClientId, msg: &[u8]) -> Result<Classified, SendError> {
+        self.note(PacketEvent::ClientOut { client, msg });
         self.queues.send(&self.sizes, client, msg)
     }
 
     /// Direct sends (§3.3 rule 5): straight to the client's receive
     /// lists, ahead of anything still buffered.
     pub fn send_direct(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        self.buffers.note(|| Tapped::Direct(client, msg.to_vec()));
+        self.note_tap();
         self.inboxes.entry(client).or_default().push(msg)
     }
 
@@ -218,16 +271,40 @@ where
     pub fn frame(&mut self) -> Result<FrameReport, HostError> {
         let now = self.clock.now_ms();
         self.game.set_host_tick(now);
+        // tools/perf: wall-clock timing of the parts, off unless enabled.
+        let timed = crate::perf::enabled();
+        let t0 = Instant::now();
         let mut report = FrameReport {
             messages: self.drain(now)?,
             ..FrameReport::default()
         };
         if self.driver.poll(now, self.catch_up) {
             report.ticked = true;
+            let drain_us = crate::perf::us_since(t0);
+            let t1 = Instant::now();
+            if self.packets.is_some() {
+                let frame = self.game.frame().wrapping_add(1);
+                self.note(PacketEvent::Tick { frame });
+            }
             self.game.tick(&mut self.buffers);
+            if self.packets.is_some() {
+                self.note_tap();
+                let frame = self.game.frame();
+                self.note(PacketEvent::TickEnd { frame });
+            }
+            let tick_us = crate::perf::us_since(t1);
+            let t2 = Instant::now();
             let (buffers, discarded) = self.flush(true, now)?;
             report.flushed_buffers = buffers;
             report.discarded_bytes = discarded;
+            if timed {
+                crate::perf::record(crate::perf::TickTime {
+                    frame: self.game.frame() as u32,
+                    drain_us,
+                    tick_us,
+                    flush_us: crate::perf::us_since(t2),
+                });
+            }
         }
         Ok(report)
     }
@@ -235,7 +312,31 @@ where
     /// Drain `0x0052CFE0` and the per-queue handlers (§2.1 rule 7).
     fn drain(&mut self, now: u32) -> Result<Vec<HandledMessage>, HostError> {
         let mut out = Vec::new();
+        self.note(PacketEvent::Drain);
         for d in self.queues.drain() {
+            if d.queue != Queue::Admin {
+                self.note(PacketEvent::C2s {
+                    system: d.queue == Queue::System,
+                    client: d.client,
+                    size: d.size,
+                    msg: &d.msg,
+                });
+            }
+            // The dispatcher runs exactly when the player lookup finds a
+            // player (`process_game_message`); read before, for the record.
+            if self.packets.is_some()
+                && d.queue == Queue::Game
+                && matches!(self.game.player(d.client), PlayerLookup::Player(_))
+                && self.records.contains_key(&d.client)
+            {
+                let game_frame = self.game.frame();
+                self.note(PacketEvent::Dispatch {
+                    client: d.client,
+                    id: d.msg[0],
+                    size: d.size,
+                    game_frame,
+                });
+            }
             let handled = match d.queue {
                 Queue::System => {
                     // The game's session part first (`Intents::session_message`),
@@ -267,6 +368,13 @@ where
                 )?),
                 Queue::Admin => Handled::AdminIgnored,
             };
+            self.note_tap();
+            if let Handled::Game(Outcome::Dispatched(code)) = handled {
+                self.note(PacketEvent::Result {
+                    client: d.client,
+                    code,
+                });
+            }
             out.push(HandledMessage {
                 client: d.client,
                 id: d.msg[0],
@@ -285,6 +393,13 @@ where
     /// rule 5) are not single player and not implemented; the empty-game
     /// timeout belongs to the session code.
     pub fn flush(&mut self, force: bool, now: u32) -> Result<(usize, usize), HostError> {
+        self.note(PacketEvent::Flush);
+        let r = self.flush_inner(force, now);
+        self.note_tap();
+        r
+    }
+
+    fn flush_inner(&mut self, force: bool, now: u32) -> Result<(usize, usize), HostError> {
         if !force {
             if let Some(last) = self.last_flush {
                 if now.wrapping_sub(last) < FLUSH_MS {
@@ -331,6 +446,7 @@ impl<S: MessageSizes> MessageSink for SystemSink<'_, S> {
         self.buffers.has_queued(client)
     }
     fn send_direct(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        self.buffers.note(|| Tapped::Direct(client, msg.to_vec()));
         self.inboxes.entry(client).or_default().push(msg)
     }
     fn flush_client(&mut self, client: ClientId) -> Result<(), QueueError> {

@@ -18,7 +18,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
+use d2_client::app::play::{
+    add_client_data, add_game, add_preview, add_walk, send_create_game_for,
+};
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, BuildError, Link};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
@@ -54,7 +56,9 @@ impl Clock for StepClock {
     }
 }
 
-struct Shared<L>(Arc<Mutex<L>>);
+/// The shared server link; what the client receives is also kept in `rx`
+/// (see [`Rig::saw_s2c`]).
+struct Shared<L>(Arc<Mutex<L>>, Arc<Mutex<Vec<Vec<u8>>>>);
 
 impl<L: ServerLink> ServerLink for Shared<L> {
     fn protocol_version(&self) -> u32 {
@@ -67,7 +71,9 @@ impl<L: ServerLink> ServerLink for Shared<L> {
         self.0.lock().unwrap().pump()
     }
     fn receive(&mut self) -> Vec<Vec<u8>> {
-        self.0.lock().unwrap().receive()
+        let got = self.0.lock().unwrap().receive();
+        self.1.lock().unwrap().extend(got.iter().cloned());
+        got
     }
 }
 
@@ -80,6 +86,62 @@ pub fn skill_row(id: usize) -> Skills {
         .unwrap_or_else(|| panic!("no skills row {id}"))
 }
 
+/// An excel text table of the install (`skills.txt`, `weapons.txt`, ...):
+/// the header and the rows, cells by column name.
+pub struct ExcelTable {
+    header: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+}
+
+impl ExcelTable {
+    pub fn load(file: &str) -> ExcelTable {
+        use d2_data::bin::TableFiles;
+        let (_, bytes) = crate::app_support::live()
+            .archives
+            .read_excel(file)
+            .expect("excel read")
+            .unwrap_or_else(|| panic!("{file} in the install"));
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        let mut lines = text.lines();
+        let header = lines
+            .next()
+            .unwrap_or("")
+            .split('\t')
+            .map(str::to_owned)
+            .collect();
+        let rows = lines
+            .map(|l| l.split('\t').map(str::to_owned).collect())
+            .collect();
+        ExcelTable { header, rows }
+    }
+
+    /// The row whose first column is `key`.
+    pub fn row(&self, key: &str) -> &[String] {
+        self.rows
+            .iter()
+            .find(|r| r.first().map(String::as_str) == Some(key))
+            .unwrap_or_else(|| panic!("no row {key:?}"))
+    }
+
+    /// The cell of `row` in column `col` ("" when empty or absent).
+    pub fn cell<'a>(&self, row: &'a [String], col: &str) -> &'a str {
+        let i = self
+            .header
+            .iter()
+            .position(|h| h.eq_ignore_ascii_case(col))
+            .unwrap_or_else(|| panic!("no column {col:?}"));
+        row.get(i).map_or("", String::as_str)
+    }
+}
+
+/// The `skills` id (`Id` column) of the install's skill named `name`.
+pub fn skill_named(name: &str) -> usize {
+    let t = ExcelTable::load("skills.txt");
+    t.cell(t.row(name), "Id")
+        .parse()
+        .unwrap_or_else(|_| panic!("skill {name:?} has an Id"))
+}
+
 pub struct Rig {
     pub app: App,
     pub ms: Arc<AtomicU32>,
@@ -87,6 +149,8 @@ pub struct Rig {
     /// The walks the rig sends, as the play app's `PredictLink` records
     /// its own: hand it to `add_walk` so the client walks them too.
     pub tap: WalkTap,
+    /// Every S→C message the client received so far.
+    rx: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 impl Rig {
@@ -116,7 +180,8 @@ impl Rig {
         })
         .unwrap();
         let link = Arc::new(Mutex::new(link));
-        let dyn_link: DynLink = Box::new(Shared(link.clone()));
+        let rx: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
+        let dyn_link: DynLink = Box::new(Shared(link.clone(), rx.clone()));
         let mut app = App::new();
         app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
@@ -124,6 +189,9 @@ impl Rig {
             .init_resource::<ButtonInput<MouseButton>>()
             .init_resource::<ButtonInput<KeyCode>>();
         add_game(&mut app, dyn_link, false).unwrap();
+        // The client tables before the join's messages (the 0x23 hand
+        // selects need the skill rows).
+        crate::app_support::live_tables(&mut app);
         send_create_game_for(&mut app, &character).unwrap();
         let data = crate::app_support::game_data();
         let levels = single_player::client_level_rows(&data);
@@ -133,12 +201,20 @@ impl Rig {
             levels.clone(),
         );
         add_preview(&mut app, levels, TileAssets::default());
-        crate::app_support::live_tables(&mut app);
+        // The client walks what the rig sends (the play app's own-walk
+        // prediction), so its C→S 0x5F reports the position the player
+        // really has; without it the client stays at the spawn point and
+        // the server (`pathing.md` §1.6) walks the player back to it
+        // (q-fix-real-gate-snapback).
+        let tap = WalkTap::default();
+        let speeds = single_player::walk_speeds(&data, &character).unwrap();
+        add_walk(&mut app, tap.clone(), speeds);
         let mut r = Rig {
             app,
             ms,
             link,
-            tap: WalkTap::default(),
+            tap,
+            rx,
         };
         while r.joined().is_none() {
             r.step(1);
@@ -168,6 +244,31 @@ impl Rig {
             .unwrap()
     }
 
+    /// How many S→C messages the client has received so far (a mark for
+    /// [`Rig::s2c_contains_since`]).
+    pub fn s2c_mark(&self) -> usize {
+        self.rx.lock().unwrap().len()
+    }
+
+    /// Whether a message the client received after `mark` has the byte
+    /// `byte` anywhere in it (the loose test the old rigs made of their
+    /// `got` list).
+    pub fn s2c_contains_since(&self, mark: usize, byte: u8) -> bool {
+        self.rx.lock().unwrap()[mark..]
+            .iter()
+            .any(|m| m.contains(&byte))
+    }
+
+    /// How many S→C messages with id `id` the client has received so far.
+    pub fn s2c_count(&self, id: u8) -> usize {
+        self.rx
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|m| m.first() == Some(&id))
+            .count()
+    }
+
     pub fn step(&mut self, n: usize) {
         for _ in 0..n {
             self.app.update();
@@ -191,7 +292,7 @@ impl Rig {
             .unwrap()
     }
 
-    fn send(&mut self, msg: &[u8]) {
+    pub fn send(&mut self, msg: &[u8]) {
         self.tap.record(msg);
         self.link
             .lock()
@@ -204,7 +305,7 @@ impl Rig {
         self.with(|sim, p| sim.events.action.sys.hooks.path_position(p))
     }
 
-    fn mode(&mut self) -> u32 {
+    pub fn mode(&mut self) -> u32 {
         self.with(|sim, p| sim.events.action.sys.units.get(p).map_or(0, |u| u.mode))
     }
 
@@ -235,12 +336,10 @@ impl Rig {
     /// twenty sub-tiles on into the level (a monster in a town room is no
     /// target). The town's NPCs walk their map-AI paths
     /// (`ai-bodies.md` §9.9), so a leg can be cut short near the gate:
-    /// the route is retried from where the player stands, up to 40 times.
-    /// TEMPORARY (build-queue q-fix-real-gate-snapback): 40 hides the gate
-    /// snap-back; back to 12 once it is fixed.
+    /// the route is retried from where the player stands, up to 12 times.
     pub fn leave_town(&mut self) {
         let (town, moor) = (single_player::ACT1_TOWN, single_player::BLOOD_MOOR);
-        for _ in 0..40 {
+        for _ in 0..12 {
             if self.level() == Some(moor) {
                 break;
             }

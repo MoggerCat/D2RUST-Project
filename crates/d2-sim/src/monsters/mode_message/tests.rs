@@ -88,11 +88,13 @@ fn stop_and_block_vectors() {
 // Covers: specs/sim/intents-events.md §7.7 r5, §7.7 r6
 #[test]
 fn builder_vectors() {
+    // (a, b) of a walk to a point is the path target (rule 4, WL takes
+    // it from the path): the recorded bytes give the target, not the cell.
     let walk = ModeInput {
         mode: mode::WL,
         guid: 6,
-        cell: (4825, 5636),
-        path_target: (4830, 5640),
+        cell: (4820, 5630),
+        path_target: (4825, 5636),
         stop_distance: 0,
         path_type: 7,
         velocity: 75,
@@ -132,6 +134,27 @@ fn builder_vectors() {
         ..ModeInput::default()
     };
     assert_eq!(send(&cast), hex("6b 06000000 0c 0000 0000 00 00 d912 0416"));
+}
+
+/// Kashya's map walk at the Rogue Encampment arrival (1.14d under Wine,
+/// `record_packets.py --auto ScnAma --seed 1234`, tick 32): from her
+/// cell (4891, 4226) toward the map node (4898, 4233); the 0x67 carries
+/// the node.
+// Covers: specs/sim/intents-events.md §7.4 r4
+#[test]
+fn a_walk_to_a_point_sends_the_path_target() {
+    let i = ModeInput {
+        mode: mode::WL,
+        guid: 3,
+        cell: (4891, 4226),
+        path_target: (4898, 4233),
+        stop_distance: 0,
+        path_type: 7,
+        velocity: 75,
+        max_distance: 5,
+        ..ModeInput::default()
+    };
+    assert_eq!(send(&i), hex("67 03000000 01 2213 8910 01 00 07 4b00 05"));
 }
 
 /// Rule 3: mode 14 or a skill in use → the skill message (0x4C with the

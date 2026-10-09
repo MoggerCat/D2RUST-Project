@@ -32,7 +32,7 @@ pub struct ExportContext<'a> {
     pub sky: &'a [SkyDraw],
     /// Each drawn unit's cel context direction by GUID
     /// (`WorldFrame::unit_dirs`, §5 r14).
-    pub unit_dirs: &'a BTreeMap<u32, u8>,
+    pub unit_dirs: &'a BTreeMap<u64, u8>,
     /// Cel calls without pixels (`WorldFrame::unit_calls`), sorted by key;
     /// one row each, merged with the items by key (§5 r15).
     pub unit_calls: &'a [UnitCall],
@@ -40,6 +40,8 @@ pub struct ExportContext<'a> {
     /// (`ViewAssets::color_rows`): a rectangle's colour is its shade map
     /// minus this (§5 r16).
     pub color_rows: Option<MapId>,
+    /// `WorldFrame::ui_calls`: a UI cel's op (§5 r18).
+    pub ui_calls: &'a [crate::ui::draw::CelCall],
 }
 
 /// The frame-set path prefix of the UI rectangles
@@ -168,9 +170,13 @@ fn call_rows(
     draws: &mut Vec<Vec<String>>,
 ) {
     unit_row(c.tag, c.shadow, cx, last_run, draws);
+    // §5 r17: the unit draw alone (the body failed the pre-test).
+    let Some(path) = &c.path else {
+        return;
+    };
     let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
     row[1] = if c.shadow { "CelDrawShadow" } else { "CelDraw" }.into();
-    row[2] = c.path.as_str().to_owned();
+    row[2] = path.as_str().to_owned();
     row[3] = c.dir64.to_string();
     row[4] = c.frame.to_string();
     for cell in &mut row[6..15] {
@@ -258,6 +264,10 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
             continue;
         }
         row[2] = key.path().to_owned();
+        // §5 r10: a pass-4 pool cel is tagged for `--skip-weather`.
+        if item.key.pass() == pass::UNIDENTIFIED_4 {
+            row[16] = super::compare::POOLS_TAG.into();
+        }
         match key.part() {
             FramePart::Tile(t) => {
                 row[1] = op(true, item).into();
@@ -274,11 +284,19 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 }
             }
             FramePart::Dir(d) => {
-                row[1] = op(false, item).into();
+                row[1] = match item.tag {
+                    // §5 r18: a UI cel's wrapper.
+                    ItemTag::Ui(i) => cx
+                        .ui_calls
+                        .get(i as usize)
+                        .map_or(op(false, item), |c| c.op()),
+                    _ => op(false, item),
+                }
+                .into();
                 // §5 r14: a unit cel's `dir` is the context's `dir64`, not
                 // the file direction the frame set is keyed by.
                 let d = match item.tag {
-                    ItemTag::Unit(guid) => cx.unit_dirs.get(&guid).copied().unwrap_or(d),
+                    ItemTag::Unit(_) => cx.unit_dirs.get(&item.key.slot()).copied().unwrap_or(d),
                     _ => d,
                 };
                 row[3] = d.to_string();
@@ -432,17 +450,30 @@ pub fn files(header: &Header, rows: &Rows, frame: &FrameState) -> [(&'static str
     ]
 }
 
-/// The `--dump-draws DIR --at-tick N` request of `play`.
+/// The `--dump-draws DIR --at-tick N[,M...] [--dump-image]` request of
+/// `play` (§5 r13, r19).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DumpRequest {
     pub dir: std::path::PathBuf,
-    /// The first drawn frame whose server tick is at least this.
-    pub at_tick: u64,
+    /// Per dump, the first drawn frame whose server tick is at least this;
+    /// strictly increasing, at least one.
+    pub at_ticks: Vec<u64>,
+    /// §5 r19: also write the composed frame as `frame.png`.
+    pub image: bool,
     /// The header's `command` (the command line).
     pub command: String,
 }
 
 impl DumpRequest {
+    /// The folder of dump `i` (§5 r19): `dir` itself for a single tick,
+    /// else `dir/tick-<N>`.
+    pub fn dir_for(&self, i: usize) -> std::path::PathBuf {
+        match self.at_ticks.as_slice() {
+            [_] => self.dir.clone(),
+            ticks => self.dir.join(format!("tick-{}", ticks[i])),
+        }
+    }
+
     /// The d2rs header of §1 r1.
     pub fn header(&self) -> Header {
         let v = env!("CARGO_PKG_VERSION");
@@ -465,8 +496,9 @@ pub struct DumpFrame<'a> {
     pub seq: u64,
 }
 
-/// Writes the three files of `d` into `req.dir` (§5).
-pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
+/// Writes the three files of `d` (and with `req.image` the frame's
+/// `frame.png`, §5 r19) into `dir` (§5).
+pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), FactsError> {
     let unit_type = |guid: u32| {
         let mut types = d.world.units.keys().filter(|k| k.guid == guid);
         match (types.next(), types.next()) {
@@ -482,6 +514,7 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         unit_dirs: &d.frame.unit_dirs,
         unit_calls: &d.frame.unit_calls,
         color_rows: d.assets.color_rows,
+        ui_calls: &d.frame.ui_calls,
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();
@@ -495,15 +528,16 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
     );
     // §5 r8: the CPU reference composition onto a copy of the framebuffer.
     let mut cycle = d.cycle.clone();
-    let index = cycle
+    let pixels = cycle
         .compose(
             d.blank_screen,
             &d.frame.items,
             &d.assets.frames,
             &d.assets.maps,
         )
-        .map(sha256_hex)
+        .map(<[u8]>::to_vec)
         .map_err(|e| FactsError::Export(format!("compose: {e}")))?;
+    let index = sha256_hex(&pixels);
     let palette: Vec<u8> = d
         .assets
         .palette
@@ -525,7 +559,36 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         index_sha256: Some(index),
         palette_sha256: sha256_hex(&palette),
     };
-    write_dir(&req.dir, &files(&req.header(), &rows, &state))
+    write_dir(dir, &files(&req.header(), &rows, &state))?;
+    if req.image {
+        let png = indexed_png(view.width, view.height, &pixels, &palette)?;
+        let path = dir.join(IMAGE_FILE);
+        std::fs::write(&path, png).map_err(|source| FactsError::Io { path, source })?;
+    }
+    Ok(())
+}
+
+/// §5 r19: the composed frame of `--dump-image`.
+pub const IMAGE_FILE: &str = "frame.png";
+
+/// An 8-bit palettized PNG of `pixels` (the index bytes as they are, the
+/// palette as `PLTE`), the form of `record_frames.py`'s captures.
+pub fn indexed_png(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+    palette_rgb: &[u8],
+) -> Result<Vec<u8>, FactsError> {
+    let err = |e: png::EncodingError| FactsError::Export(format!("png: {e}"));
+    let mut out = Vec::new();
+    let mut enc = png::Encoder::new(&mut out, width, height);
+    enc.set_color(png::ColorType::Indexed);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_palette(palette_rgb.to_vec());
+    let mut w = enc.write_header().map_err(err)?;
+    w.write_image_data(pixels).map_err(err)?;
+    w.finish().map_err(err)?;
+    Ok(out)
 }
 
 fn write_dir(dir: &Path, files: &[(&'static str, String)]) -> Result<(), FactsError> {

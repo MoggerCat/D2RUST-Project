@@ -817,3 +817,135 @@ fn a_save_in_act_three_to_five_is_placed_at_the_join() {
         assert!(placed, "act {act}: no player after the join");
     }
 }
+
+/// A saved character's hitpoints and mana are the stored values after the
+/// items are placed: the item bonuses raise the maximum, not the current
+/// value (`formats/d2s.md` §9 rules 2 and 4; `items-load-mixed` against
+/// 1.14d, frame 2: mana 14984 of 25856, not the max-rescaled 25856).
+// Covers: specs/formats/d2s.md §9 r4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_loaded_characters_mana_ignores_the_items_bonuses() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let dir = std::env::temp_dir().join(format!("d2rs-load-mana-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("Mana.d2s");
+    let args: Vec<String> = [
+        "new",
+        "--name",
+        "Mana",
+        "--class",
+        "ama",
+        "--expansion",
+        "--level",
+        "30",
+        "--item",
+        "cap/body=1/q=magic",
+        "--item",
+        "amu/body=2/q=rare",
+        "--item",
+        "rin/body=6/q=magic",
+        "--item",
+        "rin/body=7/q=rare",
+        "-o",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .chain([path.display().to_string()])
+    .collect();
+    assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
+    let data = app_support::game_data();
+    let character = single_player::load_character(&data, &path, 0).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start_with(data, DEFAULT_SEED, character.clone(), StepClock(ms.clone()))
+            .unwrap();
+    let req = single_player::create_request_for(&character);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    for _ in 0..4 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+    }
+    let (mana, max) = link
+        .with(|l| {
+            let g = &mut l.host_mut().game;
+            let (p, _) = single_player::local_player(g).expect("joined");
+            let s = &g.events.action.sys.stats;
+            (s.unit_total(p, 8, 0), s.unit_total(p, 9, 0))
+        })
+        .unwrap();
+    assert!(max > 14976 + 256, "the items raise the maximum: {max}");
+    // The stored 14976 plus a few ticks of regeneration (1.14d: 14984 at
+    // frame 2), far below the maximum.
+    assert!(
+        (14976..14976 + 64).contains(&mana),
+        "mana {mana} of {max} after the load"
+    );
+}
+
+/// The new sorceress's start items (`items/generation.md` §10.3) reach
+/// the client as in the Wine recording of a character made in the create
+/// screen (`facts/join/a1-new-sor.tsv`): the staff's `StartSkill` o-skill
+/// 0x21 when it is equipped, the two scrolls' item-skill counts 0x22
+/// (`inventory.md` §5.5, books `scrollskill`), then the join's item
+/// messages: the staff's 0x9D, the four belt potions' 0x9C action 0x0E
+/// (`inventory-moves.md` §7.14) and the two scrolls' 0x9C action 4.
+/// Byte for byte, except the bytes the builders do not write
+/// (`tools/scenario-masks.tsv`: 0x21 byte 11, 0x22 bytes 2 and 10).
+// Covers: specs/items/generation.md §10.3; specs/items/inventory.md §5.5; specs/items/inventory-moves.md §7.14
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_start_items_messages_follow_the_recorded_join() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    const ITEM_IDS: [u8; 4] = [0x21, 0x22, 0x9C, 0x9D];
+    let masked = |id: u8, k: usize| matches!((id, k), (0x21, 11) | (0x22, 2) | (0x22, 10));
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    let got: Vec<Vec<u8>> = link
+        .receive()
+        .into_iter()
+        .filter(|m| ITEM_IDS.contains(&m[0]))
+        .collect();
+    let want: Vec<Vec<u8>> = app_support::recorded_new_sor_bytes()
+        .into_iter()
+        .filter(|(f, m)| f.is_some_and(|f| f <= 1) && ITEM_IDS.contains(&m[0]))
+        .map(|(_, m)| m)
+        .collect();
+    let ids = |v: &[Vec<u8>]| v.iter().map(|m| m[0]).collect::<Vec<u8>>();
+    assert_eq!(
+        ids(&want),
+        [0x21, 0x22, 0x22, 0x9D, 0x9C, 0x9C, 0x9C, 0x9C, 0x9C, 0x9C]
+    );
+    assert_eq!(ids(&got), ids(&want));
+    for (g, w) in got.iter().zip(&want) {
+        assert_eq!(g.len(), w.len(), "{g:02x?} vs {w:02x?}");
+        for k in (0..w.len()).filter(|&k| !masked(w[0], k)) {
+            assert_eq!(g[k], w[k], "byte {k}: {g:02x?} vs {w:02x?}");
+        }
+    }
+}

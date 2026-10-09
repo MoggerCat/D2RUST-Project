@@ -88,6 +88,19 @@ pub fn set_mode<H: UnitHooks>(
     mode: u32,
 ) -> Result<(), UnitError> {
     hooks.drop_combat_entries(sim, unit);
+    write_mode(sim, hooks, unit, mode)
+}
+
+/// `0x00624690`(unit, mode) (§4.1), the part of [`set_mode`] after the
+/// combat drop: the mode written, the unit queued for update, flag 0x1,
+/// and on a new mode the TEMPONLY lists freed and the animation fields
+/// re-initialised. A monster staying in mode 1 and a tile: nothing.
+pub fn write_mode<H: UnitHooks>(
+    sim: &mut Sim<'_>,
+    hooks: &mut H,
+    unit: UnitId,
+    mode: u32,
+) -> Result<(), UnitError> {
     let rec = record_mut(sim, unit)?;
     if rec.ty == UnitType::Tile {
         return Ok(());
@@ -502,7 +515,9 @@ pub fn monster_set_mode<H: UnitHooks>(
     }
     if mode != monster_mode::GH {
         hooks.monster_mode_bookkeeping(sim, unit, mode);
-        // `umod-callbacks.md` §2 rule 1: umod mode 0, old mode still set.
+        // `umod-callbacks.md` §2 rule 1: the mode damage rewrite, then
+        // umod mode 0, old mode still set.
+        hooks.monster_mode_damage(sim, unit, mode);
         hooks.monster_umods(sim, unit, 0);
     }
     let start = monster_record(sim, hooks, unit, mode)

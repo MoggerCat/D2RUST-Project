@@ -87,6 +87,12 @@ pub struct MonsterData {
     /// Monster data +0x40, written by S→C 0x98 (`msg-units.md` §7 r9;
     /// −1 for 0xFFFF); `None` until written. Meaning: open question 9.
     pub f40: Option<i32>,
+    /// Monster data +0x30: the critter AI's think timer T
+    /// (`model.md` §5 r6.4; 0 at the create).
+    pub think: i32,
+    /// T as the first critter AI call read it (the `think0` record of
+    /// `record_client_creations.py`); `None` before that call.
+    pub first_think: Option<i32>,
 }
 
 /// The last item message an item unit received (`msg-stats-items.md` §2
@@ -244,6 +250,13 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// Unit +0x38 >> 8: the frame event index (`ui/controls.md` §6 r4,
+    /// `0x004645B0`). The play host writes the local player's; 0 else.
+    pub event_index: u32,
+    /// The precise path position (16.16 sub-tiles) of a walking monster,
+    /// written by the client track ([`super::motion`]); the draw uses it
+    /// while its cell is `position`. `None`: the cell centre.
+    pub precise: Option<(u32, u32)>,
     /// +0x48: the animation's frame count (8.8), written by a monster's
     /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
     pub frame_count: i32,
@@ -299,6 +312,8 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            event_index: 0,
+            precise: None,
             frame_count: 0,
             speed: None,
             flag_ex: 0,
@@ -1249,6 +1264,10 @@ pub struct MonsterClass {
     /// `data/fixups.md` §8): w of `sim/units.md` §4.7 steps 6–7.
     pub walk_speed: u16,
     pub run_speed: u16,
+    /// `monstats` `MinGrp` (+0x2F) and `MaxGrp` (+0x30): the critter
+    /// group size (`monsters/population.md` §11.7 r2).
+    pub min_grp: u8,
+    pub max_grp: u8,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up
@@ -1308,6 +1327,10 @@ pub struct StateRow {
     pub colorpri: u8,
     pub colorshift: u8,
     pub light_rgb: (u8, u8, u8),
+    /// `meleeonly` (`states.txt` flag bit 38 = 0x26, `data/fields.tsv`):
+    /// the state is in the state-mask group 0x26 that `range(P, skill)`
+    /// tests (`skills/use.md` §3 r6).
+    pub meleeonly: bool,
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1411,6 +1434,8 @@ pub struct SkillRow {
     pub anim: u8,
     /// +0x11 `monanim`.
     pub monanim: u8,
+    /// +0x13 `seqnum` (`skills/sequences.md` §1 rule 2).
+    pub seqnum: u8,
     /// +0x94 `passivestate` (read signed; > 0 = a passive state).
     pub passivestate: u16,
     /// `maxlvl` (u16 at 300, read signed).
@@ -1425,12 +1450,36 @@ pub struct SkillRow {
     pub skilldesc: u16,
     /// `EType` (+0x1DC).
     pub etype: u8,
+    /// `seqinput` (+0x16; `ui/controls.md` §6 r4).
+    pub seqinput: u8,
     /// `range` (+0x14, the `@range` index: 0 none, 1 h2h, 2 rng, 3 both,
     /// 4 loc; `ui/controls.md` §6 r4, `skills/use.md` §3 r6).
     pub range: u8,
     /// The flag columns `ui/controls.md` §6 r8 reads, by `skills.txt`
     /// bit (`controls::click::skill_flag`).
     pub flags: u32,
+}
+
+/// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):
+/// `cmon1`–`4` (+0xCC, i16; negative = empty), `cpct1`–`4` (+0xD4, i16)
+/// and the amounts as the pass reads them: slot 0 is +0xDC (where all
+/// four `camt` columns are parsed, so `camt4` wins), slots 1–3 read
+/// +0xDE…+0xE2, always 0. The default has every slot empty.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Critters {
+    pub cmon: [i16; 4],
+    pub cpct: [i16; 4],
+    pub camt: [u16; 4],
+}
+
+impl Default for Critters {
+    fn default() -> Self {
+        Self {
+            cmon: [-1; 4],
+            cpct: [0; 4],
+            camt: [0; 4],
+        }
+    }
 }
 
 /// The `Levels.txt` fields the client reads of the player's level
@@ -1452,6 +1501,9 @@ pub struct LevelRow {
     pub rain: bool,
     /// `Mud` (+0x06, `render/draw-order-2.md` §11.5).
     pub mud: bool,
+    /// The critter columns of the client room pass
+    /// (`monsters/population.md` §11.7 r1).
+    pub critters: Critters,
     /// The level's `leveldefs` `Intensity`, `Red`, `Green`, `Blue`
     /// (`render/lighting.md` §3.1 r2; the darkness base of §10 r3).
     pub ambient: crate::rules::lighting::environment::Ambient,
@@ -1487,4 +1539,8 @@ pub struct ModelInputs {
     /// evaluates (`client/msg-skills.md` §2 r4); `None`: a passive skill
     /// is a handler error.
     pub skill_tables: Option<std::sync::Arc<super::passive::Tables>>,
+    /// The players' animation lookup of the client player update
+    /// ([`super::player_anim`]); `None`: a player mode has no frames and
+    /// an attack, cast or hit mode ends on the next update.
+    pub player_anims: Option<std::sync::Arc<dyn super::player_anim::PlayerAnims>>,
 }

@@ -310,6 +310,8 @@ fn client_world_holds_only_stated_fields() {
         // `world/objects-client.md` §25 r5; `msg-units.md` §1.2 r3–r4.
         interact_ms,
         frame,
+        // The client track's precise position (`bridge::motion`).
+        precise,
         // +0x48, a monster's mode set (`client/model.md` §19 r8.5).
         frame_count,
         flag_ex,
@@ -318,11 +320,14 @@ fn client_world_holds_only_stated_fields() {
         hit_class,
         // `world/objects-client.md` §25 r8 (+0x4C).
         speed,
+        // `ui/controls.md` §6 r4 (+0x38 >> 8).
+        event_index,
     } = ClientUnit::new(key);
     assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
     assert_eq!(frame_count, 0);
+    assert_eq!(precise, None);
     assert_eq!(speed, None);
-    assert_eq!(hit_class, 0);
+    assert_eq!((hit_class, event_index), (0, 0));
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);
     assert!(direction_of.is_none() && !room_freed && !flag_200);

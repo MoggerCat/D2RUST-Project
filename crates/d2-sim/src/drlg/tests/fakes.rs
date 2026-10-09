@@ -160,8 +160,19 @@ impl LevelTypes for FakeTypes {
         self.door_flag
     }
 
-    fn warp_unit(&mut self, _: &mut Drlg, _: DrlgRoomId, wx: i32, wy: i32, _: u32) {
+    #[allow(clippy::too_many_arguments)]
+    fn warp_unit(
+        &mut self,
+        _: &mut Drlg,
+        _: &DrlgData,
+        _: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        _: u32,
+        _: u32,
+    ) -> Result<bool, DrlgError> {
         self.warp_units.push((wx, wy));
+        Ok(true)
     }
 }
 

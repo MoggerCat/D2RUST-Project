@@ -86,6 +86,14 @@ pub trait ViewFeed: ViewSource {
     /// handed over before each build. The default ignores them.
     fn set_motion_offsets(&mut self, _offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>) {}
 
+    /// The same units' shadow offsets (`blend-modes.md` §5 r3: `oz / 2`
+    /// on both axes). The default ignores them.
+    fn set_motion_shadow_offsets(
+        &mut self,
+        _offsets: std::collections::BTreeMap<UnitKey, (i32, i32)>,
+    ) {
+    }
+
     /// The unit under the cursor, handed over before each build by the
     /// play preview (`bridge::hover::pick`; d2rs-own, unverified): drawn
     /// highlighted (`blend-modes.md` §3 `h`). The default ignores it.

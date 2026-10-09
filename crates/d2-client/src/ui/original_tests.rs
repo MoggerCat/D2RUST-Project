@@ -490,10 +490,13 @@ fn character_art_and_close_button() {
     );
     // No stat-point box or add buttons (`PENDING`).
     assert!(panel_images(&img, "panel\\skillpoints").is_empty());
-    // Only the control panel's two closed level buttons (frame 2, §8).
+    // Only the control panel's: the help button's socket and button
+    // (`control-panel.md` §11 r3, state 2 does not hide it:
+    // `a1-panel-character`; the filter's prefix takes `levelsocket` too)
+    // and the two closed level buttons (frame 2, §8).
     assert_eq!(
         panel_images(&img, "panel\\level"),
-        vec![(2, 206, 592), (2, 563, 592)]
+        vec![(0, 725, 440), (0, 728, 436), (2, 206, 592), (2, 563, 592)]
     );
     // A classic install draws `InvChar`.
     let mut c = ui(Some(areas()), false);
@@ -771,11 +774,12 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     u.click(&w, orow(1));
     let t = texts(&u);
     assert_eq!(art_names(&u, &w)[0], "*local\\videooptions");
-    assert!(t.contains(&"Window Mode".to_string()));
-    // Video rows (tops 70 + 45 k for 9 rows): Window Mode is row 2.
+    // frontend-options.md §O8: the Video menu has no Window Mode row.
+    assert!(!t.contains(&"Window Mode".to_string()));
+    // Video exp rows: title, Resolution, Light Quality, ...: row 2.
     let m = u.ui.shared.borrow().esc.menu.clone();
     let wm = Point::new(400, m.y_top(2) + 20);
-    // Window Mode cycles and reports the change once; the value round-trips
+    // Light Quality cycles and reports the change once; the value round-trips
     // through the config text (§O7).
     assert!(u.ui.take_settings_change().is_none());
     u.ui.take_outcome();
@@ -783,7 +787,7 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     // A choice entry activated: sound 1 (§15 r5).
     assert_eq!(u.ui.take_outcome().sounds, [SoundRequest::Ui(1)]);
     let s = u.ui.take_settings_change().unwrap();
-    assert_eq!(s.window_mode, crate::app::config::WindowMode::Borderless);
+    assert_eq!(s.light_quality, 0);
     assert!(u.ui.take_settings_change().is_none());
     let back = crate::app::config::parse_settings(&crate::app::config::write_settings(&s));
     assert_eq!(back.unwrap(), s);
@@ -904,6 +908,10 @@ fn the_mini_panel_game_menu_button_opens_it() {
     let w = world(AMAZON, 1, true);
     u.ui.set_ui(0x15, 0, false).unwrap();
     u.root.sync_states(&u.ui.shared.borrow().states);
+    // The hit test reads the layout of the last draw (§9 r6-r8): the
+    // frame drew layout 2.
+    u.ui.shared.borrow_mut().hud.mini.last_layout =
+        Some(crate::ui::panels::control::minipanel::Layout::Two);
     // Row 7 of the mini panel; the exact rectangle is the spec's, so
     // find it by scanning the panel strip for a click that opens ui 9.
     let mut opened = false;
@@ -1307,6 +1315,8 @@ fn ui_with_fonts(w: &ClientWorld) -> Ui {
     u
 }
 
+// 1.14d sends the same three messages for a Shift click on Vitality with
+// 70 points (recorded 2026-10-09 under Wine, `record_packets.py`; REC-268).
 // Covers: specs/ui/panels-2.md §17 r2; specs/ui/panels.md §8 r5
 #[test]
 fn a_stat_button_spends_one_point_and_shift_spends_all_in_chunks_of_32() {
@@ -1385,8 +1395,11 @@ mod grid_hover {
 
     // The spec vector: record 16, 2 × 3 item, graphic 56 × 84. A move to
     // (500, 340) sets cell (2, 0); at (700, 340) the footprint overhangs
-    // the last column, the cell stays (2, 0), and the press there places
-    // the item at (2, 0) (0x18) instead of sending nothing.
+    // the last column, the kept cell stays (2, 0), but the drop cell
+    // `0x00486BD0` (§10 r4.2) is recomputed from the click without the
+    // overflow return, fails the placement test and sends nothing
+    // (changed 2026-10-09, q-fix-ui-drop-cell: it used to place at the
+    // kept cell with 0x18). A press inside the grid places.
     // Covers: specs/ui/inventory.md §5 r3, §10 r4
     #[test]
     fn an_inventory_press_over_the_last_column_keeps_the_last_cell() {
@@ -1395,14 +1408,18 @@ mod grid_hover {
         u.send(&w, UiEvent::CursorMoved(Point::new(500, 340)));
         u.send(&w, UiEvent::CursorMoved(Point::new(700, 340)));
         u.click(&w, Point::new(700, 340));
+        assert_eq!(u.root.take_intents(), Vec::<ClientIntent>::new());
+        u.click(&w, Point::new(500, 340));
         let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 2, 0, 0));
         assert_eq!(u.root.take_intents(), vec![want]);
     }
 
     // The stash misclick (q-ui-audit.md §3): a 2 × 2 item moved over
     // stash cell (4, 2), then pressed over the right half of the last
-    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) is placed at
-    // the kept cell (4, 2) on page 4.
+    // column (c = (14 − 154 + 319) / 29 − 1 = 5, 2 + 5 > 6) sends nothing:
+    // the drop cell fails the placement test (changed 2026-10-09,
+    // q-fix-ui-drop-cell: it used to place at the kept cell (4, 2)); the
+    // kept cell's own press still places on page 4.
     // Covers: specs/ui/inventory.md §5 r3, §10 r4
     #[test]
     fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
@@ -1415,6 +1432,8 @@ mod grid_hover {
         w.expansion = 1;
         u.send(&w, UiEvent::CursorMoved(Point::new(290, 239)));
         u.click(&w, Point::new(319, 239));
+        assert_eq!(u.root.take_intents(), Vec::<ClientIntent>::new());
+        u.click(&w, Point::new(290, 239));
         let want = ClientIntent::from_message(&crate::bridge::items::insert(9, 4, 2, 4));
         assert_eq!(u.root.take_intents(), vec![want]);
     }
@@ -1761,6 +1780,9 @@ mod hud_small {
     fn mini_open(u: &mut Ui) {
         u.ui.set_ui(0x15, 0, false).unwrap();
         u.ui.sync_root(&mut u.root);
+        // The hit test reads the layout of the last draw (§9 r6-r8).
+        u.ui.shared.borrow_mut().hud.mini.last_layout =
+            Some(crate::ui::panels::control::minipanel::Layout::Two);
     }
 
     /// The press point of mini-panel button i (inside x_i < x < x_i + 20,
@@ -1912,6 +1934,74 @@ mod hud_small {
         });
         w.units.get_mut(&key).unwrap().states.insert(0x3A);
         assert!(frames(&u, &w).contains(&2), "{:?}", frames(&u, &w));
+    }
+
+    // `a4-town-pandemonium-fortress` (1.14d) rows 249–270: the globes'
+    // row window is `CelDrawEx`, the skill icons `CelDrawColor`; the
+    // stamina bar the rectangle (colour = the palette's nearest gold,
+    // mode 2); the skill icons before the new-stats / new-skills buttons;
+    // the mini panel open from the start (REC-519).
+    // Covers: specs/ui/control-panel.md §1 r3, §4 r2, §9
+    #[test]
+    fn the_control_panel_draws_in_the_recorded_order_and_calls() {
+        use crate::ui::draw::CelCall;
+        let mut w = world(AMAZON, 1, true);
+        let key = w.local_player.unwrap();
+        let unit = w.units.get_mut(&key).unwrap();
+        unit.stats.insert(10, 80 << 8);
+        unit.stats.insert(11, 80 << 8);
+        for (stat, v) in [(6, 50), (7, 50), (8, 20), (9, 20)] {
+            unit.stats.insert(stat, v << 8);
+        }
+        let mut u = ui(Some(areas()), true);
+        assert!(u.ui.is_open(0x15), "the mini panel is open from the start");
+        let mut colors = [d2_formats::palette::Rgb::default(); 256];
+        colors[109] = d2_formats::palette::Rgb {
+            r: 244,
+            g: 192,
+            b: 76,
+        };
+        u.ui.set_palette(&d2_formats::palette::Palette { colors });
+        let ctx = UiCtx {
+            tick: 0,
+            world: &w,
+            strings: &NoStrings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        let files = u.ui.files();
+        let named: Vec<(String, CelCall)> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) => Some((files.name(i.image.file)?.to_string(), i.call)),
+                _ => None,
+            })
+            .collect();
+        let call_of = |n: &str| named.iter().find(|(f, _)| f == n).map(|(_, c)| *c);
+        assert_eq!(call_of("panel\\hlthmana"), Some(CelCall::Ex));
+        assert_eq!(call_of("panel\\overlap"), Some(CelCall::Draw));
+        let stamina: Vec<(i32, i32, u8, u8)> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Rect(r) if r.mode == 2 => Some((r.x0, r.y0, r.color, r.mode)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(stamina, vec![(273, 573, 109, 2)]);
+        assert!(
+            !named.iter().any(|(f, _)| f == hud::FILL_FILE),
+            "no fill cel"
+        );
+        let pos = |n: &str| named.iter().position(|(f, _)| f == n);
+        let (mini, menu) = (pos("panel\\minipanel_s"), pos("panel\\menubutton"));
+        assert!(mini.is_some() && menu < mini);
+        if let (Some(icon), Some(level)) = (
+            named.iter().position(|(f, _)| f.contains("skillicon")),
+            pos("panel\\level"),
+        ) {
+            assert!(icon < level, "the skill icons before the level buttons");
+            assert_eq!(named[icon].1, CelCall::Color);
+        }
     }
 
     // The life text toggle is stored at once (§3 r5) and read at start.
@@ -2135,5 +2225,26 @@ mod equip_backgrounds_play {
         w.units.get_mut(&me).unwrap().mode = 1;
         assert!(pictures(&u, &w, "panel\\inv_armor").is_empty());
         assert!(pictures(&u, &w, "panel\\inv_weapons").is_empty());
+    }
+}
+
+// Key mode (`0x007A7418`): 1 at game start, 0 with the chat open (key-up
+// kept), 2 with the stash open, back to 1 on close; ui 5 closing while
+// the stash is open leaves the mode alone (PROVISIONAL REC-726 for the
+// Esc and non-command exemption in the host filter).
+// Covers: specs/ui/controls.md §4.1 r5
+#[test]
+fn the_ui_hooks_move_the_key_mode() {
+    let mut u = ui(Some(areas()), true);
+    assert_eq!(u.ui.key_mode(), 1);
+    if u.ui.set_ui(5, 0, false).expect("chat on") {
+        assert_eq!(u.ui.key_mode(), 0);
+        u.ui.set_ui(5, 1, false).expect("chat off");
+        assert_eq!(u.ui.key_mode(), 1);
+    }
+    if u.ui.set_ui(25, 0, false).expect("stash on") && u.ui.is_open(25) {
+        assert_eq!(u.ui.key_mode(), 2);
+        u.ui.set_ui(25, 1, false).expect("stash off");
+        assert_eq!(u.ui.key_mode(), 1);
     }
 }

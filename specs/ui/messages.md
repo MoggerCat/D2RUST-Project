@@ -30,21 +30,21 @@
 |   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
 |   4. Recipe scroll text (0x26 type 7) | 202–226 |
 |   5. Overhead text | 227–295 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–361 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 362–501 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 502–514 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 515–531 |
-|   10. Other 0x50 codes (UI effects) | 532–567 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 568–649 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 650–656 |
-|   13. NPC intro table `0x00726850` (0x91) | 657–694 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 695–711 |
-| Constants & data dependencies | 712–729 |
-| Randomness | 730–734 |
-| Edge cases & original bugs | 735–755 |
-| Test vectors | 756–778 |
-| Provenance | 779–809 |
-| Open questions | 810–835 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–373 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 374–513 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 514–526 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 527–543 |
+|   10. Other 0x50 codes (UI effects) | 544–579 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 580–661 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 662–668 |
+|   13. NPC intro table `0x00726850` (0x91) | 669–706 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 707–723 |
+| Constants & data dependencies | 724–741 |
+| Randomness | 742–746 |
+| Edge cases & original bugs | 747–767 |
+| Test vectors | 768–790 |
+| Provenance | 791–821 |
+| Open questions | 822–849 |
 <!-- /index -->
 
 ## Summary
@@ -341,6 +341,18 @@ stops at a `ÿc` that ends the string.
    r5; sets `[0x007C0C6A]` := 1) and the new +0x0D is used; the text
    played (`0x004A10E0`, §7 r1) is u16 +0 of text record (index modulo
    count +9).
+   **"introduction"** (`0x004B41E0`; 2026-10-09 read, REC-727 settled):
+   p = the local player's class (unit +4; −1 without a player). With the
+   interact NPC present and of class 513 (Malah) and p = 4 → index 15;
+   class 514 (Nihlathak) and p = 2 → index 11; class 515 (Qual-Kehk) and
+   p = 3 → index 10. Otherwise (any other class or player class, or no
+   NPC): index 1 when p = the class field u32 +0x0B of the entry's text
+   record 1, else index 0. Then the gossip body `0x004B40D0(index, 0)`
+   above with the "use the new +0x0D" argument 0: the same presence
+   test, end callback, box free, **+0x11 := 1** and first-time re-roll
+   of every entry (`[0x007C0C6A]`) as gossip, but the chosen index is
+   kept (not replaced by +0x0D, and +0x0D is not changed by it); the
+   text played is u16 +0 of record (index modulo count). No C→S message.
 5. Gossip index (`0x004B1680(entry)`): up to 10 draws on the local
    player's unit seed (+0x20 / +0x24, multiplier 0x6AC690C5, the same
    step as `sim/rng.md`; mask when the count is a power of two, else
@@ -822,10 +834,12 @@ outside the repo. No capture yet.
    `0x0047F4E0`; `ui/control-panel.md` §9 r5), so the automap key
    typed as a character does not skip a dialog (§7 r7). Was: Binding 7 of `0x00469AA0` (the key that does not skip a dialog):
    which command it is (a controls spec).
-4. The 15-byte gossip text records (+5 of an intro-table entry): field
-   meanings beyond text id +0, flag +2, quest +3 / +7, class +0x0B
-   (`0x004B1680`, `0x004B41C0`, `0x004B41E0`): Ghidra read of the two
-   handlers.
+4. **Answered** (2026-10-09, §6 r4): both handlers read only text id
+   +0 and, for the introduction, class +0x0B of record 1; no further
+   field is read by `0x004B41C0` / `0x004B41E0`. Was: the 15-byte gossip
+   text records (+5 of an intro-table entry): field meanings beyond text
+   id +0, flag +2, quest +3 / +7, class +0x0B (`0x004B1680`,
+   `0x004B41C0`, `0x004B41E0`): Ghidra read of the two handlers.
 5. 0x50 code 36 (`0x004BDE40`, pointer table `0x00727834`, client units
    of class 0x95): owner a client effects spec.
 6. The inventory handlers that see a socket-dialog click first

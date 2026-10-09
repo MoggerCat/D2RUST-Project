@@ -28,17 +28,17 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–364 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 365–494 |
-|   9. Act V intro (chain 40, slot 42) | 495–521 |
-|   10. Hooks called from other systems | 522–544 |
-|   11. NPC services and game completion | 545–558 |
-| Constants & data dependencies | 559–578 |
-| Randomness | 579–590 |
-| Edge cases & original bugs | 591–626 |
-| Test vectors | 627–641 |
-| Provenance | 642–664 |
-| Open questions | 665–738 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–370 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–500 |
+|   9. Act V intro (chain 40, slot 42) | 501–527 |
+|   10. Hooks called from other systems | 528–550 |
+|   11. NPC services and game completion | 551–564 |
+| Constants & data dependencies | 565–584 |
+| Randomness | 585–596 |
+| Edge cases & original bugs | 597–632 |
+| Test vectors | 633–647 |
+| Provenance | 648–670 |
+| Open questions | 671–750 |
 <!-- /index -->
 
 ## Summary
@@ -258,7 +258,13 @@ Where the statues stand (objects 474–476, Arreat Summit preset): `drlg/levels.
   slot [spawned] := 1 with its GUID, spawned += 1, alive += 1, +0x48 :=
   1.
 - Kill (event 8, `0x0058C9A0`; Ancients reach it through their
-  superunique link, §10; forced): needs +0x11, +0x10 and no town portal
+  superunique link, §10; forced. The link, read 2026-10-09: the spawn
+  `0x0054E600` calls the preset superunique creation `0x005A49B0`
+  (`0x0054E67E`), whose switch on hcIdx − 6 sends superuniques 43–45
+  (Talic, Madawc, Korlic) to `0x005A4DC3`: `push 0x23`, jump to the
+  shared tail `0x005A4C43` → `0x005436B0(game, U, 35)` (`0x005A4C47`)
+  → `0x00545B50` (`0x005A4C50`). So each Ancient carries the chain-35
+  link from its creation, before any event; settles REC-795): needs +0x11, +0x10 and no town portal
   open. +0x04 = 0 → +0x04 := 1, timer period 2 `0x0058BD50`. Victim 540
   → +0x3E (statue 475), 541 → +0x3C (476), 542 → +0x3D (474); other
   victims stop. Missile 541 flies from the victim to its statue
@@ -688,6 +694,12 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    lays it out as `bit(22)` of the flags dword at offset 12, i.e. byte
    +0x0E mask 0x40; `0x0058E8B8` reads that byte and ANDs it with the
    mask table entry `0x006CE280` (= 0x40, read from the image).
+4a. Wired host (`d2-sim` `wiring/economy/quest_host.rs`): PROVISIONAL:
+   the Ancients' removal `0x0058BEC0` (§7.6) clears state 54 and removes
+   the unit at once (mode 12 not modelled; REC-790); Baal's gold pile
+   `0x0055B030` (§8.7) is `0x0055A090` with max 1 on the host's
+   inventory model, as the gold pickup's rest pile (REC-793). Settled by
+   R-PQ-13 (`docs/handoff/pc2-rec-pc2-quests.md`).
 5. ~~The Baal throne AI condition that calls `0x0058E600` and the callers
    of `0x0058E920`: AI / monster specs.~~ **Answered** (2026-10-07): the
    caller of `0x0058E600` is BaalToStairs (AI 138, `0x005EF620`), not the

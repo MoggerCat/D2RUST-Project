@@ -1,4 +1,4 @@
-// Spec: specs/world/objects-client.md (§25–§28), specs/client/model.md (§2 rule 1, §5 rules 2–3, §8 rule 7, §18), specs/render/lighting.md (open question 11), specs/render/overlay.md (§5)
+// Spec: specs/world/objects-client.md (§25–§28), specs/client/model.md (§2 rule 1, §5 rules 2–3, §5 rule 6.3, §8 rule 7, §18), specs/render/lighting.md (open question 11), specs/render/overlay.md (§5)
 //! The client side of objects: the per-object client update `0x004BDFF0`
 //! (the generic step `0x004BCBB0`, then the object's `ClientFn` and the
 //! mode sound call, call site A), the second `ClientFn` call of a C
@@ -72,6 +72,16 @@ pub struct ObjClientRow {
     pub lit: [u8; 8],
     /// `Red`, `Green`, `Blue`.
     pub rgb: (u8, u8, u8),
+    /// `IsDoor` (+0x13A): a non-cycling mode steps by the door step.
+    pub is_door: u8,
+    /// `OrderFlag2` (+0x133).
+    pub order_flag2: u8,
+    /// `Parm7` (+0x194): the sound of the mode 1 → 2 turn.
+    pub parm7: u32,
+    /// `Overlay` (+0x1B5).
+    pub overlay: u8,
+    /// `HasCollision0`–`7`.
+    pub has_collision: [u8; 8],
 }
 
 impl ObjClientRow {
@@ -129,6 +139,20 @@ impl ObjClientRow {
                 o.lit0, o.lit1, o.lit2, o.lit3, o.lit4, o.lit5, o.lit6, o.lit7,
             ],
             rgb: (o.red, o.green, o.blue),
+            is_door: o.isdoor,
+            order_flag2: o.orderflag2,
+            parm7: o.parm7,
+            overlay: o.overlay,
+            has_collision: [
+                o.hascollision0,
+                o.hascollision1,
+                o.hascollision2,
+                o.hascollision3,
+                o.hascollision4,
+                o.hascollision5,
+                o.hascollision6,
+                o.hascollision7,
+            ],
         }
     }
 
@@ -202,12 +226,14 @@ impl Latches {
 }
 
 /// Set C and the object latches (`model.md` §2 rule 1; §27).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClientObjects {
     /// Set C: the client-only units (unit flag 0x200000), by key.
     pub set_c: BTreeMap<UnitKey, ClientUnit>,
     pub latches: Latches,
-    /// The client GUID counter `[0x00711F30]` of `0x00466730`.
+    /// The client GUID counter `[0x00711F30]` of `0x00466730`: the last
+    /// GUID given (`model.md` §5 r6.3: .data initial value 1, never
+    /// reset; [`create_client_unit`]).
     pub next_guid: u32,
     /// The missile fields of the set-C missiles
     /// (`super::client_missiles`, `missiles/client.md` §C1).
@@ -225,6 +251,21 @@ pub struct ClientObjects {
     /// Monster type flag 0x80 (+0x16) while the umod 29 hook makes its
     /// copies (`monsters/umod-callbacks.md` §28.2).
     pub multishot_guard: std::collections::BTreeSet<UnitKey>,
+}
+
+impl Default for ClientObjects {
+    fn default() -> Self {
+        Self {
+            set_c: BTreeMap::new(),
+            latches: Latches::default(),
+            next_guid: 1,
+            missiles: Default::default(),
+            just_hit: BTreeMap::new(),
+            unit_grids: BTreeMap::new(),
+            missile_sounds: Vec::new(),
+            multishot_guard: Default::default(),
+        }
+    }
 }
 
 /// A unit and the set it is in.
@@ -285,6 +326,13 @@ pub enum ObjFx {
     /// The client skill start `0x004C6EB0(P, R)` (`render/lighting.md`
     /// §8 r3).
     SkillStart { player: UnitKey, record: [i32; 7] },
+    /// U flag `+0xC4 |= bits` (`OrderFlag2`: 0x100000, generic step
+    /// `world/objects-client.md` §25 r9.2.2).
+    FlagOr { unit: ObjUnit, bits: u32 },
+    /// The `Parm7` sound call `0x0046C320(U, id, 4)` (§25 r9.2.2).
+    Parm7Sound { unit: ObjUnit, id: u32 },
+    /// The collision call `0x00623830(U)` (§25 r9.2.2).
+    Collision { unit: ObjUnit },
 }
 
 /// The context of one client object call: the model, the inputs, the
@@ -329,29 +377,31 @@ impl Cx<'_> {
     }
 
     /// `set_mode(U, m)` (`0x00624690`, §25 r5): a different mode is
-    /// written and the animation re-init sets the frame to 0 (frame bonus
-    /// 0 for objects); the same mode changes nothing the model holds.
+    /// written and the animation re-init [`anim_setup`] runs in it (a new
+    /// speed drawn on U's client seed when `Sync` = 0); the same mode
+    /// changes nothing the model holds (measured: the 0x0E same-mode
+    /// `set_mode` runs no re-init, `facts/objects/objanim-a1-town.tsv`).
     /// TODO(spec: sim/units.md §4.1): unit flag 1 and the temporary stat
     /// lists are not in the client model.
     pub fn set_mode(&mut self, m: u32) -> Result<(), HandlerError> {
+        let row = self.row;
         let u = self.u()?;
         if u.mode != m {
             u.mode = m;
-            u.frame = 0;
-            u.speed = None;
+            anim_setup(u, &row, m)?;
         }
         Ok(())
     }
 
-    /// `reinit(U)` (`0x00624390`): frame := 0.
-    /// TODO(spec: world/objects-client.md §25 r5, REC-440): whether this
-    /// re-init draws a new speed on the client ([`anim_setup`]) is not
-    /// measured; the speed falls back to `FrameDelta[mode]` meanwhile.
+    /// `reinit(U)` (`0x00624390`): the animation set-up [`anim_setup`] in
+    /// U's mode. Measured (REC-440, `facts/objects/objanim-a1-town.tsv`):
+    /// `0x00624390` draws `roll(d >> 3)` on the object's own seed for
+    /// client and server objects alike, whichever caller runs it.
     pub fn reinit(&mut self) -> Result<(), HandlerError> {
+        let row = self.row;
         let u = self.u()?;
-        u.frame = 0;
-        u.speed = None;
-        Ok(())
+        let m = u.mode;
+        anim_setup(u, &row, m)
     }
 
     /// `refresh(U)` (`0x00470610(U, 0)`): an effect call.
@@ -477,41 +527,156 @@ fn row_of(
         ))
 }
 
-/// The generic object step `0x004BCBB0` (`render/lighting.md` §8;
-/// `world/objects-client.md` §26.6: frame += speed, a non-cycling mode
-/// clamps at its last frame).
+/// The classes whose `Overlay` the end of mode 1 creates (§25 r9.2.2).
+const END_OVERLAY_CLASSES: [u32; 7] = [354, 355, 356, 397, 405, 406, 407];
+
+/// The generic object step `0x004BCBB0` (`world/objects-client.md` §25
+/// r9; `render/lighting.md` §8). The speed is U's own (+0x4C,
+/// [`anim_setup`]); a unit without one (no setup ran) steps by the
+/// class's `FrameDelta[mode]`.
 ///
-/// The speed is U's own (+0x4C, [`anim_setup`]); a unit without one
-/// (no setup ran) steps by the class's `FrameDelta[mode]`.
-/// PROVISIONAL (objects-client.md §26.16; REC-45): a cycling mode wraps (frame − `FrameCnt`, modulo); a mode
-/// with `FrameCnt` 0 does not advance; and the end of a non-cycling mode
-/// 1 sets mode 2 (`set_mode`, then the graphics refresh), the transition
-/// §26.2, §26.7 and §26.16 name.
-/// TODO(spec: render/lighting.md §8): the `Lit2` light of the generic
-/// step is not made here.
+/// A cycling mode wraps by one subtraction of `FrameCnt` (Start 0):
+/// measured on 1.14d's `0x004BCBB0` for the Rogue Encampment torches and
+/// classes 35, 36, 39, 40–42 (`facts/objects/objanim-a1-town.tsv` run r2).
 pub fn generic_step(cx: &mut Cx<'_>) -> Result<(), HandlerError> {
     let m = cx.u()?.mode;
-    let cnt = frame_cnt(&cx.row, m)? as i32;
-    if cnt <= 0 {
+    let cnt = frame_cnt(&cx.row, m)?;
+    if cnt == 0x100 {
         return Ok(());
     }
     let i = m as usize;
     let delta = i32::from(cx.row.frame_delta[i]);
+    let class = cx.u()?.class;
+    if cx.row.cycle_anim[i] == 0 {
+        if cx.row.is_door != 0 {
+            return door_step(cx, cnt as i32);
+        }
+        let f = cx.u()?.frame;
+        if f >= (cnt as i32).wrapping_sub(256) {
+            if class == 189 && matches!(m, 2 | 3) {
+                let n = m + 1;
+                cx.u()?.mode = n;
+                cx.refresh()?;
+                cx.reinit()?;
+                cx.u()?.frame = i32::from(cx.row.start[n as usize]) * 256;
+                return Ok(());
+            }
+            if m != 1 {
+                return Ok(());
+            }
+            return end_of_mode_1(cx, class);
+        }
+    }
+    let start = i32::from(cx.row.start[i]) * 256;
     let cycle = cx.row.cycle_anim[i] != 0;
     let u = cx.u()?;
     let speed = u.speed.unwrap_or(delta);
-    u.frame = u.frame.wrapping_add(speed);
-    if u.frame < cnt {
-        return Ok(());
+    let c = cnt as i32;
+    if class == 12 {
+        u.frame = u.frame.wrapping_sub(speed);
+        if u.frame < 0 {
+            u.frame = u.frame.wrapping_add(c);
+        }
+    } else if class == 189 && m == 3 {
+        u.frame = u.frame.wrapping_sub(speed);
+        if u.frame < 0 {
+            u.mode = 4;
+            cx.refresh()?;
+            cx.reinit()?;
+            cx.u()?.frame = i32::from(cx.row.start[4]) * 256;
+        }
+    } else {
+        u.frame = u.frame.wrapping_add(speed);
+        if u.frame >= c {
+            u.frame = if cycle {
+                start.wrapping_add(u.frame.wrapping_sub(c))
+            } else {
+                c.wrapping_sub(256)
+            };
+        }
     }
-    if cycle {
-        u.frame = u.frame.rem_euclid(cnt);
-        return Ok(());
+    Ok(())
+}
+
+/// The door step `0x004BCB20` (§25 r9.2.1, REC-725 settled): `End` =
+/// `FrameCnt[m] − 256`; mode 1 opens (at `End` → finish, else the frame
+/// advances by the speed, clamped to `End`), mode 3 closes (at or below 0
+/// → finish, else it runs back, clamped to 0); any other mode is fatal.
+fn door_step(cx: &mut Cx<'_>, cnt: i32) -> Result<(), HandlerError> {
+    let m = cx.u()?.mode;
+    let end = cnt.wrapping_sub(256);
+    let u = cx.u()?;
+    let s = u
+        .speed
+        .unwrap_or_else(|| i32::from(cx.row.frame_delta[m as usize & 7]));
+    let u = cx.u()?;
+    match m {
+        1 => {
+            if u.frame != end {
+                u.frame = u.frame.wrapping_add(s).min(end);
+                return Ok(());
+            }
+        }
+        3 => {
+            if u.frame > 0 {
+                u.frame = if s > u.frame { 0 } else { u.frame - s };
+                return Ok(());
+            }
+        }
+        _ => {
+            return Err(HandlerError::Invalid(
+                "door step in a mode other than 1 or 3",
+            ))
+        }
     }
-    u.frame = cnt.wrapping_sub(256);
-    if m == 1 {
-        cx.set_mode(2)?;
-        cx.refresh()?;
+    // Finish `0x004BCA90`: no sound, light, OrderFlag2, Parm7 or overlay.
+    let unit = cx.unit;
+    if m == 3 {
+        cx.u()?.mode = 0;
+        cx.u()?.frame = i32::from(cx.row.start[0]);
+    } else {
+        cx.fx(ObjFx::Collision { unit });
+        cx.u()?.mode = 2;
+        cx.u()?.frame = i32::from(cx.row.start[2]);
+    }
+    cx.refresh()?;
+    cx.reinit()?;
+    let n = cx.u()?.mode as usize;
+    let sel = cx.row.selectable[n] != 0;
+    cx.u()?.flag_2 = Some(sel);
+    Ok(())
+}
+
+/// §25 r9.2.2, mode 1: the update after the clamp turns it into mode 2.
+fn end_of_mode_1(cx: &mut Cx<'_>, class: u32) -> Result<(), HandlerError> {
+    let unit = cx.unit;
+    cx.u()?.mode = 2;
+    if cx.row.order_flag2 == 1 {
+        cx.fx(ObjFx::FlagOr {
+            unit,
+            bits: 0x10_0000,
+        });
+    }
+    if cx.row.parm7 != 0 {
+        let id = if cx.row.parm7 == 0xFF { 0x153 } else { 0x97 };
+        cx.fx(ObjFx::Parm7Sound { unit, id });
+    }
+    cx.u()?.frame = i32::from(cx.row.start[2]) * 256;
+    cx.refresh()?;
+    cx.reinit()?;
+    cx.u()?.frame = i32::from(cx.row.start[2]) * 256;
+    if cx.row.overlay != 0 && END_OVERLAY_CLASSES.contains(&class) {
+        cx.fx(ObjFx::OverlayRemove {
+            unit,
+            overlay: 0x47,
+        });
+    }
+    let sel = cx.row.selectable[2] != 0;
+    cx.u()?.flag_2 = Some(sel);
+    let (lit, rgb) = (cx.row.lit[2], cx.row.rgb);
+    cx.fx(ObjFx::Light { unit, lit, rgb });
+    if cx.row.has_collision[2] == 0 && cx.row.has_collision[1] != 0 {
+        cx.fx(ObjFx::Collision { unit });
     }
     Ok(())
 }
@@ -554,9 +719,8 @@ pub fn object_update(
 
 /// Call site B (§25 r3; `model.md` §5 rule 3): after a C unit's update,
 /// a type-2 unit still in set C runs the dispatch once more, result
-/// ignored.
-/// TODO(spec: client/model.md §5 rule 3): type 1 runs `0x0046D780`
-/// (not specified).
+/// ignored. (Type 1 runs the critter AI `0x0046D780` in the C monsters'
+/// walk, [`super::critters::c_monsters`].)
 pub fn site_b(
     w: &mut ClientWorld,
     inputs: &ModelInputs,
@@ -604,9 +768,9 @@ pub fn c_order(w: &ClientWorld, unit_type: u8) -> Vec<UnitKey> {
 /// 6. Returns its key; `None` when the create fails (the point is in no
 /// room of the client DRLG).
 ///
-/// PROVISIONAL (objects-client.md §26.17; REC-objclient-1): the counter
-/// starts at 0 and the new GUID is the counter's value before a += 1
-/// (the counter's start and step are not specified).
+/// The GUID is the counter + 1 (−1 wraps to 0), stored back before the
+/// create (`model.md` §5 r6.3): the first client GUID is 2, and a failed
+/// create still uses its GUID.
 pub fn create_client_unit(
     w: &mut ClientWorld,
     unit_type: u8,
@@ -614,8 +778,8 @@ pub fn create_client_unit(
     x: u16,
     y: u16,
 ) -> Option<UnitKey> {
-    let guid = w.objclient.next_guid;
-    w.objclient.next_guid = guid.wrapping_add(1);
+    let guid = w.objclient.next_guid.wrapping_add(1);
+    w.objclient.next_guid = guid;
     let key = UnitKey::new(unit_type, guid);
     let mut u = ClientUnit::new(key);
     u.class = class;

@@ -1126,19 +1126,8 @@ pub fn order_grid(
     positions: &BTreeMap<UnitKey, ClientPos>,
     clock: FadeClock,
 ) -> Result<FrameOrder, OrderError> {
-    // Pass 1: level backgrounds. Level 120's is drawn by the world view's
-    // pass-1 layer (`world_view::background_view`); level 74's stars
-    // need the initial star tick `last`, which §12 r3 does not name.
-    if near.level.id == background::ARCANE_SANCTUARY {
-        return Err(open(
-            1,
-            format!(
-                "level {} draws a background (draw-order-2.md §12, `background`): \
-                 §12 r3 names no initial star tick `last`",
-                near.level.id
-            ),
-        ));
-    }
+    // Pass 1: level backgrounds (levels 74 and 120) are drawn by the
+    // world view's pass-1 layer (`world_view::background_view`).
     let lists = fill(grid, near, positions, clock, false)?;
     let mut p = Passes {
         near,

@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–210 |
-|   4. Mode change gates | 211–268 |
-|   5. Start and do | 269–459 |
-|   6. Cooldown | 460–473 |
-|   7. Periodic skills and auras | 474–523 |
-|   8. Function tables | 524–543 |
-| Constants & data dependencies | 544–564 |
-| Randomness | 565–574 |
-| Edge cases & original bugs | 575–596 |
-| Test vectors | 597–617 |
-| Provenance | 618–637 |
-| Open questions | 638–690 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–218 |
+|   4. Mode change gates | 219–276 |
+|   5. Start and do | 277–467 |
+|   6. Cooldown | 468–481 |
+|   7. Periodic skills and auras | 482–531 |
+|   8. Function tables | 532–551 |
+| Constants & data dependencies | 552–572 |
+| Randomness | 573–582 |
+| Edge cases & original bugs | 583–604 |
+| Test vectors | 605–625 |
+| Provenance | 626–645 |
+| Open questions | 646–698 |
 <!-- /index -->
 
 ## Summary
@@ -200,7 +200,15 @@ offsets from `data/fields.tsv`).
    missing target changes nothing).
 6. Else by `range(skill, unit)` (`0x00645460`: 0 none, 1 h2h, 2 rng, 3
    both, 4 loc; `both` is rng with a bow or crossbow equipped, else h2h;
-   a player with range 2 and state mask 0x26 is treated as h2h):
+   a player with range 2 and state mask 0x26 is treated as h2h). The
+   state test applies only to `both` resolved to rng (a skill whose
+   `range` is `rng` returns 2 untested): `0x00645460` pushes the
+   immediate 0x26 (`0x006454A3`) as the flag index of `0x0063A7B0(unit,
+   i)` (i ≤ 0x27, else 0), which takes the per-flag state mask at data
+   +0xCC + 4·i and tests it against the unit's state bits
+   (`0x0063A130`, any shared bit). Index 0x26 = 38 = `states.txt` flag
+   `meleeonly` (`data/fields.tsv`; scheme `ui/panels-3.md` §24 r1),
+   2026-10-09:
    - h2h in melee range (`0x00622C40`) → use now;
    - h2h out of range, or loc → run (mode 3) to the target and remember
      the skill (`0x00548A50`); it fires on arrival (`sim/units.md`);

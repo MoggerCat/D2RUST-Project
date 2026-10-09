@@ -1,0 +1,144 @@
+# Act III objectives for tools/playthrough/playthrough.py (spec:
+# specs/tools/playthrough.md). Crude, as act1.play: pokes (warp, pos,
+# stat, missile) jump between milestones; each milestone is its own
+# state-dump run. A boss kill is a Fire Bolt `missile` poke at the boss
+# (moved next to the player, life set to 1): the headless right click
+# walks instead of casting (spec Open question 2).
+# Quests: specs/world/quests-act3.md (slots 17 Lam Esen's Tome,
+# 18 Khalim's Will, 19 Blade of the Old Religion, 20 Golden Bird,
+# 21 Blackened Temple, 22 The Guardian, 23 Act III completed; quests.md
+# §1.3).
+# Ids from the 1.14d tables (levels.txt rows, monstats rows, objects.txt
+# rows): Kurast Docks 75, Spider Forest 76, Great Marsh 77, Flayer
+# Jungle 78, Lower Kurast 79, Kurast Bazaar 80, Upper Kurast 81,
+# Travincal 83, Spider Cavern 85, Flayer Dungeon 3 = 91, Kurast Sewers 2
+# = 93, Ruined Temple 94, Durance of Hate 2 = 101, Durance of Hate 3 =
+# 102, Pandemonium Fortress 103; Deckard Cain (Act III) 245, Asheara 252,
+# Hratli 253, Alkor 254, Ormus 255, Meshif (Act III) 264, Natalya 297,
+# High Council 345,346,347, Mephisto 242; Lam Esen's tome 193, Gidbinn
+# altar 251, Gidbinn decoy 252, waypoint objects 119,145,156,157,237,238,288,323,324,398,
+# 402,429,494,496,511,539.
+playthrough 1
+act 3
+
+# Act III town (town byte act 2), Acts I-II done (acts=2: slots 7, 15 bit 0).
+save sor --name PtSorC --class sor --expansion --level 40 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=2 --act 2 --difficulty normal
+
+milestone town-start
+  use sor
+  deadline 40
+  note the NPCs 1.14d has at frame 40 (only the start's active rooms; q-prov-data)
+  need player lv == 75
+  need player act == 2
+  need unit ut 1 cl 253,264,294 count >= 3
+
+milestone town-wp
+  use sor
+  deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 75
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 75 seen
+
+milestone spider-forest
+  use sor
+  deadline 80
+  poke 5 warp 76
+  need player lv == 76
+  need unit ut 1 lv 76 count >= 3
+
+milestone spider-cavern
+  use sor
+  deadline 80
+  poke 5 warp 85
+  need player lv == 85
+  need unit ut 1 lv 85 count >= 3
+
+# The Gidbinn altar (251, DS1 id 96) is a Kurast Docks object (docktown3,
+# Ormus' map AI walks to it, quests-act3.md §5.7); the Flayer Jungle
+# holds the Gidbinn decoy (252, DS1 id 97 of the Pygmy clearings' second
+# files, outdoor-act3-act5.md §3).
+milestone docks-gidbinn-altar
+  use sor
+  deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 75
+  need unit ut 2 cl 251 lv 75 seen
+
+milestone flayer-jungle-decoy
+  use sor
+  deadline 3000
+  poke 5 warp 78
+  sweep 20 2 1200 40
+  need ever player lv == 78
+  need unit ut 2 cl 252 lv 78 seen
+
+milestone flayer-dungeon-3
+  use sor
+  deadline 80
+  poke 5 warp 91
+  need player lv == 91
+  need unit ut 1 lv 91 count >= 3
+
+milestone kurast-sewers-2
+  use sor
+  deadline 80
+  poke 5 warp 93
+  need player lv == 93
+  need unit ut 1 lv 93 count >= 3
+
+milestone ruined-temple-tome
+  use sor
+  deadline 1000
+  poke 5 warp 94
+  sweep 20 2 200 20 grid
+  need ever player lv == 94
+  need unit ut 2 cl 193 lv 94 seen
+
+milestone travincal-council
+  use sor
+  deadline 1000
+  poke 5 warp 83
+  sweep 20 2 400 40
+  need ever player lv == 83
+  need unit ut 1 cl 345,346,347 lv 83 seen
+
+milestone council-killed
+  use sor
+  deadline 1000
+  poke 5 warp 83
+  sweep 20 2 400 40
+  find ut 1 cl 345,346,347
+  poke +2 pos @1:345 @x+3 @y
+  poke +2 stat @1:345 6 0 256
+  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 345 killed
+
+milestone durance-2
+  use sor
+  deadline 80
+  poke 5 warp 101
+  need player lv == 101
+  need unit ut 1 lv 101 count >= 3
+
+milestone mephisto-present
+  use sor
+  deadline 80
+  poke 5 warp 102
+  need player lv == 102
+  need unit ut 1 cl 242 present
+
+milestone mephisto-killed
+  use sor
+  deadline 200
+  poke 5 warp 102
+  poke 30 pos @1:242 @x+3 @y
+  poke 30 stat @1:242 6 0 256
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 242 dead
+
+milestone to-act4
+  use sor
+  deadline 100
+  poke 5 warp 103
+  need player lv == 103
+  need player act == 3

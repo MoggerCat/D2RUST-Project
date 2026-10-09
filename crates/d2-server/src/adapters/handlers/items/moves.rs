@@ -221,10 +221,13 @@ pub(crate) struct MoveRun<'m> {
 pub(crate) type MoveOut = (
     Option<Result<u32, MoveFatal>>,
     Vec<(Option<UnitId>, Vec<u8>)>,
-    Vec<UnitId>,
     Vec<(UnitId, UnitId, bool)>,
 );
 
+/// The item use inside the handler (`items/use.md` §1) runs the Town
+/// Portal cast on the economy's hooks (`LifecycleHooks::town_portal_cast`),
+/// so a 0x20 / 0x26 / 0x27 charges the scroll or tome only when the cast
+/// made the pair (`inventory-moves.md` §7.11 rule 3, §7.17).
 impl MoveCall for MoveRun<'_> {
     type Out = MoveOut;
     fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> MoveOut {
@@ -232,9 +235,8 @@ impl MoveCall for MoveRun<'_> {
         let guid = d.guid_of(self.player);
         let r = sim_moves::handle(&mut d, guid, self.msg);
         d.flush_equip();
-        let portals = d.take_portal_requests();
         let walks = d.take_item_walks();
-        (r, take_sent(&mut d), portals, walks)
+        (r, take_sent(&mut d), walks)
     }
 }
 
@@ -345,12 +347,7 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     // Every item-move id has a fixed size ≤ 17 (`client-messages.tsv`).
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
-    let (run, sent, portals, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
-    // A used Town Portal scroll / tome opens its pair (`items/use.md` §4,
-    // `world/objects-2.md` §27.1 steps 5–9 on the action wiring).
-    for p in portals {
-        sim.world.town_portal(game, events, p);
-    }
+    let (run, sent, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
     // §7.1 step 2: a pick-up out of reach runs the player to the item.
     for w in walks {
         sim.world.item_walk(game, events, w);
@@ -440,6 +437,10 @@ impl MoveCall for UpdateRun {
         // item messages do not touch the sound slots.
         let sounds = self.sounds(econ.game);
         let mut d = parts.desk(econ);
+        // The items placed on the ground since the last pass: their unit
+        // flag 0x1000 was cleared by the tick's room clean-up (PROVISIONAL,
+        // REC-730: d2rs-own bookkeeping for the pass's place in the tick).
+        let dropped = d.take_dropped();
         let (mut sent, mut fatal) = (Vec::new(), Vec::new());
         let mut announced = Vec::new();
         let mut sounds = sounds.into_iter();
@@ -462,11 +463,27 @@ impl MoveCall for UpdateRun {
             for &u in &r.ground {
                 let guid = d.guid_of(u);
                 if d.unit_exists(Owner::item(guid)) && d.mode(guid) == GROUND {
-                    match sim_moves::announce_item(&d, guid) {
+                    // An item dropped in this tick is announced with
+                    // action 2 (§6.3, unit flag 0x1000; recorded
+                    // 2026-10-09, `facts/items/a1-town-item-moves.tsv`
+                    // n 57–58: a 0x17 drop from the cursor).
+                    let was_dropped = dropped.contains(&u);
+                    match sim_moves::announce_item_as(&d, guid, was_dropped) {
                         Ok(m) => sent.push((r.client, m)),
                         Err(e) => fatal.push((r.client, e)),
                     }
                     announced.push((r.client, u));
+                }
+            }
+        }
+        // The item case of the room clean-up (`intents-events.md` §7.5 step
+        // 7, `generation.md` §1.4 row 0x2000): item flags 0x20 and 0x2000
+        // clear once the item sat in a client's room queue, after the
+        // announcing 0x9C carried them.
+        for r in &self.receivers {
+            for &u in &r.ground {
+                if let Some(it) = d.econ.items.get_mut(u) {
+                    it.flags &= !0x2020;
                 }
             }
         }

@@ -24,20 +24,20 @@
 | Rules | 74–75 |
 |   1. Which draw path | 76–122 |
 |   2. COF file | 123–183 |
-|   3. Direction and frame | 184–242 |
-|   4. Pre-test: COF box culling | 243–252 |
-|   5. The slot loop (`0x00470EC0`) | 253–373 |
-|   6. Component file and cel | 374–414 |
-|   7. Colormap source per component | 415–439 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 440–535 |
-|   9. Single-cel units (missiles, items) | 536–550 |
-|   10. d2rs mapping | 551–565 |
-| Constants & data dependencies | 566–579 |
-| Randomness | 580–583 |
-| Edge cases & original bugs | 584–598 |
-| Test vectors | 599–619 |
-| Provenance | 620–667 |
-| Open questions | 668–731 |
+|   3. Direction and frame | 184–249 |
+|   4. Pre-test: COF box culling | 250–259 |
+|   5. The slot loop (`0x00470EC0`) | 260–380 |
+|   6. Component file and cel | 381–421 |
+|   7. Colormap source per component | 422–446 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 447–549 |
+|   9. Single-cel units (missiles, items) | 550–564 |
+|   10. d2rs mapping | 565–579 |
+| Constants & data dependencies | 580–593 |
+| Randomness | 594–597 |
+| Edge cases & original bugs | 598–612 |
+| Test vectors | 613–633 |
+| Provenance | 634–681 |
+| Open questions | 682–745 |
 <!-- /index -->
 
 ## Summary
@@ -185,7 +185,14 @@ with every 0x20 turned into 0, so a part ends at its first space (the
 
 1. **Direction** `dir64` (0–63): dynamic path direction (`0x006487F0`)
    for types 0, 1, 3; static path +0x1C byte for types 2 and 4
-   (`0x00620100`).
+   (`0x00620100`). Measured (2026-10-09, `a1-walk-n`): the local
+   player walking to a clicked point is drawn at dir64 32, the direction
+   from its start subtile (4873, 4228) to the clicked (4867, 4222) (the
+   prepared target (4868, 4222) would give 34), kept while it walks.
+   PROVISIONAL (REC-517): the d2rs prediction faces the click target
+   from the walk's start and keeps it (because the path direction is
+   set at the walk request; settled by a recording of the dynamic path
+   direction during a walk that bends).
 2. **Frame**: unit +0x44 >> 8; frame count unit +0x48 >> 8, objects
    `FrameCnt[mode]` (`0x00621810`). The draw reads neither AnimData nor
    the COF rate: speed and frame advance belong to the animation code
@@ -495,6 +502,11 @@ Created (`0x004DA000`, zeroed) and freed (`0x004DA080`) by client effect
 code: 16 creation sites (`0x00465716` … `0x004F0BCC`), fields set through
 `0x004DA1D0` (position, `<< 11`), `0x004DA200` (velocity), `0x004DA250`,
 `0x004DA2A0` (others). With no record every offset is 0.
+Getters (unit on the stack, `ret 4`; 0 without a record): x, y, z
+`>> 11` (arithmetic; 1/32 subtile, the setter's unit) `0x004DA110`,
+`0x004DA130`, `0x004DA150`; the stored 16.16 values `0x004DA170`,
+`0x004DA190`, `0x004DA1B0`. So a getter → `0x004DA1D0` copy keeps the
+position with its low 11 bits cleared.
 
 Creation `0x004DA000`: reuses the unit's record when it has one, else
 allocates **0x48** bytes; then zeroes **0x4C** bytes and attaches it
@@ -505,9 +517,11 @@ the last argument is non-zero): position `0x004DA1D0(x, y, z)` (always
 ≪), velocity `0x004DA200`, acceleration `0x004DA250`, limits
 `0x004DA2A0`; flag 0x20 `0x004DA6E0` (EDX ≠ 0 sets, 0 clears), flag
 0x10 `0x004DA620` (same), bounce `0x004DA2F0(count, factor)` (flag 4),
-timed arc `0x004DA5B0` (EDX = height `h`, stack `n`: flag 2, ticks :=
-max(`n`, 1), x = y = 0, z := `h` ≪, vx = vy = 0, az := −0x1000 when 0,
-vz := (−`h`·2048 − az·`n`²/2) / `n`, C division), done `0x004DA640`
+timed arc `0x004DA5B0` (EDX = height `h`, stack `n`: flags |= 2 (an
+OR: other bits, a restart's flag 8 too, stay), t := ticks := max(`n`,
+1), x = y = 0, z := `h` ≪, vx = vy = 0, az := −0x1000 when 0, vz :=
+(−(`h` << 11) − trunc(az·t·t / 2)) / t, 32-bit products, both divisions
+C (toward zero), by the clamped t; 1.14d asm 2026-10-09), done `0x004DA640`
 (flag 1), restart `0x004DA690` (clears flag 1, sets flag 8; flag 8 has
 no other reader than `0x004DA6B0`, which reports "still moving" unless
 flag 1 is set and flag 8 clear).

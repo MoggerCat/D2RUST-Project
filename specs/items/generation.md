@@ -29,26 +29,26 @@
 |---|---|
 | Summary | 54–68 |
 | Inputs | 69–107 |
-| Outputs / state changes | 108–120 |
-| Rules | 121–122 |
-|   1. Conventions | 123–230 |
-|   2. Seeds | 231–249 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 250–271 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 272–319 |
-|   5. Special item kinds | 320–330 |
-|   6. Normal quality and class skill mods | 331–377 |
-|   7. Sockets | 378–409 |
-|   8. Ethereal | 410–430 |
-|   9. Forced requests, ears, names, timers | 431–464 |
-|   10. Items from a code: the create wrapper and start items | 465–535 |
-|   11. Format-0 branches (legacy items) | 536–581 |
-|   12. Repair, recharge and runeword removal | 582–668 |
-| Constants & data dependencies | 669–691 |
-| Randomness | 692–710 |
-| Edge cases & original bugs | 711–725 |
-| Test vectors | 726–741 |
-| Provenance | 742–768 |
-| Open questions | 769–859 |
+| Outputs / state changes | 108–121 |
+| Rules | 122–123 |
+|   1. Conventions | 124–231 |
+|   2. Seeds | 232–250 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 251–286 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 287–334 |
+|   5. Special item kinds | 335–345 |
+|   6. Normal quality and class skill mods | 346–392 |
+|   7. Sockets | 393–424 |
+|   8. Ethereal | 425–445 |
+|   9. Forced requests, ears, names, timers | 446–479 |
+|   10. Items from a code: the create wrapper and start items | 480–553 |
+|   11. Format-0 branches (legacy items) | 554–599 |
+|   12. Repair, recharge and runeword removal | 600–686 |
+| Constants & data dependencies | 687–709 |
+| Randomness | 710–728 |
+| Edge cases & original bugs | 729–743 |
+| Test vectors | 744–759 |
+| Provenance | 760–799 |
+| Open questions | 800–890 |
 <!-- /index -->
 
 ## Summary
@@ -108,7 +108,8 @@ column used below by its name).
 ## Outputs / state changes
 
 - A new item unit with: item record, format, item level, quality,
-  file index (unique/set/superior/low-quality/book index or −1), affix
+  file index (unique/set/superior/low-quality/body-part index, −1 after
+  a Clear, else 0 from allocation: §3 step 2), affix
   slots (`items/affixes.md` §1), flags, base stats and property stats,
   start seed, the two seed states after the last draw.
 - Steps of the game seed (two per item, `sim/rng.md` §5.2–§5.3), of the
@@ -187,7 +188,7 @@ socket step), `items/quality.md` §10 (quality roll, low quality
 | 0x100 | broken | forced (§9) |
 | 0x800 | socketed | §7 |
 | 0x1000 | nosell | forced |
-| 0x2000 | instore | every non-forced creation (§3 step 5); **cleared** on every item created from a save-format record: the loader's item create `0x00558CB0` (`0x00558D44`–`0x00558D4C`; callers `0x005335E0` player / corpse / hireling lists, `0x0056ACE0` golem, `0x00541990`) and the item copy `0x0055A2A0` (copy and each child, `world/vendors.md` §7.3) |
+| 0x2000 | instore ("new", 1.14d use) | every non-forced creation (§3 step 5) and the thief umod's stolen item (`0x005A31F2`–`0x005A31FA`, `monsters/umod-callbacks.md` §17); **cleared** by the room clean-up `0x00553220`, item case, together with item flag 0x20 (`0x00553345`–`0x00553357`; tick step 6, `sim/intents-events.md` §7.5 rule 7): so it lives from creation to the end of the first tick in which the item sits in a room update queue, and the 0x9C that announces a new drop in that tick's client pass carries it, while any state read after that tick shows it clear (§3 step 5); **cleared** right after creation by the object gold drop `0x00559300` (`0x00559480`–`0x00559488`, `world/objects-2.md` §20.3); **cleared** on every item created from a save-format record: the loader's item create `0x00558CB0` (`0x00558D44`–`0x00558D4C`; callers `0x005335E0` player / corpse / hireling lists, `0x0056ACE0` golem, `0x00541990`) and the item copy `0x0055A2A0` (copy and each child, `world/vendors.md` §7.3) |
 | 0x8000 | named | ears (§9) |
 | 0x10000 | is ear | ears (§6) |
 | 0x20000 | start item | forced |
@@ -250,18 +251,32 @@ owned by `sim/stat-lists.md`.
 ### 3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`)
 
 Arguments: game, request, "use seed" (true when the caller supplies
-seeds).
+seeds). Call form (asm): ECX game, EDX request; stack [ESP+4] use
+seed; `ret 4`; EAX the item unit, 0 = failed. A ground item at a point
+is this call with request spawn mode 3, x, y, room set (§Inputs).
 
 1. Classic game (game +0x70 = 0): fail if the item record is missing or
    its `version` ≥ 100.
 2. Fail if `item` < 0 or ≥ the items count. Allocate the item unit
-   (mode, position, room, init flags from the request; §2.1). Set flag
-   0x80000 (init). Set the format from the request.
+   (mode, position, room, init flags from the request; §2.1). The item
+   data (0x74 bytes, `0x00627C90`) is zero-filled (`0x00627CE4`) and
+   only its owner GUID (+0x0C) is set, to −1: the **file index (+0x28)
+   starts at 0**, and only the quality routines change it
+   (`items/quality.md` §1). Set flag 0x80000 (init). Set the format from
+   the request.
 3. If "use seed" or `force`: unit seed := `{seed, 666}` and the unit's
    init seed := `seed`; start seed := `item seed`; item seed :=
    `{item seed, 666}`.
 4. `ilvl` < 1 → `ilvl` := 1 (in the request). Store it as the item level.
-5. Not forced → set flag 0x2000. Set the inventory page to none (0xFF).
+5. Not forced (request `force` +0x2C = 0, `0x00558E95`–`0x00558EA3`) →
+   set flag 0x2000; nothing else here reads or writes it, and "use seed"
+   does not enter. Set the inventory page to none (0xFF). Treasure drops
+   and the poke `item` request (force 0) both take this branch; neither
+   path clears the flag during creation. The clear is the room clean-up
+   at the end of the tick (§1.4 row 0x2000), which is why recorded item
+   state shows 0x80000 only (`traces/checks/items-ground-many.check`)
+   while a recorded drop's 0x9C shows 0x00A02010
+   (`facts/items/a1-cold-plains-poke-kills.tsv`).
 6. **Base stats and quality:** §4 with "quest" = true (it calls the
    quality dispatch). Failure → remove the unit, fail.
 7. Forced → §9 steps 1–4.
@@ -469,6 +484,9 @@ draw. Also used by property function 23 and craft lists
 A 4-byte item code (space-padded, as in `items.txt` `code`) → the
 combined items index through the code map (`data/callbacks.md`, linker
 `0x0096BCC4`); unknown code → not found (index 0, null record).
+Call form (asm): stack [ESP+4] code (u32), &index (out); `ret 8`; EAX
+the record (index × 0x1A8 + the records pointer `0x0096CA5C`), 0 when
+not found.
 
 #### 10.2 Create from an index (`0x00559CE0`)
 
@@ -765,6 +783,19 @@ Real 1.14d vectors need the recording in Open questions 2.
   1.14d ear branch and personalized names use the request unit's player
   data lookup `0x006221A0`; staffmods pass the request ilvl as the bonus
   only with flags2 & 0x20 (as D2MOO).
+- 2026-10-09 (pc1-day3-c, read in all.asm / disasm.py; pc1-data.md
+  Step 4 item 26): §3 step 5 and §1.4 row 0x2000: the only set in
+  `0x00558D90` is `0x00558E95`–`0x00558EA3` (force test); the writers of
+  item flag 0x2000 in the binary are the `0x006280D0(item, 0x2000, …)`
+  calls at `0x00553357` (room clean-up, item case of the type table
+  `0x00553364`: types 0–2 own cases, 3 none, 4 item), `0x00558D4C`,
+  `0x00558EA3`, `0x00559488`, `0x0055A366`, `0x0055A43E`,
+  `0x005A31FA`; the clean-up runs from `0x0053B000` (tick step 6,
+  caller `0x0052D900`). §3 step 2: item-data allocation `0x00627C90`
+  (size 0x74, memset `0x00627CE4`, +0x0C := −1 at `0x00627CE9`),
+  called from `0x0055531D`. Matches the 1.14d recording of 36 poked
+  items (flags 0x80000, file index 0 without a unique/set/superior
+  index).
 
 ## Open questions
 

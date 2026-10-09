@@ -90,6 +90,23 @@ pub enum QuestEvent {
     BaalToStairs,
     /// Anya's AI asks for the temple portal (`0x0058BC80`, §6.7).
     AnyaOpenPortal { unit: UnitId },
+    /// The baalfx control missile asks for Tyrael (`0x0058E920` from
+    /// server-do 36 / server-hit 57, `quests-act5-2.md` §8.8), with the
+    /// missile's room and position at the call.
+    SpawnTyrael {
+        room: Option<RoomId>,
+        missile: UnitId,
+        x: i32,
+        y: i32,
+    },
+    /// A caged barbarian left through its group's portal (`0x00588880`
+    /// from the prisoner AI, `quests-act5.md` §4.10), by GUID (the unit is
+    /// removed in the same call).
+    WussieLeft { guid: u32 },
+    /// The prisoner AI's rescue `0x005888D0(game, P, unit)` (§4.7).
+    WussieRescue { player: UnitId, unit: UnitId },
+    /// The prisoner AI's wait hook `0x00588DD0` (§4.10).
+    WussieWait,
     /// C→S 0x44 reached `0x005852E0` (`quests-act2-2.md` §3.2): `player`
     /// puts `item` (GUID, 0: none) into the object with GUID `object`
     /// (`action` 2 cancel, 3 insert).
@@ -99,6 +116,18 @@ pub enum QuestEvent {
         item: u32,
         action: u16,
     },
+    /// A special monster was created (`0x005A09E0` → `0x00544E80`,
+    /// `quests-act3.md` §6.2: the Golden Bird's boss choice).
+    BossCreated { unit: UnitId },
+    /// A preset superunique's quest hook `0x00545B50` (`monsters/init.md`
+    /// §20.1; `quests-act3.md` §7.5: the Travincal council).
+    PresetBoss { unit: UnitId },
+    /// Alkor's map AI cleared the Golden Bird's +0x00 (`0x005BAD40`,
+    /// `ai-bodies.md` §9.9).
+    AlkorReset,
+    /// Ormus' map AI activates the Gidbinn altar (`0x005B9CD0`,
+    /// `quests-act3.md` §5.7).
+    OrmusAltar,
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec
@@ -752,16 +781,6 @@ pub trait Pending {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         false
     }
-    /// Missile damage setup `0x0059F900` (skills spec).
-    fn missile_damage_setup(
-        &mut self,
-        game: &mut Game,
-        owner: UnitId,
-        origin: Option<UnitId>,
-        missile: UnitId,
-        level: i32,
-    ) {
-    }
     /// A missile parameter record's init callback with an id no spec
     /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
     /// 21).
@@ -874,9 +893,24 @@ pub trait Pending {
         false
     }
 
-    /// Reaction `0x0057CEE0` (`damage.md` §7.1, call level only; its mode
-    /// changes and the kill `0x0057CCB0` are not specified in full).
+    /// Reaction `0x0057CEE0` (`damage.md` §7.1) steps 1–2 (the town rule
+    /// and the hit class store); steps 3–5 run in
+    /// [`super::reaction::reaction`].
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
+    /// AI state setter `0x005734C0(unit, v)` (monster data `dwAiState`,
+    /// `monsters/ai.md` §3 "AI state"); read back by [`Self::ai_state`].
+    fn set_monster_ai_state(&mut self, unit: UnitId, v: u32) {}
+    /// A player mode request (`0x005809D0` / `0x00580A70`, re-entry 0)
+    /// on a host without the path provider. Default: nothing.
+    fn player_mode_request(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        skill: Option<u16>,
+        mode: u32,
+        target: crate::path::walk::request::WalkTarget,
+    ) {
+    }
     /// Overlay `0x00621E40`.
     fn overlay(&mut self, unit: UnitId, id: i32) {}
     /// `0x00623F50` animation rate refresh.
@@ -952,6 +986,19 @@ pub trait Pending {
     }
     /// `0x00535D10` / `0x00535E20`.
     fn dual_wield_switch(&mut self, a: UnitId, offhand: bool, on: bool) {}
+    /// Attack weapon `0x00623990(unit, 1)` (`sim/units.md` §4.7) and a
+    /// monster's `0x00622830` (`missiles/damage.md` §1 step 6). Default:
+    /// [`Self::weapon`].
+    fn attack_weapon(&self, unit: UnitId) -> Option<UnitId> {
+        self.weapon(unit)
+    }
+    /// `0x006289C0`: items `2handed` ≠ 0. Default: false.
+    fn item_two_handed(&self, item: UnitId) -> bool {
+        false
+    }
+    /// Dual-wield stat toggle `0x00623C80(unit, 1)` (`sim/units.md`
+    /// §4.7). Default: nothing.
+    fn dual_wield_toggle(&mut self, unit: UnitId) {}
 
     // ---- objects, interaction, messages (waypoints seam) ---------------
 
@@ -1029,6 +1076,10 @@ pub trait Pending {
     fn object_remove_portal(&mut self, game: &mut Game, object: UnitId) {}
     /// `0x0058CF50(game, L)`. Default: nothing.
     fn object_portal_act5(&mut self, partner: UnitId) {}
+    /// `0x0058CF00(game, O)`: the Act V hook of a town portal the cast
+    /// opened (`world/objects-2.md` §27.1 step 8, `quests-act5-2.md`
+    /// §7.6). Default: nothing.
+    fn object_portal_opened(&mut self, portal: UnitId) {}
     /// State 102 on P until `expire` (§12 rule 13). Default: nothing.
     fn object_just_portaled(&mut self, game: &mut Game, player: UnitId, expire: i32) {}
     /// What the object module handed back without running it: quest,
@@ -1583,6 +1634,16 @@ pub trait Pending {
     {
         false
     }
+    /// The save load's passive states (`formats/d2s-load.md` §2
+    /// "skills", the assign's passive part): routed to
+    /// [`crate::wiring::interaction::skill_events::passive_refresh_all`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default:
+    /// nothing.
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The skill part of the monster sequence event 0 `0x005A8670`
     /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
     /// the moving skill's step and the do `0x0056FC50` by frame code. A
@@ -1590,6 +1651,45 @@ pub trait Pending {
     /// [`crate::wiring::interaction::skill_events::monster_sequence_frame`].
     /// Default: nothing.
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The used-skill branch of the monster attack-family event 0
+    /// `0x005A7670` (`skills/use.md` §5.2 "Monsters", before the
+    /// animation refresh): a moving skill's step and the do `0x0056FC50`
+    /// on every event. A [`crate::wiring::interaction::UseRest`] value
+    /// routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_skill`].
+    /// Default: nothing.
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The strike of the monster attack-family event 0 `0x005A7670` with
+    /// no used skill (`skills/use.md` §5.2 "Monsters"): the mode missile
+    /// `0x005A6D50` (`moving`: its argument), else the melee set-up and
+    /// `apply_melee` on the path target unit. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_strike`].
+    /// Default: nothing.
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) where
+        Self: Sized,
+    {
+    }
+    /// The monster mode damage `0x005A4F50(unit, mode)` of the mode set
+    /// (`skills/bodies-2.md` §2.1, `umod-callbacks.md` §2 rule 1): the
+    /// base list's damage and to-hit for the requested mode. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_mode_damage`].
+    /// Default: nothing.
+    fn monster_mode_damage(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId, mode: u32)
     where
         Self: Sized,
     {
@@ -1681,6 +1781,40 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The not-intro test `0x005444B0(game, chain)` (`quests.md` §2.3:
+    /// no record with the chain → true, else its not-intro byte +0x09):
+    /// the quest control publishes its records' answers once per tick.
+    /// Default: false (no quest control).
+    fn quest_not_intro(&self, chain: u8) -> bool {
+        false
+    }
+    /// The quest control's not-intro bytes `(chain, not_intro)` of every
+    /// record (for [`Self::quest_not_intro`]). Default: nothing.
+    fn publish_not_intro(&mut self, records: &[(u8, bool)]) {}
+    /// A quest event for the quest control (`take_quest_events`).
+    /// Default: dropped.
+    fn queue_quest_event(&mut self, e: QuestEvent) {}
+    /// A caged barbarian's group state by GUID (`quests-act5.md` §4.10):
+    /// (`0x00588830` the group counter ≠ 0 in a not-intro record, the
+    /// group's portal GUID when `0x00588D60` would find it spawned).
+    /// Default: (false, none).
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        (false, None)
+    }
+    /// The quest control's caged-barbarian states (GUID, counting,
+    /// portal) of every group, once per tick. Default: nothing.
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {}
+    /// `0x0058E920(game, room, missile)` from a missile body (Tyrael's
+    /// spawn, `quests-act5-2.md` §8.8). Default: nothing.
+    fn missile_spawn_tyrael(&mut self, room: Option<RoomId>, missile: UnitId, x: i32, y: i32) {}
+    /// The Durance of Hate warp check's answer (`0x005BBFA0`, `quests.md`
+    /// §8.2: into level 100 from anywhere but level 101), published by
+    /// the quest control once per tick. Default: nothing.
+    fn set_durance_open(&mut self, open: bool) {}
+    /// The Act III answers the town NPCs' map AI reads (`ai-bodies.md`
+    /// §9.9: alkor `0x005BAD20`, ormus `0x005B9CA0`), published by the
+    /// quest control once per tick. Default: nothing.
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

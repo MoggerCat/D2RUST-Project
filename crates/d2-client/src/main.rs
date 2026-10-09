@@ -1,17 +1,21 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--res 800x600|640x480] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--game-dir DIR] [--res 800x600|640x480] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
-//!   d2-client play       ... --dump-draws DIR [--at-tick N] [--input SCRIPT]
+//!   d2-client play       ... --dump-draws DIR [--at-tick N[,M...]] [--dump-image] [--input SCRIPT]
 //!   d2-client play       ... [--poke "F DIRECTIVE ARGS"]... [--poke-file FILE]
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
 //!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]...
+//!   d2-client soak [--save FILE.d2s | --new CLASS] [--warp LEVEL] [--seed N] [--steps N] [--replay LOG] [--log-out LOG] [--report FILE] [--keep-going]
+//!   d2-client autoplay-host (--save FILE.d2s | --new CLASS NAME) [--seed N] [--difficulty D] [--game-dir DIR]
+//!                        (the headless play client on a stdin/stdout line protocol,
+//!                        specs/tools/autoplay.md; tools/autoplay/ drives it)
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -41,9 +45,12 @@
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
 //! exactly N. Every case (map and synthetic) runs on one headless compute
 //! compositor. `cpu-render` writes the CPU reference image only.
-//! `play --dump-draws DIR [--at-tick N]` writes the rendering facts
-//! (`specs/tools/facts-render.md` §5) of the first drawn frame at server
-//! tick N or later (default 1) to DIR and exits (skips the front end).
+//! `play --dump-draws DIR [--at-tick N[,M...]] [--dump-image]` writes the
+//! rendering facts (`specs/tools/facts-render.md` §5) of the first drawn
+//! frame at server tick N or later (default 1) to DIR and exits (skips the
+//! front end); several ticks write DIR/tick-N each, `--dump-image` adds the
+//! composed frame as `frame.png` (§5 r19). `play --sound-log FILE` writes
+//! every sound request call (§5 r20).
 //! `play --input "move X Y; wait N; click X Y; rclick X Y"` plays the
 //! steps as pointer input, timed in server ticks, in place of the window's
 //! pointer (`facts-render.md` §5 r11).
@@ -53,7 +60,10 @@
 //! T server ticks and writes one `state-1` game-state snapshot per tick
 //! (`specs/tools/state-snapshot.md`; `--game-dir` or $D2_GAME_DIR).
 //!
-//! Game files are read from $D2_GAME_DIR. Output images go under the
+//! Game files are read from `--game-dir DIR`, else $D2_GAME_DIR, else the
+//! exe's folder or the current folder when it holds `d2data.mpq`
+//! (`launch::game_dir`; `docs/PLAYTEST.md`). A panic or a fatal error
+//! writes `d2rs-crash.log` next to the exe (`launch`). Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
 //! never be committed.
 
@@ -106,8 +116,13 @@ struct Options {
     hardcore: bool,
     /// `play --dump-draws DIR`: the facts export (`facts-render.md` §5).
     dump_draws: Option<PathBuf>,
-    /// `play --at-tick N`: the dump's first server tick.
-    at_tick: Option<u64>,
+    /// `play --at-tick N[,M...]`: each dump's first server tick, strictly
+    /// increasing (`facts-render.md` §5 r19).
+    at_tick: Option<Vec<u64>>,
+    /// `play --dump-image`: each dump also writes `frame.png` (§5 r19).
+    dump_image: bool,
+    /// `play --sound-log FILE`: every sound request call (§5 r20).
+    sound_log: Option<PathBuf>,
     /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
     input: Option<Vec<d2_client::world_view::input_script::Step>>,
     /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
@@ -115,6 +130,16 @@ struct Options {
     /// `play --poke "<f> <directive> ..."` (repeatable) and `--poke-file
     /// FILE` (`specs/tools/poke.md` §5 rule 2), in the order given.
     pokes: Vec<d2_client::app::poke::Entry>,
+    /// `play --send "<f> <Name> <field>=<value>..." | "<f> hex <bytes>"`
+    /// (repeatable; `specs/tools/scenario-diff.md` §3 r12).
+    sends: Vec<d2_client::app::send::SendEntry>,
+    /// Internal (`play` launcher): run the front end once and write its
+    /// choice to this file.
+    menu_once: Option<PathBuf>,
+    /// Internal: the front end opens on the main menu (after a game).
+    after_game: bool,
+    /// Internal: start the game with the choice the front end wrote here.
+    start_choice: Option<PathBuf>,
 }
 
 /// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
@@ -167,8 +192,14 @@ fn parse_options(args: &[String]) -> Result<Options> {
         res: None,
         dump_draws: None,
         at_tick: None,
+        dump_image: false,
+        sound_log: None,
         input: None,
         pokes: Vec::new(),
+        sends: Vec::new(),
+        menu_once: None,
+        after_game: false,
+        start_choice: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -188,7 +219,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--seed" => o.seed = Some(value()?.parse().context("--seed")?),
             "--hardcore" => o.hardcore = true,
             "--dump-draws" => o.dump_draws = Some(PathBuf::from(value()?)),
-            "--at-tick" => o.at_tick = Some(value()?.parse().context("--at-tick")?),
+            "--at-tick" => o.at_tick = Some(parse_ticks(value()?)?),
+            "--dump-image" => o.dump_image = true,
+            "--sound-log" => o.sound_log = Some(PathBuf::from(value()?)),
             "--input" => {
                 o.input = Some(
                     d2_client::world_view::input_script::parse(value()?)
@@ -198,6 +231,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--poke" => o
                 .pokes
                 .push(d2_client::app::poke::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--send" => o
+                .sends
+                .push(d2_client::app::send::parse_send_arg(value()?).map_err(anyhow::Error::msg)?),
             "--poke-file" => {
                 let path = value()?;
                 let text =
@@ -208,6 +244,10 @@ fn parse_options(args: &[String]) -> Result<Options> {
                 );
             }
             "--save" => o.save = Some(PathBuf::from(value()?)),
+            // Read before the options (`main`, `launch::game_dir`).
+            "--game-dir" => {
+                value()?;
+            }
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
             "--difficulty" => {
@@ -219,6 +259,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             }
             "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
             "--res" => o.res = Some(parse_res(value()?)?),
+            "--menu-once" => o.menu_once = Some(PathBuf::from(value()?)),
+            "--after-game" => o.after_game = true,
+            "--start-choice" => o.start_choice = Some(PathBuf::from(value()?)),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -241,7 +284,22 @@ fn parse_options(args: &[String]) -> Result<Options> {
     if o.at_tick.is_some() && o.dump_draws.is_none() {
         bail!("--at-tick needs --dump-draws DIR");
     }
+    if o.dump_image && o.dump_draws.is_none() {
+        bail!("--dump-image needs --dump-draws DIR");
+    }
     Ok(o)
+}
+
+/// `--at-tick N[,M...]`: one or more strictly increasing server ticks.
+fn parse_ticks(s: &str) -> Result<Vec<u64>> {
+    let ticks = s
+        .split(',')
+        .map(|t| t.trim().parse::<u64>().context("--at-tick"))
+        .collect::<Result<Vec<_>>>()?;
+    if !ticks.windows(2).all(|w| w[0] < w[1]) {
+        bail!("--at-tick {s}: the ticks must be strictly increasing");
+    }
+    Ok(ticks)
 }
 
 fn cpu_render(o: Options) -> Result<()> {
@@ -480,56 +538,180 @@ fn select_data(
     Ok((data, dir, origin))
 }
 
-/// `play`: the front end (main menu) first, then the game; the game's window
-/// closing returns to character select. `--new`, `--save` and `--frames` skip
-/// the front end (a shortcut straight into the game).
+/// `play`: the front end (main menu) first, then the game; Save and Exit
+/// returns to the main menu (REC-200), the game's window closing ends the
+/// program (REC-291). `--new`, `--save`, `--frames` and `--dump-draws`
+/// skip the front end (a shortcut straight into the game).
+///
+/// The windowing library allows one event loop per process, so the menu
+/// and the game each run in a child process of this one (`--menu-once`,
+/// `--start-choice`); this process only launches them in turn. A game
+/// whose window closed writes `exit` to the choice file: the program ends.
 fn play(o: Options) -> Result<()> {
-    use d2_client::app::front_host::{run_front_end, FrontArt};
-    use d2_client::app::front_start::{front_host, Entry, StartChoice};
-    use d2_client::ui::front_end::Outcome;
     if let Some(res) = o.res {
         d2_client::rules::camera::FrameSize::set_play(res)?;
         println!("play: frame {} x {}", res.width, res.height);
     }
+    if let Some(out) = &o.menu_once {
+        return menu_once(&o, out);
+    }
+    if let Some(file) = &o.start_choice {
+        let (choice, menu_difficulty) = read_choice(file)?;
+        let (data, dir, origin) = select_data(&o)?;
+        if !play_once(&o, data, dir, origin, menu_difficulty, Some(choice))? {
+            std::fs::write(file, "exit\n")
+                .with_context(|| format!("writing {}", file.display()))?;
+        }
+        return Ok(());
+    }
     if o.save.is_some() || o.new.is_some() || o.frames.is_some() || o.dump_draws.is_some() {
         let (data, dir, origin) = select_data(&o)?;
-        return play_once(&o, data, dir, origin, None, None);
+        return play_once(&o, data, dir, origin, None, None).map(|_| ());
     }
-    let mut first = true;
-    loop {
-        let (data, dir, origin) = select_data(&o)?;
-        let (art, expansion) = {
-            use d2_data::bin::TableFiles;
-            let d2_client::app::single_player::GameData::Live(d) = &data;
-            let mut art = FrontArt::new(d.archives.source());
-            if let Ok(t) = d2_client::app::strings::TableStrings::load(
-                d.archives.as_ref(),
-                d2_client::app::strings::LANG,
-            ) {
-                art = art.with_strings(move |id| {
-                    u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default()
-                });
-            }
-            (Some(art), d.archives.lod())
-        };
-        let saves = o
-            .save_dir
-            .clone()
-            .unwrap_or_else(d2_client::app::save::default_save_dir);
-        // After a game: the main menu (§F1.3, REC-200, recorded).
-        let entry = if first { Entry::First } else { Entry::MainMenu };
-        let (host, handles) = front_host(&saves, art, expansion, entry);
-        first = false;
-        match run_front_end(host) {
-            Outcome::Exit => return Ok(()),
-            Outcome::GameLoad(g) => {
-                let choice = StartChoice::resolve(g, &handles, &saves);
-                play_once(&o, data, dir, origin, g.difficulty, choice)?
-            }
+    let exe = std::env::current_exe().context("the program's own path")?;
+    let file = std::env::temp_dir().join(format!("d2rs-menu-choice-{}.txt", std::process::id()));
+    // The children inherit $D2_GAME_DIR (set by `run`).
+    let pass = |c: &mut std::process::Command| {
+        if let Some(seed) = o.seed {
+            c.arg("--seed").arg(seed.to_string());
         }
+        if let Some(res) = o.res {
+            c.arg("--res").arg(format!("{}x{}", res.width, res.height));
+        }
+        if let Some(d) = &o.save_dir {
+            c.arg("--save-dir").arg(d);
+        }
+        if let Some(d) = &o.native {
+            c.arg("--native").arg(d);
+        }
+        if let Some(s) = &o.source {
+            c.arg("--source").arg(s);
+        }
+    };
+    let mut after_game = false;
+    loop {
+        let _ = std::fs::remove_file(&file);
+        let mut menu = std::process::Command::new(&exe);
+        menu.arg("play").arg("--menu-once").arg(&file);
+        if after_game {
+            menu.arg("--after-game");
+        }
+        pass(&mut menu);
+        d2_client::launch::note("front end (main menu)");
+        let status = menu.status().context("starting the menu")?;
+        if !status.success() {
+            bail!("the menu exited with {status}");
+        }
+        let text = std::fs::read_to_string(&file).unwrap_or_default();
+        if text.trim().is_empty() || text.starts_with("exit") {
+            let _ = std::fs::remove_file(&file);
+            return Ok(());
+        }
+        let mut game = std::process::Command::new(&exe);
+        game.arg("play").arg("--start-choice").arg(&file);
+        pass(&mut game);
+        let status = game.status().context("starting the game")?;
+        if !status.success() {
+            eprintln!("play: the game exited with {status}; back to the menu");
+        } else if std::fs::read_to_string(&file)
+            .unwrap_or_default()
+            .starts_with("exit")
+        {
+            // The game's window closed (REC-291).
+            let _ = std::fs::remove_file(&file);
+            return Ok(());
+        }
+        after_game = true;
     }
 }
 
+/// `play --menu-once FILE`: one front-end run; writes `exit` or the start
+/// choice ([`write_choice`]) to `FILE`.
+fn menu_once(o: &Options, out: &std::path::Path) -> Result<()> {
+    use d2_client::app::front_host::{run_front_end, FrontArt};
+    use d2_client::app::front_start::{front_host, Entry, StartChoice};
+    use d2_client::ui::front_end::Outcome;
+    let (data, _dir, _origin) = select_data(o)?;
+    let (art, expansion) = {
+        use d2_data::bin::TableFiles;
+        let d2_client::app::single_player::GameData::Live(d) = &data;
+        let mut art = FrontArt::new(d.archives.source());
+        if let Ok(t) = d2_client::app::strings::TableStrings::load(
+            d.archives.as_ref(),
+            d2_client::app::strings::LANG,
+        ) {
+            art = art
+                .with_strings(move |id| u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default());
+        }
+        (Some(art), d.archives.lod())
+    };
+    let saves = o
+        .save_dir
+        .clone()
+        .unwrap_or_else(d2_client::app::save::default_save_dir);
+    // After a game: the main menu (§F1.3, REC-200, recorded).
+    let entry = if o.after_game {
+        Entry::MainMenu
+    } else {
+        Entry::First
+    };
+    let (host, handles) = front_host(&saves, art, expansion, entry);
+    let text = match run_front_end(host) {
+        Outcome::Exit => "exit\n".to_owned(),
+        Outcome::GameLoad(g) => match StartChoice::resolve(g, &handles, &saves) {
+            Some(c) => write_choice(&c, g.difficulty),
+            None => "exit\n".to_owned(),
+        },
+    };
+    std::fs::write(out, text).with_context(|| format!("writing {}", out.display()))?;
+    Ok(())
+}
+
+/// The start choice as `key=value` lines (one process to the next).
+fn write_choice(c: &d2_client::app::front_start::StartChoice, menu: Option<u8>) -> String {
+    let mut s = String::new();
+    s += &format!("name={}\n", c.name);
+    s += &format!("class={}\n", c.class);
+    s += &format!("status={}\n", c.status);
+    s += &format!("difficulty={}\n", c.difficulty);
+    if let Some(p) = &c.save {
+        s += &format!("save={}\n", p.display());
+    }
+    s += &format!("file={}\n", c.file.display());
+    if let Some(d) = menu {
+        s += &format!("menu_difficulty={d}\n");
+    }
+    s
+}
+
+fn read_choice(
+    file: &std::path::Path,
+) -> Result<(d2_client::app::front_start::StartChoice, Option<u8>)> {
+    let text =
+        std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
+    let get = |k: &str| {
+        text.lines()
+            .find_map(|l| l.strip_prefix(k).and_then(|r| r.strip_prefix('=')))
+            .map(str::to_owned)
+    };
+    let need = |k: &str| get(k).with_context(|| format!("{}: no {k}", file.display()));
+    let choice = d2_client::app::front_start::StartChoice {
+        name: need("name")?,
+        class: need("class")?.parse().context("class")?,
+        status: need("status")?.parse().context("status")?,
+        difficulty: need("difficulty")?.parse().context("difficulty")?,
+        save: get("save").map(PathBuf::from),
+        file: PathBuf::from(need("file")?),
+    };
+    let menu = match get("menu_difficulty") {
+        Some(d) => Some(d.parse().context("menu_difficulty")?),
+        None => None,
+    };
+    Ok((choice, menu))
+}
+
+/// One game; `Ok(true)`: back to the front end (Save and Exit), `Ok(false)`:
+/// the program ends (the window closed).
 fn play_once(
     o: &Options,
     data: d2_client::app::single_player::GameData,
@@ -537,7 +719,7 @@ fn play_once(
     origin: String,
     menu_difficulty: Option<u8>,
     choice: Option<d2_client::app::front_start::StartChoice>,
-) -> Result<()> {
+) -> Result<bool> {
     use d2_client::app::{play, single_player};
     let single_player::GameData::Live(d) = &data;
     println!(
@@ -567,9 +749,14 @@ fn play_once(
         println!("play: {}", start.origin);
     }
     println!("play: difficulty {}", start.difficulty);
+    let seed = d2_client::app::single_player::game_seed(&start.character, o.seed);
+    d2_client::launch::note(format!(
+        "game start: {}, difficulty {}, seed {seed}, save {:?}",
+        start.origin, start.difficulty, start.save_path
+    ));
     let result = play::run(play::PlayConfig {
         data,
-        seed: d2_client::app::single_player::game_seed(&start.character, o.seed),
+        seed,
         character: start.character,
         exit_after: o.frames,
         save_path: start.save_path,
@@ -580,14 +767,17 @@ fn play_once(
             .clone()
             .map(|dir| d2_client::facts::export::DumpRequest {
                 dir,
-                at_tick: o.at_tick.unwrap_or(1),
+                at_ticks: o.at_tick.clone().unwrap_or_else(|| vec![1]),
+                image: o.dump_image,
                 command: std::env::args().collect::<Vec<_>>().join(" "),
             }),
         input: o.input.clone(),
         pokes: o.pokes.clone(),
+        sends: o.sends.clone(),
+        sound_log: o.sound_log.clone(),
     })?;
-    match result {
-        bevy::app::AppExit::Success => Ok(()),
+    match result.exit {
+        bevy::app::AppExit::Success => Ok(result.to_menu),
         bevy::app::AppExit::Error(code) => bail!("play exited with code {code}"),
     }
 }
@@ -647,15 +837,64 @@ fn state_dump(args: &[String]) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    use d2_client::launch;
+    launch::install_crash_log();
+    // tools/perf: D2_PERF_OUT turns the timing on (server ticks, frames).
+    d2_client::app::perf::enable_from_env();
+    let result = run();
+    // tools/coverage-map: this thread's counters (a no-op unless d2-sim
+    // has the `coverage-map` feature and D2_COVERAGE_DIR is set).
+    d2_sim::debug::coverage::flush();
+    d2_client::app::perf::write_report();
+    if let Err(e) = &result {
+        launch::write_error(e);
+        pause_if_console();
+    }
+    result
+}
+
+/// A double-clicked exe's console closes on exit: on Windows, keep it
+/// open on an error until Enter, so the message can be read.
+fn pause_if_console() {
+    use std::io::IsTerminal;
+    if cfg!(windows) && std::io::stdin().is_terminal() {
+        eprintln!("press Enter to close");
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+}
+
+fn run() -> Result<()> {
+    use d2_client::launch;
     let args: Vec<String> = std::env::args().skip(1).collect();
+    launch::note(format!("command: {}", args.join(" ")));
+    // The install folder (`launch::game_dir`): `--game-dir`, $D2_GAME_DIR,
+    // then the exe's or the current folder when it holds d2data.mpq. Set
+    // as $D2_GAME_DIR before any thread starts, for every reader of it.
+    let arg_dir = args
+        .windows(2)
+        .find(|w| w[0] == "--game-dir")
+        .map(|w| PathBuf::from(&w[1]));
+    let env_dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
+    if let Some(dir) = launch::game_dir(arg_dir.as_deref(), env_dir, &launch::candidates()) {
+        println!("game folder: {}", dir.display());
+        launch::note(format!("game folder: {}", dir.display()));
+        std::env::set_var("D2_GAME_DIR", &dir);
+    }
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
         Some("state-dump") => state_dump(&args[1..]),
+        Some("soak") => {
+            let a = d2_client::app::soak::parse_args(&args[1..])?;
+            std::process::exit(d2_client::app::soak::run(&a)?)
+        }
+        Some("autoplay-host") => d2_client::app::autoplay_host::serve(&args[1..]),
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
+        // Proves the crash log (`launch`, windows-build.yml smoke step).
+        Some("crash-test") => panic!("crash-test: a deliberate panic to check d2rs-crash.log"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|soak|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--sound-log FILE] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 
@@ -716,10 +955,24 @@ mod tests {
         let o = parse_options(&args(&["--dump-draws", "d", "--at-tick", "40"])).unwrap();
         assert_eq!(
             (o.dump_draws, o.at_tick),
-            (Some(PathBuf::from("d")), Some(40))
+            (Some(PathBuf::from("d")), Some(vec![40]))
         );
         assert!(parse_options(&args(&["--at-tick", "40"])).is_err());
         assert!(parse_options(&args(&["--dump-draws"])).is_err());
+        assert!(parse_options(&args(&["--dump-image"])).is_err());
+        let o = parse_options(&args(&[
+            "--dump-draws",
+            "d",
+            "--at-tick",
+            "2,40,73",
+            "--dump-image",
+        ]))
+        .unwrap();
+        assert_eq!((o.at_tick, o.dump_image), (Some(vec![2, 40, 73]), true));
+        assert!(parse_options(&args(&["--dump-draws", "d", "--at-tick", "40,40"])).is_err());
+        assert!(parse_options(&args(&["--dump-draws", "d", "--at-tick", "40,"])).is_err());
+        let o = parse_options(&args(&["--sound-log", "s.tsv"])).unwrap();
+        assert_eq!(o.sound_log, Some(PathBuf::from("s.tsv")));
     }
 
     #[test]

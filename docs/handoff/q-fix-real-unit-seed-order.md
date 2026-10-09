@@ -99,13 +99,44 @@ own position, d2rs 0) and the player's `fc`, `sp`.
 raw file in `traces/raw/`, not committed), split with `facts_render.py
 --frame N`.
 
+## Round 3 — start cube, walk message point, walk end
+
+| Fix | Where | Check |
+|---|---|---|
+| q-fix-real-start-cube: no extra start cube (REC-244 settled by the StubAma recording) | `d2-client` play host | `app_unit_seed_order` stub test pins player + 8 items + 19 town units |
+| 0x67 (a, b) = path target for WL / RN (`intents-events.md` §7.4 r4; recorded 0x67 of Kashya at tick 32 carries (4898, 4233)) | `d2-sim` `monsters/mode_message.rs` | `a_walk_to_a_point_sends_the_path_target`; `builder_vectors` input corrected |
+| Walk / run end writes NU through `0x00624690` (`ai.md` §1.4): unit queued, flag 0x1 → 0x6D (recorded at tick 67 for Warriv) | `units::modes::write_mode`, `wiring/action/ai.rs` | `the_inner_mode_write_queues_and_flags_the_unit` |
+
+Packets: `record_packets.py --auto ScnAma --seed 1234 --input "wait 40;
+end"` under Wine; d2rs's walk messages are now byte-equal at ticks 24,
+32, 45, 56.
+
 ## Next difference (a1-town-arrival-ama)
 
-Row 108, shadow pass order: d2rs draws Kashya's shadow (now the right
-WL frame 6) before the torch at (30, 196); 1.14d draws the torch, then
-Warriv, then Kashya (screen y order). The d2rs dump has 10 unit rows
-against 25 and `?` positions and unit keys for most: the exporter /
-draw-order side of `q-fix-render-real-npc-pose` (unit draw count).
-Also: the d2rs client never ends a monster walk (Warriv stays WL after
-his last walk; 1.14d's client mode end sets NU at frame 67: REC-503's
-end tests).
+Equal through `draws.tsv` row 112. Row 113: the first chicken (ck,
+1.14d monster GUID 93). The chickens are client-made (set C) monsters:
+the server allocates none (25 unit seeds in 90 s). No spec covers their
+creation: `pc1-data.md` Step 4 "[q-fix-real-unit-seed-order]
+Client-made critters". Stopped there.
+
+State side: after the staging merge of 9608da5 (others' path-target and
+player-path fixes), `state_diff.py` over 90 frames reports no
+difference in any compared field (PARTIAL: only the documented gaps).
+
+## Round 4 — Act I scenes (coordinator's ask)
+
+Runner: the absolute panel schedule of `q-scenes-compare.md` (play
+`--input`), `facts-compare --ignore tick,index_sha256 --skip-weather`.
+
+| Fix | Where | Check |
+|---|---|---|
+| Client monster track: §9.4 velocity vector per axis (was the larger-axis length: diagonal walks 1.41× too fast), first step on the tick after the request, a point goal stops where the next step would pass the centre (no snap), precise position kept on the unit and drawn while in its cell | `d2-client` `bridge/motion.rs`, `world_view/model_feed.rs` | `a_diagonal_npc_walk_follows_the_recorded_server_positions` (Warriv's recorded 16.16 positions) |
+
+Scenes now: arrival-ama r113 and idle-sor r111 (chickens, PC 1 items
+30/34); panel-inventory r174 (an extra 1.14d draw at `0x46e539` after
+Warriv's body, rendering: q-scenes-compare); character / skilltree /
+automap / esc-menu-wine: Warriv's NU frame, because the 1.14d client
+drops his third walk in that run while its server makes it (pc1-data
+Step 4 "[q-fix-real-unit-seed-order] Client NPC stops a walk").
+The a1-npc-*, blood-moor and den-of-evil scenes are hand-played (no
+input log): not replayable frame for frame.

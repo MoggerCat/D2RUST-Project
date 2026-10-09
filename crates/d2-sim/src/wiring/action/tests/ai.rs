@@ -218,26 +218,193 @@ fn good_npc_ranged_takes_ai_turns() {
     fx.assert_clean();
 }
 
+/// The log lines of `m` starting with `p`.
+fn logged(fx: &Fx, p: &str, m: UnitId) -> Vec<String> {
+    let p = format!("{p} {}", m.0);
+    fx.sim
+        .sys
+        .hooks
+        .x
+        .log
+        .iter()
+        .filter(|l| l.starts_with(&p))
+        .cloned()
+        .collect()
+}
+
+/// Type-0 events of `m` with frame codes `codes`, one per frame from 1.
+fn frame_events(fx: &mut Fx, m: UnitId, codes: &[u32]) {
+    for (i, &c) in codes.iter().enumerate() {
+        fx.game
+            .schedule_event(m, u32::from(event::MODE_CHANGE), 1 + i as i32, None, c, 0)
+            .unwrap();
+    }
+    for _ in codes {
+        fx.frame();
+    }
+}
+
 // Covers: specs/skills/use.md §5.2
 #[test]
-fn attack_event0_runs_the_skill_frame_and_keeps_the_frame_code() {
-    // PROVISIONAL (REC-111): the attack-family event 0 `0x005A7670` runs the
-    // skill part of the sequence frame with unit +0x4E := the timer's code.
+fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
+    // `use.md` §5.2 "Monsters" `0x005A7670`: no used skill and a mode that
+    // does not move (A2: class 0's monstats2 mv bits are A1 only) → the
+    // strike (mode missile, else melee on the path target) on every event
+    // 0, whatever its frame code. +0x4E keeps the timer's code.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK2);
+    frame_events(&mut fx, m, &[1, 2, 4]);
+    let want = vec![format!("attack strike {} false", m.0); 3];
+    assert_eq!(logged(&fx, "attack strike", m), want);
+    assert!(logged(&fx, "attack skill", m).is_empty());
+    assert!(logged(&fx, "sequence frame", m).is_empty());
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 4);
+}
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn attack_event0_of_a_moving_mode_strikes_only_at_its_trigger_frame() {
+    // A1 moves for class 0 (mv bit 4): step, refresh, then the strike
+    // (moving flag set) only when trigger(U) holds, i.e. +0x4E = 1.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.mode = u32::from(mode::ATTACK1);
+        r.anim.frame_count = 1 << 16;
+    }
+    let x0 = fx.sim.sys.hooks.x.position(m).0;
+    frame_events(&mut fx, m, &[2, 1, 3]);
+    assert_eq!(
+        logged(&fx, "attack strike", m),
+        [format!("attack strike {} true", m.0)]
+    );
+    // One path step per event (the fake step moves one subtile).
+    assert_eq!(fx.sim.sys.hooks.x.position(m).0, x0 + 3);
+}
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn attack_event0_with_a_used_skill_runs_its_branch_on_every_event() {
+    // With a used skill the do runs on each event 0 regardless of +0x4E
+    // (no frame-code test), and the no-skill strike never runs.
     let mut fx = Fx::new();
     let m = monster(&mut fx);
     fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK1);
-    fx.game
-        .schedule_event(m, u32::from(event::MODE_CHANGE), 1, None, 1, 0)
-        .unwrap();
-    fx.frame();
-    assert!(
-        fx.sim
-            .hooks()
-            .x
-            .log
-            .contains(&format!("sequence frame {}", m.0)),
-        "{:?}",
-        fx.sim.hooks().x.log
+    fx.sim.sys.hooks.x.used.insert(
+        m,
+        crate::skills::SkillEntry {
+            skill: 0,
+            base: 1,
+            owner_guid: -1,
+            ..crate::skills::SkillEntry::default()
+        },
     );
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 1);
+    frame_events(&mut fx, m, &[3, 0, 1]);
+    assert_eq!(logged(&fx, "attack skill", m).len(), 3);
+    assert!(logged(&fx, "attack strike", m).is_empty());
+}
+
+/// A monster world holding only monster data (the AI-state tests).
+struct DataWorld(std::collections::BTreeMap<UnitId, crate::monsters::init::MonsterData>);
+
+impl<X> crate::wiring::action::monsters::MonsterWorld<X> for DataWorld {
+    fn type_init(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+    ) {
+    }
+    fn umods(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+        _: Option<UnitId>,
+        _: u8,
+    ) {
+    }
+    fn assign_umod(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut ActionHooks<X>,
+        _: UnitId,
+        _: u8,
+    ) {
+    }
+    fn forget(&mut self, _: UnitId) {}
+    fn monster(&self, unit: UnitId) -> Option<&crate::monsters::init::MonsterData> {
+        self.0.get(&unit)
+    }
+    fn monster_mut(&mut self, unit: UnitId) -> Option<&mut crate::monsters::init::MonsterData> {
+        self.0.get_mut(&unit)
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+}
+
+fn ai_state_of(fx: &mut Fx, m: UnitId) -> u32 {
+    fx.sim.hooks().monster_data(m).unwrap().ai_state
+}
+
+fn leave(fx: &mut Fx, m: UnitId, from: u8, state: u32) {
+    fx.sim.hooks().set_monster_ai_state(m, state);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(from);
+    fx.game.frame += 1;
+    let ok = fx.sim.with(&mut fx.game, |g, v| {
+        v.change_mode(g, m, mode::NEUTRAL, ModeTarget::Unit(m))
+    });
+    assert!(ok);
+}
+
+#[test]
+fn ai_state_is_stored_and_follows_the_mode_set() {
+    // `ai.md` §3 "AI state": the monster data's `dwAiState` (0 at
+    // creation); `0x005734C0` stores a value (a soft hit: 19) and the
+    // monster mode set `0x005A7C20` applies `0x005A68E0` to the mode it
+    // leaves: not for mode 1; state ≥ 16 → state − 16; 13 leaving mode 3
+    // stays; else the state becomes that mode.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let world = DataWorld([(m, Default::default())].into_iter().collect());
+    fx.sim.sys.hooks.monster_world = Some(Box::new(world));
+    assert_eq!(ai_state_of(&mut fx, m), 0);
+    fx.sim.hooks().set_monster_ai_state(m, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 19);
+    // 19 leaving A2 (mode 5) → 3.
+    leave(&mut fx, m, mode::ATTACK2, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 3);
+    // 0 leaving A2 → 5.
+    leave(&mut fx, m, mode::ATTACK2, 0);
+    assert_eq!(ai_state_of(&mut fx, m), 5);
+    // Leaving mode 1: unchanged.
+    leave(&mut fx, m, mode::NEUTRAL, 19);
+    assert_eq!(ai_state_of(&mut fx, m), 19);
+    // 13 leaving mode 3 stays 13; leaving mode 4 it becomes 4.
+    leave(&mut fx, m, mode::GETHIT, 13);
+    assert_eq!(ai_state_of(&mut fx, m), 13);
+    leave(&mut fx, m, mode::ATTACK1, 13);
+    assert_eq!(ai_state_of(&mut fx, m), 4);
+    fx.assert_clean();
+}
+
+#[test]
+fn last_dead_ring_keeps_the_last_four_in_slot_order() {
+    // `units.md` §4.6 rule 1.3 / `0x0061AFA0`: the room's four GUID slots
+    // are written at the ring index, which steps mod 4; the Fallen's
+    // corpse check (`ai-bodies.md` §9.4 step 2) reads them in slot order.
+    let mut fx = Fx::new();
+    let ms: Vec<UnitId> = (0..5)
+        .map(|i| fx.spawn(UnitType::Monster, 0, fx.a, 10 + i, 10))
+        .collect();
+    for &m in &ms {
+        fx.sim.hooks().push_last_dead(&fx.game, m);
+    }
+    let ring = fx.sim.hooks().last_dead[&fx.a];
+    let slots: Vec<UnitId> = ring.slots.iter().map(|s| s.unwrap().0).collect();
+    assert_eq!(slots, [ms[4], ms[1], ms[2], ms[3]]);
+    assert_eq!(ring.index, 1);
 }

@@ -28,7 +28,7 @@ use crate::rules::camera::{Camera, ClientPos, FrameSize, OpenMode};
 
 use super::dispatch::HandlerError;
 use super::objects::interact;
-use super::output::Output;
+use super::output::{Output, Outputs};
 use super::world::{ClientWorld, ModelInputs, UnitKey, PLAYER};
 
 /// The frame's view facts the dispatcher reads (§6 r1, r2, r7).
@@ -103,17 +103,40 @@ impl RunMods {
 
 /// `0x00464600(P, skill)` (§6 r4 kind 0): 0 when P holds a cursor item
 /// or is not a player, or in mode 0, 4, 7–12, 17 or 19; mode 13 with
-/// class 3, mode 14 with class 6, modes 15–16 with classes 4–6.
-/// PROVISIONAL (ui/controls.md §6 r4, `0x004645B0`; controls-0001): mode
-/// 18 (sequence), whose answer `0x004645B0(skill)` decides, reads as 0.
-pub fn can_act(is_player: bool, cursor_item: bool, mode: u32, class: u32) -> bool {
+/// class 3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18
+/// (sequence) as `0x004645B0` decides ([`sequence_can_act`]).
+/// `used`: P's used skill's `(anim, seqinput)` (skill list +0x10), `None`
+/// when there is none; `event_index`: unit +0x38 >> 8.
+pub fn can_act(
+    is_player: bool,
+    cursor_item: bool,
+    mode: u32,
+    class: u32,
+    used: Option<(u8, u8)>,
+    event_index: u32,
+) -> bool {
     if !is_player || cursor_item {
         return false;
     }
+    if mode == 18 {
+        return sequence_can_act(used, event_index);
+    }
     !matches!(
         (mode, class),
-        (0 | 4 | 7..=12 | 17 | 18 | 19, _) | (13, 3) | (14, 6) | (15 | 16, 4..=6)
+        (0 | 4 | 7..=12 | 17 | 19, _) | (13, 3) | (14, 6) | (15 | 16, 4..=6)
     )
+}
+
+/// `0x004645B0` (`ui/controls.md` §6 r4): no used skill → act; its `anim`
+/// not 18 → act; `seqinput` 0 or 255 → no; else act iff the frame event
+/// index has reached `seqinput`.
+pub fn sequence_can_act(used: Option<(u8, u8)>, event_index: u32) -> bool {
+    match used {
+        None => true,
+        Some((anim, _)) if anim != 18 => true,
+        Some((_, 0 | 255)) => false,
+        Some((_, seq)) => event_index >= u32::from(seq),
+    }
 }
 
 impl ModelClick<'_> {
@@ -224,11 +247,21 @@ impl ClickWorld for ModelClick<'_> {
         let Some(p) = self.world.local() else {
             return false;
         };
+        let used = p
+            .skills
+            .as_ref()
+            .and_then(|l| l.entries.get(l.current?))
+            .map(|e| {
+                let r = self.inputs.tables.skills.get(usize::from(e.skill));
+                r.map_or((0, 0), |r| (r.anim, r.seqinput))
+            });
         can_act(
             p.key.unit_type == PLAYER,
             self.world.use_cursor.is_some(),
             p.mode,
             p.class,
+            used,
+            p.event_index,
         )
     }
     fn left_skill(&self) -> Option<SkillRef> {
@@ -255,7 +288,7 @@ impl ClickWorld for ModelClick<'_> {
             .or_else(|| self.view.pick.then(SkillRowFacts::default))
     }
     fn range(&self, skill: SkillRef) -> u8 {
-        super::combat::range_of(self.inputs, skill.id)
+        super::combat::range_of(self.inputs, self.world.local(), skill.id)
     }
     fn use_state(&self, _skill: SkillRef) -> u32 {
         // TODO(spec: skills/use.md §2 `0x00647960`): the client use state
@@ -400,11 +433,17 @@ impl ClickWorld for ModelClick<'_> {
 
 /// Applies the dispatcher's outputs in order: codes 1–0x11 become their
 /// C→S message on `outgoing` (§6 r7), code 0x13 the interact sender
-/// (`client/model.md` §8 rule 7), [`ClickOut::Send`] its bytes. The
-/// client mode request of a code (`0x00480C10` inside `0x00481030`) is
-/// not applied: PROVISIONAL (ui/controls.md §6 r7; REC-51): which mode
-/// request code `0x00481030` passes for a click code is not stated, so
-/// the local player's mode follows the server's echo of the message.
+/// (`client/model.md` §8 rule 7), [`ClickOut::Send`] its bytes. A skill
+/// code first runs the local player's mode request (`0x00481030` →
+/// `0x00480C10(0x15 | 0x16, P, record, 0)`, [`skill_request`]): the
+/// attack or cast mode starts at the click, and the client player update
+/// ends it ([`super::player_anim`]). The walk codes' mode requests are
+/// not applied (the walk prediction moves the player).
+/// PROVISIONAL (skills/sequences.md local player rule 1; REC-1002): the
+/// gate `0x00480BA0` (current skill without `interrupt` and mode not 1 /
+/// 5 → no request, no send) is not run; the dispatcher's
+/// [`can_act`] refuses the attack and cast modes before it; settled by a
+/// 1.14d click log while walking with a non-interrupt skill selected.
 /// Sounds, hover calls and the pending record are returned to the
 /// caller (the UI layer).
 pub fn apply(
@@ -422,6 +461,11 @@ pub fn apply(
                 b,
             } => outputs.extend(interact::send(world, inputs, a as u16, b)?),
             ClickOut::Code { code, a, b } => {
+                if let Some((p, req, record)) = skill_request(world, code, a, b) {
+                    let sink = Outputs::default();
+                    super::modes::mode_request(world, inputs, p, req, record, &sink)?;
+                    outputs.extend(sink.take());
+                }
                 if let Some(m) = click::code_bytes(code, a, b) {
                     world.outgoing.push(m);
                 }
@@ -431,6 +475,39 @@ pub fn apply(
         }
     }
     Ok((rest, outputs))
+}
+
+/// The local player's mode request of a skill code
+/// (`skills/sequences.md` local player rule 1, `0x00481030`): point codes
+/// 5, 8, 0xC, 0xF → 0x15; unit codes 6, 7, 9, 0xA, 0xD, 0xE, 0x10, 0x11
+/// → 0x16; record r0 := the side's skill (left for codes below 0xC),
+/// r1 := its owner, r2 / r3 := a / b. `None`: another code, or no local
+/// player or skill on that side.
+pub fn skill_request(
+    world: &ClientWorld,
+    code: u8,
+    a: u32,
+    b: u32,
+) -> Option<(UnitKey, u8, [i32; 7])> {
+    let req = match code {
+        5 | 8 | 0xC | 0xF => 0x15,
+        6 | 7 | 9 | 0xA | 0xD | 0xE | 0x10 | 0x11 => 0x16,
+        _ => return None,
+    };
+    let p = world.local()?;
+    let list = p.skills.as_ref()?;
+    let side = if code < 0xC { list.left } else { list.right };
+    let e = list.entries.get(side?)?;
+    let record = [
+        i32::from(e.skill),
+        e.owner as i32,
+        a as i32,
+        b as i32,
+        0,
+        0,
+        0,
+    ];
+    Some((p.key, req, record))
 }
 
 /// One world click against the model (§6 r1–r2 and [`apply`]).
@@ -530,6 +607,7 @@ mod tests {
     }
     use crate::bridge::predict::{walk_of, Walk, WalkTo};
     use crate::bridge::skills::{SkillEntry, SkillList};
+    use crate::bridge::update::update_pass;
     use crate::bridge::world::ClientUnit;
 
     // Synthetic fixture: in game, the local player in town mode 1 at
@@ -665,6 +743,44 @@ mod tests {
         );
     }
 
+    // Covers: specs/render/camera.md §4
+    #[test]
+    fn screen_to_world_is_the_unit_draw_inverse_four_rows_down() {
+        // REC-514 (measured on 1.14d, supersedes camera.md §4's "no -8"
+        // reading): client (sx + cx_u - shift_x, sy + cy_u - 4).
+        let cam = |x, y| {
+            Camera::new(
+                FrameSize::D2RS,
+                OpenMode::NONE,
+                crate::rules::camera::ClientPos { x, y },
+                (0, 0),
+            )
+        };
+        let (w, h) = (FrameSize::D2RS.width, FrameSize::D2RS.height);
+        let shift = cam(0, 0).view.shift_x;
+        let want = |x: i32, y: i32| ((x + 2 * y) >> 5, (2 * y - x) >> 5);
+        for (px, py) in [(0, 0), (16, 0), (-40, -24), (7, -3)] {
+            let c = cam(px, py);
+            assert_eq!(
+                screen_to_world(&c, w / 2 + shift, h / 2 - 8),
+                want(px, py + 4)
+            );
+        }
+    }
+
+    // Covers: specs/ui/controls.md §6 r4
+    #[test]
+    fn sequence_mode_gates_on_the_frame_event_index() {
+        let act = |used, ev| can_act(true, false, 18, 0, used, ev);
+        assert!(!act(Some((18, 4)), 3));
+        assert!(act(Some((18, 4)), 4));
+        assert!(!act(Some((18, 0)), 9));
+        assert!(!act(Some((18, 255)), 9));
+        assert!(act(Some((7, 4)), 0), "a non-SQ used skill acts");
+        assert!(act(None, 0), "no used skill acts");
+        assert!(!can_act(true, true, 18, 0, None, 0), "cursor item wins");
+    }
+
     // Covers: specs/ui/controls.md §6 r8
     #[test]
     fn left_click_on_a_hostile_monster_sends_the_skill_on_the_unit() {
@@ -760,6 +876,91 @@ mod tests {
         assert_eq!(w.outgoing.len(), 1, "{:?}", w.outgoing);
         assert_eq!(w.outgoing[0][0], 0x0C, "C→S 0x0C RightSkill at a point");
         assert_eq!(w.outgoing[0].len(), 5);
+    }
+
+    /// A synthetic animation lookup: every player mode 4 frames at
+    /// speed 256.
+    #[derive(Debug)]
+    struct Four;
+    impl crate::bridge::player_anim::PlayerAnims for Four {
+        fn anim(
+            &self,
+            _: &ClientWorld,
+            _: UnitKey,
+            _: u32,
+        ) -> Option<crate::bridge::player_anim::PlayerAnim> {
+            Some(crate::bridge::player_anim::PlayerAnim {
+                frames: 4,
+                speed: 256,
+                weapon: 0,
+            })
+        }
+    }
+
+    // The local player rules and the client mode machine (REC-1000,
+    // q-fix-pt-cast-input-lock).
+    // Covers: specs/skills/sequences.md §3
+    #[test]
+    fn a_cast_ends_in_neutral_and_the_next_right_click_casts_again() {
+        use crate::bridge::dispatch::Dispatch;
+        use crate::bridge::receive::ReceiveLog;
+        use crate::bridge::world::SkillRow;
+        let key = UnitKey::new(PLAYER, 1);
+        let mut w = world();
+        if let Some(list) = w.units.get_mut(&key).and_then(|e| e.skills.as_mut()) {
+            list.entries.push(SkillEntry {
+                skill: 3,
+                mode: 10,
+                ..SkillEntry::default()
+            });
+            list.right = Some(1);
+        }
+        let mut inputs = ModelInputs::default();
+        inputs.tables.skills = vec![
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow {
+                anim: 10,
+                range: 2,
+                ..SkillRow::default()
+            },
+        ];
+        inputs.player_anims = Some(std::sync::Arc::new(Four));
+        let dispatch = Dispatch::from_spec().unwrap();
+        let mut st = ClickState::default();
+        let at = (500, 200);
+        let click = |w: &mut ClientWorld, st: &mut ClickState| {
+            w.outgoing.clear();
+            world_click(w, &inputs, st, view(at), Kind::RightDown, Some(at), 0).unwrap();
+            world_click(w, &inputs, st, view(at), Kind::RightUp, Some(at), 0).unwrap();
+            // One loop pass per click (the per-pass latch, §6 r2).
+            st.end_pass();
+            w.outgoing.iter().filter(|m| m[0] == 0x0C).count()
+        };
+        let update = |w: &mut ClientWorld| {
+            let (mut log, mut out) = (ReceiveLog::default(), Vec::new());
+            update_pass(w, &inputs, &dispatch, &mut log, &mut out);
+            assert!(log.rejected.is_empty(), "{:?}", log.rejected);
+            w.units[&key].mode
+        };
+        assert_eq!(click(&mut w, &mut st), 1, "the first cast");
+        // The click starts the cast mode SC locally (frame 0 of 4).
+        assert_eq!(w.units[&key].mode, 10);
+        // While it runs, a right click sends nothing (`can_act`).
+        assert_eq!(click(&mut w, &mut st), 0);
+        // Updates 1–2 advance to frame 2; after update 3's advance frame
+        // 3 + speed 1 reaches 4: neutral on update 3 (mode 1: the player
+        // is in no town room).
+        assert_eq!(update(&mut w), 10);
+        assert_eq!(update(&mut w), 10);
+        assert_eq!(update(&mut w), 1);
+        assert_eq!(
+            click(&mut w, &mut st),
+            1,
+            "the second cast after the first ended"
+        );
+        assert_eq!(w.units[&key].mode, 10);
     }
 
     #[test]

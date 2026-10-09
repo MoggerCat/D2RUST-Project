@@ -31,8 +31,6 @@ pub const CODE_DT: u8 = 8;
 pub const CODE_DD: u8 = 9;
 /// Neutral after death (`client/model.md` §8 r4 code 7).
 pub const CODE_UP: u8 = 7;
-/// Stat 6, `hitpoints`.
-const LIFE: u16 = 6;
 
 impl<X: Pending> super::ActionHooks<X> {
     /// The corpse unit of `p` (`vitals.md` §4.7 r1.3–1.4) when
@@ -111,9 +109,10 @@ pub fn client_players(game: &Game) -> Vec<UnitId> {
 }
 
 impl<X: Pending> ActionSim<X> {
-    /// The death pass of one tick: starts DT for each player with no
-    /// life left and tells the clients of each DT / DD change once.
-    /// Returns the players that changed.
+    /// The death pass of one tick: tells the clients of each DT / DD
+    /// change once (a lethal hit starts DT, [`Self::start_death`]; 0 life
+    /// alone does not, `vitals.md` §4.8). Returns the players that
+    /// changed.
     pub fn player_deaths(&mut self, game: &mut Game) -> Vec<UnitId> {
         let players = client_players(game);
         self.deaths_of(game, &players)
@@ -121,32 +120,15 @@ impl<X: Pending> ActionSim<X> {
 
     /// The DT start `0x00580EC0` for `p` now (the penalties, mode 0, the
     /// death animation): what a lethal hit requests (`damage.md` §7.1
-    /// r5.4) and the life check of [`Self::player_deaths`] does. A
-    /// player already in DT / DD is left alone. The clients hear of it
+    /// r5.4). A player already in DT / DD is left alone. The clients hear of it
     /// in the next [`Self::player_deaths`] pass.
     pub fn start_death(&mut self, game: &mut Game, p: UnitId) {
-        let s = &mut self.sys;
-        if s.units.get(p).is_none_or(|r| r.mode == DT || r.mode == DD) {
-            return;
-        }
-        s.hooks.mode_target = None;
-        // Ours to announce (code 0: started, nothing sent yet).
-        s.hooks.death.announced.entry(p).or_insert(0);
-        s.hooks.death.died.insert(p);
-        let mut sim = crate::units::hooks::Sim {
-            game,
-            units: &mut s.units,
-            stats: &mut s.stats,
-            data: &s.data,
-        };
-        if let Err(e) = player_start(&mut sim, &mut s.hooks, p, DT) {
-            s.hooks.errors.push(super::WiringError::Unit(e));
-        }
+        self.with(game, |game, v| v.start_player_death(game, p, None));
     }
 
     /// [`Self::player_deaths`] for the given players (every one of them
     /// is told).
-    pub fn deaths_of(&mut self, game: &mut Game, players: &[UnitId]) -> Vec<UnitId> {
+    pub fn deaths_of(&mut self, _game: &mut Game, players: &[UnitId]) -> Vec<UnitId> {
         let mut changed = Vec::new();
         // A corpse the pickup freed is no longer one.
         let units = &self.sys.units;
@@ -159,11 +141,11 @@ impl<X: Pending> ActionSim<X> {
             let Some(mode) = self.sys.units.get(p).map(|r| r.mode) else {
                 continue;
             };
-            if self.sys.stats.unit_total(p, LIFE, 0) > 0 {
-                self.sys.hooks.death.seen_alive.insert(p);
-            } else if mode != DT && mode != DD && self.sys.hooks.death.seen_alive.remove(&p) {
-                self.start_death(game, p);
-            }
+            // No life check here: a player at 0 life stays alive until a
+            // lethal hit requests DT (`vitals.md` §4.8 "Who starts them":
+            // `damage.md` §7.1 r5.4 only). Recorded
+            // `death-town-ama.check`: life poked to 0 at frame 10, the
+            // player stays in TN with 0 life for 110 frames.
             let s = &mut self.sys;
             let mode = s.units.get(p).map_or(mode, |r| r.mode);
             let code = match mode {
@@ -261,4 +243,33 @@ impl<X: Pending> ActionSim<X> {
 
 fn s_fresh<X>(a: &mut ActionSim<X>) -> Vec<UnitId> {
     std::mem::take(&mut a.sys.hooks.death.fresh)
+}
+
+impl<X: Pending> View<'_, X> {
+    /// The DT start `0x00580EC0` for `p` with killer K (`vitals.md`
+    /// §4.8): [`ActionSim::start_death`] and the lethal hit's request
+    /// (`damage.md` §7.1 r5.4, K = the attacker).
+    pub fn start_player_death(&mut self, game: &mut Game, p: UnitId, killer: Option<UnitId>) {
+        if self
+            .units
+            .get(p)
+            .is_none_or(|r| r.mode == DT || r.mode == DD)
+        {
+            return;
+        }
+        self.h.mode_target = killer;
+        // Ours to announce (code 0: started, nothing sent yet).
+        self.h.death.announced.entry(p).or_insert(0);
+        self.h.death.died.insert(p);
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut *self.units,
+            stats: &mut *self.stats,
+            data: self.data,
+        };
+        if let Err(e) = player_start(&mut sim, &mut *self.h, p, DT) {
+            self.h.errors.push(super::WiringError::Unit(e));
+        }
+        self.h.mode_target = None;
+    }
 }

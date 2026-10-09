@@ -68,6 +68,7 @@ impl Widget for Button {
                 at: self.rect.origin(),
                 clip: Screen::play().rect(),
                 look: crate::ui::CelLook::PLAIN,
+                call: crate::ui::draw::CelCall::Draw,
             }));
         }
     }
@@ -94,6 +95,7 @@ impl Widget for FrameImage {
             at: self.rect.origin(),
             clip: Screen::play().rect(),
             look: crate::ui::CelLook::PLAIN,
+            call: crate::ui::draw::CelCall::Draw,
         }));
     }
 }
@@ -252,6 +254,21 @@ impl CellGrid {
     /// without change (the footprint would pass the grid's right or
     /// bottom edge); the caller keeps its previous cursor cell.
     pub fn cursor_cell(&self, p: Point, w: u16, h: u16, gw: u32, gh: u32) -> Option<(i32, i32)> {
+        let (c, r) = self.drop_cell(p, w, h, gw, gh);
+        if w > 1 && i64::from(w) + i64::from(c) > i64::from(self.cols) {
+            return None;
+        }
+        if h > 1 && i64::from(h) + i64::from(r) > i64::from(self.rows) {
+            return None;
+        }
+        Some((c, r))
+    }
+
+    /// The grid drop cell (`0x00486BD0`, `ui/inventory.md` §10 r4.2): the
+    /// §5 r3 cursor-cell formula recomputed from the click's mouse, without
+    /// the overflow returns (an out-of-grid footprint then fails the
+    /// placement test, so no 0x18 is sent).
+    pub fn drop_cell(&self, p: Point, w: u16, h: u16, gw: u32, gh: u32) -> (i32, i32) {
         let (cw, ch) = (u32::from(self.cell_w), u32::from(self.cell_h));
         let (mut c, mut r) = self.mouse_cell(p);
         let left = self.origin.x as u32;
@@ -275,20 +292,14 @@ impl CellGrid {
             if c < 0 {
                 c = 0;
             }
-            if i64::from(w) + i64::from(c) > i64::from(self.cols) {
-                return None;
-            }
         }
         if h > 1 {
             r -= i32::from(h >> 1);
             if r < 0 {
                 r = 0;
             }
-            if i64::from(h) + i64::from(r) > i64::from(self.rows) {
-                return None;
-            }
         }
-        Some((c, r))
+        (c, r)
     }
 
     /// The cel draw point of an item graphic whose footprint's top-left

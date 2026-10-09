@@ -3,7 +3,7 @@
 //! (§5), stats and skills (§6), components (§10), monprop (§11),
 //! monequip (§12), normal and boss mods (§14).
 
-use d2_data::tables::Monprop;
+use d2_data::tables::{Monequip, Monprop};
 
 use crate::rng::Seed;
 use crate::units::UnitId;
@@ -86,6 +86,7 @@ pub fn type_init<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
     h.alloc_ai(unit);
     let class = class_of(h, unit);
     h.monsters().entry(unit).class = class;
+    crate::cov!(Monster, class, 0);
     // Step 4.
     let level_id = h.level_id(unit);
     stats_and_skills(cx, h, unit, level_id);
@@ -171,10 +172,10 @@ pub fn stats_and_skills<H: InitHost + ?Sized>(
     }
     // Step 7.
     let base = stats_by_level(m, cx.tables.monlvl, info.l_flag(), d, level);
-    // Step 8.
-    let rolled = seed(h, unit).roll_range(
-        base.min_hp,
-        base.max_hp.wrapping_sub(base.min_hp).wrapping_add(1),
+    // Step 8: minHP + roll(maxHP − minHP + 1), the plain roll helper
+    // (`0x0045C3E0`, the draw 1.14d records at `0x00573F8F`).
+    let rolled = base.min_hp.wrapping_add(
+        seed(h, unit).roll(base.max_hp.wrapping_sub(base.min_hp).wrapping_add(1)) as i32,
     );
     let mut hp = rolled.wrapping_add(pct(rolled, bonus.hp, 100));
     if hp >= 0x80_0000 {
@@ -320,25 +321,42 @@ pub fn monprop<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: u
 }
 
 /// monequip `0x005D6B60(game, 0, unit, −1, level, level, 1)` (§12).
-/// The class's first row (monstats +0x2A, built at load) is found here
-/// as the first row naming the class (rows are contiguous per class).
 pub fn monequip<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, level: i32) {
+    // Only for units with an inventory (unit +0x60).
     if !h.has_inventory(unit) {
         return;
     }
+    monequip_rows(cx.tables.monequip, h, unit, None, level, level, true);
+}
+
+/// monequip `0x005D6B60(game, owner, unit, skill, L, ilvl, oninit)`
+/// (§12; `skills/bodies.md` §6.5 step 9 for a summon): rows of the
+/// unit's class are skipped while their `level` > `cutoff`; items are
+/// made at item level `ilvl`; `check_oninit` is the last argument (1:
+/// the first row's `oninit` 0 ends it, 0: no test). An item code of four
+/// spaces copies the base code of the `owner`'s item at that location
+/// ([`InitHost::owner_item_code`]).
+pub fn monequip_rows<H: InitHost + ?Sized>(
+    rows: &[Monequip],
+    h: &mut H,
+    unit: UnitId,
+    owner: Option<UnitId>,
+    cutoff: i32,
+    ilvl: i32,
+    check_oninit: bool,
+) {
     let class = class_of(h, unit);
-    let rows = cx.tables.monequip;
     let Some(first) = rows.iter().position(|r| u32::from(r.monster) == class) else {
         return;
     };
     // Step 1.
-    if rows[first].oninit == 0 {
+    if check_oninit && rows[first].oninit == 0 {
         return;
     }
     let same = |i: usize| rows.get(i).is_some_and(|r| u32::from(r.monster) == class);
     // Step 2.
     let mut i = first;
-    while same(i) && i32::from(rows[i].level) > level {
+    while same(i) && i32::from(rows[i].level) > cutoff {
         i += 1;
     }
     // Step 3.
@@ -352,10 +370,21 @@ pub fn monequip<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, lev
         let count = slots.iter().take_while(|s| (1..=10).contains(&s.1)).count();
         if count > 0 {
             let k = seed(h, unit).roll(count as i32) as usize;
-            let (item, loc, md) = slots[k];
+            let (mut item, loc, md) = slots[k];
             if !h.has_item_at(unit, loc) {
                 let md = if md <= 7 { md } else { 0 };
-                h.create_equip_item(unit, item, loc, md, level);
+                if item == *b"    " {
+                    // PROVISIONAL (REC-1030; bodies.md §6.5 step 9): no
+                    // owner item there, no item.
+                    match owner.and_then(|o| h.owner_item_code(o, loc)) {
+                        Some(c) => item = c,
+                        None => {
+                            i += 1;
+                            continue;
+                        }
+                    }
+                }
+                h.create_equip_item(unit, item, loc, md, ilvl);
             }
         }
         i += 1;

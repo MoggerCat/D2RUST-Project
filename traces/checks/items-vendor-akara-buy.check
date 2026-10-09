@@ -1,0 +1,27 @@
+check 1
+# Buying from Akara through scripted C->S messages (`at … send`,
+# specs/tools/scenario-diff.md §2, §3 rule 11): ScnBuy (ScnAma with 5000 gold:
+# a buy without gold is refused, vendors.md §7.1 rule 4), -seed 1234, no input.
+# Akara (monstats 148) stands at (4932, 4206) in this town; her room is not
+# active from the start position, so the player is poked towards her in
+# steps (each point inside a room already active), last to (4928, 4210),
+# within the 0x13 start distance (world/npc.md §2 rule 4). Then the
+# client's NPC flow, one message per frame: 0x13 interact (npc.md §2), 0x2F
+# chat open (§3), 0x38 action 1 = trade (§4; the store is generated,
+# world/vendors.md §3-§4), 0x32 buy of the first store item (vendors.md §7.1;
+# the character has no items, so the first item unit in GUID order, @4, is
+# the store's first item).
+name items-vendor-akara-buy
+save ScnBuy --class ama --expansion --gold 5000
+seed 1234
+ticks 40
+seconds 300
+channels state packets
+at 4 poke pos @player 4888 4228
+at 7 poke pos @player 4903 4224
+at 10 poke pos @player 4918 4216
+at 13 poke pos @player 4928 4210
+at 16 send InteractWithEntity type=1 id=@1:148
+at 18 send InitEntityChat id=@1:148
+at 20 send EntityAction action=1 npc=@1:148 item=0
+at 24 send BuyItem npc=@1:148 item=@4 transaction=0 client_price=0

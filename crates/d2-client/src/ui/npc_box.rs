@@ -35,6 +35,7 @@ use super::SharedRef;
 use crate::bridge::hover::feet;
 use crate::bridge::items;
 use crate::bridge::world::{ClientWorld, UnitKey};
+use crate::controls::Action;
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
@@ -42,6 +43,7 @@ use crate::ui::hire_list::hire_intent;
 use crate::ui::layout::{MenuOption, NpcMenuRecord, OptionKind};
 use crate::ui::messages::socket::NPC_CHARSI;
 use crate::ui::messages::Ltrb;
+use crate::ui::panel::ActionId;
 use crate::ui::panel::WidgetId;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, StringLookup, UiCtx, UiEvent, UiResponse};
 use crate::ui::panels::menu_box::{anchor, MenuBox, MenuDraw, WaitingNote, STR_WAITING};
@@ -701,12 +703,27 @@ impl Panel for NpcMenuUi {
     }
 
     fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
+        let esc = matches!(e, UiEvent::Action(a) if [Action::GameMenu, Action::ClearScreen]
+            .iter()
+            .any(|k| a == ActionId(k.index() as u16)));
         if self.shop.borrow().confirm.is_some() {
-            return self.confirm_event(e);
+            // The confirm box eats the key (the game menu stays shut).
+            return if esc {
+                UiResponse::Consumed
+            } else {
+                self.confirm_event(e)
+            };
         }
         let Some(guid) = self.st.borrow().up.as_ref().map(|it| it.guid) else {
             return UiResponse::Ignored;
         };
+        if esc {
+            if !self.esc_key(guid, ctx) && self.st.borrow().bx.is_some() {
+                let o = self.st.borrow_mut().end(guid);
+                self.out(o);
+            }
+            return UiResponse::Consumed;
+        }
         if self.st.borrow().bx.is_none() {
             return self.talk_event(e, guid, ctx);
         }
@@ -785,6 +802,14 @@ impl OriginalUi {
         let mut st = self.npcm.borrow_mut();
         st.anchor = npc_anchor(world, guid, open_mode);
         st.start(guid, class, level, identify_n);
+        // The greeting of the menu open (§13 r3): in mode 2 (return) it
+        // gives a sound (REC-728, `npc_talk` module doc) and C→S 0x4D goes.
+        if let Some(mode) = st.talk.intro().menu_open(class) {
+            let played = st.talk.intro().greeting_played(mode, class);
+            if let Some(i) = played.send_4d {
+                st.push_pending(vec![PanelOutput::Intent(i)]);
+            }
+        }
     }
 
     /// Per UI frame, before the events: builds an asked-for box with the

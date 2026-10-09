@@ -1,0 +1,12 @@
+check 1
+# Rogue Encampment arrival, idle, RNG channel (specs/tools/rng-trace.md):
+# every game-seed and unit-seed draw of 40 ticks on both sides.
+# ScnAma, -seed 1234, no input. 1.14d side: record_rng.py --frames
+# --skip-inline drlg with emulated steps, about 11 s under Wine (65-70 s
+# single-stepping all 846 inline sites; same compared draws).
+name rng-town-arrival-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels rng

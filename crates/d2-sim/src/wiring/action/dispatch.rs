@@ -69,6 +69,19 @@ impl<X: Pending> ActionSim<X> {
         X::golem_resummon(&mut s.hooks, &mut sim, player)
     }
 
+    /// The save load's passive states of `unit`
+    /// ([`Pending::passive_refresh_all`]).
+    pub fn passive_refresh_all(&mut self, game: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::passive_refresh_all(&mut s.hooks, &mut sim, unit)
+    }
+
     /// Runs `f` with the missile code's context (creation from skills,
     /// tests).
     pub fn missiles<R>(
@@ -217,14 +230,24 @@ impl<X: Pending> ActionSim<X> {
         self.with(game, |g, v| v.warp_tile_message(g, player, guid))
     }
 
-    /// The Town Portal scroll or tome of `player` ([`View::create_town_portal`]):
-    /// the pair's units. `None`: nothing was created.
+    /// The Town Portal cast of `player` without an item
+    /// ([`View::town_portal_cast`], `objects-2.md` §27.1): the pair's
+    /// units (object 1 next to the player, object 2 in town). `None`:
+    /// refused or not made.
     pub fn open_town_portal(
         &mut self,
         game: &mut Game,
         player: UnitId,
     ) -> Option<(UnitId, UnitId)> {
-        self.with(game, |g, v| v.create_town_portal(g, player))
+        self.with(game, |g, v| {
+            let (made, _) = v.town_portal_cast(g, player);
+            if made == 0 {
+                return None;
+            }
+            let g1 = v.h.portals.player_portal(player)?;
+            let o1 = g.lists.find_unit(crate::units::UnitType::Object, g1)?;
+            Some((o1, v.portal_partner(g, o1)?))
+        })
     }
 
     fn log(&mut self, r: Result<(), WiringError>) {
@@ -245,13 +268,9 @@ impl<X: Pending> EventDispatch for ActionSim<X> {
 /// `intents-events.md` §8.2 rule 3.5).
 pub const INVENTORY_REFRESH_EX: u32 = 0x0020_0000;
 
-impl<X: Pending> TickHooks for ActionSim<X> {
-    /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
-    /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
-    /// removal record in the client room's adjacent rooms. PROVISIONAL
-    /// (REC-281): the records are the freed ground items'
-    /// (`ActionHooks::removed_items`).
-    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+impl<X: Pending> ActionSim<X> {
+    /// The freed ground items' removal records (PROVISIONAL, REC-281).
+    fn send_removed_items(&mut self, game: &mut Game, client: ClientId) {
         let h = &mut self.sys.hooks;
         if h.removed_items.is_empty() {
             return;
@@ -274,10 +293,24 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             }
         }
     }
+}
+
+impl<X: Pending> TickHooks for ActionSim<X> {
+    /// Per-client update removals (`0x0053A770`, `tick.md` §6 rule 5):
+    /// S→C 0x0A (`messages::remove_unit`) to the client's player for each
+    /// removal record in the client room's adjacent rooms. PROVISIONAL
+    /// (REC-281): the records are the freed ground items'
+    /// (`ActionHooks::removed_items`).
+    fn send_removed_units(&mut self, game: &mut Game, client: ClientId) {
+        self.send_removed_items(game, client);
+        // The room delete lists (`tick.md` §6.5, [`View::send_room_deletes`]).
+        self.with(game, |g, v| v.send_room_deletes(g, client));
+    }
 
     /// Step 7 (`0x0061A2C0`): the room's removal records are freed.
     fn free_removal_records(&mut self, _: &mut Game, room: RoomId) {
         self.sys.hooks.removed_items.retain(|&(_, r)| r != room);
+        self.sys.hooks.room_deletes.remove(&room);
     }
 
     /// Step 1 `0x0061C040(act, a)` (`render/lighting.md` §9.3 rule 5):
@@ -349,7 +382,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     }
 
     /// Step 9 `0x005433F0` (`units.md` §3.3) on the inactive store
-    /// ([`ActionSim::compress`]; nothing while the store is off).
+    /// ([`ActionSim::compress`]; only warp tiles while the store is off).
     fn compress_unit(&mut self, game: &mut Game, unit: UnitId) {
         self.compress(game, unit);
     }
@@ -391,10 +424,24 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 }
             }
         }
+        let is_player = v.units.get(unit).is_some_and(|r| r.ty == UnitType::Player);
         // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of
-        // a unit that is not new to the client.
-        if let (Some(p), None) = (receiver, new) {
+        // a unit that is not new to the client (a player's: below).
+        if let (Some(p), None, false) = (receiver, new, is_player) {
             v.state_change_messages(p, unit);
+        }
+        if is_player {
+            // §7.3 rule 1 (`0x00580860`): steps 1 and 3 (the path part),
+            // then step 5 (any state-changed bit, whether announced or
+            // not) and step 7.
+            if v.h.paths.is_some() {
+                crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+            }
+            if let Some(p) = receiver {
+                v.state_change_messages(p, unit);
+                v.player_stat_sends(p, unit);
+            }
+            return;
         }
         if game
             .lists
@@ -421,9 +468,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             .is_some_and(|e| e.ty == UnitType::Monster)
         {
             v.monster_update(game, client, unit);
-            return;
         }
-        crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
     }
 
     /// Per-client update (`tick.md` §6 rule 5, after the unit updates):
@@ -504,6 +549,11 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             level(client_room, &self.sys.hooks),
             level(new, &self.sys.hooks),
         );
+        if let (Some(_), Some(to)) = (player, to) {
+            if from != Some(to) {
+                crate::cov!(Level, to, 0);
+            }
+        }
         if let (Some(p), Some(from), Some(to)) = (player, from, to) {
             if from != to {
                 self.with(game, |g, v| {

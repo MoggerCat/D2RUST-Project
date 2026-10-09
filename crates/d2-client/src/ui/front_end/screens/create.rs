@@ -10,7 +10,9 @@
 //! save (§F3.6 r3) is the host's job, as the screen sees no file system.
 //!
 //! Preview fills are `// d2rs-own, unverified`; open points are PROVISIONAL
-//! under REC-181.
+//! under REC-181 (name filter and the click during a walk measured:
+//! `traces/frontend/frontend-menus/frontend-0001.json`; the hover box is
+//! `q-fix-create-hitbox`).
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -40,6 +42,8 @@ pub mod act {
     pub const BACKSPACE: u32 = 23;
     pub const WARN_OK: u32 = 24;
     pub const WARN_CANCEL: u32 = 25;
+    /// The message pop-up's CANCEL (`0x00432060`).
+    pub const MESSAGE_CLOSE: u32 = 26;
 }
 
 /// Class ids (save +0x28, §F3.2).
@@ -145,60 +149,77 @@ pub fn anim_entry(class: Class, state: u8) -> (u32, u32) {
     t[usize::from(state.min(4))]
 }
 
-/// The cel file of a class state, relative to `data\global\ui\FrontEnd\`.
+/// The cel file of a class state, relative to `data\global\ui\` (§F3.8:
+/// all under `FrontEnd\<class>\`).
 pub fn anim_file(class: Class, state: u8) -> &'static str {
     const F: [[&str; 5]; 7] = [
         [
-            "amazon\\amnu1",
-            "amazon\\amnu2",
-            "amazon\\amfw",
-            "amazon\\amnu3",
-            "amazon\\ambw",
+            "FrontEnd\\amazon\\amnu1",
+            "FrontEnd\\amazon\\amnu2",
+            "FrontEnd\\amazon\\amfw",
+            "FrontEnd\\amazon\\amnu3",
+            "FrontEnd\\amazon\\ambw",
         ],
         [
-            "sorceress\\sonu1",
-            "sorceress\\sonu2",
-            "sorceress\\sofw",
-            "sorceress\\sonu3",
-            "sorceress\\sobw",
+            "FrontEnd\\sorceress\\sonu1",
+            "FrontEnd\\sorceress\\sonu2",
+            "FrontEnd\\sorceress\\sofw",
+            "FrontEnd\\sorceress\\sonu3",
+            "FrontEnd\\sorceress\\sobw",
         ],
         [
-            "necromancer\\nenu1",
-            "necromancer\\nenu2",
-            "necromancer\\nefw",
-            "necromancer\\nenu3",
-            "necromancer\\nebw",
+            "FrontEnd\\necromancer\\nenu1",
+            "FrontEnd\\necromancer\\nenu2",
+            "FrontEnd\\necromancer\\nefw",
+            "FrontEnd\\necromancer\\nenu3",
+            "FrontEnd\\necromancer\\nebw",
         ],
         [
-            "paladin\\panu1",
-            "paladin\\panu2",
-            "paladin\\pafw",
-            "paladin\\panu3",
-            "paladin\\pabw",
+            "FrontEnd\\paladin\\panu1",
+            "FrontEnd\\paladin\\panu2",
+            "FrontEnd\\paladin\\pafw",
+            "FrontEnd\\paladin\\panu3",
+            "FrontEnd\\paladin\\pabw",
         ],
         [
-            "barbarian\\banu1",
-            "barbarian\\banu2",
-            "barbarian\\bafw",
-            "barbarian\\banu3",
-            "barbarian\\babw",
+            "FrontEnd\\barbarian\\banu1",
+            "FrontEnd\\barbarian\\banu2",
+            "FrontEnd\\barbarian\\bafw",
+            "FrontEnd\\barbarian\\banu3",
+            "FrontEnd\\barbarian\\babw",
         ],
         [
-            "druid\\dznu1",
-            "druid\\dznu2",
-            "druid\\dzfw",
-            "druid\\dznu3",
-            "druid\\dzbw",
+            "FrontEnd\\druid\\dznu1",
+            "FrontEnd\\druid\\dznu2",
+            "FrontEnd\\druid\\dzfw",
+            "FrontEnd\\druid\\dznu3",
+            "FrontEnd\\druid\\dzbw",
         ],
         [
-            "assassin\\asnu1",
-            "assassin\\asnu2",
-            "assassin\\asfw",
-            "assassin\\asnu3",
-            "assassin\\asbw",
+            "FrontEnd\\assassin\\asnu1",
+            "FrontEnd\\assassin\\asnu2",
+            "FrontEnd\\assassin\\asfw",
+            "FrontEnd\\assassin\\asnu3",
+            "FrontEnd\\assassin\\asbw",
         ],
     ];
     F[usize::from(class.id())][usize::from(state.min(4))]
+}
+
+/// The overlay cel of a class state and its draw mode (§F3.8 "+file
+/// mode"), drawn after the base cel with the same frame (§F3.3 r3).
+pub fn anim_overlay(class: Class, state: u8) -> Option<(&'static str, u8)> {
+    Some(match (class, state) {
+        (Class::Necromancer, FORWARD) => ("FrontEnd\\necromancer\\nefws", 3),
+        (Class::Necromancer, SELECTED) => ("FrontEnd\\necromancer\\nenu3s", 3),
+        (Class::Necromancer, BACK) => ("FrontEnd\\necromancer\\nebws", 3),
+        (Class::Barbarian, FORWARD) => ("FrontEnd\\barbarian\\bafws", 5),
+        (Class::Sorceress, FORWARD) => ("FrontEnd\\sorceress\\sofws", 3),
+        (Class::Sorceress, SELECTED) => ("FrontEnd\\sorceress\\sonu3s", 3),
+        (Class::Sorceress, BACK) => ("FrontEnd\\sorceress\\sobws", 3),
+        (Class::Paladin, FORWARD) => ("FrontEnd\\paladin\\pafws", 5),
+        _ => return None,
+    })
 }
 
 /// One hero's animation control (`0x00500850`, §F3.3 r2/r4).
@@ -260,15 +281,21 @@ impl HeroAnim {
     }
 }
 
-/// Whether `c` may be typed into the name box (§F3.4 r1–r2). `text` is the
-/// current text; the caret is at its end (PROVISIONAL, REC-181).
-pub fn accepts_char(text: &str, c: char) -> bool {
+/// Whether `c` may be typed into the name box at unit `caret` (§F3.4
+/// r1–r2). Measured (REC-181 / REC-209,
+/// `traces/frontend/frontend-menus/frontend-0001.json`): letters only, at
+/// most 15; a `-` / `_` is refused at caret 0 even when text follows
+/// (Home, then `-` on "ab" leaves "ab"), accepted inside, and refused when
+/// the text already holds one; digits, space, 0xC0 / 0xE9 / 0xFF, `.` and
+/// `'` are refused. The screen's caret is always at the end (it has no
+/// Home / Left / Right: `q-fix-create-name-caret`).
+pub fn accepts_char(text: &str, caret: usize, c: char) -> bool {
     if text.chars().count() >= NAME_MAX {
         return false;
     }
     match c {
         'A'..='Z' | 'a'..='z' => true,
-        '-' | '_' => !text.is_empty() && !text.contains(['-', '_']),
+        '-' | '_' => caret != 0 && !text.contains(['-', '_']),
         _ => false,
     }
 }
@@ -455,7 +482,8 @@ impl CreateState {
     /// A typed character; returns whether it was accepted. Only while the
     /// name box is shown.
     pub fn type_char(&mut self, c: char) -> bool {
-        if !self.name_box_visible() || self.warning || !accepts_char(&self.name, c) {
+        let caret = self.name.chars().count();
+        if !self.name_box_visible() || self.warning || !accepts_char(&self.name, caret, c) {
             return false;
         }
         self.name.push(c);
@@ -561,6 +589,7 @@ struct Idx {
     grey: Vec<usize>,
     ok: Option<usize>,
     warn: Vec<usize>,
+    taken: Vec<usize>,
 }
 
 impl CreateScreen {
@@ -580,7 +609,35 @@ impl CreateScreen {
 }
 
 const BG: &str = "FrontEnd\\CharacterCreate";
+/// Fonts of the text descriptors (§F1.1 r6): Font30 (`0x007089B4`),
+/// Font16 (`0x007089C4`).
+const FONT30: u16 = 2;
+const FONT16: u16 = 1;
+/// Font24 (`0x007089BC`): the message pop-up text 249.
+const FONT24: u16 = 7;
+/// Positions of texts 197 and 198 in the built list.
+const TEXT_NAME: usize = 2;
+const TEXT_DESC: usize = 3;
 const BG_EXP: &str = "FrontEnd\\charactercreationscreenEXP";
+/// Pop-up art (§F3.8): hardcore warning `PopUpOKCancel` (`0x00779780`),
+/// message `PopUpOK2` (`0x007797AC`), buttons `OkCancelButtonBlank`
+/// (`0x007797B0`).
+const POPUP_OK_CANCEL: &str = "FrontEnd\\PopUpOKCancel";
+const POPUP_OK: &str = "FrontEnd\\PopUpOk2";
+const POPUP_BUTTON: &str = "FrontEnd\\OkCancelButtonBlank";
+/// 5103 CANCEL, 5102 OK (§F3.6 r2).
+const STR_CANCEL: u32 = 5103;
+const STR_OK: u32 = 5102;
+
+/// A pop-up text (208 / 249, §F3.6 r2.1 / r2.4): (268, 320) 264 × 120,
+/// margins 10 / 8, flag 2 (centred, wrapped), colour 0.
+fn popup_text(string_id: u32, font: u16) -> Control {
+    let mut c = Control::new(ControlKind::Text, 268, 320, 264, 120)
+        .with_string(string_id)
+        .with_font(font, 2);
+    c.margin = (10, 8);
+    c
+}
 
 impl Screen for CreateScreen {
     fn build(&mut self, ctx: &mut FrontCtx) -> Vec<Control> {
@@ -593,16 +650,21 @@ impl Screen for CreateScreen {
             } else {
                 BG
             }),
-            Control::new(ControlKind::Text, 0, 80, 800, 50).with_string(5127),
-            Control::new(ControlKind::Text, 0, 180, 800, 100),
-            Control::new(ControlKind::Text, 250, 210, 300, 100),
+            // 174 title, 197 class name, 198 description (§F3.1 table).
+            Control::new(ControlKind::Text, 0, 80, 800, 50)
+                .with_string(5127)
+                .with_font(FONT30, 2),
+            Control::new(ControlKind::Text, 0, 180, 800, 100).with_font(FONT30, 2),
+            Control::new(ControlKind::Text, 250, 210, 300, 100).with_font(FONT16, 2),
             Control::new(ControlKind::Button, 33, 572, 128, 35)
                 .with_art("FrontEnd\\MediumSelButtonBlank")
                 .with_string(5101)
                 .with_hotkey(vk::ESC)
                 .with_action(Action::Trigger(Trigger::Exit)),
             Control::new(ControlKind::Image, 319, 519, 169, 26).with_art("FrontEnd\\textbox"),
-            Control::new(ControlKind::Text, 321, 512, 200, 32).with_string(5125),
+            Control::new(ControlKind::Text, 321, 512, 200, 32)
+                .with_string(5125)
+                .with_font(FONT16, 0),
             {
                 let mut e = Control::new(ControlKind::EditBox, 318, 510, 157, 16);
                 e.font = 5;
@@ -621,7 +683,11 @@ impl Screen for CreateScreen {
                 .with_art("FrontEnd\\clickbox")
                 .with_action(Action::Custom(act::HARDCORE)),
         );
-        v.push(Control::new(ControlKind::Text, lx, ly, 100, 32).with_string(5126));
+        v.push(
+            Control::new(ControlKind::Text, lx, ly, 100, 32)
+                .with_string(5126)
+                .with_font(FONT16, 0),
+        );
         if ctx.expansion {
             self.idx.expansion = vec![v.len(), v.len() + 1];
             self.idx.grey = vec![v.len() + 2];
@@ -630,7 +696,15 @@ impl Screen for CreateScreen {
                     .with_art("FrontEnd\\clickbox")
                     .with_action(Action::Custom(act::EXPANSION)),
             );
-            v.push(Control::new(ControlKind::Text, 339, 561, 100, 32).with_string(22731));
+            // 211: PROVISIONAL size (§F3.5 gives the position only): 200 ×
+            // 32 as label 201, so "EXPANSION CHARACTER" stays on one row
+            // (100 px would wrap it onto the Hardcore label); settled by a
+            // capture of the create screen with a class selected.
+            v.push(
+                Control::new(ControlKind::Text, 339, 561, 200, 32)
+                    .with_string(22731)
+                    .with_font(FONT16, 0),
+            );
             v.push(
                 Control::new(ControlKind::Image, 319, 540, 15, 16)
                     .with_art("FrontEnd\\joingameclickboxgrey"),
@@ -663,22 +737,41 @@ impl Screen for CreateScreen {
             vk::BACKSPACE,
             Action::Custom(act::BACKSPACE),
         ));
-        // Hardcore warning (5303): YES / NO, shown while it is up.
-        self.idx.warn = vec![v.len(), v.len() + 1];
+        // Hardcore warning `0x00430520` (§F3.6 r2.4): 205 image, 206
+        // CANCEL, 207 OK, 208 text 5303; shown while it is up.
+        self.idx.warn = (v.len()..v.len() + 4).collect();
+        v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP_OK_CANCEL));
         v.push(
-            Control::new(ControlKind::Button, 270, 400, 128, 35)
-                .with_art("FrontEnd\\MediumSelButtonBlank")
-                .with_string(5166)
-                .with_action(Action::Custom(act::WARN_OK)),
-        );
-        v.push(
-            Control::new(ControlKind::Button, 410, 400, 128, 35)
-                .with_art("FrontEnd\\MediumSelButtonBlank")
-                .with_string(5167)
+            Control::new(ControlKind::Button, 281, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_CANCEL)
                 .with_action(Action::Custom(act::WARN_CANCEL)),
         );
+        v.push(
+            Control::new(ControlKind::Button, 421, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_OK)
+                .with_action(Action::Custom(act::WARN_OK)),
+        );
+        v.push(popup_text(STR_HARDCORE_WARNING, FONT16));
+        // Message pop-up `0x00433460` (§F3.6 r2.1) with 5165: 247 image,
+        // 250 CANCEL (Esc), 249 text (Font24).
+        self.idx.taken = (v.len()..v.len() + 3).collect();
+        v.push(Control::new(ControlKind::Image, 268, 350, 264, 176).with_art(POPUP_OK));
+        v.push(
+            Control::new(ControlKind::Button, 351, 337, 96, 32)
+                .with_art(POPUP_BUTTON)
+                .with_string(STR_CANCEL)
+                .with_hotkey(vk::ESC)
+                .with_action(Action::Custom(act::MESSAGE_CLOSE)),
+        );
+        v.push(popup_text(STR_NAME_TAKEN, FONT24));
         self.state = Some(st);
         v
+    }
+
+    fn palette(&self) -> Option<[&'static str; 2]> {
+        Some(crate::ui::front_end::FECHAR_PALETTE)
     }
 
     fn action(&mut self, ctx: &mut FrontCtx, id: u32) -> Option<Trigger> {
@@ -703,6 +796,10 @@ impl Screen for CreateScreen {
             act::WARN_OK => st.warning_ok(),
             act::WARN_CANCEL => {
                 st.warning_cancel(ctx.now_ms);
+                None
+            }
+            act::MESSAGE_CLOSE => {
+                st.name_taken = false;
                 None
             }
             n if n >= act::CLASS => {
@@ -738,7 +835,11 @@ impl Screen for CreateScreen {
 
     fn pointer(&mut self, ctx: &mut FrontCtx, p: Point) {
         let slots: &[Slot] = if ctx.expansion { &EXPANSION } else { &CLASSIC };
-        // The 88×184 descriptor box, bottom-left at (x, y) (REC-181).
+        // PROVISIONAL (REC-181 -> q-fix-create-hitbox): the 88×184
+        // descriptor box, bottom-left at (x, y). Measured
+        // (`traces/frontend/frontend-menus/frontend-0002.json`): 1.14d
+        // hovers by the DC6 frame-0 box of §F3.3 r5 (Barbarian x 361..446,
+        // y 198..380), which needs the cel sizes from the host.
         let under = slots
             .iter()
             .rev()
@@ -764,23 +865,21 @@ impl Screen for CreateScreen {
         let mut out = Vec::new();
         for &(class, x, y) in slots {
             if let Some((state, frame)) = st.hero_frame(class, now_ms) {
+                let at = Point::new(x, y);
                 out.push(DrawItem::Art {
                     file: anim_file(class, state),
                     frame,
-                    at: Point::new(x, y),
-                });
-            }
-        }
-        // Hover / selection texts (197 name, 198 description).
-        if let Some(((name, desc), _)) = st.texts() {
-            for (id, at) in [(name, Point::new(0, 180)), (desc, Point::new(250, 210))] {
-                out.push(DrawItem::Text {
-                    label: None,
-                    string_id: id,
-                    text: String::new(),
-                    font: 1,
                     at,
                 });
+                if let Some((file, mode)) = anim_overlay(class, state) {
+                    out.push(DrawItem::Blend {
+                        file,
+                        frame,
+                        at,
+                        mode,
+                        boxed: false,
+                    });
+                }
             }
         }
         // Check marks of the boxes.
@@ -820,22 +919,8 @@ impl Screen for CreateScreen {
                 ),
                 font: 5,
                 at: Point::new(322, 510),
-            });
-        }
-        let popup = if st.warning {
-            Some(STR_HARDCORE_WARNING)
-        } else if st.name_taken {
-            Some(STR_NAME_TAKEN)
-        } else {
-            None
-        };
-        if let Some(id) = popup {
-            out.push(DrawItem::Text {
-                label: None,
-                string_id: id,
-                text: String::new(),
-                font: 1,
-                at: Point::new(270, 360),
+                color: 0,
+                boxed: None,
             });
         }
         out
@@ -856,7 +941,25 @@ impl Screen for CreateScreen {
         show(controls, &self.idx.hardcore, st.hardcore_visible());
         show(controls, &self.idx.expansion, st.expansion_box_visible());
         show(controls, &self.idx.grey, st.expansion_grey_visible());
-        show(controls, &self.idx.warn, st.warning);
+        // The pop-ups (list A): shown and live only while up.
+        for (ix, on) in [
+            (&self.idx.warn, st.warning),
+            (&self.idx.taken, st.name_taken),
+        ] {
+            for &i in ix {
+                if let Some(c) = controls.get_mut(i) {
+                    c.visible = on;
+                    c.enabled = on;
+                }
+            }
+        }
+        // Texts 197 / 198: the hovered or selected class (§F3.3 r7).
+        let (name, desc) = st.texts().map_or((0, 0), |(ids, _)| ids);
+        for (i, id) in [(TEXT_NAME, name), (TEXT_DESC, desc)] {
+            if let Some(c) = controls.get_mut(i) {
+                c.string_id = id;
+            }
+        }
         if let Some(c) = self.idx.ok.and_then(|i| controls.get_mut(i)) {
             c.visible = st.name_box_visible();
             c.enabled = st.ok_enabled();
@@ -891,15 +994,49 @@ mod tests {
 
     #[test]
     fn name_filter_vectors() {
-        assert!(accepts_char("", 'Z'));
-        assert!(!accepts_char("", '7'));
-        assert!(!accepts_char("Zz", ' '));
-        assert!(!accepts_char("Zz", 'é'));
-        assert!(!accepts_char("", '-'));
-        assert!(accepts_char("Zz", '-'));
-        assert!(!accepts_char("a-b", '_'));
-        assert!(!accepts_char(&"a".repeat(15), 'b'));
-        assert!(accepts_char(&"a".repeat(14), 'b'));
+        assert!(accepts_char("", 0, 'Z'));
+        assert!(!accepts_char("", 0, '7'));
+        assert!(!accepts_char("Zz", 2, ' '));
+        assert!(!accepts_char("Zz", 2, 'é'));
+        assert!(!accepts_char("", 0, '-'));
+        assert!(accepts_char("Zz", 2, '-'));
+        assert!(!accepts_char("a-b", 3, '_'));
+        assert!(!accepts_char(&"a".repeat(15), 15, 'b'));
+        assert!(accepts_char(&"a".repeat(14), 14, 'b'));
+    }
+
+    /// The recorded name-box steps (`frontend-0001`: REC-181 / REC-209).
+    #[test]
+    fn name_filter_matches_the_recording() {
+        // "-" then "_" into the empty box: both refused.
+        assert!(!accepts_char("", 0, '-') && !accepts_char("", 0, '_'));
+        // "a1 #b-c_d" → "ab-cd".
+        let mut t = String::new();
+        for c in "a1 #b-c_d".chars() {
+            if accepts_char(&t, t.len(), c) {
+                t.push(c);
+            }
+        }
+        assert_eq!(t, "ab-cd");
+        // "ab", Home, "-": refused at caret 0 although text follows.
+        assert!(!accepts_char("ab", 0, '-'));
+        // caret 1: "_" accepted ("a_b"); then "-" refused.
+        assert!(accepts_char("ab", 1, '_'));
+        assert!(!accepts_char("a_xb", 3, '-'));
+        // 0xE9, 0xC0, 0xFF, space, 0, 9, '.', '\'' refused; "-" then "_"
+        // after "a": "a-", the "_" refused.
+        for c in ['\u{e9}', '\u{c0}', '\u{ff}', ' ', '0', '9', '.', '\''] {
+            assert!(!accepts_char("a", 1, c), "{c:?}");
+        }
+        assert!(accepts_char("a", 1, '-') && !accepts_char("a-", 2, '_'));
+        // 17 letters typed: 15 kept.
+        let mut t = String::new();
+        for c in "QRSTUVWXYZabcdefg".chars() {
+            if accepts_char(&t, t.len(), c) {
+                t.push(c);
+            }
+        }
+        assert_eq!(t, "QRSTUVWXYZabcde");
     }
 
     #[test]

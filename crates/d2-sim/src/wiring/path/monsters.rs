@@ -455,7 +455,37 @@ impl<X: Pending> ActionHooks<X> {
         if self.point_count(unit) == 0 {
             return false;
         }
-        self.plain_mode(sim, unit, mode)
+        let started = self.plain_mode(sim, unit, mode);
+        self.apply_speed_bonus(sim, unit);
+        started
+    }
+
+    /// The set-up's speed bonus (P +0x10, `ai.md` §7.5 rule 4.4; the AI's
+    /// velocity request speed, e.g. the Fallen's escape 50) as a
+    /// temporary stat-67 list like the player's run list (`pathing.md`
+    /// §8.2), read by the velocity rule (§8.1 rule 2) and the rate
+    /// (`units.md` §4.7 step 7).
+    // PROVISIONAL (ai.md §7.5 rule 4.4, REC-1111): the spec stores P
+    // +0x10 := v and names no reader. 1.14d's Fallen flees at velocity
+    // and speed ×(75 + 50) / 75 of its walk (speed 192 → 320, check
+    // combat-melee-fallen, unit 20 from f48), which is stat 67 raised by
+    // v for the mode. Settled by a recording of another speed bonus.
+    fn apply_speed_bonus(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let Some(speed) = self
+            .paths
+            .as_ref()
+            .and_then(|p| p.setup.get(&unit))
+            .map(|s| s.speed)
+            .filter(|&v| v != 0)
+        else {
+            return;
+        };
+        {
+            let mut v = View::of(sim.units, sim.stats, sim.data, self);
+            let mut c = PathCtx::of(&mut v, sim.game);
+            WalkUnits::attach_run_stats(&mut c, unit, speed);
+        }
+        self.monster_mode_velocity(sim, unit);
     }
 
     /// GH start `0x005A7580` (rule 6).
@@ -626,14 +656,36 @@ impl<X: Pending> ActionHooks<X> {
         }
     }
 
-    /// Attack-family event 0 `0x005A7670` (`skills/use.md` §5.2: "monsters
-    /// branch", Open question 6).
-    // PROVISIONAL (skills/use.md OQ6; REC-111): the sequence frame's skill
-    // part (the do by frame code, unit +0x4E = 1 or 2 or 4), then the
-    // animation refresh. The spec says the test reads +0x4E = 1.
+    /// Attack-family event 0 `0x005A7670` (modes 4, 5, 7, 8, 9;
+    /// `skills/use.md` §5.2 "Monsters"). With a used skill: its branch
+    /// ([`Pending::monster_attack_skill`]: a moving skill's step, the do
+    /// on every event with no frame-code test), then the animation
+    /// refresh. Without one: r := the mode moves (`0x005A6B10`); moving →
+    /// step, refresh, animation complete → done (2), trigger(U) false →
+    /// done; then (r = 0, or a moving mode at its trigger frame) the
+    /// strike ([`Pending::monster_attack_strike`]: the mode missile, else
+    /// the melee on the path target), with no refresh.
     fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        X::monster_sequence_frame(self, sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        if self.used_skill_of(unit).is_some() {
+            X::monster_attack_skill(self, sim, unit);
+            self.x.refresh_animation(sim.game, unit);
+            return;
+        }
+        let Some(mode) = sim.units.get(unit).map(|r| r.mode) else {
+            return;
+        };
+        let moving = monster_moves(sim, unit, mode);
+        if moving {
+            let _ = self.monster_step(sim, unit);
+            self.x.refresh_animation(sim.game, unit);
+            if self.monster_anim_complete(sim, unit) {
+                return;
+            }
+            if !crate::wiring::interaction::skill_events::monster_trigger(sim.units, unit) {
+                return;
+            }
+        }
+        X::monster_attack_strike(self, sim, unit, moving);
     }
 
     /// S3 event 0 `0x005A74A0` (rule 11): step (result ignored),

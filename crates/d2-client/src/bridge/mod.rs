@@ -21,9 +21,11 @@ pub mod click;
 pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
+pub mod critters;
 pub mod dispatch;
 pub mod drlg;
 pub mod hover;
+pub mod inject;
 pub mod intent;
 pub mod item_lists;
 pub mod items;
@@ -41,9 +43,12 @@ pub mod output;
 pub mod passive;
 #[cfg(test)]
 mod passive_tests;
+pub mod player_anim;
 pub mod poke;
 pub mod predict;
 pub mod receive;
+#[cfg(feature = "rng-trace")]
+pub mod rng_trace;
 pub mod skill_fallback;
 pub mod skills;
 pub mod state;
@@ -479,6 +484,12 @@ impl<L: ServerLink> Bridge<L> {
     /// The skills tables of the passive refresh (`msg-skills.md` §2 r4).
     pub fn set_skill_tables(&mut self, tables: std::sync::Arc<d2_sim::skills::SkillTables>) {
         self.inputs.skill_tables = Some(tables);
+    }
+
+    /// The players' animation lookup of the client player update
+    /// ([`player_anim`]).
+    pub fn set_player_anims(&mut self, anims: std::sync::Arc<dyn player_anim::PlayerAnims>) {
+        self.inputs.player_anims = Some(anims);
     }
 
     /// The `skills` rows of the client skill list (`msg-skills.md`

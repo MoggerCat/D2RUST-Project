@@ -19,13 +19,13 @@
 | Inputs | 37–40 |
 | Outputs / state changes | 41–44 |
 | Rules | 45–46 |
-|   11. Clarifications (implementation questions QC-1 … QC-7, 2026-10-07) | 47–208 |
-| Constants & data dependencies | 209–217 |
-| Randomness | 218–223 |
-| Edge cases & original bugs | 224–230 |
-| Test vectors | 231–242 |
-| Provenance | 243–257 |
-| Open questions | 258–262 |
+|   11. Clarifications (implementation questions QC-1 … QC-7, 2026-10-07) | 47–215 |
+| Constants & data dependencies | 216–224 |
+| Randomness | 225–230 |
+| Edge cases & original bugs | 231–237 |
+| Test vectors | 238–249 |
+| Provenance | 250–264 |
+| Open questions | 265–269 |
 <!-- /index -->
 
 ## Summary
@@ -187,6 +187,13 @@ Object init functions receive the init record {game +0x00, object
    its value).
 3. Hratli dummies (inits 49, 50): Hratli is spawned at the dummy's
    (room, x, y) with `0x005B2F20(game, room, x, y, 253, mode 1, −1, 0)`.
+   That is the full creation `0x005B2A00` (placement, then the
+   allocator with the monster type init, mods, party), not a bare unit
+   allocation: Hratli's unit seed is stepped twice in his creation frame
+   (component pick, then the HP `roll(1)`; `monsters/init.md` §4.2).
+   Neither init draws on it after the call. Provenance: 2026-10-09
+   (pc1-day3-c, read in `0x005B70B0`, `0x005B2F20`, `0x005B2A00`;
+   recorded seed in `monsters/init.md` §4.2; q-prov-data).
    Init 50 stores +0x04 / +0x08 := (x, y) before the game-flag test.
 4. Wanderer init 43: target := (x + 7, y) (stored only while +0x01);
    room := `0x00463740(init room, x + 7, y)`: the init room when its

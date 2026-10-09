@@ -45,10 +45,16 @@ fn player_act(game: &Game, player: UnitId) -> u32 {
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// The quest/NPC act changes the calls asked
-    /// (`LifecycleHooks::request_act_change`, Warriv's "Go East"): the
-    /// level warp, which is the act change when the level is in another
-    /// act ([`d2_sim::wiring::path::act_change`], d2rs-own, unverified).
+    /// (`LifecycleHooks::request_act_change`, `0x0054B830(game, player,
+    /// level, arg)`, Warriv's "Go East"): the level warp `0x0053AEC0` with
+    /// the argument as its spawn tile index (`world/npc.md` §8.3), which is
+    /// the act change `0x0053ACC0` when the level is in another act
+    /// ([`d2_sim::wiring::path::act_change`], `world/waypoints.md` §11).
     /// Run when the handler or tick that asked returns.
+    ///
+    /// TODO(world/npc.md §8.3): `0x0054B830`'s level-0 form (the town of
+    /// the player's act) and its same-act form (a class-59 pair at the
+    /// player's (x − 5, y)) are not run: no §8.3 caller reaches them.
     fn act_changes<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         let a = events.action();
         if a.sys.hooks.act_changes.is_empty() || a.sys.hooks.paths.is_none() {
@@ -57,11 +63,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         let q = std::mem::take(&mut a.sys.hooks.act_changes);
         a.with(game, |g, v| {
-            for (player, level, _arg) in q {
+            for (player, level, arg) in q {
                 let c = d2_sim::wiring::path::PathCtx::of(v, g);
-                if d2_sim::wiring::path::place::level_warp(c, player, level, 0).is_none() {
+                if d2_sim::wiring::path::place::level_warp(c, player, level, arg).is_none() {
                     let c = d2_sim::wiring::path::PathCtx::of(v, g);
-                    d2_sim::wiring::path::act_change::run(c, player, level, 0);
+                    d2_sim::wiring::path::act_change::run(c, player, level, arg);
                 }
             }
         });

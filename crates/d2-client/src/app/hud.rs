@@ -9,7 +9,7 @@ use d2_data::bin::TableFiles;
 use d2_data::tables::{decode_all, Charstats, Experience, Skilldesc, Skills, States};
 
 use crate::ui::char_feed::{CharTables, DescRow};
-use crate::ui::original::hud::HudTables;
+use crate::ui::original::hud::{HudTables, SkillButtonFlags};
 use crate::world_view::WorldViewUi;
 
 /// The HUD tables of a live install.
@@ -37,6 +37,21 @@ pub fn hud_tables(archives: &dyn TableFiles) -> Result<HudTables, String> {
             continue;
         };
         tables.icons.insert(id, (s.charclass, d.iconcel));
+    }
+    // §7 r2: the flags of the button state (`use.md` §2 tests 1, 3, 4 and
+    // `InTown`).
+    for (id, s) in skills.iter().enumerate() {
+        if let Ok(id) = u16::try_from(id) {
+            tables.flags.insert(
+                id,
+                SkillButtonFlags {
+                    in_game: s.ingame,
+                    aura: s.aura,
+                    passive: s.passive,
+                    in_town: s.intown,
+                },
+            );
+        }
     }
     tables.experience = exp
         .iter()
@@ -115,14 +130,31 @@ pub fn char_tables(archives: &dyn TableFiles) -> Result<CharTables, String> {
                     name_id: d.str_name,
                     descdam: d.descdam,
                     descatt: d.descatt,
+                    src_dam: s.srcdam,
                 },
             );
         }
     }
+    let weapons: Vec<d2_data::tables::Weapons> =
+        decode_all(table("weapons")?).map_err(|e| e.to_string())?;
+    let weapons = weapons
+        .iter()
+        .map(|w| {
+            (
+                w.code,
+                crate::ui::char_feed::WeaponRow {
+                    str_bonus: i32::from(w.strbonus as i16),
+                    dex_bonus: i32::from(w.dexbonus as i16),
+                },
+            )
+        })
+        .collect();
     Ok(CharTables {
         class_keys,
         state_flags,
         skill_desc,
+        tohit_factor: chars.iter().map(|c| c.tohitfactor as i32).collect(),
+        weapons,
     })
 }
 

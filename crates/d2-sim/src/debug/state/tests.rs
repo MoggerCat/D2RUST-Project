@@ -46,7 +46,45 @@ fn full_unit() -> UnitState {
         vit: Some(26),
         lvl: Some(27),
         own: Some(28),
+        iq: Some(29),
+        ifl: Some(30),
+        fi: Some(-31),
+        il: Some(32),
+        aa: Some(33),
+        pf: Some([34, 35, 36]),
+        sf: Some([37, 38, 39]),
+        rp: Some(40),
+        rs: Some(41),
+        ik: Some([42, 4_000_000_001]),
+        ss: Some(43),
+        is: Some(vec![[44, 0, 45], [46, 1, -47]]),
+        q: None,
     }
+}
+
+// Covers: specs/tools/state-snapshot.md §2
+#[test]
+fn quest_record_words_on_the_player_line() {
+    use crate::world::quests::QuestFlags;
+    let mut f = QuestFlags::default();
+    f.set(1, 13);
+    f.set(1, 0);
+    f.set(7, 0);
+    f.set(41, 15);
+    assert_eq!(quest_words(&f), vec![[1, 0x2001], [7, 1], [41, 0x8000]]);
+    assert!(quest_words(&QuestFlags::default()).is_empty());
+    let mut s = StateSnapshot {
+        frame: 1,
+        seed: [0, 0],
+        units: vec![unit(0, 1), unit(1, 1)],
+    };
+    s.set_quests(1, quest_words(&f));
+    s.set_quests(9, vec![[2, 2]]);
+    assert_eq!(
+        s.to_json_line(),
+        r#"{"k":"snap","f":1,"seed":[0,0],"units":[{"ut":0,"g":1,"q":[[1,8193],[7,1],[41,32768]]},{"ut":1,"g":1}]}"#
+    );
+    assert!(!FIELDS.contains(&"q") && HOST_FIELDS == ["q"]);
 }
 
 // Covers: specs/tools/state-snapshot.md §1 r2, §1 r4, §2
@@ -63,7 +101,9 @@ fn a_snap_line_has_every_key_in_table_order() {
             r#"{"k":"snap","f":3,"seed":[1234,666],"units":[{"ut":1,"g":7,"cl":2,"m":3,"#,
             r#""x":4,"y":5,"xf":6,"yf":7,"tx":8,"ty":9,"d":10,"fr":-11,"fc":12,"sp":-13,"#,
             r#""s":[14,4000000000],"act":15,"lv":16,"hp":17,"hpx":18,"mp":19,"mpx":20,"#,
-            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28}]}"#
+            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28,"#,
+            r#""iq":29,"if":30,"fi":-31,"il":32,"aa":33,"pf":[34,35,36],"sf":[37,38,39],"#,
+            r#""rp":40,"rs":41,"ik":[42,4000000001],"ss":43,"is":[[44,0,45],[46,1,-47]]}]}"#
         )
     );
     // The key order of the line is the spec's table.
@@ -261,4 +301,112 @@ fn coverage_lists_every_key_but_the_gaps() {
     let (fields, gaps) = coverage(&bare.sim.sys);
     assert!(PATH_FIELDS.iter().all(|k| !fields.iter().any(|f| f == k)));
     assert_eq!(gaps.len(), 2);
+}
+
+/// AnimData with one record per name: (name, frames, speed), no events.
+fn anim_data(rows: &[(&[u8; 8], u32, u32)]) -> d2_formats::animdata::AnimData {
+    use d2_formats::animdata::{self, AnimData, AnimRecord};
+    let mut a = AnimData {
+        buckets: vec![Vec::new(); animdata::BUCKETS],
+    };
+    for &(name, frames, speed) in rows {
+        let len = name.iter().position(|&b| b == 0).unwrap_or(8);
+        a.buckets[animdata::hash(&name[..len])].push(AnimRecord {
+            name: *name,
+            frames,
+            speed,
+            events: [0; animdata::EVENTS],
+        });
+    }
+    a
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/sim/units.md §4.1
+#[test]
+fn a_joined_player_snapshots_the_frame_count_and_speed_of_its_mode() {
+    // The 1.14d Amazon's town and field neutral records (AMTNHTH 16
+    // frames at speed 80, AMNUHTH 8 at 128): a player standing in town
+    // reads +0x48 = 4096, +0x4C = 80 with no animated start run.
+    const TN: &[u8; 8] = b"AMTNHTH\0";
+    const NU: &[u8; 8] = b"AMNUHTH\0";
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    {
+        let h = fx.sim.hooks();
+        h.anim_data = Some(std::sync::Arc::new(anim_data(&[
+            (TN, 16, 80),
+            (NU, 8, 128),
+        ])));
+        h.x.names.insert((UnitType::Player, 5), *TN);
+        h.x.names.insert((UnitType::Player, 1), *NU);
+    }
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 1, a, 3, 4);
+    // The rate stats every loaded player has (`d2s-load.md` §2
+    // post-load: stats 67–69 = 100), read by `units.md` §4.7 step 10.
+    fx.stats(p, &[(67, 100), (68, 100), (69, 100)]);
+    // The allocator's mode 0 (`units.md` §2), then the join's neutral
+    // start (§6.1): the mode set's re-init fills +0x48 / +0x4C.
+    fx.sim.sys.units.get_mut(p).unwrap().mode = 0;
+    fx.sim
+        .sys
+        .with(&mut fx.game, |sim, hooks| {
+            crate::units::modes::player_join(sim, hooks, p)
+        })
+        .unwrap();
+    let mode = fx.sim.sys.units.get(p).unwrap().mode;
+    let (fc, sp) = if mode == 5 {
+        (16 << 8, 80)
+    } else {
+        (8 << 8, 128)
+    };
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let g = fx.game.lists.unit(p).unwrap().guid;
+    let u = s.units.iter().find(|u| (u.ut, u.g) == (0, g)).unwrap();
+    assert_eq!((u.m, u.fc, u.sp), (Some(mode), Some(fc), Some(sp)));
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/monsters/init.md §4.1 r1
+#[test]
+fn a_spawned_monster_snapshots_its_spawn_point_as_the_path_target() {
+    // 1.14d: a fallen spawned at (4876, 4231), idle in mode 1, reads
+    // path +0x10 / +0x12 = (4876, 4231): the creation mode request's
+    // target point is the spawn point (`0x005735A0`).
+    let (fx, _, m) = small_game();
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let g = fx.game.lists.unit(m).unwrap().guid;
+    let u = s.units.iter().find(|u| (u.ut, u.g) == (1, g)).unwrap();
+    assert_eq!((u.x, u.y), (Some(6), Some(5)));
+    assert_eq!((u.tx, u.ty), (Some(6), Some(5)));
+}
+
+// Covers: specs/tools/state-snapshot.md §2; specs/sim/units.md §4.7 r7
+#[test]
+fn a_walking_monster_snapshots_the_velocity_mode_speed() {
+    // 1.14d Charsi (class 154, its own base, CIWLHTH speed 256) walking
+    // in town reads +0x4C = 192: w (the walk speed +0x36, 256) · p / 100
+    // with p = 75, not the AnimData speed.
+    const WL: &[u8; 8] = b"M0WLHTH\0";
+    let (mut fx, _, m) = small_game();
+    {
+        let h = fx.sim.hooks();
+        h.anim_data = Some(std::sync::Arc::new(anim_data(&[(WL, 8, 256)])));
+        h.x.names.insert((UnitType::Monster, 2), *WL);
+        h.x.names.insert((UnitType::Monster, 1), *WL);
+    }
+    // A monster's init rate stats (`monsters/init.md`: attackrate 100,
+    // velocitypercent 75, other_animrate 100).
+    fx.stats(m, &[(67, 75), (68, 100), (69, 100)]);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 2;
+    let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
+    });
+    assert_eq!(sp, 192);
+    // Mode 1 (no velocity modifier): §4.7 step 10, other_animrate 100 →
+    // the AnimData speed.
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    let sp = fx.sim.sys.with(&mut fx.game, |sim, hooks| {
+        crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
+    });
+    assert_eq!(sp, 256);
 }

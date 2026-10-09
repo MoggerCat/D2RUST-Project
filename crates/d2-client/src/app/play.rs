@@ -320,9 +320,15 @@ pub struct PlayConfig {
     /// `--input SCRIPT` (`specs/tools/facts-render.md` §5 r11): scripted
     /// pointer input in place of the window's.
     pub input: Option<Vec<crate::world_view::input_script::Step>>,
+    /// `--sound-log FILE` (`specs/tools/facts-render.md` §5 r20): every
+    /// sound request call written to FILE.
+    pub sound_log: Option<std::path::PathBuf>,
     /// `--poke` / `--poke-file` (`specs/tools/poke.md` §5 rule 2): pokes
     /// applied on the server thread between frames; empty: none.
     pub pokes: Vec<super::poke::Entry>,
+    /// `--send "<f> <Name> f=v..."` (`specs/tools/scenario-diff.md` §3
+    /// r12): C→S messages injected on the server thread after frame f − 1.
+    pub sends: Vec<super::send::SendEntry>,
 }
 
 #[derive(Resource)]
@@ -355,9 +361,13 @@ pub fn after_run(world: &mut bevy::ecs::world::World) -> Result<bool, BridgeErro
 /// C→S 0x69 ([`Bridge::save_and_exit`]) and runs bridge frames until the
 /// server's 0x05 takes it out of the game (at most 100 frames: the drain
 /// of the next server frame answers it). Returns whether the client is
-/// out of the game. PROVISIONAL (REC-291): the window close of 1.14d
-/// runs the same exit path (`ui/frontend-options.md` §O3, `WM_CLOSE`);
-/// its chain is `flows/save-exit.md` OQ1. d2rs-own, unverified.
+/// out of the game. The window close leaves the same way: measured
+/// (REC-291, `traces/frontend/frontend-options/frontend-0004.json`):
+/// 1.14d's `WM_CLOSE` in a
+/// game rewrites the `.d2s` and ends the program (launcher mode 0 within
+/// 0.5 s, exit code 0; a kill at the same point leaves the file as it
+/// was), so the close saves; its exact chain stays `flows/save-exit.md`
+/// OQ1 (the 0x69 itself is not traced).
 pub fn leave_game<L: crate::bridge::link::ServerLink>(
     bridge: &mut Bridge<L>,
 ) -> Result<bool, BridgeError> {
@@ -428,7 +438,10 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let object_rows = single_player::client_object_rows(&data);
     let object_names = single_player::client_object_names(&data);
     let automap_source = super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?;
-    let hire_rows = d.tables.hire_rows().map_err(anyhow::Error::msg)?;
+    let hire_rows = d2_sim::world::hirelings::HirelingRows::from_table(
+        d.tables.table("hireling").map_err(anyhow::Error::msg)?,
+    )
+    .map_err(|e| anyhow::anyhow!("hireling: {e}"))?;
     let (link, tap) = predict_link(link);
     add_game(app, link, c.gpu)?;
     send_create_game_flags(app, c.request, c.start_flags)?;
@@ -455,6 +468,11 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         .resource_mut::<BridgeResource>()
         .0
         .set_unit_rows(units);
+    let player_anims = single_player::client_player_anims(&data)?;
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_player_anims(std::sync::Arc::new(player_anims));
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
@@ -535,7 +553,7 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     ui::set_waypoint_map(app, waypoint_map);
     ui::set_level_names(app, level_names);
     ui::set_shop_prices(app, c.prices);
-    super::hire_stats::install_hire_stats(app, hire_rows, true);
+    super::hire_stats::install_hire_stats(app, hire_rows, true, c.request.difficulty());
     let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let audio = GameAudio::new(AudioParts::original(archives.source(), table));
     // The unit sounds' tables (`audio/unit_feed.rs`): `monsounds`, the
@@ -566,7 +584,18 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
 }
 
 /// Opens the window and runs the game until it is closed.
-pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
+/// How a game run ended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlayEnd {
+    pub exit: AppExit,
+    /// Save and Exit asked in the game: the front end opens at the main
+    /// menu (REC-200). False when the window was closed: the program ends,
+    /// as 1.14d's `WM_CLOSE` does (REC-291,
+    /// `traces/frontend/frontend-options/frontend-0004.json`).
+    pub to_menu: bool,
+}
+
+pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
     let GameData::Live(live) = config.data.clone();
     let request = config.character.clone();
     // d2rs-own, unverified: the map files sit next to the character save.
@@ -599,7 +628,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
-    super::poke::install(&mut link, config.pokes)?;
+    super::send::install(&mut link, config.pokes, config.sends)?;
     // Before the app exists, so not through Bevy's log.
     println!("single player: seed {}", config.seed);
     let mut app = App::new();
@@ -627,6 +656,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         }),
         ..default()
     }));
+    super::perf::add(&mut app);
     app.insert_resource(super::config::ConfigRes {
         dir: cfg_dir,
         settings,
@@ -661,6 +691,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if let Some(steps) = config.input {
         app.insert_resource(crate::world_view::input_script::InputScript::new(steps));
     }
+    if let Some(path) = &config.sound_log {
+        app.insert_resource(super::sound::SoundLog::create(path)?);
+    }
     if let Some(request) = config.dump {
         app.insert_resource(crate::world_view::present::DrawDump::new(request))
             .insert_resource(crate::bridge::mirror::DrawnTick::default());
@@ -670,6 +703,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
+    let to_menu = app
+        .world()
+        .get_resource::<BridgeResource>()
+        .is_some_and(|b| b.0.world().exit_requested);
     let left = after_run(app.world_mut());
     match (&saver, left) {
         (Some(h), Ok(true)) => println!(
@@ -680,5 +717,5 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         (_, Ok(false)) => eprintln!("play: the server never answered the leave"),
         (_, Err(e)) => eprintln!("play: the leave failed: {e}"),
     }
-    Ok(exit)
+    Ok(PlayEnd { exit, to_menu })
 }

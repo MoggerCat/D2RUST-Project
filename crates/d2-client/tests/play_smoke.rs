@@ -1924,3 +1924,111 @@ fn a_town_portal_scroll_used_in_town_is_refused_without_cost() {
         "the scroll stays"
     );
 }
+
+/// A click while walking re-targets the walk from the precise position
+/// (`sim/pathing.md` §1.5: "the fraction is kept"): the predicted
+/// position moves at most one walk step per server tick across the
+/// re-target (`a1-walk-s`: re-placing the path at the cell centre jumped
+/// it by up to half a sub-tile and drifted the camera 3 px).
+// Covers: specs/sim/pathing.md §1.5
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_retarget_while_walking_keeps_the_precise_position() {
+    let mut run = Run::start();
+    let precise = |run: &Run| {
+        run.app
+            .world()
+            .resource::<d2_client::world_view::walk::PreviewWalk>()
+            .predict
+            .position()
+            .map(|(x, y)| (i64::from(x), i64::from(y)))
+            .expect("a prediction")
+    };
+    // The clicks of `a1-walk-*`: through the UI, so the prediction walks.
+    run.click(Point::new(600, 284));
+    run.step(10);
+    let last = precise(&run);
+    // The click's own two frames (two ticks), then two more ticks.
+    run.click(Point::new(400, 384));
+    let p2 = precise(&run);
+    run.step(1);
+    let p3 = precise(&run);
+    run.step(1);
+    let p4 = precise(&run);
+    let v = (p4.0 - p3.0, p4.1 - p3.1);
+    assert!(v != (0, 0), "the re-targeted walk moves");
+    assert!(p2 != last, "the click's frames walk");
+    assert_eq!((p3.0 - v.0, p3.1 - v.1), p2, "one velocity from p2 on");
+    // Where the re-targeted path's first step left from: the precise
+    // position, not the centre of its sub-tile (the old re-placement
+    // gave p2 = centre + v on both axes).
+    let from = (p2.0 - v.0, p2.1 - v.1);
+    let centre = |c: i64| (c & !0xFFFF) | 0x8000;
+    assert_ne!(
+        from,
+        (centre(from.0), centre(from.1)),
+        "the re-target restarted at a sub-tile centre"
+    );
+}
+
+// `client/msg-units.md` §3 r2 (REC-706): the client path sees the
+// model's living monsters as footprints (mask 0x100), so a walk onto a
+// town NPC's sub-tile stops short of it, as the 1.14d walk-se / walk-nw
+// recordings stop short of Warriv.
+#[test]
+#[ignore = "needs the D2 install (D2_GAME_DIR)"]
+fn the_client_path_stops_short_of_a_monster_footprint() {
+    use d2_client::bridge::client_path::{ClientPath, Own, PathTo};
+    use d2_client::bridge::predict::{MoveStats, Speeds};
+    let mut run = Run::start();
+    run.step(4);
+    let bridge = run.bridge();
+    let world = bridge.world();
+    let others = d2_client::world_view::walk::other_units(world, &bridge.inputs().tables.monsters);
+    let me = world.local_cell().expect("the player's cell");
+    let npc = *others
+        .iter()
+        .min_by_key(|u| {
+            (i32::from(u.x) - i32::from(me.0)).abs() + (i32::from(u.y) - i32::from(me.1)).abs()
+        })
+        .expect("a town NPC in the model");
+    let drlg = &world.drlg.as_ref().expect("the client DRLG").drlg;
+    let t = d2_sim::path::tables::PathTables::spec().unwrap();
+    let speeds = Speeds { walk: 6, run: 9 };
+    let own = Own {
+        stamina: 0x6400,
+        moves: MoveStats::CREATION,
+    };
+    let end = |stamp: bool| {
+        let mut p = ClientPath::default();
+        assert!(p.place(&t, drlg, me.0, me.1), "the player's room is active");
+        if stamp {
+            p.stamp_others(&t, drlg, &others);
+        }
+        let to = PathTo::Point(npc.x, npc.y);
+        assert!(
+            p.request(&t, drlg, speeds, own, to, false),
+            "the walk moves"
+        );
+        for _ in 0..400 {
+            if stamp {
+                p.stamp_others(&t, drlg, &others);
+            }
+            if !p.tick(&t, drlg, speeds, own, Some(to)) {
+                break;
+            }
+        }
+        let (x, y) = p.position().unwrap();
+        ((x >> 16) as u16, (y >> 16) as u16)
+    };
+    assert_eq!(
+        end(false),
+        (npc.x, npc.y),
+        "no footprint: the walk ends on the NPC"
+    );
+    assert_ne!(
+        end(true),
+        (npc.x, npc.y),
+        "the NPC's footprint stops the walk"
+    );
+}

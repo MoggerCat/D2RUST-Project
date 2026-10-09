@@ -49,7 +49,9 @@ pub use data::{DoorTables, DrlgData, LevelDef, WallClass, WallRemap, WarpDef};
 pub use level::{BuildCursor, Drlg, Dungeon, Level, SpawnTile, WarpRecord};
 pub use logic::{CoordRec, LogicGrids, LogicInfo};
 pub use room::{DrlgRoom, RoomKind, WarpLink};
-pub use seams::{ActRooms, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource};
+pub use seams::{
+    ActRooms, ClientPreset, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource,
+};
 pub use tiles::{CellGrid, GridPass, RoomGrids, RoomTiles, TileRecord, TileRef};
 
 /// A DRLG room (RoomEx) of one [`Drlg`], by slot. Slots are never reused.
@@ -116,6 +118,9 @@ pub mod room_flags {
     pub const NO_POPULATION: u32 = 0x80_0000;
     pub const TILE_LIB_LOADED: u32 = 0x100_0000;
     pub const PRESET_UNITS_ADDED: u32 = 0x200_0000;
+    /// The preset-unit list was handed to population (`0x0066BFA0`,
+    /// `rooms.md` §8 rule 6); no code clears it.
+    pub const PRESETS_HANDED_OUT: u32 = 0x400_0000;
     /// Room has animated tiles (`rooms.md` §9.7).
     pub const ANIMATED: u32 = 0x800_0000;
 }

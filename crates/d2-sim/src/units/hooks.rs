@@ -147,6 +147,19 @@ pub trait UnitHooks: StatHost {
         false
     }
 
+    /// `0x00648730` outside a tick (the NPC interaction start,
+    /// `world/npc.md` §2 rule 2): stop the unit's path. False: no path
+    /// provider (the caller's own seam answers). Provider: path spec.
+    fn stop_path_now(&mut self, unit: UnitId) -> bool {
+        false
+    }
+
+    /// `0x0058EC00(unit, 1, v)`: AI param 0 (control +0x14) := v
+    /// (`monsters/ai.md` §3 NPC interaction row). False: no AI store.
+    fn set_ai_param0(&mut self, unit: UnitId, v: i32) -> bool {
+        false
+    }
+
     // ---- players (units.md §4.5, §6.1) --------------------------------
 
     /// `0x0057EDD0` / `0x0057EEC0`: the mode request check. Provider:
@@ -212,6 +225,12 @@ pub trait UnitHooks: StatHost {
     /// `0x005A7C20`: path and AI-state bookkeeping before a mode start
     /// (every mode but GH). Provider: monster spec.
     fn monster_mode_bookkeeping(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {}
+
+    /// `0x005A7C20`: the monster mode damage `0x005A4F50(unit, mode)`
+    /// (`skills/bodies-2.md` §2.1), after the bookkeeping and before umod
+    /// mode 0, every mode but GH (`umod-callbacks.md` §2 rule 1).
+    /// Provider: skills spec.
+    fn monster_mode_damage(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {}
 
     /// Per-class mode records (`0x006E22D0`–`0x006E23A0`, classes with
     /// monstats +0x1A5): the record to use instead of the table's.
@@ -304,7 +323,8 @@ pub trait UnitHooks: StatHost {
     /// hover/chat spec.
     fn free_hover(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
-    /// After the type-12 expiry walk (`stat-lists.md` §10.4) of `unit`:
-    /// the remove callbacks of the lists it freed (§8.2 rule 6) run here.
+    /// After the type-12 expiry walk (`stat-lists.md` §10.4) of `unit`,
+    /// and after the regeneration tick frees a potion list (§10.1): the
+    /// remove callbacks of the lists freed (§8.2 rule 6) run here.
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 }

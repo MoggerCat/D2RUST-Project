@@ -434,10 +434,17 @@ impl ConfigureControls {
                 if self.editing && row == self.selected && slot == self.column && blink_hidden {
                     continue;
                 }
-                let (id, name) = match self.table.key_of(mr.cmd, slot) {
-                    UNBOUND => (3762, String::new()),
-                    vk => (0, vk_name(vk)),
-                };
+                // The long name `0x00469DE0` (`control-panel.md` §5 r13):
+                // a string id the host resolves, or the key's low byte.
+                let (id, name) =
+                    match crate::controls::key_names::long_name(self.table.key_of(mr.cmd, slot)) {
+                        crate::controls::key_names::KeyName::Id(id) => {
+                            (u32::from(id), String::new())
+                        }
+                        crate::controls::key_names::KeyName::Unit(u) => {
+                            (0, String::from_utf16_lossy(&[u]))
+                        }
+                    };
                 out.push(text(id, &name, x, y, self.key_color(row, slot)));
             }
         }
@@ -450,7 +457,8 @@ impl ConfigureControls {
         for (i, (id, hot)) in labels.into_iter().enumerate() {
             let c = M + 206 * i as i32 + 103;
             let over = pointer.is_some_and(|(px, py)| {
-                (c - BTN_HALF..c + BTN_HALF).contains(&px) && (T + 329..T + 367).contains(&py)
+                (c - BTN_HALF[i]..=c + BTN_HALF[i]).contains(&px)
+                    && (T + 329..T + 329 + BTN_H).contains(&py)
             });
             // Text x = centre − w/2; the width is the host's font measure
             // (REC-184): the centre is passed as x and the host centres.
@@ -500,12 +508,26 @@ impl ConfigureControls {
     }
 }
 
-/// Track frames drawn (the span 59…305 is 246 px of 12-px steps).
-/// PROVISIONAL (REC-184): the spec gives the step, not the count.
-const TRACK_FRAMES: i32 = 20;
-/// Half width of a button hit box: spec is w/2 + 10 from the text width,
-/// which needs the font measure; PROVISIONAL (REC-184): w = 100.
-pub(crate) const BTN_HALF: i32 = 60;
+/// Track frames drawn (bottoms T + 59 + 12k). Measured (REC-184,
+/// `traces/frontend/frontend-options/frontend-0006.json`): the track
+/// shows down to y T + 293 (just above the down arrow at T + 294..T + 305)
+/// and nothing below the arrow, so k = 0..20: 21 frames (20 would leave
+/// T + 288..T + 293 bare).
+const TRACK_FRAMES: i32 = 21;
+/// Half width of a button hit box, c ± (w/2 + 10) with w the label's
+/// width (§O9 r2), both ends in. Measured on the English 1.14d labels
+/// (REC-184, `traces/frontend/frontend-options/frontend-0006.json`):
+/// Cancel x 161..=225 (c 193), Default x 364..=434 (c 399), Accept
+/// x 573..=637 (c 605), so 32, 35, 32.
+/// PROVISIONAL (REC-184 -> q-fix-controls-btn-width): the English values
+/// until the label width comes from the font measure.
+pub(crate) const BTN_HALF: [i32; 3] = [32, 35, 32];
+/// Rows of a button hit box: T + 329 ..= T + 367 (measured, both ends
+/// in: y 399 and 437 hover Cancel, 398 and 438 do not).
+pub(crate) const BTN_H: i32 = 39;
+/// Width of the block a button label is centred in (the host's text
+/// placement; wider than any label).
+pub(crate) const BTN_TEXT_BLOCK: i32 = 240;
 
 /// Display name of a key (d2rs-own: the original's names are localised).
 pub fn vk_name(vk: u16) -> String {
@@ -699,10 +721,10 @@ impl Screen for ControlsScreen {
             let c = M + 206 * i as i32 + 103;
             let mut b = Control::new(
                 ControlKind::Button,
-                c - BTN_HALF,
-                T + 367,
-                (2 * BTN_HALF) as u16,
-                38,
+                c - BTN_HALF[i],
+                T + 329 + BTN_H,
+                (2 * BTN_HALF[i] + 1) as u16,
+                BTN_H as u16,
             )
             .with_string(id)
             .with_action(Action::Custom(BTN_BASE + i as u32));
@@ -768,13 +790,15 @@ impl Screen for ControlsScreen {
                     text,
                     x,
                     y,
-                    ..
+                    color,
                 } => DrawItem::Text {
                     label: None,
                     string_id,
                     text,
                     font: FONT,
                     at: Point::new(x, y),
+                    color: i32::from(color),
+                    boxed: None,
                 },
             })
             .collect()

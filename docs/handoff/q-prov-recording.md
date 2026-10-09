@@ -144,11 +144,105 @@ with the mouse outside the window**; until then REC-290 ticks are equal over 60 
    `d2_server::adapters::session::load_save`, so both sides start from the same save; steps the
    scenario host cannot apply are gaps. Today: `header`, `quests`, `npc fields`, `items`, `item
    indices`, `quest entry` are unapplied, because the host is `ActionWorld`; the items need
-   `WiredWorld::load_items` (the play app's host). Next: run the scenario host on `WiredWorld`.
+   `WiredWorld::load_items` (the play app's host). **Done (2026-10-09):** the scenario host is
+   `WiredWorld<ScenarioRest>` (`tools/scenario-run/src/rest.rs`, no-op seams; quest / NPC
+   controls on a scratch seed so existing traces keep their draws); `--save-dir` now loads the
+   save's items and quest records. Still gaps: `header`, `item indices`, `quest entry`.
+   First replay, `belt-potion-drop` (below) on ItmAmc, against 1.14d: belt placement equal; four
+   differences → `q-fix-real-item-replay-belt-use`.
+
+```
+scenario 1
+name belt-potion-drop
+game 1.14d
+seed 0x000004d2
+init 1234
+difficulty normal
+expansion yes
+end 520
+char save ItmAmc
+char class 0
+char area 0 1
+char at default
+char stat 6 2560
+char stat 8 256
+char item hp1 inv 7 0
+char item hp1 inv 8 0
+char item mp1 inv 9 0
+record s2c
+at 76 hex 19 01 00 00 00
+at 107 hex 23 01 00 00 00 00 00 00 00
+at 162 hex 26 01 00 00 00 00 00 00 00 00 00 00 00
+at 400 hex 20 03 00 00 00 09 13 00 00 84 10 00 00
+at 460 hex 19 02 00 00 00
+at 480 hex 17 02 00 00 00
+```
+   For the potion durations (REC-102, q-fix-p5-potion-entry3) the 0x20 must keep the facts'
+   offset of −3 like the 0x26 (165 → 162): `at 494` for the 0x20 (then `at 554`, `at 574`,
+   `end 620`); at 400 the mana at the use is lower and the mp1 gap is 53, not 51.
 3. **Pokes in `record_packets.py`** (0.2.0, `--poke` / `--poke-file`, at its 0x0052FD1E hook): the
    first poke run on 1.14d: `spawn 19` next to the player in Cold Plains works (5 of 10, the others'
    spots taken). G4 then gave REC-108: drops land beside the death point →
    `q-fix-real-monster-drop-spot`.
+
+### G2 with the new item writer (2026-10-09)
+
+| Point | Result |
+|---|---|
+| `wiring/inventory/identify.rs:6`, `pending.rs:174`, `pending.rs:510` (REC-113) | **settled (confirmed)** (`facts/items/a1-town-identify.tsv`) |
+| `wiring/inventory/units.rs:226` (REC-121) | **settled (confirmed)** (`facts/items/a1-town-socket-fill.tsv`) |
+| REC-188 server half (not an index row) | confirmed: the join's 0x1D–0x1F carry base stats only (dex 25 with a +1 dex charm), and moving a charm or an equipped magic ring sends no stat message (`facts/items/a1-town-charm-ring.tsv`, raw g2charm); the client's list attach (`item_lists.rs:14`) and REC-163's server link are not visible on the wire: open |
+
+Chests by poke (`object 5 @x+4 @y+4`, Cold Plains): created and opened (C→S 0x13 → S→C 0x0E
+mode change), but nothing drops: the `object` directive's allocator path does not run the chest's
+init (`objects.md` init 3), so a poked chest is not a real chest. REC-260 / REC-93 need a preset
+chest (a route to one, or a poke that runs the object init).
+
+## Area C: level generation, diff-driven (2026-10-09)
+
+`traces/checks/a1-warp-den-ama.check` (ScnAma, seed 1234, poke `warp 8`
+at frame 20, 160 ticks; channels state and rng, the 1.14d rng side by
+`record_rng.py --poke`). Each line: the first divergence and
+what moved it.
+
+1. Frame 20, torch 2:18 and tile 5:1 seeds swapped: the first walk of
+   `0x005559A0` creates objects and warp tiles in one list-order pass
+   before the monsters (`drlg/rooms.md` §8 rule 6); d2rs made objects
+   first and tiles after the monsters. Fixed (`spawn_preset_units`; the same fix landed on staging).
+2. Frame 21, game seed (object 2:21 class 55 misplaced; d2rs corpse 56 +
+   flies 103 extra): the shrine pick ran 8 tries in d2rs, 1 in 1.14d
+   (`0x0054F7D4` one step), because the init read the level from the
+   unit's room, which a new object does not have yet (`objects.md` §3:
+   init runs before the unit joins the world): level 0 failed every
+   `LevelMin`. Fixed: the level of the init record's room.
+3. Frame 24, town NPC seeds: 1.14d stops the town NPCs' thinks once no
+   client sees their room; d2rs keeps them (map AI draws at 24, 32).
+   Measured: `q-fix-real-npc-sleep-no-client`, a duplicate of `q-fix-p3-room-empty-think` (`ai.md` §1.5 r3, another session).
+
+4. `a1-warp-cave-ama` (Cave Level 1, `warp 9`), frame 21: a berserker
+   champion (1:8, umod 39) at hitpoints −6144 vs 3072. 1.14d reads maxhp
+   and hitpoints before writing either; d2rs re-read hitpoints after the
+   maxhp write had rescaled it (`stat-lists.md` §7.2). Fixed (`raise_hp`).
+
+5. `a2-warp-sewers-ama` (Lut Gholein Sewers Level 1, `warp 47` from
+   Lut Gholein): state equal on all 160 frames (PARTIAL only through the
+   declared gaps; the Lut Gholein NPCs did not diverge either); rng
+   differs only by the creation attribution of `q-fix-tool-rng-creation-draws`.
+
+6. `a3-warp-flayer-dungeon-ama` (Flayer Dungeon Level 1, `warp 88` from
+   Kurast Docks): state equal on all 160 frames (5 objects, a warp tile).
+7. `a5-warp-crystalized-ama` (Crystalized Cavern Level 1, `warp 113`
+   from Harrogath): every level-113 unit equal on all 160 frames (15
+   monsters, 14 objects); the check's first divergence is in Harrogath at
+   frame 2 (Larzuk 1:1 class 511 at 5145,5031 vs 5142,5029), area E's
+   `a5-harrogath-arrival-ama`.
+
+So the Den of Evil's and Cave Level 1's generation, presets and
+population are equal for all 160 frames outside town (every non-player
+unit of the dungeon level), the first divergence of both checks being
+the town NPCs at frame 24; through frame 23 (state and rng channels; 160 frames compared). The rng
+channel also reports a false frame-2 divergence on every run
+(`q-fix-tool-rng-creation-draws`).
 
 ## Where the rest is blocked (2026-10-09, end of this session)
 
@@ -167,3 +261,60 @@ each group in the cloud, and the tool work that would unblock it:
 | G9 later acts | quest-state saves need `--quests` slot bits per quest and long scripted play | per-quest `d2s-tool` set-ups + `poke` |
 | G10 rest (REC-212, REC-228, REC-205, REC-221–225, REC-201) | pixel checks need the cels drawn (not eye reads); timing points need hooks | `facts_render.py` captures of the menus (`record_frames.py` in the front end) |
 | G11 audio | `-ns` and no sound device under Wine | an ALSA dummy device or a sound-call hook |
+
+## Hand-back (2026-10-09 wrap-up)
+
+**Done this session (area C, diff-driven).** Warp checks seed 1234,
+`warp L` at frame 20, 160 ticks, state + rng channels: Den of Evil (8),
+Cave Level 1 (9), Lut Gholein Sewers Level 1 (47), Flayer Dungeon
+Level 1 (88), Crystalized Cavern Level 1 (113): every unit of the warped
+level equal to 1.14d on all 160 frames. d2-sim fixes on the way: the
+object init reads the level of the init room (`world/objects.md` §3; the
+shrine pick took 8 tries at level 0), umods 38/39 read maxhp and
+hitpoints before writing (`stat-lists.md` §7.2 rescale; Cave berserker
+−6144 vs 3072); the preset first walk (objects and warp tiles in list
+order) landed on staging from another session the same day. Tools:
+`tools/cloud-game/probe_call.py` (call-form probe) and
+`facts/calls/warp-0x53aec0.jsonl` (the warp form measured on a waypoint
+warp); my `rng_poke.py` was replaced by the tools session's
+`record_rng.py --poke`.
+
+**In progress (not started on 1.14d: the run was stopped at the wrap-up,
+nothing half-done is in the branch).** Eleven more warp checks are
+committed, not yet run: `traces/checks/a1-warp-{tower-cellar,jail,catacombs}-ama`,
+`a2-warp-{maggot-lair,tal-rasha-tomb,arcane}-ama`,
+`a3-warp-{kurast-sewers,durance}-ama`, `a4-warp-river-ama`,
+`a5-warp-{halls-anguish,wsk}-ama`. Next step: run each (command below),
+compare only the warped level's units (the town parts belong to other
+areas), fix the first dungeon divergence. Also queued to me by the
+coordinator, not started: the Cold Plains waypoint object and landing are
+(+15, +5) sub-tiles off 1.14d (5169, 4659) in
+`traces/checks/warp-cold-plains-ama.check` while the monsters match (the
+waypoint tile pattern pasted at another spot of the room; room-seed
+draws): run that check with the rng channel and compare the room seed's
+draws of the waypoint room.
+
+**Open rows (mine):** `q-fix-tool-rng-creation-draws` (the rng channel's
+false frame-2 divergence: creation draws credited to no unit on 1.14d,
+`roll` vs `roll_range` labels). Closed: `q-fix-real-npc-sleep-no-client`
+(done by skills-2). Earlier rows of this branch: see "Results" above and
+`build-queue.tsv` (`q-fix-real-*`). Not mine but found here: Harrogath
+arrival, Larzuk 1:1 at (5142, 5029) vs 1.14d (5145, 5031) at frame 2
+(area E, `a5-harrogath-arrival-ama`).
+
+**RECs / PC 1:** no new REC ids used (550–559 still free); PC 1 item 26
+(re-record sim-0009 without input) unchanged.
+
+**Repro.**
+
+    export D2_GAME_DIR=$HOME/game CARGO_INCREMENTAL=0
+    python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-warp-den-ama.check
+    # d2rs only, reusing the 1.14d recording:
+    python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-warp-den-ama.check --reuse-orig
+    # one 1.14d call form (entry registers, stack, ret N):
+    tools/cloud-game/run.sh --python -- tools/cloud-game/probe_call.py \
+        --game "$D2_GAME_DIR/Game.exe" --at 0x53AEC0 --auto ScnAma --seed 1234 --input "..."
+
+A 1.14d warp check takes about 5 minutes under Wine and the d2rs side
+about 2; `run.sh` waits on a stale `sleep` holding the prefix lock after a
+killed run (`fuser $WINEPREFIX/.run.lock`, kill the `sleep`).

@@ -1,4 +1,4 @@
-// Spec: specs/drlg/levels.md, specs/drlg/rooms.md
+// Spec: specs/drlg/levels.md, specs/drlg/rooms.md, specs/client/model.md (§5 rule 6.2)
 //! The traits the DRLG needs from systems other specs own, and the
 //! bundle of services a room build uses.
 //!
@@ -73,6 +73,13 @@ pub trait LevelTypes {
         Vec::new()
     }
 
+    /// The client presets of a room (`client/model.md` §5 r6.2,
+    /// `0x00466820`): its preset units whose flag word (+0x1C) has bit 0
+    /// set, in list order, room-relative.
+    fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {
+        Vec::new()
+    }
+
     /// `preset.md` §3.2 step 4, generic branch: whether generating this
     /// level on a DRLG with the automap callback (the client copy) streams
     /// its rooms: a preset level whose lvlprest `AutoMap` ≠ 0, other than
@@ -119,9 +126,26 @@ pub trait LevelTypes {
         false
     }
 
-    /// A hidden exit cell's warp unit (`0x0066E1C0`, `rooms.md` §9.5.1
-    /// step 3; wall warp tiles for sub 0 or 4).
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {}
+    /// An exit cell's warp tile preset (`0x0066E1C0`,
+    /// `sim/path-placement.md` §12.1; `rooms.md` §9.5.1 step 3 for a
+    /// hidden cell, the wall warp tiles for sub 0 or 4): world tile
+    /// (`wx`, `wy`), packed `cell`, cell type `orientation` (10 or 11).
+    /// `Ok(true)`: a type-5 preset unit was prepended to the room's list;
+    /// `Ok(false)`: none (far edge, or a provider with no warp tiles);
+    /// `Err`: no lvlwarp record (fatal in the original).
+    #[allow(clippy::too_many_arguments)]
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        Ok(false)
+    }
 }
 
 /// A [`LevelTypes`] that generates nothing (levels stay empty).
@@ -136,6 +160,17 @@ impl LevelTypes for NoLevelTypes {}
 pub struct PresetUnit {
     pub unit_type: u32,
     pub class: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// A client preset (`client/model.md` §5 r6.2): the creator's type,
+/// class, mode and room-relative sub-tile position.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClientPreset {
+    pub unit_type: u32,
+    pub class: i32,
+    pub mode: u32,
     pub x: i32,
     pub y: i32,
 }

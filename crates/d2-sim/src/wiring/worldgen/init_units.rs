@@ -185,7 +185,11 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
             .unwrap_or([0; 16])
     }
 
+    /// `0x005543B0`: the unit's state-105 list
+    /// ([`crate::wiring::action::View::set_alignment`]),
+    /// then the host's copy.
     fn set_alignment(&mut self, unit: UnitId, alignment: u8) {
+        self.v.set_alignment(self.game, unit, alignment);
         self.v.h.x.set_alignment(unit, alignment);
     }
 
@@ -207,6 +211,10 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
 
     fn quest_chain(&mut self, unit: UnitId, chain: u32) {
         self.v.h.x.monster_quest_chain(unit, chain);
+    }
+
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.v.h.x.quest_preset_boss(unit);
     }
 
     /// `0x0058F030(game, boss, boss GUID, 1, 1, 0)`.
@@ -256,6 +264,24 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
                 .errors
                 .push(WorldgenError::Wiring(WiringError::Unit(e)));
         }
+    }
+
+    /// `init.md` §6 step 12: the monster base list, the only list with
+    /// flag 1 (`stat-lists.md` §2, `0x0057407D`), allocated
+    /// (`0x006251F0`) and attached to the unit (`0x00626E10`). The mode
+    /// damage `0x005A4F50` (`skills/bodies-2.md` §2.1) and the umod
+    /// callbacks write into it.
+    ///
+    /// PROVISIONAL (init.md §6 step 12, REC-891): the call's owner and
+    /// attach `reset` are not stated; owner = the monster, reset = 1 (a
+    /// DYNAMIC list would keep `mindamage` / `maxdamage` / `tohit` out of
+    /// the unit's totals, and 1.14d monsters hit with them).
+    fn post_extra_list(&mut self, unit: UnitId) {
+        let Some((ty, guid)) = self.v.units.get(unit).map(|r| (r.ty, r.guid)) else {
+            return;
+        };
+        let l = self.v.stats.alloc(1, 0, ty.index() as u32, guid);
+        self.v.stats.attach(&mut *self.v.h, unit, l, true);
     }
 
     /// State toggle (`stat-lists.md` §9.2).
@@ -406,6 +432,66 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         if let (true, Some(item)) = (announce, item) {
             self.v.h.x.umod_recharge(item);
         }
+    }
+    /// `init.md` §6 step 13: the monster's inventory (`0x0063ABD0`) is a
+    /// holdings entry ([`ActionHooks::monster_equip`], PROVISIONAL,
+    /// REC-1030); the NPC store inventory is the vendors'.
+    ///
+    /// [`ActionHooks::monster_equip`]: crate::wiring::action::ActionHooks
+    fn new_inventory(&mut self, unit: UnitId, npc_store: bool) {
+        if !npc_store {
+            self.v.h.monster_equip.entry(unit).or_default();
+        }
+    }
+    /// Unit +0x60 is set.
+    fn has_inventory(&mut self, unit: UnitId) -> bool {
+        self.v.h.monster_equip.contains_key(&unit)
+    }
+    /// `init.md` §12: the monster's inventory holds an item at `loc`
+    /// (PROVISIONAL, REC-1030: [`ActionHooks::monster_equip`]).
+    ///
+    /// [`ActionHooks::monster_equip`]: crate::wiring::action::ActionHooks
+    fn has_item_at(&mut self, unit: UnitId, loc: u8) -> bool {
+        let sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
+        };
+        crate::wiring::economy::monster_item_at(&*self.v.h, &sim, unit, loc).is_some()
+    }
+    /// `0x00573B20` (`init.md` §12) when the game holds the drop state
+    /// (the item tables); without it no item is made.
+    fn create_equip_item(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        loc: u8,
+        modifier: u8,
+        level: i32,
+    ) {
+        let Some(mut d) = self.v.h.object_drops.take() else {
+            return;
+        };
+        {
+            let mut sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::create_monster_equip(
+                &mut *self.v.h,
+                &mut sim,
+                &mut d,
+                unit,
+                code,
+                loc,
+                modifier,
+                level,
+            );
+        }
+        self.v.h.object_drops = Some(d);
     }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);

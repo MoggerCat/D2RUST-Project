@@ -352,7 +352,15 @@ pub fn game_entry<X: Pending>(c: PathCtx<'_, X>, player: UnitId, act: u8) -> boo
         let r = crate::path::place::game_entry(cv, host, lv, player, act);
         let placed = log(cv, r).unwrap_or(false);
         if placed {
-            if let Some(q) = cv.0.borrow_mut().v.h.hireling_calls.as_mut() {
+            let mut sh = cv.0.borrow_mut();
+            // The player's unit record carries the entry act from the join
+            // on (+0x18; measured on 1.14d by `a4-fortress-arrival-ama`:
+            // act 3 at frame 2 for an Act IV start). The writer is not in
+            // a spec yet (`waypoints.md` §11 r15 is the act change's).
+            if let Some(r) = sh.v.units.get_mut(player) {
+                r.act = act;
+            }
+            if let Some(q) = sh.v.h.hireling_calls.as_mut() {
                 q.push(HirelingCall::JoinFollow(player));
             }
         }
@@ -379,8 +387,8 @@ pub fn level_spawn<X: Pending>(
 
 /// The same-act level warp of `0x0053AEC0` (§11, `waypoints.md` §7 rule
 /// 5): spawn point (`0x0061B060`) then `0x00554EA0(exact 0, alt 0)`.
-/// `None`: the destination is in another act (act change, owner: the
-/// act/level-change spec; the caller keeps its `Pending` route).
+/// `None`: the destination is in another act: the caller runs the act
+/// change `0x0053ACC0` ([`super::act_change::run`], `waypoints.md` §11).
 pub fn level_warp<X: Pending>(
     c: PathCtx<'_, X>,
     player: UnitId,

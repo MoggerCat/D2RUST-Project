@@ -198,6 +198,10 @@ impl<S: ViewSource + ?Sized> ViewSource for OrderedSource<'_, S> {
         self.source.unit_offset(unit, pose)
     }
 
+    fn unit_shadow_offset(&self, unit: &ClientUnit, pose: &UnitPose) -> Result<(i32, i32), String> {
+        self.source.unit_shadow_offset(unit, pose)
+    }
+
     /// The ordered tiles (§3, §6 tests kept), keys filled (§10).
     fn map_tiles(&self, _: &ClientWorld, _: &ViewAssets) -> Result<Vec<MapTile>, ViewError> {
         Ok(self.tiles.clone())

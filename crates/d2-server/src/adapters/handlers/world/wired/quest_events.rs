@@ -14,7 +14,7 @@
 use d2_sim::game::Game;
 use d2_sim::units::UnitType;
 use d2_sim::wiring::action::{Pending, QuestEvent};
-use d2_sim::world::quests::{act2, act5, QuestWorld};
+use d2_sim::world::quests::{act2, act3, act5, QuestWorld};
 
 use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 
@@ -28,7 +28,6 @@ const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 /// base id is the class here, as `quests-act4.md` §4).
 const DIABLO: u16 = 243;
 const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
-
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// Runs the queued quest events and the level changes since the last
     /// tick on the quest control.
@@ -42,9 +41,51 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 }
             }
         }
+        // The Golden Bird's boss choice (`quests-act3.md` §6.2) reads the
+        // monstats flags byte +0x0D; only its bit 6 (`flying`, flag word
+        // bit 14, `quests-act3-2.md` §11.4) is tested, so the byte is
+        // built from that column. `None`: no monstats row.
+        let bosses: Vec<(d2_sim::units::UnitId, u16, Option<u8>)> = {
+            let sys = &events.action().sys;
+            queued
+                .iter()
+                .filter_map(|e| match *e {
+                    QuestEvent::BossCreated { unit } => Some(unit),
+                    _ => None,
+                })
+                .filter_map(|u| {
+                    let class = sys.units.get(u)?.class;
+                    let row = sys.hooks.tables.combat.monstats.get(class as usize);
+                    let flags = row.map(|m| if m.flying { act3::q4::FLYING_0D } else { 0 });
+                    Some((u, u16::try_from(class).ok()?, flags))
+                })
+                .collect()
+        };
+        // `0x00545B50` jumps to a `ret` stub for units in levels ≥ 108
+        // (`quests-act5-2.md` §7.9); below, to the council's `0x005BB550`
+        // (`quests-act3.md` §7.5).
+        let council: Vec<d2_sim::units::UnitId> = {
+            let a = events.action();
+            queued
+                .iter()
+                .filter_map(|e| match *e {
+                    QuestEvent::PresetBoss { unit } => Some(unit),
+                    _ => None,
+                })
+                .filter(|&u| {
+                    let room = game.lists.unit(u).and_then(|e| e.room());
+                    room.and_then(|r| a.sys.hooks.drlg.level_id(game, r))
+                        .is_some_and(|l| l < 108)
+                })
+                .collect()
+        };
         let frame = game.frame;
+        let mut durance = None;
+        let mut act3_npcs = None;
         let mut lair = None;
         let mut summit = None;
+        let mut not_intro = Vec::new();
+        let mut rescue = Vec::new();
         self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -66,6 +107,25 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
+                        // REC-799: the prisoner AI's hooks (`quests-act5.md`
+                        // §4.7, §4.10).
+                        QuestEvent::WussieLeft { guid } => act5::q2::group_count_guid(q, guid),
+                        QuestEvent::WussieRescue { player, unit } => {
+                            act5::q2::rescue(q, w, player, unit)
+                        }
+                        QuestEvent::WussieWait => act5::q2::rescue_status(q, w),
+                        // REC-796: Tyrael's spawn from the baalfx missile,
+                        // at the missile's position of the call.
+                        QuestEvent::SpawnTyrael {
+                            room: Some(room),
+                            x,
+                            y,
+                            ..
+                        } => {
+                            act5::q6::spawn_tyrael_at(w, room, x, y);
+                        }
+                        QuestEvent::AlkorReset => act3::alkor_bird_clear(q),
+                        QuestEvent::OrmusAltar => act3::activate_altar(q, w),
                         // C→S 0x44 (REC-167): the staff in the orifice.
                         QuestEvent::InsertItem {
                             player,
@@ -78,6 +138,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         }
                         _ => {}
                     }
+                }
+                for &(unit, class, flags) in &bosses {
+                    act3::choose_bird_boss(q, w, unit, class, flags);
+                }
+                for &unit in &council {
+                    act3::council_preset(q, w, unit);
                 }
                 for e in &queued {
                     if let QuestEvent::Kill { victim, killer } = *e {
@@ -108,6 +174,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                             Some(HEPHASTO) => {
                                 q.add_link(w, victim, 24, None);
                             }
+                            // The Ancients' chain-35 link is made at creation
+                            // (`quests-act5-2.md` §7.6; the superunique path).
                             _ => {}
                         }
                         q.monster_killed(w, victim, killer);
@@ -120,17 +188,37 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     q.update(w);
                 }
                 lair = act2::q6::lair_warp_open(q);
+                // From any level but Durance 2 (the host tests the source).
+                durance = Some(act3::durance_open(q, 0));
+                act3_npcs = Some((act3::alkor_bird_brought(q), act3::altar_position(q)));
                 // PROVISIONAL (REC-246, d2rs-own, unverified): the exits close
                 // only once the altar was used; the preview has no fight to
                 // open them with, so a fresh game stays passable.
                 summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
+                not_intro = q.records.iter().map(|r| (r.chain, r.not_intro)).collect();
+                rescue = act5::q2::barbarian_states(q);
             });
         });
         if let Some(open) = lair {
             events.action().sys.hooks.x.set_lair_open(open);
         }
+        if let Some((bird, altar)) = act3_npcs {
+            events
+                .action()
+                .sys
+                .hooks
+                .x
+                .set_act3_npc_answers(bird, altar);
+        }
+        if let Some(open) = durance {
+            events.action().sys.hooks.x.set_durance_open(open);
+        }
         if let Some(open) = summit {
             events.action().sys.hooks.x.set_summit_open(open);
+        }
+        if !not_intro.is_empty() {
+            events.action().sys.hooks.x.publish_not_intro(&not_intro);
+            events.action().sys.hooks.x.publish_rescue(&rescue);
         }
     }
 }

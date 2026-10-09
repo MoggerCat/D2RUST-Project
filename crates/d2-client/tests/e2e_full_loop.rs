@@ -1165,6 +1165,7 @@ impl Fx {
             levels: levels(),
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1983,8 +1984,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // The death animation: 4 frames → event 1 four frames on. Tick 1's
     // room switch woke the monster created by that tick's room pass
     // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
-    // 1 + 2; Idle → the next think at 203), which is still pending.
-    assert_eq!(fx.timers(monster), [(1, f_hit + 4), (2, 203)]);
+    // 1 + 2; Idle → the next think at 203); the death clean-up's
+    // `0x005738D0` cancelled that think (`units.md` §4.6 rule 1.2).
+    assert_eq!(fx.timers(monster), [(1, f_hit + 4)]);
     // The drop (`treasure.md` §3): TC 1 picks gold on the monster's
     // seed; the item is created on the game seed (`generation.md` §3),
     // placed at the start spot (x + 2, y + 3, §7 step 2) in mode 3, its
@@ -2012,8 +2014,9 @@ fn run_with(game_seed: u32) -> Transcript {
     };
     // The kill's mode set (DT, unit flag 0x1) goes out in the client
     // pass of the hit's tick (`intents-events.md` §7.3 rule 2 step 2,
-    // §7.4 rule 7): S→C 0x69 code 8 at the path target ((0, 0): the
-    // monster's path never had a target), d = the path direction, e =
+    // §7.4 rule 7): S→C 0x69 code 8 at the path target (the spawn
+    // point the creation's mode request wrote, `monsters/init.md` §4.1
+    // step 1.1; PROVISIONAL, REC-594), d = the path direction, e =
     // unit +0xB0 (`Pending::unit_b0`'s default 0). No other S→C so far
     // but the join's 0x07s (frame 2): the unit-add / ground messages of
     // the missile and the drop belong to the per-unit update
@@ -2027,7 +2030,10 @@ fn run_with(game_seed: u32) -> Transcript {
     code8.extend(md.target_x.to_le_bytes());
     code8.extend(md.target_y.to_le_bytes());
     code8.extend([md.direction, 0]);
-    assert_eq!(&code8[5..], [8, 0, 0, 0, 0, md.direction, 0]);
+    let (sx, sy) = (mpos.0 as u16, mpos.1 as u16);
+    let [sx0, sx1] = sx.to_le_bytes();
+    let [sy0, sy1] = sy.to_le_bytes();
+    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 0]);
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,

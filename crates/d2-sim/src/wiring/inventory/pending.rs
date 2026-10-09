@@ -47,6 +47,8 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
             Some(r) if r == spot.room => {}
             Some(_) => self.state.errors.push(InvError::OtherRoom(u)),
         }
+        // Unit flag 0x1000 (§9.1 step 3), for the host's update pass.
+        self.state.dropped.insert(u);
         // The item's path follows its ground position (REC-281).
         self.econ
             .hooks
@@ -170,16 +172,26 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
         self.open_cube_desk(player, cube)
     }
+    /// `0x0055E000` (§7.11 step 3, §7.18 step 9): the removal message
+    /// (flag 0x20), then the item leaves its inventory and is freed
+    /// ([`InvDesk::remove_used_item`]); an item without a unit: the
+    /// rest's.
     fn consume_item(&mut self, player: Owner, item: Guid) {
-        // PROVISIONAL (REC-113): a used identify scroll leaves the grid;
-        // a used Town Portal scroll too (`items/use.md` §4: the caller's
-        // consumption, `inventory-moves.md` §7.11 step 3).
+        // A used identify scroll leaves the grid; a used Town Portal
+        // scroll too (`items/use.md` §4: the caller's consumption,
+        // `inventory-moves.md` §7.11 step 3). Recorded (REC-113, REC-117):
+        // 0x9D action 5 with removal flag 0x20 for both
+        // (`facts/items/a1-town-identify.tsv`, `a1-town-portal-cold-plains.tsv`).
         if (self.item_unit(item).is_some()
             && super::identify::IDENTIFY_CODES.contains(&self.code(item)))
             || self.is_portal_scroll(item)
             // A used quest item (`inventory-moves.md` §7.11 step 4; REC-246).
             || (self.item_unit(item).is_some()
                 && matches!(&self.code(item), b"ass " | b"xyz " | b"tr2 "))
+            // A potion drunk from the grid (recorded 2026-10-09,
+            // `facts/items/a1-town-potions-low.tsv` n 30).
+            || (self.item_unit(item).is_some()
+                && super::potion::classify(self.code(item)).is_some())
         {
             return self.remove_used_item(player, item);
         }
@@ -503,11 +515,13 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         if self.use_entry(item).is_some() {
             return self.dispatch_use(player, item, target, 0, 0);
         }
-        // PROVISIONAL (REC-102): potions on the player.
+        // Potions on the player (`items/use.md` §3.1; `vps`, `rvs`,
+        // `rvl`: REC-135, d2rs-own).
         if target == player && self.use_potion(player, item) {
             return true;
         }
-        // PROVISIONAL (REC-113): identify scrolls and tomes on an item.
+        // Identify scrolls and tomes on an item (recorded, REC-113:
+        // `facts/items/a1-town-identify.tsv`).
         if self.use_identify(player, target, item) {
             return true;
         }
@@ -518,7 +532,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     }
     fn remove_used(&mut self, player: Owner, item: Guid) {
         if self.item_unit(item).is_some() {
-            return self.remove_used_item(player, item);
+            return self.remove_belt_item(player, item);
         }
         self.rest.remove_used(player, item)
     }

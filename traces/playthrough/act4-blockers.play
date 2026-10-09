@@ -1,0 +1,62 @@
+# Act IV placement blockers (q-prov-data, area: Act IV playthrough):
+# Izual in the Plains of Despair (105), Hephasto and the Hellforge in the
+# River of Flame (107), the Chaos Sanctuary seals (108). Ids from the
+# 1.14d tables: levels 105 / 107 / 108; monstats izual 256, hephasto 409,
+# diablo 243; objects Hellforge 377, Seal 393-397.
+playthrough 1
+act 4
+
+save a4 --name PtA4 --class ama --expansion --act 3 --quests acts=3 --waypoints all
+
+milestone izual
+  use a4
+  deadline 1400
+  poke 5 warp 105
+  sweep 20 2 400 40
+  need ever player lv == 105
+  need unit ut 1 cl 256 lv 105 seen
+
+milestone hephasto
+  use a4
+  deadline 3500
+  poke 5 warp 107
+  sweep 20 2 1200 60
+  need ever player lv == 107
+  need unit ut 1 cl 409 lv 107 seen
+
+milestone hellforge
+  use a4
+  deadline 3500
+  poke 5 warp 107
+  sweep 20 2 1200 60
+  need ever player lv == 107
+  need unit ut 2 cl 376,377 seen
+
+milestone seals
+  use a4
+  deadline 1400
+  poke 5 warp 108
+  sweep 20 2 400 40
+  need ever player lv == 108
+  need unit ut 2 cl 393,394,395,396,397 lv 108 seen
+
+milestone fallen-fire-bolt-105
+  use a4
+  deadline 120
+  poke 5 warp 105
+  poke 30 spawn 19 @x+3 @y normal
+  poke 32 stat @1:19 6 0 1
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  note the spawn is a pack of four: `dead` needs every match dead, so name the spawned leader (@p1)
+  need ever unit ut 1 cl 19 g @p1 dead
+
+milestone izual-fire-bolt-near
+  use a4
+  deadline 1400
+  poke 5 warp 105
+  sweep 20 2 400 40
+  find ut 1 cl 256
+  poke +2 pos @1:256 @x+3 @y
+  poke +2 stat @1:256 6 0 1
+  poke +10 missile 58 @x @y @x+3 @y skill 36 20
+  need ever unit ut 1 cl 256 dead

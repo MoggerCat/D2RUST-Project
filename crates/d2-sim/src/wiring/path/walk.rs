@@ -54,6 +54,27 @@ impl<'a, X: Pending> PathCtx<'a, X> {
             .expect("path provider on")
     }
 
+    /// The speed +0x4C of a run start after its run list is attached
+    /// (`pathing.md` §8.2, revision REC-751): the rate `0x00623F50`
+    /// (`units.md` §4.7 step 7) reads stat 67 with the run list, so a
+    /// level-1 Amazon's run speed is 101 · 150 / 100 = 151. The mode set
+    /// ([`crate::units::mode_set`]) computed it before the attach; this
+    /// recomputes it with the list in place.
+    fn refresh_run_rate(&mut self, unit: UnitId) {
+        let rate = {
+            let sim = crate::units::hooks::Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            self.v.h.movement_rate(&sim, unit)
+        };
+        if let (Some(s), Some(r)) = (rate, self.v.units.get_mut(unit)) {
+            r.anim.speed = s;
+        }
+    }
+
     fn walk_error(&mut self, e: WalkError) {
         self.v.h.errors.push(WiringError::Walk(e));
     }
@@ -154,6 +175,16 @@ impl<'a, X: Pending> PathCtx<'a, X> {
         }
     }
 
+    /// `0x00650BE0(path, room, x, y)` (`path-placement.md` §6 rule 4):
+    /// the teleport ([`PathCtx::teleport`]), then the path's point count
+    /// := 0.
+    pub fn teleport_clear(&mut self, unit: UnitId, room: Option<RoomId>, x: i32, y: i32) {
+        self.teleport(unit, room, x, y);
+        if let Some(d) = self.v.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+            d.point_count = 0;
+        }
+    }
+
     /// Room-change messages `0x00554670(game, unit, 0)` (`pathing.md`
     /// §9.8).
     pub fn room_change_messages(&mut self, unit: UnitId) {
@@ -239,6 +270,29 @@ pub fn request_skip_gate<X: Pending>(
     let t = c.tables();
     let target = WalkTarget::Point(Point::new(x, y));
     match request(&t, &mut c, player, None, mode, target, true) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
+/// Player mode request `0x005809D0` (point form) / `0x00580A70` (unit
+/// form) with re-entry 0 (`pathing.md` §1.2) for a caller outside the
+/// walk code (the damage reaction, `damage.md` §7.1 step 5). `None`: a
+/// fatal path (logged).
+pub fn player_request<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    skill: Option<u16>,
+    mode: u32,
+    target: WalkTarget,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match request(&t, &mut c, player, skill, mode, target, false) {
         Ok(o) => Some(o),
         Err(e) => {
             c.walk_error(e);
@@ -677,6 +731,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
                 self.v.set_list_stat(l, VELOCITYPERCENT, value);
                 let v = &mut self.v;
                 v.stats.attach(&mut *v.h, unit, l, true);
+                self.refresh_run_rate(unit);
             }
         }
     }

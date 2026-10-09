@@ -23,7 +23,7 @@ use std::any::Any;
 
 use crate::monsters::init::MonsterData;
 use crate::units::hooks::Sim;
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 use super::{ActionHooks, Pending, WiringError};
 
@@ -77,6 +77,19 @@ pub trait MonsterWorld<X> {
         let _ = level;
         None
     }
+    /// Class reinit `0x00574370(game, unit, class, mode)` (`init.md`
+    /// §27). Default: nothing (false).
+    fn reinit(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u32,
+    ) -> bool {
+        let _ = (sim, h, unit, class, mode);
+        false
+    }
     /// The `monstats` row count. Default 0.
     fn monstats_count(&self) -> u32 {
         0
@@ -88,6 +101,46 @@ pub trait MonsterWorld<X> {
     /// The choice counts of the class's 16 components (`0x006647C0`,
     /// monstats2 of `MonStatsEx`). Default: none.
     fn component_counts(&self, _class: u32) -> Option<[u8; 16]> {
+        None
+    }
+    /// The creation `0x005B2F20(room, x, y, class, mode, spread, flags)`
+    /// (`monsters/population.md` §9: placement on the room seed, the
+    /// allocation with its type init, alignment, normal and boss mods,
+    /// party) on the lent world. `None`: the world cannot run it (the
+    /// caller allocates plainly); `Some(None)`: nothing placed.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_at(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, x, y, class, mode, spread, flags);
+        None
+    }
+    /// The preset spawn `0x0054E600(room, class, x, y, mode)` on the lent
+    /// world (`monsters/population.md` §11.2: a class past the monstats
+    /// rows is superunique `class - rows`, §11.4, with its init, minions
+    /// and quest links). `None`: the world cannot run it;
+    /// `Some(None)`: nothing made.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_preset(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, x, y, class, mode);
         None
     }
     /// The concrete state back (the lender downcasts it).
@@ -114,6 +167,18 @@ impl<X> ActionHooks<X> {
         self.monster_world_out = false;
         self.monster_world = Some(w);
         Some(r)
+    }
+
+    /// Runs `f` while a monster route holds the world and runs a call
+    /// that is itself a world call with the world in hand (population's
+    /// creation inside [`MonsterWorld::spawn_at`]): its allocations take
+    /// their type init from that call, as population's own do, so the
+    /// hooks read as "no world lent" rather than "out".
+    pub fn as_world_holder<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let out = std::mem::replace(&mut self.monster_world_out, false);
+        let r = f(self);
+        self.monster_world_out = out;
+        r
     }
 
     /// Lends `w` to the hooks from inside a monster route (a umod
@@ -143,6 +208,11 @@ impl<X> ActionHooks<X> {
         self.monster_world.as_ref()?.monster(unit)
     }
 
+    /// The monster data of `unit` in the lent world, mutable.
+    pub fn monster_data_mut(&mut self, unit: UnitId) -> Option<&mut MonsterData> {
+        self.monster_world.as_mut()?.monster_mut(unit)
+    }
+
     /// Runs the umod dispatcher in `mode` on `unit` when a world is lent;
     /// false when none is (the caller then takes its pending default).
     pub fn run_umods(
@@ -158,6 +228,57 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// `0x0061AFA0(room, GUID)` (`units.md` §4.6 rule 1.3): the unit's
+    /// room ring takes its GUID at the ring index, then the index steps
+    /// (mod 4); a unit without a room changes nothing.
+    pub fn push_last_dead(&mut self, game: &crate::game::Game, unit: UnitId) {
+        let Some(e) = game.lists.unit(unit) else {
+            return;
+        };
+        let (Some(room), guid) = (e.room(), e.guid) else {
+            return;
+        };
+        let ring = self.last_dead.entry(room).or_default();
+        ring.slots[usize::from(ring.index)] = Some((unit, guid));
+        ring.index = (ring.index + 1) & 3;
+    }
+
+    /// `0x005734C0(unit, v)`: the monster data's `dwAiState` (+0x54,
+    /// `monsters/ai.md` §3 "AI state"); a unit without monster data in
+    /// the lent world asks [`Pending::set_monster_ai_state`].
+    pub fn set_monster_ai_state(&mut self, unit: UnitId, v: u32) {
+        match self.monster_data_mut(unit) {
+            Some(m) => m.ai_state = v,
+            None => self.x.set_monster_ai_state(unit, v),
+        }
+    }
+
+    /// `0x005A68E0(unit, m)`, the AI-state half of the monster mode set
+    /// `0x005A7C20` (`ai.md` §3 "AI state" rule 2): `m` is the mode being
+    /// left; nothing for mode 1; old state ≥ 16 → state − 16; state 13
+    /// leaving mode 3 stays; else the state is `m`.
+    pub fn leave_monster_mode(&mut self, unit: UnitId, m: u32) {
+        if m == 1 {
+            return;
+        }
+        let s = self.ai_state_of(unit);
+        let new = if s >= 16 {
+            s - 16
+        } else if s == 13 && m == 3 {
+            13
+        } else {
+            m
+        };
+        self.set_monster_ai_state(unit, new);
+    }
+
+    fn ai_state_of(&self, unit: UnitId) -> u32 {
+        match self.monster_data(unit) {
+            Some(d) => d.ai_state,
+            None => self.x.ai_state(unit),
+        }
+    }
+
     /// `0x005A0180(unit, mask)`: monster data type flags (+0x16) & mask
     /// (`init.md` Outputs); a unit without monster data asks
     /// [`Pending::monster_flag`].

@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–245 |
-|   2. Think dispatch `0x005B1740` | 246–382 |
-|   3. AI control and AI tables | 383–554 |
-|   4. AI parameters | 555–573 |
-|   5. Target selection | 574–732 |
-|   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–940 |
-|   8. AI commands and minions | 941–965 |
-|   10. The catalogue `ai-functions.tsv` | 966–986 |
-| Constants & data dependencies | 987–1010 |
-| Randomness | 1011–1032 |
-| Edge cases & original bugs | 1033–1074 |
-| Test vectors | 1075–1163 |
-| Provenance | 1164–1220 |
-| Open questions | 1221–1324 |
+|   1. Think scheduling | 97–282 |
+|   2. Think dispatch `0x005B1740` | 283–422 |
+|   3. AI control and AI tables | 423–594 |
+|   4. AI parameters | 595–613 |
+|   5. Target selection | 614–772 |
+|   6. Distances and line tests | 773–787 |
+|   7. Tactics helpers | 788–1027 |
+|   8. AI commands and minions | 1028–1054 |
+|   10. The catalogue `ai-functions.tsv` | 1055–1075 |
+| Constants & data dependencies | 1076–1099 |
+| Randomness | 1100–1121 |
+| Edge cases & original bugs | 1122–1163 |
+| Test vectors | 1164–1252 |
+| Provenance | 1253–1313 |
+| Open questions | 1314–1417 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
@@ -219,6 +221,41 @@ So a monster that walks or runs re-thinks the frame its path ends.
    `0x0053A8E0`), every monster in that room's unit list gets
    `0x00573780` (+2 if neutral). Recorded: all 61 "step clients"
    schedules are +2.
+3. **Last client leaves a room: the think is cancelled.** The room
+   leave `0x0053A9B0` (`sim/intents-events.md` §7.8 rule 3) removes the
+   client (`0x0061A700`), then tests the room's client count
+   (`cmp [room + 0x78], 0` at `0x0053AA0A`); when it is 0, every unit of
+   the room's unit list (room +0x74, next +0xE8) of type 1 gets
+   `0x005738D0(game, unit)` (call at `0x0053AA2A`): delete the unit's
+   type-2 events (AI think) and then its type-3 events (stat
+   regeneration), any argument (`0x00540E60(2, 0)`, `0x00540E60(3, 0)`).
+   Nothing is scheduled in their place, and nothing is drawn. The
+   monster has no pending think until a client enters its room again
+   (rule 2: +2 if neutral). The same "no client, no think" holds at
+   creation (`init.md` §4.1, gate `0x00553160`: `room.clients ≠ 0`, else
+   clean-up and no think), so a monster in a room no client sees never
+   thinks from a timer.
+   - The test is in the room leave only. The think path has none: the
+     class handler `0x005A7F80` (freeze gate only, §1.1), the runner
+     `0x00541060` (`sim/tick.md` §5.5), the dispatch `0x005B1740` (§2)
+     and the Npc AI `0x005E7130` (`ai-bodies.md` §9.9) never read room
+     +0x78. A think that is still pending runs normally.
+   - Only types 2 and 3 are cancelled. Mode events (types 0 and 1) stay,
+     so a monster that is mid-mode when the last client leaves still
+     reaches its mode end, and the mode end can schedule or run a think
+     (§1.3, §1.4). This is a static reading; no recording has it. An
+     idle monster has no mode end to wait for, so it stops thinking.
+   - Recorded (`traces/checks/a4-warp-plains-ama.check`, ScnAm4,
+     `-seed 1234`): the warp at frame 6 takes the client out of every
+     Pandemonium Fortress room. The Fortress NPCs (classes 405, 257,
+     246) had think +20 pending from their frame-4 home think
+     (`ai-bodies.md` §9.9 step 1). That think is cancelled, so there is
+     no frame-24 think and no map-AI draw. Their unit seeds do not
+     change from frame 6 to frame 80. With a client in the level, the
+     same think runs (`a4-fortress-arrival-ama` matches).
+   Provenance: 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`,
+   `0x005738D0`, `0x00540E60`, `0x0053A8E0`, `0x005A7F80`,
+   `0x00541060`, `0x005B1740`, `0x005E7130`; q-prov-data).
 
 #### 1.6 AI reset (event type 10)
 
@@ -271,7 +308,10 @@ If either record is missing nothing runs. Otherwise:
    unit, record). A bad code pointer is a fatal assert.
 
 1.14d-confirmed (`0x005B1740`). The 1.14d handler does not test state
-54 (D2MOO only warns).
+54 (D2MOO only warns). It does not test the room's client count either
+(room +0x78). A monster in a room with no client has no think to
+dispatch, because the room leave cancelled it (§1.5 rule 3); 2026-10-09
+(pc1-day3-c, read in `0x005B1740`).
 
 #### 2.2 Precheck A `0x005B10E0`: stun, doors, leash
 
@@ -676,7 +716,7 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 |---|---|---|
 | `0x005DD510` | `sub_6FCF27B0` | alternative-target choice: never for players or without an alternative; take it if no main target; refuse if the alternative is farther than 5; else trial path toward the main target, keep main if a path exists; else scan 7 for something closer than 20 |
 | `0x005DDC30` | `sub_6FCF2CC0` | target search for "good" shooters and secondary picks: forced target, else scan 6 + `0x005DD510`; returns target, distance (0x7FFFFFFF if none), melee flag |
-| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. PROVISIONAL: the callback's distance is the no-size distance `0x005DC530` between the two positions, "within" is ≤ 15, a tie keeps the first found (because the callback is unread in 1.14d; Warriv's recorded arrival walks fit it); settled by REC-500 |
+| `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. Callback `0x005DDE80(game, npc, C, ctx)` (1.14d-confirmed, settles REC-500): C not a player → skip; d := full-size distance `0x005DC380(npc, C)` (the NPC's size subtracted, §6); d > 15 → skip (so ≤ 15 is in); NPC without monstats flag `interact` (byte +0xD & 2, mask `0x006CE26C` = 2, flag bit 9) → take C; with it → take C only if the quest active-cycler test `0x00544590(game, C, npc)` holds and d < best. Taking C writes (C, d) and **returns C, which stops the scan** (§5.4), so the first qualifying player in scan-1 order wins and there are no ties |
 
 **Scan 6 callback `0x005DCBD0`** (the search window of `0x005DDC30`;
 2026-10-09, pc1-data Step 4 item 3). Context {main, main d, alt, alt d},
@@ -811,15 +851,17 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
-| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. PROVISIONAL: dist = no-size distance, k = min(a, dist − b), no walk when k ≤ 0 or dist = 0; point = own + Δ·k / dist per axis, rounded to nearest (halves away from zero); mode 2, path step count 1, with the staged velocity request (because the geometry is D2MOO's and unread in 1.14d; it reproduces Warriv's three recorded arrival walks, `-seed 1234`: (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2), player at (4873, 4228)); settled by REC-501 | none |
+| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). A target equal to U's own position: §7.5 rule 8 (no points, neutral at once, think at f + `aidel`; settles REC-665) | none |
 | `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
 | `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 
 All draws are from the moving unit's seed (unit +0x20). 1.14d-confirmed
 for `0x005DEB60`, `0x005DE200`, `0x005DF7D0`, `0x005DEFE0`, `0x005DF140`,
 `0x005DED40`, `0x005DF680`, `0x005DEF30`, `0x005DED90`, `0x005DEDE0`,
-`0x005DEE50`; the walk-in-radius geometry is
-D2MOO's.
+`0x005DEE50`, `0x005DE4E0`.
+```
+k = min(|d - b|, a); kx, ky = ax*k/n, ay*k/n; while kx+ky < k { kx += 1; ky += 1 }; p = U + sign(t - U)*(kx, ky)*s
+```
 
 #### 7.3 Velocity request
 
@@ -937,6 +979,51 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    `sim/pathing.md` §9.5 rule 3). "Stop the path" (§1.2 table, the NPC
    interaction at `0x00548B95`, AI bodies) is `0x00648730`:
    `sim/pathing.md` §13.1 rule 3.
+8. **Zero-length walk** (settles REC-665; 1.14d-read 2026-10-09,
+   `0x005DE4E0`, `0x005A7C20`, `0x005A6290`, `0x00649970`, `0x005A7520`,
+   `0x005A73E0`). A mode-2 request whose point is U's own cell (§7.2
+   walk-in-radius with k = 0 or t on U: the point is built from
+   `0x006488C0` / `0x00648900`, the same sub-tile the compute starts
+   from) runs rules 2–5 in full: target := the point, target unit none,
+   budget := 20, the velocity request consumed, step counts := n (5
+   unless the request gave steps), stop distance := 0 (path step count
+   1). Compute type 13: start = target → no path function, index :=
+   count := 0, flag 0x20 := 0 (`sim/pathing.md` §3 steps 5, 11–12).
+   Type 13 retries: U queued, U flags |= 1, set type 15, compute again
+   (same exit), c := 15. So the path is left at **type 15** (flags of
+   type 15) with 0 points; P +0x14 := −1 (no target unit); counters
+   game +0x1D70 + 4·15 and +0x1DB4 each += 1. The WL start
+   `0x005A7520` sees 0 points and returns 0 (`sim/units.md` §4.6 rule
+   5): current skill := none (`0x00620210(U, 0)`), neutral start
+   `0x005A73E0`: set mode 1 (a monster already in mode 1 is not
+   re-queued by the set itself), and when U has no type-2 timer
+   expiring after f, think at f + `aidel` (f + 45 with state 21,
+   §1.3). Mode 1 has no schedule flag, so nothing else is scheduled;
+   the unit never enters walk and no event 0 / mode end (§1.4) runs.
+   Message: the compute's flags |= 1 makes the update pass send the
+   neutral mode message to each client of U's rooms: `0x00597E20`
+   with mode 1 (current skill already none, so not the skill branch)
+   takes the mode-1 case (`0x00598067`–`0x005980B0`) and sends **S→C
+   0x6D** (`0x0053BB70`: GUID, U's cell x, y, life byte
+   `0x005A5650(U)`), then stat 328 += 1, and returns before any 0x67 /
+   0x68 (`sim/intents-events.md` §7.4 rule 5; 1.14d-read 2026-10-09,
+   corrects the earlier "0x67 code 7"). Draws: none
+   (the point, the request, both computes and the neutral start draw
+   nothing). Next think: f + `aidel` (15 for the Act 1 classes of the
+   recordings) unless the AI body schedules or deletes thinks itself.
+   ```
+   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x6D, stat 328 += 1
+   ```
+9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
+   after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
+   the m ≠ 3 branch, `0x005A4F50(U, m)` with m = the requested mode
+   (record +0x00, kept at [ebp − 4]) rewrites U's base `tohit`,
+   `mindamage`, `maxdamage` and element stats for m
+   (`skills/bodies-2.md` §2.1), then umod mode 0 (`0x005A4350` at
+   `0x005A7D42`) and the start function. Every non-GH request (also
+   one whose start then fails, and the creation mode) runs it; a
+   monster's melee to-hit and damage are those of its last such
+   request (`combat/damage.md` §10, checked by a 1.14d recording).
 
 ### 8. AI commands and minions
 
@@ -954,7 +1041,9 @@ last). Param 0 is the command type.
 | `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
 | `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
-| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
+| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0: 0 when control +0x28 is 0; else the unit of type +0x30, GUID +0x2C (`0x00552F60`) |
+| `0x0058F030(game, unit, GUID, type, a, b)` | — (set owner data) | monsters only: b ≠ 0 → `0x005DD230(control, 2, 1)`; a ≠ 0 → `0x005DD230(control, 1, 1)`; then control +0x2C := GUID, +0x30 := type, +0x28 := game (this is what makes `0x0058F0D0` answer). Party leaders get their own GUID (`population.md` §10.2.1), so `0x0058F0D0(leader)` = leader (`ai-bodies.md` §9.4 rule 6) |
+| `0x0058F100(game, leader, minion)` | — (add minion) | new 8-byte node {minion GUID (+0x0C, −1 for none), next}, pushed at the **head** of control +0x34, so the list runs newest first |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
 minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
@@ -1217,6 +1306,10 @@ Other recorded checks:
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
+- 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`, `0x005738D0`,
+  `0x00540E60`, `0x005B1740`, `0x005E7130`): §1.5 rule 3. When the last
+  client leaves a room, the think is cancelled. Evidence:
+  `traces/checks/a4-warp-plains-ama.check`.
 
 ## Open questions
 

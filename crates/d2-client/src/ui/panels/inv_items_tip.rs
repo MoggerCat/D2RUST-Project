@@ -34,8 +34,8 @@ pub fn is_identify(code: Option<[u8; 4]>) -> bool {
     matches!(code, Some(c) if &c == b"isc " || &c == b"ibk ")
 }
 
-/// The Town Portal scroll and tome codes (the server's use,
-/// `d2_sim::wiring::inventory::town_portal`).
+/// The Town Portal scroll and tome codes (the server's use: item-use
+/// entry 2, `d2_sim::wiring::inventory::item_use`).
 pub fn is_portal(code: Option<[u8; 4]>) -> bool {
     matches!(code, Some(c) if &c == b"tsc " || &c == b"tbk ")
 }
@@ -94,6 +94,12 @@ impl ItemsUi {
         let Some(it) = self.item_at(world, files, &layout, at) else {
             return Vec::new();
         };
+        // `item-tips.md` (inputs): a grid item's tip is the hovered item
+        // of the §5 state (`0x007BCBF4`), cleared by a use press (REC-707).
+        let hs = self.hover.get();
+        if it.mode == mode::STORED && !(hs.in_grid && hs.item == Some(it.key.guid)) {
+            return Vec::new();
+        }
         // `item-tips.md` §6 r2: the fillers' properties are summed into
         // the item's own block (no separate filler lines).
         let me = crate::ui::item_tip_world::WorldUnit::local(world);
@@ -129,6 +135,7 @@ impl ItemsUi {
             self.identify.set(Some(it.key.guid));
         } else if is_cube(it.code) || is_portal(it.code) {
             let (x, y) = world.local().and_then(|u| u.position).unwrap_or((0, 0));
+            self.clear_hover();
             return vec![PanelOutput::Intent(ClientIntent::from_message(
                 &items::use_grid(it.key.guid, u32::from(x), u32::from(y)),
             ))];

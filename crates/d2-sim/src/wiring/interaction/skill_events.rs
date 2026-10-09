@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §5.2, §7; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1
+// Spec: specs/skills/use.md §5.2 (players; monsters `0x005A7670`), §7; specs/missiles/missiles.md §R2.2; specs/combat/damage.md §5.1; specs/sim/stat-lists.md §10.2, §10.3; specs/sim/units.md §4.6 r7, r10, r13, §5, §6.1; specs/skills/bodies-2.md §2.1 (mode damage of the mode set)
 //! The skill timer events of the unit dispatch on the skill use
 //! pipeline: event 5 (active state), 8 (periodic skills and auras) and 9
 //! (item auras) reach [`crate::skills::use_`] through [`UseView`].
@@ -23,7 +23,10 @@
 //! Event 14 (callback `0x00554570`) is not routed: `use.md` §6 states it
 //! is never scheduled in 1.14d and its body is not specified.
 
+use crate::combat::apply_melee;
 use crate::skills::levels::skill_level;
+use crate::skills::use_::bodies::b4_mon::monster_mode_missile;
+use crate::skills::use_::bodies::{melee_setup, mode_damage, BodyWorld};
 use crate::skills::use_::{
     active_state_event, attack_frame_event, do_skill, item_aura_event, periodic_event, start,
     UseWorld, FLAG_MISSILE_FIRED, SKILL_ARRIVED, SKILL_MOVING,
@@ -171,6 +174,107 @@ pub fn monster_sequence_frame<X: Pending + UseRest>(
     }
 }
 
+/// trigger(U) of the monster attack event (`use.md` §5.2 "Monsters"):
+/// U's mode is 14 ? unit flag 0x40 (+0xC4) set : frame code (+0x4E) = 1.
+pub fn monster_trigger(units: &crate::units::record::Units, unit: UnitId) -> bool {
+    units.get(unit).is_some_and(|r| {
+        if r.mode == 14 {
+            r.flags & FLAG_MISSILE_FIRED != 0
+        } else {
+            r.anim.action_frame == 1
+        }
+    })
+}
+
+/// The used-skill branch of the monster attack-family event 0
+/// `0x005A7670` (`use.md` §5.2 "Monsters") on the skill use pipeline: E
+/// flags bit 0 (a moving skill): the target check and step (`0x00553490`,
+/// `0x00554CA0`); stopped → E flags |= 2, the do `0x0056FC50`, and a
+/// second do when trigger(U); done. Otherwise (and for a moving skill
+/// still on its way) the do, on every event: no frame-code test. The
+/// animation refresh that follows is the caller's.
+pub fn monster_attack_skill<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let do_it = |w: &mut UseView<'_, X>| {
+        if let Some(e) = w.used_skill(unit) {
+            let l = skill_level(w, &t.skills, Some(unit), Some(&e), true);
+            do_skill(w, &t.skills, unit, e.skill, l);
+        }
+    };
+    if w.used_skill(unit).is_none() {
+        return;
+    }
+    let f = w.used_skill_flags(unit);
+    if f & SKILL_MOVING != 0 && w.step_path(unit) == 2 {
+        w.set_used_skill_flags(unit, f | SKILL_ARRIVED);
+        do_it(&mut w);
+        // trigger(U) is read after the first do (which may set flag 0x40).
+        if monster_trigger(w.cv.v.units, unit) {
+            do_it(&mut w);
+        }
+        return;
+    }
+    do_it(&mut w);
+}
+
+/// The strike of the monster attack-family event 0 `0x005A7670` with no
+/// used skill (`use.md` §5.2 "Monsters"): the mode missile `0x005A6D50`
+/// (`missiles.md` §R2.2, its argument the moving flag); none → the melee
+/// set-up `0x005A5490` and `apply_melee` `0x0057D4F0` (`combat/damage.md`
+/// §5.1) on the path target unit `0x00553540`, when there is one.
+pub fn monster_attack_strike<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    moving: bool,
+) {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    if monster_mode_missile(&mut w, &ct, unit, moving) != 0 {
+        return;
+    }
+    melee_setup(&mut w, &t.skills, &ct, unit);
+    if let Some(tg) = crate::wiring::path::monsters::path_target(&*w.cv.v.h, unit) {
+        apply_melee(w.combat(), &ct, unit, tg);
+    }
+}
+
+/// The monster mode damage `0x005A4F50(unit, mode)` of the mode set
+/// `0x005A7C20` (`skills/bodies-2.md` §2.1, `umod-callbacks.md` §2 rule
+/// 1), on the unit's base list (flag 1).
+pub fn monster_mode_damage<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    mode: u32,
+) {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    mode_damage(&mut w, &t.skills, &ct, unit, mode as i32);
+}
+
 /// The join's Iron Golem re-summon (`formats/d2s-load.md` §3 step 2,
 /// `skills/bodies-2b.md` §7.12): the player's skill 90 level L (base +
 /// bonuses) and the golem spawned at the player. The saved item has no
@@ -201,4 +305,39 @@ pub fn golem_resummon<X: Pending + UseRest>(
     crate::skills::use_::bodies::b3_lvl24::golem_summon(
         &mut w, &t.skills, &ct, player, IRON_GOLEM, l, None,
     ) == 1
+}
+
+/// The save load's skill section (`formats/d2s-load.md` §2 "skills":
+/// `0x0056A710` → `0x0056DEB0` → assign `0x00647280`,
+/// `client/msg-skills.md` §2 rules 1–2, 4): every loaded entry whose
+/// skill has a `passivestate` p > 0 gets state p on and its passive
+/// stat list refreshed (`0x00646D60`), in list order (the masteries,
+/// Increased Stamina, Iron Skin, ... count from the join on).
+pub fn passive_refresh_all<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let entries = h
+        .skill_lists
+        .get(&unit)
+        .map(|l| l.view())
+        .unwrap_or_default();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    for e in entries {
+        let p = t
+            .skills
+            .skill(e.skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if let Ok(p @ 1..) = u16::try_from(p) {
+            w.cv.v.set_state(unit, p, true);
+            crate::skills::use_::bodies::BodyWorld::passive_state_apply(&mut w, unit, &e);
+        }
+    }
 }

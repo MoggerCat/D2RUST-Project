@@ -36,22 +36,22 @@
 | Inputs | 76–87 |
 | Outputs / state changes | 88–94 |
 | Rules | 95–96 |
-|   1. Quest flag records | 97–238 |
-|   2. Quest control and quest records | 239–345 |
-|   3. Game entry: picking the quest set | 346–393 |
-|   4. Events and dispatch | 394–478 |
-|   5. Quest updater and timers (tick step 8) | 479–500 |
-|   6. Status reporting | 501–610 |
-|   7. NPC dialog hooks | 611–643 |
-|   8. Act transitions, warps and portals | 644–731 |
-|   9. Quest items, rewards and helpers | 732–924 |
-|   11. Acts II–V | 925–941 |
-| Constants & data dependencies | 942–956 |
-| Randomness | 957–984 |
-| Edge cases & original bugs | 985–1003 |
-| Test vectors | 1004–1035 |
-| Provenance | 1036–1064 |
-| Open questions | 1065–1137 |
+|   1. Quest flag records | 97–297 |
+|   2. Quest control and quest records | 298–404 |
+|   3. Game entry: picking the quest set | 405–452 |
+|   4. Events and dispatch | 453–537 |
+|   5. Quest updater and timers (tick step 8) | 538–559 |
+|   6. Status reporting | 560–741 |
+|   7. NPC dialog hooks | 742–774 |
+|   8. Act transitions, warps and portals | 775–862 |
+|   9. Quest items, rewards and helpers | 863–1055 |
+|   11. Acts II–V | 1056–1072 |
+| Constants & data dependencies | 1073–1087 |
+| Randomness | 1088–1115 |
+| Edge cases & original bugs | 1116–1134 |
+| Test vectors | 1135–1166 |
+| Provenance | 1167–1195 |
+| Open questions | 1196–1268 |
 <!-- /index -->
 
 ## Summary
@@ -235,6 +235,65 @@ What a "completed" quest is in 1.14d and what the save carries of it
    the character title use the progression bits of the client save flags
    (`quests-act1-rest.md` §5, header progression in `formats/d2s.md`),
    which only the act-end quest code raises.
+
+#### 1.9 Checkpoints per act (playthrough harness)
+
+What a run through the acts can check in the player's quest record of
+the game difficulty (§1.4), and what opens the next act. Collected
+2026-10-09 from the act files and §8 / `world/npc.md` §8.3 (each row
+cites its owner; nothing new is read here). **Done = bit 0 of the
+slot** (§1.8 rules 1 and 4): every completion reader and act gate tests
+it. Bits 13 / 14 are set during the game that completes and cleared by
+the next load (§1.6); bit 1 is the pending reward, so "goal done, reward
+not taken" = bit 1 (or 13) without bit 0. Harness form (proposed,
+`tools/playthrough.md` §2): `need quest <slot> <bit> set|clear`.
+
+| Act | Quest | Chain / slot | Bit 0 set by (precondition) | Owner |
+|---|---|---|---|---|
+| I | Den of Evil | 1 / 1 | akara (148) msg 76, with 1.1; also 41.13, 41.1 | `quests-act1.md` §10.4 |
+| I | Sisters' Burial Grounds | 2 / 2 | kashya (150) msg 92, with 2.1 | `quests-act1.md` §10.5 |
+| I | Search for Cain (Tristram) | 4 / 4 | akara (148) msg 118, with 4.1 | `quests-act1.md` §10.6 |
+| I | Sisters to the Slaughter (Andariel) | 6 / 6 | warriv1 (155) msg 183, with 6.1 | `quests-act1.md` §10.8 |
+| II | Radament's Lair | 8 / 9 | atma (176) msg 334, with 9.1 | `quests-act2.md` §3.3 |
+| II | The Horadric Staff | 9 / 10 | the staff placed in the orifice (`0x0059DD80`; party in Act II too); else the Meshif travel (§8.1) | `quests-act2.md` §8.7 |
+| II | Tainted Sun | 10 / 11 | any NPC msg 362–372, with 11.1 | `quests-act2.md` §5.6 |
+| II | Arcane Sanctuary | 11 / 12 | Horazon's journal (operate 42), not-intro and state ≠ 5: players in level 74 lacking 12.0 / 12.1 (and their party in Act II) get 12.13, 12.1, 12.0 at once; the 397–407 talk only clears 12.1 | `quests-act2.md` §6.7 |
+| II | The Summoner | 12 / 13 | any NPC msg 419–429, with 13.1 | `quests-act2.md` §7.2 |
+| II | The Seven Tombs (Duriel) | 13 / 14 | meshif1 (210) msg 450, with 14.4 | `quests-act2.md` §8.11 |
+| III | Lam Esen's Tome | 15 / 17 | alkor (254) msg 564 for players in Act III lacking 17.0 / 17.1: 17.13, 17.0, 17.1 | `quests-act3.md` §3.3 |
+| III | Khalim's Will | 16 / 18 | Compelling Orb smashed with `qf2` (2nd valid hit; party in Act III); else the Durance warp (§8.1) | `quests-act3.md` §7.7 |
+| III | Blade of the Old Religion | 17 / 19 | ormus (255) msg 593 or asheara (252) msg 589, whichever completes 19.7 + 19.8; or game start with 19.6–19.8 | `quests-act3.md` §5.4, §5.8 |
+| III | The Golden Bird | 18 / 20 | alkor (254) msg 538, with 20.1 | `quests-act3.md` §6.5 |
+| III | The Blackened Temple | 19 / 21 | cain3 (245) msg 626 with 21.4; or the last council kill with 18.0; or the Orb smash with 21.4 | `quests-act3.md` §7.3, §7.6 |
+| III | The Guardian (Mephisto) | 20 / 22 | Mephisto's kill credit (killer; players in level 102; party in Act III): 22.13, 22.0, 22.11 | `quests-act3.md` §8.5 |
+| IV | The Fallen Angel (Izual) | 22 / 25 | tyrael2 (367) msg 676, with 25.1 | `quests-act4.md` §3.4 |
+| IV | Terror's End (Diablo) | 23 / 26 | Diablo's kill credit (players in the kill room or next to it; party in Act IV) | `quests-act4.md` §5.7 |
+| IV | Hell's Forge | 24 / 27 | cain4 (246) msg 680, with 27.1 | `quests-act4.md` §4.4 |
+| V | Siege on Harrogath | 31 / 35 | Larzuk's socket reward (`0x005877C0`), with 35.1 | `quests-act5.md` §3.9 |
+| V | Rescue on Mount Arreat | 32 / 36 | qual-kehk (515) msg 20110, with 36.1, at least one rune given | `quests-act5.md` §4.4 |
+| V | Prison of Ice | 33 / 37 | the second of malah (513) msg 20132 (scroll) and drehya (512) msg 20136 (Anya's item), each with 37.1 | `quests-act5.md` §5.7 |
+| V | Betrayal of Harrogath | 34 / 38 | Anya's personalize reward (`0x0058BC00`), with 38.1 | `quests-act5-2.md` §6.11 |
+| V | Rite of Passage | 35 / 39 | the last Ancient's death (killer, players in level 120, party in Act V): 39.13 and the experience | `quests-act5-2.md` §7.6 |
+| V | Eve of Destruction (Baal) | 36 / 40 | Baal's kill credit (players in level 132, party in Act V) | `quests-act5-2.md` §8.5 |
+
+The goal steps that set the precondition bits (1, 4, 13) are in each
+owner section. Slot 0 (Warriv gossip) is set by warriv1 msg 0 or 1 and
+gates nothing.
+
+**What opens the next act** (each needs bit 0 of the act's last quest;
+the travel then sets the act-completed slot):
+
+| From → to | Opened by | Needs | Sets | Owner |
+|---|---|---|---|---|
+| I → II | warriv1 (155) travel ("Go east"), to level 40 Lut Gholein | 6.0 | 7.0, 7.13; level 40's waypoint | `world/npc.md` §8.3, §8.1 here |
+| II → III | meshif1 (210) travel ("Sail east"), to level 75 Kurast Docks | 14.0 | 10.0 / 10.13 if 10.0 was clear; 15.0, 15.13; level 75's waypoint | same |
+| III → IV | the Hellgate (object 342) in Durance of Hate 3 (level 102), opened (mode 1) by Mephisto's death; its warp goes to level 103 Pandemonium Fortress | Mephisto dead in this game (record extra +0x0C = 2); no player bit | 18.0 / 18.13 if 18.0 was clear; 23.0, 23.13 | `quests-act3.md` §8.5–§8.6, §8.1 here |
+| IV → V | tyrael2 (367) travel, to level 109 Harrogath (expansion only) | 26.0 and an expansion game | 28.0, 28.13; level 109's waypoint | `world/npc.md` §8.3, §8.1 here |
+| V end | Baal killed in level 132 | — | 40.0 (table above); the Worldstone Chamber warp itself is `§8.2` chain 36 | `quests-act5-2.md` §8.5 |
+
+Waypoints: the three NPC travels activate the destination town's
+waypoint (`world/npc.md` §8.3); the Hellgate warp is an object warp
+(§8.1, `0x00546AC0`) and is not listed there with a waypoint step.
 
 ### 2. Quest control and quest records
 
@@ -566,6 +625,78 @@ act whose active_fn (+0xEC) is valid: if active_fn(record, npc class,
 player, player record, npc) returns true, send `8A 01 <npc GUID u32>`
 (6 bytes) and stop. Recorded every 20 frames or so while near the NPC
 (`8a 01 07000000` from frame 24 on in `022633`).
+
+**The active test as a seam** (the NPC AI's interact gate; read in full
+2026-10-09 from `0x00544590` and its caller `0x005DDE80` / `0x005DDF20`;
+`monsters/ai.md` §5.3 scan 2). Signature: `active_test(game, player C,
+npc N) → bool`, with one side effect (the 0x8A send). In order:
+
+1. C null or not a player (type ≠ 0) → fatal 0x7EC; N null or not a
+   monster (type ≠ 1) → fatal 0x7ED.
+2. N's class (+0x04) outside monstats, or its flags byte +0xD AND
+   `[0x006CE26C]` (= 2, `interact`) is 0 → **false** (no list walk,
+   no send).
+3. Control = game +0x10F4; picked (control +0x08) = 0 → fatal 0x7F4.
+4. act := the act byte of C's client (`0x005531C0(C)` → client,
+   `0x005382B0(client)`; the client record's act, not the unit's
+   room): the act the client was last sent (`sim/path-placement.md`
+   §13), which equals the player's room act except during an act
+   change.
+5. Walk the records from control +0x00 through +0xF4 (newest → oldest:
+   chains 40, 39, 38, 37, then 36 … 0, §2.3). Skip a record whose act
+   byte (+0x08) ≠ act. For a record of that act:
+   1. active_fn (+0xEC) null → fatal 0x813; not a code pointer
+      (`IsBadCodePtr`) → fatal 0x802. (Every record has one, so these
+      never happen in a well-formed set; d2rs may skip instead.)
+   2. F := the player's quest-flag record for the game's difficulty:
+      player data (`0x006221A0(C)`, null → fatal 0x803) +0x10 + 4 ×
+      game +0x6D (difficulty 0–2); null → fatal 0x805. (The same
+      record the save's quest section loads, `formats/d2s.md`.)
+   3. r := active_fn(ECX record, EDX N's class, C, F, N), a byte. The
+      functions are the per-quest "active fn" of `quests.tsv` and the
+      act files (`quests-act1.md` §10.3 A1Q0: warriv1 and slot 0 bit 0
+      clear; …). They read only F, the record, the game record (slot
+      bits), other records' not-intro bytes and the NPC intro record
+      (§6.7). A scan of the 39 functions stored at +0xEC (37 in the
+      export; `0x005985C0` returns false, `quests-act2-2.md`;
+      `0x005BD0C0` is not exported) finds no inline seed step and no
+      store outside their own frame; their calls are the bit test
+      `0x0065C310`, the lookup `0x00543640`, `0x00544760`, the intro
+      test `0x005723C0`, player data `0x006221A0`, and `0x00558110`,
+      `0x00554010`, `0x006253B0`, `0x00545290`, `0x00599590`,
+      `0x005BBF80` (not followed here; their act files own them).
+   4. r ≠ 0 → send `8A 01 <N GUID u32>` to C's client (`0x0053DFF0`,
+      queued S→C, 6 bytes) and return **true**; the walk stops at the
+      first true.
+6. No record of the act returns true → **false**.
+
+The gate in the scan callback `0x005DDE80(game, N, C, ctx)` (ctx =
+{best unit, best d}, best d starts 0x7FFFFFFF): C not a player →
+skip. d := full-size distance `0x005DC380(N, C)`; d > 15 → skip. N
+null or without `interact` → take C. With `interact`: call
+active_test(game, C, N) **before** the d < best test; true and d <
+best → take C. Taking writes (C, d) and stops the scan, so best d is
+never smaller than 0x7FFFFFFF when the test runs, and the test runs
+once per qualifying player per scan, in scan order, until one passes.
+Consequences: (a) 0x8A goes to every player (within 15, in scan order
+up to the taker) for whom the test passes, and the AI takes the first
+of them; (b) the 0x8A rate is the NPC's think rate while a player is
+within 15; (c) an NPC with no room: `0x005DDF20` returns 0 (not the
+NPC) without scanning.
+
+d2rs (q-fix-p3-npc-interact-gate, 2026-10-09):
+`QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
+implements steps 2–6 and returns the bool (the caller passes the NPC
+class's monstats `interact` flag for step 2); `records` is in list
+order, so its index walk is newest → oldest. The AI seam
+`AiSummons::npc_wants_interact` returns the bool and reaches the lent
+quest control (`QuestObjectHost::npc_wants_interact`, `QuestLoan`);
+`nearest_player` (`wiring/action/ai.rs`) runs the gate above. Step 4
+takes the act from `unit_act(player)`: the sim has no client act
+(PROVISIONAL, REC-860). Edge (c) (no room → 0) is not modelled: d2rs
+returns the NPC itself. The 0x8A send is checked against 1.14d:
+`traces/checks/packets-town-arrival-ama.check` (`8a 01 07000000` at
+frame 24, every S→C message of 40 frames equal).
 
 #### 6.5 S→C 0x89 UniqueEvent
 

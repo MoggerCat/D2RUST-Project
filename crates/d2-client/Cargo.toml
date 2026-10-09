@@ -23,6 +23,10 @@ d2-server.workspace = true
 d2-sim.workspace = true
 d2-data.workspace = true
 d2-verify.workspace = true
+# `state-dump --send` (`bridge::inject`, `app::send`): the scenario
+# scripts' message parser, encoder and references (`specs/tools/scenario.md`
+# §3), shared with `tools/scenario-run`. Its dependencies are all above.
+conformance.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 # PNG output for the CPU reference renderer and verification images. Same
@@ -42,6 +46,14 @@ toml_edit = { version = "0.25", default-features = false, features = ["parse"] }
 # Bevy already builds (same version and backends), used directly so the
 # compositor runs headless for verify; `wgpu::naga` validates its WGSL in CI.
 wgpu = { version = "29.0.3", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan", "naga-ir"] }
+
+[features]
+# `state-dump --rng FILE`: the RNG draw log of d2-sim
+# (`specs/tools/rng-trace.md`); off in every normal build.
+rng-trace = ["d2-sim/rng-trace"]
+# Behaviour coverage counters of d2-sim (tools/coverage-map); off in every
+# normal build.
+coverage-map = ["d2-sim/coverage-map"]
 
 [dev-dependencies]
 criterion.workspace = true

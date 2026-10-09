@@ -97,6 +97,7 @@ pub(super) fn draw(sh: &Shared, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
                     at: Point::new(x, y),
                     clip: sh.config.screen.rect(),
                     look: CelLook::PLAIN,
+                    call: crate::ui::draw::CelCall::Draw,
                 }));
             }
         }

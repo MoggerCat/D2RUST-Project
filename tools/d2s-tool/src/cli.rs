@@ -34,7 +34,7 @@ edit flags:
   --all-skills LEVEL           every skill byte
   --left-skill ID / --right-skill ID   the mouse skill (skill id, e.g. 36 Fire Bolt)
   --quests none|all|LIST       LIST: comma-separated [diff:]acts=N or [diff:]SLOT.BIT ('all' is Pending)
-  --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX
+  --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX or [diff:]lv=LEVEL
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
   --act A --difficulty D       town byte: act 0..4 of difficulty D (default 0, normal)
   --item CODE[#Q][@X,Y][:PAGE] a normal identified item (page 0 inventory, 3 cube, 4 stash;
@@ -43,6 +43,8 @@ edit flags:
                                /idx=ROW (set/unique row) /ilvl=N /sock=N /unid /eth
                                /body=1..12 (equipped; the base must fit the
                                location, or 1.14d drops it at load) /belt=0..15
+  --merc ID,NAME,SEED,EXP      hireling block (d2s.md §2.5): hireling.txt Id, name
+                               index, seed, experience; expansion: an empty jf list
   --seed S                     game seed the items' seeds derive from (default 1)
   --map-seed S                 header map seed (new: default = the time)
   --time T                     create/save time (new: default now; set: save time)
@@ -125,6 +127,19 @@ fn parse(rest: Vec<String>) -> Result<(Edits, Common)> {
             "--difficulty" => e.difficulty = Some(parse_difficulty(&a.value(&f)?)?),
             "--act" => e.act = Some(num(&a.value(&f)?, "--act")?),
             "--item" => e.items.push(a.value(&f)?.parse()?),
+            "--merc" => {
+                let v = a.value(&f)?;
+                let p: Vec<&str> = v.split(',').collect();
+                if p.len() != 4 {
+                    bail!("--merc ID,NAME,SEED,EXP: {v:?}");
+                }
+                e.merc = Some((
+                    num(p[0], "--merc id")?,
+                    num(p[1], "--merc name")?,
+                    num(p[2], "--merc seed")?,
+                    num(p[3], "--merc exp")?,
+                ));
+            }
             "--seed" => e.seed = Some(num(&a.value(&f)?, "--seed")?),
             "--map-seed" => e.map_seed = Some(num(&a.value(&f)?, "--map-seed")?),
             "--time" => e.time = Some(num(&a.value(&f)?, "--time")?),

@@ -1,0 +1,140 @@
+# Act II objectives for tools/playthrough/playthrough.py (spec:
+# specs/tools/playthrough.md). Crude, as act1.play: pokes (warp, pos,
+# stat) jump between milestones; each milestone is its own state-dump run.
+# Quests: specs/world/quests-act2.md (slots 9 Radament, 10 Horadric Staff,
+# 11 Tainted Sun, 12 Arcane Sanctuary, 13 Summoner, 14 Seven Tombs,
+# 15 Act II completed; quests.md §1.3).
+# Ids from the 1.14d tables (levels.txt rows, monstats rows, objects.txt
+# rows): Lut Gholein 40, Rocky Waste 41, Dry Hills 42, Far Oasis 43,
+# Lost City 44, Sewers 3 = 49, Halls of the Dead 3 = 60, Claw Viper
+# Temple 2 = 61, Maggot Lair 3 = 64, Tal Rasha's Tomb 66-72, Duriel's
+# Lair 73, Arcane Sanctuary 74, Kurast Docks 75; Warriv 175, Atma 176,
+# Drognan 177, Fara 178, Greiz 198, Elzix 199, Jerhyn 201, Lysander 202,
+# Meshif 210, Duriel 211, Radament 229, Deckard Cain (Act II) 244,
+# Summoner 250; Tainted Sun altar 149, orifice 152; waypoint objects
+# 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539.
+playthrough 1
+act 2
+
+# Act II town (town byte act 1), Act I done (acts=1: slot 7 bit 0).
+save sor --name PtSorB --class sor --expansion --level 30 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=1 --act 1 --difficulty normal
+
+milestone town-start
+  use sor
+  deadline 40
+  note the NPCs 1.14d has at frame 40 (only the start's active rooms; q-prov-data)
+  need player lv == 40
+  need player act == 1
+  need unit ut 1 cl 175,195,196 count >= 3
+
+milestone town-wp
+  use sor
+  deadline 1000
+  sweep 20 2 300 30
+  need ever player lv == 40
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 40 seen
+
+milestone rocky-waste
+  use sor
+  deadline 80
+  poke 5 warp 41
+  need player lv == 41
+  need unit ut 1 lv 41 count >= 3
+
+milestone dry-hills-wp
+  use sor
+  deadline 1000
+  poke 5 warp 42
+  sweep 20 2 400 40
+  need ever player lv == 42
+  need unit ut 2 cl 119,145,156,157,237,238,288,323,324,398,402,429,494,496,511,539 lv 42 seen
+
+milestone radament-present
+  use sor
+  deadline 1000
+  poke 5 warp 49
+  sweep 20 2 300 30 grid
+  need ever player lv == 49
+  need unit ut 1 cl 229 lv 49 seen
+
+milestone radament-killed
+  use sor
+  deadline 1000
+  poke 5 warp 49
+  sweep 20 2 300 30 grid
+  find ut 1 cl 229
+  poke +2 pos @1:229 @x+3 @y
+  poke +2 stat @1:229 6 0 256
+  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 229 dead
+
+milestone halls-of-dead-3
+  use sor
+  deadline 80
+  poke 5 warp 60
+  need player lv == 60
+  need unit ut 1 lv 60 count >= 3
+
+milestone claw-viper-altar
+  use sor
+  deadline 1000
+  poke 5 warp 61
+  sweep 20 2 300 30 grid
+  need ever player lv == 61
+  need unit ut 2 cl 149 lv 61 seen
+
+milestone maggot-lair-3
+  use sor
+  deadline 80
+  poke 5 warp 64
+  need player lv == 64
+  need unit ut 1 lv 64 count >= 3
+
+milestone summoner-present
+  use sor
+  deadline 1000
+  poke 5 warp 74
+  sweep 20 1 1000 10 cross
+  need ever player lv == 74
+  need unit ut 1 cl 250 lv 74 seen
+
+milestone summoner-killed
+  use sor
+  deadline 1000
+  poke 5 warp 74
+  sweep 20 1 1000 10 cross
+  find ut 1 cl 250
+  poke +2 pos @1:250 @x+3 @y
+  poke +2 stat @1:250 6 0 256
+  poke +10 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 250 dead
+
+milestone tal-rasha-tomb
+  use sor
+  deadline 80
+  poke 5 warp 66
+  need player lv == 66
+  need unit ut 1 lv 66 count >= 3
+
+milestone duriel-present
+  use sor
+  deadline 80
+  poke 5 warp 73
+  need player lv == 73
+  need unit ut 1 cl 211 present
+
+milestone duriel-killed
+  use sor
+  deadline 200
+  poke 5 warp 73
+  poke 30 pos @1:211 @x+3 @y
+  poke 30 stat @1:211 6 0 256
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 211 dead
+
+milestone to-act3
+  use sor
+  deadline 100
+  poke 5 warp 75
+  need player lv == 75
+  need player act == 2

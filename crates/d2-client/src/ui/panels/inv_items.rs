@@ -17,7 +17,10 @@
 //! - the layout without `inventory.bin` rows: the grid of the spec's
 //!   measured record 0 / 16 (`panels.md` §Test vectors), no equipment
 //!   boxes;
-//! - the drop cell `0x00486BD0` (not specified) is the cursor cell;
+//! - the drop cell `0x00486BD0` (not specified, REC-745) is the cell of
+//!   the press point itself ([`grid_drop_cell`]), the kept cursor cell
+//!   ([`ItemsUi::track_hover`]) is read for the overlap and the sent
+//!   message only;
 //! - tints (§3 r2–r3, §6 r4), sockets, ethereal draw mode and the
 //!   item's colour remap are not drawn ([`super::super::ImageRequest`]
 //!   has no draw mode or remap field).
@@ -63,6 +66,8 @@ const NO_BOX: EquipBox = EquipBox {
     top: 0,
     w: 0,
     h: 0,
+    right: 0,
+    bottom: 0,
 };
 
 /// The layout of an `inventory.bin` row (`panels.md` §9.2: grid, then the
@@ -70,11 +75,13 @@ const NO_BOX: EquipBox = EquipBox {
 /// rArm 4, lArm 5, rHand 6, lHand 7, belt 8, feet 9, gloves 10; each box
 /// left, top and the width / height bytes).
 pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
-    let b = |left: u32, top: u32, w: u8, h: u8| EquipBox {
+    let b = |left: u32, top: u32, w: u8, h: u8, right: u32, bottom: u32| EquipBox {
         left: left as i32,
         top: top as i32,
         w: i32::from(w),
         h: i32::from(h),
+        right: right as i32,
+        bottom: bottom as i32,
     };
     InvLayout {
         grid: GridRecord {
@@ -89,16 +96,86 @@ pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
         },
         equip: [
             NO_BOX,
-            b(r.headleft, r.headtop, r.headwidth, r.headheight),
-            b(r.neckleft, r.necktop, r.neckwidth, r.neckheight),
-            b(r.torsoleft, r.torsotop, r.torsowidth, r.torsoheight),
-            b(r.rarmleft, r.rarmtop, r.rarmwidth, r.rarmheight),
-            b(r.larmleft, r.larmtop, r.larmwidth, r.larmheight),
-            b(r.rhandleft, r.rhandtop, r.rhandwidth, r.rhandheight),
-            b(r.lhandleft, r.lhandtop, r.lhandwidth, r.lhandheight),
-            b(r.beltleft, r.belttop, r.beltwidth, r.beltheight),
-            b(r.feetleft, r.feettop, r.feetwidth, r.feetheight),
-            b(r.glovesleft, r.glovestop, r.gloveswidth, r.glovesheight),
+            b(
+                r.headleft,
+                r.headtop,
+                r.headwidth,
+                r.headheight,
+                r.headright,
+                r.headbottom,
+            ),
+            b(
+                r.neckleft,
+                r.necktop,
+                r.neckwidth,
+                r.neckheight,
+                r.neckright,
+                r.neckbottom,
+            ),
+            b(
+                r.torsoleft,
+                r.torsotop,
+                r.torsowidth,
+                r.torsoheight,
+                r.torsoright,
+                r.torsobottom,
+            ),
+            b(
+                r.rarmleft,
+                r.rarmtop,
+                r.rarmwidth,
+                r.rarmheight,
+                r.rarmright,
+                r.rarmbottom,
+            ),
+            b(
+                r.larmleft,
+                r.larmtop,
+                r.larmwidth,
+                r.larmheight,
+                r.larmright,
+                r.larmbottom,
+            ),
+            b(
+                r.rhandleft,
+                r.rhandtop,
+                r.rhandwidth,
+                r.rhandheight,
+                r.rhandright,
+                r.rhandbottom,
+            ),
+            b(
+                r.lhandleft,
+                r.lhandtop,
+                r.lhandwidth,
+                r.lhandheight,
+                r.lhandright,
+                r.lhandbottom,
+            ),
+            b(
+                r.beltleft,
+                r.belttop,
+                r.beltwidth,
+                r.beltheight,
+                r.beltright,
+                r.beltbottom,
+            ),
+            b(
+                r.feetleft,
+                r.feettop,
+                r.feetwidth,
+                r.feetheight,
+                r.feetright,
+                r.feetbottom,
+            ),
+            b(
+                r.glovesleft,
+                r.glovestop,
+                r.gloveswidth,
+                r.glovesheight,
+                r.glovesright,
+                r.glovesbottom,
+            ),
         ],
     }
 }
@@ -457,10 +534,15 @@ impl ItemsUi {
         self.body_press(world, layout, cursor.as_ref(), at)
     }
 
-    /// Right mouse down in the inventory panel (d2rs-own, REC-117): on a
-    /// page-0 grid item with no item on the cursor, C→S 0x20 UseGridItem
-    /// (`inventory-moves.md` §7.11) with the local player's point; the
-    /// server decides whether the item can be used.
+    /// Right mouse down in the inventory panel, the grid handler
+    /// `0x00487740` (`items/use.md` Inputs): on a page-0 grid item with no
+    /// item on the cursor, C→S 0x20 UseGridItem (`0x004786D0`,
+    /// `inventory-moves.md` §7.11) with the item's GUID and the local
+    /// player's point.
+    ///
+    /// TODO(items/use.md Inputs): the client's items `useable` gate
+    /// (`0x00628C20`) and the cube-open flag of `box ` are not applied
+    /// here; the server refuses a non-useable item (§7.11 rule 1).
     pub fn use_press(
         &self,
         world: &ClientWorld,
@@ -494,7 +576,18 @@ impl ItemsUi {
             x: u32::from(px),
             y: u32::from(py),
         };
+        self.clear_hover();
         vec![PanelOutput::Intent(ClientIntent::from_message(&m))]
+    }
+
+    /// d2rs-own (PROVISIONAL, REC-707): a use press clears the hover
+    /// state (`0x007BCBE4`, `0x007BCBF4` := 0, as the equipment press of
+    /// `panels-3.md` §29 r1 does), so the used item keeps its own tint until
+    /// the mouse moves (`a1-panel-cube` row 25: tint 2, not 1).
+    pub(crate) fn clear_hover(&self) {
+        let mut h = self.hover.get();
+        h.without_cursor_item(None);
+        self.hover.set(h);
     }
 
     /// The hover handler `0x00487000` (§5) for a mouse event at `at`
@@ -621,14 +714,25 @@ impl ItemsUi {
         // row there keeps the last valid cell.
         let mut cursor_cell = (mc, mr);
         let mut overlap: Vec<&ItemView> = Vec::new();
-        let mut fits = true;
+        // The drop cell `0x00486BD0` (§10 r4.2) and its placement test.
+        let mut drop_cell = None;
         if let Some(cur) = cursor {
             let a = self.art(files, cur, cell);
             let (w, h) = a.map_or((1, 1), |a| (a.w, a.h));
+            let (gw, gh) = a.map_or((cell.0, cell.1), |a| (a.gw, a.gh));
+            if let Some((dc, dr)) = grid_drop_cell(g, at, (w, h), (gw, gh)) {
+                let inside = dc + w <= i32::from(g.grid_x) && dr + h <= i32::from(g.grid_y);
+                let free = !grid.iter().any(|(_, x, y, iw, ih)| {
+                    *x < dc + w && dc < x + iw && *y < dr + h && dr < y + ih
+                });
+                if inside && free {
+                    drop_cell = Some((dc as u32, dr as u32));
+                }
+            }
             self.track_hover(world, files, g, page, at);
             let (c, r) = self.hover.get().cursor_cell;
             // d2rs-own: no cell was ever set (§4 r2 tests ≥ 0).
-            fits = c >= 0 && r >= 0;
+            let fits = c >= 0 && r >= 0;
             if fits {
                 cursor_cell = (c as u32, r as u32);
                 let (c0, r0) = (cursor_cell.0 as i32, cursor_cell.1 as i32);
@@ -673,8 +777,7 @@ impl ItemsUi {
                 .iter()
                 .find(|i| i.code == Some(*b"box "))
                 .map(|i| iref(i)),
-            // d2rs-own: the drop cell `0x00486BD0` is the cursor cell.
-            drop_cell: fits.then_some(cursor_cell),
+            drop_cell,
             swap_ok: overlap.len() == 1,
             cursor_cell,
             cube_has_room,
@@ -764,15 +867,36 @@ pub fn grid_cursor_cell(
     cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
 }
 
+// PROVISIONAL (specs/ui/inventory.md §10 r4.2; REC-745): the press point.
+/// The drop cell (`0x00486BD0`, `ui/inventory.md` §10 r4.2): the cursor
+/// cell without the overflow returns.
+pub fn grid_drop_cell(
+    g: &GridRecord,
+    at: Point,
+    (w, h): (i32, i32),
+    (gw, gh): (i32, i32),
+) -> Option<(i32, i32)> {
+    let cg = CellGrid::new(
+        WidgetId(0),
+        Point::new(g.left, g.top),
+        u16::from(g.grid_x),
+        u16::from(g.grid_y),
+        u16::from(g.cell_w),
+        u16::from(g.cell_h),
+    )
+    .ok()?;
+    Some(cg.drop_cell(at, w as u16, h as u16, gw as u32, gh as u32))
+}
+
 /// The equipment box under `at` (`panels-3.md` §29 r1: boxes 1–10, first
 /// hit in location order).
 fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     (1u8..=10).find(|&l| {
         let b = layout.equip[usize::from(l)];
-        b.w > 0
-            && b.h > 0
-            && (b.left..b.left + b.w).contains(&at.x)
-            && (b.top..b.top + b.h).contains(&at.y)
+        // `panels-3.md` §29 r1: left, right, top, bottom all inclusive.
+        (b.right > b.left || b.bottom > b.top)
+            && (b.left..=b.right).contains(&at.x)
+            && (b.top..=b.bottom).contains(&at.y)
     })
 }
 

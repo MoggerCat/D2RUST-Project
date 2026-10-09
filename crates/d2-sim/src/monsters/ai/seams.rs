@@ -133,8 +133,10 @@ pub trait AiModes {
             None => self.change_mode(game, unit, mode, target),
         }
     }
-    /// Sets the anim mode without a mode change (inline thinks, §1.4).
-    fn set_anim_mode(&mut self, unit: UnitId, mode: u8);
+    /// `0x00624690(unit, mode)` (inline thinks, §1.4; `sim/units.md`
+    /// §4.1): the mode written with the unit queued and flag 0x1, no
+    /// mode start.
+    fn set_anim_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8);
     /// The path step count.
     fn set_path_steps(&mut self, unit: UnitId, steps: i32);
     /// Path flag 0x800 (blocked step).
@@ -874,9 +876,14 @@ pub trait AiSummons {
     fn rescue_portal(&mut self, _game: &mut Game, _unit: UnitId) -> Option<Option<UnitId>> {
         None
     }
-    /// S→C 0x8A NpcWantsInteract {1, the unit's GUID} to the player's
-    /// client (`0x005531C0`, `0x0053DFF0`).
-    fn npc_wants_interact(&mut self, _game: &mut Game, _player: UnitId, _unit: UnitId) {}
+    /// The quest active test `0x00544590(game, player, npc)`
+    /// (`world/quests.md` §6.4): true when an active function wants the
+    /// player to talk to the NPC, after S→C 0x8A NpcWantsInteract {1, the
+    /// unit's GUID} went to the player's client (`0x005531C0`,
+    /// `0x0053DFF0`). Default: no quest control, false.
+    fn npc_wants_interact(&mut self, _game: &mut Game, _player: UnitId, _unit: UnitId) -> bool {
+        false
+    }
 }
 
 /// Everything AI code needs.

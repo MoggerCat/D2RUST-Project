@@ -616,6 +616,7 @@ impl NpcControl {
             return Ok(Some(1));
         }
         let class = w.monster_class(npc).unwrap_or(0);
+        crate::cov!(NpcTopic, class, 0);
         if self.is_npc(class) && self.interacts(class) {
             w.clear_path(npc);
             w.npc_ai_param(npc, AI_PARAM);
@@ -767,6 +768,7 @@ impl NpcControl {
             return Ok(0);
         };
         let class = w.monster_class(npc).unwrap_or(0);
+        crate::cov!(NpcTopic, class, (1u32 << 16) | (action & 0xFFFF));
         if !self.interacts(class) {
             return Ok(0);
         }

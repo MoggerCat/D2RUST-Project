@@ -69,6 +69,9 @@ pub fn create_item<S: ItemStats>(
     };
     // §2.1: unit seed, then the item seed ({1, 666} then one game step).
     let mut item = Item::new(idx, rq.format, stats);
+    // `generation.md` §3 step 2: the item data is zero-filled, so the file
+    // index starts at 0 (only the quality routines write it).
+    item.file_index = 0;
     item.unit_seed = game.seed().derive();
     item.init_seed = item.unit_seed.lo;
     item.start_seed = game.seed().step();
@@ -105,6 +108,7 @@ pub fn create_item<S: ItemStats>(
         personalize(&mut item, rq)?;
     }
     let event3_at = replenish_timer(&item.stats, false, frame);
+    crate::cov!(Item, item.record, item.quality);
     Ok(Created { item, event3_at })
 }
 

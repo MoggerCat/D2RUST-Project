@@ -18,6 +18,7 @@ use std::any::Any;
 
 use crate::game::Game;
 use crate::monsters::init::{self, MonsterData};
+use crate::monsters::population::{placement, preset};
 use crate::units::hooks::Sim;
 use crate::units::UnitId;
 
@@ -46,6 +47,19 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         let t = self.tables.clone();
         let mut wh = host(sim, h, self);
         init::type_init(&t.init(), &mut wh, unit);
+    }
+
+    fn reinit(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u32,
+    ) -> bool {
+        let t = self.tables.clone();
+        let mut wh = host(sim, h, self);
+        init::reinit(&t.init(), &mut wh, unit, class, mode)
     }
 
     fn umods(
@@ -85,6 +99,56 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
             .components
             .get(usize::from(m.monstatsex))
             .copied()
+    }
+
+    /// `0x005B2F20` through population's placement and creation
+    /// (`population.md` §9, [`placement::place_at`]). The population
+    /// state lent elsewhere (a population call in progress): `None`.
+    fn spawn_at(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let placed = h.as_world_holder(|h| {
+            let mut wh = host(sim, h, self);
+            wh.population(|cx| {
+                placement::place_at(cx, room, None, x, y, class, mode, spread, flags)
+            })
+        });
+        Some(placed.unit())
+    }
+
+    /// `0x0054E600` through population's preset spawn
+    /// ([`preset::preset_spawn`]); population's state lent elsewhere:
+    /// `None`.
+    fn spawn_preset(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let made = h.as_world_holder(|h| {
+            let mut wh = host(sim, h, self);
+            wh.population(|cx| preset::preset_spawn(cx, room, class, x, y, mode))
+        });
+        Some(made)
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
