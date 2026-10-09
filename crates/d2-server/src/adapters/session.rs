@@ -214,23 +214,19 @@ impl PlayerRecord {
     /// A new character's record (`formats/d2s-load.md` §8 rules 1, 3):
     /// +0x2C from [`initial_portal_flags`]; hand 0 = the right skill
     /// `StartSkill` when load §1 selected it, else 0; hand 1 = 0.
-    /// PROVISIONAL (formats/d2s-load.md §8 r3; REC-02): both items −1, as
-    /// the recorded fresh saves carry (`23 … ffffffff`), not the static
-    /// reading's zero fill: with item 0 the client's select (`client/
-    /// msg-skills.md` §2 r3) finds no (skill, 0) entry and the player has
-    /// no left skill, so no click walks.
+    /// Both items are 0 (`23 00 <guid> 01 0000 00000000` and the hand 0
+    /// form), as the Wine recording of a character made in the create
+    /// screen carries (`facts/join/a1-new-ama.tsv`, REC-02; q-fix-real-
+    /// newchar-hand-item).
     pub fn new_character(portal_levels: &[u32], right: Option<u16>) -> Self {
         Self {
             portal_flags: initial_portal_flags(portal_levels),
             hands: [
                 SkillHand {
                     skill: right.unwrap_or(0),
-                    item: u32::MAX,
+                    item: 0,
                 },
-                SkillHand {
-                    skill: 0,
-                    item: u32::MAX,
-                },
+                SkillHand { skill: 0, item: 0 },
             ],
         }
     }
@@ -666,22 +662,11 @@ mod tests {
         assert_eq!(e.hotkeys, [NO_HOT_KEY; 16]);
         let r = e.record.unwrap();
         assert_eq!(r.portal_flags, 1);
-        // Hand 0 = `StartSkill`, hand 1 = 0; both items −1 (PROVISIONAL,
-        // d2s-load.md §8 r3).
-        assert_eq!(
-            r.hands[0],
-            SkillHand {
-                skill: 36,
-                item: u32::MAX
-            }
-        );
-        assert_eq!(
-            r.hands[1],
-            SkillHand {
-                skill: 0,
-                item: u32::MAX
-            }
-        );
+        // Hand 0 = `StartSkill`, hand 1 = 0; both items 0 (d2s-load.md
+        // §8 r3, recorded: facts/join/a1-new-ama.tsv). The load's own 0x23
+        // keeps the class skill's owner −1.
+        assert_eq!(r.hands[0], SkillHand { skill: 36, item: 0 });
+        assert_eq!(r.hands[1], SkillHand { skill: 0, item: 0 });
         assert_eq!(
             e.load_skill,
             Some(SkillHand {
@@ -691,13 +676,7 @@ mod tests {
         );
         // No start skill: hand 0 is 0 and the load sends no 0x23.
         let e = Entry::new_character([0; 16], &PORTALS, None);
-        assert_eq!(
-            e.record.unwrap().hands[0],
-            SkillHand {
-                skill: 0,
-                item: u32::MAX
-            }
-        );
+        assert_eq!(e.record.unwrap().hands[0], SkillHand { skill: 0, item: 0 });
         assert_eq!(e.load_skill, None);
     }
 }
