@@ -61,7 +61,11 @@ exits. Several sessions or worktrees on one PC therefore queue: the second
 prints `another 1.14d run holds the game lock; waiting`. With the lock
 held, it also waits until no `Game.exe` is running, in case a game was
 started by hand or by an older copy of these tools. The wait gives up
-after one hour. `D2_GAME_LOCK=0` turns the lock off.
+after one hour. It also follows the file rule in `docs/handoff/pc1-data.md`:
+it creates `%TEMP%\d2-game.lock` exclusively, waits while another holder
+has it, and deletes it at exit. A lock file older than 15 minutes with no
+`Game.exe` running is treated as left behind and removed. `D2_GAME_LOCK=0`
+turns all of it off.
 
 ## How it hooks the RNG
 
@@ -199,7 +203,7 @@ recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
 [DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
 type and class by clicking toward it, wait until the player stands
 still, click it at its draw point + (DX, DY), default (0, −8); screen
-position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (with LABEL `rooms<id>` it also lists that level's DRLG rooms: tile rect, type, lvlprest index, preset units; log the
 client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
 init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
 DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp
