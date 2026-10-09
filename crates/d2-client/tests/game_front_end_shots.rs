@@ -96,10 +96,8 @@ fn front_end_screens_on_the_install() {
             }
         }
     }
-    let data = GameData::select(Some(&game), false).expect("live data");
-    let GameData::Live(d) = &data else {
-        panic!("not live data")
-    };
+    let data = GameData::select(Some(&game)).expect("live data");
+    let GameData::Live(d) = &data;
     let mut art = FrontArt::new(d.archives.source());
     if let Ok(t) = d2_client::app::strings::TableStrings::load(
         d.archives.as_ref(),

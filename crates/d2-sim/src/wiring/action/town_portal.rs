@@ -519,7 +519,7 @@ impl<X: Pending> View<'_, X> {
     }
 
     /// The object data of `object` (`None`: no object state or data).
-    fn object_data_mut(
+    pub(super) fn object_data_mut(
         &mut self,
         object: UnitId,
     ) -> Option<&mut crate::world::objects::ObjectData> {

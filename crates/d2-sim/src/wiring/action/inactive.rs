@@ -564,10 +564,6 @@ impl<X: Pending> View<'_, X> {
         self.allocate(game, &req, rec.x, rec.y)
     }
 
-    fn object_data_mut(&mut self, u: UnitId) -> Option<&mut crate::world::objects::ObjectData> {
-        self.h.objects.as_mut()?.control.data.get_mut(&u)
-    }
-
     /// The object part of §3.4 rule 4.3 for a new object `u`.
     fn restore_object(&mut self, game: &mut Game, u: UnitId, rec: &OtherRecord) {
         let Some(row) = self.object_row(u).cloned() else {
