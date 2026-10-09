@@ -160,6 +160,7 @@ fn art_mode(
                 mode,
                 remap: Remap::None,
             },
+            call: crate::ui::draw::CelCall::Draw,
         }));
     }
 }
@@ -281,6 +282,7 @@ pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, f: u32, out: &mut dyn UiDraw
             at: Point::new(x, y),
             clip,
             look: crate::ui::CelLook::PLAIN,
+            call: crate::ui::draw::CelCall::Draw,
         }));
     }
 }

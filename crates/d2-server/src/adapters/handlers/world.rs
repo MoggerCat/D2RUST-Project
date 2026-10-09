@@ -949,7 +949,16 @@ impl<H: LifecycleHooks> StartItemWorld for WiredStart<'_, '_, H> {
         let (o, g) = (self.owner, self.guid(item));
         let mut d = self.inv.desk(self.econ);
         match d.belt_free_slot(o, g) {
-            Some(s) => d.belt_place(o, g, u32::from(s)),
+            Some(s) => {
+                let placed = d.belt_place(o, g, u32::from(s));
+                if placed {
+                    // The slot placement leaves the mode to its caller
+                    // (the item moves set it); the item was made on the
+                    // cursor (mode 4).
+                    d.set_mode(g, d2_sim::items::inventory::mode::BELT);
+                }
+                placed
+            }
             None => false,
         }
     }

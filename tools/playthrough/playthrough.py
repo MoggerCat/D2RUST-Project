@@ -558,6 +558,36 @@ def report(play, results, path):
     return 0
 
 
+def summary(play, results, path):
+    """One act's line of the `--all` table and of `--json` (spec Outputs):
+    act, reached / total, furthest consecutive, first blocker."""
+    consecutive = 0
+    for _, r in results:
+        if r["status"] != "reached":
+            break
+        consecutive += 1
+    first = next(((m, r) for m, r in results if r["status"] != "reached"), None)
+    fb = None
+    if first:
+        m, r = first
+        fb = {"milestone": m["name"], "kind": r["status"], "frame": r["frame"],
+              "evidence": r["evidence"], "command": m.get("cmd")}
+    return {"play": path, "act": play["act"], "reached": sum(1 for _, r in results if r["status"] == "reached"),
+            "total": len(results), "consecutive": consecutive, "first_blocker": fb}
+
+
+def print_table(rows):
+    print(f"{'act':>3}  {'reached':>7}  {'consec':>6}  first blocker")
+    for s in rows:
+        fb = s["first_blocker"]
+        if fb:
+            ev = fb["evidence"] if len(fb["evidence"]) <= 160 else fb["evidence"][:157] + "..."
+            b = f"{fb['milestone']} ({fb['kind']}) f{fb['frame']}: {ev}"
+        else:
+            b = "none"
+        print(f"{s['act']:>3}  {s['reached']:>3}/{s['total']:<3}  {s['consecutive']:>3}/{s['total']:<2}  {b}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("play", nargs="*", help="objective files (traces/playthrough/actN.play)")
@@ -565,13 +595,18 @@ def main(argv=None):
     ap.add_argument("--work", help="work dir (default: a temp dir under target/playthrough)")
     ap.add_argument("--game-dir", default=os.environ.get("D2_GAME_DIR"))
     ap.add_argument("--build", action="store_true", help="cargo build --release d2-client and d2s-tool first")
+    ap.add_argument("--all", action="store_true", help="every traces/playthrough/act*.play, then a per-act table")
     ap.add_argument("--json", help="also write the results as JSON here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
+    if a.all:
+        d = os.path.join(REPO, "traces", "playthrough")
+        a.play += sorted(os.path.join(d, f) for f in os.listdir(d)
+                         if f.startswith("act") and f.endswith(".play"))
     if not a.play:
-        ap.error("an objective file is needed")
+        ap.error("an objective file is needed (or --all)")
     try:
         client, d2s = tool_paths(a)
         worst = 0
@@ -593,8 +628,11 @@ def main(argv=None):
                 print(f"  {m['name']}: {r['status']}", file=sys.stderr)
             worst = max(worst, report(play, results, path))
             print(f"work dir: {work}")
-            all_json.append({"play": path, "act": play["act"], "milestones": [
-                {"name": m["name"], "command": m.get("cmd"), **r} for m, r in results]})
+            all_json.append(dict(summary(play, results, path), milestones=[
+                {"name": m["name"], "command": m.get("cmd"), **r} for m, r in results]))
+        if len(all_json) > 1 or a.all:
+            print()
+            print_table(all_json)
         if a.json:
             with open(a.json, "w", encoding="utf-8") as f:
                 json.dump({"format": "playthrough-result-1", "tool": f"playthrough.py {VERSION}",
@@ -712,6 +750,13 @@ milestone walk
         raise AssertionError("missing file read")
     except OSError:
         pass
+    # the per-act summary: consecutive count and first blocker keys
+    sm = summary(play, [(town, {"status": "reached", "frame": 1, "evidence": ""}),
+                        (kill, {"status": "stuck", "frame": 9, "evidence": "e"}),
+                        (walk, {"status": "reached", "frame": 2, "evidence": ""})], "p")
+    assert (sm["act"], sm["reached"], sm["total"], sm["consecutive"]) == (1, 2, 3, 1), sm
+    assert {k: sm["first_blocker"][k] for k in ("milestone", "kind", "frame", "evidence")} == \
+        {"milestone": "kill", "kind": "stuck", "frame": 9, "evidence": "e"}, sm
     # ever: held at some snapshot, not at the deadline
     ev = dict(town, need=[dict(parse_pred("player lv == 1", "t"), ever=True, src="ever player lv == 1")])
     r = evaluate(ev, snaps, pokes)

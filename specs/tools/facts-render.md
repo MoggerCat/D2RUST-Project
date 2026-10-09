@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–318 |
-|   6. Comparison | 319–356 |
-|   7. Requests | 357–368 |
-| Constants & data dependencies | 369–372 |
-| Randomness | 373–376 |
-| Edge cases & original bugs | 377–384 |
-| Test vectors | 385–393 |
-| Provenance | 394–398 |
-| Open questions | 399–413 |
+|   5. d2rs export | 190–326 |
+|   6. Comparison | 327–364 |
+|   7. Requests | 365–376 |
+| Constants & data dependencies | 377–380 |
+| Randomness | 381–384 |
+| Edge cases & original bugs | 385–392 |
+| Test vectors | 393–401 |
+| Provenance | 402–406 |
+| Open questions | 407–421 |
 <!-- /index -->
 
 ## Summary
@@ -315,6 +315,14 @@ composition, through `d2-client` only (game logic untouched).
    is still a unit draw call: its `unit` row at its draw key, no cel row
    (`WorldFrame::unit_calls` with no file; revision 2026-10-09,
    `a1-panel-inventory` row 128: the torch 2:9 at X = 920).
+18. A UI cel's `op` is the 1.14d wrapper its draw names
+   (`ui::draw::CelCall`, kept per UI draw in `WorldFrame::ui_calls`):
+   `CelDrawEx` for the globes' row window (`ui/control-panel.md` §3),
+   `CelDrawColor` for the skill icons and every font glyph,
+   `CelDrawClipped` for the automap's cells (not yet set by d2rs: its
+   automap cels export as `CelDraw`), else `CelDraw` (revision
+   2026-10-09, measured: the wrapper names of the recorded scenes'
+   `ui/`, `font`, `spells` and `automap` cels). World cels keep r3.
 
 ### 6. Comparison
 

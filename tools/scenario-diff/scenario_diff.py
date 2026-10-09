@@ -4,7 +4,7 @@ difference per channel (specs/tools/scenario-diff.md).
 
     python3 tools/scenario-diff/scenario_diff.py traces/checks/<name>.check
         [--channels state,draws] [--work DIR] [--reuse] [--orig-only | --d2rs-only]
-        [--next N] [--dry-run]
+        [--next N] [--dry-run] [--reuse-orig] [--json FILE]
     python3 tools/scenario-diff/scenario_diff.py --selftest
 
 Linux (cloud): 1.14d runs under Wine through tools/cloud-game/run.sh
@@ -12,11 +12,16 @@ Linux (cloud): 1.14d runs under Wine through tools/cloud-game/run.sh
 recorders run with this Python directly. D2_GAME_DIR names the install
 (default $HOME/game on Linux, game/ in the repo on Windows).
 
+D2RS_BIN_DIR (set by suite.py): run the prebuilt binaries d2-client,
+d2-client-rng (the rng-trace feature build) and d2s-tool from there
+instead of `cargo run` (parallel runs never wait on cargo's lock).
+
 Exit code: the worst channel's (0 match, 1 diverged, 2 partial, 3 error).
 Standard library only. Our own code.
 """
 
 import argparse
+import json
 import os
 import shlex
 import shutil
@@ -180,8 +185,10 @@ def shared_script_error(text):
 # --- running ------------------------------------------------------------------
 
 class Runner:
-    def __init__(self, check, work, dry=False, reuse=False):
+    def __init__(self, check, work, dry=False, reuse=False, reuse_orig=False):
         self.c, self.work, self.dry, self.reuse = check, work, dry, reuse
+        self.reuse_orig = reuse_orig   # keep 1.14d outputs only (suite.py's cache)
+        self.bin_dir = os.environ.get("D2RS_BIN_DIR") or None
         self.game_dir = os.environ.get("D2_GAME_DIR") or (
             os.path.join(REPO, "game") if WINDOWS else os.path.expanduser("~/game"))
         self.log = []
@@ -207,10 +214,21 @@ class Runner:
     def path(self, *p):
         return os.path.join(self.work, *p)
 
-    def cargo(self, pkg, args, timeout=7200):
+    def cargo(self, pkg, args, timeout=7200, features=None):
+        """`cargo run --release -p pkg [--features F] -- args`, or the prebuilt
+        binary in D2RS_BIN_DIR (`<pkg>`, `<pkg>-rng` for the rng-trace build)."""
         env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0", D2_GAME_DIR=self.game_dir)
-        return self.sh(["cargo", "run", "--release", "-q", "-p", pkg, "--"] + args,
+        if self.bin_dir:
+            name = pkg + ("-rng" if features == "rng-trace" else "")
+            exe = os.path.join(self.bin_dir, name + (".exe" if WINDOWS else ""))
+            return self.sh([exe] + args, timeout=timeout, env=env)
+        feat = ["--features", features] if features else []
+        return self.sh(["cargo", "run", "--release", "-q", "-p", pkg] + feat + ["--"] + args,
                        timeout=timeout, env=env)
+
+    def json_args(self, ch):
+        """The comparator's --json summary file (scenario-diff.md §4)."""
+        return ["--json", self.path(f"{ch}.summary.json")]
 
     # save ----------------------------------------------------------------
     def save_dir_orig(self):
@@ -231,7 +249,10 @@ class Runner:
         print(f"save: {out} -> {dst}")
         if not self.dry:
             os.makedirs(dst, exist_ok=True)
-            shutil.copyfile(out, os.path.join(dst, c["char"] + ".d2s"))
+            target = os.path.join(dst, c["char"] + ".d2s")
+            if os.path.exists(target):
+                os.unlink(target)  # never write through a hard link (a `cp -al` prefix copy)
+            shutil.copyfile(out, target)
         return out
 
     # 1.14d -----------------------------------------------------------------
@@ -244,7 +265,7 @@ class Runner:
                "--out", out] + args + self.poke_args()
         if self.orig_input():
             rec += ["--input", self.orig_input()]
-        if self.reuse and os.path.exists(out):
+        if (self.reuse or self.reuse_orig) and os.path.exists(out):
             print(f"reuse {out}")
             return
         if WINDOWS:
@@ -286,7 +307,7 @@ class Runner:
         if sides != {"orig", "d2rs"}:
             return None
         argv = [sys.executable, os.path.join(REC, "state_diff.py"), orig, d2rs,
-                "--next", str(self.next)]
+                "--next", str(self.next)] + self.json_args("state")
         if self.c["ignore"]:
             argv += ["--ignore", ",".join(self.c["ignore"])]
         code = self.sh(argv, check=False)
@@ -354,14 +375,22 @@ class Runner:
                     print(f"[draws] warning: d2rs play exited {code} after writing the dump")
         if sides != {"orig", "d2rs"}:
             return None
-        return self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d,
+        code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d,
                         "--ignore", "tick"], check=False, timeout=300)
+        if not self.dry:
+            sm = draws_summary(os.path.join(scene_o, "scenes", "s", "draws.tsv"),
+                               os.path.join(scene_d, "draws.tsv"), code, at)
+            with open(self.path("draws.summary.json"), "w", encoding="utf-8") as f:
+                json.dump(sm, f, indent=1)
+        return code
 
     draws_timeout = 900  # seconds for one d2rs play run (lavapipe draws ~3 ticks/s)
 
     def d2_client_bin(self):
         """Builds d2-client (release) once and returns the binary's path; the
         play run then needs no cargo in its time limit."""
+        if self.bin_dir:
+            return os.path.join(self.bin_dir, "d2-client" + (".exe" if WINDOWS else ""))
         env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0")
         self.sh(["cargo", "build", "--release", "-q", "-p", "d2-client"], timeout=7200, env=env)
         target = os.environ.get("CARGO_TARGET_DIR") or os.path.join(REPO, "target")
@@ -449,6 +478,61 @@ def scene_tick(scene):
     except (OSError, ValueError):
         pass
     return None
+
+
+DRAWS_INFO = ("i", "at", "seq", "tick")  # never compared (facts-compare's INFO + --ignore tick)
+
+
+def read_draws(path):
+    """(columns, rows) of a facts draws.tsv (`#` lines skipped)."""
+    with open(path, encoding="utf-8") as f:
+        lines = [ln.rstrip("\n") for ln in f if not ln.startswith("#") and ln.strip()]
+    if not lines:
+        return [], []
+    return lines[0].split("\t"), [ln.split("\t") for ln in lines[1:]]
+
+
+def draws_summary(orig_tsv, d2rs_tsv, code, tick):
+    """The draws channel's summary (scenario-diff.md §4): rows aligned by
+    position, a row equal when every compared column is (a '?' cell counts
+    as equal, as facts-compare's unmeasured cells); one compared frame.
+    `code` is facts-compare's exit code (its first difference also covers
+    frame.tsv and sprites, which this count does not)."""
+    verdict = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL"}.get(code, "ERROR")
+    out = {"format": "diff-summary-1", "channel": "draws", "tool": "scenario_diff.py",
+           "code": code, "verdict": verdict, "frames_compared": 1,
+           "frames_equal": 1 if code == 0 else 0, "tick": tick}
+    try:
+        ca, ra = read_draws(orig_tsv)
+        cb, rb = read_draws(d2rs_tsv)
+    except OSError as e:
+        out.update(rows_compared=0, rows_equal=0, first=None, error=str(e))
+        return out
+    cols = [c for c in ca if c in cb and c not in DRAWS_INFO]
+    ia, ib = [ca.index(c) for c in cols], [cb.index(c) for c in cols]
+    equal, first = 0, None
+    for n in range(max(len(ra), len(rb))):
+        a = ra[n] if n < len(ra) else None
+        b = rb[n] if n < len(rb) else None
+        diff = None
+        if a is None or b is None:
+            diff = ("<row>", "absent" if a is None else "row", "absent" if b is None else "row")
+        else:
+            for c, x, y in zip(cols, ia, ib):
+                va, vb = (a[x] if x < len(a) else ""), (b[y] if y < len(b) else "")
+                if va != vb and "?" not in (va, vb):
+                    diff = (c, va, vb)
+                    break
+        if diff is None:
+            equal += 1
+        elif first is None:
+            op = a[ca.index("op")] if a and "op" in ca else b[cb.index("op")] if b and "op" in cb \
+                else "?"
+            first = {"frame": tick, "text": f"tick {tick} draw row {n} ({op}) column {diff[0]}: "
+                                            f"1.14d {diff[1]} vs d2rs {diff[2]}"}
+    out.update(rows_compared=max(len(ra), len(rb)), rows_equal=equal, first=first,
+               rows=(len(ra), len(rb)))
+    return out
 
 
 def frame_seq_at(raw, tick):
@@ -608,6 +692,60 @@ def selftest():
     ok += packets_channel.selftest(Runner, parse(GOOD), shared_script_error)
     # rng: record_rng.py --frames, state-dump --rng (rng-trace feature), rng_diff.py
     ok += rng_channel.selftest(Runner, parse(GOOD))
+    # D2RS_BIN_DIR (suite.py): prebuilt binaries, no cargo; --reuse-orig keeps 1.14d only
+    old = os.environ.get("D2RS_BIN_DIR")
+    os.environ["D2RS_BIN_DIR"] = "/b"
+    try:
+        r = Runner(dict(parse(GOOD), poke=[], input={}), "/tmp/w", dry=True)
+        r.next = 5
+        r.build_save()
+        r.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+        r.draws("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+        rng_channel.run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+        assert not any(x.startswith("cargo") for x in r.log), r.log
+        assert r.log[0].startswith("/b/d2s-tool new --name ScnAma"), r.log[0]
+        assert any(x.startswith("/b/d2-client state-dump") for x in r.log)
+        assert any(x.startswith("/b/d2-client play") for x in r.log)
+        assert any(x.startswith("/b/d2-client-rng state-dump") and "--rng" in x for x in r.log)
+    finally:
+        if old is None:
+            os.environ.pop("D2RS_BIN_DIR")
+        else:
+            os.environ["D2RS_BIN_DIR"] = old
+    ok += 1
+    with tempfile.TemporaryDirectory() as td:
+        orig = os.path.join(td, "orig.state.jsonl")
+        open(orig, "w").close()
+        r = Runner(dict(parse(GOOD), poke=[], input={}), td, dry=True, reuse_orig=True)
+        r.next = 5
+        r.state(os.path.join(td, "ScnAma.d2s"), {"orig", "d2rs"})
+        assert not any("record_state" in x for x in r.log) and \
+            any("state-dump" in x for x in r.log), r.log
+        ok += 1
+        # draws_summary: rows aligned by position, i / at / tick never compared, '?' equal
+        hdr = "# facts v1\ni\top\tx\tlight\tat\n"
+        a_ = os.path.join(td, "a.tsv")
+        b_ = os.path.join(td, "b.tsv")
+        with open(a_, "w") as f:
+            f.write(hdr + "0\tStart\t1\t-\t0x1\n1\tFloor\t5\tab\t0x2\n2\tWall\t7\tcd\t0x3\n")
+        with open(b_, "w") as f:
+            f.write(hdr + "0\tStart\t1\t-\tx\n1\tFloor\t5\t?\ty\n2\tWall\t8\tcd\tz\n"
+                    "3\tLine\t1\t-\tw\n")
+        sm = draws_summary(a_, b_, 1, 73)
+        assert (sm["rows_compared"], sm["rows_equal"]) == (4, 2), sm
+        assert sm["first"]["text"] == "tick 73 draw row 2 (Wall) column x: 1.14d 7 vs d2rs 8", sm
+        assert draws_summary(a_, a_, 0, 73)["rows_equal"] == 3
+        # write_result: the codes and the comparators' summaries
+        with open(os.path.join(td, "state.summary.json"), "w") as f:
+            json.dump({"frames_compared": 3, "frames_equal": 2}, f)
+        out = os.path.join(td, "res.json")
+        write_result(out, {"name": "x"}, td, {"state": 1, "rng": 2, "draws": 3}, "boom")
+        with open(out) as f:
+            res = json.load(f)
+        assert res["channels"]["state"]["summary"]["frames_equal"] == 2, res
+        assert res["channels"]["rng"]["summary"] is None and res["error"] == "boom", res
+        assert res["channels"]["draws"]["verdict"] == "ERROR", res
+        ok += 3
     # every check file in traces/checks parses
     d = os.path.join(REPO, "traces", "checks")
     for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
@@ -620,6 +758,27 @@ def selftest():
     return 0
 
 
+def write_result(path, c, work, codes, error=None):
+    """--json: {"format": "scenario-diff-result-1", "check", "channels": {ch:
+    {"code", "verdict", "summary": the comparator's diff-summary-1 or None}},
+    "error"} (scenario-diff.md §4)."""
+    names = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR", None: "RECORDED"}
+    chans = {}
+    for ch, code in codes.items():
+        sm = None
+        p = os.path.join(work, f"{ch}.summary.json") if work else None
+        if p and code in (0, 1, 2) and os.path.exists(p):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    sm = json.load(f)
+            except (OSError, ValueError):
+                sm = None
+        chans[ch] = {"code": code, "verdict": names.get(code, str(code)), "summary": sm}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"format": "scenario-diff-result-1", "check": c and c.get("name"),
+                   "channels": chans, "error": error}, f, indent=1)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("check", nargs="?", help="traces/checks/<name>.check")
@@ -630,12 +789,18 @@ def main(argv=None):
     ap.add_argument("--d2rs-only", action="store_true")
     ap.add_argument("--next", type=int, default=20)
     ap.add_argument("--dry-run", action="store_true", help="print the commands only")
+    ap.add_argument("--reuse-orig", action="store_true",
+                    help="reuse the 1.14d outputs already in the work dir; re-run d2rs (suite.py)")
+    ap.add_argument("--json", default=None, metavar="FILE",
+                    help="write the per-channel codes and comparator summaries here (§4)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
     if not a.check:
         ap.error("a check file is needed")
+    c = work = ch = None
+    codes = {}
     try:
         with open(a.check, encoding="utf-8") as f:
             c = parse(f.read())
@@ -645,14 +810,16 @@ def main(argv=None):
             c["channels"] = [x for x in a.channels.split(",") if x]
         work = a.work or os.path.join(REPO, "traces", "raw", "check-" + c["name"])
         os.makedirs(work, exist_ok=True)
-        r = Runner(c, work, dry=a.dry_run, reuse=a.reuse)
+        r = Runner(c, work, dry=a.dry_run, reuse=a.reuse, reuse_orig=a.reuse_orig)
         r.next = a.next
         sides = {"orig", "d2rs"} - ({"d2rs"} if a.orig_only else set()) - (
             {"orig"} if a.d2rs_only else set())
         save = r.build_save()
-        codes = {}
         for ch in c["channels"]:
             print(f"\n=== channel {ch} ===", flush=True)
+            stale = r.path(f"{ch}.summary.json")
+            if not a.dry_run and os.path.exists(stale):
+                os.unlink(stale)  # a summary is this run's or none
             if ch == "state":
                 codes[ch] = r.state(save, sides)
             elif ch == "draws":
@@ -665,7 +832,13 @@ def main(argv=None):
                 codes[ch] = r.not_available(ch)
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:
         print(f"error: {e}", file=sys.stderr)
+        if a.json:
+            if ch is not None and ch not in codes:
+                codes[ch] = 3
+            write_result(a.json, c, work, codes, str(e))
         return 3
+    if a.json and not a.dry_run:
+        write_result(a.json, c, work, codes)
     names = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR", None: "recorded only"}
     print("\n=== summary ===")
     for ch, code in codes.items():
