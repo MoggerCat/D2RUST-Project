@@ -61,6 +61,31 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         init::reinit(&t.init(), &mut wh, unit, class, mode)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn place_monster(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: crate::units::RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        r: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let mut wh = host(sim, h, self);
+        Some(wh.population(|cx| {
+            crate::monsters::population::placement::place_at(
+                cx, room, None, x, y, class, mode, r, flags,
+            )
+            .unit()
+        }))
+    }
+
     fn umods(
         &mut self,
         sim: &mut Sim<'_>,

@@ -325,5 +325,5 @@ REC-793	6710		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`
 REC-795	6711		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		1	
 REC-796	6712		Tyrael's spawn after the tick (PROVISIONAL, `d2-sim` `wiring/action/missiles.rs` `spawn_ty	unstated	no		0	
 REC-797	6713		The player's act byte at the join (PROVISIONAL, `d2-server` `adapters/session.rs`, M22): u	recording	no		1	
-REC-798	6714		Quest monster spawn without the spread (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.r	unstated	no		1	
+REC-798	6714		*settled 2026-10-09 (q-play-act5)*: quest monster spawns `0x005B2F20` now run population's	recording	no		0	
 REC-799	6715		The prisoner AI's quest hooks after the tick (PROVISIONAL, `d2-sim` `wiring/action/ai.rs` 	recording	no		0	

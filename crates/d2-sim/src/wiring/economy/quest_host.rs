@@ -105,6 +105,34 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
+    /// `0x005B2F20` through the lent monster world
+    /// (`MonsterWorld::place_monster`): `None` when no world is lent (or
+    /// population's state is out), else the placement's result.
+    #[allow(clippy::too_many_arguments)]
+    fn place_unit(
+        &mut self,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: u16,
+        mode: u8,
+        r: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        self.view(|g, v| {
+            let mut sim = crate::units::hooks::Sim {
+                game: g,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            v.h.with_monster_world(|w, h| {
+                w.place_monster(&mut sim, h, room, x, y, i32::from(class), mode, r, flags)
+            })
+            .flatten()
+        })
+    }
+
     /// Runs `f` on the action wiring's view over the economy's parts.
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
@@ -718,11 +746,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         self.inner
             .free_spot_at(room, x, y, size, mask, radius, limit)
     }
-    /// `0x005B2F20`: a monster unit allocated in a DRLG room through the
-    /// action wiring (`units.md` §3.1); else the rest's. PROVISIONAL
-    /// (REC-798): the spread `r` (population §9's placement around the
-    /// point and its draws) is not applied: Larzuk stands at the free
-    /// spot, 1.14d 3 sub-tiles away (`a5-town-arrival-bar.check`).
+    /// `0x005B2F20(game, room, x, y, class, mode, r, 0)` in a DRLG room:
+    /// population's placement search and creation (`population.md` §9)
+    /// on the lent monster world; without one, the plain allocation at
+    /// (x, y); else the rest's.
     fn spawn_monster(
         &mut self,
         room: RoomId,
@@ -733,6 +760,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         r: u32,
     ) -> Option<UnitId> {
         if self.drlg_room(room) {
+            if let Some(u) = self.place_unit(room, x, y, class, mode, r as i32, 0) {
+                return u;
+            }
             return self.spawn_unit(room, x, y, class, mode);
         }
         self.inner.spawn_monster(room, x, y, class, mode, r)
@@ -804,6 +834,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         flags: u32,
     ) -> Option<UnitId> {
         if self.drlg_room(room) {
+            if let Some(u) = self.place_unit(room, x, y, class, mode, spread, flags as u16) {
+                return u;
+            }
             return self.spawn_unit(room, x, y, class, mode);
         }
         self.inner
