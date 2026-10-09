@@ -537,7 +537,7 @@ rather than a hand-run recipe.
   `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
   plain `0x0063C9B0`? Answer into §1 step 6.
 
-- **[q-play-act5] join act byte**: which 1.14d function writes the
+- **[q-play-act5] join act byte** — answered → see `docs/handoff/pc1-day3-a.md`. Which 1.14d function writes the
   player unit's act (+0x18) on a join into a save's act? The recording
   `traces/checks/a5-town-arrival-bar.check` shows 4 from frame 2 (a
   barbarian saved in Act V); `sim/units.md` §2 names only the allocation

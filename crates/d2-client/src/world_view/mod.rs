@@ -649,7 +649,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .cofs
             .get(&pose.cof)
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
-        // `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the
+        // `blend-modes.md` §5 r3 revision (settled, REC-511): the
         // body's COF box pre-test does not cull the unit's shadow.
         let body = rules.unit_box_visible(unit, &pose, cof)?;
         let shadow_ok = rules.unit_shadow_box_visible(unit, &pose, cof)?;
