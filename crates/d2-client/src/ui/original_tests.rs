@@ -490,10 +490,13 @@ fn character_art_and_close_button() {
     );
     // No stat-point box or add buttons (`PENDING`).
     assert!(panel_images(&img, "panel\\skillpoints").is_empty());
-    // Only the control panel's two closed level buttons (frame 2, §8).
+    // Only the control panel's: the help button's socket and button
+    // (`control-panel.md` §11 r3, state 2 does not hide it:
+    // `a1-panel-character`; the filter's prefix takes `levelsocket` too)
+    // and the two closed level buttons (frame 2, §8).
     assert_eq!(
         panel_images(&img, "panel\\level"),
-        vec![(2, 206, 592), (2, 563, 592)]
+        vec![(0, 725, 440), (0, 728, 436), (2, 206, 592), (2, 563, 592)]
     );
     // A classic install draws `InvChar`.
     let mut c = ui(Some(areas()), false);

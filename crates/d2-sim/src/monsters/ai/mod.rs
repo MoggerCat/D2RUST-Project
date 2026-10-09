@@ -822,6 +822,7 @@ pub fn think<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: Uni
     }
     // The prechecks may have reinstalled the AI: call the current one.
     let f = cx.store.control(unit).map_or(function, |c| c.function);
+    crate::cov!(MonsterAi, f, class);
     run_function(game, cx, f, unit, &p);
 }
 

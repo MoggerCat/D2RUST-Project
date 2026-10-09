@@ -11,6 +11,8 @@ license.workspace = true
 d2-data.workspace = true
 d2-formats.workspace = true
 thiserror.workspace = true
+# Behaviour coverage counters, only with the `coverage-map` feature.
+coverage-map = { workspace = true, optional = true }
 
 [dev-dependencies]
 proptest.workspace = true
@@ -41,3 +43,8 @@ bench-fixtures = []
 # the debug export turns it on (`d2-client state-dump --rng`); never in a
 # normal build.
 rng-trace = []
+# Behaviour coverage counters (tools/coverage-map): ids of the skills,
+# monsters, AI functions, objects, items, NPC topics, quest steps, levels,
+# missiles and states a run exercised, written when D2_COVERAGE_DIR is set.
+# Never in a normal build; no outcome depends on it.
+coverage-map = ["dep:coverage-map"]

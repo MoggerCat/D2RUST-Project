@@ -592,13 +592,22 @@ pub fn run_umod_init<H: InitHost + ?Sized>(
     }
 }
 
-/// maxhp := hitpoints := maxhp + pct(maxhp, p, 100) (umods 38, 39;
-/// §19.6: both written with the new value, as umod 2, REC-752).
+/// maxhp and hitpoints += pct(maxhp, p, 100) (umods 38, 39). Both are
+/// read before either is written: the maxhp write rescales hitpoints
+/// through the server callback (`sim/stat-lists.md` §7.2), and the
+/// hitpoints write then sets the value read before it plus the delta.
+/// Measured: a Cave Level 1 berserker (maxhp 12288) ends at maxhp =
+/// hitpoints = 3072 in 1.14d (traces/checks/a1-warp-cave-ama.check,
+/// frame 21 monster 1:8); a re-read after the maxhp write gives −6144.
 fn raise_hp<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, p: i32) {
-    let hp = h.stat(unit, stat::MAXHP);
-    let v = hp.wrapping_add(pct(hp, p, 100));
-    h.set_stat(unit, stat::MAXHP, v);
-    h.set_stat(unit, stat::HITPOINTS, v);
+    let max = h.stat(unit, stat::MAXHP);
+    let hp = h.stat(unit, stat::HITPOINTS);
+    let delta = pct(max, p, 100);
+    if delta == 0 {
+        return;
+    }
+    h.set_stat(unit, stat::MAXHP, max.wrapping_add(delta));
+    h.set_stat(unit, stat::HITPOINTS, hp.wrapping_add(delta));
 }
 
 /// damagepercent += v, halved (signed / 2) for `BaseId` 118.

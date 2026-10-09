@@ -1021,6 +1021,7 @@ fn start_core_with<W: UseWorld>(
     if table::lookup(table::Kind::Start, r.srvstfunc).is_none() {
         return 1;
     }
+    crate::cov!(Skill, skill, 0);
     let res = match bodies::start(r.srvstfunc) {
         Some(v) => v,
         None => w.srvst(r.srvstfunc, u, skill, l),
@@ -1059,6 +1060,7 @@ pub fn do_core<W: UseWorld>(
     let Some(r) = rec(t, skill) else {
         return 0;
     };
+    crate::cov!(Skill, skill, 1);
     let ty = w.unit_type(u);
     let living = w.is_alive(u);
     let used = w.used_skill(u);
