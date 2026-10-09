@@ -231,7 +231,7 @@ fn lvlprest_measurements() {
         let k = d.files.max(0) as usize;
         d.file.iter().skip(k).any(|f| f.len() > 1)
     });
-    assert_eq!(beyond, 82);
+    assert_eq!(beyond, 80);
     for &id in &PRESET_LEVELS {
         let d = pd.def(pd.def_for_level(id).unwrap()).unwrap();
         assert_eq!(d.files, preset_files(id), "Files of level {id}");

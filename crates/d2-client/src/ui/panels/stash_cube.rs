@@ -18,9 +18,8 @@
 //!   (only the tool-tip y `H + sy − 100` / `H + sy − 223` is given), and
 //!   whether the cube close button also calls `SetUIState(0x1A, off)`:
 //!   [`cube_close`] sends 0x4F 0x17 only, as §12.6 states.
-//! - Open: §12.4 the animation cel is drawn in draw mode 3 and
-//!   `ImageRequest` has no draw-mode field: the frame is exposed as a query
-//!   ([`HoradricAnim::frame`], [`horadric_pos`]) for the sink. Whether
+//! - §12.4: the frame is exposed as a query ([`HoradricAnim::frame`],
+//!   [`horadric_pos`]); the cube adapter draws it in mode 3. Whether
 //!   frame 30 is drawn once before the stop, and how the "last step" tick
 //!   is initialised when the animation starts, are not stated: here the
 //!   caller passes the start tick, and the step that reaches 30 stops the
