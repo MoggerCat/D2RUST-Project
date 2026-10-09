@@ -349,3 +349,27 @@ spawn.
     the pack; 0x1 + 0x2 makes the first minion the leader (`0x0058F530`).
   - Spec: `monsters/umod-callbacks.md` §1 r5.
   - d2rs differs: row `q-fix-c7-owner-flags`.
+
+## Resume (session paused 2026-10-09)
+
+- **State:** branch `claude/local-pc1-day3-b` is pushed and clean,
+  merged with staging. Worktree `../d2rs-b` (re/, game/ read from
+  `../d2rs`). Scratch worktrees `../d2rs-tools` and `../d2rs-check` can
+  be removed.
+- **Done:** rounds 1–3, items 41 / 45 / 46, and the four
+  `[q-fix-b-monster-combat]` items. Every answered line in pc1-data.md
+  is marked "answered → see docs/handoff/pc1-day3-b.md".
+- **Open PROVISIONAL:**
+  - REC-817: MonLvl `L-TH` at level 1; MonLvl.txt is not extracted.
+  - REC-900: why the whirl path first steps on update 3; needs the anim
+    recorder tools.
+- **On resume:**
+  1. Pull staging and merge.
+  2. Take new unanswered `[combat-a1]` / `[skills-1]` / `[skills-2]` /
+     `[q-fix-b-monster-combat]` items. Check that the line is not already
+     marked, and tell PC1-C (and PC1-A) before starting.
+  3. Append q-fix rows only as NEW ids at the end of build-queue.tsv.
+     Never re-apply old row files: that once overwrote rows the cloud had
+     edited.
+  4. 1.14d runs: the recorders take `%TEMP%\d2-game.lock` themselves.
+     Do not hold it around `scenario_diff.py`.
