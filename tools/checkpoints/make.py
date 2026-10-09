@@ -295,6 +295,68 @@ def verify(ck, save, client, out, game_dir, ticks):
     return row
 
 
+def save_dir_default():
+    """1.14d's save folder: under Wine, the prefix's Saved Games\\Diablo II
+    (tools/cloud-game/prepare_saves.sh); on Windows, %USERPROFILE%."""
+    if os.name == "nt":
+        return os.path.join(os.environ.get("USERPROFILE", ""), "Saved Games", "Diablo II")
+    prefix = os.environ.get("WINEPREFIX", os.path.join(os.path.expanduser("~"), ".wine-d2"))
+    user = os.environ.get("USER") or os.path.basename(os.path.expanduser("~"))
+    return os.path.join(prefix, "drive_c", "users", user, "Saved Games", "Diablo II")
+
+
+def verify_orig(ck, save, out, game_dir, save_dir, ticks):
+    """The 1.14d side (spec §4 r4): the save copied into the game's save
+    folder, then one record_state.py run with --auto <name> and the start
+    pokes (under Wine through tools/cloud-game/run.sh). The load state is
+    the last snapshot before the first start poke, the start state the
+    last one. 1.14d's recorder reads no quest record (`q`), so the quest
+    bits are not checked here."""
+    import shutil
+    row = {"name": ck["file"], "load": "fail", "load_quests": None}
+    os.makedirs(save_dir, exist_ok=True)
+    shutil.copyfile(save, os.path.join(save_dir, f"{ck['name']}.d2s"))
+    first = min([f for f, _ in ck["start"]], default=ticks)
+    n = max([ticks] + [f + (GOTO_TICKS if d.startswith("goto") else 20) for f, d in ck["start"]])
+    st = os.path.join(out, f"{ck['file']}.orig.jsonl")
+    if os.path.exists(st):
+        os.remove(st)
+    rec = [os.path.join(REPO, "tools", "trace-recorder", "record_state.py"), "--game",
+           os.path.join(game_dir, "Game.exe"), "--seconds", str(60 + n), "--ticks", str(n),
+           "--snap-every", "2", "--auto", ck["name"], "--seed", "1", "--out", st]
+    for f, d in ck["start"]:
+        rec += ["--poke", f"{f} {d}"]
+    if os.name == "nt":
+        cmd = [sys.executable] + rec
+    else:
+        cmd = [os.path.join(REPO, "tools", "cloud-game", "run.sh"), "--python", "--seconds", str(120 + n),
+               "--out", os.path.join(out, f"{ck['file']}.orig-run"), "--"] + rec
+    row["load_cmd"] = row["start_cmd"] = " ".join(shlex.quote(c) for c in cmd)
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, env=_env(game_dir), timeout=300 + n)
+    except subprocess.TimeoutExpired:
+        row["load"] = "timeout"
+        return row
+    if not os.path.exists(st):
+        row["load"] = "no state file"
+        return row
+    snaps, pk = read_state(st)
+    snaps = [x for x in snaps if player(x)]
+    before = [x for x in snaps if x["f"] < first]
+    if not before:
+        row["load"] = "no player before the start pokes"
+        return row
+    keys = ("lv", "act", "x", "y", "lvl", "hp", "hpx", "mp", "mpx", "m")
+    for tag, snap in (("load", before[-1]), ("start", snaps[-1])):
+        pl = player(snap)
+        row[tag] = "ok"
+        row[f"{tag}_state"] = dict({k: pl.get(k) for k in keys}, f=snap["f"])
+    row["pokes"] = [f"{p.get('d')}:{p.get('r')}" for p in pk]
+    if any(p.get("r") != "ok" for p in pk) or len(pk) != len(ck["start"]):
+        row["start"] = "pokes " + " ".join(row["pokes"])
+    return row
+
+
 def check_row(ck, row):
     """The load check (spec §4 r2): the player is at the save's level,
     in the town of the save's act, with the save's quest bits; and every
@@ -309,7 +371,8 @@ def check_row(ck, row):
         fails.append(f"act {s.get('act')} != {ck['act']}")
     want = {q for q in ck["quests"] if not q.split(":")[-1].startswith("acts=")}
     want = {q.split(":")[-1] for q in want if ":" not in q or q.startswith(ck["difficulty"] + ":")}
-    missing = sorted(want - set(row.get("load_quests", [])), key=lambda q: tuple(map(int, q.split("."))))
+    have = row.get("load_quests")
+    missing = [] if have is None else sorted(want - set(have), key=lambda q: tuple(map(int, q.split("."))))
     if missing:
         fails.append("quest bits missing " + ",".join(missing))
     for n in ck["need"]:
@@ -330,17 +393,21 @@ TSV_COLS = ("name", "load", "lvl", "act", "lv", "x", "y", "hp", "mp", "quests", 
             "start_y", "pokes")
 
 
-def tsv(rows, cmd):
+def tsv(rows, cmd, side="d2rs"):
+    what = ("d2rs only: what d2rs makes of each save (load = state after the load ticks; start = after the "
+            "start pokes)." if side == "d2rs" else
+            "1.14d (record_state.py): load = the last snapshot before the first start poke; start = the last "
+            "snapshot; quest bits are not read on this side (-).")
     out = [f"# checkpoint-start-1 (tools/checkpoints/make.py {VERSION}; specs/tools/checkpoints.md §4)",
            f"# command: {cmd}",
-           "# d2rs only: what d2rs makes of each save (load = state after the load ticks; start = after the start pokes).",
+           f"# {what}",
            "\t".join(TSV_COLS)]
     for r in rows:
         s = r.get("load_state", {})
         t = r.get("start_state", {})
         out.append("\t".join(str(v) for v in (
             r["name"], r.get("load"), s.get("lvl"), s.get("act"), s.get("lv"), s.get("x"), s.get("y"),
-            s.get("hp"), s.get("mp"), ",".join(r.get("load_quests", [])) or "-", r.get("start"),
+            s.get("hp"), s.get("mp"), ",".join(r.get("load_quests") or []) or "-", r.get("start"),
             t.get("lv"), t.get("x"), t.get("y"), " ".join(r.get("pokes", [])) or "-")))
     return "\n".join(out) + "\n"
 
@@ -367,7 +434,11 @@ def main(argv=None):
     ap.add_argument("--build", action="store_true", help="cargo build --release d2-client and d2s-tool first")
     ap.add_argument("--verify", action="store_true", help="load each save in d2rs (state-dump)")
     ap.add_argument("--ticks", type=int, default=25, help="load-check ticks (default 25)")
-    ap.add_argument("--record", help="with --verify: write the checkpoint-start-1 table here")
+    ap.add_argument("--record", help="with --verify / --orig: write the checkpoint-start-1 table here")
+    ap.add_argument("--orig", action="store_true",
+                    help="load each save in 1.14d instead (record_state.py; under Wine via tools/cloud-game)")
+    ap.add_argument("--save-dir", default=None, help="with --orig: 1.14d's save folder (default: the Wine "
+                    "prefix's, or %%USERPROFILE%%\\Saved Games\\Diablo II)")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
@@ -387,8 +458,11 @@ def main(argv=None):
         for ck in cks:
             path, cmd = build(ck, d2s, a.out, a.game_dir)
             print(f"{ck['file']}: {path}")
-            if a.verify:
-                row = verify(ck, path, client, a.out, a.game_dir, a.ticks)
+            if a.verify or a.orig:
+                if a.orig:
+                    row = verify_orig(ck, path, a.out, a.game_dir, a.save_dir or save_dir_default(), a.ticks)
+                else:
+                    row = verify(ck, path, client, a.out, a.game_dir, a.ticks)
                 fails = check_row(ck, row)
                 rows.append(row)
                 if fails:
@@ -401,7 +475,9 @@ def main(argv=None):
                           f"start lv {t.get('lv')} at ({t.get('x')},{t.get('y')}) {' '.join(row.get('pokes', []))}")
         if a.record and rows:
             with open(a.record, "w", encoding="utf-8") as f:
-                f.write(tsv(rows, "python3 tools/checkpoints/make.py --verify --record " + os.path.relpath(a.record, REPO)))
+                flag = "--orig" if a.orig else "--verify"
+                f.write(tsv(rows, f"python3 tools/checkpoints/make.py {flag} --record "
+                            + os.path.relpath(a.record, REPO), "1.14d" if a.orig else "d2rs"))
         return worst
     except (CkError, OSError) as e:
         print(f"checkpoints: error: {e}", file=sys.stderr)
@@ -470,6 +546,8 @@ need player lv 49
     assert check_row(ck, dict(row, load_state=dict(row["load_state"], act=0))) == ["act 0 != 1"]
     assert check_row(ck, dict(row, start_state={"lv": 48})) == ["start lv 48 != 49"]
     assert check_row(ck, dict(row, load="crash: x")) == ["load crash: x"]
+    assert check_row(ck, dict(row, load_quests=None)) == []  # 1.14d: q not read
+    assert tsv([dict(row, load_quests=None)], "x", "1.14d").splitlines()[2].startswith("# 1.14d")
     assert quest_bits([[1, 0x2002], [6, 1]]) == ["1.1", "1.13", "6.0"]
     # the committed definitions parse, names unique
     cks = load_all()

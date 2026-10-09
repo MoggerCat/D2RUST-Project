@@ -28,16 +28,16 @@
 | Inputs | 55–62 |
 | Outputs / state changes | 63–74 |
 | Rules | 75–76 |
-|   1. Objective file `playthrough 1` | 77–110 |
-|   2. Predicates | 111–134 |
-|   3. Verdict per milestone | 135–150 |
-|   4. Class × difficulty matrix | 151–218 |
-| Constants & data dependencies | 219–224 |
-| Randomness | 225–229 |
-| Edge cases & original bugs | 230–237 |
-| Test vectors | 238–245 |
-| Provenance | 246–257 |
-| Open questions | 258–281 |
+|   1. Objective file `playthrough 1` | 77–118 |
+|   2. Predicates | 119–142 |
+|   3. Verdict per milestone | 143–158 |
+|   4. Class × difficulty matrix | 159–226 |
+| Constants & data dependencies | 227–232 |
+| Randomness | 233–237 |
+| Edge cases & original bugs | 238–245 |
+| Test vectors | 246–253 |
+| Provenance | 254–265 |
+| Open questions | 266–289 |
 <!-- /index -->
 
 ## Summary
@@ -93,8 +93,16 @@ hide the ones after it.
    (cx, cy), `step` sub-tiles apart, ending back at (cx, cy). `spiral`
    (the default) goes outward from the centre, so each target is next
    to the last one. `grid` goes row by row from the (−R, −R) corner,
-   serpentine. A sweep exists because units only exist in active rooms
-   near a player. A refused `pos` is expected and is not a blocker.
+   serpentine. The player walks to each target with `hop @player x y`
+   pokes (`tools/poke.md` §1), one every `every` frames, ceil(d / 16) + 1
+   per leg (d the distance between targets): a hop moves at most 16
+   sub-tiles per axis from where the player stands, to the first free
+   spot of a ring around the step (q-play-act5's walk,
+   `tests/play_act5.rs`); a blocked hop leaves the player there and the
+   next tries again. The run is extended to the sweep's last hop + 10
+   frames. A sweep exists because units only exist in active rooms near
+   a player. A refused `pos` is expected and is not a blocker.
+r.
 5. **checkpoint** (2026-10-09). `checkpoint <name>` in a milestone
    replaces `use <save>`: the save is built from
    `traces/checkpoints/<name>.checkpoint` (`tools/checkpoints.md` §3),

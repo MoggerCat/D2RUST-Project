@@ -217,12 +217,25 @@ what moved it.
    `LevelMin`. Fixed: the level of the init record's room.
 3. Frame 24, town NPC seeds: 1.14d stops the town NPCs' thinks once no
    client sees their room; d2rs keeps them (map AI draws at 24, 32).
-   Measured, no spec: `q-fix-real-npc-sleep-no-client`.
+   Measured: `q-fix-real-npc-sleep-no-client`, a duplicate of `q-fix-p3-room-empty-think` (`ai.md` §1.5 r3, another session).
 
 4. `a1-warp-cave-ama` (Cave Level 1, `warp 9`), frame 21: a berserker
    champion (1:8, umod 39) at hitpoints −6144 vs 3072. 1.14d reads maxhp
    and hitpoints before writing either; d2rs re-read hitpoints after the
    maxhp write had rescaled it (`stat-lists.md` §7.2). Fixed (`raise_hp`).
+
+5. `a2-warp-sewers-ama` (Lut Gholein Sewers Level 1, `warp 47` from
+   Lut Gholein): state equal on all 160 frames (PARTIAL only through the
+   declared gaps; the Lut Gholein NPCs did not diverge either); rng
+   differs only by the creation attribution of `q-fix-tool-rng-creation-draws`.
+
+6. `a3-warp-flayer-dungeon-ama` (Flayer Dungeon Level 1, `warp 88` from
+   Kurast Docks): state equal on all 160 frames (5 objects, a warp tile).
+7. `a5-warp-crystalized-ama` (Crystalized Cavern Level 1, `warp 113`
+   from Harrogath): every level-113 unit equal on all 160 frames (15
+   monsters, 14 objects); the check's first divergence is in Harrogath at
+   frame 2 (Larzuk 1:1 class 511 at 5145,5031 vs 5142,5029), area E's
+   `a5-harrogath-arrival-ama`.
 
 So the Den of Evil's and Cave Level 1's generation, presets and
 population are equal for all 160 frames outside town (every non-player
@@ -248,3 +261,60 @@ each group in the cloud, and the tool work that would unblock it:
 | G9 later acts | quest-state saves need `--quests` slot bits per quest and long scripted play | per-quest `d2s-tool` set-ups + `poke` |
 | G10 rest (REC-212, REC-228, REC-205, REC-221–225, REC-201) | pixel checks need the cels drawn (not eye reads); timing points need hooks | `facts_render.py` captures of the menus (`record_frames.py` in the front end) |
 | G11 audio | `-ns` and no sound device under Wine | an ALSA dummy device or a sound-call hook |
+
+## Hand-back (2026-10-09 wrap-up)
+
+**Done this session (area C, diff-driven).** Warp checks seed 1234,
+`warp L` at frame 20, 160 ticks, state + rng channels: Den of Evil (8),
+Cave Level 1 (9), Lut Gholein Sewers Level 1 (47), Flayer Dungeon
+Level 1 (88), Crystalized Cavern Level 1 (113): every unit of the warped
+level equal to 1.14d on all 160 frames. d2-sim fixes on the way: the
+object init reads the level of the init room (`world/objects.md` §3; the
+shrine pick took 8 tries at level 0), umods 38/39 read maxhp and
+hitpoints before writing (`stat-lists.md` §7.2 rescale; Cave berserker
+−6144 vs 3072); the preset first walk (objects and warp tiles in list
+order) landed on staging from another session the same day. Tools:
+`tools/cloud-game/probe_call.py` (call-form probe) and
+`facts/calls/warp-0x53aec0.jsonl` (the warp form measured on a waypoint
+warp); my `rng_poke.py` was replaced by the tools session's
+`record_rng.py --poke`.
+
+**In progress (not started on 1.14d: the run was stopped at the wrap-up,
+nothing half-done is in the branch).** Eleven more warp checks are
+committed, not yet run: `traces/checks/a1-warp-{tower-cellar,jail,catacombs}-ama`,
+`a2-warp-{maggot-lair,tal-rasha-tomb,arcane}-ama`,
+`a3-warp-{kurast-sewers,durance}-ama`, `a4-warp-river-ama`,
+`a5-warp-{halls-anguish,wsk}-ama`. Next step: run each (command below),
+compare only the warped level's units (the town parts belong to other
+areas), fix the first dungeon divergence. Also queued to me by the
+coordinator, not started: the Cold Plains waypoint object and landing are
+(+15, +5) sub-tiles off 1.14d (5169, 4659) in
+`traces/checks/warp-cold-plains-ama.check` while the monsters match (the
+waypoint tile pattern pasted at another spot of the room; room-seed
+draws): run that check with the rng channel and compare the room seed's
+draws of the waypoint room.
+
+**Open rows (mine):** `q-fix-tool-rng-creation-draws` (the rng channel's
+false frame-2 divergence: creation draws credited to no unit on 1.14d,
+`roll` vs `roll_range` labels). Closed: `q-fix-real-npc-sleep-no-client`
+(done by skills-2). Earlier rows of this branch: see "Results" above and
+`build-queue.tsv` (`q-fix-real-*`). Not mine but found here: Harrogath
+arrival, Larzuk 1:1 at (5142, 5029) vs 1.14d (5145, 5031) at frame 2
+(area E, `a5-harrogath-arrival-ama`).
+
+**RECs / PC 1:** no new REC ids used (550–559 still free); PC 1 item 26
+(re-record sim-0009 without input) unchanged.
+
+**Repro.**
+
+    export D2_GAME_DIR=$HOME/game CARGO_INCREMENTAL=0
+    python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-warp-den-ama.check
+    # d2rs only, reusing the 1.14d recording:
+    python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-warp-den-ama.check --reuse-orig
+    # one 1.14d call form (entry registers, stack, ret N):
+    tools/cloud-game/run.sh --python -- tools/cloud-game/probe_call.py \
+        --game "$D2_GAME_DIR/Game.exe" --at 0x53AEC0 --auto ScnAma --seed 1234 --input "..."
+
+A 1.14d warp check takes about 5 minutes under Wine and the d2rs side
+about 2; `run.sh` waits on a stale `sleep` holding the prefix lock after a
+killed run (`fuser $WINEPREFIX/.run.lock`, kill the `sleep`).

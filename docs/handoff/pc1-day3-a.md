@@ -261,3 +261,40 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   `0x005A4C47`, then `0x00545B50`. So the link exists from creation.
   Written into `quests-act5-2.md` §7.6. d2rs links by class just before
   the kill: row `q-fix-p6-ancients-link`.
+
+## Resume here (session paused 2026-10-09 evening)
+
+State: branch `claude/local-pc1-day3-a` (worktree `..\d2rs-a`) is pushed
+and level with staging plus this hand-back. Nothing is claimed; no
+1.14d run, build or poller is left running; the game lock is free.
+
+Open, for whoever continues as PC1-A:
+- **Claim protocol** (agreed with PC1-C): before taking a tagged Step 4
+  item or a REC, check that its `pc1-data.md` line isn't marked and
+  message PC1-C; mark the line "answered → see …" when done.
+- **Tags to watch on staging:** `[seed-order]`, `[recording-2]`,
+  `[proto-items]`, `[q-fix-pc1-day3-a-r2]`, `[prov-data]`; plus items
+  about towns, NPCs, quests, waypoints. "Hratli's unit seed" and REC-576
+  points 3, 4, 6 belong to PC1-C.
+- **Rows from this session waiting for cloud implementation:**
+  `q-fix-p4-death-cleanup`, `q-fix-p5-alignment-resend` (the current first
+  divergence of `packets-town-arrival-ama.check`, frame 2 s2c #66),
+  `q-fix-p3-room-empty-think` (PC1-C's; mine is marked as its
+  duplicate), `q-fix-p6-ancients-link` (with
+  `q-fix-p3-quest-superunique-spawn`), `q-tool-playthrough-quests`.
+  After they land, rerun `packets-town-arrival-ama.check` (next
+  divergence) and `a4-warp-plains-ama.check`.
+- **Live runs:** the recorders take the game lock themselves (named mutex
+  and `%TEMP%\d2-game.lock`); don't hold the lock file around them.
+  `scenario_diff.py` gives up after 360 s of waiting, so start a check
+  only when `tasklist` shows no `Game.exe` and the lock file is absent.
+  d2rs side: `D2RS_BIN_DIR=..\d2rs\target\release` (release build of
+  staging at 17:38; rebuild with `CARGO_TARGET_DIR=..\d2rs\target
+  cargo build --release -p d2-client -p d2s-tool -j 4`; disk is ~8 GB
+  free, so don't make a second target dir).
+- **Merges:** staging's merge conflicts in `build-queue.tsv` almost every
+  time; resolve staging's rows first, then ours, and grep for
+  `^<<<<<<< ` before committing. `coverage.py --check` exits 0 even with
+  errors: look for "0 errors".
+- Screenshots of item 23 are local only:
+  `C:\Users\pc\Documents\Claude code folder\shots\pc1-day3-a\`.

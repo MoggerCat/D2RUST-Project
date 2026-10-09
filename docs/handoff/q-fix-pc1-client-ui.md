@@ -35,6 +35,19 @@
 - Esc: the "box drawn more than 4 times" guard (REC-746) is not modelled;
   the topic-box and dialog-skip paths have no tests (only the menu box).
 
+## Open bug reports (not started; the session was wrapped)
+
+- esc-questlog (from q-tool-autoplay, e869ba7a): with the quest log open
+  (ui 17, e.g. after Atma's talk in Act II) one Esc closes it AND opens the
+  Esc menu (9); Esc on that menu then reopens the quest log, so Esc never
+  clears the screen (same double action as the NPC case fixed in REC-746).
+  Likely cause: `OriginalUi::game_menu_key` runs `close_all` over
+  `ESC_CLOSABLE` (17 is not in it, so it closes nothing and the menu opens),
+  while a keys-path closes 17 separately; and `restore_game_menu_states`
+  reopens `GAME_MENU_KEEP` states (17 is in it). Spec: frontend-options.md
+  §O1 r2-r3. Repro: `python3 tools/autoplay/autoplay.py --act 2 --plan probe`
+  (before the bot's Q-key workaround in `close_panels`).
+
 ## Open RECs
 
 REC-720 settled; open: 721, 722, 724 (preview use state tests 5-10 and the

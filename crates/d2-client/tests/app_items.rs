@@ -99,7 +99,10 @@ fn item_messages_fill_the_model_and_the_belt_key_and_pickup_reach_the_server() {
     ));
     bridge.receive_chunk(&chunk).unwrap();
     let w = bridge.world();
-    assert_eq!(w.belt_ready, [false, false, true, false]);
+    // The new sorceress's start items put four potions in belt slots 0-3
+    // (`items/generation.md` §10.3, the recorded join's four 0x9C action
+    // 0x0E, `facts/join/a1-new-sor.tsv`), so every column is ready.
+    assert_eq!(w.belt_ready, [true, true, true, true]);
     let belt = items::belt(w);
     assert_eq!(belt.get(&2).map(|i| i.key.guid), Some(0x700));
     let ground = items::ground_items(w);
@@ -111,12 +114,12 @@ fn item_messages_fill_the_model_and_the_belt_key_and_pickup_reach_the_server() {
         [(0x701, 500, 600, Some(*b"cap "))]
     );
 
-    // The belt key of column 3 (slot 2) sends 0x26 to the server; column
-    // 1 is not ready and sends nothing.
+    // The belt keys of column 3 (slot 2) and column 1 (slot 0, a start
+    // potion) each send 0x26 to the server.
     let keys =
         [Action::BeltSlot3, Action::BeltSlot1].map(|a| UiEvent::Action(ActionId(a.index() as u16)));
     let no_ui = belt::KeyFacts::default();
-    assert_eq!(belt::send_keys(&mut bridge, &keys, no_ui).unwrap(), 1);
+    assert_eq!(belt::send_keys(&mut bridge, &keys, no_ui).unwrap(), 2);
     assert_eq!(
         belt::key_message(bridge.world(), 2, no_ui),
         Some(vec![0x26, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])

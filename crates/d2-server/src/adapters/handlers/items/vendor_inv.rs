@@ -82,6 +82,18 @@ where
     }
 }
 
+/// A character without start items has no inventory yet (`world.rs` adds
+/// it with the first item, d2rs-own): the buy's equip and auto-place need it.
+fn ensure_inventory<H: LifecycleHooks>(
+    d: &mut InvDesk<'_, '_, H, dyn MoveRest + Send + Sync>,
+    player: UnitId,
+) {
+    if let Some(kind) = d.kind_of(player) {
+        let guid = d.guid_of(player);
+        d.state.add_inventory(player, kind, guid);
+    }
+}
+
 impl<H, R> NpcLink for InvVendors<'_, '_, '_, '_, H, R>
 where
     H: LifecycleHooks,
@@ -390,6 +402,7 @@ where
             return self.inner.equip_ammo(player, item);
         }
         self.with_desk(|d| {
+            ensure_inventory(d, player);
             let Some(p) = d.owner_of(player) else {
                 return false;
             };
@@ -429,6 +442,7 @@ where
         self.with_desk(|d| {
             let g = d.guid_of(item);
             MoveUnits::set_page(d, g, d2_sim::items::inventory::page::INVENTORY);
+            ensure_inventory(d, player);
             d.place(player, item, (0, 0), true, true)
         })
         .unwrap_or(false)

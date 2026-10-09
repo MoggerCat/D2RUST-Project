@@ -479,6 +479,17 @@ impl MoveCall for UpdateRun {
                 }
             }
         }
+        // The item case of the room clean-up (`intents-events.md` §7.5 step
+        // 7, `generation.md` §1.4 row 0x2000): item flags 0x20 and 0x2000
+        // clear once the item sat in a client's room queue, after the
+        // announcing 0x9C carried them.
+        for r in &self.receivers {
+            for &u in &r.ground {
+                if let Some(it) = d.econ.items.get_mut(u) {
+                    it.flags &= !0x2020;
+                }
+            }
+        }
         // The update-list reset of the room clean-up (`tick.md` §3 step 6,
         // `0x00553220` → `0x00597B00`; §6.1 rule 4, `InvDesk::update_done`):
         // +0xC8 bit 0 cleared (bit 1, "save pending", stays: IS1), the
