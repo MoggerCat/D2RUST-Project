@@ -76,5 +76,5 @@ owner from `owners.tsv` (area, path prefixes, session, branch; the first
 spec any row covers, longest prefix). Anything else prints `unrouted`; exit 1
 when any line is unrouted.
 
-`owners.tsv` is seeded from the 2026-10-09 day run in
-`docs/handoff/overnight-loop.md`; the coordinator keeps it current.
+`owners.tsv` holds the coordinator's owner list (2026-10-09 14:28 UTC); a message row is
+`<table>.tsv#0xNN` (e.g. the C2S skill casts and 0x01 go to skills-2). The coordinator keeps it current.

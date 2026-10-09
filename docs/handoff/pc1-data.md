@@ -317,7 +317,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
-45. **Melee on a fallen from the shared script** (q-fix-b-headless-unit-click-keys;
+45. **Melee on a fallen from the shared script** answered → see docs/handoff/pc1-day3-b.md. (q-fix-b-headless-unit-click-keys;
     `specs/tools/scenario-diff.md` §2 r4.5, §3 r8.5):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-melee-fallen.check --orig-only`.
     Look for: the footer notes `autostart: frame 39: clickunit 1 19 368 300
@@ -329,7 +329,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     0x03) — only once `record_packets.py` applies `frame` input
     (`AutoStart.attach`; today it notes "they never run here"). Then run
     without `--orig-only` (both sides) and record the first difference.
-46. **A belt potion mid-fight from the shared script** (same row):
+46. **A belt potion mid-fight from the shared script** answered → see docs/handoff/pc1-day3-b.md. (same row):
     `py tools\scenario-diff\scenario_diff.py traces\checks\combat-potion-midfight.check --orig-only`.
     Look for: the footer note `autostart: frame 70: key 49 posted at the
     stop of frame 69`; in the state the player's `hp` 2560 -> 2640 at
@@ -357,27 +357,27 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     for a key in the array but absent from the base array (0, as the
     flush `0x006258D0` does, or nothing; d2rs: nothing). Answer into
     §11 rule 4.
-- **[q-fix-b-monster-combat] Zero-length walk: which mode message (REC-890)**
+- **[q-fix-b-monster-combat] Zero-length walk: which mode message (REC-890)** answered → see docs/handoff/pc1-day3-b.md.
     `monsters/ai.md` §7.5 rule 8 says the neutral start after a
     zero-length walk sends S→C 0x67 code 7 at U's cell; the builder's
     owner spec `sim/intents-events.md` §7.4 rule 5 sends mode 1 as 0x6D
     (GUID, cell, life byte; stat 328 += 1) and stops. d2rs sends 0x6D (test
     `a_zero_length_walk_goes_neutral_and_sends_code_7`). Read which one
     `0x00597E20` sends for that update and fix the other rule.
-- **[q-fix-b-monster-combat] Monster base list: owner and attach reset (REC-891)**
+- **[q-fix-b-monster-combat] Monster base list: owner and attach reset (REC-891)** answered → see docs/handoff/pc1-day3-b.md.
     `monsters/init.md` §6 step 12 (`0x006251F0` + `0x00626E10`, the
     flag-1 list at `0x0057407D`) gives no owner type / GUID, expire or
     attach `reset`. d2rs: flags 1, expire 0, owner = the monster, reset = 1
     (a DYNAMIC list would keep `mindamage` / `maxdamage` / `tohit` out of
     the totals). Read the arguments; answer into init §6 step 12.
-- **[q-fix-b-monster-combat] Owner data f1 / f2 (REC-892)**
+- **[q-fix-b-monster-combat] Owner data f1 / f2 (REC-892)** answered → see docs/handoff/pc1-day3-b.md.
     `0x0058F030(game, u, GUID, type, f1, f2)`: `umod-callbacks.md` §1
     rule 5 says f1 / f2 ≠ 0 "restart the AI" (`0x005DD230`);
     `sim/units.md` (`0x0058F530`) reads as control flags |= 0x2, |= 0x1.
     d2rs writes the minion owner (+0x2C / +0x30) and nothing for f1 / f2
     (the Fallen leader `SetBoss`, `BossXfer` call is (GUID, 1, 1, 1)).
     State what `0x005DD230` does with each flag.
-- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)**
+- **[q-fix-b-monster-combat] Quill Rat at frame 59 (q-fix-b-quillrat-shoot)** answered → see docs/handoff/pc1-day3-b.md.
     d2rs (`traces/checks/combat-arrow-quillrat.check`, staging + this
     branch): the rat is placed exactly at the poke point (5147, 4267),
     4,4 from the player at (5143, 4263); its think at 31 has D = 6, no
@@ -537,7 +537,7 @@ rather than a hand-run recipe.
   `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
   plain `0x0063C9B0`? Answer into §1 step 6.
 
-- **[q-play-act5] join act byte**: which 1.14d function writes the
+- **[q-play-act5] join act byte** — answered → see `docs/handoff/pc1-day3-a.md`. Which 1.14d function writes the
   player unit's act (+0x18) on a join into a save's act? The recording
   `traces/checks/a5-town-arrival-bar.check` shows 4 from frame 2 (a
   barbarian saved in Act V); `sim/units.md` §2 names only the allocation
