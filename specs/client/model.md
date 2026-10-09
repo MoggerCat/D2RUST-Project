@@ -44,16 +44,16 @@
 |   14. Pet list and the hireling GUID | 915–979 |
 |   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 980–1069 |
 |   16. C→S 0x4B after a teleport (the hireling case) | 1070–1104 |
-|   17. Model writes made by 1.14d UI code | 1105–1296 |
-|   18. Audio driver inputs and the client object functions | 1297–1327 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1328–1557 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1558–1718 |
-| Constants & data dependencies | 1719–1731 |
-| Randomness | 1732–1747 |
-| Edge cases & original bugs | 1748–1772 |
-| Test vectors | 1773–1830 |
-| Provenance | 1831–1936 |
-| Open questions | 1937–2132 |
+|   17. Model writes made by 1.14d UI code | 1105–1310 |
+|   18. Audio driver inputs and the client object functions | 1311–1341 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1342–1571 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1572–1732 |
+| Constants & data dependencies | 1733–1745 |
+| Randomness | 1746–1761 |
+| Edge cases & original bugs | 1762–1786 |
+| Test vectors | 1787–1844 |
+| Provenance | 1845–1950 |
+| Open questions | 1951–2146 |
 <!-- /index -->
 
 ## Summary
@@ -1293,6 +1293,20 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    scene's recorder (breakpoint-driven, the client falls behind the
    server) than a rule. REC-1110 stays open for a frame-anchored rerun
    under the same recorder reading +0x28 and the receive queue.
+   *Rerun under the recorder (2026-10-09, PC 1, Windows,
+   `record_frames.py --auto SceSor --seed 1234 --every 1 --draws-every 1
+   --no-save --input "waitticks 20; key I; waitticks 30; click 678 330;
+   waitticks 10; click 563 250; waitticks 15; key I; waitticks 20;
+   end"`):* the drop **does** reproduce: Warriv (1, 7) is drawn in WL
+   from tick 24 (frame restarts at 40 and 45, the second and third
+   one-sub-tile walks) to tick 55, then NU (frame 0) from tick 56 to the
+   end at 90 at client point (10192, 72816), i.e. the walk the server
+   starts at 56 is not shown. So the client-side fallback depends on the
+   client's timing against the server (the recorder stops the client at
+   every draw), not on the panel input. A candidate to read next: the
+   code-0x07 position test of §19 r4 (|x − r0| ≤ 1 and |y − r1| ≤ 1 →
+   F), which a one-sub-tile walk meets whenever the client has already
+   reached the previous end point when the request is dispatched.
 
 ### 18. Audio driver inputs and the client object functions
 
