@@ -44,6 +44,7 @@ fn run_sends(
             .collect(),
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     game.character = character;
