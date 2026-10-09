@@ -28,3 +28,26 @@ GROUPS["a1town"] = {
     "script": "waitticks 40; mark t; waitticks 10; end",
     "scenes": {"a1-town-idle-sor": ("t", 0)},
 }
+
+GROUPS["npc"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": "goto 2 267; waitticks 70; mark s0; waitticks 30; mark s1; "
+              "goto 1 150; waitticks 70; mark n0; waitticks 30; mark n1; waitticks 10; end",
+    "scenes": {"s0": ("s0", 0), "s1": ("s1", 0), "n0": ("n0", 0), "n1": ("n1", 0)},
+}
+
+# walking and running in the 8 screen directions (SceSor, Rogue Encampment): click a point 200 px
+# from the player's screen position (400, 284); the frame is the first one 10 ticks after the click
+_DIRS = (("n", 400, 184), ("s", 400, 384), ("ne", 541, 213), ("sw", 259, 355),
+         ("e", 600, 284), ("w", 200, 284), ("se", 541, 355), ("nw", 259, 213))
+_walk = "waitticks 20; "
+for _n, _x, _y in _DIRS:
+    _walk += f"click {_x} {_y}; waitticks 10; mark w_{_n}; waitticks 4; "
+_walk += "key R; waitticks 6; "
+for _n, _x, _y in _DIRS:
+    _walk += f"click {_x} {_y}; waitticks 10; mark r_{_n}; waitticks 4; "
+GROUPS["walk"] = {
+    "char": "SceSor", "seed": 1234, "script": _walk + "waitticks 6; end",
+    "scenes": {**{f"a1-walk-{n}": (f"w_{n}", 0) for n, _, _ in _DIRS},
+               **{f"a1-run-{n}": (f"r_{n}", 0) for n, _, _ in _DIRS}},
+}

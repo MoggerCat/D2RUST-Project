@@ -139,7 +139,7 @@ def vk_code(k):
 
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
-              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1),
+              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4),
               "end": (0, 0)}
 
 
@@ -161,6 +161,8 @@ def parse_script(text):
             a = [raw.strip()[4:].strip()]
         elif op == "key":
             a = [vk_code(a[0])] + [float(x) for x in a[1:]]
+        elif op == "clickunit":
+            a = [int(a[0], 0), a[1]] + [int(x, 0) for x in a[2:]]
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
                  + [float(x) for x in a[2:]])
@@ -335,15 +337,21 @@ class AutoStart:
     def send(self, mem, msg, wp, lp):
         hwnd = self.window(mem)
         if hwnd:
+            if msg == WM_MOUSEMOVE and os.name == "nt":
+                # the game reads the real pointer for hover and cursor draws (the cursor of the
+                # frame records stays at the window centre when only messages are posted)
+                pt = W.POINT(lp & 0xFFFF, (lp >> 16) & 0xFFFF)
+                user32.ClientToScreen(hwnd, C.byref(pt))
+                user32.SetCursorPos(pt.x, pt.y)
             post(hwnd, msg, wp, lp)
 
     def click(self, mem, x, y, right=False):
         down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) if right
                         else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
         self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
-        yield 0.03
+        yield 0.4      # the game finds the hovered unit in a frame (about 12 per second under Wine)
         self.send(mem, down, mk, lparam(x, y))
-        yield 0.05
+        yield 0.25     # held across at least one game frame (a click shorter than a frame can be lost)
         self.send(mem, up, 0, lparam(x, y))
 
     def run(self, mem):
@@ -402,6 +410,16 @@ class AutoStart:
                          f"position {player_pos(mem)}")
             elif op == "goto":
                 yield from self.goto(mem, *a)
+            elif op == "clickunit":
+                # click the nearest unit (utype, cls) where it is drawn now (no walking)
+                best = nearest(mem, a[0], tuple(int(c, 0) for c in a[1].split(",")))
+                if best is None:
+                    self.log(f"autostart: clickunit {a[0]}:{a[1]} not found")
+                else:
+                    x, y = screen_of(mem, best[1])
+                    dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
+                    self.log(f"autostart: clickunit {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
+                    yield from self.click(mem, x + dx, y + dy)
             elif op == "dumpdrlg":
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)
