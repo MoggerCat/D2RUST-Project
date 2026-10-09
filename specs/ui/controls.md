@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–645 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 646–687 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 688–713 |
-| Constants & data dependencies | 714–720 |
-| Randomness | 721–724 |
-| Edge cases & original bugs | 725–737 |
-| Test vectors | 738–765 |
-| Provenance | 766–784 |
-| Open questions | 785–832 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–687 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 688–729 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 730–755 |
+| Constants & data dependencies | 756–762 |
+| Randomness | 763–766 |
+| Edge cases & original bugs | 767–779 |
+| Test vectors | 780–807 |
+| Provenance | 808–826 |
+| Open questions | 827–874 |
 <!-- /index -->
 
 ## Summary
@@ -642,6 +642,48 @@ check reads it.
        (`0x004646A0`) blocks it (`0x0064CB30(room, x, y, 1)` ≠ 0) and a
        free point is found nearby (`0x0064E780(room, &pt, 1, 1, 0, 7)`),
        (x, y) := that point and U := none; else U unchanged.
+
+12. **Right click: cast or walk, summary** (2026-10-09; a restatement of
+    r1–r11 for the right button, re-read from `0x0044C180`,
+    `0x00462BA0`, `0x004621D0`, `0x004625B0`, `0x00461C70`; nothing new
+    is decided here). Inputs: skill = P's **right** skill (`0x006201D0`,
+    unit's right-skill entry, `client/model.md` §8 / the S→C 0x23 of
+    hand 0); rng = `range(P, skill)` (`skills/use.md` §3 r6: 0 none, 1
+    h2h, 2 rng, 4 loc; a `both` skill is resolved by P's weapon); U =
+    the hovered unit after the re-pick (r10, which for a right click
+    without a unit forces a location target); hostile = r9.7. Gates
+    before any send: the press filter (r3), `0x00464600` (P's mode,
+    cursor item; r4 kind 0), a right down inside an open panel's half
+    is not dispatched (r1), and for rng ≠ 1 the set-up (r8.1: no row →
+    nothing; not `InTown` in town → refusal sound, nothing; `passive` →
+    nothing).
+
+    | Right click on | rng | Sends (press; held = the r7 held code) |
+    |---|---|---|
+    | ground (no U), or U dropped by r10 | ≠ 1 | use check r9.1 passes → **0x0C** (x, y) at the clicked point; fails → nothing (the refusal sound); Attack (id 0) with use state 1 (no mana) and no Stand Still → walk |
+    | ground | 1 (h2h) | **walk** to the clamped point (code 1, or 3 with run), r9.6 / r9.8 |
+    | a live hostile monster | 2 (rng) or 0 (none) | attack sender r9.3: P in melee range of U → **0x0D** (1, GUID); else **0x0D** as well (other rng → skill on unit) |
+    | a live hostile monster | 1 (h2h) or 4 (loc) | r9.3: in melee range → **0x0D**; else (no Stand Still) **walk to the unit** (code 2 / 4) with pending (0xD, 1, GUID) |
+    | a live non-hostile monster | any | press only: `interact` → interact (0x13 / walk, r9.2); else walk to it (code 2 / 4); held → nothing |
+    | a dead monster, row without `TargetCorpse` | any | as ground (r8.2 / r10: U dropped, point = its position) |
+    | an object / item, row without `TargetItem` | ≠ 1 | as ground (r8.2) |
+
+    With Stand Still (Shift) the ground rows always take the use check
+    and **0x0C** (also for h2h), and a hostile monster out of melee
+    range gets **0x0C** at the point (r9.3 "SS → skill at the point").
+    The skill flags that change the target are `SearchEnemyNear`,
+    `SearchEnemyXY`, `SearchOpenXY` (r10–r11, only when use_state = 0),
+    `TargetCorpse`, `TargetItem`, `TargetPet`, `TargetAlly`; the cast
+    itself is the r7 code, which also issues the client mode request.
+    *Diagnosis aid*: a build in which every right click walks reaches
+    one of the walk rows, so either rng resolved to 1 (the right skill's
+    `range` / `both` resolution) or the right skill is Attack (id 0:
+    `skills.txt` row 0 is `both`, h2h with a melee weapon or none; or
+    no mana). A failed use check sends nothing, not a walk. In the
+    `Patch_D2` skills.txt Fire Bolt (36), Charged Bolt (38) and Frost
+    Nova (44) have `range` = none (0), Magic Arrow (6) `rng`, Attack (0)
+    `both`: so Fire Bolt or Frost Nova on the ground must send 0x0C, and
+    on a hostile monster 0x0D (rng 0 is neither 1 nor 4).
 
 ### 7. Gates and belt use (answers OQ 3, OQ 4, OQ 5)
 

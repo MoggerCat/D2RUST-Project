@@ -377,7 +377,8 @@ pub struct UnitArt {
     /// The server tick the local player's predicted walk started on
     /// (`Predict::walk_since`): its walk frames count from there
     /// (`sim/units.md` §4.7 step 7 revision, REC-516).
-    pub pose_since: Option<(UnitKey, u64)>,
+    /// With the animation speed (8.8 per tick) of the predicted mode.
+    pub pose_since: Option<(UnitKey, u64, u64)>,
     /// The model facing of every unit (module doc), by
     /// [`Self::observe_facing`].
     pub facing: BTreeMap<UnitKey, Facing>,

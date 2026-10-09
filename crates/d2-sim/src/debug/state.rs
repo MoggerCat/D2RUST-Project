@@ -21,6 +21,10 @@
 //! | `seed` | [`ActionHooks::game_seed`] (game +0xD0) |
 //!
 //! `own` is left out (spec §2: no 1.14d source; [`D2RS_GAPS`]).
+//!
+//! `q` (the player's quest flag record, [`HOST_FIELDS`]) is not in the
+//! wired game: the host keeps the players' records (`PlayerQuests`) and
+//! fills it with [`StateSnapshot::set_quests`] from [`quest_words`].
 
 use std::fmt::Write as _;
 
@@ -32,6 +36,7 @@ use crate::units::dispatch::UnitSystem;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::action::ActionHooks;
 use crate::wiring::worldgen::WorldSim;
+use crate::world::quests::{QuestFlags, SLOTS};
 
 /// The format name of line 1 (§1 rule 1).
 pub const FORMAT: &str = "state-1";
@@ -42,6 +47,12 @@ pub const FIELDS: [&str; 41] = [
     "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl", "own", "iq",
     "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is",
 ];
+
+/// Keys a host fills from records it keeps outside the wired game (§2:
+/// `q`, the player's quest flag record of the game's difficulty). A host
+/// that fills them adds them to the header `fields`; [`coverage`] does
+/// not list them.
+pub const HOST_FIELDS: [&str; 1] = ["q"];
 
 /// The keys whose values need the path provider (path +0x00 … +0x64, and
 /// the level of the path's room).
@@ -118,6 +129,10 @@ pub struct UnitState {
     /// The item's stat list base array: `[stat, layer, value]` in key
     /// order.
     pub is: Option<Vec<[i32; 3]>>,
+    /// Players: the quest flag record of the game's difficulty as
+    /// `[slot, word]` for every slot whose 16-bit word is non-zero, slots
+    /// ascending ([`quest_words`]).
+    pub q: Option<Vec<[u16; 2]>>,
 }
 
 /// One snapshot (§1 rule 2): the state after tick `frame` (§3).
@@ -131,6 +146,18 @@ pub struct StateSnapshot {
 }
 
 impl StateSnapshot {
+    /// Sets `q` of the player unit with GUID `guid` (no such unit:
+    /// nothing).
+    pub fn set_quests(&mut self, guid: u32, words: Vec<[u16; 2]>) {
+        if let Some(u) = self
+            .units
+            .iter_mut()
+            .find(|u| u.ut == UnitType::Player as u8 && u.g == guid)
+        {
+            u.q = Some(words);
+        }
+    }
+
     /// Sorts the units by (`ut`, `g`) ascending (§1 rule 2).
     pub fn sort_units(&mut self) {
         self.units.sort_by_key(|u| (u.ut, u.g));
@@ -220,7 +247,27 @@ fn unit_json(o: &mut String, u: &UnitState) {
         }
         o.push(']');
     }
+    if let Some(q) = &u.q {
+        o.push_str(",\"q\":[");
+        for (i, [slot, word]) in q.iter().enumerate() {
+            if i > 0 {
+                o.push(',');
+            }
+            let _ = write!(o, "[{slot},{word}]");
+        }
+        o.push(']');
+    }
     o.push('}');
+}
+
+/// `q` of a quest flag record (§2): `[slot, word]` for slots 0..41 whose
+/// little-endian word is non-zero (`world/quests.md` §1.1: bit b of slot
+/// q is bit b of the word).
+pub fn quest_words(flags: &QuestFlags) -> Vec<[u16; 2]> {
+    (0..SLOTS)
+        .map(|q| [u16::from(q), flags.word(q)])
+        .filter(|w| w[1] != 0)
+        .collect()
 }
 
 /// A JSON string literal of `s` (quotes, backslash and control
@@ -351,6 +398,12 @@ pub fn snapshot<X>(game: &Game, sys: &UnitSystem<ActionHooks<X>>) -> StateSnapsh
 /// [`snapshot`] of a [`WorldSim`] (the app's and the server's wired game).
 pub fn snapshot_world<X>(game: &Game, sim: &WorldSim<X>) -> StateSnapshot {
     snapshot(game, &sim.action.sys)
+}
+
+/// The game's difficulty (game +0x6D) of a [`WorldSim`]: which of a
+/// player's three quest records `q` reads (`world/quests.md` §1.4).
+pub fn difficulty_world<X>(sim: &WorldSim<X>) -> u8 {
+    sim.action.sys.data.difficulty
 }
 
 /// [`coverage`] of a [`WorldSim`].

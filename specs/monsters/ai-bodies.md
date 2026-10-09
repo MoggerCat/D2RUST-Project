@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–871 |
+|   9. Per-AI behaviours | 29–938 |
 <!-- /index -->
 
 ## Summary
@@ -100,6 +100,27 @@ failed move (`aidel`). 1.14d-confirmed; same as D2MOO.
 in steps 4 and 5.1 leaves only the `aidel` think from the failed mode
 start (`ai.md` §1.3), since the fallen deleted its thinks in step 1.
 
+6. Leader test of 5.2 (`0x005F047F`–`0x005F04A8`): D < 15 first, then
+   `0x0058F0D0(unit)` (control +0x28 game ≠ 0 → the unit with GUID
+   +0x2C, type +0x30) compared by pointer with the fallen itself, and
+   only then the P(aip1) draw (`roll(100)` at `0x005F0498`). A fallen
+   whose owner data was never set (control +0x28 = 0) and every party
+   member (owner = the leader) skip 5.2 **without a draw**. The leader's
+   owner data is set by the party code (`population.md` §10.2.1:
+   fallen1 has `SetBoss`, so `0x005B28E9` calls `0x0058F030(game,
+   leader, leader GUID, 1, 1, BossXfer)` before the count draw), so a
+   pack leader always draws aip1 at D < 15.
+7. Recorded check (1.14d, `check-combat-fallen-hits-player`; fallen1
+   party spawned at frame 30, leader GUID 19, player at D = 2, C set,
+   no command, param 0 = 0; Normal aip1 30, aip3 50, aip4 20). Leader
+   seed at frame 30 {2409280208, 8913528}. Frame 30 think: 64 ≥ 30
+   (5.2 fails), 89 ≥ 50 (aip3 fails), 39 ≥ 30 (pct(30) fails) → idle 10;
+   seed {3163442939, 446165621}. Frame 41 think: 76 ≥ 30, 74 ≥ 50,
+   27 < 30 → mode 9 (S2) at T; seed {516034227, 1787617634}. Drawing
+   without the 5.2 draw (leader not its own owner) gives 64 ≥ 50 →
+   89 ≥ 30 → idle 10, then 39 < 50 → param 0 := 0, 76 ≥ 20 → A2 at frame
+   41 — the d2rs result of that recording (q-fix-c2-fallen-s2-choice).
+
 #### 9.5 Brute (7) `0x005EFB80`
 
 1. C: P(aip3) [100] → P(aip4) [45] → A1 else A2. Else a second P(aip3):
@@ -146,6 +167,44 @@ Draw order: up to 1 (step 1) + 1 (step 3) + 1 (step 4) + 1 (5) + 1 (6)
 7. D > 3 → wander max(aip4, 3); else A2.
 
 1.14d-confirmed. A2 is the quill (missile `spike1`, `MissA2`).
+
+8. Thresholds and timer, quillrat1 Normal: D < 10 (aip1) reaches the
+   draw; P(35) (aip2) shoots; a failed draw tries escape 2 (aip4) and
+   only then D > 3 wanders 3, D ≤ 3 shoots. Exactly one draw (step 5)
+   before the escape; steps 1–4 draw nothing. The think comes back at
+   the A2 mode end + `aidel` 15 (`ai.md` §1.3); a started escape or
+   wander thinks again at its own end. **What makes it fire again
+   without a draw:** step 3, AI state 3 or 19 (`ai.md` §3.1 "AI
+   state"): any hit on the rat that starts no get-hit/block mode sets
+   19 (`combat/damage.md` §7.1 steps 4.5–4.7), and leaving the
+   following non-neutral mode turns 19 into 3, so a rat that was hit
+   since its last mode change shoots every think while D < 10 and C is
+   clear. Only an unhit rat (state = its last left mode, e.g. 5) draws.
+9. Recorded check (1.14d, `check-combat-arrow-quillrat`; quillrat1
+   GUID 19 poked at frame 30 at (+4, +4) from the player, D = 4, no
+   command, C clear; player arrows (missile 0, skill 0 level 1, no
+   damage) poked at frames 38, 50, 62, 74, 86). Rat seed at frame 30
+   {21370634, 838424606}.
+   - f31 think: state 0, P → 8 < 35 → A2; seed {2409280208, 8913528}.
+   - f36 quill created (one owner-seed step) → {4094205064, 1004892389}.
+   - f42 arrow 1 reaches the rat (player seed steps; rat hp 1280
+     unchanged, mode stays 5): reaction without a mode → AI state 19.
+   - f44 A2 ends → mode 1; 19 → 3 (`0x005A68E0`); think at 44 + 15 = 59.
+   - f46 the quill reaches the player and is removed; one rat-seed step
+     → {1069704589, 1707661690} (`lo' % 100` = 89), player hp unchanged
+     (PROVISIONAL REC-826: the drawing call of a monster missile that
+     reaches the player without damage is not read here).
+   - f54 arrow 2 reaches the rat → AI state 19.
+   - f59 think: step 3 (state 19) → A2, **no draw** (seed unchanged
+     46–63); f64 quill 2 created → {3163442939, 446165621}; it
+     re-fires the same way at f87 (arrow at 74; no AI draw).
+   d2rs (same seeds, GUID 17): never stores the AI state (reads 0), so
+   f59 reaches step 5 and draws {4094205064, …} → `lo'` 1069704589,
+   89 ≥ 35 → escape 2 started → walk to (5149, 4269), mode 2. The
+   d2rs quill also flies past the player at f46 without the rat-seed
+   step; with that step its f59 draw would be 39 ≥ 35, still an escape,
+   so the AI state alone decides the frame-59 mode
+   (q-fix-c3-quillrat-choice). 1.14d-confirmed except REC-826.
 
 #### 9.8 CorruptLancer (36) `0x005F5D50`
 
@@ -309,11 +368,19 @@ compare, `docs/handoff/q-scenes-compare.md`):
    that think.
 
 d2rs (`monsters/ai/npc.rs` `npc_map_ai`, `rng.rs` `roll`) follows rules
-1–4. The Act I scene difference (d2rs's Warriv standing on (4866, 4235)
-at r110 while 1.14d's walks east) is therefore not in the node choice;
-it is the seed state or the think in which the pick happens (unit seed
-order, `q-fix-real-unit-seed-order`), or the step-3 gate (§6.4). Which
-one is a live run (PC1-C, `docs/handoff/pc1-day3-a.md` "Live runs").
+1–4. Recorded 2026-10-09 (Windows, SceSor, `-seed 1234`, 120 ticks):
+at the Act I arrival Warriv (1:7) takes no map-AI path at all. His
+unit seed draws once (frame 2, `0x00573F8F`, `roll(1)`), the active
+test passes for the player at every think (S→C `8a 01 07000000` at
+frames 24, 45, 56, 67, 87, 107; `world/quests.md` §6.4), and his walks
+are step 7's walk in radius: (4866, 4235) → (4868, 4233) at frame 24,
+→ (4869, 4232) at 45, → (4870, 4231) at 56, stop at 67. A d2rs
+state-dump of the same save (release build of 2026-10-09) equals the
+1.14d state recording for Warriv in mode, position, sub-tile fraction
+and target on every frame 22–47, and has the same four walk / stop
+frames to 120. So the scene note "d2rs's `wa` stands on (4866, 4235)
+at r110" (`docs/handoff/q-scenes-compare.md`, scene tick 42) came from
+an older build.
 
 1.14d-confirmed (all functions above); D2MOO differs: it tests the
 interaction block the other way round (returns 0 when one exists) and

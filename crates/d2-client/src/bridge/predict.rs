@@ -285,7 +285,7 @@ pub struct Predict {
     /// The server tick the walk under way started on (kept while a new
     /// click re-targets it; cleared when it ends): the walk animation's
     /// start ([`Self::walk_since`]).
-    since: Option<u64>,
+    since: Option<(u64, u32)>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -612,17 +612,19 @@ impl Predict {
         if ticked {
             self.tick(world, speeds);
         }
-        self.since = match (self.walk, self.since) {
+        // The animation restarts with the mode (walk ↔ run, `a1-run-*`:
+        // the run frames count from the first run click).
+        self.since = match (self.mode(), self.since) {
             (None, _) => None,
-            (Some(_), None) => Some(world.server_ticks),
-            (Some(_), since) => since,
+            (Some(m), Some((t, was))) if was == m => Some((t, m)),
+            (Some(m), _) => Some((world.server_ticks, m)),
         };
     }
 
     /// The server tick the walk under way started on (`sim/units.md`
     /// §4.7 step 7 revision: the walk frame counts from there).
     pub fn walk_since(&self) -> Option<u64> {
-        self.since
+        self.since.map(|(t, _)| t)
     }
 
     /// The predicted precise position (16.16 sub-tiles, the form

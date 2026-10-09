@@ -317,6 +317,17 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+- **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
+    `combat/hit.md` §7.1 says players carry it, and the recording shows
+    it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
+    39) with a 0xA8 of state 105 one frame later, but no spec names the
+    call site. Read the character load of the join (`0x005344B0` /
+    `0x00534520`, the allocation's per-kind init `0x005348C0`) for the
+    `0x005543B0(player, 2, v)` call: where it runs relative to the unit
+    seed and the stats, its v argument, and whether a corpse (player
+    unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
+    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
 
 
 42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
@@ -615,7 +626,7 @@ Then the rest:
 31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
 32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
 33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).
-41. **Skill button state 0x004A8D30** (q-fix-pc1-client-ui) Specify the icon state (0, 1 or 4) the control panel's skill buttons pass as the colored cel draw's `k` (REC-720; `control-panel.md` §7 r2: which conditions give 4, and the town / flag bit `[0x006CE268]` rule). d2rs draws the button icons with k 0.
+41. **Skill button state 0x004A8D30** answered → see docs/handoff/pc1-day3-b.md. (q-fix-pc1-client-ui) Specify the icon state (0, 1 or 4) the control panel's skill buttons pass as the colored cel draw's `k` (REC-720; `control-panel.md` §7 r2: which conditions give 4, and the town / flag bit `[0x006CE268]` rule). d2rs draws the button icons with k 0.
 
 ## Hand-back — PC 1 day 2, 2026-10-09 (branch `claude/local-pc1-day2`)
 
