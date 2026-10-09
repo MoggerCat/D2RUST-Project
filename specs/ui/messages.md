@@ -30,21 +30,21 @@
 |   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
 |   4. Recipe scroll text (0x26 type 7) | 202–226 |
 |   5. Overhead text | 227–295 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–360 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 361–500 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 501–513 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 514–530 |
-|   10. Other 0x50 codes (UI effects) | 531–566 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 567–648 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 649–655 |
-|   13. NPC intro table `0x00726850` (0x91) | 656–688 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 689–705 |
-| Constants & data dependencies | 706–723 |
-| Randomness | 724–728 |
-| Edge cases & original bugs | 729–749 |
-| Test vectors | 750–772 |
-| Provenance | 773–803 |
-| Open questions | 804–829 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–361 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 362–501 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 502–514 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 515–531 |
+|   10. Other 0x50 codes (UI effects) | 532–567 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 568–649 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 650–656 |
+|   13. NPC intro table `0x00726850` (0x91) | 657–694 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 695–711 |
+| Constants & data dependencies | 712–729 |
+| Randomness | 730–734 |
+| Edge cases & original bugs | 735–755 |
+| Test vectors | 756–778 |
+| Provenance | 779–809 |
+| Open questions | 810–835 |
 <!-- /index -->
 
 ## Summary
@@ -320,7 +320,8 @@ stops at a `ÿc` that ends the string.
      caption id u16) of the 527-entry table `0x00722678` whose text id
      equals id, searching entries 0–99 when id < entry 100's text id
      (164), else entries 100–526; not found → 3724 "Invalid Quest
-     Value";
+     Value". The 527 pairs: `facts/ui/npc-talk-pairs.tsv` (made by
+     `py tools/facts/npc_talk.py` from the 1.14d image);
    - NPC 201 (Jerhyn): "about the merchants" (3392, `0x004B1B80`);
    - NPC 244, 245, 246, 265, 520 (Cain) with the Horadric Cube (`box `)
      in the local player's inventory: 2231 "Horadric Cube"
@@ -660,7 +661,12 @@ overlay rules of `render/unit-composite.md`. The sounds are
    u32 +0x09, gossip index u32 +0x0D, gossip heard u8 +0x11, **return
    greeting due u8 +0x12**, u8 +0x13, no-introduction u8 +0x14, greeting
    due u8 +0x15. Static values: +0x15 = 1 in all; +0x14 = 1 for 146,
-   175, 176, 210, 244, 265; +0x13 = 1 for 155, 210, 367, 521.
+   175, 176, 244, 265 (not 210, corrected 2026-10-09 from the image; no
+   writer of +0x14, its one reader is `0x004B594B`); +0x13 = 1 for 155,
+   210, 367, 521. All 46 entries: `facts/ui/npc-talk-intros.tsv`; their
+   15-byte text records (text id u16 +0, flag u8 +2, u32 +3, u32 +7,
+   player class u32 +0x0B; 418 in all): `facts/ui/npc-talk-gossip.tsv`
+   (both by `py tools/facts/npc_talk.py`, which checks these values).
 2. Writers of +0x12: 0x91 (`0x004B3510`) := 1; game start / exit reset
    (`0x004B32F0`, from `0x00453DE0`) clears +0x11 and +0x12 of all; the
    NPC menu open (r3) clears it.
