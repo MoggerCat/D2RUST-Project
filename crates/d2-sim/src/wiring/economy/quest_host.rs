@@ -229,7 +229,14 @@ impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
             return Some(item);
         }
         let spot = if droppable {
-            self.reward_spot(player)
+            match self.reward_spot(player) {
+                // The search found nothing: its out room is none and the
+                // drop (`0x00558AA0`) does nothing; the item stays
+                // allocated in no room and is still returned (§9.1).
+                Some(None) => return Some(item),
+                Some(Some(spot)) => Some(spot),
+                None => None,
+            }
         } else {
             None
         };
@@ -250,14 +257,11 @@ impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
 
     /// §9.1's drop spot: `0x00545340` ([`helpers::free_spot`]) from the
     /// player's path position and room, size 1, mask 0x3E01, limit 100.
-    /// `None`: the player has no position (the reward is freed).
-    ///
-    /// PROVISIONAL (quests.md §9.1; REC-none): when the search accepts
-    /// nothing (or the player's room has no DRLG room here) the item is
-    /// dropped at the player's own position and room (`0x00545340` leaves
-    /// the point as passed; what the drop does with its null out room is
-    /// not written).
-    fn reward_spot(&mut self, player: UnitId) -> Option<Spot> {
+    /// Outer `None`: the player has no position (the reward is freed).
+    /// `Some(None)`: the search accepted nothing (or the player's room
+    /// has no DRLG room here): the out room is none and the drop does
+    /// nothing (`quests.md` §9.1, `0x00558AA0`).
+    fn reward_spot(&mut self, player: UnitId) -> Option<Option<Spot>> {
         let (x, y, room) = self.unit_position(player)?;
         let found = if self.drlg_room(room) {
             helpers::free_spot(
@@ -272,8 +276,7 @@ impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
         } else {
             None
         };
-        let (x, y, room) = found.unwrap_or((x, y, room));
-        Some(Spot { room, x, y })
+        Some(found.map(|(x, y, room)| Spot { room, x, y }))
     }
 }
 

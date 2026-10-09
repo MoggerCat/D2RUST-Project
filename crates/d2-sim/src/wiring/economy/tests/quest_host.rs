@@ -121,6 +121,26 @@ fn a_reward_the_inventory_takes_is_returned_identified() {
     fx.assert_clean();
 }
 
+// Covers: specs/world/quests.md §9.1 (drop paragraph)
+#[test]
+fn a_reward_with_no_free_spot_stays_unplaced() {
+    let mut fx = Fx::new();
+    let a = fx.a;
+    // Far outside every room: the 100-ring search accepts nothing.
+    let p = fx.spawn(UnitType::Player, 0, a, 100_000, 100_000);
+    let mut rest = Rest::new();
+    let mut inv = Inv::default();
+    let item = host(&mut fx, &mut rest, Some(&mut inv), None, |w| {
+        w.reward_item(p, *b"cap ", 0, 2, true)
+    })
+    .expect("returned");
+    // No drop message, not freed, in no room.
+    assert!(inv.drops.is_empty());
+    assert!(fx.sim.sys.hooks.items.get(item).is_some());
+    assert!(fx.sim.sys.units.get(item).is_some());
+    assert_eq!(fx.game.lists.unit(item).and_then(|u| u.room()), None);
+}
+
 // Covers: specs/world/quests.md §9.1; specs/world/quests-helpers.md §1
 #[test]
 fn a_refused_reward_is_dropped_near_the_player_or_freed() {

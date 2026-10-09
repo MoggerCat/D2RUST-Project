@@ -514,6 +514,38 @@ pub fn remove_body_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u
     Ok(res::OK)
 }
 
+/// `0x00560CD0(game, player, loc, 1)` (`formats/d2s-load.md` §6 rule 1.2,
+/// `world/quests.md` §9.2 mode 1): [`remove_body_item`]'s take-off with
+/// the fourth argument set: the item is not made the cursor item but gets
+/// item flag 0x20; mode 4, command flag 0x10, update entry, stats refresh,
+/// weapon bookkeeping and inventory pass. End state: detached, not freed.
+/// Nothing changes unless the cursor is empty and the body slot check
+/// gives 3 or 4. Returns whether the item was taken off.
+pub fn unequip_detached<W: MoveWorld>(w: &mut W, p: Owner, loc: u8) -> Result<bool, MoveFatal> {
+    if !valid_loc(u32::from(loc)) || w.cursor(p).is_some() {
+        return Ok(false);
+    }
+    let r = w.equip_check(p, loc, None, false);
+    if r != 3 && r != 4 {
+        return Ok(false);
+    }
+    let Some(it) = w.item_to_remove(p, loc) else {
+        return Ok(false);
+    };
+    remove_from_body(w, p, it)?;
+    w.stat_refresh(p);
+    add_iflags(w, it, iflag::COPIED);
+    clear_uflags(w, it, uflag::TARGETABLE);
+    w.set_mode(it, mode::CURSOR);
+    add_cmd(w, it, cmd::UNEQUIP);
+    clear_iflags(w, it, iflag::NOEQUIP);
+    w.update_list_add(p, it);
+    owner_refresh(w, p);
+    w.weapon_bookkeeping(p);
+    w.inventory_pass(p);
+    Ok(true)
+}
+
 // ------------------------------------------------------------------ 0x1D
 
 /// 0x1D SwapCursorWithBody `0x0054AF50` → `0x00560F00` (§7.8).
