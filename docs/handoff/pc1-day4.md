@@ -62,3 +62,66 @@ waypoint). Screenshots are local only:
 
 Every step the definitions set shows done; no finding for the
 definitions or `d2s-tool`.
+
+### REC-706 client footprints (item 51)
+
+Recorded with a scratch poll probe (`..\d2rs-probes\probe_footprint.py`,
+not in git; no breakpoints): Warriv's 0x100 footprint is the plus pattern
+on the sub-tile holding his client path position, moving as soon as that
+position crosses a sub-tile. Written into `client/model.md` (the REC-706
+PROVISIONAL now has the recorded answer; d2rs's choice matches when its
+model position is the client path position).
+
+### REC-1110 (item 52) at normal speed
+
+The same probe, SceSor `-seed 1234` with the panel scene's inputs in
+seconds: the client walks Warriv normally and his +0x28 stays 0, so the
+scene's NU does not reproduce without the breakpoint recorder. Noted in
+`client/model.md` §17 r7; REC-1110 stays open for a frame-anchored rerun.
+
+### Positions (Hephasto, Hellforge, Izual, Anya, Nihlathak)
+
+Already recorded by PC1-C on day 3 (`pc1-day3-c.md` Round 2, the seven
+`traces/checks/milestone-*.check`). Nothing left.
+
+### HANDOFF §5 queue
+
+Only the checkpoint quest-log entry was run (above). The rest of §5 is
+mostly front-end screenshot work that needs a person at the menus;
+combat-melee-fallen / combat-potion-midfight were done on day 3.
+
+## Playtest of `d2rs-windows-018587d2` (staging HEAD)
+
+Computer use is not on in this session, so there was no hands-on 10–15
+minute play. Instead the artifact (`gh run download 37959911940`) ran
+from the D2 folder with its own scripted input (`play --input`, image
+dumps per tick), and the same script ran on 1.14d (`poke.py --input
+--shots`, frame-anchored). New Barbarian (hand axe, buckler, 4 hp1),
+`-seed 1234`, `warp 2` at frame 4, a Fallen party at player + (3, 3) at
+frame 30, attack the nearest Fallen at 40 and again at 80, walk click
+(600, 300) at 120, I at 160 / 190, right click at 220.
+
+Screenshots and saves stay local:
+`C:\Users\pc\Documents\Claude code folder\shots\pc1-day4\play-d2rs\tick-*\frame.png`,
+`...\play-orig\t*.png`, the side-by-side montages `play-d2rs.png`,
+`play-orig.png`, `play-*-zoom.png`; the 1.14d save is `PtBar.d2s` in
+`%USERPROFILE%\Saved Games\Diablo II`.
+
+| What | 1.14d | d2rs `018587d2` |
+|---|---|---|
+| First swing (f40) | kills a Fallen (corpse and blood at f60); the rest of the pack scatters | swing animates; no Fallen visibly dies, the pack stays packed round the player to f230 |
+| Second attack (f80), walk click (f120) | both act; the player has walked away by f125 (camera moved) | neither acts: the player stands on the same spot to f230 (blocker 1, `q-fix-pc1d4-player-mode-end`) |
+| Player life | 66 → 63 by f90 (a Fallen hit) | no visible loss |
+| Level entry text | "Entering The Blood Moor" drawn f39–45 | none |
+| Life text over the orb | "Life: 66 / 66" | none |
+| Hover label | "Fallen / Demon" name box at the top at f45 | none (script clicks don't hover) |
+| "Help (H)" button over the right of the control panel | not drawn | drawn every frame |
+| Inventory open / close (I) | opens and closes | the same (panel looks alike) |
+| Exit | — | `play: the server never answered the leave`; **no `.d2s` written** (only `PtBar.map`): the new character was lost |
+| Log | — | dozens of `audio: cue at tick N queued after tick N was presented` warnings from f218 on |
+
+The kill, the scatter and the life loss need the state channel to say
+whether d2rs's server missed or only the client doesn't show it; the
+cleaner check is `traces/checks/combat-melee-fallen.check`, where day 3
+found the kill matching. Here the attack went to the nearest Fallen by
+the client's own pick, so a different target is possible.
