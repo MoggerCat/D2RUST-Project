@@ -673,7 +673,14 @@ def run_milestone(m, play, client, d2s, work, game_dir):
         return {"status": "crash", "frame": None,
                 "evidence": f"exit {r.returncode}: {first_error_line(r.stderr)}"}
     _, snaps, pokes, _ = read_state(out)
-    return evaluate(m, snaps, pokes)
+    res = evaluate(m, snaps, pokes)
+    if res["status"] == "reached":  # a reached milestone's files are not kept (disk: the matrix runs hundreds)
+        for suffix in ("state", "probe", "ref", "find"):
+            try:
+                os.remove(os.path.join(work, f"{m['name']}.{suffix}.jsonl"))
+            except OSError:
+                pass
+    return res
 
 
 # `@pI` in a poke: the unit poke I of the milestone created (spec §4 r8)
