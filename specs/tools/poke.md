@@ -4,8 +4,15 @@
   every 1.14d address and argument form below is cited from the owning
   spec; directives whose 1.14d call form no spec states are gaps on the
   original side (§4, Open questions) and are queued for PC 1
-  (`docs/handoff/pc1-data.md` Step 4). No directive has been run on
-  1.14d yet (REC-590).
+  (`docs/handoff/pc1-data.md` Step 4). Run on 1.14d under Wine
+  (2026-10-09, `poke.py` 0.1.0, `--auto ScnAma --seed 1234`, F0 = 2):
+  `spawn` normal (GUID 8), `seed-unit`, `object` (GUID 18), `time`,
+  `seed-game`, `superunique` (GUID 8), `missile` (GUID 1) all returned
+  `ok` with no fault (`traces/pokes/spawn-town.poke`,
+  `missile-superunique.poke`). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
+  play --poke`): every directive runs on the synthetic install; `warp`
+  to another act and `item` without item tables are d2rs gaps.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -24,21 +31,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–56 |
-| Inputs | 57–63 |
-| Outputs / state changes | 64–72 |
-| Rules | 73–74 |
-|   1. Directives | 75–109 |
-|   2. Poke files | 110–132 |
-|   3. In scenarios | 133–147 |
-|   4. The 1.14d side (`poke.py`) | 148–171 |
-|   5. The d2rs side (`d2-sim::poke`) | 172–183 |
-| Constants & data dependencies | 184–196 |
-| Randomness | 197–203 |
-| Edge cases & original bugs | 204–213 |
-| Test vectors | 214–222 |
-| Provenance | 223–228 |
-| Open questions | 229–249 |
+| Summary | 51–63 |
+| Inputs | 64–70 |
+| Outputs / state changes | 71–79 |
+| Rules | 80–81 |
+|   1. Directives | 82–116 |
+|   2. Poke files | 117–139 |
+|   3. In scenarios | 140–154 |
+|   4. The 1.14d side (`poke.py`) | 155–178 |
+|   5. The d2rs side (`d2-sim::poke`) | 179–190 |
+| Constants & data dependencies | 191–203 |
+| Randomness | 204–210 |
+| Edge cases & original bugs | 211–220 |
+| Test vectors | 221–229 |
+| Provenance | 230–235 |
+| Open questions | 236–256 |
 <!-- /index -->
 
 ## Summary
