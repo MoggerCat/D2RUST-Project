@@ -887,3 +887,5 @@ Then the rest:
   `q-fix-p6-npc-intro-record`.
 - **Tools:** `q-fix-p3-state-own`.
 - **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
+
+- [q-fix-d5-draws] C monster (critter) walk and cel frame: record the Rogue Encampment chickens' (ck, GUIDs 93-95) client position and anim frame every tick 2..80 on ScnAma seed 1234 (`record_frames.py --every 1 --draws-every 1`, CelDraw rows of `monsters/ck/`), and read the C monster's path record and walk end (REC-742); 1.14d at tick 73 draws the walk frame 40 at (80, 416) and the neutral frame 32 at (48, 516), d2rs frame 0 at the creation cell

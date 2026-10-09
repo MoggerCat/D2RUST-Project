@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–395 |
-|   6. Position check (`0x004804E0`) | 396–439 |
-|   7. Session messages | 440–637 |
-|   8. Mode requests | 638–723 |
-|   9. Room-in-sight messages | 724–758 |
-|   10. Bit reader | 759–773 |
-|   11. Current act and level (join and later) | 774–819 |
-|   12. Client DRLG and the room of a point | 820–861 |
-|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
-|   14. Pet list and the hireling GUID | 914–978 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 979–1068 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1069–1103 |
-|   17. Model writes made by 1.14d UI code | 1104–1250 |
-|   18. Audio driver inputs and the client object functions | 1251–1281 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1282–1510 |
-| Constants & data dependencies | 1511–1523 |
-| Randomness | 1524–1539 |
-| Edge cases & original bugs | 1540–1564 |
-| Test vectors | 1565–1622 |
-| Provenance | 1623–1727 |
-| Open questions | 1728–1907 |
+|   5. Client update pass | 250–409 |
+|   6. Position check (`0x004804E0`) | 410–453 |
+|   7. Session messages | 454–651 |
+|   8. Mode requests | 652–737 |
+|   9. Room-in-sight messages | 738–772 |
+|   10. Bit reader | 773–787 |
+|   11. Current act and level (join and later) | 788–833 |
+|   12. Client DRLG and the room of a point | 834–875 |
+|   13. Visibility predicate (`0x004DBF20`) | 876–927 |
+|   14. Pet list and the hireling GUID | 928–992 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 993–1082 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1083–1117 |
+|   17. Model writes made by 1.14d UI code | 1118–1264 |
+|   18. Audio driver inputs and the client object functions | 1265–1295 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1296–1524 |
+| Constants & data dependencies | 1525–1537 |
+| Randomness | 1538–1553 |
+| Edge cases & original bugs | 1554–1578 |
+| Test vectors | 1579–1636 |
+| Provenance | 1637–1741 |
+| Open questions | 1742–1921 |
 <!-- /index -->
 
 ## Summary
@@ -392,6 +392,20 @@ position check of the local player.
       and its walk end (positions of the recorded chickens from tick 8).
       The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
       the light) is not run on set C either (same REC).
+
+      Drawing (q-fix-d5-draws, REC-1395, PROVISIONAL): the critters
+      draw like any monster, filed in their room's unit list
+      (`render/draw-order.md` §3 r4), so a `ck` shadow and cel row
+      appear in `a1-town-arrival-ama` (rows 113, 115, 181, 186). The two
+      sets number their GUIDs apart (set C from 2, server monsters from
+      1), so d2rs keys a set C monster in the room lists and the view by
+      GUID | 0x8000_0000 (`ClientWorld::view_key`); the model's own set
+      C keys are unchanged. Checked 2026-10-09 against the committed
+      scene at tick 73: rows 1–110 equal; the chickens' position and
+      cel frame are not (1.14d: walk frame 40 at (80, 416), neutral
+      frame 32 at (48, 516); d2rs: frame 0 at the creation cell), which
+      is REC-742's open point: no 1.14d per-tick track of a critter
+      exists.
 
 ### 6. Position check (`0x004804E0`)
 
