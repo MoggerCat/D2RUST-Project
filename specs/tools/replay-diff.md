@@ -22,15 +22,15 @@
 | Rules | 71–72 |
 |   1. Sessions | 73–89 |
 |   2. The 1.14d recording | 90–107 |
-|   3. The d2rs replay | 108–130 |
-|   4. Comparison | 131–171 |
-|   5. Verdict | 172–179 |
-| Constants & data dependencies | 180–185 |
-| Randomness | 186–190 |
-| Edge cases & original bugs | 191–209 |
-| Test vectors | 210–216 |
-| Provenance | 217–222 |
-| Open questions | 223–235 |
+|   3. The d2rs replay | 108–136 |
+|   4. Comparison | 137–177 |
+|   5. Verdict | 178–185 |
+| Constants & data dependencies | 186–191 |
+| Randomness | 192–196 |
+| Edge cases & original bugs | 197–215 |
+| Test vectors | 216–222 |
+| Provenance | 223–228 |
+| Open questions | 229–249 |
 <!-- /index -->
 
 ## Summary
@@ -118,11 +118,17 @@ per frame against 1.14d's.
 2. Not replayed: messages with no frame (before the first tick: the
    create / join sequence the bridge runs itself), empty ones, and the
    ids the d2rs bridge sends on its own: 0x67 (create), 0x6B (the
-   answer to S→C 0x02), 0x5F (position resync). PROVISIONAL: this id
-   set (because state-dump's bridge sends exactly these by itself,
-   state-dump's `RUN_GAPS`; replaying them too would send them twice);
-   settled by REC-1370: the first replay whose input channel (§4 r6)
-   shows them in the same frames on both sides.
+   answer to S→C 0x02), 0x5F (position resync), 0x2F (the talk sent on
+   the server's NPC interaction, `bridge/world.rs`). PROVISIONAL: this id
+   set (because state-dump's bridge sends these by itself, state-dump's
+   `RUN_GAPS`; replaying them too sends them twice: measured 2026-10-09,
+   town-ama-10k frame 633, d2rs `2f 2f 31` against 1.14d `2f 31` before
+   0x2F was added); settled by REC-1370: a state-dump switch that
+   silences the bridge's own C→S after 0x67 (then the set is {0x67} and
+   every recorded message is replayed), or a replay whose input channel
+   (§4 r6) shows these ids in the same frames on both sides. Measured
+   (2026-10-09): 0x6B and 0x2F land in the same frames on both sides;
+   0x5F does not (§ Open questions 1).
 3. Nothing else is decided on the d2rs client side: no input script, no
    clicks, no hover pick; the messages carry 1.14d's GUIDs and
    coordinates as recorded, so a GUID that differs between the games
@@ -222,8 +228,16 @@ nothing here is a new 1.14d fact.
 
 ## Open questions
 
-1. REC-1370 (§3 r2): the bridge-own id set; settled by the input channel
-   of the first runs.
+1. REC-1370 (§3 r2): the bridge-own id set. Measured 2026-10-09: with
+   `--send` the bridge has no walk prediction for the local player, so
+   its model stays at the walk's start and its position check
+   (`client/model.md` §12 r8, `bridge/check.rs`) sends C→S 0x5F with
+   that start point, which 1.14d never sends here: 87 of 398 input
+   windows in town-ama-10k (first at frame 374), 52 of 272 in
+   bloodmoor-bar-10k (first at 145), 1 of 5 in smoke-town-ama (frame 86,
+   where it is the first state divergence: the server walks the player
+   back). Needs a state-dump switch that drops the bridge's own C→S
+   (owner: state-dump; routed to the coordinator 2026-10-09).
 2. REC-1371: the d2rs `state-dump` clock starts at 1 s and steps 40 ms
    per tick; 1.14d's server clock is wall time under the debugger. A
    handler that reads the host clock (the waypoint's hostile delay,

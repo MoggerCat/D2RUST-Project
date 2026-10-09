@@ -49,11 +49,12 @@ TYPE_NAMES = state_diff.TYPE_NAMES
 
 # PROVISIONAL (specs/tools/replay-diff.md §3 r2, REC-1370): the C->S ids the
 # d2rs headless bridge sends on its own (state-dump: 0x67 create before the
-# first pump, 0x6B the answer to S->C 0x02, 0x5F the position resync); they
-# are not replayed, the input channel compares them where each side sent
-# them. Settled by the first replay whose input channel shows these ids in
-# the same frames on both sides.
-BRIDGE_OWN = frozenset({0x5F, 0x67, 0x6B})
+# first pump, 0x6B the answer to S->C 0x02, 0x5F the position resync, 0x2F
+# the talk sent on the server's NPC interaction); they are not replayed, the
+# input channel compares them where each side sent them. Settled by a
+# state-dump switch that silences the bridge (then only 0x67 stays here) or
+# by a replay whose input channel shows these ids in the same frames.
+BRIDGE_OWN = frozenset({0x2F, 0x5F, 0x67, 0x6B})
 
 
 class ReplayError(Exception):
