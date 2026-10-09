@@ -17,6 +17,8 @@ python3 tools/sidebyside/build.py --out ~/sbs/run [--groups walk,panels] [--scen
 | 1.14d | per group of `tools/cloud-game/scene_defs.py` (plus `arrival`: the scene of `traces/checks/draws-town-arrival-ama.check`), one `record_frames.py` run with that input, every drawn frame's PNG in `OUT/orig/<group>/img` (`--img-dir`) |
 | d2rs | per scene one `d2-client play --dump-draws --at-tick <every 1.14d frame tick up to the scene frame> --dump-image` (`specs/tools/facts-render.md` §5 r19), with the steps acting up to the scene tick T (a paused scene: the steps before its mark) |
 | compare | per tick: RGB pixels after each side's palette, equal or not; the scene frame's `facts-compare --ignore tick,index_sha256 --skip-weather` for the first difference line |
+| sounds | every sound request call on both sides: 1.14d `record_frames.py --sounds` (hook at `0x004B9A00`), d2rs `play --sound-log` (`facts-render.md` §5 r20); compared as the ordered sequence of (tick, id, unit, delay, flags, offset) up to the scene tick, plus a per-tick set view (order aside) |
+| input feel | per input step, the drawn ticks until the player's mode first changes (1.14d: the capture's player mode; d2rs: the mode token of the player's cel in the dump), with the new mode, on both sides |
 | page | `OUT/side-by-side.html`: index (badge, match % of the scene frame, first differing tick, first difference line), per scene the first frame, the first differing frame, fixed ticks 40 / 100 / 200 and the scene frame, with a slider, a toggle and a diff overlay; `OUT/summary.json` |
 
 **Rule 1:** the frames are rendered game art. `--out` must lie outside the
@@ -24,8 +26,8 @@ repository (the tool refuses a folder inside it). The page goes to the
 private data repo, `reports/side-by-side/<date>/`, with the command and the
 tool version; only this code is public.
 
-Badge: **pass** only when every compared tick is pixel-identical and
-`facts-compare` reports a match (rule 10: exact, no tolerance). The scene
+Badge: **pass** only when every compared tick is pixel-identical,
+`facts-compare` reports a match and the sound calls are the same sequence (rule 10: exact, no tolerance). The scene
 frame and the first differing frame are lossless PNG; the other frames are
 WebP previews (the diff overlay is computed on the lossless frames and is
 exact everywhere).

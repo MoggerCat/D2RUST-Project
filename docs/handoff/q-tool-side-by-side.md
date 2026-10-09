@@ -36,6 +36,13 @@ PNGs there too. Pages go to the private data repo,
   `facts::tests::dump_image_keeps_indices_and_palette`,
   `facts::tests::dump_dirs_per_tick`, `main` `dump_draws_takes_a_dir_and_a_tick`.
 - `tools/trace-recorder/record_frames.py --img-dir DIR`.
+- Coordinator items 16 (audio) and 17 (input feel): `d2-client play
+  --sound-log FILE` (every `SoundSystem::request` call, `facts-render.md`
+  §5 r20, test `sound_table::tests::request_log_keeps_every_call`) and
+  `record_frames.py --sounds` (1.14d `0x004B9A00` entry, bytes
+  `55 8B EC 83 EC 18`, `audio/triggers.md` Checks "request log"); the page
+  shows both sequences around the first difference and the input-to-mode
+  latency per step.
 
 ## Notes
 
@@ -68,3 +75,4 @@ Findings of the first run (all on framed input, d2rs at `8dd2c592`):
   turns back south-west (x 9930 → 9926 by tick 47) while d2rs keeps
   drifting east (9931 → 9933): the re-targeted walk's direction, not a
   render difference. Every later walk / run scene inherits the offset.
+| 2026-10-09 (2) | `reports/side-by-side/2026-10-09-2/side-by-side.html` (27 MB, 32 scenes, sounds + input feel) | `d2146986` | 0 pass. Pixels: walks s–e now 98.7–99.4 % (staging's walk fixes); walk-w 32 %, se / nw 23 %, runs 18–19 %, Cold Plains 14 %. Sounds: every scene differs at call 0 (order): 1.14d makes its id-0 unit calls (return `0x4d9bcc`) before the object calls of tick 2, d2rs after them; 1.14d requests id 6 (no unit) at tick 2 where d2rs requests 70 and 4673. Cold Plains: 1.14d 221–614 calls vs d2rs 108–182. Input feel: the first town click (tick 22) shows d2rs's player in WL at tick 22 and TW from 24; 1.14d stays TN until TW at 24 |
