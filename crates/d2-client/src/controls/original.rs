@@ -751,9 +751,15 @@ pub struct Binding {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BindingTable(pub Vec<Binding>);
 
+/// The commands whose slot-0 entry precedes their slot-1 entry in the
+/// compiled table (`controls.md` §3.4; every other command is slot 1
+/// first). Measured on `Game.exe` 0x312220: command 1 (`B`, then `I`).
+const SLOT0_FIRST: [u8; 1] = [1];
+
 impl BindingTable {
     /// The compiled defaults `0x00712220` (§3, §B4): entries in
-    /// `file_pos` order, slot 1 then slot 0.
+    /// `file_pos` order, slot 1 then slot 0, except command 1 (slot 0
+    /// first; `controls.md` §3.4, measured on `Game.exe`).
     pub fn defaults() -> BindingTable {
         let mut v = vec![
             Binding {
@@ -765,16 +771,23 @@ impl BindingTable {
         ];
         for c in &COMMANDS {
             let p = usize::from(c.file_pos);
-            v[2 * p] = Binding {
+            let one = Binding {
                 cmd: i32::from(c.cmd),
                 key: c.key1,
                 slot: 1,
             };
-            v[2 * p + 1] = Binding {
+            let zero = Binding {
                 cmd: i32::from(c.cmd),
                 key: c.key2,
                 slot: 0,
             };
+            let (first, second) = if SLOT0_FIRST.contains(&c.cmd) {
+                (zero, one)
+            } else {
+                (one, zero)
+            };
+            v[2 * p] = first;
+            v[2 * p + 1] = second;
         }
         BindingTable(v)
     }
