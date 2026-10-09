@@ -653,6 +653,17 @@ fn state_dump(args: &[String]) -> Result<()> {
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // tools/perf: D2_PERF_OUT turns the timing on (server ticks, frames).
+    d2_client::app::perf::enable_from_env();
+    let result = run_main(&args);
+    // tools/coverage-map: this thread's counters (a no-op unless d2-sim
+    // has the `coverage-map` feature and D2_COVERAGE_DIR is set).
+    d2_sim::debug::coverage::flush();
+    d2_client::app::perf::write_report();
+    result
+}
+
+fn run_main(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
         Some("state-dump") => state_dump(&args[1..]),

@@ -504,6 +504,11 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             level(client_room, &self.sys.hooks),
             level(new, &self.sys.hooks),
         );
+        if let (Some(_), Some(to)) = (player, to) {
+            if from != Some(to) {
+                crate::cov!(Level, to, 0);
+            }
+        }
         if let (Some(p), Some(from), Some(to)) = (player, from, to) {
             if from != to {
                 self.with(game, |g, v| {

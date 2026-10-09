@@ -147,6 +147,9 @@ impl QuestFlags {
     /// `0x0065C360`.
     pub fn set(&mut self, q: u8, b: u8) {
         let (i, m) = Self::pos(q, b);
+        if self.0[i] & m == 0 {
+            crate::cov!(Quest, q, b);
+        }
         self.0[i] |= m;
     }
 
@@ -2048,6 +2051,11 @@ impl QuestControl {
         } else {
             None
         };
+        crate::cov!(
+            NpcTopic,
+            npc.map_or(0, |n| n.1),
+            (2u32 << 16) | u32::from(index)
+        );
         let args = EventArgs {
             target: npc.map(|n| n.0),
             player: Some(player),

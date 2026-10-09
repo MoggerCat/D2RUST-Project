@@ -20,6 +20,7 @@ members = [
     "tools/seed-finder",
     "tools/d2s-tool",
     "tools/d2-convert",
+    "tools/coverage-map",
 ]
 
 [workspace.package]
@@ -38,6 +39,7 @@ d2-proto = { path = "crates/d2-proto" }
 d2-net = { path = "crates/d2-net" }
 d2-server = { path = "crates/d2-server" }
 d2-verify = { path = "crates/d2-verify" }
+coverage-map = { path = "tools/coverage-map" }
 test-fixtures = { path = "crates/test-fixtures" }
 d2-native = { path = "crates/d2-native" }
 conformance = { path = "crates/conformance" }

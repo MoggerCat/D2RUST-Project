@@ -86,6 +86,7 @@ pub fn type_init<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
     h.alloc_ai(unit);
     let class = class_of(h, unit);
     h.monsters().entry(unit).class = class;
+    crate::cov!(Monster, class, 0);
     // Step 4.
     let level_id = h.level_id(unit);
     stats_and_skills(cx, h, unit, level_id);

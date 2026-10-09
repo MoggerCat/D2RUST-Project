@@ -366,7 +366,11 @@ pub fn dump<W: Write>(
             ms.fetch_add(STEP_MS, Ordering::SeqCst);
         }
         bridge.set_now(ms.load(Ordering::SeqCst));
+        let t0 = super::perf::enabled().then(std::time::Instant::now);
         let report = bridge.frame()?;
+        if let Some(t0) = t0 {
+            super::perf::record_bridge_frame(t0, report.ticked);
+        }
         bridge.take_outputs();
         if let Some(h) = input.as_mut() {
             h.observe(bridge.world(), report.ticked);
