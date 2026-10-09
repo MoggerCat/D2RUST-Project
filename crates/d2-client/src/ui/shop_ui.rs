@@ -478,6 +478,39 @@ impl ShopUi {
     }
 }
 
+/// The tip context of a store item hovered in the shop (`item-tips.md`
+/// Inputs, §1 r3, §11 r2–r3): the inventory mode, a store item
+/// (`[0x00721E38]` = 0), the gamble store and the price text `Cost: ` +
+/// the price (gold fails, §11 r3).
+///
+/// d2rs-own, unverified: the inventory mode is 4 while the repair button
+/// is on (§11 r1's repair mode), else 1 (`panels-2.md` §16 r13, the idle
+/// trade mode); the other buttons' modes are not in the spec. A store
+/// item without a price yet fails.
+fn store_tip_ctx<'a>(
+    base: crate::ui::item_tip_build::TipCtx<'a>,
+    st: &ShopState,
+    guid: u32,
+    code: Option<[u8; 4]>,
+) -> crate::ui::item_tip_build::TipCtx<'a> {
+    use crate::ui::item_tip_build::PriceText;
+    let gold = code.is_some_and(|c| &c == b"gld ");
+    let price = match st.prices.get(guid) {
+        Some(p) if !gold => PriceText::Price {
+            label: crate::ui::item_tip_build::tid::COST,
+            price: p as i32,
+        },
+        _ => PriceText::Fail,
+    };
+    crate::ui::item_tip_build::TipCtx {
+        mode: if st.repair_mode { 4 } else { 1 },
+        own_item: false,
+        gamble: st.gamble,
+        price,
+        ..base
+    }
+}
+
 /// The item's name: the first line of its tip (d2rs-own until the
 /// `item-tips.md` builder names it, q-fix-ui-item-tips).
 fn item_name(sh: &super::Shared, world: &ClientWorld, it: &ItemView) -> Option<Vec<u16>> {
@@ -535,16 +568,16 @@ impl Panel for ShopUi {
                 ));
             }
         }
-        // The hovered item's tip with its price (REC-242), else the bare price.
+        // The hovered store item's tip with the store context
+        // (`item-tips.md` §1 r3, §11), else the bare price.
         let hovered = item_at(&sh, &g, &list, sh.mouse);
         let tip = hovered.as_ref().and_then(|it| {
             let tips = sh.items.tips.as_ref()?;
             let stream = crate::bridge::items::stream(ctx.world, it.key)?;
-            let me = ctx.world.local()?;
-            let usable = it
-                .code
-                .is_none_or(|c| tips.can_use(c, me.stat(0), me.stat(2), me.stat(12)));
-            let lines = tips.shop_lines(stream, st.prices.get(it.key.guid).unwrap_or(0), usable);
+            let me = crate::ui::item_tip_world::WorldUnit::local(ctx.world);
+            let base = crate::ui::item_tip_world::hover_ctx(tips, ctx.world, me.as_ref(), it);
+            let tc = store_tip_ctx(base, &st, it.key.guid, it.code);
+            let lines = tips.tip_lines(stream, &tc);
             (!lines.is_empty()).then_some(lines)
         });
         if let Some(lines) = tip {
@@ -749,6 +782,32 @@ impl OriginalUi {
             .find(|i| i.key.guid == guid)?;
         let (l, t, w, h) = g.cell(i32::from(it.x), i32::from(it.y));
         Some(Point::new(l + w / 2, t + h / 2))
+    }
+
+    /// The tip lines of store item `guid` as the shop draws them on
+    /// hover, with the store context ([`store_tip_ctx`]; tests).
+    pub fn store_tip_lines(&self, world: &ClientWorld, guid: u32) -> Vec<String> {
+        let sh = self.shared.borrow();
+        let st = self.shop.borrow();
+        let Some(tips) = sh.items.tips.as_ref() else {
+            return Vec::new();
+        };
+        let Some(it) = items::store_items(world)
+            .into_iter()
+            .find(|i| i.key.guid == guid)
+        else {
+            return Vec::new();
+        };
+        let Some(stream) = items::stream(world, it.key) else {
+            return Vec::new();
+        };
+        let me = crate::ui::item_tip_world::WorldUnit::local(world);
+        let base = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), &it);
+        let tc = store_tip_ctx(base, &st, guid, it.code);
+        tips.tip_lines(stream, &tc)
+            .iter()
+            .map(|l| String::from_utf16_lossy(&l.text))
+            .collect()
     }
 
     /// The centre of store grid cell (x, y) on screen (tests).

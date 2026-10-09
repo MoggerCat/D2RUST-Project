@@ -671,7 +671,7 @@ impl Run {
 // 1), a left click on a store item opens the confirm dialog and No sends
 // nothing, the shop's close ends the interaction; Kashya's build sends the
 // hire-list request C→S 0x38 [3][NPC][player].
-// Covers: specs/ui/menus.md §2 r2, §2 r6, §4 r4, §4 r5; specs/ui/messages.md §6 r3; specs/ui/panels-2.md §14 r8, §14 r9
+// Covers: specs/ui/menus.md §2 r2, §2 r6, §4 r4, §4 r5; specs/ui/messages.md §6 r3; specs/ui/panels-2.md §14 r8, §14 r9; specs/ui/item-tips.md §11 r2, §11 r3
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_spec_npc_ui_on_the_install() {
@@ -724,10 +724,21 @@ fn the_spec_npc_ui_on_the_install() {
         .0
         .world()
         .clone();
-    let it = d2_client::bridge::items::store_items(&w)
+    let (guid, it) = d2_client::bridge::items::store_items(&w)
         .into_iter()
-        .find_map(|i| run.with_ui(|u| u.store_item_point(&w, i.key.guid)))
+        .find_map(|i| {
+            run.with_ui(|u| u.store_item_point(&w, i.key.guid))
+                .map(|p| (i.key.guid, p))
+        })
         .expect("a store item on the shown page");
+    // The store item's tip carries the store context (`item-tips.md`
+    // §11 r2–r3): its top line is `Cost: ` and the price.
+    let tip = run.with_ui(|u| u.store_tip_lines(&w, guid));
+    eprintln!("store tip: {tip:?}");
+    assert!(
+        tip.first().is_some_and(|l| l.starts_with("Cost: ")),
+        "{tip:?}"
+    );
     run.click(it);
     run.step(2);
     let (kind, confirm) = run
