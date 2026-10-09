@@ -99,6 +99,9 @@ pub enum QuestEvent {
         item: u32,
         action: u16,
     },
+    /// A special monster was created (`0x005A09E0` → `0x00544E80`,
+    /// `quests-act3.md` §6.2: the Golden Bird's boss choice).
+    BossCreated { unit: UnitId },
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec

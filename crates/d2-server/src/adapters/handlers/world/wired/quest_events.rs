@@ -14,7 +14,7 @@
 use d2_sim::game::Game;
 use d2_sim::units::UnitType;
 use d2_sim::wiring::action::{Pending, QuestEvent};
-use d2_sim::world::quests::{act2, act5, QuestWorld};
+use d2_sim::world::quests::{act2, act3, act5, QuestWorld};
 
 use super::{quest_call, ActionEvents, TradeRest, WiredWorld};
 
@@ -42,6 +42,26 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 }
             }
         }
+        // The Golden Bird's boss choice (`quests-act3.md` §6.2) reads the
+        // monstats flags byte +0x0D; only its bit 6 (`flying`, flag word
+        // bit 14, `quests-act3-2.md` §11.4) is tested, so the byte is
+        // built from that column. `None`: no monstats row.
+        let bosses: Vec<(d2_sim::units::UnitId, u16, Option<u8>)> = {
+            let sys = &events.action().sys;
+            queued
+                .iter()
+                .filter_map(|e| match *e {
+                    QuestEvent::BossCreated { unit } => Some(unit),
+                    _ => None,
+                })
+                .filter_map(|u| {
+                    let class = sys.units.get(u)?.class;
+                    let row = sys.hooks.tables.combat.monstats.get(class as usize);
+                    let flags = row.map(|m| if m.flying { act3::q4::FLYING_0D } else { 0 });
+                    Some((u, u16::try_from(class).ok()?, flags))
+                })
+                .collect()
+        };
         let frame = game.frame;
         let mut lair = None;
         let mut summit = None;
@@ -78,6 +98,9 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         }
                         _ => {}
                     }
+                }
+                for &(unit, class, flags) in &bosses {
+                    act3::choose_bird_boss(q, w, unit, class, flags);
                 }
                 for e in &queued {
                     if let QuestEvent::Kill { victim, killer } = *e {

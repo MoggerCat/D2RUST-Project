@@ -1050,6 +1050,14 @@ impl Pending for LocalSeams {
 }
 
 impl WorldPending for LocalSeams {
+    /// `0x00544E80` from special monster creation: queued for the quest
+    /// control (the Golden Bird's boss choice, `quests-act3.md` §6.2).
+    /// PROVISIONAL (REC-780, d2rs-own, unverified): it runs after the tick,
+    /// as the other queued quest events (REC-129), not inside the creation.
+    fn boss_quest_hook(&mut self, boss: UnitId) {
+        self.quest_events
+            .push(d2_sim::wiring::action::QuestEvent::BossCreated { unit: boss });
+    }
     /// A host-placed monster of a level's preset list
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
