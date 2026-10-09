@@ -68,7 +68,7 @@ milestone flayer-jungle-decoy
   use sor
   deadline 3000
   poke 5 warp 78
-  sweep 20 2 1200 40
+  poke 20 goto preset 78 2:252
   need ever player lv == 78
   need unit ut 2 cl 252 lv 78 seen
 
