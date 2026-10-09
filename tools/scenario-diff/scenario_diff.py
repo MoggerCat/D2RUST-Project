@@ -156,7 +156,7 @@ class Runner:
         return os.path.join(self.work, *p)
 
     def cargo(self, pkg, args, timeout=7200):
-        env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0")
+        env = dict(os.environ, CARGO_PROFILE_RELEASE_DEBUG="0", D2_GAME_DIR=self.game_dir)
         return self.sh(["cargo", "run", "--release", "-q", "-p", pkg, "--"] + args,
                        timeout=timeout, env=env)
 
