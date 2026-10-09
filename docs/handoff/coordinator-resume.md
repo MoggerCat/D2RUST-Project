@@ -1,5 +1,25 @@
 # Coordinator resume — playable-build loop (2026-10-08)
 
+## Coordinator run 2026-10-09 evening (session_01KcnkwCTXbuv5ZbToEUpBSj)
+
+Merged onto integ-local (gate r1): q-diff-skills-2 (room-cancel rule done twice: both tests kept), q-play-act5 (0x005B2F20 quest spawn done twice: kept `MonsterWorld::spawn_at`, dropped `place_monster`), q-diff-combat-a1 (poke `goto` + `msg` both kept; `Schedule::run_due` takes the link), q-prov-recording-2 (kept staging's bridge/objects GUID counter), q-fixture-migrate-2, coord-resume-2, q-fix-server-store-fill, q-tool-soak; then local-pc1-test (docs) and local-pc1-play (45-file merge, its own gate).
+
+Fix sessions launched 17:05 UTC (each branch carries `docs/handoff/<branch>-task.md` with its brief and the session rules; REC blocks from 1000):
+
+| Branch | Session | Model | REC | Area |
+|---|---|---|---|---|
+| q-fix-input-lock | session_01JQwtFjADMhRsW7QNGqCiie | Opus | 1000–1009 | cast/attack input lock (#1) |
+| q-fix-client-crash | session_01RdQgHcwijQxkvdvx6nPuAW | Opus | 1010–1019 | geom.rs:197 crash; walk desync / re-target |
+| q-fix-boss-damage | session_01QjgkBNuhD5xisApMttxSB8 | Opus | 1020–1029 | Andariel never dies, Radament at 256 hp |
+| q-fix-items-shop | session_01BBQcb5iXAv9CoWsyhDqVge | Sonnet | 1030–1039 | shop "no room", belt after load, monster items 0x00573B20 |
+| q-fix-npc-menus | session_01VzxhMLTVzSSr24GoMX684d | Sonnet | 1040–1049 | Natalya, Halbu, Nihlathak; Esc in quest log |
+| q-fix-a1-den-wp | session_011nm8wnAZ8dXwKuehwW9a8D | Sonnet | 1050–1059 | Den of Evil flag; Cold Plains waypoint (+15,+5) |
+| q-fix-class-rows | session_017Zjk6EsU1ooMqhtmpz54ih | Sonnet | 1060–1069 | q-fix-pt-whirlwind / right-aura / pet-warp-follow / blessed-hammer |
+| q-fix-depcheck | session_01Bw9umZerDFScSEkXWhvchg | Sonnet | 1070–1079 | rng_trace thread_local behind a feature |
+| q-fix-pt-sweep | session_01BU2ZCAxsiRDowTgb9cTSki | Sonnet | 1080–1089 | sweep hops ≤16 + fallback ring, goto cells; A3–V matrix |
+
+Next free REC block: 1090. pc1-data Step 4: last number 46.
+
 ## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
 
 The user paused every session to continue later. Each session was told to
