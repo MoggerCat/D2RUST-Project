@@ -376,3 +376,37 @@ fn the_path_target_needs_the_path_provider() {
     assert_eq!(t, None);
     assert_eq!(rest.log, ["unhandled 254 0x56d2c0"]);
 }
+
+// Covers: specs/world/quests-act2-2.md §2 r1; specs/sim/units.md §3.1 r4
+#[test]
+fn a_quest_spawn_draws_the_economys_game_seed() {
+    // The allocation's game-seed step lands in the economy's fields, which
+    // the quest loan writes back to the hooks (recorded
+    // `act-travel-lut-ama.check`: start Jerhyn's step precedes the next
+    // object's); before, the view drew a stale copy that was lost.
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let tables = item_tables();
+    let mut rest = Rest::new();
+    let s = &mut fx.sim.sys;
+    let start = s.hooks.game_seed;
+    let mut fields = GameFields::new(start, true);
+    let mut items = std::mem::replace(&mut s.hooks.items, ItemStore::new());
+    let made = {
+        let mut econ = Economy {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+            hooks: &mut s.hooks,
+            fields: &mut fields,
+            tables: &tables,
+            items: &mut items,
+        };
+        let mut w = HostQuests::new(EconomyQuests::new(&mut econ, &mut rest));
+        w.spawn_monster_flags(a, 12, 12, 0, 1, -1, 0)
+    };
+    s.hooks.items = items;
+    assert!(made.is_some());
+    assert_ne!(fields.seed, start, "the spawn's step is the economy's");
+}

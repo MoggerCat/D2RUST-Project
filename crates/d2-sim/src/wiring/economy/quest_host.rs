@@ -94,7 +94,6 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
-    /// Runs `f` on the action wiring's view over the economy's parts.
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
     /// `levels`; the economy's item store, game seed and unique bits go
@@ -138,10 +137,26 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         Some(out)
     }
 
+    /// Runs `f` on the action wiring's view over the economy's parts.
+    /// The game seed, item store and unique bits are the economy's for
+    /// the call (as [`Self::with_drop_state`]): an allocation through the
+    /// view (a quest monster, `quests-act2-2.md` §2) draws the economy's
+    /// seed, and the loan writes that seed back to the hooks after the
+    /// call (recorded `act-travel-lut-ama.check`: start Jerhyn's game-seed
+    /// step precedes the next object's).
     fn view<T>(&mut self, f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T) -> T {
         let e = &mut *self.inner.econ;
-        let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
-        f(&mut *e.game, &mut v)
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
+        let out = {
+            let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
+            f(&mut *e.game, &mut v)
+        };
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
+        e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
+        out
     }
 
     /// `0x00559A30` with the drop code `code` (`treasure.md` §9,
