@@ -6,6 +6,10 @@ The user paused every session to continue later. Each session was told to
 push and write its hand-back `docs/handoff/<branch>.md` (done / in
 progress / next / open RECs / repro commands). Read those first.
 
+**Unmerged at pause (staging 018587d2):** these wrapped branches conflict with staging and hold final fixes; merge them first:
+q-diff-combat-a1 (killed monsters stay dead, 069d6bcf+), q-play-act5, q-diff-skills-2, q-prov-recording-2, q-fixture-migrate-2.
+Also: d2-server prop_unified_items item_moves_keep_one_place fails on rare random seeds (real item-move bug, items owner). Fixed late: shop buy, belt potions, town objects after a waypoint, Esc in NPC talk, CI depcheck. New blocker: throne Baal stuck in mode 10 after Decrepify (no S3mv; PC 1 item).
+
 **Goal set by the user:** "99% playable": the whole game can be played
 start to finish with the 1.14d experience (exact match stays the bar,
 rule 10).
