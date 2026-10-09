@@ -294,6 +294,7 @@ fn inv_tables() -> InvTables {
         },
         equiv: equiv(),
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

@@ -1,0 +1,38 @@
+check 1
+# Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
+# frozen Anya (object 558) in the Frozen River (level 114), RiverIce04.ds1, code spawn from dummy object 460.
+# The player warps there before frame 4, then is moved along a path with
+# pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
+# 1.14d (PC 1, Windows, -seed 1234): ut 2 cl 558: GUID 72 at (10056, 6551), mode 0; no monster 512 / 527; created when its room
+# is populated (the player's room becomes adjacent), not at level load.
+# Table: docs/handoff/pc1-day3-c.md "Round 2 — placement". Spec: specs/tools/scenario-diff.md.
+name milestone-anya
+save MilBaal --class sor --expansion --act 4
+seed 1234
+ticks 111
+seconds 240
+channels state
+at 4 poke warp 114
+at 12 poke pos @player 10293 6600
+at 15 poke pos @player 10283 6596
+at 18 poke pos @player 10273 6593
+at 21 poke pos @player 10262 6590
+at 24 poke pos @player 10252 6586
+at 27 poke pos @player 10242 6583
+at 30 poke pos @player 10232 6580
+at 33 poke pos @player 10222 6577
+at 36 poke pos @player 10212 6573
+at 39 poke pos @player 10201 6570
+at 42 poke pos @player 10191 6567
+at 45 poke pos @player 10181 6563
+at 48 poke pos @player 10171 6560
+at 51 poke pos @player 10161 6560
+at 54 poke pos @player 10151 6560
+at 57 poke pos @player 10141 6560
+at 60 poke pos @player 10131 6560
+at 63 poke pos @player 10120 6560
+at 66 poke pos @player 10110 6560
+at 69 poke pos @player 10100 6560
+at 72 poke pos @player 10090 6560
+at 75 poke pos @player 10080 6560
+at 78 poke pos @player 10070 6560
