@@ -85,7 +85,8 @@ use d2_native::source::NativeAsset;
 use d2_server::adapters::character::LoadContext;
 use d2_server::adapters::handlers::skills::wired::WiredSkills;
 use d2_server::adapters::handlers::world::{
-    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+    preview_cube_parts, preview_inv_parts, ActionEvents, ActionWorld, Outbox, QuestEnter,
+    WiredWorld, WorldHost,
 };
 use d2_server::adapters::session::{load_new_character_with_items, load_save, GameSetup};
 use d2_server::adapters::session_flow::{
@@ -2123,6 +2124,13 @@ fn loader(
         let rest = &mut s.world.rest;
         rest.quests.insert(player, quests);
         rest.names.insert(player, name[..n].to_vec());
+        // The quest entry `0x00546270` (`world/quests.md` §3: single player
+        // takes `0x005344B0`, mode 0; a new character's stub load calls
+        // mode 1 first): its messages (0x5E, 0x28, 0x29, 0x89) are the
+        // join's rule 3.1 (e), sent after the loader's other messages.
+        let new_character = matches!(character, Character::New | Character::Named(_))
+            || matches!(&character, Character::Save(save, _) if save.body.is_none());
+        quest_entry(s, player, new_character);
         // The point parser reads the staged position (`point_state`); the
         // tick moves it to the path's ([`WorldHost::unit_positions`]).
         s.set_unit(
@@ -2145,6 +2153,47 @@ fn loader(
         );
         Ok(Loaded { player, entry })
     })
+}
+
+/// Runs the join's quest entry on the host's quest control and queues its
+/// messages for the join ([`d2_sim::wiring::action::switch::SessionState::join_quest`]).
+/// An error (the original's fatal assert, for example a game without the
+/// quest tables) is logged and the join goes on.
+fn quest_entry(s: &mut Sim, player: UnitId, new_character: bool) {
+    let modes: &[u8] = if new_character { &[1, 0] } else { &[0] };
+    for &mode in modes {
+        let r = WorldHost::quests(
+            &mut s.world,
+            &mut s.game,
+            &mut s.events,
+            QuestEnter { player, mode },
+        );
+        if let Some(Err(e)) = r {
+            s.events
+                .action
+                .hooks()
+                .x
+                .log
+                .push(format!("join: quest entry mode {mode}: {e}"));
+        }
+    }
+    let sent: Vec<Vec<u8>> = s
+        .world
+        .rest
+        .take_sent()
+        .into_iter()
+        .filter(|(u, _)| *u == player)
+        .map(|(_, b)| b)
+        .collect();
+    if !sent.is_empty() {
+        s.events
+            .action
+            .sys
+            .hooks
+            .session
+            .join_quest
+            .insert(player, sent);
+    }
 }
 
 /// The local client's player and its GUID once the join has run (C→S
