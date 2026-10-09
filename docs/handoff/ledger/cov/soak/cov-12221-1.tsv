@@ -1,0 +1,10 @@
+coverage-map 1
+monster	264	0	1
+monster	294	0	1
+monster-ai	6189360	264	246
+monster-ai	6190400	294	187
+object	117	11	1
+npc-topic	264	0	2
+npc-topic	294	0	10
+quest	16	13	1
+state	105	0	3
