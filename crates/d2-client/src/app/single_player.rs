@@ -815,6 +815,17 @@ impl Pending for LocalSeams {
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::monster_attack_skill(h, sim, unit);
+    }
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) {
+        skill_events::monster_attack_strike(h, sim, unit, moving);
+    }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }

@@ -1623,6 +1623,34 @@ pub trait Pending {
         Self: Sized,
     {
     }
+    /// The used-skill branch of the monster attack-family event 0
+    /// `0x005A7670` (`skills/use.md` §5.2 "Monsters", before the
+    /// animation refresh): a moving skill's step and the do `0x0056FC50`
+    /// on every event. A [`crate::wiring::interaction::UseRest`] value
+    /// routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_skill`].
+    /// Default: nothing.
+    fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The strike of the monster attack-family event 0 `0x005A7670` with
+    /// no used skill (`skills/use.md` §5.2 "Monsters"): the mode missile
+    /// `0x005A6D50` (`moving`: its argument), else the melee set-up and
+    /// `apply_melee` on the path target unit. A
+    /// [`crate::wiring::interaction::UseRest`] value routes it to
+    /// [`crate::wiring::interaction::skill_events::monster_attack_strike`].
+    /// Default: nothing.
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) where
+        Self: Sized,
+    {
+    }
 
     // ---- client intents (`sim/intents-events.md` §9; d2-server's
     // `handlers::player`) -------------------------------------------------
