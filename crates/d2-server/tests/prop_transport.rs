@@ -271,6 +271,12 @@ fn expected(a: &Answers, msg: &[u8], size: usize) -> Option<ResultCode> {
             Some(n) if n < 256 => {}
             _ => return Some(Invalid),
         },
+        // §2.4 rule 6 (0x15, `0x0054A5D0`): strlen < 256 and strlen + 4 <
+        // size, else rejected with 2 (PROVISIONAL code, REC-402).
+        0x15 => match msg[3..].iter().position(|&c| c == 0) {
+            Some(n) if n < 256 && n + 4 < size => {}
+            _ => return Some(Invalid),
+        },
         _ => {}
     }
     None

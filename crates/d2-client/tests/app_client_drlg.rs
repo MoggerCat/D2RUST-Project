@@ -118,6 +118,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();

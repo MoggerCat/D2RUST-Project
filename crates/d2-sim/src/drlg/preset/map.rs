@@ -72,11 +72,10 @@ impl Presets {
     /// map over the level rectangle (redraws `roll(Files)`), sync the
     /// direction, build the area (no extra flags, multi-room).
     ///
-    /// Step 4 (automap callbacks) exists only on the client DRLG and is
-    /// not modelled.
-    // TODO(preset.md §3.2 step 4): the client automap branch generates the
-    // Vis levels without rooms and streams this level's rooms (their own
-    // draws); needed only for a client-copy DRLG.
+    /// Step 4 (automap callbacks, client DRLG only) needs the room
+    /// services: [`Drlg::generate_level_svc`] runs its generic branch
+    /// (Vis levels, then every room streamed in list order) after this.
+    /// The callbacks themselves (automap presentation) are not modelled.
     pub fn generate(
         &mut self,
         drlg: &mut Drlg,

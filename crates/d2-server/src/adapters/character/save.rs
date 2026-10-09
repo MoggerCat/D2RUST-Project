@@ -13,7 +13,9 @@
 //! the appearance inputs of each inventory item, read through
 //! [`SaveItems`] ([`InvDesk`] in the game).
 
-use d2_formats::d2s::appearance::{self, AppearanceTables, Equipment, EquippedItem, BODY_SLOTS};
+use d2_formats::d2s::appearance::{
+    self, AppearanceTables, Equipment, EquippedItem, BODY_SLOTS, MODE_EQUIPPED,
+};
 use d2_formats::d2s::{D2s, ItemEntry};
 use d2_sim::items::bitstream::{write_save, IscTable, StreamItem};
 use d2_sim::items::inventory::node;
@@ -178,6 +180,83 @@ pub fn rebuild(
         body.set_hireling_items(ctx.expansion, list);
     }
     Ok(())
+}
+
+/// The appearance inputs of a save's own player item list, without a
+/// running game (`d2s-tool resave`; `d2s-appearance.md` Inputs): each
+/// entry read as the load reads it (`items::bitstream::read`), the body
+/// grid from the equipped items' body locations, and the weapon in use as
+/// the load leaves it: the body link `0x0063D1D0` (`world/quests-act3-2.md`
+/// §11.5 r1) run on each equipped hand item in list order. No states (a
+/// loaded player has none). PROVISIONAL (REC-291 (5)): the weapon class
+/// `0x0064F380` is the `wclass` index of the weapon in use (0 without
+/// one); it only matters for a crossbow (§4 r4). d2rs-own, unverified;
+/// settled by the C66 saves (`d2s-tool resave` against the game's).
+pub fn equipment_of_save(
+    items: &[ItemEntry],
+    t: &ItemTables,
+    a: &AppearanceTables,
+) -> Result<Equipment, String> {
+    use d2_sim::items::bitstream::read::read_save_entry;
+    use d2_sim::items::inventory::{body, iflag, ty};
+    let mut out = Vec::new();
+    let mut locs = Vec::new();
+    for (k, e) in items.iter().enumerate() {
+        let r = read_save_entry(&e.bytes, t).map_err(|err| format!("item {k}: {err:?}"))?;
+        let s = &r.item.item;
+        out.push(EquippedItem {
+            record: r.item.record,
+            mode: s.mode as u8,
+            body_loc: s.body_loc,
+            quality: s.quality,
+            prefix: s.prefix,
+            suffix: s.suffix,
+            auto_affix: s.auto_affix,
+            file_index: s.file_index,
+            flags: s.flags,
+            max_sockets: max_sockets(t, r.item.record, s.ilvl),
+            first_child: r.children.first().map(|c| c.item.record),
+        });
+        locs.push((s.mode, s.body_loc, s.flags, r.item.record));
+    }
+    let mut body_grid = [None; BODY_SLOTS];
+    for (k, &(mode, loc, _, _)) in locs.iter().enumerate() {
+        if mode == u32::from(MODE_EQUIPPED) && usize::from(loc) < BODY_SLOTS {
+            body_grid[usize::from(loc)] = Some(k);
+        }
+    }
+    let usable = |f: u32| f & iflag::IDENTIFIED != 0 && f & (iflag::BROKEN | iflag::F4000) == 0;
+    let weap = |rec: usize| t.is_type(rec, ty::WEAP);
+    let tpot = |rec: usize| t.item(rec).is_some_and(|r| r.type_ == ty::TPOT);
+    let mut in_use: Option<usize> = None;
+    for (k, &(mode, loc, flags, rec)) in locs.iter().enumerate() {
+        let hand = matches!(loc, body::RIGHT_HAND | body::LEFT_HAND);
+        if mode != u32::from(MODE_EQUIPPED) || !hand || !weap(rec) {
+            continue;
+        }
+        if !usable(flags) {
+            if in_use == Some(k) {
+                in_use = None;
+            }
+            continue;
+        }
+        in_use = match in_use {
+            None => Some(k),
+            Some(c) if !weap(locs[c].3) || tpot(locs[c].3) => Some(k),
+            Some(c) if c == k => None,
+            keep => keep,
+        };
+    }
+    let weapon_class = in_use
+        .and_then(|k| a.items.get(locs[k].3))
+        .map_or(0, |g| appearance::wclass_index(g.wclass));
+    Ok(Equipment {
+        items: out,
+        body_grid,
+        weapon_in_use: in_use,
+        weapon_class,
+        states: Vec::new(),
+    })
 }
 
 /// Max sockets (`0x0062BC20`, `items/generation.md` §7.2) of the record

@@ -4,7 +4,7 @@ use super::fakes::*;
 use crate::drlg::room::{is_near, near_gaps, sort_near};
 use crate::drlg::*;
 use crate::rng::Seed;
-use crate::units::{ClientId, UnitType};
+use crate::units::{ClientId, RoomId, UnitType};
 
 const INIT: u32 = 644_409_375;
 
@@ -644,4 +644,51 @@ fn rooms_built_in_one_burst_head_the_act_list_newest_first() {
     // The room pass walks from the head: the reverse of the build order.
     let walk = w.lists.active_rooms(0);
     assert_eq!(walk, [built[2], built[1], built[0]]);
+}
+
+// preset.md §3.2 step 4 (generic branch), measured on 1.14d (the client's
+// first 0x07 generates the Rogue Encampment and builds its 35 rooms in
+// level-list order, from 0x006424A0): on a client copy, generating a level
+// whose type streams it builds every room of the level in list order; a
+// server DRLG, or a level without AutoMap, builds only the room in sight.
+// Covers: specs/drlg/preset.md §3.2
+#[test]
+fn client_generation_streams_an_automap_level_in_list_order() {
+    let run = |on_client: bool, automap: bool| {
+        let mut dat = data();
+        gen_level(&mut dat, 2, 2);
+        dat.levels[2].size = [(48, 8); 3];
+        let mut types = FakeTypes::default();
+        types
+            .rooms
+            .insert(2, (0..6).map(|i| preset(8 * i, 0, 8, 8)).collect());
+        types.default_grid = Some(floor_grid);
+        if automap {
+            types.automap_levels = vec![2];
+        }
+        let mut w = World::new(dat, types);
+        let mut d = Drlg::create(0, INIT, 0, 0, on_client, &w.data, &mut w.types).unwrap();
+        let mut svc = w.svc();
+        let hit = d.set_in_sight_at(&mut svc, 2, 8, 0, None).unwrap();
+        let l = d.find_level(2).unwrap();
+        let r = d.level_rooms(l);
+        assert_eq!(hit, Some(r[1]));
+        let active: Vec<Option<RoomId>> =
+            r.iter().map(|&x| d.active_room(x).map(|a| a.id)).collect();
+        active
+    };
+    // Client copy, AutoMap level: every room built, in list order.
+    let all = run(true, true);
+    let ids: Vec<RoomId> = all.iter().map(|a| a.expect("every room built")).collect();
+    let mut sorted = ids.clone();
+    sorted.sort();
+    assert_eq!(ids, sorted, "built in level-list order");
+    // Client copy without AutoMap, or a server DRLG: only the room in sight.
+    for (on_client, automap) in [(true, false), (false, true)] {
+        let built: Vec<bool> = run(on_client, automap)
+            .iter()
+            .map(Option::is_some)
+            .collect();
+        assert_eq!(built, [false, true, false, false, false, false]);
+    }
 }

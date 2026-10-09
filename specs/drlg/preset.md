@@ -25,23 +25,23 @@
 | Rules | 86–87 |
 |   1. Records (1.14d layout, for recorders and checks) | 88–103 |
 |   2. Finding lvlprest rows | 104–114 |
-|   3. DrlgType 2 levels | 115–171 |
-|   4. Allocating a preset map (`0x00666ED0`; all level types) | 172–188 |
-|   5. Loading a DS1 (`0x00665F40`, parser `0x00665950`) | 189–271 |
-|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 272–352 |
-|   7. Unit filter (`0x00667620`) | 353–377 |
-|   8. First activation of a preset room (`0x00667890`) | 378–414 |
-|   9. Preset room grids and unit transfer (`0x006667D0`) | 415–444 |
-|   10. Tile fill switches (`0x00666AC0`) | 445–457 |
-|   11. Door preset units (`0x0066D9E0`) | 458–482 |
-|   12. Pops at run time (presentation) | 483–495 |
-|   13. lvlprest columns (1.14d use) | 496–516 |
-| Constants & data dependencies | 517–548 |
-| Randomness | 549–571 |
-| Edge cases & original bugs | 572–589 |
-| Test vectors | 590–615 |
-| Provenance | 616–657 |
-| Open questions | 658–747 |
+|   3. DrlgType 2 levels | 115–184 |
+|   4. Allocating a preset map (`0x00666ED0`; all level types) | 185–201 |
+|   5. Loading a DS1 (`0x00665F40`, parser `0x00665950`) | 202–284 |
+|   6. Building a preset area (`0x00667ED0`, scan `0x00667970`) | 285–365 |
+|   7. Unit filter (`0x00667620`) | 366–390 |
+|   8. First activation of a preset room (`0x00667890`) | 391–427 |
+|   9. Preset room grids and unit transfer (`0x006667D0`) | 428–457 |
+|   10. Tile fill switches (`0x00666AC0`) | 458–470 |
+|   11. Door preset units (`0x0066D9E0`) | 471–495 |
+|   12. Pops at run time (presentation) | 496–508 |
+|   13. lvlprest columns (1.14d use) | 509–529 |
+| Constants & data dependencies | 530–561 |
+| Randomness | 562–584 |
+| Edge cases & original bugs | 585–602 |
+| Test vectors | 603–628 |
+| Provenance | 629–670 |
+| Open questions | 671–760 |
 <!-- /index -->
 
 ## Summary
@@ -161,6 +161,19 @@ may replace the `roll(3)` result after one drlg-seed draw (`0x006774DB`).
      active room to the callback.
    In 1.14d only Defs 1, 301, 529, 797, 863 have `AutoMap` = 1 (levels 1,
    40, 75, 103, 109), so the generic branch runs for levels 1 and 75.
+   Measured (1.14d under Wine, `-seed 1234`, character ScnAma, 2026-10-09,
+   `tools/cloud-game/probe_room_builds.py`): the client's first S→C 0x07
+   (`client/model.md` §9 r1) looks the room up (`0x00642C30`), finds the
+   client's Rogue Encampment without rooms and generates it; that
+   generation resets the seeds of all 35 rooms in level-list order
+   (room 34 first: callers `0x006424F4` ← `0x00642CE9` ← `0x0061B672`
+   ← `0x0061A0BB` ← `0x0045CB11`), before any 0x07 room is built in
+   sight. The server's town generation at DRLG creation builds no room
+   (no automap callback). Consequence for the tile choices (`drlg/rooms.md`
+   §9.4, §9.6): the client's town rooms take their linked cells in that
+   order, so every client floor variant depends on it (scene
+   `a1-town-arrival-ama`: 102 of 102 floor tiles equal after d2rs runs this
+   step, 36 of 102 without). d2rs: `Drlg::generate_level_svc`.
 
 #### 3.3 Freeing
 

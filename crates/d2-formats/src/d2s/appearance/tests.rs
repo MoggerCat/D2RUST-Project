@@ -128,7 +128,7 @@ fn tables_with(
 
 /// The reference slots the synthetic `rows()` are shaped for: slots
 /// 57–124 `weap`, nothing else reserved. With these rows it lands the
-/// 1.14d anchors of §1 r3; the real table (`ReferenceSlots::v1_14d`,
+/// 1.14d anchors of §1 r3; the real table (`ReferenceSlots::game`,
 /// §Constants) is checked on the user's item tables
 /// (`d2-server` `character_save` `token_positions_on_the_users_install`).
 fn fixture_reference() -> ReferenceSlots {

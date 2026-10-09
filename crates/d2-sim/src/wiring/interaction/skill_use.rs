@@ -1085,6 +1085,16 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
+        // `0x00571B70` (`bodies-2.md` §2.13): the 0xA5 record on the unit,
+        // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        if let bodies::BodyEffect::MsgA5 { u, skill } = e {
+            use crate::wiring::action::event_records::EventRecord;
+            let r = EventRecord::Landing {
+                skill: skill as u16,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
+        }
         if let Some(e) = self.pet_effect(e) {
             self.xm().body_effect(e);
         }
@@ -1556,6 +1566,40 @@ impl<X: Pending + UseRest> EventWorld for UseView<'_, X> {
         self.cv.v.h.x.event_corpse_near(game, t0)
     }
     fn queue_item_cast(&mut self, u: UnitId, msg: ItemCastMsg) {
+        // `0x005717C0` / `0x00571840`: the 0x99 / 0x9A record on the unit,
+        // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        // PROVISIONAL (REC-413): the wire level byte is the cast level
+        // clamped to a byte and w (u16) is the `aim` flag; the record
+        // bytes are not spelled out in the specs; settled by a 1.14d
+        // recording of an item-cast skill (`events.txt` item cast).
+        use crate::wiring::action::event_records::EventRecord;
+        let r = match msg {
+            ItemCastMsg::Unit {
+                skill,
+                level,
+                target,
+                aim,
+            } => EventRecord::CastOnUnit {
+                skill: skill as u16,
+                level: level.clamp(0, 255) as u8,
+                target: (target.0 as u8, target.1),
+                w: u16::from(aim),
+            },
+            ItemCastMsg::Point {
+                skill,
+                level,
+                at,
+                aim,
+            } => EventRecord::CastOnPoint {
+                skill: skill as u32,
+                level: level.clamp(0, 255) as u8,
+                x: at.0 as u16,
+                y: at.1 as u16,
+                w: u16::from(aim),
+            },
+        };
+        self.cv.v.h.event_records.push(u, r);
+        let _ = self.cv.game.lists.queue_update(u);
         self.xm().queue_item_cast(u, msg);
     }
     fn raise_test(&self, v: UnitId) -> bool {

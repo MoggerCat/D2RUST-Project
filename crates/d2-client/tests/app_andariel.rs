@@ -87,6 +87,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         combat,
         levels: vec![Record::decode(&vec![0u8; d2_data::tables::Levels::SIZE]); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.data = UnitData {
         monsters: vec![
@@ -209,6 +210,7 @@ fn app_with_game() -> (App, Arc<AtomicU32>, Link) {
     let link: Link = Arc::new(Mutex::new(link));
     let dyn_link: DynLink = Box::new(Shared(link.clone()));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>()
