@@ -61,7 +61,11 @@ exits. Several sessions or worktrees on one PC therefore queue: the second
 prints `another 1.14d run holds the game lock; waiting`. With the lock
 held, it also waits until no `Game.exe` is running, in case a game was
 started by hand or by an older copy of these tools. The wait gives up
-after one hour. `D2_GAME_LOCK=0` turns the lock off.
+after one hour. It also follows the file rule in `docs/handoff/pc1-data.md`:
+it creates `%TEMP%\d2-game.lock` exclusively, waits while another holder
+has it, and deletes it at exit. A lock file older than 15 minutes with no
+`Game.exe` running is treated as left behind and removed. `D2_GAME_LOCK=0`
+turns all of it off.
 
 ## How it hooks the RNG
 
