@@ -71,7 +71,7 @@ fn walk(s: &mut Session, text: &str) -> (PokeResult, GotoWalk) {
     }
 }
 
-// Covers: specs/tools/poke.md §6 r3.2
+// Covers: specs/tools/poke.md §6 r3
 #[test]
 fn goto_a_unit_in_the_active_rooms_lands_next_to_it() {
     let mut s = session();
@@ -116,7 +116,7 @@ fn goto_a_unit_in_the_active_rooms_lands_next_to_it() {
     assert_eq!(s.sim().events.errors(), Vec::<String>::new());
 }
 
-// Covers: specs/tools/poke.md §6 r3.3, r3.4
+// Covers: specs/tools/poke.md §6 r3, §6 r4
 #[test]
 fn goto_a_missing_target_explores_then_fails() {
     let mut s = session();

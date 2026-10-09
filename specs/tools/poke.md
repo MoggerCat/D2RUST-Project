@@ -50,13 +50,13 @@
 |   3. In scenarios | 152–166 |
 |   4. The 1.14d side (`poke.py`) | 167–215 |
 |   5. The d2rs side (`d2-sim::poke`) | 216–230 |
-|   6. `goto`: walking to a target | 231–294 |
-| Constants & data dependencies | 295–307 |
-| Randomness | 308–314 |
-| Edge cases & original bugs | 315–324 |
-| Test vectors | 325–338 |
-| Provenance | 339–344 |
-| Open questions | 345–352 |
+|   6. `goto`: walking to a target | 231–305 |
+| Constants & data dependencies | 306–318 |
+| Randomness | 319–325 |
+| Edge cases & original bugs | 326–335 |
+| Test vectors | 336–349 |
+| Provenance | 350–355 |
+| Open questions | 356–363 |
 <!-- /index -->
 
 ## Summary

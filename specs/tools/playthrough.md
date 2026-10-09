@@ -28,16 +28,16 @@
 | Inputs | 55–62 |
 | Outputs / state changes | 63–74 |
 | Rules | 75–76 |
-|   1. Objective file `playthrough 1` | 77–98 |
-|   2. Predicates | 99–122 |
-|   3. Verdict per milestone | 123–138 |
-|   4. Class × difficulty matrix | 139–206 |
-| Constants & data dependencies | 207–212 |
-| Randomness | 213–217 |
-| Edge cases & original bugs | 218–225 |
-| Test vectors | 226–233 |
-| Provenance | 234–245 |
-| Open questions | 246–267 |
+|   1. Objective file `playthrough 1` | 77–110 |
+|   2. Predicates | 111–134 |
+|   3. Verdict per milestone | 135–150 |
+|   4. Class × difficulty matrix | 151–218 |
+| Constants & data dependencies | 219–224 |
+| Randomness | 225–229 |
+| Edge cases & original bugs | 230–237 |
+| Test vectors | 238–245 |
+| Provenance | 246–257 |
+| Open questions | 258–281 |
 <!-- /index -->
 
 ## Summary
