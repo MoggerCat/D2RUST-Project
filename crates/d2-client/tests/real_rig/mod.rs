@@ -236,6 +236,8 @@ impl Rig {
     /// target). The town's NPCs walk their map-AI paths
     /// (`ai-bodies.md` §9.9), so a leg can be cut short near the gate:
     /// the route is retried from where the player stands, up to 40 times.
+    /// TEMPORARY (build-queue q-fix-real-gate-snapback): 40 hides the gate
+    /// snap-back; back to 12 once it is fixed.
     pub fn leave_town(&mut self) {
         let (town, moor) = (single_player::ACT1_TOWN, single_player::BLOOD_MOOR);
         for _ in 0..40 {
