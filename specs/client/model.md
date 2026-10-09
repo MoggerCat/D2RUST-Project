@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–370 |
-|   6. Position check (`0x004804E0`) | 371–414 |
-|   7. Session messages | 415–590 |
-|   8. Mode requests | 591–676 |
-|   9. Room-in-sight messages | 677–711 |
-|   10. Bit reader | 712–726 |
-|   11. Current act and level (join and later) | 727–772 |
-|   12. Client DRLG and the room of a point | 773–814 |
-|   13. Visibility predicate (`0x004DBF20`) | 815–866 |
-|   14. Pet list and the hireling GUID | 867–920 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 921–1010 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1011–1045 |
-|   17. Model writes made by 1.14d UI code | 1046–1192 |
-|   18. Audio driver inputs and the client object functions | 1193–1223 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1224–1452 |
-| Constants & data dependencies | 1453–1465 |
-| Randomness | 1466–1481 |
-| Edge cases & original bugs | 1482–1506 |
-| Test vectors | 1507–1564 |
-| Provenance | 1565–1668 |
-| Open questions | 1669–1827 |
+|   5. Client update pass | 250–383 |
+|   6. Position check (`0x004804E0`) | 384–427 |
+|   7. Session messages | 428–603 |
+|   8. Mode requests | 604–689 |
+|   9. Room-in-sight messages | 690–724 |
+|   10. Bit reader | 725–739 |
+|   11. Current act and level (join and later) | 740–785 |
+|   12. Client DRLG and the room of a point | 786–827 |
+|   13. Visibility predicate (`0x004DBF20`) | 828–879 |
+|   14. Pet list and the hireling GUID | 880–933 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 934–1023 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1024–1058 |
+|   17. Model writes made by 1.14d UI code | 1059–1205 |
+|   18. Audio driver inputs and the client object functions | 1206–1236 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1237–1465 |
+| Constants & data dependencies | 1466–1478 |
+| Randomness | 1479–1494 |
+| Edge cases & original bugs | 1495–1519 |
+| Test vectors | 1520–1577 |
+| Provenance | 1578–1681 |
+| Open questions | 1682–1840 |
 <!-- /index -->
 
 ## Summary
