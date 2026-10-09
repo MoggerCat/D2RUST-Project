@@ -1,4 +1,4 @@
-# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py --merge-sprites /tmp/s2/a.tsv /tmp/s2/b.tsv --out /tmp/s2/out; game: 1.14d
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/day4/night.jsonl --scene a1-blood-moor-night --frame 22 --out facts/render; game: 1.14d
 file	dir	frame	w	h	xoff	yoff
 data/global/chars/am/hd/amhdlittn1ht.dcc	0	6	9	18	-9	-50
 data/global/chars/am/hd/amhdlittn1ht.dcc	47	0	15	15	-10	-46
@@ -16,6 +16,7 @@ data/global/chars/am/tr/amtrlittn1ht.dcc	0	6	15	25	-12	-31
 data/global/chars/am/tr/amtrlittn1ht.dcc	47	0	16	24	-7	-31
 data/global/chars/so/hd/sohdlitnuhth.dcc	0	0	18	16	-13	-49
 data/global/chars/so/hd/sohdlitnuhth.dcc	0	3	17	17	-13	-48
+data/global/chars/so/hd/sohdlitnuhth.dcc	0	7	17	17	-12	-48
 data/global/chars/so/hd/sohdlitnuhth.dcc	23	6	21	28	-5	-38
 data/global/chars/so/hd/sohdlitnuhth.dcc	28	6	20	29	-4	-37
 data/global/chars/so/hd/sohdlitrnhth.dcc	0	6	18	13	-12	-50
@@ -48,6 +49,7 @@ data/global/chars/so/hd/sohdlittwhth.dcc	56	0	19	22	-13	-42
 data/global/chars/so/hd/sohdlittwhth.dcc	63	3	18	20	-12	-45
 data/global/chars/so/la/solalitnuhth.dcc	0	0	12	27	2	-26
 data/global/chars/so/la/solalitnuhth.dcc	0	3	12	26	2	-26
+data/global/chars/so/la/solalitnuhth.dcc	0	7	12	27	2	-26
 data/global/chars/so/la/solalitnuhth.dcc	23	6	12	25	-15	-28
 data/global/chars/so/la/solalitnuhth.dcc	28	6	12	24	-15	-30
 data/global/chars/so/la/solalitrnhth.dcc	0	6	9	24	4	-27
@@ -80,6 +82,7 @@ data/global/chars/so/la/solalittwhth.dcc	56	0	13	29	2	-25
 data/global/chars/so/la/solalittwhth.dcc	63	3	9	28	4	-26
 data/global/chars/so/lg/solglitnuhth.dcc	0	0	28	46	-14	3
 data/global/chars/so/lg/solglitnuhth.dcc	0	3	28	46	-14	3
+data/global/chars/so/lg/solglitnuhth.dcc	0	7	28	46	-14	3
 data/global/chars/so/lg/solglitnuhth.dcc	23	6	26	47	-15	3
 data/global/chars/so/lg/solglitnuhth.dcc	28	6	28	44	-15	1
 data/global/chars/so/lg/solglitrnhth.dcc	0	6	16	43	-7	0
@@ -112,6 +115,7 @@ data/global/chars/so/lg/solglittwhth.dcc	56	0	21	49	-9	6
 data/global/chars/so/lg/solglittwhth.dcc	63	3	17	47	-8	4
 data/global/chars/so/ra/soralitnuhth.dcc	0	0	11	25	-14	-29
 data/global/chars/so/ra/soralitnuhth.dcc	0	3	11	25	-14	-29
+data/global/chars/so/ra/soralitnuhth.dcc	0	7	11	25	-14	-29
 data/global/chars/so/ra/soralitnuhth.dcc	23	6	11	24	3	-30
 data/global/chars/so/ra/soralitnuhth.dcc	28	6	12	25	3	-28
 data/global/chars/so/ra/soralitrnhth.dcc	0	6	13	24	-15	-28
@@ -144,6 +148,7 @@ data/global/chars/so/ra/soralittwhth.dcc	56	0	9	29	-12	-24
 data/global/chars/so/ra/soralittwhth.dcc	63	3	9	31	-11	-23
 data/global/chars/so/s1/sos1litnuhth.dcc	0	0	6	4	-9	-51
 data/global/chars/so/s1/sos1litnuhth.dcc	0	3	6	4	-9	-51
+data/global/chars/so/s1/sos1litnuhth.dcc	0	7	6	4	-9	-51
 data/global/chars/so/s1/sos1litnuhth.dcc	23	6	7	6	3	-49
 data/global/chars/so/s1/sos1litnuhth.dcc	28	6	7	6	3	-48
 data/global/chars/so/s1/sos1litrnhth.dcc	0	6	7	6	-9	-47
@@ -176,6 +181,7 @@ data/global/chars/so/s1/sos1littwhth.dcc	56	0	7	5	-9	-48
 data/global/chars/so/s1/sos1littwhth.dcc	63	3	8	5	-10	-49
 data/global/chars/so/s2/sos2litnuhth.dcc	0	0	7	4	2	-49
 data/global/chars/so/s2/sos2litnuhth.dcc	0	3	8	5	1	-48
+data/global/chars/so/s2/sos2litnuhth.dcc	0	7	7	5	2	-48
 data/global/chars/so/s2/sos2litnuhth.dcc	23	6	8	5	-9	-48
 data/global/chars/so/s2/sos2litnuhth.dcc	28	6	8	6	-10	-48
 data/global/chars/so/s2/sos2litrnhth.dcc	0	6	8	6	3	-45
@@ -208,6 +214,7 @@ data/global/chars/so/s2/sos2littwhth.dcc	56	0	7	5	2	-49
 data/global/chars/so/s2/sos2littwhth.dcc	63	3	7	6	4	-49
 data/global/chars/so/tr/sotrlitnuhth.dcc	0	0	12	23	-7	-36
 data/global/chars/so/tr/sotrlitnuhth.dcc	0	3	12	23	-7	-36
+data/global/chars/so/tr/sotrlitnuhth.dcc	0	7	12	23	-7	-36
 data/global/chars/so/tr/sotrlitnuhth.dcc	23	6	13	21	-6	-38
 data/global/chars/so/tr/sotrlitnuhth.dcc	28	6	12	20	-5	-39
 data/global/chars/so/tr/sotrlitrnhth.dcc	0	6	13	20	-6	-35
@@ -521,6 +528,7 @@ data/global/ui/cursor/ohand.dc6	0	5	32	27	-2	24
 data/global/ui/cursor/ohand.dc6	0	6	32	28	-2	24
 data/global/ui/cursor/ohand.dc6	0	7	32	29	-2	24
 data/global/ui/cursor/orotate.dc6	0	0	31	30	-2	24
+data/global/ui/cursor/orotate.dc6	0	1	32	30	-2	24
 data/global/ui/cursor/pentspin.dc6	0	2	27	53	11	0
 data/global/ui/cursor/pentspin.dc6	0	3	9	53	21	0
 data/global/ui/cursor/pentspin.dc6	0	5	40	53	7	0
