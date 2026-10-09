@@ -358,7 +358,9 @@ def item_rows(ctx):
         t = excel(ctx.excel, tn, ["code", "name"])
         for r in t.rows:
             code = t.get(r, "code")
-            if code.strip():
+            if code.strip() == "ear":
+                out.append((len(out), "ear", t.get(r, "name")))  # keeps the index; not poked
+            elif code.strip():
                 out.append((len(out), code.strip(), t.get(r, "name")))
     return out
 
@@ -371,7 +373,10 @@ def fam_item(ctx):
         n = k // ITEM_CHUNK
         lines = ["at 4 poke seed-game 0x00001234 666"]
         for j, (idx, code, _) in enumerate(chunk):
-            lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} @y+{2 * (j // 5)}")
+            if code == "ear":
+                continue  # the ear is made from a killed player (PK); `poke item` refuses it
+            dy = 2 * (j // 5)
+            lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} " + (f"@y+{dy}" if dy else "@y"))
         c = Check(f"gen-item-{n:02d}", "item",
                   f"items {chunk[0][0]}-{chunk[-1][0]} (combined index)",
                   f"base items {chunk[0][1]} .. {chunk[-1][1]} ({len(chunk)} items)",

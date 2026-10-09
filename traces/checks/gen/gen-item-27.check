@@ -10,11 +10,11 @@ ticks 20
 seconds 240
 channels items
 at 4 poke seed-game 0x00001234 666
-at 4 poke item sol @x+2 @y+0
-at 4 poke item scz @x+4 @y+0
-at 4 poke item spe @x+6 @y+0
-at 4 poke item key @x+8 @y+0
-at 4 poke item luv @x+10 @y+0
+at 4 poke item sol @x+2 @y
+at 4 poke item scz @x+4 @y
+at 4 poke item spe @x+6 @y
+at 4 poke item key @x+8 @y
+at 4 poke item luv @x+10 @y
 at 4 poke item xyz @x+2 @y+2
 at 4 poke item j34 @x+4 @y+2
 at 4 poke item g34 @x+6 @y+2
@@ -26,7 +26,6 @@ at 4 poke item ass @x+6 @y+4
 at 4 poke item qey @x+8 @y+4
 at 4 poke item qhr @x+10 @y+4
 at 4 poke item qbr @x+2 @y+6
-at 4 poke item ear @x+4 @y+6
 at 4 poke item gcv @x+6 @y+6
 at 4 poke item gfv @x+8 @y+6
 at 4 poke item gsv @x+10 @y+6

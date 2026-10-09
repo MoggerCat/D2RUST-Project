@@ -10,11 +10,11 @@ ticks 20
 seconds 240
 channels items
 at 4 poke seed-game 0x00001234 666
-at 4 poke item gps @x+2 @y+0
-at 4 poke item ops @x+4 @y+0
-at 4 poke item gpm @x+6 @y+0
-at 4 poke item opm @x+8 @y+0
-at 4 poke item gpl @x+10 @y+0
+at 4 poke item gps @x+2 @y
+at 4 poke item ops @x+4 @y
+at 4 poke item gpm @x+6 @y
+at 4 poke item opm @x+8 @y
+at 4 poke item gpl @x+10 @y
 at 4 poke item opl @x+2 @y+2
 at 4 poke item d33 @x+4 @y+2
 at 4 poke item g33 @x+6 @y+2
