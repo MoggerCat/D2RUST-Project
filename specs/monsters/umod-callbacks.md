@@ -30,42 +30,42 @@
 | Inputs | 82–91 |
 | Outputs / state changes | 92–98 |
 | Rules | 99–100 |
-|   1. Scope, order and conventions | 101–139 |
-|   2. Where the dispatcher runs | 140–177 |
-|   3. Shared helpers | 178–347 |
-|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 348–357 |
-|   5. Umod 7 curse: mode 3 `0x005A2530` | 358–387 |
-|   6. Umod 9 fire | 388–413 |
-|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 414–419 |
-|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 420–438 |
-|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 439–448 |
-|   10. Umod 17 lightning | 449–469 |
-|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 470–476 |
-|   12. Umod 19 hireable | 477–492 |
-|   13. Umod 20 scarab | 493–503 |
-|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 504–514 |
-|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 515–560 |
-|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 561–565 |
-|   17. Umod 24 thief: mode 3 `0x005A30E0` | 566–582 |
-|   18. Umod 27 spectralhit | 583–603 |
-|   19. Umod 29 multishot: mode 5 `0x005A3610` | 604–625 |
-|   20. Umod 31 goboom: mode 2 `0x005A2840` | 626–632 |
-|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 633–643 |
-|   22. Umod 33 suicideminion_explode | 644–670 |
-|   23. Umod 34 ai_after_death | 671–696 |
-|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 697–700 |
-|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 701–707 |
-|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 708–713 |
-|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 714–727 |
-|   28. Client umod hooks (table `0x00724E28`) | 728–816 |
-| Constants & data dependencies | 817–832 |
-| Randomness | 833–851 |
-| Edge cases & original bugs | 852–890 |
-| Test vectors | 891–892 |
-|   Synthetic (CI-safe) | 893–925 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 926–933 |
-| Provenance | 934–992 |
-| Open questions | 993–1045 |
+|   1. Scope, order and conventions | 101–152 |
+|   2. Where the dispatcher runs | 153–190 |
+|   3. Shared helpers | 191–360 |
+|   4. Death event `0x005A3800` (mode 1; umods 10, 18, 31, 32, 42) | 361–370 |
+|   5. Umod 7 curse: mode 3 `0x005A2530` | 371–400 |
+|   6. Umod 9 fire | 401–426 |
+|   7. Umod 10 poisondead: mode 2 `0x005A2C20` | 427–432 |
+|   8. Umod 14 spcdamage: mode 0 `0x005A3B50` (traps) | 433–451 |
+|   9. Umod 15 partydead: mode 1 `0x005A2D10` | 452–461 |
+|   10. Umod 17 lightning | 462–482 |
+|   11. Umod 18 cold: mode 2 `0x005A2BD0` | 483–489 |
+|   12. Umod 19 hireable | 490–505 |
+|   13. Umod 20 scarab | 506–516 |
+|   14. Umod 21 killself: mode 2 `0x005A3AA0` | 517–527 |
+|   15. Umod 22 questcomplete: mode 1 `0x005A3250` | 528–573 |
+|   16. Umod 23 poisonhit: mode 0 `0x005A3490` | 574–578 |
+|   17. Umod 24 thief: mode 3 `0x005A30E0` | 579–595 |
+|   18. Umod 27 spectralhit | 596–616 |
+|   19. Umod 29 multishot: mode 5 `0x005A3610` | 617–638 |
+|   20. Umod 31 goboom: mode 2 `0x005A2840` | 639–645 |
+|   21. Umod 32 firespike_explode: mode 2 `0x005A3D20` | 646–656 |
+|   22. Umod 33 suicideminion_explode | 657–683 |
+|   23. Umod 34 ai_after_death | 684–709 |
+|   24. Umod 35 shatter_on_death: mode 1 `0x005A3A80` | 710–713 |
+|   25. Umod 40 worms_on_death: mode 1 `0x005A4200` | 714–720 |
+|   26. Umod 41 always_run_ai: mode 2 `0x005A4230` | 721–726 |
+|   27. Umod 42 lightningdeath: mode 2 `0x005A2910` | 727–740 |
+|   28. Client umod hooks (table `0x00724E28`) | 741–829 |
+| Constants & data dependencies | 830–845 |
+| Randomness | 846–864 |
+| Edge cases & original bugs | 865–903 |
+| Test vectors | 904–905 |
+|   Synthetic (CI-safe) | 906–938 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 939–946 |
+| Provenance | 947–1005 |
+| Open questions | 1006–1058 |
 <!-- /index -->
 
 ## Summary
@@ -129,8 +129,21 @@ data +0x16 bits 0x80 and 0x100 and +0x18, and unit-seed draws.
    record (monster data +0x28): +0x28 game ≠ 0 → the unit looked up by
    (type +0x30, GUID +0x2C) in the game's unit table (`0x00552F60`)
    at every call, no pointer kept; `0x0058F030(game, u, GUID, type, f1,
-   f2)` writes +0x2C, +0x30 and +0x28 := game (f1 / f2 ≠ 0 restart the
-   AI, `0x005DD230`). Owner data (−1, 1, 0, 0) therefore drops the link:
+   f2)` (monsters only; ECX game, EDX u, stack GUID, type, f1, f2)
+   sets control flag bits, then writes +0x2C := GUID, +0x30 := type,
+   +0x28 := game. `0x005DD230(C, bit, on)` is a plain bit set / clear
+   on the control's u16 flags +0x08; here always on = 1: f2 ≠ 0 → C
+   flags |= 0x2 (`0x0058F056`), then f1 ≠ 0 → C flags |= 0x1
+   (`0x0058F06A`); a zero flag leaves its bit as it was (never
+   cleared). No AI restart. 1.14d-read 2026-10-09, settles REC-892.
+   Bit 0x1 = pack leader, bit 0x2 = leadership passes on: read by the
+   death handover `0x0058F6C0` (`sim/units.md` §4.6 rule 1 step 3.1: 0x1 alone
+   → the pack is released; 0x1 and 0x2 → `0x0058F530` makes the first
+   minion leader and sets 0x2, 0x1 on it) and saved / cleared by
+   `0x0058F440`. So the Fallen `SetBoss` + `BossXfer` leader's
+   (GUID, 1, 1, 1) sets both bits; `SetBoss` alone (… 1, 1, 0) sets
+   0x1. `C.flags |= (f2 ? 2 : 0) | (f1 ? 1 : 0)`.
+   Owner data (−1, 1, 0, 0) therefore drops the link:
    the lookup of GUID −1 finds no unit. Alignment =
    `0x006259B0`. "Hostile" = `0x00554200(game, a, b)` (`combat/hit.md`).
 6. U = the unit's own seed (unit +0x20, `rng.md` §5.3). "One U step" =
