@@ -70,7 +70,7 @@ to 500..599, ten per session:
 | q-tool-state-diff (per-tick unit state diff; one-command scenario diff) | 580–589 | Opus |
 | q-tool-poke (state injection on both sides; test-install patch variants) | 590–599 | Opus |
 
-Next free cloud id: REC-600. Session cap raised to 10 for the two tooling sessions.
+Next free cloud id: REC-700 (PC 1 took REC-600..654 as its day block). Session cap raised to 13 for the PC 1 rows (2026-10-09 09:20).
 
 Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
 run only the changed crate's tests while iterating and the full gate before
