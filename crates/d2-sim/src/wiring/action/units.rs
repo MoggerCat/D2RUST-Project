@@ -384,6 +384,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         );
     }
 
+    /// `0x00571A10`(unit, f) (`stat-lists.md` §10.1, `stats.md` §9.3): the
+    /// 0xAB record {f} on the unit, the unit queued for update
+    /// (`intents-events.md` §7.9 rule 2).
+    fn send_life_fraction(&mut self, sim: &mut Sim<'_>, unit: UnitId, fraction: i32) {
+        use super::event_records::EventRecord;
+        let life = fraction.clamp(0, 255) as u8;
+        self.event_records.push(unit, EventRecord::NpcHeal { life });
+        let _ = sim.game.lists.queue_update(unit);
+    }
+
     /// Object events (`units.md` §6.4) on the object state
     /// ([`super::objects`]); a game without one keeps the default.
     fn object_event(&mut self, sim: &mut Sim<'_>, unit: UnitId, event: u8) {

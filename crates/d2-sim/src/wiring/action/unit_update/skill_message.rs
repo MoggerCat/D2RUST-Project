@@ -106,7 +106,9 @@ impl<X: Pending> View<'_, X> {
         // byte; settled by REC-95.
         let b = e.base.wrapping_add(e.level_bonus).clamp(0, 255) as u8;
         let m = match target {
-            Some(t) => self.skill_on_unit_message(game, receiver, (ty, guid), e.skill, b, t),
+            Some(t) => {
+                self.skill_on_unit_message(game, receiver, (ty, guid), e.skill, b, t, 0, false)
+            }
             None => skill_on_point(ty, guid, e.skill as u32, b, point.0, point.1, 0).to_vec(),
         };
         self.h.x.send(receiver, &m);
@@ -117,7 +119,8 @@ impl<X: Pending> View<'_, X> {
     /// receiver without a room, or the target's room not in the
     /// receiver's room's adjacency list (`0x00619790`) → the 17-byte
     /// form at the target's path target; else the 16-byte 0x4C.
-    fn skill_on_unit_message(
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::wiring::action) fn skill_on_unit_message(
         &self,
         game: &Game,
         receiver: UnitId,
@@ -125,7 +128,17 @@ impl<X: Pending> View<'_, X> {
         skill: i32,
         b: u8,
         (tt, tg): (u8, u32),
+        w: u16,
+        flag: bool,
     ) -> Vec<u8> {
+        // Flag ≠ 0 (the pending records, §7.9 rule 2): the id is the
+        // flagless id + 0x4D, 0x4C → 0x99 and 0x4D → 0x9A.
+        let id = |mut m: Vec<u8>| {
+            if flag {
+                m[0] = m[0].wrapping_add(0x4D);
+            }
+            m
+        };
         let found = UnitType::ALL
             .get(tt as usize)
             .and_then(|&t| game.lists.find_unit(t, tg));
@@ -146,10 +159,10 @@ impl<X: Pending> View<'_, X> {
                     .as_ref()
                     .and_then(|p| p.dynamic(t))
                     .map_or((0, 0), |d| (d.target_x, d.target_y));
-                return skill_on_point(ty, guid, skill as u16 as u32, b, x, y, 0).to_vec();
+                return id(skill_on_point(ty, guid, skill as u16 as u32, b, x, y, w).to_vec());
             }
         }
-        skill_on_unit(ty, guid, skill as u16, b, tt, tg, 0).to_vec()
+        id(skill_on_unit(ty, guid, skill as u16, b, tt, tg, w).to_vec())
     }
 
     /// §7.3 rule 2 step 7 (`0x00597CF0`): p := the life fraction, stored

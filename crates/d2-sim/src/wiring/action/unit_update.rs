@@ -86,6 +86,9 @@ impl<X: Pending> View<'_, X> {
     ///    §14 rule 2, [`crate::units::sound::sound_message`]);
     /// 7. unit flag 0x8000 (hit): S→C 0x0C (`0x00597CF0`,
     ///    [`skill_message::monster_hit`]);
+    /// 9. the unit's list has the overlay flag (`0x00625A20`): S→C 0x11
+    ///    (`0x0053D850`, `units::messages::report_kill`) with the overlay
+    ///    list's stat 178 when it is in 0..=[`super::ActionTables::overlay_count`];
     /// 10. unit flag 0x800 and monster data +0x5C bit 1 (`0x00573540(unit,
     ///     1)`): S→C 0x57 (`0x00597C70` → `0x0053D880`,
     ///     `units::messages::npc_enchants`).
@@ -94,11 +97,10 @@ impl<X: Pending> View<'_, X> {
     /// announced) gets its add messages (§7.2, [`View::monster_add`]:
     /// 0xAC, 0x98, 0x21, 0xAA, part B with a mode message). Of rule 2,
     /// step 3 sends the pending event records
-    /// ([`View::send_event_records`], §7.9 rule 2) and steps 5,
-    /// 8 and 9 are not sent: step 5 needs the item world, step 8's test
-    /// `0x00639F20` and stat sender `0x005711D0` and step 9's
-    /// `0x00625A20` / `0x005715A0` overlay-list reads have no d2rs
-    /// provider yet.
+    /// ([`View::send_event_records`], §7.9 rule 2) and steps 5
+    /// and 8 are not sent: step 5 needs the item world, step 8's test
+    /// `0x00639F20` and stat sender `0x005711D0` have no d2rs provider
+    /// yet.
     pub fn monster_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
             return;
@@ -132,7 +134,7 @@ impl<X: Pending> View<'_, X> {
             self.mode_update(game, client, receiver, unit);
         }
         // Step 3: the pending event records (`0x00571CD0`, §7.9 rule 2).
-        self.send_event_records(receiver, unit);
+        self.send_event_records(game, receiver, unit);
         // Step 4.
         if unit_flags & flags::HOVER_FREED != 0 {
             self.overhead_message(receiver, unit, UnitType::Monster as u8, guid);
@@ -145,6 +147,16 @@ impl<X: Pending> View<'_, X> {
         // Step 7.
         if unit_flags & HIT != 0 {
             self.hit_message(receiver, unit, guid);
+        }
+        // Step 9: the unit's list has the overlay flag (`0x00625A20`) →
+        // `0x005715A0`: stat 178 of the overlay list, 0..=overlay count
+        // (inclusive) → S→C 0x11 (`0x0053D850`).
+        if let Some(v) = self.stats.overlay_to_send(unit) {
+            if (0..=self.h.tables.overlay_count).contains(&v) {
+                let m =
+                    crate::units::messages::report_kill(UnitType::Monster as u8, guid, v as u16);
+                self.h.x.send(receiver, &m);
+            }
         }
         // Step 10: unit flag 0x800 → `0x00597C70`: monster data +0x5C
         // bit 1 (`0x00573540(unit, 1)`) → S→C 0x57 (`0x0053D880`).

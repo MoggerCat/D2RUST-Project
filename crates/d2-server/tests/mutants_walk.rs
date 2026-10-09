@@ -245,6 +245,7 @@ fn tables() -> ActionTables {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     }
 }
 

@@ -411,6 +411,7 @@ impl Fx {
             },
             levels: Vec::new(),
             skill_modes: Vec::new(),
+            overlay_count: 0,
         };
         let mut hooks = ActionHooks::new(
             Arc::new(tables),
