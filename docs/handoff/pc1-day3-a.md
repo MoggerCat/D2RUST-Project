@@ -67,3 +67,20 @@ points: 800–814.
   seed state or think timing, or from the interaction gate (item 3).
   No q-fix row for the node choice. Which cause it is: live run 1 below
   (`traces/checks/rng-town-idle-sor.check`).
+- **Item 3 — quest active-test seam** (the interact gate of
+  `q-fix-p3-npc-nearest-player`). Read `0x00544590`, its caller
+  `0x005DDE80` and `0x005DDF20`. Written into `specs/world/quests.md`
+  §6.4 "The active test as a seam":
+  - inputs: game, player, NPC; output: a bool, plus the 0x8A send;
+  - the `interact` precheck (false, no walk);
+  - the act comes from the player's client;
+  - records are walked newest → oldest and filtered by act;
+  - each active fn gets (record, NPC class, player, the player's
+    quest-flag record of the game difficulty, NPC);
+  - the first true sends `8A 01 GUID` and stops;
+  - the fatal asserts are listed.
+  The scan callback calls the test before `d < best` and stops at the
+  first taker, so 0x8A goes out at the think rate. A scan of the 39
+  active fns found no RNG and no stores. d2rs differs: the test returns
+  nothing, walks the records oldest first, and the AI never calls it.
+  Row `q-fix-p3-npc-interact-gate`.

@@ -567,6 +567,71 @@ player, player record, npc) returns true, send `8A 01 <npc GUID u32>`
 (6 bytes) and stop. Recorded every 20 frames or so while near the NPC
 (`8a 01 07000000` from frame 24 on in `022633`).
 
+**The active test as a seam** (the NPC AI's interact gate; read in full
+2026-10-09 from `0x00544590` and its caller `0x005DDE80` / `0x005DDF20`;
+`monsters/ai.md` §5.3 scan 2). Signature: `active_test(game, player C,
+npc N) → bool`, with one side effect (the 0x8A send). In order:
+
+1. C null or not a player (type ≠ 0) → fatal 0x7EC; N null or not a
+   monster (type ≠ 1) → fatal 0x7ED.
+2. N's class (+0x04) outside monstats, or its flags byte +0xD AND
+   `[0x006CE26C]` (= 2, `interact`) is 0 → **false** (no list walk,
+   no send).
+3. Control = game +0x10F4; picked (control +0x08) = 0 → fatal 0x7F4.
+4. act := the act byte of C's client (`0x005531C0(C)` → client,
+   `0x005382B0(client)`; the client record's act, not the unit's
+   room): the act the client was last sent (`sim/path-placement.md`
+   §13), which equals the player's room act except during an act
+   change.
+5. Walk the records from control +0x00 through +0xF4 (newest → oldest:
+   chains 40, 39, 38, 37, then 36 … 0, §2.3). Skip a record whose act
+   byte (+0x08) ≠ act. For a record of that act:
+   1. active_fn (+0xEC) null → fatal 0x813; not a code pointer
+      (`IsBadCodePtr`) → fatal 0x802. (Every record has one, so these
+      never happen in a well-formed set; d2rs may skip instead.)
+   2. F := the player's quest-flag record for the game's difficulty:
+      player data (`0x006221A0(C)`, null → fatal 0x803) +0x10 + 4 ×
+      game +0x6D (difficulty 0–2); null → fatal 0x805. (The same
+      record the save's quest section loads, `formats/d2s.md`.)
+   3. r := active_fn(ECX record, EDX N's class, C, F, N), a byte. The
+      functions are the per-quest "active fn" of `quests.tsv` and the
+      act files (`quests-act1.md` §10.3 A1Q0: warriv1 and slot 0 bit 0
+      clear; …). They read only F, the record, the game record (slot
+      bits), other records' not-intro bytes and the NPC intro record
+      (§6.7). A scan of the 39 functions stored at +0xEC (37 in the
+      export; `0x005985C0` returns false, `quests-act2-2.md`;
+      `0x005BD0C0` is not exported) finds no inline seed step and no
+      store outside their own frame; their calls are the bit test
+      `0x0065C310`, the lookup `0x00543640`, `0x00544760`, the intro
+      test `0x005723C0`, player data `0x006221A0`, and `0x00558110`,
+      `0x00554010`, `0x006253B0`, `0x00545290`, `0x00599590`,
+      `0x005BBF80` (not followed here; their act files own them).
+   4. r ≠ 0 → send `8A 01 <N GUID u32>` to C's client (`0x0053DFF0`,
+      queued S→C, 6 bytes) and return **true**; the walk stops at the
+      first true.
+6. No record of the act returns true → **false**.
+
+The gate in the scan callback `0x005DDE80(game, N, C, ctx)` (ctx =
+{best unit, best d}, best d starts 0x7FFFFFFF): C not a player →
+skip. d := full-size distance `0x005DC380(N, C)`; d > 15 → skip. N
+null or without `interact` → take C. With `interact`: call
+active_test(game, C, N) **before** the d < best test; true and d <
+best → take C. Taking writes (C, d) and stops the scan, so best d is
+never smaller than 0x7FFFFFFF when the test runs, and the test runs
+once per qualifying player per scan, in scan order, until one passes.
+Consequences: (a) 0x8A goes to every player (within 15, in scan order
+up to the taker) for whom the test passes, and the AI takes the first
+of them; (b) the 0x8A rate is the NPC's think rate while a player is
+within 15; (c) an NPC with no room: `0x005DDF20` returns 0 (not the
+NPC) without scanning.
+
+d2rs: `QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
+implements steps 2–6 with the 0x8A send but returns nothing, walks
+`records` from index 0 (oldest first), takes the act from
+`unit_act(player)`, and is not called from the AI's `nearest_player`
+(`wiring/action/ai.rs`, which has no gate). Row
+`q-fix-p3-npc-interact-gate`.
+
 #### 6.5 S→C 0x89 UniqueEvent
 
 `0x00545760(game, b)` stores b at control +0x20 and, for every player,
