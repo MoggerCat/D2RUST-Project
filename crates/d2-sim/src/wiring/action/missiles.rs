@@ -276,62 +276,51 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The candidates of `0x00641CB0` (`path-placement.md` §4 rule 6)
-    /// with query size `r`, through [`crate::path::collision::unit_at_point`]
-    /// on the DRLG's rooms (every candidate offered to an accept that
-    /// collects it and declines).
+    /// `0x00641CB0(room, x, y, accept, arg, r)` without the accept call
+    /// (`sim/path-placement.md` §4 rule 6): `r` outside 1..3 finds none;
+    /// the room and its adjacency array (the room first), units in
+    /// room-list order; players in mode 0 / 17 and monsters in mode 0 /
+    /// 12 are skipped, objects, items and tiles never found; a unit of
+    /// size `s` (> 3 counts 3, ≤ 0 skipped) is found when the query
+    /// shape of size `r` overlaps its shape (rule 5's table).
     fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
-        let search = UnitSearch { v: self, game };
-        let mut out = Vec::new();
-        crate::path::collision::unit_at_point(&search, Some(room), x, y, r, |u| {
-            out.push(u);
-            false
-        });
-        out
-    }
-}
-
-/// The unit search's view (`path-placement.md` §4 rule 6): the DRLG's
-/// active rooms and the game's room unit lists.
-struct UnitSearch<'a, 'v, X> {
-    v: &'a View<'v, X>,
-    game: &'a Game,
-}
-
-impl<X: Pending> crate::path::collision::CollisionRooms for UnitSearch<'_, '_, X> {
-    fn subtile_rect(&self, room: RoomId) -> Option<crate::drlg::TileRect> {
-        self.v.h.drlg.subtile_rect(room)
-    }
-    fn adjacent_count(&self, room: RoomId) -> usize {
-        self.v.h.drlg.adjacent_count(room)
-    }
-    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
-        self.v.h.drlg.adjacent(room, i)
-    }
-    fn grid(&self, room: RoomId) -> Option<&crate::drlg::collision::CollisionGrid> {
-        self.v.h.drlg.grid(room)
-    }
-    fn grid_mut(&mut self, _: RoomId) -> Option<&mut crate::drlg::collision::CollisionGrid> {
-        None
-    }
-}
-
-impl<X: Pending> crate::path::collision::UnitsAtPoint for UnitSearch<'_, '_, X> {
-    type Unit = UnitId;
-    fn room_units(&self, room: RoomId) -> Option<Vec<UnitId>> {
-        Some(self.game.lists.room_units(room))
-    }
-    fn unit_type(&self, unit: UnitId) -> UnitType {
-        self.game.lists.unit(unit).map_or(UnitType::Tile, |e| e.ty)
-    }
-    fn unit_mode(&self, unit: UnitId) -> u32 {
-        self.v.units.get(unit).map_or(0, |r| r.mode)
-    }
-    fn unit_size(&self, unit: UnitId) -> i32 {
-        self.v.path_size(unit)
-    }
-    fn unit_point(&self, unit: UnitId) -> (i32, i32) {
-        self.v.h.path_position(unit)
+        if !(1..=3).contains(&r) {
+            return Vec::new();
+        }
+        let adjacent = game
+            .lists
+            .room(room)
+            .map(|r| r.adjacent.clone())
+            .unwrap_or_default();
+        std::iter::once(room)
+            .chain(adjacent.into_iter().filter(|&r| r != room))
+            .flat_map(|r| game.lists.room_units(r))
+            .filter(|&u| {
+                let Some(rec) = self.units.get(u) else {
+                    return false;
+                };
+                match rec.ty {
+                    UnitType::Player if matches!(rec.mode, 0 | 17) => return false,
+                    UnitType::Monster if matches!(rec.mode, 0 | 12) => return false,
+                    UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                    _ => return false,
+                }
+                let s = self.path_size(u).min(3);
+                if s <= 0 {
+                    return false;
+                }
+                let (ux, uy) = self.h.path_position(u);
+                let (dx, dy) = ((x - ux).abs(), (y - uy).abs());
+                match (r, s) {
+                    (1, 1) => dx == 0 && dy == 0,
+                    (1, 2) | (2, 1) => dx + dy <= 1,
+                    (1, 3) | (3, 1) => dx <= 1 && dy <= 1,
+                    (2, 2) => dx + dy <= 2,
+                    (2, 3) | (3, 2) => (dx <= 2 && dy <= 1) || (dx <= 1 && dy <= 2),
+                    _ => dx <= 2 && dy <= 2,
+                }
+            })
+            .collect()
     }
 }
 

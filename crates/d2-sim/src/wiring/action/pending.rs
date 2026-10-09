@@ -696,6 +696,13 @@ pub trait Pending {
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
         (None, 0x7FFF_FFFF, false)
     }
+    /// The scan 6 candidates of `0x005DDC30` before the callback's
+    /// filter (`ai.md` §5.3): the live units hostile to `unit`, in scan
+    /// order; `None` = the host runs the whole search itself
+    /// ([`Self::secondary_target`]).
+    fn secondary_candidates(&mut self, game: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     /// `0x005DDF20`: the NPC itself when none.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
         (unit, false)

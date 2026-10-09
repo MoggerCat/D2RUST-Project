@@ -455,6 +455,13 @@ pub fn kill_by<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: Option<Unit
     // Step 3.
     let game = &mut *cv.game;
     if let Some(a) = a {
+        // The death request's direction toward A (`0x00621DC0(D, A x, A
+        // y)`), applied by the mode set's snap `0x006488A0`
+        // (`sim/pathing.md` §8.5).
+        let at = cv.v.h.path_position(a);
+        if let Some(dir) = cv.v.path_dir64(d, at) {
+            cv.v.path_snap_direction(d, dir);
+        }
         cv.v.h.x.kill_step(game, KillStep::FaceAttacker, d, a);
     }
     cv.v.h.mode_target = a;

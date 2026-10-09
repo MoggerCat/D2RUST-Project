@@ -334,3 +334,5 @@ REC-1000	6746		Client player mode end (PROVISIONAL, `d2-client` `bridge/player_a
 REC-1001	6747		Client player animation rate (PROVISIONAL, `bridge/player_anim.rs` `rate`; q-fix-input-loc	recording	no		3	
 REC-1002	6748		The click gate `0x00480BA0` is not run (PROVISIONAL, `bridge/click.rs` `apply` / `skill_re	unstated	no		2	
 REC-1030	6525		Monster and summon equipment (PROVISIONAL, `d2-sim` `wiring/economy/monster_equip.rs`, `wi	recording	no		5	
+REC-1270	6749		Trap target scan skips a monster in melee range (PROVISIONAL, `d2-sim` `wiring/action/ai.r	unstated	no		3	
+REC-1271	6750		Alternative target order (PROVISIONAL, same code): with no main candidate the alternative 	unstated	no		1	

@@ -437,6 +437,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 speed: 256,
                 pos: 0,
                 events: frames.iter().map(|f| f.event).collect(),
+                drawn: frames.iter().map(|f| f.frame).collect(),
             });
         }
         if rec.ty != UnitType::Player {
@@ -455,6 +456,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             speed: 256,
             pos: 0,
             events: frames.iter().map(|f| f.event).collect(),
+            drawn: frames.iter().map(|f| f.frame).collect(),
         })
     }
 
