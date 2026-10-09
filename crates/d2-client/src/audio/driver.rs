@@ -80,12 +80,6 @@ pub const PENDING: &[(&str, &str)] = &[
         "the item grid actions are the inventory UI's and the item quality is in the item \
          stream, not in the model's item view; only the base-row cursor / drop sounds are wired",
     ),
-    (
-        "level-entry lines (`environment.md` §4 r2)",
-        "the client quest check `0x004A4180` (`world/quests-status.md` §12) needs the 0x5E \
-         bytes and the quest records, which no client owner holds for the sound layer: asked \
-         as pending, answered no",
-    ),
 ];
 
 /// A fatal path of the original (a [`SoundWorld`] question the model
@@ -920,14 +914,11 @@ struct Hooks<'a> {
 }
 
 impl EnvHooks for Hooks<'_> {
-    /// `0x004A4180(q)` reads the client quest state of
-    /// `world/quests-status.md` §12 (the 0x5E bytes, the quest records),
-    /// which no client owner holds for the sound layer yet: pending.
-    fn quest_check(&self, _: u8) -> bool {
-        self.asked
-            .borrow_mut()
-            .push("client quest check 0x004A4180 (environment.md §4 r2): quest state not held");
-        false
+    /// `0x004A4180(q)` over the client quest state the bridge keeps
+    /// (`world/quests-status.md` §12): the 0x5E bytes and the records of
+    /// 0x28 / 0x29 / 0x52.
+    fn quest_check(&self, q: u8) -> bool {
+        crate::audio::quest_check::client_quest_check(self.world, q)
     }
 
     fn player_event(&mut self, s: &mut dyn SoundCalls, e: u8) {
@@ -1619,7 +1610,7 @@ mod tests {
         assert!(!sw.blocked(key) && !sw.indoors() && sw.client_seed().is_none());
         assert_eq!(sw.asked.borrow().len(), 3);
         assert!(
-            PENDING.len() >= 4,
+            PENDING.len() >= 3,
             "the not-wired list shrank only with wiring"
         );
     }

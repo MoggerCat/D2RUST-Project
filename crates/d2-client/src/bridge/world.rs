@@ -743,6 +743,15 @@ pub struct ClientWorld {
     /// client quest byte 1 (`render/lighting.md` §8 monster row, §10 r1,
     /// §13 "override state"). `None` until the first 0x5E.
     pub quest_availability: Option<[u8; 37]>,
+    /// The client quest state the level-entry check `0x004A4180` reads
+    /// (`world/quests-status.md` §12): the player's flag record P (S→C
+    /// 0x28 type 6, `[0x007C0D43]`), the game's G (0x29), the status list
+    /// S (0x52) and the counters D, Y, B of 0x50 type 1. `None` until the
+    /// message arrives (the UI layer keeps its own copy).
+    pub quest_player: Option<[u8; 96]>,
+    pub quest_game: Option<[u8; 96]>,
+    pub quest_status: Option<[u8; 41]>,
+    pub quest_counters: [i32; 3],
     /// Active rooms created since the last client update's lighting part,
     /// for the Den lights of a level-8 room loaded after the Den flag
     /// (`render/lighting.md` §10 r1, `0x0046BE60`).

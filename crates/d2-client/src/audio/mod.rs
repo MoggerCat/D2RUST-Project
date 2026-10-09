@@ -28,6 +28,7 @@ pub mod log;
 pub mod mixer;
 pub mod output;
 pub mod pool;
+pub mod quest_check;
 pub mod sound_table;
 pub mod triggers;
 pub mod unit_feed;
