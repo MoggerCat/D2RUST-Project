@@ -55,10 +55,6 @@ pub enum BackgroundError {
     /// capture records `[0x00712C4C]` / `[0x00712C50]`).
     #[error("TODO(spec: {SPEC} §12): level {level} background first use without a recorded seed")]
     NoSeed { level: u32 },
-    /// The star tick needs `last` before the first call (§12 r3 names no
-    /// initial value).
-    #[error("TODO(spec: {SPEC} §12 r3): initial value of the star tick `last` is not specified")]
-    NoStarLast,
     /// The star colors need the palette `nearest` searches (§12 r1).
     #[error("TODO(spec: {SPEC} §12 r1): star colors need the palette `nearest` reads")]
     NoPalette,
@@ -140,7 +136,7 @@ pub struct Stars {
 impl Stars {
     /// The first call's set-up (r1): `seed` is the recorded time-seeded
     /// seed, `last` the tick of the last move (an input: §12 does not name
-    /// its initial value). `w`, `h` are `W`, `H` (`camera.md` §1).
+    /// its initial value is 0, §12 l74 r3). `w`, `h` are `W`, `H` (`camera.md` §1).
     pub fn new(seed: Seed, last: u32, palette: &Palette, w: i32, h: i32) -> Self {
         let mut s = Stars {
             seed,
@@ -338,7 +334,8 @@ pub struct BackgroundFrame<'a> {
     /// The recorded seeds for a first use (level 74, level 120).
     pub stars_seed: Option<Seed>,
     pub summit_seed: Option<Seed>,
-    /// The star tick `last` before the first call (§12 r3 open).
+    /// The star tick `last` before the first call: `None` = 0, the
+    /// zero-filled global `[0x007B57E0]` (§12 l74 r3).
     pub stars_last: Option<u32>,
     /// The palette `nearest` searches for the star colors.
     pub palette: Option<&'a Palette>,
@@ -362,7 +359,7 @@ impl Backgrounds {
                     let seed = f
                         .stars_seed
                         .ok_or(BackgroundError::NoSeed { level: f.level })?;
-                    let last = f.stars_last.ok_or(BackgroundError::NoStarLast)?;
+                    let last = f.stars_last.unwrap_or(0);
                     let palette = f.palette.ok_or(BackgroundError::NoPalette)?;
                     self.stars = Some(Stars::new(seed, last, palette, f.w, f.h));
                 }

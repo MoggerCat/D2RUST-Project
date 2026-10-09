@@ -434,53 +434,48 @@ impl SocketDialog {
         handled_by_inventory: bool,
         cursor: Option<CursorItem>,
     ) -> (Vec<SocketEffect>, bool) {
-        // Ignored within 400 ms of the last accepted click.
+        // Ignored within 400 ms of the last click; every click not ignored
+        // stamps the time first, accepted or not (§11 r5).
         if now.wrapping_sub(self.last_click) < CLICK_GAP_MS {
             return (Vec::new(), true);
         }
+        self.last_click = now;
         let mut e = Vec::new();
-        if matches!(self.step, Step::Open | Step::Placed) && handled_by_inventory {
+        let live = matches!(self.step, Step::Open | Step::Placed);
+        if live && handled_by_inventory {
             return (e, true);
         }
-        // The button press (`0x004BFBC0`, sound 1).
-        for b in &mut self.buttons {
-            if b.hit(pos.0, pos.1) {
-                b.pressed = true;
-                b.armed = true;
-                e.push(SocketEffect::Sound(1));
+        // The button press (`0x004BFBC0`, sound 1): steps 1 and 2 only.
+        if live {
+            for b in &mut self.buttons {
+                if b.hit(pos.0, pos.1) {
+                    b.pressed = true;
+                    b.armed = true;
+                    e.push(SocketEffect::Sound(1));
+                }
             }
         }
-        // The item area: x 123–211, y 106–220.
+        // The item area: x 123-211, y 106-220, keyed on the model's cursor
+        // item (it stays the placed item while placed).
         if (123..=211).contains(&pos.0) && (106..=220).contains(&pos.1) {
-            match (self.step, cursor) {
-                (Step::Open, Some(c)) => {
-                    let accepted = c.type_ok
-                        && match self.mode {
-                            Mode::Npc => c.npc_accepts,
-                            Mode::Object => c.is_staff,
-                        };
-                    if accepted {
-                        self.step = Step::Placed;
-                        self.placed = c.guid;
-                        self.last_click = now;
-                        e.push(SocketEffect::CursorEmptied);
-                    } else {
-                        e.push(SocketEffect::Sound(3));
-                    }
-                }
-                // PROVISIONAL (specs/ui/messages.md §11 r5; REC-ui-socket):
-                // with an item placed, a click in the area without a
-                // cursor item takes it back (`0x004BFA70`, step 2 → 1),
-                // with a cursor item it is refused.
-                (Step::Placed, None) => {
+            if let (Step::Open | Step::Placed, Some(c)) = (self.step, cursor) {
+                let accepted = c.type_ok
+                    && match self.mode {
+                        Mode::Npc => c.npc_accepts,
+                        Mode::Object => c.is_staff,
+                    };
+                if !accepted {
+                    e.push(SocketEffect::Sound(3));
+                } else if self.step == Step::Open {
+                    self.step = Step::Placed;
+                    self.placed = c.guid;
+                    e.push(SocketEffect::CursorEmptied);
+                } else {
                     self.step = Step::Open;
                     self.placed = 0;
-                    self.last_click = now;
                     e.push(SocketEffect::ItemToCursor);
                     e.push(SocketEffect::Sound(1));
                 }
-                (Step::Placed, Some(_)) => e.push(SocketEffect::Sound(3)),
-                _ => {}
             }
         }
         (e, true)
@@ -876,10 +871,11 @@ mod tests {
         assert!(e.is_empty() && d.step == Step::Open);
         // A staff dropped in the area (mode 0): placed; its drop sound is
         // the cursor's.
-        let (e, c) = d.left_down(2000, (150, 150), false, Some(staff(9)));
+        // (The inventory-handled click at 2000 stamped the time already.)
+        let (e, c) = d.left_down(2500, (150, 150), false, Some(staff(9)));
         assert!(c);
         assert_eq!(e, vec![SocketEffect::CursorEmptied]);
-        assert_eq!((d.step, d.placed, d.last_click), (Step::Placed, 9, 2000));
+        assert_eq!((d.step, d.placed, d.last_click), (Step::Placed, 9, 2500));
         // An item other than the staff in mode 0: refused, sound 3.
         let (mut d, _) = open_obj(true);
         let mut c = staff(4);
@@ -890,7 +886,7 @@ mod tests {
         // A type that fails `0x006280A0(item, 0x10)`: refused.
         let mut c = staff(4);
         c.type_ok = false;
-        let (e, _) = d.left_down(2000, (150, 150), false, Some(c));
+        let (e, _) = d.left_down(2500, (150, 150), false, Some(c));
         assert_eq!(e, vec![SocketEffect::Sound(3)]);
         // Mode 1: the NPC must accept it.
         let mut n = SocketDialog::new();
@@ -903,20 +899,46 @@ mod tests {
             vec![SocketEffect::Sound(3)]
         );
         c.npc_accepts = true;
-        n.left_down(2000, (150, 150), false, Some(c));
+        n.left_down(2500, (150, 150), false, Some(c));
         assert_eq!((n.step, n.placed), (Step::Placed, 4));
-        // Step 2: taking it back (step 1, placed 0, the item on the
-        // cursor, sound 1).
-        let (e, _) = n.left_down(3000, (150, 150), false, None);
+        // Step 2: the model's cursor item stays the placed item; a click
+        // in the area takes it back (step 1, placed 0, sound 1).
+        let (e, _) = n.left_down(3000, (150, 150), false, Some(c));
         assert_eq!(e, vec![SocketEffect::ItemToCursor, SocketEffect::Sound(1)]);
         assert_eq!((n.step, n.placed), (Step::Open, 0));
+        // Placed + a refused cursor item: sound 3; no cursor item: nothing.
+        n.step = Step::Placed;
+        n.placed = 4;
+        let mut bad = c;
+        bad.npc_accepts = false;
+        assert_eq!(
+            n.left_down(3500, (150, 150), false, Some(bad)).0,
+            vec![SocketEffect::Sound(3)]
+        );
+        assert!(n.left_down(4000, (150, 150), false, None).0.is_empty());
+        assert_eq!((n.step, n.placed), (Step::Placed, 4));
+        n.step = Step::Open;
+        n.placed = 0;
         // Outside the area (x 123–211, y 106–220): nothing placed.
-        let (e, _) = n.left_down(4000, (122, 150), false, Some(staff(1)));
+        let (e, _) = n.left_down(4500, (122, 150), false, Some(staff(1)));
         assert!(e.is_empty());
+        // A refused click stamps the time: 450 ms later a click is accepted
+        // by the gate, one 350 ms after that is ignored.
+        let (mut d, _) = open_obj(true);
+        d.left_down(2000, (150, 150), false, Some(staff(9)));
+        d.left_down(2450, (10, 10), false, None);
+        assert_eq!(d.last_click, 2450);
+        d.step = Step::Open;
+        let (e, _) = d.left_down(2800, (150, 150), false, Some(staff(9)));
+        assert!(e.is_empty() && d.step == Step::Open);
         // A press inside a button arms it (sound 1).
         let (e, _) = n.left_down(5000, (130, 230), false, None);
         assert_eq!(e, vec![SocketEffect::Sound(1)]);
         assert!(n.buttons[0].armed && n.buttons[0].pressed);
+        // Waiting (step 3): the button loop is skipped.
+        let (mut w3, _) = open_obj(true);
+        w3.step = Step::Waiting;
+        assert!(w3.left_down(5000, (130, 230), false, None).0.is_empty());
     }
 
     // Test vector "item dialog step 2, mode 1, NPC GUID 5, item GUID 9,

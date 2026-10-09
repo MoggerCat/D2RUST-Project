@@ -667,7 +667,7 @@ fn clientfn_16_portal() {
     assert_eq!((obj(&w).mode, obj(&w).frame), (2, 0));
 }
 
-// Covers: specs/world/objects-client.md §26.6 text, §25 r5
+// Covers: specs/world/objects-client.md §25 r9
 #[test]
 fn generic_step_clamps_a_non_cycling_mode() {
     let mut w = world((0, 0));
@@ -676,20 +676,132 @@ fn generic_step_clamps_a_non_cycling_mode() {
     i.objclient.rows[0].frame_cnt = [3 * 256; 8];
     i.objclient.rows[0].cycle_anim[0] = 1;
     obj_mut(&mut w).mode = 3;
-    // 200, 400, 600, then 800 ≥ 768 → End(3) = 512; the next step adds
-    // the speed again (712 < 768: no clamp).
+    // r9.2.2: the end test (f ≥ 512) runs before the advance. 200, 400,
+    // 600 (< 768: no clamp); then 600 ≥ 512 and mode ≠ 1: the frame stays.
     let mut frames = Vec::new();
     for _ in 0..5 {
         object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
         frames.push(obj(&w).frame);
     }
-    assert_eq!(frames, [200, 400, 600, 512, 712]);
+    assert_eq!(frames, [200, 400, 600, 600, 600]);
     assert_eq!(obj(&w).mode, 3);
-    // A cycling mode wraps (PROVISIONAL).
+    // The clamp: 500 + 300 = 800 ≥ 768 → End(3) = 512, then it stops.
+    i.objclient.rows[0].frame_delta = [300; 8];
+    obj_mut(&mut w).frame = 400;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 700);
+    obj_mut(&mut w).frame = 300;
+    obj_mut(&mut w).speed = Some(500);
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 512);
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 512);
+    // A cycling mode wraps to Start[m] · 256 + (f − FrameCnt): frame
+    // 700 + 200 with Start0 = 1 → 256 + 132.
+    i.objclient.rows[0].frame_delta = [200; 8];
+    i.objclient.rows[0].start[0] = 1;
     obj_mut(&mut w).mode = 0;
     obj_mut(&mut w).frame = 700;
+    obj_mut(&mut w).speed = None;
     object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
-    assert_eq!(obj(&w).frame, 900 - 768);
+    assert_eq!(obj(&w).frame, 388);
+}
+
+// Covers: specs/world/objects-client.md §25 r9
+#[test]
+fn generic_step_one_frame_and_door() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    i.objclient.rows[0].frame_delta = [50; 8];
+    i.objclient.rows[0].frame_cnt = [0x100; 8];
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 0);
+    // FrameCnt 0 is not "one frame": a cycling mode advances (r9.3: the
+    // wrap adds f − FrameCnt to Start).
+    i.objclient.rows[0].frame_cnt = [0; 8];
+    i.objclient.rows[0].cycle_anim[0] = 1;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 50);
+    obj_mut(&mut w).frame = 0;
+    // IsDoor, non-cycling: the door step (PROVISIONAL, REC-725), not this one.
+    i.objclient.rows[0].frame_cnt = [4 * 256; 8];
+    i.objclient.rows[0].cycle_anim[0] = 0;
+    i.objclient.rows[0].is_door = 1;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!(obj(&w).frame, 0);
+}
+
+// Covers: specs/world/objects-client.md §25 r9
+#[test]
+fn generic_step_mode_1_turns_into_mode_2_after_the_clamp() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    let r = &mut i.objclient.rows[0];
+    r.frame_delta = [256; 8];
+    r.frame_cnt = [2 * 256; 8];
+    r.start[2] = 1;
+    r.order_flag2 = 1;
+    r.parm7 = 0xFF;
+    r.selectable[2] = 1;
+    r.lit[2] = 5;
+    r.rgb = (1, 2, 3);
+    r.has_collision = [0, 1, 0, 0, 0, 0, 0, 0];
+    obj_mut(&mut w).mode = 1;
+    let mut out = Vec::new();
+    // 0 → 256: the advance (256 < 512 − 256 + 1 is the last-frame test of
+    // the NEXT update); no turn yet.
+    object_update(&mut w, &i, S, &mut out).unwrap();
+    assert_eq!((obj(&w).mode, obj(&w).frame), (1, 256));
+    assert!(!out
+        .iter()
+        .any(|o| matches!(o, Output::ObjectFx(ObjFx::FlagOr { .. }))));
+    // 256 ≥ End(1) = 256 → mode 2, frame Start2 · 256.
+    object_update(&mut w, &i, S, &mut out).unwrap();
+    assert_eq!((obj(&w).mode, obj(&w).frame), (2, 256));
+    assert_eq!(obj(&w).flag_2, Some(true));
+    let unit = ObjUnit {
+        key: OBJ,
+        client_only: false,
+    };
+    assert!(out.contains(&Output::ObjectFx(ObjFx::FlagOr {
+        unit,
+        bits: 0x10_0000
+    })));
+    assert!(out.contains(&Output::ObjectFx(ObjFx::Parm7Sound { unit, id: 0x153 })));
+    assert!(out.contains(&Output::ObjectFx(ObjFx::Light {
+        unit,
+        lit: 5,
+        rgb: (1, 2, 3)
+    })));
+    assert!(out.contains(&Output::ObjectFx(ObjFx::Collision { unit })));
+}
+
+// Covers: specs/world/objects-client.md §25 r9, §25 r9
+#[test]
+fn generic_step_class_12_runs_backwards_and_189_chains() {
+    let mut w = world((0, 0));
+    let mut i = inputs(0, 0);
+    i.objclient.rows = (0..190).map(|_| row(0)).collect();
+    for r in &mut i.objclient.rows {
+        r.frame_delta = [100; 8];
+        r.frame_cnt = [4 * 256; 8];
+        r.cycle_anim[0] = 1;
+        r.cycle_anim[3] = 1;
+        r.start[3] = 0;
+        r.start[4] = 2;
+    }
+    obj_mut(&mut w).class = 12;
+    obj_mut(&mut w).mode = 0;
+    obj_mut(&mut w).frame = 50;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    // 50 − 100 < 0 → + FrameCnt.
+    assert_eq!(obj(&w).frame, 50 - 100 + 4 * 256);
+    // Class 189: mode 3 runs backwards; below 0 → mode 4, Start4 · 256.
+    obj_mut(&mut w).class = 189;
+    obj_mut(&mut w).mode = 3;
+    obj_mut(&mut w).frame = 60;
+    object_update(&mut w, &i, S, &mut Vec::new()).unwrap();
+    assert_eq!((obj(&w).mode, obj(&w).frame), (4, 2 * 256));
 }
 
 // Covers: specs/world/objects-client.md §25 r8; specs/world/objects.md §4 text

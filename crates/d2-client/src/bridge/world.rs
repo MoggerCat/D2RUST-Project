@@ -244,6 +244,9 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// Unit +0x38 >> 8: the frame event index (`ui/controls.md` §6 r4,
+    /// `0x004645B0`). The play host writes the local player's; 0 else.
+    pub event_index: u32,
     /// +0x48: the animation's frame count (8.8), written by a monster's
     /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
     pub frame_count: i32,
@@ -299,6 +302,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            event_index: 0,
             frame_count: 0,
             speed: None,
             flag_ex: 0,
@@ -1425,6 +1429,8 @@ pub struct SkillRow {
     pub skilldesc: u16,
     /// `EType` (+0x1DC).
     pub etype: u8,
+    /// `seqinput` (+0x16; `ui/controls.md` §6 r4).
+    pub seqinput: u8,
     /// `range` (+0x14, the `@range` index: 0 none, 1 h2h, 2 rng, 3 both,
     /// 4 loc; `ui/controls.md` §6 r4, `skills/use.md` §3 r6).
     pub range: u8,

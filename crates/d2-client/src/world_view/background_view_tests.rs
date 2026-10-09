@@ -165,3 +165,34 @@ fn only_level_120_draws_and_never_while_exiting() {
     let log = v.add_to_frame(&world(120), 0, 10_063, &mut a, &mut frame);
     assert!(frame.items.is_empty() && log.len() == 1, "{log:?}");
 }
+
+// Covers: specs/render/draw-order-2.md §12
+#[test]
+fn seeds_mix_the_clock_and_the_shake_start() {
+    use super::{stars_seed_at, summit_seed_at};
+    // time 100, tick 7: 100 + 7 + 7 = 114.
+    assert_eq!(
+        summit_seed_at(100, 7),
+        Seed::init_low(d2_sim::rng::time_value(114))
+    );
+    // The stars add the shake start instead of a second tick count.
+    assert_eq!(
+        stars_seed_at(100, 7, 50),
+        Seed::init_low(d2_sim::rng::time_value(157))
+    );
+    assert_eq!(
+        stars_seed_at(100, 7, 0),
+        Seed::init_low(d2_sim::rng::time_value(107))
+    );
+}
+
+// Covers: specs/render/draw-order-2.md §12
+#[test]
+fn level_74_initialises_the_stars_once_with_last_zero() {
+    let mut a = assets();
+    let mut v = view();
+    let mut frame = framed();
+    v.add_to_frame(&world(74), 0, 0, &mut a, &mut frame);
+    assert!(v.state().stars.is_some());
+    assert!(frame.items.is_empty());
+}

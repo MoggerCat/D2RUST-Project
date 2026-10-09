@@ -176,7 +176,9 @@ the floor rounding are `camera.md`'s RE results.
    `render/camera.md` §4 "Screen → world": the unit origin, minus
    `shiftX`, with **no −8** on y, then `0x00643510` (floor shifts);
    perspective first when on. d2rs's `bridge::click::screen_to_world`
-   subtracts 8 from y: q-fix-click-no-minus-8.
+   had subtracted 8 from y. CONFLICT with REC-514 (measured, §2.1):
+   the recording wins, so d2rs subtracts 4 (q-fix-click-no-minus-8 is
+   superseded; re-read `0x0045AFF0` to settle which constant it adds).
 2. The hover model `0x00467A10` (the original hit-tests drawn sprites):
    when specified, §2.5 becomes "the pick reads the drawn cel's
    rectangle", and the d2rs-own box goes.

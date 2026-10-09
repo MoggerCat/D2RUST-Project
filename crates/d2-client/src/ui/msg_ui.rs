@@ -240,6 +240,14 @@ impl OriginalUi {
             self.game_message(o, world.frames);
             return Ok(());
         }
+        if let Output::NpcIntro { slots } = *o {
+            // 0x91 also sets the talk's return-greeting flags (§13 r2).
+            let rows = self.more.monstats_rows;
+            let mut st = self.npcm.borrow_mut();
+            for v in slots.into_iter().filter(|&v| u32::from(v) < rows) {
+                st.talk.intro().on_0x91(u32::from(v));
+            }
+        }
         if self.apply_more(o)? {
             return Ok(());
         }

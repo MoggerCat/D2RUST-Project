@@ -104,7 +104,7 @@ newest-first, and set each row's status to `done <commit>`.
 - The coordinator polls `claude/local-pc1-facts` and the private repo's
   `main`; no message is needed.
 
-## Set up any state for a check (q-tool-poke, 2026-10-09)
+## Set up any state for a check (q-tool-poke, final 2026-10-09)
 
 Never walk through the game to reach a state. Three layers, the same on
 1.14d and d2rs, so a comparison starts from identical state:
@@ -112,28 +112,64 @@ Never walk through the game to reach a state. Three layers, the same on
 | Need | Tool | Spec |
 |---|---|---|
 | the character (class, level, stats, skills, waypoints, quests, items) | `d2s-tool new` / `set` → a `.d2s` | `formats/d2s.md` |
-| units and world state at a tick (monster, superunique, object, missile, game / unit seed, time of day; d2rs also pos, warp, item, stat, state) | a poke: `traces/pokes/<name>.poke`, `at <t> poke ...` scenario steps, or `--poke "<frame> <directive> ..."` | `tools/poke.md` |
+| units and world state at a frame | a poke (directives below) | `tools/poke.md` |
 | table data (a level with one monster class, a fixed damage range, ...) | a test variant: `traces/variants/<name>/<name>.d2stack` → `data-tool variant build` | `tools/test-variants.md` |
+| the front-end screens | `record_frames.py --front-end --front-end-script "..."` | `render/capture.md` §2a |
+
+Directives (`tools/poke.md` §1; refs `@player`, `@x±N`, `@y±N`,
+`@<type>[:<class>][#n]`, `<type>/<guid>`):
+
+| Directive | 1.14d (`poke.py`) | d2rs |
+|---|---|---|
+| `spawn <class> <x> <y> normal\|champion umod <u>\|random-boss\|unique umod <u>...` | runs (all four kinds checked on 1.14d) | runs |
+| `superunique <row> <x> <y>` | runs | runs |
+| `object <class> <x> <y> [mode <m>]` (the object init runs at the point: a chest operates and drops as the seed rolls) | runs | runs |
+| `missile <class> <x> <y> <tx> <ty> [skill <id> <lvl>] [owner <ref>]` | runs | runs |
+| `seed-game <lo> <hi>`, `seed-unit <ref> <lo> <hi>` | runs | runs |
+| `time <period 0..5> <ticks>` | runs | runs |
+| `freeze <seconds>` | holds the game | no-op |
+| `pos <ref> <x> <y>` | **item 22 (a)**: fill `CALL_FORMS["teleport"]` or `["place"]` | runs |
+| `warp <level> [tile <n>]` | **item 22 (b)**: `CALL_FORMS["warp"]` | runs (any act) |
+| `item <code> <x> <y> [quality <q>] [ilvl <n>]` | **item 22 (c)**: `CALL_FORMS["item_create"]` | runs |
+| `stat <ref> <stat> <layer> <value>`, `state <ref> <state> on\|off` | **item 22 (d)**: `CALL_FORMS["stat_set"]`, `["state_set"]` | runs |
+
+A directive whose form is missing reports `gap`, and the comparison is
+`partial`, never silently skipped. Filling a form (item 22): answer into
+the owning spec, try it with `poke.py --forms FILE` (format
+`poke-forms-1`, `tools/trace-recorder/README.md` "Call forms"), copy it
+into `CALL_FORMS`, `py tools\trace-recorder\poke.py --selftest`, run once
+on the game.
+
+Commands (Windows, PC 1; in the cloud prefix each 1.14d command with
+`tools/cloud-game/run.sh --python --seconds 150 --`):
 
 ```
-# 1.14d (Windows; in the cloud: tools/cloud-game/run.sh --python --seconds 150 -- <the same command>)
-py tools/trace-recorder/poke.py --poke-file traces/pokes/spawn-town.poke --auto ScnAma --seed 1234 --seconds 60
-py tools/trace-recorder/poke.py --poke "4 spawn 19 4876 4231 normal" --auto ScnAma --seed 1234
-#   other recorders: import poke; poke.add_options(ap); poke.PokeLayer.from_args(a).attach(rec)
-# d2rs
-cargo run -p scenario-run -- run traces/scenarios/poke-spawn-town.scenario --game-dir %D2_GAME_DIR%
-cargo run -p d2-client -- play --save ScnAma.d2s --seed 1234 --poke-file traces/pokes/spawn-town.poke
-# test variant (output outside the repo; never commit it)
-cargo run --release -p data-tool -- variant build traces/variants/only-fallen/only-fallen.d2stack --out ..\variants\only-fallen
-py tools/trace-recorder/record_tick.py --game ..\variants\only-fallen\Game.exe --auto ScnAma --seed 1234
+:: 1.14d: a poke file (relative ticks) or absolute frames
+py tools\trace-recorder\poke.py --poke-file traces\pokes\spawn-town.poke --auto ScnAma --seed 1234 --seconds 60
+py tools\trace-recorder\poke.py --poke "4 spawn 19 @x+3 @y+3 normal" --poke "8 missile 58 @x @y @x+3 @y+3 skill 36 1" --auto ScnAma --seed 1234
+py tools\trace-recorder\poke.py --forms my-forms.json --poke "4 warp 2" --auto ScnAma --seed 1234
+:: any recorder takes the same --poke / --poke-file (record_state, record_frames)
+:: one-command 1.14d vs d2rs comparison of a .check file (at <frame> poke ... lines)
+py tools\scenario-diff\scenario_diff.py traces\checks\poke-fallen-town.check
+:: d2rs
+cargo run -p scenario-run -- run traces\scenarios\poke-spawn-town.scenario --game-dir %D2_GAME_DIR%
+cargo run -p d2-client -- play --save ScnAma.d2s --seed 1234 --poke-file traces\pokes\spawn-town.poke
+cargo run -p d2-client -- state-dump --save ScnAma.d2s --seed 1234 --ticks 54 --poke "4 spawn 19 @x+3 @y+3 normal" --out traces\raw\x.jsonl
+:: test variant (output outside the repo; never commit it)
+cargo run --release -p data-tool -- variant build traces\variants\only-fallen\only-fallen.d2stack --out ..\variants\only-fallen
+py tools\trace-recorder\record_tick.py --game ..\variants\only-fallen\Game.exe --auto ScnAma --seed 1234
+:: front end (main menu, character select, create, loading)
+py tools\trace-recorder\record_frames.py --seconds 140 --front-end --front-end-script "wait 8; shot main-menu; wait 5; click 400 307; wait 10; shot char-select; wait 5; click 117 498; wait 12; shot char-create; wait 5; click 97 555; wait 10; shot loading change; key ENTER; wait 25; end"
+py tools\trace-recorder\facts_render.py traces\raw\<time>-frames.jsonl --shot main-menu
 ```
 
-Rules: pokes run between two server ticks (after frame t, before the next
-drain) and draw no RNG of their own; a directive with no spec'd 1.14d
-call form reports `gap` on 1.14d (item 22 below lists them) and the
-comparison is `partial`, never silently skipped. A variant is a patch
-stack (rule 9): commit the `.d2stack` / `.d2patch`, never the built
-install.
+Rules: pokes run between two server frames (after frame f − 1, before
+frame f's drain) and draw no RNG of their own. Checked on 1.14d vs d2rs
+(REC-590): `traces/checks/poke-fallen-town-unpinned.check` equal in
+every compared field for 54 frames. The front-end script's waits were
+tuned under Wine (menu up after ~20 s); on Windows shorten the first
+wait. A variant is a patch stack (rule 9): commit the `.d2stack` /
+`.d2patch`, never the built install.
 
 ## Step 4 — binary reads and one recording only PC 1 can do (queued by the coordinator, 2026-10-08)
 
@@ -501,3 +537,6 @@ Then the rest:
   `q-fix-ui-npc-talk-facts`, `q-fix-render-bg-seed`.
 - **Closures (no code change, tests only):** `q-fix-proto-vitals-dx-sign`,
   `q-fix-proto-state-param-sign`, `q-fix-seam-stamina-scale`.
+31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
+32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
+33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).

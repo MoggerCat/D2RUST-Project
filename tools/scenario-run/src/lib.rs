@@ -39,6 +39,7 @@ use d2_server::adapters::handlers::world::{
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::seams::{ClientId, MessageSink, PlayerGate, Pos, SessionHandler};
 use d2_server::transport::{Classified, Queue, ServerQueues};
+use d2_server::world_data::tables::drop_tables;
 use d2_sim::combat::vitals::init_player_stats;
 use d2_sim::drlg::{act_of_level, DrlgError};
 use d2_sim::game::Game;
@@ -52,7 +53,7 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
 use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, Pending};
-use d2_sim::wiring::economy::GameFields;
+use d2_sim::wiring::economy::{DeathDrops, GameFields};
 use d2_sim::wiring::interaction::{VitalsRest, VitalsView};
 use d2_sim::wiring::worldgen::dispatch::WorldSim;
 use d2_sim::wiring::worldgen::{WorldPending, WorldState};
@@ -344,6 +345,21 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     fields.game_type = 3;
     ActionEvents::create_game(&mut sim, &fields);
     sim.create_regions();
+    // The object control, the next creation seed (`rng.md` §5.2,
+    // `objects.md` §2), so objects (presets, `poke object`) get their
+    // init and the 0x13 object case reaches their operate; the chest
+    // drop's state (`treasure.md` §4) on the action wiring, as the play
+    // game holds it.
+    sim.create_objects(Arc::new(d.object_tables().map_err(b)?));
+    match drop_tables(&d.fixed) {
+        Ok(t) => {
+            sim.action.hooks().object_drops = Some(Box::new(DeathDrops::new(
+                Arc::new(t),
+                GameFields::new(Seed::init_low(0), false),
+            )))
+        }
+        Err(e) => gaps.push(format!("drops: no drop tables ({e}): objects drop nothing")),
+    }
 
     let wp_levels = d.waypoints().map_err(b)?;
     // The area generated and every room streamed.

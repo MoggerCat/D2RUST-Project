@@ -873,8 +873,9 @@ impl Pending for LocalSeams {
     fn item_max_stack(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).max_stack
     }
-    fn anim_name(&self, _: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
-        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode)
+    fn anim_name(&self, unit: UnitId, ty: UnitType, class: u32, mode: u32) -> Option<[u8; 8]> {
+        let weapon = self.weapons.cof_class(unit);
+        super::anim_names::anim_key(self.looks.as_deref()?, ty, class, mode, weapon)
     }
     fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
         super::anim_names::anim_rate(speed)
@@ -1779,6 +1780,7 @@ pub fn client_monster_anims(
                 d2_sim::units::UnitType::Monster,
                 class as u32,
                 mode as u32,
+                0,
             );
             *a = match key {
                 Some(k) => anim.record(&k).ok().map(|rec| (rec.frames, rec.speed)),
