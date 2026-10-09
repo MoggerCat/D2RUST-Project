@@ -349,7 +349,8 @@ def route(kb, ch, s):
         for m in kb.modules_for(sp["spec"], sp["section"]):
             if m not in mods:
                 mods.append(m)
-    own = kb.owner_for([s["spec"] for s in specs] + mods)
+    own = kb.owner_for([s["spec"] + ("#" + s["section"][4:] if s["section"].startswith("row ") else "")
+                        for s in specs] + mods)
     return {"channel": ch, "line": s, "what": what, "specs": specs, "modules": mods[:6],
             "owner": own and {"area": own["area"], "session": own["session"], "branch": own["branch"]},
             "routed": bool(specs) and own is not None}
