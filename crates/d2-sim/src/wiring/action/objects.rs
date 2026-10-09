@@ -112,6 +112,20 @@ pub trait QuestObjectHost<X> {
     ) {
         let _ = (game, v, player, from, to);
     }
+    /// The quest active test `0x00544590(game, player, npc)` of the NPC
+    /// scan callback (`world/quests.md` §6.4, `monsters/ai.md` §5.3):
+    /// true when an active function of the player's act passed, which
+    /// also sent S→C 0x8A. Default: false (nothing sent).
+    fn npc_active_test(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        player: UnitId,
+        npc: UnitId,
+    ) -> bool {
+        let _ = (game, v, player, npc);
+        false
+    }
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }

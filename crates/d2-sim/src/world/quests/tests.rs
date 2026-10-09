@@ -1426,13 +1426,17 @@ fn npc_wants_interact() {
     ctl.picked = true;
     // Records are walked newest first: the Act I intro's active fn (not
     // specified) is reached before Warriv's gossip.
-    ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1)
-        .unwrap();
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1),
+        Ok(true)
+    );
     assert_eq!(f.sent.last().unwrap().1, hex("8a 01 12000000"));
     f.sent.clear();
     f.p(P1).quests.flags[0].set(0, 0);
-    ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1)
-        .unwrap();
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1),
+        Ok(false)
+    );
     assert!(f.sent.is_empty());
 }
 

@@ -1010,18 +1010,32 @@ fn the_nearest_client_player_within_15_is_found() {
     let m = fx.spawn(UnitType::Monster, 0, a, 20, 10);
     // Every monster has an interaction block (`npc.md` §2 r2).
     assert!(fx.sim.with(&mut fx.game, |_, v| v.has_interaction_block(m)));
-    let far = fx.spawn(UnitType::Player, 0, a, 36, 10);
+    // `0x005DDE80`: the full-size distance (the NPC's size subtracted
+    // per axis, `0x005DC380`), d ≤ 15.
+    let size = fx.sim.with(&mut fx.game, |_, v| v.size(m));
+    let far = fx.spawn(UnitType::Player, 0, a, 20 + 16 + size, 10);
     fx.game.lists.add_client(Some(far), Some(a), 0);
     // 16 away: none, the unit itself.
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
     assert_eq!(got, (m, false));
-    let near = fx.spawn(UnitType::Player, 0, a, 23, 13);
+    let near = fx.spawn(UnitType::Player, 0, a, 23 + size, 13 + size);
     fx.game.lists.add_client(Some(near), Some(a), 0);
-    // (3, 3): no-size distance 4, found, not "close" (< 4).
+    // (3, 3): distance 4, found, not "close" (< 4).
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
     assert_eq!(got, (near, false));
     // A player unit without a client is not scanned.
     let _ = fx.spawn(UnitType::Player, 0, a, 21, 10);
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
     assert_eq!(got, (near, false));
+    // The first qualifying player in scan order is taken (the scan
+    // stops), not the nearest: a later one (prepended to the room list)
+    // at distance 10 wins over `near`; a player at 15 qualifies.
+    let ten = fx.spawn(UnitType::Player, 0, a, 30 + size, 10);
+    fx.game.lists.add_client(Some(ten), Some(a), 0);
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (ten, false));
+    let edge = fx.spawn(UnitType::Player, 0, a, 20 + 15 + size, 10);
+    fx.game.lists.add_client(Some(edge), Some(a), 0);
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (edge, false));
 }

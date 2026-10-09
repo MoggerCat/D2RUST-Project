@@ -1978,15 +1978,20 @@ impl QuestControl {
         Ok(())
     }
 
-    /// `0x00544590` (§6.4): S→C 0x8A when an active function wants the
-    /// player to talk to `npc`.
+    /// `0x00544590` (§6.4 "The active test as a seam", steps 3–6): walks
+    /// the records of the player's act newest first; the first active
+    /// function that returns true sends S→C 0x8A and makes the result
+    /// true. Step 2 (an NPC class without monstats `interact` → false)
+    /// is the caller's: the AI's scan callback calls this only for such
+    /// NPCs. The act is the player's unit act (the client's act equals
+    /// it except during an act change, which the sim does not model).
     pub fn npc_wants_interact<W: QuestWorld>(
         &self,
         w: &mut W,
         player: UnitId,
         npc: UnitId,
         npc_class: u16,
-    ) -> Result<(), QuestError> {
+    ) -> Result<bool, QuestError> {
         if !self.picked {
             return Err(QuestError::NotPicked);
         }
@@ -2003,10 +2008,10 @@ impl QuestControl {
                 m[1] = 1;
                 m[2..6].copy_from_slice(&w.guid(npc).to_le_bytes());
                 w.send(player, &m);
-                return Ok(());
+                return Ok(true);
             }
         }
-        Ok(())
+        Ok(false)
     }
 
     /// `0x00545760` (§6.5): store b, then 0x28 and `89 b` to every player.

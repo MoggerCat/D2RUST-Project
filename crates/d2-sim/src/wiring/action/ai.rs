@@ -418,13 +418,14 @@ impl<X: Pending> AiTargets for View<'_, X> {
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
-    /// list order) keeping the nearest within 15; "close" when it is
-    /// nearer than 4; the unit itself when none.
-    /// PROVISIONAL (`ai.md` §5.3, REC-500): the callback's distance is
-    /// read as the no-size distance `0x005DC530` between the two
-    /// positions, "within 15" as ≤ 15 and a tie keeps the first found;
-    /// settled by a recording of an NPC with a player at 15 / 16 and two
-    /// players at equal distance.
+    /// list order) with the callback `0x005DDE80`: d := the full-size
+    /// distance `0x005DC380(npc, C)`; d > 15 → skip; an NPC without
+    /// monstats `interact` takes C; with it, C is taken only when the
+    /// quest active test `0x00544590` holds (`world/quests.md` §6.4,
+    /// [`super::QuestObjectHost::npc_active_test`], which sends S→C 0x8A
+    /// when it passes; no quest host lent: false) and d < the best d
+    /// (0x7FFFFFFF). Taking stops the scan. "Close" when d < 4; the unit
+    /// itself when none is taken.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
         use crate::path::collision::CollisionRooms;
         let Some(room) = game.lists.unit(unit).and_then(|e| e.room()) else {
@@ -438,23 +439,42 @@ impl<X: Pending> AiTargets for View<'_, X> {
             rooms.insert(0, room);
         }
         let players = super::dying::client_players(game);
+        let candidates: Vec<UnitId> = rooms
+            .into_iter()
+            .flat_map(|r| game.lists.room_units(r))
+            .filter(|p| players.contains(p))
+            .collect();
+        let interact = self
+            .units
+            .get(unit)
+            .and_then(|r| self.h.tables.combat.monstats(r.class as i32))
+            .is_some_and(|m| m.interact);
         let at = self.h.path_position(unit);
-        let mut best: Option<(UnitId, i32)> = None;
-        for r in rooms {
-            for p in game.lists.room_units(r) {
-                if !players.contains(&p) {
-                    continue;
-                }
-                let dist = crate::monsters::ai::distance_no_size(at, self.h.path_position(p));
-                if dist <= 15 && best.is_none_or(|(_, b)| dist < b) {
-                    best = Some((p, dist));
-                }
+        let size = self.path_size(unit);
+        const BEST: i32 = 0x7FFF_FFFF;
+        for p in candidates {
+            let dist = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(p));
+            if dist > 15 {
+                continue;
+            }
+            let take = if interact {
+                let active = match self.h.quest_host.take() {
+                    Some(mut host) => {
+                        let r = host.npc_active_test(game, self, p, unit);
+                        self.h.quest_host = Some(host);
+                        r
+                    }
+                    None => false,
+                };
+                active && dist < BEST
+            } else {
+                true
+            };
+            if take {
+                return (p, dist < 4);
             }
         }
-        match best {
-            Some((p, dist)) => (p, dist < 4),
-            None => (unit, false),
-        }
+        (unit, false)
     }
     fn find_door(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.find_door(game, unit)
