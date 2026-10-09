@@ -299,3 +299,53 @@ spawn.
     d2rs → `q-fix-b45-createxgame-byte18`.
   - Then the Blood Moor warp population (known:
     `q-fix-b-bloodmoor-warp-population`).
+
+### [q-fix-b-monster-combat] Quill Rat at frame 59 (answered)
+- **Correction:** my earlier note ("the rat is placed elsewhere") was
+  wrong. In 1.14d the rat is at the poke point (5147, 4267), exactly as in
+  d2rs. The arrows (missile class 0) reach it at f41–42 and f53–54 and do
+  0 damage, because ScnAma has no bow.
+- **1.14d rat lines, f30–64** (from
+  `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl`, the
+  `record_state.py` output; every row x 5147, y 4267, hp 1280):
+
+  | Frames | Mode | Seed s |
+  |---|---|---|
+  | 30 | 1 | [21370634, 838424606] |
+  | 31–35 | 5 | [2409280208, 8913528] (think, 1 draw) |
+  | 36–43 | 5 | [4094205064, 1004892389] (quill 1 created at f36) |
+  | 44–45 | 1 | same |
+  | 46–58 | 1 | [1069704589, 1707661690] (quill 1's to-hit at the player at f46: a miss, 1 owner step, REC-826) |
+  | 59–63 | **5** | **[1069704589, 1707661690], unchanged** |
+  | 64 | 5 | [3163442939, 446165621] (quill 2 created) |
+
+- **Answer:** the f59 think takes A2 with no draw on the rat's seed (the
+  same seed from f46 to f63). That is `monsters/ai-bodies.md` §9.7 r8 step
+  3: AI state 3 / 19 → A2, no draw. The arrow that reached the rat at
+  f54 set state 19 even with 0 damage (a hit with no get-hit mode), and
+  the 0x005A68E0 rule turns 19 into 3 when the next non-neutral mode is
+  left.
+- So the cloud's draw count is right: no extra draws make P(35) pass,
+  because 1.14d takes no draw there. d2rs walks because it never stores
+  the AI state (`q-fix-c3-quillrat-choice`). The arrows **do** cause it:
+  they set the state. A run without arrows would differ in 1.14d too.
+
+### [q-fix-b-monster-combat] REC-890, REC-891, REC-892 (answered)
+- **REC-890:** the neutral start after a zero-length walk sends **0x6D**
+  (`0x00597E20` mode-1 case `0x00598067`–`0x005980B0` → `0x0053BB70`:
+  GUID, cell, life byte; stat 328 += 1), not 0x67 code 7.
+  `monsters/ai.md` §7.5 r8 is corrected (my REC-665 text was wrong there).
+  d2rs already matches. Correction row: `q-fix-c7-b665-correction`.
+- **REC-891:** the monster base list (`0x00574072`–`0x00574086`) is
+  `0x006251F0` with flags 1, expire 0, owner type 1 / owner GUID = the
+  unit, then `0x00626E10(unit, list, reset 1)`. It is not DYNAMIC, so
+  mindamage / maxdamage / tohit go into the totals. Spec:
+  `monsters/init.md` §6 step 12. d2rs matches.
+- **REC-892:** `0x0058F030` (ECX game, EDX unit; stack GUID, type, f1,
+  f2): f2 ≠ 0 sets control flags bit 0x2, f1 ≠ 0 sets 0x1
+  (`0x005DD230` only sets bits; it does not restart the AI). Then
+  +0x2C / +0x30 / +0x28.
+  - The death handover `0x0058F6C0` uses the bits: 0x1 alone releases
+    the pack; 0x1 + 0x2 makes the first minion the leader (`0x0058F530`).
+  - Spec: `monsters/umod-callbacks.md` §1 r5.
+  - d2rs differs: row `q-fix-c7-owner-flags`.
