@@ -9,6 +9,7 @@ seed 1234
 ticks 70
 seconds 300
 channels state rng
+ignore q
 at 10 send AddStatPoint stat=0 repeat=1
 at 14 send AddStatPoint stat=1 repeat=1
 at 18 send AddStatPoint stat=2 repeat=1

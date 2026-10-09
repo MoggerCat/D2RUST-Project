@@ -7,6 +7,7 @@ ticks 100
 seconds 300
 difficulty hell
 channels state rng
+ignore q
 variant blood-moor-empty
 at 4 poke warp 2
 at 30 poke spawn 19 @x+4 @y+4 normal

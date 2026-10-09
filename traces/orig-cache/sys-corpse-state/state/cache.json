@@ -1,0 +1,38 @@
+{
+ "channel": "state",
+ "check": "sys-corpse-state",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "220",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "10 stat @player 6 0 0"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "a375e5b6eeba40a6f4865f5d560ad9dc8788095d933c30771d26b18516be1e4c",
+   "size": 912344
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "7ee161627247abda49bb5832419bec03e7cceca3f6ee635562d11d4a8acd6c23",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "34a481c679d94ec9597eefc371db57fbf425fc6bcb33a7fb5c06bbb0cf11f1de"
+ }
+}

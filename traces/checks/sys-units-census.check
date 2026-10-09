@@ -9,6 +9,7 @@ seed 1234
 ticks 140
 seconds 360
 channels state rng
+ignore q
 variant blood-moor-empty
 at 4 poke warp 2
 at 30 poke seed-game 0x00001234 666
@@ -17,5 +18,5 @@ at 30 poke spawn 19 @x+4 @y+4 normal
 at 34 poke object 119 @x-4 @y+4
 at 38 poke item hp1 @x+2 @y+2
 at 42 poke missile 12 @x @y @x+5 @y+5 skill 7 5
-at 46 poke spawn 63 @x+5 @y-5 unique
-at 60 poke spawn 5 @x-5 @y-5 champion
+at 46 poke spawn 19 @x+5 @y-5 unique umod 3
+at 60 poke spawn 19 @x-5 @y-5 champion

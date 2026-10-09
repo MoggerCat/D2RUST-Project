@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "sys-vitals-create-bar",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "220",
+  "--auto",
+  "ScnBar",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "10 stat @player 6 0 2560",
+  "--poke",
+  "10 stat @player 8 0 1024",
+  "--poke",
+  "10 stat @player 10 0 5120"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "4fcb6e7cd39de3f4f5d91daa3a79b13a96ccaaf5de72f5d92180bf5ed0fd5d2c",
+   "size": 913096
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "8adc7c095d5858b06a14e885fa5f149fa12938236b0d14dfbc3cb457ad7d7825",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "0c75f656c9fe7adb2b58ec2ad55b1720c688f104a7f0997df6ddc8a3ef16de0e"
+ }
+}

@@ -8,6 +8,7 @@ seed 1234
 ticks 80
 seconds 300
 channels state rng
+ignore q
 at 10 poke stat @player 6 0 99999999
 at 12 poke stat @player 8 0 99999999
 at 14 poke stat @player 10 0 99999999

@@ -9,6 +9,7 @@ seed 1234
 ticks 110
 seconds 300
 channels state rng
+ignore q
 at 4 poke warp 2
 at 30 poke seed-game 0x00001234 666
 at 30 poke seed-unit @player 0x00000055 666

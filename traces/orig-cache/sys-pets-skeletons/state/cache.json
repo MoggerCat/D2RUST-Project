@@ -1,0 +1,48 @@
+{
+ "channel": "state",
+ "check": "sys-pets-skeletons",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "400",
+  "--ticks",
+  "220",
+  "--auto",
+  "ScnNec",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--poke",
+  "10 spawn 179 @x+5 @y+2 normal",
+  "--poke",
+  "10 spawn 179 @x+5 @y-2 normal",
+  "--poke",
+  "10 spawn 179 @x+6 @y normal",
+  "--input",
+  "frame 20; rclick 544 336; frame 60; rclick 544 336; frame 100; rclick 544 336; frame 140; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "4cbcb1de59dd279acf60a1467c18df10c6e213a7673e08aef6174457cd0fdea7",
+   "size": 809298
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "2dfef778f41c934d0af9ce1e5b2a1ae73ebdd025173ac0e779e5cad65f43f498",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "2d074ef34fc4209fd370a38800d3c69fc920db62d4401aed61a1eaa51b6ff524"
+ }
+}
