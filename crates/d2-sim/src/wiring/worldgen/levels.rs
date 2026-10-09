@@ -385,6 +385,17 @@ impl LevelTypes for WorldTypes {
             .unwrap_or_default()
     }
 
+    fn unit_path(
+        &self,
+        drlg: &Drlg,
+        room: DrlgRoomId,
+        index: usize,
+    ) -> Option<Vec<(u32, i32, i32)>> {
+        let p = self.presets.get(&drlg.act)?;
+        let path = p.unit_path(room, index)?;
+        Some(path.iter().map(|q| (q.action, q.x, q.y)).collect())
+    }
+
     /// The client presets (`client/model.md` §5 r6.2): a preset room's
     /// units with flag bit 0. An outdoor room's substitution units carry
     /// no flag word in the model, so none of them is a client preset.
@@ -556,6 +567,15 @@ impl LevelTypes for SharedTypes {
 
     fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
         self.0.borrow().preset_units(drlg, room)
+    }
+
+    fn unit_path(
+        &self,
+        drlg: &Drlg,
+        room: DrlgRoomId,
+        index: usize,
+    ) -> Option<Vec<(u32, i32, i32)>> {
+        self.0.borrow().unit_path(drlg, room, index)
     }
 
     fn client_presets(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<ClientPreset> {

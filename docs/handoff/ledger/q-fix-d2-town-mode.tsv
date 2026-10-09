@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+level.a5.109.act-5-town	entity	world	Levels.txt Act 5 - Town (109) DrlgType=preset	specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md	draft	a5-harrogath-arrival-ama,a5-town-arrival-bar,milestone-act5-entry	PARTIAL	?	13	y	claude/q-fix-d2-town-mode	NO-CHECK	M	Larzuk's preset-path map AI wired (REC-1380); a5-harrogath-arrival-ama, a5-town-arrival-bar, milestone-act5-entry now PARTIAL (every compared frame equal; own/q fields one side only); no per-level layout check; size M: needs both recorders to write the same field set
