@@ -1,0 +1,44 @@
+{
+ "channel": "packets",
+ "check": "items-vendor-halbu-stock",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "400",
+  "--ticks",
+  "140",
+  "--auto",
+  "ScnBuy",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 103",
+  "--poke",
+  "12 goto unit 257",
+  "--send",
+  "62 InteractWithEntity type=1 id=@1:257",
+  "--send",
+  "64 InitEntityChat id=@1:257",
+  "--send",
+  "66 EntityAction action=1 npc=@1:257 item=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "4667be69c9566b9296f6a0514be8e0c62122cbfc802fbb52e62b31f6ddf2a99e",
+   "size": 185181
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "5eb0dba6e831216294519c2d20661f905b535c4782285df5682ca3337f9c5d7c",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "07bef22def593cb31d444f383466ce2c28ba60d6024a315bca7735b30e2c1716"
+ }
+}

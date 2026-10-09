@@ -38,7 +38,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -388,6 +388,56 @@ def fam_item(ctx):
                            "S->C 0x9C bit streams item by item. Items: " +
                            ", ".join(f"{i}-{cd}" for i, cd, _ in chunk) + "."])
         c.extra = {"items": [(i, cd) for i, cd, _ in chunk]}
+
+def fam_netc2s(ctx):
+    """C->S message types no recorded check carries (docs/handoff/packet-census.tsv,
+    state NOT-CARRIED): one check per id sends that message once, with the
+    packets channel comparing bytes on both sides. Fields: unit references
+    become @player / @x / @y, every other numeric field 0; messages without
+    a layout are sent as `hex` with `size` zero bytes after the id. System
+    ids (0x67 and up) and variable-size 0x66 are session-level: no check."""
+    rows = read_tsv(ctx.client_messages, ["id", "name", "transport_size", "layout", "kind"])
+    carried = set()
+    for r in read_tsv(ctx.census, ["stream", "id", "state"]):
+        if r["stream"] == "c2s" and r["state"] != "NOT-CARRIED":
+            carried.add(int(r["id"], 16))
+    out = []
+    for r in rows:
+        n = int(r["id"], 16)
+        if n in carried or n >= 0x66 or r["name"] == "-" or r["kind"] in ("none", "system"):
+            continue
+        if not r["transport_size"].isdigit() or int(r["transport_size"]) == 0:
+            continue
+        size = int(r["transport_size"])
+        name = r["name"]
+        fields = []
+        for f in r["layout"].split():
+            fn, ft = f.split("@")[0].split(":")
+            if ft.startswith("cstr") or ft.startswith("bit"):
+                fields = None
+                break
+            if fn in ("id", "unit", "player", "npc", "merc", "orifice") and ft == "u32":
+                fields.append(f"{fn}=@player")
+            elif fn == "x" or fn.startswith("x"):
+                fields.append(f"{fn}=@x+2")
+            elif fn == "y" or fn.startswith("y"):
+                fields.append(f"{fn}=@y")
+            else:
+                fields.append(f"{fn}=0")
+        if fields is None or not r["layout"].strip():
+            body = " ".join(["%02x" % n] + ["00"] * (size - 1))
+            line = f"at 20 send hex {body}"
+        else:
+            line = f"at 20 send {name} " + " ".join(fields)
+        c = Check(f"gen-netc2s-{n:02x}", "netc2s", f"client-messages.tsv {r['id']} {name}",
+                  f"C->S {r['id']} {name}", "ScnAma --class ama --expansion", 40, 240,
+                  "packets", [line],
+                  comment=[f"One {name} ({r['id']}) at frame 20 in the Rogue Encampment; the "
+                           "packets channel compares the C->S bytes, the dispatch result and "
+                           "every S->C message the handler queues. Default field values "
+                           "(PROVISIONAL REC-1750): a handler that needs a live target answers "
+                           "its refusal path on both sides."])
+        c.extra = {"msg": n}
         out.append(c)
     return out
 
@@ -428,8 +478,8 @@ def fam_itemq(ctx):
     return out
 
 
-FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss,
-             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq}
+
+FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s}
 
 
 # ----------------------------------------------------------- ledger join
@@ -477,6 +527,9 @@ def resolve_area(c, areas):
         # the ledger lists the bases "never created" in run a1a2 only; others have no row
         c.area = ",".join(pick) if pick else "-"
         return
+
+    elif f == "netc2s":
+        pick = [a for a, _ in areas if a == f"net.c2s.0x{x['msg']:02x}"]
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
@@ -529,6 +582,8 @@ def main(argv=None):
     ap.add_argument("--waypoints", default=os.path.join(ROOT, "specs", "world", "waypoints.tsv"))
     ap.add_argument("--waypoint-towns", default=os.path.join(HERE, "waypoint-towns.tsv"))
     ap.add_argument("--shrine-seeds", default=os.path.join(HERE, "shrine-seeds.tsv"))
+    ap.add_argument("--client-messages", default=os.path.join(ROOT, "specs", "sim", "client-messages.tsv"))
+    ap.add_argument("--census", default=os.path.join(ROOT, "docs", "handoff", "packet-census.tsv"))
     ap.add_argument("--check", action="store_true", help="fail when the files differ")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--selftest", action="store_true")
@@ -541,6 +596,8 @@ def main(argv=None):
     ctx.waypoints = a.waypoints
     ctx.waypoint_towns = a.waypoint_towns
     ctx.ledger = a.ledger
+    ctx.client_messages = a.client_messages
+    ctx.census = a.census
     ctx.shrine_seeds = {}
     if os.path.isfile(a.shrine_seeds):
         for r in read_tsv(a.shrine_seeds, ["shrine", "seed", "object_class", "verified"]):
