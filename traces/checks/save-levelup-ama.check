@@ -1,0 +1,22 @@
+check 1
+# Save channel after a level-up: the combat-arrow-kill scene (warp to the
+# Blood Moor at frame 4, a Quill Rat poked at frame 30, Fire Arrows at it
+# from frame 34) with the Amazon at 499 experience (level 1 needs 500), so
+# the kill raises her to level 2. Save and Exit after frame 110 on both
+# sides; the written .d2s is compared byte for byte.
+# Spec: specs/tools/scenario-diff.md, specs/formats/d2s.md.
+name save-levelup-ama
+save SavAma --class ama --expansion --stat 13=499
+seed 1234
+ticks 110
+seconds 300
+channels save
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+4 @y+4 normal
+at 34 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 42 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 50 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 58 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 66 poke missile 12 @x @y @x+4 @y+4 skill 7 20

@@ -28,23 +28,23 @@
 |   1. Entry points | 88–101 |
 |   2. Screen message list (`0x0049E3A0(text, color)`) | 102–145 |
 |   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
-|   4. Recipe scroll text (0x26 type 7) | 202–226 |
-|   5. Overhead text | 227–295 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–373 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 374–513 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 514–526 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 527–543 |
-|   10. Other 0x50 codes (UI effects) | 544–579 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 580–661 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 662–668 |
-|   13. NPC intro table `0x00726850` (0x91) | 669–706 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 707–723 |
-| Constants & data dependencies | 724–741 |
-| Randomness | 742–746 |
-| Edge cases & original bugs | 747–767 |
-| Test vectors | 768–790 |
-| Provenance | 791–821 |
-| Open questions | 822–849 |
+|   4. Recipe scroll text (0x26 type 7) | 202–239 |
+|   5. Overhead text | 240–308 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 309–386 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 387–534 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 535–547 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 548–564 |
+|   10. Other 0x50 codes (UI effects) | 565–600 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 601–682 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 683–689 |
+|   13. NPC intro table `0x00726850` (0x91) | 690–727 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 728–744 |
+| Constants & data dependencies | 745–762 |
+| Randomness | 763–767 |
+| Edge cases & original bugs | 768–788 |
+| Test vectors | 789–811 |
+| Provenance | 812–842 |
+| Open questions | 843–870 |
 <!-- /index -->
 
 ## Summary
@@ -216,6 +216,19 @@ stops at a `ÿc` that ends the string.
    `Nls\CodePage\ACP`), under which `MB_PRECOMPOSED` may make the call
    fail (documented ERROR_INVALID_FLAGS for UTF-8) and leave the text
    empty; settle with a recorded 0x26 type 7 carrying a byte ≥ 0x80.
+   *Measured (2026-10-09, PC 1, Windows 10 19045, `GetACP()` = 65001,
+   OEM 65001; the same call from a test program, `MultiByteToWideChar(0,
+   MB_PRECOMPOSED, …)`):* the flag does **not** fail under UTF-8 (return
+   = characters written, last error 0, the same as flags 0): bytes
+   decode as UTF-8, a valid sequence giving one character (`c3 a9` →
+   U+00E9, `"\xc3\xa9t\xc3\xa9"` → 3 characters) and each lone byte
+   ≥ 0x80 giving U+FFFD (`"caf\xe9"` → `caf` + U+FFFD). So on this PC the
+   0x26 type 7 text is the UTF-8 decode of the message bytes; under a
+   single-byte ACP (e.g. 1252) the same bytes map 1:1 through that code
+   page. A live 0x26 type 7 with such a byte was not staged (English
+   string tables hold none and no tool injects S→C messages), so the
+   game-side half (the 256-byte length and the NUL inside it) rests on
+   the asm reading above.
 2. Draw `0x0048BC10` (UI pass `[0x25]`, `ui/panels.md` §5 step 4), only
    while the game is an expansion game (`[0x007A04F4]`, `0x0044DCC0`)
    and state 0x25 is open: `menu\recipescroll` (`0x004520C0`, cached in
@@ -426,11 +439,19 @@ stops at a `ÿc` that ends the string.
    100 units followed by LF is followed by one empty line (the LF starts
    the next chunk); the speed is not written for an empty text (the
    panel's speed field keeps the pool memory's value, `0x004A05E0`
-   does not set it). PROVISIONAL (REC-643): a text whose last line has
-   no LF, or that is only the speed line, makes the reader copy past the
-   terminating NUL until an LF or 100 units (the copy has no NUL test);
-   what the stock strings end with is unchecked (needs a string-table
-   scan of the dialog ids).
+   does not set it). A text whose last line has no LF, or that is only
+   the speed line, makes the reader copy past the terminating NUL until
+   an LF or 100 units (re-read 2026-10-09: both copy loops of
+   `0x004A0320`, `0x004A0367`–`0x004A03D1` and `0x004A04B0`–
+   `0x004A051A`, test only LF (`cmp ax, 0xa`) and the count (`cmp edi,
+   0x64`); the only NUL tests are the entry's `0x004A0334` and the
+   outer loop's `0x004A05B8`). No stock text reaches it (settles
+   REC-643; 2026-10-09 scan of the English `string.tbl`,
+   `expansionstring.tbl`, `patchstring.tbl`): all 867 strings whose
+   first line is a decimal scroll speed end with LF, none is the speed
+   line alone, and none has a line of 100 or more units. So for stock
+   data the over-read never happens; d2rs may treat an unterminated
+   last line as a line (no 1.14d input distinguishes it).
 3. **Scroll** (`0x0049D5A0`, per draw, font 8). Panel fields: lines +0,
    count +4, position p +8 (1/1024 pixel), speed +0x0C, t_last +0x1A,
    t_start +0x1E, step +0x22, acc +0x26, same u16 +0x2A. With t =

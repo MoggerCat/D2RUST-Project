@@ -27,34 +27,34 @@
 | Inputs | 80–87 |
 | Outputs / state changes | 88–105 |
 | Rules | 106–107 |
-|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–282 |
-|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 283–313 |
-|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 314–358 |
-|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 359–440 |
-|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 441–470 |
-|   6. 0x4E hire offer and 0x4F hire list reset | 471–483 |
-|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 484–524 |
-|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 525–558 |
-|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 559–587 |
-|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 588–598 |
-|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 599–611 |
-|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 612–621 |
-|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 622–634 |
-|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 635–646 |
-|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 647–657 |
-|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 658–784 |
-|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 785–797 |
-|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 798–808 |
-|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 809–828 |
-|   20. 0x61 act video (`0x0045E660`) | 829–836 |
-|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 837–844 |
-|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 845–854 |
-| Constants & data dependencies | 855–866 |
-| Randomness | 867–871 |
-| Edge cases & original bugs | 872–888 |
-| Test vectors | 889–936 |
-| Provenance | 937–1004 |
-| Open questions | 1005–1140 |
+|   1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`) | 108–289 |
+|   2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`) | 290–320 |
+|   3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`) | 321–365 |
+|   4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`) | 366–447 |
+|   5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`) | 448–477 |
+|   6. 0x4E hire offer and 0x4F hire list reset | 478–490 |
+|   7. 0x50 quest special (`0x0045E370` → `0x004B9210`) | 491–531 |
+|   8. 0x58 UI open (`0x0045E490` → `0x004C0550`) | 532–565 |
+|   9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`) | 566–594 |
+|   10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`) | 595–605 |
+|   11. 0x78 trade partner (`0x0045E810` → `0x004B9010`) | 606–618 |
+|   12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`) | 619–628 |
+|   13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`) | 629–641 |
+|   14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`) | 642–653 |
+|   15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`) | 654–664 |
+|   16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`) | 665–791 |
+|   17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`) | 792–804 |
+|   18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`) | 805–815 |
+|   19. 0x5A event text (`0x0045E070` → `0x0049EB10`) | 816–835 |
+|   20. 0x61 act video (`0x0045E660`) | 836–843 |
+|   21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`) | 844–851 |
+|   22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`) | 852–861 |
+| Constants & data dependencies | 862–873 |
+| Randomness | 874–878 |
+| Edge cases & original bugs | 879–895 |
+| Test vectors | 896–943 |
+| Provenance | 944–1011 |
+| Open questions | 1012–1147 |
 <!-- /index -->
 
 Owned ids: 0x26, 0x27, 0x29, 0x4E, 0x4F, 0x50, 0x52, 0x58, 0x5D, 0x5E,
@@ -264,7 +264,14 @@ layer.
       counters `[0x007BF2A4]`, `[0x007BF2AC]` and the selected slot
       `[0x007BF2B9]` are read by the quest-log rows and tab
       (`world/quests-status.md` §1 r3, §4, §5). UI state: not in the
-      model.
+      model. Ui 17 itself (the alert button, its draw, handlers and
+      every close) is `ui/panels.md` §2 r10; the game-menu restore
+      reopens ui 17 without raising the latch again
+      (`ui/frontend-options.md` §O1 r2), so a restored alert leaves
+      latch 0 and later tails are refused until it closes. d2rs keeps
+      the latch as a bool that nothing clears (`MsgUiState::
+      quest_log_latch`, `crates/d2-client/src/ui/msg_ui.rs`): none of
+      the resets above is modelled.
 7. **f bit 5, other c** (the Den of Evil counter path): when the client
    quest flags (`0x004B32D0` → record `[0x007C0D43]`, `world/quests.md`
    §1) have quest 1 bit 0 or quest 1 bit 1 set (`0x0065C310`) →

@@ -1,0 +1,14 @@
+check 1
+# Act II NPC elzix (monstats 199), gamble: goto the NPC, interact (0x13),
+# open the chat (0x2F), the menu action, close (0x30); state + packets.
+name a2-npc-elzix-gamble
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 50
+seconds 300
+channels state packets
+at 4 poke goto unit 1:199
+at 14 send InteractWithEntity type=1 id=@1:199
+at 16 send InitEntityChat id=@1:199
+at 18 send EntityAction action=2 npc=@1:199 item=0
+at 21 send TerminateEntityChat id=@1:199

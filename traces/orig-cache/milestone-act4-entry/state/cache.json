@@ -1,0 +1,38 @@
+{
+ "channel": "state",
+ "check": "milestone-act4-entry",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "40",
+  "--auto",
+  "MilA4",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 103"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "09ea4bb486f6045f126d085feae9d7f048c4ae261423d78e87a4f18d61b8621b",
+   "size": 293905
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "d855ae37b0a3610e572b68dab3868196ef39348213a1132da69f946f27dbefcd",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "save": "e751f81e687b7b79010d622055dda68ed62d038736fbef715ea1b69461376fec"
+ }
+}

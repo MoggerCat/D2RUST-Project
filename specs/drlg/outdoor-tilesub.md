@@ -23,13 +23,13 @@
 |   1. Rows and files | 64–87 |
 |   2. Border substitution (`0x00670750`, D2MOO `DRLGTILESUB_AddSecondaryBorder`) | 88–181 |
 |   3. Sub-theme pick (`0x006706A0`, D2MOO `DRLGTILESUB_PickSubThemes`) | 182–189 |
-|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 190–256 |
-| Constants & data dependencies | 257–273 |
-| Randomness | 274–281 |
-| Edge cases & original bugs | 282–293 |
-| Test vectors | 294–309 |
-| Provenance | 310–328 |
-| Open questions | 329–367 |
+|   4. Room substitution (`0x006707A0`, D2MOO `sub_6FD8AA80`) | 190–261 |
+| Constants & data dependencies | 262–278 |
+| Randomness | 279–286 |
+| Edge cases & original bugs | 287–298 |
+| Test vectors | 299–314 |
+| Provenance | 315–333 |
+| Open questions | 334–372 |
 <!-- /index -->
 
 ## Summary
@@ -162,13 +162,13 @@ Replace, per cell (xoff = variant offset):
   roll per first stamp the Cold Plains type 2 variant roll moves from
   level-seed draw 1747, seq 8643, to 1751, and the build ends at 97
   rooms). The earlier text said "file −1" (a build-list file).
-  PROVISIONAL: the stamp's file is 0 and the build list is not touched
-  (because the recording fixes only that no draw happens; every
-  replacement-stamped piece 12–15 has `Files` 1, where any reading gives
-  file 0; it differs only for a multi-file piece, 4–7, stamped by a
-  replacement); settled by REC-404 (the file argument the replace
-  callback `0x0066F520` passes to `0x006743C0`, and that function's path
-  for it);
+  The stamp's file is the literal 0 and the build list is not touched,
+  for any piece including the multi-file 4–7 (1.14d-read 2026-10-09,
+  settles REC-404): the replace call `0x0066F62D`–`0x0066F63B` passes
+  (ctx, x, y, P, file 0, border 1) to the record's +0x34, which both
+  record builders (`0x006752A0` at `0x00675304`, Act V `0x0067E0E0` at
+  `0x0067E130`) set to `0x006743C0`; that stamp rolls the build list
+  (`0x00674320`) only for file −1 (`0x006743FB`);
 - else f & 2: keep cell; else: blank cell.
 
 Act V style map (`0x0067E000`; style must be 48 or 49, else fatal): the
@@ -253,6 +253,11 @@ At room cell (x, y) with x offset o into the pattern:
    between G.y and G.y + G.h — of the **match pattern** box, not the
    chosen variant — becomes a room preset unit at (x + ux − G.x, y + uy −
    G.y) (`0x0066BF30`, `preset.md` owns the unit records).
+   `0x0066BF30` **prepends**: the file's unit list is already in reverse
+   file order, so the room's list ends up in file order reversed again,
+   i.e. the last unit of the file's list first. Measured: Stony Field
+   arrival room, 1.14d creates (27,12), (12,27), then the waypoint
+   (check `combat-pop-stony-field`, frame 4, object GUIDs 18–20).
 
 ## Constants & data dependencies
 

@@ -1,0 +1,12 @@
+check 1
+# Act 5 waypoint 37 (level 118, object 511): open it (0x13 type 2), then travel to Harrogath (0x49 wp 30, level 109).
+name a5-wp-37-lv118
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4 --waypoints all
+seed 1234
+ticks 540
+seconds 420
+channels state
+at 4 poke warp 118
+at 20 poke goto preset 118 2:511
+at 450 poke msg 0x13 2 @2:511
+at 470 send TakeOrCloseWp wp=30 level=109
