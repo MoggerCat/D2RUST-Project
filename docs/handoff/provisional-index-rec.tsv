@@ -76,7 +76,7 @@ REC-110	6502		NPC shop panel and store display (PROVISIONAL, `ui/shop_ui.rs`, `d
 REC-112	6497		Waypoint travel in the preview (PROVISIONAL, `app/single_player.rs`, q-waypoint-travel): t	unstated	no		0	
 REC-113	6498		Identify effect (PROVISIONAL, `d2-sim` `wiring/inventory/identify.rs`, `pending.rs`, q-ide	recording	no		4	
 REC-114	6499		Item tool tip text and identify cursor (PROVISIONAL, `ui/item_tip.rs`, `ui/panels/inv_item	recording	no		0	
-REC-115	6501		Loaded-item placement is d2rs-own (PROVISIONAL, `d2-sim` `wiring/inventory/load.rs`, q-sav	binary	no		3	
+REC-115	6501		Loaded-item placement is d2rs-own (PROVISIONAL, `d2-sim` `wiring/inventory/load.rs`, q-sav	binary	no		2	
 REC-116	6503		Client missiles and overlays (PROVISIONAL, `world_view/missiles.rs`, M22): the real client	recording	no		0	
 REC-117	6487		Town Portal scroll / tome and the portal pair (PROVISIONAL, `d2-sim` `wiring/action/town_p	recording	no		3	q-fix-just-portaled,q-fix-portal-pair,q-fix-tp-use,q-fix-vendor-buy-copy
 REC-119	6504		Horadric Cube in the play preview (PROVISIONAL, `d2-sim` `wiring/inventory/cube_open.rs`, 	data	yes		0	
@@ -214,14 +214,14 @@ REC-275	6591		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22;
 REC-276	6647		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
 REC-277	6604		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		13	
 REC-278	6605		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		6	
-REC-279	6590		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes		9	
+REC-279	6590		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes		8	
 REC-280	6606		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
 REC-281	6650		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		8	
 REC-282	6583		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `seed_new_flags`, `app/save_	recording	no		1	
 REC-286	6589		Visibility predicate inputs in play (PROVISIONAL, `d2-client` `world_view/visibility.rs`, 	recording	no		4	
 REC-287	6651		Inactive room store in play (PROVISIONAL, `d2-sim` `wiring/action/inactive.rs`, `d2-client	data	yes		5	
 REC-288	6607		Arrival walk-outs in the walk prediction (PROVISIONAL, `d2-client` `bridge/predict.rs` `Pr	recording	no		4	
-REC-289	6608		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		7	
+REC-289	6608		Item-move fills of q-fix-items-play (PROVISIONAL, M22; `d2-sim` `items/inventory/equip.rs`	recording	no		6	
 REC-291	6652		Server saves on the flow's path (PROVISIONAL, `d2-server` `adapters/storage.rs`, `adapters	recording	yes		4	
 REC-300	6235	MANUAL	(R-SWAP-1)	recording	no		0	
 REC-301	6238	MANUAL	(R-SET-1, R-SET-2)	unstated	no		0	
@@ -267,11 +267,11 @@ REC-405	6638		Per-client inventory refresh without its item steps (PROVISIONAL, 
 REC-406	6639		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		1	
 REC-410	6372	AUTO hook	(R-OVL11-1)	recording	no	yes	0	
 REC-411	6375	AUTO	(R-LAND-1)	recording	no	yes	2	
-REC-412	6378	AUTO hook	(R-HEAL-1)	recording	no	yes	2	
+REC-412	6378	AUTO hook	(R-HEAL-1)	recording	no	yes	1	
 REC-413	6381	AUTO	(R-CAST-1)	recording	no	yes	1	
-REC-414	6384	AUTO	(R-MISS73-1)	recording	no	yes	3	
-REC-415	6387	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	2	
-REC-416	6390	AUTO	(R-92-1)	unstated	no	yes	1	
+REC-414	6384	AUTO	(R-MISS73-1)	recording	no	yes	0	
+REC-415	6387	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	1	
+REC-416	6390	AUTO	(R-92-1)	unstated	no	yes	0	
 REC-420	6628		Arreat Summit background seed (PROVISIONAL, `d2-client` `world_view/background_view.rs` `s	recording	no		4	
 REC-430	6402	AUTO hook	(R-ANIM-1)	recording	no		1	
 REC-431	6405	AUTO hook	(R-FLOOR-1)	recording	no		0	
@@ -299,4 +299,4 @@ REC-546	6618		Unit footprints for the client missiles (PROVISIONAL, `d2-client` 
 REC-547	6617		A client hit body the model cannot run (PROVISIONAL, `d2-client` `bridge/client_missiles.r	unstated	no		1	
 REC-548	6616		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		2	
 REC-549	6615		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	
-REC-602	6653		Client run end on stamina 0 (PROVISIONAL, `client/model.md` OQ2 stamina answer; q-fix-seam	recording	no		1	
+REC-602	6653		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		1	
