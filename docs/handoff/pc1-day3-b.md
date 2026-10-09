@@ -126,6 +126,50 @@ spawn.
 
 ## Round 3
 
+### Item 1: monster melee damage to the player (answered)
+- **Cause in d2rs:** the monster mode set never runs the mode damage. In
+  1.14d, `0x005A7C20` calls `0x005A4F50(unit, mode)` at `0x005A7D39` for
+  every mode except GH. It runs after the path set-up and before umod
+  mode 0, and writes base tohit (19), mindamage (21) and maxdamage (22)
+  from the A1 / A2 / S1 row by mode.
+- d2rs `monster_set_mode` skips it, so a Fallen has tohit 0, its hit
+  chance clamps to 5 %, and it always misses. In the d2rs trace one seed
+  step at f77 is the hit draw; no roll follows.
+- **Full path:** `combat/damage.md` §10 ("Monster melee on a player, end
+  to end"):
+  - mode damage with MonLvl level scaling and the difficulty and
+    player-count columns;
+  - event 0 `0x005A7670` → `0x005A5490` → melee apply;
+  - hit chance, then a physical roll of 256 per point;
+  - flat damage reduction, damage resist (capped at 50 %);
+  - the life change in 1/256 units;
+  - a soft hit: flag 0x8000, S→C 0x0D; life sync 0x95 at a 10 % drop.
+
+  Also `monsters/ai.md` §7.5 r9.
+- **Draw order per strike:** hit (mod 100), physical roll(256), burn
+  roll(1), crit (mod 100 vs `Crit` 5). A hit is 4 seed steps, a miss is 1.
+- **Reproduced with `d2rng.py` on the recorded seeds:**
+
+  | Fallen GUID | Mode, start → hit | Damage | Hit draw r |
+  |---|---|---|---|
+  | 21 | A1, 70 → 77 | 479 | 25 |
+  | 20 | A1, 91 → 98 | 455 | 29 |
+  | 20 | A2, 116 → 124 | 469 | 25 |
+  | 19 | A2, 129 → 137 | 358 | 45 |
+  | 21 | A2, 165 → 173 | 479 | 20 |
+
+  Misses: 21 at f137 (r 92), 20 at f158 (r 65), 19 at f172 (r 96).
+  Damage is 1–2 points (256–512); there is no reduction. The player's
+  seed and mode never change: no block draw, no get-hit.
+- **Row:** `q-fix-c1-monster-melee-rule`.
+  - Change: a `monster_mode_damage` hook in `monster_set_mode`, between
+    the bookkeeping and the umods, using `helpers3::mode_damage`.
+  - Test: rerun the check; hp must read 12321 / 11866 / 11397 / 11039 /
+    10560 at f77 / 98 / 124 / 137 / 173.
+- **PROVISIONAL REC-817:** the exact MonLvl `L-TH` at level 1. MonLvl.txt
+  is not in the extracted data (1.14d ships the compiled table only). Any
+  value giving a to-hit of 6–11 reproduces the recording.
+
 ### Item 2: Fallen leader A2 vs S2 at f41 (answered)
 - The Fallen body matches. The leader is its own minion owner
   (`0x005B28E9` SetBoss → `0x0058F030` owner data), so step 5.2 makes
