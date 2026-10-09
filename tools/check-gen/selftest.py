@@ -42,6 +42,9 @@ def synthetic(d):
     table(os.path.join(d, "skills.txt"), ["skill", "Id", "charclass", "passive"],
           [["Attack", 0, "", 0], ["Fire Bolt", 36, "sor", ""], ["Warmth", 37, "sor", 1],
            ["Magic Arrow", 6, "ama", ""], ["Wolf", 223, "dru", ""]])
+    table(os.path.join(d, "weapons.txt"), ["name", "code"], [["Hand Axe", "hax"], ["Axe", "axe"]])
+    table(os.path.join(d, "armor.txt"), ["name", "code"], [["Cap", "cap"]])
+    table(os.path.join(d, "misc.txt"), ["name", "code"], [["Key", "key"], ["Ring", "rin"], ["Amulet", "amu"], ["Charm", "cm1"], ["Jewel", "jew"], ["", ""]])
     table(os.path.join(d, "shrines.txt"), ["Shrine Type", "Shrine name", "Code"],
           [["None", "None", 0], ["Recharge", "Refill", 1], ["Recharge", "Health Boost", 2]])
 
@@ -103,6 +106,10 @@ def run():
         t.ok(by["skill"] == ["gen-skill-ama-6", "gen-skill-sor-36", "gen-skill-sor-37",
                              "gen-skill-dru-223"], by["skill"])
         t.ok(by["shrine"] == ["gen-shrine-1"], by["shrine"])
+        t.ok(by["item"] == ["gen-item-00"], by["item"])
+        t.ok(len(by["itemq"]) == 24, by["itemq"])
+        t.ok("poke item key @x+" in next(c for c in checks if c.name == "gen-item-00").render(),
+             "item poke lines")
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")

@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-103-3-rune-13-1-chipped-ruby-rune-",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "16be9a3692fc6b3c57297d44c7da0a89a9a13aeeb9e07950a6009f4d079efb40",
+   "size": 48438
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "8395cc5fa68b736e3b2e20f8420264894e0c11353bb86f44dee434462993c6dd",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "e9381d9e746d3a440aaf51a66146b0a41868e223320bb4482e1af3d5c668d203"
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-125-r08-r10-1-perfect-sapphire-nor",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "8918c32a59fa78b42882a5ee6925586d9e8e865409f3f889f64deaa12757d981",
+   "size": 48759
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "23c0fa249996877c447aceca8589e06dcd35df6ed153f3a3c2225c3c538936d8",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "62f6cbccd199f7fbcfe0fb9878685df28cf5f6e98c3c23fed85f317dfd08d392"
+ }
+}

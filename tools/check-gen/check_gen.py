@@ -15,6 +15,9 @@ Families (one check per table row, written under traces/checks/gen/):
   umod  one unique spawn per monumod row          (boss-kinds.poke)
   skill one right-click cast per class skill      (dru-* / bar-* / ass-*)
   shrine one shrine operated per reachable shrines.txt row
+  itemq the same items at each quality (low .. crafted) over three game seeds
+  item  a census of ITEM_CHUNK base items per check, each created on the ground by
+        the game's own creation path (poke `item`), compared by the items channel
 
 Every generated file starts with a header naming this generator, its
 format version, the family and the table row; the files are never edited
@@ -35,7 +38,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -344,8 +347,89 @@ def fam_shrine(ctx):
     return out
 
 
+ITEM_CHUNK = 20
+ITEM_TABLES = ["weapons.txt", "armor.txt", "misc.txt"]
+
+
+def item_rows(ctx):
+    """(combined index, code, name) over weapons, armor, misc in file order: the
+    combined items array of items/treasure.md section 9.1 (ledger ids item.<id>-<code>)."""
+    out = []
+    for tn in ITEM_TABLES:
+        t = excel(ctx.excel, tn, ["code", "name"])
+        for r in t.rows:
+            code = t.get(r, "code")
+            if code.strip() == "ear":
+                out.append((len(out), "ear", t.get(r, "name")))  # keeps the index; not poked
+            elif code.strip():
+                out.append((len(out), code.strip(), t.get(r, "name")))
+    return out
+
+
+def fam_item(ctx):
+    rows = item_rows(ctx)
+    out = []
+    for k in range(0, len(rows), ITEM_CHUNK):
+        chunk = rows[k:k + ITEM_CHUNK]
+        n = k // ITEM_CHUNK
+        lines = ["at 4 poke seed-game 0x00001234 666"]
+        for j, (idx, code, _) in enumerate(chunk):
+            if code == "ear":
+                continue  # the ear is made from a killed player (PK); `poke item` refuses it
+            dy = 2 * (j // 5)
+            lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} " + (f"@y+{dy}" if dy else "@y"))
+        c = Check(f"gen-item-{n:02d}", "item",
+                  f"items {chunk[0][0]}-{chunk[-1][0]} (combined index)",
+                  f"base items {chunk[0][1]} .. {chunk[-1][1]} ({len(chunk)} items)",
+                  "ScnAma --class ama --expansion", 20, 240, "items", lines,
+                  comment=["Census of base items (items/generation.md section 3): each item is "
+                           "created on the ground at normal quality by the game's own creation "
+                           "path with the game seed fixed first; the items channel compares the "
+                           "S->C 0x9C bit streams item by item. Items: " +
+                           ", ".join(f"{i}-{cd}" for i, cd, _ in chunk) + "."])
+        c.extra = {"items": [(i, cd) for i, cd, _ in chunk]}
+        out.append(c)
+    return out
+
+
+QUALITIES = {1: "low", 2: "normal", 3: "superior", 4: "magic", 5: "set", 6: "rare",
+             7: "unique", 8: "crafted"}
+QSEEDS = [(0x1234, 666), (0x2222, 77), (0x5A5A, 4242)]
+QEXTRA = ["rin", "amu", "cm1", "jew"]
+
+
+def fam_itemq(ctx):
+    rows = item_rows(ctx)
+    wa = [r for r in rows if r[0] < 100000 and r[1] not in QEXTRA and not r[1].startswith(("hp", "mp", "rv"))]
+    body = [r for r in wa if r[0] < next(i for i, c, _ in rows if c == "key")]  # weapons + armor
+    pick = [body[k * len(body) // 16] for k in range(16)]
+    codes = [c for _, c, _ in pick] + QEXTRA
+    for need in QEXTRA:
+        if need not in [c for _, c, _ in rows]:
+            raise GenError(f"itemq: code {need} missing from the item tables")
+    out = []
+    for q, qn in QUALITIES.items():
+        for si, (lo, hi) in enumerate(QSEEDS):
+            lines = [f"at 4 poke seed-game 0x{lo:08X} {hi}"]
+            for j, code in enumerate(codes):
+                dy = 2 * (j // 5)
+                lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} "
+                             + (f"@y+{dy}" if dy else "@y") + f" quality {qn} ilvl 85")
+            c = Check(f"gen-itemq-{qn}-{si}", "itemq", f"quality {q} {qn}, seed set {si}",
+                      f"{len(codes)} items at quality {qn} (game seed 0x{lo:X} {hi})",
+                      "ScnAma --class ama --expansion", 20, 240, "items", lines,
+                      comment=["Quality census (items/quality.md): the same spread of base items "
+                               f"created at quality {q} ({qn}) and item level 85 by the poke "
+                               "`item` path; the items channel compares the 0x9C bit streams "
+                               "(affix and unique picks, properties, sockets) item by item. "
+                               "Items: " + ", ".join(codes) + "."])
+            c.extra = {"quality": qn}
+            out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss,
-             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine}
+             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq}
 
 
 # ----------------------------------------------------------- ledger join
@@ -387,6 +471,12 @@ def resolve_area(c, areas):
                 and f"({x['skill']})" in s]
     elif f == "shrine":
         pick = [a for a, _ in areas if a.startswith(f"shrine.{x['shrine']}.")]
+    elif f == "item":
+        ids = {a: a for a, _ in areas}
+        pick = [f"item.{i}-{cd}" for i, cd in x["items"] if f"item.{i}-{cd}" in ids]
+        # the ledger lists the bases "never created" in run a1a2 only; others have no row
+        c.area = ",".join(pick) if pick else "-"
+        return
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
