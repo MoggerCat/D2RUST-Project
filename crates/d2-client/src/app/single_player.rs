@@ -1356,10 +1356,26 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
 }
 
 /// The `objects.txt` rows of the client object update
-/// (`world/objects-client.md` §28 r1): the live table.
+/// (`world/objects-client.md` §28 r1): the live table **after its load
+/// fix-up** (`data/fixups.md` §13 r2: `FrameCnt0`–`7` in 1/256 frames, as
+/// §5's `End(m)` reads them). The raw `.bin` rows hold whole frames: a
+/// one-frame mode would clamp at −255 and its frame (`+0x44 >> 8`) read
+/// 0xFFFFFF (scene `a1-town-arrival-ama`: every frame dropped).
 pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjClientRow> {
     let GameData::Live(d) = data;
-    crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects)
+    let fixed: Option<Vec<Objects>> = d
+        .tables
+        .fixed
+        .table("objects")
+        .and_then(|t| decode_all(t).ok());
+    match fixed {
+        Some(rows) => crate::bridge::objects::ObjClientRow::rows(&rows),
+        // No fixed table: §13 r2 on the raw rows.
+        None => crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects)
+            .into_iter()
+            .map(crate::bridge::objects::ObjClientRow::frame_counts_fixed)
+            .collect(),
+    }
 }
 
 /// The `objects.txt` `Name` of each class, for the mouse-over label

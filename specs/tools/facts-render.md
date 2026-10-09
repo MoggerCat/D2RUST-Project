@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–133 |
 |   3. `frame.tsv` | 134–166 |
 |   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–261 |
-|   6. Comparison | 262–284 |
-|   7. Requests | 285–296 |
-| Constants & data dependencies | 297–300 |
-| Randomness | 301–304 |
-| Edge cases & original bugs | 305–312 |
-| Test vectors | 313–321 |
-| Provenance | 322–326 |
-| Open questions | 327–341 |
+|   5. d2rs export | 183–269 |
+|   6. Comparison | 270–292 |
+|   7. Requests | 293–304 |
+| Constants & data dependencies | 305–308 |
+| Randomness | 309–312 |
+| Edge cases & original bugs | 313–320 |
+| Test vectors | 321–329 |
+| Provenance | 330–334 |
+| Open questions | 335–349 |
 <!-- /index -->
 
 ## Summary
@@ -212,6 +212,14 @@ composition, through `d2-client` only (game logic untouched).
 6. `w h xoff yoff` of a cel row and its `sprites.tsv` row: the frame
    store's frame, with `yoff` converted to §4 r1's meaning (a DCC frame
    box keeps its top row: `yoff = y_off + h − 1`).
+   A unit shadow (shadow pass) is drawn by 1.14d from the unit's own cel
+   (`CelDrawShadow`, `blend-modes.md` §5); d2rs composes it from a derived
+   `#shadow` set of sheared frames. Its row names the unit's cel file
+   (no `#shadow`) and that cel's `w h xoff yoff`; its `x`, `y` are `?`
+   (the sheared image's position is not inverted to the call's X, Y).
+   The shadow pass writes no `unit` row: 1.14d's has no unit draw
+   `0x00471EC0` (`a1-town-arrival-ama` rows 97–115); a unit's run outside
+   it starts with its `unit` row even right after its own shadow.
 7. Columns d2rs does not measure are `?`: the cel `mode`, `light`, `pal`
    (d2rs keeps a shade chain and blend op, not the call's arguments:
    REC-297), the tile `tile`, `mode` and `light`, the unit `light`, and in

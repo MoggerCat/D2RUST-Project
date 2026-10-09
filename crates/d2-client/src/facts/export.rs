@@ -10,7 +10,7 @@ use super::{
     sha256_hex, write, FactsError, Header, DRAWS_FILE, DRAW_COLUMNS, FRAME_COLUMNS, FRAME_FILE,
     FRAME_KEYS, NA, SPRITES_FILE, SPRITE_COLUMNS, UNKNOWN,
 };
-use crate::frames::{FrameAnchor, FramePart, FrameStore, IndexFrame};
+use crate::frames::{FrameAnchor, FramePart, FrameSetKey, FrameStore, IndexFrame};
 use crate::rules::camera::{Camera, CELL_HALF_WIDTH};
 use crate::rules::draw_order::weather::SkyDraw;
 use crate::rules::placement;
@@ -56,6 +56,10 @@ fn cel_xy(f: &IndexFrame, item: &DrawItem) -> Option<(i32, i32)> {
     let p = placement::place(f, x, y, item.clip);
     (p.x == item.x && p.y == item.y).then_some((x, y))
 }
+
+/// The suffix of a derived unit-shadow frame set
+/// (`world_view::unit_shadow::shadow_key`).
+const SHADOW_SUFFIX: &str = "#shadow";
 
 /// The pass of the weather calls (`draw-order.md` §10, `draw-order-2.md` §11.7).
 const SKY_PASS: u32 = pass::UNIDENTIFIED_9;
@@ -134,8 +138,12 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         }) {
             continue;
         }
-        if let ItemTag::Unit(guid) = item.tag {
-            if last.map(|l| l.tag) != Some(item.tag) {
+        // §5 r1: the unit draw `0x00471EC0` starts a unit's run outside
+        // the shadow pass; 1.14d's shadow pass calls `CelDrawShadow` with
+        // no unit draw (`a1-town-arrival-ama` rows 97–115).
+        if let (ItemTag::Unit(guid), false) = (item.tag, item.key.pass() == pass::SHADOWS) {
+            // A run after the unit's own shadow still starts with it.
+            if last.map(|l| (l.tag, l.key.pass() == pass::SHADOWS)) != Some((item.tag, false)) {
                 let unit = match (cx.unit_type)(guid) {
                     Some(t) => format!("{t}:{guid}"),
                     None => UNKNOWN.to_owned(),
@@ -179,7 +187,27 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 row[1] = op(false, item).into();
                 row[3] = d.to_string();
                 row[4] = index.to_string();
-                let xy = cel_xy(f, item);
+                // §5 r6: a unit shadow is drawn from the unit's own cel
+                // (`blend-modes.md` §5); d2rs composes it from a derived
+                // `#shadow` set of sheared frames. The row names the cel's
+                // file and size; the call's X, Y (the sheared image's
+                // inverse is not specified) are not measured.
+                let (f, xy) = match key.path().strip_suffix(SHADOW_SUFFIX) {
+                    Some(base) => {
+                        row[2] = base.to_owned();
+                        let base_key = FrameSetKey::new(base, key.part())
+                            .map_err(|e| FactsError::Export(e.to_string()))?;
+                        let id = cx
+                            .frames
+                            .id(&base_key, index)
+                            .map_err(|e| FactsError::Export(format!("{base}: {e}")))?;
+                        let base_frame = cx.frames.frame(id).ok_or_else(|| {
+                            FactsError::Export(format!("{base} frame {index} not resident"))
+                        })?;
+                        (base_frame, None)
+                    }
+                    None => (f, cel_xy(f, item)),
+                };
                 row[6] = num(xy.map(|p| p.0));
                 row[7] = num(xy.map(|p| p.1));
                 let size = [
@@ -192,7 +220,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 for cell in &mut row[12..15] {
                     *cell = UNKNOWN.into();
                 }
-                sprites.insert((key.path().to_owned(), u32::from(d), index), size);
+                sprites.insert((row[2].clone(), u32::from(d), index), size);
             }
         }
         // §5 r1: a tile's block draws are separate frames (each block with

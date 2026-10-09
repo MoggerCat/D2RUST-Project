@@ -520,3 +520,58 @@ fn block_frames_of_one_tile_are_one_row() {
         ]
     );
 }
+
+/// §5 r1, r6: a unit's shadow (pass 5) writes no unit row (1.14d's shadow
+/// pass has no unit draw) and names the unit's own cel and its size, not
+/// the derived sheared `#shadow` frame; its X, Y are not measured. The
+/// unit's own run (pass 6) still starts with its unit row.
+#[test]
+fn unit_shadows_name_the_cel_and_write_no_unit_row() {
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    let mut s = store();
+    let sheared = IndexFrame::new(7, 2, -5, 0, vec![1; 14]).unwrap();
+    s.insert(
+        FrameSetKey::new("x/unit.dcc#shadow", FramePart::Dir(3)).unwrap(),
+        FrameSet {
+            frames: vec![sheared],
+        },
+    )
+    .unwrap();
+    let shadow_id = s
+        .id(
+            &FrameSetKey::new("x/unit.dcc#shadow", FramePart::Dir(3)).unwrap(),
+            0,
+        )
+        .unwrap();
+    let mut shadow = DrawItem::new(shadow_id, 40, 50);
+    shadow.key = DrawKey::new(pass::SHADOWS, 0, 0, 0).unwrap();
+    shadow.tag = ItemTag::Unit(9);
+    let mut body = DrawItem::new(FrameId(1), 50, 60);
+    body.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+    body.tag = ItemTag::Unit(9);
+    let unit_type = |g: u32| (g == 9).then_some(1u8);
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+    };
+    let rows = draw_rows(&[shadow, body], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 CelDrawShadow x/unit.dcc 3 0 - ? ? 2 5 3 -2",
+            "1 unit - - - - ? ? - - - -",
+            &format!(
+                "2 CelDraw x/unit.dcc 3 0 - {} {} 2 5 3 -2",
+                rows.draws[2][6], rows.draws[2][7]
+            ),
+        ]
+    );
+    assert_eq!(
+        rows.sprites,
+        [vec!["x/unit.dcc", "3", "0", "2", "5", "3", "-2"]]
+    );
+}
