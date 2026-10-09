@@ -654,7 +654,7 @@ lines into the `q-fix-*` row.
 53. **[q-diff-combat-a1] preparation probe at the start (REC-753)** answered → see `docs/handoff/pc1-day4.md` (`sim/pathing.md` §4 r3).
 54. **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)** answered → see `docs/handoff/pc1-day4.md` (same mechanism as `q-fix-p3-room-empty-think`).
 55. **[pc1-day4] Local player attack / cast mode end and the next click (coordinator blocker 1)** answered → see `docs/handoff/pc1-day4.md` (`client/model.md` §20).
-56. **[pc1-day4] Andariel never dies, Radament stays at 256 hp (playthrough act1 #14, act2 #6)** → see `docs/handoff/pc1-day4.md`.
+56. **[pc1-day4] Andariel never dies, Radament stays at 256 hp (playthrough act1 #14, act2 #6)** answered (setup, not damage) → see `docs/handoff/pc1-day4.md`.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
