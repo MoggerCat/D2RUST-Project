@@ -1623,7 +1623,8 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_unit_find(room, at, r, f)
     }
     fn point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
-        self.x().body_point_collides(room, at, mask)
+        self.rooms_point_collides(room, at, mask)
+            .unwrap_or_else(|| self.x().body_point_collides(room, at, mask))
     }
     fn spawn_monster(&mut self, q: bodies::MonsterSpawn<UnitId, RoomId>) -> Option<UnitId> {
         self.xm().body_spawn_monster(q)

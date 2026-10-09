@@ -717,3 +717,31 @@ fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
     assert!(!blocked, "the wall between the two");
     fx.assert_clean();
 }
+
+// Covers: specs/skills/bodies-4.md §4.9 r8
+#[test]
+fn use_point_collides_reads_the_rooms_once_paths_are_on() {
+    use crate::skills::use_::bodies::BodyWorld;
+    // `0x0064CB30(room, x, y, 1)` of Armageddon's tries (§4.9 step 8):
+    // without the provider the seam's default (collides); with it the
+    // cell's value under the mask.
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let _player = fx.spawn(UnitType::Player, 10, 10);
+    let room = fx.room;
+    let at = |fx: &mut Fx, m| {
+        fx.sim.skill_use(&mut fx.game, |w| {
+            BodyWorld::point_collides(w, room, (13, 10), m)
+        })
+    };
+    assert!(!at(&mut fx, 1), "an open cell");
+    *fx.sim
+        .sys
+        .hooks
+        .drlg
+        .collision_mut(&fx.game, room, 13, 10)
+        .expect("in a grid") |= bits::WALL;
+    assert!(at(&mut fx, 1), "a wall under mask 1");
+    assert!(!at(&mut fx, 0), "nothing under mask 0");
+    fx.assert_clean();
+}

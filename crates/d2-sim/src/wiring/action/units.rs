@@ -42,8 +42,11 @@ pub const STATE_DEATH_DELAY: u16 = 92;
 
 impl<X: Pending> StatHost for ActionHooks<X> {
     /// §8.2 rule 6: queue the callbacks this wiring runs after the expiry
-    /// walk ([`UnitHooks::lists_expired`]): the default one and the shrine
-    /// ones. The others are run by their skill bodies.
+    /// walk ([`UnitHooks::lists_expired`]): the default one, the shrine
+    /// ones, and Inferno's / Blade Fury's (`skills/bodies.md` §6.16,
+    /// `bodies-2b.md` §6.16: state off, unit flags |= 0x40; the timer 12
+    /// expiry is what ends a player's Inferno / Arctic Blast channel). The
+    /// others are run by their skill bodies.
     fn list_removed(
         &mut self,
         _lists: &mut StatLists,
@@ -52,8 +55,12 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
-        if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
+        if matches!(
+            callback.0,
+            DEFAULT | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+        ) {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
@@ -302,6 +309,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     // maximum (the shrine set stamina to 2v on the list); the skill one's
     // skill refresh has nothing to refresh here (levels read the stat).
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, INFERNO};
+        use crate::skills::use_::bodies::helpers::FLAG_40;
         use crate::world::objects::shrines::STAMINA_REMOVE;
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
@@ -326,6 +335,14 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             }
             if cb == STAMINA_REMOVE {
                 sim.stats.clamp_to_max(self, u);
+            }
+            // `0x005C8BF0` / `0x005D69B0`: unit flags (+0xC4) |= 0x40, so
+            // the sequence's later do events do not run (`use.md` §5.2
+            // rule 3).
+            if matches!(cb, INFERNO | BLADE_FURY) {
+                if let Some(r) = sim.units.get_mut(u) {
+                    r.flags |= FLAG_40;
+                }
             }
         }
         let _ = unit;

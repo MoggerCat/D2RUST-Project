@@ -162,6 +162,41 @@ fn state_lists_expire_through_the_type_12_event() {
     fx.assert_clean();
 }
 
+// Covers: specs/skills/bodies.md §6.16 r4
+#[test]
+fn an_expired_inferno_list_runs_its_remove_callback() {
+    // Inferno / Arctic Blast start (`bodies.md` §6.16 step 4): a flags-2
+    // list of state 12 expiring at F + 20 with the remove callback
+    // `0x005C8BF0`. Its expiry by event 12 runs the callback: state 12
+    // off and unit flag 0x40 set, which stops the sequence's do events
+    // (1.14d: dru-arctic-blast's channel ends at F + 20).
+    use crate::skills::use_::bodies::callback::INFERNO;
+    use crate::stats::lists::RemoveCallback;
+    const STATE_INFERNO: u32 = 12;
+    let mut fx = Fx::new();
+    let p = fx.spawn(UnitType::Player, 0, fx.a, 10, 10);
+    fx.sim.with(&mut fx.game, |g, v| {
+        let guid = v.units.get(p).unwrap().guid;
+        let l = v.stats.alloc(2, 5, 0, guid);
+        v.stats.attach(&mut *v.h, p, l, true);
+        v.stats
+            .set_remove_callback(l, Some(RemoveCallback(INFERNO)));
+        v.stats.set_state(l, STATE_INFERNO);
+        v.stats.toggle_state(p, STATE_INFERNO, true);
+        g.schedule_event(p, u32::from(event::REMOVE_STATE), 5, None, 0, 0)
+            .unwrap();
+        assert_eq!(v.units.get(p).unwrap().flags & 0x40, 0);
+    });
+    for _ in 0..5 {
+        fx.frame();
+    }
+    fx.sim.with(&mut fx.game, |_, v| {
+        assert!(!v.stats.has_state(p, STATE_INFERNO));
+        assert_ne!(v.units.get(p).unwrap().flags & 0x40, 0);
+    });
+    fx.assert_clean();
+}
+
 // Covers: specs/combat/hit.md §7.1; specs/sim/intents-events.md §7.9 r1
 #[test]
 fn a_set_alignment_makes_the_state_105_list() {
