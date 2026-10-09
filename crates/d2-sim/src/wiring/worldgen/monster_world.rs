@@ -48,6 +48,19 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         init::type_init(&t.init(), &mut wh, unit);
     }
 
+    fn reinit(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u32,
+    ) -> bool {
+        let t = self.tables.clone();
+        let mut wh = host(sim, h, self);
+        init::reinit(&t.init(), &mut wh, unit, class, mode)
+    }
+
     fn umods(
         &mut self,
         sim: &mut Sim<'_>,

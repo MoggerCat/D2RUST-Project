@@ -472,6 +472,14 @@ pub fn enter_game<D: ActionEvents, W>(
         .lists
         .ensure_act(entry.act)
         .map_err(|_| JoinError::NoAct(entry.act))?;
+    // PROVISIONAL (REC-797): the player's act byte (+0x18) is the
+    // client act from the join on; recorded 4 from frame 2 for a save in
+    // Act V (traces/checks/a5-town-arrival-bar.check), and no spec names
+    // the 1.14d writer (`sim/units.md` §2 lists only the allocation and
+    // the act change). Settled by PC 1 Step 4 "[q-play-act5] join act byte".
+    if let Some(r) = a.sys.units.get_mut(player) {
+        r.act = entry.act;
+    }
     a.sys
         .hooks
         .x

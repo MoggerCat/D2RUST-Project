@@ -265,6 +265,37 @@ fn a_grid_item_without_a_cursor_item_sends_0x19() {
         .is_empty());
 }
 
+// `inventory.md` §3 r2: the hover tint is the hovered item of the §5
+// state, not the item under the mouse; a use press clears that state
+// (PROVISIONAL, REC-707: `a1-panel-cube` row 25 draws the right-clicked
+// cube with its own tint) until the next move tracks it again.
+// Covers: specs/ui/inventory.md §3 r2
+#[test]
+fn a_use_press_clears_the_hover_tint_until_the_mouse_moves() {
+    let (mut u, files) = ui();
+    u.tint_colors = Some(TINTS);
+    let mut w = world(&[(7, mode::STORED, (0, 0, 0, 1), b"box ")], None);
+    w.units.get_mut(&PLAYER).unwrap().position = Some((10, 20));
+    let l = layout();
+    let at = in_cell(0, 0);
+    let cube = crate::bridge::items::local_items(&w)
+        .into_iter()
+        .find(|i| i.key.guid == 7)
+        .unwrap();
+    let hovered = |u: &ItemsUi| {
+        let d = u.grid_item_tints(&w, &l.grid, at, &cube);
+        !tiles(&d, TINTS[1]).is_empty()
+    };
+    // Under the mouse but not tracked: not hovered.
+    assert!(!hovered(&u));
+    u.track_hover(&w, &files, &l.grid, 0, at);
+    assert!(hovered(&u));
+    assert!(!u.right_press(&w, &files, &l, at).is_empty(), "0x20 sent");
+    assert!(!hovered(&u), "the use press clears the hover");
+    u.track_hover(&w, &files, &l.grid, 0, at);
+    assert!(hovered(&u), "a move tracks it again");
+}
+
 // Covers: specs/items/inventory-moves.md §7.11
 #[test]
 fn a_right_click_on_a_grid_item_sends_0x20_with_the_player_point() {
