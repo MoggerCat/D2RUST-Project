@@ -30,7 +30,7 @@ Fix sessions launched 17:05 UTC (each branch carries `docs/handoff/<branch>-task
 | q-fix-check-triage | session_01B2eB5Q2V444GgPtPfrhLNK | Sonnet | 1180–1189 | all 88 scenario-diff checks vs 1.14d → checks-status.md |
 | q-fix-difficulty-a1a2 | session_01LiMn42LTayZFyizFKwHzQo | Sonnet | 1200–1209 | Nightmare / Hell, Acts I–II |
 
-Batch 2 launched 17:29 UTC. Branch `claude/q-fix-realdata-baseline` (REC 1190–1199, brief pushed) is held, not launched. Next free REC block: 1210.
+Batch 2 launched 17:29 UTC; q-fix-realdata-baseline (REC 1190–1199) session_01Hv1NPtDa5KwdQ56KbYdTYm launched 17:41 at the user's request (21 sessions). Next free REC block: 1210.
 pc1-data Step 4: last number 46.
 
 ## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
