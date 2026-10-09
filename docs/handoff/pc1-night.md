@@ -25,6 +25,26 @@ messages.
     path does not sync with the economy's seed the way `quest_host.rs`
     does (likely cause of "unit seed right, game seed unchanged").
 
+- **B done (game-seed callers, for q-fix-seed-game)**: `sim/rng.md` §5.6
+  (every game-seed draw G1–G10 from a full scan of game +0xD0 uses, with
+  two recordings as evidence), `sim/units.md` §3.1 r4.1–r4.2 (all 69
+  allocation calls by unit type; the player-load G6 sites
+  `0x00569F53` / `0x0053254E`), `combat/hit.md` and `items/treasure.md`
+  Randomness. Result: after creation (G2–G5) the game seed moves only by
+  allocations (unit G6 `0x00552E31`, item G7 `0x00552E9F`), room
+  population (G8 `0x0054ED96`, G9 `0x0054EE53`) and the cube type pick
+  (G10). The hit / damage / recovery / death / TC code draws nothing from
+  it (recorded: a Fallen killed at frame 46, zero game-seed draws from
+  frame 30 to 150). d2rs has every site (only G1, the non-`-seed` root
+  step, is missing; irrelevant to checks). So the q-fix-seed-game
+  divergences are in **which units / items / population tries are
+  made, and in what order**: frame 4 of the state checks = units of
+  room activation (1.14d: 24 at frame 2, 10 after a move); combat frames
+  = missile count per attack (sub / hit missiles, umod callbacks), drop
+  items, population of newly entered rooms. No new row: the fix is the
+  per-frame allocation diff (a G6 ledger with unit type / class per
+  frame, which `record_rng.py` + the state channel already give).
+
 ## C — numbered items
 
 | # | Item | Answer | Rows |
