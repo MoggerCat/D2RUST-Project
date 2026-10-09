@@ -35,7 +35,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "mon"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -238,6 +238,33 @@ def fam_ai(ctx):
     return out
 
 
+def fam_mon(ctx):
+    """One spawn check per monstats row that has its own ledger row `monster.<id>`
+    (the class rows of the coverage group): spawn, idle and think frames, state and rng."""
+    _, mons = monster_rows(ctx)
+    wanted = set()
+    for area, source in load_ledger(ctx.ledger):
+        m = re.fullmatch(r"monstats\.txt \S+ \(hcIdx (\d+)\)", source)
+        if m and area.startswith("monster."):
+            wanted.add(int(m.group(1)))
+    out = []
+    for hc, ident, ai, enabled, boss in mons:
+        if hc not in wanted:
+            continue
+        c = spawn_check(f"gen-mon-{hc}", "mon", f"monstats.txt row {hc}",
+                        f"monster class {hc} {ident} (AI {ai})",
+                        f"spawn {hc} @x+5 @y-4 normal",
+                        [f"Monster class {hc} ({ident}, AI {ai}) spawned normal next to the "
+                         "player: its spawn state and its idle and think frames."])
+        c.channels = "state rng"
+        # the player's quest list (q) and the game seed differ on every check of every
+        # family at frame 2 / 30 (harness level, not the monster): not compared here
+        c.lines = ["ignore q seed"] + c.lines
+        c.extra = {"class": hc, "id": ident}
+        out.append(c)
+    return out
+
+
 def fam_su(ctx):
     t = excel(ctx.excel, "superuniques.txt", ["Superunique", "Name", "Class", "hcIdx"])
     out = []
@@ -345,7 +372,7 @@ def fam_shrine(ctx):
 
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss,
-             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine}
+             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "mon": fam_mon}
 
 
 # ----------------------------------------------------------- ledger join
@@ -387,6 +414,9 @@ def resolve_area(c, areas):
                 and f"({x['skill']})" in s]
     elif f == "shrine":
         pick = [a for a, _ in areas if a.startswith(f"shrine.{x['shrine']}.")]
+    elif f == "mon":
+        pick = [a for a, s in areas if a.startswith("monster.")
+                and s.endswith(f"(hcIdx {x['class']})")]
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"

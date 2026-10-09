@@ -70,7 +70,8 @@ class Repo:
             # specs/tools/ describe our own measuring tools, not 1.14d behaviour
             and not os.path.relpath(p, root).replace(os.sep, "/").startswith("specs/tools/"))
         self.checks = sorted(os.path.basename(p)[:-6] for p in
-                             glob.glob(os.path.join(root, "traces", "checks", "*.check")))
+                             glob.glob(os.path.join(root, "traces", "checks", "*.check"))
+                             + glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
         self.messages = []
         for d, f in (("c2s", "client-messages.tsv"), ("s2c", "server-messages.tsv")):
             p = os.path.join(root, "specs", "sim", f)
