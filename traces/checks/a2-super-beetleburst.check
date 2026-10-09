@@ -1,0 +1,11 @@
+check 1
+# Act II superunique beetleburst (superuniques row 13): warp 43, spawn beside the player, kill it by poke; the state channel carries minions and drops.
+name a2-super-beetleburst
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 120
+seconds 600
+channels state packets
+at 4 poke warp 43
+at 10 poke superunique 13 @x+6 @y
+at 30 poke missile 58 @x @y @x+6 @y

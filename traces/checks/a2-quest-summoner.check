@@ -1,0 +1,13 @@
+check 1
+# Quest 13 The Summoner (s7): warp to the Arcane Sanctuary (74), kill the Summoner by poke.
+name a2-quest-summoner
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1 12.0
+seed 1234
+ticks 76
+seconds 600
+channels state packets
+at 4 poke warp 74
+at 14 poke goto unit 1:250
+at 26 poke pos @1:250 @x+3 @y
+at 28 poke stat @1:250 6 0 256
+at 30 poke missile 58 @x @y @x+3 @y

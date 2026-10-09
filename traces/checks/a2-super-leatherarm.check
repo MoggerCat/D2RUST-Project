@@ -1,0 +1,11 @@
+check 1
+# Act II superunique leatherarm (superuniques row 14): warp 46, spawn beside the player, kill it by poke; the state channel carries minions and drops.
+name a2-super-leatherarm
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 120
+seconds 600
+channels state packets
+at 4 poke warp 46
+at 10 poke superunique 14 @x+6 @y
+at 30 poke missile 58 @x @y @x+6 @y

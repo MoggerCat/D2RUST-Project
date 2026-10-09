@@ -1,0 +1,12 @@
+check 1
+# Act II waypoint on level 52 (object 288): warp, operate (0x13 type 2), open menu; take the waypoint to level 40 (0x49).
+name a2-wp-52
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1 --waypoints all
+seed 1234
+ticks 50
+seconds 600
+channels state packets
+at 4 poke warp 52
+at 8 poke goto unit 2:288
+at 24 send InteractWithEntity type=2 id=@2:288
+at 30 send TakeOrCloseWp wp=@2:288 level=40
