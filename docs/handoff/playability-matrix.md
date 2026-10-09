@@ -96,3 +96,14 @@ So far no blocker depends on the difficulty.
   act flags.
 - Step 3 (the matrix with the autoplay bot) was dropped by the
   coordinator.
+
+## Update q-fix-difficulty-a1a2 (2026-10-09): druid and assassin act2
+
+Run on the current branch (staging-7 merged), `act2.play --class dru,ass
+--difficulty normal,nightmare,hell --jobs 4`: all 6 cells reach 14/15; the
+first blocker is `radament-killed` (unit class 229 never present in the
+sweep), the same in every cell. Nothing differs between Normal, Nightmare
+and Hell, so no difficulty-specific cause exists in Acts I-II so far (act1
+cells were already identical across difficulties above). The act2 numbers
+for the other classes (11/15 `town-start`) predate later staging merges and
+were not re-run here. Radament belongs to q-fix-boss-damage / q-fix-act2-play.
