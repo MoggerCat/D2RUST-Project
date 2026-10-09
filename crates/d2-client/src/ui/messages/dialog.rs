@@ -689,10 +689,7 @@ mod tests {
         // §7 r2: a line of exactly 100 units followed by LF leaves the LF
         // unconsumed; it becomes an empty next line.
         let t = parse_text(&w(&format!("8\n{}\nb", "a".repeat(100))));
-        assert_eq!(
-            t.lines,
-            vec![w(&"a".repeat(100)), Vec::new(), w("b")]
-        );
+        assert_eq!(t.lines, vec![w(&"a".repeat(100)), Vec::new(), w("b")]);
         // An empty text gives no lines; a speed line alone, none either.
         assert!(parse_text(&[]).lines.is_empty());
         assert!(parse_text(&w("7")).lines.is_empty());

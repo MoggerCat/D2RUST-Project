@@ -144,12 +144,7 @@ fn topic_text(
 ) -> Option<u16> {
     let (player_class, seed) = player;
     match h {
-        TopicHandler::Replay(k) => st
-            .talk
-            .list
-            .as_ref()?
-            .nth_of_kind(2, k)
-            .map(|e| e.string),
+        TopicHandler::Replay(k) => st.talk.list.as_ref()?.nth_of_kind(2, k).map(|e| e.string),
         TopicHandler::Introduction => {
             let i = st.talk.intro().index_of(class)?;
             st.talk.intro().entries[i].records.first().map(|r| r.text())

@@ -752,7 +752,7 @@ mod tests {
             [false, false, false, false, false, false, true, false]
         );
         // Before the first draw every x is 0: x 5 hits button 0.
-        let mut m = MiniPanel::new(1);
+        let m = MiniPanel::new(1);
         assert_eq!(m.button_at(800, 600, 5).map(|b| b.i), Some(0));
         assert_eq!(m.button_at(800, 600, 316 + 25), None);
     }

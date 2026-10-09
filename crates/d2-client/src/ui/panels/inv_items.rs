@@ -597,9 +597,9 @@ impl ItemsUi {
             let (gw, gh) = a.map_or((cell.0, cell.1), |a| (a.gw, a.gh));
             if let Some((dc, dr)) = grid_drop_cell(g, at, (w, h), (gw, gh)) {
                 let inside = dc + w <= i32::from(g.grid_x) && dr + h <= i32::from(g.grid_y);
-                let free = !grid
-                    .iter()
-                    .any(|(_, x, y, iw, ih)| *x < dc + w && dc < x + iw && *y < dr + h && dr < y + ih);
+                let free = !grid.iter().any(|(_, x, y, iw, ih)| {
+                    *x < dc + w && dc < x + iw && *y < dr + h && dr < y + ih
+                });
                 if inside && free {
                     drop_cell = Some((dc as u32, dr as u32));
                 }

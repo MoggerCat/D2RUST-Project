@@ -56,7 +56,8 @@ pub fn intro_table() -> IntroTable {
     let entries = rows(INTROS)
         .map(|r| {
             let i = num(r[0]) as usize;
-            let mut e = IntroEntry::new(num(r[1]), num(r[2]) as u8, std::mem::take(&mut records[i]));
+            let mut e =
+                IntroEntry::new(num(r[1]), num(r[2]) as u8, std::mem::take(&mut records[i]));
             e.flag13 = num(r[8]) != 0;
             e.no_intro = num(r[9]) != 0;
             e.greeting_due = num(r[10]) != 0;
@@ -77,13 +78,26 @@ mod tests {
     fn the_facts_give_the_intro_table_and_the_captions() {
         let t = intro_table();
         assert_eq!(t.entries.len(), INTRO_COUNT);
-        let mut no: Vec<u32> = t.entries.iter().filter(|e| e.no_intro).map(|e| e.class).collect();
+        let mut no: Vec<u32> = t
+            .entries
+            .iter()
+            .filter(|e| e.no_intro)
+            .map(|e| e.class)
+            .collect();
         no.sort_unstable();
         assert_eq!(no, NO_INTRO);
-        let mut f13: Vec<u32> = t.entries.iter().filter(|e| e.flag13).map(|e| e.class).collect();
+        let mut f13: Vec<u32> = t
+            .entries
+            .iter()
+            .filter(|e| e.flag13)
+            .map(|e| e.class)
+            .collect();
         f13.sort_unstable();
         assert_eq!(f13, FLAG_13);
-        assert_eq!(t.entries.iter().map(|e| e.records.len()).sum::<usize>(), 418);
+        assert_eq!(
+            t.entries.iter().map(|e| e.records.len()).sum::<usize>(),
+            418
+        );
         // Entry 15 (class 201): 10 records; record 2 is text 255, flag 1.
         let e = &t.entries[15];
         assert_eq!((e.class, e.records.len()), (201, 10));
