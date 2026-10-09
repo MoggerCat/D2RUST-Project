@@ -15,7 +15,7 @@ use crate::rules::camera::{Camera, CELL_HALF_WIDTH};
 use crate::rules::draw_order::weather::SkyDraw;
 use crate::rules::placement;
 use crate::scene::order::pass;
-use crate::scene::{BlendOp, DrawItem, FrameCycle, ItemTag};
+use crate::scene::{BlendOp, DrawItem, DrawKey, FrameCycle, ItemTag};
 use crate::world_view::weather_view::is_sky_call_path;
 use crate::world_view::UnitCall;
 
@@ -176,7 +176,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut draws: Vec<Vec<String>> = Vec::new();
     let mut sprites = BTreeMap::new();
     let mut last: Option<&DrawItem> = None;
-    let mut last_tile: Option<(ItemTag, Vec<String>)> = None;
+    let mut last_tile: Option<(ItemTag, DrawKey, Vec<String>)> = None;
     let mut sky = Some(sky_rows(cx.sky));
     // The last unit-pass entry (item or call): its tag and whether it
     // was a shadow (§5 r1 unit rows).
@@ -202,9 +202,14 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         if call_item {
             continue;
         }
-        // §5 r1: the per-block draws of one tile are one row.
+        // §5 r1: the per-block draws of one tile are one row; two tile
+        // records (two draw keys) are two calls.
         if last.is_some_and(|l| {
-            l.tag == item.tag && l.frame == item.frame && l.x == item.x && l.y == item.y
+            l.tag == item.tag
+                && l.frame == item.frame
+                && l.x == item.x
+                && l.y == item.y
+                && l.key == item.key
         }) {
             continue;
         }
@@ -296,11 +301,11 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         if tile_row
             && last_tile
                 .as_ref()
-                .is_some_and(|(tag, r)| *tag == item.tag && *r == row)
+                .is_some_and(|(tag, key, r)| *tag == item.tag && *key == item.key && *r == row)
         {
             continue;
         }
-        last_tile = tile_row.then(|| (item.tag, row.clone()));
+        last_tile = tile_row.then(|| (item.tag, item.key, row.clone()));
         draws.push(row);
     }
     for c in calls {

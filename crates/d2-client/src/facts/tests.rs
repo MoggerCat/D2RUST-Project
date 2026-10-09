@@ -528,6 +528,32 @@ fn block_frames_of_one_tile_are_one_row() {
             "1 TileDrawLit x/f.dt1 - 3 ? 260 40",
         ]
     );
+    // Two records of one cell with the same tile (two draw keys, the
+    // record's list position) are two calls (`a4-town-pandemonium-fortress`
+    // rows 12–13: one lower wall called twice).
+    let twice = |id, x: i32, minor| {
+        let mut i = item(id, x, (1, 1));
+        i.key = DrawKey::new(pass::WALLS_UNITS, 0, minor, 0).unwrap();
+        i
+    };
+    let rows = draw_rows(
+        &[
+            twice(ids[0], 100, 0),
+            twice(ids[1], 132, 0),
+            twice(ids[0], 100, 1),
+            twice(ids[1], 132, 1),
+        ],
+        &cx,
+    )
+    .unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 TileDrawLit x/f.dt1 - 3 ? 100 40",
+            "1 TileDrawLit x/f.dt1 - 3 ? 100 40",
+        ]
+    );
 }
 
 /// §5 r1, r6: a unit's shadow (pass 5) writes no unit row (1.14d's shadow

@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–303 |
-|   6. Comparison | 304–341 |
-|   7. Requests | 342–353 |
-| Constants & data dependencies | 354–357 |
-| Randomness | 358–361 |
-| Edge cases & original bugs | 362–369 |
-| Test vectors | 370–378 |
-| Provenance | 379–383 |
-| Open questions | 384–398 |
+|   5. d2rs export | 190–306 |
+|   6. Comparison | 307–344 |
+|   7. Requests | 345–356 |
+| Constants & data dependencies | 357–360 |
+| Randomness | 361–364 |
+| Edge cases & original bugs | 365–372 |
+| Test vectors | 373–381 |
+| Provenance | 382–386 |
+| Open questions | 387–401 |
 <!-- /index -->
 
 ## Summary
@@ -195,7 +195,10 @@ composition, through `d2-client` only (game logic untouched).
 
 1. Rows come from the sorted `DrawItem` list. Consecutive items with the
    same tag, frame and position (the per-block draws of one tile,
-   `client/render-pipeline.md` §A3) are one row. Before the first item of
+   `client/render-pipeline.md` §A3) are one row; two tile records of one
+   cell (two draw keys) stay two rows, as 1.14d calls the drawer per
+   record (revision 2026-10-09: `a4-town-pandemonium-fortress` rows
+   12–13). Before the first item of
    each run of items tagged with the same unit, one `unit` row.
 2. A frame of a DT1 part is a tile op; of a direction part a cel op;
    `file` / `dir` / `frame` come from the frame store's owner of the
