@@ -289,6 +289,7 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -432,6 +433,7 @@ fn sky_calls_replace_their_pixel_items() {
         sky: &sky,
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     // Item rows by op; call rows with x, y and mode.
     let rows = |items: &[DrawItem]| -> Vec<String> {
@@ -508,6 +510,7 @@ fn block_frames_of_one_tile_are_one_row() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(
         &[
@@ -593,6 +596,7 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[shadow, body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -635,6 +639,7 @@ fn unit_cel_dir_is_the_context_dir64() {
         sky: &[],
         unit_dirs: &dirs,
         unit_calls: &[],
+        color_rows: None,
     };
     let rows = draw_rows(&[body, other], &cx).unwrap();
     let dirs: Vec<&str> = rows
@@ -682,6 +687,7 @@ fn unit_calls_are_rows_at_their_keys() {
         sky: &[],
         unit_dirs: &std::collections::BTreeMap::new(),
         unit_calls: &calls,
+        color_rows: None,
     };
     let rows = draw_rows(&[body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -736,4 +742,52 @@ fn skip_weather_drops_pass9_rows_only() {
     let a = set(&[ROW0, bx, ROW1], &[], Some(&[SPRITE])).without_weather();
     let b = set(&[ROW0, ROW1], &[], Some(&[SPRITE])).without_weather();
     assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.row == 1));
+}
+
+// Covers: specs/tools/facts-render.md §5 r16
+/// A UI rectangle (`0x0046EFD0`, a d2rs `d2rs/ui/rect/WxH` item) is
+/// 1.14d's `DrawBox` row: left, top and the colour (its colour row minus
+/// the first one); without the colour rows the colour is `?`.
+#[test]
+fn ui_rectangles_are_drawbox_rows() {
+    use crate::scene::{MapId, ShadeChain};
+    let mut s = FrameStore::new();
+    let key = crate::world_view::ui_bind::rect_key(29, 29);
+    s.insert(
+        key.clone(),
+        FrameSet {
+            frames: vec![IndexFrame::new(29, 29, 0, 0, vec![1; 29 * 29]).unwrap()],
+        },
+    )
+    .unwrap();
+    let mut item = DrawItem::new(s.id(&key, 0).unwrap(), 198, 199);
+    item.shade = ShadeChain::new(&[MapId(10 + 234)]).unwrap();
+    item.tag = ItemTag::Ui(0);
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: None,
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
+        color_rows: Some(MapId(10)),
+    };
+    let mut next = item;
+    next.x = 227;
+    let rows = draw_rows(&[item, next], &cx).unwrap();
+    let cols: Vec<String> = rows.draws.iter().map(|r| r.join(" ")).collect();
+    assert_eq!(
+        cols,
+        [
+            "0 DrawBox - - - - 198 199 - - - - 234 - - - -",
+            "1 DrawBox - - - - 227 199 - - - - 234 - - - -",
+        ]
+    );
+    assert!(rows.sprites.is_empty());
+    let cx = ExportContext {
+        color_rows: None,
+        ..cx
+    };
+    assert_eq!(draw_rows(&[item], &cx).unwrap().draws[0][12], "?");
 }

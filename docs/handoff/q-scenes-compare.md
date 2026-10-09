@@ -1,6 +1,6 @@
 # Handoff: d2rs vs 1.14d scene compares — `claude/q-scenes-compare`
 
-Cloud session, 2026-10-09. REC block 510–519 (used: 510–514).
+Cloud session, 2026-10-09. REC block 510–519 (used: 510–515).
 Facts: `facts/render/scenes/*` (q-facts-scenes, Wine). d2rs: dev build,
 `d2-client play --save S.d2s --seed 1234 --dump-draws DIR --at-tick T [--input SCRIPT]`
 under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick,index_sha256 --skip-weather`.
@@ -24,8 +24,9 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 5. itemtypes `class` 0xFF (empty cell, real data) is "none" (`items/inventory.md` §4.2 step 7 revision, REC-513): classless items equip; the Sash goes to the belt and the cube opens.
 6. Click → subtile four rows below the plain inverse (`ui/controls.md` §6 r2, REC-514): walk-n reaches 1.14d's position.
 7. A predicted walk in town is drawn in mode 6 (`pathing.md` §1.5 r2; `Predict::mode`).
+8. Inventory family draw order (`ui/panels.md` §9 r1 revision, REC-515 for stash / shop; §9 r6; §12 r3): the mode panel (cube) draws before the inventory (`Panel::draw_before`, routing unchanged); per item its cell tints (one box per cell, row by row) then the item; gold line, gold button, close button after the items; cube buttons after its grid. UI rectangles export as `DrawBox` rows (`facts-render.md` §5 r16). Cube: equal through row 24.
 
-## First difference per scene (after fixes 1–7)
+## First difference per scene (after fixes 1–8)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor | r108 NPC `rc` walk frame 7 vs 1 (NPC path / seed order: q-fix-real-unit-seed-order) |
@@ -34,8 +35,8 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 | a1-panel-character | r109 `wa` NU dir 47 vs WL dir 0 (NPC pose) |
 | a1-panel-skilltree | r111 `wa` vs `rc` (NPC pose) |
 | a1-panel-automap | r109 `wa` vs `rc` (NPC pose) |
-| a1-panel-esc-menu | r108 `rc` NU at 814,484 vs a torch (NPC position) |
-| a1-panel-cube | r1 panel order: 1.14d draws `supertransmogrifier` (4 cels) and the cube's item-cell boxes before the inventory; d2rs the inventory first |
+| a1-panel-esc-menu-wine | r108 `rc` NU at 814,484 vs a torch (NPC position); renamed at the staging merge (PC 1's Windows recording holds `a1-panel-esc-menu`) |
+| a1-panel-cube | r25 the hovered cube's tint: d2rs the hover colour 118 (§3 r2), 1.14d the usable 234 (the cursor rests on the cube since the right click; 1.14d's hover state may follow mouse moves only: settled by a recording that moves the mouse onto the item) |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
 | a3-town-kurast-docks | r97 pass-9 cel (`at` 0x473bd0, file ?) vs d2rs `rain3.dc6` f1 |
 | a4-town-pandemonium-fortress | r100 object shadow `98` vs `99` (object order) |
