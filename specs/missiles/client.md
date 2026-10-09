@@ -38,20 +38,20 @@
 |   C4. Create — tail | 188–215 |
 |   C5. Callers | 216–227 |
 |   C6. Per-update dispatch `0x004D2C70` | 228–245 |
-|   C7. Default step `0x004D30C0` (function 1) | 246–297 |
-|   C8. Client collide table `0x0072A350` | 298–318 |
-|   C9. End `0x004D2D70(m, U, forced)` | 319–361 |
-|   C10. Removal and lifetime | 362–374 |
-|   C11. `InitSteps` and `ExplosionMissile` | 375–385 |
-|   C12. Client function table `0x0072A398` | 386–472 |
-|   C13. Function bodies specified here | 473–528 |
-|   C14. Seeds (capture-only) | 529–575 |
-| Constants & data dependencies | 576–597 |
-| Randomness | 598–601 |
-| Edge cases & original bugs | 602–621 |
-| Test vectors | 622–637 |
-| Provenance | 638–654 |
-| Open questions | 655–715 |
+|   C7. Default step `0x004D30C0` (function 1) | 246–301 |
+|   C8. Client collide table `0x0072A350` | 302–322 |
+|   C9. End `0x004D2D70(m, U, forced)` | 323–367 |
+|   C10. Removal and lifetime | 368–380 |
+|   C11. `InitSteps` and `ExplosionMissile` | 381–391 |
+|   C12. Client function table `0x0072A398` | 392–478 |
+|   C13. Function bodies specified here | 479–534 |
+|   C14. Seeds (capture-only) | 535–581 |
+| Constants & data dependencies | 582–603 |
+| Randomness | 604–607 |
+| Edge cases & original bugs | 608–627 |
+| Test vectors | 628–643 |
+| Provenance | 644–660 |
+| Open questions | 661–721 |
 <!-- /index -->
 
 ## Summary
@@ -250,9 +250,13 @@ No row → return. One pass:
 1. active := frames left ≤ activate frame.
 2. active and elapsed (`missiles.md` §R1.4) > `InitSteps` → flag-ex &=
    ~0x40000 (drawn from now on).
-3. Motion record reports "not moving" (`0x004DA6B0`: done and not
-   restarted, i.e. a flag-0x100 arc that landed) → end(none, 1)
-   (§C9); return.
+3. Motion record reports "not moving" (`0x004DA6B0`: flag 1 set and
+   flag 8 clear) → end(none, 1) (§C9); return. The create restarts
+   every missile's record (flag 8) and the flag-0x100 arc ORs flag 2
+   onto it (`render/unit-composite.md` §8), so a landed create arc does
+   **not** end the missile here: it holds at x = y = 0 until frames
+   left runs out (r6). Only a record made later without a restart (flag
+   8 clear) can end it here.
 4. active → animation:
    - `LoopAnim` = 0: advance unless at the end (`0x006217C0`: frame +
      speed ≥ length); at the end the frame holds.
@@ -348,8 +352,10 @@ Callers: the default step (none, 1), (none, 0), (U, 0); function 2
    4. `HitSound` ≥ 0 → request on m (`audio/triggers.md` §8 r3).
    5. E := `ExplosionMissile` (i16) ≥ 0 → X := `0x004CDBA0(m, E, 0, 0,
       m's skill, m's level)` (flags 0x20: target (0, 0) absolute). X
-      made: X's motion position := m's motion (x, y, z) (`0x004DA110`,
-      `0x004DA130`, `0x004DA150` → `0x004DA1D0`), done (`0x004DA640`),
+      made: X's motion position := m's motion (x, y, z) `>> 11` then `<<
+      11` (getters `0x004DA110`, `0x004DA130`, `0x004DA150` shift, the
+      setter `0x004DA1D0` shifts back: m's position with the low 11
+      bits cleared), done (`0x004DA640`),
       restart (`0x004DA690`); X class 146 `spidergoo` → direction :=
       rnd(64) on X's seed; else X direction := m's direction
       (`0x006487F0` → `0x00648820`).
