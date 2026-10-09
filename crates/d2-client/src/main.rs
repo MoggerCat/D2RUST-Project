@@ -1,7 +1,7 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--res 800x600|640x480] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--game-dir DIR] [--res 800x600|640x480] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
@@ -14,7 +14,7 @@
 //!   d2-client autoplay-host (--save FILE.d2s | --new CLASS NAME) [--seed N] [--difficulty D] [--game-dir DIR]
 //!                        (the headless play client on a stdin/stdout line protocol,
 //!                        specs/tools/autoplay.md; tools/autoplay/ drives it)
-//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--packets FILE]
+//!   d2-client state-dump --save FILE.d2s [--seed N] [--difficulty D] --ticks T [--every n] --out FILE [--game-dir DIR] [--date YYYY-MM-DD] [--poke "F DIRECTIVE ARGS"]... [--send "F NAME FIELD=VALUE..." | --send "F hex BYTES..."]... [--input SCRIPT] [--packets FILE]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
@@ -56,7 +56,10 @@
 //! T server ticks and writes one `state-1` game-state snapshot per tick
 //! (`specs/tools/state-snapshot.md`; `--game-dir` or $D2_GAME_DIR).
 //!
-//! Game files are read from $D2_GAME_DIR. Output images go under the
+//! Game files are read from `--game-dir DIR`, else $D2_GAME_DIR, else the
+//! exe's folder or the current folder when it holds `d2data.mpq`
+//! (`launch::game_dir`; `docs/PLAYTEST.md`). A panic or a fatal error
+//! writes `d2rs-crash.log` next to the exe (`launch`). Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
 //! never be committed.
 
@@ -211,6 +214,10 @@ fn parse_options(args: &[String]) -> Result<Options> {
                 );
             }
             "--save" => o.save = Some(PathBuf::from(value()?)),
+            // Read before the options (`main`, `launch::game_dir`).
+            "--game-dir" => {
+                value()?;
+            }
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
             "--difficulty" => {
@@ -524,6 +531,7 @@ fn play(o: Options) -> Result<()> {
         let entry = if first { Entry::First } else { Entry::MainMenu };
         let (host, handles) = front_host(&saves, art, expansion, entry);
         first = false;
+        d2_client::launch::note("front end (main menu)");
         match run_front_end(host) {
             Outcome::Exit => return Ok(()),
             Outcome::GameLoad(g) => {
@@ -575,9 +583,14 @@ fn play_once(
         println!("play: {}", start.origin);
     }
     println!("play: difficulty {}", start.difficulty);
+    let seed = d2_client::app::single_player::game_seed(&start.character, o.seed);
+    d2_client::launch::note(format!(
+        "game start: {}, difficulty {}, seed {seed}, save {:?}",
+        start.origin, start.difficulty, start.save_path
+    ));
     let result = play::run(play::PlayConfig {
         data,
-        seed: d2_client::app::single_player::game_seed(&start.character, o.seed),
+        seed,
         character: start.character,
         exit_after: o.frames,
         save_path: start.save_path,
@@ -655,7 +668,43 @@ fn state_dump(args: &[String]) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    use d2_client::launch;
+    launch::install_crash_log();
+    let result = run();
+    if let Err(e) = &result {
+        launch::write_error(e);
+        pause_if_console();
+    }
+    result
+}
+
+/// A double-clicked exe's console closes on exit: on Windows, keep it
+/// open on an error until Enter, so the message can be read.
+fn pause_if_console() {
+    use std::io::IsTerminal;
+    if cfg!(windows) && std::io::stdin().is_terminal() {
+        eprintln!("press Enter to close");
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+}
+
+fn run() -> Result<()> {
+    use d2_client::launch;
     let args: Vec<String> = std::env::args().skip(1).collect();
+    launch::note(format!("command: {}", args.join(" ")));
+    // The install folder (`launch::game_dir`): `--game-dir`, $D2_GAME_DIR,
+    // then the exe's or the current folder when it holds d2data.mpq. Set
+    // as $D2_GAME_DIR before any thread starts, for every reader of it.
+    let arg_dir = args
+        .windows(2)
+        .find(|w| w[0] == "--game-dir")
+        .map(|w| PathBuf::from(&w[1]));
+    let env_dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
+    if let Some(dir) = launch::game_dir(arg_dir.as_deref(), env_dir, &launch::candidates()) {
+        println!("game folder: {}", dir.display());
+        launch::note(format!("game folder: {}", dir.display()));
+        std::env::set_var("D2_GAME_DIR", &dir);
+    }
     match args.first().map(String::as_str) {
         Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
         Some("state-dump") => state_dump(&args[1..]),
@@ -664,7 +713,9 @@ fn main() -> Result<()> {
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
+        // Proves the crash log (`launch`, windows-build.yml smoke step).
+        Some("crash-test") => panic!("crash-test: a deliberate panic to check d2rs-crash.log"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 
