@@ -11,7 +11,10 @@
 //! - a monster in walk / run whose last request is a move code of the
 //!   server's mode table (walk 1 / 0, run 23 / 24 to a point / a unit,
 //!   `sim/intents-events.md` §7.4) gets a track from its cell toward the
-//!   request's point, or the target unit's cell;
+//!   request's point, or the target unit's cell (the local player's
+//!   cell is its own position, the walk prediction:
+//!   `seams/movement-prediction.md` §2.9 r2; its model cell is the last
+//!   placement, possibly hundreds of sub-tiles behind);
 //! - from the tick after the request (the server path's first step) the
 //!   track steps each server tick by the velocity vector of
 //!   `sim/pathing.md` §9.4 r2.1 ((m · direction vector) >> 12 per axis,
@@ -170,6 +173,17 @@ fn centre(c: (u16, u16)) -> (i64, i64) {
     )
 }
 
+/// The cell of a unit goal: the local player's own position
+/// (`seams/movement-prediction.md` §2.9 r1–r2: the client path that
+/// `0x00480780` aims at is the player's walk prediction, not its last
+/// placement), else the model cell.
+fn target_cell(world: &ClientWorld, key: UnitKey) -> Option<(u16, u16)> {
+    if world.local_player == Some(key) {
+        return world.local_cell();
+    }
+    world.units.get(&key).and_then(|u| u.position)
+}
+
 impl MonsterMotion {
     /// The number of monsters with a track.
     pub fn walking(&self) -> usize {
@@ -237,7 +251,7 @@ impl MonsterMotion {
             }
             let goal = match t.goal {
                 Goal::Point(x, y) => Some((x, y)),
-                Goal::Unit(u) => world.units.get(&u).and_then(|u| u.position),
+                Goal::Unit(u) => target_cell(world, u),
             };
             let Some(goal) = goal else { continue };
             let (gx, gy) = centre(goal);
@@ -377,6 +391,32 @@ mod tests {
             w.units[&UnitKey::new(MONSTER, 5)].position,
             Some((100, 107))
         );
+    }
+
+    /// The autoplay crash (Cold Plains, seed 1234): monsters walking to
+    /// the local player (code 0) aimed at its model cell, the town
+    /// placement about 300 sub-tiles back, and the direction vector's
+    /// `127 × l` wrapped into a negative `tan` index. They aim at the player's
+    /// own position, the walk prediction.
+    #[test]
+    fn a_monster_walks_to_the_local_players_predicted_position() {
+        let mut w = ClientWorld::default();
+        let p = UnitKey::new(PLAYER, 1);
+        let mut pu = ClientUnit::new(p);
+        pu.position = Some((4873, 4228));
+        w.units.insert(p, pu);
+        w.local_player = Some(p);
+        let near = (5164u32 << 16 | 0x8000, 4564u32 << 16 | 0x8000);
+        w.set_local_walk(Some(near), Some(2));
+        monster(&mut w, 45, (5150, 4550), mode::WL, request(0, 0, 1, 75));
+        let mut m = MonsterMotion::default();
+        m.frame(&mut w, &classes());
+        for _ in 0..4 {
+            tick(&mut m, &mut w);
+        }
+        let k = UnitKey::new(MONSTER, 45);
+        let (x, y) = w.units[&k].precise.expect("the monster moved");
+        assert!(x > (5150 << 16 | 0x8000) && y > (4550 << 16 | 0x8000));
     }
 
     #[test]

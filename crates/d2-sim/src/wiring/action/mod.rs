@@ -30,6 +30,7 @@ pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
 pub mod monster_add;
+pub mod monster_death;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
@@ -164,14 +165,6 @@ pub struct HirelingAiFacts {
 
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
-/// A room's last-dead ring: four (unit, GUID) slots in memory order and
-/// the ring index.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct LastDead {
-    pub slots: [Option<(crate::units::UnitId, u32)>; 4],
-    pub index: u8,
-}
-
 pub struct ActionHooks<X> {
     pub tables: Arc<ActionTables>,
     pub drlg: DrlgWorld,
@@ -285,6 +278,9 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The unit whose death clean-up ran in the DT start running now
+    /// ([`monster_death::death_cleanup`]).
+    pub death_cleaned: Option<UnitId>,
     /// The mode of the monster mode change running now (the record's
     /// mode, `units.md` §4.6), for the start functions that read it (the
     /// attack / skill start `0x005A75C0`, rule 7).
@@ -296,10 +292,6 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
-    /// Each room's ring of its last four dead monsters (room +0x38..+0x44
-    /// GUIDs, ring index byte +0x14; `0x0061AFA0`, `units.md` §4.6 rule
-    /// 1.3), read by the Fallen's corpse check.
-    pub last_dead: BTreeMap<crate::units::RoomId, LastDead>,
     /// The quest control lent by the host that holds it
     /// ([`objects::QuestObjectHost`]): a quest init, operate or object
     /// event 7 the object module hands back runs on it at once, inside the
@@ -445,10 +437,10 @@ impl<X> ActionHooks<X> {
             monster_sequences: None,
             vitals: None,
             mode_target: None,
+            death_cleaned: None,
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
-            last_dead: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
             deferred_inits: None,

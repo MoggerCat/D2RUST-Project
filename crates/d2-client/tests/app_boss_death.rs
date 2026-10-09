@@ -33,6 +33,7 @@ fn run_with(ticks: u32, pokes: &[&str]) -> Vec<u8> {
         sends: Vec::new(),
         packets: None,
         rng: None,
+        save_out: None,
     };
     let mut game = DumpGame::resolve(&args, app_support::game_data(), None).unwrap();
     let save = d2_formats::d2s::D2s::new_stub(b"BossSor", 1, 0x20, 0).unwrap();

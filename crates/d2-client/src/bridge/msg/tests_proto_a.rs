@@ -1295,7 +1295,7 @@ fn npc_info_0x27_one_layout() {
         s[2..6].copy_from_slice(&c[6].to_le_bytes());
         s[6..].copy_from_slice(&crate::app::npc_seams::encode_text_list(&list));
         let mut p = base(1, c[6], n.min(7) as u8, 0, 0);
-        let mut e = list.iter().take(7).map(|&(st, k)| (k as u8, st));
+        let mut e = list.iter().rev().take(7).map(|&(st, k)| (k as u8, st));
         let mut next = || e.next().unwrap_or_default();
         (p.kind0, p.str0) = next();
         (p.kind1, p.str1) = next();

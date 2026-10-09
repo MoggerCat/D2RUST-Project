@@ -190,28 +190,30 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 - [q-fix-act4-play] De Seis seal on a WingN1 game: open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1).
 - [q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG, opened by the S→C quest-log tail `msg-ui.md` §1 r6) in 1.14d, and what does Esc do with it open? The flag table says Esc-closable 0, so d2rs's Esc closes it through the game-menu open and the next Esc restores it (keep = 1). Check on the Windows game: talk to Atma with a pending quest log, press Esc once.
+59. **[q-fix-act4-play] De Seis seal on a WingN1 game** answered → `world/quests-act4.md` §5.4 (recorded: spawns; dummy at (7770, 5226), De Seis at (7773, 5207)). open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1).
+59. **[q-fix-act4-play] De Seis seal on a WingN1 game** answered → `world/quests-act4.md` §5.4 (recorded: spawns; dummy at (7770, 5226), De Seis at (7773, 5207)). open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1). *Cloud, Wine (q-fix-a4-deseis, 2026-10-09)*: the same numbers when the seal is operated right after the walk (`traces/checks/a4-deseis-seal-early.check`, d2rs identical); operated after 200 idle frames at the seal, with the arm room south of it unloaded, 1.14d keeps the seal in mode 0 and d2rs too (`a4-deseis-seal-unloaded.check`): the boss-spot lookups see active rooms only. No d2rs change needed (`docs/handoff/q-fix-a4-deseis.md`).
 
-1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
+1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).** answered → see "Hand-back — PC 1 day run" below.
    S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
    side `0x0045DC50` / `0x0045DB20`. `combat/vitals.md` §5.2/§5.4 and
    `client/msg-units.md` §5 r3 contradict each other; the ignored test
    of row `q-fix-proto-vitals-dx-sign` / `q-fix-seam-vitals-delta` is
    ready.
-2. **Esc menu pause in single player** (`client/bridge.md` §8 r5; rows
+2. **Esc menu pause in single player** answered → see "Hand-back — PC 1 day run" below. (`client/bridge.md` §8 r5; rows
    `q-fix-ui-pause`, `q-fix-seam-pause`): does 1.14d stop the game loop
    under the Esc menu, and from which call.
-3. **Hireling target search range**: 20 sub-tiles (REC-100) vs 35
+3. **Hireling target search range** answered → see "Hand-back — PC 1 day run" below.: 20 sub-tiles (REC-100) vs 35
    (REC-279).
-4. **x87 precision at start-up (REC-21)**: the C runtime start-up's
+4. **x87 precision at start-up (REC-21)** answered → see "Hand-back — PC 1 day run" below.: the C runtime start-up's
    control word; settles five provisional points.
-5. **REC-290 tick half**: `record_tick.py --auto ScnAma --seed 1234
+5. **REC-290 tick half** answered → see "Hand-back — PC 1 day run" below.: `record_tick.py --auto ScnAma --seed 1234
    --ticks 600` on PC 1, committed as a trace, so the cloud can compare
    its Wine run (equal except ms between two Wine runs).
 
-6. UI spec gaps from `docs/handoff/q-ui-audit.md`: menu-box window
+6. (answered → see "Hand-back — PC 1 day run" below) UI spec gaps from `docs/handoff/q-ui-audit.md`: menu-box window
    handlers 0x0E/1, drop cell `0x00486BD0`, gamble flag (panels-2 §14
    r11 vs menus §4.2), waypoint level names.
-7. **Callers of three S→C senders (q-fix-proto-rest, REC-415)**: the static
+7. **Callers of three S→C senders (q-fix-proto-rest, REC-415)** answered → see "Hand-back — PC 1 day run" below.: the static
    callers of `0x0053C1D0` (0x20 StatUpdate), `0x0053C6F0` (0x93 skill
    bonus by element and page) and `0x0053E1C0` (0xA6; the spec found none)
    and `0x0053B3D0`'s 0x92 call site: when each runs and with which
@@ -219,23 +221,23 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
    contract-tested; only the call sites are missing. Answer into
    `client/msg-stats-items.md` §1 r4 / §5 r5 / r7 and `client/msg-skills.md`
    §9.
-8. **Argument form of `0x00554200(unit)` at the 0xAB case of
+8. (answered → see "Hand-back — PC 1 day run" below) **Argument form of `0x00554200(unit)` at the 0xAB case of
    `0x00571CD0`** (REC-412) and the base-or-total read of stat 178 in
    `0x00625A50` (REC-410): `sim/intents-events.md` §7.9 r2 and §7.3 r2
    step 9.
-9. **Field sources of S→C 0x73 in `0x0059FEE0`** (REC-414): which missile
+9. **Field sources of S→C 0x73 in `0x0059FEE0`** answered → see "Hand-back — PC 1 day run" below. (REC-414): which missile
    fields fill the two u32 positions, the first path point and the level
    byte; `missiles/missiles.md` R2.4.
-10. **Node order and asserts of the client 0x92 handler `0x004C23E0`**
+10. **Node order and asserts of the client 0x92 handler `0x004C23E0`** answered → see "Hand-back — PC 1 day run" below.
     (REC-416): the order of the inventory nodes it walks and what `0x0063E0B0`
     does at its end; `client/msg-stats-items.md` §5 r5.
-11. **Command 1 slot order in the controls table** (`q-fix-real-controls-default-order`):
+11. **Command 1 slot order in the controls table** answered → see "Hand-back — PC 1 day run" below. (`q-fix-real-controls-default-order`):
     Game.exe at 0x312220 holds (cmd 1, 'B', slot 0) before (cmd 1, 'I', slot 1);
     `specs/ui/key-commands.tsv` with the §3.4 / §B4 r1 rule gives them the other
     way round. Spec decision: a slot-order column in the TSV or an exception
     for command 1, and whether first-match lookup makes the order matter; then
     `BindingTable::defaults` and the test builder change together.
-12. **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
+12. (answered → see "Hand-back — PC 1 day run" below) **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
     q-fix-items-play)**: (a) the sixth argument of `0x0065FEC0` (the
     apply type, `items/properties.md` §2) at each static caller other
     than the affix roller (`0x005C12F0`), §11 and §12: which value each
@@ -244,50 +246,50 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the craft list (`0x00660240`, mode 7) call `0x0065FE10` or
     `0x0065FD70` directly (§2 says directly, §14 lists §12 among the
     wrapper's callers). Answer into `items/properties.md` §2 / §14.
-13. **State param sign in S→C 0xA8 / 0xAA** (`q-fix-proto-state-param-sign`):
+13. **State param sign in S→C 0xA8 / 0xAA** answered → see "Hand-back — PC 1 day run" below. (`q-fix-proto-state-param-sign`):
     the sim writes the param unsigned (`units/messages.rs`), the client
     reads it signed (`client/stat-lists.md` §3 r1); settle the read sign
     with `0x0045EE20` / `0x00470E30` (`stat-lists.md` OQ5).
-14. **Stamina scale on the client** (`q-fix-seam-stamina-scale`): the wire
+14. **Stamina scale on the client** answered → see "Hand-back — PC 1 day run" below. (`q-fix-seam-stamina-scale`): the wire
     carries stamina >> 8, the client's exhaustion test reads raw 1..255;
     does 1.14d's client drain stamina locally (`client/model.md` OQ2,
     REC-51)? Spec decision first, then `bridge/predict.rs`.
-15. **The other four progression call sites** (`q-fix-save-gaps`, REC-265
+15. **The other four progression call sites** answered → see "Hand-back — PC 1 day run" below. (`q-fix-save-gaps`, REC-265
     (2)): `0x00538680(client, step, difficulty)` at `0x0058DCE2`,
     `0x0058DD65`, `0x0058E4F1` (Act II) and `0x0059C848` (Act III): which
     quest event and which `step` each passes. Act I (`0x00596210`), Act IV
     (`0x005B4D77`, step 4, classic only) and Act III's Mephisto credit
     (`0x005BC182`) are wired.
-16. **Loader messages 0x22 / 0x21 at the join** (`q-fix-flow-join-load`):
+16. **Loader messages 0x22 / 0x21 at the join** answered → see "Hand-back — PC 1 day run" below. (`q-fix-flow-join-load`):
     the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
     0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
     entry itself is wired (`world/quests.md` §3 names the caller).
-17. **Think restart gate `0x00553160`** (REC-442, q-cloud-game): in
+17. **Think restart gate `0x00553160`** answered → see "Hand-back — PC 1 day run" below. (REC-442, q-cloud-game): in
     SUNIT_Add's monster branch (`init.md` §4.1), when does 1.14d restart
     the think at f + 2? d2rs always restarts it. Answer into `init.md`
     §4.1 / `ai.md`.
-18. **Missile damage setup `0x0059F900` → `0x0064B860`**
+18. **Missile damage setup `0x0059F900` → `0x0064B860`** answered → see "Hand-back — PC 1 day run" below.
     (`q-fix-real-missile-damage`, from q-fix-real-skills): how a missile's
     damage record is filled from its owner and skill; no spec exists.
     Write `missiles/damage.md` (or a section of `missiles/missiles.md`).
-19. **Arcane Sanctuary star tick** (`draw-order-2.md` OQ 12, HANDOFF §5
+19. **Arcane Sanctuary star tick** answered → see "Hand-back — PC 1 day run" below. (`draw-order-2.md` OQ 12, HANDOFF §5
     entry 103; REC-420): the initial `last` of §12 r3 and the time / seed
     argument form.
-20. **Windows recordings Wine cannot make** (`facts/requests.tsv`, open
+20. **Windows recordings Wine cannot make** partly answered (front-end, night and earlier scenes done; frontend-character-select open, `docs/handoff/pc1-day4.md`). (`facts/requests.tsv`, open
     rows from q-facts-scenes): stash panel; NPC dialog, shop and gamble
     screens (clicks do not open them under Wine); the 4 front-end scenes;
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
-21. **Owner of a unit, for the state snapshot** (`specs/tools/state-snapshot.md`
+21. **Owner of a unit, for the state snapshot** answered → see "Hand-back — PC 1 day 2" below. (`specs/tools/state-snapshot.md`
     §2 `own`, OQ 1; q-tool-state-diff): where 1.14d keeps the owner GUID
     of a pet / summon / hireling, a missile and an item (its container or
     holder), as offsets read from a server unit, so `record_state.py` can
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
-28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
-34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
-26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+28. **0x8E flag byte at the join** answered → see "Hand-back — PC 1 day 2" below. (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** answered → see "Hand-back — PC 1 day 2" below. (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
+26. **Re-record sim-0009 without input** answered → see "Hand-back — PC 1 day 2" below. (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
     timer on unit (1, 7), player queue) and the player changes rooms at 121,
@@ -296,7 +298,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
-29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+29. **Monster path target at the death message** answered → see "Hand-back — PC 1 day 2" below. (q-tool-poke, REC-594): 1.14d state
     snapshots read an idle spawned monster's path target (+0x10/+0x12) as
     its spawn point (`monsters/init.md` §4.1 step 1.1; check
     `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
@@ -306,7 +308,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
-- **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
+57. **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)** answered → see `items/use.md` §3.1 (REC-102 / REC-730).
     The spec is silent (open question 1); d2rs now does what the
     recording shows (`facts/items/a1-town-potions-low.tsv` n 9–31,
     `a1-town-item-moves.tsv` n 40–51): a potion used from the grid (0x20)
@@ -320,7 +322,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
-- **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend**
+47. **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend** answered → see `docs/handoff/pc1-day4.md`.
     The Wine join of a new sorceress (`facts/join/a1-new-sor.tsv`) shows
     the player already carrying state 105 with stat 172 = 2 in the
     loader's 0xAA (n 8, `aa00010000000c6959f9ff1f`), then at frame 2 a
@@ -355,7 +357,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `orig.packets.jsonl` (once it takes `frame` input) the join's S->C
     0x9C action 0x0E for the two hp1 (d2rs sends none: its load leaves
     belt items in mode 4) and a C->S `26 02000000 00000000 00000000`.
-- **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
+48. **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)** answered → see `docs/handoff/pc1-day4.md`.
     `combat/hit.md` §7.1 says players carry it, and the recording shows
     it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
     39) with a 0xA8 of state 105 one frame later, but no spec names the
@@ -366,7 +368,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
     d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
-- **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case**
+49. **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case** answered → see `docs/handoff/pc1-day4.md`.
     `monsters/ai-bodies.md` §9.9 step 2 row 201 calls `0x0059F570`; no
     spec gives its body. Recorded (`act-travel-lut-ama.check`,
     `join-act2-quests-ama.check`): start Jerhyn's first think (frame 24)
@@ -374,7 +376,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     "= 0 → idle 40" branch is not what runs for a fresh or act-1-done
     character. Read `0x0059F570` (and confirm `0x0059F580`'s outputs a,
     b for these states) into `world/quests-act2.md` §10. d2rs: REC-734.
-- **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
+50. **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array** answered → see `docs/handoff/pc1-day4.md`.
     `sim/stat-lists.md` §11 rule 4 was corrected from the recording
     (`packets-town-arrival-ama.check` frame 2: the player update sends
     12, 0, 2, keys in the mod array, and not 67 / 68, base 100 outside
@@ -423,33 +425,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
 43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
-- **[q-diff-combat-a1] preparation probe at the start**
-    `sim/pathing.md` §4 rule 3 (REC-753). Measured: when the target
-    preparation `0x00648120`'s first probe p0 steps onto the start, the
-    compute returns 0 and the path target keeps the requested point
-    (Warriv, `combat-random-boss.check` frame 45). Read `0x00648120`:
-    is the start tested before the free test of each probe (so p1 / p2
-    on the start also stop with no write), is the write skipped only
-    when the found point equals the start, or does the free test see the
-    start as occupied (so the loop goes on)? d2rs: PROVISIONAL, any found
-    point equal to the start → result 0, target unchanged
-    (`d2-sim` `path/walk/find.rs` `prepare`).
-- **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)**
-    `combat-cold-plains-wp.check` (seed 1234, no seed pin; the player
-    runs from (4873, 4228) to (4884, 4221) from frame 10, then stands).
-    1.14d: at frame 24 Gheed (GUID 4, class 147, (4836, 4278)) and Charsi
-    (GUID 6, class 154, (4834, 4217)) neither draw nor move, and stay so
-    through frame 120; in `combat-random-boss` (player standing at (4873,
-    4228)) both think at frame 24 (Gheed one draw, Charsi a map-AI walk
-    to (4835, 4211)). d2rs (staging-7 merge, HEAD cd9c0dc9) runs both
-    thinks at 24 in either case; Kashya (GUID 3) and the player now
-    match through frame 120. Read why Gheed's and Charsi's pending thinks
-    (idle 20 from their first think) do not run, or run without a draw,
-    once the player has left the starting room: room client membership
-    (`drlg/rooms.md` §7), a think gate in `0x005B1740` / the Npc body, or
-    the timer itself. Not the REC-753 mechanism (no blocked target).
-- **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
-- **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
+51. **[q-scenes-compare] Client footprints of walking monsters (REC-706)** answered → see `docs/handoff/pc1-day4.md`. The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
+58. **[q-scenes-compare] Hover state after a use press (REC-707)** answered → see `docs/handoff/pc1-day4.md`. `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
 - [prov-data] **Hratli's unit seed two steps at creation** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
   `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
@@ -463,7 +440,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
   think; `monsters/init.md` §4 lists none.
 
-- [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+60. **[q-fix-room-links]** answered → `drlg/rooms.md` §8 (recorded: 1.14d also leaves far town rooms unpopulated; old level freed 122 frames after the return). After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+61. **[q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG), and Esc with it open** answered → `ui/panels.md` §2 r10, `ui/frontend-options.md` §O1 r2 (from the binary: ui 17 is the quest-log alert button; Esc remembers, closes and restores it with the latch 0; d2rs never clears the latch: `q-fix-pc1eve-questlog-alert`).
 
 ## How to check a behaviour in one command
 
@@ -514,14 +492,14 @@ rather than a hand-run recipe.
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
     screenshot (Wine screenshots are blank). Commands in "Set up any
     state for a check" below.
-24. **Client missile motion and body gaps** (`q-fix-client-missiles-rest`,
+24. **Client missile motion and body gaps** answered → see "Hand-back — PC 1 day 2" below. (`q-fix-client-missiles-rest`,
     REC-540–549): `missiles/client.md` Open questions 9 onward: the
     timed arc `0x004DA5B0` (flag store vs set, the vz division), the
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
-25. **Potion state length and the end-when-full rule** (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
-26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+25. **Potion state length and the end-when-full rule** answered → see "Hand-back — PC 1 day 2" below. (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
+26. **Re-record sim-0009 without input** answered → see "Hand-back — PC 1 day 2" below. (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
     timer on unit (1, 7), player queue) and the player changes rooms at 121,
@@ -529,15 +507,15 @@ rather than a hand-run recipe.
     1234 --ticks 600` again with the mouse outside the game window and replace
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
-27. **NPC nearest player and walk in radius** (q-fix-real-unit-seed-order)
+27. **NPC nearest player and walk in radius** answered → see "Hand-back — PC 1 day 2" below. (q-fix-real-unit-seed-order)
   (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2
   callback of `0x005DDF20` (distance function, `<` or `≤ 15`, ties) and
   `0x005DE4E0` (target point geometry, rounding, path step count,
   failure when the point is the unit's own). d2rs reads: no-size
   distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
   nearest; it matches Warriv's three recorded arrival walks.
-28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
-29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+28. **0x8E flag byte at the join** answered → see "Hand-back — PC 1 day 2" below. (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+29. **Monster path target at the death message** answered → see "Hand-back — PC 1 day 2" below. (q-tool-poke, REC-594): 1.14d state
     snapshots read an idle spawned monster's path target (+0x10/+0x12) as
     its spawn point (`monsters/init.md` §4.1 step 1.1; check
     `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
@@ -547,7 +525,7 @@ rather than a hand-run recipe.
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
-28. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
+28. **Interact range test `0x00623660(P, O)`** answered → see `docs/handoff/pc1-day4.md`. (REC-94): its formula
     (object size, which positions). Measured under Wine
     (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
     waypoint 119 with the player 4 sub-tiles off in x and 3 in y, 0 at 5;
@@ -555,7 +533,7 @@ rather than a hand-run recipe.
     r3 (d2rs reads it as always in range for a player: true for every
     0x13 the client sends).
 
-30. **Client-made critters (set C monsters)** (q-fix-real-unit-seed-order)
+30. **Client-made critters (set C monsters)** answered → see "Hand-back — PC 1 day 2" below. (q-fix-real-unit-seed-order)
   (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
   `monsters/population.md` §11.3 r2): the Rogue Encampment arrival has
   three chickens (ck, class 149) with GUIDs 93–95 that the server never
@@ -565,11 +543,11 @@ rather than a hand-run recipe.
   another source), the GUID counter (why 93), the client set-up
   (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
   AI / motion (the recorded ck frames walk: WL at tick 8 and on).
-34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
-35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
-36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
-37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
-38. **Range state mask 0x26 = `meleeonly`?** `range(P,
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** answered → see "Hand-back — PC 1 day 2" below. (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
+35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** answered → see "Hand-back — PC 1 day 2" below. (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
+36. **Who writes unit +0x4E from a type-0 timer's frame code?** answered → see "Hand-back — PC 1 day 2" below. (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
+37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** answered → see "Hand-back — PC 1 day 2" below. (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
+38. **Range state mask 0x26 = `meleeonly`?** answered → see "Hand-back — PC 1 day 2" below. `range(P,
   skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
   d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
   `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
@@ -577,13 +555,13 @@ rather than a hand-run recipe.
   `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
   passes is that flag index (not a data offset or a precomputed group),
   and write it into `use.md` §3 r6.
-39. **Evade's reaction (`combat/damage.md` §7.1 step
+39. (answered → see "Hand-back — PC 1 day 2" below) **Evade's reaction (`combat/damage.md` §7.1 step
   5.2)**: "state 68 list; s, E as above" — does the evade branch also
   set E flags |= 4 and make the unit form request (E, mode 13, tA, gA,
   0) like 5.1, or only the `stsound` sound event 12? d2rs
   (`wiring/action/reaction.rs`) does the full 5.1 skill form plus the
   sound. Answer into §7.1 step 5.2.
-40. **Missile damage setup weapon of a monster
+40. (answered → see "Hand-back — PC 1 day 2" below) **Missile damage setup weapon of a monster
   (`missiles/damage.md` §1 step 6)**: d2rs serves `0x00622830` (a type-1
   owner with an inventory) with the same seam as the player's attack
   weapon `0x00623990(owner, 1)` (`Pending::attack_weapon`). Is
@@ -652,18 +630,17 @@ lines into the `q-fix-*` row.
 26. **Item flag 0x2000 and the default file index of a poked item** answered → see `docs/handoff/pc1-day3-c.md`. (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
 
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
-27. **Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
-- **[q-fix-server-store-fill] Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
+27. **Order of the property rolls of a magic item** answered → see `docs/handoff/pc1-day4.md`. (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
 
-- **[q-fix-server-store-fill] Identified flag 0x10 of normal items** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): the ten poked items with no quality (normal, misc: `tbk`, `rvl`, `gsw`, `gzv`, `r10`, `r30`, `key`, `ibk`, `hp5`, `mp4`, `sbk`) have item flags 0x80010 on 1.14d (identified set), d2rs 0x80000; the magic / rare / set / unique poked items are equal (0x10 clear). `generation.md` §1.4 row 0x10 says "set for quest-difficulty items and by callers", `quality.md` has no set for the normal routine. Read in `0x00558D90` and the quality dispatch `0x00557450` / normal routine `0x00556E80` where flag 0x10 is set for a normal item (and whether weapons and armor of quality 2 get it too); answer into `items/generation.md` §1.4 and §6.1.
+28. **Identified flag 0x10 of normal items** answered → see `docs/handoff/pc1-day4.md`. (area G, `traces/checks/items-ground-many.check`, 2026-10-09): the ten poked items with no quality (normal, misc: `tbk`, `rvl`, `gsw`, `gzv`, `r10`, `r30`, `key`, `ibk`, `hp5`, `mp4`, `sbk`) have item flags 0x80010 on 1.14d (identified set), d2rs 0x80000; the magic / rare / set / unique poked items are equal (0x10 clear). `generation.md` §1.4 row 0x10 says "set for quest-difficulty items and by callers", `quality.md` has no set for the normal routine. Read in `0x00558D90` and the quality dispatch `0x00557450` / normal routine `0x00556E80` where flag 0x10 is set for a normal item (and whether weapons and armor of quality 2 get it too); answer into `items/generation.md` §1.4 and §6.1.
 
-- [prov-data] **Monster think in a room with no clients** (q-prov-data,
+- [prov-data] **Monster think in a room with no clients** (duplicate entry, answered above) (q-prov-data,
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
 
 - [prov-data] **Monster think in a room with no clients** — answered → see `docs/handoff/pc1-day3-a.md` and `docs/handoff/pc1-day3-c.md` (same answer; fix row `q-fix-p3-room-empty-think`, `q-fix-p3-leave-cancels-thinks` is its duplicate) (q-prov-data,
-27. **Order of the property rolls of a magic item** (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
+27. **Order of the property rolls of a magic item** answered → see `docs/handoff/pc1-day4.md` (duplicate entry). (area G, `traces/checks/items-vendor-akara-buy.check`, 2026-10-09): the store's 7th item (guid 8, quality 4, prefix 1156, suffix 552, ilvl 6) has a charged-skill property (stat 204, skill 193, level 4, max 67). 1.14d current charges 67, d2rs 65: `properties.md` §5 rule 9 gives cur = (r + c/8 + 1) & 0xFF with r = roll(c − c/8) on the item seed, so r is 58 on 1.14d and 56 on d2rs, while the item seeds after creation are equal (`ik` equal). Same draws, different order. Read which property of the item rolls before the charged one (prefix and suffix properties, the 107 single-skill rows, the 45 row) and in which order the affix properties are applied (`affixes.md` §7: P0 S0 P1 S1 P2 S2?); answer into `items/affixes.md` §7 and `items/properties.md` §5.
 
-- [prov-data] **Monster think in a room with no clients** (q-prov-data,
+- [prov-data] **Monster think in a room with no clients** (duplicate entry, answered above) (q-prov-data,
   `monsters/ai.md` §1.5, §2, `ai-bodies.md` §9.9 Map AI): after the
   player warps away (same act, `a4-warp-plains-ama`, warp 105 at frame
   6), the Fortress NPCs (classes 405, 257, 246; Npc AI `0x005E7130`)
@@ -675,7 +652,7 @@ lines into the `q-fix-*` row.
   it schedules instead. The same think with a client in the level
   matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
 
-- **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes**
+52. **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes** answered in part (REC-1110 open) → see `docs/handoff/pc1-day4.md`.
   (`client/model.md` §19 r4 "NPC busy", monster data +0x28 bit 0):
   scenes-compare's panel run (SceSor, `-seed 1234`, inventory open at
   tick 22, an item taken to the cursor at 52, put down at 62): the 1.14d
@@ -686,6 +663,11 @@ lines into the `q-fix-*` row.
   its clear, §17 r1.7, is specified) or what else makes the client's
   walk dispatch fall back to neutral here. Blocks a1-panel-character /
   skilltree / automap / esc-menu-wine (Warriv NU frame) in d2rs.
+
+53. **[q-diff-combat-a1] preparation probe at the start (REC-753)** answered → see `docs/handoff/pc1-day4.md` (`sim/pathing.md` §4 r3).
+54. **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)** answered → see `docs/handoff/pc1-day4.md` (same mechanism as `q-fix-p3-room-empty-think`).
+55. **[pc1-day4] Local player attack / cast mode end and the next click (coordinator blocker 1)** answered → see `docs/handoff/pc1-day4.md` (`client/model.md` §20).
+56. **[pc1-day4] Andariel never dies, Radament stays at 256 hp (playthrough act1 #14, act2 #6)** answered (setup, not damage) → see `docs/handoff/pc1-day4.md`.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
@@ -890,3 +872,5 @@ Then the rest:
   `q-fix-p6-npc-intro-record`.
 - **Tools:** `q-fix-p3-state-own`.
 - **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
+
+- [q-fix-d9-arcane] Quest A2Q4 event 3 (`0x0059F0C0`): is the old-level-40 handling (start-Jerhyn removal, quick remove) skipped when the new level is 74? Recording `a2-warp-arcane-ama` keeps Jerhyn (class 201, 1:1) alive to frame 143 on 1.14d, every other warp from Lut Gholein removes him at the warp frame. d2rs skips the whole `a == 40` block for `b == 74` (REC-1405, PROVISIONAL); read the branch structure and fix `specs/world/quests-act2.md` §6.6 / `quests-act2-2.md` §2 item 3.
