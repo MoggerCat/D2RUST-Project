@@ -65,7 +65,9 @@ class Repo:
             os.path.relpath(p, root).replace(os.sep, "/")
             for p in glob.glob(os.path.join(root, "specs", "**", "*"), recursive=True)
             if os.path.isfile(p) and p.endswith((".md", ".tsv"))
-            and os.path.basename(p) not in ("README.md", "_TEMPLATE.md"))
+            and os.path.basename(p) not in ("README.md", "_TEMPLATE.md")
+            # specs/tools/ describe our own measuring tools, not 1.14d behaviour
+            and not os.path.relpath(p, root).replace(os.sep, "/").startswith("specs/tools/"))
         self.checks = sorted(os.path.basename(p)[:-6] for p in
                              glob.glob(os.path.join(root, "traces", "checks", "*.check")))
         self.messages = []
@@ -226,6 +228,31 @@ def verdict_of(checks, repo, status, area=""):
 
 # ---------------------------------------------------------------- merge
 
+def reconcile(r, repo, status):
+    """Bring a row in line with its checks; returns what was wrong (empty = consistent).
+    last_verdict := the checks' verdict; a row naming a DIVERGED check is DIVERGED;
+    UNKNOWN with PARTIAL checks is NO-CHECK; a non-EQUAL row has a size."""
+    issues = []
+    v = verdict_of(split_list(r["checks"]), repo, status, r["area"])
+    if v != "-" and r["last_verdict"] != v:
+        issues.append(f"last_verdict {r['last_verdict']} but checks say {v}")
+        r["last_verdict"] = v
+    v = r["last_verdict"]
+    if v.startswith("DIVERGED") and r["state"] in ("NO-CHECK", "UNKNOWN", "EQUAL"):
+        issues.append(f"state {r['state']} but checks say {v}")
+        r["note"] += f" [ledger.py: {r['state']} -> DIVERGED from its checks]"
+        r["state"] = "DIVERGED"
+    elif v == "PARTIAL" and r["state"] == "UNKNOWN":
+        issues.append(f"state UNKNOWN but checks say {v}")
+        r["note"] += " [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL]"
+        r["state"] = "NO-CHECK"
+    if r["state"] != "EQUAL" and r["size"] == "-":
+        issues.append(f"state {r['state']} without a size")
+        r["size"] = "M"
+        r["note"] += " [ledger.py: size M assumed]"
+    return issues
+
+
 def merge(parts, repo, status):
     """parts: [(name, rows)] in name order. Returns (rows, notes dict)."""
     rank = {"yes": 2, "no": 1, "?": 0}
@@ -259,24 +286,10 @@ def merge(parts, repo, status):
     disagree = []
     if status:
         for r in out:
-            v = verdict_of(split_list(r["checks"]), repo, status, r["area"])
-            if v != "-" or r["last_verdict"] in ("", "-"):
-                r["last_verdict"] = v
+            reconcile(r, repo, status)
             v = r["last_verdict"]
-            # A row that names a check is not NO-CHECK / UNKNOWN once that check ran.
-            if v.startswith("DIVERGED") and r["state"] in ("NO-CHECK", "UNKNOWN"):
-                r["note"] += f" [ledger.py: {r['state']} -> DIVERGED from its checks]"
-                r["state"] = "DIVERGED"
-            elif v == "PARTIAL" and r["state"] == "UNKNOWN":
-                r["note"] += " [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL]"
-                r["state"] = "NO-CHECK"
-            if r["state"] != "EQUAL" and r["size"] == "-":
-                r["size"] = "M"
-                r["note"] += " [ledger.py: size M assumed]"
             if r["state"] == "EQUAL" and v != "MATCH":
                 disagree.append(f"`{r['area']}`: EQUAL but checks say {v}")
-            if v.startswith("DIVERGED") and r["state"] not in ("DIVERGED", "NOT-IMPLEMENTED"):
-                disagree.append(f"`{r['area']}`: {r['state']} but checks say {v}")
     named_specs, named_checks = set(), set()
     for r in out:
         for s in split_list(r["specs"]):
@@ -361,8 +374,11 @@ def render_md(rows, notes, inputs, status_label):
     a("")
     a("Family = the first part of the area id (two parts for `system.*`, `net.*`, `skill.*`, `item.*`).")
     a("")
-    a("| Family | Rows | " + " | ".join(STATES) + " | S | M | L | Needs PC 1 | Exercised no |")
-    a("|---|---" + "|---" * len(STATES) + "|---|---|---|---|---|")
+    a("NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared frame "
+      "equal, some field not recorded on one side): column \"of which partly compared\".")
+    a("")
+    a("| Family | Rows | " + " | ".join(STATES) + " | of which partly compared | S | M | L | Needs PC 1 | Exercised no |")
+    a("|---|---" + "|---" * len(STATES) + "|---|---|---|---|---|---|")
     fams = collections.defaultdict(list)
     for r in rows:
         fams[family(r["area"])].append(r)
@@ -370,8 +386,9 @@ def render_md(rows, notes, inputs, status_label):
         rs = fams[f]
         st = collections.Counter(r["state"] for r in rs)
         sz = collections.Counter(r["size"] for r in rs)
+        part_cmp = sum(r["state"] == "NO-CHECK" and r["last_verdict"] in ("PARTIAL", "MATCH") for r in rs)
         a(f"| `{f}` | {len(rs)} | " + " | ".join(str(st[s]) for s in STATES)
-          + f" | {sz['S']} | {sz['M']} | {sz['L']} | {sum(r['needs_pc1'] == 'y' for r in rs)} | "
+          + f" | {part_cmp} | {sz['S']} | {sz['M']} | {sz['L']} | {sum(r['needs_pc1'] == 'y' for r in rs)} | "
           f"{sum(r['exercised'] == 'no' for r in rs)} |")
     a("")
     a("## Not covered by any row")
@@ -413,21 +430,33 @@ def render_md(rows, notes, inputs, status_label):
 
 # ---------------------------------------------------------------- driver
 
-def run(root, parts_dir, out_tsv, out_md, status_path, check):
+def run(root, parts_dir, out_tsv, out_md, status_path, check, fix=False):
     repo = Repo(root)
+    status, label = load_status(root, status_path)
     files = sorted(glob.glob(os.path.join(parts_dir, "*.tsv")))
     errs, parts = [], []
     for f in files:
         rows, e = read_part(f)
+        if fix and status and not e:
+            changed = 0
+            for r in rows:
+                changed += bool(reconcile(r, repo, status))
+            if changed:
+                with open(f, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(PART_MAGIC + "\n" + "\t".join(COLS) + "\n"
+                             + "".join("\t".join(r[c] for c in COLS) + "\n" for r in rows))
+                print(f"ledger: --fix rewrote {changed} row(s) of {os.path.basename(f)}")
         errs += e
         seen = set()
         for r in rows:
             errs += check_row(r, repo)
+            if status:
+                for i in reconcile(dict(r), repo, status):
+                    errs.append(f"{r['_file']}:{r['_line']}: {r['area']}: contradiction: {i} (--fix applies it)")
             if r["area"] in seen:
                 errs.append(f"{r['_file']}:{r['_line']}: {r['area']}: duplicate area in this part")
             seen.add(r["area"])
         parts.append((os.path.basename(f), rows))
-    status, label = load_status(root, status_path)
     rows, notes = merge(parts, repo, status)
     inputs = [os.path.relpath(f, root).replace(os.sep, "/") for f in files]
     tsv = render_tsv(rows, inputs, label)
@@ -505,7 +534,7 @@ def selftest():
         assert rows["net.c2s.0x01"]["last_verdict"] == "PARTIAL", rows["net.c2s.0x01"]
         assert rows["net.c2s.0x02"]["last_verdict"] == "DIVERGED@1"
         md = open(out_md).read()
-        assert "`m.one`: EQUAL but checks say DIVERGED@1" in md
+        assert rows["m.one"]["state"] == "DIVERGED"
         assert "`m.one`: a.tsv:3 kept, b.tsv:3 dropped" in md
         assert "`specs/sim/b.md`" in md and "`orphan`" in md and "`net.c2s.0x02`" not in md.split("no `net.*` row")[1].split("\n")[0]
         assert "`specs/sim/a.md`" not in md.split("Spec files named by no row")[1].split("\n")[0]
@@ -520,7 +549,8 @@ def selftest():
         with open(os.path.join(root, "parts", "b.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.two") + row(area="m.three", checks="c-one", state="UNKNOWN", note="n/a"))
         with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-            run(root, os.path.join(root, "parts"), out_tsv, out_md, status, False)
+            assert run(root, os.path.join(root, "parts"), out_tsv, out_md, status, True) == 1
+            run(root, os.path.join(root, "parts"), out_tsv, out_md, status, False, fix=True)
             assert run(root, os.path.join(root, "parts"), out_tsv, out_md, status, True) == 0
         three = [ln for ln in open(out_tsv).read().splitlines() if ln.startswith("m.three\t")][0].split("\t")
         assert three[COLS.index("state")] == "DIVERGED", three
@@ -536,6 +566,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="validate parts and that the outputs are current")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--fix", action="store_true",
+                    help="rewrite the part files: last_verdict from the checks, states that contradict them, missing sizes")
     ap.add_argument("--parts", default=os.path.join(REPO, "docs", "handoff", "ledger"))
     ap.add_argument("--out-tsv", default=os.path.join(REPO, "docs", "handoff", "fidelity-ledger.tsv"))
     ap.add_argument("--out-md", default=os.path.join(REPO, "docs", "handoff", "fidelity-ledger.md"))
@@ -543,7 +575,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()
-    return run(REPO, a.parts, a.out_tsv, a.out_md, a.status, a.check)
+    return run(REPO, a.parts, a.out_tsv, a.out_md, a.status, a.check, a.fix)
 
 
 if __name__ == "__main__":

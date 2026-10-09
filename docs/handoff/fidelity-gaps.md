@@ -7,6 +7,12 @@ from the parts in `docs/handoff/ledger/`). Inputs: the merged ledger,
 108 channel results, suite run 2026-10-09 17:34 UTC at 739dd943), the
 existing tools under `tools/` and `specs/tools/`.
 
+**Merged ledger (6 parts, 2,346 rows):** DIVERGED 150, NOT-IMPLEMENTED 59,
+NO-CHECK 2,137, UNKNOWN 0, **EQUAL 0**. Every spec file (outside
+`specs/tools/`), every check and every message id is named by a row
+(`fidelity-ledger.md` "Not covered by any row" is empty); the exercised
+column waits for the three coverage parts.
+
 **Bar (CLAUDE.md rule 10):** an area is done only when a 1.14d check passes.
 Today **no row is EQUAL**: the only full MATCH is `packets-town-arrival-ama`
 (packets channel, 40/40 frames), and every state-channel result is PARTIAL
@@ -53,32 +59,37 @@ both recorders write the same field set. **Existing tool, extension:**
 
 ## 3. NO-CHECK and NOT-IMPLEMENTED groups: the missing checks
 
-| Family (ledger) | Rows | What is missing | Existing tool that can produce the check | New tool needed | Size (checks + fixes they expose) |
-|---|---|---|---|---|---|
-| `net.c2s`, `net.s2c` messages | 251 NO-CHECK, 43 NOT-IMPLEMENTED | a packets-channel check whose stream carries the id; today only the town-arrival stream is compared byte for byte | scenario-diff `packets` (record_packets.py / packets_diff.py) with scripted input; one check per message family (moves, skills, items, NPC/trade, quests, party) | none for single player. **Multiplayer-only ids** (party, player trade, hostility, other players' units) need two clients on 1.14d: tool `two-client-recorder` (L), deferred with Phase 7 | L (about 15–25 checks) |
-| `level.a1`–`a5` (DRLG, populations) | 122 NO-CHECK, 11 DIVERGED | a warp check per level (only ~20 of 136 levels have one) | scenario-diff `state` + `rng` with `poke warp N` (the `a*-warp-*` pattern) | `check-gen` (S): writes the per-level, per-waypoint, per-shrine check files from the tables so nobody hand-writes 136 files | M to generate, L to clear what they show |
-| `drlg.*` (tile layout) | 6 | unit state does not compare tiles/rooms | `tools/trace-recorder/check_rooms.py`, `check_drlg_acts.py` (trace) and the draws channel (tiles drawn) | none | M |
-| `waypoint.*` | 37 NO-CHECK | operate each waypoint, travel | scenario-diff with input click on the waypoint, or a poke | `poke operate <object>` on both sides (part of `interact-pokes`, below) | M |
-| `object.*`, `shrine.*` | 92 + 23 | **no object was ever operated in any run** (coverage map) | scenario-diff `state` once objects can be operated | **`interact-pokes`** (M): `poke operate <unit>` and `poke talk <npc> <menu>` for 1.14d (debugger call of the operate / NPC handlers, `specs/tools/poke.md`) and d2rs (debug entry), so checks do not depend on d2rs' stand-in hover box | M tool + L checks |
-| `npc.*` | 38 NO-CHECK | dialogue, menus, vendor stock; the playthrough cannot talk | scenario-diff `state`+`packets` with `interact-pokes`; `facts/ui/npc-talk-*` for text | `interact-pokes` (above); playthrough `talk` directive (extension, S) | L |
-| `quest.*` | 42 NO-CHECK, 4 DIVERGED | per-quest state-flag sequence compared, not just reached | checkpoints (`traces/checkpoints/`) as the save on both sides + scenario-diff `state` (quest flags are in the snapshot) | none | L (≈ 40 checks; many need `interact-pokes`) |
-| `hireling.*` | 1 NO-CHECK (A3 sorceress), 3 DIVERGED | A3 hireling check; AI over time | scenario-diff (`merc-*-cow` pattern) | none | S |
-| `system.sim.*`, `system.combat.*`, `system.flows.*` | 84 NO-CHECK, 59 DIVERGED, 4 NOT-IMPLEMENTED | blocked behind D1; rule groups without a scenario (stat ops, pets, path tables) | scenario-diff `state`/`rng`; conformance replays (`crates/conformance/tests/*_replay.rs`) | none | L (after D1) |
-| `system.formats.*` | 62 NO-CHECK, 12 NOT-IMPLEMENTED (`d2s-legacy`: pre-1.10 saves) | the format checks exist but are not recorded as 1.14d checks in a status file; d2s **written** bytes are not compared | `mpq-tool formats`, `data-tool tables` (73 tables byte-identical, M01), d2s-tool | **`save` channel** in scenario-diff (M): 1.14d saves at the end of the scenario (save-and-exit), d2rs too; byte compare of the .d2s | M |
-| `system.render.*` (105), `system.client.*` (86) | NO-CHECK | pixels and draw lists per scene; one draws check today | `tools/sidebyside` (RGB per tick, facts-compare first difference), scenario-diff `draws` | none; more scene groups | L |
-| `system.ui.*` | 174 NO-CHECK | every panel / menu / tip compared in pixels and state | `tools/sidebyside` groups (panels), `traces/frontend` + `menu_trace.py` (front end), `panel_text.py` | none; scene groups per panel | L |
-| `system.audio.*` | 47 NO-CHECK | rule 10 asks for **identical decoded samples and trigger ticks**; side-by-side compares only the sound *request* sequence (tick, id, unit, flags) | sidebyside `--sounds` (trigger ticks) | **`audio-diff`** (L): capture the mixed PCM 1.14d writes to DirectSound under Wine (hook the secondary buffer writes) and d2rs' mixer output per tick; compare decoded samples per voice and the mixed stream | L |
-| `system.perf`, timing | 1 | tick numbers only (rule 10); perf is a d2rs budget | `tools/perf/perf.py`; the state channel's frame alignment checks tick timing | none | S |
-| long play (all families) | — | divergences that need thousands of ticks (AI drift, timers, regen) | soak (d2rs only, invariants), playthrough (milestones, not compared to 1.14d) | **`replay-diff`** (M–L): record a human 1.14d session's input per server frame (C→S stream already recorded by `record_packets.py`), replay it on d2rs, compare state per frame over 10⁴+ frames | M–L |
+Row counts from `fidelity-ledger.md` "By family" (D = DIVERGED, NC =
+NO-CHECK, NI = NOT-IMPLEMENTED). A NO-CHECK row whose checks ran PARTIAL is
+counted as compared in part, not as unchecked (§2).
 
-Families still arriving from the part sessions (monsters, skills, items,
-coverage): see §6; this table is completed when they land.
+| Family (ledger) | Rows (D / NC / NI) | What is missing | Existing tool that can produce the check | New tool needed | Size (checks + fixes they expose) |
+|---|---|---|---|---|---|
+| `net.c2s`, `net.s2c` | 295 (3 / 249 / 43) | only the town-arrival stream is compared byte for byte; nobody scans which ids a 1.14d session ever sends, so most ids have no recorded instance at all | scenario-diff `packets` (record_packets.py / packets_diff.py) per scripted check | **`packet-census`** (S–M): run every check's 1.14d packets recording, list per id the checks whose stream carries it and its first equal/diverged instance; turns the 295 rows into data instead of hand verdicts. **Multiplayer-only ids** (party, player trade, hostility, other players): `two-client-recorder` (L), deferred with Phase 7 | L (15–25 new checks for ids no stream carries) |
+| `item.*`, `drop`, `inv`, `cube`, `vendor` | 135 + cube 14 + vendor 25 (10 D) | **no check compares generated item contents** (base, quality, affixes, properties, sockets, ilvl) of drops, vendor stock, gambling, cube output: the state channel records only unit fields (class, flags, position) | scenario-diff `state` sees item units; `check_treasure.py` (trace) for treasure picks | **`items` channel** (M): per created item, both sides write the item bitstream (or its decoded field list) with the creating event (drop, store fill, gamble, cube); compare item by item in creation order; then mass checks (`poke kill` N monsters per TC, refresh vendor N times) | M tool + L fixes |
+| `level` (DRLG, populations) | 132 (12 / 120 / 0) | a warp check per level (≈ 20 of 136 levels have one) | scenario-diff `state` + `rng` with `poke warp N` (the `a*-warp-*` pattern) | **`check-gen`** (S): writes per-level / waypoint / shrine / AI-type / skill check files from the tables | M to generate, L to clear what they show |
+| `drlg` (tile layout) | 7 (4 / 3) | unit state does not compare tiles/rooms | `check_rooms.py`, `check_drlg_acts.py` (traces), draws channel (tiles drawn) | none | M |
+| `object`, `shrine`, `waypoint` | 92 + 23 + 39 (2 D) | **no object was ever operated in any run** (coverage map) | scenario-diff `state` once objects can be operated | **`interact-pokes`** (M): `poke operate <unit>` and `poke talk <npc> <menu>` on 1.14d (debugger call of the operate / NPC handlers, `specs/tools/poke.md`) and d2rs (debug entry), so checks do not depend on d2rs' stand-in hover box | M tool + L checks |
+| `npc` | 43 (1 / 42) | dialogue, menus, vendor stock; the playthrough cannot talk | scenario-diff `state`+`packets` with `interact-pokes`; `facts/ui/npc-talk-*` for text | `interact-pokes`; playthrough `talk` directive (extension, S) | L |
+| `quest` | 43 (6 / 37) | per-quest flag sequence compared, not just "milestone reached" | checkpoints (`traces/checkpoints/`) as the save on both sides + scenario-diff `state` (quest flags are in the snapshot) | none (many need `interact-pokes`) | L (≈ 40 checks) |
+| `monster` (bosses, superuniques, AI types, umods) | 305 (16 / 289) | one check per AI type and per boss/superunique; today only the classes met in the combat and warp checks | scenario-diff `state` with `poke spawn` (`traces/pokes/boss-kinds.poke`, `missile-superunique.poke`) | `check-gen` (AI type → one spawn check each) | L |
+| `skill.*` (7 classes × 30), `missile`, `state` | 588 (28 D) incl. missile 182, state 184 | 22 class-skill checks exist (asn/bar/dru only); amazon, sorceress, necromancer, paladin: none | scenario-diff `state` (the `dru-*` pattern: save with all skills 20, one cast); `classes.play` | `check-gen` (one check per skill) | L |
+| `hireling` | 8 (5 / 3) | A3 hireling check; AI over time | scenario-diff (`merc-*-cow` pattern) | none | S–M |
+| `system.sim`, `system.combat`, `system.flows`, `system.seams` | 153 (45 / 104 / 4) | blocked behind D1; rule groups without a scenario (stat ops, pets, path tables) | scenario-diff `state`/`rng`; conformance replays (`crates/conformance/tests/*_replay.rs`) | none | L (after D1) |
+| `system.formats`, `format`, `data` | 81 (0 / 69 / 12; `d2s-legacy`: pre-1.10 saves) | the format and table checks (`mpq-tool formats`, `data-tool tables`, 73 tables reproduced per M01) are not recorded as verdicts; written `.d2s` bytes are never compared | `mpq-tool formats`, `data-tool tables`, d2s-tool | **`save` channel** in scenario-diff (M): 1.14d saves at save-and-exit after the scenario, d2rs too; byte compare | S to record the existing ones, M for the save channel |
+| `system.render`, `render`, `system.client`, `client` | 193 (16 / 177) | pixels and draw lists per scene; one draws check today | `tools/sidebyside` (RGB per tick, facts-compare first difference), scenario-diff `draws` | none; more scene groups | L |
+| `system.ui`, `ui` | 176 (0 / 176) | every panel / menu / tip compared in pixels and state | `tools/sidebyside` groups (panels), `traces/frontend` + `menu_trace.py` (front end), `panel_text.py` | none; scene groups per panel | L |
+| `system.audio`, `audio` | 49 (0 / 49) | rule 10 asks for **identical decoded samples and trigger ticks**; side-by-side compares only the sound *request* sequence | sidebyside `--sounds` (trigger ticks) | **`audio-diff`** (L): the mixed PCM 1.14d writes to DirectSound under Wine (hook the secondary-buffer writes) vs d2rs' mixer output per tick; compare per voice and mixed | L |
+| `system.perf`, timing, difficulty, town portal, death, act travel | 5 | tick numbers only (rule 10) | `tools/perf/perf.py`; state channel frame alignment; existing `death-town-ama`, `act-travel-lut-ama` | none | S–M |
+| long play (all families) | — | divergences that need thousands of ticks (AI drift, timers, regen) | soak (d2rs only, invariants), playthrough (not compared to 1.14d) | **`replay-diff`** (M–L): record a 1.14d session's C→S input per server frame (`record_packets.py` already records it), replay on d2rs, compare state per frame over 10⁴+ frames | M–L |
 
 ## 4. Tools to build (no existing tool can produce the check)
 
 | Tool | Measures | Comparison | Size | Unblocks |
 |---|---|---|---|---|
 | `interact-pokes` | operate object / talk to NPC / NPC menu choice at a chosen frame, both sides | via scenario-diff channels (state, packets) | M | objects (115 rows), waypoints (37), NPCs (38), quests (≈ 40) |
+| `items` channel | every created item's contents (bitstream / decoded fields) with its creating event, both sides | item by item in creation order, bytes | M | items (135), drops, vendors (25), cube (14), gambling |
+| `packet-census` | per message id, which 1.14d recordings carry it and its first equal / diverged instance | packets_diff per id | S–M | the 295 `net.*` rows |
 | `check-gen` | generates `.check` files per level, waypoint, shrine, message family, skill from the tables | (authoring tool; the checks compare) | S | levels (122), waypoints, shrines, skills |
 | `save` channel | the `.d2s` 1.14d writes at save-and-exit after the scenario vs d2rs' | bytes (identical) | M | save/load rows, `system.formats.d2s*` |
 | `audio-diff` | decoded PCM per voice and mixed, trigger tick | identical decoded samples, identical ticks | L | `system.audio.*` (47) |
@@ -96,15 +107,15 @@ same time as the tranche above it.
 | T0 | Fix D1 (seed order) first: it is the first difference in 41 results and hides the rest of those checks | 4–8 h first fix; 10–30 h for the rounds it exposes | — | no (Wine in the cloud records) | high: unknown what lies behind it |
 | T0' | D2–D11, one owner each | 1–8 h each, 20–45 h total | yes, with T0 (different code) | no | medium |
 | T1 | State-field parity (PARTIAL → verdict) | 4–8 h + 1 Wine hour rerun | yes | no | low |
-| T2 | Build `interact-pokes`, `check-gen`, `save` channel | 4–8 h each, 12–24 h | yes | `interact-pokes` needs the 1.14d handler addresses: if not in specs, a PC 1 / Ghidra item | medium |
-| T3 | Generate and run checks for levels, waypoints, shrines, objects, NPCs, quests, messages, skills (part rows); fix what they show | checks: 10–20 h to author/run; fixes: 60–200 h | after T2; families in parallel (one session each) | no (Wine) | high: the fix count is unknown until the checks run |
+| T2 | Build `interact-pokes`, `check-gen`, `items` channel, `packet-census`, `save` channel | 2–8 h each, 18–36 h | yes | `interact-pokes` needs the 1.14d handler addresses: if not in specs, a PC 1 / Ghidra item | medium |
+| T3 | Generate and run checks for levels (132), waypoints, shrines, objects, NPCs, quests, AI types, bosses, the 4 classes with no skill check, item contents, messages; fix what they show | checks: 10–20 h to author/run; fixes: 60–200 h | after T2; families in parallel (one session each) | no (Wine) | high: the fix count is unknown until the checks run |
 | T4 | Render / UI / client scenes in side-by-side (one group per panel / act) and fix | 40–120 h | yes, with T3 | no | high |
 | T5 | Build `audio-diff`, then audio fixes | 12–20 h tool + 10–40 h fixes | yes | maybe (DirectSound capture under Wine must be proven first; fallback PC 1) | high |
 | T6 | `replay-diff` long runs; soak against 1.14d | 10–20 h tool + fixes unknown | after T0–T3 settle | PC 1 to record a human session (or Wine + autoplay input) | high |
 | — | Deferred: multiplayer ids (`two-client-recorder`), legacy saves (`d2s-legacy`, 12 rows) | L | — | — | out of the Phases 0–6 scope by CLAUDE.md for multiplayer; legacy saves are a choice for the user |
 
 Totals (sum of the ranges above, not of the ledger rows): roughly
-**180–550 session-hours** before every single-player area has a passing check,
+**190–570 session-hours** before every single-player area has a passing check,
 with the high end driven by how many fixes T3/T4 expose. Wall-clock with the
 current ~15 parallel cloud sessions: T0–T2 in about one day; T3–T5 several
 days, bounded by Wine recording time (one 1.14d run per check channel,
@@ -115,16 +126,26 @@ addresses the specs lack and possibly for the audio capture.
 
 | Part | Branch | Rows | State |
 |---|---|---|---|
-| systems | claude/q-ledger-systems | 934 | merged (25 DIVERGED rows had size `-`: set to M by the integrator) |
+| systems | claude/q-ledger-systems | 906 kept (28 `net.c2s` item ids dropped as duplicates of the items part) | merged |
 | world | claude/q-ledger-world | 385 | merged |
-| monsters | claude/q-ledger-monsters | — | pending |
-| skills | claude/q-ledger-skills | — | pending |
-| items | claude/q-ledger-items | — | pending |
-| coverage a1a2, a3a5, checks | claude/q-ledger-cov-* | — | pending |
+| skills | claude/q-ledger-skills | 588 | merged |
+| monsters | claude/q-ledger-monsters | 302 | merged |
+| items | claude/q-ledger-items | 135 | merged |
+| integrator | claude/q-fidelity-ledger | 30 | rows for the specs and checks no part named (data layer, format readers, constant tables, continuation specs, 6 checks) |
+| coverage a1a2, a3a5, checks | claude/q-ledger-cov-* | — | pending: second pass fills `exercised` |
+
+`tools/coord/ledger.py --fix` reconciled the parts with checks-status.md
+(last_verdict from the checks; a row naming a DIVERGED check is DIVERGED;
+UNKNOWN with PARTIAL checks is NO-CHECK; a missing size is M): 58 rows.
 
 Known weaknesses of the merged rows (to fix in the parts, not here):
+- `needs_pc1 = y` on 795 rows comes from the settling kind `recording`;
+  1.14d now runs under Wine in the cloud (`tools/cloud-game/`), so most of
+  these need **Wine recording time, not PC 1**. True PC 1 items are RE
+  questions (addresses for `interact-pokes`, open spec questions).
 - `system.flows.game-join.*` are NOT-IMPLEMENTED because no crate names the
   spec in a `// Spec:` line, yet the join stream MATCHes in
   `packets-town-arrival-ama`: the systems part's heuristic; treat as NO-CHECK.
-- No row says `needs_pc1 = y`; the parts did not assess PC 1 needs in depth.
-- Every world row is size M; per-row sizes overstate the total (see the top).
+- The monsters part matched checks by monster name (over-matches generic
+  names); sizes are coarse (most rows M), so the ledger's hour totals
+  (3,980–15,822+) count shared code paths many times: use §5.
