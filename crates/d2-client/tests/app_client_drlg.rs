@@ -100,8 +100,9 @@ impl Clock for StepClock {
 
 // Covers: specs/client/model.md §12 r1, §11 r3, §11 r5, §9 r1; specs/sim/path-placement.md §13 r3; specs/sim/tick.md §6 r6; specs/sim/intents-events.md §8.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_join_builds_the_client_drlg_in_the_app() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     // The app's own game on its server thread, entered through the
     // session flow (`intents-events.md` §8): the client's 0x67 → 0x01,
     // 0x00, 0x02 with tick 1's flush; the client's 0x6B → 0x59, 0xAA,
@@ -127,7 +128,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -228,10 +229,8 @@ fn the_recorded_join_on_the_install() {
     use d2_client::app::palette::{act_palette_path, ActPalettes};
 
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
-    let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
-    let GameData::Live(live) = &data else {
-        unreachable!("a game dir selects live data")
-    };
+    let data = GameData::select(Some(std::path::Path::new(&dir))).unwrap();
+    let GameData::Live(live) = &data;
     let link = join(
         "03 00 c4 88 38 10 01 00 61 d1 e0 9f",
         "07 a0 03 88 03 01",
@@ -270,7 +269,7 @@ fn the_recorded_join_on_the_install() {
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn the_session_join_on_the_install() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
-    let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
+    let data = GameData::select(Some(std::path::Path::new(&dir))).unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),

@@ -9,6 +9,8 @@
 //!   roof's wall alpha blend; `shading.md` §4 names walls *and roofs* for
 //!   the corner path, so which one a roof block takes is open (PROVISIONAL);
 //! - a wall's fade state is 0 (the normal point table);
+//! - a 32-row RLE floor block takes the flat branch (PROVISIONAL, see
+//!   [`block_shades`]);
 //! - a tile whose light cannot be read (wall direction 0 or past 9, a grid
 //!   index out of range) keeps its flat tile shade.
 
@@ -18,9 +20,9 @@ use crate::rules::lighting::draws::{
 };
 use crate::rules::lighting::map::LightCell;
 use crate::rules::lighting::view::FrameLight;
-use crate::rules::shading::{floor_block_chain, floor_block_light};
+use crate::rules::shading::{floor_block_chain, floor_block_light, BlockLight};
 use crate::rules::{BlockRect, BlockShade};
-use crate::scene::BlendOp;
+use crate::scene::{BlendOp, GradientKind};
 
 /// Sub-tiles per tile edge.
 const SUBTILES: i32 = 5;
@@ -44,9 +46,21 @@ pub fn block_shades(
     let grid_shades = |cells: [u8; 64]| -> Vec<BlockShade> {
         let mut out = Vec::with_capacity(blocks.len());
         for (block, &(gx, gy)) in blocks.iter().zip(grids) {
-            let Ok(l) = floor_block_light(&cells, gx, gy, false) else {
+            let Ok(mut l) = floor_block_light(&cells, gx, gy, false) else {
                 return Vec::new();
             };
+            // PROVISIONAL (shading.md §4 floors r3): the RLE floor
+            // gradient has 15 rows, but the user's floor tiles carry
+            // 32-row RLE blocks (Rogue Encampment, orientation 0); such a
+            // block takes the flat branch's map `e[g+9] >> 3` (r1).
+            // Settled by a capture of a lit floor tile with a 32-row RLE
+            // block (finding q-fix-real-floor-rle-rows,
+            // docs/handoff/q-fixture-migrate.md).
+            if block.height > GradientKind::RleFloor.rows() {
+                if let BlockLight::Gradient(_) = l {
+                    l = BlockLight::Flat(cells[usize::from(gx) + 8 * usize::from(gy) + 9] >> 3);
+                }
+            }
             out.push(BlockShade {
                 block: *block,
                 shade: floor_block_chain(&light.tables, l, 0, 0),
@@ -150,11 +164,40 @@ mod tests {
             cell,
             0xFF,
             BlendOp::Opaque,
-            &[rect(0)],
+            &[BlockRect {
+                height: 15,
+                ..rect(0)
+            }],
             &[(0, 0)],
         );
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].shade.gradient().expect("gradient").corners, want);
+    }
+
+    /// PROVISIONAL (q-fix-real-floor-rle-rows): a 32-row RLE floor block
+    /// (the user's floor tiles carry them) takes the flat branch's map
+    /// `e[g+9] >> 3`, so its pixels never leave the 15-row gradient.
+    #[test]
+    fn a_32_row_floor_block_takes_the_flat_map() {
+        let f = frame(&[((102, 102), 6, (255, 255, 255))]);
+        let e9 = f.map.read(8 * 100, 8 * 100).i;
+        let out = block_shades(
+            &f,
+            env(),
+            floor(),
+            &Dt1Facts::default(),
+            (20, 20),
+            0xFF,
+            BlendOp::Opaque,
+            &[rect(0)],
+            &[(0, 0)],
+        );
+        assert_eq!(out.len(), 1);
+        assert!(out[0].shade.gradient().is_none());
+        assert_eq!(
+            out[0].shade,
+            floor_block_chain(&f.tables, BlockLight::Flat(e9 >> 3), 0, 0)
+        );
     }
 
     // Covers: specs/render/shading.md §4

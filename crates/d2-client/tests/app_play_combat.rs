@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::click::{screen_to_world, ClickView};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
@@ -27,6 +27,8 @@ use d2_client::controls::click::{skill_flag, ClickState, Kind};
 use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_server::seams::Clock;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -73,8 +75,9 @@ fn monster_at(app: &App, guid: u32) -> (u16, u16) {
 
 // Covers: specs/ui/controls.md §6 r8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_monster_walks_and_a_left_click_on_it_attacks() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(

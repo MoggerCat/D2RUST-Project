@@ -15,9 +15,12 @@ mod rig;
 
 use rig::*;
 
+mod app_support;
+
 // Covers: specs/skills/bodies.md §3.8
 // Covers: specs/skills/use.md §5.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn bash_on_a_monster_costs_mana_and_hurts_it() {
     let mut r = Rig::new(&[BASH]);
     r.leave_town();
@@ -35,6 +38,7 @@ fn bash_on_a_monster_costs_mana_and_hurts_it() {
 // Covers: specs/skills/bodies.md §6.8
 // Covers: specs/skills/use.md §5.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
     let mut r = Rig::new(&[SHOUT, BATTLE_ORDERS]);
     r.leave_town();
@@ -56,6 +60,7 @@ fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
 
 // Covers: specs/skills/bodies-2.md §4.8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn double_swing_hits_two_monsters_in_two_swings() {
     let mut r = Rig::new(&[DOUBLE_SWING]);
     r.leave_town();
@@ -76,6 +81,7 @@ fn double_swing_hits_two_monsters_in_two_swings() {
 // Covers: specs/skills/levels.md §6.4
 // Covers: specs/client/msg-skills.md §2 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
     let mut r = Rig::with_rows(&[NATURAL_RESISTANCE], &[]);
     r.leave_town();
@@ -98,6 +104,7 @@ fn a_learned_mastery_puts_its_passive_stats_in_its_state() {
 // Covers: specs/skills/bodies-2.md §4.6
 // Covers: specs/skills/bodies-2.md §4.7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_spends_mana_and_moves_the_barbarian() {
     let mut r = Rig::new(&[LEAP]);
     r.leave_town();
@@ -119,6 +126,7 @@ fn leap_spends_mana_and_moves_the_barbarian() {
 
 // Covers: specs/skills/bodies-2b.md §8.10
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn whirlwind_spends_mana_and_moves_the_barbarian() {
     let mut r = Rig::new(&[WHIRLWIND]);
     r.leave_town();
@@ -143,6 +151,7 @@ fn whirlwind_spends_mana_and_moves_the_barbarian() {
 // damage record (`bodies-2.md` §4.7): the barbarian lands exactly on the
 // aimed point and the monster standing there loses no life.
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
     let mut r = Rig::new(&[LEAP]);
     r.leave_town();
@@ -167,6 +176,7 @@ fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
 // Covers: specs/skills/bodies-2b.md §6.11, §6.12
 // Covers: specs/skills/bodies-2.md §2.19
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leap_attack_leaps_to_the_monster_and_strikes_it() {
     let mut r = Rig::new(&[LEAP_ATTACK]);
     r.leave_town();
@@ -182,6 +192,7 @@ fn leap_attack_leaps_to_the_monster_and_strikes_it() {
 
 // Covers: specs/skills/bodies-2.md §3.10, §3.11, §2.5, §2.6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dragon_talon_kick_hurts_a_monster() {
     let mut r = Rig::new(&[DRAGON_TALON]);
     r.leave_town();
@@ -196,6 +207,7 @@ fn dragon_talon_kick_hurts_a_monster() {
 
 // Covers: specs/skills/bodies-2b.md §7.20
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn dragon_flight_kick_hurts_a_monster() {
     let mut r = Rig::new(&[DRAGON_FLIGHT]);
     r.leave_town();

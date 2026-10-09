@@ -720,6 +720,27 @@ impl ClientWorld {
     pub fn remove(&mut self, key: UnitKey) -> Option<ClientUnit> {
         let unit = self.units.remove(&key)?;
         self.freed.push(key);
+        // PROVISIONAL (q-fix-real-unit-free-light,
+        // docs/handoff/q-fixture-migrate.md): the free removes the unit's
+        // light (unit +0x64, `render/lighting.md` §6.2 r5 `0x00464930`);
+        // §2 rule 5 does not name it. Without it an object light (kind 2)
+        // outlives its owner and the next new active room is fatal 0x591
+        // (§6.4), on the user's Rogue Encampment fires. Settled by the RE
+        // of the client unit free (`client/model.md` §2 rule 5).
+        let owner = Owner {
+            unit_type: u32::from(key.unit_type),
+            guid: key.guid,
+            client_only: false,
+        };
+        let lit: Vec<_> = self
+            .lights
+            .iter()
+            .filter(|(_, r)| r.owner() == Some(owner))
+            .map(|(id, _)| id)
+            .collect();
+        for id in lit {
+            let _ = self.lights.remove(id);
+        }
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {

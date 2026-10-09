@@ -476,7 +476,7 @@ fn sorceress_at_22_travels_with_the_arrival_message() {
     assert_eq!(fx.interact(), None);
     let room = fx.host.game.game.lists.unit(p).unwrap().room();
     assert_eq!(
-        fx.host.game.world.arrivals.0,
+        fx.host.game.events.sys.hooks.arrivals.0,
         vec![ArrivalNode { room, x: 42, y: 20 }]
     );
     fx.assert_clean();

@@ -107,14 +107,8 @@ fn play_data_on_native_equals_play_data_on_the_archives() {
     assert_eq!(summary.failures, Vec::new());
 
     // The play app's own data load, both ways.
-    let mpq = match GameData::select(Some(&dir.join("install")), false).unwrap() {
-        GameData::Live(d) => d,
-        GameData::Synthetic => panic!("archives load live"),
-    };
-    let nat = match GameData::select_native(&out).unwrap() {
-        GameData::Live(d) => d,
-        GameData::Synthetic => panic!("native loads live"),
-    };
+    let GameData::Live(mpq) = GameData::select(Some(&dir.join("install"))).unwrap();
+    let GameData::Live(nat) = GameData::select_native(&out).unwrap();
     assert!(!mpq.archives.is_native() && nat.archives.is_native());
     assert_eq!(
         format!("{:?}", mpq.waypoints),

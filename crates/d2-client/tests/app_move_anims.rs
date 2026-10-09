@@ -6,6 +6,8 @@
 #[path = "app_barbarian/rig.rs"]
 mod rig;
 
+mod app_support;
+
 use d2_client::app::play::add_walk;
 use d2_client::bridge::predict::{Speeds, WalkTap};
 use d2_client::bridge::world::SkillRow;
@@ -48,6 +50,7 @@ fn offsets(r: &Rig) -> Option<(i32, i32)> {
 
 // Covers: specs/render/unit-composite.md §8 r1, §8 r2, §8 r6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_leap_draw_height_follows_the_timed_arc_frame_by_frame() {
     let mut r = rig_with_walk(&[LEAP]);
     r.select_right(LEAP);
@@ -93,6 +96,7 @@ fn the_leap_draw_height_follows_the_timed_arc_frame_by_frame() {
 
 // Covers: specs/skills/bodies-2b.md §8.11
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn whirlwind_shows_its_skill_mode_while_it_spins() {
     let mut r = rig_with_walk(&[WHIRLWIND]);
     r.select_right(WHIRLWIND);

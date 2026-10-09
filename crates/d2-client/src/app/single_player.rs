@@ -53,11 +53,9 @@
 //! and lvltypes DT1, parsed), so the acts are generated through
 //! `d2_sim::wiring::worldgen::levels::WorldTypes` (the Maze / Presets /
 //! Outdoor dispatcher) with the server's town level ids (`levels.md` §2
-//! step 2: 1, 40). [`GameData::Synthetic`] (no game files) uses the
-//! bridge test's rows and its synthetic two-act DRLG
-//! (`bridge/local_tests.rs`: one 8×8-tile floor room per level), with
-//! empty skill, combat, monster, item and vendor tables, no drop state
-//! and no hireling tables.
+//! step 2: 1, 40). There is no other data: without the user's files
+//! the game is not built ([`BuildError::NoGameDir`]; the invented
+//! synthetic game was retired by q-fixture-migrate, M23).
 //!
 //! Seams without a provider are [`LocalSeams`] (the action and world
 //! wiring's): the narrowest answers (`Pending`'s and `WorldPending`'s
@@ -77,8 +75,8 @@ use crate::assets::game_files::GameFiles;
 use crate::assets::path::{CanonicalPath, FileSource};
 use d2_data::bin::TableFiles;
 use d2_data::tables::{
-    decode_all, Charstats, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Record,
-    Shrines, Skills,
+    decode_all, Charstats, Difficultylevels, Itemstatcost, Levels, Monstats, Objects, Shrines,
+    Skills,
 };
 use d2_formats::animdata::AnimData;
 use d2_formats::d2s::{self, D2s, ReadOptions};
@@ -99,15 +97,10 @@ use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
 use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
-use d2_server::world_data::{self, Dt1Files, WorldFiles};
+use d2_server::world_data::{self, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
-use d2_sim::combat::CombatTables;
 use d2_sim::drlg::maze::Maze;
-use d2_sim::drlg::room::LinkAt;
-use d2_sim::drlg::{
-    CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, Dungeon, GridPass, LevelDef, LevelIdx,
-    LevelTypes, PresetUnit, RoomGrids, RoomKind, TileInfo, TileRect, TileSource, WarpDef,
-};
+use d2_sim::drlg::{Drlg, DrlgData, DrlgError, Dungeon, LevelTypes, TileSource};
 use d2_sim::game::Game;
 use d2_sim::items::inventory::tables::InvTables;
 use d2_sim::items::ItemTables;
@@ -115,10 +108,9 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillTables;
 use d2_sim::stats::StatData;
-use d2_sim::units::hooks::{MonsterInfo, Sim as USim, UnitData};
+use d2_sim::units::hooks::{Sim as USim, UnitData};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
-use d2_sim::wiring::action::warp_tile::HOST_MONSTER_PRESET;
 use d2_sim::wiring::action::{ActionHooks, ActionTables, DrlgWorld, Pending, SkillEvent};
 use d2_sim::wiring::economy::{DeathDrops, DropTables, GameFields};
 use d2_sim::wiring::interaction::skill_events;
@@ -138,10 +130,6 @@ use d2_sim::drlg::preset::{Ds1Input, Ds1Source};
 use super::rest::AppRest;
 use super::server_thread::{ThreadLink, ThreadStopped};
 use super::skill_rest::SkillStore;
-use super::{
-    synthetic_a1_maze, synthetic_act2, synthetic_act4, synthetic_act5, synthetic_burial,
-    synthetic_chains, synthetic_maze, synthetic_tower,
-};
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::local::{LocalLink, PendingSession};
 use crate::bridge::world::{
@@ -171,16 +159,16 @@ pub const STONY_FIELD: u32 = 4;
 /// The Den of Evil (act 0): the cave entrance in the Blood Moor is a
 /// level warp ([`BLOOD_MOOR_TO_DEN`] / [`DEN_TO_BLOOD_MOOR`]).
 pub const DEN_OF_EVIL: u32 = 8;
-/// The `lvlwarp` `Id` (and tile class) of the Blood Moor's cave entrance
-/// and of the Den's way back (synthetic rows 0 and 1).
-pub const BLOOD_MOOR_TO_DEN: u32 = 11;
-pub const DEN_TO_BLOOD_MOOR: u32 = 12;
-/// Sub-tile of a warp tile in its room (the 40 × 40 sub-tile room's
-/// middle) and the synthetic walk-out.
-pub const WARP_TILE_XY: i32 = 20;
 pub const ACT2_TOWN: u32 = 40;
 /// Harrogath (act 4, the fifth act; `levels` row 109).
 pub const ACT5_TOWN: u32 = 109;
+/// Kurast Docks (act 2's town, `levels` row 75) and the Pandemonium
+/// Fortress (act 3's, row 103).
+pub const KURAST_DOCKS: u32 = 75;
+/// The stash object's class (`objects.txt` row 267, `world/objects.md`
+/// §16.10 `BANK_CLASS`).
+pub const STASH_CLASS: u32 = 267;
+pub const PANDEMONIUM_FORTRESS: u32 = 103;
 /// Catacombs Level 4, Andariel's lair (act 0; a flat level in the
 /// synthetic world, reached by a level warp: d2rs-own, unverified).
 pub const CATACOMBS_4: u32 = 37;
@@ -189,104 +177,17 @@ pub const DEFAULT_SEED: u32 = 1234;
 /// Game +0x6A of a single-player game: 3 (`rng.md` §5 open question,
 /// answered: the client's create message carries 3, stored at +0x6A).
 pub const GAME_TYPE: u8 = 3;
-/// Sub-tile x and y of the waypoint object from the origin of the town's
-/// first room (inside the synthetic 8 × 8-tile room, 40 sub-tiles square).
-pub const WAYPOINT_X: i32 = 20;
-/// The synthetic chest row's class, operate function and init function
-/// (`object-functions.tsv`).
-pub const SYNTHETIC_CHEST_CLASS: u32 = 1;
-const SYNTHETIC_CHEST_OPERATE: u8 = 4;
-const SYNTHETIC_CHEST_INIT: u8 = 3;
-/// The synthetic town portal row's class, operate function and init
-/// function (`object-functions.tsv`; REC-117).
-pub const SYNTHETIC_PORTAL_CLASS: u32 = 59;
-const SYNTHETIC_PORTAL_OPERATE: u8 = 15;
-const SYNTHETIC_PORTAL_INIT: u8 = 11;
-pub const UNIT_Y: i32 = 20;
-/// Akara's x in the synthetic town room (sub-tiles from its origin).
-pub const AKARA_X: i32 = 28;
-/// Kashya's x in the synthetic town room (d2rs-own, unverified: she
-/// stands in the Rogue Encampment, 5 sub-tiles from the player's start).
-pub const KASHYA_X: i32 = 18;
-/// d2rs-own, unverified (q-a2-town): Lut Gholein's NPCs in the synthetic
-/// Act II town, Warriv (175), Atma, Drognan, Fara, Greiz, Jerhyn (201),
-/// Elzix, Lysander and Meshif (210), in a row at [`ACT2_NPC_Y`], four
-/// sub-tiles apart from [`ACT2_NPC_X0`].
-pub const ACT2_NPCS: [u16; 9] = [
-    d2_sim::world::npc::class::WARRIV2,
-    d2_sim::world::npc::class::ATMA,
-    d2_sim::world::npc::class::DROGNAN,
-    d2_sim::world::npc::class::FARA,
-    d2_sim::world::npc::class::GREIZ,
-    201,
-    d2_sim::world::npc::class::ELZIX,
-    d2_sim::world::npc::class::LYSANDER,
-    d2_sim::world::npc::class::MESHIF1,
-];
-pub const ACT2_NPC_X0: i32 = 3;
-pub const ACT2_NPC_Y: i32 = 12;
-/// The Act II town waypoint (sub-tiles from its room's origin).
-pub const ACT2_WAYPOINT_XY: (i32, i32) = (20, 30);
-
-/// The Harrogath waypoint (sub-tiles from its room's origin).
-pub const ACT5_WAYPOINT_XY: (i32, i32) = (20, 30);
-/// The Harrogath waypoint's index (`levels` `Waypoint`): 30, row
-/// `Harrogath` of `world/waypoints.tsv` (35 is Halls of Death's Calling).
-const ACT5_WAYPOINT: u8 = 30;
-/// Kurast Docks's waypoint object (sub-tiles from its room's origin).
-/// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
-pub const ACT3_WAYPOINT_XY: (i32, i32) = (20, 30);
-/// The Act III and Act V waypoint levels of the synthetic chains
-/// ([`synthetic_chains`]) with their `levels` `Waypoint` indexes
-/// (`world/waypoints.tsv`; Kurast Docks 18 .. Durance of Hate Level 2 26,
-/// Rigid Highlands 31 .. the Worldstone Keep Level 2 38, those the chains have;
-/// Harrogath is 30, [`ACT5_WAYPOINT`]; the Act IV portal lights it).
-/// d2rs-own, unverified (q-act3-act5-gaps, REC-246).
-pub const CHAIN_WAYPOINTS: [(u32, u8); 16] = [
-    (75, 18),
-    (76, 19),
-    (77, 20),
-    (78, 21),
-    (79, 22),
-    (80, 23),
-    (81, 24),
-    (83, 25),
-    (101, 26),
-    (111, 31),
-    (112, 32),
-    (113, 33),
-    (115, 34),
-    (117, 36),
-    (118, 37),
-    (129, 38),
-];
-
-/// Every NPC class of the synthetic game: the Rogue Encampment's Akara,
-/// Kashya and Warriv, Lut Gholein's and Harrogath's.
-fn synthetic_npc_classes() -> impl Iterator<Item = u16> {
-    [
-        d2_sim::world::npc::class::AKARA,
-        d2_sim::world::npc::class::KASHYA,
-        d2_sim::world::npc::class::GHEED,
-        d2_sim::world::npc::class::CHARSI,
-        // Warriv (act 1): the act travel of Sisters to the Slaughter
-        // (`docs/handoff/q-a1-andariel.md`).
-        d2_sim::world::npc::class::WARRIV1,
-    ]
-    .into_iter()
-    .chain(ACT2_NPCS)
-    .chain(synthetic_act4::NPCS)
-    .chain(super::town_npcs::ACT5.iter().map(|&(c, _)| c))
-    .chain(super::town_npcs::ACT3.iter().map(|&(c, _)| c))
-}
-/// [`synthetic_npc_classes`] in `monstats` row order, once each (the
-/// vendor tables' `interact` list, `vendors.md` §1 r2).
-fn synthetic_interact_classes() -> Vec<u16> {
-    let mut v: Vec<u16> = synthetic_npc_classes().collect();
-    v.sort_unstable();
-    v.dedup();
-    v
-}
+/// Duriel's Lair (`levels` row 73, act 1).
+pub const DURIELS_LAIR: u32 = 73;
+/// Duriel's `monstats` row.
+pub const DURIEL_CLASS: u32 = 211;
+/// Izual's `monstats` row and the quest chain his death links
+/// (`init.md` §14.3).
+pub const IZUAL: u32 = 256;
+pub const IZUAL_CHAIN: u32 = 22;
+/// Blood Raven's `monstats` row and her quest chain (`init.md` §14.3).
+pub const BLOOD_RAVEN: u32 = 267;
+pub const BLOOD_RAVEN_CHAIN: u32 = 2;
 
 /// The player's character class (1, sorceress, as in the server tests).
 pub const PLAYER_CLASS: u32 = 1;
@@ -535,6 +436,10 @@ pub enum BuildError {
     World(#[from] d2_server::world_data::WorldDataError),
     #[error("archives in {dir}: {message}")]
     Archives { dir: String, message: String },
+    /// No game directory given: the game plays only on the user's own
+    /// files (`$D2_GAME_DIR`, or `--native DIR`).
+    #[error("no game files: set D2_GAME_DIR to a Diablo II 1.14d install")]
+    NoGameDir,
     #[error("no objects row has operate function 23 and init function 17")]
     NoWaypointObject,
     /// Game creation's NPC or quest control (`rng.md` §5.2).
@@ -636,9 +541,6 @@ impl LocalSeams {
             .min_by_key(|&(u, d)| (d, u))
     }
 }
-
-/// Unit flags `0x005557D0` gives a preset unit (`population.md` §11.1).
-const SYNTHETIC_PRESET_FLAGS: u32 = 0x300_0000;
 
 /// d2rs-own, unverified (preview, D1): the melee reach of every unit in
 /// sub-tiles (`0x00622870` reads the unit's size and weapon; not
@@ -802,12 +704,12 @@ impl Pending for LocalSeams {
     /// Lair has a way in from every tomb).
     fn warp_quest_gate(&self, source: u32, level: u32) -> u32 {
         u32::from(
-            (level == synthetic_act2::DURIELS_LAIR
+            (level == DURIELS_LAIR
                 && !(self.lair_open && source == self.staff_tomb))
                 // `0x0058D090` (`quests-act5-2.md` §7.8): leaving the
                 // summit for 118 or 128 waits for the Ancients (d2rs-own,
                 // unverified, REC-246: the made-up chain has both exits).
-                || (source == super::synthetic_act5::SUMMIT
+                || (source == d2_sim::world::quests::act5::q5::SUMMIT
                     && matches!(level, 118 | 128)
                     && self.summit_closed),
         )
@@ -1090,18 +992,18 @@ impl WorldPending for LocalSeams {
     /// ([`HOST_MONSTER_PRESET`]): Blood Raven carries chain 2 (`init.md`
     /// §14.3), as her boss mods link it when population creates her.
     fn host_monster_created(&mut self, unit: UnitId, class: u32) {
-        if class == synthetic_burial::BLOOD_RAVEN {
-            self.monster_quest_chain(unit, synthetic_burial::CHAIN);
+        if class == BLOOD_RAVEN {
+            self.monster_quest_chain(unit, BLOOD_RAVEN_CHAIN);
         }
-        if class == synthetic_act4::IZUAL {
-            self.monster_quest_chain(unit, synthetic_act4::IZUAL_CHAIN);
+        if class == IZUAL {
+            self.monster_quest_chain(unit, IZUAL_CHAIN);
         }
     }
     /// Duriel acts from the world (q-a2-duriel-ai, REC-254): the Lair's
     /// population starts his AI as monster creation does. d2rs-own,
     /// unverified.
     fn host_monster_ai(&self, class: u32) -> bool {
-        class == synthetic_act2::DURIEL_CLASS
+        class == DURIEL_CLASS
     }
 }
 
@@ -1109,188 +1011,6 @@ impl Outbox for LocalSeams {
     fn take_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
         std::mem::take(&mut self.sent)
     }
-}
-
-/// One 8×8-tile floor room per listed level.
-struct Types(BTreeMap<u32, TileRect>);
-
-impl LevelTypes for Types {
-    fn generate(
-        &mut self,
-        drlg: &mut Drlg,
-        _: &DrlgData,
-        level: LevelIdx,
-    ) -> Result<(), DrlgError> {
-        let id = drlg.level(level).id;
-        if let Some(&rect) = self.0.get(&id) {
-            let r = drlg.alloc_room(level, RoomKind::Preset, rect);
-            drlg.room_mut(r).dt1_mask = 1;
-            if id == ACT1_TOWN || id == BLOOD_MOOR {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
-            }
-            // The cave entrance pair: Blood Moor slot 1 ↔ Den slot 0.
-            if id == BLOOD_MOOR {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
-            }
-            // Black Marsh slot 1 ↔ the Tower (q-a1-tower); its way back
-            // (slot 0) and the Burial Grounds' come from the Act I tree
-            // below (q-a1-vis-links).
-            if id == synthetic_tower::BLACK_MARSH {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
-            }
-            // The Act IV line (q-a4): slot 0 back, slot 1 on.
-            if let Some((back, on)) = synthetic_act4::links(id) {
-                if back.is_some() {
-                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
-                }
-                if on.is_some() {
-                    drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
-                }
-            }
-            // The remaining chains (q-levels-warps-all): slot 0 back, 1 on.
-            for (slot, _, _) in synthetic_chains::slots(id) {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << slot;
-            }
-            if id == DEN_OF_EVIL {
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0;
-                // The stairs down to Cave Level 1 (slot 1, q-act1-dungeons).
-                drlg.room_mut(r).flags |= d2_sim::drlg::room_flags::WARP_0 << 1;
-            }
-            drlg.link_room(r, LinkAt::Tail);
-        }
-        Ok(())
-    }
-    /// The warp tiles of the cave entrance pair (`path-placement.md`
-    /// §12.1 rule 3 shape: unit type 5, class = the lvlwarp `Id`, room
-    /// sub-tiles). d2rs-own, unverified.
-    fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<PresetUnit> {
-        use synthetic_burial as b;
-        use synthetic_tower as t;
-        let tile = |class, xy| PresetUnit {
-            unit_type: 5,
-            class,
-            x: xy,
-            y: xy,
-        };
-        let id = drlg.level(drlg.room(room).level).id;
-        let mut v = match id {
-            t::BLACK_MARSH => vec![tile(t::MARSH_TO_TOWER, t::MARSH_TOWER_XY)],
-            BLOOD_MOOR => vec![tile(BLOOD_MOOR_TO_DEN, WARP_TILE_XY)],
-            // Blood Raven, placed by the host (REC-130).
-            b::BURIAL_GROUNDS => vec![PresetUnit {
-                unit_type: HOST_MONSTER_PRESET,
-                class: b::BLOOD_RAVEN,
-                x: b::RAVEN_XY,
-                y: b::RAVEN_XY,
-            }],
-            id if synthetic_act4::index(id).is_some() => {
-                use synthetic_act4 as a;
-                let (back, on) = a::links(id).unwrap_or((None, None));
-                let mut v = Vec::new();
-                if id == a::PLAINS_OF_DESPAIR {
-                    // Izual, placed by the host (q-a4).
-                    v.push(PresetUnit {
-                        unit_type: HOST_MONSTER_PRESET,
-                        class: a::IZUAL,
-                        x: a::IZUAL_XY,
-                        y: a::IZUAL_XY,
-                    });
-                }
-                v.extend(back.map(|c| tile(c, a::BACK_XY)));
-                v.extend(on.map(|c| tile(c, a::ON_XY)));
-                v
-            }
-            // The Arreat Summit's quest objects (q-act3-act5-gaps); its warp
-            // tiles come from the tree below.
-            synthetic_act5::SUMMIT => synthetic_act5::PRESET_OBJECTS
-                .iter()
-                .map(|&(class, xy)| PresetUnit {
-                    unit_type: d2_sim::wiring::action::warp_tile::HOST_OBJECT_PRESET,
-                    class,
-                    x: xy.0,
-                    y: xy.1,
-                })
-                .collect(),
-            DEN_OF_EVIL => vec![
-                tile(DEN_TO_BLOOD_MOOR, WARP_TILE_XY),
-                tile(synthetic_maze::DEN_TO_CAVE, synthetic_maze::DEN_STAIRS_XY),
-            ],
-            _ => Vec::new(),
-        };
-        // The tree's tiles (q-levels-warps-all, q-a1-dungeons), also on
-        // levels that have their own tiles above.
-        v.extend(
-            synthetic_chains::slots(id)
-                .into_iter()
-                .map(|(slot, _, class)| {
-                    let (x, y) = synthetic_chains::tile_xy(slot);
-                    PresetUnit {
-                        unit_type: 5,
-                        class,
-                        x,
-                        y,
-                    }
-                }),
-        );
-        v
-    }
-    fn room_grids(
-        &mut self,
-        drlg: &mut Drlg,
-        _: &DrlgData,
-        room: DrlgRoomId,
-    ) -> Result<RoomGrids, DrlgError> {
-        let r = drlg.room(room).rect;
-        let (w, h) = (r.w as usize + 1, r.h as usize + 1);
-        let mut g = CellGrid::new(w, h);
-        for y in 0..h {
-            for x in 0..w {
-                g.set(x, y, d2_sim::drlg::tiles::cell::FLOOR);
-            }
-        }
-        Ok(RoomGrids {
-            passes: vec![GridPass {
-                cells: g,
-                orientation: None,
-                fill_blanks: false,
-            }],
-            ..RoomGrids::default()
-        })
-    }
-}
-
-fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
-    TileInfo {
-        orientation: o,
-        main,
-        sub,
-        rarity,
-        material: 0,
-        subtile_flags: [0; 25],
-        roof_height: 0,
-        height: 0,
-    }
-}
-
-/// The synthetic tile library: one floor tile, the fixed library's
-/// blank and tile-10 entries (in drlg-data's DT1 provider type).
-fn tiles() -> Dt1Files {
-    use d2_sim::drlg::tiles::FIXED_LIBRARY;
-    let mut t = BTreeMap::new();
-    t.insert(b"floor.dt1".to_vec(), vec![tile(0, 0, 0, 1)]);
-    let blank = |sub| {
-        let mut x = tile(0, 30, sub, 0);
-        x.subtile_flags = [0x20; 25];
-        x
-    };
-    t.insert(FIXED_LIBRARY[0].to_vec(), vec![blank(0), blank(1)]);
-    t.insert(FIXED_LIBRARY[1].to_vec(), vec![]);
-    t.insert(FIXED_LIBRARY[2].to_vec(), vec![tile(10, 0, 0, 0)]);
-    Dt1Files(t)
-}
-
-fn blank<T: Record>() -> T {
-    T::decode(&vec![0u8; T::SIZE])
 }
 
 /// The tables the game's waypoint world reads, and the waypoint object's
@@ -1303,129 +1023,6 @@ pub struct WaypointTables {
 }
 
 impl WaypointTables {
-    /// The bridge test's rows: 150 levels (act 1 from level 40),
-    /// waypoints 0 / 1 / 9 at levels 1 / Cold Plains / Lut Gholein, one
-    /// waypoint object (class 0).
-    pub fn synthetic() -> Self {
-        let mut levels = vec![blank::<Levels>(); 150];
-        for (i, l) in levels.iter_mut().enumerate() {
-            l.waypoint = NO_WAYPOINT;
-            l.act = if i >= ACT5_TOWN as usize {
-                4
-            } else if i >= synthetic_act4::FORTRESS as usize {
-                3
-            } else if i >= 75 {
-                2
-            } else if i >= 40 {
-                1
-            } else {
-                0
-            };
-        }
-        levels[1].waypoint = 0;
-        levels[COLD_PLAINS as usize].waypoint = 1;
-        levels[STONY_FIELD as usize].waypoint = 2;
-        levels[ACT2_TOWN as usize].waypoint = 9;
-        levels[synthetic_act4::FORTRESS as usize].waypoint = 27;
-        levels[ACT5_TOWN as usize].waypoint = ACT5_WAYPOINT;
-        for (level, wp) in CHAIN_WAYPOINTS {
-            levels[level as usize].waypoint = wp;
-        }
-        let mut o: Objects = blank();
-        o.operatefn = 23;
-        o.initfn = 17;
-        o.framecnt1 = 15 << 8;
-        // The town units the build places are kept by the inactive store
-        // (`units.md` §3.3: objects `Restore` ≠ 0; a chest only while
-        // unopened, `RestoreVirgins`). d2rs-own, unverified (REC-287).
-        o.restore = 1;
-        // Class 1: a chest (`objects.md` §5.2, §8.1), placed only on
-        // request ([`build_with_chests`]). d2rs-own, unverified.
-        let mut chest: Objects = blank();
-        chest.operatefn = SYNTHETIC_CHEST_OPERATE;
-        chest.initfn = SYNTHETIC_CHEST_INIT;
-        chest.framecnt1 = 15 << 8;
-        chest.restore = 1;
-        chest.restorevirgins = 1;
-        // Class 59: the town portal (`objects.md` §12), padded rows
-        // before it are blank. d2rs-own, unverified (REC-117).
-        let mut portal: Objects = blank();
-        portal.operatefn = SYNTHETIC_PORTAL_OPERATE;
-        portal.initfn = SYNTHETIC_PORTAL_INIT;
-        portal.framecnt1 = 15 << 8;
-        portal.sizex = 1;
-        portal.sizey = 1;
-        // Class 60: the Moldy Tome of the Forgotten Tower quest
-        // (`quests-act1.md` §10.7). d2rs-own, unverified (q-a1-tower).
-        let mut tome: Objects = blank();
-        tome.operatefn = synthetic_tower::TOME_OPERATE;
-        tome.initfn = synthetic_tower::TOME_INIT;
-        tome.framecnt1 = 15 << 8;
-        tome.restore = 1;
-        let mut objects = vec![o, chest];
-        objects.resize(SYNTHETIC_PORTAL_CLASS as usize, blank());
-        objects.push(portal);
-        debug_assert_eq!(objects.len(), synthetic_tower::TOME_CLASS as usize);
-        objects.push(tome);
-        // Class 100: Duriel's Lair entrance (a quest object, `quests-act2.md`
-        // §8.8; no operate here, the way in is the warp tile), and class
-        // 152: the orifice (operate 25, init 21). d2rs-own, unverified
-        // (REC-167).
-        for (class, operate, init) in [
-            (synthetic_act2::LAIR_ENTRANCE_CLASS, 0, 0),
-            (synthetic_act2::ORIFICE_CLASS, 25, 21),
-            // Tyrael's door: init 38 (`quests-act2.md` §8.8), REC-234.
-            (synthetic_act2::TYRAEL_DOOR_CLASS, 0, 38),
-        ] {
-            let c = class as usize;
-            if objects.len() <= c {
-                objects.resize(c + 1, blank());
-            }
-            let mut row: Objects = blank();
-            row.operatefn = operate;
-            row.initfn = init;
-            row.framecnt1 = 15 << 8;
-            objects[c] = row;
-        }
-        // The Act IV endgame objects (q-a4-endgame), by class.
-        let last = synthetic_act4::OBJECT_ROWS.iter().map(|r| r.0).max();
-        objects.resize(
-            last.map_or(0, |c| c as usize + 1).max(objects.len()),
-            blank(),
-        );
-        for &(class, operate, init) in &synthetic_act4::OBJECT_ROWS {
-            let row = &mut objects[class as usize];
-            row.operatefn = operate;
-            row.initfn = init;
-            row.framecnt1 = 20 << 8;
-        }
-        // The Act V quest objects (q-act3-act5-gaps), by class.
-        let last = super::synthetic_act5::OBJECT_ROWS.iter().map(|r| r.0).max();
-        objects.resize(
-            last.map_or(0, |c| c as usize + 1).max(objects.len()),
-            blank(),
-        );
-        for &(class, operate, init) in &super::synthetic_act5::OBJECT_ROWS {
-            let row = &mut objects[class as usize];
-            row.operatefn = operate;
-            row.initfn = init;
-            row.framecnt1 = 20 << 8;
-        }
-        // The Hellforge's animation: mode 1 ends in mode 2 (`objects-2.md`
-        // §18.6 needs `Mode2`), frame counts 22 (`quests-act4.md` §1.4).
-        // d2rs-own, unverified (q-a4-quest-items, REC-235).
-        let forge = &mut objects[synthetic_act4::HELLFORGE as usize];
-        forge.mode2 = 1;
-        forge.hascollision2 = 1;
-        forge.framecnt1 = 22 << 8;
-        forge.framecnt3 = 22 << 8;
-        WaypointTables {
-            levels,
-            objects,
-            object_class: 0,
-        }
-    }
-
     /// The user's own `levels` and `objects` tables (`loading.md`: the
     /// live `.bin` set, validated).
     pub fn live(archives: &dyn TableFiles) -> Result<Self, BuildError> {
@@ -1582,8 +1179,7 @@ pub fn save_name(bytes: &[u8]) -> &[u8] {
 /// and checked with the user's tables ([`LiveData::read_save`]), loaded
 /// at the join with [`LoadContext`] of the app's game (Normal; the saved
 /// map seed does not apply: the app's game runs on a fixed seed, game
-/// +0x84 = 1, `formats/d2s.md` §2.2 rule 8, `rng.md` §5.2). Synthetic
-/// data has no save tables: an error.
+/// +0x84 = 1, `formats/d2s.md` §2.2 rule 8, `rng.md` §5.2).
 pub fn load_character(
     data: &GameData,
     path: &std::path::Path,
@@ -1593,11 +1189,7 @@ pub fn load_character(
         path: path.display().to_string(),
         message,
     };
-    let GameData::Live(d) = data else {
-        return Err(err(
-            "reading a save needs the game's tables (D2_GAME_DIR)".into()
-        ));
-    };
+    let GameData::Live(d) = data;
     let bytes = std::fs::read(path).map_err(|e| err(e.to_string()))?;
     let save = d
         .read_save(&bytes, difficulty)
@@ -1614,28 +1206,23 @@ pub fn load_character(
 /// Where the game's tables and levels come from.
 #[derive(Debug, Clone)]
 pub enum GameData {
-    Synthetic,
     /// Tables and level data already loaded from the user's files.
     Live(Arc<LiveData>),
 }
 
 impl GameData {
-    /// The data of `game_dir` (`$D2_GAME_DIR`): live when a directory is
-    /// given and `synthetic` is not asked, else synthetic. A given
-    /// directory that does not load is an error, not a fallback.
-    pub fn select(game_dir: Option<&std::path::Path>, synthetic: bool) -> Result<Self, BuildError> {
-        match game_dir {
-            Some(dir) if !synthetic => {
-                let archives = ArchiveSet::open_dir(dir).map_err(|e| BuildError::Archives {
-                    dir: dir.display().to_string(),
-                    message: e.to_string(),
-                })?;
-                Ok(GameData::Live(Arc::new(LiveData::load(Arc::new(
-                    GameFiles::archives(Arc::new(archives)),
-                ))?)))
-            }
-            _ => Ok(GameData::Synthetic),
-        }
+    /// The data of `game_dir` (`$D2_GAME_DIR`): the user's own files. No
+    /// directory is an error naming `D2_GAME_DIR` (nothing plays on
+    /// invented data, M23), and so is a directory that does not load.
+    pub fn select(game_dir: Option<&std::path::Path>) -> Result<Self, BuildError> {
+        let dir = game_dir.ok_or(BuildError::NoGameDir)?;
+        let archives = ArchiveSet::open_dir(dir).map_err(|e| BuildError::Archives {
+            dir: dir.display().to_string(),
+            message: e.to_string(),
+        })?;
+        Ok(GameData::Live(Arc::new(LiveData::load(Arc::new(
+            GameFiles::archives(Arc::new(archives)),
+        ))?)))
     }
 
     /// The data of a converted native folder (`play --native DIR`,
@@ -1650,10 +1237,8 @@ impl GameData {
     }
 
     fn tables(&self) -> WaypointTables {
-        match self {
-            GameData::Synthetic => WaypointTables::synthetic(),
-            GameData::Live(d) => d.waypoints.clone(),
-        }
+        let GameData::Live(d) = self;
+        d.waypoints.clone()
     }
 }
 
@@ -1663,28 +1248,14 @@ struct LevelSource {
     data: Arc<DrlgData>,
     tiles: Box<dyn TileSource>,
     types: Box<dyn LevelTypes>,
+    /// The same level-type state as `types`, for the world state's
+    /// preset lookups (population reads the rooms the DRLG generated).
+    shared: SharedTypes,
     /// (act, init seed, town level id) of each created act.
     acts: Vec<(u8, u32, u32)>,
 }
 
 impl LevelSource {
-    /// The bridge test's synthetic DRLG: one 8×8-tile floor room per
-    /// level, no town generated at act creation, init seeds 1 and 2.
-    fn synthetic() -> Self {
-        LevelSource {
-            data: Arc::new(synthetic_drlg_data()),
-            tiles: Box::new(tiles()),
-            types: Box::new(synthetic_level_types()),
-            acts: vec![
-                (0, 1, 0),
-                (1, 2, 0),
-                (2, 5, 0),
-                (4, 3, 0),
-                (synthetic_act4::ACT, 4, 0),
-            ],
-        }
-    }
-
     /// The user's level data through the level-type dispatcher
     /// (`WorldTypes`, as drlg-data's game-file tests build it). Acts get
     /// the server's town level ids 1 and 40 (`levels.md` §2 step 2) and
@@ -1704,229 +1275,19 @@ impl LevelSource {
         LevelSource {
             data,
             tiles: Box::new(d.files.dt1.clone()),
+            shared: types.clone(),
             types: Box::new(types),
             acts: vec![
                 (0, init_seed, 1),
                 (1, init_seed, ACT2_TOWN),
-                (2, init_seed, synthetic_chains::KURAST_DOCKS),
+                (2, init_seed, KURAST_DOCKS),
                 (4, init_seed, ACT5_TOWN),
-                (synthetic_act4::ACT, init_seed, synthetic_act4::FORTRESS),
+                (3, init_seed, PANDEMONIUM_FORTRESS),
             ],
         }
     }
 }
 
-/// The synthetic DRLG table view: 150 levels without warps; the Rogue
-/// Encampment, Cold Plains and Lut Gholein are preset levels of tile
-/// library 1 (`floor.dt1`).
-fn synthetic_drlg_data() -> DrlgData {
-    let mut drlg = DrlgData {
-        levels: vec![LevelDef::default(); 150],
-        ..DrlgData::default()
-    };
-    for l in &mut drlg.levels {
-        l.warp = [-1; 8];
-    }
-    let mut files = vec![Vec::new(); 32];
-    files[0] = b"floor.dt1".to_vec();
-    drlg.lvltypes = vec![
-        vec![Vec::new(); 32],
-        files.clone(),
-        vec![Vec::new(); 32],
-        files,
-    ];
-    for id in [
-        ACT1_TOWN,
-        BLOOD_MOOR,
-        COLD_PLAINS,
-        STONY_FIELD,
-        synthetic_tower::BLACK_MARSH,
-        synthetic_burial::BURIAL_GROUNDS,
-        DEN_OF_EVIL,
-        CATACOMBS_4,
-        ACT2_TOWN,
-        ACT5_TOWN,
-    ]
-    .into_iter()
-    .chain(synthetic_act4::LEVELS)
-    .chain(synthetic_chains::levels())
-    {
-        drlg.levels[id as usize].drlg_type = 2;
-        drlg.levels[id as usize].level_type = 1;
-    }
-    // Cave Level 1: a maze level (q-act1-dungeons), warp pair with the
-    // Den (Den slot 1, cave slot 0).
-    {
-        let c = &mut drlg.levels[synthetic_maze::CAVE_LEVEL_1 as usize];
-        c.drlg_type = 1;
-        // Level type 3 (cave): the maze generator's type (`maze.md` §1).
-        c.level_type = 3;
-        c.size = [(200, 200); 3];
-        c.offset = (1500, 1000);
-        c.vis[0] = DEN_OF_EVIL;
-        c.warp[0] = synthetic_maze::CAVE_TO_DEN as i32;
-    }
-    // The tree dungeons built by the maze generator (q-dungeon-builds);
-    // their vis / warp slots come from the tree below.
-    synthetic_a1_maze::add_levels(&mut drlg);
-    drlg.levels[DEN_OF_EVIL as usize].vis[1] = synthetic_maze::CAVE_LEVEL_1;
-    drlg.levels[DEN_OF_EVIL as usize].warp[1] = synthetic_maze::DEN_TO_CAVE as i32;
-    // The town and the Blood Moor see each other through vis slot 0, a
-    // border (warp −1, `drlg/rooms.md` §3.3): each one's room carries
-    // flag WARP_0 ([`Types`]).
-    drlg.levels[ACT1_TOWN as usize].vis[0] = BLOOD_MOOR;
-    drlg.levels[BLOOD_MOOR as usize].vis[0] = ACT1_TOWN;
-    // The cave entrance: a warp pair (lvlwarp rows 0 and 1) in slot 1 of
-    // the Blood Moor and slot 0 of the Den (`rooms.md` §3.3).
-    drlg.levels[BLOOD_MOOR as usize].vis[1] = DEN_OF_EVIL;
-    drlg.levels[BLOOD_MOOR as usize].warp[1] = BLOOD_MOOR_TO_DEN as i32;
-    drlg.levels[DEN_OF_EVIL as usize].vis[0] = BLOOD_MOOR;
-    drlg.levels[DEN_OF_EVIL as usize].warp[0] = DEN_TO_BLOOD_MOOR as i32;
-    // The Black Marsh and the Tower line (q-a1-tower): Blood Moor slot 2
-    // ↔ Black Marsh slot 0, Black Marsh slot 1 ↔ Tower slot 0, then each
-    // Tower level's slot 1 ↔ the next one's slot 0.
-    {
-        use synthetic_tower as t;
-        let l = &mut drlg.levels;
-        l[t::BLACK_MARSH as usize].vis[1] = t::TOWER_LEVELS[0];
-        l[t::BLACK_MARSH as usize].warp[1] = t::MARSH_TO_TOWER as i32;
-        for (i, &id) in t::TOWER_LEVELS.iter().enumerate() {
-            let c = &mut l[id as usize];
-            c.drlg_type = 1;
-            c.level_type = 3;
-            c.size = [(200, 200); 3];
-            c.offset = (2000 + 300 * i as i32, 1000);
-            let (back, to) = if i == 0 {
-                (t::BLACK_MARSH, t::TOWER_TO_MARSH)
-            } else {
-                (t::TOWER_LEVELS[i - 1], t::up(i - 1))
-            };
-            c.vis[0] = back;
-            c.warp[0] = to as i32;
-            if let Some(&next) = t::TOWER_LEVELS.get(i + 1) {
-                c.vis[1] = next;
-                c.warp[1] = t::down(i) as i32;
-            }
-        }
-    }
-    // The Burial Grounds hang off Cold Plains in the Act I tree
-    // (q-a1-vis-links; q-a1-bloodraven put them off the Blood Moor).
-    // The Act IV line (q-a4): level i slot 1 ↔ level i + 1 slot 0.
-    {
-        use synthetic_act4 as a;
-        for i in 0..a::LEVELS.len() - 1 {
-            let (from, to) = (a::LEVELS[i] as usize, a::LEVELS[i + 1] as usize);
-            drlg.levels[from].vis[1] = a::LEVELS[i + 1];
-            drlg.levels[from].warp[1] = a::on(i) as i32;
-            drlg.levels[to].vis[0] = a::LEVELS[i];
-            drlg.levels[to].warp[0] = a::back(i) as i32;
-        }
-    }
-    synthetic_act2::add_levels(&mut drlg);
-    // The remaining chains (q-levels-warps-all): slot 0 back, slot 1 on.
-    for e in synthetic_chains::edges() {
-        drlg.levels[e.from as usize].vis[e.slot] = e.to;
-        drlg.levels[e.from as usize].warp[e.slot] = e.on as i32;
-        drlg.levels[e.to as usize].vis[0] = e.from;
-        drlg.levels[e.to as usize].warp[0] = e.back as i32;
-    }
-    let mut ids = vec![
-        BLOOD_MOOR_TO_DEN,
-        DEN_TO_BLOOD_MOOR,
-        synthetic_maze::DEN_TO_CAVE,
-        synthetic_maze::CAVE_TO_DEN,
-    ];
-    ids.extend(synthetic_tower::BLOOD_MOOR_TO_MARSH..=synthetic_tower::LAST_WARP);
-    ids.extend([
-        synthetic_burial::BLOOD_MOOR_TO_BURIAL,
-        synthetic_burial::BURIAL_TO_BLOOD_MOOR,
-    ]);
-    ids.extend(synthetic_act2::FIRST_WARP..=synthetic_act2::last_warp());
-    ids.extend(synthetic_act4::first_warp()..=synthetic_act4::last_warp());
-    ids.extend(synthetic_chains::first_warp()..=synthetic_chains::last_warp());
-    drlg.warps = ids
-        .iter()
-        .map(|&id| WarpDef {
-            id: id as i32,
-            direction: b'b',
-            ..WarpDef::default()
-        })
-        .collect();
-    // ExitWalkX/Y per row: the walk-out after the arrival.
-    drlg.warp_exits = ids
-        .iter()
-        .map(|&id| if id % 2 == 0 { (3, 3) } else { (0, 0) })
-        .collect();
-    drlg
-}
-
-/// Every warp of the synthetic game: (level, destination level, tile
-/// class) per vis slot with a warp, in level and slot order. The level
-/// holds a tile unit of that class that leads to the destination
-/// (q-levels-warps-all).
-pub fn synthetic_level_warps() -> Vec<(u32, u32, u32)> {
-    let drlg = synthetic_drlg_data();
-    let mut out = Vec::new();
-    for (id, l) in drlg.levels.iter().enumerate() {
-        for (vis, warp) in l.vis.iter().zip(l.warp.iter()) {
-            if *warp >= 0 && *vis != 0 {
-                out.push((id as u32, *vis, *warp as u32));
-            }
-        }
-    }
-    out
-}
-
-/// The synthetic level types: one 8×8-tile floor room in the Rogue
-/// Encampment (the game entry's town, at tile (16, 0): levels of one act
-/// do not overlap), one in the Blood Moor east of it (tile (24, 0), a
-/// level border), one in Cold Plains and one in Lut Gholein.
-fn synthetic_types() -> Types {
-    let mut m = BTreeMap::from([
-        (ACT1_TOWN, TileRect::new(16, 0, 8, 8)),
-        (BLOOD_MOOR, TileRect::new(24, 0, 8, 8)),
-        (COLD_PLAINS, TileRect::new(0, 0, 8, 8)),
-        (STONY_FIELD, TileRect::new(0, 16, 8, 8)),
-        (DEN_OF_EVIL, TileRect::new(0, 8, 8, 8)),
-        (synthetic_tower::BLACK_MARSH, TileRect::new(8, 16, 8, 8)),
-        (synthetic_burial::BURIAL_GROUNDS, TileRect::new(0, 24, 8, 8)),
-        (ACT2_TOWN, TileRect::new(0, 0, 8, 8)),
-        (synthetic_act4::FORTRESS, TileRect::new(0, 0, 8, 8)),
-        (synthetic_act4::OUTER_STEPPES, TileRect::new(8, 0, 8, 8)),
-        (
-            synthetic_act4::PLAINS_OF_DESPAIR,
-            TileRect::new(16, 0, 8, 8),
-        ),
-        (
-            synthetic_act4::CITY_OF_THE_DAMNED,
-            TileRect::new(24, 0, 8, 8),
-        ),
-        (synthetic_act4::RIVER_OF_FLAME, TileRect::new(32, 0, 8, 8)),
-        // 40 × 40 tiles: the seal bosses stand up to 52 sub-tiles from
-        // their seals (`quests-act4.md` §5.4; q-a4-endgame).
-        (
-            synthetic_act4::CHAOS_SANCTUARY,
-            TileRect::new(40, 0, 40, 40),
-        ),
-        (ACT5_TOWN, TileRect::new(0, 0, 8, 8)),
-    ]);
-    // The remaining chains' levels (q-levels-warps-all) that have no
-    // room yet.
-    for id in synthetic_chains::levels() {
-        if let (false, Some((x, y))) = (m.contains_key(&id), synthetic_chains::room_origin(id)) {
-            m.insert(id, TileRect::new(x, y, 8, 8));
-        }
-    }
-    Types(m)
-}
-
-/// The synthetic level types: the flat levels plus the maze level.
-fn synthetic_level_types() -> synthetic_maze::SyntheticTypes<Types> {
-    synthetic_maze::SyntheticTypes::new(synthetic_types(), Arc::new(synthetic_drlg_data()))
-}
-
-/// The live DS1 files of the client DRLG's level types, shared with the
-/// game's data (no copy per act build).
 struct LiveDs1(Arc<LiveData>);
 
 impl Ds1Source for LiveDs1 {
@@ -1949,42 +1310,31 @@ impl SubFiles for LiveSubs {
 /// DRLG reads, with fresh level-type state for every client act (the
 /// client never reads the server's DRLG).
 pub fn client_drlg_source(data: &GameData) -> DrlgSource {
-    match data {
-        GameData::Synthetic => DrlgSource {
-            data: Arc::new(synthetic_drlg_data()),
-            tiles: Arc::new(tiles()),
-            types: Arc::new(|| Box::new(synthetic_level_types())),
-        },
-        GameData::Live(d) => {
-            let live = d.clone();
-            let drlg = Arc::new(d.levels.drlg.clone());
-            let types_data = drlg.clone();
-            DrlgSource {
-                data: drlg,
-                tiles: Arc::new(d.files.dt1.clone()),
-                types: Arc::new(move || {
-                    Box::new(WorldTypes::new(
-                        types_data.clone(),
-                        Maze::new(live.levels.maze.clone()),
-                        live.levels.preset.clone(),
-                        live.levels.outdoor.clone(),
-                        Box::new(LiveDs1(live.clone())),
-                        Box::new(LiveSubs(live.clone())),
-                    ))
-                }),
-            }
-        }
+    let GameData::Live(d) = data;
+    let live = d.clone();
+    let drlg = Arc::new(d.levels.drlg.clone());
+    let types_data = drlg.clone();
+    DrlgSource {
+        data: drlg,
+        tiles: Arc::new(d.files.dt1.clone()),
+        types: Arc::new(move || {
+            Box::new(WorldTypes::new(
+                types_data.clone(),
+                Maze::new(live.levels.maze.clone()),
+                live.levels.preset.clone(),
+                live.levels.outdoor.clone(),
+                Box::new(LiveDs1(live.clone())),
+                Box::new(LiveSubs(live.clone())),
+            ))
+        }),
     }
 }
 
 /// The `objects.txt` rows of the client object update
-/// (`world/objects-client.md` §28 r1): the live table; none for the
-/// synthetic game (its object update then runs nothing).
+/// (`world/objects-client.md` §28 r1): the live table.
 pub fn client_object_rows(data: &GameData) -> Vec<crate::bridge::objects::ObjClientRow> {
-    match data {
-        GameData::Synthetic => Vec::new(),
-        GameData::Live(d) => crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects),
-    }
+    let GameData::Live(d) = data;
+    crate::bridge::objects::ObjClientRow::rows(&d.waypoints.objects)
 }
 
 /// The `objects.txt` `Name` of each class, for the mouse-over label
@@ -2044,15 +1394,12 @@ pub fn client_resist_penalties(archives: &dyn TableFiles) -> Result<Vec<i32>, Bu
 
 /// The charstats walk / run speeds of `character`'s class
 /// (`sim/pathing.md` §8.1 r2, §8.2) for the play preview's walk
-/// prediction (decision D2); `None` on synthetic data (no charstats rows)
-/// or a class past the rows.
+/// prediction (decision D2); `None` for a class past the rows.
 pub fn walk_speeds(
     data: &GameData,
     character: &Character,
 ) -> Result<Option<crate::bridge::predict::Speeds>, BuildError> {
-    let GameData::Live(d) = data else {
-        return Ok(None);
-    };
+    let GameData::Live(d) = data;
     let class = match character {
         Character::New => PLAYER_CLASS as u8,
         Character::Named(c) => c.class,
@@ -2228,9 +1575,6 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
 /// exists only after the join (C→S 0x6B): [`local_player`].
 pub struct LocalGame {
     pub sim: Sim,
-    pub waypoint: UnitId,
-    /// The waypoint object's GUID.
-    pub waypoint_guid: u32,
 }
 
 /// The tables game creation and the wired host read beyond the DRLG's.
@@ -2239,8 +1583,6 @@ struct GameParts {
     stats: StatData,
     units: UnitData,
     world: WorldTables,
-    /// The level-type handle of the world state (preset lookups).
-    world_types: SharedTypes,
     objects: ObjectTables,
     monstats: Vec<Monstats>,
     hire_rows: Vec<HireRow>,
@@ -2264,184 +1606,7 @@ struct GameParts {
     cube: Option<CubeData>,
 }
 
-/// Rows of the synthetic `monstats` (classes 0 … 399; Akara is the only
-/// NPC).
-const SYNTHETIC_MONSTATS: usize = 600;
-
-/// d2rs-own, unverified (preview): the synthetic game's `monstats`, all
-/// zero rows with Akara `npc` and `interact` (the town NPC of
-/// `docs/handoff/q-quests.md`).
-fn synthetic_monstats() -> Vec<Monstats> {
-    let mut v: Vec<Monstats> = (0..SYNTHETIC_MONSTATS)
-        .map(|_| Monstats::decode(&vec![0u8; Monstats::SIZE]))
-        .collect();
-    for c in synthetic_npc_classes() {
-        let a = &mut v[usize::from(c)];
-        a.npc = true;
-        a.interact = true;
-    }
-    // Blood Raven (REC-130): a killable class, so the kill parse runs.
-    v[synthetic_burial::BLOOD_RAVEN as usize].killable = true;
-    v[synthetic_act4::IZUAL as usize].killable = true;
-    v[synthetic_act2::DURIEL_CLASS as usize].killable = true;
-    // The Act IV endgame bosses (q-a4-endgame).
-    for c in synthetic_act4::BOSSES {
-        v[c as usize].killable = true;
-    }
-    super::synthetic_items::smoke::monster(&mut v);
-    v
-}
-
-/// d2rs-own, unverified (preview; REC-130): Kashya's `hireling` rows
-/// (Rogue Scout, one per difficulty, version 100 = expansion), so her NPC
-/// start has a hire list.
-fn synthetic_hire_rows() -> Vec<HireRow> {
-    (1..=3)
-        .map(|difficulty| HireRow {
-            version: 100,
-            class: 271,
-            act: 1,
-            difficulty,
-            seller: u32::from(d2_sim::world::npc::class::KASHYA),
-            gold: 100,
-            level: 1,
-            name_first: 100,
-            name_last: 104,
-        })
-        .chain(std::iter::once(HireRow {
-            // Greiz's one row, so his hire list can be made (d2rs-own,
-            // unverified, q-a2-town): the desert mercenary, names 2000..2002.
-            version: 100,
-            class: 271,
-            act: 2,
-            difficulty: 1,
-            seller: u32::from(d2_sim::world::npc::class::GREIZ),
-            gold: 0, // no gold stat row in the synthetic game (REC-157)
-            level: 9,
-            name_first: 2000,
-            name_last: 2002,
-        }))
-        .collect()
-}
-
-/// The synthetic hire rows' mercenary classes (Kashya's and Greiz's 271,
-/// Asheara's 357, Qual-Kehk's 560; made up).
-const MERC_CLASSES: [usize; 3] = [271, 357, 560];
-
-/// d2rs-own, unverified (preview): the client's monster rows for the
-/// synthetic game, so Akara's S→C 0xAC creates her unit (a class without
-/// a row is ignored, `client/msg-units.md` §1.2 r2).
-pub fn synthetic_unit_rows() -> UnitRows {
-    let raven = synthetic_burial::BLOOD_RAVEN as usize;
-    let izual = synthetic_act4::IZUAL as usize;
-    let top = synthetic_npc_classes()
-        .map(usize::from)
-        .max()
-        .unwrap_or(0)
-        .max(raven)
-        .max(izual)
-        .max(synthetic_act2::DURIEL_CLASS as usize)
-        .max(MERC_CLASSES.into_iter().max().unwrap_or(0));
-    let mut monsters = vec![None; top + 1];
-    let class_row = |npc| MonsterClass {
-        components: [0; 16],
-        npc,
-        interact: npc,
-        setup: Some(crate::bridge::world::MonsterSetup {
-            is_att: true,
-            is_sel: true,
-            ..Default::default()
-        }),
-    };
-    for c in synthetic_npc_classes() {
-        monsters[usize::from(c)] = Some(class_row(true));
-    }
-    monsters[raven] = Some(class_row(false));
-    monsters[izual] = Some(class_row(false));
-    monsters[synthetic_act2::DURIEL_CLASS as usize] = Some(class_row(false));
-    // The hirable mercenaries (q-mercs-acts, REC-157): plain monster rows.
-    for c in MERC_CLASSES {
-        monsters[c] = Some(class_row(false));
-    }
-    // The item smoke test's monster (q-smoke-items, REC-281).
-    monsters[super::synthetic_items::smoke::MONSTER as usize] = Some(class_row(false));
-    UnitRows {
-        monsters,
-        ..UnitRows::default()
-    }
-}
-
 impl GameParts {
-    /// No game files: the waypoint rows, everything else empty; the world
-    /// state's level types over the synthetic DRLG view with no preset,
-    /// outdoor or maze data.
-    fn synthetic(wp: &WaypointTables) -> Result<Self, BuildError> {
-        let hire_rows: Vec<HireRow> = synthetic_hire_rows()
-            .into_iter()
-            .chain(super::town_npcs::synthetic_hire_rows())
-            .collect();
-        // The maze level's rows and DS1 (q-act1-dungeons).
-        let world_types =
-            SharedTypes::new(synthetic_maze::maze_types(Arc::new(synthetic_drlg_data())));
-        let mut action = empty_action_tables();
-        // The unit path needs the monster's `monstats` row (the shape).
-        action.combat.monstats = synthetic_monstats();
-        action.combat.charstats = synthetic_charstats();
-        // The waypoint indexes of the levels (the quest-side
-        // `0x005B4FF0` reads them; q-a4-harrogath).
-        action.levels = wp.levels.clone();
-        Ok(GameParts {
-            action,
-            stats: super::synthetic_items::stat_data(),
-            units: UnitData {
-                expansion: GAME_SETUP.expansion,
-                monsters: vec![
-                    MonsterInfo {
-                        enabled: true,
-                        aidel: [15; 3],
-                        moves: 0,
-                    };
-                    SYNTHETIC_MONSTATS
-                ],
-                ..UnitData::default()
-            },
-            world: WorldTables {
-                levels: wp.levels.clone(),
-                ..WorldTables::default()
-            },
-            world_types,
-            objects: ObjectTables {
-                objects: wp.objects.clone(),
-                shrines: Vec::new(),
-                levels: wp.levels.clone(),
-                // The portal's quest gate reads a record per level
-                // (`objects.md` §12 rule 7): blank, no gate (REC-117).
-                leveldefs: vec![blank(); wp.levels.len()],
-                ..ObjectTables::default()
-            },
-            monstats: synthetic_monstats(),
-            hire_rows: hire_rows.clone(),
-            items: super::synthetic_items::item_tables(),
-            // The stores of the synthetic traders (q-smoke-town, REC-278).
-            vendors: super::synthetic_vendors::vendor_tables(
-                &super::synthetic_items::item_tables(),
-                synthetic_interact_classes(),
-                SYNTHETIC_MONSTATS,
-            ),
-            anim: None,
-            vitals: Some(Arc::new(synthetic_vitals())),
-            bodies: None,
-            // The Hellforge's code drops (q-a4-quest-items, REC-235).
-            drops: Some(Arc::new(super::synthetic_items::drop_tables())),
-            hirelings: Some(super::merc_rows::synthetic_hireling_tables(&hire_rows)),
-            inventory: Some(super::synthetic_items::inv_tables(
-                &super::synthetic_items::item_tables(),
-            )),
-            // No recipe; the stash and cube buttons need the parts (REC-281).
-            cube: Some(super::synthetic_items::cube_data()),
-        })
-    }
-
     /// The user's tables (`GameTables`), the drop and hireling tables of
     /// [`LiveData`], the world state's level types over the live data.
     fn live(d: &LiveData) -> Result<Self, BuildError> {
@@ -2451,7 +1616,6 @@ impl GameParts {
             stats: t.stat_data()?,
             units: t.unit_data(GAME_SETUP.expansion)?,
             world: t.world_tables()?,
-            world_types: live_types(d),
             objects: t.object_tables()?,
             monstats: t.rows()?,
             hire_rows: t.hire_rows()?,
@@ -2474,116 +1638,6 @@ impl GameParts {
     }
 }
 
-/// d2rs-own, unverified: one `charstats` row per player class with the
-/// walk / run velocities (6 / 9, the speeds of the preview's prediction),
-/// so the synthetic server moves the player (a zero velocity never
-/// does: the NPC approach walks, `docs/handoff/q-npc-approach.md`), and
-/// sorceress-like start attributes, life, stamina and per-level gains
-/// (q-smoke-town, REC-278: the creation stats of `combat/vitals.md` §1
-/// need them; with all zero the player has no life and the vitals sync
-/// sends nothing, §5.1 step 1).
-fn synthetic_charstats() -> Vec<d2_data::tables::Charstats> {
-    use d2_data::tables::Record;
-    let mut c = d2_data::tables::Charstats::decode(&[0u8; d2_data::tables::Charstats::SIZE]);
-    c.walkvelocity = 6;
-    c.runvelocity = 9;
-    c.str = 10;
-    c.dex = 25;
-    c.int = 35;
-    c.vit = 10;
-    c.stamina = 74;
-    c.hpadd = 30;
-    c.lifeperlevel = 4;
-    c.staminaperlevel = 4;
-    c.manaperlevel = 8;
-    c.lifepervitality = 8;
-    c.staminapervitality = 4;
-    c.manapermagic = 8;
-    c.statperlevel = 5;
-    // No class skills (`Skill 1`–`Skill 10` = −1, an empty slot; the
-    // synthetic `skills` table has no rows to name): the join's native
-    // list is skill 0 alone (`client/msg-skills.md` §2 rule 8).
-    for s in [
-        &mut c.skill_1,
-        &mut c.skill_2,
-        &mut c.skill_3,
-        &mut c.skill_4,
-        &mut c.skill_5,
-        &mut c.skill_6,
-        &mut c.skill_7,
-        &mut c.skill_8,
-        &mut c.skill_9,
-        &mut c.skill_10,
-    ] {
-        *s = 0xFFFF;
-    }
-    vec![c; 7]
-}
-
-/// d2rs-own, unverified (q-smoke-town, REC-278): the synthetic game's
-/// vitals tables, so a new character gets its creation stats
-/// (`combat/vitals.md` §1: life, mana, stamina, velocity 100, …): the
-/// [`synthetic_charstats`] rows and an `experience` table of 99 levels
-/// at 500 × level² (row 0 `MaxLvl`, as `app_levelup.rs`).
-fn synthetic_vitals() -> VitalsTables {
-    use d2_data::tables::{Experience, Record};
-    let row = |v: u32| {
-        let mut e = Experience::decode(&[0u8; Experience::SIZE]);
-        e.amazon = v;
-        e.sorceress = v;
-        e.necromancer = v;
-        e.paladin = v;
-        e.barbarian = v;
-        e.druid = v;
-        e.assassin = v;
-        e
-    };
-    let mut experience = vec![row(99)];
-    experience.extend((0..=99).map(|l: u32| row(500 * l * l)));
-    VitalsTables {
-        charstats: synthetic_charstats(),
-        experience,
-    }
-}
-
-/// Action tables with no rows (the synthetic game reads none).
-fn empty_action_tables() -> ActionTables {
-    ActionTables {
-        missiles: Vec::new(),
-        skills: SkillTables {
-            skills: Vec::new(),
-            skilldesc: Vec::new(),
-            missiles: Vec::new(),
-            skills_code: Vec::new(),
-            miss_code: Vec::new(),
-            level_cap: 0,
-            stat_count: 0,
-        },
-        combat: CombatTables {
-            charstats: Vec::new(),
-            difficultylevels: Vec::new(),
-            monstats: Vec::new(),
-            monstats2: Vec::new(),
-            hitclass: Vec::new(),
-        },
-        levels: Vec::new(),
-        skill_modes: Vec::new(),
-    }
-}
-
-/// The level-type dispatcher over the live data (`WorldTypes`, as
-/// drlg-data's game-file tests build it).
-fn live_types(d: &LiveData) -> SharedTypes {
-    SharedTypes::new(WorldTypes::new(
-        Arc::new(d.levels.drlg.clone()),
-        Maze::new(d.levels.maze.clone()),
-        d.levels.preset.clone(),
-        d.levels.outdoor.clone(),
-        Box::new(d.files.ds1.clone()),
-        Box::new(d.files.subs.clone()),
-    ))
-}
-
 /// Builds the game on `seed`: the DRLG of both acts, game creation
 /// (`rng.md` §5.2, module docs), one room streamed
 /// in the Rogue Encampment, Cold Plains and Lut Gholein, the waypoint
@@ -2601,72 +1655,10 @@ pub fn build_with(
     seed: u32,
     character: Character,
 ) -> Result<LocalGame, BuildError> {
-    build_with_chests(data, seed, character, &[])
-}
-
-/// [`build_with`] plus a synthetic chest (`SYNTHETIC_CHEST_CLASS`) in the
-/// town's first room at each sub-tile offset from the room origin
-/// (synthetic data only; the end-to-end tests of world objects).
-pub fn build_with_chests(
-    data: &GameData,
-    seed: u32,
-    character: Character,
-    chests: &[(i32, i32)],
-) -> Result<LocalGame, BuildError> {
-    build_with_objects(data, seed, character, chests, None)
-}
-
-/// The stash object's class (`objects.txt` row 267, `world/objects.md`
-/// §16.10 `BANK_CLASS`) and its operate function (32, the bank).
-pub const STASH_CLASS: u32 = 267;
-const STASH_OPERATE: u8 = 32;
-
-/// [`build_with_chests`] plus, for synthetic data, a stash object
-/// ([`STASH_CLASS`]) in the town's first room at the sub-tile offset
-/// `stash` (the synthetic `objects` table is padded to the stash row).
-/// d2rs-own, unverified: the end-to-end tests of the stash.
-pub fn build_with_objects(
-    data: &GameData,
-    seed: u32,
-    character: Character,
-    chests: &[(i32, i32)],
-    stash: Option<(i32, i32)>,
-) -> Result<LocalGame, BuildError> {
-    build_with_town(
-        data,
-        seed,
-        character,
-        chests,
-        stash,
-        &super::town_npcs::ACT1,
-    )
-}
-
-/// [`build_with_objects`] with the synthetic town's NPCs given as (class,
-/// sub-tile offset from the room origin) pairs (`super::town_npcs`;
-/// synthetic data only, the live town's NPCs come from its presets).
-pub fn build_with_town(
-    data: &GameData,
-    seed: u32,
-    character: Character,
-    chests: &[(i32, i32)],
-    stash: Option<(i32, i32)>,
-    npcs: &[(u16, i32)],
-) -> Result<LocalGame, BuildError> {
-    let mut wp_tables = data.tables();
-    if stash.is_some() && matches!(data, GameData::Synthetic) {
-        wp_tables
-            .objects
-            .resize(STASH_CLASS as usize + 1, blank::<Objects>());
-        let row = &mut wp_tables.objects[STASH_CLASS as usize];
-        row.operatefn = STASH_OPERATE;
-        row.framecnt1 = 15 << 8;
-        row.restore = 1;
-    }
-    let (mut levels, parts) = match data {
-        GameData::Synthetic => (LevelSource::synthetic(), GameParts::synthetic(&wp_tables)?),
-        GameData::Live(d) => (LevelSource::live(d, seed), GameParts::live(d)?),
-    };
+    let GameData::Live(d) = data;
+    let wp_tables = data.tables();
+    let (mut levels, parts) = (LevelSource::live(d, seed), GameParts::live(d)?);
+    let shared_types = levels.shared.clone();
     let mut dungeon = Dungeon::default();
     for (act, init_seed, town) in levels.acts.iter().copied() {
         dungeon.acts[usize::from(act)] = Some(
@@ -2699,12 +1691,16 @@ pub fn build_with_town(
     };
     let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
-    if let GameData::Live(d) = data {
-        // The server's animation names follow the client art's name rules.
-        hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
-            .ok()
-            .map(Arc::new);
-    }
+    // The server's animation names follow the client art's name rules.
+    hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+        .ok()
+        .map(Arc::new);
+    // Init function 17 of the waypoint objects (`waypoints.md` §5.1) on
+    // the game's tables.
+    hooks.waypoint_init = Some(Arc::new(WaypointData::new(
+        &wp_tables.levels,
+        &wp_tables.objects,
+    )));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
     // The client vitals sync (`combat/vitals.md` §5.1): life, mana,
@@ -2728,7 +1724,11 @@ pub fn build_with_town(
         ladder: GAME_SETUP.ladder,
         ..GameInfo::default()
     };
-    let state = WorldState::new(parts.world_types, Arc::new(parts.world), info);
+    // One level-type state for the DRLG and population (`SharedTypes`):
+    // the presets of a generated room are the ones population places
+    // (q-fixture-migrate: a second, fresh state left every town without
+    // its preset NPCs and objects on the user's files).
+    let state = WorldState::new(shared_types, Arc::new(parts.world), info);
     let mut sim = WorldSim::new(Arc::new(parts.stats), parts.units, hooks, state);
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
@@ -2756,19 +1756,7 @@ pub fn build_with_town(
         ))
     });
     let mut game = Game::new();
-    let mut rooms = Vec::new();
-    let mut start_levels = vec![(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
-    // The Moldy Tome stands in the Black Marsh (synthetic data only;
-    // q-a1-tower, d2rs-own, unverified).
-    if matches!(data, GameData::Synthetic) {
-        start_levels.push((0, synthetic_tower::BLACK_MARSH));
-        // Harrogath's room (rooms[4]; q-a5-town).
-        start_levels.push((4, ACT5_TOWN));
-        // The Pandemonium Fortress's room (rooms[5]; q-a4).
-        start_levels.push((synthetic_act4::ACT, synthetic_act4::FORTRESS));
-        // Kurast Docks's room (q-levels-warps-all).
-        start_levels.push((2, synthetic_chains::KURAST_DOCKS));
-    }
+    let start_levels = [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
     for (act, level) in start_levels {
         game.lists
             .ensure_act(act)
@@ -2793,7 +1781,7 @@ pub fn build_with_town(
             .ok_or_else(|| BuildError::Setup(format!("act {act} has no DRLG")))?
             .map_err(BuildError::Drlg)?
             .ok_or_else(|| BuildError::Setup(format!("level {level}: no room streamed")))?;
-        rooms.push(r);
+        let _ = r;
     }
     // The Act II DRLG chose its staff tomb at creation (`levels.md` §3).
     if let Some(t) = sim
@@ -2803,245 +1791,6 @@ pub fn build_with_town(
         .with_act(1, &mut game.lists, |d, _| d.staff_tomb)
     {
         sim.action.hooks().x.staff_tomb = t;
-    }
-    // The waypoint object stands in the town's first room at a fixed
-    // sub-tile offset from its origin (subtile = tile × 5, `levels.md`
-    // §1), as the server tests stage it.
-    let (room0, rect0) = rooms[0];
-    let (ox, oy) = (rect0.x * 5, rect0.y * 5);
-    let req = AllocRequest {
-        ty: UnitType::Object,
-        class: wp_tables.object_class,
-        room: Some(room0),
-        add: true,
-        fixed_guid: None,
-        mode: 1,
-        allied: false,
-    };
-    let waypoint = sim
-        .action
-        .with(&mut game, |g, v| {
-            v.allocate(g, &req, ox + WAYPOINT_X, oy + UNIT_Y)
-        })
-        .ok_or_else(|| BuildError::Setup("allocating the waypoint object failed".into()))?;
-    for &(dx, dy) in chests {
-        let chest = AllocRequest {
-            class: SYNTHETIC_CHEST_CLASS,
-            mode: 0,
-            ..req
-        };
-        sim.action
-            .with(&mut game, |g, v| v.allocate(g, &chest, ox + dx, oy + dy))
-            .ok_or_else(|| BuildError::Setup("allocating a chest failed".into()))?;
-    }
-    if let Some((dx, dy)) = stash {
-        let req = AllocRequest {
-            class: STASH_CLASS,
-            mode: 0,
-            ..req
-        };
-        sim.action
-            .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + dy))
-            .ok_or_else(|| BuildError::Setup("allocating the stash failed".into()))?;
-    }
-    if let Some(&(marsh, rect)) = rooms.get(3) {
-        let tome = AllocRequest {
-            class: synthetic_tower::TOME_CLASS,
-            room: Some(marsh),
-            mode: 0,
-            ..req
-        };
-        let (tx, ty) = synthetic_tower::TOME_XY;
-        sim.action
-            .with(&mut game, |g, v| {
-                v.allocate(g, &tome, rect.x * 5 + tx, rect.y * 5 + ty)
-            })
-            .ok_or_else(|| BuildError::Setup("allocating the Moldy Tome failed".into()))?;
-    }
-    let waypoint_guid = game
-        .lists
-        .unit(waypoint)
-        .ok_or_else(|| BuildError::Setup("waypoint unit missing".into()))?
-        .guid;
-    // The synthetic game's town NPCs (d2rs-own, unverified; the live
-    // game's NPCs come from the town presets).
-    if matches!(data, GameData::Synthetic) {
-        for &(class, dx) in npcs {
-            let req = AllocRequest {
-                ty: UnitType::Monster,
-                class: u32::from(class),
-                room: Some(room0),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: true,
-            };
-            sim.action
-                .with(&mut game, |g, v| v.allocate(g, &req, ox + dx, oy + UNIT_Y))
-                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-        }
-    }
-    // Lut Gholein: its NPCs and its waypoint (act 1's room, d2rs-own,
-    // unverified, q-a2-town).
-    if matches!(data, GameData::Synthetic) {
-        let (room2, rect2) = rooms[2];
-        let (ox2, oy2) = (rect2.x * 5, rect2.y * 5);
-        for (i, &class) in ACT2_NPCS.iter().enumerate() {
-            let req = AllocRequest {
-                ty: UnitType::Monster,
-                class: u32::from(class),
-                room: Some(room2),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: true,
-            };
-            sim.action
-                .with(&mut game, |g, v| {
-                    v.allocate(g, &req, ox2 + ACT2_NPC_X0 + 4 * i as i32, oy2 + ACT2_NPC_Y)
-                })
-                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-        }
-        let req = AllocRequest {
-            ty: UnitType::Object,
-            class: wp_tables.object_class,
-            room: Some(room2),
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: false,
-        };
-        sim.action
-            .with(&mut game, |g, v| {
-                v.allocate(g, &req, ox2 + ACT2_WAYPOINT_XY.0, oy2 + ACT2_WAYPOINT_XY.1)
-            })
-            .ok_or_else(|| BuildError::Setup("allocating the Act II waypoint failed".into()))?;
-    }
-    // Harrogath: its NPCs and its waypoint (act 4's room, d2rs-own,
-    // unverified, q-a5-town, REC-144).
-    if matches!(data, GameData::Synthetic) {
-        let (room5, rect5) = rooms[4];
-        let (ox5, oy5) = (rect5.x * 5, rect5.y * 5);
-        for &(class, dx) in &super::town_npcs::ACT5 {
-            let req = AllocRequest {
-                ty: UnitType::Monster,
-                class: u32::from(class),
-                room: Some(room5),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: true,
-            };
-            sim.action
-                .with(&mut game, |g, v| {
-                    v.allocate(g, &req, ox5 + dx, oy5 + UNIT_Y)
-                })
-                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-        }
-        let req = AllocRequest {
-            ty: UnitType::Object,
-            class: wp_tables.object_class,
-            room: Some(room5),
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: false,
-        };
-        sim.action
-            .with(&mut game, |g, v| {
-                v.allocate(g, &req, ox5 + ACT5_WAYPOINT_XY.0, oy5 + ACT5_WAYPOINT_XY.1)
-            })
-            .ok_or_else(|| BuildError::Setup("allocating the Act V waypoint failed".into()))?;
-    }
-    // Pandemonium Fortress: its NPCs and its waypoint (rooms[5], d2rs-own,
-    // unverified, q-a4, REC-143).
-    if matches!(data, GameData::Synthetic) {
-        let (room6, rect6) = rooms[5];
-        let (ox6, oy6) = (rect6.x * 5, rect6.y * 5);
-        for (i, &class) in synthetic_act4::NPCS.iter().enumerate() {
-            let req = AllocRequest {
-                ty: UnitType::Monster,
-                class: u32::from(class),
-                room: Some(room6),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: true,
-            };
-            let x = ox6 + synthetic_act4::NPC_X0 + synthetic_act4::NPC_STEP * i as i32;
-            sim.action
-                .with(&mut game, |g, v| {
-                    v.allocate(g, &req, x, oy6 + synthetic_act4::NPC_Y)
-                })
-                .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-        }
-        let req = AllocRequest {
-            ty: UnitType::Object,
-            class: wp_tables.object_class,
-            room: Some(room6),
-            add: true,
-            fixed_guid: None,
-            mode: 1,
-            allied: false,
-        };
-        let (wx, wy) = synthetic_act4::WAYPOINT_XY;
-        sim.action
-            .with(&mut game, |g, v| v.allocate(g, &req, ox6 + wx, oy6 + wy))
-            .ok_or_else(|| BuildError::Setup("allocating the Act IV waypoint failed".into()))?;
-    }
-    // Kurast Docks's waypoint (rooms[6], d2rs-own, unverified,
-    // q-act3-act5-gaps, REC-246).
-    if matches!(data, GameData::Synthetic) {
-        if let Some(&(room3, rect3)) = rooms.get(6) {
-            let req = AllocRequest {
-                ty: UnitType::Object,
-                class: wp_tables.object_class,
-                room: Some(room3),
-                add: true,
-                fixed_guid: None,
-                mode: 1,
-                allied: false,
-            };
-            let (wx, wy) = ACT3_WAYPOINT_XY;
-            sim.action
-                .with(&mut game, |g, v| {
-                    v.allocate(g, &req, rect3.x * 5 + wx, rect3.y * 5 + wy)
-                })
-                .ok_or_else(|| {
-                    BuildError::Setup("allocating the Act III waypoint failed".into())
-                })?;
-            // Its NPCs (`town_npcs::act3_docks`; q-smoke-town, REC-278).
-            for (class, (dx, dy)) in super::town_npcs::act3_docks() {
-                let req = AllocRequest {
-                    ty: UnitType::Monster,
-                    class: u32::from(class),
-                    room: Some(room3),
-                    add: true,
-                    fixed_guid: None,
-                    mode: 1,
-                    allied: true,
-                };
-                sim.action
-                    .with(&mut game, |g, v| {
-                        v.allocate(g, &req, rect3.x * 5 + dx, rect3.y * 5 + dy)
-                    })
-                    .ok_or_else(|| BuildError::Setup(format!("allocating NPC {class} failed")))?;
-            }
-        }
-    }
-    // The synthetic towns' units stand in for the live towns' preset units,
-    // which `0x005557D0` creates with unit flags 0x3000000
-    // (`population.md` §11.1), so the inactive store keeps them whatever
-    // the level's `SaveMonsters` (`units.md` §3.3 `S`). d2rs-own,
-    // unverified (REC-287).
-    if matches!(data, GameData::Synthetic) {
-        for ty in [UnitType::Monster, UnitType::Object] {
-            for u in game.lists.units_of_type(ty) {
-                if let Some(r) = sim.action.sys.units.get_mut(u) {
-                    r.flags |= SYNTHETIC_PRESET_FLAGS;
-                }
-            }
-        }
     }
     let interact_classes: Vec<u16> = parts
         .monstats
@@ -3100,11 +1849,7 @@ pub fn build_with_town(
     // is ready and the client pass sends 0x04 (`tick.md` §6 rule 6).
     let cold_plains_wp = wp_tables.waypoint(COLD_PLAINS);
     s.set_session(SessionFlow::new(loader(character, cold_plains_wp)));
-    Ok(LocalGame {
-        sim: s,
-        waypoint,
-        waypoint_guid,
-    })
+    Ok(LocalGame { sim: s })
 }
 
 /// The character load of the session flow (§8.2 rule 2): the player of
@@ -3295,8 +2040,6 @@ pub fn local_player(s: &Sim) -> Option<(UnitId, u32)> {
 /// the join: [`local_player`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Started {
-    pub waypoint: UnitId,
-    pub waypoint_guid: u32,
     /// The store prices the host publishes for the shop panel.
     pub prices: crate::ui::original::ShopPrices,
 }
@@ -3318,57 +2061,10 @@ pub fn start_with<C: Clock + Send + 'static>(
     character: Character,
     clock: C,
 ) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
-    start_with_chests(data, seed, character, clock, Vec::new())
-}
-
-/// [`start_with`] with synthetic chests ([`build_with_chests`]).
-pub fn start_with_chests<C: Clock + Send + 'static>(
-    data: GameData,
-    seed: u32,
-    character: Character,
-    clock: C,
-    chests: Vec<(i32, i32)>,
-) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
-    start_with_objects(data, seed, character, clock, chests, None)
-}
-
-/// [`start_with_chests`] plus a stash ([`build_with_objects`]).
-pub fn start_with_objects<C: Clock + Send + 'static>(
-    data: GameData,
-    seed: u32,
-    character: Character,
-    clock: C,
-    chests: Vec<(i32, i32)>,
-    stash: Option<(i32, i32)>,
-) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
-    start_with_town(
-        data,
-        seed,
-        character,
-        clock,
-        chests,
-        stash,
-        super::town_npcs::ACT1.to_vec(),
-    )
-}
-
-/// [`start_with_objects`] with the synthetic town's NPCs given
-/// ([`build_with_town`]).
-pub fn start_with_town<C: Clock + Send + 'static>(
-    data: GameData,
-    seed: u32,
-    character: Character,
-    clock: C,
-    chests: Vec<(i32, i32)>,
-    stash: Option<(i32, i32)>,
-    npcs: Vec<(u16, i32)>,
-) -> Result<(ThreadLink<Link<C>>, Started), BuildError> {
     let (tx, rx) = std::sync::mpsc::channel();
     let link = ThreadLink::spawn(move || {
-        let g = build_with_town(&data, seed, character, &chests, stash, &npcs)?;
+        let g = build_with(&data, seed, character)?;
         let _ = tx.send(Started {
-            waypoint: g.waypoint,
-            waypoint_guid: g.waypoint_guid,
             prices: g.sim.world.rest.prices.clone(),
         });
         Ok::<_, BuildError>(LocalLink::new(Host::new(

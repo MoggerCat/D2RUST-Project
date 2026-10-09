@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_data::bin::BinTable;
 use d2_data::fixup::records::stat_ops;
@@ -17,6 +17,8 @@ use d2_sim::combat::vitals::{add_experience, VitalsTables};
 use d2_sim::stats::{ClassStats, StatData, StatLists, StatTable};
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::View;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -117,8 +119,12 @@ impl Game {
 /// with 100 life, and one class skill (id 1) in the tables.
 fn joined() -> (Game, UnitId, u32) {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (mut link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     link.send(SendQueue::System, &single_player::create_request().encode())
         .unwrap();
     ms.fetch_add(40, Ordering::SeqCst);
@@ -205,6 +211,7 @@ fn has(msgs: &[Vec<u8>], m: &[u8]) -> bool {
 
 // Covers: specs/combat/vitals.md §3, §4.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn experience_to_level_up_reaches_the_client_as_stat_messages() {
     let (mut g, p, _) = joined();
     g.tick();
@@ -223,6 +230,7 @@ fn experience_to_level_up_reaches_the_client_as_stat_messages() {
 
 // Covers: specs/combat/vitals.md §2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_stat_point_spends_on_the_server_and_is_sent_back() {
     let (mut g, p, _) = joined();
     g.gain(p, 500);
@@ -244,6 +252,7 @@ fn a_stat_point_spends_on_the_server_and_is_sent_back() {
 
 // Covers: specs/skills/levels.md §6.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_skill_point_adds_the_skill_and_tells_the_client() {
     let (mut g, p, guid) = joined();
     g.gain(p, 500);

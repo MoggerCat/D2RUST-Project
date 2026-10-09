@@ -13,7 +13,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::link::{LinkError, Sent, ServerLink};
@@ -28,6 +28,8 @@ use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_client::world_view::{WorldViewState, WorldViewUi};
 use d2_server::seams::Clock;
+
+mod app_support;
 
 /// Records every C→S message sent through it.
 struct RecLink<L> {
@@ -253,8 +255,9 @@ fn open(app: &App, ui: u8) -> bool {
 
 // Covers: specs/ui/control-panel.md §8 r1, §8 r4, §8 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn unspent_points_light_the_level_buttons_and_open_the_panels() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(

@@ -1,23 +1,26 @@
 // Spec: specs/world/quests-act1-rest.md §1.2, §2.3, §3; specs/world/quests-act1.md §10.6
 //! The quest world calls Cain's quest needs, on the play preview's
-//! built game (synthetic fixtures): a monster spawned in a DRLG room
+//! built game on the user's install (`D2_GAME_DIR`): a monster spawned in a DRLG room
 //! (Cain in town), a portal object to a level (the red portal to
 //! Tristram), an object looked up by class and a monster removed.
 //! Before `HostQuests` answered them they went to `AppRest`, which only
 //! logged and returned nothing.
 
-use d2_client::app::single_player::{self, GameData, SYNTHETIC_PORTAL_CLASS};
+use d2_client::app::single_player;
 use d2_server::adapters::handlers::world::{QuestCall, WorldHost};
 use d2_sim::units::{RoomId, UnitId};
 use d2_sim::world::npc::class;
 use d2_sim::world::quests::{QuestControl, QuestWorld};
 
+mod app_support;
+
 const TRISTRAM: u32 = 38;
+/// The install's `objects` row 59 (TownPortal; the red portal's class).
+const PORTAL_CLASS: u16 = 59;
 
 struct Probe {
     room: RoomId,
     at: (i32, i32),
-    waypoint: UnitId,
 }
 
 #[derive(Debug)]
@@ -35,16 +38,8 @@ impl QuestCall for Probe {
         let (x, y) = self.at;
         let cain = w.spawn_monster(self.room, x, y, class::CAIN5, 1, 0);
         let cain_class = cain.and_then(|c| w.monster_class(c));
-        let portal = w.open_portal(
-            None,
-            self.room,
-            x + 6,
-            y,
-            TRISTRAM,
-            SYNTHETIC_PORTAL_CLASS as u16,
-            false,
-        );
-        let found = w.find_object_near(self.waypoint, SYNTHETIC_PORTAL_CLASS as u16);
+        let portal = w.open_portal(None, self.room, x + 6, y, TRISTRAM, PORTAL_CLASS, false);
+        let found = cain.and_then(|c| w.find_object_near(c, PORTAL_CLASS));
         let removed_gone = match cain {
             Some(c) => {
                 w.remove_monster(c);
@@ -64,21 +59,31 @@ impl QuestCall for Probe {
 
 // Covers: specs/world/quests-act1-rest.md §1.2, §2.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn cains_spawn_the_red_portal_and_his_removal_run_on_real_units() {
-    let mut g = single_player::build(&GameData::Synthetic, single_player::DEFAULT_SEED).unwrap();
+    let mut g =
+        single_player::build(&app_support::game_data(), single_player::DEFAULT_SEED).unwrap();
     let s = &mut g.sim;
-    let room = s
-        .game
-        .lists
-        .unit(g.waypoint)
-        .and_then(|u| u.room())
-        .unwrap();
-    let at = s.events.action.hooks().path_position(g.waypoint);
-    let probe = Probe {
-        room,
-        at: (at.0 + 3, at.1 + 8),
-        waypoint: g.waypoint,
+    // A free sub-tile of the Rogue Encampment's streamed room with a free
+    // one 6 east of it (the real town's collision, move mask 0x1C09).
+    let (room, at) = {
+        let rooms = s.game.lists.active_rooms(0);
+        let h = s.events.action.hooks();
+        let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+        let free = |x: i32, y: i32| d.collision_at(x, y).is_some_and(|m| m & 0x1C09 == 0);
+        rooms
+            .into_iter()
+            .filter(|&r| h.drlg.level_id(&s.game, r) == Some(single_player::ACT1_TOWN))
+            .find_map(|r| {
+                let t = h.drlg.subtiles(&s.game, r)?;
+                (t.y..t.y + t.h)
+                    .flat_map(|y| (t.x..t.x + t.w - 6).map(move |x| (x, y)))
+                    .find(|&(x, y)| free(x, y) && free(x + 6, y))
+                    .map(|p| (r, p))
+            })
+            .expect("a free spot in the town's room")
     };
+    let probe = Probe { room, at };
     let out = WorldHost::quests(&mut s.world, &mut s.game, &mut s.events, probe).unwrap();
     assert!(out.cain.is_some(), "{out:?}");
     assert_eq!(out.cain_class, Some(class::CAIN5));

@@ -15,13 +15,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_data::tables::{Charstats, Monstats, Monstats2, Record, Skills};
 use d2_proto::client::Walk;
 use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -50,8 +52,12 @@ impl Game {
     /// ticks: the player is in its room.
     fn joined() -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         // The test-local skill rows: eight zero `skills` records with
         // Attack's `anim` and `range`.
@@ -124,6 +130,7 @@ impl Game {
 
 // Covers: specs/sim/intents-events.md §2.4 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_server_side_player_walks_on_a_client_walk() {
     let mut g = Game::joined();
     let start = g
@@ -191,6 +198,7 @@ fn monster_at(g: &mut Game, dx: i32) -> u32 {
 
 // Covers: specs/sim/intents-events.md §2.4 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_left_skill_on_a_monster_next_to_the_player_starts_the_attack() {
     let mut g = Game::joined();
     let guid = monster_next_to_player(&mut g);
@@ -223,6 +231,7 @@ fn a_left_skill_on_a_monster_next_to_the_player_starts_the_attack() {
 
 // Covers: specs/sim/intents-events.md §2.4 r3, §9 r10; specs/sim/pathing.md §10 r2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
     let mut g = Game::joined();
     // More than 25 frames since the last accepted point (`+0x168`).
@@ -246,6 +255,7 @@ fn an_out_of_range_walk_resyncs_the_client_with_0x15() {
 
 // Covers: specs/skills/use.md §3; specs/sim/pathing.md §1.2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_left_skill_on_a_far_monster_runs_the_server_player_to_it() {
     let mut g = Game::joined();
     let near = monster_at(&mut g, 12);
@@ -321,6 +331,7 @@ fn run_to_item(g: &mut Game, guid: u32) -> String {
 
 // Covers: specs/sim/intents-events.md §2.4 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn an_item_target_is_staged_with_its_owner() {
     let mut g = Game::joined();
     // Far outside the 50-subtile reach: only an owned item passes.

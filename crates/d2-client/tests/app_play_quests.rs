@@ -13,7 +13,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
@@ -215,7 +215,7 @@ fn queue(app: &mut App, e: UiEvent) {
 
 /// The play app over the synthetic game, joined, with a left skill.
 fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let (link, _) = single_player::start_with(
         data.clone(),
@@ -247,8 +247,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         levels,
         TileAssets::new(Some(source.clone()), None),
     );
-    app_support::synthetic_skill_rows(&mut app);
-    set_npc_rows(&mut app);
+    app_support::live_tables(&mut app);
     add_act_palettes(
         &mut app,
         ActPalettes {
@@ -296,15 +295,6 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         .receive_chunk(&msgs)
         .unwrap();
     app
-}
-
-/// The client's monster rows: Akara is an `npc` and `interact` class,
-/// attackable-flagged so the pick takes her (`isAtt`, `bridge/click.rs`).
-fn set_npc_rows(app: &mut App) {
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_unit_rows(single_player::synthetic_unit_rows());
 }
 
 /// The screen point of Akara (the one monster in the model), as the
@@ -414,6 +404,7 @@ fn quest_messages(wire: &Arc<Mutex<Wire>>) -> Vec<(u32, u32)> {
 
 // Covers: specs/world/npc.md §2, §3; specs/world/quests.md §7.2, §7.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn talking_to_akara_twice_starts_the_den_of_evil() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
@@ -464,6 +455,7 @@ fn log_rows(app: &App) -> Vec<(u8, IconState, u8)> {
 
 // Covers: specs/world/quests.md §6.2; specs/world/quests-status.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_quest_log_shows_the_started_den_of_evil() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
@@ -497,6 +489,7 @@ fn the_quest_log_shows_the_started_den_of_evil() {
 
 // Covers: specs/ui/menus.md §2; specs/world/npc.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn akaras_menu_offers_talk_trade_and_cancel() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
@@ -539,6 +532,7 @@ fn akaras_menu_offers_talk_trade_and_cancel() {
 
 // Covers: specs/world/npc.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leaving_the_menu_sends_the_chat_end() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));

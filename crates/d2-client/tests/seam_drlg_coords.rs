@@ -12,11 +12,13 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::world::{ClientTables, SkillRow};
 use d2_client::bridge::Bridge;
 use d2_server::seams::Clock;
 use d2_sim::drlg::TileRect;
+
+mod app_support;
 
 /// The host clock, advanced by the test.
 struct StepClock(Arc<AtomicU32>);
@@ -187,7 +189,7 @@ fn check_rooms(bridge: &mut Bridge<Thread>, when: &str) {
 }
 
 fn start() -> (Bridge<Thread>, Arc<AtomicU32>) {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -214,6 +216,7 @@ fn start() -> (Bridge<Thread>, Arc<AtomicU32>) {
 
 // Covers: specs/seams/drlg-coords.md §2.1, §2.2, §2.3, §2.4, §2.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn client_rooms_equal_the_servers_after_the_join() {
     let (mut bridge, _) = start();
     assert!(
@@ -241,6 +244,7 @@ fn client_rooms_equal_the_servers_after_the_join() {
 
 // Covers: specs/seams/drlg-coords.md §2.2, §2.3, §2.5, §2.6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn client_rooms_follow_the_server_across_the_level_border() {
     let (mut bridge, ms) = start();
     let start_pos = server_player(&mut bridge).expect("placed").0;

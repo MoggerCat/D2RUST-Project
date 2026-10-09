@@ -66,7 +66,7 @@ use crate::units::hooks::{Sim, UnitData};
 use crate::units::modes::UnitError;
 use crate::units::record::Units;
 use crate::units::UnitId;
-use crate::world::waypoints::WaypointRecords;
+use crate::world::waypoints::{ArrivalList, WaypointData, WaypointRecords};
 
 pub use dispatch::ActionSim;
 pub use hirelings::HirelingCall;
@@ -188,6 +188,13 @@ pub struct ActionHooks<X> {
     pub items: crate::wiring::economy::ItemStore,
     /// Waypoint records per player (player data +0x1C, `waypoints.md` §2).
     pub waypoints: BTreeMap<UnitId, WaypointRecords>,
+    /// The object control's arrival list (`waypoints.md` §7.1): written
+    /// by travel (the host's C→S 0x49), read by init function 17.
+    pub arrivals: ArrivalList,
+    /// The waypoint tables init function 17 runs on (`waypoints.md`
+    /// §5.1) inside the object's creation (`objects.md` §3 rule 6);
+    /// `None`: the init route goes to [`Pending::object_route`].
+    pub waypoint_init: Option<Arc<WaypointData>>,
     /// The object control (game +0x10F0, `objects.md` §2), the object
     /// tables and the host tick ([`objects`]). `None` (the default): not
     /// created ([`ActionSim::create_objects`]); the object routes keep
@@ -375,6 +382,8 @@ impl<X> ActionHooks<X> {
             uniques: crate::items::UniqueBits::default(),
             items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
+            arrivals: ArrivalList::default(),
+            waypoint_init: None,
             objects: None,
             objects_out: false,
             portals: Default::default(),

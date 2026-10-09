@@ -534,6 +534,44 @@ impl Session {
         );
     }
 
+    /// Legs along [`route`] from level `from` into level `to` until the
+    /// player is there (the route is searched again as the rooms ahead
+    /// become active).
+    pub fn walk_route(&mut self, from: u32, to: u32, what: &str) {
+        let (a, b) = (self.level_rect(from), self.level_rect(to));
+        let mut stuck = 0;
+        for _ in 0..200 {
+            if self.unit_level(self.player) == Some(to) || stuck >= 3 {
+                break;
+            }
+            let start = self.pos();
+            let act = usize::from(self.act);
+            let legs = {
+                let d = self.sim().events.action.hooks().drlg.dungeon.acts[act]
+                    .as_ref()
+                    .unwrap();
+                route(d, start, a, b, 12)
+            };
+            for g in legs {
+                self.leg(g);
+                if self.unit_level(self.player) == Some(to) {
+                    break;
+                }
+            }
+            stuck = if cheb(self.pos(), start) <= 2 {
+                stuck + 1
+            } else {
+                0
+            };
+        }
+        assert_eq!(
+            self.unit_level(self.player),
+            Some(to),
+            "{what}: not reached; player at {:?}",
+            self.pos()
+        );
+    }
+
     /// The tile rect of an allocated level.
     pub fn level_rect(&mut self, id: u32) -> TileRect {
         let act = usize::from(self.act);
@@ -548,6 +586,80 @@ impl Session {
 /// Chebyshev distance.
 pub fn cheb(a: (i32, i32), b: (i32, i32)) -> i32 {
     (a.0 - b.0).abs().max((a.1 - b.1).abs())
+}
+
+/// The collision bits a player's move is blocked by (`pathing.md`: move
+/// mask 0x1C09).
+pub const MOVE_MASK: u16 = 0x1C09;
+
+/// A walking route of sub-tiles from `start` toward the tile rect `to`
+/// over `drlg`'s collision of its active rooms ([`MOVE_MASK`]): a
+/// breadth-first search inside the rects `from` and `to`, to the first
+/// free cell of `to`, else to the reached cell nearest to it. Every
+/// `step`-th cell of the path, and its last. A test harness's route (what
+/// a player clicks along), not a game rule.
+pub fn route(
+    drlg: &Drlg,
+    start: (i32, i32),
+    from: TileRect,
+    to: TileRect,
+    step: usize,
+) -> Vec<(i32, i32)> {
+    use std::collections::{BTreeMap, VecDeque};
+    let sub = |r: TileRect| (r.x * SUB, r.y * SUB, (r.x + r.w) * SUB, (r.y + r.h) * SUB);
+    let (a, b) = (sub(from), sub(to));
+    let inside =
+        |(x, y): (i32, i32), r: (i32, i32, i32, i32)| x >= r.0 && y >= r.1 && x < r.2 && y < r.3;
+    let free = |c: (i32, i32)| {
+        drlg.collision_at(c.0, c.1)
+            .is_some_and(|m| m & MOVE_MASK == 0)
+    };
+    let dist = |c: (i32, i32)| {
+        let dx = (b.0 - c.0).max(c.0 - (b.2 - 1)).max(0);
+        let dy = (b.1 - c.1).max(c.1 - (b.3 - 1)).max(0);
+        dx.max(dy)
+    };
+    let mut prev = BTreeMap::from([(start, start)]);
+    let mut q = VecDeque::from([start]);
+    let mut best = (dist(start), start);
+    while let Some(c) = q.pop_front() {
+        let d = dist(c);
+        if d < best.0 {
+            best = (d, c);
+        }
+        if d == 0 {
+            break;
+        }
+        for (dx, dy) in [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ] {
+            let n = (c.0 + dx, c.1 + dy);
+            if prev.contains_key(&n) || !(inside(n, a) || inside(n, b)) || !free(n) {
+                continue;
+            }
+            prev.insert(n, c);
+            q.push_back(n);
+        }
+    }
+    let mut path = vec![best.1];
+    let mut c = best.1;
+    while c != start {
+        c = prev[&c];
+        path.push(c);
+    }
+    path.reverse();
+    let mut out: Vec<(i32, i32)> = path.iter().copied().skip(step).step_by(step).collect();
+    if out.last() != path.last() {
+        out.extend(path.last());
+    }
+    out
 }
 
 /// Goal points two tiles inside `to`, along the edge it shares with
