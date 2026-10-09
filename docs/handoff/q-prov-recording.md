@@ -122,6 +122,16 @@ because the menu appears between 7 and 11 s.
 | REC-205 dead hardcore figure | observed (two `d2s-tool` hardcore saves with status bit 0x08, Amazon and Barbarian): both slots show a grey hooded figure that looks alike; the backgrounds differ, so pixel equality of the two figures is not established: open |
 | REC-212 Esc menu | screenshot taken; the pentagram pixels need the cel geometry for an exact check: open |
 
+### REC-290 tick half (2026-10-09)
+
+Wine: `record_tick.py --auto ScnAma --seed 1234 --ticks 600` (same command as PC 1's
+`traces/sim/tick/sim-0009.json`), `check_tick.py` 0 errors, converted with `convert_tick.py`
+(not committed). Ticks 0–60: **equal** to sim-0009 (340 inputs, 201 expected records). At tick 61
+the Windows trace has a client message in the drain (step `pre`: a timer on unit (1, 7), a player
+queue entry) and the player then changes rooms at ticks 121, 241, 351; the Wine run has no input.
+The PC 1 window received input (likely the mouse over the window): **re-record sim-0009 on PC 1
+with the mouse outside the window**; until then REC-290 ticks are equal over 60 ticks only.
+
 ## Where the rest is blocked (2026-10-09, end of this session)
 
 Remaining `recording` rows after the runs above: see the last
