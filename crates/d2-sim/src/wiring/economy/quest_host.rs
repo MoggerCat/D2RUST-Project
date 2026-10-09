@@ -177,18 +177,26 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         Some(out)
     }
 
-    /// The action view of the economy's units. The economy holds the
-    /// game seed for the call (`fields.seed`): it is handed to the hooks
-    /// for `f` (an allocation steps it, `rng.md` §5.3) and taken back
-    /// after, as [`Self::with_drop_state`] does.
+    /// Runs `f` on the action wiring's [`View`]. The economy holds the
+    /// game's item store, game seed and unique bits for the quest call
+    /// ([`QuestLoan::on_world`]): they go back to their home in the hooks
+    /// for the call and are taken again after it, so an allocation made
+    /// here (Hratli from his dummy's init, a monster's equipment) keeps
+    /// its seed draws. Without this the draws were overwritten when the
+    /// call ended (found by `a3-start-noquest-sor`: the Act III start's
+    /// game seed was one step behind 1.14d's).
     fn view<T>(&mut self, f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T) -> T {
         let e = &mut *self.inner.econ;
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
         let out = {
             let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
             f(&mut *e.game, &mut v)
         };
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
         out
     }
 
