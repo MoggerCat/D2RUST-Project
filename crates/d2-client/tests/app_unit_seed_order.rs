@@ -210,7 +210,7 @@ fn assert_prefix(got: &[Drawn], want: &[Drawn]) {
     }
 }
 
-// Covers: specs/sim/units.md §3.1 r4.1; specs/sim/rng.md §5.2
+// Covers: specs/sim/units.md §3.1 r4; specs/sim/rng.md §5.2
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_full_save_join_takes_the_recorded_game_seed_steps_in_order() {
@@ -227,7 +227,7 @@ fn a_full_save_join_takes_the_recorded_game_seed_steps_in_order() {
     assert_prefix(&consumers(&server), &recorded_full_save());
 }
 
-// Covers: specs/sim/units.md §3.1 r4.1
+// Covers: specs/sim/units.md §3.1 r4
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_character_draws_its_seed_before_its_start_items() {

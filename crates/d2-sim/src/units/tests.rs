@@ -706,7 +706,7 @@ fn per_kind_init_runs_before_the_unit_is_linked() {
     assert_eq!(sys.hooks.inits.len(), 2);
 }
 
-// Covers: specs/sim/units.md §3.1 r4.1; specs/sim/rng.md §5.2
+// Covers: specs/sim/units.md §3.1 r4; specs/sim/rng.md §5.2
 #[test]
 fn the_player_load_draws_the_recorded_unit_seed_before_the_town() {
     // 1.14d under Wine, `-seed 1234` (game seed {1234, 666} unstepped),
