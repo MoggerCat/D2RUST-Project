@@ -1095,15 +1095,29 @@ fn the_live_run() {
     );
     assert_eq!(saved.header.towns[0] & 0x80, 0x80, "the Normal town byte");
     // `d2s.md` §2.8: the server's save rebuilt the appearance bytes from
-    // the equipped items (a new character's base has none, all 0xFF): the
-    // `sb1 ` (`1hs`) in hand is the weapon in use (inventory +0x1C, set by
-    // the body link, `quests-act3-2.md` §11.5 r1), so it is the right-hand
-    // owner (`d2s-appearance.md` §4 r1) and draws in RH as token 4, the
-    // first weapon slot after `lit` / `med` / `hvy` (§1 r3: `hax` 4 in
-    // 1.14d); no other part, no colour.
-    let mut want = [0xFF; 16];
-    want[d2_formats::d2s::appearance::part::RH] = 4;
-    assert_eq!(saved.header.components, want, "appearance components");
+    // the equipped items (a new character's base has none). With nothing
+    // equipped they are 32 x 0xFF (§2.8 r2); a weapon in the right hand
+    // is the weapon in use (inventory +0x1C, the body link,
+    // `quests-act3-2.md` §11.5 r1), so the right-hand owner
+    // (`d2s-appearance.md` §4 r1), and draws in RH as its own token (§2:
+    // `alternategfx`, then `code`).
+    {
+        let a = d2_client::app::save::appearance_tables(&live.tables.fixed).unwrap();
+        let c = saved.header.components;
+        let worn: Vec<&([u8; 4], u8, u8)> = before.2.iter().filter(|i| i.1 == 1).collect();
+        if worn.is_empty() {
+            assert_eq!(c, [0xFF; 16], "nothing equipped: appearance components");
+        }
+        if let Some(&&(code, _, _)) = worn.iter().find(|i| i.2 == 4) {
+            let g = a.items.iter().find(|g| g.code == code).expect("the record");
+            let token = a.tokens.lookup(g.alternategfx, g.code);
+            assert_eq!(
+                c[d2_formats::d2s::appearance::part::RH],
+                token,
+                "the right-hand weapon's token in RH: {c:02X?}"
+            );
+        }
+    }
     // The file alone gives the same bytes (`d2s-tool resave`'s path,
     // `equipment_of_save`: the load's reading of the items and its
     // weapon-in-use links) as the running game's rebuild.
