@@ -152,7 +152,8 @@ def main(argv=None):
     for oid, (name, v, res, first, owner) in sorted(results.items()):
         area = next(k for k in ledger if k.startswith(f"object.{oid}-"))
         row = dict(ledger[area])
-        row.update(kind="entity", group="world", checks=name, last_verdict=v, exercised="yes",
+        # ledger.py only knows traces/checks/*.check: the generated check is named in the note
+        row.update(kind="entity", group="world", checks="-", last_verdict=v, exercised="yes",
                    needs_pc1="n", owner=owner)
         if v.startswith("DIVERGED"):
             row["state"], row["size"] = "DIVERGED", "S"
@@ -165,7 +166,8 @@ def main(argv=None):
             row["state"], row["size"] = "EQUAL", "-"
             row["note"] = "state, items and rng MATCH"
         o = objs.get(oid, {})
-        row["note"] = f"OperateFn {o.get('OperateFn')} InitFn {o.get('InitFn')}: " + row["note"]
+        row["note"] = (f"{name} (traces/checks/gen), OperateFn {o.get('OperateFn')} InitFn "
+                       f"{o.get('InitFn')}: " + row["note"])
         out.append(row)
         for key in (("operate", o.get("OperateFn")), ("init", o.get("InitFn"))):
             byfn.setdefault(key, []).append((oid, name, v, owner))
@@ -183,7 +185,10 @@ def main(argv=None):
         row = dict(r)
         div = [x for x in members if x[2].startswith("DIVERGED")]
         row.update(kind="entity", group="world", exercised="yes", needs_pc1="n")
-        row["checks"] = ",".join(sorted({x[1] for x in members}))
+        row["checks"] = "-"
+        names = sorted({x[1] for x in members}, key=lambda n: int(n.split("-")[-1]))
+        lst = ", ".join(names) if len(names) <= 6 else f"{names[0]} .. {names[-1]} ({len(names)})"
+        row["note_prefix"] = f"checks {lst} (traces/checks/gen): "
         frames = [int(x[2].split("@")[1]) for x in div]
         row["last_verdict"] = (f"DIVERGED@{min(frames)}" if div else
                                "PARTIAL" if any(x[2] == "PARTIAL" for x in members) else "MATCH")
@@ -196,6 +201,7 @@ def main(argv=None):
         else:
             row["state"], row["size"] = "NO-CHECK", "S"
             row["note"] = f"all {len(members)} object rows equal where compared (state PARTIAL)"
+        row["note"] = row.pop("note_prefix") + row["note"]
         out.append(row)
     with open(a.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("#ledger 1\n" + "\t".join(COLS) + "\n")
