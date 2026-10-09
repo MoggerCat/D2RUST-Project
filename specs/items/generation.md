@@ -47,8 +47,8 @@
 | Randomness | 714–732 |
 | Edge cases & original bugs | 733–747 |
 | Test vectors | 748–763 |
-| Provenance | 764–803 |
-| Open questions | 804–894 |
+| Provenance | 764–806 |
+| Open questions | 807–897 |
 <!-- /index -->
 
 ## Summary
@@ -799,7 +799,10 @@ Real 1.14d vectors need the recording in Open questions 2.
   (size 0x74, memset `0x00627CE4`, +0x0C := −1 at `0x00627CE9`),
   called from `0x0055531D`. Matches the 1.14d recording of 36 poked
   items (flags 0x80000, file index 0 without a unique/set/superior
-  index).
+  index). The later recording `items-ground-many` (2026-10-09) shows
+  the quality-2 items with flag 0x10 set (0x80010) and magic / rare /
+  set / unique with it clear: the normal routine (§6.1) leaves 0x10 set
+  (PROVISIONAL, REC-1400; superior and low quality unrecorded).
 
 ## Open questions
 

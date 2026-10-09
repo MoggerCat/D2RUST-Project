@@ -1286,7 +1286,7 @@ fn npc_info_0x27_one_layout() {
     }
     // npc.md §2 step 5 (`world/npc.rs` 0x27 type 1 + the 34 list bytes of
     // `encode_text_list` in `app/npc_seams.rs`: newest entry first,
-    // REC-1634).
+    // REC-1401).
     for c in sweep(700).chunks(7) {
         let n = (c[0] % 8) as usize;
         let list: Vec<(u16, u32)> = c.iter().take(n).map(|&v| (v as u16, v >> 24)).collect();

@@ -220,7 +220,7 @@ Entry order of the 0x27 list (recorded 2026-10-09,
 quest dispatch adds 11, then 64, i.e. newest first. d2rs reads the add
 `0x006612F0` as a prepend (as the client's build `0x00661510`,
 `client/msg-ui.md` §16 r9) and the writer `0x00661480` as a walk from
-the head. PROVISIONAL (REC-1634): one recording with two entries from
+the head. PROVISIONAL (REC-1401): one recording with two entries from
 two records; a list with two entries of one table would tell a prepend
 from a reversed dispatch.
 

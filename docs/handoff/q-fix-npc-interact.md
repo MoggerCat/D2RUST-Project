@@ -5,7 +5,7 @@ FIX session for the NPC interaction family found by q-chk-act2 (rows
 `claude/q-chk-act2`. Every result below ran under Wine against 1.14d
 (`scenario_diff.py <check> --orig-cache`, 1.14d side filled with
 `--fill-cache`; the 20 new `traces/orig-cache/a2-npc-*` / `a2-quest-*`
-entries are committed). REC ids used: REC-1631..1634.
+entries are committed). REC ids used: REC-1631..1633.
 
 ## Done (in the order asked: 2, 1, 3, 4, 5)
 
@@ -19,7 +19,7 @@ entries are committed). REC ids used: REC-1631..1634.
 | q-fix-a2-fara-heal-order | the NPC desk's `set_stat_send` / `attach_sound` only logged (AppRest); and the vitals sync ran at the tick's end, 1.14d runs it in the flush (the "second 0x95" is the comparator's next window) | SetStat via `0x0053BE40` (`stat_message`) at once; sound via `units::sound::queue_sound` (0x2C in the client pass); `Tick::flush_sync` (new, default no-op) called by `Host::flush_inner` before the buffers are sent, `SimGame` moves its vitals sync there | `a2-npc-fara-heal`: packets from f13 MATCH, state no difference |
 | q-fix-a2-elzix-gamble-items | gamble-list items were never placed (rest stub): mode 4, no x / y; and never destroyed on the list drop | `InvState::gambles` (per (NPC, player GUID) node inventory), `InvDesk::gamble_place` / `gamble_unlink` (the store's `0x00560200` placement), wired in `VendorDesk` (`NpcInventory`) and `InvVendors`; `gamble::drop_list` and `clear_record` destroy the items (§5.4) | `a2-npc-elzix-gamble`: packets from f13 MATCH, state no difference |
 | (warriv, f41) | Jerhyn's greeting (§9.9 interaction step 6, sound 18 toward the player) never sent: no host implements the AI's `play_sound` | `View::play_sound` queues `0x00553380` on the unit sound queue (0x2C), then the host's call | `a2-npc-warriv-talk` packets from f13 MATCH |
-| (q-fix-a2-npc-text-0x27, order) | 0x27 entries went out in insertion order; 1.14d sends newest first (`items-vendor-akara-buy` f15, Akara (64, 11)) | `encode_text_list` walks from the newest entry, PROVISIONAL REC-1634 (PC 1 question) | akara-buy's 0x27 equal; its next difference is a 0x9C item byte at f20 (sent to q-fix-d7d8-items-net) |
+| (q-fix-a2-npc-text-0x27, order) | 0x27 entries went out in insertion order; 1.14d sends newest first (`items-vendor-akara-buy` f15, Akara (64, 11)) | `encode_text_list` walks from the newest entry, PROVISIONAL REC-1401 (the same fix landed from q-fix-d7d8-items-net in integ-r7; merged) | akara-buy's 0x27 equal; its next difference is a 0x9C item byte at f20 (sent to q-fix-d7d8-items-net) |
 
 Final run (one binary with every change above, `--orig-cache`):
 
@@ -47,7 +47,7 @@ C→S 0x2F and 0x31 byte-equal at f149–150.
   not this family (q-fix-join-items / unrouted).
 - `0x0059B8F0` return value, `0x0059D7E0`'s chain, the palace placement's
   size loop, the 0x27 list order: PC 1 questions in `pc1-data.md` Step 4
-  (REC-1631..1634).
+  (REC-1631..1633).
 - Quest code's own sounds (`EconomyQuests::attach_sound` → the rest) are
   still the AppRest note; only the NPC desk's heal sound is wired here.
 
