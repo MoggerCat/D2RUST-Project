@@ -1,0 +1,56 @@
+{
+ "channel": "packets",
+ "check": "milestone-izual",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "72",
+  "--auto",
+  "MilA5",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 105",
+  "--poke",
+  "12 pos @player 5467 4739",
+  "--poke",
+  "15 pos @player 5477 4747",
+  "--poke",
+  "18 pos @player 5488 4756",
+  "--poke",
+  "21 pos @player 5499 4764",
+  "--poke",
+  "24 pos @player 5509 4772",
+  "--poke",
+  "27 pos @player 5520 4780",
+  "--poke",
+  "30 pos @player 5530 4785",
+  "--poke",
+  "33 pos @player 5540 4790",
+  "--poke",
+  "36 pos @player 5550 4795",
+  "--poke",
+  "39 pos @player 5560 4800"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "16eeaef93fbf86b93d06c9f41418ada956840955da78c2ccc8e306c5eb7bfbd0",
+   "size": 168444
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "0a4387ebd16cf4663c200b41b588f79797d0b561979b3ee34187dd0ef3546d4e",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "d8a2b2868b11f00f1354a28b534fcd2bbc77e0d2471510d7bc46390df1074c31"
+ }
+}
