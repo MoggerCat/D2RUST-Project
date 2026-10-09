@@ -24,20 +24,20 @@
 |   2. Tint colours | 90–117 |
 |   3. Grid items (`0x00483FF0`) | 118–143 |
 |   4. Placement tint (cursor item over a grid) | 144–160 |
-|   5. Hover state (`0x00487000`) | 161–196 |
-|   6. Equipment boxes (`0x004845A0`) | 197–226 |
-|   7. Not drawn here | 227–236 |
-|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 237–293 |
-|   9. Item checks used by the tints (answers OQ 6) | 294–310 |
-|   10. Grid click → C→S message (`0x0048FFE0`) | 311–380 |
-|   11. Gold amount dialog (`0x00454150`) | 381–412 |
-|   B5. `CellGrid` answers (`client/ui.md` §B5) | 413–420 |
-| Constants & data dependencies | 421–430 |
-| Randomness | 431–434 |
-| Edge cases & original bugs | 435–442 |
-| Test vectors | 443–469 |
-| Provenance | 470–484 |
-| Open questions | 485–533 |
+|   5. Hover state (`0x00487000`) | 161–214 |
+|   6. Equipment boxes (`0x004845A0`) | 215–244 |
+|   7. Not drawn here | 245–254 |
+|   8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2) | 255–311 |
+|   9. Item checks used by the tints (answers OQ 6) | 312–328 |
+|   10. Grid click → C→S message (`0x0048FFE0`) | 329–398 |
+|   11. Gold amount dialog (`0x00454150`) | 399–430 |
+|   B5. `CellGrid` answers (`client/ui.md` §B5) | 431–438 |
+| Constants & data dependencies | 439–448 |
+| Randomness | 449–452 |
+| Edge cases & original bugs | 453–460 |
+| Test vectors | 461–487 |
+| Provenance | 488–510 |
+| Open questions | 511–559 |
 <!-- /index -->
 
 ## Summary
@@ -183,16 +183,34 @@ anchor, `0x007BCC20` hovered body location).
    cell and hover flags keep their previous values); the same for h, r,
    gridY. Then cursor cell := (c, r), hover-in-grid `[0x007BCBE4]` := 1,
    hovered item and last hovered := 0.
-4. PROVISIONAL (q-scenes-compare, REC-707): the handler runs on a mouse
-   move or a button press over a grid, not on a release; a right press
-   that uses a grid item (C→S 0x20) then clears the hovered item and
-   hover-in-grid (as `ui/panels-3.md` §29 r1 step 4 does for an
-   equipment press), so until the next move the used item draws its §3
-   r3 tint and has no tip (because `a1-panel-cube`, a right click on the
-   cube with no move after it, draws the cube with tint 2 and no tip;
-   `a1-npc-shop-tooltip`, a move over an item, draws tint 1); settled by
-   REC-707 (the callers of `0x00487000` and what clears `0x007BCBF4`
-   after a use press).
+4. **When it runs; the use press** (r4, 2026-10-09, static asm;
+   REC-707 settled). `0x00487000` runs only on **WM_MOUSEMOVE**: its
+   callers are the inventory move handler `0x004873A0` (handler table
+   `0x006D5F80`: msg 0x200; its five call sites cover the grids of the
+   open inventory mode) and the shop move handlers `0x004889D0`
+   (table `0x0070F8A0`) and `0x00488F10` (shop menu `0x004B2900`,
+   `0x004B2940`). `0x004873A0` is also the move handler body of
+   `0x004894D0` (table `0x0070F964`), the stash `0x00489A30`
+   (`0x0070F9F8`), the cube `0x0048A0F0` (`0x0070FA58`), and of
+   `0x00489060` (from the quest item-place screen's move `0x004BFA30`,
+   `ui/messages.md`). No press or release handler calls it (the same
+   tables give WM_LBUTTONDOWN `0x004912A0`, WM_LBUTTONUP `0x00486EF0`,
+   WM_RBUTTONDOWN `0x004917C0`), so a press acts on the hover state left
+   by the last move.
+   The right press `0x004917C0` (inside the grid rectangle) calls the
+   use request `0x00487740` (`items/use.md`); when it sends C→S 0x20
+   (`0x004786D0`) it then plays the use sound and sets **hover-in-grid
+   `[0x007BCBE4]` := 0** (`0x00487918`). The hovered item `[0x007BCBF4]`
+   and last hovered `[0x007BCBF8]` keep their values: §3 r2 needs both,
+   so the item draws its §3 r3 tint, and the tip needs a hover flag
+   (`ui/item-tips.md` §1 rule 2), so none is drawn until the next move
+   sets `[0x007BCBE4]` again (same item: no anchor change, since it
+   equals last hovered). This matches `a1-panel-cube` (right click on
+   the cube, no move: tint 2, no tip) against `a1-npc-shop-tooltip`
+   (move: tint 1). Other writers that clear all four hover globals:
+   `0x00487990` (UI changes, `ui/panels.md`), `0x004879D0` (item
+   freed, `client/model.md`), the equipment press (`ui/panels-3.md` §29
+   r1 step 4).
 
 ### 6. Equipment boxes (`0x004845A0`)
 
@@ -481,6 +499,14 @@ arguments checked with `tools/ghidra/disasm.py`. §10: `0x0048FFE0`
 `0x00454124` read from the binary), opener call sites `0x00486FAD`,
 `0x004896CA`, `0x00489BE9`, `0x00489C0A`, `0x0048A2F1` (2026-10-07,
 `claude/pc2-ui`). No D2MOO code used.
+
+§5 r4 (2026-10-09, pc1-day4, static asm): every `call 0x487000` and
+`call 0x4873A0` site in `all.asm`; the handler tables `0x006D5F48`–
+`0x006D5F88`, `0x0070F8A0`, `0x0070F930`–`0x0070F970`,
+`0x0070F9D0`–`0x0070FA10`, `0x0070FA30`–`0x0070FA60` read from the
+image (`re/scripts/rd.py`); `0x004917C0`, `0x00487740`
+(`0x00487918`), `0x00487990`; every write of `0x007BCBE4` /
+`0x007BCBF4`.
 
 ## Open questions
 

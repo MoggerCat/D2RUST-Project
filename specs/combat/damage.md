@@ -32,18 +32,18 @@
 |   2. Pipeline | 142–156 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 157–302 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 303–404 |
-|   5. Application | 405–595 |
-|   6. Hit class and hit recovery | 596–626 |
-|   7. Reaction and death trigger | 627–732 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 733–796 |
-|   9. Durability `0x0057D3D0` | 797–818 |
-|   10. Monster melee on a player, end to end | 819–911 |
-| Constants & data dependencies | 912–933 |
-| Randomness | 934–966 |
-| Edge cases & original bugs | 967–1001 |
-| Test vectors | 1002–1077 |
-| Provenance | 1078–1103 |
-| Open questions | 1104–1153 |
+|   5. Application | 405–599 |
+|   6. Hit class and hit recovery | 600–630 |
+|   7. Reaction and death trigger | 631–736 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 737–800 |
+|   9. Durability `0x0057D3D0` | 801–822 |
+|   10. Monster melee on a player, end to end | 823–915 |
+| Constants & data dependencies | 916–937 |
+| Randomness | 938–970 |
+| Edge cases & original bugs | 971–1005 |
+| Test vectors | 1006–1088 |
+| Provenance | 1089–1114 |
+| Open questions | 1115–1164 |
 <!-- /index -->
 
 ## Summary
@@ -460,7 +460,8 @@ Fastcall ECX game, EDX attacker; stack defender, missile, record.
    (monster AI bookkeeping, monsters branch).
 10. Absorbed life (+0x48): `heal(defender, absorbed)` (`0x0057A980`,
     §5.3 rule H).
-11. Total (+0x4C) > 0: `life = life − total`; `< 256` → 0.
+11. Total (+0x4C) > 0: `life = life − total`; `< 256` → 0 (signed
+    `cmp 0x100` at `0x0057C865`: a life below one whole point is 0).
 12. Mana leech (+0x3C) > 0: defender `mana −= value`, `< 256` → 0
     (`0x0057AA60`). Stamina leech (+0x40) likewise on stamina
     (`0x0057AAA0`).
@@ -469,7 +470,10 @@ Fastcall ECX game, EDX attacker; stack defender, missile, record.
 14. `life > 0`: clear result 2; if total ≠ 0 and the defender is a
     monster: if `hpregen(74) ≠ 0`, cancel its type-3 timers and schedule
     type 3 at frame + 1 (`sim/tick.md` §5.2); then `0x005D6410
-    (defender)`. `life ≤ 0`: result |= 2.
+    (defender)`. `life ≤ 0`: result |= 2 (signed `test`/`jle` at
+    `0x0057C8E7`). With step 11 any hit of total ≥ 1 on a unit at
+    life 256 (one point) kills it; a poked life of 1–255 is alive until
+    the next hit with total > 0.
 15. Result lacks 0x20 and has 2: event 10 (`killed`) on the defender,
     then event 9 (`kill`) on the attacker.
 
@@ -1026,6 +1030,8 @@ Synthetic (CI-safe):
 | hit recovery: M = 25600, total 1700, class `1hss` (div 8) | 1700 < 3200 → no get-hit (no draw) |
 | M = 25600, total 4000, class `hth` (div 16) | ≥ 1600, < 3200? no; < 6400: draw `mask(4)` |
 | crushing blow on a normal monster, life 25600, damage resist 0, players 1 | x = 6400 |
+| `apply`, missile, Fire Bolt level 1 (skills.txt 36: `EMin` 6, `EMax` 12, `HitShift` 7 → fire 768–1536) on Normal Andariel (monstats 156 `ResFi` −50; `DamageRegen` 0 → hpregen 0, `monsters/init.md` §6 r10) at life 256 | §4.5: r = −50 (monster: no cap, no penalty) → fire × 150 / 100 = 1152–2304; step 11: 256 − total < 256 → life 0; step 14: result \|= 2; events 10, 9 |
+| same on Normal Radament (monstats 229: `ResFi` empty = 0, `ResPo` 50, `ResCo` 40; superunique row 10 umods 6 `fast` + 1–4, umod 2 unique sets hpregen 0, `monsters/umods.tsv`) at life 256 | fire 768–1536 unscaled; life 0; result \|= 2 |
 | open wounds, attacker level 20, monster | ow = 18 × 5 + 126 = 216; h = 256 |
 | open wounds, level 70, player defender, missile | 45 × 10 + 15 × 81 + 126 = 1791; +40 = 1831; /4 = 457; /2 = 228 |
 
@@ -1058,15 +1064,20 @@ Every hit is exactly 4 steps of the attacker's seed and every miss 1
   steps 4, 10, 13): with crit before burn the 124 hit would crit (3 <
   5) and deal 938;
 - min = 256, max = 512: `mindamage` 1, `maxdamage` 2 after mode damage
-  (pct(monlvl `L-DM` level 1, 51 / 101, 100) with `L-DM` 1 or 2, then
-  the 1 / 2 floors of §3.2); no other range reproduces all five rolls;
+  (pct(monlvl `L-DM` level 1, 51 / 101, 100) with `L-DM` = 2, read from
+  the shipped `monlvl.bin`, then the 1 / 2 floors of §3.2); no other
+  range reproduces all five rolls;
 - no DR, no resist, damage percent 100, no regeneration between hits:
   life drops by the physical roll exactly;
 - hit chance 46 … 65 (hits at r = 20 … 45, misses at r = 65, 92, 96):
   `chance = 100 × T / (T + 6)` (alvl = dlvl = 1) → to-hit T ∈ 6 … 11,
-  i.e. pct(`L-TH` level 1, 101, 100) ∈ 6 … 11 (PROVISIONAL REC-817:
-  the exact monlvl `L-TH` value was not read; any value in the bracket
-  reproduces this record);
+  i.e. pct(`L-TH` level 1, 101, 100) ∈ 6 … 11. The shipped table
+  (`Patch_D2.mpq` `data\global\excel\monlvl.bin`, 111 records of 120
+  bytes after the u32 count; record n = level n) holds `L-TH` 8 / 108 /
+  216 and `L-DM` 2 / 3 / 4 (Normal / NM / Hell) at level 1, so T =
+  pct(8, 101, 100) = 8 and the hit chance is 100 × 8 / 14 = 57 (read
+  2026-10-09, settles REC-817; matches the hits at r ≤ 45 and the
+  misses at r ≥ 65);
 - reaction: the player's seed (85, 666) and mode 5 never change, so the
   get-hit test passed its size test without a mask draw (total < M /
   div: 358 … 479 < 12800 / div → div ≤ 16, i.e. hit class not

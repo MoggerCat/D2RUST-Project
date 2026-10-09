@@ -27,14 +27,14 @@
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
 |   5. d2rs export | 190–351 |
-|   6. Comparison | 352–401 |
-|   7. Requests | 402–413 |
-| Constants & data dependencies | 414–417 |
-| Randomness | 418–421 |
-| Edge cases & original bugs | 422–429 |
-| Test vectors | 430–438 |
-| Provenance | 439–443 |
-| Open questions | 444–458 |
+|   6. Comparison | 352–408 |
+|   7. Requests | 409–420 |
+| Constants & data dependencies | 421–424 |
+| Randomness | 425–428 |
+| Edge cases & original bugs | 429–436 |
+| Test vectors | 437–445 |
+| Provenance | 446–450 |
+| Open questions | 451–465 |
 <!-- /index -->
 
 ## Summary
@@ -382,10 +382,17 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    side (§5 r10). A difference's `row` then counts the remaining rows;
    its printed rows keep their `i`. The presented frame holds the
    particles too: such a compare also passes `--ignore index_sha256`.
-   PROVISIONAL: the call sites
-   measured so far are `0x0047368E` (rain lines) and `0x00473585`
-   (snow lines, Harrogath), both in the particle draw; settled by a
-   scene recorded with the lightning flash (REC-510).
+   The call sites measured so far are `0x0047368E` (rain lines) and
+   `0x00473585` (snow lines, Harrogath), both in the particle draw.
+   They are the only ones (2026-10-09 static read, settles REC-510):
+   in [`0x00473470`, `0x00473F50`) the only calls to a draw function
+   are those two (`0x004F6380`) and the pool cels `0x00473B81`,
+   `0x00473BD0` (`0x004F6480`, already left out below). The lightning
+   branch of pass 9 (`0x00473967`–`0x00473A38`, enabled by
+   `[0x007A8A08]`, counter `[0x007A89E8]`) calls only the roll
+   `0x00472280` and the sounds `0x004B9A00` / `0x004B99A0` and writes
+   the flash state `[0x007A8968]` / `[0x007A896C]`: the flash itself
+   adds no pass-9 row.
    *Revision (2026-10-09, q-scenes-compare):* pass 4's environment
    pools (`draw-order-2.md` §11.6: the splash and bubble cels,
    `0x00473C00` → `0x00473A70`) are left out too: on the 1.14d side a

@@ -38,14 +38,14 @@
 |   1. Inventory model | 92–184 |
 |   2. Grid placement | 185–285 |
 |   3. Belt | 286–343 |
-|   4. Equipping | 344–562 |
-|   5. Shared checks | 563–805 |
-| Constants & data dependencies | 806–828 |
-| Randomness | 829–842 |
-| Edge cases & original bugs | 843–891 |
-| Test vectors | 892–946 |
-| Provenance | 947–1011 |
-| Open questions | 1012–1117 |
+|   4. Equipping | 344–564 |
+|   5. Shared checks | 565–807 |
+| Constants & data dependencies | 808–830 |
+| Randomness | 831–844 |
+| Edge cases & original bugs | 845–893 |
+| Test vectors | 894–948 |
+| Provenance | 949–1013 |
+| Open questions | 1014–1119 |
 <!-- /index -->
 
 ## Summary
@@ -388,10 +388,12 @@ description `0x0048D1D0` passes all three (REC-253, read 2026-10-08).
    `data/field-types.md`; 0–6 for the seven classes, e.g. `belt`,
    `helm`, `wand` 0xFF, `orb ` 1, `h2h ` 6), and 1.14d equips a Sash
    (`belt`) on a sorceress (`a1-panel-belt-open`: `ctrlpnl_popbelt`
-   drawn). PROVISIONAL (REC-513): the class getter's "7 (none)" is the
-   table's 0xFF, so every class ≥ 7 reads as none (because 1.14d
-   equips classless items; settled by `0x0062C0B0`'s return for 0xFF,
-   PC 1).
+   drawn). The class getter `0x0062C0B0` (item, its primary type
+   `0x0062B400` in range of the itemtypes table, 0xE4-byte records)
+   returns the record's `class` byte (+0x21) only when it is < 7, and 7
+   otherwise (also for no item, a non-item unit or a bad type): the
+   table's 0xFF, and every value ≥ 7, reads as none (1.14d-read
+   2026-10-09, settles REC-513).
 
 **Socket contribution** (`0x0062B450(stat k, &out)`, EBX = item; one
 caller, this check): out := 0. Only when the item's record has `hasinv`

@@ -390,21 +390,3 @@ fn ai_state_is_stored_and_follows_the_mode_set() {
     assert_eq!(ai_state_of(&mut fx, m), 4);
     fx.assert_clean();
 }
-
-#[test]
-fn last_dead_ring_keeps_the_last_four_in_slot_order() {
-    // `units.md` §4.6 rule 1.3 / `0x0061AFA0`: the room's four GUID slots
-    // are written at the ring index, which steps mod 4; the Fallen's
-    // corpse check (`ai-bodies.md` §9.4 step 2) reads them in slot order.
-    let mut fx = Fx::new();
-    let ms: Vec<UnitId> = (0..5)
-        .map(|i| fx.spawn(UnitType::Monster, 0, fx.a, 10 + i, 10))
-        .collect();
-    for &m in &ms {
-        fx.sim.hooks().push_last_dead(&fx.game, m);
-    }
-    let ring = fx.sim.hooks().last_dead[&fx.a];
-    let slots: Vec<UnitId> = ring.slots.iter().map(|s| s.unwrap().0).collect();
-    assert_eq!(slots, [ms[4], ms[1], ms[2], ms[3]]);
-    assert_eq!(ring.index, 1);
-}

@@ -255,7 +255,7 @@ where
     /// The dispatcher `0x0054D750` (`intents-events.md` §2.3) called now
     /// for `client`'s player with `msg`, outside the queues: no sender, no
     /// duplicate filter, no client record update (the debugger call of
-    /// `tools/poke.md` §4 rule 10, §5 rule 4). What the handler sends goes
+    /// `tools/poke.md` §4 rule 11, §5 rule 4). What the handler sends goes
     /// to the client's buffers as in a drain. `None`: the client is in no
     /// game or has no player (the dispatcher is not reached). The packet
     /// recorder sees a `dispatch` and the S→C messages, as the 1.14d

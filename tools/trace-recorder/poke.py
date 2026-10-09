@@ -38,7 +38,7 @@ specs/sim/client-messages.tsv) at S+0x300 and calls the client sender
 the server drains it in the next frame as if the client had sent it. The
 sender's duplicate filter (wall clock) is not visible: the result is `ok`.
 
-`operate <ref>` and `talk <ref> [<choice>...]` (poke.md §1, §4 rule 10) call
+`operate <ref>` and `talk <ref> [<choice>...]` (poke.md §1, §4 rule 11) call
 the server's C->S dispatcher 0x0054D750 (ECX game, EDX player, [ESP+4]
 message, [ESP+8] size; sim/intents-events.md §2.3) at the stop, once per
 message: 0x13 {type, GUID}; for `talk` then 0x2F and one message per choice
@@ -98,7 +98,7 @@ ROOM_AT = 0x00463740             # entry 6: ECX room, EDX x; y (§1; poke.md §4
 MISSILE = 0x0059FA30             # ECX game, EDX record (original-hooks.md §7.1)
 MISSILE_BYTES = bytes.fromhex("558BEC83EC28")  # entry bytes (original-hooks.md §7.1 rule 1)
 DISPATCH = 0x0054D750            # C->S dispatcher: ECX game, EDX player; message, size; EAX code
-                                 # (sim/intents-events.md §2.3; poke.md §4 rule 10)
+                                 # (sim/intents-events.md §2.3; poke.md §4 rule 11)
 SEND = 0x00478350                # client game-message sender: EDI size, [ESP+4] message; duplicate
 #                                  filter (sim/intents-events.md §2.1 rule 1; poke.md §1 `msg`)
 
@@ -269,7 +269,7 @@ CALL_FORMS = {
                Form({"edi": "size"}, ["message"])),
     "dispatch": Fn(DISPATCH, ("game", "player", "message", "size"), "none",
                    "sim/intents-events.md §2.3", None,
-                   Form({"ecx": "game", "edx": "player"}, ["message", "size"])),
+                   Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
     "boss_minions": Fn(0x005A2120, ("min", "cl", "max", "game", "unit", "minions"), "none",
                        "monsters/init.md §18, §25.1", "22 (e)",
                        Form({"ecx": "min", "edx": "cl", "eax": "max"}, ["game", "unit", "minions"], 0xC)),
@@ -1456,7 +1456,7 @@ class PokeLayer:
 
     def _interact(self, rec, game, tid, saved, d, a):
         """`operate` / `talk`: each message through the dispatcher 0x0054D750 now
-        (poke.md §4 rule 10); the first result that is not 0 ends it."""
+        (poke.md §4 rule 11); the first result that is not 0 ends it."""
         try:
             u = resolve_unit(rec, game, a["unit" if d == "operate" else "npc"])
             player = player_of(rec, game)
@@ -2484,7 +2484,7 @@ def selftest_forms(m, game, Rec):
         ("msg 0x06 1 @1:21", forms, {"r": "unresolved"}, []),
         ("msg 0x3A @x 1", forms, {"r": "unresolved"}, []),
         # operate / talk: each message at S+0x300, then 0x0054D750 with ECX game, EDX player,
-        # [ESP+4] the message, [ESP+8] its size (poke.md §4 rule 10)
+        # [ESP+4] the message, [ESP+8] its size (poke.md §4 rule 11)
         ("operate @1", forms, {"r": "ok", "guid": 5, "codes": [0], "bytes": ["130100000005000000"]},
          [(DISPATCH, {"ecx": game, "edx": P}, [S + SCRATCH_MSG, 9])]),
         ("talk @1 trade hire quest:92 close", forms,
@@ -2519,7 +2519,7 @@ def selftest_forms(m, game, Rec):
             assert rec.read(MD + FIELDS["mon_umods"], UMOD_MAX) == bytes([5, 1, 2, 9, 0, 0, 0, 0, 0])
         n += 1
     # operate / talk: the last message is in place with four zero bytes after it; the first
-    # call whose EAX is not 0 ends the directive (poke.md §4 rule 10)
+    # call whose EAX is not 0 ends the directive (poke.md §4 rule 11)
     r, calls, rec = run("talk @1 close", forms)
     assert rec.read(S + SCRATCH_MSG, 13).hex() == "30000000000500000000000000"
     rec = fake()

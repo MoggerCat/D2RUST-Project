@@ -7,7 +7,7 @@ every 1.14d address comes from specs, nothing is provisional.
 ## Done
 
 - **Spec** `specs/tools/poke.md`: rows `operate <ref>` and `talk <ref>
-  [<choice>...]` (§1), §4 rule 10 (1.14d: the C→S dispatcher `0x0054D750`,
+  [<choice>...]` (§1), §4 rule 11 (1.14d: the C→S dispatcher `0x0054D750`,
   ECX game, EDX player, [ESP+4] message, [ESP+8] size, EAX the result code;
   `sim/intents-events.md` §2.3), §5 rule 4 (d2rs), §5 rule 5 (the tick-end
   point), Edge case 5, Constants, Test vectors with the live runs.

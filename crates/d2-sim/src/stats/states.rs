@@ -30,6 +30,12 @@ pub mod group {
     pub const HIDE: usize = 2;
     /// `disguise`.
     pub const DISGUISE: usize = 16;
+    /// `plrstaydeath` (states flag bit 13; data tables +0x100).
+    pub const PLR_STAY_DEATH: usize = 13;
+    /// `monstaydeath` (bit 14; +0x104).
+    pub const MON_STAY_DEATH: usize = 14;
+    /// `bossstaydeath` (bit 15; +0x108).
+    pub const BOSS_STAY_DEATH: usize = 15;
     /// `life` (`0x0063A750`).
     pub const LIFE: usize = 32;
 }
@@ -196,6 +202,25 @@ impl StatLists {
             w[words + i] |= bit;
         } else {
             w[words + i] &= !bit;
+        }
+    }
+
+    /// `0x00639FB0`(unit, boss)'s bit walk (`units.md` §4.6 rule 3.1):
+    /// every set state bit outside flag group `keep` is cleared and marked
+    /// in the changed half. The state lists are not touched; units without
+    /// an extended list have no states.
+    pub fn clear_states_except(&mut self, unit: UnitId, keep: usize) {
+        let words = self.data().states.words();
+        let mask: Vec<u32> = (0..words)
+            .map(|i| self.data().states.bitset(keep).get(i).copied().unwrap_or(0))
+            .collect();
+        let Some(w) = self.unit_list(unit).and_then(|r| self.state_words_mut(r)) else {
+            return;
+        };
+        for (i, m) in mask.iter().enumerate() {
+            let gone = w[i] & !m;
+            w[i] &= !gone;
+            w[words + i] |= gone;
         }
     }
 
