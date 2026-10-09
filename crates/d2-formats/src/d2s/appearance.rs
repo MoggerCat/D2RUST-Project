@@ -193,25 +193,27 @@ impl ReferenceSlots {
     }
 
     /// The 1.14d reference table (`0x00744CA8`): [`REFERENCE_TYPES`]
-    /// under the game's itemtypes is-a matrix `m` (§1 r2 step 4).
+    /// under the game's itemtypes is-a matrix `m` (§1 r2 step 4). On the
+    /// 1.14d tables it equals [`ReferenceSlots::v1_14d`].
     pub fn game(m: &IsA) -> Self {
         Self::from_types(&reference_types(), m)
     }
 
-    /// The 1.14d slots as §1 r3 describes their effect: the weapon
-    /// tokens fill 4–56, the throwing potions skip to 125–134 while the
-    /// helms start at 57, so slots 57–124 are `weap` slots; no other slot
-    /// is reserved.
-    // PROVISIONAL (formats/d2s-appearance.md §1 r2, §1 r3, Open
-    // question 3; IT-6; REC-91): the
-    // table's bytes are not in the spec; this reconstruction gives the
-    // anchors of §1 r3 (`hax` 4 … `ktr` 45, `cap` 57, `buc` 79, potions
-    // 125–134) but not the second `ktr` at 243 (edge case 4). Settled by
-    // reading `0x00744CA8` from the 1.14d image, or by the IT-6 saves.
-    pub fn provisional_1_14d() -> Self {
+    /// The 1.14d table (§Constants, read from the image): under the 1.14d
+    /// is-a relation its types reserve slots 43–116, 130–133 and 135–234
+    /// as `weap` and 4–42, 118–121, 124–129, 134 and 235–255 as `armo`;
+    /// 0–3, 117, 122 and 123 are neither.
+    pub fn v1_14d() -> Self {
         let mut s = Self::none();
-        for slot in &mut s.0[57..=124] {
-            slot.weap = true;
+        for r in [43..=116, 130..=133, 135..=234] {
+            for slot in &mut s.0[r] {
+                slot.weap = true;
+            }
+        }
+        for r in [4..=42, 118..=121, 124..=129, 134..=134, 235..=255] {
+            for slot in &mut s.0[r] {
+                slot.armo = true;
+            }
         }
         s
     }
@@ -400,8 +402,8 @@ impl TokenTable {
     /// §2 r1 (`0x0063D900`): the first entry 1..254 whose code is `a` or
     /// `b`; none → 0. An entry never filled has code 0, so a zero code
     /// matches the first unfilled entry (the original's comparison).
-    // PROVISIONAL (formats/d2s-appearance.md §2 r1, Open question 4;
-    // IT-6; REC-92): an empty `a` is compared like any code.
+    // An empty `a` is compared like any code (§2 r1, Open question 4,
+    // answered).
     pub fn lookup(&self, a: [u8; 4], b: [u8; 4]) -> u8 {
         let (a, b) = (code_u32(a), code_u32(b));
         (1..TOKEN_ENTRIES)

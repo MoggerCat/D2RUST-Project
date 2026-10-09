@@ -52,7 +52,7 @@ fn row(c: &str, t: i32, component: u8, wclass: &str) -> ItemGfx {
     }
 }
 
-/// Weapons, armor and misc in record order, so that the provisional
+/// Weapons, armor and misc in record order, so that the fixture
 /// reference table gives the 1.14d positions of §1 r3 and the Test
 /// vectors: `hax` 4, `wnd` 9, `clb` 12, `ssd` 17, `jav` 27, `bst` 37,
 /// `ktr` 45 (weapons 4–56), potions 125–134, `cap` 57, body armours from
@@ -122,8 +122,21 @@ fn tables_with(
         vec![code("lit"), code("med"), code("hvy")],
         types(),
         colours,
-        &ReferenceSlots::provisional_1_14d(),
+        &fixture_reference(),
     )
+}
+
+/// The reference slots the synthetic `rows()` are shaped for: slots
+/// 57–124 `weap`, nothing else reserved. With these rows it lands the
+/// 1.14d anchors of §1 r3; the real table (`ReferenceSlots::v1_14d`,
+/// §Constants) is checked on the user's item tables
+/// (`d2-server` `character_save` `token_positions_on_the_users_install`).
+fn fixture_reference() -> ReferenceSlots {
+    let mut s = ReferenceSlots::none();
+    for slot in &mut s.0[57..=124] {
+        slot.weap = true;
+    }
+    s
 }
 
 fn tables() -> AppearanceTables {
@@ -245,7 +258,7 @@ fn a_search_past_the_table_falls_back_to_n() {
 
 // Covers: specs/formats/d2s-appearance.md §1 r3
 #[test]
-fn the_provisional_reference_gives_the_1_14d_positions() {
+fn the_fixture_reference_gives_the_1_14d_anchor_positions() {
     let t = tables();
     let at = |c: &str| t.tokens.lookup(code(c), code(c));
     assert_eq!(at("hax"), 4);

@@ -34,12 +34,18 @@ GAME_DEFAULT=$HOME/game
 
 CRATES="d2-formats d2-data d2-sim d2-server conformance d2s-tool scenario-run seed-finder"
 [ $NO_CLIENT = 1 ] || CRATES="$CRATES d2-client"
-SKIP_NAMES=$($PY tools/realdata_inventory.py --skip-names)
+# recording replays need traces/raw/ (gitignored, local recordings): skipped when it is empty
+REC_FLAG=--no-recordings
+ls traces/raw/*.jsonl >/dev/null 2>&1 && REC_FLAG=
+# tests that read a local save (D2_SAVE) are skipped when it is unset
+SAVE_FLAG=--no-save
+[ -n "$D2_SAVE" ] && SAVE_FLAG=
+SKIP_NAMES=$($PY tools/realdata_inventory.py --skip-names $REC_FLAG $SAVE_FLAG)
 
 if [ $LIST = 1 ]; then
   echo "crates (nextest --run-ignored only, else cargo test -- --ignored): $CRATES"
   echo "tool checks: data-tool tables | links ; mpq-tool check | formats"
-  echo "skipped (needs-window): GPU tests and dump-recording tests:"; echo "$SKIP_NAMES" | sed 's/^/  /'
+  echo "skipped: GPU, dump and known-bug repro tests, recording replays (without traces/raw/*.jsonl), D2_SAVE tests (D2_SAVE unset):"; echo "$SKIP_NAMES" | sed 's/^/  /'
   echo "skipped (needs-window): d2-client play / verify / examples (LOCAL-RUN Batches 3-6)"
   exit 0
 fi
@@ -81,15 +87,21 @@ for f in m["files"]:
       echo "realdata-gate: private repo install is incomplete; missing: $(echo $MISSING | tr '\n' ' ')" >&2
       no_data "install not fully uploaded yet"
     fi
-    git -C "$PRIV" sparse-checkout set tools install extracted >&2
+    # install/ only: the repo's extracted/ (3 GB, per-archive folders, Patch_D2.mpq
+    # partly named) is not what the tests read; step 1b builds their view.
+    git -C "$PRIV" sparse-checkout set tools install >&2
     $PY "$PRIV/tools/assemble.py" "$GAME" >&2 || no_data "assemble.py reported mismatches"
     have_install "$GAME" || no_data "assembled install lacks d2data.mpq / d2exp.mpq / Game.exe"
   fi
-  # tests read $D2_GAME_DIR/extracted/...: link the private repo's extracted/
-  if [ -d "$PRIV/extracted" ] && [ ! -e "$GAME/extracted" ]; then ln -s "$PRIV/extracted" "$GAME/extracted"; fi
   export D2_GAME_DIR=$GAME
 fi
-[ -d "$GAME/extracted" ] || echo "realdata-gate: warning: $GAME/extracted missing; tests reading extracted/ will fail" >&2
+
+# ---- 1b. the excel view the table tests read ($D2_GAME_DIR/extracted/patch_d2/data/global/excel/):
+# the live excel set, each file from the highest-priority archive, lowercase names
+EXCEL=$GAME/extracted/patch_d2/data/global/excel
+if [ ! -f "$EXCEL/skills.bin" ]; then
+  cargo run -q $RELEASE -p data-tool -- excel-dir "$EXCEL" "$GAME" || echo "realdata-gate: warning: excel-dir failed; tests reading extracted/ will fail" >&2
+fi
 echo "realdata-gate: install at $GAME"
 
 # ---- 2. run
@@ -110,7 +122,7 @@ tool_step mpq-tool-formats cargo run -q $RELEASE -p mpq-tool -- formats
 
 if cargo nextest --version >/dev/null 2>&1; then
   FILTER=""
-  for n in $SKIP_NAMES; do FILTER="$FILTER${FILTER:+ | }test(=$n)"; done
+  for n in $SKIP_NAMES; do FILTER="$FILTER${FILTER:+ | }test(/(^|::)$n$/)"; done
   for c in $CRATES; do
     echo "=== $c (nextest)"
     log=$LOGDIR/$c.log
@@ -142,7 +154,10 @@ echo
 echo "=========== realdata-gate summary (install: $GAME)"
 printf '%s' "$SUMMARY"
 echo "ignored tests: $NPASS passed, $NFAIL failed"
-echo "needs-window (not run): $(echo $SKIP_NAMES | tr ' ' ',')"
+echo "skipped (not run): $(echo $SKIP_NAMES | tr ' ' ',')"
+[ -n "$REC_FLAG" ] && echo "  (recording replays skipped: no traces/raw/*.jsonl)"
+[ -n "$SAVE_FLAG" ] && echo "  (D2_SAVE tests skipped: D2_SAVE unset)"
+echo "  (realdata_inventory.py 'needs' column: gpu, dump, repro, recording, save)"
 echo "needs-window (not run): d2-client play / verify / gpu_compare (docs/LOCAL-RUN.md Batches 3-6), trace recordings"
 [ $NO_CLIENT = 1 ] && echo "skipped on request: d2-client ignored tests (--no-client)"
 echo "logs: $LOGDIR"
