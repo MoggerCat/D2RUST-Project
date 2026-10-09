@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 636–667 |
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1293 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1294–1559 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1560–1732 |
-| Constants & data dependencies | 1733–1751 |
-| Randomness | 1752–1757 |
-| Edge cases & original bugs | 1758–1803 |
-| Test vectors | 1804–1890 |
-| Provenance | 1891–2017 |
-| Open questions | 2018–2170 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1304 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1305–1611 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1612–1784 |
+| Constants & data dependencies | 1785–1803 |
+| Randomness | 1804–1809 |
+| Edge cases & original bugs | 1810–1855 |
+| Test vectors | 1856–1942 |
+| Provenance | 1943–2069 |
+| Open questions | 2070–2222 |
 <!-- /index -->
 
 ## Summary
@@ -981,8 +981,8 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 4. The unit must have a path (fatal 0xE6). With T: id 0x68, code := E
    code to unit, (a, b) := (T type, T GUID); modes 2 and 15 with path
    type 5 or 6 (`0x00648E30`) instead id 0x67, code to point, (a, b) :=
-   the path target. Without T: id 0x67, code to point, (a, b) := the
-   path target (`0x00648A40`, `0x00648A60`) when "target from path",
+   the path end. Without T: id 0x67, code to point, (a, b) := the
+   path end (`0x00648A40`, `0x00648A60`) when "target from path",
    else the unit's cell (`0x006488C0`, `0x00648900`).
 5. Per-mode bytes d (direction-like) and e: mode 0 and 12: d := path
    direction (`0x006487F0`), e := unit +0xB0 for mode 0 and 0 for 12;
@@ -1003,17 +1003,28 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    a, b, d) or 0x69 (`0x0053BA40`: GUID u32@1, code u8@5, a u16@6, b
    u16@8, d u8@10, e u8@11).
 7. **Death**: the kill sets mode 0 (flag 0x1), so the next client pass
-   sends 0x69 code 8 with (a, b) = the path target (mode 0 has "target
-   from path": a monster's creation writes its spawn point as the
-   target, `monsters/init.md` §4.1 step 1.1, read so by 1.14d state
-   snapshots of idle spawned monsters; the recorded `69 1b000000 08 0000
-   0000 38 06` at frame 2882 shows (0, 0), a target cleared later.
-   PROVISIONAL: spawn point until cleared (because the snapshots and
-   init.md agree); settled by REC-594) and d, e (mode 0 has no
+   sends 0x69 code 8 with (a, b) = the path end and d, e (mode 0 has no
    target); when mode 12 is set (§7.7 rule 3) 0x69 code 9 at the unit's
    cell with e = 0 follows. Recorded: `69 13000000 08 9512 5515 38 06`
    (frame 2724) and `69 13000000 09 9412 5515 38 00` (frame 2748) in
    `20261006-015956`; 0x69 code 6 (mode 3, get-hit) 15 times.
+   **Path end** (`0x00648A40` x, `0x00648A60` y; 1.14d-confirmed
+   2026-10-09, settles REC-594): with point count n = path +0x28 ≠ 0,
+   the last computed path point, u16 x / y at path +0x98 + 4·n (point
+   n − 1 of the list at +0x9C, `sim/pathing.md`); n = 0 → (0, 0). It
+   never reads the path target +0x10 / +0x12, so the spawn point
+   written there by `monsters/init.md` §4.1 step 1.1 (and read as `tx`,
+   `ty` by state snapshots) does not reach this message: a monster that
+   never computed a path, or whose count was reset (`pathing.md` §9.7,
+   path-placement `0x00650BE0`), sends (0, 0) — the recorded
+   `69 1b000000 08 0000 0000 38 06` (frame 2882) — and one that walked
+   sends its last point — `69 13000000 08 9512 5515` (frame 2724), next
+   to its cell (0x1294, 0x1555) of the code 9 that follows. No AI
+   request clears anything for this: (0, 0) at the kill means a point
+   count of 0 (the mode-0 set does not reset it, frame 2724).
+   ```
+   (a, b) = if path.count != 0 { path.points[path.count - 1] } else { (0, 0) }
+   ```
 
 #### 7.5 Room clean-up (`0x00553220(game, unit)`)
 
@@ -1483,6 +1494,45 @@ Recorded (`-022633` seq 142–155): 0x03, 0x53, 0x07 × 10, 0x15, 0x7E;
 the switch sent no add message (the town rooms are populated by the
 next tick, `sim/tick.md` §4).
 
+8. **A save outside Act I** (2026-10-09; static read plus two 1.14d
+   RNG recordings on Windows: `record_rng.py --frames --ticks 4 --auto
+   SceAct2 --seed 1234` and the same with ScnAma; the SceAct2 save is
+   `tools/cloud-game/prepare_scene_chars.sh`'s, no items).
+   1. *Act.* The client act byte (client +0x1AC) is written by the save
+      header read inside rule 2's load: `0x0056A090` at
+      `0x0056A1D4`–`0x0056A1F7`, t := `.d2s` byte +0xA8 + game
+      difficulty (game +0x6D), act := t & 0x7F, 0 when ≥ 5, through
+      `0x005382E0` (`sim/path-placement.md` §13 rule 2 owns the
+      detail). It is the last write before rule 4 reads it: rule 4
+      builds that act (`0x0052C210` → `0x0053AC70`, `drlg/levels.md`
+      §2) and sends S→C 0x03 with it, and rule 5 enters the player in
+      the act's town (levels 1, 40, 75, 103, 109). Recorded: SceAct2
+      (town byte act 1) enters level 40 at (5153, 5203); ScnAma level 1.
+   2. *Game seed.* Act creation and its DRLG draw nothing from the game
+      seed (`drlg/levels.md` §2–§3: the DRLG seed comes from game +0x7C
+      / the map seed; the level-link checks of `drlg/outdoor.md` draw on
+      copies of the DRLG seed). So the game-seed sequence before the
+      first town unit does not depend on the act: (a) game creation,
+      frame 0: the four derivations of `sim/rng.md` §5.2 (monster
+      region `0x00547D38`, object control `0x00546CB9`, NPC control
+      `0x005360D8`, quest `0x00545F27`; with `-seed N` no root step
+      before them); (b) the join's load, frame 1: the player's unit
+      seed (`0x00552E31`), then two steps per loaded item and the
+      corpse / hireling items of rule 3.1 (none in these saves); (c)
+      frame 2, the first tick's room population (`sim/tick.md` §4):
+      one step per unit allocation (`0x00552DF0`) and two per item, in
+      the town of the client's act. Recorded, `-seed 1234`: (a)
+      2972047412, 1542758918, 1961566614, 2016663226 and (b)
+      4048349444 in both saves; the first frame-2 unit draws
+      108806926 in both; frame 2 has 24 unit draws in Act I and 12 in
+      Act II (the towns' units). A build whose frame-2 game seed
+      differs outside Act I therefore either built or populated the
+      wrong act's town (act byte 0, rule 8.1) or drew outside (a)–(c).
+   3. Caution for value matching: with `-seed N` the game seed and a
+      DRLG seed made from the same N both start at {N, 666}, so draws on
+      the two seeds at the same step count have equal values; tell them
+      apart by owner (`tools/rng-trace.md` owners), not by value.
+
 #### 8.3 First tick after the join
 
 Client state 3 (`sim/tick.md` §6 rule 4): the per-client update
@@ -1524,6 +1574,8 @@ for C in client list:                       // any state
     for each corpse GUID g of P(C) (pcdata corpse list, 0x0063D570 /
         0x0063D610; g ≠ −1):
         send to J: 0x8E CorpseAssign(P(C), unit g)   // 0x0053DFB0
+            // flag byte = constant 1 (push 1 at 0x0052C4AB): 10 bytes
+            // 8E 01, P(C)'s GUID u32 (EDX), g u32 (stack 1)
 send to J: 0x5B of P(J)
 // 0x0053FC70(game, J) → 0x0053FB90(game, 1) with EBX = J
 for C in client list with state 4 and P(C):

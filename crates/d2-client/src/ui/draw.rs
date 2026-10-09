@@ -82,6 +82,34 @@ pub struct ImageRequest {
     pub clip: Rect,
     /// Draw mode and remap ([`CelLook::PLAIN`] for the plain cel draw).
     pub look: CelLook,
+    /// The 1.14d cel wrapper the original calls for it (the rendering
+    /// facts' `op`, `tools/facts-render.md` §5 r18).
+    pub call: CelCall,
+}
+
+/// Which 1.14d cel draw wrapper a UI cel is (`render/capture.md` §3.5
+/// wrapper names; `tools/facts-render.md` §5 r18): the plain draw, the
+/// row-window draw of the globes, the colour (palette) draw of the skill
+/// icons and font glyphs, the clipped draw of the automap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CelCall {
+    #[default]
+    Draw,
+    Ex,
+    Color,
+    Clipped,
+}
+
+impl CelCall {
+    /// The `draws.tsv` op name.
+    pub fn op(self) -> &'static str {
+        match self {
+            CelCall::Draw => "CelDraw",
+            CelCall::Ex => "CelDrawEx",
+            CelCall::Color => "CelDrawColor",
+            CelCall::Clipped => "CelDrawClipped",
+        }
+    }
 }
 
 /// A filled rectangle: the arguments of `D2GFX_DrawRectangle`

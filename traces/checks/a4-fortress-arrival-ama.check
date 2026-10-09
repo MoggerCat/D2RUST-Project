@@ -1,0 +1,10 @@
+check 1
+# Pandemonium Fortress arrival, idle: ScnAm4 (expansion, act IV start,
+# acts 1-3 done), -seed 1234, no input. Area E of the day-run diff loop
+# (q-prov-data). Spec: specs/tools/scenario-diff.md.
+name a4-fortress-arrival-ama
+save ScnAm4 --class ama --expansion --act 3 --quests acts=3
+seed 1234
+ticks 60
+seconds 300
+channels state

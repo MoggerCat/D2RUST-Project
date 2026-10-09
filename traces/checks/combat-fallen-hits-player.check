@@ -1,0 +1,16 @@
+check 1
+# A Fallen (monstats 19, normal) poked 2 sub-tiles from the player in the
+# Blood Moor (warp 2 at frame 4; town allows no combat) walks in and melee-hits the player; no input. Compare
+# the Fallen's modes / seeds and the player's life (stat 6) frame by frame:
+# monster melee on the player, hit recovery, damage (PC1-B round 2).
+# Seeds fixed before the spawn as in poke-fallen-town.
+name combat-fallen-hits-player
+save ScnAma --class ama --expansion
+seed 1234
+ticks 200
+seconds 300
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+2 @y normal

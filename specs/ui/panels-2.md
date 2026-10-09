@@ -26,19 +26,19 @@
 | Inputs | 54–63 |
 | Outputs / state changes | 64–68 |
 | Rules | 69–70 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 71–245 |
-|   17. Character panel details (`panels.md` §8; answers UP-6) | 246–360 |
-|   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 361–385 |
-|   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 386–456 |
-|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 457–586 |
-|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 587–681 |
-|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 682–739 |
-| Constants & data dependencies | 740–754 |
-| Randomness | 755–759 |
-| Edge cases & original bugs | 760–780 |
-| Test vectors | 781–810 |
-| Provenance | 811–841 |
-| Open questions | 842–868 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 71–246 |
+|   17. Character panel details (`panels.md` §8; answers UP-6) | 247–361 |
+|   18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8) | 362–386 |
+|   19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23) | 387–457 |
+|   20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13) | 458–587 |
+|   21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5) | 588–682 |
+|   22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`) | 683–740 |
+| Constants & data dependencies | 741–755 |
+| Randomness | 756–760 |
+| Edge cases & original bugs | 761–781 |
+| Test vectors | 782–811 |
+| Provenance | 812–842 |
+| Open questions | 843–869 |
 <!-- /index -->
 
 ## Summary
@@ -78,8 +78,8 @@ and tab state globals named per rule, `SetUIState` calls.
    | Handler | Option | Sends |
    |---|---|---|
    | `0x004B6C70` | talk (3381) | dialog: C→S 0x2F / 0x30 (`0x004B6A30`) |
-   | `0x004B42B0` | trade (3396), trade/repair (3334) | C→S 0x38 action 1, NPC GUID, 0 |
-   | `0x004B3D40` | gamble (3398) | C→S 0x38 action 2, NPC GUID, 0 |
+   | `0x004B42B0` | trade (3396), trade/repair (3334) | gamble flag `[0x007C0DB0]` := 0; C→S 0x38 action 1, NPC GUID, 0 |
+   | `0x004B3D40` | gamble (3398) | gamble flag `[0x007C0DB0]` := 1; C→S 0x38 action 2, NPC GUID, 0 |
    | `0x004B5C60` | hire (3397) | opens the hire list (`ui/menus.md` §3); choosing a row sends C→S 0x36 (`0x004B1E9E`). The hire-list request C→S 0x38 action 3 is sent when the menu opens (`ui/menus.md` §2.2) |
    | `0x004B52C0` | go west (3383) | C→S 0x38 action 0, NPC GUID, 1 |
    | `0x004B5260` | sail west (3385) | C→S 0x38 action 0, NPC GUID, 0x28 |
@@ -184,9 +184,10 @@ and tab state globals named per rule, `SetUIState` calls.
     enabled u32, +4 state u32 (the "state +0" of rule 4), +8 string id
     u16, +0x0A u16, +0x0E base frame u16 (the "base u16 +0x0A" of rule 4,
     counted from `0x007BC9E4`), +0x10 u32. `[0x007C0DB0]` (`0x004B3500`)
-    is written only with 0 (`0x004B6FD7` …) and cleared by the
-    interaction memset, so the "≠ 0" branches of this rule and of rule 4
-    are dead: the tab captions are always drawn.
+    is the gamble flag: 1 from the gamble option (`0x004B3D40`, rule 1)
+    until the trade option or the next interaction start / end
+    (`ui/menus.md` §4.2 r2), so the "≠ 0" branches of this rule and of
+    rule 4 run in a window opened by Gamble (REC-729, 2026-10-09).
     - NPC 147, 148, 177, 199, 202, 252, 254, 255, 405, 512, 513: count
       `[0x00722160]` = 4, mode `[0x0072215C]` = 3, `[0x007BCC05]` = 3;
       record 0 (1, 0, 3335 "Buy", 2, frame 2, 3), record 1 (1, 0, 3336

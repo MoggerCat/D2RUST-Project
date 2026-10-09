@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–136 |
-|   4. The table (`sequences.tsv`) | 137–168 |
-|   5. Users in 1.14d | 169–185 |
-| Constants & data dependencies | 186–194 |
-| Randomness | 195–198 |
-| Edge cases & original bugs | 199–218 |
-| Test vectors | 219–233 |
-| Provenance | 234–248 |
-| Open questions | 249–254 |
+|   3. Frame queries | 112–289 |
+|   4. The table (`sequences.tsv`) | 290–321 |
+|   5. Users in 1.14d | 322–338 |
+| Constants & data dependencies | 339–347 |
+| Randomness | 348–351 |
+| Edge cases & original bugs | 352–371 |
+| Test vectors | 372–386 |
+| Provenance | 387–401 |
+| Open questions | 402–407 |
 <!-- /index -->
 
 ## Summary
@@ -133,6 +133,159 @@ row), +3 drawn frame, +5 event byte (0 none, 1–4 the codes of `use.md`
   §15): +0x4E := 0; flag 0x4000 cleared; p = +0x38 + +0x3C, minus +0x34
   once when ≥ +0x34; +0x38 := p; +0x48 −= +0x3C; frame setup with b = the
   old +0x38; drawn mode changed → flag 0x4000 set.
+
+**Client mode-18 machine** (2026-10-09, REC-702..704; 1.14d asm). The
+client player update `0x00463390` drives a mode-18 unit by the mode row
+`0x00711E00` + 12·18 = {kind 2, advance 1, end 3}, in this order each
+client update:
+
+1. Used skill E (`0x00620250`) with flags bit 1 (moving): path step
+   `0x004807C0` (`render/camera.md` §9); "arrived" = the step returned 0
+   (`0x00650840`: no move, or the step that reached the last point). Arrived
+   → E flags |= 2 and the client do `0x004C68F0` → `0x004C6680`
+   (`cltdofunc`, table `0x00727BA8`).
+2. Not arrived, unit flag 0x40 (+0xC4) clear and +0x4E ∈ {1, 2, 3} →
+   the client do. +0x4E is the byte the previous update's advance wrote.
+3. Advance: animation not complete (`0x006217C0`: +0x48 < 1) → frame
+   advance `0x00623E00` (above).
+4. Mode 18 with flag 0x4000 → graphics refresh `0x00470610`.
+5. End: `0x006217C0` true → the neutral end (mode set by `0x004611F0`).
+
+Request timing: the 0x4C / 0x4D mode request (codes 0x16 / 0x15,
+`client/model.md` §8 rule 4 and rule 7) is a unit-queued message,
+drained after the unit's per-type update (`client/model.md` §4 r5), so
+its update loads the sequence at frame 0 (§2) and runs the client start
+(`cltstfunc` table `0x00727A90`) with **no** mode-18 machine step; the
+next update is the first step (do test on frame 0's byte, then the
+advance to frame 1). Code 0x16's record: r2 = target unit type (EDX),
+r3 = GUID (ECX) of `0x00463990` at `0x004C6ECF` (`0x004C6EB0`), r4 =
+level. That request path is for units other than the local player.
+
+Local player (2026-10-09, REC-670 settled; 1.14d asm): the local
+client starts mode 18 itself, at the click, and never from a server
+message:
+
+1. The click's skill code (`ui/controls.md` §6 r7) goes to
+   `0x00481030(code, P, a, b)`. Gate `0x00480BA0`: P's used skill
+   lacks `interrupt` (row byte +7 & `[0x006CE284]` = 0x80) and P's mode
+   is not 1 / 5 → nothing (no request, no send). Else it builds a
+   record r0 := the side's skill id (`0x00643CE0` of `0x00620190` left /
+   `0x006201D0` right), r1 := its owner GUID (`0x00643AD0`), r2 / r3 :=
+   a / b, r4–r6 := 0, and maps the code: 5, 8, 0xC, 0xF → mode request
+   **0x15** (point); 6, 7, 9, 0xA, 0xD, 0xE, 0x10, 0x11 → **0x16**
+   (unit: a / b = type / GUID) (`0x0048114E`, `0x00481186`,
+   `0x004811BE`, `0x004811F6`).
+2. `0x00480C10(0x15 | 0x16, P, record, flag 0)` (`0x004810B5`) runs
+   at once: the player machine's code 0x15 / 0x16 (`client/model.md` §8
+   r4) → the client skill start `0x004C6140` (§8 r7 there): mode set
+   18 and sequence frame 0 (§2), `cltstfunc`. Only then (request
+   returned non-zero) stat 0x148 += 1 and the C→S message
+   (`0x00480B40`).
+3. The server sends the own client no skill message: the skill-mode
+   row `0x00548090` of the per-mode table skips the unit's own client
+   unless E flags bit 0x4 (dodge / avoid only; `sim/pathing.md` §10
+   r2).
+4. Timing: the click runs in the input part of the client loop pass
+   (button handlers, held repeat `0x0044F039`), before the receive
+   `0x0044F167` and the client update `0x0044C790`, and outside any
+   update. So the click is the start (frame 0, no machine step, as the
+   queued request's update for other units), and the **first mode-18
+   machine step is the first client update after the click** (do test
+   on frame 0's byte, advance to frame 1).
+
+   ```
+   on click(code): if gate(P) { r = {skill, owner, a, b, 0, 0, 0};
+       mode_request(code_map(code), P, r, 0) /* mode 18, frame 0 */;
+       send(code, a, b) }
+   next client update: machine step 1 (rules 1-5 above)
+   ```
+
+Leap (`cltstfunc` 30 `0x004C8D90`, `cltdofunc` 43 `0x004C8C60`) and
+Leap Attack (`cltstfunc` 30, `cltdofunc` 44 `0x004C8ED0`) share start
+and hold:
+
+1. Start: target point stored in E; E flags := 0x1080.
+2. Do with flag 0x80 (frame 5, event 5:1): `0x004C85B0` (E flags :=
+   0x1101; path to the point at run speed: `charstats` +0x41 << 8, a
+   monster `monstats` +0x34 << 8) and the motion record `0x004C8670`
+   (`render/unit-composite.md` §8).
+3. Do with flag 0x100 (frame 11, event 11:1): landing check
+   `0x004C8970(E, 1)` (`audio/triggers-2.md` §13.3). Not landed
+   (record z ≠ 0 and position ≠ the point) → sequence position +0x38 :=
+   10·256 (`0x006212C0`), +0x48 := (+0x48 & ~0xFF) + 256, do returns
+   0; the advance then reaches frame 11 again with +0x4E = 1, so the
+   next update repeats the do: **frame 11 is held while airborne**, for
+   Leap and Leap Attack alike (same function, same frame-11 event).
+   Monsters: `BaseId` 78 → position 8; 540 → 10, or 12 when
+   `0x006417F0` distance < 2.
+4. E flags 0x1101 include bit 1, so machine step 1 also steps the leap
+   path; its arrival sets flag 2 and runs the do. Landed: with flag 2
+   → path end `0x004C8890`, E flags := 0; without → E flags := 0x1000
+   (not for monsters); the sequence then runs to its end. Leap Attack
+   additionally takes its target
+   (`0x00644500`); none → +0x48 := 0x400 (four frames left), else the
+   strike set-up (`0x00620C10`, `0x00623C20`, sounds).
+
+Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
+
+1. Start: player or monster only; path speed := `charstats` +0x40
+   (walk) << 8 for a player, `monstats` `Velocity` +0x32 << 8 for a
+   monster (`0x00648690` at `0x004C9291`); path computed; E flags := 1,
+   E point := the path's last point. One path step is then (0x400 ·
+   speed) >> 6 = walk << 12 (16.16 sub-tiles) along the Euclidean
+   direction (`sim/pathing.md` §9.4). Measured: the first step is on
+   update 3 (request update = 0; the update whose advance reaches
+   sequence position 3), the last (partial) step on update
+   a = 2 + ⌈(path length << 16) / step⌉. Read (REC-815, 2026-10-09):
+   nothing in the client chain holds the step. The start's path compute
+   `0x00649970` sets path flag 0x20, the point count +0x28 and +0x24 :=
+   0, then `0x00648690` sets velocity +0x7C; machine step 1 calls
+   `0x004807C0` → `0x00650840` from update 1 (E flags & 1, mode row kind
+   2). `0x00650840` (`0x00650869`–`0x00650897`) needs flag 0x20, +0x28 >
+   0, +0x7C ≠ 0, `0x006503F0` (point path: true), +0x24 < +0x28 and a
+   non-zero step vector (`0x006502D0`); **any failed gate ends the
+   path** (`0x006507B0`: snap to the sub-tile centre, flag 0x20 and
+   +0x24 / +0x28 := 0, return 0 = arrived), so a no-move step cannot
+   occur and return "moving". PROVISIONAL (REC-900): the 2-update
+   delay is not explained by `0x00463390` / `0x004C9120` / `0x00650840`;
+   open: whether the start runs later than the click for this request
+   (e.g. `0x004C52E0` / `0x004648F0` target not ready) or the
+   recorder's `px` is not path +0x00. N below uses the measured a.
+2. Do while moving (flags & 3 = 1): +0x38 := 3·256, +0x48 := 0x500
+   (loop A1 3–6). Rate 256: +0x48 runs 2048 − 256·i to 256 at update 7,
+   then 1024, 768, 512, 256 per loop; it is 256 after the advance of
+   updates 7, 11, 15, … (event 7:1, +0x4E = 1).
+3. Do on arrival (flags & 3 = 3; `0x004C9320`: `0x0064EC10` /
+   `0x00648C30` collision moves, `0x00644660` E flags := 0, sound stop
+   `0x004BA840`, returns 1): no rewind and no mode change. Later do calls
+   (+0x4E = 1, flags & 3 = 0) do nothing. The end is the machine's
+   step 5 only (`0x006217C0`: +0x48 < 1 after the advance). End rule:
+   mode 18 lasts **N = max(8, 4·⌈a / 4⌉)** client updates (request
+   update included; the unit shows the next mode on update N): the
+   arrival update if +0x48 was 256 before its advance, else the end of
+   the current A1 3–6 loop.
+   ```
+   a = 2 + ceil((d << 16) / (walk << 12))
+   N = max(8, 4 * ceil(a / 4))
+   ```
+   Check (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`, step
+   0x6000): whirl 1 d 8 (x −8·65536): steps on updates 3..24 (21 full +
+   8192), a = 24, N = 24 (measured 24); whirl 2 d √197 ≈ 14.04 (x +1, y
+   +14): steps on 3..40, a = 40, N = 40 (measured 40). Both arrivals fall
+   on a loop end, so these facts equally fit "ends on the arrival
+   update" (N = a); the binary read above (no end in `0x004C9320`) gives
+   the rounding. Settles REC-671. Settled (REC-816, 2026-10-09): the
+   update-N mode change is machine step 5. The facts' `f` / `F` / `s`
+   columns are +0x44 / +0x48 / +0x4C, not +0x38 / +0x48 / +0x3C: `f`
+   reads 768 at sequence index 4 (A1.3) and 1536 at index 7 (A1.6,
+   event 7:1), where +0x38 would read 1024 / 1792. The 213 after update
+   N − 1 is the rate `0x00623F50` (`sim/units.md` §4.7) taking the
+   velocity branch (`0x006214A0`: mode 18 is V-skill and E flags & 1,
+   not 0x1000; player w = 213), which writes only the speed +0x4C; +0x3C
+   is written only by the cast and attack branches. So +0x3C stays 256,
+   the update-N advance leaves +0x48 = 0 and `0x006217C0` (+0x30 ≠ 0:
+   +0x48 < 1) ends the mode through `0x004611F0`; the local player gets
+   no server skill message (local-player rule 3 above).
 
 ### 4. The table (`sequences.tsv`)
 

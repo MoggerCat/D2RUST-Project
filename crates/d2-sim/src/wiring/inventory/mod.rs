@@ -57,7 +57,7 @@ pub mod units;
 pub(crate) mod tests;
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::economy::{Economy, EconomyError, ItemSpawn};
 use crate::items::bitstream::WriteBack;
@@ -138,6 +138,12 @@ pub struct InvState {
     /// (§7.1 step 2, `0x00548A50`: player, item, cursor flag), taken by
     /// the host that runs them ([`InvDesk::take_item_walks`], REC-281).
     pub item_walks: Vec<(UnitId, UnitId, bool)>,
+    /// Items placed on the ground (`0x00558AA0`, `inventory-moves.md` §9.1
+    /// step 3) since the host last took them ([`InvDesk::take_dropped`]):
+    /// their unit flag 0x1000 ("dropped") is still set when the client
+    /// pass of the tick sends §6.3's 0x9C action 2, but the d2rs update
+    /// pass runs after the room clean-up has cleared it.
+    pub dropped: BTreeSet<UnitId>,
     /// Equipment-rule calls the inventory functions asked for while the
     /// owner's inventory was lent to them ([`InvDesk::with_inv`]); run
     /// when the call returns, before the owner refreshes.

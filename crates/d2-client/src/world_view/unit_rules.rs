@@ -72,17 +72,41 @@ impl<R> UnitRules<R> {
     }
 }
 
+/// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-518): object
+/// `class` in `mode` casts its composite shadow when its `BlocksLight` of
+/// that mode is ≠ 0; a class without a row casts it.
+pub fn object_casts_shadow(looks: &UnitLooks, class: u32, mode: u32) -> bool {
+    looks.object_blocks_light.get(&class).is_none_or(|b| {
+        usize::try_from(mode)
+            .ok()
+            .and_then(|m| b.get(m))
+            .is_some_and(|&v| v != 0)
+    })
+}
+
 /// The player's walk speed (`sim/units.md` §4.7 step 7: w = 213 for a
 /// player not running, p = 100 without item / skill velocity).
 pub const PLAYER_WALK_SPEED: u64 = 213;
 
-/// `sim/units.md` §4.7 step 7 revision (measured on `a1-walk-*`,
-/// PROVISIONAL REC-516): the walk frame at server tick `tick` of a walk
-/// that started on `since` (kept across re-targeting clicks):
-/// `((tick − since) · 213 >> 8) mod frames`.
-pub fn walk_frame(tick: u64, since: u64, frames: u8) -> usize {
+/// The player's run speed (`sim/units.md` §4.7 step 7: w = 101, p = the
+/// run's velocity percent 100 · `RunVelocity` / `WalkVelocity`; 150 for
+/// the sorceress' 9 / 6: speed 151, `a1-run-*`). Without the charstats
+/// speeds p = 100.
+pub fn player_run_speed(speeds: Option<crate::bridge::predict::Speeds>) -> u64 {
+    let p = speeds
+        .filter(|s| s.walk > 0)
+        .map_or(100, |s| 100 * u64::from(s.run) / u64::from(s.walk));
+    101 * p / 100
+}
+
+/// `sim/units.md` §4.7 step 7 revision (measured on `a1-walk-*` and
+/// `a1-run-*`, PROVISIONAL REC-516): the frame at server tick `tick` of
+/// a walk or run whose mode started on `since` (kept across re-targeting
+/// clicks, restarted by a walk ↔ run change): `((tick − since) · speed >>
+/// 8) mod frames`.
+pub fn walk_frame(tick: u64, since: u64, frames: u8, speed: u64) -> usize {
     let frames = u64::from(frames.max(1));
-    (((tick.saturating_sub(since) * PLAYER_WALK_SPEED) >> 8) % frames) as usize
+    (((tick.saturating_sub(since) * speed) >> 8) % frames) as usize
 }
 
 /// §3 r2: the frame drawn at server tick `tick`, `((tick − 1) · rate
@@ -135,12 +159,12 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
             frame: if let Some((_, f)) = art.sequence.filter(|(k, _)| *k == unit.key) {
                 // `skills/sequences.md` §3: the sequence frame's drawn frame.
                 f % usize::from(cof.frames.max(1))
-            } else if let Some(since) = art
+            } else if let Some((since, speed)) = art
                 .pose_since
-                .filter(|(k, _)| *k == unit.key && matches!(unit.mode, 2 | 6))
-                .map(|(_, s)| s)
+                .filter(|(k, ..)| *k == unit.key && matches!(unit.mode, 2 | 3 | 6))
+                .map(|(_, s, v)| (s, v))
             {
-                walk_frame(world.server_ticks, since, cof.frames)
+                walk_frame(world.server_ticks, since, cof.frames, speed)
             } else {
                 Self::frame(world, unit, cof.frames, cof.animation_rate)
             },
@@ -177,6 +201,12 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         let (Some(at), Some(cof)) = (at, assets.cofs.get(&pose.cof)) else {
             return Ok(Vec::new());
         };
+        // `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-518): an
+        // object casts the shadow only when its mode's BlocksLight ≠ 0.
+        if unit.key.unit_type == OBJECT && !object_casts_shadow(&self.looks, unit.class, unit.mode)
+        {
+            return Ok(Vec::new());
+        }
         super::unit_shadow::draws(cof, unit.key.guid, at, draws, assets)
     }
 

@@ -120,8 +120,20 @@ pub trait LevelTypes {
     }
 
     /// A hidden exit cell's warp unit (`0x0066E1C0`, `rooms.md` §9.5.1
-    /// step 3; wall warp tiles for sub 0 or 4).
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {}
+    /// step 3; wall warp tiles for sub 0 or 4). `t` is the cell's exit
+    /// type (10 left, 11 right: `sim/path-placement.md` §12.1 rule 1).
+    #[allow(clippy::too_many_arguments)]
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        t: u32,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+    ) {
+    }
 }
 
 /// A [`LevelTypes`] that generates nothing (levels stay empty).

@@ -177,6 +177,9 @@ at 400 hex 20 03 00 00 00 09 13 00 00 84 10 00 00
 at 460 hex 19 02 00 00 00
 at 480 hex 17 02 00 00 00
 ```
+   For the potion durations (REC-102, q-fix-p5-potion-entry3) the 0x20 must keep the facts'
+   offset of −3 like the 0x26 (165 → 162): `at 494` for the 0x20 (then `at 554`, `at 574`,
+   `end 620`); at 400 the mana at the use is lower and the mp1 gap is 53, not 51.
 3. **Pokes in `record_packets.py`** (0.2.0, `--poke` / `--poke-file`, at its 0x0052FD1E hook): the
    first poke run on 1.14d: `spawn 19` next to the player in Cold Plains works (5 of 10, the others'
    spots taken). G4 then gave REC-108: drops land beside the death point →
