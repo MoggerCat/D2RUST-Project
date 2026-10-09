@@ -247,6 +247,10 @@ pub struct ClientUnit {
     /// Unit +0x38 >> 8: the frame event index (`ui/controls.md` §6 r4,
     /// `0x004645B0`). The play host writes the local player's; 0 else.
     pub event_index: u32,
+    /// The precise path position (16.16 sub-tiles) of a walking monster,
+    /// written by the client track ([`super::motion`]); the draw uses it
+    /// while its cell is `position`. `None`: the cell centre.
+    pub precise: Option<(u32, u32)>,
     /// +0x48: the animation's frame count (8.8), written by a monster's
     /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
     pub frame_count: i32,
@@ -303,6 +307,7 @@ impl ClientUnit {
             interact_ms: 0,
             frame: 0,
             event_index: 0,
+            precise: None,
             frame_count: 0,
             speed: None,
             flag_ex: 0,
