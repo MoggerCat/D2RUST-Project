@@ -276,3 +276,26 @@ spawn.
     (4801 at f103, …).
 - The d2rs side runs with the same command without `--orig-only`; it
   needs the d2-client from that branch (the cloud runs it).
+
+### Items 45 and 46: both sides (pc1-data Step 4)
+- Run with `scenario_diff.py <check> --reuse`: the 1.14d side is item 5's
+  recording; d2rs is the staging d2-client built on PC 1.
+- **combat-melee-fallen: the melee itself matches.**
+  - Both sides: player mode 7 at f40; the nearest Fallen (1.14d 21,
+    d2rs 19) is killed by the one swing (mode 0, hp 0 at f46, mode 12 at
+    f66); the player is back to mode 1 at f55.
+  - The leader's f41 choice still differs (A2 vs S2, the known
+    `q-fix-c2-fallen-s2-choice`), and the pack's modes follow from it.
+- **combat-potion-midfight: d2rs never drinks.**
+  - 1.14d sends C→S `26 02000000 …` in frame 69's input phase, and the
+    player's hp rises 80 a frame from f70.
+  - d2rs sends no C→S message after the join and its hp stays 2560 →
+    `q-fix-b45-belt-key-no-send`.
+  - d2rs also takes no Fallen damage (known: `q-fix-c1-monster-melee-rule`).
+- **First difference in both checks:**
+  - state, f2: save-loaded items have seed [1, 666] in d2rs, the real
+    seed in 1.14d → `q-fix-b45-save-item-seed`;
+  - packets, f1: C→S 0x67 byte 18 is 0 in 1.14d and 4 (the class) in
+    d2rs → `q-fix-b45-createxgame-byte18`.
+  - Then the Blood Moor warp population (known:
+    `q-fix-b-bloodmoor-warp-population`).
