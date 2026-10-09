@@ -105,7 +105,6 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
-    /// Runs `f` on the action wiring's view over the economy's parts.
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
     /// `levels`; the economy's item store, game seed and unique bits go
