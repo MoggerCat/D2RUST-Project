@@ -39,7 +39,13 @@ pub fn parse_text(text: &[u16]) -> DialogText {
     let mut cur: Vec<u16> = Vec::new();
     for &u in text {
         if u == 0x0A {
+            // §7 r2 (0x004A0320): a line that reached exactly 100 units
+            // leaves the LF unconsumed; it ends an empty next line.
+            let cut = cur.len() >= MAX_LINE;
             all.push(std::mem::take(&mut cur));
+            if cut {
+                all.push(Vec::new());
+            }
             continue;
         }
         if cur.len() == MAX_LINE {
@@ -553,15 +559,20 @@ impl DialogUi {
                     }
                 }
             }
-            // PROVISIONAL (specs/ui/messages.md §7 r6; REC-ui-dialog-end):
-            // "in the same pass" is read as inside the running step.
-            if inp.local_dead_or_absent || inp.unit_in_mode12 {
+            // specs/ui/messages.md §7 r6 (0x004A0E70): evaluated after the
+            // running step, which may have cleared the unit dialog.
+            if inp.local_dead_or_absent || (self.unit_dialog.is_some() && inp.unit_in_mode12) {
                 if let Some(g) = self.unit_dialog {
                     out.effects
                         .push(DialogEffect::Send(msg_u32s(0x30, &[1, g])));
                     out.effects.push(DialogEffect::UnitDialogCleanup);
                 }
                 out.effects.push(DialogEffect::Run4a0880);
+                self.unit_dialog = None;
+                if self.handlers {
+                    out.effects.push(DialogEffect::UnregisterHandlers);
+                    self.handlers = false;
+                }
             }
         }
         if inp.timed_box_drawn {
@@ -674,6 +685,13 @@ mod tests {
         assert_eq!(
             t.lines.iter().map(Vec::len).collect::<Vec<_>>(),
             vec![100, 100, 50]
+        );
+        // §7 r2: a line of exactly 100 units followed by LF leaves the LF
+        // unconsumed; it becomes an empty next line.
+        let t = parse_text(&w(&format!("8\n{}\nb", "a".repeat(100))));
+        assert_eq!(
+            t.lines,
+            vec![w(&"a".repeat(100)), Vec::new(), w("b")]
         );
         // An empty text gives no lines; a speed line alone, none either.
         assert!(parse_text(&[]).lines.is_empty());
@@ -991,6 +1009,37 @@ mod tests {
         );
         d.speech_pending = false;
         d
+    }
+
+    // Covers: specs/ui/messages.md §7 r6
+    #[test]
+    fn pass_abort_tests_the_unit_dialog_after_the_step() {
+        // A finishing step clears the unit dialog: mode 12 no longer aborts.
+        let mut d = running("100");
+        d.unit_dialog = Some(4);
+        d.panel.as_mut().unwrap().scroll.t_start = 1;
+        d.panel.as_mut().unwrap().scroll.p = 0;
+        let o = d.pass(&PassInput {
+            now: 1_000_000,
+            unit_in_mode12: true,
+            ..Default::default()
+        });
+        assert!(!o.effects.contains(&DialogEffect::Run4a0880));
+        // A dead player with handlers registered: Run4a0880, then unregister.
+        let mut d = running("8");
+        d.handlers = true;
+        let o = d.pass(&PassInput {
+            now: 1000,
+            local_dead_or_absent: true,
+            ..Default::default()
+        });
+        let at = |e: DialogEffect| o.effects.iter().position(|x| *x == e);
+        let (a, b) = (
+            at(DialogEffect::Run4a0880).unwrap(),
+            at(DialogEffect::UnregisterHandlers).unwrap(),
+        );
+        assert!(a < b);
+        assert!(d.unit_dialog.is_none() && !d.handlers);
     }
 
     // Covers: specs/ui/messages.md §7 r6
