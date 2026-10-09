@@ -198,6 +198,32 @@ mode change), but nothing drops: the `object` directive's allocator path does no
 init (`objects.md` init 3), so a poked chest is not a real chest. REC-260 / REC-93 need a preset
 chest (a route to one, or a poke that runs the object init).
 
+## Area C: level generation, diff-driven (2026-10-09)
+
+`traces/checks/a1-warp-den-ama.check` (ScnAma, seed 1234, poke `warp 8`
+at frame 20, 160 ticks; channels state and rng, the 1.14d rng side by
+`tools/trace-recorder/rng_poke.py`). Each line: the first divergence and
+what moved it.
+
+1. Frame 20, torch 2:18 and tile 5:1 seeds swapped: the first walk of
+   `0x005559A0` creates objects and warp tiles in one list-order pass
+   before the monsters (`drlg/rooms.md` §8 rule 6); d2rs made objects
+   first and tiles after the monsters. Fixed (`spawn_preset_first_pass`).
+2. Frame 21, game seed (object 2:21 class 55 misplaced; d2rs corpse 56 +
+   flies 103 extra): the shrine pick ran 8 tries in d2rs, 1 in 1.14d
+   (`0x0054F7D4` one step), because the init read the level from the
+   unit's room, which a new object does not have yet (`objects.md` §3:
+   init runs before the unit joins the world): level 0 failed every
+   `LevelMin`. Fixed: the level of the init record's room.
+3. Frame 24, town NPC seeds: 1.14d stops the town NPCs' thinks once no
+   client sees their room; d2rs keeps them (map AI draws at 24, 32).
+   Measured, no spec: `q-fix-real-npc-sleep-no-client`.
+
+So the Den of Evil's generation, presets and population are equal
+through frame 23 (state and rng channels; 160 frames compared). The rng
+channel also reports a false frame-2 divergence on every run
+(`q-fix-tool-rng-creation-draws`).
+
 ## Where the rest is blocked (2026-10-09, end of this session)
 
 Remaining `recording` rows after the runs above: see the last
