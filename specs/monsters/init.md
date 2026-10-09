@@ -31,37 +31,37 @@
 |   3. Placement | 165–173 |
 |   4. Creation sequence after placement (`0x005B2A00`) | 174–285 |
 |   5. Monster type init (`0x00574250`) | 286–303 |
-|   6. Stats and skills (`0x00573CB0`) | 304–343 |
-|   7. Monster level | 344–359 |
-|   8. Base values from monlvl | 360–394 |
-|   9. Player-count bonus (`0x00573930`) | 395–406 |
-|   10. Components (`0x005739D0`) | 407–417 |
-|   11. monprop (`monprop.txt`) | 418–426 |
-|   12. monequip (`0x005D6B60`) | 427–443 |
-|   13. Classic scaling (`0x0063EEF0`) | 444–451 |
-|   14. Normal mods and boss mods | 452–553 |
-|   15. Party minions | 554–558 |
-|   16. Boss spawns | 559–594 |
-|   17. Choosing umods (`0x005A0760`) | 595–638 |
-|   18. Boss minions and umod init (`0x005A2120`) | 639–656 |
-|   19. Umod init functions | 657–743 |
-|   20. Superuniques (`0x005A49B0`) | 744–792 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 793–807 |
-|   22. Umod callbacks and the type-7 event | 808–859 |
-|   23. Unique names (client) | 860–869 |
-|   24. Monster assign message | 870–921 |
-|   25. Calling the spawn functions outside population (tools) | 922–1012 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1013–1072 |
-|   27. Class reinit (`0x00574370`) | 1073–1118 |
-| Constants & data dependencies | 1119–1140 |
-| Randomness | 1141–1183 |
-| Edge cases & original bugs | 1184–1215 |
-| Test vectors | 1216–1217 |
-|   Synthetic (CI-safe) | 1218–1240 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1241–1271 |
-|   Recorded checks (monster assign 0xAC) | 1272–1284 |
-| Provenance | 1285–1363 |
-| Open questions | 1364–1444 |
+|   6. Stats and skills (`0x00573CB0`) | 304–356 |
+|   7. Monster level | 357–372 |
+|   8. Base values from monlvl | 373–407 |
+|   9. Player-count bonus (`0x00573930`) | 408–419 |
+|   10. Components (`0x005739D0`) | 420–430 |
+|   11. monprop (`monprop.txt`) | 431–439 |
+|   12. monequip (`0x005D6B60`) | 440–456 |
+|   13. Classic scaling (`0x0063EEF0`) | 457–464 |
+|   14. Normal mods and boss mods | 465–566 |
+|   15. Party minions | 567–571 |
+|   16. Boss spawns | 572–607 |
+|   17. Choosing umods (`0x005A0760`) | 608–651 |
+|   18. Boss minions and umod init (`0x005A2120`) | 652–669 |
+|   19. Umod init functions | 670–756 |
+|   20. Superuniques (`0x005A49B0`) | 757–805 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 806–820 |
+|   22. Umod callbacks and the type-7 event | 821–872 |
+|   23. Unique names (client) | 873–882 |
+|   24. Monster assign message | 883–934 |
+|   25. Calling the spawn functions outside population (tools) | 935–1025 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1026–1085 |
+|   27. Class reinit (`0x00574370`) | 1086–1131 |
+| Constants & data dependencies | 1132–1153 |
+| Randomness | 1154–1196 |
+| Edge cases & original bugs | 1197–1228 |
+| Test vectors | 1229–1230 |
+|   Synthetic (CI-safe) | 1231–1253 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1254–1284 |
+|   Recorded checks (monster assign 0xAC) | 1285–1297 |
+| Provenance | 1298–1376 |
+| Open questions | 1377–1457 |
 <!-- /index -->
 
 ## Summary
@@ -329,6 +329,19 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     (else fatal error).
 11. Classic scaling `0x0063EEF0` (§13; no effect in expansion games).
 12. Post an extra stat list (`0x006251F0` + `0x00626E10`, `sim/stat-lists.md`).
+    1.14d-read 2026-10-09 (`0x00574072`–`0x00574086`, settles REC-891):
+    new list `0x006251F0(pool = game +0x1C, flags 1, expire 0, owner
+    type 1, owner GUID = unit +0x0C)` (list +0x00 pool, +0x08 owner
+    type, +0x0C owner GUID, +0x10 flags, +0x18 expire; all else 0), then
+    attach `0x00626E10(unit, list, reset 1)` (`sim/stat-lists.md` §8.1).
+    Flags 1 has neither 0x80000000 (extended) nor 0x2000, so the list
+    is linked as a plain list (unit list +0x3C chain); reset 1 clears
+    its DYNAMIC bit 0x40000000, so every entry it later gets propagates
+    into the unit's totals unfiltered (no `mindamage` / `maxdamage` /
+    `tohit` exclusion). The list is empty at attach.
+    ```
+    L := new_list(pool, flags=1, expire=0, owner=(1, U.guid)); attach(U, L, reset=1)
+    ```
 13. Inventory: monstats `inventory` set → `interact` set: NPC store
     inventory (`0x00536B20`, unit +0x60); else a new inventory
     (`0x0063ABD0`).
