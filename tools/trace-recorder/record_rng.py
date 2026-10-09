@@ -21,6 +21,19 @@ What it hooks (addresses: specs/sim/rng.md, Provenance):
 While a thread single-steps, every other thread is suspended, so no thread
 can run through a temporarily removed breakpoint.
 
+Emulation (`--emulate on`, the default; specs/tools/rng-trace.md §4 r7):
+single steps are the cost (two debug events each), so at a breakpoint the
+instructions the single steps would run are run instead by `x86emu.py` on
+the stopped thread's registers: an inline site's whole trace from the
+`mov` to the `adc` (one debug event per draw instead of about seven), and
+the one instruction under a helper, setter, tick or return breakpoint
+(no step-over). The same rules pick the `mul` and the add/adc pair; the
+registers, flags and stack writes are committed only when every
+instruction was understood and every status flag is defined, else the
+thread is single-stepped as before. `--emulate check` single-steps
+everything and compares each emulated result with the real one;
+`--emulate off` never emulates.
+
 The game process is always terminated when this script ends: on the time
 limit, on Ctrl+C, on any error (finally block), and by the system if the
 debugger dies (kill-on-exit).
@@ -39,7 +52,9 @@ import sys
 import time
 from ctypes import wintypes as W
 
-TOOL = "trace-recorder 0.2.0"
+import x86emu
+
+TOOL = "trace-recorder 0.3.0"
 RAW_FORMAT = "rng-raw-1"
 GAME_EXE_SHA256 = "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf"
 IMAGE_BASE = 0x400000
@@ -362,6 +377,15 @@ def decode_add_adc(code):
 MUL_FOR_MOV = {0xB9: b"\xF7\xE1", 0xBA: b"\xF7\xE2"}  # mov ecx -> mul ecx, mov edx -> mul edx
 
 
+def text_section(exe_bytes):
+    """[lo, hi) of Game.exe's .text in memory (the first section)."""
+    pe = struct.unpack_from("<I", exe_bytes, 0x3C)[0]
+    optsz = struct.unpack_from("<H", exe_bytes, pe + 20)[0]
+    name, vsz, va = struct.unpack_from("<8sII", exe_bytes, pe + 24 + optsz)
+    assert name.rstrip(b"\0") == b".text"
+    return IMAGE_BASE + va, IMAGE_BASE + va + ((vsz + 0xFFF) & ~0xFFF)
+
+
 def find_inline_sites(exe_bytes):
     """Scan .text for `mov ecx|edx, K` followed within 14 bytes by
     `mul ecx|edx` (spec §3.4). Returns the `mov` addresses outside the
@@ -397,6 +421,8 @@ class Recorder:
     frames = False   # --frames: tick markers, frame and owner hints (rng-trace.md §4)
     max_ticks = 0    # --ticks N: stop at the entry of tick N + 1
     skip_ranges = ()  # --skip-inline: [lo, hi) code ranges whose inline sites are not hooked
+    emulate = "off"  # --emulate on|off|check (x86emu instead of single steps;
+    #                  main() defaults to on, subclasses and probes keep off)
 
     def __init__(self, exe, args, out, seconds, with_inline, max_events):
         self.exe, self.args, self.out_path = exe, args, out
@@ -425,6 +451,9 @@ class Recorder:
         self.frame = 0           # its frame (0 before the first tick)
         self.ticks = 0
         self.done = False
+        self.emu_notes = set()
+        self.text_range = (0, 0)  # Game.exe .text [lo, hi) (orig_code's page cache)
+        self.code_pages = {}
 
     # memory / context
     def read(self, addr, n):
@@ -483,7 +512,25 @@ class Recorder:
                 self.bp_inserted.discard(addr)
 
     def orig_code(self, addr, n):
-        """Memory with our INT3s replaced by the original bytes."""
+        """Memory with our INT3s replaced by the original bytes. With
+        emulation on, Game.exe's .text is read once per 4 KB page and kept
+        (the code does not change; our own INT3s are undone from bp_orig)."""
+        lo, hi = self.text_range
+        if self.emulate != "off" and lo <= addr and addr + n <= hi:
+            out, a = bytearray(), addr
+            while a < addr + n:
+                page = a & ~0xFFF
+                p = self.code_pages.get(page)
+                if p is None:
+                    p = bytearray(self.read(page, 0x1000))
+                    for b_addr, v in self.bp_orig.items():
+                        if page <= b_addr < page + 0x1000:
+                            p[b_addr - page] = v
+                    self.code_pages[page] = p
+                take = min(addr + n, page + 0x1000) - a
+                out += p[a - page:a - page + take]
+                a += take
+            return bytes(out)
         b = bytearray(self.read(addr, n))
         for k in range(n):
             if addr + k in self.bp_inserted:
@@ -544,10 +591,28 @@ class Recorder:
             self.on_helper_entry(tid, addr, ctx)
         if "setter" in roles:
             self.on_setter(tid, addr, ctx)
+        emu = None
         if "inline" in roles:
+            if self.emulate != "off":
+                emu = self.emu_inline(addr, ctx)
+                if emu is not None and self.emulate == "on":
+                    self.commit(tid, ctx, emu[1])
+                    self.count("emu:inline")
+                    mul, lo, new = emu[0]
+                    self.emit(self.inline_record(tid, addr, mul, lo, new, None))
+                    self.end_stepping(tid)
+                    return
             # at the mov: seek the mul of that register, then the add/adc
             trace = {"site": addr, "mul": None, "lo": None, "steps": 0, "pending": None,
-                     "new_lo": None, "reg": "Ecx" if self.bp_orig[addr] == 0xB9 else "Edx"}
+                     "new_lo": None, "reg": "Ecx" if self.bp_orig[addr] == 0xB9 else "Edx",
+                     "emu": emu}
+        elif self.emulate != "off":
+            emu = self.emu_one(addr, ctx)
+            if emu is not None and self.emulate == "on":
+                self.commit(tid, ctx, emu)
+                self.count("emu:one")
+                self.end_stepping(tid)
+                return
         # step over the original instruction
         if addr in self.bp_inserted:
             self.write(addr, bytes([self.bp_orig[addr]]))
@@ -555,13 +620,23 @@ class Recorder:
         self.bp_out.setdefault(addr, set()).add(tid)
         ctx.EFlags |= TRAP_FLAG
         self.set_ctx(tid, ctx)
-        self.stepping[tid] = {"reinsert": addr, "trace": trace}
+        self.stepping[tid] = {"reinsert": addr, "trace": trace,
+                              "emu": emu if trace is None else None}
         self.thaw(tid)
         self.freeze_others()
+
+    def end_stepping(self, tid):
+        """An emulated hit that arrived while this thread was still being
+        stepped (its step landed on a breakpoint): it steps no more."""
+        if self.stepping.pop(tid, None) is not None and not self.stepping:
+            self.thaw_all()
 
     def on_single_step(self, tid):
         st = self.stepping[tid]
         self.finish_reinsert(tid, st)
+        if st.get("emu") is not None:  # --emulate check: one instruction
+            self.emu_compare(tid, self.get_ctx(tid), st["emu"], "one")
+            st["emu"] = None
         tr = st["trace"]
         if tr is not None and self.trace_step(tid, st, tr):
             return
@@ -592,6 +667,11 @@ class Recorder:
                 if kind == "add":
                     tr["new_lo"] = val
                 elif kind == "adc" and tr["new_lo"] is not None:
+                    if tr.get("emu") is not None:  # --emulate check: the whole trace
+                        e = tr["emu"]
+                        got = (tr["mul"], tr["lo"], (tr["new_lo"], val))
+                        self.emu_compare(tid, ctx, e[1], "inline",
+                                         None if e[0] == got else f"draw {e[0]} vs {got}")
                     self.finish_trace(tid, st, (tr["new_lo"], val), None)
                     return False
             if tr["steps"] > 64:
@@ -615,11 +695,16 @@ class Recorder:
     def finish_trace(self, tid, st, new_state, problem):
         tr = st["trace"]
         st["trace"] = None
+        if tr.get("emu") is not None and problem is not None:
+            self.count("emu_check:unfinished")
         if tr["mul"] is None:  # interrupted before the mul: no draw yet
             return
+        self.emit(self.inline_record(tid, tr["site"], tr["mul"], tr["lo"], new_state, problem))
+
+    @staticmethod
+    def inline_record(tid, site, mul, lo, new_state, problem):
         rec = {"type": "draw", "via": "inline", "op": "step", "tid": tid,
-               "site": f"{tr['site']:#x}", "mul": f"{tr['mul']:#x}"}
-        lo = tr["lo"]
+               "site": f"{site:#x}", "mul": f"{mul:#x}"}
         if new_state is None:
             rec["before"] = [lo, None]
             rec["after"] = None
@@ -630,7 +715,138 @@ class Recorder:
             rec["before"] = [lo, hi]
             rec["after"] = [lo2, hi2]
             rec["ret"] = lo2
-        self.emit(rec)
+        return rec
+
+    # --- emulation instead of single steps (x86emu; rng-trace.md §4 r7) ----
+    def cpu_from(self, ctx, addr):
+        return x86emu.Cpu([getattr(ctx, n) for n in REGS], addr, ctx.EFlags, self.read)
+
+    def hooked_inside(self, ins, start):
+        """True when an address of `ins` other than `start` holds one of our
+        breakpoints: running it here would skip that hook."""
+        return any(a in self.roles for a in range(ins.addr, ins.addr + ins.len) if a != start)
+
+    def emu_one(self, addr, ctx):
+        """The instruction under a breakpoint, run on a copy; None when it
+        cannot be emulated exactly."""
+        try:
+            ins = x86emu.decode(addr, self.orig_code(addr, 16))
+            if self.hooked_inside(ins, addr):
+                return None
+            cpu = self.cpu_from(ctx, addr)
+            cpu.execute(ins)
+        except (x86emu.Unsupported, OSError) as e:
+            self.count("emu:fallback_one")
+            self.emu_why(addr, e)
+            return None
+        if not cpu.exact():
+            self.count("emu:fallback_one")
+            return None
+        return cpu
+
+    def emu_inline(self, addr, ctx):
+        """The inline trace (trace_step's rules: the first `mul` of the
+        register while it holds K, then the add/adc pair) run on a copy from
+        the `mov`. ((mul, lo, (lo', hi')), cpu), or None when an
+        instruction is not emulated, a hook lies on the path, a limit is
+        reached or a flag stays undefined (then the thread is stepped)."""
+        reg = 1 if self.bp_orig[addr] == 0xB9 else 2
+        want = MUL_FOR_MOV[self.bp_orig[addr]]
+        win_lo, win = addr, self.orig_code(addr, 64)
+
+        def code(a, n):
+            nonlocal win_lo, win
+            if not (win_lo <= a and a + n <= win_lo + len(win)):
+                win_lo, win = a, self.orig_code(a, 64)
+            return win[a - win_lo:a - win_lo + n]
+        try:
+            cpu = self.cpu_from(ctx, addr)
+            steps, mul, lo, pending, new_lo = 0, None, None, None, None
+            while True:
+                if steps:
+                    if mul is None:
+                        if steps > 24:
+                            raise x86emu.Unsupported("no mul within 24 instructions")
+                        if code(cpu.eip, 2) == want and cpu.r[reg] == MULTIPLIER:
+                            mul, lo = cpu.eip, cpu.r[0]
+                    else:
+                        if pending is not None:
+                            kind, r = pending
+                            val = cpu.r[r]
+                            pending = None
+                            if kind == "add":
+                                new_lo = val
+                            elif kind == "adc" and new_lo is not None:
+                                break
+                        if steps > 64:
+                            raise x86emu.Unsupported("no add/adc within 64 instructions")
+                        pending = decode_add_adc(code(cpu.eip, 6))
+                ins = x86emu.decode(cpu.eip, code(cpu.eip, 16))
+                if self.hooked_inside(ins, addr if not steps else None):
+                    raise x86emu.Unsupported(f"hook inside {ins.addr:#x}")
+                cpu.execute(ins)
+                steps += 1
+            if not cpu.exact():
+                raise x86emu.Unsupported("undefined flag at the end")
+        except (x86emu.Unsupported, OSError) as e:
+            self.count("emu:fallback_inline")
+            self.emu_why(addr, e)
+            return None
+        return (mul, lo, (new_lo, val)), cpu
+
+    def emu_why(self, addr, e):
+        key = f"emulation fell back at {addr:#x}: {e}"
+        if key not in self.emu_notes:
+            self.emu_notes.add(key)
+            if len(self.emu_notes) <= 20:
+                self.notes.append(key)
+
+    def commit(self, tid, ctx, cpu):
+        """Registers, eip, status flags and buffered writes of an emulated
+        run into the thread (the breakpoint stays armed)."""
+        run, start = b"", None
+        for a in sorted(cpu.writes):
+            if start is not None and a == start + len(run):
+                run += bytes([cpu.writes[a]])
+                continue
+            if run:
+                self.write_data(start, run)
+            start, run = a, bytes([cpu.writes[a]])
+        if run:
+            self.write_data(start, run)
+        for i, n in enumerate(REGS):
+            setattr(ctx, n, cpu.r[i])
+        ctx.Eip = cpu.eip
+        ctx.EFlags = (ctx.EFlags & ~x86emu.STATUS & M32) | (cpu.fl & x86emu.STATUS)
+        self.set_ctx(tid, ctx)
+
+    def write_data(self, addr, data):
+        buf = (C.c_ubyte * len(data)).from_buffer_copy(data)
+        got = C.c_size_t()
+        if not WriteProcessMemory(self.h_process, C.c_void_p(addr), buf, len(data),
+                                  C.byref(got)):
+            raise winerr(f"WriteProcessMemory {addr:#x}")
+
+    def emu_compare(self, tid, ctx, cpu, what, extra=None):
+        """--emulate check: the real state after the single steps against
+        the emulated one."""
+        diffs = [f"{n} {getattr(ctx, n):#x} vs {cpu.r[i]:#x}" for i, n in enumerate(REGS)
+                 if getattr(ctx, n) != cpu.r[i]]
+        if ctx.Eip != cpu.eip:
+            diffs.append(f"eip {ctx.Eip:#x} vs {cpu.eip:#x}")
+        if (ctx.EFlags ^ cpu.fl) & x86emu.STATUS:
+            diffs.append(f"flags {ctx.EFlags & x86emu.STATUS:#x} vs {cpu.fl & x86emu.STATUS:#x}")
+        for a, v in sorted(cpu.writes.items()):
+            if self.read(a, 1)[0] != v:
+                diffs.append(f"byte {a:#x}")
+                break
+        if extra:
+            diffs.append(extra)
+        self.count(f"emu_check:{what}_{'diff' if diffs else 'ok'}")
+        if diffs and len(self.emu_notes) < 40:
+            self.emu_notes.add(f"check {what} {tid}")
+            self.notes.append(f"emulation check {what} differs at eip {ctx.Eip:#x}: "
+                              + "; ".join(diffs))
 
     def on_helper_entry(self, tid, addr, ctx):
         op, layout, _ = HELPERS[addr]
@@ -663,7 +879,10 @@ class Recorder:
             self.ret_refs[addr] -= 1
             if self.ret_refs[addr] == 0:
                 del self.ret_refs[addr]
-                self.drop_role(addr, "ret")
+                if self.emulate == "off":
+                    self.drop_role(addr, "ret")
+                # else the return INT3 stays: a hit without a pending call is
+                # ignored above, and two memory writes per call are saved
 
     # --- frames and owners (--frames) ---------------------------------------
     def on_tick(self, ctx):
@@ -767,6 +986,7 @@ class Recorder:
         if sha != GAME_EXE_SHA256:
             raise RuntimeError(f"{self.exe}: sha256 {sha} is not the reference 1.14d Game.exe")
         self.inline_sites, odd = find_inline_sites(exe_bytes)
+        self.text_range = text_section(exe_bytes)
         if odd:
             self.notes.append(f"{odd} multiplier immediates without a nearby mul (not hooked)")
         os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
@@ -787,7 +1007,7 @@ class Recorder:
                   "date": datetime.date.today().isoformat(), "game_exe_sha256": sha,
                   "args": self.args, "pid": self.pid, "seconds": self.seconds,
                   "inline": self.with_inline, "side": "orig", "frames": self.frames,
-                  "max_ticks": self.max_ticks,
+                  "max_ticks": self.max_ticks, "emulate": self.emulate,
                   "skip_inline": [[f"{a:#x}", f"{b:#x}"] for a, b in self.skip_ranges]}
         self.out.write(json.dumps(header) + "\n")
         try:
@@ -945,6 +1165,10 @@ def main():
                     help="LO-HI[,LO-HI...]: inline sites in these code ranges are not hooked "
                          "(e.g. 'drlg' = %s); faster, those draws are missing" % (
                              ",".join(f"{a:#x}-{b:#x}" for a, b in SKIP_PRESETS["drlg"])))
+    ap.add_argument("--emulate", choices=("on", "off", "check"), default="on",
+                    help="run the instructions under a breakpoint and an inline trace in "
+                         "x86emu.py instead of single-stepping (on, default), never (off), or "
+                         "single-step and compare every emulated result (check)")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"],
                     help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
@@ -959,6 +1183,7 @@ def main():
     r.auto = auto
     r.frames, r.max_ticks = a.frames, a.ticks
     r.skip_ranges = parse_ranges(a.skip_inline)
+    r.emulate = a.emulate
     t0 = time.perf_counter()
     try:
         counts = r.run()
