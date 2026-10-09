@@ -1,0 +1,58 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Duriel's Lair is level 73, Duriel monstats 211. Duriel's death leads to 14.4 (Tyrael) then Meshif msg 450 sets 14.0.
+checkpoint 1
+name CkDuriel
+title Duriel: Duriel's Lair (Act II boss, quest 14)
+class sor
+level 30
+expansion
+difficulty normal
+act 1
+stat 0 45   # strength
+stat 1 70   # energy
+stat 2 35   # dexterity
+stat 3 75   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 50944   # life 199 (x256)
+stat 7 50944
+stat 8 41728   # mana 163
+stat 9 41728
+stat 10 43008   # stamina 168
+stat 11 43008
+skill 0 4   # fb (skill 36)
+skill 3 4   # ib (skill 39)
+skill 4 1   # fa (skill 40)
+skill 6 4   # static (skill 42)
+skill 7 1   # tk (skill 43)
+skill 8 8   # nova (skill 44)
+skill 9 6   # blast (skill 45)
+skill 1 1   # warmth (skill 37)
+skill 18 1   # tele (skill 54)
+skill 19 1   # gs (skill 55)
+right-skill 45
+left-skill 36
+gold 150000
+quests 1.0 2.0 4.0 6.0 acts=1 9.0 10.0 11.0 12.0 13.0
+waypoints lv=1 lv=3 lv=4 lv=5 lv=6 lv=27 lv=29 lv=32 lv=35 lv=40 lv=48 lv=42 lv=57 lv=43 lv=44 lv=52 lv=74 lv=46
+item fhl/body=1
+item brs/body=3
+item bst/body=4
+item mgl/body=10
+item mbt/body=9
+item mbl/body=8
+item rin/body=6
+item rin/body=7
+item amu/body=2
+item hp4/belt=0
+item hp4/belt=1
+item mp4/belt=2
+item mp4/belt=3
+item rvs/belt=4
+item rvs/belt=5
+start 5 warp 73
+start 20 goto unit 211
+need player lv 73

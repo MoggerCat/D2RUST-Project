@@ -532,7 +532,9 @@ pub fn monster_set_mode<H: UnitHooks>(
     }
     if mode != monster_mode::GH {
         hooks.monster_mode_bookkeeping(sim, unit, mode);
-        // `umod-callbacks.md` §2 rule 1: umod mode 0, old mode still set.
+        // `umod-callbacks.md` §2 rule 1: the mode damage rewrite, then
+        // umod mode 0, old mode still set.
+        hooks.monster_mode_damage(sim, unit, mode);
         hooks.monster_umods(sim, unit, 0);
     }
     let start = monster_record(sim, hooks, unit, mode)

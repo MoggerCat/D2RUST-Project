@@ -707,15 +707,38 @@ pub fn recorded_rooms() -> Vec<(bool, u8, u16, u16)> {
         .collect()
 }
 
+/// `facts/join/a1-new-sor.tsv`: the Wine recording of a new Rogue
+/// Encampment sorceress's join.
+const NEW_SOR: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../facts/join/a1-new-sor.tsv"
+));
+
+/// The server→client messages of [`NEW_SOR`] in record order: the server
+/// frame (`None` before the first) and the bytes.
+pub fn recorded_new_sor_bytes() -> Vec<(Option<u32>, Vec<u8>)> {
+    NEW_SOR
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.starts_with("n\t"))
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.get(2) == Some(&"s2c")).then(|| {
+                let hex = f[6];
+                let bytes = (0..hex.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex"))
+                    .collect();
+                (f[1].parse().ok(), bytes)
+            })
+        })
+        .collect()
+}
+
 /// One server→client message of the Wine recording of a new Rogue
-/// Encampment sorceress (`facts/join/a1-new-sor.tsv`): the server frame
-/// (`None` before the first), the message id and its size.
+/// Encampment sorceress ([`NEW_SOR`]): the server frame (`None` before
+/// the first), the message id and its size.
 pub fn recorded_new_sor() -> Vec<(Option<u32>, u8, usize)> {
-    const FACTS: &str = include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../facts/join/a1-new-sor.tsv"
-    ));
-    FACTS
+    NEW_SOR
         .lines()
         .filter(|l| !l.starts_with('#') && !l.starts_with("n\t"))
         .filter_map(|l| {

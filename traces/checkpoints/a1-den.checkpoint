@@ -1,0 +1,43 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Den of Evil is level 8; bit 1.0 is set by Akara (msg 76) with 1.1 after the clear (quests.md §1.9).
+checkpoint 1
+name CkDen
+title Den of Evil: before the clear (Act I, quest 1)
+class sor
+level 6
+expansion
+difficulty normal
+act 0
+stat 0 20   # strength
+stat 1 45   # energy
+stat 2 25   # dexterity
+stat 3 15   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 14080   # life 55 (x256)
+stat 7 14080
+stat 8 16640   # mana 65
+stat 9 16640
+stat 10 21504   # stamina 84
+stat 11 21504
+skill 0 3   # fb (skill 36)
+skill 1 1   # warmth (skill 37)
+skill 4 1   # fa (skill 40)
+right-skill 36
+left-skill 36
+gold 30000
+# no quest bits
+waypoints lv=1 lv=3
+item cap/body=1
+item qui/body=3
+item sst/body=4
+item lbt/body=9
+item hp2/belt=0
+item hp2/belt=1
+item mp2/belt=2
+item mp2/belt=3
+start 5 warp 8
+need player lv 8

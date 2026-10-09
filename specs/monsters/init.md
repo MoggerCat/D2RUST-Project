@@ -29,39 +29,39 @@
 |   1. Entry points | 124–146 |
 |   2. The create request | 147–164 |
 |   3. Placement | 165–173 |
-|   4. Creation sequence after placement (`0x005B2A00`) | 174–243 |
-|   5. Monster type init (`0x00574250`) | 244–261 |
-|   6. Stats and skills (`0x00573CB0`) | 262–301 |
-|   7. Monster level | 302–317 |
-|   8. Base values from monlvl | 318–352 |
-|   9. Player-count bonus (`0x00573930`) | 353–364 |
-|   10. Components (`0x005739D0`) | 365–375 |
-|   11. monprop (`monprop.txt`) | 376–384 |
-|   12. monequip (`0x005D6B60`) | 385–401 |
-|   13. Classic scaling (`0x0063EEF0`) | 402–409 |
-|   14. Normal mods and boss mods | 410–511 |
-|   15. Party minions | 512–516 |
-|   16. Boss spawns | 517–552 |
-|   17. Choosing umods (`0x005A0760`) | 553–596 |
-|   18. Boss minions and umod init (`0x005A2120`) | 597–614 |
-|   19. Umod init functions | 615–701 |
-|   20. Superuniques (`0x005A49B0`) | 702–750 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 751–765 |
-|   22. Umod callbacks and the type-7 event | 766–817 |
-|   23. Unique names (client) | 818–827 |
-|   24. Monster assign message | 828–879 |
-|   25. Calling the spawn functions outside population (tools) | 880–970 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 971–1030 |
-|   27. Class reinit (`0x00574370`) | 1031–1076 |
-| Constants & data dependencies | 1077–1098 |
-| Randomness | 1099–1141 |
-| Edge cases & original bugs | 1142–1173 |
-| Test vectors | 1174–1175 |
-|   Synthetic (CI-safe) | 1176–1198 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1199–1229 |
-|   Recorded checks (monster assign 0xAC) | 1230–1242 |
-| Provenance | 1243–1321 |
-| Open questions | 1322–1402 |
+|   4. Creation sequence after placement (`0x005B2A00`) | 174–285 |
+|   5. Monster type init (`0x00574250`) | 286–303 |
+|   6. Stats and skills (`0x00573CB0`) | 304–356 |
+|   7. Monster level | 357–372 |
+|   8. Base values from monlvl | 373–407 |
+|   9. Player-count bonus (`0x00573930`) | 408–419 |
+|   10. Components (`0x005739D0`) | 420–430 |
+|   11. monprop (`monprop.txt`) | 431–439 |
+|   12. monequip (`0x005D6B60`) | 440–456 |
+|   13. Classic scaling (`0x0063EEF0`) | 457–464 |
+|   14. Normal mods and boss mods | 465–566 |
+|   15. Party minions | 567–571 |
+|   16. Boss spawns | 572–607 |
+|   17. Choosing umods (`0x005A0760`) | 608–651 |
+|   18. Boss minions and umod init (`0x005A2120`) | 652–669 |
+|   19. Umod init functions | 670–756 |
+|   20. Superuniques (`0x005A49B0`) | 757–805 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 806–820 |
+|   22. Umod callbacks and the type-7 event | 821–872 |
+|   23. Unique names (client) | 873–882 |
+|   24. Monster assign message | 883–934 |
+|   25. Calling the spawn functions outside population (tools) | 935–1025 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1026–1085 |
+|   27. Class reinit (`0x00574370`) | 1086–1131 |
+| Constants & data dependencies | 1132–1153 |
+| Randomness | 1154–1196 |
+| Edge cases & original bugs | 1197–1228 |
+| Test vectors | 1229–1230 |
+|   Synthetic (CI-safe) | 1231–1253 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1254–1284 |
+|   Recorded checks (monster assign 0xAC) | 1285–1297 |
+| Provenance | 1298–1376 |
+| Open questions | 1377–1457 |
 <!-- /index -->
 
 ## Summary
@@ -241,6 +241,48 @@ none in slot 3), never NU (1) or DD (12). So a monster created in mode
 1 (population) or 12 draws nothing between the type init and the
 allocator's return.
 
+#### 4.2 Unit-seed draws of a town NPC's creation
+
+Every successful call of `0x005B2A00` runs the type init inside the
+allocator (§4 step 1), so its unit-seed draws (Randomness 3–8) happen
+whoever builds the request: population, DS1 presets
+(`population.md` §11.3) and object or quest inits alike. The wrapper
+`0x005B2F20` only copies its arguments into the request (§2) and draws
+nothing; an object init that spawns through it (Hratli dummies, inits
+49 / 50, `world/quests-act3-2.md` §11.7 rule 3) adds nothing after the
+call either.
+
+For an Npc town row (blank `minHP` / `maxHP`, no monprop, no monequip,
+`El*Mode` unused, no party, no umod: hratli 253, meshif2 264, the other
+Act III NPCs) the creation steps U exactly twice:
+
+| # | Site (1.14d) | Draw | Use |
+|---|---|---|---|
+| 1 | components `0x005739D0` (§10): `roll(variant count)` at `0x00573A03` when the class has region variants, else the inline per-component loop (`0x00573A8E`) | one step: the only component with a nonzero choice count is TR (`TRv` = `lit`, n = 1) | component index (TR := 0, `lit`); the other 15 have n = 0 and do not step |
+| 2 | HP, `0x00573CB0` step 8: `0x0045C3E0` at `0x00573F8F` with n = maxHP − minHP + 1 = 1 | one step (`roll(1)` steps and returns 0) | base HP := minHP + 0 |
+
+Nothing else draws on U before the unit's first think: mode 1 has no
+mode damage or start-function draw (§4.1), `BaseId` hratli / meshif2 has
+no normal or boss mod (§14), `PartyMin` = `PartyMax` (no party roll),
+and the first think (frame + 2, `ai.md` §1.5) is the Npc home step
+(`ai-bodies.md` §9.9 step 1: idle 20, no draw).
+
+Recorded (`traces/raw/check-milestone-act4-entry/orig.state.jsonl`,
+`-seed 1234`; same Act III town units as `a3-start-noquest-sor`): the
+units appear in the frame-2 snapshot (frame 1 has none), i.e. in their
+creation frame. Hratli (class 253, g 1, spawned by dummy 378 with
+`0x005B2F20(game, room, x, y, 253, mode 1, −1, 0)`): fresh unit seed
+{4040195123, 666} → step 1 {3284026841, 1685134555} → step 2
+{3975998680, 1369742535}, the recorded value. meshif2 264 (DS1 preset):
+fresh {2782325891, 666} → {2931798889, 1160486897} → recorded
+{3503407038, 1222830944}, the same two steps. act3male 294 (Towner,
+more component choices) steps more often. Step: `sim/rng.md`
+(lo' = low 32 bits, hi' = high 32 bits of lo × 0x6AC690C5 + hi).
+Provenance: 2026-10-09 (pc1-day3-c, read in `0x005B2F20`, `0x005B70B0`,
+`0x0054E490`, `0x005557D0`, `0x005B2A00`, `0x005739D0`, `0x006647C0`,
+`0x00573CB0`, `0x0045C3E0`; seeds stepped with `sim/rng.md`;
+q-prov-data).
+
 ### 5. Monster type init (`0x00574250`)
 
 Called by the allocator with (game, room, unit, GUID):
@@ -287,6 +329,19 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     (else fatal error).
 11. Classic scaling `0x0063EEF0` (§13; no effect in expansion games).
 12. Post an extra stat list (`0x006251F0` + `0x00626E10`, `sim/stat-lists.md`).
+    1.14d-read 2026-10-09 (`0x00574072`–`0x00574086`, settles REC-891):
+    new list `0x006251F0(pool = game +0x1C, flags 1, expire 0, owner
+    type 1, owner GUID = unit +0x0C)` (list +0x00 pool, +0x08 owner
+    type, +0x0C owner GUID, +0x10 flags, +0x18 expire; all else 0), then
+    attach `0x00626E10(unit, list, reset 1)` (`sim/stat-lists.md` §8.1).
+    Flags 1 has neither 0x80000000 (extended) nor 0x2000, so the list
+    is linked as a plain list (unit list +0x3C chain); reset 1 clears
+    its DYNAMIC bit 0x40000000, so every entry it later gets propagates
+    into the unit's totals unfiltered (no `mindamage` / `maxdamage` /
+    `tohit` exclusion). The list is empty at attach.
+    ```
+    L := new_list(pool, flags=1, expire=0, owner=(1, U.guid)); attach(U, L, reset=1)
+    ```
 13. Inventory: monstats `inventory` set → `interact` set: NPC store
     inventory (`0x00536B20`, unit +0x60); else a new inventory
     (`0x0063ABD0`).

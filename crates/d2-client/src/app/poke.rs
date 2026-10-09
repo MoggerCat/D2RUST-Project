@@ -21,7 +21,7 @@
 use std::collections::BTreeSet;
 
 use d2_server::adapters::handlers::world::WorldHost;
-use d2_sim::poke::{self, PokeFile, PokeOp};
+use d2_sim::poke::{self, Directive, GotoTarget, GotoWalk, PokeFile, PokeOp};
 use d2_sim::units::lists::client_state;
 
 use super::server_thread::{ThreadLink, ThreadStopped};
@@ -88,6 +88,8 @@ pub fn due_after(when: When, anchor: Option<i32>) -> Option<i32> {
 #[derive(Debug, Default)]
 pub struct Schedule {
     pending: Vec<Entry>,
+    /// `goto` walks still stepping (`poke.md` §6), with their state.
+    walking: Vec<(Entry, GotoWalk)>,
     /// F0: the frame in which the local client was first seen in game.
     anchor: Option<i32>,
 }
@@ -96,17 +98,18 @@ impl Schedule {
     pub fn new(entries: Vec<Entry>) -> Self {
         Self {
             pending: entries,
+            walking: Vec::new(),
             anchor: None,
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.pending.is_empty()
+        self.pending.is_empty() && self.walking.is_empty()
     }
 
     /// Runs every due entry in order on `s` and prints its result.
     pub fn run_due(&mut self, s: &mut Sim) {
-        if self.pending.is_empty() {
+        if self.is_empty() {
             return;
         }
         let frame = s.game.frame;
@@ -126,8 +129,23 @@ impl Schedule {
             .into_iter()
             .partition(|e| due_after(e.when, anchor).is_some_and(|f| frame >= f));
         self.pending = later;
-        for e in due {
-            let r = apply_now(s, &e.op);
+        let walks = std::mem::take(&mut self.walking);
+        let due = walks
+            .into_iter()
+            .map(|(e, w)| (e, Some(w)))
+            .chain(due.into_iter().map(|e| (e, None)));
+        for (e, walk) in due {
+            let r = match (&e.op, walk) {
+                (PokeOp::Directive(Directive::Goto(t)), w) => {
+                    let (r, w) = goto_now(s, *t, w.unwrap_or_default());
+                    if r == poke::PokeResult::Pending {
+                        self.walking.push((e, w));
+                        continue;
+                    }
+                    r
+                }
+                _ => apply_now(s, &e.op),
+            };
             let late = match due_after(e.when, anchor) {
                 Some(f) if frame > f => format!(" (late: due after frame {f})"),
                 _ => String::new(),
@@ -172,18 +190,37 @@ pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
         return poke::PokeResult::Unresolved("@player".into());
     };
     let waypoints = waypoint_classes(s);
+    // A copy: the loan below takes the world's tables for its call.
+    let tables = s.world.tables.clone();
     let env = poke::Env {
         player,
         waypoint_classes: &waypoints,
-        items: Some(&s.world.tables),
+        items: Some(&tables),
     };
-    let r = poke::apply_op(&mut s.game, &mut s.events, &env, op);
+    // The quest parts are lent as in the tick and the 0x13 / waypoint
+    // handlers, so a quest object a directive creates (a `warp` that
+    // builds an act) runs its init (`quests-act2-2.md` §2 item 1).
+    let game = &mut s.game;
+    let r = s
+        .world
+        .lend_quests(&mut s.events, |_, ev| poke::apply_op(game, ev, &env, op));
     // The unit work the directive raised runs inside it in 1.14d: a
     // `warp`'s pet follow `0x005754B0` (inside the level warp
     // `0x0053AEC0`, `hirelings.md` §6 rule 1), so the hireling stands at
     // the player before the next frame's events.
     s.world.session_work(&mut s.game, &mut s.events);
     r
+}
+
+/// One step of a `goto` walk (`poke.md` §6) on `s`, with the walk's
+/// state; no local player: `unresolved @player`.
+pub fn goto_now(s: &mut Sim, t: GotoTarget, mut walk: GotoWalk) -> (poke::PokeResult, GotoWalk) {
+    let Some((player, _)) = local_player(s) else {
+        return (poke::PokeResult::Unresolved("@player".into()), walk);
+    };
+    let env = poke::Env::new(player);
+    let r = poke::goto_step(&mut s.game, &mut s.events, &env, &t, &mut walk);
+    (r, walk)
 }
 
 /// The keyword a `poke` record names (`d`): the directive's, or `spawn`.
@@ -200,6 +237,17 @@ pub fn op_keyword(op: &PokeOp) -> &'static str {
 /// point, `d`, `r`, `guid` when `ok` created a unit, `note` for
 /// `unresolved` / `gap`, `src` the canonical directive.
 pub fn record_line(f: i32, i: usize, op: &PokeOp, r: &poke::PokeResult) -> String {
+    record_line_steps(f, i, op, r, None)
+}
+
+/// [`record_line`] with a `goto`'s `steps` (`poke.md` §6 rule 4).
+pub fn record_line_steps(
+    f: i32,
+    i: usize,
+    op: &PokeOp,
+    r: &poke::PokeResult,
+    steps: Option<u32>,
+) -> String {
     use d2_sim::debug::state::json_string;
     let mut o = format!(
         "{{\"k\":\"poke\",\"f\":{f},\"frame\":{},\"i\":{i},\"d\":{},\"r\":{}",
@@ -214,6 +262,9 @@ pub fn record_line(f: i32, i: usize, op: &PokeOp, r: &poke::PokeResult) -> Strin
         }
         _ => {}
     }
+    if let Some(n) = steps {
+        o.push_str(&format!(",\"steps\":{n}"));
+    }
     o.push_str(&format!(",\"src\":{}}}", json_string(&op.to_string())));
     o
 }
@@ -226,6 +277,13 @@ impl<C: d2_server::seams::Clock + Send + 'static> crate::bridge::poke::PokeTarge
     fn poke(&mut self, op: &PokeOp) -> Result<poke::PokeResult, Self::Error> {
         let op = op.clone();
         self.with(move |l| apply_now(&mut l.host_mut().game, &op))
+    }
+    fn goto_step(
+        &mut self,
+        target: GotoTarget,
+        walk: GotoWalk,
+    ) -> Result<(poke::PokeResult, GotoWalk), Self::Error> {
+        self.with(move |l| goto_now(&mut l.host_mut().game, target, walk))
     }
 }
 

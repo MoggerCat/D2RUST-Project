@@ -17,27 +17,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 43–56 |
-| Inputs | 57–68 |
-| Outputs / state changes | 69–78 |
-| Rules | 79–82 |
-|   L1 Save fields the front end reads (`0x00439840`, `0x00439780`) | 83–98 |
-|   L2 Enable rules | 99–124 |
-|   L3 Art and palette (`0x00456550`) | 125–141 |
-|   L4 One loading draw (`0x004565E0(step)`) | 142–165 |
-|   L5 When loading draws happen (single player) | 166–179 |
-|   L6 Between draws | 180–189 |
-|   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 190–208 |
-|   L8 Input during loading | 209–235 |
-|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 236–259 |
-|   L10 Act-start cinematics (hooks only) | 260–286 |
-|   L11 Sounds (deferred) | 287–293 |
-| Constants & data dependencies | 294–310 |
-| Randomness | 311–314 |
-| Edge cases & original bugs | 315–330 |
-| Test vectors | 331–350 |
-| Provenance | 351–375 |
-| Open questions | 376–388 |
+| Summary | 43–62 |
+| Inputs | 63–74 |
+| Outputs / state changes | 75–84 |
+| Rules | 85–88 |
+|   L1 Save fields the front end reads (`0x00439840`, `0x00439780`) | 89–104 |
+|   L2 Enable rules | 105–130 |
+|   L3 Art and palette (`0x00456550`) | 131–147 |
+|   L4 One loading draw (`0x004565E0(step)`) | 148–171 |
+|   L5 When loading draws happen (single player) | 172–236 |
+|   L6 Between draws | 237–246 |
+|   L7 End: the first game frame (`0x0044C990` → `0x004547B0`) | 247–265 |
+|   L8 Input during loading | 266–292 |
+|   L9 Act change (S→C 0x05, 0x03, …, 0x04) | 293–316 |
+|   L10 Act-start cinematics (hooks only) | 317–357 |
+|   L11 Sounds (deferred) | 358–364 |
+| Constants & data dependencies | 365–381 |
+| Randomness | 382–385 |
+| Edge cases & original bugs | 386–406 |
+| Test vectors | 407–427 |
+| Provenance | 428–453 |
+| Open questions | 454–466 |
 <!-- /index -->
 
 ## Summary
@@ -46,8 +46,14 @@ What the player sees from pressing OK on character select (or create) until the 
 again whenever the local player changes act. The front end ends (`ui/frontend-menus.md` §F2.6 rule 4); the
 game state `0x0044F360` queues C→S 0x67 and then draws the **loading screen**: one 256 × 256 frame of
 `data\global\ui\Loading\loadingscreen.dc6`, centred, on black, with the `Loading` palette. It is not
-timed: the frame index steps once per loading draw, and in single player there are exactly two draws at a
-game start (frames 0 and 1) and one per act change (frame 0). The screen stays until the first in-game
+timed: the frame index steps once per loading draw. In single player the draws are:
+
+- at a game start, the init draw and the 0x03 draw;
+- at an act change, the 0x03 draw;
+- in both cases, at S→C 0x04, one draw per preloaded room (measured: frames 0–9 at a game start, 0–8
+  at an Act II arrival).
+
+The screen stays until the first in-game
 frame, which needs S→C 0x04 (in game) and a placed local player; that frame frees the art, loads the act
 palette and is presented black. An act change (waypoint, Warriv, Meshif, the Durance red portal, Tyrael to
 Act V) sends S→C 0x05 and 0x03, which show the same screen; there is no act-specific art. The act-start
@@ -170,12 +176,63 @@ With p and E from L1 and connection mode 0 (single player, `[0x007795EC]`):
 | game start, right after C→S 0x67 is queued (`0x0044F45E`) | `0x0044F360` → `0x0044E200` (`0x0044F4E0`): L3 then L4 | 1 | 0 | 1 |
 | S→C 0x03 at the join (art still held) | `0x0045C8E0` → `0x0044E100` → L4 (`0x0044E185`) | 1 | 1 | 2 |
 | S→C 0x03 of an act change (art released by the last game frame) | same; L4 runs L3 first | 1 | 0 | 1 |
+| S→C 0x04 (in game), before the first game frame | `0x0045C9A0` → `0x00470B10` (call `0x0045C9CB`) → preload `0x00470070` → L4 (`0x004700DD`) | 1 | counter, once per drawn room | +1 per draw |
 
-There is no timer: the picture changes only at these calls, so a single-player game start shows frame 0
-then frame 1, and an act change shows frame 0; frames 2–9 appear only through the multiplayer callers
-(`0x00478160`: 8 draws with step 0 and `Sleep(250)`, from `0x004781D0` for game types 6–9, named only).
-The third caller, the room-graphics preload `0x00470070`, draws only when `[0x007A8920]` ≠ 0; nothing in
-1.14d writes it (image value 0), so it never draws.
+There is no timer: the picture changes only at these calls. The fourth row is the **room-graphics
+preload**. The 0x04 handler `0x0045C9A0` sets `in_game` and then calls `0x00470B10` (its ECX argument is
+unused). That function is the only writer of the preload flag `[0x007A8920]`, and no instruction takes the
+flag's address. Ghidra had not defined a function at `0x00470B10`, which is why the exports showed only
+reads.
+
+1. `[0x007A8920]` := 1 (`0x00470B13`).
+2. Preload pass, argument 0 (`0x00470B1D`). Then `[0x007A8910]` := now in ms (`[0x006CC260]`).
+3. Second pass, argument 1 (`0x00470B4F`). It runs at once because the flag is set; with the flag clear
+   it would wait until 600 ms (0x258) after `[0x007A8910]`. Then `[0x007A8910]` := now.
+4. `[0x007A8920]` := 0 (`0x00470B5B`).
+
+So the flag is 1 only while S→C 0x04 is handled; its image value is 0. The other caller of the preload,
+the in-game throttle `0x00470350` (called from `0x0044C7BA`), always sees 0 there and never draws.
+
+The preload pass `0x00470070(arg)` (arg in EAX), as authored pseudocode:
+
+```
+room := room of the local player (0x00463DD0 → 0x00620BB0); none → return
+rooms, n := the room list of `room` (0x00619790)
+k := 0                                       // local, per pass
+for i in 0 .. n − 1:
+    if flag [0x007A8920] ≠ 0:
+        if not (arg ≠ 0 and [0x007A8928] = 0):        // 0x004700B9–0x004700C4
+            if (k & 0x1F) ≠ 0: loading_draw(step 1)   // L4, call 0x004700DD
+            k += 1
+    else if pending count (0x005FF2A0) ≥ 30: return   // budget; skipped while the flag is set
+    load the graphics of every entry of rooms[i] (list at +0x74, next at +0xE8),
+        with the same budget test after each entry (0x004701B8)
+```
+
+A draw is made for every room **except** those where k & 0x1F = 0 (k = 0, 32, 64, …). The first room
+never draws, so a pass over n ≤ 32 rooms makes n − 1 draws. The second pass (arg 1) draws only when
+`[0x007A8928]` ≠ 0. `[0x007A8928]` is set once at the preload init `0x00470200` (called from
+`0x0045740F`) from `0x004FAC90`. That function is a file test for `d2char.mpq` (two paths): it returns 0
+when the file is found, so on a standard install the second pass draws nothing. Measured 0 on PC 1, and
+a non-zero value is not modelled. The art is still held (L7 has not run), so the counter goes on from
+the 0x03 draw.
+
+Measured (2026-10-09, PC 1 Windows debugger probe; Provenance):
+
+- **Act change, Act I → II, no video** (ScnAma `-seed 1234`, `poke 50 warp 40`): one draw from the 0x03
+  path (return `0x0044E18A`) at server frame 49 with the flag 0. Then 8 draws at frame 50, all from the
+  preload (return `0x004700E2`, ECX = 1, flag 1, `[0x007A8928]` = 0). Then the first game frame at frame
+  50.
+- **Game start:** 10 draws, 1 before the first server tick and 9 at frame 2. That is the init draw, the
+  0x03 draw and 8 preload draws. The return-address split was not logged for the game start; this
+  breakdown is inferred.
+- **Rooms:** 8 preload draws means 9 rooms in the list (n − 1 = 8), which is inferred from the draw
+  count and not measured.
+
+So a single-player game start presents frames 0–9 (init 0, 0x03 1, preload 2–9), and an Act II arrival
+presents frames 0–8 (0x03 0, preload 1–8). Each picture stays only as long as its room's graphics take
+to load. The multiplayer callers are named only: `0x00478160` makes 8 draws with step 0 and `Sleep(250)`,
+called from `0x004781D0` for game types 6–9.
 
 ### L6 Between draws
 
@@ -276,9 +333,23 @@ The third caller, the room-graphics preload `0x00470070`, draws only when `[0x00
 2. Order: the act change runs before act completion at every travel site, so the client gets 0x05, 0x03
    (loading screen) and only then 0x61: the video plays over the loading screen, before 0x04.
    `0x00482EF0` ends by loading Act V's palette (`render/composition.md` §4); L7 then loads the arrival
-   act's palette anyway. PROVISIONAL: after the video the loading frame is not redrawn and the screen
-   shows black until L7 (because no caller of `0x004565E0` follows the video and the player cannot see a
-   redraw); settled by REC-223. After the video the handler calls `0x0047F1D0`, which re-reads the
+   act's palette anyway. **After the video the loading frame is redrawn** before the first world
+   frame, by the S→C 0x04 preload draws (L5 row 4). The video does not cause the redraw; 0x04 does.
+   Measured (REC-223, settled 2026-10-09, PC 1 Windows, windowed `-w`, debugger probe; first-time Warriv
+   travel, save with quest word 6 bit 0 set and word 7 clear):
+   - `0x00482EF0` was entered with ECX = 2 (the id is passed in ECX) at server frame 296.
+   - `0x0047F1D0` followed 8 ms later.
+   - Then came 8 loading draws from the preload (return `0x004700E2`) and the first game frame, all at
+     frame 296.
+
+   The video returned almost at once, probably because Bink does not play in windowed mode. The evidence
+   is the call sequence. PrintWindow screenshots were black at every loading draw, including the no-video
+   control, so they show nothing. Still open: a full-screen run that plays the video and checks the
+   pixels of the redrawn frame. The palette of the redrawn frames is PROVISIONAL. The preload draws run
+   with the art held, so L3 does not run and the `Loading` palette is not set again. The frames therefore
+   use whatever palette `0x00482EF0` left: Act V's (`render/composition.md` §4), if that palette load
+   (`0x00483283`) runs on the exit path the video took. The same full-screen check settles it. After the
+   video the handler calls `0x0047F1D0`, which re-reads the
    registry `Resolution` (missing → 1) and re-applies the resolution mode (`0x0044BA20(2 or 0)`,
    `ui/frontend-options.md` §O6 r7); d2rs: no effect (one logical size).
 3. End-of-game videos (`[0x007A0604]` → entry 5, `[0x007A0628]` → entry 7, after the game loop in
@@ -314,8 +385,9 @@ None. The loading screen and the difficulty rules draw no game-seed values.
 
 ## Edge cases & original bugs
 
-1. The loading "animation" is not one: single player shows at most frames 0 and 1; frames 2–9 exist in
-   the file but only multiplayer callers reach them (L5).
+1. The loading "animation" is not timed. Single player steps one frame per loading draw: the init, the
+   0x03 draw, then one draw per preloaded room at S→C 0x04 (L5). A game start shows frames 0–9 and an
+   Act II arrival frames 0–8, each for as long as one room's graphics take to load.
 2. An expansion character on a classic install: OK silently does nothing (L1, `0x00439840` returns 0).
 3. Difficulty and start act: the save keeps only the act of the difficulty last played (`+0xA8..+0xAA`,
    one byte non-zero). Choosing another difficulty starts in that difficulty's Act I town, even when the
@@ -326,7 +398,11 @@ None. The loading screen and the difficulty rules draw no game-seed values.
    into the game.
 7. With the Esc menu open during a load (single player), the paused path draws the world as soon as the
    player has a room, before 0x04, and the server does not tick while it is open (L6 rule 1 (b); REC-222).
-8. `[0x007A8920]` is never written, so the preload's loading draws (`0x00470070`) are dead code in 1.14d.
+8. The room preload `0x00470070` draws the loading screen only while S→C 0x04 is handled. `0x00470B10`
+   sets `[0x007A8920]` := 1 at `0x00470B13` and clears it at `0x00470B5B`. In that window it draws once
+   per listed room except where its counter & 0x1F = 0, so the first room never draws (L5). The in-game
+   throttled preload (`0x00470350`) never draws. Reproduce: these draws are the frames 2–9 and 1–8 of
+   edge case 1, and the redraw after an act-start video (L10 rule 2).
 
 ## Test vectors
 
@@ -341,12 +417,13 @@ None. The loading screen and the difficulty rules draw no game-seed values.
 | +0xA8..+0xAA = `00 83 00`, Nightmare / Normal chosen | start act 3 (Act IV) / act 0 | L2.4 |
 | 800 × 600, counter 0 | frame 0 at columns 272–527, rows 173–428; rest index 0; Loading palette | L4 |
 | 640 × 480, counter 1 | frame 1 at columns 192–447, rows 113–368 | L4 |
-| single-player start: 0x0044E200, then S→C 0x01, 0x00, 0x02, 0x03, …, 0x04 | presented: frame 0, frame 1, one black frame, world | L5, L7 |
-| act change: 0x05, 0x03 (act 1), 0x53, 0x07 × n, 0x0D, next tick 0x04 | presented: last world frame, frame 0, black, Act II world with `act2` palette | L9, L7 |
+| single-player start: 0x0044E200, then S→C 0x01, 0x00, 0x02, 0x03, …, 0x04 (9 listed rooms) | presented: frame 0, frame 1, frames 2–9 (8 preload draws at 0x04), one black frame, world | L5, L7 |
+| act change: 0x05, 0x03 (act 1), 0x53, 0x07 × n, 0x0D, next tick 0x04 (9 listed rooms) | presented: last world frame, frame 0, frames 1–8 (preload at 0x04), black, Act II world with `act2` palette | L9, L7, L5 |
+| preload pass over n rooms, flag set, arg 0 | n − ⌈n/32⌉ loading draws (none for k = 0, 32, …); n = 33 → 31 | L5 |
 | counter 12, 10 frames, step 1 | frame 9 drawn; counter 10 | L4.2, L4.6 |
 | language id 3 | art path `DATA\LOCAL\UI\LoadingScreen` | L3.1 |
 | left click at (400, 300) between 0x03 and 0x04 | no C→S message | L8.1 |
-| Warriv travel, first time | 0x05, 0x03 (frame 0), …, 0x61 `02` → video hook id 2 (`ACT02START`) before 0x04 | L10 |
+| Warriv travel, first time | 0x05, 0x03 (frame 0), …, 0x61 `02` → video hook id 2 (`ACT02START`) before 0x04; then the 0x04 preload draws (frames 1–8), black, world | L10 |
 
 ## Provenance
 
@@ -358,7 +435,7 @@ call `0x0044F4E0`); game init `0x0044E200` (`0x0044E27D`, `0x0044E287`, multipla
 loading art `0x00456550`, palette `0x00454740`, draw `0x004565E0` (clamp `0x0045676F`–`0x00456788`,
 progress-bar branch `0x004566A9`–`0x0045676A`), release `0x004547B0`, flag reader `0x00454840`, progress
 `0x00478130`, `0x00478150`, `0x00478160`, `0x004781D0`, preload `0x00470070` / `0x00470350`
-(`[0x007A8920]` read only; image value 0), frame-count accessor `0x006019F0`, mouse resets `0x0044DA40`,
+(flag `[0x007A8920]` written only by `0x00470B10`, the 0x04 handler's call; image value 0), frame-count accessor `0x006019F0`, mouse resets `0x0044DA40`,
 `0x0044DA70`; client loop `0x0044EFA0` (paused path `0x0044EFE3`–`0x0044F017`, in-game draw
 `0x0044F28B`); first frame `0x0044C990`; mouse handlers `0x0044BF40`, `0x0044C000`, `0x0044C060`,
 `0x0044C180`, `0x0044C2C0`, `0x0044C370`, `0x0044C400`, `0x0044C470`, `0x0044C4A0`, `0x0044C4D0`,
@@ -372,6 +449,7 @@ used.
 2026-10-08 (REC-251): 0x03 handler `0x0045C8E0` → `0x0044E100` (no act compare; `0x0061AFD0`, `0x006194A0`,
 `0x004565E0`), post-video `0x0047F1D0` → `0x0044BA20`.
 - 2026-10-09 (pc1-day3-c, REC-222): keys during loading measured on Windows with a scratch debugger probe (breakpoints `0x004565E0` loading draw, `0x0046A840` key-down, `0x004690B0` Esc command, server tick entry; key posted from the first loading-draw stop), L8 rule 3.
+- 2026-10-09 (pc1-day3-c, REC-223: Windows debugger probe, windowed `-w`, sound on; breakpoints at the loading draw `0x004565E0` logging [esp] and `[0x007A8920]` / `[0x007A8928]`, video player `0x00482EF0`, post-video `0x0047F1D0`, game frame `0x004547B0`, server tick; ScnAma `-seed 1234` `poke 50 warp 40`, and a first-time Warriv save; PrintWindow pixels black throughout, so not evidence; writer of 0x007A8920 read in all.asm): flag writer `0x00470B10` (`0x00470B13` := 1, preload calls `0x00470B1D` / `0x00470B4F`, `0x00470B5B` := 0) found by an image scan for the address bytes, because Ghidra had no function there; its caller is the 0x04 handler `0x0045C9A0` (call `0x0045C9CB`); preload gate and cadence `0x004700B0`–`0x004700DD`, budget `0x005FF2A0` (`0x004700EB`, `0x004701C1`); `[0x007A8928]` from `0x004FAC90` at `0x00470283` (init `0x00470200`, called from `0x0045740F`); L5, L10 rule 2, edge cases 1 and 8.
 
 ## Open questions
 
@@ -382,6 +460,6 @@ used.
   S→C packets with tick numbers and screenshots per client frame. Settles L9.3: the tick of 0x04 after
   the 0x49 drain, and the presented sequence (world, frame 0, black, Act II world).
 - **REC-222** Keys during loading: *settled 2026-10-09* (L8 rule 3).
-- **REC-223** After an act-start video. Capture: a first-time Warriv travel (Act I → II) with video
-  enabled; screenshot the frame after the video ends and before the world appears. Settles L10.2
-  (black vs the loading frame).
+- **REC-223** After an act-start video: *settled 2026-10-09* (L10 rule 2). The preload redraws the
+  loading frame at S→C 0x04. This was measured windowed, where the video returned at once. Still open:
+  a full-screen pixel check of the redrawn frame and its palette.

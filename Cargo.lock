@@ -2256,6 +2256,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "coverage-map"
+version = "0.0.0"
+
+[[package]]
 name = "cpal"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2521,6 +2525,7 @@ dependencies = [
 name = "d2-sim"
 version = "0.0.0"
 dependencies = [
+ "coverage-map",
  "criterion",
  "d2-data",
  "d2-formats",

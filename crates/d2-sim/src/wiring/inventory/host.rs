@@ -18,7 +18,7 @@ use crate::items::inventory::{
     grid_id, ground_or_owned_check, place_in_page, stored_item_check, targeting_reset, Inventory,
     BODY_GRID,
 };
-use crate::items::moves::{deferred, MoveFatal, MovePending, MoveUnits};
+use crate::items::moves::{deferred, mode, MoveFatal, MovePending, MoveUnits};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -129,7 +129,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
                 ) && i.items().contains(&item)
             })
             .map(|(&u, _)| u);
-        holder.is_some_and(|npc| self.remove(npc, item))
+        let Some(npc) = holder else {
+            return false;
+        };
+        let removed = self.remove(npc, item);
+        if removed {
+            // The taken store item reaches the client in mode 4 (1.14d,
+            // `items-vendor-akara-buy` frame 24: the 0x9C action 12 record).
+            let g = self.guid_of(item);
+            self.set_mode(g, mode::CURSOR);
+        }
+        removed
     }
 
     /// Unlinks `item` from the owner's inventory (`0x0063AAF0`, §1.4 rule

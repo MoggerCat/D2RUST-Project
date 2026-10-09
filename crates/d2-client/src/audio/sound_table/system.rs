@@ -303,6 +303,21 @@ pub struct SoundSystem {
     state_duck: i32,
     cache: Cache,
     errors: Vec<SoundError>,
+    /// `play --sound-log` (`specs/tools/facts-render.md` §5 r20): every
+    /// call of [`SoundSystem::request`] at its entry, when on.
+    request_log: Option<Vec<RequestCall>>,
+}
+
+/// One call of the request entry (`0x004B9A00`), its arguments as given
+/// and the sound tick (`0x007BC9BC`) at the call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequestCall {
+    pub sound_tick: u32,
+    pub id: i32,
+    pub unit: Option<UnitKey>,
+    pub delay: u32,
+    pub flags: u32,
+    pub offset: u32,
 }
 
 impl SoundSystem {
@@ -323,7 +338,26 @@ impl SoundSystem {
             state_duck: 100,
             cache: Cache::default(),
             errors: Vec::new(),
+            request_log: None,
         }
+    }
+
+    /// Starts (or stops) logging every request call (§5 r20 of
+    /// `tools/facts-render.md`); a running log is kept.
+    pub fn log_requests(&mut self, on: bool) {
+        match (on, self.request_log.is_some()) {
+            (true, false) => self.request_log = Some(Vec::new()),
+            (false, _) => self.request_log = None,
+            _ => {}
+        }
+    }
+
+    /// The request calls since the last take, in call order.
+    pub fn take_request_log(&mut self) -> Vec<RequestCall> {
+        self.request_log
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default()
     }
 
     pub fn table(&self) -> &SoundTableData {
@@ -485,6 +519,16 @@ impl SoundSystem {
         flags: u32,
         offset: u32,
     ) -> Handle {
+        if let Some(log) = self.request_log.as_mut() {
+            log.push(RequestCall {
+                sound_tick: self.tick,
+                id,
+                unit,
+                delay,
+                flags,
+                offset,
+            });
+        }
         if !self.enabled || id < 1 {
             return 0;
         }

@@ -105,7 +105,6 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
-    /// Runs `f` on the action wiring's view over the economy's parts.
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
     /// `levels`; the economy's item store, game seed and unique bits go
@@ -798,8 +797,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn open_quest_message(&mut self, player: UnitId, object: UnitId, msg: u16) {
         self.inner.open_quest_message(player, object, msg)
     }
-    /// [`Self::spawn_monster`] with the spawn flags (PROVISIONAL, REC-128:
-    /// spread and flags are not applied).
+    /// [`Self::spawn_monster`] with the spawn flags: `0x005B2F20` through
+    /// population when the monster world is lent; else the plain
+    /// allocation (PROVISIONAL, REC-128: spread and flags not applied).
     #[allow(clippy::too_many_arguments)]
     fn spawn_monster_flags(
         &mut self,
@@ -812,6 +812,35 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         flags: u32,
     ) -> Option<UnitId> {
         if self.drlg_room(room) {
+            // `0x005B2F20` on the lent monster world (placement, type
+            // init, mods; REC-733 settled: start Jerhyn's unit seed in
+            // `act-travel-lut-ama.check`); without one, the plain
+            // allocation.
+            let created = self.view(|g, v| {
+                let mut sim = crate::units::hooks::Sim {
+                    game: g,
+                    units: &mut *v.units,
+                    stats: &mut *v.stats,
+                    data: v.data,
+                };
+                v.h.with_monster_world(|w, h| {
+                    w.spawn_at(
+                        &mut sim,
+                        h,
+                        room,
+                        x,
+                        y,
+                        i32::from(class),
+                        mode,
+                        spread,
+                        flags as u16,
+                    )
+                })
+                .flatten()
+            });
+            if let Some(u) = created {
+                return u;
+            }
             return self.spawn_unit(room, x, y, class, mode);
         }
         self.inner

@@ -1,0 +1,56 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Sewers 3 is level 49, Radament monstats 229. Act I done (6.0, acts=1: 7.0).
+checkpoint 1
+name CkRadament
+title Radament: Sewers 3 (Act II, quest 9)
+class sor
+level 26
+expansion
+difficulty normal
+act 1
+stat 0 35   # strength
+stat 1 70   # energy
+stat 2 35   # dexterity
+stat 3 65   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 44800   # life 175 (x256)
+stat 7 44800
+stat 8 39680   # mana 155
+stat 9 39680
+stat 10 39424   # stamina 154
+stat 11 39424
+skill 0 4   # fb (skill 36)
+skill 3 4   # ib (skill 39)
+skill 4 1   # fa (skill 40)
+skill 6 4   # static (skill 42)
+skill 7 1   # tk (skill 43)
+skill 8 7   # nova (skill 44)
+skill 9 4   # blast (skill 45)
+skill 1 1   # warmth (skill 37)
+right-skill 44
+left-skill 36
+gold 130000
+quests 1.0 2.0 4.0 6.0 acts=1
+waypoints lv=1 lv=3 lv=4 lv=5 lv=6 lv=27 lv=29 lv=32 lv=35 lv=40 lv=48
+item hlm/body=1
+item stu/body=3
+item cst/body=4
+item vgl/body=10
+item vbt/body=9
+item vbl/body=8
+item rin/body=6
+item rin/body=7
+item amu/body=2
+item hp4/belt=0
+item hp4/belt=1
+item mp4/belt=2
+item mp4/belt=3
+item rvs/belt=4
+item rvs/belt=5
+start 5 warp 49
+start 20 goto unit 229
+need player lv 49

@@ -1,0 +1,11 @@
+check 1
+# Player death (combat/vitals.md §4.7-§4.8): ScnAma in the Rogue Encampment,
+# hitpoints (stat 6) set to 0 by a poke at frame 10, then idle through the
+# death animation and the corpse; state channel.
+name death-town-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 120
+seconds 300
+channels state
+at 10 poke stat @player 6 0 0

@@ -28,6 +28,8 @@ import time
 from collections import deque
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# acts.py imports this module as `autoplay`: one module, one Stuck class
+sys.modules.setdefault("autoplay", sys.modules[__name__])
 import acts  # noqa: E402
 import nav  # noqa: E402
 
@@ -279,6 +281,10 @@ class Host:
         return Map(self.cmd("map", record=False))
 
     def close(self):
+        if self.p.poll() is not None:
+            self.log.close()
+            self.err.close()
+            return
         try:
             self.p.stdin.write("quit\n")
             self.p.stdin.flush()
@@ -300,13 +306,28 @@ class View:
         self.snap = s["snap"]
         self.frame = self.snap["f"]
         self.client = s["client"]
-        self.units = self.snap["units"]
         g = s.get("local")
-        self.me = next((u for u in self.units if u["ut"] == 0 and (g is None or u["g"] == g)), None)
+        self.all_units = self.snap["units"]
+        self.me = next((u for u in self.all_units if u["ut"] == 0 and (g is None or u["g"] == g)), None)
+        # the server lists every level's units: keep the player's level
+        lv = self.me.get("lv") if self.me else None
+        self.units = [u for u in self.all_units if u.get("lv", lv) == lv]
 
     @property
     def pos(self):
         return (self.me["x"], self.me["y"])
+
+    @property
+    def cam(self):
+        """The client camera's player position (sub-tiles, fractional):
+        what the screen is drawn around and the hover pick reads. The
+        server position when no frame was drawn yet."""
+        c = self.client.get("camera")
+        if c and "x16" in c:
+            return (c["x16"] / 65536, c["y16"] / 65536)
+        if c:
+            return (c["x"], c["y"])
+        return self.pos
 
     @property
     def level(self):
@@ -361,6 +382,8 @@ class Bot:
         self.v = None
         self.map = None
         self.known = nav.Known()
+        self.no_fight = bool(plan.get("no_fight"))
+        acts._BOT[0] = self
         self.deadline_s = deadline_s
         self.progress_at = 0
         self.best = None
@@ -372,8 +395,18 @@ class Bot:
 
     def click(self, p, button="L", hold=2):
         x, y = clamp_screen(p)
+        st = self.h.state()
+        if 9 in st["client"]["open"]:
+            # the Esc menu is up (an Esc that closed a panel opened it):
+            # never click into it; Esc closes it first
+            self.act("close the Esc menu")
+            self.h.cmd("key esc")
+            self.h.step(4)
+            st = self.h.state()
+        if st["client"].get("exit_requested") or st.get("local") is None:
+            raise Stuck("the player left the game (exit requested)")
         self.act(f"click {button} {x} {y}")
-        before = self.sent_total()
+        before = sum(st["client"]["sent"].values())
         self.h.cmd(f"press {button} {x} {y}")
         self.h.step(hold)
         self.h.cmd(f"release {button} {x} {y}")
@@ -459,14 +492,19 @@ class Bot:
             return True
         if v.level in TOWNS:
             return False
-        target = self.nearest_hostile(acts.FIGHT_RADIUS)
+        if self.no_fight:
+            # WORKAROUND (bot only): attacking freezes the client model
+            # (the kill-zombie blocker), so the probe plan never attacks.
+            target = None
+        else:
+            target = self.nearest_hostile(acts.FIGHT_RADIUS)
         if target is not None:
             self.attack(target)
             return True
         item = self.nearest_pickup(acts.PICK_RADIUS)
         if item is not None:
             self.act(f"pick {item['code']} at {item['x']},{item['y']}")
-            self.click(to_screen(*v.pos, item["x"], item["y"]))
+            self.click(to_screen(*v.cam, item["x"], item["y"]))
             self.wait(8)
             return True
         return False
@@ -513,7 +551,7 @@ class Bot:
 
     def attack(self, u):
         v = self.v
-        p = to_screen(*v.pos, u["x"], u["y"])
+        p = to_screen(*v.cam, u["x"], u["y"])
         p = (p[0], p[1] - acts.BODY_LIFT)
         self.act(f"attack cl {u.get('cl')} g {u['g']} hp {u.get('hp')} at {u['x']},{u['y']}")
         button = self.plan.get("attack_button", "L")
@@ -527,10 +565,36 @@ class Bot:
     def leg(self, path, why):
         """One walk click along `path` (sub-tiles), about LEG_REACH ahead."""
         v = self.v
+        if [u for u in v.client["open"] if u not in acts.ALWAYS_OPEN_UI]:
+            self.close_panels()
+            v = self.v
         p = nav.ahead(path, acts.LEG_REACH)
+        # a click on a monster attacks it: aim the walk click beside any
+        # monster near the point (an earlier path point)
+        mons = [(u["x"], u["y"]) for u in v.monsters() if v.alive(u)]
+        i = min(len(path) - 1, acts.LEG_REACH)
+        while i > 1 and any(cheb(path[i], m) <= 2 for m in mons):
+            i -= 1
+        p = path[i]
         self.act(f"{why}: walk {v.pos} -> {p} (path {len(path)})")
-        self.click(toward(*v.pos, *p, reach=acts.LEG_REACH + 2), hold=1)
+        walks0 = v.client["sent"].get("01", 0)
+        self.click(toward(*v.cam, *p, reach=acts.LEG_REACH + 2), hold=1)
         self.wait(acts.WALK_STEP)
+        w = self.look()
+        walked = w.client["sent"].get("01", 0) > walks0 and not w.client.get("npc_menu")
+        if walked and cheb(w.pos, v.pos) == 0:
+            # the walk went nowhere: the point is not reachable (an unseen
+            # obstacle); remember it so the next plan goes around
+            self.no_move += 1
+            if self.no_move >= 2:
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        self.known.learned.add((p[0] + dx, p[1] + dy))
+                self.no_move = 0
+        else:
+            self.no_move = 0
+
+    no_move = 0
 
     def walk_to(self, target, near=3, budget_s=None, fight=True):
         """Walks to world sub-tile `target` by clicks along a planned path
@@ -622,7 +686,7 @@ class Bot:
         """Clicks warp tile unit `t`; True when the level changed."""
         lv = self.v.level
         self.act(f"warp tile g {t['g']} cl {t.get('cl')} at {t['x']},{t['y']}")
-        self.click(to_screen(*self.v.pos, t["x"], t["y"]))
+        self.click(to_screen(*self.v.cam, t["x"], t["y"]))
         for _ in range(10):
             self.wait(10)
             if self.look().level != lv:
@@ -650,23 +714,30 @@ class Bot:
         """Walks to the NPC, clicks it, chooses Talk, skips the dialog,
         until `until(view)` (spec §3 r4)."""
         self.say(f"  talk to npc {npc_class} ({what})")
-        for attempt in range(8):
+        attempt = 0
+        self.reset_progress()
+        interacts0 = self.h.state()["client"]["sent"].get("13", 0)
+        while attempt < 8:
             v = self.look()
             if until(v):
+                self.close_panels()
                 return
             npcs = v.find(1, npc_class)
             if not npcs:
-                spot = acts.NPC_SPOT.get(npc_class)
-                if spot is None:
-                    raise Stuck(f"npc {npc_class} not in sight and no known spot")
                 self.explore_town(npc_class)
                 continue
             n = npcs[0]
             if dist(v.pos, (n["x"], n["y"])) > 8:
-                self.walk_to((n["x"], n["y"]), near=6, budget_s=40, fight=False)
+                try:
+                    self.walk_to((n["x"], n["y"]), near=6, budget_s=20, fight=False)
+                except Stuck as e:
+                    if "no path" not in e.reason:
+                        raise
+                    attempt += 1
                 continue
+            attempt += 1
             v = self.look()
-            p = to_screen(*v.pos, n["x"], n["y"])
+            p = to_screen(*v.cam, n["x"], n["y"])
             self.click((p[0], p[1] - acts.BODY_LIFT))
             self.wait(30)
             v = self.look()
@@ -674,11 +745,15 @@ class Bot:
             if menu is None:
                 self.say(f"  no NPC menu after the click (attempt {attempt})")
                 continue
+            self.menus_seen.setdefault(npc_class, [r["kind"] for r in menu["rows"]])
             talk = [r for r in menu["rows"] if r["kind"] and "Talk" in r["kind"]]
             if talk and talk[0]["at"] and not menu["talking"]:
                 self.act("menu Talk")
                 self.click(talk[0]["at"])
                 self.wait(20)
+                v = self.look()
+                if v.client.get("dialog_lines") or v.client.get("topics"):
+                    self.talked.add(npc_class)
             # skip the dialog / topic box: Esc until the menu is down
             for _ in range(30):
                 v = self.look()
@@ -700,8 +775,58 @@ class Bot:
                 break
             v = self.look()
             if until(v):
+                self.close_panels()
                 return
-        raise Stuck(f"talking to npc {npc_class} did not {what}")
+        if self.h.state()["client"]["sent"].get("13", 0) == interacts0:
+            # no click on it ever became an interact (C->S 0x13): not a
+            # talking NPC (townsfolk, guards); noted, not a stuck point
+            self.say(f"  npc {npc_class}: clicks never interact (not a talking NPC?)")
+            self.not_npc.add(npc_class)
+            self.talked.add(npc_class)
+            return
+        raise Stuck(f"talking to npc {npc_class} did not {what} (C->S 0x13 sent, no menu)")
+
+    not_npc = set()
+
+    talked = set()
+    menus_seen = {}
+
+    def close_panels(self):
+        """Esc until no panel but the mini panel (21) is open and no NPC
+        dialog is up, as a player closes what covers the world."""
+        for _ in range(12):
+            v = self.look()
+            panels = [u for u in v.client["open"] if u not in acts.ALWAYS_OPEN_UI]
+            if not panels and not v.client.get("dialog_lines") and not v.client.get("npc_menu"):
+                return
+            # WORKAROUND (bot only): an NPC talk is left by its cancel
+            # rows, not Esc: Esc closes it without C->S 0x30, and the
+            # server then never answers another NPC (finding esc-npc).
+            t = v.client.get("topics")
+            if t and t.get("cancel") and not v.client.get("dialog_lines"):
+                self.act("topic cancel")
+                self.click(t["cancel"])
+                self.wait(10)
+                continue
+            m = v.client.get("npc_menu")
+            if m and m["rows"] and not m["talking"] and m["rows"][-1]["at"]:
+                self.act("menu cancel")
+                self.click(m["rows"][-1]["at"])
+                self.wait(10)
+                continue
+            if 17 in panels:
+                # WORKAROUND (bot only): Esc on the quest log opens the Esc
+                # menu, whose Esc reopens the log (finding esc-questlog);
+                # the log's own key closes it
+                self.act("close quest log")
+                self.key("q")
+                self.wait(6)
+                continue
+            self.act(f"close panels {panels}")
+            self.key("esc")
+            self.wait(6)
+        v = self.look()
+        raise Stuck(f"panels {v.client['open']} do not close with Esc")
 
     def explore_town(self, npc_class):
         if not self.explore_step(self.v.level):
@@ -709,11 +834,14 @@ class Bot:
 
     # ---- the plan
 
+    keep_going = False
+
     def run(self, milestones, only=None):
         results = []
         stuck = None
         t0 = None
-        for m in milestones:
+        self.milestones = milestones = list(milestones)
+        for m in milestones:  # a play may append milestones (town probes)
             if only and m.name != only:
                 continue
             v = self.look()
@@ -732,8 +860,11 @@ class Bot:
                     raise Stuck(f"{m.name}: steps ran but the milestone is not reached")
                 self.say(f"{m.name}: reached at frame {v.frame} (level {v.level})")
                 results.append({"name": m.name, "reached": True, "frame": v.frame})
-            except Stuck as e:
+            except (Stuck, HostError) as e:
+                if isinstance(e, HostError):
+                    e.reason = f"host failure: {e}"
                 v = self.v
+                first = stuck
                 stuck = {
                     "milestone": m.name,
                     "reason": e.reason,
@@ -743,8 +874,17 @@ class Bot:
                     "actions": list(self.actions),
                 }
                 self.say(f"{m.name}: STUCK at frame {stuck['frame']} level {stuck['level']} pos {stuck['pos']}: {e.reason}")
-                results.append({"name": m.name, "reached": False, "frame": stuck["frame"]})
-                break
+                results.append({"name": m.name, "reached": False, "frame": stuck["frame"],
+                                "reason": e.reason})
+                if first is not None:
+                    stuck = first  # the report keeps the first stuck point
+                if not self.keep_going or isinstance(e, HostError):
+                    break
+                # --keep-going: clear the screen and try the next milestone
+                try:
+                    self.close_panels()
+                except Stuck:
+                    break
         frames = (self.v.frame - t0) if (self.v and t0 is not None) else 0
         return results, stuck, frames
 
@@ -766,6 +906,7 @@ def tool_path(build):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--act", type=int, default=1)
+    ap.add_argument("--plan", default="story", help="story (the act's quests) or probe (no fighting: routes, NPC talks, waypoints)")
     ap.add_argument("--save", help="character save (.d2s); default a fresh character of the act plan's class")
     ap.add_argument("--seed", type=int)
     ap.add_argument("--only", help="run one milestone")
@@ -774,6 +915,7 @@ def main(argv=None):
     ap.add_argument("--work", help="work dir (default target/autoplay/act<N>-<time>)")
     ap.add_argument("--json", help="also write the result (autoplay-result-1) here")
     ap.add_argument("--build", action="store_true")
+    ap.add_argument("--keep-going", action="store_true", help="after a stuck milestone, try the next ones (probe plans)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -783,10 +925,21 @@ def main(argv=None):
     except HostError as e:
         print(f"autoplay: {e}", file=sys.stderr)
         return 3
-    plan = acts.plan(a.act)
+    plan = acts.plan(a.act, a.plan)
     work = a.work or os.path.join(REPO, "target", "autoplay", f"act{a.act}-{time.strftime('%Y%m%d-%H%M%S')}")
     os.makedirs(work, exist_ok=True)
-    args = ["--save", a.save] if a.save else ["--new", plan["class"], plan["name"]]
+    save = a.save
+    if not save and plan.get("save_args"):
+        # a d2s-tool save made for the plan (e.g. a character in Act II)
+        d2s = os.path.join(REPO, "target", "release", "d2s-tool")
+        save = os.path.join(work, plan["name"] + ".d2s")
+        r = subprocess.run([d2s, "new", "--name", plan["name"]] + plan["save_args"] + ["-o", save],
+                           capture_output=True, text=True,
+                           env=dict(os.environ, **({"D2_GAME_DIR": a.game_dir} if a.game_dir else {})))
+        if r.returncode != 0:
+            print(f"autoplay: d2s-tool new failed: {r.stderr.strip() or r.stdout.strip()}", file=sys.stderr)
+            return 3
+    args = ["--save", save] if save else ["--new", plan["class"], plan["name"]]
     if a.seed is not None:
         args += ["--seed", str(a.seed)]
     t_start = time.time()
@@ -798,6 +951,7 @@ def main(argv=None):
     print(f"autoplay {VERSION}: act {a.act}, {' '.join(host.cmdline)}")
     print(f"work dir {work}")
     bot = Bot(host, plan)
+    bot.keep_going = a.keep_going
     ms = plan["milestones"]
     if a.start:
         names = [m.name for m in ms]
@@ -820,6 +974,11 @@ def main(argv=None):
             stuck["state"] = host.state()
         except Exception as e:  # noqa: BLE001 - the host may be gone
             stuck["state"] = f"unavailable: {e}"
+        crash = os.path.join(os.path.dirname(client), "d2rs-crash.log")
+        if os.path.exists(crash) and os.path.getmtime(crash) >= t_start:
+            import shutil
+            shutil.copy(crash, os.path.join(work, "d2rs-crash.log"))
+            stuck["crash_log"] = os.path.join(work, "d2rs-crash.log")
         with open(os.path.join(work, "stuck.json"), "w") as f:
             json.dump(stuck, f, indent=1)
     host.close()
@@ -833,7 +992,9 @@ def main(argv=None):
         "act": a.act,
         "command": " ".join(host.cmdline),
         "reached": reached,
-        "total": len(ms) if not a.only else 1,
+        "reached_any": sum(1 for r in results if r["reached"]),
+        "stuck_all": [r for r in results if not r["reached"]],
+        "total": len(getattr(bot, "milestones", ms)) if not a.only else 1,
         "milestones": results,
         "ticks": frames,
         "game_seconds": round(frames / TICKS_PER_SECOND, 1),
@@ -842,6 +1003,12 @@ def main(argv=None):
         "stuck": {k: v for k, v in stuck.items() if k != "state"} if stuck else None,
     }
     print()
+    if bot.not_npc:
+        result["not_talking"] = sorted(bot.not_npc)
+    if len(result["stuck_all"]) > 1:
+        print("all stuck milestones (--keep-going):")
+        for r in result["stuck_all"]:
+            print(f"  {r['name']} frame {r['frame']}: {r.get('reason')}")
     print(f"act {a.act}: {reached}/{result['total']} milestones, {result['game_seconds']} s game time, "
           f"{bot.deaths} deaths, {result['wall_seconds']} s wall")
     if stuck:

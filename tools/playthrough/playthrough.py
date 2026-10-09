@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import threading
 
 VERSION = "0.3.0"
 FORMAT = "playthrough 1"
@@ -121,6 +122,7 @@ def parse_play(text, name="<play>"):
                 "name": parts[0],
                 "line": no,
                 "save": None,
+                "checkpoint": None,
                 "seed": 1,
                 "ticks": None,
                 "difficulty": None,
@@ -140,6 +142,18 @@ def parse_play(text, name="<play>"):
                 if rest not in play["saves"]:
                     raise PlayError(f"{where}: unknown save '{rest}'")
                 cur["save"] = rest
+            elif word == "checkpoint":
+                # spec §1 r5: the checkpoint's save and start pokes (traces/checkpoints/)
+                if not re.fullmatch(r"[a-z0-9-]+", rest):
+                    raise PlayError(f"{where}: checkpoint <name>")
+                cur["checkpoint"] = rest
+            elif word == "goto":
+                # spec §1 r6: `goto <frame> unit ...|preset ...` = `poke <frame> goto ...`
+                f, _, d = rest.partition(" ")
+                _int(f[1:] if f.startswith("+") else f, where)
+                if not d.strip().startswith(("unit ", "preset ")):
+                    raise PlayError(f"{where}: goto <frame> unit [<type>:]<class> | preset <level> [<type>:]<class>")
+                cur["pokes"].append(f"{f} goto {d.strip()}")
             elif word == "seed":
                 cur["seed"] = _int(rest, where)
             elif word == "deadline":
@@ -189,8 +203,8 @@ def parse_play(text, name="<play>"):
         if m["name"] in names:
             raise PlayError(f"{w}: duplicate name")
         names.add(m["name"])
-        if m["save"] is None:
-            raise PlayError(f"{w}: no 'use <save>'")
+        if (m["save"] is None) == (m["checkpoint"] is None):
+            raise PlayError(f"{w}: exactly one of 'use <save>' and 'checkpoint <name>'")
         if m["ticks"] is None:
             raise PlayError(f"{w}: no 'deadline <frames>'")
         if not m["need"]:
@@ -528,14 +542,46 @@ def first_error_line(text):
     return lines[-1].strip() if lines else "(no output)"
 
 
+def load_checkpoint(name):
+    """The parsed definition traces/checkpoints/<name>.checkpoint (through
+    tools/checkpoints/make.py)."""
+    sys.path.insert(0, os.path.join(REPO, "tools", "checkpoints"))
+    try:
+        import make as ckmake
+    finally:
+        sys.path.pop(0)
+    path = os.path.join(ckmake.DEFS, f"{name}.checkpoint")
+    try:
+        with open(path, encoding="utf-8") as f:
+            ck = ckmake.parse(f.read(), os.path.basename(path))
+    except OSError:
+        raise PlayError(f"no checkpoint '{name}' ({path})") from None
+    except ckmake.CkError as e:
+        raise PlayError(str(e)) from None
+    return ck, ckmake.d2s_args(ck)
+
+
 def run_milestone(m, play, client, d2s, work, game_dir):
-    save = os.path.join(work, f"{m['save']}.d2s")
+    if m["checkpoint"]:
+        ck, args = load_checkpoint(m["checkpoint"])
+        save = os.path.join(work, f"ck-{m['checkpoint']}.d2s")
+        if m["difficulty"] is None:
+            m["difficulty"] = ck["difficulty"]
+        # the checkpoint's start pokes first (their indices are @p0...), then the milestone's
+        start = [f"{f} {d}" for f, d in ck["start"]]
+        if not m.get("_started"):
+            m["pokes"] = start + m["pokes"]
+            m["_started"] = True
+    else:
+        save = os.path.join(work, f"{m['save']}.d2s")
+        args = play["saves"][m["save"]]
     if not os.path.exists(save):
-        cmd = [d2s, "new"] + play["saves"][m["save"]] + ["-o", save]
+        cmd = [d2s, "new"] + args + ["-o", save]
         r = subprocess.run(cmd, capture_output=True, text=True, env=_env(game_dir))
         if r.returncode != 0:
-            raise PlayError(f"save {m['save']}: {first_error_line(r.stderr + r.stdout)}")
+            raise PlayError(f"save {m['save'] or m['checkpoint']}: {first_error_line(r.stderr + r.stdout)}")
     pokes = [p for p in m["pokes"] if not p.startswith("+")]
+    pokes.sort(key=lambda p: int(p.split()[0]))
     script = m["input"]
     if any(PREF.search(p) for p in pokes):
         pokes = resolve_poke_refs(m, pokes, save, client, work, game_dir)
@@ -1015,10 +1061,15 @@ def main(argv=None):
             return worst
         jobs = [(p, c, d) for p in a.play for c in classes for d in diffs]
         cells = []
+        lock = threading.Lock()
 
         def one(job):
             p, c, d = job
             _, _, sm = run_cell(p, texts[p], c, d, client, d2s, base, a.game_dir, only)
+            if a.json:
+                # each finished cell at once, so a long run that stops early keeps its cells
+                with lock, open(a.json + ".cells.jsonl", "a", encoding="utf-8") as f:
+                    f.write(json.dumps(sm) + "\n")
             print(f"  {os.path.basename(p)} {c} {d}: {sm['reached']}/{sm['total']}"
                   + (f", first blocker {sm['first_blocker']['milestone']} ({sm['first_blocker']['kind']})"
                      if sm["first_blocker"] else ""), file=sys.stderr, flush=True)
@@ -1246,6 +1297,36 @@ milestone walk
     assert len(cr) == 16 and cr[-1] == "25 pos @player 1000 2000", cr
     pts = {tuple(map(int, q.split()[3:])) for q in sw}
     assert pts == {(1000 + 30 * i, 2000 + 30 * j) for i in range(-2, 3) for j in range(-2, 3)}, pts
+    # checkpoint start and goto steps (spec §1 r5-r6)
+    cp = parse_play("playthrough 1\nmilestone a\n checkpoint a4-hellforge\n deadline 300\n"
+                    " goto 30 unit 409\n need unit ut 1 cl 409 g @p2 present\n", "c")
+    cm = cp["milestones"][0]
+    assert cm["checkpoint"] == "a4-hellforge" and cm["save"] is None and cm["pokes"] == ["30 goto unit 409"], cm
+    ck, args = load_checkpoint("a4-hellforge")
+    assert ck["start"][0] == (5, "warp 107") and "--act" in args, ck["start"]
+    for bad in ("playthrough 1\nsave a --x\nmilestone a\n use a\n checkpoint b\n deadline 2\n need player lv == 1",
+                "playthrough 1\nmilestone a\n deadline 2\n need player lv == 1",
+                "playthrough 1\nmilestone a\n checkpoint A_B\n deadline 2\n need player lv == 1",
+                "playthrough 1\nmilestone a\n checkpoint x\n deadline 2\n goto 5 here 3\n need player lv == 1",
+                "playthrough 1\nmilestone a\n checkpoint x\n deadline 2\n goto x unit 3\n need player lv == 1"):
+        try:
+            parse_play(bad, "bad")
+        except PlayError:
+            continue
+        raise AssertionError(f"accepted: {bad!r}")
+    try:
+        load_checkpoint("no-such-checkpoint")
+        raise AssertionError("missing checkpoint loaded")
+    except PlayError:
+        pass
+    # every committed objective file parses
+    d = os.path.join(REPO, "traces", "playthrough")
+    for f in sorted(os.listdir(d)):
+        if f.endswith(".play"):
+            with open(os.path.join(d, f), encoding="utf-8") as fh:
+                text = fh.read()
+            if "{" not in text:  # a matrix template parses per cell (cell_text)
+                parse_play(text, f)
     # matrix (spec §4): only / roles / cell saves / delta / since
     mtext = """playthrough 1
 act 1

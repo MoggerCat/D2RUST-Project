@@ -169,6 +169,7 @@ impl StatLists {
             return Toggle::default();
         }
         if on {
+            crate::cov!(State, s, 0);
             w[i] |= bit;
         } else {
             w[i] &= !bit;

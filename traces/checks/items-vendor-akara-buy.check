@@ -11,6 +11,9 @@ check 1
 # world/vendors.md §3-§4), 0x32 buy of the first store item (vendors.md §7.1;
 # the character has no items, so the first item unit in GUID order, @4, is
 # the store's first item).
+# fi (file index 0 vs -1 of items without one) waits on pc1-data Step 4
+# item 26.
+ignore if fi
 name items-vendor-akara-buy
 save ScnBuy --class ama --expansion --gold 5000
 seed 1234

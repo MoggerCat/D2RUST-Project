@@ -1,0 +1,64 @@
+# Checkpoint definition (specs/tools/checkpoints.md); tools/checkpoints/make.py
+# builds the save with d2s-tool. Ids are rows of the 1.14d tables
+# (levels, monstats, objects), as the traces/playthrough/act*.play
+# comments name them. Gear and stats are our choice for the point.
+# Throne of Destruction is level 131, Baal (throne) monstats 543; his chamber, the Worldstone Chamber, is level 132 (Baal 544).
+checkpoint 1
+name CkBaal
+title Baal: Throne of Destruction to the Worldstone Chamber (Act V boss, quest 40)
+class sor
+level 60
+expansion
+difficulty normal
+act 4
+stat 0 80   # strength
+stat 1 120   # energy
+stat 2 45   # dexterity
+stat 3 130   # vitality
+stat 4 0     # unspent stat points
+stat 5 0     # unspent skill points
+stat 6 86784   # life 339 (x256)
+stat 7 86784
+stat 8 82688   # mana 323
+stat 9 82688
+stat 10 64768   # stamina 253
+stat 11 64768
+skill 0 4   # fb (skill 36)
+skill 3 4   # ib (skill 39)
+skill 4 1   # fa (skill 40)
+skill 6 4   # static (skill 42)
+skill 7 1   # tk (skill 43)
+skill 8 8   # nova (skill 44)
+skill 9 8   # blast (skill 45)
+skill 1 1   # warmth (skill 37)
+skill 18 1   # tele (skill 54)
+skill 19 1   # gs (skill 55)
+skill 23 20   # blizz (skill 59)
+skill 28 8   # fo (skill 64)
+skill 29 6   # cm (skill 65)
+skill 22 1   # es (skill 58)
+right-skill 64
+left-skill 36
+gold 300000
+quests 1.0 2.0 4.0 6.0 9.0 10.0 11.0 12.0 13.0 14.0 17.0 18.0 19.0 20.0 21.0 22.0 25.0 26.0 27.0 acts=4 35.0 36.0 37.0 38.0 39.0
+waypoints lv=1 lv=3 lv=4 lv=5 lv=6 lv=27 lv=29 lv=32 lv=35 lv=40 lv=48 lv=42 lv=57 lv=43 lv=44 lv=52 lv=74 lv=46 lv=75 lv=76 lv=77 lv=78 lv=79 lv=80 lv=81 lv=83 lv=101 lv=103 lv=106 lv=107 lv=109 lv=111 lv=112 lv=113 lv=115 lv=123 lv=117 lv=118 lv=129
+item ghm/body=1
+item spl/body=3
+item wst/body=4
+item hgl/body=10
+item hbt/body=9
+item hbl/body=8
+item rin/body=6
+item rin/body=7
+item amu/body=2
+item hp5/belt=0
+item hp5/belt=1
+item mp5/belt=2
+item mp5/belt=3
+item rvs/belt=4
+item rvs/belt=5
+item rvs/belt=6
+item rvs/belt=7
+start 5 warp 131
+start 20 goto unit 543
+need player lv 131

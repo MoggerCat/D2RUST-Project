@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–327 |
-|   6. Comparison | 328–377 |
-|   7. Requests | 378–389 |
-| Constants & data dependencies | 390–393 |
-| Randomness | 394–397 |
-| Edge cases & original bugs | 398–405 |
-| Test vectors | 406–414 |
-| Provenance | 415–419 |
-| Open questions | 420–434 |
+|   5. d2rs export | 190–351 |
+|   6. Comparison | 352–401 |
+|   7. Requests | 402–413 |
+| Constants & data dependencies | 414–417 |
+| Randomness | 418–421 |
+| Edge cases & original bugs | 422–429 |
+| Test vectors | 430–438 |
+| Provenance | 439–443 |
+| Open questions | 444–458 |
 <!-- /index -->
 
 ## Summary
@@ -324,6 +324,30 @@ composition, through `d2-client` only (game logic untouched).
    automap cels export as `CelDraw`), else `CelDraw` (revision
    2026-10-09, measured: the wrapper names of the recorded scenes'
    `ui/`, `font`, `spells` and `automap` cels). World cels keep r3.
+19. `--at-tick N,M,...` (strictly increasing) dumps several frames in
+   one run, each the first drawn frame at or after its tick (r13), into
+   `DIR/tick-<N>`; one tick keeps `DIR` itself. `--dump-image` also
+   writes the composed index frame of r8 as `frame.png`: an 8-bit
+   palettized PNG, the index bytes as they are, the frame palette as
+   `PLTE` (the form of `record_frames.py`'s captures), so a pixel view
+   compares indices, not converted colours. The image is rendered game
+   art: it is written only where the caller points `DIR`
+   (`tools/sidebyside/build.py` points it outside the repository,
+   CLAUDE.md rule 1), never under `facts/` (revision 2026-10-09,
+   q-tool-side-by-side).
+20. `play --sound-log FILE` writes every call of the sound request entry
+   (`audio/triggers.md` §1 r1: 1.14d `0x004B9A00`; d2rs
+   `SoundSystem::request`) at its entry, rejected calls (id < 1, volume
+   0) included, in call order: a `# sound-log v1` line, a column row,
+   then `tick sound_tick id unit_type guid delay flags offset` per call
+   (`-` for no unit). `tick` is the server tick of the audio frame that
+   made the call, `sound_tick` the sound tick (`0x007BC9BC`). The 1.14d
+   side is `record_frames.py --sounds`: a `{"k": "sound"}` record per
+   entry hit with the recorder's frame, `[0x007BC9BC]`, ECX, EDX's type
+   (+0x00) and GUID (+0x0C), the three stack words and the return
+   address (`audio/triggers.md` Checks, "request log"). The two logs
+   compare as the sequence of (tick, id, unit, delay, flags, offset)
+   (revision 2026-10-09, q-tool-side-by-side).
 
 ### 6. Comparison
 

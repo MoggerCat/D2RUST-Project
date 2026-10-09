@@ -107,7 +107,7 @@ offset seen in the 1.14d code named in the last column):
 | +0x0C | GUID | `unit-order.md` §1 | — |
 | +0x10 | mode | §4 | `0x00624690` |
 | +0x14 | per-kind data | player/monster/object/missile/item data | `0x005553C8`, `0x005A73E0` |
-| +0x18 | act (u8) | act of the allocation room's level; a player's is rewritten by the act change (`world/waypoints.md` §11 rule 15) | `0x005552ED`, `0x0053AE4E` |
+| +0x18 | act (u8) | act of the allocation room's level; rewritten with +0x1C (the act record, game +0xBC + 4·act) by every placement `0x00554850` from the room it places in (the join's game entry, `intents-events.md` §8.2 rule 5: a loaded player, allocated in no room, gets its act here; for a null room the allocation's level lookup `0x0061A1B0` returns no value, so +0x18 is meaningless until then); a player's is also rewritten by the act change (`world/waypoints.md` §11 rule 15) | `0x005552ED`, `0x0055489C`, `0x0053AE4E` |
 | +0x1C | act record | game +0xBC + 4·act (same writers as +0x18) | `0x005552FA`, `0x0053AE56` |
 | +0x20, +0x28 | seed, init seed | `rng.md` §5.3 | — |
 | +0x2C | path | freed at removal | `0x0055568B` |

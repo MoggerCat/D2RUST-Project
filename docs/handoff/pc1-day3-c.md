@@ -232,3 +232,108 @@ The harness should test class and position, not GUID.
   - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
     their seeds stay unchanged.
   - **d2rs differs:** `q-fix-p3-room-empty-think`.
+
+- **REC-223, the screen after an act-start video: settled from the call sequence** (`ui/frontend-loading.md` L10
+  rule 2, L5; edge case 8 corrected).
+  - **Run:** a first-time Warriv travel with a save whose quest word 6 bit 0 is set and word 7 is
+    clear, so the server sends 0x61 id 2. Windowed, sound on.
+  - **Video:** `0x00482EF0` ran (id 2 in ECX) at frame 296 and returned at once; Bink doesn't seem to
+    play in `-w`. Then 8 loading draws, then the first game frame at frame 296. So the loading frame
+    **is** redrawn after the video.
+  - **Who redraws it:** the room-graphics preload `0x00470070` (call `0x004700DD`, one draw per room
+    except k & 0x1F = 0). It runs from the S→C 0x04 handler `0x0045C9A0` through `0x00470B10`, which
+    holds `[0x007A8920]` = 1 for that pass only. The address is referenced only by bytes Ghidra had
+    not disassembled, so the spec had called this path dead. The no-video control (`warp 40`) shows
+    the same 8 preload draws, after the one 0x03 draw.
+  - **New PROVISIONAL:** the redrawn frames don't reload the Loading palette, so after a played video
+    they may show the palette the video player left.
+  - **d2rs differs:** it makes no preload draws and shows black after a video:
+    `q-fix-p6-loading-preload-draws`.
+  - **Pixels:** PrintWindow returns black at every loading draw, the control included, so the pixels
+    prove nothing. A full-screen pixel check of a played video remains open.
+
+- **[prov-data] Hratli's unit seed two steps at creation: answered** (`monsters/init.md` §4.2 new;
+  `world/quests-act3-2.md` §11.7 r3; the item's §3.3 pointer was wrong, that section covers Alkor).
+  - **Not the dummy code:** the spawn wrapper `0x005B2F20`, inits 49 / 50 and the first think draw
+    nothing.
+  - **The two steps come from normal creation:** `0x005B2A00` → `0x00555230` → `0x00573CB0`:
+    1. components `0x005739D0` (one roll; only TR has a choice);
+    2. HP `0x0045C3E0` at `0x00573F8F` (`roll(1)`).
+  - **Numeric check:** (4040195123, 666) → (3284026841, 1685134555) → (3975998680, 1369742535),
+    which equals the recording. Meshif 264 (a DS1 preset) gets the same two steps through the same
+    path.
+  - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
+    `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.
+
+## Round 4 — REC-576 Windows points (q-prov-recording-2)
+
+- **(6) Weather frame rate `[0x007BB390]`: settled** (`render/draw-order-2.md` §11.7 r2). Read with
+  no breakpoints, 4 times a second for 30 s in the Rogue Encampment:
+  - 0 in the menus;
+  - 30–44 for about 10 s after the arrival;
+  - then 21–26, 25 in most samples.
+
+  The 0–12 seen under the debugger came from the hooks slowing the client. The ≥ 10 flash gate always
+  passes in play, so d2rs's fixed 25 matches in effect. No q-fix.
+- **(4) Hireling 0x81 fields: settled** (`client/model.md` §14 r3; `msg-units.md` OQ 7 answered).
+  - **Recording:** a scripted Kashya hire (`record_packets.py`). The save has quest word 2 bit 0 and
+    5000 gold; the script picks the first row of the hire list.
+  - **Frame 367:** C→S 0x36 (Kashya GUID 3, id 0x0D53), then S→C 0x81
+    `81 07 0f01 01000000 0d000000 083bd951 530d0000`. That is pet GUID 13, +0x24 = the list entry's
+    seed 0x51D93B08, +0x28 = hire id 0x0D53.
+  - **Frame 368:** the hireling's 0xAC. No 0x7A is sent.
+  - **d2rs matches;** only a PROVISIONAL note remains: `q-fix-p6-pet-record-settled`.
+- **(3) Audio ST-4, one-shot end tick: recorded** (`audio/sound-table.md` §6.6 r3, OQ 12).
+  - **Method:** sound on, a probe with breakpoints only at the start and the natural-end store, so
+    the client ran at full speed; 60 s of walking.
+  - **Result:** 73 footsteps (ids 2768–2771) end at start + ceil(frames / 882) + 1 ticks (+2 in a
+    third of the cases, +0 once). The end comes 30–125 ms after the sample's duration, which fits the
+    50 ms voice service thread.
+  - **d2rs** ends them 1 tick early: `q-fix-p6-oneshot-end-tick`.
+  - **ST-7 (`Async Only` completion): not recorded.** A probe on the async issue (`0x00482AFC`),
+    the pending check (`0x00482BE1`) and the collect (`0x00482BF0`) saw no hit in 60 s of town play.
+    The rows are evidently loaded before any start; a run that starts an unloaded `Async Only` id is
+    still needed (noted in OQ 13).
+
+## Resume here (session paused 2026-10-09)
+
+**State:** everything is committed and pushed on `claude/local-pc1-day3-c` (worktree
+`..\d2rs-c`; `game\` there is a junction to `..\d2rs\game`). Staging was merged before each push.
+Both checks passed at the last push.
+
+**Done in this session:**
+- **Runs and placements:**
+  - item 23;
+  - the act-entry milestones (III, IV, V, Baal's chamber);
+  - the Act IV/V boss and quest-object placements (7 checks).
+- **Items:** 42–44, the item flag 0x2000, the two `[prov-data]` items.
+- **Windows runs:** REC-222, REC-223, REC-576 (3) ST-4, (4) and (6).
+- **Tools:** the game lock (mutex + `%TEMP%\d2-game.lock`) and `dumpdrlg rooms<id>`.
+
+**Open for this session:**
+- **REC-576 (3) ST-7:** the `Async Only` completion tick. It needs a run that starts an `Async
+  Only` id that is not yet loaded. Probe: `probe_async.py`.
+- **REC-223 pixels:** a full-screen check with the Bink video actually playing; in `-w` the video
+  returns at once. Run full screen only with the user's OK, because it changes the display mode.
+- **Next:** pull staging for new `[play-act3]` / `[play-act5]` / `[prov-data]` / `[prov-recording]`
+  / `[store-fill]` items. Before starting one, check that its pc1-data line is unmarked and claim it
+  with PC1-A / PC1-B by message; all three sessions agreed to this.
+
+**Scratch probes (not in git, rule: probes stay out of the repo):** `..\d2rs-probes\`:
+- `probe_loadkeys.py`: keys during loading (REC-222);
+- `probe_video.py` / `probe_control.py`: video and loading-draw callers (REC-223);
+- `probe_fps.py`: a global polled with no breakpoints;
+- `probe_sound.py` / `probe_async.py`: sound start / end and async ticks;
+- `sweep.py`, `spiral.py`, `path.py`: `pos` poke-file generators;
+- `seen.py`: first sighting of a class in a state file;
+- `mkcheck.py`: path `.check` generator;
+- `ds1obj.py`: DS1 preset-unit reader.
+
+They import `tools\trace-recorder` from `..\d2rs-c`; adjust the `REC` path if the worktree moves.
+
+**Saves made** (in `%USERPROFILE%\Saved Games\Diablo II`, all from `d2s-tool new --class sor
+--expansion --map-seed 1`):
+- `MilA3` / `MilA4` / `MilA5` / `MilBaal`: town bytes 1–4;
+- `MilWarriv`: quest word 6 bit 0 only, for the first Warriv travel with video;
+- `MilHire`: quest word 2 bit 0, 5000 gold;
+- `Mil*none` / `Mil*q`: the load tests.
