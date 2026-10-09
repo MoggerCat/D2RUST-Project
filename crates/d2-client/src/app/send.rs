@@ -166,7 +166,7 @@ pub fn install<C: Clock + Send + 'static>(
     let mut pokes = super::poke::Schedule::new(pokes);
     let mut sends = SendSchedule::new(sends);
     link.set_before_pump(move |l: &mut Link<C>| {
-        pokes.run_due(&mut l.host_mut().game);
+        pokes.run_due(l);
         sends.run_due(l);
     })
 }
