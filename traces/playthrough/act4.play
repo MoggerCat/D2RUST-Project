@@ -74,7 +74,7 @@ milestone hellforge
   use sor
   deadline 1000
   poke 5 warp 107
-  sweep 20 2 800 80
+  poke 20 goto preset 107 2:376
   need ever player lv == 107
   need unit ut 2 cl 376 lv 107 seen
 
@@ -82,7 +82,7 @@ milestone hephasto-present
   use sor
   deadline 1000
   poke 5 warp 107
-  sweep 20 2 800 80
+  poke 20 goto preset 107 1:409
   need ever player lv == 107
   need unit ut 1 cl 409 lv 107 seen
 
