@@ -64,9 +64,13 @@ impl Panel for CubeUi {
         PanelId(u16::from(UI_CUBE))
     }
 
+    /// The left half above the control panel, plus the inventory close
+    /// rectangle the stash / cube mouse handlers test first (`panels.md`
+    /// §11 r7, `panels-2.md` §20 r1–r3): the frame above the control
+    /// panel, and [`Self::event`] lets every other point go on.
     fn rect(&self) -> Rect {
         let s = self.sh.borrow().config.screen;
-        Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16)
+        Rect::new(0, 0, s.w as u16, (s.h - 48) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -151,9 +155,17 @@ impl Panel for CubeUi {
         }
         let s = sh.config.screen;
         let was_transmute = self.input.transmute_pressed;
+        // `0x00486E10`: the inventory close rectangle (the belt popup
+        // covering it is not tested: d2rs-own, the popup is the HUD's).
+        let in_inv_close = crate::ui::panels::inventory::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(at));
+        let left = Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16);
+        if !in_inv_close && !left.contains(at) {
+            return UiResponse::Ignored;
+        }
         let ptr = Pointer {
             at,
-            in_inv_close: false,
+            in_inv_close,
             cursor_item: items::cursor_item(ctx.world).is_some(),
         };
         let eff = if down {

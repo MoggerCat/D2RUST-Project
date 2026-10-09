@@ -1460,3 +1460,76 @@ mod key_commands {
         assert!(!u.ui.is_open(0x18));
     }
 }
+
+/// The centre of the inventory close rectangle (`panels.md` §9.3).
+fn inv_close_point(u: &Ui) -> Point {
+    let r = crate::ui::panels::inventory::close_rect(&u.ui.shared.borrow().tables, &Screen::R800)
+        .expect("the close row");
+    Point::new(r.x + r.w as i32 / 2, r.y + r.h as i32 / 2)
+}
+
+/// S→C 0x77 `code` (0x10 stash, 0x15 cube) delivered and mirrored.
+fn open_by_0x77(u: &mut Ui, w: &ClientWorld, code: u8) {
+    u.ui.apply_output(
+        &crate::bridge::output::Output::TradeAction {
+            code,
+            dead_or_absent: false,
+        },
+        w,
+    )
+    .unwrap();
+    let e = UiEvent::Press {
+        button: PointerButton::Right,
+        at: Point::new(0, 0),
+    };
+    u.ui.after_event(&mut u.root, e, Routed::Unhandled).unwrap();
+    u.root.take_intents();
+}
+
+// The inventory close button with the stash up is the stash's (§11 r7,
+// `panels-2.md` §20 r1): press sets the inventory close flag (sound 4),
+// the release closes ui 0x19 alone and its hook sends one 0x4F 0x12; ui 1
+// is never touched and the open mode returns to 0.
+// Covers: specs/ui/panels.md §11 r7; specs/ui/panels-2.md §20 r1
+#[test]
+fn the_inventory_close_button_closes_the_stash() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    open_by_0x77(&mut u, &w, 0x10);
+    assert!(u.ui.is_open(0x19) && !u.ui.is_open(UI_INVENTORY));
+    let p = inv_close_point(&u);
+    u.ui.take_outcome();
+    u.click(&w, p);
+    assert!(!u.ui.is_open(0x19), "the stash closed");
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    assert_eq!(u.ui.open_mode().get(), 0);
+    assert_eq!(
+        u.root.take_intents(),
+        vec![ClientIntent(vec![0x4F, 0x12, 0, 0, 0, 0, 0])]
+    );
+    assert!(u
+        .ui
+        .take_outcome()
+        .sounds
+        .contains(&crate::audio::driver::SoundRequest::Ui(4)));
+}
+
+// The same for the cube (§20 r2–r3): one 0x4F 0x17 through the close hook.
+// Covers: specs/ui/panels-2.md §20 r2, §20 r3
+#[test]
+fn the_inventory_close_button_closes_the_cube() {
+    let mut u = ui(Some(areas()), true);
+    let w = world(AMAZON, 1, true);
+    open_by_0x77(&mut u, &w, 0x15);
+    assert!(u.ui.is_open(0x1A));
+    let p = inv_close_point(&u);
+    u.click(&w, p);
+    assert!(!u.ui.is_open(0x1A), "the cube closed");
+    assert!(!u.ui.is_open(UI_INVENTORY));
+    let sent = u.root.take_intents();
+    assert_eq!(
+        sent.iter().filter(|i| i.0[..2] == [0x4F, 0x17]).count(),
+        1,
+        "{sent:?}"
+    );
+}

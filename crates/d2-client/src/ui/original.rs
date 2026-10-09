@@ -1686,8 +1686,13 @@ impl Panel for TopUi {
                 out,
             );
         }
-        // The item tool tip over everything (`item_tip`).
-        if sh.states.is_open(UI_INVENTORY) {
+        // The item tool tip over everything (`item_tip`), while the
+        // inventory family is drawn (`panels.md` §5 step 5: with the stash,
+        // the cube or the shop too, not only flag 1).
+        let family = super::root::INVENTORY_FAMILY
+            .iter()
+            .any(|&u| sh.states.is_open(u));
+        if family {
             let class = Facts::of(ctx.world).class;
             let lines = sh.items.hover_lines(
                 ctx.world,
