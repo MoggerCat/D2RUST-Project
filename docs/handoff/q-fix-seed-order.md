@@ -84,6 +84,11 @@ this path does not show here: unit seeds are equal on all 400 frames
 (the monsters of this check do think and fight). Re-check
 `variant blood-moor-empty` on its own branch if it still differs.
 
+Playthrough (`playthrough.py traces/playthrough/act1.play --build`, this
+branch): reached 14/17, furthest consecutive 5/17; first blocker
+`den-of-evil-done` (quest 1.0 never set), then `andariel-done`,
+`act2-open` (quests, not this area).
+
 ## Open
 
 - **Monster AI, not this area** (for q-fix-monster-ai): Cold Plains
