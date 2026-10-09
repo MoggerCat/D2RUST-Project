@@ -36,8 +36,23 @@ build at release opt-level 3: run d2-sim and d2-server in debug.
 - `app_single_player` load steps: the load logs "has skill" as an unapplied step on the install (`q-fix-real-load-steps`).
 - `app_assassin_gaps` `a_lightning_sentry_fires_its_missile`: missile damage setup (`q-fix-real-missile-damage`).
 
+## In progress at the pause (kept out of the branch)
+
+- F1 `q-fix-client-path-exact` and F2 `q-fix-real-equip-2h` were with subagents, stopped half done. Their
+  uncommitted production edits are NOT in the branch; the diff is saved as
+  `wip-f1-f2.patch` in the session scratchpad only (lost with the container), so redo from the notes:
+  - F1: root cause not yet confirmed. Lead: the client path's grids lack other units' (objects')
+    footprints, `client_path.rs` module doc; a fire (objects class 37) stands near the run stop
+    point (4925,4210); measure client vs server position per tick on `the_scripted_play_run`
+    (legs to (4931,4207), (4898,4227)), then stamp the model objects' footprints into the
+    client path's private grids with `d2-sim` `path/footprint.rs` (objects table rows:
+    `client_object_rows`, `bridge/objects`). Target: `play_smoke` tolerance 2 -> 0.
+  - F2: reproduce in a new ignored test on `Rig::new("sorceress", &[])`: C->S 0x1C bodyloc 4, then
+    0x1A equip of the staff to 4; find the failing step in `d2-sim` `items/inventory/equip.rs`
+    `equip_check` (body_location_allowed / requirements_met / hands_compatible). Not yet found.
+
 ## Not done
 
-G7 (the live run in release already; blocked behind the 6D finding), F2, corpse-regen
+G7 (the live run in release already; blocked behind the 6D finding), F1, F2, corpse-regen
 (`stat-lists.md` §10.1 has no dead-mode stop; needs the original's behavior), the
 `app_frame_loop` numbers after the join count, `test_fixtures::install` users outside the client.
