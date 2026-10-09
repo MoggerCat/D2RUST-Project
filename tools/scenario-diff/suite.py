@@ -556,6 +556,8 @@ def main(argv=None):
                     help="with --orig-cache: store fresh 1.14d recordings in the cache")
     ap.add_argument("--fresh", action="store_true", help="record 1.14d again (no reuse)")
     ap.add_argument("--no-checks", action="store_true")
+    ap.add_argument("--gen", action="store_true",
+                    help="run the generated checks in traces/checks/gen instead")
     ap.add_argument("--no-playthrough", action="store_true")
     ap.add_argument("--no-build", action="store_true",
                     help="use the binaries already in target/suite-bin")
@@ -578,6 +580,7 @@ def main(argv=None):
     t0 = time.time()
     try:
         jobs = [] if a.no_checks else discover(
+            os.path.join(CHECKS_DIR, "gen") if a.gen else CHECKS_DIR,
             pattern=a.filter, areas=set(x for x in (a.area or "").split(",") if x) or None)
         if not a.no_checks and not jobs:
             raise SuiteError("no check matches")
