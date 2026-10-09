@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–331 |
-|   R3. Per-tick dispatch | 332–361 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 362–492 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 493–545 |
-|   R6. Damage stage (missile-owned part) | 546–666 |
-|   R7. Lifetime and expiry | 667–720 |
-|   R8. Pierce | 721–747 |
-|   R9. Server-do and server-hit catalogues | 748–978 |
-|   R10. Behaviour of the recorded missiles | 979–1013 |
-|   R11. `missiles.txt` columns and their server use | 1014–1061 |
-| Constants & data dependencies | 1062–1088 |
-| Randomness | 1089–1121 |
-| Edge cases & original bugs | 1122–1148 |
-| Test vectors | 1149–1231 |
-| Provenance | 1232–1284 |
-| Open questions | 1285–1366 |
+|   R2. Creation | 141–356 |
+|   R3. Per-tick dispatch | 357–386 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 387–517 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 518–570 |
+|   R6. Damage stage (missile-owned part) | 571–691 |
+|   R7. Lifetime and expiry | 692–745 |
+|   R8. Pierce | 746–772 |
+|   R9. Server-do and server-hit catalogues | 773–1003 |
+|   R10. Behaviour of the recorded missiles | 1004–1038 |
+|   R11. `missiles.txt` columns and their server use | 1039–1086 |
+| Constants & data dependencies | 1087–1113 |
+| Randomness | 1114–1146 |
+| Edge cases & original bugs | 1147–1173 |
+| Test vectors | 1174–1256 |
+| Provenance | 1257–1309 |
+| Open questions | 1310–1391 |
 <!-- /index -->
 
 ## Summary

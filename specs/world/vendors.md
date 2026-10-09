@@ -38,13 +38,13 @@
 |   6. Refresh | 361–392 |
 |   7. Buying and selling | 393–586 |
 |   8. Repair | 587–641 |
-|   9. Prices | 642–838 |
-| Constants & data dependencies | 839–858 |
-| Randomness | 859–877 |
-| Edge cases & original bugs | 878–917 |
-| Test vectors | 918–940 |
-| Provenance | 941–979 |
-| Open questions | 980–1063 |
+|   9. Prices | 642–841 |
+| Constants & data dependencies | 842–861 |
+| Randomness | 862–880 |
+| Edge cases & original bugs | 881–920 |
+| Test vectors | 921–943 |
+| Provenance | 944–982 |
+| Open questions | 983–1066 |
 <!-- /index -->
 
 ## Summary

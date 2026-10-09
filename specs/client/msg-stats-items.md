@@ -27,13 +27,13 @@
 |   2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`) | 137–266 |
 |   3. Other item messages | 267–367 |
 |   4. Hireling stats: 0x9E–0xA2 (`0x0045D540`) | 368–383 |
-|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 384–519 |
-| Constants & data dependencies | 520–528 |
-| Randomness | 529–532 |
-| Edge cases & original bugs | 533–552 |
-| Test vectors | 553–591 |
-| Provenance | 592–627 |
-| Open questions | 628–668 |
+|   5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6 | 384–555 |
+| Constants & data dependencies | 556–564 |
+| Randomness | 565–568 |
+| Edge cases & original bugs | 569–588 |
+| Test vectors | 589–627 |
+| Provenance | 628–663 |
+| Open questions | 664–704 |
 <!-- /index -->
 
 Owned ids: 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x3F, 0x42,

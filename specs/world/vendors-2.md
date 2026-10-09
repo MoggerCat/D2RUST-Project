@@ -23,7 +23,7 @@
 | Rules | 39–40 |
 |   7.3 Item copy (`0x0055A2A0`, ECX game, EDX source S, owner, fillers) | 41–116 |
 |   7.3.1 Fields the decoder rebuilds (Open question 8) | 117–170 |
-|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 171–286 |
+|   10. C→S 0x4F buttons (`0x0054C7C0` → `0x00568060`; answers `ui/panels.md` OQ 6) | 171–294 |
 <!-- /index -->
 
 ## Summary

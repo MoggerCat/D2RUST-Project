@@ -16,12 +16,12 @@
 | Summary | 27–33 |
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–129 |
-|   7. Intents | 130–691 |
-|   8. Pickup from the ground | 692–873 |
-|   9. Drop to the ground | 874–921 |
-|   10. Gold | 922–961 |
-|   11. Message layouts | 962–991 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 992–1119 |
+|   7. Intents | 130–695 |
+|   8. Pickup from the ground | 696–877 |
+|   9. Drop to the ground | 878–925 |
+|   10. Gold | 926–965 |
+|   11. Message layouts | 966–995 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 996–1123 |
 <!-- /index -->
 
 ## Summary
@@ -536,8 +536,12 @@ gold − pile gold (`0x00530EA0`). Result 0.
 1. Classic game → 3. Busy and trading → 3.
 2. Ends with 0 (no effect) unless: the player has no used skill (`0x00620250`(player): skill list +0x10,
    `skills/levels.md`; register argument pushed at `0x0054D47A`), the player is alive (`0x005541B0` = 0), a hireling
-   exists (`0x00574EC0(7, 0)`), it is alive, and it belongs to the player
-   (`0x0065A590`).
+   exists (`0x00574EC0(7, 0)`), it is alive, and it is near the player
+   (`0x0065A590(hireling, player)`, pushed at `0x0054D4B6`: 1 when the
+   hireling's room is in the room list `0x00619790` of the **player's**
+   room; either room missing → 0; a null first / second argument is
+   fatal 0x18 / 0x19. The 0x4B test, `sim/intents-events.md` §9 rule 10,
+   is the same function with (player, unit)).
 3. No player inventory → 3. Cursor item C present: C's items `quest` = 0
    → `0x0054D230` (give to the hireling; result ignored), 0. No cursor:
    location (u16 @1) ≠ 0 → `0x0054D130` (take from the hireling) and its

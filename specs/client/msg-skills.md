@@ -32,14 +32,14 @@
 |   6. 0x23 SetSkill (`0x0045DE10`) | 284–290 |
 |   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 291–334 |
 |   8. 0xA3 skill do (`0x0045D5E0`) | 335–348 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–382 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 383–397 |
-| Constants & data dependencies | 398–409 |
-| Randomness | 410–413 |
-| Edge cases & original bugs | 414–423 |
-| Test vectors | 424–449 |
-| Provenance | 450–475 |
-| Open questions | 476–510 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–386 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 387–401 |
+| Constants & data dependencies | 402–413 |
+| Randomness | 414–417 |
+| Edge cases & original bugs | 418–427 |
+| Test vectors | 428–453 |
+| Provenance | 454–479 |
+| Open questions | 480–514 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.

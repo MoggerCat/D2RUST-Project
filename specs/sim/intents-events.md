@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 627–658 |
 |   5. Machine-readable tables | 659–695 |
 |   6. Exact-match comparison | 696–804 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1255 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1256–1519 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1520–1692 |
-| Constants & data dependencies | 1693–1711 |
-| Randomness | 1712–1717 |
-| Edge cases & original bugs | 1718–1763 |
-| Test vectors | 1764–1850 |
-| Provenance | 1851–1977 |
-| Open questions | 1978–2130 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1266 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1267–1530 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1531–1703 |
+| Constants & data dependencies | 1704–1722 |
+| Randomness | 1723–1728 |
+| Edge cases & original bugs | 1729–1774 |
+| Test vectors | 1775–1861 |
+| Provenance | 1862–1988 |
+| Open questions | 1989–2141 |
 <!-- /index -->
 
 ## Summary
@@ -845,7 +845,8 @@ room-change merge (`sim/pathing.md` §9.8). Part A by type:
 | item | only with unit flag 0x10: mode 3 and unit flag 0x1000 → 0x9C action 2 (`0x0053EC90`), else 0x9C action 0 (`0x0053EC00`) (`items/inventory-moves.md` §6.3) | |
 | other (5) | 0x09 (`0x0053BCD0`: type, GUID, class u8, x, y) | |
 
-Part B by type: player → `0x005489F0`, then a corpse 0x74
+Part B by type: player → `0x005489F0` (another player only: five
+S→C 0x20, `client/msg-stats-items.md` §1 r4.2), then a corpse 0x74
 (`0x0053DA40`) when `0x005541B0(unit)` and `0x00639DF0(unit, 7)` hold,
 else `0x00534F80`;
 `0x00570E30`, `0x005484B0`, `0x00571CD0`, `0x00571620`; monster → its
