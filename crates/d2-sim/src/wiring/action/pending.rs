@@ -116,6 +116,18 @@ pub enum QuestEvent {
         item: u32,
         action: u16,
     },
+    /// A special monster was created (`0x005A09E0` → `0x00544E80`,
+    /// `quests-act3.md` §6.2: the Golden Bird's boss choice).
+    BossCreated { unit: UnitId },
+    /// A preset superunique's quest hook `0x00545B50` (`monsters/init.md`
+    /// §20.1; `quests-act3.md` §7.5: the Travincal council).
+    PresetBoss { unit: UnitId },
+    /// Alkor's map AI cleared the Golden Bird's +0x00 (`0x005BAD40`,
+    /// `ai-bodies.md` §9.9).
+    AlkorReset,
+    /// Ormus' map AI activates the Gidbinn altar (`0x005B9CD0`,
+    /// `quests-act3.md` §5.7).
+    OrmusAltar,
 }
 
 /// Seams without a provider (see the module doc). Grouped by the spec
@@ -1618,6 +1630,16 @@ pub trait Pending {
     {
         false
     }
+    /// The save load's passive states (`formats/d2s-load.md` §2
+    /// "skills", the assign's passive part): routed to
+    /// [`crate::wiring::interaction::skill_events::passive_refresh_all`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default:
+    /// nothing.
+    fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The skill part of the monster sequence event 0 `0x005A8670`
     /// (`units.md` §4.6 rule 13, before the animation refresh): E flags,
     /// the moving skill's step and the do `0x0056FC50` by frame code. A
@@ -1770,6 +1792,14 @@ pub trait Pending {
     /// `0x0058E920(game, room, missile)` from a missile body (Tyrael's
     /// spawn, `quests-act5-2.md` §8.8). Default: nothing.
     fn missile_spawn_tyrael(&mut self, room: Option<RoomId>, missile: UnitId, x: i32, y: i32) {}
+    /// The Durance of Hate warp check's answer (`0x005BBFA0`, `quests.md`
+    /// §8.2: into level 100 from anywhere but level 101), published by
+    /// the quest control once per tick. Default: nothing.
+    fn set_durance_open(&mut self, open: bool) {}
+    /// The Act III answers the town NPCs' map AI reads (`ai-bodies.md`
+    /// §9.9: alkor `0x005BAD20`, ormus `0x005B9CA0`), published by the
+    /// quest control once per tick. Default: nothing.
+    fn set_act3_npc_answers(&mut self, alkor_bird: bool, ormus_altar: Option<(i32, i32)>) {}
     /// `0x00574EC0(game, player, 7, 0)`: the player's hireling (§9 rule
     /// 8; `hirelings.md` §5 rule 4; the wired host answers it from the
     /// hireling list). Default: none.

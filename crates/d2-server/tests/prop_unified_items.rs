@@ -1998,6 +1998,14 @@ fn check_stream(
     // A player item that moved between held places was announced. Not
     // after a new limbo: §7.10's failure path runs no owner refresh, so
     // the target's move to the cursor is not sent in that frame.
+    // `inventory-moves.md` §7.6 (0x1B Swap2HandedItem): the two-handed
+    // item's partner X goes from the body to the cursor with no command
+    // flag and no update-list entry of its own; the client learns it from
+    // the 0x9D action 7 (indirect swap) of the item put in its place.
+    let swapped_in = direct
+        .iter()
+        .chain(ticked)
+        .any(|m| m[0] == 0x9D && m.get(1) == Some(&7));
     let new_limbo = by_guid
         .values()
         .any(|&(a, b)| matches!(b, Some(Place::Limbo(_))) && !matches!(a, Some(Place::Limbo(_))));
@@ -2008,7 +2016,8 @@ fn check_stream(
         let kind = |p: Place| std::mem::discriminant(&p);
         let moved = kind(a) != kind(b)
             || matches!((a, b), (Place::Page(_, x), Place::Page(_, y)) if x != y);
-        if moved && !announced.contains(&g) {
+        let displaced = swapped_in && matches!((a, b), (Place::Body(_), Place::Cursor(_)));
+        if moved && !announced.contains(&g) && !displaced {
             return Err(format!("GUID {g} moved {a:?} → {b:?} with no 0x9C / 0x9D"));
         }
     }
@@ -2538,4 +2547,54 @@ fn buying_a_ground_item_is_refused() {
     );
     let after = check_state(&mut h, None).unwrap();
     assert_eq!(before, after);
+}
+
+/// Counterexample kept (seed 157386857, found by the random property in
+/// the coordinator's gate): C→S 0x1B (Swap2HandedItem) with the trade
+/// window open moved the equipped partner to the cursor and no message
+/// named it. `inventory-moves.md` §7.6: the partner gets no command flag
+/// and no update entry; the 0x9D action 7 of the item put in its place
+/// carries the swap, so the property accepts the move when that message
+/// was sent (the sent message is asserted here).
+#[test]
+fn swap_two_handed_with_a_trade_open_announces_the_cursor_item() {
+    let ops = [
+        Op::OpenTrade,
+        Op::Spawn(0),
+        Op::Msg {
+            id: 50,
+            a: 185,
+            b: 0,
+            x: 0,
+            y: 0,
+        },
+        Op::Msg {
+            id: 25,
+            a: 61,
+            b: 0,
+            x: 0,
+            y: 0,
+        },
+        Op::Msg {
+            id: 27,
+            a: 5,
+            b: 0,
+            x: 46,
+            y: 0,
+        },
+    ];
+    run(157_386_857, &ops).unwrap();
+    // The swap itself reached the client: a 0x9D action 7 in the frame.
+    let mut h = host(157_386_857);
+    for op in &ops[..4] {
+        h.frame(op);
+    }
+    let (direct, ticked) = h.frame(&ops[4]);
+    assert!(
+        direct
+            .iter()
+            .chain(&ticked)
+            .any(|m| m[0] == 0x9D && m.get(1) == Some(&7)),
+        "{direct:02X?} {ticked:02X?}"
+    );
 }

@@ -530,6 +530,14 @@ pub trait QuestWorld {
     // Act I quest seams (§10.6–§10.8; paths, rooms, monsters, objects).
     /// `0x00620870`: the unit's position and room (`None`: no room).
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)>;
+    /// The object whose quest init function runs now and its init point
+    /// (room, x, y: where it was created), `None` after it. A host whose
+    /// objects are linked into their room only after the init answers
+    /// [`QuestWorld::unit_position`] for it from this point, as
+    /// `0x00620870` reads the created object in 1.14d. Default: ignored.
+    fn set_init_point(&mut self, point: Option<(UnitId, i32, i32, RoomId)>) {
+        let _ = point;
+    }
     /// The unit's position alone (`0x0045ADF0` / `0x0045AE20`; an
     /// object's static path +0x0C, +0x10), which an object keeps when its
     /// room is freed (`drlg/rooms.md` §8.2 rule 4, `quests-act1-rest.md`

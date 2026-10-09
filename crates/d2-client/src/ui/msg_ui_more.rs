@@ -28,7 +28,7 @@ pub mod skip {
     pub const MERC_MENU: &str =
         "0x9B: the NPC-menu edit 0x004B6440 (ui/panels.md §14; msg-ui §15 r2)";
     pub const CHAT_FILTER: &str =
-        "0x26: the text filter object 0x00611560 (msg-ui §4 r3.2) is not specified: nothing is filtered";
+        "0x26: the ignore list 0x00611560 (msg-ui §4 r3.2.1-r3.2.4) is empty without an ignorelist file or ignore command: nothing is filtered";
 }
 
 /// One entry of the NPC intro table `0x00726850` (§10 r2): the NPC
@@ -410,9 +410,10 @@ impl OriginalUi {
         if unit.unit_type == 0 && roster_squelched {
             return None;
         }
-        // r3.2: the filter object is not specified.
-        // PROVISIONAL (client/msg-ui.md §4 r3.2): nothing is filtered;
-        // settled by a capture of a filtered line.
+        // r3.2 (r3.2.1–r3.2.4): the filter object is the persistent
+        // ignore list, filled only from an `ignorelist` file and the chat
+        // ignore commands; d2rs has neither, so nothing is filtered (the
+        // spec's single-player case).
         self.skip(skip::CHAT_FILTER);
         // r3.3.
         if !text_converts(text, *lang, self.more.own_lang) {
