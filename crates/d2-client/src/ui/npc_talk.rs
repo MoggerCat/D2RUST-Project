@@ -34,7 +34,7 @@ use crate::bridge::items;
 use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::ui::draw::{CelLook, UiDrawSink};
 use crate::ui::draw::{ImageRef, ImageRequest, RectRequest, TextRequest, TextStyle, UiDraw};
-use crate::ui::geom::{Point, Rect, FRAME};
+use crate::ui::geom::{Point, Rect};
 use crate::ui::messages::dialog::{
     panel_draw, DialogDraw, DialogEffect, DialogOpen, DialogUi, PassInput, SkipEvent, PANEL_FONT,
 };
@@ -270,13 +270,14 @@ impl NpcMenuUi {
     pub(super) fn draw_talk(&self, st: &NpcMenuState, m: &dyn Metrics, out: &mut dyn UiDrawSink) {
         let mut spin = 0;
         if let Some(bx) = &st.talk.topic {
-            push_menu_draws(bx.draw(&mut spin, m), out);
+            push_menu_draws(bx.draw(&mut spin, m), st.screen_rect(), out);
         }
         let d = &st.talk.dialog;
         let Some(p) = d.panel.as_ref() else {
             return;
         };
         let font_h = m.font_height(PANEL_FONT);
+        let clip = st.screen_rect();
         for dr in panel_draw(d.x, d.y, !d.place1, p.scroll.p, &p.lines, font_h) {
             match dr {
                 DialogDraw::Backing(r) => {
@@ -293,7 +294,7 @@ impl NpcMenuUi {
                         color: 0,
                     },
                     opts: TextOpts::default(),
-                    clip: FRAME,
+                    clip,
                 })),
                 DialogDraw::Window {
                     line,
@@ -309,7 +310,7 @@ impl NpcMenuUi {
                         color: 0,
                     },
                     opts: TextOpts::Vertical { skip, lines },
-                    clip: FRAME,
+                    clip,
                 })),
             }
         }
@@ -586,16 +587,17 @@ impl Panel for SocketUi {
             Err(_) => return,
         };
         let file = |n: &str| sh.tables.files.id(n);
+        let clip = sh.config.screen.rect();
         for d in draws {
             match d {
                 SocketDraw::Background { mode, x, y } => {
                     if let Some(f) = file(background_file(mode)) {
-                        out.push(cel(f, 0, x, y));
+                        out.push(cel(f, 0, x, y, clip));
                     }
                 }
                 SocketDraw::Button { frame, x, y } => {
                     if let Some(f) = file(BUTTON_CEL) {
-                        out.push(cel(f, frame, x, y));
+                        out.push(cel(f, frame, x, y, clip));
                     }
                 }
                 SocketDraw::HoverBox(r) => out.push(UiDraw::Rect(RectRequest::sized(
@@ -609,7 +611,7 @@ impl Panel for SocketUi {
                         color: u16::try_from(l.color).unwrap_or(0),
                     },
                     opts: TextOpts::default(),
-                    clip: FRAME,
+                    clip,
                 })),
                 // The placed item's cel (module doc: not drawn).
                 SocketDraw::Item { .. } => {}
@@ -662,11 +664,11 @@ impl Panel for SocketUi {
     }
 }
 
-fn cel(file: u32, frame: u32, x: i32, y: i32) -> UiDraw {
+fn cel(file: u32, frame: u32, x: i32, y: i32, clip: Rect) -> UiDraw {
     UiDraw::Image(ImageRequest {
         image: ImageRef { file, frame },
         at: Point::new(x, y),
-        clip: FRAME,
+        clip,
         look: CelLook::PLAIN,
     })
 }

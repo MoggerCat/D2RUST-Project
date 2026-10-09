@@ -220,6 +220,24 @@ fn imbue_runs_the_item_socket_dialog() {
     assert!(!ui.is_open(8) && ui.is_open(UI_SOCKET));
     assert!(root.open_panels().contains(&SOCKET_PANEL));
     assert_eq!(ui.socket_step(), Some(Step::Open));
+    // Its text is clipped to the configured screen.
+    {
+        let s = Strs::new();
+        let ctx = UiCtx {
+            tick: w.frames,
+            world: &w,
+            strings: &s,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        root.draw(&ctx, &mut out);
+        assert!(out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(t.clip),
+                _ => None,
+            })
+            .all(|c| c == Screen::R800.rect()));
+    }
     ui.imbue_place(555);
     // §11 r5: no click within 400 ms of the open.
     w.frames += 10;

@@ -37,7 +37,7 @@ use crate::bridge::items;
 use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
-use crate::ui::geom::{Point, Rect, FRAME};
+use crate::ui::geom::{Point, Rect};
 use crate::ui::hire_list::hire_intent;
 use crate::ui::layout::{MenuOption, NpcMenuRecord, OptionKind};
 use crate::ui::messages::socket::NPC_CHARSI;
@@ -218,7 +218,8 @@ pub(super) fn item_at<H: Clone + PartialEq>(bx: &MenuBox<H>, p: Point) -> Option
 }
 
 /// The draws of a menu box through the present sink.
-pub(crate) fn push_menu_draws(draws: Vec<MenuDraw>, out: &mut dyn UiDrawSink) {
+/// `clip` is the screen (every UI text is clipped to it).
+pub(crate) fn push_menu_draws(draws: Vec<MenuDraw>, clip: Rect, out: &mut dyn UiDrawSink) {
     for d in draws {
         match d {
             MenuDraw::Frame(r) => out.push(UiDraw::Rect(RectRequest::sized(
@@ -238,7 +239,7 @@ pub(crate) fn push_menu_draws(draws: Vec<MenuDraw>, out: &mut dyn UiDrawSink) {
                     color: u16::from(color),
                 },
                 opts: TextOpts::default(),
-                clip: FRAME,
+                clip,
             })),
             // Cels and the pentagram need the cel draw of the sink
             // (q-fix-ui-draw-sink); the NPC menu (style 1) has neither.
@@ -442,6 +443,12 @@ impl NpcMenuState {
     pub(super) fn anchor_or_centre(&self) -> (i32, i32) {
         self.anchor
             .unwrap_or((self.screen.0 / 2, self.screen.1 / 3))
+    }
+
+    /// The whole screen: the clip of every draw and the area of a box
+    /// that takes every press.
+    pub(super) fn screen_rect(&self) -> Rect {
+        Rect::new(0, 0, self.screen.0 as u16, self.screen.1 as u16)
     }
 
     /// Outputs that wait for the next poll (outside an event).
@@ -656,14 +663,14 @@ impl Panel for NpcMenuUi {
 
     fn rect(&self) -> Rect {
         if self.shop.borrow().confirm.is_some() {
-            return FRAME;
+            return self.st.borrow().screen_rect();
         }
         let st = self.st.borrow();
         let talking = st.talk.active;
         if st.bx.is_some() || talking {
             // The whole frame: a press outside the box ends the chat; a
             // press while talking ends the talk.
-            FRAME
+            st.screen_rect()
         } else {
             Rect::new(0, 0, 0, 0)
         }
@@ -675,13 +682,13 @@ impl Panel for NpcMenuUi {
         let m = Measure(sh.fonts.as_ref());
         let mut spin = 0;
         if let Some(bx) = &st.bx {
-            push_menu_draws(bx.draw(&mut spin, &m), out);
+            push_menu_draws(bx.draw(&mut spin, &m), st.screen_rect(), out);
         }
         if let Some(n) = &st.note {
-            push_menu_draws(n.bx.draw(&mut spin, &m), out);
+            push_menu_draws(n.bx.draw(&mut spin, &m), st.screen_rect(), out);
         }
         if let Some(c) = &self.shop.borrow().confirm {
-            push_menu_draws(c.bx.draw(&mut spin, &m), out);
+            push_menu_draws(c.bx.draw(&mut spin, &m), st.screen_rect(), out);
         }
         self.draw_talk(&st, &m, out);
         let _ = ctx;

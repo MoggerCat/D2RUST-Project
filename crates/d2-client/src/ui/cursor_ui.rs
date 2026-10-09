@@ -21,7 +21,7 @@ use crate::bridge::items;
 use crate::bridge::world::ClientWorld;
 use crate::ui::cursor::{CursorDraw, TYPES};
 use crate::ui::draw::{CelLook, ImageRef, ImageRequest, UiDraw, UiDrawSink};
-use crate::ui::geom::{Point, FRAME};
+use crate::ui::geom::Point;
 use crate::ui::panel::{UiCtx, UiEvent};
 
 use super::OriginalUi;
@@ -95,7 +95,7 @@ pub(super) fn draw(sh: &Shared, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
                 out.push(UiDraw::Image(ImageRequest {
                     image: ImageRef { file, frame },
                     at: Point::new(x, y),
-                    clip: FRAME,
+                    clip: sh.config.screen.rect(),
                     look: CelLook::PLAIN,
                 }));
             }

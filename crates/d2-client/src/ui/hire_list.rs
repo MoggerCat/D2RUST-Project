@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect, FRAME};
+use super::geom::{Point, Rect};
 use super::messages::msg_u32s;
 use super::messages::Metrics;
 use super::original::game_messages::Measure;
@@ -96,6 +96,11 @@ impl Default for HireState {
 }
 
 impl HireState {
+    /// The whole screen: the clip of every draw.
+    fn screen_rect(&self) -> Rect {
+        Rect::new(0, 0, self.screen.0 as u16, self.screen.1 as u16)
+    }
+
     /// S→C 0x4F: the list is reset.
     pub fn reset(&mut self) {
         self.offers.clear();
@@ -220,7 +225,7 @@ impl Panel for HireListUi {
                 at,
                 style: TextStyle { font: 1, color },
                 opts: TextOpts::default(),
-                clip: FRAME,
+                clip: st.screen_rect(),
             })
         };
         // §3.2: the box (gold line, Back) is the spec menu box.
@@ -233,7 +238,7 @@ impl Panel for HireListUi {
             &m,
         ) {
             let mut spin = 0;
-            push_menu_draws(bx.draw(&mut spin, &m), out);
+            push_menu_draws(bx.draw(&mut spin, &m), st.screen_rect(), out);
         }
         // §3.3: the list widget's rows (its scroll and columns are not
         // drawn: d2rs-own).
@@ -385,9 +390,22 @@ mod tests {
         w
     }
 
+    /// [`world`] with the local unit a player (the list draws only then).
+    fn player_world() -> ClientWorld {
+        let mut w = world();
+        let pk = w.local_player.unwrap();
+        w.units.get_mut(&pk).unwrap().kind =
+            KindData::Player(crate::bridge::world::PlayerData::default());
+        w
+    }
+
     fn setup() -> (OriginalUi, UiRoot) {
+        setup_at(Screen::R800)
+    }
+
+    fn setup_at(screen: Screen) -> (OriginalUi, UiRoot) {
         let config = UiConfig {
-            screen: Screen::R800,
+            screen,
             expansion_installed: true,
         };
         let ui = OriginalUi::new(config, None).unwrap();
@@ -445,6 +463,71 @@ mod tests {
         // The reset the server sends after the hire does not reopen it.
         ui.apply_output(&Output::HireListReset, &w).unwrap();
         assert_eq!(ui.hire_list().up, None);
+    }
+
+    // Covers: specs/ui/menus.md §3 r4
+    #[test]
+    fn the_list_sits_by_the_screen_at_640_and_800() {
+        // Spec §3.3: list x = (W − 490) / 2, y = (H − 40) / 2 − 160.
+        for (screen, x, y) in [(Screen::R800, 155, 120), (Screen::R640, 75, 60)] {
+            let w = player_world();
+            let (mut ui, mut root) = setup_at(screen);
+            ui.open_hire_list(77);
+            ui.apply_output(&Output::HireListReset, &w).unwrap();
+            for name in [3000, 3001] {
+                ui.apply_output(&Output::HireOffer { name, seed: 5 }, &w)
+                    .unwrap();
+            }
+            assert_eq!(ui.hire_list().screen, (screen.w, screen.h));
+            // Every draw is clipped to the screen, not to 800 × 600.
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<crate::ui::UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let texts: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    crate::ui::UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!texts.is_empty());
+            assert!(texts.iter().all(|c| *c == screen.rect()));
+            // Row 1 of the list under the list's own origin.
+            release(&mut root, &w, x + 45, y + 15 + 3);
+            assert_eq!(root.take_intents(), vec![hire_intent(77, 3001)]);
+        }
+    }
+
+    // Covers: specs/ui/menus.md §2 r1
+    #[test]
+    fn the_npc_menu_clips_to_the_screen_at_640_and_800() {
+        for screen in [Screen::R800, Screen::R640] {
+            let w = player_world();
+            let (mut ui, mut root) = setup_at(screen);
+            ui.open_npc_menu(77, KASHYA, 1, &w);
+            ui.npc_menu_poll(&w, &mut root, &NoStrings);
+            assert!(ui.npc_menu().is_some(), "the box is built");
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<crate::ui::UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let clips: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    crate::ui::UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!clips.is_empty(), "{screen:?}");
+            assert!(clips.iter().all(|c| *c == screen.rect()), "{screen:?}");
+        }
     }
 
     // Covers: specs/ui/menus.md §3 r2

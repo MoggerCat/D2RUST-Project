@@ -23,10 +23,10 @@ use crate::ui::front_end::screens::controls::{
     M, T, VISIBLE, W,
 };
 use crate::ui::geom::{Point, Rect};
+use crate::ui::layout::Screen;
 use crate::ui::panel::UiCtx;
 use crate::ui::panels::utf16;
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 /// The open screen.
 #[derive(Clone, Debug)]
@@ -219,7 +219,7 @@ impl ControlsHost {
                     block_w: block,
                     mode: 5,
                 },
-                clip: FRAME,
+                clip: Screen::play().rect(),
             }));
         }
     }
