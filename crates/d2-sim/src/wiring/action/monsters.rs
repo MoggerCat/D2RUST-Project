@@ -204,6 +204,32 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// The DT start's direction snap (`units.md` §4.6 rule 1.2:
+    /// `0x006488A0(path, R byte +0x14)`, direction := new direction :=
+    /// d & 63). The kill's request byte (`damage.md` §7.2 step 3) is the
+    /// direction from the unit toward the killer (`0x00621DC0`), else
+    /// the current direction (`0x006487F0`).
+    pub fn death_face(&mut self, unit: UnitId, killer: Option<UnitId>) {
+        let at = killer.map(|k| self.path_position(k));
+        let from = self.path_position(unit);
+        let Some(paths) = self.paths.as_mut() else {
+            return;
+        };
+        let d = at.map(|at| {
+            crate::path::walk::geom::direction_vector(
+                &paths.tables,
+                (from.0 as u32, from.1 as u32),
+                (at.0 as u32, at.1 as u32),
+            )
+            .1
+        });
+        if let Some(p) = paths.dynamic_mut(unit) {
+            let d = d.unwrap_or(p.direction) & 63;
+            p.direction = d;
+            p.new_direction = d;
+        }
+    }
+
     /// The AI state `0x005734E0` (`ai.md` §3.1): monster data
     /// `dwAiState` (+0x54); a unit without monster data asks
     /// [`Pending::ai_state`].

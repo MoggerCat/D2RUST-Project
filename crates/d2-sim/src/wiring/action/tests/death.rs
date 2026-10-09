@@ -1103,3 +1103,34 @@ fn a_player_is_knocked_back_or_gets_hit() {
     assert_eq!(r.mode, 1);
     assert_ne!(r.flags & 0x8000, 0, "soft hit");
 }
+
+/// `damage.md` §7.2 step 3 / `units.md` §4.6 rule 1.2: the DT start
+/// snaps the monster's path direction toward the killer (recorded:
+/// `check-combat-arrow-kill`, the quill rat killed by an arrow from
+/// (−4, −4) faces 32); without a killer the direction stays.
+// Covers: specs/combat/damage.md §7.2 r3
+#[test]
+fn death_start_faces_the_killer() {
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let (_, m) = kill_setup(&mut fx);
+    let k = fx.spawn(UnitType::Player, 1, fx.a, 9, 6);
+    let dir = |fx: &mut Fx| {
+        let p = fx.sim.hooks().paths.as_ref().unwrap().dynamic(m).unwrap();
+        (p.direction, p.new_direction)
+    };
+    assert_eq!(dir(&mut fx), (0, 0));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, k);
+    });
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    assert_eq!(dir(&mut fx), (32, 32));
+    // No killer: the current direction (M08: a killer at (17, 14) gives
+    // another value).
+    fx.sim.sys.units.get_mut(m).unwrap().mode = 1;
+    fx.sim.hooks().death_face(m, None);
+    assert_eq!(dir(&mut fx), (32, 32));
+    let far = fx.spawn(UnitType::Player, 1, fx.a, 17, 14);
+    fx.sim.hooks().death_face(m, Some(far));
+    assert_ne!(dir(&mut fx).0, 32);
+}

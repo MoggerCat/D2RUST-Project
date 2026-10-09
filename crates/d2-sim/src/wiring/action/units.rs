@@ -520,6 +520,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         }
         if address == MONSTER_MODES[0].start {
             let target = self.mode_target;
+            self.death_face(unit, target);
             let started = X::monster_death_start(self, sim, unit, target);
             if started {
                 // The death clean-up's last call (`units.md` §4.6 rule

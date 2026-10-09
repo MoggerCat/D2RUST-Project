@@ -106,11 +106,23 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     let f = fx.game.frame;
     kill_now(&mut fx, m, p);
     assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, 0);
+    // The DT start snapped the direction toward the killer (`units.md`
+    // §4.6 rule 1.2), replacing 0x38; d is that path direction.
+    let dir = fx
+        .sim
+        .hooks()
+        .paths
+        .as_ref()
+        .unwrap()
+        .dynamic(m)
+        .unwrap()
+        .direction;
+    assert_ne!(dir, 0x38);
     let g = guid(&fx, m);
     fx.tick();
     let mut want = vec![0x69];
     want.extend(g.to_le_bytes());
-    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x38, 0x00]);
+    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, dir, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     assert_eq!(
         fx.sim.sys.units.get(m).unwrap().flags & (flags::CHANGED | flags::MODE_CHANGING),
@@ -131,7 +143,7 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     want.push(0x09);
     want.extend((d.x() as u16).to_le_bytes());
     want.extend((d.y() as u16).to_le_bytes());
-    want.extend([0x38, 0x00]);
+    want.extend([dir, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     for _ in 0..30 {
         fx.tick();
