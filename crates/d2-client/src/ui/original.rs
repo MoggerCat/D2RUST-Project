@@ -1782,28 +1782,40 @@ impl CharacterUi {
             experience: &sh.hud.tables.experience,
         };
         let env = sh.env();
-        self.panel
-            .draw(&sh.tables, &env, &view, fonts, ctx.strings, out);
-        super::char_feed::damage_block(
-            ctx.world,
-            key,
-            &sh.char_tables,
-            ctx.strings,
-            &env.screen,
+        // 1.14d order (`panels/character.rs` `draw_staged`): labels, the skill
+        // damage blocks, the close button, the class and name lines, values.
+        self.panel.draw_staged(
+            &sh.tables,
+            &env,
+            &view,
             fonts,
+            ctx.strings,
             out,
+            &mut |stage, out| match stage {
+                character::Stage::Labels => super::char_feed::damage_block(
+                    ctx.world,
+                    key,
+                    &sh.char_tables,
+                    ctx.strings,
+                    &env.screen,
+                    fonts,
+                    out,
+                ),
+                character::Stage::Close => {
+                    if let Some(u) = ctx.world.units.get(&key) {
+                        super::char_feed::class_line(
+                            u.class,
+                            &sh.char_tables,
+                            ctx.strings,
+                            &env.screen,
+                            fonts,
+                            out,
+                        );
+                    }
+                    name_line(name, &env.screen, fonts, out);
+                }
+            },
         );
-        if let Some(u) = ctx.world.units.get(&key) {
-            super::char_feed::class_line(
-                u.class,
-                &sh.char_tables,
-                ctx.strings,
-                &env.screen,
-                fonts,
-                out,
-            );
-        }
-        name_line(name, &env.screen, fonts, out);
     }
 
     fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
