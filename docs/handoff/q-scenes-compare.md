@@ -1,6 +1,6 @@
 # Handoff: d2rs vs 1.14d scene compares — `claude/q-scenes-compare`
 
-Cloud session, 2026-10-09. REC block 510–519 (used: 510–518).
+Cloud session, 2026-10-09. REC block 510–519 (all used: 510–519).
 Facts: `facts/render/scenes/*` (q-facts-scenes, Wine). d2rs: dev build,
 `d2-client play --save S.d2s --seed 1234 --dump-draws DIR --at-tick T [--input SCRIPT]`
 under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick,index_sha256 --skip-weather`.
@@ -30,8 +30,9 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 11. A listed unit whose body fails the pre-test still writes its `unit` row (`facts-render.md` §5 r17; the unit draw calls the pre-test inside): a1-panel-inventory past row 128.
 12. An object casts its composite shadow only where its mode's `BlocksLight` ≠ 0 (`blend-modes.md` §5 r3 revision, REC-518): a4 equal through the world (row 248).
 13. A click while walking re-targets from the precise position (`sim/pathing.md` §1.5, already specified; `Predict::path_step`): walk-s, ne, sw, e match every frame input.
+14. Control panel: UI cels export their 1.14d wrapper (`facts-render.md` §5 r18: orbs `CelDrawEx`, skill icons / glyphs `CelDrawColor`); the stamina bar is the rectangle (`control-panel.md` §4 r2); the new-stats / new-skills buttons after the skill icons (§1 r3); the mini panel open from the start (§9 revision, REC-519). a4 equal through row 257; next: the help button `0x004A64C0` ("Help (H)" + levelsocket, unspecified: `pc1-data.md` Step 4 item 41).
 
-## First difference per scene (after fixes 1–13)
+## First difference per scene (after fixes 1–14)
 | Scene | First difference |
 |---|---|
 | a1-town-idle-sor, a1-walk-n, a1-walk-s | r110 NPC `wa` WL dir 47 vs 0: d2rs's `wa` already stands on its walk target (4866, 4235), 1.14d's still walks east past it (NPC path node: q-fix-real-unit-seed-order) |
@@ -47,7 +48,7 @@ under Xvfb + lavapipe; compare: `d2-client facts-compare SCENE DIR --ignore tick
 | a1-panel-cube | r25 the hovered cube's tint: d2rs 118 (hover, §3 r2), 1.14d 234 (usable): 1.14d's hover state may follow mouse moves only |
 | a2-town-lut-gholein | r115 critter `bg` shadow missing (q-fix-real-town-critters) |
 | a3-town-kurast-docks | r97 pass-9 cel (`at` 0x473bd0, file ?) vs d2rs `rain3.dc6` f1 |
-| a4-town-pandemonium-fortress | r249 the orb `hlthmana.dc6`: 1.14d `CelDrawEx`, d2rs exports every UI cel as `CelDraw` (UI wrapper ops: `CelDrawEx` orbs, `CelDrawColor` skill icons / glyphs, `CelDrawClipped` automap) |
+| a4-town-pandemonium-fortress | r258 the help button `0x004A64C0` ("Help (H)", `levelsocket`, `level` at 725, 440): not specified (`pc1-data.md` Step 4 item 41) |
 | a5-town-harrogath | r76 monster `6z` NU frame 3 vs 5 (6 frames, rate 32: the monster's animation start, REC-512) |
 | a1-cold-plains-monsters | level 3 vs 1: the waypoint walk does not reach the waypoint (walk / run drift) |
 | a1-town-arrival-ama | skipped (q-fix-real-unit-seed-order) |

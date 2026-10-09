@@ -89,6 +89,7 @@ impl Panel for TestPanel {
             at: self.rect.origin(),
             clip: FRAME,
             look: d2_client::ui::CelLook::PLAIN,
+            call: d2_client::ui::draw::CelCall::Draw,
         }));
     }
     fn hit(&self, p: Point) -> Option<WidgetId> {

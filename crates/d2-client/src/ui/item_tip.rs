@@ -747,6 +747,7 @@ pub fn draw_tip(
                     at: Point::new(tx, ty),
                     clip: Rect::new(tx, ty, cw as u16, ch as u16),
                     look: crate::ui::CelLook::PLAIN,
+                    call: crate::ui::draw::CelCall::Draw,
                 }));
                 tx += tw;
             }

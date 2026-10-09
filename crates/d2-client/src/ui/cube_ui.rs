@@ -117,6 +117,7 @@ impl Panel for CubeUi {
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
                 look: HORADRIC_LOOK,
+                call: crate::ui::draw::CelCall::Draw,
             }));
         }
         if anim.grid_visible() {
