@@ -192,3 +192,29 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   Bolt and Frost Nova are range `none`, so on the ground they must send
   0x0C. No q-fix row: the skills-2 session is bisecting the regression,
   and this rule is the check for its fix.
+- **Item 4 — my live runs** (under the lock, Windows, SceSor /
+  `-seed 1234`).
+  1. *Warriv's node pick.* 1.14d (`record_rng.py --frames --ticks 120`,
+     `record_packets.py --ticks 120`, `record_state.py --ticks 50`):
+     - Warriv takes no node pick: one unit-seed draw only (frame 2,
+       `0x00573F8F` `roll(1)`).
+     - 0x8A `8a 01 07000000` at every think (24, 45, 56, 67, 87, 107):
+       the interact gate passes for this save.
+     - The walks are step 7's walk in radius: to (4868, 4233) at 24,
+       (4869, 4232) at 45, (4870, 4231) at 56, stop at 67.
+     
+     d2rs: `d2-client state-dump` (the release binary built 2026-10-09
+     16:26, no rebuild) equals 1.14d for Warriv on every frame 22–47
+     (mode, position, fraction, target) and has the same walks to 120.
+     So the scene note (tick 42) is stale; there is no Warriv
+     difference in the current build. Written into `ai-bodies.md` §9.9
+     (replacing my round-2 guess). `q-fix-p3-npc-interact-gate` is
+     still right for saves where the test fails, but it doesn't change
+     this arrival.
+  2. *C→S 0x67 mask.* Not run: `q-fix-tool-c2s-masks` hasn't landed on
+     staging (`packets_diff.py` still masks only s2c), so the check
+     would show the known 0x67 divergence. Run 2 of "Live runs for
+     PC1-C" stays queued for after that row.
+- **Item 5 (round 3).** No Step 4 items with `[seed-order]`,
+  `[recording-2]`, `[proto-items]`, `[q-fix-pc1-day3-a-r2]` or
+  `[prov-data]` on staging yet; polling every 30 minutes.
