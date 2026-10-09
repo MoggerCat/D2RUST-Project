@@ -567,9 +567,12 @@ pub fn serve(args: &[String]) -> Result<()> {
             continue;
         }
         let reply = match parse_command(t) {
-            Ok(c) => match host.run(c)? {
-                Some(v) => v,
-                None => break,
+            Ok(c) => match host.run(c) {
+                Ok(Some(v)) => v,
+                Ok(None) => break,
+                // a read that cannot answer (no local player: the game
+                // was left) is reported, the host keeps serving
+                Err(e) => json!({"k": "error", "error": format!("{e:#}")}),
             },
             Err(e) => json!({"k": "error", "error": e}),
         };
