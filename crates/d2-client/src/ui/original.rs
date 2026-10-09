@@ -677,6 +677,21 @@ impl OriginalUi {
         self.shared.borrow_mut().items.ctrl = ctrl;
     }
 
+    /// The centre of the backpack cell the player's page-0 item `guid`
+    /// starts at (tests).
+    pub fn inv_item_point(&self, world: &ClientWorld, guid: u32) -> Option<Point> {
+        let sh = self.shared.borrow();
+        let class = Facts::of(world).class;
+        let l = sh.items.layout(class, &sh.config.screen)?;
+        let it = crate::bridge::items::local_items(world)
+            .into_iter()
+            .find(|i| {
+                i.key.guid == guid && i.mode == crate::bridge::items::mode::STORED && i.page == 0
+            })?;
+        let (x, y, w, h) = l.grid.cell(i32::from(it.x), i32::from(it.y));
+        Some(Point::new(x + w / 2, y + h / 2))
+    }
+
     /// Measured item graphic frame sizes by `invfile` (lower case).
     pub fn set_item_frame_sizes(&mut self, sizes: BTreeMap<String, (u32, u32)>) {
         self.shared.borrow_mut().items.frame_sizes = sizes;

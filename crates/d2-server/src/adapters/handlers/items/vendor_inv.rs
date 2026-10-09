@@ -242,13 +242,29 @@ where
     fn new_store_inventory(&mut self, npc_class: u16, npc: Option<UnitId>) {
         self.inner.new_store_inventory(npc_class, npc)
     }
+    /// `0x00560200` on the NPC's inventory (`InvDesk::store_place`) when
+    /// the call has one; else the wrapped world's.
     fn place_in_store(&mut self, npc_class: u16, item: UnitId) -> bool {
-        self.inner.place_in_store(npc_class, item)
+        let Some(npc) = self
+            .inner
+            .record_npc(npc_class)
+            .filter(|_| self.inv.is_some())
+        else {
+            return self.inner.place_in_store(npc_class, item);
+        };
+        self.with_desk(|d| d.store_place(npc, item))
+            .unwrap_or(false)
     }
+    /// The store item leaves the NPC grid (§6 rule 4), then the wrapped
+    /// world's removal.
     fn remove_store_item(&mut self, npc_class: u16, item: UnitId) {
+        self.with_desk(|d| d.store_unlink(item));
         self.inner.remove_store_item(npc_class, item)
     }
+    /// A purchase takes the store item out of the NPC grid (§7.1 rule
+    /// 10), then the wrapped world's take (the action 12 queue).
     fn take_from_store(&mut self, npc_class: u16, item: UnitId) {
+        self.with_desk(|d| d.store_unlink(item));
         self.inner.take_from_store(npc_class, item)
     }
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {

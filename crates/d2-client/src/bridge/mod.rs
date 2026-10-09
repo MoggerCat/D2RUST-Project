@@ -556,6 +556,12 @@ impl<L: ServerLink> Bridge<L> {
         &self.world
     }
 
+    /// A drawn frame's camera: the unit origin the client missile
+    /// function 2 reads (`world::UnitOrigin`, `missiles/client.md` §C13).
+    pub fn set_unit_origin(&mut self, cam: &crate::rules::camera::Camera) {
+        self.world.unit_origin = Some(world::UnitOrigin::of(cam));
+    }
+
     /// A drawn frame's light pass (`render/lighting.md` §6.4): `pass` gets
     /// the model and the client's kept light list (§6.3), taken out of the
     /// model for the pass and put back after it.
