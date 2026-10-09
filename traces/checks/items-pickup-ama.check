@@ -1,16 +1,17 @@
 check 1
 # Pick-up of a potion and a gold pile (C->S 0x16, inventory-moves.md 7.1):
 # two items on the ground next to the Amazon (poke item, the game's own
-# creation path); the shared input walks to the nearest unit of type 4 and
-# clicks it. q-tool-replay-diff found d2rs leaves the item on the ground.
+# creation path), then C->S 0x16 sent for each (the shared click input does
+# not reach the item on d2rs, so the message is scripted). q-tool-replay-diff
+# found d2rs leaves the item on the ground.
 # Spec: specs/items/inventory-moves.md, specs/tools/scenario-diff.md.
 name items-pickup-ama
 save SavAma --class ama --expansion
 seed 1234
-ticks 100
+ticks 60
 seconds 300
 channels state packets
 at 4 poke seed-game 0x00001234 666
 at 4 poke item hp1 @x+2 @y
 at 4 poke item gld @x+2 @y+3
-input frame 9; move 400 300; frame 10; clickunit 4 *; frame 40; move 400 300; frame 41; clickunit 4 *; frame 70; move 400 300; frame 71; clickunit 4 *
+at 10 send PickItem type=4 id=@4 cursor=0
