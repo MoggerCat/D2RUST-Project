@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–398 |
-|   3. Server → client | 399–635 |
-|   4. d2rs mapping and scope | 636–667 |
-|   5. Machine-readable tables | 668–704 |
-|   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1337 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1338–1682 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1683–1855 |
-| Constants & data dependencies | 1856–1874 |
-| Randomness | 1875–1880 |
-| Edge cases & original bugs | 1881–1926 |
-| Test vectors | 1927–2013 |
-| Provenance | 2014–2140 |
-| Open questions | 2141–2293 |
+|   2. Client → server | 115–399 |
+|   3. Server → client | 400–636 |
+|   4. d2rs mapping and scope | 637–668 |
+|   5. Machine-readable tables | 669–705 |
+|   6. Exact-match comparison | 706–814 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1343 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1344–1688 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1689–1861 |
+| Constants & data dependencies | 1862–1880 |
+| Randomness | 1881–1886 |
+| Edge cases & original bugs | 1887–1932 |
+| Test vectors | 1933–2019 |
+| Provenance | 2020–2146 |
+| Open questions | 2147–2299 |
 <!-- /index -->
 
 ## Summary
@@ -279,10 +279,11 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    `0x0054A3F0`; §9 rule 3; corrected 2026-10-08 for
    `docs/handoff/impl-umods-cs-handlers.md`, which found "else 2" here);
    name = cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
-   strlen + 4 < size, else rejected. PROVISIONAL: the rejection returns 2
-   and a msg without a NUL in the message is rejected (because the
-   result code of this rejection is not written; 0x14's strlen ≥ 256
-   returns 2); settled by REC-402.
+   strlen + 4 < size, else **2** (both tests jump to the `mov eax, 2`
+   exit `0x0054A910`, from `0x0054A640` / `0x0054A64C`). The strlen
+   (`0x00413750` at `0x0054A636`) is unbounded, so a msg with no NUL
+   before the message end measures ≥ size − 3 and is rejected
+   (1.14d-read 2026-10-09, settles REC-402).
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
    0–14 skill (> count → unbind, −1), bit 15 left hand, bits 16–31 slot
@@ -1306,9 +1307,14 @@ or the new room equals the client's room (client +0x1B4, the old room).
    0xA4, 0xA5 (the landing message) and 0xAB (the life-fraction update of
    `sim/stat-lists.md` §10.1, `UnitHooks::send_life_fraction`) as
    `wiring/action/event_records.rs` records; 0x9E is sent at once by the
-   hireling code; 0xA1 never runs; 0x23 has no d2rs writer. PROVISIONAL
-   (a) 0xA5: the message names the unit the record sits on (the writer's
-   unit); settled by REC-411. (b) 0xAB (REC-412 settled 2026-10-09,
+   hireling code; 0xA1 never runs; 0x23 has no d2rs writer. (a) 0xA5
+   names the unit the record sits on (1.14d-read 2026-10-09, settles
+   REC-411): the writer `0x00571B70` turns state 18 off on the unit
+   (`0x00639DB0(unit, 18, 0)`), then stores the unit's own type (+8,
+   6 for none) and GUID (+0xC, −1 for none) and EDX as u16 (+0x10);
+   the send (`0x00571E3F`–`0x00571E4D`) passes those three to
+   `0x0053C190`, which writes `A5 type:u8 GUID:u32 value:u16` (8
+   bytes). (b) 0xAB (REC-412 settled 2026-10-09,
    rule 2 above): a receiver gets it only when the unit's hit flag
    0x8000 is clear and its player may attack the unit (hostility
    `combat/hit.md` §7.1: a monster climbs to its owner, so a player's

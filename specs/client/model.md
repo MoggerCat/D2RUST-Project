@@ -32,28 +32,28 @@
 |   2. Unit table | 140–189 |
 |   3. Local player | 190–212 |
 |   4. Receive and the unit message queue | 213–250 |
-|   5. Client update pass | 251–416 |
-|   6. Position check (`0x004804E0`) | 417–460 |
-|   7. Session messages | 461–658 |
-|   8. Mode requests | 659–744 |
-|   9. Room-in-sight messages | 745–779 |
-|   10. Bit reader | 780–794 |
-|   11. Current act and level (join and later) | 795–840 |
-|   12. Client DRLG and the room of a point | 841–882 |
-|   13. Visibility predicate (`0x004DBF20`) | 883–934 |
-|   14. Pet list and the hireling GUID | 935–999 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1000–1089 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1090–1124 |
-|   17. Model writes made by 1.14d UI code | 1125–1330 |
-|   18. Audio driver inputs and the client object functions | 1331–1361 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1362–1591 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1592–1752 |
-| Constants & data dependencies | 1753–1765 |
-| Randomness | 1766–1781 |
-| Edge cases & original bugs | 1782–1806 |
-| Test vectors | 1807–1864 |
-| Provenance | 1865–1970 |
-| Open questions | 1971–2166 |
+|   5. Client update pass | 251–480 |
+|   6. Position check (`0x004804E0`) | 481–524 |
+|   7. Session messages | 525–722 |
+|   8. Mode requests | 723–808 |
+|   9. Room-in-sight messages | 809–843 |
+|   10. Bit reader | 844–858 |
+|   11. Current act and level (join and later) | 859–904 |
+|   12. Client DRLG and the room of a point | 905–946 |
+|   13. Visibility predicate (`0x004DBF20`) | 947–998 |
+|   14. Pet list and the hireling GUID | 999–1063 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1064–1153 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1154–1188 |
+|   17. Model writes made by 1.14d UI code | 1189–1394 |
+|   18. Audio driver inputs and the client object functions | 1395–1425 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1426–1655 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1656–1816 |
+| Constants & data dependencies | 1817–1829 |
+| Randomness | 1830–1845 |
+| Edge cases & original bugs | 1846–1870 |
+| Test vectors | 1871–1928 |
+| Provenance | 1929–2034 |
+| Open questions | 2035–2240 |
 <!-- /index -->
 
 ## Summary
@@ -382,9 +382,73 @@ position check of the local player.
       S1 with the move test. The recorded chickens' WL from tick 8 is
       the code-1 step.
 
-      PROVISIONAL (REC-741): the zoo body `0x0046D660` and the class
-      bodies other than `chicken_ai` are not read; d2rs runs nothing for
-      them (the zoo test needs `monstats` flag 22 in the client tables).
+      The other bodies (1.14d-read 2026-10-09, settles REC-741; class
+      map checked against the jump tables `0x0046D8D0` / `0x0046D8F4`).
+      Helpers: `r100` = one step of U's seed, `lo % 100` (unsigned; also
+      `0x0045C390(seed, 100)`); `own` = `0x0046CAB0`: request **code 8**
+      (death, §19 r5) at U's own position; `away(V, d, code, r4)` =
+      `0x0046C7D0`: s := sign(U − V) per axis; the cell U + s blocked
+      (`0x0064D9B0`, size 1, U's move mask) → returns 0, no request;
+      else request `code` at U + d·s, returns 1; `toward(V, r4)` =
+      `0x0046C770`: request code 0 on V (record {V's type, V's GUID, 0,
+      path type, r4, path byte}); `on(P)` = `0x0046CBF0`: U's position
+      equals P's; `dead` = `0x0063EA40`. "mode != 1: return" is where
+      each body shows it; P, D as above (P is never none here).
+
+      ```text
+      zoo 0x0046D660:          dead or mode != 1: return
+          class lacks mode 2 (0x0046C140): T = 20; idle; return
+          r = r100; r < 40: T = 20; idle
+          r < 60: toward(P, 6)  r < 80: away(P, 8, 1, 4)  else step(8, 1, 4)
+      159 bat 0x0046CDC0:      mode != 1: return. D < 5: (r100 < 66 ? away(P, 8, 1, 30)
+                                                 : step(12, 1, 30))
+                               else step(9, 1, 0)
+      227 maggot 0x0046D070:   dead: return; on(P): own; return
+          mode != 1: return. r100 < 40: T = 20; idle   else step(4, 1, 0)
+      318 snake 0x0046D280:    dead: return; on(P): own; return
+          mode != 1: return. D <= 1: away(P, 4, 1, 0)
+          else r100 < 75: T = 32; idle   else step(4, 1, 0)
+      151 rat, 269 scorpion, 283 larva, 339 minispider 0x0046D110:
+          mode 0 or 12: return; D < 2 and on(P): own; return
+          mode != 1: return. D < 4: away(P, 6, 1, 0); return
+          V = none; if D > 7: scan the rooms near U (0x0046C570, filter
+              0x0046C660): W a player in mode 0 / 0x11 or a monster in
+              mode 0 / 12, 3 <= dist(U, W) <= 25, dist(local player, W)
+              > 7, then one draw `lo & 1` (0x0045C390(seed, 2)) = 1 ->
+              V = W (the last accepted wins; the draw is made only for
+              a W that passes the distance tests)
+          F = monster data +0x34 (0x004AE170); none: T = 32; idle; return
+          V and D > 7 and F == 0: toward(V, 6); F = 1; return
+          F != 0: (r100 < 20 -> F = 0); T = 32; idle; return
+          r100 < 75: T = 30; idle   else step(5, 1, 0)
+      157 bird1, 158 bird2, 319 parrot 0x0046CE40:
+          mode != 1: return. F = data +0x34; none: return
+          L = local player; F != 0 and dist(U, L) > 25: remove U
+              (0x00465F00(GUID, 1)); return
+          F = 1; a = draw; b = draw % 40
+          (ox, oy) = a odd ? (40, b) : (b, 40)
+          draw odd: ox = -ox;  draw odd: oy = -oy
+          path +distance := 90 (0x00648E70)
+          request code 1 at (3(L.x + ox) - 2 U.x, 3(L.y + oy) - 2 U.y)
+      556 bunny 0x0046D310:    mode != 1: return. U's cell blocked for mask 0x1C0
+              (0x0064CB30): own; return
+          V, d as chicken_ai; none: return
+          footprint mask 0x3C01; d < 6: mask 0xC01;
+              away(V, 6, 1, 120) = 0 -> step(6, 1, 120)
+          else r100 < 30: step(2, 1, 0)   else T = 5
+      574 worldstoneeffect 0x0046D450 (no mode test): local player
+          none: T = 5; return. r100 >= 5: return. missile 570 + (draw
+          & 3); x = U.x + draw % 60 - 30, y = U.y + draw % 60 - 30;
+          client missile 0x004CDB40(U, missile, x, y, 0, 1); made: one
+          draw picks the sign set of its 0x004DA1D0 / 0x004DA200 /
+          0x004DA2A0 set-ups (odd: -100, 6, 300; even: 300, -6, -100),
+          then 0x004DA6E0(m, odd), 0x004DA350, path 0x0064A2B0(60),
+          0x0064A330(60), 0x0064A710(100), 0x0064A760(300)
+      ```
+
+      No 1.14d critter class (Levels `cmon`: bat, bug, bunny, chicken,
+      larva, minispider, parrot, rat, scorpion, snake) has `zoo`, so
+      the zoo body runs only for a zoo-class client preset.
       PROVISIONAL (REC-742): a C monster's client path (§19 r4 with the
       path helpers of a set-C unit) is not specified; d2rs draws the
       step's two seed values, sets the mode the code sets (1 → 2 WL,
@@ -2067,16 +2131,26 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    0" on the model value (server raw < 256): the click dispatcher's run
    flag 0x40 (`0x00462DBF`, `ui/controls.md` §6 r2) and the player
    update `0x00463390`: local player in mode 3 (run) → `0x00463260`
-   (`0x004636ED`), which on stat 10 = 0 ends the client's run locally
-   (mode machine code 6, `0x00461250`, when `0x00648BF0(path)` is set;
-   else re-path to the path target +0x10 / +0x12 and leave the run
-   through `0x004804A0` / `0x00480E70` or `0x00460830(1)`), with no C→S
-   message. So for server raw stamina 1..255 the 1.14d client already
-   walks while the server still runs (`sim/pathing.md` §9.9 r3:
-   exhausted at raw ≤ 0) until the server's own drain ends the run; §6
-   corrects the gap. PROVISIONAL: the branch detail of `0x00463260`
-   beyond "ends the run" (which branch a town or no-target path takes)
-   (because only the static read was made); settled by REC-602.
+   (`0x004636ED`), which on stat 10 = 0 turns the run into a walk to
+   the same target, with no C→S message. `0x00463260` (EAX = U; 1.14d-
+   read 2026-10-09, settles REC-602; correction: the earlier "code 6"
+   was the default target type): returns at once unless U is the local
+   player (`0x00463DE0`) and stat 10 (`0x00625480(U, 10, 0)`) is 0.
+   (a) The path has a target unit (`0x00648BF0` = path +0x58 ≠ 0):
+   §8 r4 request code **0** (`0x00461250`, ECX 0) with a zeroed 7-i32
+   record, r0 := the target's type, r1 := its GUID (6 / −1 when
+   `0x004648F0(U)` gives none): `0x00480780` walk-to-unit, mode WL 2 /
+   TW 6 by U's room. (b) Else, inline: r0, r1 := the path's target
+   point +0x10 / +0x12 (`0x00648A00` / `0x00648A10`); cast light
+   detached (`0x00643A00`, `0x004743D0`); `0x004611F0(1)`;
+   `0x00620210(U, 0)`; then (U mode ≠ 0x13, always true from mode 3)
+   `0x00648DC0(path)`, (walk, neutral) := (6, 5) when U's room is a
+   town room (`0x0061AB00`), else (2, 1); `0x004804A0(U, r0, r1)` ≠ 0
+   → mode set walk (`0x00480E70`), else `0x00460830(U, neutral, 1)`.
+   The town test picks only the mode pair; no branch keeps the run. So
+   for server raw stamina 1..255 the 1.14d client already walks while
+   the server still runs (`sim/pathing.md` §9.9 r3: exhausted at raw ≤
+   0) until the server's own drain ends the run; §6 corrects the gap.
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
    (2026-10-08 correction: the ping round trip written by 0x8F, not
    only zeroed); the single-player value is open question 18.

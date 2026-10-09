@@ -32,9 +32,22 @@ route), so this section stands in for the "A done" message.
 
 REC block of this session: 1150–1179 (1150 used).
 
-## C
+## C — PROVISIONAL points settled by a binary read
 
-(filled when the PROVISIONAL sweep lands)
+Settled in place (provenance in each spec): REC-404 (`drlg/outdoor-tilesub.md`,
+replacement stamps never roll the build list; d2rs right), REC-50
+(`client/stat-lists.md`, revive flag 31 read by the client path reset;
+**d2rs differs**), REC-602 (`client/model.md`, `0x00463260`: request code 0
+with the target unit, "code 6" was a misread; d2rs consistent), REC-741
+(`client/model.md` §5 r6.4: every critter class body and the zoo body as
+pseudocode; **d2rs differs**), REC-402 and REC-411 (`sim/intents-events.md`;
+d2rs right), REC-206 (`ui/frontend-menus.md`, spec text corrected), REC-07
+(`world/objects.md`: the fire event sends no 0x0E). Rows:
+`q-fix-pc1eve-revive-client-footprint`, `q-fix-pc1eve-critter-class-bodies`,
+`q-fix-pc1eve-stale-markers-2`. Not binary-settleable (left): REC-35 (memory
+read of the Trees records), REC-61 (data recount), the frontend-loading
+full-screen check, REC-34 (stack trace), REC-860 (design choice), REC-900
+(narrowed by the day-4 recording). REC-742 was recorded on day 4.
 
 ## D
 
