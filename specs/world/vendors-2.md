@@ -200,6 +200,14 @@ type +0x68, active byte +0x6C). Results: `sim/intents-events.md`
    (§10.3) on button − 2 (table `0x00568620`, 7 entries for buttons
    2–8); result 0. Buttons 0, 1, 9–0x11, 0x15, 0x16 and ≥ 0x19 reach
    this rule and, after its checks, do nothing.
+6. `0x00597A20(game, U)` (also used by §10.3 rows 2, 3, 4, 8; read
+   2026-10-09): 1 when U's flags 2 (+0xC8) has bit 0x400000 or
+   0x800000; else 1 when any node of U's inventory GUID list
+   (inventory +0x2C, `0x0063CBB0`; node GUID +0, next +4) names an
+   existing item unit (`0x00552F60(game, 4, GUID)`); else 0. A null U
+   skips the flag test and then reads U +0x60 (crash; every caller
+   passes a live player). A player with neither (no flag, empty list)
+   gets 0, so rule 5 sends 0x77 0x0C.
 
 #### 10.2 Stash buttons (`0x00564D50`)
 

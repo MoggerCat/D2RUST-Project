@@ -129,7 +129,7 @@ draw mode 5 unless a rule says otherwise.
    4. e = C − last change C; d = last change C − start C clamped to 7…15.
       If v > 0, e < d and last ≠ start: shown = start + `_ftol`(((e + 1)
       / d) · (last − start)) (x87: `fild`, `fidiv`, `fimul`, truncation
-      toward 0; §Open questions 1); else shown = v. Then clamp to 0…m.
+      toward 0, binary64 at PC = 53, not the integer product; §Open questions 1); else shown = v. Then clamp to 0…m.
 2. **Life** (`0x00496F80`): m = max life; m = 0 → nothing (no globe, no
    overlay). f = (80 · shown) / m (C division); f = 1 or 2 with P a
    living player (type 0, mode ≠ 0x11) → 2.
@@ -740,10 +740,19 @@ with Python scripts outside the repo. No capture yet.
 
 ## Open questions
 
-1. **Needs recording.** Globe smoothing: whether `(e + 1) / d · Δ` under
-   the process's x87 precision control truncates exactly like the
-   integer `(e + 1) · Δ / d` (cases like d = 3, Δ = 3); a recording of a
-   globe refilling (frame by frame) settles it.
+1. **Answered** (2026-10-09, pc1-data Step 4 item 4; REC-21's static
+   half). Globe smoothing: the precision is PC = 53 (CRT start-up,
+   `items/treasure.md` OQ5), so `0x00496F3F`–`0x00496F48` (`fild`
+   e + 1, `fidiv` d, `fimul` Δ, `0x00682FD0`: exact `fstp` to a double,
+   `cvttsd2si`) equals binary64 `trunc(fl(fl((e + 1) / d) · Δ))`. It is
+   **not** the integer `(e + 1) · Δ / d`: the smallest case is d = 11,
+   e + 1 = 3, Δ = ±55 (float 14.999… → 14, integer 15); over d 7…15 and
+   |Δ| ≤ 200000 they differ in 48,562 cases (exhaustive, Python
+   binary64). PROVISIONAL (REC-610) only for a video runtime DLL
+   changing PC on the game thread.
+   ```
+   shown = start + trunc_f64((e1 as f64 / d as f64) * delta as f64)
+   ```
 2. **Answered** (2026-10-07, §5 r10–r12; belt use by key
    `0x00498A90`: `ui/controls.md` §7 r3). Was: Belt hover tracking
    `0x00498930` / `0x00498A90` / `0x00498D60` / `0x00498E80` (hovered

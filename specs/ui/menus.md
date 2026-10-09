@@ -24,13 +24,13 @@
 |   1. Waypoint menu input (ui 0x14) | 68–124 |
 |   2. NPC menu box | 125–200 |
 |   3. Hire list (`0x004B5C60`, NPC option "hire") | 201–243 |
-|   4. Shop transactions | 244–323 |
-| Constants & data dependencies | 324–331 |
-| Randomness | 332–335 |
-| Edge cases & original bugs | 336–347 |
-| Test vectors | 348–359 |
-| Provenance | 360–376 |
-| Open questions | 377–392 |
+|   4. Shop transactions | 244–329 |
+| Constants & data dependencies | 330–337 |
+| Randomness | 338–341 |
+| Edge cases & original bugs | 342–353 |
+| Test vectors | 354–365 |
+| Provenance | 366–382 |
+| Open questions | 383–398 |
 <!-- /index -->
 
 ## Summary
@@ -271,9 +271,15 @@ menus: its client sender is `client/model.md` §7 rule 9.
      the confirm dialog `0x004B2F50` (§Open questions 2).
 3. **Send** (`0x004B2650(1, flags)`; cancel `0x00487C20` without a
    pending transaction): kind 1 → 0x32, 2 → 0x33, 3 → 0x35 (click sound
-   0x0F), other → cancel. Repair all: refused within 2,000 ms of the
-   previous one (`[0x007C0E48]`). A missing item (`0x00463990(GUID, 4)`)
-   aborts: pending := 0, no message. 17 bytes (`0x00478700`): [id][NPC
+   0x0F), other → menu state 3 and cancel. Repair all: refused within
+   2,000 ms of the previous one (`[0x007C0E48]`); a refusal only calls
+   `0x00487C20` (which resets the cursor-mode globals when
+   `[0x007BCBF0]` = 5) and returns — pending `[0x007C0DE0]`, menu state
+   and `[0x007C0E48]` stay as they were; an accepted repair all sets
+   `[0x007C0E48]` := now (`0x004B2650` body, GetTickCount compare at
+   the `0x00489870() ≠ 0` branch). A missing item (`0x00463990(GUID, 4)`)
+   aborts: menu state 3, `0x0048A630`, `[0x007C0DE9]` := now,
+   `[0x007C0DED]` += 1, pending := 0, no message. 17 bytes (`0x00478700`): [id][NPC
    GUID u32 @1][item GUID u32 @5][u32 @9][u32 @13]; `m` = the item's
    mode (unit +0x10, low 16 bits):
 

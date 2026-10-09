@@ -297,7 +297,8 @@ object other than class 152 takes this branch.
 
 1. Action 3, object class ≠ 152: the item comes off P's cursor
    (`0x0055EEA0(game, P, item)`, items spec); failure → S→C 0x58 result
-   4, stop. Then P's interact is cleared (`0x00554190`, §16.3 rule 2).
+   4, stop, return 1 (`0x0058538C`–`0x0058539D`: every exit of
+   `0x005852E0` returns 1). Then P's interact is cleared (`0x00554190`, §16.3 rule 2).
 2. b := **power-up** (`0x00585240(game, s)`, P in EDI), s := byte +0x122
    of the item's items record (`subtype`, `data/fields.tsv` seq 62):
    1. s ≥ the table count (dword `0x00732FAC` = 21; signed compare) →

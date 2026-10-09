@@ -1450,7 +1450,7 @@ Real (recordings; message side):
 8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
    re-path budget at path +0x94 (not the distance budget +0x90); set to
    20 by `0x005A7C20` (§9.10).
-9. PROVISIONAL: §11.3 runs in 53-bit x87 precision (because `Game.exe` sets 53-bit once at start-up and never changes it); settled by REC-21. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
+9. Settled for Game.exe (2026-10-09, CRT start-up read, `items/treasure.md` OQ5): §11.3 runs in 53-bit x87 precision; PROVISIONAL (REC-610) only for a video runtime DLL changing it. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
    rounds cos · r to float32 before the truncation). Settle: a recording
    of a Blessed Hammer missile's per-tick positions, or a debugger read
    of the FPU control word in `0x0067A140`.

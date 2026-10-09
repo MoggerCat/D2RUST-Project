@@ -780,7 +780,10 @@ Products are 32-bit signed and wrap.
 72, 152, 252, 253 and 254; AC is the item's **base** 31
 (`0x006253B0`); max durability is `0x00625E00`: 0 when the list's base array has no
 stat 73 entry, else the total of stat 73 (`0x00624ED0` then
-`0x00624F60`).
+`0x00624F60`). A base array keeps no value-0 entries
+(`sim/stat-lists.md` §3 rule 4), so "no entry" is "base stat 73 = 0";
+a null item, a null stat list (+0x5C) or an `itemstatcost` with ≤ 73
+rows also give 0 (`0x00625E00`, read 2026-10-09).
 The entry walks read the item's stat list (unit +0x5C) only when it is
 an extended list (flag bit 31, `sim/stat-lists.md` §2), from its
 **full** array (+0x48): (A) and (C) the entries of stat 107 / 204 in

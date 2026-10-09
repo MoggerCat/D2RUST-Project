@@ -375,10 +375,14 @@ level on a unit, toward a unit (0x99, the 16-byte form) or a point
 5. Model: the entries' level bonus and the passive-state lists. No
    output.
 
-d2rs: `units::messages::skill_bonus` builds the message; no caller of
-`0x0053C6F0` is named by any spec, so nothing sends it yet. PROVISIONAL:
-the layout is the TSV's; the senders (an item or shrine bonus?) are
-unknown; settled by REC-415 (a static caller search of `0x0053C6F0`).
+6. **Never sent by 1.14d** (2026-10-09, REC-415 settled): the sender
+   `0x0053C6F0` (id 0x93 at `0x0053C703`, then `0x0053B280`) has no
+   caller: no rel32 call or jump to it in `.text` and no 4-byte pointer
+   to it anywhere in the image (scan of `Game.exe`, as for 0xA6 in
+   `client/msg-stats-items.md` §5 r7.2). The client handler stays as
+   rules 1–5 say (reachable only from a foreign server). d2rs:
+   `units::messages::skill_bonus` builds the message for the contract
+   test; d2rs servers never send it.
 
 ### 10. 0xA5 skill end on a unit (`0x0045D6A0`)
 

@@ -35,16 +35,16 @@
 |   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 452–464 |
 |   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 465–481 |
 |   10. Other 0x50 codes (UI effects) | 482–516 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 517–586 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 587–593 |
-|   13. NPC intro table `0x00726850` (0x91) | 594–622 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 623–639 |
-| Constants & data dependencies | 640–657 |
-| Randomness | 658–662 |
-| Edge cases & original bugs | 663–683 |
-| Test vectors | 684–706 |
-| Provenance | 707–737 |
-| Open questions | 738–763 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 517–598 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 599–605 |
+|   13. NPC intro table `0x00726850` (0x91) | 606–634 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 635–651 |
+| Constants & data dependencies | 652–669 |
+| Randomness | 670–674 |
+| Edge cases & original bugs | 675–695 |
+| Test vectors | 696–718 |
+| Provenance | 719–749 |
+| Open questions | 750–775 |
 <!-- /index -->
 
 ## Summary
@@ -561,14 +561,26 @@ stops at a `ÿc` that ends the string.
    w/2, y = 106 + (h < 112 ? (114 − h) / 2 : 0), (w, h) = its cel size
    (`0x004DBEA0`), drawn with `0x0046EE80`.
 5. **Place / take**: left button down (`0x004BFC50`) is ignored within
-   400 ms of the last accepted click; then (step 1 or 2) the inventory
-   handler gets it first; the button press `0x004BFBC0` (sound 1); with
-   a cursor item inside x 123–211, y 106–220 of an item type that
+   400 ms of the last click; every click not ignored sets last click
+   `[0x007C5488]` := now first (accepted or not). Then step 1: the
+   inventory handler `0x004922A0` gets it first; step 2: only
+   `0x00489190` (the inventory close-button rectangle x W − 302 … W − 270,
+   y H − 96 … H − 64 → `[0x007BCE90]` := 1, consumed) — the inventory
+   grid is not live while an item is placed; if either consumed it:
+   done. Steps 1 and 2 only: the button press `0x004BFBC0` (sound 1);
+   steps 0 and 3 skip both. Then (any step) with the player's cursor
+   item (`0x0063C1E0(inventory)`, the model's cursor item, not the
+   cursor graphic) inside x 123–211, y 106–220 of an item type that
    passes `0x006280A0(item, 0x10)`: mode 1 → NPC 154 `0x0062C590`, 511
    `0x0062C770`, 512 `0x0062C6A0` must accept it; mode 0 → its code must
-   be `hst ` (the Horadric staff); accepted → `0x004BFA70`: step 1 → 2,
-   cursor emptied, placed := its GUID, its drop sound; step 2 → 1,
-   placed := 0, the item back on the cursor, sound 1. Refused → sound 3.
+   be `hst ` (the Horadric staff); accepted → `0x004BFA70(ESI = item)`:
+   step 1 → 2, cursor graphic cleared (`0x00468070(0)`), placed := its
+   GUID, its drop sound (`0x004C1D60` → `0x004B9A00`); step 2 → 1,
+   placed := 0, cursor graphic := the item (`0x00468070(item)`), sound
+   1; step 3: nothing. Refused → sound 3. Placing never removes the item
+   from the model's cursor slot (only the graphic), so in step 2 the
+   cursor item is the placed item and a click in the area takes it back;
+   with no cursor item a click in the area does nothing.
 6. **Buttons** (left button up `0x004C04E0` → `0x004C0450`; Esc / Space
    `0x004C0150`; mouse move `0x004BFA30`; WM_CHAR consumed):
    - a release inside an armed button's hit rectangle plays sound 1

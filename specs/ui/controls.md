@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–227 |
 |   4. Dispatch | 228–297 |
 |   5. Key-config screen assignment | 298–313 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 314–629 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 630–671 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 672–697 |
-| Constants & data dependencies | 698–704 |
-| Randomness | 705–708 |
-| Edge cases & original bugs | 709–721 |
-| Test vectors | 722–749 |
-| Provenance | 750–768 |
-| Open questions | 769–816 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 314–633 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 634–675 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 676–701 |
+| Constants & data dependencies | 702–708 |
+| Randomness | 709–712 |
+| Edge cases & original bugs | 713–725 |
+| Test vectors | 726–753 |
+| Provenance | 754–772 |
+| Open questions | 773–820 |
 <!-- /index -->
 
 ## Summary
@@ -357,8 +357,12 @@ check reads it.
    - 0 left down (`0x004629A0`): skill := P's left skill (`0x00620190`).
      If `0x00464600(P, skill)` = 0 (P holds a cursor item or is not a
      player; or P's mode is 0, 4, 7–12, 17 or 19; or mode 13 with class
-     3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18 as
-     `0x004645B0(skill)` decides): cursor state 6 → `0x00453EC0` (C→S
+     3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18
+     (sequence) as `0x004645B0` decides, which ignores the clicked
+     skill: P's used skill entry (skill list +0x10, `0x006439A0`) none
+     → act; its row's `anim` (+0x10) ≠ 18 → act; its `seqinput`
+     (+0x16) 0 or 255 → 0; else act iff P's frame event index (unit
+     +0x38 >> 8) ≥ `seqinput`): cursor state 6 → `0x00453EC0` (C→S
      **0x27** with the cursor unit's GUID in both fields); cursor state 8
      → C→S **0x4C** [−1]; then, holding a cursor item → C→S **0x17**
      [item GUID] (drop it, `DropItem`), returns 0. Else flags |= 0x80 and

@@ -259,8 +259,8 @@ REC-332	6331	MANUAL, second client] [MANUAL	(R-TP-1, R-TP-2, R-TP-3, R-TP-4)	uns
 REC-333	6337	MANUAL	(R-CUBE-1, R-CUBE-2)	recording	no		0	
 REC-334	6341	AUTO] [MANUAL	(R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)	unstated	no		0	
 REC-335	6348	AUTO hook, MANUAL placement	(R-LOS-1)	recording	no		0	
-REC-400	6351	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	7	
-REC-401	6354	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	2	
+REC-400	6351	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	6	
+REC-401	6354	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	1	
 REC-402	6357	AUTO hook	(R-CHAT15-1)	recording	no	yes	4	
 REC-404	6387	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	5	
 REC-405	6613		Per-client inventory refresh without its item steps (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
@@ -270,7 +270,7 @@ REC-411	6363	AUTO	(R-LAND-1)	recording	no	yes	2
 REC-412	6366	AUTO hook	(R-HEAL-1)	recording	no	yes	2	
 REC-413	6369	AUTO	(R-CAST-1)	recording	no	yes	1	
 REC-414	6372	AUTO	(R-MISS73-1)	recording	no	yes	4	
-REC-415	6375	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	5	
+REC-415	6375	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	4	
 REC-416	6378	AUTO	(R-92-1)	unstated	no	yes	2	
 REC-420	6603		Arreat Summit background seed (PROVISIONAL, `d2-client` `world_view/background_view.rs` `s	recording	no		4	
 REC-430	6390	AUTO hook	(R-ANIM-1)	recording	no		1	
@@ -289,3 +289,4 @@ REC-452	6600		Client hit functions read as non-zero (PROVISIONAL, `d2-client` `b
 REC-460	6381	MANUAL	(R-SKPT-1)	unstated	no	yes	1	
 REC-461	6384		(R-SENTRY-1)	recording	no	yes	1	
 REC-480	5912	MANUAL	drlg/maze.md, drlg/rooms.md §9.5.1 (exit warps of maze levels, q-act1-dungeons)	recording	no		0	
+REC-602	6628		Client run end on stamina 0 (PROVISIONAL, `client/model.md` OQ2 stamina answer; q-fix-seam	recording	no		1	
