@@ -24,20 +24,20 @@
 | Rules | 74–75 |
 |   1. Which draw path | 76–122 |
 |   2. COF file | 123–183 |
-|   3. Direction and frame | 184–249 |
-|   4. Pre-test: COF box culling | 250–259 |
-|   5. The slot loop (`0x00470EC0`) | 260–380 |
-|   6. Component file and cel | 381–421 |
-|   7. Colormap source per component | 422–446 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 447–549 |
-|   9. Single-cel units (missiles, items) | 550–564 |
-|   10. d2rs mapping | 565–579 |
-| Constants & data dependencies | 580–593 |
-| Randomness | 594–597 |
-| Edge cases & original bugs | 598–612 |
-| Test vectors | 613–633 |
-| Provenance | 634–681 |
-| Open questions | 682–745 |
+|   3. Direction and frame | 184–259 |
+|   4. Pre-test: COF box culling | 260–269 |
+|   5. The slot loop (`0x00470EC0`) | 270–390 |
+|   6. Component file and cel | 391–431 |
+|   7. Colormap source per component | 432–456 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 457–559 |
+|   9. Single-cel units (missiles, items) | 560–574 |
+|   10. d2rs mapping | 575–589 |
+| Constants & data dependencies | 590–603 |
+| Randomness | 604–607 |
+| Edge cases & original bugs | 608–622 |
+| Test vectors | 623–643 |
+| Provenance | 644–691 |
+| Open questions | 692–755 |
 <!-- /index -->
 
 ## Summary
@@ -189,10 +189,14 @@ with every 0x20 turned into 0, so a part ends at its first space (the
    player walking to a clicked point is drawn at dir64 32, the direction
    from its start subtile (4873, 4228) to the clicked (4867, 4222) (the
    prepared target (4868, 4222) would give 34), kept while it walks.
-   PROVISIONAL (REC-517): the d2rs prediction faces the click target
-   from the walk's start and keeps it (because the path direction is
-   set at the walk request; settled by a recording of the dynamic path
-   direction during a walk that bends).
+   That is the straight-walk case of the path rules (REC-517 settled
+   2026-10-09 by `sim/pathing.md` §8.4–§8.5): each time the path takes
+   its next point, the new direction := the direction toward that point
+   (`0x0064FE40` → `0x006485F0`), and the client unit update turns the
+   drawn direction toward it by the turn step once per update
+   (`0x00648640`, from `0x00463390` players / `0x004B13A0` monsters).
+   So a walk that bends turns at each path point; a straight walk
+   keeps its start facing, as measured.
 2. **Frame**: unit +0x44 >> 8; frame count unit +0x48 >> 8, objects
    `FrameCnt[mode]` (`0x00621810`). The draw reads neither AnimData nor
    the COF rate: speed and frame advance belong to the animation code
@@ -204,10 +208,16 @@ with every 0x20 turned into 0, so a part ends at its first space (the
    `sotnhth` / `amtn1ht`; F the frame count, 16): 12 recorded scenes
    (`facts/render/scenes/a1-town-idle-sor`, `a2..a5-town-*`,
    `a1-panel-*`, `a1-town-arrival-ama`), i.e. T − 1 advances by the
-   draw of tick T. PROVISIONAL (REC-512): monsters and missiles take
-   the same clock in d2rs (because their client advance is not
-   modelled; settled by a scene with a monster standing from its
-   appearance on).
+   draw of tick T. That clock is the player's only: the frame a
+   monster or missile is drawn with is its own +0x44, advanced by its
+   own client update from the value its mode set or create gave it
+   (REC-512 settled 2026-10-09 by the specs that own those updates):
+   monsters by the anim step of `client/model.md` §19 r8.5 (advance
+   `0x00623E00`, or the complete / hold kinds) once per client monster
+   update from the mode set's frame; missiles by `missiles/client.md`
+   §C7 r4 (only while active; `LoopAnim` / `SubLoop` kinds) from the
+   create's frame (§C3). A monster that appears at tick A is therefore
+   drawn with the advances since A, not since tick 1.
 3. **Expected direction count** `n` (`0x004DAF70`): players 8, or 16 for
    the local player while `[0x007A8928]` = 0; monsters monstats2 `d<mode>`
    (+0xF4 + mode), but 4 when that is 8 and the class's graphics-ready

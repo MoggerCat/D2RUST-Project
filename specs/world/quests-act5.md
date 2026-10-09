@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 674–708 |
 | Test vectors | 709–723 |
 | Provenance | 724–748 |
-| Open questions | 749–811 |
+| Open questions | 749–816 |
 <!-- /index -->
 
 ## Summary
@@ -767,7 +767,11 @@ other Act V part-1 quest code draws.
    GUID)`), attaches it
    (`0x00626E10(player, list, 1)`), writes the four stats with
    `0x00627150(list, stat, v, 0)` and sends them (`0x00548520`); it
-   never looks for or frees an earlier list. Attached lists add into the
+   never looks for or frees an earlier list. The sends are four calls
+   `0x00548520(player, stat, v, player)` in the order 39, 41, 43, 45
+   after all four writes (`0x0058A056`–`0x0058A08F`), each with the
+   written value v (not the unit total): one stat message per stat
+   (1.14d-read 2026-10-09, settles REC-792). Attached lists add into the
    totals (`sim/stat-lists.md` §6). So in one game: load with k
    difficulties done gives one list of 10·k; using the scroll then adds
    a second list of 10·(k + 1) (totals 10·(2k + 1)) until the next load
@@ -805,6 +809,7 @@ other Act V part-1 quest code draws.
    kept outside any room are not modelled) (REC-790); "killed in town"
    `0x00589340` runs stat 6 := 0, the mode 12 change, the room refresh
    and unit flags |= 1, without the path free and the AI event 2
-   deletion (REC-791); the scroll's resistance list sends each of the
-   four stats with the written value, in id order (REC-792). Settled by
-   R-PQ-13 (`docs/handoff/pc2-rec-pc2-quests.md`).
+   deletion (REC-791). Settled by R-PQ-13
+   (`docs/handoff/pc2-rec-pc2-quests.md`). The scroll's resistance list
+   sends each of the four stats with the written value, in id order:
+   1.14d-read, Open question 3 (settles REC-792).
