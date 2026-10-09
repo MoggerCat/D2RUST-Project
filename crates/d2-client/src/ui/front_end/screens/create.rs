@@ -10,7 +10,9 @@
 //! save (§F3.6 r3) is the host's job, as the screen sees no file system.
 //!
 //! Preview fills are `// d2rs-own, unverified`; open points are PROVISIONAL
-//! under REC-181.
+//! under REC-181 (name filter and the click during a walk measured:
+//! `traces/frontend/frontend-menus/frontend-0001.json`; the hover box is
+//! `q-fix-create-hitbox`).
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -260,15 +262,21 @@ impl HeroAnim {
     }
 }
 
-/// Whether `c` may be typed into the name box (§F3.4 r1–r2). `text` is the
-/// current text; the caret is at its end (PROVISIONAL, REC-181).
-pub fn accepts_char(text: &str, c: char) -> bool {
+/// Whether `c` may be typed into the name box at unit `caret` (§F3.4
+/// r1–r2). Measured (REC-181 / REC-209,
+/// `traces/frontend/frontend-menus/frontend-0001.json`): letters only, at
+/// most 15; a `-` / `_` is refused at caret 0 even when text follows
+/// (Home, then `-` on "ab" leaves "ab"), accepted inside, and refused when
+/// the text already holds one; digits, space, 0xC0 / 0xE9 / 0xFF, `.` and
+/// `'` are refused. The screen's caret is always at the end (it has no
+/// Home / Left / Right: `q-fix-create-name-caret`).
+pub fn accepts_char(text: &str, caret: usize, c: char) -> bool {
     if text.chars().count() >= NAME_MAX {
         return false;
     }
     match c {
         'A'..='Z' | 'a'..='z' => true,
-        '-' | '_' => !text.is_empty() && !text.contains(['-', '_']),
+        '-' | '_' => caret != 0 && !text.contains(['-', '_']),
         _ => false,
     }
 }
@@ -455,7 +463,8 @@ impl CreateState {
     /// A typed character; returns whether it was accepted. Only while the
     /// name box is shown.
     pub fn type_char(&mut self, c: char) -> bool {
-        if !self.name_box_visible() || self.warning || !accepts_char(&self.name, c) {
+        let caret = self.name.chars().count();
+        if !self.name_box_visible() || self.warning || !accepts_char(&self.name, caret, c) {
             return false;
         }
         self.name.push(c);
@@ -738,7 +747,11 @@ impl Screen for CreateScreen {
 
     fn pointer(&mut self, ctx: &mut FrontCtx, p: Point) {
         let slots: &[Slot] = if ctx.expansion { &EXPANSION } else { &CLASSIC };
-        // The 88×184 descriptor box, bottom-left at (x, y) (REC-181).
+        // PROVISIONAL (REC-181 -> q-fix-create-hitbox): the 88×184
+        // descriptor box, bottom-left at (x, y). Measured
+        // (`traces/frontend/frontend-menus/frontend-0002.json`): 1.14d
+        // hovers by the DC6 frame-0 box of §F3.3 r5 (Barbarian x 361..446,
+        // y 198..380), which needs the cel sizes from the host.
         let under = slots
             .iter()
             .rev()
@@ -891,15 +904,49 @@ mod tests {
 
     #[test]
     fn name_filter_vectors() {
-        assert!(accepts_char("", 'Z'));
-        assert!(!accepts_char("", '7'));
-        assert!(!accepts_char("Zz", ' '));
-        assert!(!accepts_char("Zz", 'é'));
-        assert!(!accepts_char("", '-'));
-        assert!(accepts_char("Zz", '-'));
-        assert!(!accepts_char("a-b", '_'));
-        assert!(!accepts_char(&"a".repeat(15), 'b'));
-        assert!(accepts_char(&"a".repeat(14), 'b'));
+        assert!(accepts_char("", 0, 'Z'));
+        assert!(!accepts_char("", 0, '7'));
+        assert!(!accepts_char("Zz", 2, ' '));
+        assert!(!accepts_char("Zz", 2, 'é'));
+        assert!(!accepts_char("", 0, '-'));
+        assert!(accepts_char("Zz", 2, '-'));
+        assert!(!accepts_char("a-b", 3, '_'));
+        assert!(!accepts_char(&"a".repeat(15), 15, 'b'));
+        assert!(accepts_char(&"a".repeat(14), 14, 'b'));
+    }
+
+    /// The recorded name-box steps (`frontend-0001`: REC-181 / REC-209).
+    #[test]
+    fn name_filter_matches_the_recording() {
+        // "-" then "_" into the empty box: both refused.
+        assert!(!accepts_char("", 0, '-') && !accepts_char("", 0, '_'));
+        // "a1 #b-c_d" → "ab-cd".
+        let mut t = String::new();
+        for c in "a1 #b-c_d".chars() {
+            if accepts_char(&t, t.len(), c) {
+                t.push(c);
+            }
+        }
+        assert_eq!(t, "ab-cd");
+        // "ab", Home, "-": refused at caret 0 although text follows.
+        assert!(!accepts_char("ab", 0, '-'));
+        // caret 1: "_" accepted ("a_b"); then "-" refused.
+        assert!(accepts_char("ab", 1, '_'));
+        assert!(!accepts_char("a_xb", 3, '-'));
+        // 0xE9, 0xC0, 0xFF, space, 0, 9, '.', '\'' refused; "-" then "_"
+        // after "a": "a-", the "_" refused.
+        for c in ['\u{e9}', '\u{c0}', '\u{ff}', ' ', '0', '9', '.', '\''] {
+            assert!(!accepts_char("a", 1, c), "{c:?}");
+        }
+        assert!(accepts_char("a", 1, '-') && !accepts_char("a-", 2, '_'));
+        // 17 letters typed: 15 kept.
+        let mut t = String::new();
+        for c in "QRSTUVWXYZabcdefg".chars() {
+            if accepts_char(&t, t.len(), c) {
+                t.push(c);
+            }
+        }
+        assert_eq!(t, "QRSTUVWXYZabcde");
     }
 
     #[test]

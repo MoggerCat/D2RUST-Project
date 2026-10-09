@@ -40,6 +40,8 @@ pub struct ExportContext<'a> {
     /// (`ViewAssets::color_rows`): a rectangle's colour is its shade map
     /// minus this (§5 r16).
     pub color_rows: Option<MapId>,
+    /// `WorldFrame::ui_calls`: a UI cel's op (§5 r18).
+    pub ui_calls: &'a [crate::ui::draw::CelCall],
 }
 
 /// The frame-set path prefix of the UI rectangles
@@ -278,7 +280,15 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 }
             }
             FramePart::Dir(d) => {
-                row[1] = op(false, item).into();
+                row[1] = match item.tag {
+                    // §5 r18: a UI cel's wrapper.
+                    ItemTag::Ui(i) => cx
+                        .ui_calls
+                        .get(i as usize)
+                        .map_or(op(false, item), |c| c.op()),
+                    _ => op(false, item),
+                }
+                .into();
                 // §5 r14: a unit cel's `dir` is the context's `dir64`, not
                 // the file direction the frame set is keyed by.
                 let d = match item.tag {
@@ -486,6 +496,7 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         unit_dirs: &d.frame.unit_dirs,
         unit_calls: &d.frame.unit_calls,
         color_rows: d.assets.color_rows,
+        ui_calls: &d.frame.ui_calls,
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();

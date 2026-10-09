@@ -46,7 +46,45 @@ fn full_unit() -> UnitState {
         vit: Some(26),
         lvl: Some(27),
         own: Some(28),
+        iq: Some(29),
+        ifl: Some(30),
+        fi: Some(-31),
+        il: Some(32),
+        aa: Some(33),
+        pf: Some([34, 35, 36]),
+        sf: Some([37, 38, 39]),
+        rp: Some(40),
+        rs: Some(41),
+        ik: Some([42, 4_000_000_001]),
+        ss: Some(43),
+        is: Some(vec![[44, 0, 45], [46, 1, -47]]),
+        q: None,
     }
+}
+
+// Covers: specs/tools/state-snapshot.md §2
+#[test]
+fn quest_record_words_on_the_player_line() {
+    use crate::world::quests::QuestFlags;
+    let mut f = QuestFlags::default();
+    f.set(1, 13);
+    f.set(1, 0);
+    f.set(7, 0);
+    f.set(41, 15);
+    assert_eq!(quest_words(&f), vec![[1, 0x2001], [7, 1], [41, 0x8000]]);
+    assert!(quest_words(&QuestFlags::default()).is_empty());
+    let mut s = StateSnapshot {
+        frame: 1,
+        seed: [0, 0],
+        units: vec![unit(0, 1), unit(1, 1)],
+    };
+    s.set_quests(1, quest_words(&f));
+    s.set_quests(9, vec![[2, 2]]);
+    assert_eq!(
+        s.to_json_line(),
+        r#"{"k":"snap","f":1,"seed":[0,0],"units":[{"ut":0,"g":1,"q":[[1,8193],[7,1],[41,32768]]},{"ut":1,"g":1}]}"#
+    );
+    assert!(!FIELDS.contains(&"q") && HOST_FIELDS == ["q"]);
 }
 
 // Covers: specs/tools/state-snapshot.md §1 r2, §1 r4, §2
@@ -63,7 +101,9 @@ fn a_snap_line_has_every_key_in_table_order() {
             r#"{"k":"snap","f":3,"seed":[1234,666],"units":[{"ut":1,"g":7,"cl":2,"m":3,"#,
             r#""x":4,"y":5,"xf":6,"yf":7,"tx":8,"ty":9,"d":10,"fr":-11,"fc":12,"sp":-13,"#,
             r#""s":[14,4000000000],"act":15,"lv":16,"hp":17,"hpx":18,"mp":19,"mpx":20,"#,
-            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28}]}"#
+            r#""st":21,"stx":22,"str":23,"ene":24,"dex":25,"vit":26,"lvl":27,"own":28,"#,
+            r#""iq":29,"if":30,"fi":-31,"il":32,"aa":33,"pf":[34,35,36],"sf":[37,38,39],"#,
+            r#""rp":40,"rs":41,"ik":[42,4000000001],"ss":43,"is":[[44,0,45],[46,1,-47]]}]}"#
         )
     );
     // The key order of the line is the spec's table.

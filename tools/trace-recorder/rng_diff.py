@@ -4,7 +4,7 @@ print the first divergence, then the next N, the game-seed sequence and a
 summary per owner (specs/tools/rng-trace.md §5).
 
     python3 rng_diff.py ORIG.rng.jsonl D2RS.rng.jsonl [--next 20]
-        [--owners game,unit] [--from F] [--to F] [--state-only]
+        [--owners game,unit] [--from F] [--to F] [--state-only] [--json FILE]
     python3 rng_diff.py --selftest
 
 Alignment: by frame. Within a frame, each owner's ordered draws (the game
@@ -86,6 +86,16 @@ def prepare(header, recs):
             continue
         out.append(d)
     return out, info
+
+
+def only_drlg(ranges):
+    """True when every skipped [lo, hi) lies inside the DRLG code ranges whose
+    inline draws are always `other:drlg` (rng-trace.md §2 r5, §5 r5)."""
+    for lo, hi in ranges:
+        lo, hi = int(lo, 16), int(hi, 16)
+        if not any(a <= lo and hi <= b for a, b in rng_owners.DRLG_SITES):
+            return False
+    return True
 
 
 def is_compared(owner):
@@ -265,8 +275,14 @@ def report(r, ha, hb, nxt=20, out=sys.stdout):
     p(f"not compared: other seeds orig {ia['other']}, d2rs {ib['other']}; no-step draws orig "
       f"{ia['nostep']}, d2rs {ib['nostep']}; unresolved inline orig {ia['unresolved']}")
     gaps = []
-    if ha.get("skip_inline"):
-        gaps.append(f"orig inline sites skipped in {ha['skip_inline']}")
+    skipped = ha.get("skip_inline") or []
+    if skipped and only_drlg(skipped):
+        # rng_owners rule 5: every inline draw there is other:drlg and takes
+        # no part in the owner chains, so the comparison misses nothing
+        p(f"note: orig inline sites skipped in {skipped}: DRLG code only (owner other:drlg, "
+          f"never compared)")
+    elif skipped:
+        gaps.append(f"orig inline sites skipped in {skipped}")
     if ia["unresolved"]:
         gaps.append(f"{ia['unresolved']} orig inline draws without a state")
     for g in gaps:
@@ -279,6 +295,34 @@ def report(r, ha, hb, nxt=20, out=sys.stdout):
         verdict, code = "MATCH", 0
     p(f"\n{verdict}")
     return code
+
+
+VERDICTS = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR"}
+
+
+def summary(r, code):
+    """The machine-readable summary (`--json FILE`, format diff-summary-1;
+    specs/tools/scenario-diff.md §4). Ticks compared: every frame of the
+    compared range (a frame without draws on either side is equal); equal:
+    the frames without a divergence."""
+    lo, hi = r["frames"]
+    n = max(0, hi - lo + 1)
+    bad = {d["frame"] for d in r["diffs"]}
+    first = None
+    if r["diffs"]:
+        d = r["diffs"][0]
+        first = {"frame": d["frame"], "text": where(d) + (
+            f": 1.14d site {(d['orig'] or {}).get('site')} vs d2rs site "
+            f"{(d['d2rs'] or {}).get('site')}")}
+    return {"format": "diff-summary-1", "channel": "rng", "tool": "rng_diff.py", "code": code,
+            "verdict": VERDICTS[code], "frames_compared": n, "frames_equal": n - len(bad),
+            "frame_range": [lo, hi], "differences": len(r["diffs"]), "first": first}
+
+
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
+        f.write("\n")
 
 
 # --- self-test -----------------------------------------------------------------
@@ -351,7 +395,7 @@ def run(orig, d2rs, **kw):
     return compare(split(copy.deepcopy(orig)), split(copy.deepcopy(d2rs)), **kw)
 
 
-# Covers: specs/tools/rng-trace.md §1 r2, §5 r1, §5 r2, §5 r3, §5 r4, §5 r5
+# Covers: specs/tools/rng-trace.md §1 r2, §5 r1, §5 r2, §5 r3, §5 r4, §5 r5, §4 r6
 def selftest():
     ok = 0
     orig, d2rs = synthetic()
@@ -381,7 +425,13 @@ def selftest():
         got = (d["frame"], d["owner"], d["index"], d["field"])
         assert got == want, (k, v, got, want)
         assert report(r, orig[0], b[0], out=sink) == 1
+        sm = summary(r, 1)
+        assert sm["first"]["frame"] == 2 and sm["frames_compared"] == 4, sm
+        assert sm["frames_equal"] == 3 and sm["verdict"] == "DIVERGED", sm
         ok += 1
+    sm = summary(run(orig, d2rs), 0)
+    assert (sm["frames_compared"], sm["frames_equal"], sm["first"]) == (4, 4, None), sm
+    ok += 1
     # the inline unit draw's ret is not compared (1.14d gives lo')
     b = copy.deepcopy(d2rs)
     b[idx[2]]["ret"] = 12345
@@ -431,6 +481,12 @@ def selftest():
     a[0]["skip_inline"] = [["0x642000", "0x682000"]]
     assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 2
     ok += 1
+    # ... unless the skipped ranges are DRLG code only (other:drlg, never compared)
+    a[0]["skip_inline"] = [[f"{x:#x}", f"{y:#x}"] for x, y in rng_owners.DRLG_SITES]
+    assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 0
+    a[0]["skip_inline"] = [["0x66b000", "0x683000"]]  # one page past the DRLG code
+    assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 2
+    ok += 1
     # a file without frames is an error
     a = copy.deepcopy(orig)
     for x in a:
@@ -455,6 +511,8 @@ def main(argv=None):
     ap.add_argument("--to", dest="hi", type=int, default=None)
     ap.add_argument("--state-only", action="store_true",
                     help="compare seed states only (not op / n / min / ret)")
+    ap.add_argument("--json", default=None, metavar="FILE",
+                    help="also write a machine-readable summary (diff-summary-1) here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -468,8 +526,14 @@ def main(argv=None):
         r = compare((ha, ra), (hb, rb), owners, a.lo, a.hi, a.state_only)
     except (RngError, OSError, KeyError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
+        if a.json:
+            write_json(a.json, {"format": "diff-summary-1", "channel": "rng", "code": 3,
+                                "verdict": "ERROR", "error": str(e)})
         return 3
-    return report(r, ha, hb, a.next)
+    code = report(r, ha, hb, a.next)
+    if a.json:
+        write_json(a.json, summary(r, code))
+    return code
 
 
 if __name__ == "__main__":

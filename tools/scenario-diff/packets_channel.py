@@ -15,11 +15,8 @@ def run(r, save, sides, shared_script_error):
     c = r.c
     rec = _rec()
     orig, d2rs = r.path("orig.packets.jsonl"), r.path("d2rs.packets.jsonl")
-    if c["poke"]:
-        # record_packets.py has no poke layer (scenario-diff.md §3 rule 9)
-        print("[packets] not compared: record_packets.py takes no --poke "
-              "(scenario-diff.md §3 rule 9)")
-        return 2
+    # pokes and sends reach both sides: record_packets.py has the poke and the
+    # send layers, state-dump takes both (scenario-diff.md §3 rules 9-10)
     if "orig" in sides:
         r.recorder("record_packets.py", [], orig)
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
@@ -32,7 +29,7 @@ def run(r, save, sides, shared_script_error):
     if sides != {"orig", "d2rs"}:
         return None
     code = r.sh([sys.executable, os.path.join(rec, "packets_diff.py"), orig, d2rs,
-                 "--next", str(r.next)], check=False)
+                 "--next", str(r.next)] + r.json_args("packets"), check=False)
     if r.d2rs_input() and shared_script_error(r.d2rs_input()):
         print("[packets] d2rs ran without 'input d2rs' (not in the shared frame form, "
               "which state-dump needs): partial at best")
@@ -48,11 +45,13 @@ def _rec():
 def selftest(runner_cls, check, shared_script_error):
     """Dry run: the recorder, the dump with --packets and the comparator,
     with the check's save and seed. Returns the number of checks passed."""
-    poked = dict(check, poke=[(1, 5, "time 1 0")])
+    poked = dict(check, poke=[(1, 5, "time 1 0")], send=[(2, 7, "Walk x=10 y=20")])
     r = runner_cls(poked, "/tmp/w", dry=True)
     r.next = 5
-    assert run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"}, shared_script_error) == 2
-    assert not r.log  # nothing run: record_packets.py has no poke layer
+    run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"}, shared_script_error)
+    for what in ("record_packets.py", "state-dump"):  # pokes and sends on both sides
+        line = next(x for x in r.log if what in x)
+        assert "--poke '5 time 1 0'" in line and "--send '7 Walk x=10 y=20'" in line, line
     r = runner_cls(dict(check, poke=[]), "/tmp/w", dry=True)
     r.next = 5
     code = run(r, "/tmp/w/ScnAma.d2s", {"orig", "d2rs"}, shared_script_error)
@@ -64,8 +63,9 @@ def selftest(runner_cls, check, shared_script_error):
     assert "--ticks 20" in dump, dump
     cmp_ = r.log[-1]
     assert "packets_diff.py /tmp/w/orig.packets.jsonl /tmp/w/d2rs.packets.jsonl" in cmp_, cmp_
+    assert "--json /tmp/w/packets.summary.json" in cmp_, cmp_
     assert code == 0  # a dry run's commands "succeed"
     r.log = []
     run(r, "/tmp/w/ScnAma.d2s", {"d2rs"}, shared_script_error)   # one side: no compare
     assert not any("packets_diff" in x or "record_packets" in x for x in r.log)
-    return 3
+    return 4

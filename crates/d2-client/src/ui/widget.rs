@@ -68,6 +68,7 @@ impl Widget for Button {
                 at: self.rect.origin(),
                 clip: Screen::play().rect(),
                 look: crate::ui::CelLook::PLAIN,
+                call: crate::ui::draw::CelCall::Draw,
             }));
         }
     }
@@ -94,6 +95,7 @@ impl Widget for FrameImage {
             at: self.rect.origin(),
             clip: Screen::play().rect(),
             look: crate::ui::CelLook::PLAIN,
+            call: crate::ui::draw::CelCall::Draw,
         }));
     }
 }

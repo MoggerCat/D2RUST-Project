@@ -1010,18 +1010,174 @@ fn the_nearest_client_player_within_15_is_found() {
     let m = fx.spawn(UnitType::Monster, 0, a, 20, 10);
     // Every monster has an interaction block (`npc.md` §2 r2).
     assert!(fx.sim.with(&mut fx.game, |_, v| v.has_interaction_block(m)));
-    let far = fx.spawn(UnitType::Player, 0, a, 36, 10);
+    // The full-size distance `0x005DC380` subtracts the NPC's size per
+    // axis (clamped at 0).
+    let s = fx.sim.with(&mut fx.game, |_, v| v.size(m));
+    assert!((1..=3).contains(&s), "size {s}");
+    let far = fx.spawn(UnitType::Player, 0, a, 20 + 16 + s, 10);
     fx.game.lists.add_client(Some(far), Some(a), 0);
-    // 16 away: none, the unit itself.
+    // Full-size distance 16: none, the unit itself.
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
     assert_eq!(got, (m, false));
-    let near = fx.spawn(UnitType::Player, 0, a, 23, 13);
-    fx.game.lists.add_client(Some(near), Some(a), 0);
-    // (3, 3): no-size distance 4, found, not "close" (< 4).
+    let edge = fx.spawn(UnitType::Player, 0, a, 20, 10 + 15 + s);
+    fx.game.lists.add_client(Some(edge), Some(a), 0);
+    // Full-size distance 15: found, not "close".
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
-    assert_eq!(got, (near, false));
+    assert_eq!(got, (edge, false));
     // A player unit without a client is not scanned.
     let _ = fx.spawn(UnitType::Player, 0, a, 21, 10);
     let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
-    assert_eq!(got, (near, false));
+    assert_eq!(got, (edge, false));
+}
+
+/// Two client players near monster `m` of `fx` at full-size distances
+/// `first` and `second`, `first` earlier in scan order (room A's list).
+fn two_players(fx: &mut Fx, m: UnitId, first: i32, second: i32) -> (UnitId, UnitId) {
+    use crate::monsters::ai::seams::AiUnits as _;
+    let a = fx.a;
+    let s = fx.sim.with(&mut fx.game, |_, v| v.size(m));
+    // The room's unit list is prepended to (`unit-order.md` §2): the
+    // later spawn comes first in scan order.
+    let q = fx.spawn(UnitType::Player, 0, a, 20 - second - s, 10);
+    let p = fx.spawn(UnitType::Player, 0, a, 20 + first + s, 10);
+    fx.game.lists.add_client(Some(q), Some(a), 0);
+    fx.game.lists.add_client(Some(p), Some(a), 0);
+    let order: Vec<UnitId> = fx
+        .game
+        .lists
+        .room_units(a)
+        .into_iter()
+        .filter(|&u| u == p || u == q)
+        .collect();
+    assert_eq!(order, [p, q], "scan order");
+    (p, q)
+}
+
+// 1.14d's callback `0x005DDE80` takes the first qualifying player in scan
+// order (taking stops the scan), not the nearest.
+// Covers: specs/monsters/ai.md §5.3
+#[test]
+fn a_non_interact_npc_takes_the_first_player_in_scan_order() {
+    use crate::monsters::ai::seams::AiTargets;
+    let mut fx = fx();
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 20, 10);
+    let (first, _) = two_players(&mut fx, m, 10, 3);
+    let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    fx.sim.sys.hooks.quest_host = Some(Box::new(Gate {
+        pass: Vec::new(),
+        calls: calls.clone(),
+    }));
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (first, false));
+    // No interact flag: the quest test is not called.
+    assert!(calls.borrow().is_empty());
+}
+
+/// The lent quest host of the interact-gate tests: the active test is
+/// true for the players in `pass` (and then "sends" 8A 01 <npc GUID>
+/// to `TestPending::sent`); every call is logged.
+struct Gate {
+    pass: Vec<UnitId>,
+    calls: std::rc::Rc<std::cell::RefCell<Vec<(UnitId, u16, bool)>>>,
+}
+
+impl crate::wiring::action::QuestObjectHost<crate::wiring::action::tests::TestPending> for Gate {
+    fn run(
+        &mut self,
+        _: &mut crate::game::Game,
+        _: &mut crate::wiring::action::View<'_, crate::wiring::action::tests::TestPending>,
+        _: crate::wiring::action::QuestObjectCall,
+    ) -> Option<crate::wiring::action::ObjectRoute> {
+        None
+    }
+    fn npc_wants_interact(
+        &mut self,
+        game: &mut crate::game::Game,
+        v: &mut crate::wiring::action::View<'_, crate::wiring::action::tests::TestPending>,
+        player: UnitId,
+        npc: UnitId,
+        class: u16,
+        interact: bool,
+    ) -> bool {
+        self.calls.borrow_mut().push((player, class, interact));
+        if !self.pass.contains(&player) {
+            return false;
+        }
+        let guid = game.lists.unit(npc).expect("npc").guid;
+        let mut m = vec![0x8A, 1];
+        m.extend_from_slice(&guid.to_le_bytes());
+        v.h.x.sent.push((player, m));
+        true
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+}
+
+/// [`fx`] with monster class 0 an `interact` NPC (monstats flag bit 9).
+fn fx_interact() -> Fx {
+    let mut fx = fx();
+    Arc::make_mut(&mut fx.sim.hooks().tables).combat.monstats[0].interact = true;
+    fx
+}
+
+// The interact gate (`world/quests.md` §6.4, `ai.md` §5.3 scan 2): an
+// `interact` NPC takes the first player within 15 for whom the quest
+// active test is true; each true call sends 0x8A; none: the NPC itself.
+// Covers: specs/monsters/ai.md §5.3; specs/world/quests.md §6.4
+#[test]
+fn an_interact_npc_takes_the_first_player_the_quest_test_passes() {
+    use crate::monsters::ai::seams::AiTargets;
+    // A player at distance 10 passing the test: taken, one 8A.
+    let mut fx = fx_interact();
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 20, 10);
+    let (first, second) = two_players(&mut fx, m, 10, 3);
+    let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    fx.sim.sys.hooks.quest_host = Some(Box::new(Gate {
+        pass: vec![first],
+        calls: calls.clone(),
+    }));
+    let guid = fx.game.lists.unit(m).unwrap().guid;
+    let mut want = vec![0x8A, 1];
+    want.extend_from_slice(&guid.to_le_bytes());
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (first, false));
+    assert_eq!(*calls.borrow(), [(first, 0, true)]);
+    assert_eq!(fx.sim.hooks().x.sent, [(first, want.clone())]);
+    // Neither passes: the NPC itself, both tested in scan order, no 8A.
+    calls.borrow_mut().clear();
+    fx.sim.hooks().x.sent.clear();
+    fx.sim.sys.hooks.quest_host = Some(Box::new(Gate {
+        pass: Vec::new(),
+        calls: calls.clone(),
+    }));
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (m, false));
+    assert_eq!(*calls.borrow(), [(first, 0, true), (second, 0, true)]);
+    assert!(fx.sim.hooks().x.sent.is_empty());
+    // Both pass: the first in scan order is taken, 8A only to it (the
+    // nearer second one, distance 3, is never tested).
+    calls.borrow_mut().clear();
+    fx.sim.sys.hooks.quest_host = Some(Box::new(Gate {
+        pass: vec![first, second],
+        calls: calls.clone(),
+    }));
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (first, false));
+    assert_eq!(*calls.borrow(), [(first, 0, true)]);
+    assert_eq!(fx.sim.hooks().x.sent, [(first, want)]);
+    // Only the second passes: taken, "close" (distance 3 < 4).
+    calls.borrow_mut().clear();
+    fx.sim.hooks().x.sent.clear();
+    fx.sim.sys.hooks.quest_host = Some(Box::new(Gate {
+        pass: vec![second],
+        calls: calls.clone(),
+    }));
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (second, true));
+    assert_eq!(fx.sim.hooks().x.sent.len(), 1);
+    // No lent quest control: the test is false, the NPC itself.
+    fx.sim.sys.hooks.quest_host = None;
+    let got = fx.sim.with(&mut fx.game, |g, v| v.nearest_player(g, m));
+    assert_eq!(got, (m, false));
 }

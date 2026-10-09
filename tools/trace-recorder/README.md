@@ -13,9 +13,10 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_rng.py` | Recomputes every recorded event from its own seed-before with `d2rng.py`; exit 1 on any mismatch |
 | `convert_rng.py` | Splits a raw file into seed chains and writes chosen chains as `traces/sim/rng/sim-NNNN.json` |
 | `d2rng.py` | The RNG rule from the spec (step and the five helpers), used by the two above |
+| `x86emu.py` | A small 32-bit x86 interpreter (integer moves, ALU ops, `mul`, `jcc`, `push` / `pop`; exact status flags, undefined ones tracked): `record_rng.py --emulate` runs the instructions under a breakpoint with it instead of single-stepping them; `--selftest`. Spec: `specs/tools/rng-trace.md` §4 r7 |
 | `rng_owners.py` | Owner post-pass of a `record_rng.py --frames` file: `game`, `unit T:G` or `other:…` on every draw and seed write (`specs/tools/rng-trace.md` §2); `--selftest` |
 | `rng_diff.py` | Compares a 1.14d and a d2rs (`d2-client state-dump --rng`) RNG recording: per frame, per owner, draw by draw; first divergence, next N, the game seed's draws in order, per-owner summary; exit 0/1/2/3 as `state_diff.py`; `--selftest`. Spec: `specs/tools/rng-trace.md` |
-| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; `--ticks N` ends after tick N's flush; writes `traces/raw/<time>-packets.jsonl` (gitignored; format `packets-raw-1`). Specs: `specs/sim/intents-events.md`, `specs/tools/packets-trace.md` |
+| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; `--ticks N` ends after tick N's flush; writes `traces/raw/<time>-packets.jsonl` (gitignored; format `packets-raw-1`). Specs: `specs/sim/intents-events.md`, `specs/tools/packets-trace.md`; `--poke` (`poke.py`) and `--send` (`send.py`: scripted C→S messages) |
 | `packets_diff.py` | Compares a 1.14d packets recording with a d2rs one (`d2-client state-dump --packets`): per frame the C→S, S→C and flushed-buffer streams record by record (id, size, bytes; `scenario-masks.tsv` masks; transport rows excluded); first divergence with context, next N, summary; exit 0/1/2/3; `--selftest`. Spec: `specs/tools/packets-trace.md` |
 | `path_tables.py` | Checks `specs/sim/path-tables.tsv` against the reference `Game.exe` file image (no process); `--write` regenerates it, `--perturb N` must report row N, `--selftest` perturbs every row. Spec: `specs/sim/pathing.md` |
 | `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
@@ -23,15 +24,21 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_tick.py` | Replays a tick recording through a model of those specs: must predict every timer run and reproduce every snapshot; `--perturb-ex N`, `--perturb-snap N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors |
 | `record_stats.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick and step hooks only): logs every base write, attach, detach, free, dynamic toggle, by-time refresh, state toggle, expiry and value-change callback on server stat lists, the regeneration entry points, and snapshots of the players' and monsters' list trees; writes `traces/raw/<time>-stats.jsonl` (gitignored). Specs: `specs/sim/stats.md`, `specs/sim/stat-lists.md` |
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
-| `record_state.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick entry hook only, plus the tick return `0x0052FD1E`): after every server tick (or every N-th) writes the game seed and every server unit (type, GUID, class, mode, position, fraction, target, direction, animation frame / count / speed, unit seed, act, level id, life / mana / stamina and base stats) to `traces/raw/<time>-state.jsonl` (gitignored; format `state-1`); `--selftest` checks the reader on a synthetic game (exact records, every source byte perturbed). Spec: `specs/tools/state-snapshot.md` |
+| `record_state.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick entry hook only, plus the tick return `0x0052FD1E`): after every server tick (or every N-th) writes the game seed and every server unit (type, GUID, class, mode, position, fraction, target, direction, animation frame / count / speed, unit seed, act, level id, life / mana / stamina and base stats) to `traces/raw/<time>-state.jsonl` (gitignored; format `state-1`); `--selftest` checks the reader on a synthetic game (exact records, every source byte perturbed). Spec: `specs/tools/state-snapshot.md`; `--poke` (`poke.py`) and `--send` (`send.py`: scripted C→S messages) |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
-| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation), the stability count and the front-end mode. `--front-end --front-end-script SCRIPT`: no game start; every `EndScene` call is a frame (any caller: menu `0x4F9A67`, loading `0x4567D4`, in game `0x44CB4F`; numbered `present`, no tick, no game state unless in game), D2Win cel files named through `0x4FA9B0`; SCRIPT is autostart's input script with `shot NAME [change|0xRET]` (capture the next presented frame with its draw log as scene NAME; `change`: the next frame from another caller, e.g. the loading screen), mouse and keys as X input under Wine (`--x-input`). Spec: `specs/render/capture.md` (§2a) |
+| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation), the stability count and the front-end mode. `--front-end --front-end-script SCRIPT`: no game start; every `EndScene` call is a frame (any caller: menu `0x4F9A67`, loading `0x4567D4`, in game `0x44CB4F`; numbered `present`, no tick, no game state unless in game), D2Win cel files named through `0x4FA9B0`; SCRIPT is autostart's input script with `shot NAME [change|0xRET]` (capture the next presented frame with its draw log as scene NAME; `change`: the next frame from another caller, e.g. the loading screen), mouse and keys as X input under Wine (`--x-input`). Spec: `specs/render/capture.md` (§2a); `--poke` (`poke.py`) and `--send` (`send.py`: scripted C→S messages) |
 | `facts_join.py` | Turns one `record_packets.py` raw file (`packets-raw-1`) into message facts (`join-facts-1`): every C→S message the client sent and every S→C message queued, with frame, id, size, caller and bytes, from the start through `--frames N` (default 2: the join) or a later window (`--from F --frames 0`, `--skip` ids), into `facts/join/<name>.tsv` (or `--out-dir`) with the command and the run in the header. q-prov-recording |
 | `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--shot NAME` picks a `--front-end` shot (game keys `-`, `tick` `?`); `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
+| `record_objanim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): every call of the animation re-init `0x00624390` on an object (client or server) with seed, mode, frame and speed before / after and the caller addresses on the stack, the client object init `0x004BC720` and 0x0E mode change `0x004BCF60`; `--steps` the generic step `0x004BCBB0` (mode changes, wraps), `--range` the interact range test `0x00623660` (result) and the C→S 0x13 object case `0x00548B00`; format `objanim-raw-1`; `--selftest`. Specs: `world/objects.md` §4, §7, `world/objects-client.md` §25 |
+| `objanim_facts.py` | Turns `record_objanim.py` recordings into `facts/objects/*.tsv` (measurements only); `--selftest` |
 | `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame), `--forms FILE` (call forms, `CALL_FORMS`); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
+| `send.py` | Scripted C→S messages (`specs/tools/scenario-diff.md` §2 `at … send`, §3 rule 12): `--send "F NAME FIELD=VALUE..."` / `--send "F hex BYTES..."` (absolute frame F; typed messages of `specs/sim/client-messages.tsv` encoded as `specs/tools/scenario.md` §3 rule 2, references `@player`, `@x±N`, `@y±N`, `@T[:C][#n]` read from the live unit lists) injected by `specs/tools/original-hooks.md` §1 rule 4: at the first stop of the drain call `0x0044F136` after tick F − 1 (frame from the tick return `0x0052FD1E`), the bytes on a scratch page and a call of the transport send `0x0052AE50` on the stopped thread, EAX checked, context restored; a `{"k":"send",...}` record per message. `SendLayer` / `add_options` for `record_state.py`, `record_packets.py`, `record_frames.py`; `--encode NAME FIELD=VALUE...`; `--selftest` |
+| `record_anim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): per client unit update (`0x00480810`) the player / monster mode, frame +0x44, frame count +0x48, speed +0x4C, event +0x4E, footstep stamp +0x84, path position and motion record (flags, ticks left, ox / oy / oz); every footstep call (`0x004CAF60`) and leap start (`0x004C8670`); `--arm-level N` arms the hooks only in level N; writes `traces/raw/<time>-anim.jsonl` (format `anim-raw-1`). Specs: `client/model.md` §5, `render/unit-composite.md` §8, `audio/triggers.md` §5 |
+| `anim_facts.py` | Turns one `record_anim.py` recording into `facts/client/anim/<name>.tsv` (format `anim-facts-1`): the chosen units' update, footstep and leap rows; `--selftest` |
+| `panel_text.py` | Reads the text one `record_frames.py` frame draws (glyph `CelDrawColor` draws grouped by pen y, Latin glyph frame = character) into `facts/client/ui/<name>.tsv` (format `panel-text-1`); `--selftest` |
 
 ## Use
 
@@ -44,13 +51,29 @@ py tools/trace-recorder/convert_rng.py traces/raw/<file>.jsonl --chain 3 --limit
 
 `record_rng.py` options: `--seconds N` (default 30; the game is killed
 then), `--no-inline` (helpers and setters only: fast, but misses most
-draws), `--max-events N`, `--out FILE`, `--game PATH`, then Game.exe
+draws), `--skip-inline drlg|LO-HI,…`, `--emulate on|off|check` (default
+on; below), `--max-events N`, `--out FILE`, `--game PATH`, then Game.exe
 arguments after `--` (default `-w -ns`). The script refuses any
 `Game.exe` whose SHA-256 is not the reference 1.14d one
 (`traces/reference-install.toml`). It never writes to `game/`.
 
 The game is always terminated when the script ends: time limit, Ctrl+C,
 an exception (`finally`), or the debugger process dying (kill-on-exit).
+
+## One game at a time
+
+Only one 1.14d `Game.exe` may run on a machine. Every recorder starts the
+game through `record_rng.CreateProcessW`, which first takes the named mutex
+`Local\d2rs-original-game-1.14d` and holds it until the Python process
+exits. Several sessions or worktrees on one PC therefore queue: the second
+prints `another 1.14d run holds the game lock; waiting`. With the lock
+held, it also waits until no `Game.exe` is running, in case a game was
+started by hand or by an older copy of these tools. The wait gives up
+after one hour. It also follows the file rule in `docs/handoff/pc1-data.md`:
+it creates `%TEMP%\d2-game.lock` exclusively, waits while another holder
+has it, and deletes it at exit. A lock file older than 15 minutes with no
+`Game.exe` running is treated as left behind and removed. `D2_GAME_LOCK=0`
+turns all of it off.
 
 ## How it hooks the RNG
 
@@ -76,9 +99,26 @@ state of the same seed.
 While any thread single-steps, all other threads are suspended, so no
 thread can run through a breakpoint that is temporarily removed.
 
-Cost: every inline draw is about six debug events. With all hooks the
-game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
-`--no-inline` is near full speed.
+Cost: single-stepped, every inline draw is about seven debug events.
+With all hooks single-stepped the game runs far slower (entering Act 1
+takes over 40 s instead of ~2 s); `--no-inline` is near full speed.
+
+Emulation (`--emulate on`, the default since 0.3.0;
+`specs/tools/rng-trace.md` §4 r7): at a breakpoint `x86emu.py` runs, on
+the stopped thread's registers, what the single steps would run: an
+inline site's whole trace from the `mov` to the add/adc pair (one debug
+event per draw), and the one instruction under a helper, setter, tick or
+return breakpoint (no step-over). It commits registers, eip, status
+flags and memory writes only when every instruction was decoded, no
+other breakpoint lies on the path and every flag is defined; otherwise
+the thread is single-stepped as before (footer counts `emu:inline`,
+`emu:one`, `emu:fallback_*`; the first fall-backs are notes). Return
+breakpoints stay armed after their call returns, and Game.exe's `.text`
+is read once per page. `--emulate check` single-steps everything and
+compares each emulated result with the real one (`emu_check:*_ok` /
+`_diff`); `--emulate off` is the 0.2.0 recorder. Only `record_rng.py`'s
+own runs emulate: subclasses (`record_packets.py`) and probes keep
+single steps.
 
 ### Frames and owners (`--frames`, version 0.2.0)
 
@@ -95,11 +135,23 @@ every record and, on helper / setter records, an owner hint (`game_seed`
 or `unit` "T:G" when seed address − 0x20 is a server unit); after the run
 `rng_owners.py` adds `owner` to every record. `--ticks N` stops at the
 entry of tick N + 1. `--skip-inline drlg` (or `LO-HI,…`) leaves the
-DRLG inline sites unhooked (faster; those draws are missing). The run
-prints its speed. Measured under Wine (2026-10-09, `ScnAma`, seed 1234,
-all 846 inline sites): arrival at 58 s, 40 ticks recorded by 63 s;
-16,152 records, 103,471 debug events (1,643/s). Details and the
-comparison: `specs/tools/rng-trace.md`.
+DRLG inline sites unhooked (faster; those draws are missing, but they
+are always `other:drlg` and never compared, so `rng_diff.py` keeps a
+MATCH; the `rng` channel of `scenario_diff.py` uses it). The run prints
+its speed. Measured under Wine (2026-10-09, `ScnAma`, seed 1234, 40
+ticks, `D2_AUTO_AFTER=0`):
+
+| Run | Wall | Level reached | Records | Debug events |
+|---|---|---|---|---|
+| `--emulate off`, all 846 sites (0.2.0) | 70.5 s | 63.2 s | 16,142 | 103,419 |
+| `--emulate off --skip-inline drlg` | 21.5 s | 14.3 s | 5,068 | 24,697 |
+| `--emulate on`, all sites | 22.2 s | 17.2 s | 16,152 | 18,393 |
+| `--emulate on --skip-inline drlg` (the channel) | 11.1 s | 7.2 s | 5,068 | 7,289 |
+
+`rng_diff.py` between the first and the last: MATCH, every game and unit
+draw and every tick record identical (`specs/tools/rng-trace.md` Open
+questions 3); `--emulate check` on all sites: 13,081 inline traces and
+5,168 single instructions equal to the single-stepped result, 0 diffs.
 
 ## Raw format (`rng-raw-1`, JSON lines)
 
@@ -188,14 +240,14 @@ recording after S seconds, default 120), `goto TYPE CLASS[,CLASS…] [S
 [DX DY]]` (walk toward the nearest unit of set S `0x7A5E70` with that
 type and class by clicking toward it, wait until the player stands
 still, click it at its draw point + (DX, DY), default (0, −8); screen
-position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (log the
+position from `render/camera.md` §2–§4), `dumpdrlg [LABEL]` (with LABEL `rooms<id>` it also lists that level's DRLG rooms: tile rect, type, lvlprest index, preset units; log the
 client act's DRLG and level list, `drlg/levels.md` §1 offsets: act no,
 init seed, DRLG seed, `dwStartSeed`, tombs, jungle bit, per level id,
 DRLG type, flags, rooms, rect, level type, seed, jungle fields, warp
 centre count), `end` (stops the recording; the game is killed as
 always). Every log line also goes to the recorder's footer notes.
-Arrival takes about 6.3 s after launch (about 23 s with `record_rng.py`
-inline hooks).
+Arrival takes about 6.3 s after launch (about 11 s with `record_rng.py
+--skip-inline drlg` and its default emulation).
 
 Frame-anchored steps (the shared input form of
 `specs/tools/scenario-diff.md` §2 rule 4, which d2rs `state-dump --input`
@@ -394,6 +446,21 @@ entry), `footer`. A list dump: `L`, `ext`, `fl`, `st`, `ex`, `ot`, `og`,
 extended lists `last`, `setl`, `ow`, `F` (full), `m` (mod keys), `cb`,
 `sb` (state bits).
 
+## record_walk.py: the local player's client path against the server's
+
+`record_walk.py` (0.1.0, raw format `walk-raw-1`) reuses `record_tick.py`'s
+debugger with two hooks only, the server tick `0x52D870` and the in-game
+draw entry `0x44C990` (`render/capture.md` §2), and logs the client player
+(`0x7A6A70`) and the server player (game unit hash, same GUID): path
+16.16 position, mode, path target, index and count, at every tick start
+(`t`) and every draw entry (`fr`), the unit / path pointers when they
+change (`units`), and the camera globals `0x7A520C` / `0x7A5208` /
+`0x7A5214` at the first tick and the first draw entry (`cam0`). Fast under
+Wine (about 1,700 ticks in 4 minutes). `convert_walk.py RAW --id ID --out
+traces/client/model/ID.json` writes the committed trace (area `client`,
+behavior `model`: the camera records and the tick states where either
+path changed, with tick / frame difference counts). `--selftest` checks
+the readers.
 ## record_state.py: game-state snapshots
 
 ```

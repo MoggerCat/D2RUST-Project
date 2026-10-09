@@ -1,0 +1,164 @@
+# Act I objectives for tools/playthrough/playthrough.py (spec:
+# specs/tools/playthrough.md). Crude: pokes (warp, spawn, pos, stat) jump
+# between milestones instead of walking; each milestone is its own
+# state-dump run. Ids from the 1.14d tables (levels.txt rows, monstats
+# rows, objects.txt rows): Blood Moor 2, Cold Plains 3, Stony Field 4,
+# Den of Evil 8, Burial Grounds 17, Tower Cellar 5 = 25, Barracks 28,
+# Catacombs 4 = 37, Tristram 38, Lut Gholein 40; Akara 148, Kashya 150,
+# Charsi 154, Gheed 147, Warriv 155, Zombie 5, Andariel 156,
+# Blood Raven 267, Griswold 365, The Smith 402, Countess base class 45;
+# waypoint object 119, cairn stones 17-22.
+# Quests (specs/world/quests.md §1.9; done = bit 0 of the slot): Den of
+# Evil slot 1 (Akara msg 76 with 1.1), Andariel slot 6 (Warriv msg 183
+# with 6.1), Act I completed slot 7 (Warriv's travel to Lut Gholein with
+# 6.0). The three quest milestones need an NPC talk, which the headless
+# input cannot do yet (no hover pick, playthrough.md Open question 3):
+# expected blockers with the quest bit clear.
+playthrough 1
+act 1
+
+save ama --name PtAma --class ama --expansion
+save sor --name PtSor --class sor --expansion --level 30 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=1
+save den --name PtDen --class ama --expansion --quests 1.1
+save andy --name PtAndy --class sor --expansion --level 30 --waypoints all --quests 6.1
+save east --name PtEast --class sor --expansion --level 30 --waypoints all --quests 6.0
+
+milestone town-start
+  use ama
+  deadline 40
+  note Akara (148) is left out: her tent is outside the start's active rooms (unverified on 1.14d)
+  need player lv == 1
+  need unit ut 1 cl 150 present
+  need unit ut 1 cl 154 present
+  need unit ut 1 cl 147 present
+  need unit ut 1 cl 155 present
+
+milestone town-walk
+  use ama
+  deadline 60
+  input frame 10; click 600 300
+  need player lv == 1
+  need player moved >= 5
+  need player m == 5
+
+milestone blood-moor
+  use ama
+  deadline 80
+  poke 5 warp 2
+  need player lv == 2
+  need unit ut 1 lv 2 count >= 3
+
+milestone kill-zombie
+  use sor
+  deadline 150
+  poke 5 warp 2
+  poke 30 spawn 5 @x+3 @y normal
+  input frame 40; rclick 450 300
+  need unit ut 1 g @p1 dead
+
+milestone den-of-evil
+  use ama
+  deadline 80
+  poke 5 warp 8
+  need player lv == 8
+  need unit ut 1 lv 8 count >= 5
+
+milestone den-of-evil-done
+  use den
+  deadline 1000
+  sweep 20 2 100 20
+  find ut 1 cl 148
+  poke +2 pos @1:148 @x+3 @y
+  input frame +10; click 448 324
+  note save with 1.1 (Den cleared, reward pending); talking to Akara (msg 76) sets 1.0. The click at Akara (player x+3) walks: no hover pick
+  need quest 1 1 set
+  need ever quest 1 0 set
+
+milestone cold-plains-wp
+  use ama
+  deadline 80
+  poke 5 warp 3
+  need player lv == 3
+  need unit ut 2 cl 119 lv 3 present
+
+milestone burial-grounds
+  use sor
+  deadline 1000
+  poke 5 warp 17
+  sweep 20 2 400 40
+  need ever player lv == 17
+  need unit ut 1 cl 267 lv 17 seen
+
+milestone stony-field-cairn
+  use ama
+  deadline 1000
+  poke 5 warp 4
+  sweep 20 2 400 40
+  need ever player lv == 4
+  need unit ut 2 cl 17,18,19,20,21 lv 4 seen
+
+milestone tristram
+  use sor
+  deadline 1000
+  poke 5 warp 38
+  sweep 20 2 400 40
+  need ever player lv == 38
+  need unit ut 1 cl 365 lv 38 seen
+
+milestone countess
+  use sor
+  deadline 1000
+  poke 5 warp 25
+  sweep 20 2 300 30 grid
+  need ever player lv == 25
+  need unit ut 1 cl 45 lv 25 seen
+
+milestone smith
+  use sor
+  deadline 80
+  poke 5 warp 28
+  need player lv == 28
+  need unit ut 1 cl 402 present
+
+milestone andariel-present
+  use sor
+  deadline 80
+  poke 5 warp 37
+  need player lv == 37
+  need unit ut 1 cl 156 present
+
+milestone andariel-killed
+  use sor
+  deadline 200
+  poke 5 warp 37
+  poke 30 pos @1:156 @x+3 @y
+  poke 30 stat @1:156 6 0 256
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  note the headless right click walks instead of casting (spec Open question 2): a Fire Bolt missile poke
+  need ever unit ut 1 cl 156 killed
+
+milestone andariel-done
+  use andy
+  deadline 200
+  poke 5 pos @1:155 @x+3 @y
+  input frame 10; click 448 324
+  note save with 6.1 (Andariel dead, reward pending); talking to Warriv (msg 183) sets 6.0. The click at Warriv walks: no hover pick
+  need unit ut 1 cl 155 present
+  need ever quest 6 0 set
+
+milestone act2-open
+  use east
+  deadline 300
+  poke 5 pos @1:155 @x+3 @y
+  input frame 10; click 448 324
+  note save with 6.0; Warriv's travel ("Go east", world/npc.md §8.3) moves the player to Lut Gholein (40) and sets 7.0, 7.13. Needs the NPC menu: not reachable headless yet
+  need ever player act == 1
+  need ever player lv == 40
+  need ever quest 7 0 set
+
+milestone to-act2
+  use sor
+  deadline 100
+  poke 5 warp 40
+  need player lv == 40
+  need player act == 1

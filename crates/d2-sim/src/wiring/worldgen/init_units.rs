@@ -185,7 +185,11 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
             .unwrap_or([0; 16])
     }
 
+    /// `0x005543B0`: the unit's state-105 list
+    /// ([`crate::wiring::action::View::set_alignment`]),
+    /// then the host's copy.
     fn set_alignment(&mut self, unit: UnitId, alignment: u8) {
+        self.v.set_alignment(self.game, unit, alignment);
         self.v.h.x.set_alignment(unit, alignment);
     }
 
@@ -207,6 +211,10 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
 
     fn quest_chain(&mut self, unit: UnitId, chain: u32) {
         self.v.h.x.monster_quest_chain(unit, chain);
+    }
+
+    fn quest_preset_boss(&mut self, unit: UnitId) {
+        self.v.h.x.quest_preset_boss(unit);
     }
 
     /// `0x0058F030(game, boss, boss GUID, 1, 1, 0)`.

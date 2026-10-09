@@ -5,8 +5,11 @@
   from the file image (2026-10-08, REC-117); entry 2 (Town Portal) is
   `world/objects-2.md` §27, entry 7 (cube) `world/cube.md` §1, entry 3
   (potions) §3.1 (2026-10-09, checked against the recording
-  `facts/items/a1-town-potions-low.tsv`). The
-  other entries' bodies are not covered (open question 1). No recording.
+  `facts/items/a1-town-potions-low.tsv`; implemented in `d2-sim`
+  `wiring/inventory/potion.rs`, the d2rs replay matches the recorded
+  0xA8 → 0xA9 gaps, hp1 170 and mp1 51 frames, and the full-life 0xA9,
+  2026-10-09, REC-102). The other entries' bodies are not covered (open
+  question 1).
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::items::moves` (item use seam)
 - **Related specs:** `items/inventory-moves.md` §7.11 (0x20), §7.17
@@ -19,20 +22,20 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 38–46 |
-| Inputs | 47–66 |
-| Outputs / state changes | 67–72 |
-| Rules | 73–74 |
-|   1. Dispatcher `0x005BF240(ECX game, EDX U; I, T, x, y)` (`ret 0x10`) | 75–97 |
-|   2. Failure reset `0x005BE1C0` (U in EBX) | 98–106 |
-|   3. Use table (`0x00741790`, read from the image) | 107–190 |
-|   4. Town Portal (entry 2) | 191–202 |
-| Constants & data dependencies | 203–209 |
-| Randomness | 210–213 |
-| Edge cases & original bugs | 214–226 |
-| Test vectors | 227–236 |
-| Provenance | 237–250 |
-| Open questions | 251–257 |
+| Summary | 41–49 |
+| Inputs | 50–69 |
+| Outputs / state changes | 70–75 |
+| Rules | 76–77 |
+|   1. Dispatcher `0x005BF240(ECX game, EDX U; I, T, x, y)` (`ret 0x10`) | 78–100 |
+|   2. Failure reset `0x005BE1C0` (U in EBX) | 101–109 |
+|   3. Use table (`0x00741790`, read from the image) | 110–205 |
+|   4. Town Portal (entry 2) | 206–217 |
+| Constants & data dependencies | 218–224 |
+| Randomness | 225–228 |
+| Edge cases & original bugs | 229–241 |
+| Test vectors | 242–251 |
+| Provenance | 252–265 |
+| Open questions | 266–272 |
 <!-- /index -->
 
 ## Summary
@@ -145,10 +148,22 @@ calc is evaluated by `0x00627C20(U, I, calc)` (`data/calc-expressions.md`).
      stat ids: no factor, no draw.
    - v <<= the stat's `itemstatcost` byte +0x18 (`ValShift`); v ≤ 0 →
      next k (not counted as used).
-   - Stat 6 or 74 and U a player: v := `0x005C6870`(game, U, v) (a
-     Blood Golem share: only when U's type-3 pet is class 0x122;
-     otherwise v unchanged; the share path `0x005C5F10` is not read,
-     PROVISIONAL REC-680). Stat 6 also marks "fraction update".
+   - Stat 6 or 74 and U a player: v := **golem share** `0x005C6870`
+     (ECX game, EDX U, v; `ret 4`; settled 2026-10-09, was REC-680):
+     G := U's first type-3 pet (`0x00574EC0(game, U, 3, 0)`); no G, G
+     not a monster (type ≠ 1) or class ≠ 290 (`bloodgolem`) → v
+     unchanged. v ≠ 0: M := monstats row 290 (`0x00451F80`, record
+     0x1A8); M's `Skill1` (+0x170, i16) < 0 → v unchanged; p := that
+     skill's `Param6` (+0x15C, `0x004F4110`; 1.14d BloodGolem = 25);
+     x := (p · v) / 100 (32-bit signed, toward zero); v −= Heal(G, x)
+     (`0x005C5F10`, `combat/events.md` §1 "Heal": G's life += x up to its
+     max, returns what was applied; x ≤ 0 → 0). So G takes p % of the
+     whole potion amount at once (in the same 8.8 units as v, after
+     the ValShift), only what fits its missing life, and U gets the
+     rest (over the list's duration for stat 74). v = 0 → G's life :=
+     its max (`0x00625D10`), v stays 0 (unreachable here: v ≤ 0 skips
+     above). The same call is in entries 4 and 5 (`0x005BE8E4`,
+     `0x005BEC10`). Stat 6 also marks "fraction update".
    - L ≤ 0 (`rvs` / `rvl`, no state): cur := U's stat; if the stat's
      `maxstat` (+0x32) is a valid id and cur + v > that max: v := max −
      cur. Add stat += v (`0x006272B0`).

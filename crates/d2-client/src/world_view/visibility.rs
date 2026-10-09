@@ -17,9 +17,11 @@
 //!
 //! The rule arithmetic is `rules::unit_visibility`.
 //!
-//! PROVISIONAL (REC-286): before the first drawn frame (no camera yet) the
-//! origin and `shiftX` are read as 0, the zero-initialised globals
-//! `0x007A520C` / `0x007A5208` / `0x007A5214`; and the direction is the
+//! Before the first drawn frame (no camera yet) the origin and `shiftX`
+//! are 0: the globals `0x007A520C` / `0x007A5208` / `0x007A5214` read 0
+//! at the first server tick and at the first in-game draw entry
+//! (measured, REC-286 (1): `traces/client/model/client-0001.json`,
+//! `record_walk.py`). PROVISIONAL (REC-286 (2)): the direction is the
 //! preview facing the view draws with (`UnitArt::dir64`, itself
 //! PROVISIONAL REC-51), as the model holds no client path record.
 //!
@@ -55,7 +57,8 @@ impl ViewVisibility {
     /// `visible(U, a, b)` (§13 rules 1–5); W × H is the d2rs frame.
     pub fn visible(&self, unit: &ClientUnit, a: i32, b: i32) -> bool {
         let camera = *self.camera.read().unwrap_or_else(|e| e.into_inner());
-        // PROVISIONAL (REC-286): no frame drawn yet → zeroed globals.
+        // No frame drawn yet → the globals read 0 (measured, REC-286 (1),
+        // `traces/client/model/client-0001.json`).
         let (origin, shift_x) =
             camera.map_or(((0, 0), 0), |c| ((c.unit.x, c.unit.y), c.view.shift_x));
         let art = self.art.read().unwrap_or_else(|e| e.into_inner());

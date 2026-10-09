@@ -20,6 +20,12 @@ f - 1, after that stop's snapshot, so the snapshot of frame f is the first
 with its effect; each result is a `{"k":"poke","f",...}` line between the
 two snapshots (state_diff.py skips the kind). `--poke-file` as poke.py.
 
+Sends (`send.py`, specs/tools/original-hooks.md §1 rule 4): `--send "<f>
+<Name> <field>=<value>..."` / `--send "<f> hex <bytes>"` (repeatable) inject
+C->S messages at the first stop of the drain call 0x0044F136 after the
+tick-return stop of frame f - 1 (after its snapshot and pokes); each result is
+a `{"k":"send",...}` line before the snapshot of frame f.
+
 The game process is always terminated when this script ends (time limit,
 Ctrl+C, any error, and kill-on-exit if the debugger dies).
 
@@ -39,8 +45,9 @@ import time
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import autostart  # noqa: E402  (unattended start, input script; imports on any OS)
 import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
+import send  # noqa: E402  (--send: C->S message injection, specs/tools/original-hooks.md §1 rule 4)
 
-TOOL = "trace-recorder record_state 0.1.0"
+TOOL = "trace-recorder record_state 0.3.0"
 FORMAT = "state-1"
 SIDE = "orig"
 
@@ -59,6 +66,20 @@ BUCKETS = 128
 U_TYPE, U_CLASS, U_GUID, U_MODE, U_ACT, U_SEED, U_PATH = 0x00, 0x04, 0x0C, 0x10, 0x18, 0x20, 0x2C
 U_CUR, U_FC, U_SPEED, U_LIST, U_HASH_NEXT = 0x44, 0x48, 0x4C, 0x5C, 0xE4
 UNIT_BYTES = 0xE8         # one read covers every field above
+# owner links (state-snapshot.md §2 `own`: units.md §2, monsters/ai.md §3.1,
+# skills/bodies.md §6.20, items/inventory.md §1.1)
+U_DATA, U_MIS_OWNER, U_FLAGS2 = 0x14, 0x98, 0xC8
+MIS_OWNED = 0x400         # unit +0xC8 bit: the missile has an owner at +0x98
+MD_CONTROL, CTL_GAME, CTL_OWNER = 0x28, 0x28, 0x2C   # monster data -> AI control
+ID_INV, INV_OWNER = 0x5C, 0x08                       # item data -> inventory -> owner unit
+NO_OWNER = 0xFFFFFFFF
+# item data (items/bitstream.md Inputs: quality +0x00, item seed +0x04, start seed +0x10, flags
+# +0x18, file index +0x28, item level +0x2C, auto affix +0x36, magic prefixes +0x38, suffixes
+# +0x3E; rare prefix / suffix +0x32 / +0x34: D2MOO's D2ItemDataStrc, unconfirmed until a
+# check shows them equal on both sides)
+ID_QUALITY, ID_SEED, ID_START, ID_FLAGS, ID_FILE, ID_ILVL = 0x00, 0x04, 0x10, 0x18, 0x28, 0x2C
+ID_RARE_P, ID_RARE_S, ID_AUTO, ID_PREF, ID_SUFF = 0x32, 0x34, 0x36, 0x38, 0x3E
+ID_BYTES = 0x48
 # paths (path-placement.md §2.1-§2.3)
 DYNAMIC, STATIC = (0, 1, 3), (2, 4, 5)
 DP_XF, DP_X, DP_YF, DP_Y, DP_TX, DP_TY, DP_ROOM, DP_DIR = 0x00, 0x02, 0x04, 0x06, 0x10, 0x12, 0x1C, 0x64
@@ -76,10 +97,12 @@ WALK_LIMIT = 100000       # per list: a longer chain is a broken link
 
 FULL_STATS = (("hp", 6), ("hpx", 7), ("mp", 8), ("mpx", 9), ("st", 10), ("stx", 11))
 BASE_STATS = (("str", 0), ("ene", 1), ("dex", 2), ("vit", 3), ("lvl", 12))
-# state-snapshot.md §2 table order, `own` excluded (no 1.14d source)
+# state-snapshot.md §2 table order
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp", "s",
-          "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl"]
-GAPS = ["own: no 1.14d address in a spec (pc1-data.md Step 4 item 21)"]
+          "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl",
+          "own", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is"]
+ITEM_KEYS = ("iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is")
+GAPS = []
 
 
 # --- the snapshot reader (pure: takes read(addr, n) -> bytes) ----------------
@@ -175,6 +198,9 @@ class StateReader:
             lv = self.level_of(room)
             if lv is not None:
                 self.put(rec, ua, "lv", lv[0], *lv[1])
+        self.owner(rec, ua, ut, g32)
+        if ut == 4:
+            self.item(rec, ua, g32)
         sl = g32(U_LIST)
         if sl:
             h = self.read(sl, SL_PLAIN_BYTES)
@@ -187,6 +213,10 @@ class StateReader:
                 for key, stat in BASE_STATS:
                     self.put(rec, ua, key, vals.get((stat, 0), 0), *([(where[(stat, 0)], 4)]
                                                                       if (stat, 0) in where else []))
+                if ut == 4:   # the item's stat list: every base entry, [stat, layer, value]
+                    ents = sorted(vals)
+                    self.put(rec, ua, "is", [[st, ly, vals[(st, ly)]] for st, ly in ents],
+                             *[(where[k], 4) for k in ents])
             # the full array exists only on an extended list (stat-lists.md §1, flag §2)
             if flags & EXTENDED:
                 fptr, fcount = struct.unpack("<Ih", self.read(sl + SL_FULL, 6))
@@ -200,6 +230,53 @@ class StateReader:
             else:
                 self.note("hp..stx absent: unit +0x5C list is not extended")
         return rec
+
+    def item(self, rec, ua, g32):
+        """The item data keys (`iq` … `ss`; state-snapshot.md §2): quality, flags, file
+        index, item level, the affix ids, the item seed and the start seed."""
+        data = g32(U_DATA)
+        if not data:
+            return
+        d = self.read(data, ID_BYTES)
+        u32 = lambda o: struct.unpack_from("<I", d, o)[0]  # noqa: E731
+        u16 = lambda o: struct.unpack_from("<H", d, o)[0]  # noqa: E731
+        a = (ua + U_DATA, 4)
+        self.put(rec, ua, "iq", u32(ID_QUALITY), a, (data + ID_QUALITY, 4))
+        self.put(rec, ua, "if", u32(ID_FLAGS), a, (data + ID_FLAGS, 4))
+        self.put(rec, ua, "fi", struct.unpack_from("<i", d, ID_FILE)[0], a, (data + ID_FILE, 4))
+        self.put(rec, ua, "il", u32(ID_ILVL), a, (data + ID_ILVL, 4))
+        self.put(rec, ua, "aa", u16(ID_AUTO), a, (data + ID_AUTO, 2))
+        self.put(rec, ua, "pf", [u16(ID_PREF + 2 * i) for i in range(3)], a, (data + ID_PREF, 6))
+        self.put(rec, ua, "sf", [u16(ID_SUFF + 2 * i) for i in range(3)], a, (data + ID_SUFF, 6))
+        self.put(rec, ua, "rp", u16(ID_RARE_P), a, (data + ID_RARE_P, 2))
+        self.put(rec, ua, "rs", u16(ID_RARE_S), a, (data + ID_RARE_S, 2))
+        self.put(rec, ua, "ik", [u32(ID_SEED), u32(ID_SEED + 4)], a, (data + ID_SEED, 8))
+        self.put(rec, ua, "ss", u32(ID_START), a, (data + ID_START, 4))
+
+    def owner(self, rec, ua, ut, g32):
+        """`own` (state-snapshot.md §2): a monster's AI-control owner, a
+        missile's owner, an item's inventory owner; absent otherwise."""
+        try:
+            if ut == 1:
+                data = g32(U_DATA)
+                ctl = self.u32(data + MD_CONTROL) if data else 0
+                if ctl and self.u32(ctl + CTL_GAME):
+                    o = self.u32(ctl + CTL_OWNER)
+                    if o != NO_OWNER:
+                        self.put(rec, ua, "own", o, (ua + U_DATA, 4), (data + MD_CONTROL, 4),
+                                 (ctl + CTL_OWNER, 4))
+            elif ut == 3:
+                if g32(U_FLAGS2) & MIS_OWNED:
+                    self.put(rec, ua, "own", g32(U_MIS_OWNER), (ua + U_MIS_OWNER, 4))
+            elif ut == 4:
+                data = g32(U_DATA)
+                inv = self.u32(data + ID_INV) if data else 0
+                ou = self.u32(inv + INV_OWNER) if inv else 0
+                if ou:
+                    self.put(rec, ua, "own", self.u32(ou + U_GUID), (ua + U_DATA, 4),
+                             (data + ID_INV, 4), (inv + INV_OWNER, 4), (ou + U_GUID, 4))
+        except OSError:
+            self.note("own absent: unreadable owner link")
 
     def units_of(self, game):
         """[(type of the list, unit address)] in walk order: 5 hash tables, then tiles."""
@@ -369,6 +446,18 @@ def build_world():
             for i, (s, layer, v) in enumerate(sorted(full, key=lambda e: (e[0] << 16) | e[1])):
                 m.put(fptr + 8 * i, "<HHi", layer, s, v)
 
+    def item_data(a, q, seed, start, flags, fi, il, rp, rs, aa, pf, sf):
+        m.put(a + ID_QUALITY, "<I", q)
+        m.put(a + ID_SEED, "<II", *seed)
+        m.put(a + ID_START, "<I", start)
+        m.put(a + ID_FLAGS, "<I", flags)
+        m.put(a + ID_FILE, "<i", fi)
+        m.put(a + ID_ILVL, "<I", il)
+        m.put(a + ID_RARE_P, "<HH", rp, rs)
+        m.put(a + ID_AUTO, "<H", aa)
+        m.put(a + ID_PREF, "<HHH", *pf)
+        m.put(a + ID_SUFF, "<HHH", *sf)
+
     def link(head_addr, *units):
         m.put(head_addr, "<I", units[0])
         for a, b in zip(units, units[1:]):
@@ -393,6 +482,13 @@ def build_world():
     unit(M2, 1, 4, 5, 12, 0, (5, 6), (-1, 0, -3))
     dyn(M2, 0x341000, 1, 5901, 2, 5701, 3, 4, rooms[2], 60)          # level absent (R3)
     link(hb(1, 3), M1, M2)                                           # M2: no stat list
+    # M1: a pet of GUID 77 (AI control with a game); M2: a released pack (owner -1)
+    m.put(M1 + U_DATA, "<I", 0x333000)
+    m.put(0x333000 + MD_CONTROL, "<I", 0x334000)
+    m.put(0x334000 + CTL_GAME, "<II", game, 77)
+    m.put(M2 + U_DATA, "<I", 0x343000)
+    m.put(0x343000 + MD_CONTROL, "<I", 0x344000)
+    m.put(0x344000 + CTL_GAME, "<II", game, NO_OWNER)
     # object: static path in R1
     O = 0x350000
     unit(O, 2, 3, 2, 0, 0, (7, 8), (0, 0, 0))
@@ -412,11 +508,20 @@ def build_world():
     unit(I2, 4, 11, 26, 0, 0, (11, 12), (0, 0, 0))
     stat(I2, 0x372000, EXTENDED, [(0, 0, 3)], [(7, 0, 9)])
     link(hb(4, 0), I1, I2)
+    # I2 sits in the player's inventory; I1 (ground) has item data but no inventory
+    m.put(I2 + U_DATA, "<I", 0x373000)
+    m.put(0x373000 + ID_INV, "<I", 0x374000)
+    m.put(0x374000 + INV_OWNER, "<I", P)
+    m.put(I1 + U_DATA, "<I", 0x365000)
+    item_data(0x365000, 5, (0x1111, 0x2222), 0x77, 0x10, -1, 33, 0x101, 0x102, 7, (1, 2, 3), (4, 5, 6))
+    item_data(0x373000, 4, (0x3333, 0x4444), 0x88, 0x800010, 12, 60, 0x201, 0x202, 3, (9, 0, 0), (0, 8, 0))
     # missile: dynamic path in R1
     X = 0x380000
     unit(X, 3, 2, 10, 0, 0, (13, 14), (2, 3, 128))
     dyn(X, 0x381000, 0x10, 5820, 0x20, 5620, 5900, 5700, rooms[0], 63)
     link(hb(3, 64), X)
+    m.put(X + U_FLAGS2, "<I", MIS_OWNED)                             # owned missile of GUID 1
+    m.put(X + U_MIS_OWNER, "<I", 1)
     # tile list: one tile, static path in R2
     T = 0x390000
     unit(T, 5, 1, 0, 0, 0, (15, 16), (0, 0, 0))
@@ -436,18 +541,22 @@ EXPECTED = [
     {"ut": 1, "g": 4, "cl": 5, "m": 12, "x": 5901, "y": 5701, "xf": 1, "yf": 2, "tx": 3, "ty": 4,
      "d": 60, "fr": -1, "fc": 0, "sp": -3, "s": [5, 6], "act": 0},
     {"ut": 1, "g": 9, "cl": 5, "m": 2, "x": 5900, "y": 5700, "xf": 0, "yf": 0xFFFF, "tx": 0, "ty": 0,
-     "d": 7, "fr": 0, "fc": 3328, "sp": 256, "s": [3, 4], "act": 0, "lv": 2, "str": 0, "ene": 0,
-     "dex": 0, "vit": 0, "lvl": 2, "hp": 768, "hpx": 0, "mp": 0, "mpx": 0, "st": 0, "stx": 0},
+     "d": 7, "fr": 0, "fc": 3328, "sp": 256, "s": [3, 4], "act": 0, "lv": 2, "own": 77, "str": 0,
+     "ene": 0, "dex": 0, "vit": 0, "lvl": 2, "hp": 768, "hpx": 0, "mp": 0, "mpx": 0, "st": 0,
+     "stx": 0},
     {"ut": 2, "g": 3, "cl": 2, "m": 0, "x": 5850, "y": 5650, "d": 2, "fr": 0, "fc": 0, "sp": 0,
      "s": [7, 8], "act": 0, "lv": 2, "str": 0, "ene": 0, "dex": 0, "vit": 1, "lvl": 0},
     {"ut": 3, "g": 2, "cl": 10, "m": 0, "x": 5820, "y": 5620, "xf": 0x10, "yf": 0x20, "tx": 5900,
-     "ty": 5700, "d": 63, "fr": 2, "fc": 3, "sp": 128, "s": [13, 14], "act": 0, "lv": 2},
+     "ty": 5700, "d": 63, "fr": 2, "fc": 3, "sp": 128, "s": [13, 14], "act": 0, "lv": 2, "own": 1},
     {"ut": 4, "g": 11, "cl": 26, "m": 0, "fr": 0, "fc": 0, "sp": 0, "s": [11, 12], "act": 0,
-     "str": 3, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 9, "mp": 0, "mpx": 0, "st": 0,
-     "stx": 0},
+     "own": 1, "str": 3, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 9, "mp": 0, "mpx": 0, "st": 0,
+     "stx": 0, "iq": 4, "if": 0x800010, "fi": 12, "il": 60, "aa": 3, "pf": [9, 0, 0],
+     "sf": [0, 8, 0], "rp": 0x201, "rs": 0x202, "ik": [0x3333, 0x4444], "ss": 0x88, "is": [[0, 0, 3]]},
     {"ut": 4, "g": 12, "cl": 25, "m": 3, "x": 5801, "y": 5601, "d": 0, "fr": 0, "fc": 0, "sp": 0,
      "s": [9, 10], "act": 0, "str": 0, "ene": 0, "dex": 0, "vit": 0, "lvl": 0, "hp": 0, "hpx": 0,
-     "mp": 0, "mpx": 0, "st": 0, "stx": 0},
+     "mp": 0, "mpx": 0, "st": 0, "stx": 0, "iq": 5, "if": 0x10, "fi": -1, "il": 33, "aa": 7,
+     "pf": [1, 2, 3], "sf": [4, 5, 6], "rp": 0x101, "rs": 0x102, "ik": [0x1111, 0x2222], "ss": 0x77,
+     "is": []},
     {"ut": 5, "g": 1, "cl": 0, "m": 0, "x": 5750, "y": 5550, "d": 0, "fr": 0, "fc": 0, "sp": 0,
      "s": [15, 16], "act": 0, "lv": 1},
 ]
@@ -482,6 +591,13 @@ def selftest():
             flip = TYPE_FLIP[old]
         elif tu:  # a high type byte: no unit type 0-5, so the position fields go too
             want = want | {(tu[0], k) for k in POS_KEYS if k in base[tu[0]]}
+        if tu and "own" in base[tu[0]]:  # the owner link read depends on the unit type
+            want = want | {(tu[0], "own")}
+        if tu:  # the item keys exist only for unit type 4
+            want = want | {(tu[0], k) for k in ITEM_KEYS if k in base[tu[0]]}
+        if tu and a == tu[0] + U_TYPE and flip == 4 and struct.unpack(
+                "<I", m.read(tu[0] + U_LIST, 4))[0]:
+            want = want | {(tu[0], "is")}   # a unit that becomes an item reads its stat list too
         m.b[a] = flip
         s2, a2 = StateReader(m.read).snapshot(game)
         m.b[a] = old
@@ -523,7 +639,13 @@ def selftest_poke_options(ap):
     layer = poke.PokeLayer.from_args(a)
     assert [(s.f, s.d) for s in layer.abs] == [(4, "spawn"), (4, "seed-unit")]
     assert poke.PokeLayer.from_args(ap.parse_args([])) is None
-    print("selftest ok: --poke lines make a poke layer")
+    a = ap.parse_args(["--send", "7 InteractWithEntity type=1 id=@1:148", "--send",
+                       "8 hex 2f 00 00 00 00 09 00 00 00"])
+    sends = send.SendLayer.from_args(a)
+    assert [(s.f, s.text()) for s in sends.steps] == [
+        (7, "InteractWithEntity type=1 id=@1:148"), (8, "hex 2f 00 00 00 00 09 00 00 00")]
+    assert send.SendLayer.from_args(ap.parse_args([])) is None
+    print("selftest ok: --poke lines make a poke layer, --send lines a send layer")
 
 
 # --- main ---------------------------------------------------------------------
@@ -542,12 +664,14 @@ def main():
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
     poke.add_options(ap)
+    send.add_options(ap)
     a = ap.parse_args()
     if a.selftest:
         selftest()
         selftest_poke_options(ap)
         return
     layer = poke.PokeLayer.from_args(a)
+    sends = send.SendLayer.from_args(a)
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     out = a.out or os.path.join(
@@ -562,6 +686,8 @@ def main():
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
+    if sends:
+        sends.attach(r)  # frame from 0x0052FD1E; injection at the next 0x0044F136 stop
     try:
         r.run()
     except KeyboardInterrupt:
@@ -575,6 +701,7 @@ def main():
                   + (f" ({x['note']})" if x.get("note") else ""))
         if layer.pending():
             print(f"note: {len(layer.pending())} poke(s) not reached")
+    send.print_results(sends)
     for k, v in r.reader_notes.items():
         print(f"note: {k} ({v} units)")
     print(f"wrote {out}: {r.snaps} snapshots, {r.ticks} ticks")

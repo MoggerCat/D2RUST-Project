@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–245 |
-|   2. Think dispatch `0x005B1740` | 246–382 |
-|   3. AI control and AI tables | 383–554 |
-|   4. AI parameters | 555–573 |
-|   5. Target selection | 574–732 |
-|   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–942 |
-|   8. AI commands and minions | 943–967 |
-|   10. The catalogue `ai-functions.tsv` | 968–988 |
-| Constants & data dependencies | 989–1012 |
-| Randomness | 1013–1034 |
-| Edge cases & original bugs | 1035–1076 |
-| Test vectors | 1077–1165 |
-| Provenance | 1166–1222 |
-| Open questions | 1223–1326 |
+|   1. Think scheduling | 97–247 |
+|   2. Think dispatch `0x005B1740` | 248–384 |
+|   3. AI control and AI tables | 385–556 |
+|   4. AI parameters | 557–575 |
+|   5. Target selection | 576–734 |
+|   6. Distances and line tests | 735–749 |
+|   7. Tactics helpers | 750–984 |
+|   8. AI commands and minions | 985–1011 |
+|   10. The catalogue `ai-functions.tsv` | 1012–1032 |
+| Constants & data dependencies | 1033–1056 |
+| Randomness | 1057–1078 |
+| Edge cases & original bugs | 1079–1120 |
+| Test vectors | 1121–1209 |
+| Provenance | 1210–1266 |
+| Open questions | 1267–1370 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
@@ -811,7 +813,7 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
-| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). PROVISIONAL: what the mode request does with a target equal to U's own position (§7.5 path compute, unread for this case); settled by REC-665 | none |
+| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). A target equal to U's own position: §7.5 rule 8 (no points, neutral at once, think at f + `aidel`; settles REC-665) | none |
 | `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
 | `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 
@@ -939,6 +941,46 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    `sim/pathing.md` §9.5 rule 3). "Stop the path" (§1.2 table, the NPC
    interaction at `0x00548B95`, AI bodies) is `0x00648730`:
    `sim/pathing.md` §13.1 rule 3.
+8. **Zero-length walk** (settles REC-665; 1.14d-read 2026-10-09,
+   `0x005DE4E0`, `0x005A7C20`, `0x005A6290`, `0x00649970`, `0x005A7520`,
+   `0x005A73E0`). A mode-2 request whose point is U's own cell (§7.2
+   walk-in-radius with k = 0 or t on U: the point is built from
+   `0x006488C0` / `0x00648900`, the same sub-tile the compute starts
+   from) runs rules 2–5 in full: target := the point, target unit none,
+   budget := 20, the velocity request consumed, step counts := n (5
+   unless the request gave steps), stop distance := 0 (path step count
+   1). Compute type 13: start = target → no path function, index :=
+   count := 0, flag 0x20 := 0 (`sim/pathing.md` §3 steps 5, 11–12).
+   Type 13 retries: U queued, U flags |= 1, set type 15, compute again
+   (same exit), c := 15. So the path is left at **type 15** (flags of
+   type 15) with 0 points; P +0x14 := −1 (no target unit); counters
+   game +0x1D70 + 4·15 and +0x1DB4 each += 1. The WL start
+   `0x005A7520` sees 0 points and returns 0 (`sim/units.md` §4.6 rule
+   5): current skill := none (`0x00620210(U, 0)`), neutral start
+   `0x005A73E0`: set mode 1 (a monster already in mode 1 is not
+   re-queued by the set itself), and when U has no type-2 timer
+   expiring after f, think at f + `aidel` (f + 45 with state 21,
+   §1.3). Mode 1 has no schedule flag, so nothing else is scheduled;
+   the unit never enters walk and no event 0 / mode end (§1.4) runs.
+   Message: the compute's flags |= 1 makes the update pass send the
+   neutral mode message (`sim/intents-events.md` §7.4: S→C 0x67, code
+   7, at U's cell) to each client of U's rooms; no 0x68. Draws: none
+   (the point, the request, both computes and the neutral start draw
+   nothing). Next think: f + `aidel` (15 for the Act 1 classes of the
+   recordings) unless the AI body schedules or deletes thinks itself.
+   ```
+   point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x67 code 7
+   ```
+9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
+   after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
+   the m ≠ 3 branch, `0x005A4F50(U, m)` with m = the requested mode
+   (record +0x00, kept at [ebp − 4]) rewrites U's base `tohit`,
+   `mindamage`, `maxdamage` and element stats for m
+   (`skills/bodies-2.md` §2.1), then umod mode 0 (`0x005A4350` at
+   `0x005A7D42`) and the start function. Every non-GH request (also
+   one whose start then fails, and the creation mode) runs it; a
+   monster's melee to-hit and damage are those of its last such
+   request (`combat/damage.md` §10, checked by a 1.14d recording).
 
 ### 8. AI commands and minions
 
@@ -956,7 +998,9 @@ last). Param 0 is the command type.
 | `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
 | `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
-| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
+| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0: 0 when control +0x28 is 0; else the unit of type +0x30, GUID +0x2C (`0x00552F60`) |
+| `0x0058F030(game, unit, GUID, type, a, b)` | — (set owner data) | monsters only: b ≠ 0 → `0x005DD230(control, 2, 1)`; a ≠ 0 → `0x005DD230(control, 1, 1)`; then control +0x2C := GUID, +0x30 := type, +0x28 := game (this is what makes `0x0058F0D0` answer). Party leaders get their own GUID (`population.md` §10.2.1), so `0x0058F0D0(leader)` = leader (`ai-bodies.md` §9.4 rule 6) |
+| `0x0058F100(game, leader, minion)` | — (add minion) | new 8-byte node {minion GUID (+0x0C, −1 for none), next}, pushed at the **head** of control +0x34, so the list runs newest first |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
 minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
