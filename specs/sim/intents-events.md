@@ -1189,7 +1189,18 @@ or the new room equals the client's room (client +0x1B4, the old room).
       `0x0053BDA0`: type u8@1, GUID u32@2; a missile, type 3, gets
       nothing).
    2. The client is removed from L's client list (`0x0061A700`); if L
-      has no client left: every monster in L gets `0x005738D0`.
+      has no client left (room +0x78 = 0): every monster (type 1) in L's
+      unit list (+0x74, next +0xE8) gets `0x005738D0`, which cancels its
+      type-2 (think) and type-3 events (`0x00540E60(2, 0)`, `(3, 0)`)
+      and schedules nothing (2026-10-09, re-read `0x0053A9B0`,
+      `0x005738D0`). Such a monster does not think again until a client
+      joins its room (rule 2.3: `0x00573780`, a think at f + 2). There
+      is no room-client test in the think path itself (`0x005A7F80`,
+      `0x005B1740`); this cancel is the only gate. Example: after a
+      same-act warp out of the Pandemonium Fortress at frame 6, its
+      NPCs' pending frame-24 think (idle 20 from the frame-4 home think,
+      `monsters/ai-bodies.md` §9.9) is cancelled, so their unit seeds do
+      not change (`traces/checks/a4-warp-plains-ama.check`).
    3. **S→C 0x08** (`0x0053BC90`, the only sender of 0x08, same layout
       as 0x07: L's tile x u16@1, tile y u16@3, level id u8@5).
    4. Then, if L is the client's room (the old room): the player update
