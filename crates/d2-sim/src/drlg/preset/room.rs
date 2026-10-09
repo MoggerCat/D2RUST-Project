@@ -224,21 +224,6 @@ impl Presets {
         Ok(grids)
     }
 
-    /// `0x0066BF30`: prepends a preset unit to the room's list (the warp
-    /// tile preset's add, `sim/path-placement.md` §12.1 rule 3).
-    pub fn add_unit_front(
-        &mut self,
-        room: DrlgRoomId,
-        unit: PresetUnit,
-    ) -> Result<(), PresetError> {
-        self.rooms
-            .get_mut(&room)
-            .ok_or(PresetError::NotPresetRoom(room))?
-            .units
-            .insert(0, unit);
-        Ok(())
-    }
-
     /// `0x0066D9E0` (§11): the door cell's preset unit. `wx`, `wy` are the
     /// cell's world tile, `cell` its packed value, `orientation` the
     /// right-door test input (with a record: record type = 9; without

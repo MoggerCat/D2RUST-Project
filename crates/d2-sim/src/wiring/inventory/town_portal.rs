@@ -6,13 +6,15 @@
 //! books row (`pSpell`, extra = `BookSkill`) or the items row (`pSpell`),
 //! the first / second use with item flag 0x4, and the failure reset (§2)
 //! with S→C 0x7C on a refused use. Entry 2 (Town Portal, §4) is the cast
-//! `0x005BE290` (`objects-2.md` §27.1) up to its town refusal; the pair
-//! itself is made by the action wiring (`ActionSim::open_town_portal`),
-//! which this desk cannot reach, so a cast that passes the refusal is
-//! recorded as a request ([`InvState::portal_requests`]) the host takes
-//! after the call. Its cost (the scroll's skill count and consumption,
-//! a tome's charge) is the caller's (`inventory-moves.md` §7.11 step 3,
-//! §7.18 step 9), paid only for a 1.
+//! `0x005BE290` (`objects-2.md` §27.1), run whole by the host that owns
+//! the objects and the path code ([`LifecycleHooks::town_portal_cast`]:
+//! the action wiring's `View::town_portal_cast`, with the pair made in
+//! the call). Without such a host the desk runs the cast up to its town
+//! refusal and records a cast that passes it as a request
+//! ([`InvState::portal_requests`](super::InvState::portal_requests)) for
+//! the host to take after the call. Its cost (the scroll's skill count
+//! and consumption, a tome's charge) is the caller's
+//! (`inventory-moves.md` §7.11 step 3, §7.18 step 9), paid only for a 1.
 //!
 //! Entry 3 (healing and mana potions) is the body of §3.1
 //! ([`InvDesk::use_entry3`]). The other entries keep their earlier
@@ -20,11 +22,13 @@
 //! identify (REC-113) on `use_item`, everything else on the rest
 //! (`items/use.md` open question 1: their bodies are unwritten).
 //!
-//! PROVISIONAL (REC-289): the cast's creation (§27.1 step 6) runs after
-//! the call, so a creation that fails still costs the use.
+//! PROVISIONAL (REC-289): on the request path (no cast host) the cast's
+//! creation (§27.1 step 6) runs after the call, so a creation that fails
+//! still costs the use.
 
 use super::{InvDesk, InvRest};
 use crate::items::moves::{iflag, layouts, ty, Guid, MovePending, MoveUnits, Owner};
+use crate::units::hooks::Sim;
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
 
@@ -96,7 +100,14 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         let f = self.item_flags(item);
         self.set_item_flags(item, f | ARMED);
         let r = match n {
-            entry::TOWN_PORTAL => self.cast_town_portal(player),
+            entry::TOWN_PORTAL => {
+                let (r, item_message) = self.cast_town_portal(player);
+                // §27.1 step 9: the cast's own S→C 0x7C for the item.
+                if item_message {
+                    self.send(player, layouts::item_used(Owner::ITEM, item));
+                }
+                r
+            }
             // §3.1: U drinks it, whatever the target.
             entry::POTION => self
                 .unit_of(player)
@@ -131,12 +142,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.rest.use_item(player, target, item)
     }
 
-    /// The cast `0x005BE290` (`objects-2.md` §27.1) up to its town
-    /// refusal (steps 1, 3, 4); the rest of it is requested (module doc).
-    fn cast_town_portal(&mut self, player: Owner) -> bool {
+    /// The cast `0x005BE290` (`objects-2.md` §27.1): true = 1, and whether
+    /// the cast's own S→C 0x7C for the item is due (step 9). On a cast
+    /// host ([`LifecycleHooks::town_portal_cast`]) the whole cast; else up
+    /// to its town refusal (steps 1, 3, 4), the rest requested (module
+    /// doc).
+    fn cast_town_portal(&mut self, player: Owner) -> (bool, bool) {
         let Some(p) = self.unit_of(player).filter(|_| player.is_player()) else {
-            return false;
+            return (false, false);
         };
+        if let Some((r, item_message)) = self.town_portal_cast_hook(p) {
+            return (r != 0, item_message);
+        }
         let level = self
             .econ
             .game
@@ -146,10 +163,24 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
             .and_then(|r| self.econ.hooks.room_level(self.econ.game, r));
         if self.in_town(player) || level == Some(LEVEL_FINALE) {
             let _ = crate::units::sound::queue_sound(self.econ.game, p, SOUND_NOT_IN_TOWN, Some(p));
-            return false;
+            return (false, false);
         }
         self.state.portal_requests.push(p);
-        true
+        (true, false)
+    }
+
+    /// The cast on the hooks with the call's units and game seed
+    /// ([`LifecycleHooks::town_portal_cast`]); `None`: no cast host.
+    fn town_portal_cast_hook(&mut self, player: UnitId) -> Option<(u32, bool)> {
+        let e = &mut *self.econ;
+        let mut sim = Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        e.hooks
+            .town_portal_cast(&mut sim, &mut e.fields.seed, player)
     }
 
     /// Failure reset `0x005BE1C0` (`items/use.md` §2): every item of the

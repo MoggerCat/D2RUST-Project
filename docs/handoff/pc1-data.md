@@ -188,6 +188,9 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 (prose / authored pseudocode, addresses); a code disagreement becomes a
 `q-fix-*` row.
 
+- [q-fix-act4-play] De Seis seal on a WingN1 game: open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1).
+- [q-fix-npc-menus] What closes ui 0x11 (UI_QUESTLOG, opened by the S→C quest-log tail `msg-ui.md` §1 r6) in 1.14d, and what does Esc do with it open? The flag table says Esc-closable 0, so d2rs's Esc closes it through the game-menu open and the next Esc restores it (keep = 1). Check on the Windows game: talk to Atma with a pending quest log, press Esc once.
+
 1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
    S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
    side `0x0045DC50` / `0x0045DB20`. `combat/vitals.md` §5.2/§5.4 and
@@ -459,6 +462,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   own seed between the allocation and frame 2: a spawn-wrapper step
   (flags 0, spread -1), the dummy init `0x005B...` (init 49 / 50) or a
   think; `monsters/init.md` §4 lists none.
+
+- [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
 
 ## How to check a behaviour in one command
 

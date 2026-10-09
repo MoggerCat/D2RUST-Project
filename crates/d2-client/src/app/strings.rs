@@ -4,7 +4,7 @@
 //! by id and by key, and bound as the world view's [`StringLookup`]
 //! (replacing [`crate::ui::NoStrings`]). Panels that take a closure
 //! (`Fn(u16) -> Vec<u16>`) use [`TableStrings::by_id`].
-// d2rs-own, unverified: the id → text map is built once at load (every
+// d2rs-own, unverified: the elements are decoded once at load (every
 // element of the three tables), not read per call as the original does.
 
 use std::collections::HashMap;
@@ -23,26 +23,38 @@ pub const LANG: &str = "eng";
 /// All string-table text, UTF-16 as the fonts take it.
 #[derive(Debug, Clone, Default)]
 pub struct TableStrings {
-    by_id: HashMap<u16, Vec<u16>>,
+    /// Every element of `string.tbl`, `patchstring.tbl` and
+    /// `expansionstring.tbl`, by element number (`None`: table not loaded).
+    base: Option<Vec<Vec<u16>>>,
+    patch: Option<Vec<Vec<u16>>>,
+    expansion: Option<Vec<Vec<u16>>>,
     by_key: HashMap<String, Vec<u16>>,
 }
 
-fn add(
-    t: &StringTable,
-    base: u32,
-    ids: &mut HashMap<u16, Vec<u16>>,
-    keys: &mut Vec<(Vec<u8>, Vec<u16>)>,
-) {
-    for n in 0..usize::from(t.header.num_elements) {
-        let Some(e) = t.element(n) else { continue };
-        let text = d2_data::strings::decode_utf8_units(&e.value);
-        if let Ok(id) = u16::try_from(base + n as u32) {
-            ids.insert(id, text.clone());
-        }
-        if !e.key.is_empty() {
-            keys.push((e.key.clone(), text));
-        }
-    }
+fn elements(t: &StringTable, keys: &mut Vec<(Vec<u8>, Vec<u16>)>) -> Vec<Vec<u16>> {
+    (0..usize::from(t.header.num_elements))
+        .map(|n| {
+            let Some(e) = t.element(n) else {
+                return Vec::new();
+            };
+            let text = d2_data::strings::decode_utf8_units(&e.value);
+            if !e.key.is_empty() {
+                keys.push((e.key.clone(), text.clone()));
+            }
+            text
+        })
+        .collect()
+}
+
+/// Element `n` of a table (`ui/text.md` §2 r2.4): a number past the
+/// table's end reads element 500.
+fn element_of(t: &[Vec<u16>], n: u32) -> Option<&[u16]> {
+    let n = if n as usize >= t.len() {
+        500
+    } else {
+        n as usize
+    };
+    t.get(n).map(Vec::as_slice)
 }
 
 impl TableStrings {
@@ -59,29 +71,50 @@ impl TableStrings {
     /// Every element of `t`. A key found in several tables resolves in the
     /// order of `StringTables::id`: patch, then expansion, then base.
     pub fn from_tables(t: &StringTables) -> Self {
-        let mut by_id = HashMap::new();
         let mut keys = Vec::new();
-        // Lowest priority first, later inserts win.
-        for (table, base) in [
-            (&t.base, 0),
-            (&t.expansion, EXPANSION_BASE),
-            (&t.patch, PATCH_BASE),
-        ] {
-            if let Some(table) = table {
-                add(table, base, &mut by_id, &mut keys);
-            }
-        }
+        // Lowest key priority first, later inserts win.
+        let base = t.base.as_ref().map(|t| elements(t, &mut keys));
+        let expansion = t.expansion.as_ref().map(|t| elements(t, &mut keys));
+        let patch = t.patch.as_ref().map(|t| elements(t, &mut keys));
         let by_key = keys
             .into_iter()
             .map(|(k, v)| (String::from_utf8_lossy(&k).into_owned(), v))
             .collect();
-        TableStrings { by_id, by_key }
+        TableStrings {
+            base,
+            patch,
+            expansion,
+            by_key,
+        }
+    }
+
+    /// `D2Lang_GetStringByIndex` (`0x00524A30`, `ui/text.md` §2 r2): id ≥
+    /// 20,000 reads `expansionstring.tbl` element `id − 20,000` when it is
+    /// loaded, else the id becomes 11,078 and goes on; id ≥ 10,000 reads
+    /// `patchstring.tbl` element `id − 10,000` when loaded; else element
+    /// `id` of `string.tbl`.
+    fn lookup(&self, id: u32) -> Option<&[u16]> {
+        let mut id = id;
+        if id >= EXPANSION_BASE {
+            if let Some(t) = &self.expansion {
+                return element_of(t, id - EXPANSION_BASE);
+            }
+            id = 11_078;
+        }
+        if id >= PATCH_BASE {
+            if let Some(t) = &self.patch {
+                return element_of(t, id - PATCH_BASE);
+            }
+        }
+        element_of(self.base.as_ref()?, id)
     }
 
     /// The text of string id `id`, empty when absent (the closure form
     /// the HUD / NPC / message panels take).
     pub fn by_id(&self, id: u16) -> Vec<u16> {
-        self.by_id.get(&id).cloned().unwrap_or_default()
+        self.lookup(u32::from(id))
+            .map(<[u16]>::to_vec)
+            .unwrap_or_default()
     }
 }
 
@@ -91,7 +124,7 @@ impl StringLookup for TableStrings {
     }
 
     fn get_id(&self, id: u16) -> Option<&[u16]> {
-        self.by_id.get(&id).map(Vec::as_slice)
+        self.lookup(u32::from(id))
     }
 }
 
