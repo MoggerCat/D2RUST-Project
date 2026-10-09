@@ -229,6 +229,14 @@ what moved it.
    declared gaps; the Lut Gholein NPCs did not diverge either); rng
    differs only by the creation attribution of `q-fix-tool-rng-creation-draws`.
 
+6. `a3-warp-flayer-dungeon-ama` (Flayer Dungeon Level 1, `warp 88` from
+   Kurast Docks): state equal on all 160 frames (5 objects, a warp tile).
+7. `a5-warp-crystalized-ama` (Crystalized Cavern Level 1, `warp 113`
+   from Harrogath): every level-113 unit equal on all 160 frames (15
+   monsters, 14 objects); the check's first divergence is in Harrogath at
+   frame 2 (Larzuk 1:1 class 511 at 5145,5031 vs 5142,5029), area E's
+   `a5-harrogath-arrival-ama`.
+
 So the Den of Evil's and Cave Level 1's generation, presets and
 population are equal for all 160 frames outside town (every non-player
 unit of the dungeon level), the first divergence of both checks being
