@@ -353,7 +353,11 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         unit_type: &unit_type,
         sky: &d.frame.sky,
     };
-    let mut rows = draw_rows(&d.frame.items, &cx)?;
+    // §5 r12: the drawer calls without pixels join the items by key.
+    let mut all = d.frame.items.clone();
+    all.extend_from_slice(&d.frame.calls);
+    crate::scene::order(&mut all);
+    let mut rows = draw_rows(&all, &cx)?;
     add_cycle_rows(
         &mut rows,
         d.blank_screen,

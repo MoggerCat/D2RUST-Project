@@ -255,6 +255,14 @@ pub struct TileDraw {
     pub cell: (i32, i32),
 }
 
+impl TileDraw {
+    /// A drawer call that puts no pixel in the frame (empty clip): logged
+    /// in [`WorldFrame::calls`], never composed (`tools/facts-render.md` §5 r12).
+    pub fn is_call_only(&self) -> bool {
+        self.clip.width == 0 || self.clip.height == 0
+    }
+}
+
 /// The original-behavior questions of the world view, one hook per
 /// question; each method names the owner spec it follows.
 pub trait ViewRules {
@@ -454,6 +462,10 @@ pub struct WorldFrame {
     /// [`weather_view::is_sky_call_path`]; read by the facts export
     /// (`tools/facts-render.md` §5 r10), which writes one row per call.
     pub sky: Vec<crate::rules::draw_order::weather::SkyDraw>,
+    /// Tile drawer calls that put no pixel in the frame
+    /// ([`TileDraw::is_call_only`]), as items with an empty clip, sorted
+    /// by key; not composed. Read by the facts export (§5 r12).
+    pub calls: Vec<DrawItem>,
     /// The units' draw slots of the frame's draw order (`draw-order.md`
     /// §3 r4, §5, §10); `None` when no order was computed (no map feed).
     /// The layers drawn after the build (ground items) take their keys
@@ -523,6 +535,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     assets: &ViewAssets,
 ) -> Result<WorldFrame, ViewError> {
     let mut items = Vec::new();
+    let mut calls = Vec::new();
 
     for (index, t) in rules.tiles(world, assets)?.into_iter().enumerate() {
         let at = |error| ViewError::Tile {
@@ -539,7 +552,11 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             x: t.cell.0,
             y: t.cell.1,
         };
-        items.push(item);
+        if t.is_call_only() {
+            calls.push(item);
+        } else {
+            items.push(item);
+        }
     }
 
     let (mut units_drawn, mut units_hidden) = (0, 0);
@@ -591,6 +608,10 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_hidden,
         camera: None,
         sky: Vec::new(),
+        calls: {
+            scene::order(&mut calls);
+            calls
+        },
         slots: None,
     })
 }

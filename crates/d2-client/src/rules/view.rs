@@ -194,6 +194,11 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
     }
 
     /// The draw of one map tile, or `None` when culled (camera §6, §7).
+    /// A tile handed to its drawer that puts no pixel in the frame (a
+    /// floor or roof inside the §7 rectangle but wholly off-frame, a wall
+    /// whose every block the drawer culls) is a call without pixels: a
+    /// draw with an empty clip ([`TileDraw::is_call_only`]), kept for the
+    /// draw-call log (`tools/facts-render.md` §5 r12), never composed.
     pub fn tile(&self, tile: &MapTile, image: &IndexFrame) -> Result<Option<TileDraw>, ViewError> {
         if image.anchor != FrameAnchor::Top {
             return Err(unresolved(
@@ -211,15 +216,15 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
                 if !cam.floor_roof_visible(handed) {
                     return Ok(None);
                 }
-                frame
+                Some(frame)
             }
-            TileList::Wall => match self.wall_clip(tile, origin, frame)? {
-                Some(clip) => clip,
-                None => return Ok(None),
-            },
+            TileList::Wall => self.wall_clip(tile, origin, frame)?,
         };
-        let placed = placement::place(image, origin.0, origin.1, clip);
-        Ok(placed.clip.map(|clip| TileDraw {
+        let placed = placement::place(image, origin.0, origin.1, clip.unwrap_or(frame));
+        let clip = clip
+            .and(placed.clip)
+            .unwrap_or_else(|| Rect::new(placed.x, placed.y, 0, 0));
+        Ok(Some(TileDraw {
             frame: tile.frame.clone(),
             x: placed.x,
             y: placed.y,
@@ -248,7 +253,7 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
         let Some(whole) = self.tile(tile, image)? else {
             return Ok(Vec::new());
         };
-        if blocks.is_empty() {
+        if blocks.is_empty() || whole.is_call_only() {
             return Ok(vec![whole]);
         }
         let cam = &self.camera;
@@ -304,6 +309,13 @@ impl<'a, R: ?Sized, S: ?Sized> OriginalView<'a, R, S> {
                 blend: b.blend,
                 ..whole.clone()
             });
+        }
+        // The drawer is called whether or not a block lands in the frame:
+        // a tile whose every block draws nothing is one call without
+        // pixels (`tools/facts-render.md` §5 r12).
+        if out.is_empty() {
+            let clip = Rect::new(whole.x, whole.y, 0, 0);
+            out.push(TileDraw { clip, ..whole });
         }
         Ok(out)
     }

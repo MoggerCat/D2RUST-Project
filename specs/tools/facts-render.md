@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–133 |
 |   3. `frame.tsv` | 134–166 |
 |   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–253 |
-|   6. Comparison | 254–276 |
-|   7. Requests | 277–288 |
-| Constants & data dependencies | 289–292 |
-| Randomness | 293–296 |
-| Edge cases & original bugs | 297–304 |
-| Test vectors | 305–313 |
-| Provenance | 314–318 |
-| Open questions | 319–333 |
+|   5. d2rs export | 183–261 |
+|   6. Comparison | 262–284 |
+|   7. Requests | 285–296 |
+| Constants & data dependencies | 297–300 |
+| Randomness | 301–304 |
+| Edge cases & original bugs | 305–312 |
+| Test vectors | 313–321 |
+| Provenance | 322–326 |
+| Open questions | 327–341 |
 <!-- /index -->
 
 ## Summary
@@ -241,6 +241,14 @@ composition, through `d2-client` only (game logic untouched).
    `ui/control-panel.md` §4 and a hover-label box `0x005031C1`), so those
    rows are real divergences, not export gaps.
 
+12. A tile drawer call that puts no pixel in the frame is a row like any
+   other: a floor or roof that passes the whole-tile test of
+   `camera.md` §7 whose blocks all lie outside the frame (1.14d's
+   `a1-town-arrival-ama` log has floors handed at X = −80, a whole
+   off-frame column), and a wall whose drawer culls every block. d2rs
+   keeps such a tile as a draw with an empty clip
+   (`TileDraw::is_call_only`, `WorldFrame::calls`), never composed; the
+   export merges them with the items by draw key.
 11. `play --input SCRIPT` brings a d2rs scene where a 1.14d scene's
    `autostart.py --input` brought it: steps separated by `;`, `wait N`
    (N server ticks; autostart's `wait` counts seconds), `move X Y`,
