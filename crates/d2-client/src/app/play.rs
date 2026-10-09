@@ -543,6 +543,10 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     }
     let save_tables: std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync> =
         std::sync::Arc::new(live.save.clone());
+    // `d2s.md` §2.8: the server's saves rebuild the appearance bytes.
+    let appearance = Some(std::sync::Arc::new(
+        save::appearance_tables(&live.tables.fixed).map_err(anyhow::Error::msg)?,
+    ));
     let (mut link, started) = single_player::start_with(
         config.data,
         config.seed,
@@ -581,7 +585,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     .add_systems(Update, super::config::apply_settings);
     let (link, saver): (DynLink, Option<save::SaveHandle>) = match config.save_path {
         Some(path) => {
-            let (link, handle) = save::share(link, save_base, save_tables, path)?;
+            let (link, handle) = save::share(link, save_base, save_tables, appearance, path)?;
             (Box::new(link), Some(handle))
         }
         None => (Box::new(link), None),

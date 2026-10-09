@@ -422,6 +422,7 @@ impl EquipOutcome {
 pub fn equip_put<W: InvWorld + ?Sized>(
     inv: &mut Inventory,
     w: &mut W,
+    t: &InvTables,
     item: UnitId,
     loc: u8,
     flag: u32,
@@ -438,6 +439,9 @@ pub fn equip_put<W: InvWorld + ?Sized>(
         d.body_loc = loc;
     }
     if !swap {
+        // The weapon-in-use link `0x0063D1D0` (writes only +0x1C), then
+        // the stat link and refresh.
+        super::weapon::weapon_link(inv, w, t, item);
         w.stat_link(unit, item);
         w.stat_refresh(unit);
     }
@@ -494,7 +498,7 @@ pub fn equip_from_cursor<W: InvWorld + ?Sized>(
         w.weapon_in_use_update(unit);
     }
     // Step 5.
-    if !equip_put(inv, w, item, loc, cmd::EQUIP) {
+    if !equip_put(inv, w, t, item, loc, cmd::EQUIP) {
         return EquipOutcome::REFUSED;
     }
     EquipOutcome::OK
@@ -531,6 +535,7 @@ pub fn equip_without_cursor<W: InvWorld + ?Sized>(
     if let Some(d) = w.item_mut(item) {
         d.body_loc = loc;
     }
+    super::weapon::weapon_link(inv, w, t, item);
     w.stat_link(unit, item);
     inv.put_cursor(w, None);
     w.stat_refresh(unit);

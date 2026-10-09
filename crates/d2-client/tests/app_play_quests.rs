@@ -19,6 +19,7 @@ use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
+use d2_client::bridge::mirror::ScriptedNow;
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
@@ -200,6 +201,7 @@ fn files() -> MemorySource {
 
 fn step(app: &mut App, ms: &AtomicU32, n: usize) {
     for _ in 0..n {
+        app.insert_resource(ScriptedNow(ms.load(Ordering::SeqCst)));
         app.update();
         ms.fetch_add(40, Ordering::SeqCst);
     }

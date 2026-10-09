@@ -27,8 +27,11 @@ use bevy::app::AppExit;
 use bevy::prelude::{MessageWriter, Resource};
 use d2_formats::d2s::{self, Body, D2s, Header, SaveTables, StatEntry, Stats};
 
+use d2_formats::d2s::appearance::{AppearanceTables, IsA, ReferenceSlots};
+use d2_server::adapters::character::save::SaveContext;
 use d2_server::adapters::storage::CharacterStore;
 use d2_server::seams::ClientId;
+use d2_sim::units::UnitId;
 use d2_sim::wiring::worldgen::WorldSim;
 
 use super::server_thread::ThreadLink;
@@ -421,6 +424,45 @@ pub struct FileStore {
     pub path: PathBuf,
     pub base: D2s,
     pub tables: Arc<dyn SaveTables + Send + Sync>,
+    /// The appearance tables of the game's data ([`appearance_tables`]):
+    /// with them a save rebuilds +0x88..+0xA7 from the equipped items
+    /// (`d2s.md` §2.8); `None` (no tables): the loaded bytes stay.
+    pub appearance: Option<Arc<AppearanceTables>>,
+}
+
+/// The appearance tables of `fixed` with the image's reference table
+/// (`d2s-appearance.md` §1, `ReferenceSlots::game`).
+pub fn appearance_tables(fixed: &d2_data::fixup::FixedSet) -> Result<AppearanceTables, String> {
+    let eq = &fixed.itemtypes_equiv;
+    let m = IsA::from_fn(eq.n, |i, j| eq.get(i, j));
+    d2_server::world_data::tables::appearance_tables(fixed, &ReferenceSlots::game(&m))
+        .map_err(|e| e.to_string())
+}
+
+/// `d2s.md` §2.8 rules 1, 3 (the writer `0x00569AD0` → `0x0063D930` per
+/// equipped item): the appearance bytes of `player` from its items, its
+/// weapon class (`0x0064F380`) and the colour states it has.
+fn rebuild_appearance(sim: &mut Sim, player: UnitId, t: &AppearanceTables, save: &mut D2s) {
+    use d2_sim::wiring::action::Pending;
+    let weapon_class = sim.events.action.hooks().x.composit_weapon_class(player);
+    let states = t
+        .colours
+        .states
+        .iter()
+        .filter(|s| sim.events.action.sys.stats.has_state(player, s.state))
+        .map(|s| s.state)
+        .collect();
+    let ctx = SaveContext {
+        expansion: single_player::GAME_SETUP.expansion,
+        weapon_class,
+        states,
+    };
+    if let Ok(eq) = sim
+        .world
+        .save_equipment(&mut sim.game, &mut sim.events, player, &ctx)
+    {
+        save.header.rebuild_appearance(&eq, t);
+    }
 }
 
 /// Whether a save of `base` (a loaded file) with `live` would carry item
@@ -452,12 +494,11 @@ impl CharacterStore<WorldSim<LocalSeams>, World> for FileStore {
                 self.base.header.version
             ));
         }
-        write_file(
-            &self.path,
-            &apply_live(&self.base, &live, now_secs()),
-            &*self.tables,
-        )
-        .map_err(|e| e.to_string())
+        let mut save = apply_live(&self.base, &live, now_secs());
+        if let (Some(t), Some((player, _))) = (&self.appearance, single_player::local_player(sim)) {
+            rebuild_appearance(sim, player, t, &mut save);
+        }
+        write_file(&self.path, &save, &*self.tables).map_err(|e| e.to_string())
     }
 }
 
@@ -490,12 +531,14 @@ pub fn share<C: d2_server::seams::Clock + Send + 'static>(
     mut link: ThreadLink<Link<C>>,
     base: D2s,
     tables: Arc<dyn SaveTables + Send + Sync>,
+    appearance: Option<Arc<AppearanceTables>>,
     path: PathBuf,
 ) -> Result<(SharedLink<C>, SaveHandle), SaveError> {
     let store = FileStore {
         path: path.clone(),
         base,
         tables,
+        appearance,
     };
     link.with(move |l| l.host_mut().game.set_storage(Box::new(store)))
         .map_err(|e| SaveError::Server(e.to_string()))?;

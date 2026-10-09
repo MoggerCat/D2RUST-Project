@@ -118,6 +118,7 @@ fn handle(character: &Character, path: &std::path::Path) -> SaveHandle {
         link,
         save::base_save(character),
         Arc::new(Tables),
+        None,
         path.into(),
     )
     .unwrap();
@@ -298,6 +299,7 @@ fn waypoints_round_trip_through_the_save() {
         joined(character),
         synthetic_save(),
         Arc::new(Tables),
+        None,
         file.clone(),
     )
     .unwrap();

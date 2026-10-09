@@ -1346,6 +1346,7 @@ fn equip_from_cursor_steps() {
     assert!(equip_put(
         &mut h.inv,
         &mut h.w,
+        &h.t,
         r2,
         7,
         cmd::INDIRECT_SWAP_BODY
@@ -1647,3 +1648,42 @@ mod answer_tests;
 mod gap_tests;
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
+
+// Covers: specs/world/quests-act3-2.md §11.5 r1, §11.5 r2
+#[test]
+fn weapon_in_use_link_and_unlink() {
+    use super::weapon::{weapon_link, weapon_unlink};
+    let mut h = hands();
+    let at = |h: &mut Hands, id, r, loc| {
+        let u = h.equip(id, r, loc);
+        h.w.items.get_mut(&u).unwrap().body_loc = loc;
+        u
+    };
+    // r1: the first usable weapon in a hand becomes the weapon in use.
+    let a = at(&mut h, 20, R_SWORD, body::RIGHT_HAND);
+    weapon_link(&mut h.inv, &h.w, &h.t, a);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // A second one leaves it (the first wielded weapon stays).
+    let b = at(&mut h, 21, R_SWORD, body::LEFT_HAND);
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // Not a weapon: nothing.
+    let helm = at(&mut h, 22, R_HELM, body::HEAD);
+    weapon_link(&mut h.inv, &h.w, &h.t, helm);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // r2: taking the weapon in use off hands +0x1C to the other hand.
+    weapon_unlink(&mut h.inv, &h.w, &h.t, a);
+    assert_eq!(h.inv.weapon_guid, h.w.d(b).guid);
+    // r1: the weapon in use linked again → −1 (W is the item itself).
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+    // r1: a weapon that is not usable (unidentified) clears +0x1C when
+    // it held it, and never becomes the weapon in use.
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, h.w.d(b).guid);
+    h.w.items.get_mut(&b).unwrap().flags = 0;
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+}
