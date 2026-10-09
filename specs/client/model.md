@@ -52,7 +52,7 @@
 | Edge cases & original bugs | 1517–1541 |
 | Test vectors | 1542–1599 |
 | Provenance | 1600–1703 |
-| Open questions | 1704–1862 |
+| Open questions | 1704–1873 |
 <!-- /index -->
 
 ## Summary
