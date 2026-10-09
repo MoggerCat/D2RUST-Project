@@ -38,7 +38,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -388,6 +388,9 @@ def fam_item(ctx):
                            "S->C 0x9C bit streams item by item. Items: " +
                            ", ".join(f"{i}-{cd}" for i, cd, _ in chunk) + "."])
         c.extra = {"items": [(i, cd) for i, cd, _ in chunk]}
+        out.append(c)
+    return out
+
 
 def fam_netc2s(ctx):
     """C->S message types no recorded check carries (docs/handoff/packet-census.tsv,
@@ -479,7 +482,98 @@ def fam_itemq(ctx):
 
 
 
-FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s}
+def missile_sources(ledger):
+    """{lowercase Missiles.txt name: (ledger area, skill id or None)} from the
+    source column of the missile.* ledger areas: skills rows list their
+    Missiles.txt names and the skills.txt row that makes them; coverage rows
+    name one row. The first area wins for a row two areas name."""
+    out = {}
+    for area, src in load_ledger(ledger):
+        if not area.startswith("missile."):
+            continue
+        m = re.fullmatch(r"Missiles\.txt rows (.*) \(made by skills\.txt .* (\d+)\)", src)
+        if m:
+            for n in m.group(1).split(","):
+                out.setdefault(n.strip().lower(), (area, int(m.group(2))))
+            continue
+        m = re.fullmatch(r"missiles\.txt (.*) \(\d+\)", src)
+        if m:
+            out.setdefault(m.group(1).strip().lower(), (area, None))
+    return out
+
+
+def fam_missile(ctx):
+    """One check per Missiles.txt row a missile.* ledger area names: the
+    row's missile created by `poke missile` (the creator 0x0059FA30 on
+    1.14d, create_missile on d2rs) at the player, aimed at a cow 6 sub-tiles
+    away along +x, with the skill that makes it (level 20 for a character
+    class skill, 10 for any other: PROVISIONAL REC-1730, the level only
+    scales damage and counts); rows no skill makes carry no skill."""
+    t = excel(ctx.excel, "missiles.txt", ["Missile", "Id"])
+    sk = excel(ctx.excel, "skills.txt", ["skill", "Id", "charclass"])
+    cls = {int(sk.get(r, "Id")): sk.get(r, "charclass") for r in sk.rows}
+    src = missile_sources(ctx.ledger)
+    out = []
+    for r in t.rows:
+        name, mid = t.get(r, "Missile"), int(t.get(r, "Id"))
+        if name.lower() not in src:
+            continue
+        area, skill = src[name.lower()]
+        tail = ""
+        if skill is not None:
+            lvl = 20 if cls.get(skill) else 10
+            tail = f" skill {skill} {lvl}"
+        c = Check(
+            f"gen-missile-{mid}", "missile", f"missiles.txt Id {mid}",
+            f"missile {name} ({mid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
+            70, 300, "state rng packets",
+            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+6 @y normal",
+                  f"at 12 poke missile {mid} @x @y @x+6 @y{tail}"],
+            variant="blood-moor-empty",
+            comment=[f"Missiles.txt row {mid} ({name}) created by the poke at frame 12 at the "
+                     "player, aimed at a cow (class 179) 6 sub-tiles along +x spawned at "
+                     "frame 8, in the Blood Moor (variant blood-moor-empty: no other monster)"
+                     + (f"; skill {skill} at level {lvl}, as the row's maker (PROVISIONAL "
+                        "REC-1730)." if skill is not None else "; no skill (no skill makes it).")
+                     + " Compares the missile unit (class, mode, path, frames), what it hits, "
+                     "the seeds and the packets. `ignore q`: the quest-flag field is not written by d2rs yet "
+                     "(REC-1625) and would hide every other first difference."])
+        c.extra = {"missile": mid, "name": name, "area": area}
+        out.append(c)
+    return out
+
+
+def fam_state(ctx):
+    """One check per states.txt row 1.. : `poke state` on the player and on a
+    cow at frame 12, off at frame 24 (the toggle and its update-queue insert,
+    stat-lists.md section 9.2); the packets channel carries the set/end state
+    messages, the state channel the stats the toggle moves."""
+    t = excel(ctx.excel, "states.txt", ["state", "id"])
+    out = []
+    for r in t.rows:
+        name, sid = t.get(r, "state"), int(t.get(r, "id"))
+        if sid == 0 or not name:
+            continue
+        c = Check(
+            f"gen-state-{sid}", "state", f"states.txt id {sid}",
+            f"state {name} ({sid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
+            40, 300, "state packets",
+            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+4 @y normal",
+                  f"at 12 poke state @player {sid} on", f"at 12 poke state @1:179 {sid} on",
+                  f"at 24 poke state @player {sid} off", f"at 24 poke state @1:179 {sid} off"],
+            variant="blood-moor-empty",
+            comment=[f"States.txt row {sid} ({name}) set on the player and on a cow (class 179, "
+                     "Blood Moor, variant blood-moor-empty) at frame 12 and cleared at frame 24. "
+                     "Compares the set and end state messages and the stats the toggle moves. `ignore q`: "
+                     "the quest-flag field is not written by d2rs yet (REC-1625) and would hide "
+                     "every other first difference."])
+        c.extra = {"state": sid, "name": name}
+        out.append(c)
+    return out
+
+
+FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s,
+             "missile": fam_missile, "state": fam_state}
 
 
 # ----------------------------------------------------------- ledger join
@@ -530,6 +624,10 @@ def resolve_area(c, areas):
 
     elif f == "netc2s":
         pick = [a for a, _ in areas if a == f"net.c2s.0x{x['msg']:02x}"]
+    elif f == "missile":
+        pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
+    elif f == "state":
+        pick = [a for a, s in areas if a.startswith("state.") and f"({x['state']})" in s]
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"

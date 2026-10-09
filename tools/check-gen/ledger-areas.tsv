@@ -1297,3 +1297,484 @@ item.96-9mp	item base Crowbill (9mp, id 96)
 item.97-9wa	item base Naga (9wa, id 97)
 item.98-9la	item base Military Axe (9la, id 98)
 item.99-9ba	item base Bearded Axe  (9ba, id 99)
+missile.amplify-damage	Missiles.txt rows curseamplifydamage,cursecast (made by skills.txt Amplify Damage 66)
+missile.ancient-throwing-axe	missiles.txt ancient throwing axe (525)
+missile.andrialspray	Missiles.txt rows andarielspray (made by skills.txt AndrialSpray 164)
+missile.andypoisonbolt	Missiles.txt rows andypoisonbolt (made by skills.txt AndyPoisonBolt 201)
+missile.arcanetower	Missiles.txt rows lightningtowernova (made by skills.txt ArcaneTower 204)
+missile.arctic-blast	Missiles.txt rows arcticblast1,arcticblast2 (made by skills.txt Arctic Blast 230)
+missile.arcticblast1	missiles.txt arcticblast1 (459)
+missile.armageddon	Missiles.txt rows armageddoncontrol,armageddontail,armageddonrock (made by skills.txt Armageddon 249)
+missile.armageddoncontrol	missiles.txt armageddoncontrol (577)
+missile.attract	Missiles.txt rows curseattract,cursecast (made by skills.txt Attract 86)
+missile.baal-clone-teleport	Missiles.txt rows baalclonedeath,baalteleport (made by skills.txt Baal Clone Teleport 331)
+missile.baal-cold-missiles	Missiles.txt rows baal cold maker (made by skills.txt Baal Cold Missiles 318)
+missile.baal-inferno	Missiles.txt rows baal inferno (made by skills.txt Baal Inferno 317)
+missile.baal-monster-spawn	Missiles.txt rows baal spawn monsters (made by skills.txt Baal Monster Spawn 286)
+missile.baal-nova	Missiles.txt rows baal nova (made by skills.txt Baal Nova 316)
+missile.baal-taunt	Missiles.txt rows baal taunt control (made by skills.txt Baal Taunt 284)
+missile.baal-taunt-control	missiles.txt baal taunt control (546)
+missile.baal-teleport	Missiles.txt rows baalteleport (made by skills.txt Baal Teleport 329)
+missile.battle-command	Missiles.txt rows battlecommand (made by skills.txt Battle Command 155)
+missile.battle-cry	Missiles.txt rows battlecry (made by skills.txt Battle Cry 146)
+missile.battle-orders	Missiles.txt rows battleorders (made by skills.txt Battle Orders 149)
+missile.bighead1	missiles.txt bighead1 (2)
+missile.bighead2	missiles.txt bighead2 (3)
+missile.bighead3	missiles.txt bighead3 (4)
+missile.bighead4	missiles.txt bighead4 (5)
+missile.bighead5	missiles.txt bighead5 (6)
+missile.bighead6	missiles.txt bighead6 (647)
+missile.blade-creeper	missiles.txt blade creeper (392)
+missile.blade-fury	Missiles.txt rows bladefragment1,bladefragment2 (made by skills.txt Blade Fury 266)
+missile.blade-sentinel	Missiles.txt rows blade creeper (made by skills.txt Blade Sentinel 257)
+missile.blade-shield	Missiles.txt rows blade shield attachment (made by skills.txt Blade Shield 277)
+missile.blade-shield-attachment	missiles.txt blade shield attachment (553)
+missile.bladefragment1	missiles.txt bladefragment1 (506)
+missile.blades-of-ice	Missiles.txt rows bladesoficecubes,bladesoficeexplode (made by skills.txt Blades of Ice 274)
+missile.bladesoficecubes	missiles.txt bladesoficecubes (561)
+missile.blaze	Missiles.txt rows blaze,firewall,firesmall,firemedium (made by skills.txt Blaze 46)
+missile.blessed-hammer	Missiles.txt rows blessedhammer (made by skills.txt Blessed Hammer 112)
+missile.blizzard	Missiles.txt rows blizzardcenter (made by skills.txt Blizzard 59)
+missile.blizzardcenter	missiles.txt blizzardcenter (158)
+missile.blood-mana	Missiles.txt rows curseeffectred,cursecast (made by skills.txt Blood Mana 310)
+missile.blowgun	missiles.txt blowgun (266)
+missile.boltsentry	Missiles.txt rows sentrychargedbolt (made by skills.txt BoltSentry 306)
+missile.bomb-in-air	missiles.txt bomb in air (385)
+missile.bone-spear	Missiles.txt rows bonespear,bonecast (made by skills.txt Bone Spear 84)
+missile.bone-spirit	Missiles.txt rows bonespirit (made by skills.txt Bone Spirit 93)
+missile.bone-wall	Missiles.txt rows bonewallmaker (made by skills.txt Bone Wall 78)
+missile.bonewallmaker	missiles.txt bonewallmaker (207)
+missile.catapult-charged-ball	Missiles.txt rows catapultchargedball (made by skills.txt Catapult Charged Ball 287)
+missile.catapult-spike-ball	Missiles.txt rows catapult spike ball (made by skills.txt Catapult Spike Ball 288)
+missile.catapultblizzard	Missiles.txt rows catapult cold ball (made by skills.txt CatapultBlizzard 303)
+missile.catapultmeteor	Missiles.txt rows catapult meteor ball (made by skills.txt CatapultMeteor 305)
+missile.catapultplague	Missiles.txt rows catapult plague ball (made by skills.txt CatapultPlague 304)
+missile.chain-lightning	Missiles.txt rows chainlightning (made by skills.txt Chain Lightning 53)
+missile.charged-bolt	Missiles.txt rows chargedbolt (made by skills.txt Charged Bolt 38)
+missile.charged-strike	Missiles.txt rows chargedstrikebolt (made by skills.txt Charged Strike 24)
+missile.chargedstrikebolt	missiles.txt chargedstrikebolt (215)
+missile.chilling-armor	Missiles.txt rows chillingarmorbolt (made by skills.txt Chilling Armor 60)
+missile.chillingarmorbolt	missiles.txt chillingarmorbolt (264)
+missile.claws-of-thunder	Missiles.txt rows clawsofthundernova,clawsofthunderbolt (made by skills.txt Claws of Thunder 269)
+missile.clawsofthunderbolt	missiles.txt clawsofthunderbolt (558)
+missile.clawsofthundernova	missiles.txt clawsofthundernova (559)
+missile.cold-arrow	Missiles.txt rows coldarrow (made by skills.txt Cold Arrow 11)
+missile.confuse	Missiles.txt rows curseconfuse,cursecast (made by skills.txt Confuse 81)
+missile.corpse-explosion	Missiles.txt rows corpseexplosion,explodingarrowexp,redlightmissile (made by skills.txt Corpse Explosion 74)
+missile.corpsecycler	Missiles.txt rows recycler delay,vine beast attack (made by skills.txt CorpseCycler 307)
+missile.countessfirewall	Missiles.txt rows countessfirewallmaker,countessfirewall (made by skills.txt CountessFirewall 321)
+missile.countessfirewallmaker	missiles.txt countessfirewallmaker (653)
+missile.cr-arrow1	missiles.txt cr_arrow1 (13)
+missile.cr-arrow2	missiles.txt cr_arrow2 (14)
+missile.cr-arrow3	missiles.txt cr_arrow3 (15)
+missile.cr-arrow4	missiles.txt cr_arrow4 (16)
+missile.cr-arrow5	missiles.txt cr_arrow5 (17)
+missile.cr-arrow6	missiles.txt cr_arrow6 (660)
+missile.cursedballtrapleft	Missiles.txt rows trap cursed skull left (made by skills.txt CursedBallTrapLeft 208)
+missile.cursedballtrapright	Missiles.txt rows trap cursed skull right (made by skills.txt CursedBallTrapRight 207)
+missile.death-mauler	missiles.txt death mauler (502)
+missile.death-sentry-ltng	Missiles.txt rows sentrylightningbolt2 (made by skills.txt death sentry ltng 324)
+missile.deathmaul	Missiles.txt rows death mauler,death mauler trail (made by skills.txt DeathMaul 308)
+missile.decrepify	Missiles.txt rows cursedecrepify,cursecast (made by skills.txt Decrepify 87)
+missile.defense-curse	Missiles.txt rows curseeffectred,cursecast (made by skills.txt Defense Curse 309)
+missile.desertturret	Missiles.txt rows desertfireball (made by skills.txt DesertTurret 203)
+missile.diabfire	Missiles.txt rows diabfire (made by skills.txt DiabFire 195)
+missile.diablight	Missiles.txt rows diablight (made by skills.txt DiabLight 193)
+missile.diablogeddon	Missiles.txt rows diablogeddoncontrol,diablogeddontail,diablogeddonrock (made by skills.txt Diablogeddon 349)
+missile.diabwall	Missiles.txt rows diabwallmaker (made by skills.txt DiabWall 197)
+missile.dim-vision	Missiles.txt rows cursedimvision,cursecast (made by skills.txt Dim Vision 71)
+missile.doomknightmissile	Missiles.txt rows undeadmissile1 (made by skills.txt DoomKnightMissile 335)
+missile.dragon-tail	Missiles.txt rows dragontail missile (made by skills.txt Dragon Tail 270)
+missile.dragontail-missile	missiles.txt dragontail missile (533)
+missile.erruption-center	missiles.txt erruption center (461)
+missile.eruption	Missiles.txt rows erruption center (made by skills.txt Eruption 234)
+missile.exploding-arrow	Missiles.txt rows explodingarrow (made by skills.txt Exploding Arrow 16)
+missile.fenris-rage	Missiles.txt rows corpseexplosion (made by skills.txt fenris rage 314)
+missile.fetishaura	Missiles.txt rows curseeffectred (made by skills.txt FetishAura 177)
+missile.fetishinferno	Missiles.txt rows fetishinferno1,fetishinferno2 (made by skills.txt FetishInferno 178)
+missile.fetishinferno1	missiles.txt fetishinferno1 (144)
+missile.fingermagespider	Missiles.txt rows fingermagespider (made by skills.txt FingerMageSpider 196)
+missile.fire-arrow	Missiles.txt rows firearrow (made by skills.txt Fire Arrow 7)
+missile.fire-ball	Missiles.txt rows fireball (made by skills.txt Fire Ball 47)
+missile.fire-bolt	Missiles.txt rows firebolt (made by skills.txt Fire Bolt 36)
+missile.fire-trauma	Missiles.txt rows bomb in air (made by skills.txt Fire Trauma 251)
+missile.fire-wall	Missiles.txt rows firewallmaker,firewall (made by skills.txt Fire Wall 51)
+missile.firehead	missiles.txt firehead (277)
+missile.firestorm	Missiles.txt rows firestormmaker (made by skills.txt Firestorm 225)
+missile.firewallmaker	missiles.txt firewallmaker (68)
+missile.fist-of-the-heavens	Missiles.txt rows fistoftheheavensdelay (made by skills.txt Fist of the Heavens 121)
+missile.fistoftheheavensdelay	missiles.txt fistoftheheavensdelay (233)
+missile.fists-of-fire	Missiles.txt rows fistsoffirefirewall,fistsoffireexplode (made by skills.txt Fists of Fire 259)
+missile.fistsoffirefirewall	missiles.txt fistsoffirefirewall (557)
+missile.freezing-arrow	Missiles.txt rows freezingarrow (made by skills.txt Freezing Arrow 31)
+missile.frogfire	missiles.txt frogfire (280)
+missile.frogpois	missiles.txt frogpois (282)
+missile.frost-nova	Missiles.txt rows frostnova (made by skills.txt Frost Nova 44)
+missile.frozen-orb	Missiles.txt rows frozenorb (made by skills.txt Frozen Orb 64)
+missile.frozenhorror-arcticblast1	missiles.txt frozenhorror arcticblast1 (493)
+missile.gargoyletrap	Missiles.txt rows shafire3 (made by skills.txt GargoyleTrap 172)
+missile.glacial-spike	Missiles.txt rows glacialspike (made by skills.txt Glacial Spike 55)
+missile.goospit1	missiles.txt goospit1 (70)
+missile.goospit2	missiles.txt goospit2 (71)
+missile.goospit3	missiles.txt goospit3 (72)
+missile.goospit4	missiles.txt goospit4 (73)
+missile.goospit5	missiles.txt goospit5 (74)
+missile.goospitex	missiles.txt goospitex (668)
+missile.grim-ward	Missiles.txt rows grimwardmediumstart,grimwardsmallstart,grimwardlargestart (made by skills.txt Grim Ward 150)
+missile.grimwardlargestart	missiles.txt grimwardlargestart (255)
+missile.grimwardmediumstart	missiles.txt grimwardmediumstart (252)
+missile.grimwardsmallstart	missiles.txt grimwardsmallstart (249)
+missile.guided-arrow	Missiles.txt rows guidedarrow (made by skills.txt Guided Arrow 22)
+missile.healing-vortex	Missiles.txt rows healing vortex (made by skills.txt Healing Vortex 291)
+missile.hellmeteor	Missiles.txt rows hellmeteordown (made by skills.txt HellMeteor 213)
+missile.holy-bolt	Missiles.txt rows holybolt (made by skills.txt Holy Bolt 101)
+missile.horror-arctic-blast	Missiles.txt rows frozenhorror arcticblast1 (made by skills.txt Horror Arctic Blast 323)
+missile.howl	Missiles.txt rows howl (made by skills.txt Howl 130)
+missile.hurricane	Missiles.txt rows hurricaneswoosh,hurricanerock,hurricanetree (made by skills.txt Hurricane 250)
+missile.hydramissile	Missiles.txt rows hydra (made by skills.txt HydraMissile 337)
+missile.ice-arrow	Missiles.txt rows icearrow (made by skills.txt Ice Arrow 21)
+missile.ice-blast	Missiles.txt rows iceblast (made by skills.txt Ice Blast 45)
+missile.ice-bolt	Missiles.txt rows icebolt (made by skills.txt Ice Bolt 39)
+missile.immolation-arrow	Missiles.txt rows immolationarrow (made by skills.txt Immolation Arrow 27)
+missile.imp-charged-bolt	missiles.txt imp charged bolt (450)
+missile.imp-fire-missile	Missiles.txt rows impmiss21 (made by skills.txt Imp Fire Missile 299)
+missile.imp-fire-missile-ex	Missiles.txt rows impmiss21 (made by skills.txt Imp Fire Missile Ex 356)
+missile.imp-fireball	Missiles.txt rows impfireball (made by skills.txt Imp Fireball 283)
+missile.imp-inferno	Missiles.txt rows impinfernoflame1,impinfernoflame2 (made by skills.txt Imp Inferno 282)
+missile.imp-teleport	Missiles.txt rows imp teleport (made by skills.txt Imp Teleport 330)
+missile.impbolt	Missiles.txt rows imp charged bolt (made by skills.txt ImpBolt 322)
+missile.impinfernoflame1	missiles.txt impinfernoflame1 (398)
+missile.impmiss21	missiles.txt impmiss21 (592)
+missile.impmiss22	missiles.txt impmiss22 (593)
+missile.impmiss23	missiles.txt impmiss23 (594)
+missile.impmiss24	missiles.txt impmiss24 (595)
+missile.impmiss25	missiles.txt impmiss25 (596)
+missile.impmissex	missiles.txt impmissex (669)
+missile.inferno	Missiles.txt rows infernoflame1,infernoflame2 (made by skills.txt Inferno 41)
+missile.infernoflame1	missiles.txt infernoflame1 (60)
+missile.iron-maiden	Missiles.txt rows curseironmaiden,cursecast (made by skills.txt Iron Maiden 76)
+missile.leap	Missiles.txt rows leapknockback (made by skills.txt Leap 132)
+missile.leapknockback	missiles.txt leapknockback (346)
+missile.life-tap	Missiles.txt rows cursereversevampire,cursecast (made by skills.txt Life Tap 82)
+missile.lightning	Missiles.txt rows lightningbolt (made by skills.txt Lightning 49)
+missile.lightning-bolt	Missiles.txt rows lightningjavelin (made by skills.txt Lightning Bolt 20)
+missile.lightning-fury	Missiles.txt rows lightningfury (made by skills.txt Lightning Fury 35)
+missile.lightning-strike	Missiles.txt rows lightningstrike (made by skills.txt Lightning Strike 34)
+missile.lightningjavelin	missiles.txt lightningjavelin (205)
+missile.lower-resist	Missiles.txt rows curselowerresist,cursecast (made by skills.txt Lower Resist 91)
+missile.magic-arrow	Missiles.txt rows magicarrow (made by skills.txt Magic Arrow 6)
+missile.magottup	Missiles.txt rows dirt pile,sand pile (made by skills.txt MagottUp 161)
+missile.megademoninferno	Missiles.txt rows megademoninferno,fetishinferno1,fetishinferno2 (made by skills.txt MegademonInferno 319)
+missile.mephfrostnova	Missiles.txt rows mephfrostnova,frostnova (made by skills.txt MephFrostNova 346)
+missile.mephistomissile	Missiles.txt rows mephisto (made by skills.txt MephistoMissile 334)
+missile.meteor	Missiles.txt rows meteorcenter (made by skills.txt Meteor 56)
+missile.meteorcenter	missiles.txt meteorcenter (101)
+missile.mind-blast	Missiles.txt rows mindblast center,mindblast hit (made by skills.txt Mind Blast 273)
+missile.molten-boulder	Missiles.txt rows moltenboulderemerge (made by skills.txt Molten Boulder 229)
+missile.moltenboulderemerge	missiles.txt moltenboulderemerge (453)
+missile.mon-death-sentry	Missiles.txt rows corpseexplosion,deathsentryexplode (made by skills.txt mon death sentry 312)
+missile.mon-inferno-sentry	Missiles.txt rows inferno sentry 1,inferno sentry 2 (made by skills.txt mon inferno sentry 311)
+missile.monblizcenter	missiles.txt monblizcenter (106)
+missile.monblizzard	Missiles.txt rows monblizcenter (made by skills.txt MonBlizzard 205)
+missile.monbonespirit	Missiles.txt rows monbonespirit (made by skills.txt MonBoneSpirit 211)
+missile.monbow	Missiles.txt rows cr_arrow6 (made by skills.txt MonBow 339)
+missile.moncoldarrow	Missiles.txt rows coldarrow (made by skills.txt MonColdArrow 341)
+missile.moncursecast	Missiles.txt rows curseeffectred,cursecast (made by skills.txt MonCurseCast 212)
+missile.monexplodingarrow	Missiles.txt rows explodingarrow (made by skills.txt MonExplodingArrow 342)
+missile.monfirearrow	Missiles.txt rows firearrow (made by skills.txt MonFireArrow 340)
+missile.monfreezingarrow	Missiles.txt rows freezingarrow (made by skills.txt MonFreezingArrow 343)
+missile.monsterlight	missiles.txt monsterlight (170)
+missile.multiple-shot	Missiles.txt rows multipleshotarrow,multipleshotbolt (made by skills.txt Multiple Shot 12)
+missile.multipleshotbolt	missiles.txt multipleshotbolt (214)
+missile.mummy1	missiles.txt mummy1 (63)
+missile.mummy2	missiles.txt mummy2 (64)
+missile.mummy3	missiles.txt mummy3 (65)
+missile.mummy4	missiles.txt mummy4 (66)
+missile.mummyex	missiles.txt mummyex (667)
+missile.necromagemissile	Missiles.txt rows necromage1 (made by skills.txt NecromageMissile 338)
+missile.nihlathakcorpseexplosion	Missiles.txt rows corpseexplosion,explodingarrowexp,redlightmissile (made by skills.txt NihlathakCorpseExplosion 351)
+missile.nova	Missiles.txt rows nova (made by skills.txt Nova 48)
+missile.pantherjav1	missiles.txt pantherjav1 (226)
+missile.pantherjav2	missiles.txt pantherjav2 (227)
+missile.pantherjav4	missiles.txt pantherjav4 (229)
+missile.pantherjav5	missiles.txt pantherjav5 (658)
+missile.pantherpotgreen	missiles.txt pantherpotgreen (239)
+missile.pantherpotorange	missiles.txt pantherpotorange (238)
+missile.plague-javelin	Missiles.txt rows plaguejavelin (made by skills.txt Plague Javelin 25)
+missile.poison-explosion	Missiles.txt rows poisonexplosioncloud,poisoncorpseexplosion,greenlightmissile (made by skills.txt Poison Explosion 83)
+missile.poison-javelin	Missiles.txt rows poisonjav (made by skills.txt Poison Javelin 15)
+missile.poison-nova	Missiles.txt rows poisonnova (made by skills.txt Poison Nova 92)
+missile.poisonballtrap	Missiles.txt rows trap poison ball left (made by skills.txt PoisonBallTrap 200)
+missile.poisonexplosioncloud	missiles.txt poisonexplosioncloud (217)
+missile.poisonjav	missiles.txt poisonjav (38)
+missile.primeblaze	Missiles.txt rows blaze (made by skills.txt PrimeBlaze 187)
+missile.primebolt	Missiles.txt rows chargedstrikebolt,chargedbolt (made by skills.txt PrimeBolt 186)
+missile.primefirewall	Missiles.txt rows vampirefirewallmaker,vampirefirewall (made by skills.txt PrimeFirewall 188)
+missile.primeicenova	Missiles.txt rows frostnova (made by skills.txt PrimeIceNova 190)
+missile.primelightning	Missiles.txt rows monsterlight (made by skills.txt PrimeLightning 185)
+missile.primepoisonball	Missiles.txt rows poisonball (made by skills.txt PrimePoisonball 191)
+missile.primepoisonnova	Missiles.txt rows primepoisoncloud (made by skills.txt PrimePoisonNova 192)
+missile.primespike	Missiles.txt rows monglacialspike (made by skills.txt PrimeSpike 189)
+missile.quick-strike	Missiles.txt rows raven1 (made by skills.txt Quick Strike 168)
+missile.rabies	Missiles.txt rows rabiesplague (made by skills.txt Rabies 238)
+missile.rabiesplague	missiles.txt rabiesplague (515)
+missile.raise-skeletal-mage	Missiles.txt rows corpseexplosion (made by skills.txt Raise Skeletal Mage 80)
+missile.raise-skeleton	Missiles.txt rows corpseexplosion (made by skills.txt Raise Skeleton 70)
+missile.redemption	Missiles.txt rows redemption (made by skills.txt Redemption 124)
+missile.regurgitatorcorpse	missiles.txt regurgitatorcorpse (341)
+missile.regurgitatoreat	Missiles.txt rows corpseexplosion,bigblood1 (made by skills.txt RegurgitatorEat 214)
+missile.revive	Missiles.txt rows revivemedium,revivesmall,revivelarge (made by skills.txt Revive 95)
+missile.roguemissile	Missiles.txt rows rogue1 (made by skills.txt RogueMissile 336)
+missile.royal-strike	Missiles.txt rows royalstrikemeteorcenter,royalstrikechainlightning,royalstrikechaosice (made by skills.txt Royal Strike 280)
+missile.royalstrikechainlightning	missiles.txt royalstrikechainlightning (568)
+missile.royalstrikechaosice	missiles.txt royalstrikechaosice (569)
+missile.royalstrikemeteorcenter	missiles.txt royalstrikemeteorcenter (564)
+missile.sacrifice	Missiles.txt rows blood1 (made by skills.txt Sacrifice 96)
+missile.sanctuary	Missiles.txt rows sanctuarybolt (made by skills.txt Sanctuary 119)
+missile.sentry-lightning	Missiles.txt rows sentrylightningbolt (made by skills.txt sentry lightning 313)
+missile.shamanfire	Missiles.txt rows shafire1 (made by skills.txt ShamanFire 160)
+missile.shamanfireex	Missiles.txt rows shafire1 (made by skills.txt ShamanFireEx 355)
+missile.shamanice	Missiles.txt rows glacialspike (made by skills.txt ShamanIce 348)
+missile.shiver-armor	Missiles.txt rows sparkle (made by skills.txt Shiver Armor 50)
+missile.shock-field	Missiles.txt rows shock field in air (made by skills.txt Shock Field 256)
+missile.shock-field-in-air	missiles.txt shock field in air (388)
+missile.shock-wave	Missiles.txt rows shockwave (made by skills.txt Shock Wave 243)
+missile.shout	Missiles.txt rows shout (made by skills.txt Shout 138)
+missile.skbowarrow1	missiles.txt skbowarrow1 (196)
+missile.skbowarrow2	missiles.txt skbowarrow2 (197)
+missile.skbowarrow3	missiles.txt skbowarrow3 (198)
+missile.skbowarrow4	missiles.txt skbowarrow4 (199)
+missile.skbowarrow5	missiles.txt skbowarrow5 (200)
+missile.skbowarrow6	missiles.txt skbowarrow6 (644)
+missile.skbowarrow7	missiles.txt skbowarrow7 (645)
+missile.skbowarrow8	missiles.txt skbowarrow8 (646)
+missile.skmage1	missiles.txt skmage1 (125)
+missile.skmage2	missiles.txt skmage2 (126)
+missile.skmage3	missiles.txt skmage3 (127)
+missile.skmage4	missiles.txt skmage4 (128)
+missile.skmagecold	missiles.txt skmagecold (662)
+missile.skmagefire	missiles.txt skmagefire (663)
+missile.skmageltng	missiles.txt skmageltng (664)
+missile.skmagepois	missiles.txt skmagepois (661)
+missile.spike2	missiles.txt spike2 (8)
+missile.spike3	missiles.txt spike3 (9)
+missile.spike4	missiles.txt spike4 (10)
+missile.spike6	missiles.txt spike6 (659)
+missile.strafe	Missiles.txt rows strafearrow,strafebolt,multipleshotarrow,multipleshotbolt (made by skills.txt Strafe 26)
+missile.strafearrow	missiles.txt strafearrow (682)
+missile.strafebolt	missiles.txt strafebolt (683)
+missile.succubusbolt	Missiles.txt rows succubusmiss (made by skills.txt SuccubusBolt 345)
+missile.succubusmiss	missiles.txt succubusmiss (665)
+missile.teeth	Missiles.txt rows teeth,bonecast (made by skills.txt Teeth 67)
+missile.terror	Missiles.txt rows curseterror,cursecast (made by skills.txt Terror 77)
+missile.thunder-storm	Missiles.txt rows thunderstorm1 (made by skills.txt Thunder Storm 57)
+missile.thunderstorm1	missiles.txt thunderstorm1 (166)
+missile.tornado	Missiles.txt rows tornado (made by skills.txt Tornado 245)
+missile.trap-nova	Missiles.txt rows trapnova (made by skills.txt Trap Nova 353)
+missile.twister	Missiles.txt rows twister (made by skills.txt Twister 240)
+missile.undeadmissile1	missiles.txt undeadmissile1 (323)
+missile.unholybolt	Missiles.txt rows unholybolt1 (made by skills.txt UnHolyBolt 157)
+missile.unholybolt1	missiles.txt unholybolt1 (77)
+missile.unholyboltex	Missiles.txt rows unholybolt1 (made by skills.txt UnHolyBoltEx 354)
+missile.vampirefireball	Missiles.txt rows vampirefireball (made by skills.txt VampireFireball 169)
+missile.vampirefirewall	Missiles.txt rows vampirefirewallmaker,vampirefirewall (made by skills.txt VampireFirewall 170)
+missile.vampirefirewallmaker	missiles.txt vampirefirewallmaker (130)
+missile.vampiremeteor	Missiles.txt rows vampiremeteorcenter (made by skills.txt VampireMeteor 171)
+missile.vampiremeteorcenter	missiles.txt vampiremeteorcenter (133)
+missile.vampiremissile	Missiles.txt rows firehead (made by skills.txt VampireMissile 333)
+missile.vine-attack	Missiles.txt rows plague vines,vine beast attack,vines,vine beast walk 1,vine beast neutral (made by skills.txt Vine Attack 294)
+missile.vinecycler	Missiles.txt rows vine recycler delay,vine beast attack,recycler delay (made by skills.txt VineCycler 325)
+missile.viper-bonespear	missiles.txt viper_bonespear (652)
+missile.viper-fire	missiles.txt viper_fire (650)
+missile.viper-poisjav	missiles.txt viper_poisjav (648)
+missile.volcano	Missiles.txt rows volcano,volcano overlay fire (made by skills.txt Volcano 244)
+missile.wake-of-destruction-sentry	Missiles.txt rows wake of destruction maker (made by skills.txt Wake Of Destruction Sentry 281)
+missile.war-cry	Missiles.txt rows warcry (made by skills.txt War Cry 154)
+missile.weaken	Missiles.txt rows curseweaken,cursecast (made by skills.txt Weaken 72)
+missile.willowisplightningbolt	missiles.txt willowisplightningbolt (320)
+missile.willowisplightningbolt2	missiles.txt willowisplightningbolt2 (666)
+missile.zakarumlightning	Missiles.txt rows monsterlight (made by skills.txt ZakarumLightning 332)
+state.alignment	states.txt alignment (105) flags: -
+state.amplifydamage	states.txt amplifydamage (9) flags: curse,curable
+state.antidote	states.txt antidote (178) flags: -
+state.armageddon	states.txt armageddon (145) flags: -
+state.attached	states.txt attached (143) flags: active,udead
+state.attract	states.txt attract (57) flags: curse,curable
+state.avoid	states.txt avoid (66) flags: -
+state.axemastery	states.txt axemastery (75) flags: -
+state.barbs	states.txt barbs (147) flags: aura
+state.barbscontrol	states.txt barbscontrol (163) flags: aura
+state.battlecommand	states.txt battlecommand (51) flags: aura
+state.battlecry	states.txt battlecry (89) flags: curse
+state.battleorders	states.txt battleorders (32) flags: aura
+state.bear	states.txt bear (140) flags: transform
+state.berserk	states.txt berserk (95) flags: -
+state.bladeshield	states.txt bladeshield (158) flags: -
+state.blaze	states.txt blaze (13) flags: -
+state.blessedaim	states.txt blessedaim (40) flags: aura,immed
+state.blood-mana	states.txt blood_mana (114) flags: curse,curable
+state.bloodlust	states.txt bloodlust (141) flags: curse
+state.blue	states.txt blue (90) flags: -
+state.bonearmor	states.txt bonearmor (14) flags: -
+state.burning	states.txt burning (115) flags: -
+state.changeclass	states.txt changeclass (142) flags: -
+state.chillingarmor	states.txt chillingarmor (20) flags: -
+state.clawmastery	states.txt clawmastery (152) flags: -
+state.cleansing	states.txt cleansing (45) flags: aura
+state.cloak-of-shadows	states.txt cloak_of_shadows (153) flags: remhit
+state.cloaked	states.txt cloaked (156) flags: curse
+state.cold	states.txt cold (11) flags: -
+state.coldmastery	states.txt coldmastery (73) flags: -
+state.concentrate	states.txt concentrate (15) flags: -
+state.concentration	states.txt concentration (42) flags: aura,immed
+state.confuse	states.txt confuse (59) flags: curse,curable
+state.conversion	states.txt conversion (53) flags: -
+state.conversion-save	states.txt conversion_save (109) flags: -
+state.convicted	states.txt convicted (29) flags: aura
+state.conviction	states.txt conviction (28) flags: aura
+state.corpse-nodraw	states.txt corpse_nodraw (104) flags: hide,udead
+state.corpse-noselect	states.txt corpse_noselect (118) flags: udead
+state.corpseexp	states.txt corpseexp (173) flags: hide,udead
+state.criticalstrike	states.txt criticalstrike (64) flags: -
+state.cyclonearmor	states.txt cyclonearmor (151) flags: -
+state.death-delay	states.txt death_delay (92) flags: -
+state.debugcontrol	states.txt debugcontrol (164) flags: -
+state.decrepify	states.txt decrepify (60) flags: curse,curable
+state.defense-curse	states.txt defense_curse (113) flags: curse,curable
+state.defiance	states.txt defiance (37) flags: aura,immed
+state.delerium	states.txt delerium (177) flags: transform
+state.dimvision	states.txt dimvision (23) flags: curse,curable
+state.dodge	states.txt dodge (65) flags: -
+state.dopplezon	states.txt dopplezon (63) flags: transform,hide,udead
+state.dragonflight	states.txt dragonflight (116) flags: -
+state.enchant	states.txt enchant (16) flags: -
+state.energyshield	states.txt energyshield (30) flags: -
+state.evade	states.txt evade (68) flags: -
+state.fade	states.txt fade (159) flags: -
+state.fanaticism	states.txt fanaticism (49) flags: aura,immed
+state.fenris-rage	states.txt fenris_rage (138) flags: -
+state.feralrage	states.txt feralrage (120) flags: -
+state.fetishaura	states.txt fetishaura (25) flags: -
+state.fingermagecurse	states.txt fingermagecurse (84) flags: -
+state.firemastery	states.txt firemastery (71) flags: -
+state.freeze	states.txt freeze (1) flags: hide,shatter,udead
+state.frenzy	states.txt frenzy (94) flags: -
+state.frozenarmor	states.txt frozenarmor (10) flags: -
+state.fullsetgeneric	states.txt fullsetgeneric (175) flags: -
+state.golem-mastery	states.txt golem_mastery (111) flags: -
+state.healthpot	states.txt healthpot (100) flags: -
+state.holyfire	states.txt holyfire (35) flags: aura
+state.holyshield	states.txt holyshield (101) flags: transform
+state.holyshock	states.txt holyshock (46) flags: aura
+state.holywind	states.txt holywind (43) flags: aura
+state.holywindcold	states.txt holywindcold (44) flags: aura
+state.hurricane	states.txt hurricane (144) flags: active
+state.increasedspeed	states.txt increasedspeed (82) flags: -
+state.increasedstamina	states.txt increasedstamina (80) flags: -
+state.inferno	states.txt inferno (12) flags: -
+state.innersight	states.txt innersight (17) flags: -
+state.invis	states.txt invis (146) flags: -
+state.ironmaiden	states.txt ironmaiden (55) flags: curse,curable
+state.ironskin	states.txt ironskin (81) flags: -
+state.itemset1	states.txt itemset1 (165) flags: -
+state.itemset2	states.txt itemset2 (166) flags: -
+state.itemset3	states.txt itemset3 (167) flags: -
+state.itemset4	states.txt itemset4 (168) flags: -
+state.itemset5	states.txt itemset5 (169) flags: -
+state.itemset6	states.txt itemset6 (170) flags: -
+state.just-portaled	states.txt just_portaled (102) flags: -
+state.justhit	states.txt justhit (86) flags: -
+state.lifetap	states.txt lifetap (58) flags: curse,curable
+state.lightningbolt	states.txt lightningbolt (39) flags: -
+state.lightningmastery	states.txt lightningmastery (72) flags: -
+state.lowerresist	states.txt lowerresist (61) flags: curse,curable
+state.macemastery	states.txt macemastery (76) flags: -
+state.manapot	states.txt manapot (106) flags: -
+state.maul	states.txt maul (117) flags: -
+state.meditation	states.txt meditation (48) flags: aura,immed
+state.might	states.txt might (33) flags: aura,immed
+state.monfrenzy	states.txt monfrenzy (103) flags: -
+state.monsterset	states.txt monsterset (176) flags: transform
+state.naturalresistance	states.txt naturalresistance (83) flags: -
+state.nomanaregen	states.txt nomanaregen (85) flags: -
+state.oaksage	states.txt oaksage (149) flags: aura
+state.oaksagecontrol	states.txt oaksagecontrol (161) flags: aura
+state.openwounds	states.txt openwounds (62) flags: active,life
+state.passive-resistcold	states.txt passive_resistcold (182) flags: -
+state.passive-resistfire	states.txt passive_resistfire (181) flags: -
+state.passive-resistltng	states.txt passive_resistltng (183) flags: -
+state.penetrate	states.txt penetrate (67) flags: -
+state.pierce	states.txt pierce (69) flags: -
+state.playerbody	states.txt playerbody (7) flags: -
+state.poison	states.txt poison (2) flags: life
+state.polearmmastery	states.txt polearmmastery (77) flags: -
+state.prayer	states.txt prayer (34) flags: aura
+state.pregnant	states.txt pregnant (110) flags: -
+state.preventheal	states.txt preventheal (52) flags: immed,life
+state.progressive-cold	states.txt progressive_cold (126) flags: -
+state.progressive-damage	states.txt progressive_damage (122) flags: -
+state.progressive-fire	states.txt progressive_fire (125) flags: -
+state.progressive-lightning	states.txt progressive_lightning (127) flags: -
+state.progressive-other	states.txt progressive_other (124) flags: -
+state.progressive-steal	states.txt progressive_steal (123) flags: -
+state.quickness	states.txt quickness (157) flags: aura
+state.rabies	states.txt rabies (112) flags: -
+state.recycled	states.txt recycled (154) flags: hide,udead
+state.red	states.txt red (91) flags: -
+state.redeemed	states.txt redeemed (99) flags: hide,udead
+state.redemption	states.txt redemption (50) flags: aura
+state.resistall	states.txt resistall (8) flags: aura,immed
+state.resistcold	states.txt resistcold (4) flags: aura,immed
+state.resistfire	states.txt resistfire (3) flags: aura,immed
+state.resistlight	states.txt resistlight (5) flags: aura,immed
+state.resistmagic	states.txt resistmagic (6) flags: -
+state.restinpeace	states.txt restinpeace (172) flags: udead
+state.revive	states.txt revive (96) flags: udead
+state.runeword	states.txt runeword (171) flags: -
+state.sanctuary	states.txt sanctuary (47) flags: aura,active
+state.shadowwarrior	states.txt shadowwarrior (119) flags: transform,hide,udead
+state.shatter	states.txt shatter (107) flags: hide,shatter,udead
+state.shiverarmor	states.txt shiverarmor (88) flags: active
+state.shout	states.txt shout (26) flags: aura
+state.shrine-armor	states.txt shrine_armor (128) flags: curse
+state.shrine-combat	states.txt shrine_combat (129) flags: curse
+state.shrine-experience	states.txt shrine_experience (137) flags: curse
+state.shrine-mana-regen	states.txt shrine_mana_regen (135) flags: curse
+state.shrine-resist-cold	states.txt shrine_resist_cold (132) flags: curse
+state.shrine-resist-fire	states.txt shrine_resist_fire (131) flags: curse
+state.shrine-resist-lightning	states.txt shrine_resist_lightning (130) flags: curse
+state.shrine-resist-poison	states.txt shrine_resist_poison (133) flags: curse
+state.shrine-skill	states.txt shrine_skill (134) flags: curse
+state.shrine-stamina	states.txt shrine_stamina (136) flags: curse
+state.skel-mastery	states.txt skel_mastery (97) flags: -
+state.skill-move	states.txt skill_move (18) flags: -
+state.skilldelay	states.txt skilldelay (121) flags: -
+state.slowed	states.txt slowed (24) flags: -
+state.slowmissiles	states.txt slowmissiles (87) flags: -
+state.sourceunit	states.txt sourceunit (98) flags: -
+state.spearmastery	states.txt spearmastery (79) flags: -
+state.spiderlay	states.txt spiderlay (22) flags: -
+state.stamina	states.txt stamina (41) flags: aura,immed
+state.staminapot	states.txt staminapot (180) flags: -
+state.stunned	states.txt stunned (21) flags: -
+state.summonresist	states.txt summonresist (160) flags: -
+state.swordmastery	states.txt swordmastery (74) flags: -
+state.sync-warped	states.txt sync_warped (108) flags: -
+state.taunt	states.txt taunt (27) flags: curse,curable
+state.terror	states.txt terror (56) flags: curse,curable
+state.thawing	states.txt thawing (179) flags: -
+state.thorns	states.txt thorns (36) flags: aura
+state.throwingmastery	states.txt throwingmastery (78) flags: -
+state.thunderstorm	states.txt thunderstorm (38) flags: -
+state.uberminion	states.txt uberminion (184) flags: hide,shatter,udead
+state.uninterruptable	states.txt uninterruptable (54) flags: -
+state.valkyrie	states.txt valkyrie (93) flags: transform
+state.venomclaws	states.txt venomclaws (31) flags: -
+state.vine-beast	states.txt vine_beast (150) flags: active
+state.warmth	states.txt warmth (70) flags: -
+state.weaken	states.txt weaken (19) flags: curse,curable
+state.weaponblock	states.txt weaponblock (155) flags: -
+state.whirlwind	states.txt whirlwind (174) flags: -
+state.wolf	states.txt wolf (139) flags: transform
+state.wolverine	states.txt wolverine (148) flags: aura
+state.wolverinecontrol	states.txt wolverinecontrol (162) flags: aura

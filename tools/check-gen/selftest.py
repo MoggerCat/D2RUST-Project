@@ -45,6 +45,11 @@ def synthetic(d):
     table(os.path.join(d, "weapons.txt"), ["name", "code"], [["Hand Axe", "hax"], ["Axe", "axe"]])
     table(os.path.join(d, "armor.txt"), ["name", "code"], [["Cap", "cap"]])
     table(os.path.join(d, "misc.txt"), ["name", "code"], [["Key", "key"], ["Ring", "rin"], ["Amulet", "amu"], ["Charm", "cm1"], ["Jewel", "jew"], ["", ""]])
+
+    table(os.path.join(d, "missiles.txt"), ["Missile", "Id"],
+          [["arrow", 0], ["firebolt", 58], ["not in the ledger", 59], ["bomb in air", 60]])
+    table(os.path.join(d, "states.txt"), ["state", "id"],
+          [["none", 0], ["freeze", 1], ["poison", 2], ["", 3]])
     table(os.path.join(d, "shrines.txt"), ["Shrine Type", "Shrine name", "Code"],
           [["None", "None", 0], ["Recharge", "Refill", 1], ["Recharge", "Health Boost", 2]])
 
@@ -128,6 +133,11 @@ def run():
         t.ok(by["netc2s"] == ["gen-netc2s-02", "gen-netc2s-3a"], by["netc2s"])
         t.ok("at 20 send WalkToUnit type=0 id=@player" in
              next(c for c in checks if c.name == "gen-netc2s-02").render(), "netc2s send")
+
+        t.ok(by["state"] == ["gen-state-1", "gen-state-2"], by["state"])
+        # only the Missiles.txt rows a ledger area of the committed snapshot names get a check
+        t.ok(set(by["missile"]) <= {"gen-missile-0", "gen-missile-58", "gen-missile-60"}
+             and "gen-missile-59" not in by["missile"], by["missile"])
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")
