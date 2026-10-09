@@ -14,7 +14,7 @@ this session the integrator of 8 part sessions instead of the sole author.
   left unnamed. Coverage ids are matched to entity rows through aliases in `ledger.py`
   (level id, quest slot, AI name, table row id); `yes` comes from the coverage report
   JSONs' seen lists.
-- Integrator edits to the part copies (re-applied after every pull by a scratch script,
+- Integrator edits to the part copies (`tools/coord/ledger_fixups.py`, run by `tools/coord/ledger-pull.sh` after every pull,
   so a re-pulled part needs them again, or the part fixes itself): sizes for unsized
   DIVERGED rows, `specs/world/hirelings*` expanded, truncated `...(+N)` check lists cut,
   coverage-a3a5 reduced to its `yes` rows and lowercased.
@@ -30,7 +30,7 @@ this session the integrator of 8 part sessions instead of the sole author.
   matched checks by monster name.
 
 ## Repro
-    # pull the parts (each branch's docs/handoff/ledger/*.tsv) into docs/handoff/ledger/, then
+    sh tools/coord/ledger-pull.sh            # pull every part, apply the integrator fixups, merge
     python3 tools/coord/ledger.py --fix     # reconcile parts with checks-status, merge
     python3 tools/coord/ledger.py --check   # 0 errors, outputs current
     python3 tools/coord/ledger.py --selftest
