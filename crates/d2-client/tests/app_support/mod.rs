@@ -457,7 +457,22 @@ pub fn approach_tile<C: Clock + Send + 'static>(
         visited.push(c);
         walk_town_to(app, server, ms, c, 4);
     }
-    find(app).unwrap_or_else(|| panic!("no tile of class {class} reached the client"))
+    find(app).unwrap_or_else(|| {
+        let tiles: Vec<_> = app
+            .world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world()
+            .units
+            .iter()
+            .filter(|(k, _)| k.unit_type == d2_client::bridge::world::TILE)
+            .map(|(_, u)| (u.class, u.position))
+            .collect();
+        panic!(
+            "no tile of class {class} reached the client; tiles {tiles:?}; player at {:?} in level {level}",
+            server_pos(server)
+        )
+    })
 }
 
 /// Runs to the unit `key` as the client does before an interact (C→S
