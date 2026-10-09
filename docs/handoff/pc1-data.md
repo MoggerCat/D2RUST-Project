@@ -188,7 +188,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 (prose / authored pseudocode, addresses); a code disagreement becomes a
 `q-fix-*` row.
 
-- [q-fix-act4-play] De Seis seal on a WingN1 game: open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1).
+- [q-fix-act4-play] De Seis seal on a WingN1 game: open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1). *Answered in the cloud under Wine (q-fix-a4-deseis, 2026-10-09, seed 1 = WingN1)*: 1.14d does what d2rs does. The boss-spot room lookups see only active rooms: operated right after walking up (the arm room south of the seal still loaded) the seal opens, dummy 131 at (7770,5226), De Seis (GUID 105) at (7773,5207), identical on both sides; operated after 200 idle frames at the seal it stays in mode 0 on both sides. Checks `traces/checks/a4-deseis-seal-{early,loaded,unloaded}.check`; no PC 1 run needed (optional: the same on Windows to rule out a Wine effect).
 
 1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
    S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
