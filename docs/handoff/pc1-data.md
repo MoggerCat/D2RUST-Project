@@ -185,19 +185,25 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
    `client/msg-units.md` §5 r3 contradict each other; the ignored test
    of row `q-fix-proto-vitals-dx-sign` / `q-fix-seam-vitals-delta` is
    ready.
+
 2. **Esc menu pause in single player** (`client/bridge.md` §8 r5; rows
    `q-fix-ui-pause`, `q-fix-seam-pause`): does 1.14d stop the game loop
    under the Esc menu, and from which call.
+
 3. **Hireling target search range**: 20 sub-tiles (REC-100) vs 35
    (REC-279).
+
 4. **x87 precision at start-up (REC-21)**: the C runtime start-up's
    control word; settles five provisional points.
+
 5. **REC-290 tick half**: `record_tick.py --auto ScnAma --seed 1234
    --ticks 600` on PC 1, committed as a trace, so the cloud can compare
    its Wine run (equal except ms between two Wine runs).
+
 6. UI spec gaps from `docs/handoff/q-ui-audit.md`: menu-box window
    handlers 0x0E/1, drop cell `0x00486BD0`, gamble flag (panels-2 §14
    r11 vs menus §4.2), waypoint level names.
+
 7. **Callers of three S→C senders (q-fix-proto-rest, REC-415)**: the static
    callers of `0x0053C1D0` (0x20 StatUpdate), `0x0053C6F0` (0x93 skill
    bonus by element and page) and `0x0053E1C0` (0xA6; the spec found none)
@@ -206,22 +212,27 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
    contract-tested; only the call sites are missing. Answer into
    `client/msg-stats-items.md` §1 r4 / §5 r5 / r7 and `client/msg-skills.md`
    §9.
+
 8. **Argument form of `0x00554200(unit)` at the 0xAB case of
    `0x00571CD0`** (REC-412) and the base-or-total read of stat 178 in
    `0x00625A50` (REC-410): `sim/intents-events.md` §7.9 r2 and §7.3 r2
    step 9.
+
 9. **Field sources of S→C 0x73 in `0x0059FEE0`** (REC-414): which missile
    fields fill the two u32 positions, the first path point and the level
    byte; `missiles/missiles.md` R2.4.
+
 10. **Node order and asserts of the client 0x92 handler `0x004C23E0`**
     (REC-416): the order of the inventory nodes it walks and what `0x0063E0B0`
     does at its end; `client/msg-stats-items.md` §5 r5.
+
 11. **Command 1 slot order in the controls table** (`q-fix-real-controls-default-order`):
     Game.exe at 0x312220 holds (cmd 1, 'B', slot 0) before (cmd 1, 'I', slot 1);
     `specs/ui/key-commands.tsv` with the §3.4 / §B4 r1 rule gives them the other
     way round. Spec decision: a slot-order column in the TSV or an exception
     for command 1, and whether first-match lookup makes the order matter; then
     `BindingTable::defaults` and the test builder change together.
+
 12. **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
     q-fix-items-play)**: (a) the sixth argument of `0x0065FEC0` (the
     apply type, `items/properties.md` §2) at each static caller other
@@ -231,41 +242,50 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the craft list (`0x00660240`, mode 7) call `0x0065FE10` or
     `0x0065FD70` directly (§2 says directly, §14 lists §12 among the
     wrapper's callers). Answer into `items/properties.md` §2 / §14.
+
 13. **State param sign in S→C 0xA8 / 0xAA** (`q-fix-proto-state-param-sign`):
     the sim writes the param unsigned (`units/messages.rs`), the client
     reads it signed (`client/stat-lists.md` §3 r1); settle the read sign
     with `0x0045EE20` / `0x00470E30` (`stat-lists.md` OQ5).
+
 14. **Stamina scale on the client** (`q-fix-seam-stamina-scale`): the wire
     carries stamina >> 8, the client's exhaustion test reads raw 1..255;
     does 1.14d's client drain stamina locally (`client/model.md` OQ2,
     REC-51)? Spec decision first, then `bridge/predict.rs`.
+
 15. **The other four progression call sites** (`q-fix-save-gaps`, REC-265
     (2)): `0x00538680(client, step, difficulty)` at `0x0058DCE2`,
     `0x0058DD65`, `0x0058E4F1` (Act II) and `0x0059C848` (Act III): which
     quest event and which `step` each passes. Act I (`0x00596210`), Act IV
     (`0x005B4D77`, step 4, classic only) and Act III's Mephisto credit
     (`0x005BC182`) are wired.
+
 16. **Loader messages 0x22 / 0x21 at the join** (`q-fix-flow-join-load`):
     the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
     0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
     entry itself is wired (`world/quests.md` §3 names the caller).
+
 17. **Think restart gate `0x00553160`** (REC-442, q-cloud-game): in
     SUNIT_Add's monster branch (`init.md` §4.1), when does 1.14d restart
     the think at f + 2? d2rs always restarts it. Answer into `init.md`
     §4.1 / `ai.md`.
+
 18. **Missile damage setup `0x0059F900` → `0x0064B860`**
     (`q-fix-real-missile-damage`, from q-fix-real-skills): how a missile's
     damage record is filled from its owner and skill; no spec exists.
     Write `missiles/damage.md` (or a section of `missiles/missiles.md`).
+
 19. **Arcane Sanctuary star tick** (`draw-order-2.md` OQ 12, HANDOFF §5
     entry 103; REC-420): the initial `last` of §12 r3 and the time / seed
     argument form.
+
 20. **Windows recordings Wine cannot make** (`facts/requests.tsv`, open
     rows from q-facts-scenes): stash panel; NPC dialog, shop and gamble
     screens (clicks do not open them under Wine); the 4 front-end scenes;
     Blood Moor monsters at night; Den of Evil. Record with
     `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
     Step 3, each twice, and commit the facts.
+
 21. **Owner of a unit, for the state snapshot** (`specs/tools/state-snapshot.md`
     §2 `own`, OQ 1; q-tool-state-diff): where 1.14d keeps the owner GUID
     of a pet / summon / hireling, a missile and an item (its container or
@@ -273,6 +293,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
 28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+34. **Town critters are a client-side spawn from `Levels.txt` C1 / CA1** (q-fix-real-critters-drops; same topic as item 30) The Rogue Encampment chickens (ck, class 149) are not server units: the server's unit lists have none (state snapshots to frame 90, both sides equal at 25 units). 1.14d's client creates them with `0x00466730(class 149, x, y, 1, ..)` (type 1, client set C, GUID from the client counter `[0x00711F30]`), three per group, from return address `0x0046C316`; the caller chain is `0x0046C54D` <- `0x0044C774` (the client room function `0x0044C750`, which also runs the preset pass `0x00466820`). Levels.txt row 1 has `C1` = 149, `CA1` = 30 (the level record dump at `[arg5]` shows 0x95 and 0x1E). Per group the draws are: 3 steps at `0x0046C4AC` on three different `{lo, 666}` seeds, a `roll(0)` via `0x0045C3E0` at `0x0046C516` on the room's client seed, then per chicken one step at `0x0046C257` and one at `0x0046C29C` (x and y). First groups in frame 2 of `a1-town-arrival-ama`: (4827, 4195) (4820, 4198) (4832, 4191) and (4927, 4198) (4939, 4198) (4956, 4195); later rooms (frames 89-95): (4814, 4256) (4827, 4269) (4834, 4275) and (4871, 4242) (4877, 4254) (4849, 4267). Needed (a spec for a new `world/` or `client/` section): the body of the function holding `0x0046C257`-`0x0046C54D`: what makes a group (CA chance? MinGrp / MaxGrp 3 / 3 of the chicken row), the centre point and offset formula from the draws, the seed each step uses, and when the room function runs it (client room entry and exit; the GUIDs 93-95 of the scene need the 190 river-object creations at `0x00466862` before them). Probe: a scratch subclass of `record_state.py` hooking `0x00466730` / `0x00466360` (not committed); the facts are in `docs/handoff/q-fix-real-critters-drops.md`. `population.md` §11.3 (critters are not placed by the server) is confirmed.
 26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
     run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
     0–60, then the Windows trace has a client message at tick 61 (drain: a
@@ -307,6 +328,19 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-740 in
     `d2-sim/src/wiring/inventory/potion.rs`.
 
+35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
+36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
+37. **The client's mode-18 leap / whirl: hold, path end, code 0x16** (REC-702..704, `d2-client` `world_view/skill_motion.rs`; measured leap / whirl in `facts/client/anim/a1-cold-plains-*-bar.tsv`) Read: (1) which client code holds the Leap sequence at frame 11 while the motion record lives, and whether Leap Attack (`seqnum` 14) holds at its frame 11 the same way (REC-704); (2) the client whirl path: its step per update (d2rs: class `WalkVelocity` << 12, 0x6000 measured for the barbarian) and the update mode 18 ends on (d2rs: the one whose step reaches the end, `((d << 16) − 1) / step` after the do, `d` by `0x006417F0`; REC-703); (3) the skill mode request's first mode-18 update and code 0x16's record 2 / 3 as unit type / GUID (REC-702). Write the answers into `render/unit-composite.md` §8 or `skills/sequences.md` §3.
+
+38. **Range state mask 0x26 = `meleeonly`?** `range(P,
+  skill)` `0x00645460` (`skills/use.md` §3 r6) tests "state mask 0x26".
+  d2rs (`d2-client` `bridge/combat.rs` `in_melee_only_state`) reads it as
+  `0x0063A130` with the per-flag mask at data +0xCC + 4·0x26, i.e. the
+  `states.txt` flag bit 38 `meleeonly` (`data/fields.tsv`; the
+  `ui/panels-3.md` §24 r1 scheme). Confirm the argument `0x00645460`
+  passes is that flag index (not a data offset or a precomputed group),
+  and write it into `use.md` §3 r6.
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
@@ -328,6 +362,7 @@ field; read the state report before any draw list. Two snapshot files
 compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
 For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
 rather than a hand-run recipe.
+
 22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
     questions 1–4; until answered these directives are gaps on 1.14d):
     register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
@@ -345,6 +380,7 @@ rather than a hand-run recipe.
     (not yet run on 1.14d). Each form can be tried first with
     `poke.py --forms FILE` (README "Call forms") before it goes into
     `CALL_FORMS`.
+
 23. **Poke runs on Windows** (REC-590): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
@@ -358,7 +394,17 @@ rather than a hand-run recipe.
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
+
 25. **Potion state length and the end-when-full rule** (`q-fix-real-potion-effect`, REC-102): item-use entry 3 body (`0x005BE3F0`, `items/use.md` §3 OQ 1). Recording: hp1 at 10/50 life, state 100 from 0xA8 to 0xA9 = 170 frames, mp1 at 1 mana 51 frames (mana full), hp1 at full life ends the next frame; `misc.txt` says `len` 192 / `calc1` 30 (hp1) and `len` 128 / `calc1` 20 (mp1), so the rule that gives 170 and 51 is not `len`. Answer into `items/use.md` §3; then `wiring/inventory/potion.rs` loses its PROVISIONAL.
+
+26. **Re-record sim-0009 without input** (q-prov-recording, REC-290): the Wine
+    run of the same command equals `traces/sim/tick/sim-0009.json` for ticks
+    0–60, then the Windows trace has a client message at tick 61 (drain: a
+    timer on unit (1, 7), player queue) and the player changes rooms at 121,
+    241, 351: the window got input. Run `record_tick.py --auto ScnAma --seed
+    1234 --ticks 600` again with the mouse outside the game window and replace
+    sim-0009. (Item 20 note: under Wine the front end does take X input,
+    `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
 27. **NPC nearest player and walk in radius** (q-fix-real-unit-seed-order)
   (REC-500, REC-501, `specs/monsters/ai.md` §5.3, §7.2): read the scan-2
@@ -367,6 +413,19 @@ rather than a hand-run recipe.
   failure when the point is the unit's own). d2rs reads: no-size
   distance ≤ 15; point = own + Δ·min(a, dist − b) / dist rounded to
   nearest; it matches Warriv's three recorded arrival walks.
+
+28. **0x8E flag byte at the join** (q-fix-pc1-proto-items) The join's 0x8E CorpseAssign per corpse of another client's player (`0x0053DFB0` from `0x0052C410`, `sim/intents-events.md` §8.3) is sent with flag byte 1 (assign); the flag source at that call is not read. Needed: the byte `0x0052C410` passes to `0x0053DFB0`.
+
+29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+    snapshots read an idle spawned monster's path target (+0x10/+0x12) as
+    its spawn point (`monsters/init.md` §4.1 step 1.1; check
+    `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
+    but `sim/intents-events.md` §7.4 rule 7 says the 0x69 code-8 target
+    is (0, 0) "when the path never had a target", from the recorded
+    `69 1b000000 08 0000 0000 38 06` (frame 2882). Read which field 0x69
+    code 8 copies and whether that monster's target was cleared (an AI
+    request) before its death; answer into §7.4 rule 7. d2rs tests
+    `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
 
 30. **Client-made critters (set C monsters)** (q-fix-real-unit-seed-order)
   (`q-fix-real-town-critters`, `client/model.md` §5 r3 "C monsters",
@@ -378,6 +437,67 @@ rather than a hand-run recipe.
   another source), the GUID counter (why 93), the client set-up
   (`0x004AE8D0`-like: stats, seed, first frame), and their client-side
   AI / motion (the recorded ck frames walk: WL at tick 8 and on).
+
+39. **Evade's reaction (`combat/damage.md` §7.1 step
+  5.2)**: "state 68 list; s, E as above" — does the evade branch also
+  set E flags |= 4 and make the unit form request (E, mode 13, tA, gA,
+  0) like 5.1, or only the `stsound` sound event 12? d2rs
+  (`wiring/action/reaction.rs`) does the full 5.1 skill form plus the
+  sound. Answer into §7.1 step 5.2.
+40. **Missile damage setup weapon of a monster
+  (`missiles/damage.md` §1 step 6)**: d2rs serves `0x00622830` (a type-1
+  owner with an inventory) with the same seam as the player's attack
+  weapon `0x00623990(owner, 1)` (`Pending::attack_weapon`). Is
+  `0x00622830` the same pick (`sim/units.md` §4.7 "Attack weapon") or
+  plain `0x0063C9B0`? Answer into §1 step 6.
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks, input and channels. One command builds the
+save with `d2s-tool`, runs 1.14d with one recorder per channel and d2rs
+with the same save, seed and input, and prints the first difference per
+channel. Read the state report first: a state divergence is found at the
+tick it happens, a draw difference only where it reaches a pixel.
+
+Windows (PC 1; recorders run with `py` directly, no Wine; `D2_GAME_DIR`
+defaults to `game\` in the repo; the save goes to `%USERPROFILE%\Saved
+Games\Diablo II`, `D2_SAVE_DIR` overrides):
+
+```
+py tools\scenario-diff\scenario_diff.py traces\checks\a1-town-arrival-ama.check
+```
+
+Linux / cloud (1.14d under Wine; setup once: `tools/cloud-game/README.md`):
+
+```
+python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+```
+
+| Channel | Worked example | 1.14d recorder | d2rs side | Comparator | First line of the report |
+|---|---|---|---|---|---|
+| `state` | `a1-town-arrival-ama.check` | `record_state.py` | `d2-client state-dump` | `state_diff.py` | `FIRST DIVERGENCE: frame N <unit> field K: 1.14d A vs d2rs B` |
+| `state` + `input` | `walk-town-ama.check` (`input frame 10; click 600 300`) | same, with `--input` | `state-dump --input` | `state_diff.py` | as above |
+| `rng` | `rng-town-arrival-ama.check` | `record_rng.py --frames` + `rng_owners.py` | `state-dump --rng` (feature `rng-trace`, built by the tool) | `rng_diff.py` | frame, owner (`game`, `unit T:G`), draw index, both sides' sites |
+| `packets` | `packets-town-arrival-ama.check` | `record_packets.py --ticks` | `state-dump --packets` | `packets_diff.py` (masks: `specs/tools/scenario-masks.tsv`) | frame, stream (`c2s`, `s2c`), message, byte offset |
+| `draws` | `draws-town-arrival-ama.check` (`draws-at 73`) | `record_frames.py` + `facts_render.py` | `play --dump-draws --at-tick` | `d2-client facts-compare --ignore tick` | `draws.tsv` row and column |
+| pokes | `poke-fallen-town.check` (`at <frame> poke ...`) | `poke.py` in the recorders | `state-dump --poke` | per channel | — |
+
+Options: `--channels state,rng` (override the file), `--orig-only` /
+`--d2rs-only` (one side), `--reuse` (keep outputs in
+`traces/raw/check-<name>/`, re-compare), `--dry-run` (print the
+commands), `--next N`. Exit code: the worst channel's (0 match, 1
+diverged, 2 partial, 3 error). Each comparator also runs alone on two
+files (`py tools/trace-recorder/state_diff.py ORIG D2RS`, `rng_diff.py`,
+`packets_diff.py`).
+
+Known limits: the d2rs side has no hover model (a click on a unit is a
+ground click) and no `key` steps headless; the click target can differ
+by a sub-tile (`scenario-diff.md` OQ 3); 1.14d draws a timing-dependent
+set of ticks, so `draws-at` falls back to its last drawn tick at or
+before it; `rng` and `packets` with pokes or frame input are partial on
+1.14d. For a new behaviour, add a `.check` file (copy the example of the
+channel) rather than a hand-run recipe, and paste the report's first
+lines into the `q-fix-*` row.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
@@ -499,6 +619,10 @@ Then the rest:
   `q-fix-ui-npc-talk-facts`, `q-fix-render-bg-seed`.
 - **Closures (no code change, tests only):** `q-fix-proto-vitals-dx-sign`,
   `q-fix-proto-state-param-sign`, `q-fix-seam-stamina-scale`.
+- **[q-fix-pc1-client-ui] door step 0x004BCB20** Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
+- **[q-fix-pc1-client-ui] NPC introduction handler 0x004B41E0** Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
+- **[q-fix-pc1-client-ui] gamble buy 0x32 u32@9** menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).
+- **[q-fix-pc1-client-ui] skill button state 0x004A8D30** Specify the icon state (0, 1 or 4) the control panel's skill buttons pass as the colored cel draw's `k` (REC-720; `control-panel.md` §7 r2: which conditions give 4, and the town / flag bit `[0x006CE268]` rule). d2rs draws the button icons with k 0.
 31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
 32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
 33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).

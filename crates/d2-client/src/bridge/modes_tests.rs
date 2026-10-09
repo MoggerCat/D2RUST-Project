@@ -3,13 +3,13 @@
 use super::dispatch::HandlerError;
 use super::drlg::DrlgRoomId;
 use super::modes::{
-    mode_request, monster_mode, player_mode as pm, FATAL_OBJECT_CODE, FATAL_PLAYER_CODE,
+    mode_request, monster_table_mode, player_mode as pm, FATAL_OBJECT_CODE, FATAL_PLAYER_CODE,
 };
 use super::objects::{ObjSound, ObjUnit, NO_LOCAL_DISTANCE};
 use super::output::{Output, Outputs};
 use super::world::{
-    ActiveRoom, ClientUnit, ClientWorld, ModelInputs, ObjectRow, UnitKey, ITEM, MISSILE, MONSTER,
-    OBJECT, PLAYER,
+    ActiveRoom, ClientUnit, ClientWorld, ModelInputs, MonsterClass, ObjectRow, UnitKey, ITEM,
+    MISSILE, MONSTER, OBJECT, PLAYER,
 };
 
 const P: UnitKey = UnitKey::new(PLAYER, 1);
@@ -216,27 +216,104 @@ fn item_code_2_and_missiles() {
     assert_eq!(w.units[&m].last_mode_request, None);
 }
 
-// Covers: specs/client/model.md §8 r2
+/// Inputs whose `monstats` has class 0 with a `monstats2` row (the
+/// class gate of `client/model.md` §19 r3).
+fn monster_inputs() -> ModelInputs {
+    let mut i = ModelInputs::default();
+    i.tables.monsters = vec![Some(MonsterClass::default())];
+    i
+}
+
+/// The mode a monster in `mode` ends in after the request `code`.
+fn monster_after(i: &ModelInputs, mode: u32, code: u8, r: [i32; 7]) -> u32 {
+    let k = UnitKey::new(MONSTER, 5);
+    let mut w = world_with(k, mode);
+    req(&mut w, i, k, code, r).unwrap();
+    w.units[&k].mode
+}
+
+// Covers: specs/client/model.md §19 r4, §19 r3
 #[test]
-fn monster_mode_is_the_mode_its_code_was_sent_for() {
-    // PROVISIONAL reading of open question 1 (`sim/intents-events.md`
-    // §7.4 mode table).
-    assert_eq!(monster_mode(8), Some(0));
-    assert_eq!(monster_mode(7), Some(1));
-    assert_eq!(monster_mode(1), Some(2));
-    assert_eq!(monster_mode(0), Some(2));
-    assert_eq!(monster_mode(9), Some(12));
-    assert_eq!(monster_mode(12), Some(8));
-    assert_eq!(monster_mode(20), Some(13));
-    assert_eq!(monster_mode(23), Some(15));
-    assert_eq!(monster_mode(2), None);
-    let i = ModelInputs::default();
+fn monster_mode_follows_the_dispatch_table() {
+    let i = monster_inputs();
+    // 7: walk after the position check (far from (r0, r1)).
+    assert_eq!(monster_after(&i, 1, 0x07, R0), 2);
+    // 7 within 1 sub-tile of (r0, r1): F.
+    assert_eq!(monster_after(&i, 2, 0x07, [51, 50, 0, 0, 0, 0, 0]), 1);
+    // 2, 3, 0x19 and an unknown code: F (mode 1 from 1..15 except 12).
+    assert_eq!(monster_after(&i, 2, 0x02, R0), 1);
+    assert_eq!(monster_after(&i, 12, 0x02, R0), 12);
+    assert_eq!(monster_after(&i, 0, 0x03, R0), 0);
+    assert_eq!(monster_after(&i, 4, 0x19, R0), 1);
+    assert_eq!(monster_after(&i, 4, 0x1E, R0), 1);
+    // 0x13: no mode change.
+    assert_eq!(monster_after(&i, 4, 0x13, R0), 4);
+    assert_eq!(monster_after(&i, 1, 0x08, R0), 0);
+    assert_eq!(monster_after(&i, 1, 0x06, R0), 3);
+    assert_eq!(monster_after(&i, 1, 0x12, R0), 6);
+    assert_eq!(monster_after(&i, 1, 0x14, R0), 13);
+    assert_eq!(monster_after(&i, 1, 0x01, R0), 2);
+    assert_eq!(monster_after(&i, 1, 0x17, R0), 15);
+    // 0 / 0x18: path to a unit; the unit absent → F.
+    assert_eq!(monster_after(&i, 4, 0x00, [0, 77, 0, 0, 0, 0, 0]), 1);
+    assert_eq!(monster_after(&i, 4, 0x18, [0, 5, 0, 0, 0, 0, 0]), 1);
+    assert_eq!(
+        monster_after(&i, 4, 0x00, [MONSTER as i32, 5, 0, 0, 0, 0, 0]),
+        2
+    );
+    assert_eq!(
+        monster_after(&i, 4, 0x18, [MONSTER as i32, 5, 0, 0, 0, 0, 0]),
+        15
+    );
+    // The T table of the point and unit groups.
+    for (code, mode) in [
+        (0x04, 7),
+        (0x05, 7),
+        (0x0A, 4),
+        (0x0B, 4),
+        (0x0C, 8),
+        (0x0D, 8),
+        (0x0E, 9),
+        (0x0F, 9),
+        (0x10, 5),
+        (0x11, 5),
+        (0x1A, 10),
+        (0x1B, 10),
+        (0x1C, 11),
+        (0x1D, 11),
+    ] {
+        assert_eq!(monster_table_mode(code), Some(mode));
+        assert_eq!(monster_after(&i, 1, code, R0), mode, "{code:#x}");
+    }
+    assert_eq!(monster_table_mode(0x07), None);
+    // Code 9 kills.
     let k = UnitKey::new(MONSTER, 5);
     let mut w = world_with(k, 1);
     req(&mut w, &i, k, 9, R0).unwrap();
     assert!(w.units[&k].is_dead());
     req(&mut w, &i, k, 2, R0).unwrap();
     assert_eq!(w.units[&k].mode, 12);
+}
+
+// Covers: specs/client/model.md §19 r4
+#[test]
+fn monster_code_7_in_state_attached_falls_back() {
+    let i = monster_inputs();
+    let k = UnitKey::new(MONSTER, 5);
+    let mut w = world_with(k, 2);
+    w.units.get_mut(&k).unwrap().states.insert(143);
+    req(&mut w, &i, k, 0x07, R0).unwrap();
+    assert_eq!(w.units[&k].mode, 1);
+}
+
+// Covers: specs/client/model.md §19 r3
+#[test]
+fn a_monster_class_without_rows_has_no_mode_switch() {
+    let i = ModelInputs::default();
+    assert_eq!(monster_after(&i, 1, 0x0A, R0), 1);
+    let mut i = ModelInputs::default();
+    i.tables.monsters = vec![None];
+    assert_eq!(monster_after(&i, 1, 0x0A, R0), 1);
 }
 
 /// PROVISIONAL (client/model.md OQ 1; REC-51): codes 0x15 / 0x16 (S→C
@@ -246,7 +323,7 @@ fn monster_mode_is_the_mode_its_code_was_sent_for() {
 #[test]
 fn skill_codes_set_the_skill_animation_mode() {
     use super::world::SkillRow;
-    let mut i = ModelInputs::default();
+    let mut i = monster_inputs();
     i.tables.skills = vec![
         SkillRow::default(),
         SkillRow {
@@ -254,8 +331,17 @@ fn skill_codes_set_the_skill_animation_mode() {
             monanim: 4,
             ..SkillRow::default()
         },
+        SkillRow {
+            anim: 10,
+            monanim: 14,
+            ..SkillRow::default()
+        },
     ];
     let m = UnitKey::new(MONSTER, 2);
+    // A monster skill of mode 0xE (sequence) sets no mode (§19 r4).
+    let mut w = world_with(m, 1);
+    req(&mut w, &i, m, 0x15, [2, -1, 0, 0, 0, 0, 0]).unwrap();
+    assert_eq!(w.units[&m].mode, 1);
     for (key, code, want) in [(P, 0x16, 10), (P, 0x15, 10), (m, 0x16, 4), (m, 0x15, 4)] {
         let mut w = world_with(key, 1);
         req(&mut w, &i, key, code, [1, -1, 0, 0, 0, 0, 0]).unwrap();

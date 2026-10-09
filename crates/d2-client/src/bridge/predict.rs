@@ -19,7 +19,9 @@
 //!   before the 0x15 that places the player at the arrival point; the
 //!   walk is held until the player's client room holds its target (so it
 //!   starts from the arrival point, after the level change) and a walk
-//!   the player sends replaces it ([`Predict::server_walk`]);
+//!   the player sends replaces it ([`Predict::server_walk`]); after a
+//!   waypoint travel the client sent (C→S 0x49) the walk is dropped, as
+//!   1.14d never walks a waypoint arrival out (REC-288, measured);
 //! - each server tick the predicted position steps along the player's own
 //!   path over the client DRLG ([`ClientPath`]: the server's path code,
 //!   `sim/pathing.md` §1.2–§9, so it stops at the same wall and goes
@@ -42,7 +44,8 @@
 //! REC-277 (d)): the client path step (`ClientPath`'s module doc), the
 //! straight-line fallback, the
 //! snap rule, the tick step and the facing (the client turns, §8.5) are
-//! not 1.14d facts. PROVISIONAL (REC-288): that the 0x0D walk outlives
+//! not 1.14d facts. PROVISIONAL (REC-570; REC-288 settled the waypoint
+//! case): for a warp or portal arrival, that the 0x0D walk outlives
 //! the 0x15 placement after it (the placement's teleport sets the path's
 //! point count to 0, `sim/path-placement.md` §6 r4; whether the client
 //! then walks on to the request's target is OQ2), and the hold until the
@@ -276,6 +279,9 @@ pub struct Predict {
     /// A server walk (S→C 0x0D code 1) whose target is not yet in the
     /// player's client room ([`Self::server_walk`]).
     held: Option<(u16, u16)>,
+    /// The client sent a waypoint travel (C→S 0x49) whose arrival walk
+    /// request has not come yet ([`Self::waypoint_sent`]).
+    waypoint: bool,
     /// The server tick the walk under way started on (kept while a new
     /// click re-targets it; cleared when it ends): the walk animation's
     /// start ([`Self::walk_since`]).
@@ -287,6 +293,9 @@ pub struct Predict {
     /// for: a new walk or a snap ([`Self::observe`]) re-places it.
     path_for: Option<(Walk, (i64, i64))>,
 }
+
+/// C→S 0x49, waypoint travel (`world/waypoints.md`).
+const C2S_WAYPOINT: u8 = 0x49;
 
 /// The player mode request code "walk to (r0, r1)" (`client/model.md`
 /// §8 r4, code 0x01).
@@ -351,6 +360,7 @@ impl Predict {
                 act: world.act.as_ref().map(|a| a.act),
                 requests: p.mode_requests,
                 held: None,
+                waypoint: self.waypoint,
                 since: None,
                 path: ClientPath::default(),
                 path_for: None,
@@ -387,6 +397,14 @@ impl Predict {
         };
         if p.mode_requests != self.requests {
             self.requests = p.mode_requests;
+            // A waypoint arrival (`world/waypoints.md` §7 r7): 1.14d takes
+            // the 0x15 point and never walks to the 0x0D's x + 3, y + 3
+            // (the teleport zeroes the path, `sim/path-placement.md` §6
+            // r4; measured, REC-288, `traces/client/model/client-0002.json`).
+            if std::mem::take(&mut self.waypoint) {
+                self.held = None;
+                return;
+            }
             self.held = p
                 .last_mode_request
                 .filter(|r| r.code == CODE_WALK_TO_POINT)
@@ -412,6 +430,12 @@ impl Predict {
             to: WalkTo::Point(x, y),
             run: false,
         });
+    }
+
+    /// The client sent a waypoint travel (C→S 0x49): the next server walk
+    /// request is that arrival's walk-out, which is not walked.
+    pub fn waypoint_sent(&mut self) {
+        self.waypoint = true;
     }
 
     /// A walk intent the client sent: the new target (a held server walk
@@ -642,7 +666,10 @@ impl Predict {
 /// [`Predict::frame`] (the play app boxes the link, so it cannot be
 /// reached through the bridge's `link_mut`).
 #[derive(Clone, Debug, Default)]
-pub struct WalkTap(std::sync::Arc<std::sync::Mutex<Vec<Walk>>>);
+pub struct WalkTap(
+    std::sync::Arc<std::sync::Mutex<Vec<Walk>>>,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+);
 
 impl WalkTap {
     /// The walks sent since the last call, in send order.
@@ -654,12 +681,21 @@ impl WalkTap {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).push(w);
     }
 
-    /// Records `msg` when it is a walk intent ([`walk_of`]), as
-    /// [`PredictLink`] does for what it sends: for a sender that reaches
-    /// the server another way (a test rig's direct link).
+    /// Whether a waypoint travel (C→S 0x49) was sent since the last call.
+    pub fn take_waypoint(&self) -> bool {
+        self.1.swap(false, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Records `msg` when it is a walk intent ([`walk_of`]) or a waypoint
+    /// travel (C→S 0x49), as [`PredictLink`] does for what it sends: for a
+    /// sender that reaches the server another way (a test rig's direct
+    /// link).
     pub fn record(&self, msg: &[u8]) {
         if let Some(w) = walk_of(msg) {
             self.push(w);
+        }
+        if msg.first() == Some(&C2S_WAYPOINT) {
+            self.1.store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }
@@ -716,6 +752,22 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
 
     fn receive(&mut self) -> Vec<Vec<u8>> {
         self.inner.receive()
+    }
+}
+
+/// Pokes pass through (`state-dump` runs its bridge on a [`PredictLink`]).
+impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
+    type Error = L::Error;
+    fn poke(&mut self, op: &d2_sim::poke::PokeOp) -> Result<d2_sim::poke::PokeResult, L::Error> {
+        self.inner.poke(op)
+    }
+}
+
+/// Snapshots pass through (`state-dump`).
+impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> {
+    type Error = L::Error;
+    fn state_snapshot(&mut self) -> Result<d2_sim::debug::state::StateSnapshot, L::Error> {
+        self.inner.state_snapshot()
     }
 }
 
@@ -1056,6 +1108,39 @@ mod tests {
         w.room_units.place(key, Some(DrlgRoomId(2)));
         p.frame(&w, [], false, SPEEDS);
         assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(1013, 23)));
+    }
+
+    /// The measured waypoint arrival (REC-288, `traces/client/model/
+    /// client-0002.json`, Rogue Encampment → Cold Plains): after the
+    /// client's C→S 0x49 the server's 0x0D walk to the arrival point
+    /// (x + 3, y + 3) comes with the 0x15 at (5168, 4658); 1.14d takes the 0x15
+    /// point and never walks on.
+    // Covers: specs/client/model.md §8 r4; specs/world/waypoints.md §7 r7
+    #[test]
+    fn a_waypoint_arrival_is_not_walked_out() {
+        use crate::bridge::drlg::DrlgRoomId;
+        let (mut w, key) = two_levels(20, 20);
+        w.active_rooms.as_mut().unwrap()[1].x0 = 5150;
+        w.active_rooms.as_mut().unwrap()[1].y0 = 4640;
+        let mut p = Predict::new();
+        p.frame(&w, [], true, SPEEDS);
+        let tap = WalkTap::default();
+        tap.record(&[0x49, 1, 0, 0, 0, 3, 0, 0, 0]);
+        assert!(tap.take_waypoint());
+        assert!(!tap.take_waypoint(), "taken once");
+        p.waypoint_sent();
+        request(&mut w, key, 1, 5168 + 3, 4658 + 3);
+        w.units.get_mut(&key).unwrap().position = Some((5168, 4658));
+        w.room_units.place(key, Some(DrlgRoomId(2)));
+        for _ in 0..40 {
+            p.frame(&w, [], true, SPEEDS);
+        }
+        assert!(p.walking().is_none());
+        assert_eq!(p.cell(), Some((5168, 4658)));
+        // The next server walk (not a waypoint arrival) is held again.
+        request(&mut w, key, 1, 5170, 4660);
+        p.frame(&w, [], false, SPEEDS);
+        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(5170, 4660)));
     }
 
     // Covers: specs/client/model.md §8 r4

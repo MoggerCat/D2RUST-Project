@@ -6,8 +6,8 @@
 //!
 //! The text is built from the item's last 0x9C / 0x9D stream, decoded
 //! with `d2_proto::item_bits::decode` over the game's item tables. The
-//! box drawing ([`draw_tip`]) is d2rs-own (the pop-up queue owner is
-//! `ui/panels.md` §5 step 10, item-tips.md open question 3).
+//! box is the pop-up draw of `ui/text.md` §8 at the item's hover anchor
+//! ([`draw_tip_at`], `ui/item-tips.md` §2 r4).
 //! Unverified until the `text-0002` capture cases run (rule 10).
 
 use std::collections::BTreeMap;
@@ -23,16 +23,14 @@ use d2_proto::item_bits::{decode, ItemBits, Stat};
 use d2_server::adapters::item_bits::TablesLookup;
 use d2_sim::items::ItemTables;
 
-use super::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect};
+use super::draw::UiDrawSink;
+use super::geom::Point;
 use super::item_tip_build::{Build, ItemText, PriceText, TipCtx, TipText};
 use super::item_tip_desc::{self as desc, StatDesc};
 use super::item_tip_props::StatList;
-use super::original::hud::{FILL_FILE, FILL_H, FILL_W};
 use super::original::FontMeasure;
 use super::panel::StringLookup;
 use super::panels::UiFiles;
-use super::text::TextOpts;
 
 /// Text colour indexes (`ÿc` codes, `ui/text.md` §5).
 pub mod color {
@@ -48,12 +46,8 @@ pub mod color {
     pub const TEMPERED: u16 = 10;
 }
 
-/// The font of the box (Font16) and the line step.
+/// The font of the pop-up (Font16, `hud_tips::TIP_FONT`).
 const FONT: u16 = 1;
-/// d2rs-own, unverified: pixels per line.
-const LINE_H: i32 = 18;
-/// The fill frame of the box (`hud::fill_frames`: the darkest colour).
-const DARK: u32 = 4;
 
 /// One line of a tip: UTF-16 text and its colour.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -707,10 +701,102 @@ impl desc::DescNames for ItemTips {
     }
 }
 
-/// Draws a tip box for `lines` near `mouse` on a frame of `screen`
-/// (width, height): dark fill tiles and one centered line each, over
-/// everything drawn before. d2rs-own, unverified: above the point when it
-/// fits, else below.
+/// The hover anchor of an item (`ui/inventory.md` §5 r1; the globals
+/// `0x00721E3C` x, `0x00721E40` top, `0x00721E48` bottom).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TipAnchor {
+    pub x: i32,
+    pub top: i32,
+    pub bottom: i32,
+}
+
+impl TipAnchor {
+    /// The anchor of an item at grid cell (`c`, `r`) of size `w` × `h`
+    /// cells in a grid at (`left`, `top`) with cells `cell_w` × `cell_h`
+    /// (`ui/inventory.md` §5 r1): x = left + cellW·c + (w·cellW)/2, top =
+    /// top + cellH·r, bottom = top + cellH·(r + h).
+    pub fn of_cell(
+        (left, top): (i32, i32),
+        (cell_w, cell_h): (i32, i32),
+        (c, r): (i32, i32),
+        (w, h): (i32, i32),
+    ) -> Self {
+        TipAnchor {
+            x: left + cell_w * c + (w * cell_w) / 2,
+            top: top + cell_h * r,
+            bottom: top + cell_h * (r + h),
+        }
+    }
+
+    /// PROVISIONAL (REC-740): a bare point (no item rectangle known to
+    /// the caller) is a zero-height anchor.
+    pub fn at_point(p: Point) -> Self {
+        TipAnchor {
+            x: p.x,
+            top: p.y,
+            bottom: p.y,
+        }
+    }
+}
+
+/// The one pop-up text of `lines` (top line first), bottom line first
+/// with a colour code where the colour changes (`ui/text.md` §7); the
+/// colour of the first (bottom) line is the pop-up's.
+fn popup_text(lines: &[TipLine]) -> (Vec<u16>, u16) {
+    let mut out: Vec<u16> = Vec::new();
+    let mut cur = None;
+    for (i, l) in lines.iter().rev().enumerate() {
+        if i > 0 {
+            out.push(u16::from(b'\n'));
+        }
+        if cur != Some(l.color) {
+            out.extend([0xFF, u16::from(b'c'), u16::from(b'0') + l.color]);
+            cur = Some(l.color);
+        }
+        out.extend_from_slice(&l.text);
+    }
+    out.truncate(1023);
+    (out, lines.last().map_or(0, |l| l.color))
+}
+
+/// Queues the tip of `lines` as the hover pop-up `0x00502280(text, x, y,
+/// colour, 1)` (`ui/item-tips.md` §2 r4): x := the anchor's x; y := the
+/// anchor's top when top − H > 0, else bottom + H, H the text height
+/// (`0x00502520`); the box and text are the pop-up draw of
+/// [`super::hud_tips::push_popup`] (`ui/text.md` §8).
+pub fn draw_tip_at(
+    lines: &[TipLine],
+    anchor: TipAnchor,
+    screen: (i32, i32),
+    fonts: Option<&FontMeasure>,
+    out: &mut dyn UiDrawSink,
+) {
+    if lines.is_empty() {
+        return;
+    }
+    let (text, color) = popup_text(lines);
+    // H: the pop-up's rectangle height away from every clamp.
+    let height = fonts
+        .and_then(|f| f.popup(FONT, &text, Point::new(0, 5000), true, (10_000, 10_000)))
+        .map_or(0, |fr| fr.rect.1.y - fr.rect.0.y);
+    let y = if anchor.top - height > 0 {
+        anchor.top
+    } else {
+        anchor.bottom + height
+    };
+    super::original::hud_tips::push_popup(
+        text,
+        Point::new(anchor.x, y),
+        color,
+        true,
+        screen,
+        fonts,
+        out,
+    );
+}
+
+/// [`draw_tip_at`] for a caller that knows only the mouse (the anchor is
+/// the point; `files` is no longer read).
 pub fn draw_tip(
     lines: &[TipLine],
     mouse: Point,
@@ -719,56 +805,8 @@ pub fn draw_tip(
     files: &UiFiles,
     out: &mut dyn UiDrawSink,
 ) {
-    if lines.is_empty() {
-        return;
-    }
-    let width = |l: &TipLine| {
-        fonts
-            .and_then(|f| f.max_width(FONT, &l.text))
-            .unwrap_or(8 * l.text.len() as i32)
-    };
-    let w = lines.iter().map(width).max().unwrap_or(0) + 16;
-    let h = LINE_H * lines.len() as i32 + 8;
-    let x = (mouse.x - w / 2).clamp(0, (screen.0 - w).max(0));
-    let mut y = mouse.y - h - 12;
-    if y < 0 {
-        y = (mouse.y + 28).min((screen.1 - h).max(0));
-    }
-    if let Some(file) = files.id(FILL_FILE) {
-        let (tw, th) = (FILL_W as i32, FILL_H as i32);
-        let mut ty = y;
-        while ty < y + h {
-            let mut tx = x;
-            while tx < x + w {
-                let cw = (x + w - tx).min(tw);
-                let ch = (y + h - ty).min(th);
-                out.push(UiDraw::Image(ImageRequest {
-                    image: ImageRef { file, frame: DARK },
-                    at: Point::new(tx, ty),
-                    clip: Rect::new(tx, ty, cw as u16, ch as u16),
-                    look: crate::ui::CelLook::PLAIN,
-                }));
-                tx += tw;
-            }
-            ty += th;
-        }
-    }
-    for (i, l) in lines.iter().enumerate() {
-        out.push(UiDraw::Text(TextRequest {
-            text: l.text.clone(),
-            at: Point::new(x, y + 4 + LINE_H * (i as i32 + 1) - 3),
-            style: TextStyle {
-                font: FONT,
-                color: l.color,
-            },
-            opts: TextOpts::Draw {
-                centered: true,
-                block_w: Some(w),
-                mode: 5,
-            },
-            clip: Rect::new(0, 0, screen.0 as u16, screen.1 as u16),
-        }));
-    }
+    let _ = files;
+    draw_tip_at(lines, TipAnchor::at_point(mouse), screen, fonts, out);
 }
 
 #[cfg(test)]

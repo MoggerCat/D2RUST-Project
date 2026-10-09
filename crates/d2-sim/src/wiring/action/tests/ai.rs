@@ -218,26 +218,90 @@ fn good_npc_ranged_takes_ai_turns() {
     fx.assert_clean();
 }
 
+/// The log lines of `m` starting with `p`.
+fn logged(fx: &Fx, p: &str, m: UnitId) -> Vec<String> {
+    let p = format!("{p} {}", m.0);
+    fx.sim
+        .sys
+        .hooks
+        .x
+        .log
+        .iter()
+        .filter(|l| l.starts_with(&p))
+        .cloned()
+        .collect()
+}
+
+/// Type-0 events of `m` with frame codes `codes`, one per frame from 1.
+fn frame_events(fx: &mut Fx, m: UnitId, codes: &[u32]) {
+    for (i, &c) in codes.iter().enumerate() {
+        fx.game
+            .schedule_event(m, u32::from(event::MODE_CHANGE), 1 + i as i32, None, c, 0)
+            .unwrap();
+    }
+    for _ in codes {
+        fx.frame();
+    }
+}
+
 // Covers: specs/skills/use.md §5.2
 #[test]
-fn attack_event0_runs_the_skill_frame_and_keeps_the_frame_code() {
-    // PROVISIONAL (REC-111): the attack-family event 0 `0x005A7670` runs the
-    // skill part of the sequence frame with unit +0x4E := the timer's code.
+fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
+    // `use.md` §5.2 "Monsters" `0x005A7670`: no used skill and a mode that
+    // does not move (A2: class 0's monstats2 mv bits are A1 only) → the
+    // strike (mode missile, else melee on the path target) on every event
+    // 0, whatever its frame code. +0x4E keeps the timer's code.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK2);
+    frame_events(&mut fx, m, &[1, 2, 4]);
+    let want = vec![format!("attack strike {} false", m.0); 3];
+    assert_eq!(logged(&fx, "attack strike", m), want);
+    assert!(logged(&fx, "attack skill", m).is_empty());
+    assert!(logged(&fx, "sequence frame", m).is_empty());
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 4);
+}
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn attack_event0_of_a_moving_mode_strikes_only_at_its_trigger_frame() {
+    // A1 moves for class 0 (mv bit 4): step, refresh, then the strike
+    // (moving flag set) only when trigger(U) holds, i.e. +0x4E = 1.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.mode = u32::from(mode::ATTACK1);
+        r.anim.frame_count = 1 << 16;
+    }
+    let x0 = fx.sim.sys.hooks.x.position(m).0;
+    frame_events(&mut fx, m, &[2, 1, 3]);
+    assert_eq!(
+        logged(&fx, "attack strike", m),
+        [format!("attack strike {} true", m.0)]
+    );
+    // One path step per event (the fake step moves one subtile).
+    assert_eq!(fx.sim.sys.hooks.x.position(m).0, x0 + 3);
+}
+
+// Covers: specs/skills/use.md §5.2
+#[test]
+fn attack_event0_with_a_used_skill_runs_its_branch_on_every_event() {
+    // With a used skill the do runs on each event 0 regardless of +0x4E
+    // (no frame-code test), and the no-skill strike never runs.
     let mut fx = Fx::new();
     let m = monster(&mut fx);
     fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK1);
-    fx.game
-        .schedule_event(m, u32::from(event::MODE_CHANGE), 1, None, 1, 0)
-        .unwrap();
-    fx.frame();
-    assert!(
-        fx.sim
-            .hooks()
-            .x
-            .log
-            .contains(&format!("sequence frame {}", m.0)),
-        "{:?}",
-        fx.sim.hooks().x.log
+    fx.sim.sys.hooks.x.used.insert(
+        m,
+        crate::skills::SkillEntry {
+            skill: 0,
+            base: 1,
+            owner_guid: -1,
+            ..crate::skills::SkillEntry::default()
+        },
     );
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 1);
+    frame_events(&mut fx, m, &[3, 0, 1]);
+    assert_eq!(logged(&fx, "attack skill", m).len(), 3);
+    assert!(logged(&fx, "attack strike", m).is_empty());
 }

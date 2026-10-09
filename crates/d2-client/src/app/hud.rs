@@ -115,14 +115,31 @@ pub fn char_tables(archives: &dyn TableFiles) -> Result<CharTables, String> {
                     name_id: d.str_name,
                     descdam: d.descdam,
                     descatt: d.descatt,
+                    src_dam: s.srcdam,
                 },
             );
         }
     }
+    let weapons: Vec<d2_data::tables::Weapons> =
+        decode_all(table("weapons")?).map_err(|e| e.to_string())?;
+    let weapons = weapons
+        .iter()
+        .map(|w| {
+            (
+                w.code,
+                crate::ui::char_feed::WeaponRow {
+                    str_bonus: i32::from(w.strbonus as i16),
+                    dex_bonus: i32::from(w.dexbonus as i16),
+                },
+            )
+        })
+        .collect();
     Ok(CharTables {
         class_keys,
         state_flags,
         skill_desc,
+        tohit_factor: chars.iter().map(|c| c.tohitfactor as i32).collect(),
+        weapons,
     })
 }
 

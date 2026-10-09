@@ -13,7 +13,10 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_rng.py` | Recomputes every recorded event from its own seed-before with `d2rng.py`; exit 1 on any mismatch |
 | `convert_rng.py` | Splits a raw file into seed chains and writes chosen chains as `traces/sim/rng/sim-NNNN.json` |
 | `d2rng.py` | The RNG rule from the spec (step and the five helpers), used by the two above |
-| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; writes `traces/raw/<time>-packets.jsonl` (gitignored). Spec: `specs/sim/intents-events.md` |
+| `rng_owners.py` | Owner post-pass of a `record_rng.py --frames` file: `game`, `unit T:G` or `other:…` on every draw and seed write (`specs/tools/rng-trace.md` §2); `--selftest` |
+| `rng_diff.py` | Compares a 1.14d and a d2rs (`d2-client state-dump --rng`) RNG recording: per frame, per owner, draw by draw; first divergence, next N, the game seed's draws in order, per-owner summary; exit 0/1/2/3 as `state_diff.py`; `--selftest`. Spec: `specs/tools/rng-trace.md` |
+| `record_packets.py` | Launches `game/Game.exe` under the debugger, logs every client→server message at the server's queue read and dispatch (with result), every server→client message as queued and every flushed buffer, with tick markers and the frame number; `--ticks N` ends after tick N's flush; writes `traces/raw/<time>-packets.jsonl` (gitignored; format `packets-raw-1`). Specs: `specs/sim/intents-events.md`, `specs/tools/packets-trace.md` |
+| `packets_diff.py` | Compares a 1.14d packets recording with a d2rs one (`d2-client state-dump --packets`): per frame the C→S, S→C and flushed-buffer streams record by record (id, size, bytes; `scenario-masks.tsv` masks; transport rows excluded); first divergence with context, next N, summary; exit 0/1/2/3; `--selftest`. Spec: `specs/tools/packets-trace.md` |
 | `path_tables.py` | Checks `specs/sim/path-tables.tsv` against the reference `Game.exe` file image (no process); `--write` regenerates it, `--perturb N` must report row N, `--selftest` perturbs every row. Spec: `specs/sim/pathing.md` |
 | `check_packets.py` | Checks a packets recording against `specs/sim/intents-events.md` and its two TSVs (rules R1–R7); `--perturb N` must report seq N; `--selftest` runs a synthetic trace and every single-byte perturbation |
 | `record_tick.py` | Launches `game/Game.exe` under the debugger, logs each server tick and its step markers, every timer event scheduled, cancelled and run, every unit/room/update-queue list change, and list snapshots every 25 frames; writes `traces/raw/<time>-tick.jsonl` (gitignored). Specs: `specs/sim/tick.md`, `specs/sim/unit-order.md` |
@@ -76,6 +79,27 @@ thread can run through a breakpoint that is temporarily removed.
 Cost: every inline draw is about six debug events. With all hooks the
 game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 `--no-inline` is near full speed.
+
+### Frames and owners (`--frames`, version 0.2.0)
+
+```
+py tools/trace-recorder/record_rng.py --frames --ticks 40 --auto ScnAma --seed 1234 --seconds 240
+py tools/trace-recorder/rng_diff.py traces/raw/<time>-rng.jsonl traces/raw/<name>.d2rs.rng.jsonl
+```
+
+`--frames` also hooks the tick entry `0x0052D870` (ECX = game; the first
+game that ticks), writes a `tick` record per tick (`f` = game +0xA8 + 1,
+the game seed at game +0xD0, every unit of the five server hash lists
+with its seed at unit +0x20), puts `frame` (0 before the first tick) on
+every record and, on helper / setter records, an owner hint (`game_seed`
+or `unit` "T:G" when seed address − 0x20 is a server unit); after the run
+`rng_owners.py` adds `owner` to every record. `--ticks N` stops at the
+entry of tick N + 1. `--skip-inline drlg` (or `LO-HI,…`) leaves the
+DRLG inline sites unhooked (faster; those draws are missing). The run
+prints its speed. Measured under Wine (2026-10-09, `ScnAma`, seed 1234,
+all 846 inline sites): arrival at 58 s, 40 ticks recorded by 63 s;
+16,152 records, 103,471 debug events (1,643/s). Details and the
+comparison: `specs/tools/rng-trace.md`.
 
 ## Raw format (`rng-raw-1`, JSON lines)
 
@@ -172,6 +196,23 @@ centre count), `end` (stops the recording; the game is killed as
 always). Every log line also goes to the recorder's footer notes.
 Arrival takes about 6.3 s after launch (about 23 s with `record_rng.py`
 inline hooks).
+
+Frame-anchored steps (the shared input form of
+`specs/tools/scenario-diff.md` §2 rule 4, which d2rs `state-dump --input`
+and `play --input` also take): `frame F` waits for the tick-return stop
+`0x0052FD1E` of game frame F − 1 (game +0xA8); the steps after it are
+posted while the game is stopped there, so the window takes them before
+frame F's drain. After a `frame` step, `click` / `rclick` / `key` post
+all their messages at once and `hold X Y N` holds N frames (the release
+posted at the stop of frame F + N − 1). The stop is the one `poke.py`
+uses (`AutoStart.attach` arms it only when nobody did): `record_state.py`,
+`record_frames.py` and `poke.py` attach it when the script has a `frame`
+step; other recorders never reach it (a note says so). Each posted step
+is a footer note `autostart: frame F: <step> posted at the stop of frame
+S` (S > F − 1: late, noted). Measured 2026-10-09 under Wine:
+`record_state.py --auto ScnAma --seed 1234 --ticks 60 --input "frame 10;
+click 600 300"` twice: identical snapshots; the player walks (mode 6,
+target (4880, 4223)) from frame 10 and stops at frame 32.
 
 Proved: a click at (600, 300) walks the player; `goto 2 119` opens the
 Rogue Encampment waypoint; with `TestSor` (expansion, `d2s-tool new

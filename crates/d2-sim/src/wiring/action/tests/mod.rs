@@ -181,6 +181,21 @@ impl Pending for TestPending {
     ) {
         h.x.log.push(format!("sequence frame {}", unit.0));
     }
+    fn monster_attack_skill(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+    ) {
+        h.x.log.push(format!("attack skill {}", unit.0));
+    }
+    fn monster_attack_strike(
+        h: &mut ActionHooks<Self>,
+        _: &mut crate::units::hooks::Sim<'_>,
+        unit: UnitId,
+        moving: bool,
+    ) {
+        h.x.log.push(format!("attack strike {} {moving}", unit.0));
+    }
     fn unit_event(
         &mut self,
         event: u8,

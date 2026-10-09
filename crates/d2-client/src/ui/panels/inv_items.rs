@@ -17,7 +17,10 @@
 //! - the layout without `inventory.bin` rows: the grid of the spec's
 //!   measured record 0 / 16 (`panels.md` §Test vectors), no equipment
 //!   boxes;
-//! - the drop cell `0x00486BD0` (not specified) is the cursor cell;
+//! - the drop cell `0x00486BD0` (not specified, REC-745) is the cell of
+//!   the press point itself ([`grid_drop_cell`]), the kept cursor cell
+//!   ([`ItemsUi::track_hover`]) is read for the overlap and the sent
+//!   message only;
 //! - tints (§3 r2–r3, §6 r4), sockets, ethereal draw mode and the
 //!   item's colour remap are not drawn ([`super::super::ImageRequest`]
 //!   has no draw mode or remap field).
@@ -63,6 +66,8 @@ const NO_BOX: EquipBox = EquipBox {
     top: 0,
     w: 0,
     h: 0,
+    right: 0,
+    bottom: 0,
 };
 
 /// The layout of an `inventory.bin` row (`panels.md` §9.2: grid, then the
@@ -70,11 +75,13 @@ const NO_BOX: EquipBox = EquipBox {
 /// rArm 4, lArm 5, rHand 6, lHand 7, belt 8, feet 9, gloves 10; each box
 /// left, top and the width / height bytes).
 pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
-    let b = |left: u32, top: u32, w: u8, h: u8| EquipBox {
+    let b = |left: u32, top: u32, w: u8, h: u8, right: u32, bottom: u32| EquipBox {
         left: left as i32,
         top: top as i32,
         w: i32::from(w),
         h: i32::from(h),
+        right: right as i32,
+        bottom: bottom as i32,
     };
     InvLayout {
         grid: GridRecord {
@@ -89,16 +96,86 @@ pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
         },
         equip: [
             NO_BOX,
-            b(r.headleft, r.headtop, r.headwidth, r.headheight),
-            b(r.neckleft, r.necktop, r.neckwidth, r.neckheight),
-            b(r.torsoleft, r.torsotop, r.torsowidth, r.torsoheight),
-            b(r.rarmleft, r.rarmtop, r.rarmwidth, r.rarmheight),
-            b(r.larmleft, r.larmtop, r.larmwidth, r.larmheight),
-            b(r.rhandleft, r.rhandtop, r.rhandwidth, r.rhandheight),
-            b(r.lhandleft, r.lhandtop, r.lhandwidth, r.lhandheight),
-            b(r.beltleft, r.belttop, r.beltwidth, r.beltheight),
-            b(r.feetleft, r.feettop, r.feetwidth, r.feetheight),
-            b(r.glovesleft, r.glovestop, r.gloveswidth, r.glovesheight),
+            b(
+                r.headleft,
+                r.headtop,
+                r.headwidth,
+                r.headheight,
+                r.headright,
+                r.headbottom,
+            ),
+            b(
+                r.neckleft,
+                r.necktop,
+                r.neckwidth,
+                r.neckheight,
+                r.neckright,
+                r.neckbottom,
+            ),
+            b(
+                r.torsoleft,
+                r.torsotop,
+                r.torsowidth,
+                r.torsoheight,
+                r.torsoright,
+                r.torsobottom,
+            ),
+            b(
+                r.rarmleft,
+                r.rarmtop,
+                r.rarmwidth,
+                r.rarmheight,
+                r.rarmright,
+                r.rarmbottom,
+            ),
+            b(
+                r.larmleft,
+                r.larmtop,
+                r.larmwidth,
+                r.larmheight,
+                r.larmright,
+                r.larmbottom,
+            ),
+            b(
+                r.rhandleft,
+                r.rhandtop,
+                r.rhandwidth,
+                r.rhandheight,
+                r.rhandright,
+                r.rhandbottom,
+            ),
+            b(
+                r.lhandleft,
+                r.lhandtop,
+                r.lhandwidth,
+                r.lhandheight,
+                r.lhandright,
+                r.lhandbottom,
+            ),
+            b(
+                r.beltleft,
+                r.belttop,
+                r.beltwidth,
+                r.beltheight,
+                r.beltright,
+                r.beltbottom,
+            ),
+            b(
+                r.feetleft,
+                r.feettop,
+                r.feetwidth,
+                r.feetheight,
+                r.feetright,
+                r.feetbottom,
+            ),
+            b(
+                r.glovesleft,
+                r.glovestop,
+                r.gloveswidth,
+                r.glovesheight,
+                r.glovesright,
+                r.glovesbottom,
+            ),
         ],
     }
 }
@@ -774,6 +851,7 @@ pub fn grid_cursor_cell(
     cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
 }
 
+// PROVISIONAL (specs/ui/inventory.md §10 r4.2; REC-745): the press point.
 /// The drop cell (`0x00486BD0`, `ui/inventory.md` §10 r4.2): the cursor
 /// cell without the overflow returns.
 pub fn grid_drop_cell(
@@ -799,10 +877,10 @@ pub fn grid_drop_cell(
 fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     (1u8..=10).find(|&l| {
         let b = layout.equip[usize::from(l)];
-        b.w > 0
-            && b.h > 0
-            && (b.left..b.left + b.w).contains(&at.x)
-            && (b.top..b.top + b.h).contains(&at.y)
+        // `panels-3.md` §29 r1: left, right, top, bottom all inclusive.
+        (b.right > b.left || b.bottom > b.top)
+            && (b.left..=b.right).contains(&at.x)
+            && (b.top..=b.bottom).contains(&at.y)
     })
 }
 
