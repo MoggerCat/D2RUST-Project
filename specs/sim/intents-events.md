@@ -1494,6 +1494,45 @@ Recorded (`-022633` seq 142–155): 0x03, 0x53, 0x07 × 10, 0x15, 0x7E;
 the switch sent no add message (the town rooms are populated by the
 next tick, `sim/tick.md` §4).
 
+8. **A save outside Act I** (2026-10-09; static read plus two 1.14d
+   RNG recordings on Windows: `record_rng.py --frames --ticks 4 --auto
+   SceAct2 --seed 1234` and the same with ScnAma; the SceAct2 save is
+   `tools/cloud-game/prepare_scene_chars.sh`'s, no items).
+   1. *Act.* The client act byte (client +0x1AC) is written by the save
+      header read inside rule 2's load: `0x0056A090` at
+      `0x0056A1D4`–`0x0056A1F7`, t := `.d2s` byte +0xA8 + game
+      difficulty (game +0x6D), act := t & 0x7F, 0 when ≥ 5, through
+      `0x005382E0` (`sim/path-placement.md` §13 rule 2 owns the
+      detail). It is the last write before rule 4 reads it: rule 4
+      builds that act (`0x0052C210` → `0x0053AC70`, `drlg/levels.md`
+      §2) and sends S→C 0x03 with it, and rule 5 enters the player in
+      the act's town (levels 1, 40, 75, 103, 109). Recorded: SceAct2
+      (town byte act 1) enters level 40 at (5153, 5203); ScnAma level 1.
+   2. *Game seed.* Act creation and its DRLG draw nothing from the game
+      seed (`drlg/levels.md` §2–§3: the DRLG seed comes from game +0x7C
+      / the map seed; the level-link checks of `drlg/outdoor.md` draw on
+      copies of the DRLG seed). So the game-seed sequence before the
+      first town unit does not depend on the act: (a) game creation,
+      frame 0: the four derivations of `sim/rng.md` §5.2 (monster
+      region `0x00547D38`, object control `0x00546CB9`, NPC control
+      `0x005360D8`, quest `0x00545F27`; with `-seed N` no root step
+      before them); (b) the join's load, frame 1: the player's unit
+      seed (`0x00552E31`), then two steps per loaded item and the
+      corpse / hireling items of rule 3.1 (none in these saves); (c)
+      frame 2, the first tick's room population (`sim/tick.md` §4):
+      one step per unit allocation (`0x00552DF0`) and two per item, in
+      the town of the client's act. Recorded, `-seed 1234`: (a)
+      2972047412, 1542758918, 1961566614, 2016663226 and (b)
+      4048349444 in both saves; the first frame-2 unit draws
+      108806926 in both; frame 2 has 24 unit draws in Act I and 12 in
+      Act II (the towns' units). A build whose frame-2 game seed
+      differs outside Act I therefore either built or populated the
+      wrong act's town (act byte 0, rule 8.1) or drew outside (a)–(c).
+   3. Caution for value matching: with `-seed N` the game seed and a
+      DRLG seed made from the same N both start at {N, 666}, so draws on
+      the two seeds at the same step count have equal values; tell them
+      apart by owner (`tools/rng-trace.md` owners), not by value.
+
 #### 8.3 First tick after the join
 
 Client state 3 (`sim/tick.md` §6 rule 4): the per-client update

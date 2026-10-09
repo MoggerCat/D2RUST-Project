@@ -137,3 +137,25 @@ No new Step 4 items on staging with the tags `[seed-order]`,
 `[recording-2]` or `[proto-items]`, and none about towns, NPCs, quests
 or waypoints, as of the last pull (2026-10-09). Staging is polled every
 30 minutes.
+
+## Round 3 (2026-10-09; 1.14d runs under the lock)
+
+- **Item 1 — act and game seed for a save outside Act I.** Written into
+  `specs/sim/intents-events.md` §8.2 rule 8.
+  - Act: the save header read `0x0056A090` writes client +0x1AC from
+    town byte +0xA8 + difficulty (& 0x7F, ≥ 5 → 0), the last write
+    before the join builds the act (`0x0052C210`) and enters the town.
+  - Game seed: act creation draws nothing from it. Before the first
+    town unit there are only the four creation derivations and the
+    player's unit seed (plus two steps per loaded item); then frame 2's
+    room population in the client act's town.
+  - Two 1.14d recordings under the lock confirm it (`record_rng.py
+    --frames --ticks 4 --auto SceAct2|ScnAma --seed 1234`): SceAct2
+    enters level 40; both runs have the same five draws, and the first
+    frame-2 unit draws 108806926 in both; Act I has 24 frame-2 unit
+    draws, Act II 12.
+  - Trap: with `-seed N` the DRLG seed and the game seed start equal,
+    so match draws by owner, not by value.
+  - d2rs has the act rule (`d2-server` `adapters/character.rs`), so the
+    act-0 start is a wiring gap; q-prov-data implements it (no new row
+    from here).
