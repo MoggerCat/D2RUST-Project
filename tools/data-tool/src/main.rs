@@ -7,6 +7,7 @@
 //!   data-tool gen-proto
 //!   data-tool links [game_dir]
 //!   data-tool dump-compare <dump_dir> [game_dir]
+//!   data-tool excel-dir <out_dir> [game_dir]
 //!   data-tool patch (check | render | diff) ...
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
@@ -31,6 +32,13 @@
 //! with the live `.bin` set after `d2_data::fixup` (`loading.md` §7.4,
 //! open question 15). Exit status 1 when a byte differs outside a pointer
 //! field and outside the rows `fixup::PENDING` lists.
+//!
+//! `excel-dir` writes the live excel set (every `data\\global\\excel\\`
+//! file, each from the highest-priority archive that has it, `loading.md`
+//! §1) into `<out_dir>` under lowercase names: the folder the `#[ignore]`
+//! game-file tests read as `$D2_GAME_DIR/extracted/patch_d2/data/global/excel/`.
+//! Names: the archives' `(listfile)` excel entries, the `.bin` twin of each
+//! `.txt`, every schema table's `.txt` / `.bin` and the code buffers.
 //!
 //! `patch` checks a mod stack, renders patched tables or diffs an edited
 //! table into a layer (`specs/data/patch-layers.md` §10).
@@ -63,12 +71,61 @@ fn main() -> Result<()> {
         Some("dump-compare") if (2..=3).contains(&args.len()) => {
             dump_compare(Path::new(&args[1]), &game_dir(args.get(2))?)
         }
+        Some("excel-dir") if (2..=3).contains(&args.len()) => {
+            excel_dir(Path::new(&args[1]), &game_dir(args.get(2))?)
+        }
         Some("patch") => std::process::exit(patch::main(&args[1..])),
         _ => bail!(
             "usage: data-tool tables|links [game_dir] | data-tool gen-tables | data-tool gen-proto | \
-             data-tool dump-compare <dump_dir> [game_dir] | data-tool patch ..."
+             data-tool dump-compare <dump_dir> [game_dir] | data-tool excel-dir <out_dir> [game_dir] | \
+             data-tool patch ..."
         ),
     }
+}
+
+fn excel_dir(out: &Path, game: &Path) -> Result<()> {
+    let set = ArchiveSet::open_dir(game).with_context(|| format!("opening {}", game.display()))?;
+    let mut names = std::collections::BTreeSet::new();
+    for a in set.archives() {
+        for n in a.listfile()?.unwrap_or_default() {
+            let n = n.to_ascii_lowercase();
+            if let Some(f) = n.strip_prefix(bin::EXCEL_DIR) {
+                if !f.is_empty() && !f.contains('\\') {
+                    names.insert(f.to_owned());
+                }
+            }
+        }
+    }
+    for t in &d2_data::schema::schema().tables {
+        for f in [&t.txt_name, &t.bin_name] {
+            if !f.is_empty() {
+                names.insert(f.to_ascii_lowercase());
+            }
+        }
+    }
+    for b in d2_data::schema::CalcBuffer::ALL {
+        names.insert(format!("{}.bin", b.name()));
+    }
+    let twins: Vec<String> = names
+        .iter()
+        .filter_map(|n| n.strip_suffix(".txt").map(|s| format!("{s}.bin")))
+        .collect();
+    names.extend(twins);
+    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
+    let mut per_archive: BTreeMap<String, usize> = BTreeMap::new();
+    for n in &names {
+        if let Some((src, bytes)) = set.read_with_source(&bin::excel_path(n))? {
+            std::fs::write(out.join(n), bytes)?;
+            *per_archive.entry(src).or_default() += 1;
+        }
+    }
+    let written: usize = per_archive.values().sum();
+    println!(
+        "excel-dir: {written} of {} candidate names written to {} ({per_archive:?})",
+        names.len(),
+        out.display()
+    );
+    Ok(())
 }
 
 fn gen_tables() -> Result<()> {

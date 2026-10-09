@@ -284,8 +284,6 @@ pub trait InvRest: MovePending {
     fn set_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
     /// `0x00570080`.
     fn learn_skill(&mut self, unit: Owner, skill: i32) {}
-    /// S→C 0x22 (`0x0053C520`).
-    fn send_skill_quantity(&mut self, unit: Owner, skill: i32, q: i32) {}
     /// The left / right mouse skill (`0x00620190` / `0x006201D0`).
     fn mouse_skill(&self, unit: Owner, left: bool) -> Option<(i32, i32)> {
         None

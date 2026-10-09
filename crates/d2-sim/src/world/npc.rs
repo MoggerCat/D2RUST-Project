@@ -447,8 +447,10 @@ pub trait NpcWorld {
     /// Quest event 0 for player and NPC (`QuestControl::npc_activate`);
     /// the text list it built.
     fn quest_text_list(&mut self, player: UnitId, npc: UnitId) -> TextList;
-    /// `0x00661480`: the 34 list bytes of S→C 0x27 (not specified;
-    /// `server-messages.tsv` 0x27 is `partial`).
+    /// `0x00661480`: the 34 list bytes of S→C 0x27 from byte 6
+    /// (`server-messages.tsv` 0x27: count u8@6, then (kind u8, string
+    /// u16) at 8 + 4k for k < 8; the client refuses a count ≥ 8,
+    /// `client/msg-ui.md` §5 r1).
     fn encode_text_list(&self, list: &TextList) -> [u8; 34];
     /// `0x00544520` S→C 0x29 (`QuestControl::send_game_flags`).
     fn send_game_quests(&mut self, player: UnitId);

@@ -212,18 +212,16 @@ pub fn packed_get(b: &[u8], bit: usize, width: u32) -> u32 {
     })
 }
 
-/// ORs `v` into `width` bits of `out` starting at message bit `bit`
-/// (the order of [`packed_get`]). Fields share no bit, so ORing into a
-/// zeroed buffer builds the message in any order. Panics if `v` is wider
-/// than `width` bits or the bits run past `out`.
+/// ORs the low `width` bits of `v` into `out` starting at message bit
+/// `bit` (the order of [`packed_get`]). Fields share no bit, so ORing
+/// into a zeroed buffer builds the message in any order. A value wider
+/// than its field is cut to the field, as the senders do
+/// (`combat/vitals.md` §5.4: each value is cut to its width). Panics if
+/// the bits run past `out`.
 pub fn packed_put(out: &mut [u8], bit: usize, width: u32, v: u32) {
     assert!(
         (1..=PACKED_MAX_WIDTH as u32).contains(&width),
         "width {width}"
-    );
-    assert!(
-        width == 32 || v < 1u32 << width,
-        "value {v} does not fit in {width} bits"
     );
     for i in 0..width as usize {
         let p = bit + i;

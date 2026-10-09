@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §2.2 rule 8, §2.4 (mouse skills), §8.4 (hireling items), §8.5 (golem item); specs/formats/d2s-load.md §4
+// Spec: specs/formats/d2s.md §2.2 rule 8, §2.4 (mouse skills, hotkeys r1, r2, r4, r6, r8), §8.4 (hireling items), §8.5 (golem item); specs/formats/d2s-load.md §4
 //! The save gaps of the played character (q-save-gaps): the mouse skills,
 //! the act of the town byte, the hireling's items and the Iron Golem's
 //! item, read from the running game at save time ([`read_gaps`], laid over
@@ -15,7 +15,9 @@
 //! bits of the status word have no live source and pass through.
 
 use d2_formats::d2s::{Body, D2s, Golem, Hireling, ItemEntry, Slot};
+use d2_server::adapters::handlers::player::HotKey;
 use d2_server::adapters::handlers::world::HirelingBlock;
+use d2_server::adapters::session::HotKey as SessionHotKey;
 use d2_sim::skills::list::SkillList;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::economy::QuestRest;
@@ -45,6 +47,10 @@ pub struct Gaps {
     /// The client's save flags (status word) with the progression
     /// (bits 8–12) the quests raised. `None`: no flags for the player.
     pub status: Option<u16>,
+    /// The 16 hot-key slots of the player's client as C→S 0x51 and the
+    /// load left them (§2.4 rule 8), encoded (rules 1–2). `None`: the
+    /// player has no client.
+    pub hotkeys: Option<[Slot; 16]>,
 }
 
 /// Reads [`Gaps`] from the game's `player`.
@@ -86,7 +92,13 @@ pub fn read_gaps(sim: &mut Sim, player: UnitId) -> Gaps {
         .world
         .hireling_block(&mut sim.game, &mut sim.events, player);
     let status = sim.world.rest.save_flags.get(&player).copied();
+    let hotkeys = sim
+        .client_list()
+        .into_iter()
+        .find(|&c| sim.player_of(c) == Some(player))
+        .map(|c| hotkey_slots(&sim.hotkeys(c), &guids));
     Gaps {
+        hotkeys,
         mouse,
         town,
         hireling_items,
@@ -99,6 +111,9 @@ pub fn read_gaps(sim: &mut Sim, player: UnitId) -> Gaps {
 
 /// `save` with the [`Gaps`] laid over it.
 pub fn apply_gaps(save: &mut D2s, gaps: &Gaps) {
+    if let Some(keys) = gaps.hotkeys {
+        save.header.hotkeys = keys;
+    }
     if let Some([left, right]) = gaps.mouse {
         save.header.mouse[0] = left;
         save.header.mouse[1] = right;
@@ -275,6 +290,41 @@ fn join_hireling_items(s: &mut Sim, player: UnitId, items: &[ItemEntry]) {
 }
 
 /// §2.4 rules 1–3: the left and right skill of `list` as header slots.
+/// §2.4 rules 1–2: each hot key as the writer stores it: the skill
+/// (−1: none → 0xFFFF) with the left flag, and its item GUID as the
+/// 1-based position in `guids` (the inventory list in link order; not
+/// found → 0). A skill the writer would assert on (> 0x7FFF) is saved
+/// as none.
+pub fn hotkey_slots(keys: &[HotKey; 16], guids: &[u32]) -> [Slot; 16] {
+    keys.map(|k| {
+        let item = guids
+            .iter()
+            .position(|&g| g == k.item)
+            .map_or(0, |p| p as u16 + 1);
+        Slot::encode(i32::from(k.skill), k.left, item).unwrap_or(Slot::NONE)
+    })
+}
+
+/// §2.4 rules 4 and 6.1: the saved hot keys as the load leaves the
+/// client slots: code 0xFFFF → no skill; else skill = code & 0x0FFF, the
+/// left flag, and a non-zero item index turned into the GUID at that
+/// 1-based position of `guids` (past the end, or no index → −1).
+pub fn loaded_hotkeys(slots: &[Slot; 16], guids: &[u32]) -> [SessionHotKey; 16] {
+    slots.map(|s| {
+        let (skill, left, item) = s.decode();
+        let item = usize::try_from(item)
+            .ok()
+            .and_then(|i| i.checked_sub(1))
+            .and_then(|i| guids.get(i).copied())
+            .unwrap_or(u32::MAX);
+        SessionHotKey {
+            skill: skill as i16,
+            flag: left,
+            item,
+        }
+    })
+}
+
 /// The item index is the 1-based position of the owner item's GUID in
 /// `guids` (the inventory list in link order); a native skill and an
 /// unknown GUID give 0. No left skill is the all-zero pair.

@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2
+// Spec: specs/sim/intents-events.md §2.5, §8.1, §8.2; specs/sim/path-placement.md §13 rule 2; specs/flows/save-exit.md §2; specs/formats/d2s.md §2.4 r5
 //! The single-player session sequence on the host's drain
 //! (`intents-events.md` §8): C→S 0x67 (game creation, `0x0052C330` →
 //! `0x00530BF0`) and C→S 0x6B (join, `0x0052C550` → `0x00530190`), both
@@ -51,8 +51,10 @@ use d2_sim::units::lists::client_state;
 use d2_sim::units::messages as msg;
 use d2_sim::units::UnitId;
 
+use super::handlers::player::HotKey;
 use super::handlers::world::ActionEvents;
 use super::session::{enter_game, Entry, GameSetup, JoinError};
+use super::storage::SaveFault;
 use super::SimGame;
 use crate::buffers::QueueError;
 use crate::seams::{ClientId, MessageSink};
@@ -135,8 +137,11 @@ pub enum SessionFault {
     /// A message could not be queued.
     Queue(QueueError),
     /// §2.5 rule 2: the leave's character save (`0x00532400`) of this
-    /// client's player has no writer in d2rs.
+    /// client's player ran with no storage installed
+    /// ([`SimGame::set_storage`]).
     NotSaved,
+    /// §2.5 rule 2: the character storage refused the save.
+    SaveFailed(String),
     /// §2.5 table: 0x6C with total ≥ 0x2000 (fatal assert).
     UploadTotal(u32),
     /// §2.5 rule 4: count + len > total (fatal 0xB2F).
@@ -254,12 +259,9 @@ pub fn game_setup(r: &CreateGame) -> GameSetup {
     }
 }
 
-/// The 40-byte S→C 0x5A of a join (code 2) or leave (code 3): u8@2 = 4,
-/// u32@3 = 0, u8@7 = 0, the character name @8 (16 bytes); single player
-/// has no account name, so @0x18–@0x27 stay 0 (§2.5 rule 2, §8.3).
-pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
-    d2_sim::units::messages::player_event(code, name)
-}
+/// The 40-byte S→C 0x5A of a join (code 2) or leave (code 3), shared
+/// with the sim's join sequence (§2.5 rule 2, §8.3).
+pub use d2_sim::units::messages::player_event;
 
 /// The 53-byte S→C 0xB2 (`0x0053B1B0`, §2.5 rule 3): the name (16
 /// bytes), u16@0x31, u16@0x33; bytes 0x11–0x30 are never written (d2rs:
@@ -364,7 +366,7 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
     /// characters of the game's clients with a player are saved
     /// (`0x0052CA10`; single player is game type 3, so always), then the
     /// leaving client gets S→C 0x05, 0x06, a direct 0xB0 and its buffers
-    /// flushed; its record is removed; the 0x5A code 3 goes to every
+    /// flushed; its record is removed; S→C 0x5C (its player GUID) then the 0x5A code 3 go to every
     /// remaining client in state 4 (client-list order) when the name has
     /// a NUL in its 16 bytes. Returns whether the client left.
     pub fn leave(
@@ -379,9 +381,11 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         if s.game.lists.client(id).map(|e| e.state) != Some(client_state::IN_GAME) {
             return false;
         }
-        for c in s.client_list() {
-            if s.player_of(c).is_some() {
-                self.faults.push((c, SessionFault::NotSaved));
+        for (c, r) in s.save_characters() {
+            match r {
+                Ok(()) => {}
+                Err(SaveFault::NoStorage) => self.faults.push((c, SessionFault::NotSaved)),
+                Err(SaveFault::Failed(e)) => self.faults.push((c, SessionFault::SaveFailed(e))),
             }
         }
         let mut sent = out.queue(client, &[0x05]);
@@ -397,19 +401,37 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
             .map_or([0; 16], |r| r.char_name);
         self.uploads.remove(&client);
         self.heartbeat_flag.remove(&client);
+        let guid = s
+            .player_of(client)
+            .and_then(|p| s.game.lists.unit(p))
+            .map(|e| e.guid);
         // Cannot fail: the client is joined.
         let _ = s.leave(client);
+        // The remaining clients in state 4, client-list order (the leaver
+        // is already unlinked, so it gets neither message).
+        let in_game: Vec<ClientId> = s
+            .client_list()
+            .into_iter()
+            .filter(|&c| {
+                s.sim_client(c)
+                    .and_then(|i| s.game.lists.client(i))
+                    .is_some_and(|e| e.state == client_state::IN_GAME)
+            })
+            .collect();
+        // S→C 0x5C (`0x0052C500` → `0x0053CA90`) during the removal.
+        if let Some(g) = guid {
+            let m = msg::player_left(g);
+            for &c in &in_game {
+                if let Err(e) = out.queue(c, &m) {
+                    self.faults.push((c, SessionFault::Queue(e)));
+                }
+            }
+        }
         if name.contains(&0) {
             let m = player_event(EVENT_LEFT, &name);
-            for c in s.client_list() {
-                let in_game = s
-                    .sim_client(c)
-                    .and_then(|i| s.game.lists.client(i))
-                    .is_some_and(|e| e.state == client_state::IN_GAME);
-                if in_game {
-                    if let Err(e) = out.queue(c, &m) {
-                        self.faults.push((c, SessionFault::Queue(e)));
-                    }
+            for &c in &in_game {
+                if let Err(e) = out.queue(c, &m) {
+                    self.faults.push((c, SessionFault::Queue(e)));
                 }
             }
         }
@@ -501,6 +523,20 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
         };
         if let Some(e) = s.game.lists.client_mut(id) {
             e.player = Some(loaded.player);
+        }
+        // The load writes the client's hot-key slots (`formats/d2s.md`
+        // §2.4 rules 5–6, `0x0056A283`): the slots the save reads back and
+        // C→S 0x51 changes (`intents-events.md` §9 rule 12). Unbound slots
+        // (skill −1) stay as a new record holds them.
+        for (slot, k) in loaded.entry.hotkeys.iter().enumerate() {
+            if k.skill >= 0 {
+                let key = HotKey {
+                    skill: k.skill,
+                    left: k.flag,
+                    item: k.item,
+                };
+                s.set_hotkey(client, slot, key);
+            }
         }
         match enter_game(s, client, &loaded.entry) {
             Ok(p) => Some(p),

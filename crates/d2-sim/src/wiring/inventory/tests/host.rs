@@ -196,3 +196,27 @@ fn send_item_page_queues_0x9d_now() {
     assert_eq!(w.desk(|d| d.stored_page(k)), 3);
     let _: InvItem = w.data(k);
 }
+
+/// S→C 0x22 (`client/msg-skills.md` §5 r1): the desk's
+/// `send_skill_quantity` builds the 12 bytes from the unit's type and
+/// GUID (quantity's low byte, flag 0 without state 7) and sends them
+/// through the rest's transport; a unit without a record sends nothing.
+// Covers: specs/client/msg-skills.md §5 r1
+#[test]
+fn skill_quantity_sends_0x22() {
+    use crate::items::inventory::bookkeeping::EquipWorld;
+    let mut w = World::new();
+    let (player, me, g) = (w.player, w.me(), w.pguid());
+    w.rest.sent.clear();
+    w.desk(|d| {
+        d.send_skill_quantity(player, 220, 300);
+        d.send_skill_quantity(UnitId(9999), 220, 1);
+    });
+    assert_eq!(
+        w.rest.sent,
+        [(
+            me,
+            crate::units::messages::update_item_skill(0, g, 220, 44, false).to_vec()
+        )]
+    );
+}

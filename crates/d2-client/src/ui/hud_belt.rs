@@ -275,7 +275,9 @@ impl HudBelt {
         if hover_text(&self.state, cursor, Some(&item), &[], &[], None).is_none() {
             return (Vec::new(), (0, 0));
         }
-        let lines = items::stream(world, v.key).map_or_else(Vec::new, |s| tips.lines(s));
+        let me = crate::ui::item_tip_world::WorldUnit::local(world);
+        let ctx = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), v);
+        let lines = items::stream(world, v.key).map_or_else(Vec::new, |s| tips.tip_lines(s, &ctx));
         (lines, self.state.text_pos)
     }
 

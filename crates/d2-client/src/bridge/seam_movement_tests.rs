@@ -8,18 +8,22 @@ use d2_server::adapters::handlers::walk::{form, Form, WALK_IDS};
 use d2_sim::path::coords::{subtile_of, to_fp16_center};
 use d2_sim::path::tables::PathTables;
 use d2_sim::path::walk::geom::direction_vector;
-use d2_sim::path::walk::messages::{player_move, reassign_player};
+use d2_sim::path::walk::messages::{player_move, reassign_player, walk_verify};
 use d2_sim::path::walk::request::message_request;
 use d2_sim::path::walk::resync::{resync_distance, MESSAGE_LEN};
 use d2_sim::path::walk::step::STEP_BASE;
-use d2_sim::path::walk::velocity::{mode_velocity, run_velocity_bonus, STAT_VELOCITYPERCENT};
+use d2_sim::path::walk::velocity::{
+    mode_velocity, run_velocity_bonus, STAT_FASTERMOVE, STAT_VELOCITYPERCENT,
+};
 use d2_sim::path::walk::{Point, WalkUnits};
 use d2_sim::rng::Seed;
 use d2_sim::units::{UnitId, UnitType};
 
+use super::motion::MonsterMotion;
 use super::msg::support::Model;
-use super::predict::{cell_centre, facing, walk_of, Predict, Speeds, Walk, WalkTo};
-use super::world::{UnitKey, PLAYER};
+use super::predict::{cell_centre, facing, walk_of, MoveStats, Predict, Speeds, Walk, WalkTo};
+use super::world::{MonsterClass, MonsterSetup, UnitKey, MONSTER, PLAYER};
+use d2_sim::monsters::mode_message::{mode, monster_move, Move, MODE_ROWS};
 
 const P1: UnitKey = UnitKey::new(PLAYER, 1);
 
@@ -240,4 +244,212 @@ fn pack(fields: &[(u32, u32)]) -> Vec<u8> {
         }
     }
     out
+}
+
+// Covers: specs/seams/movement-prediction.md §2.9 r2, §2.5 r1
+#[test]
+fn a_prediction_on_the_servers_path_is_never_corrected() {
+    // The server walks the player from (100, 100) along x at walk
+    // velocity 6 (0x6000 precise a tick) and states its cell with 0x96
+    // every 5 ticks; the client's own walk is one tick behind (it steps
+    // after the receive, §2.8 r1). The check compares with that own
+    // cell, so nothing is corrected over 40 ticks (15 sub-tiles).
+    let mut m = Model::default();
+    local(&mut m, (100, 100), 1);
+    let start = to_fp16_center(100);
+    let step = Speeds { walk: 6, run: 9 }.step(false) as u32;
+    for tick in 1..=40u32 {
+        let own = start + (tick - 1) * step;
+        m.w.set_local_walk(Some((own, start)), Some(2));
+        if tick % 5 == 0 {
+            let server = (start + tick * step) >> 16;
+            m.recv(&walk_verify(100, server as u16, 100, 0, 0));
+            assert!(m.rejected().is_empty(), "{:?}", m.rejected());
+            assert!(m.w.outgoing.is_empty(), "tick {tick}: {:?}", m.w.outgoing);
+            assert_eq!(m.unit(P1).follows, 0, "tick {tick}: corrected");
+            assert_eq!(m.unit(P1).server_point, (server as u16, 100));
+        }
+    }
+}
+
+// Covers: specs/seams/movement-prediction.md §2.9 r2, §2.2 r2
+#[test]
+fn a_prediction_that_parts_from_the_server_is_corrected() {
+    // The own walk is 8 sub-tiles from the server's cell, past the walk
+    // tolerance 5: the check takes the server's point (REC-277).
+    let mut m = Model::default();
+    local(&mut m, (100, 100), 1);
+    m.w.set_local_walk(Some(cell_centre((112, 100))), Some(2));
+    m.recv(&walk_verify(100, 104, 100, 0, 0));
+    assert_eq!(m.unit(P1).follows, 1);
+    assert!(m.w.outgoing.is_empty());
+}
+
+/// One monster for the server's velocity computation.
+struct Monster {
+    mode: u32,
+    percent: i32,
+    velocity: i32,
+    seed: Seed,
+}
+
+impl WalkUnits for Monster {
+    fn unit_type(&self, _: UnitId) -> UnitType {
+        UnitType::Monster
+    }
+    fn frame(&self) -> i32 {
+        0
+    }
+    fn mode(&self, _: UnitId) -> u32 {
+        self.mode
+    }
+    fn stat(&self, _: UnitId, stat: u16) -> i32 {
+        if stat == STAT_VELOCITYPERCENT {
+            self.percent
+        } else {
+            0
+        }
+    }
+    fn seed(&mut self, _: UnitId) -> &mut Seed {
+        &mut self.seed
+    }
+    fn monstats_velocity(&self, _: UnitId) -> (i32, bool) {
+        (self.velocity, false)
+    }
+}
+
+// Covers: specs/seams/movement-prediction.md §2.4 r3
+#[test]
+fn a_monster_walk_moves_as_far_on_the_client_as_on_the_server() {
+    // monstats Velocity 6 at 75 % (the spec vector 4b00), walking to a
+    // point (path type 5: 0x67 carries the path target).
+    let t = tables();
+    let k = UnitKey::new(MONSTER, 9);
+    for (m_mode, percent) in [(mode::WL, 75), (mode::WL, 100), (mode::RN, 150)] {
+        let server_v = mode_velocity(
+            &t,
+            &Monster {
+                mode: m_mode,
+                percent,
+                velocity: 6,
+                seed: Seed::default(),
+            },
+            UnitId(1),
+            m_mode,
+        )
+        .expect("a moving mode has a velocity");
+        let server_step = i64::from(STEP_BASE.wrapping_mul(server_v) >> 6);
+        let mut m = Model::default();
+        m.inputs.tables.monsters = vec![Some(MonsterClass {
+            setup: Some(MonsterSetup {
+                velocity: 6,
+                ..Default::default()
+            }),
+            ..Default::default()
+        })];
+        let u = m.put(k);
+        u.position = Some((100, 100));
+        u.mode = mode::NU;
+        let row = MODE_ROWS[m_mode as usize];
+        m.recv(&monster_move(Move {
+            guid: 9,
+            code: row.code_to_point,
+            x: 200,
+            y: 100,
+            s: 1,
+            t: 5,
+            velocity: percent as u16,
+            max_distance: 0,
+        }));
+        m.drain();
+        assert!(m.rejected().is_empty(), "{:?}", m.rejected());
+        assert_eq!(m.unit(k).mode, m_mode);
+        let mut motion = MonsterMotion::default();
+        let classes = m.inputs.tables.monsters.clone();
+        motion.frame(&mut m.w, &classes);
+        for _ in 0..20 {
+            m.w.server_ticks += 1;
+            motion.frame(&mut m.w, &classes);
+        }
+        let server = (i64::from(to_fp16_center(100)) + 20 * server_step) >> 16;
+        assert_eq!(
+            m.unit(k).position,
+            Some((server as u16, 100)),
+            "mode {m_mode} at {percent} %"
+        );
+    }
+}
+
+/// A player with stats 67 / 96 for the server's velocity computation.
+struct Fast {
+    mode: u32,
+    percent: i32,
+    faster: i32,
+    seed: Seed,
+}
+
+impl WalkUnits for Fast {
+    fn unit_type(&self, _: UnitId) -> UnitType {
+        UnitType::Player
+    }
+    fn frame(&self) -> i32 {
+        0
+    }
+    fn mode(&self, _: UnitId) -> u32 {
+        self.mode
+    }
+    fn stat(&self, _: UnitId, stat: u16) -> i32 {
+        if stat == STAT_VELOCITYPERCENT {
+            self.percent
+        } else {
+            0
+        }
+    }
+    fn item_stat(&self, _: UnitId, stat: u16) -> i32 {
+        if stat == STAT_FASTERMOVE {
+            self.faster
+        } else {
+            0
+        }
+    }
+    fn seed(&mut self, _: UnitId) -> &mut Seed {
+        &mut self.seed
+    }
+    fn charstats_velocity(&self, _: UnitId) -> (i32, i32, i32) {
+        (6, 9, 0)
+    }
+}
+
+// Covers: specs/seams/movement-prediction.md §2.6 r2
+#[test]
+fn the_predicted_tick_distance_reads_stats_67_and_96() {
+    let t = tables();
+    let speeds = Speeds { walk: 6, run: 9 };
+    let bonus = run_velocity_bonus(6, 9).unwrap();
+    // +30 % (an item or Burst of Speed), a −50 % slow, faster run/walk 20
+    // and 150, and a slow below the 25 % floor.
+    for (percent, faster) in [(130, 0), (50, 0), (100, 20), (100, 150), (10, 0)] {
+        let mut m = Model::default();
+        local(&mut m, (100, 100), 1);
+        let u = m.w.units.get_mut(&P1).unwrap();
+        u.stats.insert(STAT_VELOCITYPERCENT, percent);
+        u.stats.insert(STAT_FASTERMOVE, faster);
+        let moves = MoveStats::of_local(&m.w);
+        assert_eq!(moves, MoveStats { percent, faster });
+        for (mode, running) in [(2u32, false), (3, true)] {
+            let u = Fast {
+                mode,
+                percent: percent + if running { bonus } else { 0 },
+                faster,
+                seed: Seed::default(),
+            };
+            let v = mode_velocity(&t, &u, UnitId(1), mode).unwrap();
+            let server = i64::from(STEP_BASE.wrapping_mul(v) >> 6);
+            assert_eq!(
+                speeds.step_with(running, moves),
+                server,
+                "stat 67 {percent}, stat 96 {faster}, mode {mode}"
+            );
+        }
+    }
 }

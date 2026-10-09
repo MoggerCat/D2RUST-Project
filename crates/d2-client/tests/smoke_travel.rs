@@ -28,7 +28,7 @@ use d2_client::app::single_player::{self, GameData, WaypointTables};
 use d2_client::app::synthetic_act4 as a4;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::predict::Speeds;
-use d2_client::bridge::world::{UnitKey, MONSTER, OBJECT, TILE};
+use d2_client::bridge::world::{UnitKey, VisibleFn, MONSTER, OBJECT, TILE};
 use d2_client::bridge::BridgeResource;
 use d2_server::dispatch::Outcome;
 use d2_server::host::Handled;
@@ -152,6 +152,19 @@ impl Rig {
             .resource_mut::<BridgeResource>()
             .0
             .set_unit_rows(single_player::synthetic_unit_rows());
+        // The rig draws no frame and loads no unit art, so the play
+        // predicate (`app::visibility`) reads every unit as off screen.
+        // The position check compares with the client's own walk
+        // (`seams/movement-prediction.md` §2.9 r2), so a waypoint
+        // arrival's walk-out (drawn at x + 3, y + 3 while the server
+        // player stays at x, y) reaches rule 6 with both axes off; on a
+        // drawn screen the camera is centred on that walk and the player
+        // is visible (`client/model.md` §6 r6–r7, REC-288). The rig
+        // states that: its units are on screen.
+        app.world_mut()
+            .resource_mut::<BridgeResource>()
+            .0
+            .set_visibility(Some(VisibleFn::new(|_, _, _| true)));
         app.update();
         let mut rig = Rig {
             app,

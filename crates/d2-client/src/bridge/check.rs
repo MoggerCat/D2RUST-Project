@@ -8,7 +8,8 @@ use crate::rules::camera::{moving_to_client, static_to_client};
 
 use super::dispatch::HandlerError;
 use super::world::{
-    ClientUnit, ClientWorld, ModelInputs, UnitKey, ITEM, MISSILE, MONSTER, OBJECT, PLAYER, TILE,
+    ClientUnit, ClientWorld, LocalWalk, ModelInputs, UnitKey, ITEM, MISSILE, MONSTER, OBJECT,
+    PLAYER, TILE,
 };
 
 /// What the check did.
@@ -42,14 +43,16 @@ fn is_static(unit_type: u8) -> bool {
     matches!(unit_type, OBJECT | ITEM | TILE)
 }
 
-/// Tolerance T (rule 4).
-fn tolerance(world: &ClientWorld, unit: &ClientUnit, kind: u8) -> u32 {
+/// Tolerance T (rule 4). `own`: the local player's own walk (its mode is
+/// the walk / run the client moves it in, `seams/movement-prediction.md`
+/// §2.9 r2).
+fn tolerance(world: &ClientWorld, unit: &ClientUnit, own: Option<LocalWalk>, kind: u8) -> u32 {
     match kind {
         1 => 10,
         2 => 0,
         _ if world.local_player == Some(unit.key) => {
             let l = latency(world);
-            match unit.mode {
+            match own.and_then(|w| w.mode).unwrap_or(unit.mode) {
                 1 => 3 + l,
                 3 => 7 + l,
                 _ => 5 + l,
@@ -64,10 +67,14 @@ fn tolerance(world: &ClientWorld, unit: &ClientUnit, kind: u8) -> u32 {
 /// The unit's client pixel point (rule 6: `0x00620650` / `0x006206B0`):
 /// the static path's point, or the dynamic path's precise position (the
 /// cell centre, model §3 rule 3) projected by `render/camera.md` §2.
-fn client_point(unit: &ClientUnit) -> (i32, i32) {
+/// `own`: the local player's own walk, whose precise position is its
+/// dynamic path's (`seams/movement-prediction.md` §2.9 r2).
+fn client_point(unit: &ClientUnit, own: Option<LocalWalk>) -> (i32, i32) {
     let (cx, cy) = unit.cell();
     let p = if is_static(unit.key.unit_type) {
         static_to_client(i32::from(cx), i32::from(cy))
+    } else if let Some(w) = own {
+        moving_to_client(w.pos.0, w.pos.1)
     } else {
         moving_to_client(
             (u32::from(cx) << 16) | 0x8000,
@@ -108,10 +115,14 @@ pub fn check(
     // Rule 3.
     unit.server_point = (x, y);
     let unit = &world.units[&key];
-    let (cx, cy) = unit.cell();
+    // U's position is its path cell: for the local player while the
+    // client moves it, its own path's cell, not the last placement
+    // (`seams/movement-prediction.md` §2.9 r2).
+    let own = world.predicted(unit);
+    let (cx, cy) = own.map_or_else(|| unit.cell(), |w| w.cell());
     let (xi, yi, cxi, cyi) = (i32::from(x), i32::from(y), i32::from(cx), i32::from(cy));
     // Rule 4.
-    let t = tolerance(world, unit, kind);
+    let t = tolerance(world, unit, own, kind);
     // Rule 5.
     let mut far = xi.abs_diff(cxi) > t;
     if far || yi.abs_diff(cyi) > t {
@@ -135,7 +146,7 @@ pub fn check(
         let pred = inputs.visible.as_ref().ok_or(HandlerError::Unspecified(
             "model.md open question 7: the visibility predicate 0x004DBF20",
         ))?;
-        let (a, b) = client_point(unit);
+        let (a, b) = client_point(unit, own);
         let p = static_to_client(xi, yi);
         pred.visible(unit, a, b) || pred.visible(unit, p.x, p.y)
     };

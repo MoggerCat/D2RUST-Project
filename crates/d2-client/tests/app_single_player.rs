@@ -150,10 +150,9 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_ne!(load.f8, 0);
     let got = ids(chunks);
     assert_eq!(got.first(), Some(&0x59), "{got:02X?}");
-    // Changed expectation (q-fix-flow-server): after 0x04, the state-3
-    // inventory refresh and the join sequence (`flows/game-join.md` §3 r2,
-    // `intents-events.md` §8.3, recorded frame 2 "0x04, 0x48, 0x5B, 0x65,
-    // 0x8D, 0x5A").
+    // 0x04, then the state-3 inventory refresh and the join sequence
+    // (`flows/game-join.md` §3 r2, `intents-events.md` §8.3, recorded
+    // frame 2 "0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A").
     assert_eq!(
         got[got.len() - 6..],
         [0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A],

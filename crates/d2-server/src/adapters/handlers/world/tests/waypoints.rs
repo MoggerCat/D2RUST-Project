@@ -529,6 +529,30 @@ fn missing_object_and_other_act() {
     fx.assert_clean();
 }
 
+// Covers: specs/seams/sim-server.md §2.5
+#[test]
+fn a_staged_players_act_follows_the_world_each_tick() {
+    let mut fx = fixture(0, 0);
+    // The fixture's spawn point (20, 20).
+    let pos = crate::seams::Pos { x: 20, y: 20 };
+    // Staged with an act the world no longer has it in (as after a
+    // cross-act warp): the waypoint of its own act reads as another act.
+    fx.host.game.set_unit(
+        fx.player,
+        crate::adapters::UnitFacts {
+            act: 1,
+            pos,
+            owner: None,
+        },
+    );
+    fx.host.clock.0 += 40;
+    assert!(fx.host.frame().unwrap().ticked);
+    fx.open_menu();
+    let (code, _) = send(&mut fx.host, &Fx::msg(fx.wp, 0));
+    assert_ne!(code, ResultCode::Invalid, "refused as another act");
+    fx.assert_clean();
+}
+
 /// A host without waypoint tables keeps the stub (recorded, result 0).
 #[test]
 fn without_waypoint_tables_0x49_stays_a_stub() {

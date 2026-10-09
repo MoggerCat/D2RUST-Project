@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5; specs/audio/triggers-2.md §14; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
+// Spec: specs/sim/tick.md §3, §5.5, §5.6; specs/sim/intents-events.md §7.3, §7.5, §8.3; specs/audio/triggers-2.md §14; specs/world/objects.md §2, §14; specs/sim/units.md §5; specs/drlg/rooms.md §4.1, §7, §8; specs/drlg/levels.md §9
 //! [`ActionSim`]: the one dispatcher the tick runs. Timer events go to
 //! the unit dispatch (`units.md` §5: the per-kind handler tables and the
 //! monster freeze drop of `tick.md` §5.6), whose hooks run the missile
@@ -407,6 +407,8 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 if let Some(m) = crate::units::sound::sound_message(game, unit, receiver) {
                     v.h.x.send(receiver, &m);
                 }
+                // §7.3 rule 3: always `0x00571CD0` (§7.9 rule 2).
+                v.send_event_records(receiver, unit);
             }
             return;
         }
@@ -537,58 +539,6 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         self.sys.hooks.x.send(p, &m);
     }
 
-    /// Step 5, a joining client (`tick.md` §6 rule 4, `intents-events.md`
-    /// §8.3): `0x0052C410` (S→C 0x5B PlayerJoined `0x0053C940`, 0x65
-    /// `0x0053FC70`), `0x0055B620` (0x8D), the host callback (none in
-    /// single player), then the join 0x5A code 2 to every client in state
-    /// 4 in client-list order, the joiner included (`0x0054AA40`: only
-    /// when the name has a NUL within its 16 bytes).
-    ///
-    /// The joiner's own 0x5B, 0x65, 0x8D go to the joiner: level stat 12,
-    /// no party (0xFFFF, `0x00554630`), kill count 0 (a new client's
-    /// arena record). PROVISIONAL (REC-292; d2rs-own, unverified): what
-    /// `0x0052C410` / `0x0055B620` send to the other clients and about
-    /// them (multiplayer, out of scope) is not specified, and the 0x8D's
-    /// party word (no spec gives `0x0055B620`'s arguments) is the 0x5B's.
-    fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
-        use crate::units::messages as msg;
-        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
-            return;
-        };
-        let Some(r) = self.sys.units.get(p) else {
-            return;
-        };
-        let (guid, class) = (r.guid, r.class as u8);
-        let name = self
-            .sys
-            .hooks
-            .session
-            .names
-            .get(&p)
-            .copied()
-            .unwrap_or_default();
-        let level = self.sys.stats.unit_base(p, crate::stats::stat::LEVEL, 0) as u16;
-        let x = &mut self.sys.hooks.x;
-        x.send(
-            p,
-            &msg::player_joined(guid, class, &name, level, msg::NO_PARTY),
-        );
-        x.send(p, &msg::player_kill_count(guid, 0));
-        x.send(p, &msg::assign_player_to_party(guid, msg::NO_PARTY));
-        if !name.contains(&0) {
-            return;
-        }
-        let joined = msg::player_event(2, &name);
-        for c in game.lists.clients() {
-            let Some(e) = game.lists.client(c) else {
-                continue;
-            };
-            if let (client_state::IN_GAME, Some(to)) = (e.state, e.player) {
-                self.sys.hooks.x.send(to, &joined);
-            }
-        }
-    }
-
     /// Step 5: S→C 0x04 LoadComplete (`0x0053B320(client, 4)`, `tick.md`
     /// §6 rule 6) to the client's player.
     fn send_load_complete(&mut self, game: &mut Game, client: ClientId) {
@@ -597,6 +547,62 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 .hooks
                 .x
                 .send(p, &crate::units::messages::LOAD_COMPLETE);
+        }
+    }
+
+    /// Step 5, the join sequence `0x0052C410` (`intents-events.md` §8.3,
+    /// `flows/game-join.md` §3 r2): S→C 0x5B PlayerJoined (`0x0053C940`:
+    /// GUID, class, name, level = stat 12, party id 0xFFFF: d2rs has no
+    /// parties), S→C 0x65 (`0x0053FC70`: kill count 0, the recorded join
+    /// value; d2rs keeps no kill count), then the join 0x5A code 2 when
+    /// the name has a NUL in its 16 bytes; each to every client in state
+    /// 4 in client-list order, the joiner included. Between 0x65 and the
+    /// 0x5A, `0x0055B620`'s S→C 0x8D AssignPlayerToParty (recorded frame
+    /// 2 order "0x5B, 0x65, 0x8D, 0x5A"). PROVISIONAL (`intents-events.md`
+    /// §8.3; REC-401): with more than one client, which 0x5B / 0x65 the
+    /// others get is not written; d2rs sends the joiner's to each.
+    /// PROVISIONAL (REC-292): the 0x8D's party word (no spec gives
+    /// `0x0055B620`'s arguments) is the 0x5B's, no party.
+    fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
+        use crate::units::messages as m;
+        let Some(p) = game.lists.client(client).and_then(|e| e.player) else {
+            return;
+        };
+        let Some(r) = self.sys.units.get(p) else {
+            return;
+        };
+        let (guid, class) = (r.guid, r.class as u8);
+        let level = self.sys.stats.unit_total(p, 12, 0) as u16;
+        let name = self
+            .sys
+            .hooks
+            .session
+            .names
+            .get(&p)
+            .copied()
+            .unwrap_or([0; 16]);
+        let joined = m::player_joined(guid, class, &name, level, m::NO_PARTY);
+        let kills = m::player_kill_count(guid, 0);
+        let party = m::assign_player_to_party(guid, m::NO_PARTY);
+        let event = name.contains(&0).then(|| m::player_event(2, &name));
+        let to: Vec<UnitId> = game
+            .lists
+            .clients()
+            .into_iter()
+            .filter_map(|c| game.lists.client(c))
+            .filter(|e| e.state == crate::units::lists::client_state::IN_GAME)
+            .filter_map(|e| e.player)
+            .collect();
+        let x = &mut self.sys.hooks.x;
+        for &t in &to {
+            x.send(t, &joined);
+            x.send(t, &kills);
+            x.send(t, &party);
+        }
+        if let Some(e) = event {
+            for &t in &to {
+                x.send(t, &e);
+            }
         }
     }
 }
