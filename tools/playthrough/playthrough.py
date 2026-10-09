@@ -422,8 +422,24 @@ def poke_guids(pokes):
     return out
 
 
-def eval_pred(pred, snaps, idx, guids, first_player=None):
+def _prefix(pred, snaps, guids, cache):
+    """Per snapshot, how many snapshots up to and including it hold a unit matching
+    the predicate's filter (built once per predicate: the `seen` / `dead` tests and
+    the `ever` loops would otherwise rescan the prefix at every snapshot)."""
+    key = ("seen", id(pred))
+    if key not in cache:
+        out, n = [], 0
+        for s_ in snaps:
+            n += any(_matches(u, pred["filter"], guids) for u in s_["units"])
+            out.append(n)
+        cache[key] = out
+    return cache[key]
+
+
+def eval_pred(pred, snaps, idx, guids, first_player=None, cache=None):
     """Evaluates `pred` at snaps[idx]. Returns (ok, evidence)."""
+    if cache is None:
+        cache = {}
     snap = snaps[idx]
     if pred["kind"] == "quest":
         p = player_of(snap)
@@ -438,8 +454,12 @@ def eval_pred(pred, snaps, idx, guids, first_player=None):
         if p is None:
             return False, "no player unit"
         if "since" in pred:
-            first_player = next((q for s_ in snaps[: idx + 1] if s_["f"] >= pred["since"]
-                                 for q in [player_of(s_)] if q and "x" in q), None)
+            k = ("since", id(pred))
+            if k not in cache:
+                cache[k] = next((i for i, s_ in enumerate(snaps) if s_["f"] >= pred["since"]
+                                 and (q := player_of(s_)) and "x" in q), None)
+            i0 = cache[k]
+            first_player = player_of(snaps[i0]) if i0 is not None and i0 <= idx else None
         if pred.get("delta"):
             v0 = (first_player or {}).get(pred["field"])
             v1 = p.get(pred["field"])
@@ -464,8 +484,9 @@ def eval_pred(pred, snaps, idx, guids, first_player=None):
     if test == "present":
         return bool(hit), f"{len(hit)} matching"
     if test == "seen":
-        n = sum(1 for s in snaps[: idx + 1] if any(_matches(u, filt, guids) for u in s["units"]))
-        first = next((s["f"] for s in snaps[: idx + 1] if any(_matches(u, filt, guids) for u in s["units"])), None)
+        pre = _prefix(pred, snaps, guids, cache)
+        n = pre[idx]
+        first = next((snaps[i]["f"] for i in range(idx + 1) if pre[i]), None) if n else None
         return n > 0, f"seen in {n} snapshots" + (f" from f{first}" if first is not None else "")
     if test == "absent":
         return not hit, f"{len(hit)} matching"
@@ -475,7 +496,7 @@ def eval_pred(pred, snaps, idx, guids, first_player=None):
         dead = [u for u in hit if u.get("m") in DEAD_MODES.get(u.get("ut"), (0,))]
         return bool(dead), f"{len(dead)} of {len(hit)} matching in a death mode"
     # dead: seen alive-or-dead before, and now every match in a death mode or gone
-    seen = any(_matches(u, filt, guids) for s in snaps[: idx + 1] for u in s["units"])
+    seen = _prefix(pred, snaps, guids, cache)[idx] > 0
     if not seen:
         return False, "never present"
     alive = [u for u in hit if u.get("m") not in DEAD_MODES.get(u.get("ut"), (0,))]
@@ -486,16 +507,16 @@ def eval_pred(pred, snaps, idx, guids, first_player=None):
     return True, f"{len(hit)} dead, {'gone' if not hit else 'in death modes'}"
 
 
-def eval_final(p, snaps, guids, first_player):
+def eval_final(p, snaps, guids, first_player, cache=None):
     """A predicate at the deadline (the last snapshot); an `ever`
     predicate holds when it held at any snapshot (spec §2)."""
     if p.get("ever"):
         for i in range(len(snaps)):
-            ok, e = eval_pred(p, snaps, i, guids, first_player)
+            ok, e = eval_pred(p, snaps, i, guids, first_player, cache)
             if ok:
                 return True, f"{e} at f{snaps[i]['f']}"
-        return False, "never held; at deadline " + eval_pred(p, snaps, len(snaps) - 1, guids, first_player)[1]
-    return eval_pred(p, snaps, len(snaps) - 1, guids, first_player)
+        return False, "never held; at deadline " + eval_pred(p, snaps, len(snaps) - 1, guids, first_player, cache)[1]
+    return eval_pred(p, snaps, len(snaps) - 1, guids, first_player, cache)
 
 
 def evaluate(m, snaps, pokes):
@@ -503,15 +524,15 @@ def evaluate(m, snaps, pokes):
     with status reached|stuck|missing-unit|wrong-level, frame, evidence."""
     if not snaps:
         return {"status": "stuck", "frame": None, "evidence": "no snapshot"}
-    guids = poke_guids(pokes)
+    guids, cache = poke_guids(pokes), {}
     first_player = next((p for p in map(player_of, snaps) if p and "x" in p), None)
     first_all = None
     for i in range(len(snaps)):
-        if all(eval_pred(p, snaps, i, guids, first_player)[0] for p in m["need"] if not p.get("ever")):
+        if all(eval_pred(p, snaps, i, guids, first_player, cache)[0] for p in m["need"] if not p.get("ever")):
             first_all = snaps[i]["f"]
             break
     last = len(snaps) - 1
-    results = [(p, *eval_final(p, snaps, guids, first_player)) for p in m["need"]]
+    results = [(p, *eval_final(p, snaps, guids, first_player, cache)) for p in m["need"]]
     f = snaps[last]["f"]
     if all(ok for _, ok, _ in results):
         ev = "; ".join(f"{p['src']}: {e}" for p, _, e in results)
@@ -652,7 +673,14 @@ def run_milestone(m, play, client, d2s, work, game_dir):
         return {"status": "crash", "frame": None,
                 "evidence": f"exit {r.returncode}: {first_error_line(r.stderr)}"}
     _, snaps, pokes, _ = read_state(out)
-    return evaluate(m, snaps, pokes)
+    res = evaluate(m, snaps, pokes)
+    if res["status"] == "reached":  # a reached milestone's files are not kept (disk: the matrix runs hundreds)
+        for suffix in ("state", "probe", "ref", "find"):
+            try:
+                os.remove(os.path.join(work, f"{m['name']}.{suffix}.jsonl"))
+            except OSError:
+                pass
+    return res
 
 
 # `@pI` in a poke: the unit poke I of the milestone created (spec §4 r8)

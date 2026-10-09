@@ -116,6 +116,23 @@ def group(draws):
     return by
 
 
+def as_roll(x, other):
+    """When the other side logged the draw as `roll(n)`, n >= 1 (sim/rng.md
+    §3), x is rewritten as that roll (rng-trace.md §5 r3): a `roll_range(min,
+    n)` is `roll(n) + min` (ret - min; 1.14d adds min inline after the
+    helper); a `step` whose `lo'` the caller takes mod n is `roll(n)` (ret
+    mod n, n from the other side)."""
+    n = other.get("n")
+    if other.get("op") != "roll" or n is None or not 1 <= n < 0x80000000:
+        return x
+    if x.get("op") == "roll_range" and x.get("n") is not None and 1 <= x["n"] < 0x80000000:
+        x = dict(x, op="roll", ret=((x.get("ret") or 0) - (x.get("min") or 0)) & M32)
+        x.pop("min", None)
+    elif x.get("op") == "step":
+        x = dict(x, op="roll", n=n, ret=((x.get("ret") or 0) & M32) % n)
+    return x
+
+
 def fields_differ(a, b, state_only):
     """The first differing field of orig draw a and d2rs draw b, or None."""
     for k in ("before", "after"):
@@ -123,6 +140,7 @@ def fields_differ(a, b, state_only):
             return k
     if state_only or a.get("via") != "helper":
         return None
+    a, b = as_roll(a, b), as_roll(b, a)
     if a.get("op") != b.get("op"):
         return "op"
     for k in ("n", "min"):
@@ -436,6 +454,33 @@ def selftest():
     b = copy.deepcopy(d2rs)
     b[idx[2]]["ret"] = 12345
     assert not run(orig, b)["diffs"]
+    ok += 1
+    # roll_range(min, n) on one side is roll(n) + min on the other (§5 r3)
+    o = next(x for x in orig if x.get("frame") == 2 and x.get("op") == "roll")
+    k = orig.index(o)
+    i = next(i for i in idx if d2rs[i]["before"] == o["before"])
+    for mn, ret, want in ((1, o["ret"] + 1, None), (1, o["ret"], "ret"), (5, o["ret"] + 5, None)):
+        b = copy.deepcopy(d2rs)
+        b[i].update(op="roll_range", min=mn, ret=ret)
+        r = run(orig, b)
+        assert (r["diffs"][0]["field"] if r["diffs"] else None) == want, (mn, ret, r["diffs"][:1])
+        a = copy.deepcopy(orig)
+        a[k].update(op="roll_range", min=mn, ret=ret)
+        r = run(a, d2rs)
+        assert (r["diffs"][0]["field"] if r["diffs"] else None) == want, (mn, ret, r["diffs"][:1])
+        ok += 1
+    b = copy.deepcopy(d2rs)
+    b[i].update(op="roll_range", min=1, n=o["n"] + 1, ret=o["ret"] + 1)
+    assert run(orig, b)["diffs"][0]["field"] == "n"
+    ok += 1
+    # a d2rs step whose lo' the caller takes mod n is the 1.14d roll(n)
+    b = copy.deepcopy(d2rs)
+    b[i].update(op="step", ret=b[i]["after"][0])
+    b[i].pop("n", None)
+    assert not run(orig, b)["diffs"], run(orig, b)["diffs"][:1]
+    a = copy.deepcopy(orig)
+    a[k]["ret"] = (o["ret"] + 1) % o["n"] if o["n"] > 1 else o["ret"] + 1
+    assert run(a, b)["diffs"][0]["field"] == "ret"
     ok += 1
     # a dropped d2rs draw: missing; an extra one: extra
     b = copy.deepcopy(d2rs)
