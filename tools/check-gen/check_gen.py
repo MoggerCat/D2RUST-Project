@@ -15,6 +15,8 @@ Families (one check per table row, written under traces/checks/gen/):
   umod  one unique spawn per monumod row          (boss-kinds.poke)
   skill one right-click cast per class skill      (dru-* / bar-* / ass-*)
   shrine one shrine operated per reachable shrines.txt row
+  item  a census of ITEM_CHUNK base items per check, each created on the ground by
+        the game's own creation path (poke `item`), compared by the items channel
 
 Every generated file starts with a header naming this generator, its
 format version, the family and the table row; the files are never edited
@@ -35,7 +37,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -344,8 +346,48 @@ def fam_shrine(ctx):
     return out
 
 
+ITEM_CHUNK = 20
+ITEM_TABLES = ["weapons.txt", "armor.txt", "misc.txt"]
+
+
+def item_rows(ctx):
+    """(combined index, code, name) over weapons, armor, misc in file order: the
+    combined items array of items/treasure.md section 9.1 (ledger ids item.<id>-<code>)."""
+    out = []
+    for tn in ITEM_TABLES:
+        t = excel(ctx.excel, tn, ["code", "name"])
+        for r in t.rows:
+            code = t.get(r, "code")
+            if code.strip():
+                out.append((len(out), code.strip(), t.get(r, "name")))
+    return out
+
+
+def fam_item(ctx):
+    rows = item_rows(ctx)
+    out = []
+    for k in range(0, len(rows), ITEM_CHUNK):
+        chunk = rows[k:k + ITEM_CHUNK]
+        n = k // ITEM_CHUNK
+        lines = ["at 4 poke seed-game 0x00001234 666"]
+        for j, (idx, code, _) in enumerate(chunk):
+            lines.append(f"at 4 poke item {code} @x+{2 + 2 * (j % 5)} @y+{2 * (j // 5)}")
+        c = Check(f"gen-item-{n:02d}", "item",
+                  f"items {chunk[0][0]}-{chunk[-1][0]} (combined index)",
+                  f"base items {chunk[0][1]} .. {chunk[-1][1]} ({len(chunk)} items)",
+                  "ScnAma --class ama --expansion", 20, 240, "items", lines,
+                  comment=["Census of base items (items/generation.md section 3): each item is "
+                           "created on the ground at normal quality by the game's own creation "
+                           "path with the game seed fixed first; the items channel compares the "
+                           "S->C 0x9C bit streams item by item. Items: " +
+                           ", ".join(f"{i}-{cd}" for i, cd, _ in chunk) + "."])
+        c.extra = {"items": [(i, cd) for i, cd, _ in chunk]}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss,
-             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine}
+             "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item}
 
 
 # ----------------------------------------------------------- ledger join
@@ -387,6 +429,12 @@ def resolve_area(c, areas):
                 and f"({x['skill']})" in s]
     elif f == "shrine":
         pick = [a for a, _ in areas if a.startswith(f"shrine.{x['shrine']}.")]
+    elif f == "item":
+        ids = {a: a for a, _ in areas}
+        pick = [f"item.{i}-{cd}" for i, cd in x["items"] if f"item.{i}-{cd}" in ids]
+        # the ledger lists the bases "never created" in run a1a2 only; others have no row
+        c.area = ",".join(pick) if pick else "-"
+        return
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
