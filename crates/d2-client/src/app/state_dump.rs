@@ -35,6 +35,7 @@ use d2_sim::debug::state;
 use super::play_start::{self, CliStart};
 use super::server_thread::ThreadLink;
 use super::single_player::{self, Character, GameData, Link};
+use crate::bridge::state::StateSource;
 use crate::bridge::Bridge;
 
 /// Milliseconds the clock advances per step: one server tick (25 Hz).
@@ -288,13 +289,9 @@ pub fn dump<W: Write>(
         }
         idle = 0;
         ran += 1;
-        let snap = bridge.link_mut().with(move |l| {
-            let sim = &l.host().game;
-            let s = state::snapshot_world(&sim.game, &sim.events);
-            (s.frame.rem_euclid(every as i32) == 0).then(|| s.to_json_line())
-        })?;
-        if let Some(line) = snap {
-            writeln!(out, "{line}")?;
+        let s = bridge.state_snapshot()?;
+        if s.frame.rem_euclid(every as i32) == 0 {
+            writeln!(out, "{}", s.to_json_line())?;
             snaps += 1;
         }
     }
@@ -304,6 +301,18 @@ pub fn dump<W: Write>(
     writeln!(out, "{}", state::footer_line(snaps, &notes))?;
     out.flush()?;
     Ok(DumpReport { ticks: ran, snaps })
+}
+
+/// The server thread's snapshot, taken on the server thread between two
+/// frames (`state-snapshot.md` §3 r1).
+impl<C: Clock + Send + 'static> StateSource for ThreadLink<Link<C>> {
+    type Error = super::server_thread::ThreadStopped;
+    fn state_snapshot(&mut self) -> Result<state::StateSnapshot, Self::Error> {
+        self.with(|l| {
+            let sim = &l.host().game;
+            state::snapshot_world(&sim.game, &sim.events)
+        })
+    }
 }
 
 /// The bridge-level client data `play` installs (`play::add_live_client`):
