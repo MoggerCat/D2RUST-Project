@@ -89,7 +89,6 @@ fn every_n_keeps_the_multiples_of_n() {
 }
 // Covers: specs/tools/poke.md §2 r6
 // (state-dump --poke: after frame f − 1's snapshot, before frame f)
-// snapshot, before frame f)
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_poke_spawn_runs_before_its_frame_and_the_unit_is_in_that_snapshot() {
