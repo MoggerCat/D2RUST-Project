@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–133 |
 |   3. `frame.tsv` | 134–166 |
 |   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–274 |
-|   6. Comparison | 275–297 |
-|   7. Requests | 298–309 |
-| Constants & data dependencies | 310–313 |
-| Randomness | 314–317 |
-| Edge cases & original bugs | 318–325 |
-| Test vectors | 326–334 |
-| Provenance | 335–339 |
-| Open questions | 340–354 |
+|   5. d2rs export | 183–290 |
+|   6. Comparison | 291–313 |
+|   7. Requests | 314–325 |
+| Constants & data dependencies | 326–329 |
+| Randomness | 330–333 |
+| Edge cases & original bugs | 334–341 |
+| Test vectors | 342–350 |
+| Provenance | 351–355 |
+| Open questions | 356–370 |
 <!-- /index -->
 
 ## Summary
@@ -271,6 +271,22 @@ composition, through `d2-client` only (game logic untouched).
    tick the world view has not drawn yet (a draw waiting on the GPU's
    previous frame would otherwise skip a tick: the dump of N = 73 landed
    on 74 on a slow software GPU).
+14. A unit cel row's `dir` (and its `sprites.tsv` key) is the cel
+   context's direction of §2 r3: the unit's `dir64` after the snap of
+   `render/unit-composite.md` §3 r4 (`UnitPose::dir64`, kept per drawn
+   unit in `WorldFrame::unit_dirs`), not the file direction of the frame
+   set (§6 r3 maps several `dir64` to one file direction). Other cel
+   rows keep the frame set's direction.
+15. A composite slot whose component request succeeds but whose file is
+   in no archive (`render/unit-composite.md` §6 r4: it draws nothing)
+   is still a cel call in 1.14d: `a1-town-arrival-ama` rows 100 and 159,
+   the Amazon's `AMSHlitTN1ht` (in no archive) as `CelDrawShadow` and
+   `CelDraw` with no cel. d2rs keeps such a slot as a call
+   (`ViewRules::unit_slot_calls`, `WorldFrame::unit_calls`: the unit's
+   pass key, and the shadow pass key when the layer casts a shadow),
+   never composed; the export writes it at its key like an item (the
+   unit row of §5 r1 included): `file`, `dir` (r14), `frame`; every
+   measured column `?`; no `sprites.tsv` row.
 
 ### 6. Comparison
 

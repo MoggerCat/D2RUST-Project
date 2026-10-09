@@ -485,6 +485,20 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
             .unit_shadows(world, unit, pose, Some(at), draws, assets)
     }
 
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &Cof,
+    ) -> Result<Vec<crate::world_view::SlotCall>, ViewError> {
+        self.rules.unit_slot_calls(unit, pose, cof)
+    }
+
+    /// The shadow pass slot the source states (`draw-order.md` §6 r3).
+    fn unit_shadow_key(&self, unit: &ClientUnit) -> Option<OrderKey> {
+        self.source.unit_shadow_slot(unit)
+    }
+
     fn component_slot_frame(
         &self,
         unit: &ClientUnit,

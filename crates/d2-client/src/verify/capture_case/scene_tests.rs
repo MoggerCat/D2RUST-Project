@@ -109,6 +109,7 @@ impl ViewRules for Fixture {
             cof: CanonicalPath::new(COF).unwrap(),
             dir: 0,
             frame: 0,
+            dir64: 0,
         }))
     }
     fn unit_params(
