@@ -33,13 +33,14 @@ import packets_channel  # noqa: E402  (the packets channel, scenario-diff.md §3
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "trace-recorder"))
 import send as send_msg  # noqa: E402  (`at … send` lines: the message syntax, scenario.md §3)
 import rng_channel  # noqa: E402  (the rng channel, scenario-diff.md §3)
+import items_channel  # noqa: E402  (the items channel, scenario-diff.md §3 rule 13)
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
 FORMAT_LINE = "check 1"
-CHANNELS = ("state", "draws", "rng", "packets")
+CHANNELS = ("state", "draws", "rng", "packets", "items")
 WINDOWS = os.name == "nt"
 
 
@@ -788,6 +789,8 @@ def selftest():
     ok += packets_channel.selftest(Runner, parse(GOOD), shared_script_error)
     # rng: record_rng.py --frames, state-dump --rng (rng-trace feature), rng_diff.py
     ok += rng_channel.selftest(Runner, parse(GOOD))
+    # items: the packets recordings (once for both channels), items_diff.py
+    ok += items_channel.selftest(Runner, parse(GOOD), shared_script_error)
     # D2RS_BIN_DIR (suite.py): prebuilt binaries, no cargo; --reuse-orig keeps 1.14d only
     old = os.environ.get("D2RS_BIN_DIR")
     os.environ["D2RS_BIN_DIR"] = "/b"
@@ -925,6 +928,8 @@ def main(argv=None):
                 codes[ch] = packets_channel.run(r, save, sides, shared_script_error)
             elif ch == "rng":
                 codes[ch] = rng_channel.run(r, save, sides)
+            elif ch == "items":
+                codes[ch] = items_channel.run(r, save, sides, shared_script_error)
             else:
                 codes[ch] = r.not_available(ch)
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:

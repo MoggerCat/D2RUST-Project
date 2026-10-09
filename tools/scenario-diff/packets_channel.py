@@ -10,10 +10,30 @@ import sys
 
 
 def run(r, save, sides, shared_script_error):
-    """One packets run on the sides asked; the comparator's exit code when
-    both ran (None when one side only). `r` is scenario_diff's Runner."""
-    c = r.c
+    """One packets run on the sides asked (the recordings: record()); the
+    comparator's exit code when both ran (None when one side only). `r` is
+    scenario_diff's Runner."""
     rec = _rec()
+    orig, d2rs = r.path("orig.packets.jsonl"), r.path("d2rs.packets.jsonl")
+    record(r, save, sides, shared_script_error)
+    if sides != {"orig", "d2rs"}:
+        return None
+    code = r.sh([sys.executable, os.path.join(rec, "packets_diff.py"), orig, d2rs,
+                 "--next", str(r.next)] + r.json_args("packets"), check=False)
+    if r.d2rs_input() and shared_script_error(r.d2rs_input()):
+        print("[packets] d2rs ran without 'input d2rs' (not in the shared frame form, "
+              "which state-dump needs): partial at best")
+        code = max(code, 2) if code != 1 else 1
+    return code
+
+
+def record(r, save, sides, shared_script_error):
+    """The two packet recordings, once per run (the packets and items channels
+    share them, scenario-diff.md §3 rule 13)."""
+    done = getattr(r, "packets_recorded", set())
+    sides = set(sides) - done
+    r.packets_recorded = done | sides
+    c = r.c
     orig, d2rs = r.path("orig.packets.jsonl"), r.path("d2rs.packets.jsonl")
     # pokes and sends reach both sides: record_packets.py has the poke and the
     # send layers, state-dump takes both (scenario-diff.md §3 rules 9-10)
@@ -26,15 +46,6 @@ def run(r, save, sides, shared_script_error):
         if r.d2rs_input() and not shared_script_error(r.d2rs_input()):
             args += ["--input", r.d2rs_input()]
         r.cargo("d2-client", args)
-    if sides != {"orig", "d2rs"}:
-        return None
-    code = r.sh([sys.executable, os.path.join(rec, "packets_diff.py"), orig, d2rs,
-                 "--next", str(r.next)] + r.json_args("packets"), check=False)
-    if r.d2rs_input() and shared_script_error(r.d2rs_input()):
-        print("[packets] d2rs ran without 'input d2rs' (not in the shared frame form, "
-              "which state-dump needs): partial at best")
-        code = max(code, 2) if code != 1 else 1
-    return code
 
 
 def _rec():
