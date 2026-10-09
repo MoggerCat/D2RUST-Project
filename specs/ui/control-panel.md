@@ -31,15 +31,15 @@
 |   6. Run / walk and menu buttons | 463–483 |
 |   7. Skill buttons | 484–514 |
 |   8. New-stats and new-skills buttons | 515–588 |
-|   9. Mini panel (state 0x15) | 589–703 |
-|   10. Control panel mouse input | 704–744 |
-|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 745–829 |
-| Constants & data dependencies | 830–845 |
-| Randomness | 846–849 |
-| Edge cases & original bugs | 850–862 |
-| Test vectors | 863–906 |
-| Provenance | 907–944 |
-| Open questions | 945–995 |
+|   9. Mini panel (state 0x15) | 589–702 |
+|   10. Control panel mouse input | 703–743 |
+|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 744–828 |
+| Constants & data dependencies | 829–844 |
+| Randomness | 845–848 |
+| Edge cases & original bugs | 849–861 |
+| Test vectors | 862–905 |
+| Provenance | 906–943 |
+| Open questions | 944–994 |
 <!-- /index -->
 
 ## Summary
@@ -592,9 +592,8 @@ Measured (revision 2026-10-09, q-scenes-compare): state 0x15 is open
 from the game's start: every recorded in-game scene (PC 1's Windows
 recordings and the Wine ones, `facts/render/scenes`) draws
 `minipanel_s` and the menu button at frame 2 with no input that opened
-it. PROVISIONAL (REC-519): d2rs opens it when the game UI is built
-(because no recorded start shows it closed; settled by the call that
-sets it at game entry, PC 1, or a scene that closes it and re-joins).
+it. The opener and its saved-setting gate are r9 (REC-519 settled):
+open at entry unless `Diablo II\Mini Panel` exists and is ≠ 0.
 
 1. **Variant** (`0x0047F0C0`, game start): multiplayer (game type ≠ 0)
    → `Panel\minipanel`, 8 buttons, `[0x007BC978]` := 0; single player →

@@ -31,20 +31,20 @@
 |   4. Recipe scroll text (0x26 type 7) | 202–226 |
 |   5. Overhead text | 227–295 |
 |   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–373 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 374–513 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 514–526 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 527–543 |
-|   10. Other 0x50 codes (UI effects) | 544–579 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 580–661 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 662–668 |
-|   13. NPC intro table `0x00726850` (0x91) | 669–706 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 707–723 |
-| Constants & data dependencies | 724–741 |
-| Randomness | 742–746 |
-| Edge cases & original bugs | 747–767 |
-| Test vectors | 768–790 |
-| Provenance | 791–821 |
-| Open questions | 822–849 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 374–521 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 522–534 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 535–551 |
+|   10. Other 0x50 codes (UI effects) | 552–587 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 588–669 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 670–676 |
+|   13. NPC intro table `0x00726850` (0x91) | 677–714 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 715–731 |
+| Constants & data dependencies | 732–749 |
+| Randomness | 750–754 |
+| Edge cases & original bugs | 755–775 |
+| Test vectors | 776–798 |
+| Provenance | 799–829 |
+| Open questions | 830–857 |
 <!-- /index -->
 
 ## Summary
@@ -426,11 +426,19 @@ stops at a `ÿc` that ends the string.
    100 units followed by LF is followed by one empty line (the LF starts
    the next chunk); the speed is not written for an empty text (the
    panel's speed field keeps the pool memory's value, `0x004A05E0`
-   does not set it). PROVISIONAL (REC-643): a text whose last line has
-   no LF, or that is only the speed line, makes the reader copy past the
-   terminating NUL until an LF or 100 units (the copy has no NUL test);
-   what the stock strings end with is unchecked (needs a string-table
-   scan of the dialog ids).
+   does not set it). A text whose last line has no LF, or that is only
+   the speed line, makes the reader copy past the terminating NUL until
+   an LF or 100 units (re-read 2026-10-09: both copy loops of
+   `0x004A0320`, `0x004A0367`–`0x004A03D1` and `0x004A04B0`–
+   `0x004A051A`, test only LF (`cmp ax, 0xa`) and the count (`cmp edi,
+   0x64`); the only NUL tests are the entry's `0x004A0334` and the
+   outer loop's `0x004A05B8`). No stock text reaches it (settles
+   REC-643; 2026-10-09 scan of the English `string.tbl`,
+   `expansionstring.tbl`, `patchstring.tbl`): all 867 strings whose
+   first line is a decimal scroll speed end with LF, none is the speed
+   line alone, and none has a line of 100 or more units. So for stock
+   data the over-read never happens; d2rs may treat an unterminated
+   last line as a line (no 1.14d input distinguishes it).
 3. **Scroll** (`0x0049D5A0`, per draw, font 8). Panel fields: lines +0,
    count +4, position p +8 (1/1024 pixel), speed +0x0C, t_last +0x1A,
    t_start +0x1E, step +0x22, acc +0x26, same u16 +0x2A. With t =

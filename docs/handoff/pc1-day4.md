@@ -174,3 +174,47 @@ Note for the coordinator: cloud sessions `q-fix-input-lock` and
 `q-fix-boss-damage` (launched 17:05) work the topics of items 55 and 56
 here; this branch has the 1.14d answers (`client/model.md` §20; the
 bosses' wall-cell setups). Merge it before they go far.
+
+## Round 3 — Step 5 (provisional points no spec stated)
+
+Two agents went through the 103 `unstated` rows of
+`docs/handoff/provisional-index.tsv` (client side and sim / server side).
+Most rows are stale code markers: the spec was settled earlier (often on
+day 2 / day 3) and only the `PROVISIONAL` comment in `crates/` is left.
+
+**Answered now (specs edited, addresses inside):**
+- REC-817 MonLvl at level 1, read from the install's `Patch_D2.mpq`
+  `monlvl.bin` (not in `extracted/`): L-TH 8 / 108 / 216, L-DM 2 / 3 / 4,
+  so the Fallen's to-hit is 8 (`combat/damage.md`); d2rs reads monlvl and
+  matches.
+- REC-513 (`items/inventory.md` §4.2 step 7), REC-731 (`skills/bodies.md`
+  §2.8), REC-792 (`world/quests-act5.md` §5), REC-793
+  (`items/inventory-moves.md` §10.2): d2rs matches. REC-516 settled from
+  the rate rule (`sim/units.md` §4.7 r7).
+- REC-514: the click mapping has no row constant (`render/camera.md` §4,
+  `ui/controls.md` §6 r2, `seams/world-screen.md`); d2rs subtracts 4.
+- REC-643 (`ui/messages.md` §7 r2, d2rs matches), REC-510
+  (`tools/facts-render.md` r5), REC-512 / REC-517 (pointers in
+  `render/unit-composite.md` §3); REC-519's stale spec marker removed.
+
+**Stale markers where the code differs** got rows; those where the code
+matches go into one clean-up row (`q-fix-pc1d4-stale-provisional-markers`).
+**Need a recording** (none possible headless here): REC-178/189 (menu vs
+screenshot), REC-742 (chicken positions from tick 8), the Fist of the
+Heavens bolt count, REC-295/296 (first scene with tile rows), REC-644
+(0x26 type 7 with a byte ≥ 0x80), REC-610 (x87 word under the real video
+DLL), REC-900, REC-1110. **d2rs-own** (no 1.14d counterpart): REC-724,
+REC-547, REC-860, the d2rs motion stand-in, test fixtures, native assets.
+**Not done:** REC-61 roof blocks (camera.md OQ1, nothing depends on it),
+REC-111 p3 (next read `0x005A75C0` → `0x00553570`), REC-242.
+
+Rows added: `q-fix-pc1d4-oskill-shrine-bonus`,
+`-mode-start-target-in-path`, `-nihlathak-kill-path-ai`,
+`-item-type-test-rules` (a bow skill fires with no arrows),
+`-stale-provisional-markers`, `-click-no-offset`, `-monster-frame-clock`,
+`-walk-facing-turn`, `-velocity-anim-rate`, `-client-hit-bodies`,
+`-item-tip-anchor`, `-npc-box-draw-guard`, `-walk-sends-path-end`.
+
+REC-1110 also got a rerun under the breakpoint recorder: the drop of
+Warriv's walk reproduces there (WL to tick 55, NU from 56), so it is a
+client-timing effect, not the panel (`client/model.md` §17 r7).
