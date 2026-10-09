@@ -20,6 +20,12 @@ f - 1, after that stop's snapshot, so the snapshot of frame f is the first
 with its effect; each result is a `{"k":"poke","f",...}` line between the
 two snapshots (state_diff.py skips the kind). `--poke-file` as poke.py.
 
+Sends (`send.py`, specs/tools/original-hooks.md §1 rule 4): `--send "<f>
+<Name> <field>=<value>..."` / `--send "<f> hex <bytes>"` (repeatable) inject
+C->S messages at the first stop of the drain call 0x0044F136 after the
+tick-return stop of frame f - 1 (after its snapshot and pokes); each result is
+a `{"k":"send",...}` line before the snapshot of frame f.
+
 The game process is always terminated when this script ends (time limit,
 Ctrl+C, any error, and kill-on-exit if the debugger dies).
 
@@ -39,8 +45,9 @@ import time
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import autostart  # noqa: E402  (unattended start, input script; imports on any OS)
 import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
+import send  # noqa: E402  (--send: C->S message injection, specs/tools/original-hooks.md §1 rule 4)
 
-TOOL = "trace-recorder record_state 0.2.0"
+TOOL = "trace-recorder record_state 0.3.0"
 FORMAT = "state-1"
 SIDE = "orig"
 
@@ -574,7 +581,13 @@ def selftest_poke_options(ap):
     layer = poke.PokeLayer.from_args(a)
     assert [(s.f, s.d) for s in layer.abs] == [(4, "spawn"), (4, "seed-unit")]
     assert poke.PokeLayer.from_args(ap.parse_args([])) is None
-    print("selftest ok: --poke lines make a poke layer")
+    a = ap.parse_args(["--send", "7 InteractWithEntity type=1 id=@1:148", "--send",
+                       "8 hex 2f 00 00 00 00 09 00 00 00"])
+    sends = send.SendLayer.from_args(a)
+    assert [(s.f, s.text()) for s in sends.steps] == [
+        (7, "InteractWithEntity type=1 id=@1:148"), (8, "hex 2f 00 00 00 00 09 00 00 00")]
+    assert send.SendLayer.from_args(ap.parse_args([])) is None
+    print("selftest ok: --poke lines make a poke layer, --send lines a send layer")
 
 
 # --- main ---------------------------------------------------------------------
@@ -593,12 +606,14 @@ def main():
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
     poke.add_options(ap)
+    send.add_options(ap)
     a = ap.parse_args()
     if a.selftest:
         selftest()
         selftest_poke_options(ap)
         return
     layer = poke.PokeLayer.from_args(a)
+    sends = send.SendLayer.from_args(a)
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     out = a.out or os.path.join(
@@ -613,6 +628,8 @@ def main():
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
+    if sends:
+        sends.attach(r)  # frame from 0x0052FD1E; injection at the next 0x0044F136 stop
     try:
         r.run()
     except KeyboardInterrupt:
@@ -626,6 +643,7 @@ def main():
                   + (f" ({x['note']})" if x.get("note") else ""))
         if layer.pending():
             print(f"note: {len(layer.pending())} poke(s) not reached")
+    send.print_results(sends)
     for k, v in r.reader_notes.items():
         print(f"note: {k} ({v} units)")
     print(f"wrote {out}: {r.snaps} snapshots, {r.ticks} ticks")
