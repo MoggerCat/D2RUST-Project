@@ -271,6 +271,9 @@ fn the_recorded_join_on_the_install() {
 fn the_session_join_on_the_install() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
     let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
+    let GameData::Live(live) = &data else {
+        unreachable!("a game dir selects live data")
+    };
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -284,6 +287,9 @@ fn the_session_join_on_the_install() {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The 0x23 SetSkill of the join selects from the `skills` rows
+    // (`msg-skills.md` §2 r3): bind the install's.
+    bridge.set_skill_rows(single_player::client_skill_rows(live.archives.as_ref()).unwrap());
     // The session sequence: 0x67, then 0x6B after the flush with 0x02.
     bridge.send(&single_player::create_request()).unwrap();
     bridge.frame().unwrap();

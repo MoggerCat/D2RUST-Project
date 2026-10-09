@@ -15,11 +15,16 @@ use super::single_player;
 use crate::bridge::world::SkillRow;
 use crate::bridge::BridgeResource;
 
+/// d2rs-own: more rows than any start skill id of the synthetic game.
+const SKILL_ROWS: usize = 357;
+
 /// d2rs-own, unverified: the synthetic game's client rows on the bridge:
 /// [`single_player::synthetic_unit_rows`] and one `skills` row (skill 0,
-/// the row every install has).
+/// the row every install has) plus default rows up to the retail count,
+/// so the join's 0x23 SetSkill (`msg-skills.md` §2 r3) finds whichever
+/// start skill the synthetic character holds.
 pub fn install(app: &mut App) {
     let mut b = app.world_mut().resource_mut::<BridgeResource>();
     b.0.set_unit_rows(single_player::synthetic_unit_rows());
-    b.0.set_skill_rows(vec![SkillRow::default()]);
+    b.0.set_skill_rows(vec![SkillRow::default(); SKILL_ROWS]);
 }
