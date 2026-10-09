@@ -985,6 +985,7 @@ impl OriginalUi {
                 .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
             // The Esc menu always reopens on its first page.
             if ui == u32::from(esc_menu::ESC_PANEL.0) {
+                sh.esc.menu.screen = sh.config.screen;
                 sh.esc.menu.open();
                 sh.esc.controls = None;
             }

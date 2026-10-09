@@ -347,21 +347,21 @@ impl WindowMode {
     }
 }
 
-/// The window size of the play frame: 640 × 480 when `play --res 640x480`
-/// chose that frame (`rules::camera::FrameSize::play`), else the
-/// settings' [`Settings::window_size`].
-pub fn play_window_size(s: &Settings) -> (u32, u32) {
-    use crate::rules::camera::FrameSize;
-    if FrameSize::play() == FrameSize::LOW {
-        (FrameSize::LOW.width as u32, FrameSize::LOW.height as u32)
-    } else {
-        s.window_size()
-    }
+/// The window size of the play frame: always the frame itself
+/// (`rules::camera::FrameSize::play`, 800 × 600 or `play --res 640x480`).
+/// The Resolution row stores its value but "the frame stays 800 × 600"
+/// (`ui/frontend-options.md` §O8), so the window never follows the row on
+/// its own: window and frame follow one setting, and the cursor mapping
+/// ([`crate::ui::Presentation::for_frame`]) always has a window at least
+/// as large as the frame.
+pub fn play_window_size() -> (u32, u32) {
+    let f = crate::rules::camera::FrameSize::play();
+    (f.width as u32, f.height as u32)
 }
 
 /// The primary window the settings ask for (before the app starts).
 pub fn window_for(s: &Settings) -> bevy::window::Window {
-    let (w, h) = play_window_size(s);
+    let (w, h) = play_window_size();
     bevy::window::Window {
         title: "d2rs".into(),
         resolution: bevy::window::WindowResolution::new(w, h),
@@ -406,7 +406,7 @@ pub fn apply_settings(
     }
     for mut w in &mut windows {
         w.mode = new.window_mode.bevy();
-        let (width, height) = play_window_size(&new);
+        let (width, height) = play_window_size();
         w.resolution.set(width as f32, height as f32);
     }
 }
@@ -437,6 +437,24 @@ mod tests {
         assert_eq!(load_settings(&d).unwrap(), s);
         assert_eq!(s.window_size(), (640, 480));
         std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    // Covers: specs/ui/frontend-options.md §o8-d2rs-stubs-rows-drawn-and-navigated-like-the-original-value-kept-in-settings-toml-no-effect
+    #[test]
+    fn the_window_follows_the_frame_not_the_resolution_row() {
+        use crate::ui::Presentation;
+        // The default frame is 800 × 600; a stored Resolution of 640 × 480
+        // must not shrink the window below it (the cursor mapping refuses
+        // a window smaller than the frame).
+        let low = Settings {
+            resolution: 0,
+            ..Settings::default()
+        };
+        assert_eq!(low.window_size(), (640, 480));
+        let (w, h) = play_window_size();
+        let f = crate::rules::camera::FrameSize::play();
+        assert_eq!((w as i32, h as i32), (f.width, f.height));
+        assert!(Presentation::for_frame(w, h, f.width as u32, f.height as u32).is_ok());
     }
 
     #[test]

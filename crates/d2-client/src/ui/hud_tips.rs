@@ -25,6 +25,8 @@ pub struct TipIn<'a> {
     pub w: i32,
     pub h: i32,
     pub mouse: (i32, i32),
+    /// Resolution mode 2 (800 × 600) of the screen.
+    pub res2: bool,
     pub mini_open: bool,
     /// State 9 (the new-stats / skills tip is hidden while it is open).
     pub state9_open: bool,
@@ -47,14 +49,19 @@ pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
     let env = BtnEnv {
         w: i.w,
         h: i.h,
-        res2: true,
+        res2: i.res2,
         open_mode: 0,
     };
     [
         run_tip(i.w, i.h, i.mouse, [None, None], &s),
         menu_tip(i.w, i.h, i.mini_open, i.mouse, &s),
-        tip_800(&env, NewBtn::Stats, i.mouse, i.state9_open, &s),
-        tip_800(&env, NewBtn::Skills, i.mouse, i.state9_open, &s),
+        // §8 r1: the tool tips are 800 × 600 only.
+        i.res2
+            .then(|| tip_800(&env, NewBtn::Stats, i.mouse, i.state9_open, &s))
+            .flatten(),
+        i.res2
+            .then(|| tip_800(&env, NewBtn::Skills, i.mouse, i.state9_open, &s))
+            .flatten(),
         exp_tip(&i.exp, i.w, i.h, i.mouse, &s),
     ]
     .into_iter()
@@ -220,6 +227,7 @@ mod tests {
             w: 800,
             h: 600,
             mouse,
+            res2: true,
             mini_open: false,
             state9_open: false,
             exp: ExpIn::default(),
@@ -229,6 +237,37 @@ mod tests {
         .iter()
         .map(|t| String::from_utf16_lossy(&t.text))
         .collect()
+    }
+
+    fn tips_at(w: i32, h: i32, mouse: (i32, i32), strings: &Strs) -> Vec<String> {
+        hud_tips(&TipIn {
+            w,
+            h,
+            mouse,
+            res2: w == 800,
+            mini_open: false,
+            state9_open: false,
+            exp: ExpIn::default(),
+            strings,
+            fonts: None,
+        })
+        .iter()
+        .map(|t| String::from_utf16_lossy(&t.text))
+        .collect()
+    }
+
+    // Covers: specs/ui/control-panel.md §8 r1, §8 r2
+    #[test]
+    fn the_new_stats_tip_is_800_only() {
+        let s = strs();
+        // §8 r1: hover W/2 − 194 < x < W/2 − 160, H − 42 < y < H − 8 gives
+        // the tip at 800 × 600 (206 < x < 240, 558 < y < 592).
+        assert_eq!(tips_at(800, 600, (220, 570), &s), ["New Stats"]);
+        assert!(tips_at(800, 600, (206, 570), &s).is_empty());
+        // §8 r2: at 640 × 480 the button is drawn with a caption and has no
+        // tool tip: the 800 rectangle at 640 (126 < x < 160, 438 < y < 472)
+        // gives none.
+        assert!(!tips_at(640, 480, (140, 450), &s).contains(&"New Stats".to_string()));
     }
 
     #[test]
@@ -245,6 +284,7 @@ mod tests {
                 w: 800,
                 h: 600,
                 mouse: (400, 570),
+                res2: true,
                 mini_open: false,
                 state9_open: false,
                 exp: ExpIn::default(),

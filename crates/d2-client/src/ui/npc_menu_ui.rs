@@ -20,7 +20,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect, FRAME};
+use super::geom::{Point, Rect};
 use super::imbue_ui::{Imbue, NPC_CHARSI};
 use super::original::OriginalUi;
 use super::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
@@ -223,6 +223,11 @@ impl NpcMenuState {
         });
     }
 
+    /// The whole screen: the clip of every draw.
+    fn screen_rect(&self) -> Rect {
+        Rect::new(0, 0, self.screen.0 as u16, self.screen.1 as u16)
+    }
+
     fn box_pos(&self) -> (i32, i32) {
         // d2rs-own, unverified: centred, a third down the frame.
         ((self.screen.0 - BOX_W) / 2, self.screen.1 / 4)
@@ -273,8 +278,8 @@ impl Panel for NpcMenuUi {
         if st.up.is_none() {
             return Rect::new(0, 0, 0, 0);
         }
-        // The whole frame: a press outside the box ends the chat.
-        FRAME
+        // The whole screen: a press outside the box ends the chat.
+        st.screen_rect()
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -292,13 +297,14 @@ impl Panel for NpcMenuUi {
                 .map(<[u16]>::to_vec)
                 .unwrap_or_else(|| utf16s(fallback(kind)))
         };
+        let screen = st.screen_rect();
         let text = |text: Vec<u16>, at: Point, color: u16| {
             UiDraw::Text(TextRequest {
                 text,
                 at,
                 style: TextStyle { font: 1, color },
                 opts: TextOpts::default(),
-                clip: FRAME,
+                clip: screen,
             })
         };
         let (x, y) = st.box_pos();
