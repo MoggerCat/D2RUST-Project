@@ -251,3 +251,28 @@ spawn.
   never gets unit flags 0x0E, so `missiles/flight.rs` `accepts()` rejects
   it. Also, d2rs's missile damage skips block / dodge and the monster
   crit. Row: `q-fix-c6-player-flags`.
+
+### Item 5: combat-melee-fallen and combat-potion-midfight (1.14d side recorded)
+- Run from `claude/q-tool-state-diff` at `06306f17` (now on staging) with
+  `scenario_diff.py <check> --orig-only` on PC 1. The 1.14d state and
+  packet files are in `traces/raw/check-*/` (gitignored, PC 1).
+  - Note for any PC 1 runner: the new recorders take
+    `%TEMP%\d2-game.lock` themselves. Do not hold it around
+    `scenario_diff.py`, or the recorder waits forever (two runs timed
+    out this way before the fix).
+- **combat-melee-fallen** (CmbBar, level 3, short sword):
+  - `clickunit 1 19` clicked (368, 300) at frame 39 and the click went
+    in at frame 40.
+  - The player enters mode 7 (A1) at f40. The nearest Fallen (GUID 21,
+    hp 256) dies on that one swing: mode 0 with hp 0 at f46, then mode 12
+    at f66. The player is back to mode 1 at f55.
+  - The leader (19) goes S2 at f41, as in combat-fallen-hits-player.
+- **combat-potion-midfight** (CmbPot, hp1 in belt slots 0 and 4):
+  - The player's life is poked to 2560 (10 points) at f60, and `key 1`
+    is posted at frame 70.
+  - From f70 life rises 80 per frame (hp1: 30·256·1 / 96 frames ≈ 80,
+    `items/use.md` §3.1).
+  - A Fallen hit lands at f77 (3120 + 80 − 479 = 2721); the regen goes on
+    (4801 at f103, …).
+- The d2rs side runs with the same command without `--orig-only`; it
+  needs the d2-client from that branch (the cloud runs it).
