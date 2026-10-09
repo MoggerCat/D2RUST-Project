@@ -163,6 +163,7 @@ impl ViewRules for TestRules {
             cof: cof_path(),
             dir: (u.key.guid % 2) as usize,
             frame: 0,
+            dir64: 0,
         }))
     }
 
@@ -244,6 +245,7 @@ fn ui_image(x: i32, y: i32) -> UiDraw {
         image: ImageRef { file: 1, frame: 0 },
         at: Point::new(x, y),
         clip: crate::ui::Rect::new(0, 0, 800, 600),
+        look: crate::ui::CelLook::PLAIN,
     })
 }
 
@@ -286,7 +288,9 @@ fn draw_list_is_ordered_by_key_with_cof_slots() {
         // Unit (0, 7), COF direction 1: component 0 behind 1.
         (set_key(0, 1), 0, 70, 50, (2, 7, 0, 0), ItemTag::Unit(7)),
         (set_key(1, 1), 0, 70, 50, (2, 7, 0, 1), ItemTag::Unit(7)),
-        (set_key(1, 1), 0, 300, 200, (5, 0, 0, 0), ItemTag::Ui(0)),
+        // The UI root's draws: major `UI_PANELS_MAJOR` (after the
+        // automap's major 0, `ui/panels.md` §5 r3).
+        (set_key(1, 1), 0, 300, 200, (5, 1, 0, 0), ItemTag::Ui(0)),
     ];
     assert_eq!(rows(&f, &a), expected);
     // Ids are the frame store's (insertion order), not build order: the

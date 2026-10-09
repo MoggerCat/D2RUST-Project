@@ -321,9 +321,6 @@ impl VendorRest for AppRest {
     fn repair_broken(&mut self, item: UnitId) {
         self.note(format!("repair {}", item.0));
     }
-    fn send_item_stat(&mut self, p: UnitId, item: UnitId, stat: u16) {
-        self.note(format!("item stat {} {} {stat}", p.0, item.0));
-    }
     /// S→C 0x2A through its builder `0x0053D740` (`npc.md` §9).
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
@@ -366,16 +363,16 @@ impl VendorRest for AppRest {
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
-    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
     fn add_to_tome(&mut self, tome: UnitId, k: i32) {
         self.note(format!("add to tome {} {k}", tome.0));
     }
-    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
-    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+    fn can_belt(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {

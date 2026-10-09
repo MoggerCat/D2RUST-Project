@@ -100,8 +100,9 @@ impl Clock for StepClock {
 
 // Covers: specs/client/model.md §12 r1, §11 r3, §11 r5, §9 r1; specs/sim/path-placement.md §13 r3; specs/sim/tick.md §6 r6; specs/sim/intents-events.md §8.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_join_builds_the_client_drlg_in_the_app() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     // The app's own game on its server thread, entered through the
     // session flow (`intents-events.md` §8): the client's 0x67 → 0x01,
     // 0x00, 0x02 with tick 1's flush; the client's 0x6B → 0x59, 0xAA,
@@ -117,6 +118,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -127,7 +129,7 @@ fn the_join_builds_the_client_drlg_in_the_app() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -228,10 +230,8 @@ fn the_recorded_join_on_the_install() {
     use d2_client::app::palette::{act_palette_path, ActPalettes};
 
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
-    let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
-    let GameData::Live(live) = &data else {
-        unreachable!("a game dir selects live data")
-    };
+    let data = GameData::select(Some(std::path::Path::new(&dir))).unwrap();
+    let GameData::Live(live) = &data;
     let link = join(
         "03 00 c4 88 38 10 01 00 61 d1 e0 9f",
         "07 a0 03 88 03 01",
@@ -243,6 +243,8 @@ fn the_recorded_join_on_the_install() {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The install's client tables: the join selects the real skills.
+    app_support::live_bridge_tables(&mut bridge);
     bridge.frame().unwrap();
     bridge.frame().unwrap();
     let w = bridge.world();
@@ -270,7 +272,7 @@ fn the_recorded_join_on_the_install() {
 #[ignore = "needs original game files in D2_GAME_DIR"]
 fn the_session_join_on_the_install() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR must be set");
-    let data = GameData::select(Some(std::path::Path::new(&dir)), false).unwrap();
+    let data = GameData::select(Some(std::path::Path::new(&dir))).unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -284,6 +286,8 @@ fn the_session_join_on_the_install() {
         levels: single_player::client_level_rows(&data),
         ..ClientTables::default()
     });
+    // The install's client tables: the join selects the real skills.
+    app_support::live_bridge_tables(&mut bridge);
     // The session sequence: 0x67, then 0x6B after the flush with 0x02.
     bridge.send(&single_player::create_request()).unwrap();
     bridge.frame().unwrap();
@@ -316,4 +320,289 @@ fn the_session_join_on_the_install() {
         w.rooms_in_sight
     );
     assert!(w.rooms_in_sight.len() >= 2);
+}
+
+// Covers: specs/render/lighting.md §8
+/// The monster light columns the model creates monster lights from
+/// (`MonsterClass::light`, `light_rgb`; §8 monster row), on the user's
+/// install: each `monstats` row carries its `MonStatsEx` row's `Light`
+/// and `light-r/g/b`, and the §8 measured facts hold (100 `monstats2`
+/// rows with `Light` > 0; the fallen shamans' 5 with 230, 168, 255).
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn monster_light_rows_come_from_the_users_monstats2() {
+    use d2_data::tables::{decode_all, Monstats, Monstats2};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = single_player::client_unit_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let m1: Vec<Monstats> = decode_all(set.table("monstats").unwrap()).unwrap();
+    let m2: Vec<Monstats2> = decode_all(set.table("monstats2").unwrap()).unwrap();
+    assert_eq!(m2.iter().filter(|r| r.light > 0).count(), 100);
+    let mut checked = 0;
+    for (m, class) in m1.iter().zip(&rows.monsters) {
+        let Some(class) = class else { continue };
+        let x = &m2[usize::from(m.monstatsex)];
+        assert_eq!(
+            (class.light, class.light_rgb),
+            (x.light, (x.light_r, x.light_g, x.light_b))
+        );
+        checked += 1;
+    }
+    assert!(
+        checked > 600,
+        "{checked} monstats rows with a monstats2 row"
+    );
+    assert!(rows
+        .monsters
+        .iter()
+        .flatten()
+        .any(|c| (c.light, c.light_rgb) == (5, (230, 168, 255))));
+}
+
+// Covers: specs/render/draw-order-2.md §12 l2 r2
+// Covers: specs/render/draw-order-2.md §12 l2 r3
+/// The Arreat Summit background on the user's archives: `summit01` and
+/// `cloud01` load and give the 12 mountain cels (resolution mode 2) and
+/// the 10 clouds' 20 cels, in pass 1, the clouds in draw mode 3 through
+/// the act V tables.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_summit_background_draws_from_the_users_archives() {
+    use d2_client::bridge::drlg::DrlgRoomId;
+    use d2_client::bridge::world::{ActiveRoom, ClientUnit, UnitKey};
+    use d2_client::rules::camera::{Camera, ClientPos, FrameSize};
+    use d2_client::rules::shading::ShadeTables;
+    use d2_client::scene::{order::pass, BlendOp};
+    use d2_client::world_view::background_view::BackgroundView;
+    use d2_client::world_view::{ViewAssets, WorldFrame};
+    use d2_sim::rng::Seed;
+    let d = app_support::live();
+    let pl2 = d
+        .archives
+        .source()
+        .read_file(r"data\global\palette\act5\pal.pl2")
+        .expect("act V pal.pl2")
+        .unwrap();
+    let mut assets = ViewAssets::from_pl2(&pl2).unwrap();
+    let pl2 = d2_formats::palette::Pl2::parse(&pl2).unwrap();
+    assets.shades = Some(ShadeTables::push(&mut assets.maps, &pl2));
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(0, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((5000, 5000));
+    w.units.insert(p, u);
+    w.local_player = Some(p);
+    w.active_rooms = Some(vec![ActiveRoom {
+        x0: 4900,
+        y0: 4900,
+        w: 200,
+        h: 200,
+        level: 120,
+        room: DrlgRoomId(1),
+    }]);
+    w.room_units.place(p, Some(DrlgRoomId(1)));
+    let mut frame = WorldFrame {
+        camera: Some(Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            ClientPos { x: 0, y: 0 },
+            (0, 0),
+        )),
+        ..WorldFrame::default()
+    };
+    let mut v = BackgroundView::new(d.archives.source(), Some(Seed::new(7, 666)));
+    let log = v.add_to_frame(&w, 0, 10_063 + 2_056, &mut assets, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    assert_eq!(frame.items.len(), 12 + 20);
+    assert!(frame
+        .items
+        .iter()
+        .all(|i| i.key.pass() == pass::LEVEL_BACKGROUND));
+    let opaque = frame
+        .items
+        .iter()
+        .filter(|i| i.blend == BlendOp::Opaque)
+        .count();
+    assert_eq!(opaque, 12, "the mountains opaque, the clouds blended");
+}
+
+// Covers: specs/render/shading.md §6 r1
+/// The `states` rows the model's state messages and colour call read, on
+/// the user's install (`shading.md` §6 r1.1 live rows): seven states have
+/// a `colorpri`, all with a `colorshift`; 90 `blue` 100 / 108 / 150, 215,
+/// 255 and 2 `poison` 95 / 104 / 128, 255, 128.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn state_colour_rows_come_from_the_users_states() {
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.states.len(), 185);
+    let coloured: Vec<usize> = (0..rows.states.len())
+        .filter(|&s| rows.states[s].colorpri > 0)
+        .collect();
+    assert_eq!(coloured.len(), 7, "{coloured:?}");
+    assert!(coloured.iter().all(|&s| rows.states[s].colorshift != 0));
+    let row = |s: usize| {
+        let r = rows.states[s];
+        (r.colorpri, r.colorshift, r.light_rgb)
+    };
+    assert_eq!(row(90), (100, 108, (150, 215, 255)));
+    assert_eq!(row(2), (95, 104, (128, 255, 128)));
+}
+
+// Covers: specs/missiles/client.md §c13-function-bodies-specified-here
+/// The client update function the effect layer's flat rule reads
+/// (`missiles` `pCltDoFunc`; functions 2 and 11 set flag 0x10000 at the
+/// animation end), on the user's install: the effect rows carry each
+/// row's value, and both functions are in use.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn effect_rows_carry_the_users_client_missile_functions() {
+    use d2_data::tables::{decode_all, Missiles};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = d2_client::app::missile_art::effect_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let table: Vec<Missiles> = decode_all(set.table("missiles").unwrap()).unwrap();
+    assert_eq!(rows.missiles.len(), table.len());
+    for (r, m) in rows.missiles.iter().zip(&table) {
+        assert_eq!(r.clt_do_func, m.pcltdofunc);
+    }
+    for f in [2, 11] {
+        let n = rows.missiles.iter().filter(|r| r.clt_do_func == f).count();
+        assert!(n > 0, "function {f} unused");
+        println!("pCltDoFunc {f}: {n} rows");
+    }
+}
+
+// Covers: specs/missiles/client.md §c4-create-tail
+/// The client create on the user's `missiles` rows: missile 287
+/// `denofevillight` (`render/lighting.md` §8: `Light` 10;
+/// `missiles/client.md` §C12: client function 23) created at a point
+/// gets its kind-1 light of radius 10.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_den_light_missile_creates_from_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    assert_eq!(rows.missiles[287].clt_do_func, 23);
+    assert_eq!(rows.missiles[287].light, 10);
+    let mut w = ClientWorld::default();
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        class: 287,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut w, &rows.missiles, &rec, true).unwrap().unwrap();
+    let (_, light) = w.lights.iter().next().unwrap();
+    assert_eq!((light.owner_guid, light.radius), (k.guid, 80));
+}
+
+// Covers: specs/missiles/client.md §c6-per-update-dispatch-0x004d2c70
+/// The client missile update on the user's rows: the Den light (287,
+/// function 23) never expires; an `arrow` (row 0, function 1) ends
+/// after its frames (`Range`) and its light, if any, dies.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missiles_update_on_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let missiles = &rows.missiles;
+    assert_eq!(missiles[0].clt_do_func, 1);
+    let mut w = ClientWorld::default();
+    let rec = |class| CreateRecord {
+        flags: flag::POSITION,
+        class,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let den = create(&mut w, missiles, &rec(287), true).unwrap().unwrap();
+    let arrow = create(&mut w, missiles, &rec(0), true).unwrap().unwrap();
+    let frames = w.objclient.missiles[&arrow].current;
+    assert_eq!(frames, i32::from(missiles[0].range));
+    for n in 1..=frames {
+        update(&mut w, missiles, arrow, true).unwrap();
+        update(&mut w, missiles, den, true).unwrap();
+        assert_eq!(
+            w.objclient.set_c.contains_key(&arrow),
+            n < frames,
+            "update {n}"
+        );
+    }
+    for _ in 0..1000 {
+        update(&mut w, missiles, den, true).unwrap();
+    }
+    assert!(w.objclient.set_c.contains_key(&den));
+}
+
+/// The `pCltDoFunc` ids of the user's `missiles` rows by row count (a
+/// listing for the queue, not a check): `--nocapture` prints them.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missile_function_counts_on_the_users_rows() {
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let mut n = std::collections::BTreeMap::new();
+    for r in &rows.missiles {
+        *n.entry(r.clt_do_func).or_insert(0usize) += 1;
+    }
+    let mut v: Vec<_> = n.into_iter().collect();
+    v.sort_by_key(|&(f, c)| (std::cmp::Reverse(c), f));
+    for (f, c) in &v {
+        println!("pCltDoFunc {f}: {c}");
+    }
+    assert_eq!(v.iter().map(|(_, c)| c).sum::<usize>(), rows.missiles.len());
+}
+
+// Covers: specs/missiles/client.md §c12-client-function-table-0x0072a398
+/// Every user `missiles` row whose client function the model runs (1,
+/// 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63): created at a point with a
+/// player owner and a target 6 sub-tiles east, then 60 client updates
+/// of every client missile; no handler error.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_users_client_missiles_run_their_functions() {
+    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
+    use d2_client::bridge::world::{ClientUnit, UnitKey};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let missiles = &rows.missiles;
+    let run = [1u16, 4, 5, 6, 8, 11, 23, 25, 43, 49, 60, 63];
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(0, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((100, 100));
+    w.units.insert(p, u);
+    let mut made = 0;
+    for (class, row) in missiles.iter().enumerate() {
+        if !run.contains(&row.clt_do_func) {
+            continue;
+        }
+        let rec = CreateRecord {
+            flags: flag::POSITION | flag::TARGET_RELATIVE,
+            owner: Some(p),
+            class: class as u32,
+            x: 100,
+            y: 100,
+            tx: 6,
+            level: 1,
+            ..CreateRecord::default()
+        };
+        if create(&mut w, missiles, &rec, true).unwrap().is_some() {
+            made += 1;
+        }
+    }
+    assert!(made > 500, "{made}");
+    for _ in 0..60 {
+        let keys: Vec<_> = w.objclient.missiles.keys().copied().collect();
+        for k in keys {
+            update(&mut w, missiles, k, true).unwrap();
+        }
+    }
 }

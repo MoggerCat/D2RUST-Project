@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–386 |
-|   3. Server → client | 387–623 |
-|   4. d2rs mapping and scope | 624–655 |
-|   5. Machine-readable tables | 656–692 |
-|   6. Exact-match comparison | 693–801 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 802–1233 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1234–1449 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1450–1622 |
-| Constants & data dependencies | 1623–1641 |
-| Randomness | 1642–1647 |
-| Edge cases & original bugs | 1648–1693 |
-| Test vectors | 1694–1780 |
-| Provenance | 1781–1907 |
-| Open questions | 1908–2060 |
+|   2. Client → server | 115–389 |
+|   3. Server → client | 390–626 |
+|   4. d2rs mapping and scope | 627–658 |
+|   5. Machine-readable tables | 659–695 |
+|   6. Exact-match comparison | 696–804 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1255 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1256–1478 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1479–1651 |
+| Constants & data dependencies | 1652–1670 |
+| Randomness | 1671–1676 |
+| Edge cases & original bugs | 1677–1722 |
+| Test vectors | 1723–1809 |
+| Provenance | 1810–1936 |
+| Open questions | 1937–2089 |
 <!-- /index -->
 
 ## Summary
@@ -279,7 +279,10 @@ of them has a consequence in 1.14d; d2rs keeps them as a diagnostic only.
    `0x0054A3F0`; §9 rule 3; corrected 2026-10-08 for
    `docs/handoff/impl-umods-cs-handlers.md`, which found "else 2" here);
    name = cstr after it (≤ 16). 0x15 (`0x0054A5D0`): msg strlen < 256 and
-   strlen + 4 < size, else rejected.
+   strlen + 4 < size, else rejected. PROVISIONAL: the rejection returns 2
+   and a msg without a NUL in the message is rejected (because the
+   result code of this rejection is not written; 0x14's strlen ≥ 256
+   returns 2); settled by REC-402.
 7. 0x3C: u32 at +1, bit 31 = left hand, bits 0–30 = skill id, must be <
    the skills count (data +0xBA0); item u32 at +5. 0x51: u32 at +1: bits
    0–14 skill (> count → unbind, −1), bit 15 left hand, bits 16–31 slot
@@ -895,7 +898,12 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
       `unit_dooverlay` (`0x00625A50`, layer 0); 0 ≤ v ≤ the overlay
       count (data tables +0xBC0; inclusive, so v = count is sent) →
       S→C **0x11** (`0x0053D850`, 8 bytes): type u8@1 = unit +0x00, GUID
-      u32@2, overlay u16@6 = v.
+      u32@2, overlay u16@6 = v. d2rs: `units::messages::report_kill`,
+      `View::monster_update` step 9, the count from `ActionTables`
+      `overlay_count` (`overlay.bin` records). PROVISIONAL: v is read as
+      the overlay list's base value of stat 178 (`0x00625A50` is not
+      spelled out; an overlay list is not extended, so base and total
+      agree); settled by REC-410.
    10. Unit flag 0x800: `0x00597C70(unit, client)`: only when monster
       data +0x5C has bit 1 (`0x00573540(unit, 1)`) and the unit has
       monster data → S→C **0x57** (`0x0053D880`, 14 bytes): GUID u32@1,
@@ -1214,6 +1222,20 @@ or the new room equals the client's room (client +0x1B4, the old room).
    | `0x00571B70` | 0xA5 | 0x14 | 10 |
    | `0x00571C00` | 0xA4 | 0x0C (u16 class @8 := EDX) | 2 (`0x005EF320`) |
    | `0x00571C60` | 0x23 | 0x10 | 2 |
+
+   d2rs writes 0x99 / 0x9A (from the item cast `queue_item_cast`), 0xA3,
+   0xA4, 0xA5 (the landing message) and 0xAB (the life-fraction update of
+   `sim/stat-lists.md` §10.1, `UnitHooks::send_life_fraction`) as
+   `wiring/action/event_records.rs` records; 0x9E is sent at once by the
+   hireling code; 0xA1 never runs; 0x23 has no d2rs writer. PROVISIONAL
+   (a) 0xA5: the message names the unit the record sits on (the writer's
+   unit); settled by REC-411. (b) 0xAB: sent for every receiver unless
+   the unit is revived (`0x00451F30`, flag 0x80000000); the third test
+   `0x00554200(unit)` (its arguments are not spelled out) is not applied;
+   settled by REC-412. (c) 0x99 / 0x9A: the level byte is the cast level
+   cut to a byte and w is the cast's `aim` flag (0 / 1); the 16-byte or
+   17-byte form is the §3.5 rule 5 choice with flag 1; settled by
+   REC-413.
 3. **Overhead text** `0x00571620(unit, client)`: unit +0xA4 = 0 →
    **S→C 0x76** (`0x0053B3D0`: type u8@1, GUID u32@2; recorded `76 00
    01000000` at the join). Else, unless the unit is a player and the
@@ -1434,6 +1456,13 @@ the game in state 4 (client-list order), the joiner included (its
 state became 4 just before, `0x0052D5AE`). Single player has no account name, so @0x18–@0x27
 are zero. Recorded seq 224: `5a 02 04 00000000 00` + "werwer" padded
 with zeros to 40 bytes. The leave 0x5A (code 3) is §2.5 rule 2.
+The join's 0x5B fields are `client/msg-units.md` §8 r3 (the 1.14d
+sender's words); its 0x65 carries the player's kill count (0 at the
+recorded join). PROVISIONAL: with more than one client in state 4, each
+gets the joiner's 0x5B and 0x65, in client-list order, before the 0x5A
+(because this section names `0x0052C410`'s messages but not who gets
+the other players' 0x5B / 0x65; single player has one client, so it
+does not change a single-player join); settled by REC-401.
 
 The first 0x48 is the per-client update's inventory refresh: in
 `0x005380D0` the order is removals (`0x0053A770`), unit updates

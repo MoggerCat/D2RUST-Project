@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7, §7.9 rule 3; specs/sim/pathing.md §9.8; specs/sim/units.md §4.1, §4.6; specs/audio/triggers-2.md §14
+// Spec: specs/sim/intents-events.md §7.3, §7.4, §7.5, §7.7, §7.9 rules 2–3; specs/sim/pathing.md §9.8; specs/sim/units.md §4.1, §4.6; specs/audio/triggers-2.md §14
 //! The monster part of the per-unit update (`0x00598220`, §7.3 rule 2
 //! step 2: the mode message `0x00597E20`, S→C 0x67–0x6D, built by
 //! [`crate::monsters::mode_message`]), the flag part of the room
@@ -85,17 +85,22 @@ impl<X: Pending> View<'_, X> {
     /// 6. unit flag 0x400: S→C 0x2C (`0x00571740`, `audio/triggers-2.md`
     ///    §14 rule 2, [`crate::units::sound::sound_message`]);
     /// 7. unit flag 0x8000 (hit): S→C 0x0C (`0x00597CF0`,
-    ///    [`skill_message::monster_hit`]).
+    ///    [`skill_message::monster_hit`]);
+    /// 9. the unit's list has the overlay flag (`0x00625A20`): S→C 0x11
+    ///    (`0x0053D850`, `units::messages::report_kill`) with the overlay
+    ///    list's stat 178 when it is in 0..=[`super::ActionTables::overlay_count`];
+    /// 10. unit flag 0x800 and monster data +0x5C bit 1 (`0x00573540(unit,
+    ///     1)`): S→C 0x57 (`0x00597C70` → `0x0053D880`,
+    ///     `units::messages::npc_enchants`).
     ///
     /// First (§7.1 rule 2.1): a monster with unit flag 0x10 (not yet
     /// announced) gets its add messages (§7.2, [`View::monster_add`]:
     /// 0xAC, 0x98, 0x21, 0xAA, part B with a mode message). Of rule 2,
-    /// step 3 has nothing to send
-    /// (d2rs keeps no pending event records, §7.9 rule 2) and steps 5 and
-    /// 8–10 are not sent: step 5 needs the item world, step 8's test
-    /// `0x00639F20` and stat sender `0x005711D0`, step 9's `0x00625A20` /
-    /// `0x005715A0` conditions and step 10's 0x57 (`0x00597C70`) are not
-    /// specified.
+    /// step 3 sends the pending event records
+    /// ([`View::send_event_records`], §7.9 rule 2) and steps 5
+    /// and 8 are not sent: step 5 needs the item world, step 8's test
+    /// `0x00639F20` and stat sender `0x005711D0` have no d2rs provider
+    /// yet.
     pub fn monster_update(&mut self, game: &mut Game, client: ClientId, unit: UnitId) {
         let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
             return;
@@ -128,6 +133,8 @@ impl<X: Pending> View<'_, X> {
         if unit_flags & flags::CHANGED != 0 {
             self.mode_update(game, client, receiver, unit);
         }
+        // Step 3: the pending event records (`0x00571CD0`, §7.9 rule 2).
+        self.send_event_records(game, receiver, unit);
         // Step 4.
         if unit_flags & flags::HOVER_FREED != 0 {
             self.overhead_message(receiver, unit, UnitType::Monster as u8, guid);
@@ -140,6 +147,29 @@ impl<X: Pending> View<'_, X> {
         // Step 7.
         if unit_flags & HIT != 0 {
             self.hit_message(receiver, unit, guid);
+        }
+        // Step 9: the unit's list has the overlay flag (`0x00625A20`) →
+        // `0x005715A0`: stat 178 of the overlay list, 0..=overlay count
+        // (inclusive) → S→C 0x11 (`0x0053D850`).
+        if let Some(v) = self.stats.overlay_to_send(unit) {
+            if (0..=self.h.tables.overlay_count).contains(&v) {
+                let m =
+                    crate::units::messages::report_kill(UnitType::Monster as u8, guid, v as u16);
+                self.h.x.send(receiver, &m);
+            }
+        }
+        // Step 10: unit flag 0x800 → `0x00597C70`: monster data +0x5C
+        // bit 1 (`0x00573540(unit, 1)`) → S→C 0x57 (`0x0053D880`).
+        if unit_flags & cleanup::MONSTER_800 != 0 {
+            if let Some(d) = self.h.monster_data(unit).filter(|d| d.data_flag1) {
+                let m = crate::units::messages::npc_enchants(
+                    guid,
+                    d.name_seed,
+                    [d.umods[0], d.umods[1], d.umods[2]],
+                    d.has_flag(4),
+                );
+                self.h.x.send(receiver, &m);
+            }
         }
     }
 
@@ -257,7 +287,7 @@ impl<X: Pending> View<'_, X> {
     /// The room clean-up `0x00553220(game, unit)` (§7.5), in order:
     /// 1. the changed-stat (mod) array emptied (`0x00625960`,
     ///    `stat-lists.md` §11.3; only an extended list has one);
-    /// 2. the pending event records: d2rs keeps none (§7.9 rule 2);
+    /// 2. the pending event records freed (§7.9 rule 2);
     /// 3. unit flags 0x1, 0x10, 0x400, 0x8000; the path's room-changed
     ///    flag (`0x00620FA0(unit, 0)`); flag-ex 0x800, 0x1000, 0x10000,
     ///    0x200000;
@@ -276,6 +306,8 @@ impl<X: Pending> View<'_, X> {
     pub fn room_cleanup(&mut self, unit: UnitId) {
         // Step 1.
         self.stats.clear_mods(unit);
+        // Step 2.
+        self.h.event_records.clear(unit);
         let Some(r) = self.units.get_mut(unit) else {
             return;
         };

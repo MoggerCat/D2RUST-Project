@@ -103,6 +103,7 @@ fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -361,7 +362,7 @@ fn wired_travel() {
     want.extend_from_slice(&[0, 0]);
     assert_eq!(got, vec![want]);
     assert_eq!(fx.interact(), None);
-    assert_eq!(fx.sim.world.action.arrivals.0.len(), 1);
+    assert_eq!(fx.sim.events.sys.hooks.arrivals.0.len(), 1);
     assert!(fx.sim.world.action.faults.is_empty());
 }
 

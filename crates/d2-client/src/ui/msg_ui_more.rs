@@ -228,7 +228,11 @@ impl OriginalUi {
             Output::HireListReset => self.hire.borrow_mut().reset(),
             Output::HireOffer { name, seed } => self.hire.borrow_mut().offer(name, seed),
             Output::MercRevive { state, value } => self.merc_revive(state, value),
-            Output::QuestFlags { record } => self.more.client_quest = record,
+            Output::QuestFlags { record } => {
+                self.more.client_quest = record;
+                self.shared.borrow_mut().client_quest = record;
+            }
+            Output::HoradricItem { code } => self.horadric_item(code),
             Output::OverheadClear { unit } => {
                 self.more.overhead.remove(&unit);
                 self.shared.borrow_mut().bubbles.clear(unit);
@@ -311,6 +315,23 @@ impl OriginalUi {
         if class == CLASS_ACT2GUARD2 && !self.more.f4b1620 && quest_clear && !blocker_open {
             self.more.unit_sounds.push((3983, unit));
         }
+    }
+
+    /// `0x0048A540(code)` (`ui/panels-2.md` §20 r7 steps 1–3): the quest
+    /// bit of the item in the client quest record (`hst ` 10.11, `qf2 `
+    /// 18.11) already set → nothing; else it is set and the Horadric
+    /// animation starts at the cube's next draw (its stamp is the draw's
+    /// tick, [`super::cube_ui`]).
+    fn horadric_item(&mut self, code: [u8; 4]) {
+        let q = if &code == b"hst " { 10 } else { 18 };
+        if crate::bridge::objects::quest_bit(&self.more.client_quest, q, 11) {
+            return;
+        }
+        let n = 16 * usize::from(q) + 11;
+        if let Some(v) = self.more.client_quest.get_mut(n >> 3) {
+            *v |= 1 << (n & 7);
+        }
+        self.shared.borrow().horadric_start.set(true);
     }
 
     /// 0x91 (§10 r2): every intro entry whose class equals a slot value

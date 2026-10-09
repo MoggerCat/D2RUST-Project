@@ -397,6 +397,7 @@ fn build(dna: &[u8]) -> (InvTables, World) {
         items,
         itemtypes,
         equiv,
+        books: Vec::new(),
     };
     let mut w = World {
         expansion,
@@ -741,11 +742,13 @@ fn ref_req(c: &Ctx, w: &World, i: usize, equipping: bool) -> bool {
         bs -= 10;
         bd -= 10;
     }
-    let stat_ok = |v: i32, req: i32, own: i32| {
+    // Rule 3 tests the stat-list link before subtracting the contribution;
+    // rule 4 (dexterity) has no link test.
+    let stat_ok = |v: i32, req: i32, own: i32, linked: bool| {
         if v < 1 || v < req {
             return false;
         }
-        if equipping && p.active {
+        if equipping && linked {
             let v = v - own;
             if v < 1 || v < req {
                 return false;
@@ -753,10 +756,10 @@ fn ref_req(c: &Ctx, w: &World, i: usize, equipping: bool) -> bool {
         }
         true
     };
-    if !stat_ok(w.unit_stats[0], rs + bs, p.contrib[0]) {
+    if !stat_ok(w.unit_stats[0], rs + bs, p.contrib[0], p.active) {
         return false;
     }
-    if !stat_ok(w.unit_stats[1], rd + bd, p.contrib[1]) {
+    if !stat_ok(w.unit_stats[1], rd + bd, p.contrib[1], true) {
         return false;
     }
     if w.unit_stats[2] < p.level_req {

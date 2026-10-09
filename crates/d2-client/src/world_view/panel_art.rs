@@ -1,16 +1,19 @@
-// Spec: specs/ui/panels.md (§1.3, §1.4, §1.6, §7.1), specs/render/shading.md (§3 r1), specs/render/blend-modes.md (mode 5), specs/render/draw-order.md (§10)
+// Spec: specs/ui/panels.md (§1.3, §1.4, §1.6, §7.1), specs/render/shading.md (§3 r1, §6 r4), specs/render/blend-modes.md (§1, §8 r2), specs/render/draw-order.md (§10)
 //! Panel art of the original UI in the world view: the `ui_image` hook
 //! for the [`ImageRef`]s of `ui::panels` ([`PanelArtRules`]) and the
 //! loader that makes their DC6 files resident ([`PanelArtLoader`]).
 //!
 //! An [`ImageRef`] names a file of [`UiFiles`] (`data\global\ui\<name>.dc6`,
-//! §7.1) and a frame of its direction 0. A panel cel draw is draw mode 5,
-//! light 0xFF, no palette remap (§1.4, §1.6): no shading map
-//! (`shading.md` §3 r1: `v = 0xFF` has no `L`) and the opaque copy
-//! (`blend-modes.md`: mode 5 is `Opaque`). The request's point is the
-//! cel draw position (§1.3), placed by `sprite-placement.md` §2
-//! ([`draw_position`]). Remapped draws (skill icons, `k`) have no field
-//! in [`ImageRequest`]; none is wired (`ui::original::PENDING`).
+//! §7.1) and a frame of its direction 0. A panel cel draw is light 0xFF
+//! (`shading.md` §3 r1: `v = 0xFF` has no `L`) with the request's
+//! [`crate::ui::CelLook`]: the plain draw is mode 5, no remap (§1.4: the
+//! opaque copy), a colored draw remaps by `k` (§1.6) or an item colour
+//! (`shading.md` §6 r4), and the draw mode picks the blend table
+//! (`blend-modes.md` §1; [`super::ui_bind::ui_cel_ops`]). The request's
+//! point is the cel draw position (§1.3), placed by
+//! `sprite-placement.md` §2 ([`draw_position`]). Rectangles
+//! (`blend-modes.md` §8 r2) are [`super::ui_bind::rect_sprite`]; the
+//! loader makes their frames and colour rows resident.
 
 use std::sync::Arc;
 
@@ -19,11 +22,14 @@ use crate::bridge::world::ClientWorld;
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::{FramePart, FrameSet, FrameSetKey, IndexFrame};
+use crate::rules::camera::FrameSize;
 use crate::rules::placement::draw_position;
-use crate::scene::{BlendOp, ShadeChain};
+use crate::rules::shading::{ITEM_PALETTE_FILES, ITEM_PALETTE_MAPS, MAP_BYTES};
+use crate::scene::{BlendOp, MapId, ShadeChain};
 use crate::ui::panels::UiFiles;
-use crate::ui::{ImageRef, ImageRequest, TextRequest, UiDraw};
+use crate::ui::{ImageRef, ImageRequest, Remap, TextRequest, UiDraw};
 
+use super::ui_bind::{ensure_rects, ui_cel_ops, ui_remap, TextColors};
 use super::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
 const SPEC: &str = "ui/panels.md";
@@ -61,22 +67,26 @@ pub fn image_set(files: &UiFiles, image: ImageRef) -> Result<FrameSetKey, ViewEr
     })
 }
 
-/// The panel cel draw of `req` (module doc).
+/// The panel cel draw of `req` (module doc); `colors` are the frame's
+/// text-colour maps (remap `k` 1–12).
 pub fn panel_sprite(
     files: &UiFiles,
     req: &ImageRequest,
+    colors: Option<&TextColors>,
     assets: &ViewAssets,
 ) -> Result<UiSprite, ViewError> {
     let set = image_set(files, req.image)?;
     let index = req.image.frame as usize;
     let frame: &IndexFrame = assets.frame(&set, index)?;
     let (x, y) = draw_position(frame, req.at.x, req.at.y);
+    let remap = ui_remap(req.look.remap, colors, assets)?;
+    let (shade, blend) = ui_cel_ops(assets.shades.as_ref(), req.look.mode, remap)?;
     Ok(UiSprite {
         frame: ComponentFrame { set, index },
         x,
         y,
-        shade: ShadeChain::EMPTY,
-        blend: BlendOp::Opaque,
+        shade,
+        blend,
     })
 }
 
@@ -131,6 +141,19 @@ impl<R: ViewRules> ViewRules for PanelArtRules<R> {
             .unit_shadows(world, unit, pose, at, draws, assets)
     }
 
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &d2_formats::cof::Cof,
+    ) -> Result<Vec<crate::world_view::SlotCall>, ViewError> {
+        self.rules.unit_slot_calls(unit, pose, cof)
+    }
+
+    fn unit_shadow_key(&self, unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        self.rules.unit_shadow_key(unit)
+    }
+
     fn component_frame(
         &self,
         unit: &ClientUnit,
@@ -178,7 +201,11 @@ impl<R: ViewRules> ViewRules for PanelArtRules<R> {
 
 impl<R: UiRules> UiRules for PanelArtRules<R> {
     fn ui_image(&self, req: &ImageRequest, assets: &ViewAssets) -> Result<UiSprite, ViewError> {
-        panel_sprite(&self.files, req, assets)
+        let colors = self
+            .text
+            .as_ref()
+            .and_then(|t| *t.read().unwrap_or_else(|e| e.into_inner()));
+        panel_sprite(&self.files, req, colors.as_ref(), assets)
     }
 
     fn ui_text(&self, req: &TextRequest, assets: &ViewAssets) -> Result<Vec<UiSprite>, ViewError> {
@@ -186,7 +213,11 @@ impl<R: UiRules> UiRules for PanelArtRules<R> {
             return self.rules.ui_text(req, assets);
         };
         let colors = *text.read().unwrap_or_else(|e| e.into_inner());
-        super::ui_bind::text_sprites(&super::ui_bind::OriginalTextHooks { colors }, req, assets)
+        let hooks = super::ui_bind::OriginalTextHooks {
+            colors,
+            shades: assets.shades,
+        };
+        super::ui_bind::text_sprites(&hooks, req, assets)
     }
 
     /// Pass 11: everything after the world draw (`draw-order.md` §10),
@@ -195,6 +226,12 @@ impl<R: UiRules> UiRules for PanelArtRules<R> {
     fn ui_pass(&self) -> Result<u32, ViewError> {
         Ok(crate::scene::order::pass::UI)
     }
+}
+
+/// The archive name of item palette file `name` (`render/shading.md` §6
+/// r4, loader `0x00600B60`).
+pub fn item_palette_name(name: &str) -> String {
+    format!("data\\global\\items\\palette\\{name}.dat")
 }
 
 /// Reads the panel DC6 files a frame's UI draws name, once each, from the
@@ -233,9 +270,52 @@ impl PanelArtLoader {
         Ok(key)
     }
 
+    /// Pushes the 21 maps of each item palette file (`shading.md` §6 r4:
+    /// `0x006009C0` loads 5,376 bytes per file) in file order; returns
+    /// the first row. A file no archive holds, or a short one, is an error.
+    fn push_item_palettes(&self, assets: &mut ViewAssets) -> Result<MapId, ViewError> {
+        let maps = usize::from(ITEM_PALETTE_MAPS);
+        let mut rows = Vec::with_capacity(ITEM_PALETTE_FILES.len() * maps);
+        for name in ITEM_PALETTE_FILES {
+            let archive = item_palette_name(name);
+            let fail = |message: String| ViewError::Unresolved {
+                what: "item palette file",
+                spec: "render/shading.md",
+                message: format!("{archive}: {message}"),
+            };
+            let bytes = self
+                .source
+                .read_file(&archive)
+                .ok_or_else(|| fail("in no archive".into()))?
+                .map_err(fail)?;
+            let need = maps * MAP_BYTES;
+            if bytes.len() < need {
+                return Err(fail(format!("{} bytes, {need} needed", bytes.len())));
+            }
+            for m in 0..maps {
+                let row: [u8; MAP_BYTES] = bytes[m * MAP_BYTES..(m + 1) * MAP_BYTES]
+                    .try_into()
+                    .expect("one map");
+                rows.push(row);
+            }
+        }
+        let base = MapId(assets.maps.len() as u32);
+        for row in rows {
+            assets.maps.push(row);
+        }
+        Ok(base)
+    }
+
     /// Makes every image's frame set resident. A file no archive holds, or
     /// one that does not parse, is an error (M07): never skipped.
     pub fn ensure(&self, draws: &[UiDraw], assets: &mut ViewAssets) -> Result<(), ViewError> {
+        ensure_rects(draws, FrameSize::play(), assets)?;
+        let item_colors = draws.iter().any(
+            |d| matches!(d, UiDraw::Image(r) if matches!(r.look.remap, Remap::ItemColor { .. })),
+        );
+        if item_colors && assets.item_palettes.is_none() {
+            assets.item_palettes = Some(self.push_item_palettes(assets)?);
+        }
         for d in draws {
             let UiDraw::Image(req) = d else { continue };
             let set = self.set_of(req.image)?;
@@ -319,6 +399,7 @@ mod tests {
             image: ImageRef { file, frame },
             at: Point::new(x, y),
             clip: FRAME,
+            look: crate::ui::CelLook::PLAIN,
         }
     }
 
@@ -340,12 +421,12 @@ mod tests {
         loader.ensure(&draws, &mut a).unwrap();
         assert_eq!(a.frames.len(), 12);
         // The cel draw at (418, 476) covers rows 476 − h + 1 … 476.
-        let s = panel_sprite(&files, &image(id, 10, 418, 476), &a).unwrap();
+        let s = panel_sprite(&files, &image(id, 10, 418, 476), None, &a).unwrap();
         assert_eq!((s.x, s.y, s.frame.index), (418, 474, 10));
         assert_eq!(s.frame.set.path(), "data/global/ui/panel/buysellbtn.dc6");
         assert_eq!((s.shade, s.blend), (ShadeChain::EMPTY, BlendOp::Opaque));
         // Past the file's frames: an error, not a skip.
-        assert!(panel_sprite(&files, &image(id, 12, 0, 0), &a).is_err());
+        assert!(panel_sprite(&files, &image(id, 12, 0, 0), None, &a).is_err());
     }
 
     // Covers: specs/ui/panels.md §7 r1

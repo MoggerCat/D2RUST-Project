@@ -279,7 +279,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn send_transaction(&mut self, _: UnitId, _: Transaction) {}
     fn new_store_inventory(&mut self, _: u16, _: Option<UnitId>) {}
     fn place_in_store(&mut self, _: u16, _: UnitId) -> bool {
@@ -302,14 +301,14 @@ impl VendorRest for Rest {
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
-    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
     fn add_to_tome(&mut self, _: UnitId, _: i32) {}
-    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
-    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+    fn can_belt(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
@@ -598,6 +597,7 @@ impl Fx {
             },
             levels: Vec::new(),
             skill_modes: Vec::new(),
+            overlay_count: 0,
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),
@@ -965,4 +965,30 @@ fn quest_host_requests_are_drained_after_the_tick_in_call_order() {
         [HostRequest::SavePass, HostRequest::EndGame]
     );
     assert!(f.h.game.take_host_requests().is_empty());
+}
+
+// Covers: specs/seams/sim-server.md §2.2
+#[test]
+fn a_ticks_messages_leave_in_production_order() {
+    // A rest (quest) message queued before the tick's last steps, then a
+    // player death announced by the action wiring in `after_tick`: the
+    // client gets the quest message first (`sim/intents-events.md` §1
+    // r3), not grouped after the action wiring's sends.
+    let mut f = Fx::new(|_| {});
+    let p = f.player;
+    let marker = vec![0x5D, 0x01, 0x00, 0x01, 0x00, 0x00];
+    f.world().rest.sent.push((p, marker.clone()));
+    let s = &mut f.h.game;
+    s.events.start_death(&mut s.game, p);
+    f.h.clock.0 += 40;
+    assert!(f.h.frame().unwrap().ticked);
+    let got = f.h.receive(0);
+    let at = got
+        .iter()
+        .position(|m| *m == marker)
+        .expect("the quest message");
+    assert!(
+        at + 1 < got.len(),
+        "the death's messages follow the quest message: {got:02x?}"
+    );
 }

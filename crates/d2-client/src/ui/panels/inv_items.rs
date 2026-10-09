@@ -1,9 +1,10 @@
-// Spec: specs/ui/inventory.md (§1 r1–r4, §3 r1, §5 r3, §6 r1–r2, §8 r2–r4, §10 r3–r4), specs/ui/panels.md (§9.2, §9.6, §9.7), specs/ui/panels-3.md (§23 r9)
+// Spec: specs/ui/inventory.md (§1 r1–r4, §3 r1, §5 r3, §6 r1–r2, §8 r2–r4, §10 r3–r4), specs/ui/panels.md (§9.2, §9.6, §9.7), specs/ui/panels-3.md (§23 r9, §29)
 //! The local player's items in the inventory panel (ui 1): the page-0
 //! grid items (`inventory.md` §3 r1) and the equipped items (§6 r2)
 //! drawn with their inventory graphic (§8), the cursor item at the mouse
 //! (`panels-3.md` §23 r9), and a left press on the grid (§10) or on an
-//! equipment box sent as a C→S item intent through the root's outbox.
+//! equipment box (`panels-3.md` §29, [`equip`]) sent as a C→S item intent
+//! through the root's outbox.
 //!
 //! Plain decisions over the client model ([`crate::bridge::items`]);
 //! the server checks every move (`items/inventory-moves.md` §7).
@@ -16,9 +17,6 @@
 //! - the layout without `inventory.bin` rows: the grid of the spec's
 //!   measured record 0 / 16 (`panels.md` §Test vectors), no equipment
 //!   boxes;
-//! - the equipment click (`0x00490780` family is not specified,
-//!   `panels.md` §15): inside a box, cursor item + empty → 0x1A, cursor
-//!   item + occupied → 0x1D, no cursor item + occupied → 0x1C;
 //! - the drop cell `0x00486BD0` (not specified) is the cursor cell;
 //! - tints (§3 r2–r3, §6 r4), sockets, ethereal draw mode and the
 //!   item's colour remap are not drawn ([`super::super::ImageRequest`]
@@ -26,15 +24,17 @@
 
 use std::collections::BTreeMap;
 
-use d2_proto::client::{RemoveBodyItem, SwapCursorBufferItem, SwapCursorWithBody};
+use d2_proto::client::SwapCursorBufferItem;
 
-use super::super::draw::UiDrawSink;
+use super::super::draw::{CelLook, Remap, UiDraw, UiDrawSink, DRAW_MODE_OPAQUE};
 use super::super::geom::Point;
+use super::super::inv_grid::HoverState;
 use super::super::inv_grid::{
     equip_draw_point, grid_click, ClickCtx, EquipBox, GridMsg, GridRecord, ItemRef,
 };
 use super::super::layout::Screen;
-use super::super::panel::ClientIntent;
+use super::super::panel::{ClientIntent, WidgetId};
+use super::super::widget::CellGrid;
 use super::{cel, PanelOutput, UiFiles};
 use crate::bridge::items::{self, mode, ItemArtRows, ItemView};
 use crate::bridge::world::ClientWorld;
@@ -103,6 +103,26 @@ pub fn inv_layout(r: &d2_data::tables::Inventory) -> InvLayout {
     }
 }
 
+/// The ten equipment rectangles of an `inventory.bin` row (`panels.md`
+/// §9.2), the empty-slot pictures' anchors (§9.4: left, bottom).
+pub fn equip_rects(r: &d2_data::tables::Inventory) -> super::inventory::EquipRects {
+    use super::inventory::BinRect;
+    let b =
+        |l: u32, rt: u32, t: u32, bt: u32| BinRect::new(l as i32, rt as i32, t as i32, bt as i32);
+    super::inventory::EquipRects {
+        r_arm: b(r.rarmleft, r.rarmright, r.rarmtop, r.rarmbottom),
+        torso: b(r.torsoleft, r.torsoright, r.torsotop, r.torsobottom),
+        l_arm: b(r.larmleft, r.larmright, r.larmtop, r.larmbottom),
+        head: b(r.headleft, r.headright, r.headtop, r.headbottom),
+        neck: b(r.neckleft, r.neckright, r.necktop, r.neckbottom),
+        r_hand: b(r.rhandleft, r.rhandright, r.rhandtop, r.rhandbottom),
+        l_hand: b(r.lhandleft, r.lhandright, r.lhandtop, r.lhandbottom),
+        belt: b(r.beltleft, r.beltright, r.belttop, r.beltbottom),
+        feet: b(r.feetleft, r.feetright, r.feettop, r.feetbottom),
+        gloves: b(r.glovesleft, r.glovesright, r.glovestop, r.glovesbottom),
+    }
+}
+
 /// d2rs-own, unverified: the grid of the spec's measured record 0 (640)
 /// / 16 (800) (`panels.md` §Test vectors) when no `inventory.bin` rows
 /// are set; no equipment boxes.
@@ -136,45 +156,44 @@ pub struct ItemsUi {
     /// Shift is held (set by the host each frame): a shift-click on a
     /// belt-able grid item sends 0x63 (`inventory.md` §10 r3.4).
     pub shift: bool,
+    /// Ctrl is held (set by the host each frame): a Ctrl-click on a grid
+    /// item never lifts it (`inventory.md` §10 r3.3; the sell itself is
+    /// the shop panel's).
+    pub ctrl: bool,
     /// The item tool tips' data (`inv_items_tip`); none: no tips.
     pub tips: Option<super::super::item_tip::ItemTips>,
+    /// The inventory tables of the equip check (`items/inventory.md`
+    /// §4.3, [`equip`]); none: an equipment box press does nothing.
+    pub inv_tables: Option<std::sync::Arc<d2_sim::items::inventory::InvTables>>,
     /// The used item of the identify cursor (cursor state 6, `inv_items_tip`).
     pub identify: std::cell::Cell<Option<u32>>,
+    /// The five tint palette indices of `inventory.md` §2 r1 (the act
+    /// palette's nearest entries, [`super::super::inv_grid::tint_indices`]);
+    /// `None` (no palette given): no tint is drawn.
+    pub tint_colors: Option<[u8; 5]>,
+    /// The hover state of §5 (`0x00487000`): one for every grid, as in
+    /// the original; updated on each mouse event over an open grid
+    /// ([`ItemsUi::track_hover`]) and read by the grid click (§10 r4).
+    pub hover: std::cell::Cell<HoverState>,
+    /// The equipment rectangles by `inventory.bin` record (§9.4 empty-slot
+    /// pictures); `None`: none drawn.
+    pub equip_rects: Option<Vec<super::inventory::EquipRects>>,
 }
 
-/// d2rs-own, unverified: whether an item code is a belt-able potion
-/// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
-/// throwing potions `gps`/`gpm`/`gpl`/`ops`/`opm`/`opl`); the server
-/// still checks the move (`inventory-moves.md` §7.24).
-pub fn fits_belt(code: Option<[u8; 4]>) -> bool {
-    let Some(c) = code else {
-        return false;
-    };
-    matches!(
-        &c[..3],
-        b"hp1"
-            | b"hp2"
-            | b"hp3"
-            | b"hp4"
-            | b"hp5"
-            | b"mp1"
-            | b"mp2"
-            | b"mp3"
-            | b"mp4"
-            | b"mp5"
-            | b"rvs"
-            | b"rvl"
-            | b"vps"
-            | b"yps"
-            | b"wms"
-            | b"gps"
-            | b"gpm"
-            | b"gpl"
-            | b"ops"
-            | b"opm"
-            | b"opl"
-    )
+/// Item flag 0x400000: ethereal (`ui/inventory.md` §8 r4).
+pub const ETHEREAL: u32 = 0x0040_0000;
+/// The draw mode of an ethereal item graphic (§8 r4): 50 % alpha.
+pub const ETHEREAL_MODE: u8 = 1;
+
+/// Whether an item code fits a belt box: the type's itemtypes `beltable`
+/// and a 1 x 1 size, as the server reads it (`seams/item-grids.md` §2.8,
+/// `inventory-moves.md` §3.3). The server still checks the move.
+pub fn fits_belt(art: &ItemArtRows, code: Option<[u8; 4]>) -> bool {
+    code.and_then(|c| art.get(c)).is_some_and(|r| r.beltable)
 }
+
+/// The cube's grid, `inventory.bin` record 9 (`inventory.md` §1.3).
+const CUBE_GRID: (i32, i32) = (3, 4);
 
 /// An item's graphic: file id, footprint in cells, frame size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -221,6 +240,48 @@ impl ItemsUi {
         Some(Art { file, w, h, gw, gh })
     }
 
+    /// The empty equipment-slot pictures (`panels.md` §9.4) of the local
+    /// player's record: a body location with no item, a hand also not
+    /// covered by a two-handed weapon in the other hand.
+    pub fn draw_equip_backgrounds(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        class: Option<u32>,
+        screen: &Screen,
+        out: &mut dyn UiDrawSink,
+    ) {
+        use super::inventory::{body_loc, equip_backgrounds, EquipState};
+        let Some(r) = class.and_then(|c| super::super::original::inventory_record(c, screen))
+        else {
+            return;
+        };
+        let Some(rects) = self.equip_rects.as_ref().and_then(|v| v.get(r)) else {
+            return;
+        };
+        let mut eq = EquipState::default();
+        for i in items::local_items(world) {
+            if i.mode != mode::BODY || !(1..=10).contains(&i.body) {
+                continue;
+            }
+            eq.occupied[usize::from(i.body)] = true;
+            // d2rs-own, unverified: `0x0063D340` = 2 read as the items
+            // `2handed` column (the equip check's two-handed test).
+            let two = i.code.is_some_and(|c| {
+                self.inv_tables
+                    .as_deref()
+                    .and_then(|t| t.items.iter().find(|r| r.code == c))
+                    .is_some_and(|r| r.twohanded != 0)
+            });
+            match i.body {
+                body_loc::RIGHT_HAND => eq.right_two_handed = two,
+                body_loc::LEFT_HAND => eq.left_two_handed = two,
+                _ => {}
+            }
+        }
+        equip_backgrounds(rects, &eq, &|f| files.id(f), out);
+    }
+
     /// The grid items of page 0 (§3 r1) and the equipped items (§6 r2) of
     /// the local player, item graphics drawn with the frame's top-left at
     /// the item's point (§8 r4).
@@ -251,7 +312,7 @@ impl ItemsUi {
                 }
                 _ => continue,
             };
-            out.push(cel(a.file, 0, top_left.x, top_left.y + a.gh));
+            out.push(self.item_cel(world, &it, a.file, top_left.x, top_left.y + a.gh));
         }
     }
 
@@ -259,18 +320,64 @@ impl ItemsUi {
     /// (the belt box, `control-panel.md` §5 r4); nothing without art.
     pub fn draw_at(
         &self,
+        world: &ClientWorld,
         files: &UiFiles,
         item: &ItemView,
         (left, top): (i32, i32),
         out: &mut dyn UiDrawSink,
     ) {
         if let Some(a) = self.art(files, item, (29, 29)) {
-            out.push(cel(a.file, 0, left, top + a.gh));
+            out.push(self.item_cel(world, item, a.file, left, top + a.gh));
         }
+    }
+
+    /// How an item graphic is written (`ui/inventory.md` §8 r4): draw mode
+    /// 1 for an ethereal item (flag 0x400000), else 5; the remap is the
+    /// item's inventory colour ([`super::super::item_tip::ItemTips::inv_color`]),
+    /// none without the tips or a map.
+    pub fn item_look(&self, world: &ClientWorld, it: &ItemView) -> CelLook {
+        let remap = self
+            .tips
+            .as_ref()
+            .zip(items::stream(world, it.key))
+            .and_then(|(t, s)| t.inv_color(s))
+            .map_or(Remap::None, |(t, c)| Remap::ItemColor { t, c });
+        CelLook {
+            mode: if it.flags & ETHEREAL != 0 {
+                ETHEREAL_MODE
+            } else {
+                DRAW_MODE_OPAQUE
+            },
+            remap,
+        }
+    }
+
+    /// The cel draw `0x004F6480` of an item graphic at (x, y) with its
+    /// [`Self::item_look`].
+    pub(crate) fn item_cel(
+        &self,
+        world: &ClientWorld,
+        it: &ItemView,
+        file: u32,
+        x: i32,
+        y: i32,
+    ) -> UiDraw {
+        let mut d = cel(file, 0, x, y);
+        if let UiDraw::Image(i) = &mut d {
+            i.look = self.item_look(world, it);
+        }
+        d
     }
 
     /// The cursor item (`panels-3.md` §23 r9): its graphic with the
     /// top-left at (mx − gw / 2, my − gh / 2) (adj 0, halves rounded down).
+    /// The cursor item's graphic frame size `gw` × `gh` (`panels-3.md`
+    /// §23 r9), when its art is known.
+    pub fn cursor_graphic_size(&self, files: &UiFiles, item: &ItemView) -> Option<(u32, u32)> {
+        let a = self.art(files, item, (29, 29))?;
+        Some((a.gw as u32, a.gh as u32))
+    }
+
     pub fn draw_cursor(
         &self,
         world: &ClientWorld,
@@ -287,11 +394,11 @@ impl ItemsUi {
         };
         let x = mouse.x - (a.gw as u32 / 2) as i32;
         let y = mouse.y - (a.gh as u32 / 2) as i32;
-        out.push(cel(a.file, 0, x, y + a.gh));
+        out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
     }
 
     /// Left mouse down in the inventory panel: the grid click (§10) or an
-    /// equipment-box click (d2rs-own, module doc). The intents only.
+    /// equipment-box click (`panels-3.md` §29).
     pub fn press(
         &self,
         world: &ClientWorld,
@@ -303,15 +410,15 @@ impl ItemsUi {
         if g.cell_w == 0 || g.cell_h == 0 {
             return Vec::new();
         }
-        let all = items::local_items(world);
         let cursor = items::cursor_item(world);
-        let intent = if g.contains_mouse(at) {
-            self.grid_press(world, files, g, cursor.as_ref(), at, 0)
-        } else {
-            self.equip_socket(world, layout, &all, cursor.as_ref(), at)
-                .or_else(|| equip_press(layout, &all, cursor.as_ref(), at))
-        };
-        intent.map(PanelOutput::Intent).into_iter().collect()
+        if g.contains_mouse(at) {
+            return self
+                .grid_press(world, files, g, cursor.as_ref(), at, 0)
+                .map(PanelOutput::Intent)
+                .into_iter()
+                .collect();
+        }
+        self.body_press(world, layout, cursor.as_ref(), at)
     }
 
     /// Right mouse down in the inventory panel (d2rs-own, REC-117): on a
@@ -354,6 +461,45 @@ impl ItemsUi {
         vec![PanelOutput::Intent(ClientIntent::from_message(&m))]
     }
 
+    /// The hover handler `0x00487000` (§5) for a mouse event at `at`
+    /// over grid `g` (page `page`): with a cursor item the cursor cell
+    /// (§5 r2–r3, kept when the footprint overhangs), else the item at
+    /// the mouse cell (§5 r1). Nothing outside the grid rectangle.
+    pub fn track_hover(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        g: &GridRecord,
+        page: u8,
+        at: Point,
+    ) {
+        if g.cell_w == 0 || g.cell_h == 0 || !g.contains_mouse(at) {
+            return;
+        }
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
+        let mut h = self.hover.get();
+        if let Some(cur) = items::cursor_item(world) {
+            let a = self.art(files, &cur, cell);
+            let (w, hh, gw, gh) = a.map_or((1, 1, cell.0, cell.1), |a| (a.w, a.h, a.gw, a.gh));
+            h.with_cursor_item(grid_cursor_cell(g, at, (w, hh), (gw, gh)));
+        } else {
+            let (c, r) = g.mouse_cell(at);
+            let (c, r) = (c as i32, r as i32);
+            let under = items::local_items(world).into_iter().find(|i| {
+                let (w, hh) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |a| {
+                    (i32::from(a.inv_w.max(1)), i32::from(a.inv_h.max(1)))
+                });
+                let (x, y) = (i32::from(i.x), i32::from(i.y));
+                i.mode == mode::STORED
+                    && i.page == page
+                    && (x..x + w).contains(&c)
+                    && (y..y + hh).contains(&r)
+            });
+            h.without_cursor_item(under.map(|i| i.key.guid));
+        }
+        self.hover.set(h);
+    }
+
     pub(super) fn grid_press(
         &self,
         world: &ClientWorld,
@@ -381,14 +527,48 @@ impl ItemsUi {
                 .find(|(_, x, y, w, h)| (*x..x + w).contains(&c) && (*y..y + h).contains(&r))
                 .map(|(i, ..)| *i)
         };
+        // The facts of §10 r4.3 from the tables and the items' streams
+        // (`seams/item-grids.md` §2.5; `inv_items_facts`).
+        let tips = self.tips.as_ref().map(|t| t as &dyn facts::GridInfo);
+        let stream_of = |i: &ItemView| items::stream(world, i.key);
+        let cursor_stream = cursor.and_then(stream_of);
         let iref = |i: &ItemView| ItemRef {
             id: i.key.guid,
             is_cube: i.code == Some(*b"box "),
-            stackable_onto: false,
-            book_kind: None,
+            stackable_onto: tips
+                .zip(cursor_stream)
+                .zip(stream_of(i))
+                .is_some_and(|((t, a), b)| facts::stack_test(t, a, b)),
+            book_kind: tips
+                .zip(stream_of(i))
+                .and_then(|(t, s)| facts::book_kind(t, s)),
             sellable: false,
-            fits_belt: fits_belt(i.code),
+            fits_belt: fits_belt(&self.art, i.code),
         };
+        // The cube's grid (`inventory.bin` record 9: 3 x 4) and what lies
+        // on its page 3, for the room test `0x0063B850` (§10 r4.4).
+        let cube_grid = if page == 3 {
+            (i32::from(g.grid_x), i32::from(g.grid_y))
+        } else {
+            CUBE_GRID
+        };
+        let cube_taken: Vec<(i32, i32, i32, i32)> = all
+            .iter()
+            .filter(|i| i.mode == mode::STORED && i.page == 3)
+            .map(|i| {
+                let (w, h) = self.art.get(i.code.unwrap_or([0; 4])).map_or((1, 1), |r| {
+                    (i32::from(r.inv_w.max(1)), i32::from(r.inv_h.max(1)))
+                });
+                (i32::from(i.x), i32::from(i.y), w, h)
+            })
+            .collect();
+        let cube_has_room = cursor.is_some_and(|c| {
+            let size = self
+                .art
+                .get(c.code.unwrap_or([0; 4]))
+                .map_or((1, 1), |r| (i32::from(r.inv_w), i32::from(r.inv_h)));
+            facts::has_room(cube_grid, &cube_taken, size)
+        });
         let (mc, mr) = g.mouse_cell(at);
         let under_view = at_cell(mc as i32, mr as i32);
         let under_mouse = under_view.map(iref);
@@ -397,18 +577,22 @@ impl ItemsUi {
             let tips = self.tips.as_ref()?;
             socket::socket_intent(tips, world, c, u)
         });
-        // Cursor cell (§5 r3) and the overlap under the footprint.
+        // The kept cursor cell (§5 r3, `[0x00721E4C]` / `[0x00721E50]`)
+        // and the overlap under the footprint. The press point is a mouse
+        // event too: a footprint overhanging the right column or bottom
+        // row there keeps the last valid cell.
         let mut cursor_cell = (mc, mr);
         let mut overlap: Vec<&ItemView> = Vec::new();
         let mut fits = true;
         if let Some(cur) = cursor {
             let a = self.art(files, cur, cell);
-            let (w, h, gw, gh) = a.map_or((1, 1, cell.0, cell.1), |a| (a.w, a.h, a.gw, a.gh));
-            match cursor_cell_for(g, at, (w, h), (gw, gh)) {
-                Some(cc) => cursor_cell = cc,
-                None => fits = false,
-            }
+            let (w, h) = a.map_or((1, 1), |a| (a.w, a.h));
+            self.track_hover(world, files, g, page, at);
+            let (c, r) = self.hover.get().cursor_cell;
+            // d2rs-own: no cell was ever set (§4 r2 tests ≥ 0).
+            fits = c >= 0 && r >= 0;
             if fits {
+                cursor_cell = (c as u32, r as u32);
                 let (c0, r0) = (cursor_cell.0 as i32, cursor_cell.1 as i32);
                 for (i, x, y, iw, ih) in &grid {
                     if *x < c0 + w && c0 < x + iw && *y < r0 + h && r0 < y + ih {
@@ -427,15 +611,23 @@ impl ItemsUi {
             },
             used_item: self.identify.get(),
             cursor_item: cursor.map(iref),
-            cursor_scroll_kind: None,
+            cursor_scroll_kind: tips
+                .zip(cursor_stream)
+                .and_then(|(t, s)| facts::scroll_kind(t, s)),
             under_mouse,
             ready: true,
             own_player: true,
             own_inventory_context: true,
-            inventory_mode: if page == 4 { 0x0C } else { 0 },
+            // `ui/inventory.md` §4 r1: the stash grid in mode 0x0C, the
+            // cube grid (page 3) in mode 0x0E.
+            inventory_mode: match page {
+                4 => 0x0C,
+                3 => 0x0E,
+                _ => 0,
+            },
             page,
             shift: self.shift,
-            ctrl: false,
+            ctrl: self.ctrl,
             store_open: false,
             overlap_item: overlap.first().map(|i| iref(i)),
             overlap_count: overlap.len() as u32,
@@ -447,7 +639,7 @@ impl ItemsUi {
             drop_cell: fits.then_some(cursor_cell),
             swap_ok: overlap.len() == 1,
             cursor_cell,
-            cube_has_room: false,
+            cube_has_room,
             cursor_can_socket: socket.is_some(),
         };
         match grid_click(&ctx).msg? {
@@ -473,51 +665,55 @@ impl ItemsUi {
                 Some(ClientIntent::from_message(&self.target_used(target, used)))
             }
             GridMsg::Socket { .. } => socket.map(|m| ClientIntent::from_message(&m)),
-            // Not produced by the facts above (no stack / scroll
-            // / cube / shop facts in the preview).
+            GridMsg::Stack { cursor, under } => {
+                Some(ClientIntent::from_message(&d2_proto::client::StackItems {
+                    src: cursor,
+                    dst: under,
+                }))
+            }
+            GridMsg::ScrollBook { cursor, under } => Some(ClientIntent::from_message(
+                &d2_proto::client::ScrollToBook {
+                    scroll: cursor,
+                    book: under,
+                },
+            )),
+            GridMsg::ToCube { item, cube } => {
+                Some(ClientIntent::from_message(&d2_proto::client::ItemToCube {
+                    item,
+                    cube,
+                }))
+            }
+            // The sell needs the open store's NPC (`vendors.md` §8): the
+            // shop panel's own sell stays the way to sell.
             _ => None,
         }
     }
 }
 
-/// The cursor cell (§5 r3); `None` when the footprint leaves the grid
-/// (the original keeps the previous cell; the preview places nothing).
-pub fn cursor_cell_for(
+/// The cursor cell of a w × h cursor item with a gw × gh graphic over
+/// grid `g` (§5 r3, [`CellGrid::cursor_cell`]); `None`: the handler
+/// returns without change (the footprint would pass the grid's right or
+/// bottom edge), the caller keeps its previous cell.
+pub fn grid_cursor_cell(
     g: &GridRecord,
     at: Point,
     (w, h): (i32, i32),
     (gw, gh): (i32, i32),
-) -> Option<(u32, u32)> {
-    let (cw, ch) = (u32::from(g.cell_w), u32::from(g.cell_h));
-    let (mut c, mut r) = g.mouse_cell(at);
-    if w % 2 == 0 {
-        c = ((gw >> 2) - g.left + at.x) as u32 / cw;
-    }
-    if h % 2 == 0 {
-        r = ((gh >> 2) - g.top + at.y) as u32 / ch;
-    }
-    let (gx, gy) = (i32::from(g.grid_x), i32::from(g.grid_y));
-    if w == gx {
-        c = (gx >> 1) as u32;
-    }
-    if h == gy {
-        r = (gy >> 1) as u32;
-    }
-    let fix = |v: u32, n: i32, max: i32| -> Option<u32> {
-        let mut v = v as i32;
-        if n > 1 {
-            v -= n >> 1;
-            if v < 0 {
-                v = 0;
-            }
-        }
-        (n + v <= max).then_some(v as u32)
-    };
-    Some((fix(c, w, gx)?, fix(r, h, gy)?))
+) -> Option<(i32, i32)> {
+    let cg = CellGrid::new(
+        WidgetId(0),
+        Point::new(g.left, g.top),
+        u16::from(g.grid_x),
+        u16::from(g.grid_y),
+        u16::from(g.cell_w),
+        u16::from(g.cell_h),
+    )
+    .ok()?;
+    cg.cursor_cell(at, w as u16, h as u16, gw as u32, gh as u32)
 }
 
-/// d2rs-own, unverified: an equipment-box press (module doc).
-/// The equipment box under `at`.
+/// The equipment box under `at` (`panels-3.md` §29 r1: boxes 1–10, first
+/// hit in location order).
 fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     (1u8..=10).find(|&l| {
         let b = layout.equip[usize::from(l)];
@@ -528,46 +724,54 @@ fn equip_loc(layout: &InvLayout, at: Point) -> Option<u8> {
     })
 }
 
-fn equip_press(
-    layout: &InvLayout,
-    all: &[ItemView],
-    cursor: Option<&ItemView>,
-    at: Point,
-) -> Option<ClientIntent> {
-    let loc = equip_loc(layout, at)?;
-    let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc);
-    match (cursor, worn) {
-        (Some(c), None) => Some(ClientIntent::from_message(&items::equip(c.key.guid, loc))),
-        (Some(c), Some(_)) => Some(ClientIntent::from_message(&SwapCursorWithBody {
-            item: c.key.guid,
-            bodyloc: loc,
-        })),
-        (None, Some(_)) => Some(ClientIntent::from_message(&RemoveBodyItem {
-            bodyloc: u16::from(loc),
-        })),
-        (None, None) => None,
-    }
-}
-
 impl ItemsUi {
-    /// A filler on the cursor over a worn socketed item: C→S 0x28
-    /// (`inventory.md` §6 r5 counts the equipment boxes too).
-    fn equip_socket(
+    /// `panels-3.md` §29 r1 on a box hit: the socket test (r1.2, not under
+    /// the use cursor), then the location's handler ([`equip::body_press`]).
+    fn body_press(
         &self,
         world: &ClientWorld,
         layout: &InvLayout,
-        all: &[ItemView],
         cursor: Option<&ItemView>,
         at: Point,
-    ) -> Option<ClientIntent> {
-        let (tips, c) = (self.tips.as_ref()?, cursor?);
-        let loc = equip_loc(layout, at)?;
-        let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc)?;
-        let m = socket::socket_intent(tips, world, c, worn)?;
-        Some(ClientIntent::from_message(&m))
+    ) -> Vec<PanelOutput> {
+        let Some(loc) = equip_loc(layout, at) else {
+            return Vec::new();
+        };
+        let used = self.identify.get();
+        if used.is_none() {
+            if let (Some(tips), Some(c)) = (self.tips.as_ref(), cursor) {
+                let all = items::local_items(world);
+                let worn = all.iter().find(|i| i.mode == mode::BODY && i.body == loc);
+                if let Some(m) = worn.and_then(|t| socket::socket_intent(tips, world, c, t)) {
+                    return vec![PanelOutput::Intent(ClientIntent::from_message(&m))];
+                }
+            }
+        }
+        let (Some(t), Some(tips)) = (self.inv_tables.as_deref(), self.tips.as_ref()) else {
+            return Vec::new();
+        };
+        let lookup = tips.tables();
+        let decode = |s: &[u8]| tips.bits(s);
+        let Some((view, inv, _)) = equip::ClientInv::build(world, t, &lookup, &decode) else {
+            return Vec::new();
+        };
+        let state = match used {
+            Some(u) => equip::Cursor::Use(u),
+            None if cursor.is_some() => equip::Cursor::Item,
+            None => equip::Cursor::Plain,
+        };
+        let p = equip::body_press(&view, &inv, loc, state);
+        if p.end_use {
+            self.identify.set(None);
+        }
+        p.out
     }
 }
 
+#[path = "inv_items_equip.rs"]
+pub mod equip;
+#[path = "inv_items_facts.rs"]
+mod facts;
 #[path = "inv_items_repair.rs"]
 mod repair;
 #[path = "inv_items_socket.rs"]

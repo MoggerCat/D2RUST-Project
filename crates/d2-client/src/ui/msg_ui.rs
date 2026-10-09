@@ -54,7 +54,6 @@ pub mod skip {
         "0x5D: the client quest flags [0x007C0D43] of the Den counter path (msg-ui OQ 4)";
     pub const QUEST_LOG_TABLE: &str =
         "0x5D: the quest-log table 0x00723F30 (41 entries) is not in the specs (msg-ui §1 r6)";
-    pub const INPUT_RESET: &str = "0x63: the input reset 0x0044DA40";
     pub const WAYPOINT_TAB_GATE: &str =
         "0x63: the waypoint tab gate reads the client quest flags (msg-ui OQ 4)";
     pub const WAYPOINT_ROWS: &str = "0x63: the row rebuild 0x0049C7F0 (ui/panels.md §13 r5)";
@@ -234,7 +233,6 @@ impl OriginalUi {
         world: &ClientWorld,
     ) -> Result<(), OriginalUiError> {
         self.refresh_facts(world);
-        self.hire_auto_open(o, world);
         self.imbue_output(o);
         if matches!(o, Output::ChatLine { .. }) {
             // `messages.md` §3: the screen message; the overhead record
@@ -261,6 +259,10 @@ impl OriginalUi {
                 ref bytes, present, ..
             } => self.npc_text_record(bytes, present),
             Output::NpcDialog(ref d) => self.npc_dialog(d, world),
+            Output::NpcTransaction { ref bytes, .. } => {
+                self.npc_transaction(bytes);
+                Ok(())
+            }
             // Not UI outputs (`client/bridge.md` §10 rule 5).
             Output::ServerSound { .. } | Output::ShrineSound { .. } => Ok(()),
             _ if o.consumer() != Consumer::Ui => Ok(()),
@@ -289,6 +291,7 @@ impl OriginalUi {
     /// (`0x004A0680`).
     pub fn free_npc_text(&mut self) {
         self.npc_text = None;
+        self.talk_list();
     }
 
     /// The NPC text list `[0x007BF250]` (§5 r2), `None` when freed.
@@ -321,6 +324,7 @@ impl OriginalUi {
             // r2.3.
             _ => self.npc_text = None,
         }
+        self.talk_list();
         self.skip(skip::NPC_TEXT_SHOW);
         Ok(())
     }
@@ -331,20 +335,55 @@ impl OriginalUi {
         // r4.2: `[0x007C0D43]` := Q (§16 r7).
         self.more.client_quest = d.quest_flags;
         self.skip(skip::NPC_DIALOG_UI);
-        // d2rs-own, unverified (`npc_menu_ui`): the menu box opens here.
-        let level = world.local().map_or(1, |u| world.base(u.key, 12, 0));
-        let n = crate::ui::npc_menu_ui::unidentified_count(world);
+        // The menu box (`npc_box`, `menus.md` §2.2) opens here. The facts
+        // are captured at receive (`client/bridge.md` §10 r3, r9), not read
+        // from the end-of-frame model.
+        let (level, n) = (d.level, d.unidentified);
         // `panels-2.md` §14.2: the Resurrect edit while the mercenary is
         // dead (`[0x00725494]` ≠ −1, S→C 0x9B) in an expansion game.
-        let expansion = world.expansion != 0 && self.shared.borrow().config.expansion_installed;
+        let expansion = d.expansion && self.shared.borrow().config.expansion_installed;
         self.npcm.borrow_mut().resurrect = (expansion && self.more.merc_state != 0xFFFF)
             .then_some(u32::from(self.more.merc_7c0dd0));
-        self.open_npc_menu_with(d.guid, d.class, level, n);
+        self.npcm.borrow_mut().merc_name = self.more.merc_state;
+        self.hire.borrow_mut().merc_state = self.more.merc_state;
+        self.open_npc_menu_with(d.guid, d.class, level, n, world);
         match dialog_case(self.msg.ui_7c0c68, self.npc_text.as_ref(), d)? {
-            Some(case) => self.dialog_answer = Some((Box::new(d.clone()), case)),
+            Some(case) => {
+                self.npc_speech(d, case);
+                self.dialog_answer = Some((Box::new(d.clone()), case));
+            }
             None => self.skip(skip::NPC_DIALOG_M),
         }
         Ok(())
+    }
+
+    /// The speech of 0x28's dialog branch (`client/msg-ui.md` §16 r4.3, in
+    /// the order of the table): B2 plays the dialog line of `m`
+    /// (`0x004A10E0(U, m, 1)`), B3 and B6 the NPC's greeting
+    /// (`0x004B4FD0`, `0x004B66B0`; `triggers.md` §10 r1); B0, B1, B4 and B5
+    /// make none. B3 holds when m2 (`0x00661440`) is not 0xFFFF.
+    fn npc_speech(&mut self, d: &NpcDialog, case: DialogCase) {
+        let request = match case {
+            DialogCase::B2 { m } => SoundRequest::NpcDialogLine {
+                npc: d.unit,
+                class: d.class,
+                key: m as i32,
+            },
+            DialogCase::Rest => {
+                let m2 = self.npc_text.as_ref().map_or(0xFFFF, NpcTextList::m2);
+                let b3 = m2 != 0xFFFF;
+                let b5 = d.f4b1a10.is_some_and(|v| v != 0);
+                if !b3 && !(d.interact && !b5) {
+                    return;
+                }
+                SoundRequest::NpcGreeting {
+                    npc: d.unit,
+                    class: d.class,
+                }
+            }
+            DialogCase::B0 | DialogCase::B1 => return,
+        };
+        self.outcome.sounds.push(request);
     }
 
     fn skip(&mut self, what: &'static str) {
@@ -426,19 +465,19 @@ impl OriginalUi {
         if !self.set_ui(UI_WAYPOINT, ON, true)? {
             return Ok(());
         }
-        self.skip(skip::INPUT_RESET);
+        // r2.2: the input reset `0x0044DA40`, applied by the host to the
+        // world clicks ([`OriginalUi::take_input_reset`]).
+        self.shared.borrow_mut().input_reset = true;
         // r2.3: the act index of the local player's room's level
         // (`0x006427F0`); none → tab 0. `0x0049C760(a)`: a ≥ 5 → 0;
         // tab 0 has no gate; the others read the client quest flags.
+        let quest = self.more.client_quest;
+        let gate = |record: u32| crate::bridge::objects::quest_bit(&quest, record as u8, 0);
         let tab = match world.player_level() {
-            None => Some(0),
+            None => 0,
             Some(level) => match act_index(u32::from(level)) {
-                a if a >= WAYPOINT_TABS => Some(0),
-                0 => Some(0),
-                _ => {
-                    self.skip(skip::WAYPOINT_TAB_GATE);
-                    None
-                }
+                a if a >= WAYPOINT_TABS => 0,
+                a => crate::ui::panels::waypoint::set_tab(a as u8, &gate),
             },
         };
         // r2.4–r2.6: the row rebuild before and after the store.
@@ -447,7 +486,7 @@ impl OriginalUi {
         self.msg.waypoint = Some(WaypointMenuState {
             guid,
             record,
-            tab,
+            tab: Some(tab),
             close_latch: false,
         });
         // The installed menu's rows (`waypoint_ui`).
@@ -458,6 +497,7 @@ impl OriginalUi {
             record,
             current: world.player_level().map_or(0, u32::from),
             seq,
+            tab,
         });
         Ok(())
     }

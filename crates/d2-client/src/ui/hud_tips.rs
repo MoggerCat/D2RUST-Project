@@ -1,19 +1,21 @@
-// Spec: specs/ui/control-panel.md (§4 r1, §6 r1/r4, §8 r1)
+// Spec: specs/ui/control-panel.md (§4 r1, §6 r1/r4, §8 r1, §9 r6)
 //! The control panel tool tips (`Tip` of `ui::panels::control`) bound to
-//! the string tables: the run, menu, new-stats / new-skills and
-//! experience hovers resolve their string ids through [`StringLookup`]
-//! and leave as centred text draws.
+//! the string tables: the run, menu, new-stats / new-skills, experience
+//! and mini-panel hovers resolve their string ids through
+//! [`StringLookup`] and leave as centred text draws.
 // d2rs-own, unverified: the tip font (1, the font of the globe numbers)
 // is not named by the spec. Without the font measure the globe numbers
-// are centred on width 0.
+// are centred on width 0. The run and mini-panel key names are the play
+// bindings' names ([`TipIn::keys`]), not the key name strings of §5 r13.
 
-use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
+use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::Point;
 use crate::ui::panel::StringLookup;
 use crate::ui::panels::control::buttons::{menu_tip, run_tip, tip_800, BtnEnv, NewBtn};
 use crate::ui::panels::control::globes::{
     exp_tip, globe_numbers, stamina_tip, ExpIn, NumbersIn, StaminaIn, Tip,
 };
+use crate::ui::panels::control::minipanel::{Layout, MiniPanel, FUNCTION_BINDINGS};
 use crate::ui::text::TextOpts;
 use crate::ui::FRAME;
 
@@ -25,15 +27,29 @@ pub struct TipIn<'a> {
     pub w: i32,
     pub h: i32,
     pub mouse: (i32, i32),
+    /// Resolution mode 2 (800 × 600) of the screen.
+    pub res2: bool,
     pub mini_open: bool,
     /// State 9 (the new-stats / skills tip is hidden while it is open).
     pub state9_open: bool,
     pub exp: ExpIn,
     pub strings: &'a dyn StringLookup,
+    /// The tip font's measure (the pop-up placement, `control-panel.md`
+    /// §5 r14); `None`: the tips are drawn at their call point.
+    pub fonts: Option<&'a super::FontMeasure>,
+    /// The primary and secondary key name of a command (`ui/controls.md`
+    /// §3 numbering).
+    pub keys: &'a dyn Fn(i32) -> [Option<Vec<u16>>; 2],
+    /// The drawn mini panel and its layout (§9 r3), while state 0x15 is
+    /// open and a side is free.
+    pub mini: Option<(Layout, &'a MiniPanel)>,
 }
 
+/// The run / walk command (`ui/controls.md` §3 cmd 0x23).
+const CMD_RUN: i32 = 0x23;
+
 /// The tips under the mouse, in the order run, menu, new stats, new
-/// skills, experience.
+/// skills, experience, mini panel.
 pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
     let s = |id: u16| {
         i.strings
@@ -44,15 +60,28 @@ pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
     let env = BtnEnv {
         w: i.w,
         h: i.h,
-        res2: true,
+        res2: i.res2,
         open_mode: 0,
     };
     [
-        run_tip(i.w, i.h, i.mouse, [None, None], &s),
+        run_tip(i.w, i.h, i.mouse, (i.keys)(CMD_RUN), &s),
         menu_tip(i.w, i.h, i.mini_open, i.mouse, &s),
-        tip_800(&env, NewBtn::Stats, i.mouse, i.state9_open, &s),
-        tip_800(&env, NewBtn::Skills, i.mouse, i.state9_open, &s),
+        // §8 r1: the tool tips are 800 × 600 only.
+        i.res2
+            .then(|| tip_800(&env, NewBtn::Stats, i.mouse, i.state9_open, &s))
+            .flatten(),
+        i.res2
+            .then(|| tip_800(&env, NewBtn::Skills, i.mouse, i.state9_open, &s))
+            .flatten(),
         exp_tip(&i.exp, i.w, i.h, i.mouse, &s),
+        // §9 r6: the button's string and its binding's keys.
+        i.mini.and_then(|(l, m)| {
+            let keys = |f: usize| match FUNCTION_BINDINGS[f] {
+                Some(cmd) => (i.keys)(i32::from(cmd)),
+                None => [None, None],
+            };
+            m.tip(l, i.w, i.h, i.mouse, &keys, &s)
+        }),
     ]
     .into_iter()
     .flatten()
@@ -69,6 +98,80 @@ pub struct GlobeTextIn<'a> {
     pub strings: &'a dyn StringLookup,
     /// Width A of a string in the tip font; none without the font.
     pub width_a: &'a dyn Fn(&[u16]) -> i32,
+    /// As [`TipIn::fonts`].
+    pub fonts: Option<&'a super::FontMeasure>,
+}
+
+/// A tip (`0x00502280(text, x, y, k, centre)`) as its pop-up draw
+/// `0x00503000` ([`push_popup`]).
+fn push_tip(t: Tip, w: i32, h: i32, fonts: Option<&super::FontMeasure>, out: &mut dyn UiDrawSink) {
+    push_popup(
+        t.text,
+        Point::new(t.x, t.y),
+        u16::from(t.color),
+        t.centered,
+        (w, h),
+        fonts,
+        out,
+    );
+}
+
+/// The colour and mode of the pop-up's backing box (§5 r14 step 5:
+/// `DrawRectangle(…, colour 0, mode 2)`, blend kind 2 of
+/// `render/blend-modes.md` §8 r2).
+pub const POPUP_BOX_COLOR: u8 = 0;
+pub const POPUP_BOX_MODE: u8 = 2;
+
+/// The pop-up draw `0x00503000` of a call `0x00502280(text, at, color,
+/// centre)` in the tip font (`control-panel.md` §5 r14): the backing box
+/// (x', b − Ht)–(x' + W, b) in colour 0, mode 2, then the text centred in
+/// a block of max width + 8 whose centre is x (centre 1), bottom y + 2,
+/// at the bottom − 3 for Font16. Without the font's measure: the text at
+/// the call point, no box. The too-tall font swap (step 3) and the one
+/// slot per frame are not applied.
+pub(super) fn push_popup(
+    text: Vec<u16>,
+    at: Point,
+    color: u16,
+    centered: bool,
+    (w, h): (i32, i32),
+    fonts: Option<&super::FontMeasure>,
+    out: &mut dyn UiDrawSink,
+) {
+    let style = TextStyle {
+        font: TIP_FONT,
+        color,
+    };
+    if let Some(fr) = fonts.and_then(|f| f.popup(TIP_FONT, &text, at, centered, (w, h))) {
+        let (p0, p1) = fr.rect;
+        out.push(UiDraw::Rect(RectRequest {
+            x0: p0.x,
+            y0: p0.y,
+            x1: p1.x,
+            y1: p1.y,
+            color: POPUP_BOX_COLOR,
+            mode: POPUP_BOX_MODE,
+        }));
+        out.push(UiDraw::Text(TextRequest {
+            text,
+            at: fr.pen,
+            style,
+            opts: fr.opts,
+            clip: FRAME,
+        }));
+        return;
+    }
+    out.push(UiDraw::Text(TextRequest {
+        text,
+        at,
+        style,
+        opts: if centered {
+            TextOpts::centered()
+        } else {
+            TextOpts::default()
+        },
+        clip: FRAME,
+    }));
 }
 
 /// Pushes the life / mana numbers (§3 r6) and the stamina tip (§4 r2).
@@ -98,13 +201,7 @@ pub fn draw_globe_text(i: &GlobeTextIn<'_>, out: &mut dyn UiDrawSink) {
     let st = &i.stamina;
     if let Some(t) = stamina_tip(st.shown, st.max, st.shrine, i.w, i.h, i.numbers.mouse, &s) {
         if !t.text.is_empty() {
-            out.push(UiDraw::Text(TextRequest {
-                text: t.text,
-                at: Point::new(t.x, t.y),
-                style: style(u16::from(t.color)),
-                opts: TextOpts::centered(),
-                clip: FRAME,
-            }));
+            push_tip(t, i.w, i.h, i.fonts, out);
         }
     }
 }
@@ -112,20 +209,7 @@ pub fn draw_globe_text(i: &GlobeTextIn<'_>, out: &mut dyn UiDrawSink) {
 /// Pushes the tips as text draws.
 pub fn draw_tips(i: &TipIn<'_>, out: &mut dyn UiDrawSink) {
     for t in hud_tips(i) {
-        out.push(UiDraw::Text(TextRequest {
-            text: t.text,
-            at: Point::new(t.x, t.y),
-            style: TextStyle {
-                font: TIP_FONT,
-                color: u16::from(t.color),
-            },
-            opts: if t.centered {
-                TextOpts::centered()
-            } else {
-                TextOpts::default()
-            },
-            clip: FRAME,
-        }));
+        push_tip(t, i.w, i.h, i.fonts, out);
     }
 }
 
@@ -162,14 +246,51 @@ mod tests {
             w: 800,
             h: 600,
             mouse,
+            res2: true,
             mini_open: false,
             state9_open: false,
             exp: ExpIn::default(),
             strings,
+            fonts: None,
+            keys: &|_| [None, None],
+            mini: None,
         })
         .iter()
         .map(|t| String::from_utf16_lossy(&t.text))
         .collect()
+    }
+
+    fn tips_at(w: i32, h: i32, mouse: (i32, i32), strings: &Strs) -> Vec<String> {
+        hud_tips(&TipIn {
+            w,
+            h,
+            mouse,
+            res2: w == 800,
+            mini_open: false,
+            state9_open: false,
+            exp: ExpIn::default(),
+            strings,
+            fonts: None,
+            keys: &|_| [None, None],
+            mini: None,
+        })
+        .iter()
+        .map(|t| String::from_utf16_lossy(&t.text))
+        .collect()
+    }
+
+    // Covers: specs/ui/control-panel.md §8 r1, §8 r2
+    #[test]
+    fn the_new_stats_tip_is_800_only() {
+        let s = strs();
+        // §8 r1: hover W/2 − 194 < x < W/2 − 160, H − 42 < y < H − 8 gives
+        // the tip at 800 × 600 (206 < x < 240, 558 < y < 592).
+        assert_eq!(tips_at(800, 600, (220, 570), &s), ["New Stats"]);
+        assert!(tips_at(800, 600, (206, 570), &s).is_empty());
+        // §8 r2: at 640 × 480 the button is drawn with a caption and has no
+        // tool tip: the 800 rectangle at 640 (126 < x < 160, 438 < y < 472)
+        // gives none.
+        assert!(!tips_at(640, 480, (140, 450), &s).contains(&"New Stats".to_string()));
     }
 
     #[test]
@@ -186,10 +307,14 @@ mod tests {
                 w: 800,
                 h: 600,
                 mouse: (400, 570),
+                res2: true,
                 mini_open: false,
                 state9_open: false,
                 exp: ExpIn::default(),
                 strings: &s,
+                fonts: None,
+                keys: &|_| [None, None],
+                mini: None,
             },
             &mut out,
         );
@@ -210,6 +335,14 @@ mod tests {
     }
 
     fn globe_text(mouse: (i32, i32), show_hp: bool) -> Vec<(String, i32, i32, u16)> {
+        globe_text_in(mouse, show_hp, None)
+    }
+
+    fn globe_text_in(
+        mouse: (i32, i32),
+        show_hp: bool,
+        fonts: Option<&crate::ui::original::FontMeasure>,
+    ) -> Vec<(String, i32, i32, u16)> {
         let s = globe_strs();
         let mut out: Vec<UiDraw> = Vec::new();
         draw_globe_text(
@@ -233,18 +366,21 @@ mod tests {
                 },
                 strings: &s,
                 width_a: &|t| 6 * t.len() as i32,
+                fonts,
             },
             &mut out,
         );
         out.into_iter()
-            .map(|d| match d {
-                UiDraw::Text(t) => (
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some((
                     String::from_utf16_lossy(&t.text),
                     t.at.x,
                     t.at.y,
                     t.style.color,
-                ),
-                _ => panic!("text only"),
+                )),
+                // The pop-up's backing box (checked by its own test).
+                UiDraw::Rect(_) => None,
+                _ => panic!("text and pop-up boxes only"),
             })
             .collect()
     }
@@ -273,6 +409,99 @@ mod tests {
             globe_text((300, 580), false),
             [("Stamina: 20 / 25".to_string(), 324, 548, 0)]
         );
+    }
+
+    // Covers: specs/ui/control-panel.md §4 r2, §5 r14
+    #[test]
+    fn the_stamina_tip_is_a_popup_centred_on_its_point() {
+        use d2_formats::font::{FontTable, Glyph};
+        // Font16 stand-in: every advance 6, height byte 10.
+        let glyphs = (0..256u16)
+            .map(|i| Glyph {
+                code: i,
+                unknown1: 0,
+                width: 6,
+                height: 10,
+                unknown2: 1,
+                unknown3: 0,
+                frame: i,
+                unknown5: 0,
+            })
+            .collect();
+        let mut m = crate::ui::original::FontMeasure::default();
+        m.insert(
+            TIP_FONT,
+            FontTable {
+                version: 1,
+                unknown: 0,
+                count: 256,
+                height: 10,
+                width: 0,
+                glyphs,
+            },
+        );
+        // 16 units, max width 96, W = 104: the block starts at 324 − 52;
+        // bottom 548 + 2, text row 550 − 3.
+        assert_eq!(
+            globe_text_in((300, 580), false, Some(&m)),
+            [("Stamina: 20 / 25".to_string(), 272, 547, 0)]
+        );
+    }
+
+    // Covers: specs/ui/control-panel.md §5 r14
+    #[test]
+    fn a_popup_draws_its_backing_box_before_its_text() {
+        use d2_formats::font::{FontTable, Glyph};
+        // The spec vector: `Run` at (255, 577), centre 1, 800 × 600, max
+        // width 26, Ht 16 → W = 34, box (238, 563)–(272, 579) in colour
+        // 0, mode 2; the text block at x 238, y 576.
+        let widths = |c: u16| match c {
+            0x52 => 10,
+            0x75 | 0x6E => 8,
+            _ => 6,
+        };
+        let glyphs = (0..256u16)
+            .map(|i| Glyph {
+                code: i,
+                unknown1: 0,
+                width: widths(i),
+                height: 16,
+                unknown2: 1,
+                unknown3: 0,
+                frame: i,
+                unknown5: 0,
+            })
+            .collect();
+        let mut m = crate::ui::original::FontMeasure::default();
+        m.insert(
+            TIP_FONT,
+            FontTable {
+                version: 1,
+                unknown: 0,
+                count: 256,
+                height: 10,
+                width: 0,
+                glyphs,
+            },
+        );
+        let mut out: Vec<UiDraw> = Vec::new();
+        push_popup(
+            "Run".encode_utf16().collect(),
+            Point::new(255, 577),
+            0,
+            true,
+            (800, 600),
+            Some(&m),
+            &mut out,
+        );
+        let [UiDraw::Rect(r), UiDraw::Text(t)] = &out[..] else {
+            panic!("box then text: {out:?}");
+        };
+        assert_eq!(
+            (r.x0, r.y0, r.x1, r.y1, r.color, r.mode),
+            (238, 563, 272, 579, 0, 2)
+        );
+        assert_eq!((t.at.x, t.at.y), (238, 576));
     }
 
     #[test]

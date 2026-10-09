@@ -1,4 +1,4 @@
-// Spec: specs/formats/d2s.md §2.8 r1, §2.8 r3, §8.1 r2, §8.1 r3, §8.1 r4, §8.1 r10, §8.4 r1; specs/formats/d2s-appearance.md §3 r1, §4 r1; specs/world/hirelings.md §10 r8
+// Spec: specs/items/bitstream.md §2 r5; specs/formats/d2s.md §2.8 r1, §2.8 r3, §8.1 r2, §8.1 r3, §8.1 r4, §8.1 r10, §8.4 r1; specs/formats/d2s-appearance.md §3 r1, §4 r1; specs/world/hirelings.md §10 r8
 //! Character storage, write side: the parts of a save the writer
 //! (`0x00568F20`) rebuilds from the game at save time rather than from
 //! the loaded file: the appearance bytes (`formats/d2s.md` §2.8, the fill
@@ -13,9 +13,11 @@
 //! the appearance inputs of each inventory item, read through
 //! [`SaveItems`] ([`InvDesk`] in the game).
 
-use d2_formats::d2s::appearance::{self, AppearanceTables, Equipment, EquippedItem, BODY_SLOTS};
+use d2_formats::d2s::appearance::{
+    self, AppearanceTables, Equipment, EquippedItem, BODY_SLOTS, MODE_EQUIPPED,
+};
 use d2_formats::d2s::{D2s, ItemEntry};
-use d2_sim::items::bitstream::{write_save, IscTable, StreamItem};
+use d2_sim::items::bitstream::{write_save, IscTable, StreamItem, WriteBack};
 use d2_sim::items::inventory::node;
 use d2_sim::items::ItemTables;
 use d2_sim::units::lifecycle::LifecycleHooks;
@@ -47,6 +49,10 @@ pub trait SaveItems {
     /// The item's appearance inputs (`d2s-appearance.md` Inputs), with
     /// `first_child` unset (the caller fills it from [`SaveItems::items`]).
     fn appearance(&self, item: UnitId) -> Option<EquippedItem>;
+    /// Queues the writer's change of `item` (`items/bitstream.md`
+    /// Outputs: item level < 1 → 1, quality outside 1–9 → 2); the owner
+    /// of the model applies it (`InvDesk::apply_write_backs`).
+    fn write_back(&self, _item: UnitId, _wb: WriteBack) {}
 }
 
 /// Why a save section could not be written.
@@ -72,13 +78,15 @@ pub struct SaveContext {
 }
 
 /// One item entry (§8.1 rule 2): the item's stream, then each item of its
-/// own inventory, recursively (rule 10).
-fn stream_tree(src: &dyn SaveItems, item: UnitId) -> Option<StreamItem> {
+/// own inventory, recursively (rule 10); `units` gets the written items in
+/// write order (the order of [`write_save`]'s write-backs).
+fn stream_tree(src: &dyn SaveItems, item: UnitId, units: &mut Vec<UnitId>) -> Option<StreamItem> {
     let mut s = src.stream(item)?;
+    units.push(item);
     s.children = src
         .items(item)
         .into_iter()
-        .filter_map(|c| stream_tree(src, c))
+        .filter_map(|c| stream_tree(src, c, units))
         .collect();
     Some(s)
 }
@@ -120,8 +128,15 @@ pub fn item_list(
         if src.flags2(u) & FLAGS2_NO_SAVE != 0 {
             continue;
         }
-        let s = stream_tree(src, u).ok_or(SaveError::Model("item without a stream view"))?;
-        let (bytes, _) = write_save(&s, isc).map_err(|_| SaveError::Overflow)?;
+        let mut units = Vec::new();
+        let s = stream_tree(src, u, &mut units)
+            .ok_or(SaveError::Model("item without a stream view"))?;
+        let (bytes, wbs) = write_save(&s, isc).map_err(|_| SaveError::Overflow)?;
+        // `items/bitstream.md` Outputs: the writer's changes stay on every
+        // written item, children too (§2 rule 5).
+        for (u, wb) in units.into_iter().zip(wbs) {
+            src.write_back(u, wb);
+        }
         out.push(ItemEntry { bytes });
     }
     Ok(out)
@@ -180,6 +195,83 @@ pub fn rebuild(
     Ok(())
 }
 
+/// The appearance inputs of a save's own player item list, without a
+/// running game (`d2s-tool resave`; `d2s-appearance.md` Inputs): each
+/// entry read as the load reads it (`items::bitstream::read`), the body
+/// grid from the equipped items' body locations, and the weapon in use as
+/// the load leaves it: the body link `0x0063D1D0` (`world/quests-act3-2.md`
+/// §11.5 r1) run on each equipped hand item in list order. No states (a
+/// loaded player has none). PROVISIONAL (REC-291 (5)): the weapon class
+/// `0x0064F380` is the `wclass` index of the weapon in use (0 without
+/// one); it only matters for a crossbow (§4 r4). d2rs-own, unverified;
+/// settled by the C66 saves (`d2s-tool resave` against the game's).
+pub fn equipment_of_save(
+    items: &[ItemEntry],
+    t: &ItemTables,
+    a: &AppearanceTables,
+) -> Result<Equipment, String> {
+    use d2_sim::items::bitstream::read::read_save_entry;
+    use d2_sim::items::inventory::{body, iflag, ty};
+    let mut out = Vec::new();
+    let mut locs = Vec::new();
+    for (k, e) in items.iter().enumerate() {
+        let r = read_save_entry(&e.bytes, t).map_err(|err| format!("item {k}: {err:?}"))?;
+        let s = &r.item.item;
+        out.push(EquippedItem {
+            record: r.item.record,
+            mode: s.mode as u8,
+            body_loc: s.body_loc,
+            quality: s.quality,
+            prefix: s.prefix,
+            suffix: s.suffix,
+            auto_affix: s.auto_affix,
+            file_index: s.file_index,
+            flags: s.flags,
+            max_sockets: max_sockets(t, r.item.record, s.ilvl),
+            first_child: r.children.first().map(|c| c.item.record),
+        });
+        locs.push((s.mode, s.body_loc, s.flags, r.item.record));
+    }
+    let mut body_grid = [None; BODY_SLOTS];
+    for (k, &(mode, loc, _, _)) in locs.iter().enumerate() {
+        if mode == u32::from(MODE_EQUIPPED) && usize::from(loc) < BODY_SLOTS {
+            body_grid[usize::from(loc)] = Some(k);
+        }
+    }
+    let usable = |f: u32| f & iflag::IDENTIFIED != 0 && f & (iflag::BROKEN | iflag::F4000) == 0;
+    let weap = |rec: usize| t.is_type(rec, ty::WEAP);
+    let tpot = |rec: usize| t.item(rec).is_some_and(|r| r.type_ == ty::TPOT);
+    let mut in_use: Option<usize> = None;
+    for (k, &(mode, loc, flags, rec)) in locs.iter().enumerate() {
+        let hand = matches!(loc, body::RIGHT_HAND | body::LEFT_HAND);
+        if mode != u32::from(MODE_EQUIPPED) || !hand || !weap(rec) {
+            continue;
+        }
+        if !usable(flags) {
+            if in_use == Some(k) {
+                in_use = None;
+            }
+            continue;
+        }
+        in_use = match in_use {
+            None => Some(k),
+            Some(c) if !weap(locs[c].3) || tpot(locs[c].3) => Some(k),
+            Some(c) if c == k => None,
+            keep => keep,
+        };
+    }
+    let weapon_class = in_use
+        .and_then(|k| a.items.get(locs[k].3))
+        .map_or(0, |g| appearance::wclass_index(g.wclass));
+    Ok(Equipment {
+        items: out,
+        body_grid,
+        weapon_in_use: in_use,
+        weapon_class,
+        states: Vec::new(),
+    })
+}
+
 /// Max sockets (`0x0062BC20`, `items/generation.md` §7.2) of the record
 /// at item level `ilvl`.
 fn max_sockets(t: &ItemTables, record: usize, ilvl: i32) -> i32 {
@@ -227,6 +319,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> SaveItems for InvDesk<'_, '_, H, R>
         // (`bitstream.md` §4.1 rule 7; as `InvDesk::save_view`).
         s.unit28 = self.econ.units.get(item)?.init_seed;
         Some(s)
+    }
+    fn write_back(&self, item: UnitId, wb: WriteBack) {
+        self.queue_write_back(item, wb);
     }
     fn appearance(&self, item: UnitId) -> Option<EquippedItem> {
         let d = self.state.items.get(&item)?;

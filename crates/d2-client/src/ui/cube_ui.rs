@@ -10,11 +10,15 @@
 //! The transmute animation (§12.4, [`HoradricAnim`]) runs on the frame
 //! tick and the open clears the close latch (`StashCubeInput::cube_opened`).
 //!
-//! Preview fills (d2rs-own, unverified, REC-267): the animation starts at
-//! the transmute button release (the spec gives the start routine
-//! `0x0048A540` but not its caller), the client frame counts 40 ms (the
-//! 25 Hz client, as `game_messages`) for the 70 ms wall-clock step, and the
-//! draw mode 3 of the cel is the sink's. The cube-gone close runs once per
+//! The animation starts when an `hst ` / `qf2 ` lands in the local
+//! player's page 3 (S→C 0x9C, `panels-2.md` §20 r7: `Output::HoradricItem`
+//! → `0x0048A540`'s quest-record check), at the cube's next draw; the
+//! transmute button starts nothing.
+//!
+//! Preview fills (d2rs-own, unverified, REC-267): the client frame counts
+//! 40 ms (the 25 Hz client, as `game_messages`) for the 70 ms wall-clock
+//! step. The
+//! cel draws in mode 3 (additive, [`HORADRIC_LOOK`]). The cube-gone close runs once per
 //! pass ([`OriginalUi::cube_poll`]).
 
 use super::{OriginalUi, OriginalUiError, SharedRef};
@@ -24,7 +28,7 @@ use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels;
-use crate::ui::panels::cube_items::cube_present;
+use crate::ui::panels::cube_items::cube_player_ok;
 use crate::ui::panels::stash_cube::{horadric_pos, CubePanel, STR_TRANSMUTE, UI_CUBE};
 use crate::ui::panels::stash_input::{
     cube_close_hit, cube_tooltips, transmute_hit, Pointer, StashCubeInput,
@@ -35,13 +39,19 @@ use crate::ui::states::id;
 use crate::ui::PointerButton;
 
 /// `strClose` (`panels.md` §8 r1) and the tool tips' font.
-const STR_CLOSE: u16 = 4144;
+pub(super) const STR_CLOSE: u16 = 4144;
 const TIP_FONT: u16 = 1;
 
 /// `menu\horadric` (31 frames), registered with the panel files.
 const HORADRIC_FILE: &str = "menu\\horadric";
+/// §12.4: the animation cel draws in mode 3 (additive), light 0xFF, no
+/// remap.
+pub const HORADRIC_LOOK: crate::ui::CelLook = crate::ui::CelLook {
+    mode: 3,
+    remap: crate::ui::Remap::None,
+};
 /// Milliseconds per client frame (d2rs-own, unverified; see the module).
-const FRAME_MS: u64 = 40;
+const FRAME_MS: u64 = crate::rules::camera::CLIENT_TICK_MS as u64;
 
 pub(super) fn cube_files() -> [String; 1] {
     [HORADRIC_FILE.to_string()]
@@ -58,9 +68,13 @@ impl Panel for CubeUi {
         PanelId(u16::from(UI_CUBE))
     }
 
+    /// The left half above the control panel, plus the inventory close
+    /// rectangle the stash / cube mouse handlers test first (`panels.md`
+    /// §11 r7, `panels-2.md` §20 r1–r3): the frame above the control
+    /// panel, and [`Self::event`] lets every other point go on.
     fn rect(&self) -> Rect {
         let s = self.sh.borrow().config.screen;
-        Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16)
+        Rect::new(0, 0, s.w as u16, (s.h - 48) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -70,12 +84,12 @@ impl Panel for CubeUi {
             close_pressed: self.input.cube_close_pressed,
             transmute_pressed: self.input.transmute_pressed,
         };
-        // The cube-gone close (§12.2, two 0x4F 0x17) is not sent from a
-        // draw: outputs leave only after an event, so
+        // The dead / no-player close (§12.2, two 0x4F 0x17) is not sent
+        // from a draw: outputs leave only after an event, so
         // [`OriginalUi::cube_poll`] sends it. The panel draws nothing
-        // while the cube item is absent.
+        // that frame.
         if !panel
-            .draw(&sh.tables, &env, cube_present(ctx.world), out)
+            .draw(&sh.tables, &env, cube_player_ok(ctx.world), out)
             .is_empty()
         {
             return;
@@ -83,7 +97,12 @@ impl Panel for CubeUi {
         // §12.4: step on the (wrapping, 32-bit) millisecond tick, draw the
         // cel, and hold the grid back for the first 14 steps.
         let mut anim = sh.cube_anim.get();
-        anim.step((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
+        let now = (ctx.tick.wrapping_mul(FRAME_MS)) as u32;
+        // §20 r7 step 3: flag, n := 0, stamp := now.
+        if sh.horadric_start.replace(false) {
+            anim.start(now);
+        }
+        anim.step(now);
         sh.cube_anim.set(anim);
         if let (Some(n), Some(file)) = (anim.frame(), sh.tables.files.id(HORADRIC_FILE)) {
             let (x, y) = horadric_pos(&sh.config.screen);
@@ -92,6 +111,7 @@ impl Panel for CubeUi {
                 image: ImageRef { file, frame: n },
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
+                look: HORADRIC_LOOK,
             }));
         }
         if anim.grid_visible() {
@@ -143,10 +163,17 @@ impl Panel for CubeUi {
             self.input.cube_opened();
         }
         let s = sh.config.screen;
-        let was_transmute = self.input.transmute_pressed;
+        // `0x00486E10`: the inventory close rectangle (the belt popup
+        // covering it is not tested: d2rs-own, the popup is the HUD's).
+        let in_inv_close = crate::ui::panels::inventory::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(at));
+        let left = Rect::new(0, 0, (s.w / 2 + 1) as u16, (s.h - 48) as u16);
+        if !in_inv_close && !left.contains(at) {
+            return UiResponse::Ignored;
+        }
         let ptr = Pointer {
             at,
-            in_inv_close: false,
+            in_inv_close,
             cursor_item: items::cursor_item(ctx.world).is_some(),
         };
         let eff = if down {
@@ -155,14 +182,10 @@ impl Panel for CubeUi {
             self.input.cube_up(&s, &ptr)
         };
         if eff.sound4 {
-            sh.outputs.push(PanelOutput::ClickSound);
+            sh.outputs.push(PanelOutput::Sound(4));
         }
-        // §12.4 start (flag, n := 0, stamp := now); the close clears it (§12 r7).
-        if !down && was_transmute && !self.input.transmute_pressed {
-            let mut a = sh.cube_anim.get();
-            a.start((ctx.tick.wrapping_mul(FRAME_MS)) as u32);
-            sh.cube_anim.set(a);
-        }
+        // The transmute button starts nothing (`panels-2.md` §20 r7); the
+        // close clears the animation (§12 r7).
         if eff
             .outputs
             .iter()
@@ -184,9 +207,9 @@ impl Panel for CubeUi {
 }
 
 impl OriginalUi {
-    /// Once per pass: when ui 0x1A is open and the cube item is no longer
-    /// in the model (moved out of the inventory, sold, dropped), the
-    /// cube-gone close of `panels.md` §12 r2 / `panels-2.md` §20 r4:
+    /// Once per pass: when ui 0x1A is open and the local player is missing
+    /// or dead (mode 0x11), the close of `panels.md` §12 r2 /
+    /// `panels-2.md` §20 r4 (a missing cube does not close it):
     /// `SetUIState(0x1A, off)`, then C→S 0x4F 0x17 twice (the latched
     /// close, then the unconditional one). The state was just open, so
     /// the close latch is the open's (clear). Nothing otherwise.
@@ -195,18 +218,20 @@ impl OriginalUi {
         world: &ClientWorld,
         root: &mut UiRoot,
     ) -> Result<(), OriginalUiError> {
-        if !self.is_open(id::CUBE) || cube_present(world) {
+        if !self.is_open(id::CUBE) || cube_player_ok(world) {
             return Ok(());
         }
         for o in StashCubeInput::default().cube_gone(true) {
             match o {
                 PanelOutput::Intent(i) => root.queue_intent(i),
                 PanelOutput::SetUi { ui, mode, jump } => {
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                    // The two 0x4F 0x17 above include the hook's.
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
                 }
-                PanelOutput::ClickSound => {}
+                PanelOutput::Sound(_) | PanelOutput::PlayerEvent(_) => {}
             }
         }
+        self.flush_hooks(root);
         self.sync_root(root);
         Ok(())
     }

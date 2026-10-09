@@ -360,10 +360,6 @@ impl VendorRest for Probe {
     fn repair_broken(&mut self, item: UnitId) {
         self.log.push(format!("repair_broken {}", item.0));
     }
-    fn send_item_stat(&mut self, p: UnitId, item: UnitId, stat: u16) {
-        self.log
-            .push(format!("send_item_stat {} {} {stat}", p.0, item.0));
-    }
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         self.log.push(format!("send_transaction {} {t:?}", p.0));
     }
@@ -403,16 +399,16 @@ impl VendorRest for Probe {
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
         unreachable!("the model answers equipped_items")
     }
-    fn find_tome(&self, _: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
         Some((UnitId(scroll.0 + 1), 3))
     }
     fn add_to_tome(&mut self, tome: UnitId, k: i32) {
         self.log.push(format!("add_to_tome {} {k}", tome.0));
     }
-    fn find_partial_stack(&self, _: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
         Some((UnitId(item.0 + 2), 4))
     }
-    fn can_belt(&self, _: UnitId, item: UnitId) -> bool {
+    fn can_belt(&mut self, _: UnitId, item: UnitId) -> bool {
         odd(item)
     }
     fn put_in_belt(&mut self, p: UnitId, item: UnitId) -> bool {
@@ -822,18 +818,14 @@ fn inv_vendors_pass_other_calls_through() {
             w.set_item_mode(ring, 3);
             assert_eq!(w.item_mode(ring), 3);
             w.set_item_page(ring, 5);
-            assert!(w.has_filled_sockets(one));
-            assert!(!w.has_filled_sockets(two));
-            let price = w.price_item(ring);
-            assert!(price.is_some());
-            assert_ne!(price, Some(Default::default()));
-            assert_eq!(price, w.inner.price_item(ring));
             w.destroy_item(made);
             // The rest's item and store calls.
             w.recharge(one);
             w.repair_broken(one);
             w.identify(one);
-            w.send_item_stat(player, one, 3);
+            // S→C 0x3E is built from the item's base stat (no rest call).
+            w.set_stat(ring, 70, 0, 300);
+            w.send_item_stat(player, ring, 70);
             let tr = Transaction {
                 kind: 1,
                 code: 2,
@@ -851,18 +843,6 @@ fn inv_vendors_pass_other_calls_through() {
             w.remove_gamble_item(5, 6, one);
             w.refresh_npc_inventory(one);
             w.add_trade_inventory(5, one);
-            assert_eq!(w.find_tome(player, one), Some((two, 3)));
-            w.add_to_tome(one, 2);
-            assert_eq!(w.find_partial_stack(player, one), Some((UnitId(3), 4)));
-            assert!(w.can_belt(player, one));
-            assert!(!w.can_belt(player, two));
-            assert!(w.put_in_belt(player, one));
-            assert!(!w.put_in_belt(player, two));
-            assert!(w.equip_ammo(player, one));
-            assert!(!w.equip_ammo(player, two));
-            w.lower_book_skill(player, one, 2);
-            assert!(w.unequip(player, one));
-            assert!(!w.unequip(player, two));
             made
         },
     );
@@ -877,9 +857,17 @@ fn inv_vendors_pass_other_calls_through() {
     assert!(t.world().state.errors.is_empty());
     // `quests.md` §6.7 for the town of act I (level 1): the act's intro
     // NPCs heard at the game's difficulty (2) in one 0x91.
-    assert_eq!(probe.sent.len(), 1);
+    assert_eq!(probe.sent.len(), 2);
     assert_eq!(probe.sent[0].0, player);
     assert_eq!(&probe.sent[0].1[..2], [0x91, 0]);
+    let rg = t.units().get(ring).unwrap().guid;
+    assert_eq!(
+        probe.sent[1],
+        (
+            player,
+            d2_sim::units::messages::update_item_stat(rg, 70, 300, 0)
+        )
+    );
     let p = player.0;
     assert_eq!(
         probe.log,
@@ -889,7 +877,6 @@ fn inv_vendors_pass_other_calls_through() {
             "recharge 1".into(),
             "repair_broken 1".into(),
             "identify 1".into(),
-            format!("send_item_stat {p} 1 3"),
             format!(
                 "send_transaction {p} {tr:?}",
                 tr = Transaction {
@@ -909,7 +896,42 @@ fn inv_vendors_pass_other_calls_through() {
             "remove_gamble_item 5 6 1".into(),
             "refresh_npc_inventory 1".into(),
             "add_trade_inventory 5 1".into(),
-            "add_to_tome 1 2".into(),
+        ]
+    );
+    // The player-inventory calls the model answers (`vendors.md` §7.1
+    // r7–r9, §7.2 r7 / r9) reach the wrapped world only without
+    // inventory parts.
+    probe.log.clear();
+    t.world().inventory = None;
+    with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| {
+            assert!(w.has_filled_sockets(one));
+            assert!(!w.has_filled_sockets(two));
+            let price = w.price_item(ring);
+            assert!(price.is_some());
+            assert_ne!(price, Some(Default::default()));
+            assert_eq!(price, w.inner.price_item(ring));
+            assert_eq!(w.find_tome(player, one), Some((two, 3)));
+            w.add_to_tome(one, 2);
+            assert_eq!(w.find_partial_stack(player, one), Some((UnitId(3), 4)));
+            assert!(w.can_belt(player, one));
+            assert!(!w.can_belt(player, two));
+            assert!(w.put_in_belt(player, one));
+            assert!(!w.put_in_belt(player, two));
+            assert!(w.equip_ammo(player, one));
+            assert!(!w.equip_ammo(player, two));
+            w.lower_book_skill(player, one, 2);
+            assert!(w.unequip(player, one));
+            assert!(!w.unequip(player, two));
+        },
+    );
+    assert_eq!(
+        probe.log,
+        [
+            "add_to_tome 1 2".to_string(),
             format!("put_in_belt {p} 1"),
             format!("put_in_belt {p} 2"),
             format!("equip_ammo {p} 1"),
@@ -1174,4 +1196,124 @@ fn server_cube_item_routines_reach_the_economy() {
     assert_eq!(fmt, format);
     assert_eq!(init, Some(ring));
     assert_eq!(value, 7);
+}
+
+// ---- InvVendors: the player-inventory seams on the model ---------------------------
+
+/// `vendors.md` §7.1 rule 7 on the model: a page-0 tome of the scroll's
+/// spell below its max stack (20) is found with its free space;
+/// `0x0055F6E0` adds k to it.
+// Covers: specs/world/vendors.md §7.1 r7
+#[test]
+fn inv_vendors_find_a_tome_and_add_to_it() {
+    let mut t = setup(4);
+    let player = t.player;
+    let tome = item(&mut t.host.game, TOME, 4);
+    t.store(tome, 0);
+    t.set_stat(tome, 70, 5);
+    let scroll = item(&mut t.host.game, SCROLL, 4);
+    let mut probe = Probe::default();
+    with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| {
+            assert_eq!(w.find_tome(player, scroll), Some((tome, 15)));
+            w.add_to_tome(tome, 3);
+        },
+    );
+    assert_eq!(t.stat(tome, 70), 8);
+    // A full tome is not found.
+    t.set_stat(tome, 70, 20);
+    with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| assert_eq!(w.find_tome(player, scroll), None),
+    );
+}
+
+/// `vendors.md` §7.1 rule 8 (`0x00577700`): the equipped stack first,
+/// then page 0; a full stack is skipped. Rule 9.6: `0x00628BA0` is true
+/// for every item (`inventory.md` §3 rule 6).
+// Covers: specs/world/vendors.md §7.1 r8, §7.1 r9
+#[test]
+fn inv_vendors_find_the_equipped_partial_stack_first() {
+    let mut t = setup(4);
+    let player = t.player;
+    let worn = item(&mut t.host.game, ARROWS, 4);
+    let packed = item(&mut t.host.game, ARROWS, 4);
+    t.store(packed, 0);
+    assert!(on_inventory(&mut t, player, |inv, d| place_at_body(
+        inv, d, worn, 5
+    )));
+    t.set_stat(worn, 70, 350);
+    t.set_stat(packed, 70, 100);
+    let bought = item(&mut t.host.game, ARROWS, 4);
+    let mut probe = Probe::default();
+    let found = with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| {
+            assert!(w.can_belt(player, bought));
+            w.find_partial_stack(player, bought)
+        },
+    );
+    assert_eq!(found, Some((worn, 150)));
+    t.set_stat(worn, 70, 500);
+    let found = with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| w.find_partial_stack(player, bought),
+    );
+    assert_eq!(found, Some((packed, 400)));
+}
+
+/// `vendors.md` §7.1.1: no weapon in use and `aqv` → no try; a bow in
+/// use → arrows are not a weapon and match the bow's hand class, so the
+/// try runs; a weapon copy with a weapon in use → no try.
+// Covers: specs/world/vendors.md §7.1 r9
+#[test]
+fn inv_vendors_equip_try_follows_the_weapon_table() {
+    let mut t = setup(4);
+    let player = t.player;
+    let arrows = item(&mut t.host.game, ARROWS, 4);
+    let mut probe = Probe::default();
+    assert!(!with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| w.equip_ammo(player, arrows)
+    ));
+    assert_eq!(t.mode(arrows), 4, "no try: the copy stays as it was");
+    // A bow in the right hand, the weapon in use.
+    let bow = item(&mut t.host.game, BOW, 4);
+    assert!(on_inventory(&mut t, player, |inv, d| {
+        let ok = place_at_body(inv, d, bow, 4);
+        inv.weapon_guid = d.guid_of(bow);
+        ok
+    }));
+    let other = item(&mut t.host.game, BOW, 4);
+    assert!(!with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| w.equip_ammo(player, other)
+    ));
+    assert_eq!(t.mode(other), 4);
+    // Arrows with the bow: tried, and `inventory.md` §4.9 puts them in
+    // the free left hand (requirements: stats ≥ 1, identified).
+    for s in [0, 2, 12] {
+        t.set_stat(player, s, 1);
+    }
+    t.items().get_mut(arrows).unwrap().flags |= flag::IDENTIFIED;
+    assert!(with_vendors(
+        &mut t,
+        &mut probe,
+        |_| {},
+        |w| w.equip_ammo(player, arrows)
+    ));
+    assert_eq!(t.mode(arrows), 1);
 }

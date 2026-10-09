@@ -43,12 +43,12 @@ pub trait VendorRest {
     /// The items in the item's inventory (sockets), in inventory order.
     fn socketed(&self, item: UnitId) -> Vec<UnitId>;
     /// The (B) bonus entries of `0x00625560` (`vendors.md` Open question
-    /// 1).
+    /// 1). Not asked: the desk reads them from the stat lists
+    /// (`VendorDesk::bonuses`, `sim/stats.md` §4.2).
     fn price_bonuses(&self, item: UnitId) -> Vec<Bonus>;
     fn recharge(&mut self, item: UnitId);
     fn repair_broken(&mut self, item: UnitId);
     // ---- messages (transport)
-    fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16);
     fn send_transaction(&mut self, player: UnitId, t: Transaction);
     /// The buy price of a store item the player was just shown (S→C 0x9C
     /// action 11). The original client computes it from its own tables;
@@ -68,10 +68,10 @@ pub trait VendorRest {
     fn owns_item(&self, player: UnitId, item: UnitId) -> bool;
     fn in_inventory(&self, player: UnitId, item: UnitId) -> bool;
     fn equipped_items(&self, player: UnitId) -> Vec<UnitId>;
-    fn find_tome(&self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)>;
+    fn find_tome(&mut self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)>;
     fn add_to_tome(&mut self, tome: UnitId, k: i32);
-    fn find_partial_stack(&self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)>;
-    fn can_belt(&self, player: UnitId, item: UnitId) -> bool;
+    fn find_partial_stack(&mut self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)>;
+    fn can_belt(&mut self, player: UnitId, item: UnitId) -> bool;
     fn put_in_belt(&mut self, player: UnitId, item: UnitId) -> bool;
     fn equip_ammo(&mut self, player: UnitId, item: UnitId) -> bool;
     fn place_in_backpack(&mut self, player: UnitId, item: UnitId) -> bool;
@@ -101,6 +101,26 @@ where
         all.into_iter()
             .filter(|&(k, _)| key_stat(k) == s)
             .map(|(k, v)| (key_layer(k), v))
+            .collect()
+    }
+
+    /// §9.2 (B)'s entries: every entry of the item's extended stat list
+    /// (full array, key order) with its unit bonus `0x00625560` (total −
+    /// base, `sim/stats.md` §4.2) ≠ 0; a list missing or not extended has
+    /// none. The 511 cap and `valshift` are the price's.
+    fn bonuses(&self, item: UnitId) -> Vec<Bonus> {
+        let stats = &self.desk.econ.stats;
+        let Some(l) = stats.unit_list(item).filter(|&l| stats.is_extended(l)) else {
+            return Vec::new();
+        };
+        stats
+            .full_entries(l)
+            .into_iter()
+            .filter_map(|(k, _)| {
+                let (stat, layer) = (key_stat(k), key_layer(k));
+                let value = stats.unit_bonus(item, stat, layer);
+                (value != 0).then_some(Bonus { stat, layer, value })
+            })
             .collect()
     }
 
@@ -219,6 +239,11 @@ where
     /// are not written; 1 as drops and the cube, so the store item is in
     /// the unit lists the 0x32 GUID lookup searches. The forced flag and
     /// the other request fields stay 0.
+    ///
+    /// §3.1 rule 2 / `generation.md` §10.2: never-ethereal 1 (request
+    /// flags2 0x02, no-sockets 0), and on success item flag 0x10
+    /// (identified), which the §3.1 rule 4 / §5.1 step 7 repair needs
+    /// (§9.2 rule 0).
     fn create_item(
         &mut self,
         npc_class: u16,
@@ -235,6 +260,7 @@ where
             item: record as i32,
             format: VendorWorld::item_format(self),
             quality,
+            flags2: crate::items::req::NEVER_ETHEREAL,
             ..ItemRequest::default()
         };
         let spawn = ItemSpawn {
@@ -243,7 +269,12 @@ where
             init_flags: 1,
         };
         match self.desk.econ.create_item(&mut rq, false, spawn) {
-            Ok(u) => Some(u),
+            Ok(u) => {
+                if let Some(i) = self.desk.econ.items.get_mut(u) {
+                    i.flags |= crate::items::flag::IDENTIFIED;
+                }
+                Some(u)
+            }
             Err(EconomyError::Create(CreateError::Fatal(f))) => {
                 self.desk
                     .state
@@ -343,7 +374,7 @@ where
             extra_stack: total(stat::EXTRA_STACK),
             item_skills: self.entries(item, stat::ITEM_SINGLESKILL),
             charges: self.entries(item, stat::CHARGED_SKILL),
-            bonuses: self.desk.rest.price_bonuses(item),
+            bonuses: self.bonuses(item),
             sockets: self
                 .desk
                 .rest
@@ -363,8 +394,18 @@ where
     fn identify(&mut self, item: UnitId) {
         NpcRest::identify(&mut *self.desk.rest, item);
     }
+    /// S→C 0x3E (`0x0053D130(client, item, 1, stat, value, 0)`) with the
+    /// item's base stat value (layer 0, `client/msg-stats-items.md` §5
+    /// r1.2), through the rest's transport. An item without a record
+    /// sends nothing. PROVISIONAL (`client/msg-stats-items.md` §5 r1.3;
+    /// REC-400): field widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, player: UnitId, item: UnitId, stat: u16) {
-        self.desk.rest.send_item_stat(player, item, stat);
+        let Some(guid) = self.desk.econ.units.get(item).map(|r| r.guid) else {
+            return;
+        };
+        let value = self.desk.econ.stats.unit_base(item, stat, 0);
+        let msg = crate::units::messages::update_item_stat(guid, stat, value, 0);
+        QuestRest::send(&mut *self.desk.rest, player, &msg);
     }
     fn send_transaction(&mut self, player: UnitId, t: Transaction) {
         self.desk.rest.send_transaction(player, t);
@@ -412,16 +453,16 @@ where
     fn equipped_items(&self, player: UnitId) -> Vec<UnitId> {
         self.desk.rest.equipped_items(player)
     }
-    fn find_tome(&self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, player: UnitId, scroll: UnitId) -> Option<(UnitId, i32)> {
         self.desk.rest.find_tome(player, scroll)
     }
     fn add_to_tome(&mut self, tome: UnitId, k: i32) {
         self.desk.rest.add_to_tome(tome, k);
     }
-    fn find_partial_stack(&self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, player: UnitId, item: UnitId) -> Option<(UnitId, i32)> {
         self.desk.rest.find_partial_stack(player, item)
     }
-    fn can_belt(&self, player: UnitId, item: UnitId) -> bool {
+    fn can_belt(&mut self, player: UnitId, item: UnitId) -> bool {
         self.desk.rest.can_belt(player, item)
     }
     fn put_in_belt(&mut self, player: UnitId, item: UnitId) -> bool {

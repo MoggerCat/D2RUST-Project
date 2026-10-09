@@ -617,7 +617,13 @@ impl<X: Pending> ActionHooks<X> {
             return;
         }
         X::monster_sequence_frame(self, sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        let advanced = sim
+            .units
+            .get_mut(unit)
+            .is_some_and(|r| crate::units::anim::advance_sequence(&mut r.anim));
+        if !advanced {
+            self.x.refresh_animation(sim.game, unit);
+        }
     }
 
     /// Attack-family event 0 `0x005A7670` (`skills/use.md` §5.2: "monsters

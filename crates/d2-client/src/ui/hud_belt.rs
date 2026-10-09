@@ -10,31 +10,28 @@
 //!   column), default type 2 without one;
 //! - the resolution index of `belts.bin` is 0 below mode 2, else 1;
 //! - every belt item counts as usable, nothing is blocked; the cursor
-//!   item fits a belt by code ([`super::panels::inv_items::fits_belt`]);
+//!   item fits a belt (`BeltParts::beltable`, from the tables);
 //! - the key labels are the play bindings' key names for the belt slot
 //!   actions ([`HudBelt::set_keys`], REC-264): the first bound key; an
 //!   unbound slot has no label; the default `1`–`4` until bindings are
 //!   set; no cut to width 28 (§5 r4); not the string ids 4049 / 4050;
-//! - the hover tip is the item tool tip ([`crate::ui::item_tip`]) at the
-//!   text position, not the `0x0048C060` / `0x004E6410` strings;
-//! - the highlight rectangles ([`BeltDraw::Box`]) are painted by the
-//!   rectangle primitive ([`fill_rect`], REC-264): opaque tiles of the
-//!   nearest palette colour; the original's mode 0 table blend is not
-//!   applied.
+//! - the hover text has no shop price (§5 r8 step 4);
+//! - the highlight rectangles ([`BeltDraw::Box`]) take the palette's
+//!   nearest colours from the inventory's tint colours (the same four
+//!   triples).
 
 use std::collections::BTreeMap;
 
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
-use crate::ui::draw::UiDrawSink;
-use crate::ui::item_tip::{ItemTips, TipLine};
-use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
+use crate::ui::draw::{RectRequest, UiDraw, UiDrawSink};
+use crate::ui::item_tip::ItemTips;
 use crate::ui::panel::ClientIntent;
 use crate::ui::panels::control::belt::{
-    hover_text, record_index, BeltColor, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8,
-    BeltState, CursorInfo, CursorItem, MoveGates, SlotInfo, FONT_AFTER_BELT,
+    hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
+    CursorInfo, CursorItem, HoverText, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
-use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
+use crate::ui::panels::inv_items::ItemsUi;
 use crate::ui::panels::UiFiles;
 
 /// The popped belt rows' art.
@@ -47,6 +44,9 @@ pub struct BeltParts {
     pub records: Vec<BeltRecord>,
     /// Item code → `belts` row (`armor.txt` `belt`).
     pub types: BTreeMap<[u8; 4], u8>,
+    /// Item codes that fit a belt box: the type's itemtypes `beltable` and
+    /// a 1 x 1 size (`seams/item-grids.md` §2.8).
+    pub beltable: std::collections::BTreeSet<[u8; 4]>,
 }
 
 /// The belt of the HUD: the rule state and the tables.
@@ -57,20 +57,6 @@ pub struct HudBelt {
     /// The key name of each belt slot's action: `None` = not set yet
     /// (the default label), `Some(None)` = unbound.
     pub keys: Option<[Option<String>; 4]>,
-}
-
-/// Paints `rect` with the belt rectangle colour (module doc).
-pub fn fill_rect(out: &mut dyn UiDrawSink, files: &UiFiles, color: BeltColor, r: crate::ui::Rect) {
-    if let Some(f) = files.id(FILL_FILE) {
-        let frame = BELT_FILL_BASE
-            + match color {
-                BeltColor::Red => 0,
-                BeltColor::Green => 1,
-                BeltColor::Blue => 2,
-                BeltColor::Yellow => 3,
-            };
-        crate::ui::original::esc_menu::push_fill(out, f, frame, r);
-    }
 }
 
 fn belt_view(world: &ClientWorld) -> BTreeMap<u16, crate::bridge::items::ItemView> {
@@ -114,12 +100,12 @@ impl HudBelt {
         }
     }
 
-    fn cursor(world: &ClientWorld) -> CursorInfo {
+    fn cursor(&self, world: &ClientWorld) -> CursorInfo {
         CursorInfo {
             mode: 0,
             item: items::cursor_item(world).map(|c| CursorItem {
                 guid: c.key.guid,
-                fits_belt: fits_belt(c.code),
+                fits_belt: c.code.is_some_and(|k| self.parts.beltable.contains(&k)),
                 swap_ok: true,
                 blocked: false,
                 put_sound: 0,
@@ -178,7 +164,7 @@ impl HudBelt {
             return Vec::new();
         };
         let slot_item = Self::slot_item(world);
-        let cursor = Self::cursor(world);
+        let cursor = self.cursor(world);
         let gates = MoveGates {
             in_game: true,
             input_blocked: false,
@@ -197,6 +183,13 @@ impl HudBelt {
             })
             .collect();
         draws.extend(self.state.slot_draws(&rec, &slots));
+        // §5 r5: the cursor-item highlight, after every slot (over the
+        // items).
+        let occupied = |i: usize| slot_item(i).is_some();
+        draws.extend(
+            self.state
+                .cursor_highlight(&rec, gates.state_1f_open, &cursor, &occupied),
+        );
         draws
     }
 
@@ -224,7 +217,7 @@ impl HudBelt {
                 }
                 BeltDraw::Item { guid, x, y } => {
                     if let Some(v) = belt.values().find(|v| v.key.guid == guid) {
-                        items_ui.draw_at(files, v, (x, y), out);
+                        items_ui.draw_at(world, files, v, (x, y), out);
                     }
                 }
                 // §5 r4: font 1, color 4.
@@ -237,46 +230,54 @@ impl HudBelt {
                         l.color as u16,
                     ));
                 }
+                // §5 r4 / r5: `0x0046EFD0(left, top, 29, 29, colour, 0)`,
+                // the colour the palette's nearest entry (the inventory's
+                // tint colours: the same four triples, `inventory.md` §2
+                // r1); no palette given: no box.
                 BeltDraw::Box { rect, color } => {
-                    let (w, h) = (rect.w.max(1) as u16, rect.h.max(1) as u16);
-                    fill_rect(
-                        out,
-                        files,
-                        color,
-                        crate::ui::Rect::new(rect.x, rect.y, w, h),
-                    );
+                    if let Some(c) = items_ui.tint_colors {
+                        out.push(UiDraw::Rect(RectRequest::sized(
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            c[color as usize],
+                            rect.mode,
+                        )));
+                    }
                 }
             }
         }
     }
 
-    /// The hover tip of the hovered belt item (§5 r8) and its anchor:
-    /// the lines of its last item stream. Empty unless the hover gate of
-    /// [`hover_text`] holds (belt hovered, an item, no cursor item, box
-    /// ≤ 3 or popped).
-    pub fn hover_tip(&self, world: &ClientWorld, tips: &ItemTips) -> (Vec<TipLine>, (i32, i32)) {
+    /// The hover text of the hovered belt item (§5 r8): T and its
+    /// pop-up point, colour and centring, the call `0x00502280` draws as
+    /// the r14 pop-up. None unless the hover gate of [`hover_text`] holds
+    /// (belt hovered, an item, no cursor item, box ≤ 3 or popped) and the
+    /// item's stream gives a tip.
+    pub fn hover_tip(&self, world: &ClientWorld, tips: &ItemTips) -> Option<HoverText> {
         let belt = belt_view(world);
-        let Some(v) = self
+        let v = self
             .state
             .hover_item
-            .and_then(|g| belt.values().find(|v| v.key.guid == g))
-        else {
-            return (Vec::new(), (0, 0));
-        };
+            .and_then(|g| belt.values().find(|v| v.key.guid == g))?;
+        let stream = items::stream(world, v.key)?;
+        let me = crate::ui::item_tip_world::WorldUnit::local(world);
+        let ctx = crate::ui::item_tip_world::hover_ctx(tips, world, me.as_ref(), v);
+        // §5 r8 steps 1–2: N `0x0048C060`, S `0x004E6410`.
+        let (name, stats) = tips.name_and_properties(stream, &ctx)?;
         let item = BeltItem {
             guid: v.key.guid,
             usable: true,
             has_use: true,
             blocked: false,
             pos_x: 0,
-            quality3: false,
+            quality3: tips
+                .bits(stream)
+                .is_some_and(|b| b.quality == d2_sim::items::q::SUPERIOR),
         };
         let cursor = items::cursor_item(world).is_some();
-        if hover_text(&self.state, cursor, Some(&item), &[], &[], None).is_none() {
-            return (Vec::new(), (0, 0));
-        }
-        let lines = items::stream(world, v.key).map_or_else(Vec::new, |s| tips.lines(s));
-        (lines, self.state.text_pos)
+        hover_text(&self.state, cursor, Some(&item), &name, &stats, None)
     }
 
     /// Whether the point is on the belt (hit area §5 r6).
@@ -302,7 +303,7 @@ impl HudBelt {
                 rec,
                 at.0,
                 at.1,
-                &Self::cursor(world),
+                &self.cursor(world),
                 &Self::slot_item(world),
             )
             .into_iter()

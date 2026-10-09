@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, send_create_game_for};
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, BuildError, GameData};
+use d2_client::app::single_player::{self, BuildError};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
@@ -87,6 +87,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         combat,
         levels: vec![Record::decode(&vec![0u8; d2_data::tables::Levels::SIZE]); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.data = UnitData {
         monsters: vec![
@@ -193,7 +194,7 @@ fn app_with_game() -> (App, Arc<AtomicU32>, Link) {
     let spawn_character = character.clone();
     let link = ThreadLink::spawn(move || {
         let mut g = single_player::build_with(
-            &GameData::Synthetic,
+            &app_support::game_data(),
             single_player::DEFAULT_SEED,
             spawn_character,
         )?;
@@ -209,19 +210,20 @@ fn app_with_game() -> (App, Arc<AtomicU32>, Link) {
     let link: Link = Arc::new(Mutex::new(link));
     let dyn_link: DynLink = Box::new(Shared(link.clone()));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>()
         .init_resource::<ButtonInput<KeyCode>>();
     add_game(&mut app, dyn_link, false).unwrap();
     send_create_game_for(&mut app, &character).unwrap();
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     add_client_data(
         &mut app,
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     step(&mut app, &ms, 10);
     (app, ms, link)
 }
@@ -229,6 +231,7 @@ fn app_with_game() -> (App, Arc<AtomicU32>, Link) {
 // Covers: specs/world/quests.md §4.3; specs/world/quests.md §4.4; specs/world/quests-act1.md §10.8
 // Covers: specs/world/npc.md §8.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn killing_andariel_completes_the_act_and_warriv_travels_east() {
     let (mut app, ms, link) = app_with_game();
 

@@ -115,14 +115,16 @@ fn compact_trailer_one() {
     assert_eq!(e.item.save_trailer, Some((0x1234_5678, 0x9ABC_DEF0)));
 }
 
-// Covers: specs/items/bitstream.md §5 r2
+// The third word is read and dropped whatever it holds (§5 rule 2;
+// `bitstream-legacy.md` §2 rule 2 at the current version).
+// Covers: specs/items/bitstream.md §5 r2; specs/items/bitstream-legacy.md §2 row7
 #[test]
-fn trailer_tail_nonzero_is_error() {
+fn trailer_tail_is_read_and_dropped() {
     let b = compact(Some((1, 2, 3)));
-    assert_eq!(
-        save_entry_len(&b, &Fixture).unwrap_err(),
-        ItemBitsError::TrailerTail(3)
-    );
+    let e = save_entry_len(&b, &Fixture).unwrap();
+    assert_eq!(e.item.save_trailer, Some((1, 2)));
+    assert_eq!(e.item.bits, 109 + 96);
+    assert!(!e.item.failed);
 }
 
 // Covers: specs/items/bitstream.md §4.1 r6, §4.1 r7, §4.4 r3, §5 r1
@@ -189,4 +191,111 @@ fn padding_bit_set_is_error() {
         save_entry_len(&b, &Fixture).unwrap_err(),
         ItemBitsError::Padding(109)
     );
+}
+
+/// [`Fixture`] with a synthetic row for stat 0 and 80 `setitems` rows.
+struct Rows;
+
+impl ItemLookup for Rows {
+    fn code(&self, code: [u8; 4]) -> Option<CodeFacts> {
+        Fixture.code(code)
+    }
+    fn isc(&self, stat: u16) -> Option<IscSave> {
+        if stat == 0 {
+            return Fixture.isc(19);
+        }
+        Fixture.isc(stat)
+    }
+    fn set_item_rows(&self) -> Option<usize> {
+        Some(80)
+    }
+}
+
+/// A full `cap ` of `quality` (no quality fields written unless given by
+/// `fields`), then its main list's `stats` (id, 10-bit value) and the
+/// terminator unless `open`.
+fn cap_of(quality: u32, fields: &[(u32, u32)], stats: &[(u32, u32)], open: bool) -> Vec<u8> {
+    let mut w = W::default();
+    w.head(FULL, 0)
+        .code(b"cap ")
+        .put(3, 0)
+        .put(32, 0xDEAD_BEEF)
+        .put(7, 30)
+        .put(4, quality)
+        .put(1, 0)
+        .put(1, 0);
+    for &(n, v) in fields {
+        w.put(n, v);
+    }
+    w.put(1, 0).put(11, 13).put(8, 12).put(9, 12);
+    if quality == 5 {
+        w.put(5, 0);
+    }
+    for &(s, v) in stats {
+        w.put(9, s);
+        if v != u32::MAX {
+            w.put(10, v);
+        }
+    }
+    if !open {
+        w.put(9, TERMINATOR);
+    }
+    w.done()
+}
+
+// `bitstream-legacy.md` §3 rule 6.7, edge case 6: a quality outside 1–9
+// reads nothing in the quality step, is read on to its end and fails.
+// Covers: specs/items/bitstream-legacy.md §3 r6, §3 r12, §edge-cases-original-bugs r6
+#[test]
+fn a_quality_outside_1_to_9_fails_after_reading_on() {
+    for q in [0, 10, 15] {
+        let b = cap_of(q, &[], &[], false);
+        let e = save_entry_len(&b, &Rows).unwrap();
+        assert!(e.item.failed, "quality {q}");
+        assert_eq!(e.len, b.len(), "quality {q}: read to the end");
+        assert_eq!(e.item.defense.map(|s| s.value()), Some(3));
+    }
+    assert!(
+        !save_entry_len(&cap_of(2, &[], &[], false), &Rows)
+            .unwrap()
+            .item
+            .failed
+    );
+}
+
+// Covers: specs/items/bitstream-legacy.md §3 r8
+#[test]
+fn a_set_index_without_a_setitems_row_fails() {
+    let ok = save_entry_len(&cap_of(5, &[(12, 79)], &[], false), &Rows).unwrap();
+    assert_eq!(
+        (ok.item.failed, ok.item.quality_fields.file_index),
+        (false, Some(79))
+    );
+    let bad = save_entry_len(&cap_of(5, &[(12, 80)], &[], false), &Rows).unwrap();
+    assert!(bad.item.failed);
+    // Without the row count the reader has no test.
+    assert!(
+        !save_entry_len(&cap_of(5, &[(12, 80)], &[], false), &Fixture)
+            .unwrap()
+            .item
+            .failed
+    );
+}
+
+// `bitstream-legacy.md` §4 rule 1, edge cases 1, 2: id 0 alone is a stat;
+// 0 after 0 fails; an id with no row ends the list with no failure.
+// Covers: specs/items/bitstream-legacy.md §4 r1, §edge-cases-original-bugs r1, §edge-cases-original-bugs r2
+#[test]
+fn list_ids_0_0_fail_and_an_id_without_a_row_ends_the_list() {
+    let one = save_entry_len(&cap_of(2, &[], &[(0, 5), (19, 1)], false), &Rows).unwrap();
+    assert!(!one.item.failed);
+    assert_eq!(one.item.lists[0].as_ref().map(Vec::len), Some(2));
+    let two = save_entry_len(&cap_of(2, &[], &[(0, 5), (0, 6)], true), &Rows).unwrap();
+    assert!(two.item.failed);
+    assert_eq!(two.item.lists[0].as_ref().map(Vec::len), Some(1));
+    // Stat 5 has no row: the list ends at its id.
+    let b = cap_of(2, &[], &[(5, u32::MAX)], true);
+    let e = save_entry_len(&b, &Rows).unwrap();
+    assert!(!e.item.failed);
+    assert_eq!(e.item.lists[0], Some(Vec::new()));
 }

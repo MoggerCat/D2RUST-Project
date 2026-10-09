@@ -639,11 +639,14 @@ pub fn swap_1h_2h_body<W: MoveWorld>(
         return Ok(Outcome::REFUSED);
     }
     // Step 3: `0x0063CB00` = a free position of page 0 for X (§2.3).
+    // X missing is fatal (unreachable after §4.3 = 7, which needs X).
     let o = other_hand(loc);
-    let x = w.body_item(p, o);
-    let Some(x) = x.filter(|&x| w.find_free(p, x, page::INVENTORY).is_some()) else {
-        return Ok(Outcome::REFUSED);
+    let Some(x) = w.body_item(p, o) else {
+        return Err(MoveFatal::Missing);
     };
+    if w.find_free(p, x, page::INVENTORY).is_none() {
+        return Ok(Outcome::REFUSED);
+    }
     // Step 4.
     if w.mode(x) == mode::EQUIPPED {
         leave_body_quiet(w, p, x)?;
@@ -782,6 +785,8 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     add_cmd(w, t, cmd::SWAP_IN_PAGE);
     changed_if_filled(w, t);
     w.update_list_add(p, t);
+    // Rule 5: item flag 0x4000 is cleared on T before C's placement.
+    clear_iflags(w, t, iflag::NOEQUIP);
     // The cursor item C.
     if !w.place_at(p, c, pg, x as i32, y as i32) {
         return Ok(res::REFUSED);
@@ -797,6 +802,10 @@ pub fn swap_cursor_buffer<W: MoveWorld>(
     if w.is_active(p, c) {
         w.stat_refresh(p);
     }
+    // Rule 5: C's item flag 0x1 test (socket-filled), then its 0x4000
+    // clear.
+    changed_if_filled(w, c);
+    clear_iflags(w, c, iflag::NOEQUIP);
     w.set_mode(c, mode::STORED);
     add_cmd(w, c, cmd::SWAP_IN_PAGE);
     w.update_list_add(p, c);
@@ -918,7 +927,13 @@ pub fn use_grid_body<W: MoveWorld>(w: &mut W, p: Owner, i: Guid, x: i32, y: i32)
         _ => return Outcome::NOTHING,
     };
     if used {
-        w.quest_item_used(p);
+        // `0x005458E0(player, chain)`: the chain is fixed per code.
+        let chain = match &w.code(i) {
+            b"ass " => 8,
+            b"xyz " => 18,
+            _ => 33,
+        };
+        w.quest_item_used(p, chain);
         w.consume_item(p, i);
     } else {
         // The sound event on the player `0x00553380` (as §8.1 step 3).
@@ -964,20 +979,26 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
         w.set_stat(s, stat::QUANTITY, qs.wrapping_add(qd).wrapping_sub(m));
         w.send_item_stat(p, src, stat::QUANTITY);
         if books {
-            w.book_count_changed(p, m.wrapping_sub(qd));
+            w.book_count_changed(p, dst, m.wrapping_sub(qd));
         }
         add_iflags(w, dst, iflag::STACK_FULL);
-    } else if w.merge_allowed(src) {
-        let ds = w.stat(s, stat::DURABILITY);
-        if ds < w.stat(d, stat::DURABILITY) {
-            // Stat 72 `durability`: throwing weapons keep the worse one.
-            w.set_stat(d, stat::DURABILITY, ds);
-            w.send_item_stat(p, dst, stat::DURABILITY);
+    } else {
+        // PROVISIONAL (§7.12, REC-289): `0x00629930(src)` ("has
+        // durability") read as gating only the stat-72 step, as §8.1's
+        // auto-stack states it; the whole merge under it would keep
+        // quivers and keys from ever merging.
+        if w.merge_allowed(src) {
+            let ds = w.stat(s, stat::DURABILITY);
+            if ds < w.stat(d, stat::DURABILITY) {
+                // Stat 72 `durability`: throwing weapons keep the worse one.
+                w.set_stat(d, stat::DURABILITY, ds);
+                w.send_item_stat(p, dst, stat::DURABILITY);
+            }
         }
         w.set_stat(d, stat::QUANTITY, qs.wrapping_add(qd));
         w.send_item_stat(p, dst, stat::QUANTITY);
         if books {
-            w.book_count_changed(p, qs);
+            w.book_count_changed(p, dst, qs);
         }
         w.set_cursor(p, None);
         w.send(p, layouts::clear_cursor(Owner::ITEM, src));
@@ -1386,7 +1407,7 @@ pub fn scroll_into_book<W: MoveWorld>(
     }
     w.set_stat(b, stat::QUANTITY, q.wrapping_add(1));
     w.send_item_stat(p, book, stat::QUANTITY);
-    w.book_count_changed(p, 1);
+    w.book_count_changed(p, book, 1);
     Ok(Outcome::DONE)
 }
 
@@ -1467,8 +1488,10 @@ pub fn merc_take<W: MoveWorld>(
     merc: Owner,
     loc: u16,
 ) -> Result<u32, MoveFatal> {
-    if !valid_loc(u32::from(loc)) {
-        return Ok(res::BAD);
+    // `0x0054D141`–`0x0054D15E`: classic, a hireling without an
+    // inventory, or a location outside 1..10 → 3.
+    if !w.expansion() || !w.has_inventory(merc) || !valid_loc(u32::from(loc)) {
+        return Ok(res::REFUSED);
     }
     let loc = loc as u8;
     let Some(it) = w
@@ -1477,8 +1500,9 @@ pub fn merc_take<W: MoveWorld>(
     else {
         return Ok(res::BAD);
     };
+    // The unlink must return the item, else 2.
     if !w.unlink(merc, it) {
-        return Err(MoveFatal::Unlink);
+        return Ok(res::BAD);
     }
     w.clear_body_slot(merc, loc);
     w.stat_refresh_unlink(merc, 0);

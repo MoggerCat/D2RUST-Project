@@ -32,6 +32,7 @@ use d2_sim::stats::{ClassStats, StatData, StatTable, StateTable};
 use d2_sim::units::hooks::UnitData;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
+use d2_sim::units::messages::update_item_stat;
 use d2_sim::units::{RoomId, UnitType};
 use d2_sim::wiring::action::{ActionHooks, ActionSim, ActionTables};
 use d2_sim::wiring::economy::{GameFields, ItemSpawn};
@@ -241,11 +242,18 @@ fn inv_tables() -> InvTables {
                 useable: r.5,
                 stackable: r.6,
                 maxstack: r.7,
+                // `pSpell` of the live `misc.txt` rows (`items/use.md` §3).
+                pspell: match &r.0 {
+                    b"tsc " | b"tbk " => 2,
+                    b"hp1 " => 3,
+                    _ => 0,
+                },
                 ..InvItemRec::default()
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -342,12 +350,15 @@ impl MovePending for MRest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.with(|r| r.sent.push((player, bytes)));
     }
-    fn send_item_stat(&mut self, _: Owner, item: Guid, stat: u16) {
-        self.log(format!("send_item_stat {item} {stat}"));
-    }
 }
 
 impl InvRest for MRest {
+    /// Every player has a left and a right skill (Attack, skill 0, class
+    /// entry, at the least): the weapon bookkeeping reads them once a
+    /// weapon is in use (`inventory.md` §5.8 step 5).
+    fn mouse_skill(&self, _: Owner, _: bool) -> Option<(i32, i32)> {
+        Some((0, -1))
+    }
     fn pos(&self, u: Owner) -> (i32, i32) {
         self.with(|r| r.pos.get(&u).copied().unwrap_or((0, 0)))
     }
@@ -460,6 +471,7 @@ fn action_tables() -> ActionTables {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     }
 }
 
@@ -1173,7 +1185,7 @@ fn use_grid_item() {
 }
 
 /// 0x21 (§7.12): keys over the max stack (12): dst := 12, src := 3, both
-/// announced (0x3E seam, logged), dst 0x9C action 0xA (row 9). 0x22
+/// announced (S→C 0x3E), dst 0x9C action 0xA (row 9). 0x22
 /// (§7.13) on an owned item → 3 (X1).
 // Covers: specs/items/inventory-moves.md §7.12, §7.13
 #[test]
@@ -1191,14 +1203,15 @@ fn stack_and_unstack_items() {
         (t.stat(du, stat::QUANTITY), t.stat(su, stat::QUANTITY)),
         (12, 3)
     );
-    assert_eq!(
-        t.rest.take_log(),
-        [
-            format!("send_item_stat {dst} 70"),
-            format!("send_item_stat {src} 70")
-        ]
-    );
-    assert_eq!(bytes, t.pass(&[x9c(0x0A, dst)]));
+    // Both announced by S→C 0x3E (`units::messages::update_item_stat`,
+    // the new base quantities) ahead of the update pass's 0x9C.
+    assert_eq!(t.rest.take_log(), Vec::<String>::new());
+    let mut want = vec![
+        update_item_stat(dst, stat::QUANTITY, 12, 0),
+        update_item_stat(src, stat::QUANTITY, 3, 0),
+    ];
+    want.extend(t.pass(&[x9c(0x0A, dst)]));
+    assert_eq!(bytes, want);
     assert_eq!(t.frame(&msg(0x21, &[src, src])), (Malformed, NO_BYTES));
     assert_eq!(t.frame(&msg(0x22, &[dst])), (Malformed, NO_BYTES));
 }
@@ -1237,10 +1250,12 @@ fn belt_moves() {
     assert_eq!(bytes, t.pass(&[x9c(0x10, b), x9c(0x10, a)]));
 }
 
-/// 0x26 (§7.17): a belt potion used on the player. PROVISIONAL (the
-/// item-use spec is unwritten): the host applies the potion itself, so
-/// the item leaves with the removal message (0x9D action 5, flag 0x20)
-/// and the rest's `use_item` is not asked.
+/// 0x26 (§7.17): a belt potion used on the player. The dispatcher arms
+/// it (item flag 0x4, `items/use.md` §1 step 5), so the targeting reset
+/// after the use (`inventory.md` §5.3) clears it with S→C 0x3F before the
+/// removal message (0x9D action 5, flag 0x20). PROVISIONAL (REC-102):
+/// the host applies the potion itself; the rest's `use_item` is not
+/// asked.
 // Covers: specs/items/inventory-moves.md §7.17
 #[test]
 fn use_belt_item() {
@@ -1249,22 +1264,40 @@ fn use_belt_item() {
     t.rest.take_log();
     let (code, bytes) = t.frame(&msg(0x26, &[a, 0, 0]));
     assert_eq!(code, Done);
-    assert_eq!(bytes.len(), 1);
-    assert_eq!(&bytes[0][..2], &[0x9D, 0x05]);
+    let mut reset = vec![0x3F, 0xFF];
+    reset.extend_from_slice(&a.to_le_bytes());
+    reset.extend_from_slice(&[0xFF, 0xFF]);
+    assert_eq!(bytes.len(), 2);
+    assert_eq!(bytes[0], reset);
+    assert_eq!(&bytes[1][..2], &[0x9D, 0x05]);
     assert!(t.rest.take_log().is_empty());
 }
 
-/// 0x20 (§7.11) of a Town Portal scroll (REC-117): used and consumed
-/// (0x9D with flag 0x20); a tome is used and stays.
-// Covers: specs/items/inventory-moves.md §7.11
+/// 0x20 (§7.11) of a Town Portal scroll (`items/use.md` §4): in a town
+/// the cast refuses and the scroll stays (no 0x9D, S→C 0x3F and 0x7C of
+/// the failure reset); outside, used and consumed (0x9D with flag 0x20);
+/// a tome is used and stays.
+// Covers: specs/items/inventory-moves.md §7.11; specs/items/use.md §4
 #[test]
 fn use_town_portal_scroll_and_tome() {
     let mut t = setup();
     let s = t.picked(TSC);
+    t.rest.with(|r| r.in_town = true);
+    let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
+    assert_eq!(code, Done);
+    assert!(!bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
+    assert!(
+        bytes.iter().any(|m| m[0] == 0x3F && m[1] == 0xFF),
+        "{bytes:?}"
+    );
+    assert!(bytes.iter().any(|m| m[0] == 0x7C), "{bytes:?}");
+    assert!(t.unit(s).is_some(), "the scroll stays");
+    t.rest.with(|r| r.in_town = false);
     let (code, bytes) = t.frame(&msg(0x20, &[s, 0, 0]));
     assert_eq!(code, Done);
     assert!(bytes.iter().any(|m| m[0] == 0x9D), "{bytes:?}");
-    // A tome is not consumed by the move handler (REC-117).
+    // A tome is not consumed (§7.11 step 3, type 18); with no books row
+    // its skill is −1, so its charge stays too.
     let b = t.picked(TBK);
     let (code, bytes) = t.frame(&msg(0x20, &[b, 0, 0]));
     assert_eq!(code, Done);
@@ -1322,9 +1355,9 @@ fn socket_item() {
 }
 
 /// 0x29 (§7.20): a cursor scroll into a stored tome of the same spell:
-/// tome quantity +1, announced (0x3E seam), the scroll freed (not
-/// consumed one by one: seam default) and the cursor cleared; nothing is
-/// sent. A second scroll of another spell → the original's fatal assert
+/// tome quantity +1, announced (S→C 0x3E), the scroll freed (not
+/// consumed one by one: seam default) and the cursor cleared; nothing
+/// else is sent. A second scroll of another spell → the original's fatal assert
 /// (line 0x149C): result 3 and a recorded fault.
 // Covers: specs/items/inventory-moves.md §7.20
 #[test]
@@ -1336,11 +1369,17 @@ fn scroll_to_book_and_its_fatal() {
     let q0 = t.stat(bu, stat::QUANTITY);
     let s = t.cursor_item(SCROLL);
     t.rest.take_log();
-    assert_eq!(t.frame(&msg(0x29, &[s, book])), (Done, NO_BYTES));
+    assert_eq!(
+        t.frame(&msg(0x29, &[s, book])),
+        (
+            Done,
+            vec![update_item_stat(book, stat::QUANTITY, q0 + 1, 0)]
+        )
+    );
     assert_eq!(t.stat(bu, stat::QUANTITY), q0 + 1);
     assert_eq!(t.unit(s), None, "freed");
     assert_eq!(t.inventory().cursor(), None);
-    assert_eq!(t.rest.take_log(), [format!("send_item_stat {book} 70")]);
+    assert_eq!(t.rest.take_log(), Vec::<String>::new());
 
     let s2 = t.cursor_item(SCROLL);
     // The spell is item data +0x3E (suffix slot 0, `queries::spell_of`).
@@ -1693,6 +1732,68 @@ fn preview_rest_picks_up_a_gold_pile() {
     assert_eq!(code, Done);
     assert_eq!(t.stat(p, stat::GOLD), 350);
     assert_eq!(t.unit(g), None, "the pile is freed");
+}
+
+/// Vector G2 on the play host's rest: level 1 (limit 10000), gold 9500,
+/// a pile of 1000 picked up → gold 10000 and a new pile of the rest, 500,
+/// on the ground (`inventory-moves.md` §10.1 `0x0055B030`, §10.2).
+// Covers: specs/items/inventory-moves.md §10.1, §10.2
+#[test]
+fn preview_rest_leaves_the_gold_above_the_cap_as_a_pile() {
+    let mut t = setup_preview();
+    // As `preview_inv_parts`.
+    t.inv().state.move_effects = true;
+    let p = t.player;
+    t.set_stat(p, stat::LEVEL, 1);
+    t.set_stat(p, stat::GOLD, 9500);
+    let g = gold_pile(&mut t, 1000);
+    let (code, _) = t.frame(&pick(g, 0));
+    assert_eq!(code, Done);
+    assert_eq!(t.stat(p, stat::GOLD), 10000);
+    assert_eq!(t.unit(g), None, "the picked pile is freed");
+    let piles: Vec<_> = t
+        .sim()
+        .game
+        .lists
+        .units_of_type(UnitType::Item)
+        .into_iter()
+        .collect();
+    assert_eq!(piles.len(), 1, "the rest stays as one new pile");
+    assert_eq!(t.stat(piles[0], stat::GOLD), 500);
+    assert!(t.sim().game.lists.unit(piles[0]).unwrap().room().is_some());
+}
+
+/// 0x21 over the max stack: each quantity change leaves as S→C 0x3E
+/// (`inventory-moves.md` §7.12; layout `client/msg-stats-items.md` §5
+/// r1), dst first, none through the rest's stat seam.
+// Covers: specs/items/inventory-moves.md §7.12
+#[test]
+fn move_effects_announce_stack_quantities_with_0x3e() {
+    use d2_sim::units::messages::update_item_stat;
+    let mut t = setup();
+    let dst = t.picked(KEY);
+    let src = t.cursor_item(KEY);
+    let (du, su) = (t.unit(dst).unwrap(), t.unit(src).unwrap());
+    t.set_stat(du, stat::QUANTITY, 8);
+    t.set_stat(su, stat::QUANTITY, 7);
+    let (code, bytes) = t.frame(&msg(0x21, &[src, dst]));
+    assert_eq!(code, Done);
+    assert!(t
+        .rest
+        .take_log()
+        .iter()
+        .all(|l| !l.starts_with("send_item_stat")));
+    let x3e: Vec<_> = bytes.into_iter().filter(|m| m[0] == 0x3E).collect();
+    // The client's split reads size u8@1; the zero padding after it
+    // arrives as 0x00 messages (`sim/intents-events.md` edge case 13).
+    let sized = |m: Vec<u8>| m[..usize::from(m[1])].to_vec();
+    assert_eq!(
+        x3e,
+        [
+            sized(update_item_stat(dst, stat::QUANTITY, 12, 0)),
+            sized(update_item_stat(src, stat::QUANTITY, 3, 0))
+        ]
+    );
 }
 
 /// 0x50 on the play host's rest: a pile is made (gold request, free

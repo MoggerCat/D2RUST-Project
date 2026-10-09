@@ -73,6 +73,14 @@ pub trait LevelTypes {
         Vec::new()
     }
 
+    /// `preset.md` §3.2 step 4, generic branch: whether generating this
+    /// level on a DRLG with the automap callback (the client copy) streams
+    /// its rooms: a preset level whose lvlprest `AutoMap` ≠ 0, other than
+    /// the town-automap levels 40, 103, 109 (levels 1 and 75 in 1.14d).
+    fn automap_streams(&self, drlg: &Drlg, level: LevelIdx) -> bool {
+        false
+    }
+
     /// Grid init (`rooms.md` §9.2 step 3c; type 1 `0x0067D2D0`, type 2
     /// `0x006667D0`): the room's packed source grids. Runs right after the
     /// room seed reset; outdoor grids draw from the room seed.
@@ -170,6 +178,9 @@ pub struct TileInfo {
     pub roof_height: u16,
     /// Height (+0x08, i32). Read only by the client draw (as above).
     pub height: i32,
+    /// Light direction (+0x00). Read only by the client draw: it picks the
+    /// wall light points (`render/lighting.md` §11 r2, Open question 8).
+    pub light_direction: u32,
 }
 
 /// Parsed DT1 files by path (no I/O in the sim). Paths are the

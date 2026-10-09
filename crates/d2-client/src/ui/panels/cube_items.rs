@@ -14,7 +14,7 @@ use super::super::geom::Point;
 use super::super::inv_grid::GridRecord;
 use super::super::layout::Screen;
 use super::inv_items::ItemsUi;
-use super::{cel, PanelOutput, UiFiles};
+use super::{PanelOutput, UiFiles};
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 
@@ -44,6 +44,14 @@ pub fn fallback_cube_grid(screen: &Screen) -> GridRecord {
         cell_w: 29,
         cell_h: 29,
     }
+}
+
+/// The cube panel's keep-open test (`panels.md` §12 r2, `0x00463DF0`):
+/// a local player whose mode is not 0x11 (dead). The exit flag
+/// (`0x0044DA30`) is not in the model. A missing cube does not close the
+/// panel (`world/cube.md` §11 r3).
+pub fn cube_player_ok(world: &ClientWorld) -> bool {
+    world.local().is_some_and(|u| u.mode != 0x11)
 }
 
 /// The cube item (code `box `, stored in the inventory) is in the model.
@@ -82,7 +90,7 @@ impl ItemsUi {
                 continue;
             };
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-            out.push(cel(a.file, 0, x, y + a.gh));
+            out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
         }
     }
 

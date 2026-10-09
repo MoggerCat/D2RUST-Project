@@ -1,40 +1,33 @@
 // Spec: specs/world/npc.md (§2, §3), specs/world/quests.md (§6.2, §7.2, §7.3), specs/client/msg-ui.md (§16); preview fills: docs/PLAN.md decisions D1–D3, docs/handoff/q-quests.md
-//! The quest path of the play preview headless, wired as `d2-client play`
-//! wires it (synthetic fixtures only, as in `app_play_npc.rs`): a left
-//! click on Akara walks there and sends C→S 0x13; the server starts the
-//! interaction (S→C 0x27, 0x29, 0x28), the client answers C→S 0x2F and
-//! the quest message 0x31, and the server starts the Den of Evil.
+//! The quest path of the play client headless on the user's install,
+//! wired as `d2-client play` wires it (`add_live_client`): the player
+//! walks the Rogue Encampment until the town's preset places Akara
+//! (`app_support::approach`), a left click on her walks there and sends
+//! C→S 0x13; the server starts the interaction (S→C 0x27, 0x29, 0x28),
+//! the client answers C→S 0x2F and the quest message 0x31, and the server
+//! starts the Den of Evil (q-fixture-migrate).
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use d2_client::app::palette::{add_act_palettes, ActPalettes};
-use d2_client::app::play::{
-    add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
-};
+use d2_client::app::play::{add_live_client, LiveClient};
 use d2_client::app::single_player::{self, GameData};
-use d2_client::app::ui::{add_original_ui_with, UiParts};
-use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
-use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
 use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
-use d2_client::rules::unit_composite::code;
-use d2_client::ui::layout::Screen;
-use d2_client::ui::original::{FontMeasure, OriginalUi, UiConfig, CHARACTER_FONTS};
 use d2_client::ui::quest_log::IconState;
-use d2_client::ui::{font_info, ActionId, Point, PointerButton, UiEvent};
-use d2_client::world_view::tile_assets::TileAssets;
-use d2_client::world_view::unit_assets::UnitLooks;
+use d2_client::ui::{ActionId, Point, PointerButton, UiEvent};
 use d2_client::world_view::walk::PreviewWalk;
 use d2_client::world_view::WorldViewUi;
 use d2_server::seams::Clock;
 
 mod app_support;
+
+use app_support::{Server, SharedLink};
 
 /// What crossed the link: the C→S messages.
 #[derive(Default)]
@@ -72,132 +65,6 @@ impl Clock for StepClock {
     }
 }
 
-/// A DT1 of one tile with one 32 × 32 RLE block (`formats/dt1.md`), the
-/// fixture of `app_play_preview.rs`.
-fn dt1_bytes() -> Vec<u8> {
-    let encoded = [0x00u8, 0x02, 0x0A, 0x0B];
-    let mut d = Vec::new();
-    d.extend_from_slice(&7u32.to_le_bytes());
-    d.extend_from_slice(&6u32.to_le_bytes());
-    d.extend_from_slice(&[0; 260]);
-    d.extend_from_slice(&1u32.to_le_bytes());
-    d.extend_from_slice(&276u32.to_le_bytes());
-    let mut tile = vec![0u8; 96];
-    tile[0x48..0x4C].copy_from_slice(&372u32.to_le_bytes());
-    tile[0x50..0x54].copy_from_slice(&1u32.to_le_bytes());
-    d.extend_from_slice(&tile);
-    for v in [0u16, 0, 0] {
-        d.extend_from_slice(&v.to_le_bytes());
-    }
-    d.extend_from_slice(&[0, 0]);
-    d.extend_from_slice(&0x1001u16.to_le_bytes());
-    d.extend_from_slice(&(encoded.len() as u32).to_le_bytes());
-    d.extend_from_slice(&0u16.to_le_bytes());
-    d.extend_from_slice(&20u32.to_le_bytes());
-    d.extend_from_slice(&encoded);
-    d
-}
-
-/// A DC6 of one direction with `frames` frames of 2 × 2 literal pixels
-/// (`formats/dc6.md`).
-fn dc6(frames: u32) -> Vec<u8> {
-    let rows = [2u8, 1, 2, 0x80, 2, 3, 4, 0x80];
-    let mut d = Vec::new();
-    for v in [6i32, 1, 0] {
-        d.extend_from_slice(&v.to_le_bytes());
-    }
-    d.extend_from_slice(&[0xEE; 4]);
-    d.extend_from_slice(&1u32.to_le_bytes());
-    d.extend_from_slice(&frames.to_le_bytes());
-    let mut at = d.len() + 4 * frames as usize;
-    let mut body = Vec::new();
-    for _ in 0..frames {
-        d.extend_from_slice(&(at as u32).to_le_bytes());
-        for v in [0u32, 2, 2, 0, 0, 0, 0, rows.len() as u32] {
-            body.extend_from_slice(&v.to_le_bytes());
-        }
-        body.extend_from_slice(&rows);
-        body.extend_from_slice(&[0xEE; 3]);
-        at += 32 + rows.len() + 3;
-    }
-    d.extend(body);
-    d
-}
-
-/// COF bytes (`formats/cof.md`): one direction, one frame, one layer
-/// (component 1, weapon class `hth`), animation rate 256.
-fn cof_bytes() -> Vec<u8> {
-    let mut v = vec![1, 1, 1, 20, 0, 0, 0, 0];
-    for x in [-10i32, 10, -20, 0] {
-        v.extend_from_slice(&x.to_le_bytes());
-    }
-    v.extend_from_slice(&256u32.to_le_bytes());
-    v.extend_from_slice(&[1, 0, 1, 0, 0]);
-    v.extend_from_slice(b"hth\0");
-    v.push(0);
-    v.push(1);
-    v
-}
-
-/// A `.tbl` (`formats/font-tbl.md`): 256 records of width 6.
-fn tbl() -> Vec<u8> {
-    let mut d = b"Woo!".to_vec();
-    d.extend_from_slice(&1u16.to_le_bytes());
-    d.extend_from_slice(&0u16.to_le_bytes());
-    d.extend_from_slice(&256u16.to_le_bytes());
-    d.extend_from_slice(&[10, 0]);
-    for i in 0..256u16 {
-        d.extend_from_slice(&i.to_le_bytes());
-        d.extend_from_slice(&[0, 6, 10, 0, 0, 0]);
-        d.extend_from_slice(&i.to_le_bytes());
-        d.extend_from_slice(&[0; 4]);
-    }
-    d
-}
-
-/// A `pal.pl2` of zeros with its 13 text colours (`formats/palette.md`).
-fn pl2() -> Vec<u8> {
-    vec![0; 1024 + 1714 * 256 + 13 * (3 + 256)]
-}
-
-/// Invented unit tokens: every player class is `OY`, mode 5 `TN`,
-/// component 1 `TR`. `OYTRlitTNhth` is the one player component file
-/// name read as a DC6 (`unit-composite.md` §6 r2), so a DC6 fixture
-/// draws the player.
-fn looks() -> UnitLooks {
-    UnitLooks {
-        player_tokens: vec![code(b"OY"); 7],
-        player_modes: [b"DT", b"NU", b"WL", b"RN", b"GH", b"TN", b"TW"]
-            .iter()
-            .map(|m| code(*m))
-            .collect(),
-        components: vec![code(b"HD"), code(b"TR")],
-        ..Default::default()
-    }
-}
-
-/// Every file the play preview reads here.
-fn files() -> MemorySource {
-    let mut s = MemorySource::default();
-    s.insert(r"DATA\GLOBAL\TILES\floor.dt1", dt1_bytes());
-    s.insert(r"data\global\chars\OY\cof\OYTNhth.cof", cof_bytes());
-    s.insert(r"data\global\chars\OY\TR\OYTRlitTNhth.dc6", dc6(1));
-    let config = UiConfig {
-        screen: Screen::R800,
-        expansion_installed: false,
-    };
-    let ui = OriginalUi::new(config, None).unwrap();
-    for name in ui.files().names() {
-        s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(64));
-    }
-    for id in 0..14 {
-        let Some(f) = font_info(id) else { continue };
-        s.insert(f.tbl_path, tbl());
-        s.insert(f.dc6_path, dc6(256));
-    }
-    s
-}
-
 fn step(app: &mut App, ms: &AtomicU32, n: usize) {
     for _ in 0..n {
         app.update();
@@ -213,108 +80,66 @@ fn queue(app: &mut App, e: UiEvent) {
         .push(e);
 }
 
-/// The play app over the synthetic game, joined, with a left skill.
-fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
-    let data = GameData::Synthetic;
+/// The play app on the user's install, joined, beside Akara: the app,
+/// the server thread.
+fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> (App, Server<StepClock>) {
+    let data = app_support::game_data();
+    let GameData::Live(live) = data.clone();
     let character = single_player::new_character("sorceress", "Test").unwrap();
-    let (link, _) = single_player::start_with(
-        data.clone(),
+    let speeds = single_player::walk_speeds(&data, &character).unwrap();
+    let (link, started) = single_player::start_with(
+        data,
         single_player::DEFAULT_SEED,
         character.clone(),
         StepClock(ms.clone()),
     )
     .unwrap();
-    let source = Arc::new(files());
+    let server: Server<StepClock> = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     let link = Recorder {
-        inner: Box::new(link),
+        inner: Box::new(SharedLink(server.clone())),
         wire: wire.clone(),
     };
-    let (link, tap) = predict_link(Box::new(link));
-    add_game(&mut app, link, false).unwrap();
-    send_create_game_for(&mut app, &character).unwrap();
-    let levels = single_player::client_level_rows(&data);
-    add_client_data(
+    add_live_client(
         &mut app,
-        single_player::client_drlg_source(&data),
-        levels.clone(),
-    );
-    add_preview(
-        &mut app,
-        levels,
-        TileAssets::new(Some(source.clone()), None),
-    );
-    app_support::synthetic_skill_rows(&mut app);
-    set_npc_rows(&mut app);
-    add_act_palettes(
-        &mut app,
-        ActPalettes {
-            pl2: std::array::from_fn(|_| pl2()),
-            shown: None,
+        Box::new(link),
+        LiveClient {
+            data: &live,
+            request: &character,
+            start_flags: None,
+            prices: started.prices,
+            speeds,
+            hardcore: false,
+            automap_files: None,
+            gpu: false,
         },
-    );
-    let fonts = FontMeasure::load(source.as_ref(), &CHARACTER_FONTS).unwrap();
-    add_original_ui_with(
-        &mut app,
-        UiParts {
-            source: source.clone(),
-            inv_areas: None,
-            expansion_installed: false,
-            fonts: Some(fonts),
-            resist_penalties: Some(vec![0, 20, 50]),
-        },
-        looks(),
     )
     .unwrap();
-    d2_client::app::ui::set_waypoint_map(&mut app, single_player::client_waypoint_map(&data));
-    add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+    while app_support::local_player(&server).is_none() {
+        step(&mut app, ms, 1);
+    }
     step(&mut app, ms, 10);
-    // The synthetic join sends no skill list: S→C 0x94 + 0x23 (as in
-    // `app_play_e2e.rs`).
-    let guid = app
-        .world()
-        .resource::<BridgeResource>()
-        .0
-        .world()
-        .local()
-        .expect("local player")
-        .key
-        .guid;
-    let mut msgs = vec![0x94, 1];
-    msgs.extend_from_slice(&guid.to_le_bytes());
-    msgs.extend_from_slice(&[0, 0, 1]);
-    msgs.extend_from_slice(&[0x23, 0]);
-    msgs.extend_from_slice(&guid.to_le_bytes());
-    msgs.extend_from_slice(&[1, 0, 0]);
-    msgs.extend_from_slice(&u32::MAX.to_le_bytes());
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .receive_chunk(&msgs)
-        .unwrap();
-    app
+    let akara = u32::from(d2_sim::world::npc::class::AKARA);
+    app_support::approach(&mut app, &server, ms, 1, &[akara]);
+    (app, server)
 }
 
-/// The client's monster rows: Akara is an `npc` and `interact` class,
-/// attackable-flagged so the pick takes her (`isAtt`, `bridge/click.rs`).
-fn set_npc_rows(app: &mut App) {
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_unit_rows(single_player::synthetic_unit_rows());
-}
-
-/// The screen point of Akara (the one monster in the model), as the
+/// The screen point of Akara in the model, as the
 /// click's camera sees it.
 fn akara_on_screen(app: &App) -> (u32, Point) {
     let w = app.world().resource::<BridgeResource>().0.world();
     let (key, u) = w
         .units
         .iter()
-        .find(|(k, u)| k.unit_type == 1 && u.class == 148 && u.position.is_some())
+        .find(|(k, u)| {
+            k.unit_type == 1
+                && u.class == u32::from(d2_sim::world::npc::class::AKARA)
+                && u.position.is_some()
+        })
         .expect("Akara in the model");
     let at = app
         .world()
@@ -328,7 +153,7 @@ fn akara_on_screen(app: &App) -> (u32, Point) {
         moving_to_client(at.0, at.1),
         (0, 0),
     );
-    let (x, y) = hover::feet(&cam, u.position.unwrap());
+    let (x, y) = hover::unit_feet(&cam, u.key.unit_type, u.position.unwrap());
     (key.guid, Point::new(x, y - 20))
 }
 
@@ -364,35 +189,51 @@ fn client_record(app: &App) -> [u8; 96] {
 /// client's 0x2F / 0x31.
 fn talk_to_akara(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
     let guid = open_akara_menu(app, ms, wire);
-    // Cancel (the last row of the NPC menu box, R800: box x 300, y 150,
-    // rows from y 170, 20 high) ends the chat: C→S 0x30.
-    click(app, ms, Point::new(400, 170 + 20 * 2 + 5));
+    // Cancel (the last row of the NPC menu box) ends the chat: C→S 0x30.
+    let p = app_support::npc_menu_row(app, 2);
+    click(app, ms, p);
     step(app, ms, 3);
     guid
 }
 
 /// Clicks Akara and waits for her menu (S→C 0x28).
 fn open_akara_menu(app: &mut App, ms: &AtomicU32, wire: &Arc<Mutex<Wire>>) -> u32 {
+    // The client refuses a repeat interact on the same monster within
+    // 200 ms (`client/model.md` §8 r7): let an earlier talk's pass.
+    step(app, ms, 10);
     let (guid, at) = akara_on_screen(app);
     assert!(
         (0..800).contains(&at.x) && (0..560).contains(&at.y),
         "Akara is on screen: {at:?}"
     );
-    click(app, ms, at);
     let mut want = vec![0x13, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());
+    // This click's 0x13: a new one (an earlier talk's is in the log).
+    let sent = |wire: &Arc<Mutex<Wire>>| {
+        wire.lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|m| **m == want)
+            .count()
+    };
+    let before = sent(wire);
+    click(app, ms, at);
     for _ in 0..200 {
         step(app, ms, 1);
-        if wire.lock().unwrap().sent.contains(&want) {
+        if sent(wire) > before {
             break;
         }
     }
-    assert!(
-        wire.lock().unwrap().sent.contains(&want),
-        "C→S 0x13 on Akara: {:?}",
-        ids(wire)
-    );
-    step(app, ms, 6);
+    assert!(sent(wire) > before, "C→S 0x13 on Akara: {:?}", ids(wire));
+    // The 0x28 and the menu box (built at the next UI frame).
+    for _ in 0..50 {
+        step(app, ms, 1);
+        if app_support::npc_menu_len(app) > 0 {
+            break;
+        }
+    }
+    step(app, ms, 2);
     guid
 }
 
@@ -414,10 +255,11 @@ fn quest_messages(wire: &Arc<Mutex<Wire>>) -> Vec<(u32, u32)> {
 
 // Covers: specs/world/npc.md §2, §3; specs/world/quests.md §7.2, §7.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn talking_to_akara_twice_starts_the_den_of_evil() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
+    let (mut app, _server) = play_app(&ms, &wire);
     assert_eq!(client_record(&app)[2] & 0x04, 0, "Den not started yet");
     // First talk: the server starts the interaction (S→C 0x27 / 0x29 /
     // 0x28), the client answers C→S 0x2F and the quest message 0x31 of
@@ -464,10 +306,11 @@ fn log_rows(app: &App) -> Vec<(u8, IconState, u8)> {
 
 // Covers: specs/world/quests.md §6.2; specs/world/quests-status.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_quest_log_shows_the_started_den_of_evil() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
+    let (mut app, _server) = play_app(&ms, &wire);
     // Before Akara: the log opens, the server answers with every status 0.
     press_q(&mut app, &ms);
     assert!(wire.lock().unwrap().sent.contains(&vec![0x40]), "C→S 0x40");
@@ -497,10 +340,11 @@ fn the_quest_log_shows_the_started_den_of_evil() {
 
 // Covers: specs/ui/menus.md §2; specs/world/npc.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn akaras_menu_offers_talk_trade_and_cancel() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
+    let (mut app, _server) = play_app(&ms, &wire);
     let guid = open_akara_menu(&mut app, &ms, &wire);
     let menu = {
         let ui = app.world().non_send::<WorldViewUi>();
@@ -517,13 +361,22 @@ fn akaras_menu_offers_talk_trade_and_cancel() {
         "no C→S 0x30 yet: {:?}",
         ids(&wire)
     );
-    // Talk shows the speech.
-    click(&mut app, &ms, Point::new(400, 170 + 5));
+    // Talk closes the box and opens the topic box (`panels-2.md` §14.9,
+    // `messages.md` §6 r3).
+    let p = app_support::npc_menu_row(&app, 0);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 2);
     let ui = app.world().non_send::<WorldViewUi>();
     assert!(ui.original.as_ref().unwrap().npc_menu().unwrap().talking);
+    // The topic box's cancel ends the talk: Akara's menu is built again
+    // (§14.8: flag 1).
+    let p = app_support::npc_topic_cancel(&app);
+    click(&mut app, &ms, p);
+    step(&mut app, &ms, 2);
+    assert_eq!(app_support::npc_menu_len(&app), 3, "the menu is back");
     // Trade: C→S 0x38 action 1 [GUID] and the menu closes.
-    click(&mut app, &ms, Point::new(400, 170 + 20 + 5));
+    let p = app_support::npc_menu_row(&app, 1);
+    click(&mut app, &ms, p);
     step(&mut app, &ms, 3);
     let mut want = vec![0x38, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());
@@ -539,10 +392,11 @@ fn akaras_menu_offers_talk_trade_and_cancel() {
 
 // Covers: specs/world/npc.md §3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn leaving_the_menu_sends_the_chat_end() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));
-    let mut app = play_app(&ms, &wire);
+    let (mut app, _server) = play_app(&ms, &wire);
     let guid = talk_to_akara(&mut app, &ms, &wire);
     let mut want = vec![0x30, 1, 0, 0, 0];
     want.extend_from_slice(&guid.to_le_bytes());

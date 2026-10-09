@@ -59,7 +59,7 @@ pub fn cache_limit(physical: u64) -> u32 {
 }
 /// Duration of one sound tick in ms: one client tick (`render/camera.md`
 /// §9), used only by d2rs's channel-end model ([`SoundSystem`] upkeep).
-pub const TICK_MS: u64 = 40;
+pub const TICK_MS: u64 = crate::rules::camera::CLIENT_TICK_MS as u64;
 /// Distance clamp per axis for distance² (§8.1 r1).
 const AXIS_CLAMP: f32 = 2000.0;
 /// Group base of `event_thunder_*` (§6.4 r2).
@@ -1662,6 +1662,14 @@ impl SoundSystem {
             r.pos = [fx, fy, (f64::from(z) + f64::from(UNIT_Z)) as f32];
             r.dist2 = dist2(fx, fy);
         }
+    }
+
+    /// The units with a non-empty request list (U +0x78).
+    pub fn attached_units(&self) -> impl Iterator<Item = UnitKey> + '_ {
+        self.unit_lists
+            .iter()
+            .filter(|(_, l)| !l.is_empty())
+            .map(|(&k, _)| k)
     }
 
     /// `unit`'s request list (U +0x78, `triggers-2.md` §19 r1–r2, r6),

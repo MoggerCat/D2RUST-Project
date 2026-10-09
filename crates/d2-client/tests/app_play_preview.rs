@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::BridgeResource;
 use d2_client::rules::OpenMode;
@@ -57,8 +57,9 @@ fn dt1_bytes() -> Vec<u8> {
 
 // Covers: specs/render/draw-order.md §9; specs/client/assets.md §a4-residency
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_preview_draws_the_map_from_the_client_drlg() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -68,6 +69,7 @@ fn the_preview_draws_the_map_from_the_client_drlg() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -86,7 +88,7 @@ fn the_preview_draws_the_map_from_the_client_drlg() {
         levels,
         TileAssets::new(Some(Arc::new(files)), None),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.world_mut()
         .resource_mut::<WorldViewState>()
         .feed

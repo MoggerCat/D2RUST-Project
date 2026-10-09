@@ -1151,3 +1151,145 @@ fn ui_answers_npc_dialog_with_0x31_in_order() {
     assert!(next.is_empty());
     assert_eq!(mode, 1);
 }
+
+/// The skill fallback is the last step of a tick frame while `in_game`
+/// (`client/bridge.md` §8 rule 5, `flows/client-frame.md` §1 rule 6);
+/// a frame without a tick does not run it.
+// Covers: specs/client/bridge.md §8 r5
+#[test]
+fn skill_fallback_runs_only_in_a_tick_frame() {
+    use super::skills::{SkillEntry, SkillList, NATIVE};
+    use super::world::{SkillRow, PLAYER};
+    let p = UnitKey::new(PLAYER, 1);
+    let native = |skill, base| SkillEntry {
+        skill,
+        base,
+        owner: NATIVE,
+        ..SkillEntry::default()
+    };
+    let (mut b, link) = bridge();
+    b.inputs.tables.skills = vec![SkillRow::default(); 37];
+    let mut u = ClientUnit::new(p);
+    u.skills = Some(SkillList {
+        entries: vec![native(0, 1), native(36, 0)],
+        left: Some(1),
+        right: Some(0),
+        ..SkillList::default()
+    });
+    b.world.units.insert(p, u);
+    b.world.local_player = Some(p);
+    b.world.in_game = true;
+    let left = |b: &Bridge<ScriptedLink>| {
+        let l = b.world.units[&p].skills.as_ref().unwrap();
+        l.left_entry().map(|e| e.skill)
+    };
+    link.deliver(false, &[]);
+    b.frame().unwrap();
+    assert_eq!(left(&b), Some(36), "no tick: no fallback");
+    link.deliver(true, &[]);
+    let r = b.frame().unwrap();
+    assert_eq!(r.rejected, 0);
+    assert_eq!(left(&b), Some(0), "tick frame: the level-0 hand fell back");
+}
+
+/// Save and Exit (`flows/save-exit.md` §1 r2): C→S 0x69 on the system
+/// queue and `exit_requested`; the client stays in game until the
+/// server's 0x05 (§4 r1). `play::leave_game` (the window close) sends it
+/// for a client still in game and runs frames until the 0x05.
+// Covers: specs/flows/save-exit.md §1 r2, §4 r1
+#[test]
+fn save_and_exit_sends_0x69_and_waits_for_the_server() {
+    let (mut b, link) = bridge();
+    b.world.in_game = true;
+    b.save_and_exit().unwrap();
+    assert_eq!(sent(&link), [(SendQueue::System, vec![0x69])]);
+    assert!(b.world.exit_requested && b.world.in_game);
+    link.deliver(false, &[&[0x05], &[0x06]]);
+    b.frame().unwrap();
+    assert!(!b.world.in_game && b.world.unloaded && b.world.exit_requested);
+
+    // The window close: one 0x69, frames until the 0x05.
+    let (mut b, link) = bridge();
+    b.world.in_game = true;
+    link.deliver(false, &[]);
+    link.deliver(false, &[&[0x05], &[0x06]]);
+    assert!(crate::app::play::leave_game(&mut b).unwrap());
+    assert_eq!(sent(&link), [(SendQueue::System, vec![0x69])]);
+    assert_eq!(
+        link.script()
+            .events
+            .iter()
+            .filter(|e| **e == Event::Pump)
+            .count(),
+        2
+    );
+    // M08: a client already out of the game sends nothing.
+    let (mut b, link) = bridge();
+    assert!(crate::app::play::leave_game(&mut b).unwrap());
+    assert!(sent(&link).is_empty());
+}
+
+/// The paused pass (`flows/client-frame.md` §1 r2, spec §8 r5): with UI
+/// state 9 or 11 open and the local player in a room, a frame runs no
+/// pump and no receive, only the skill fallback, once; unpaused, the
+/// next frame pumps and receives what waited. Without a placed local
+/// player, or once Save and Exit was asked (`flows/save-exit.md` §1 r3),
+/// the frame runs as usual.
+// Covers: specs/flows/client-frame.md §1 r2; specs/client/bridge.md §8 r5
+#[test]
+fn a_paused_frame_runs_no_pump_and_only_the_skill_fallback() {
+    use super::skills::{SkillEntry, SkillList, NATIVE};
+    use super::world::{SkillRow, PLAYER};
+    let p = UnitKey::new(PLAYER, 1);
+    let native = |skill, base| SkillEntry {
+        skill,
+        base,
+        owner: NATIVE,
+        ..SkillEntry::default()
+    };
+    let (mut b, link) = bridge();
+    b.inputs.tables.skills = vec![SkillRow::default(); 37];
+    let mut u = ClientUnit::new(p);
+    u.skills = Some(SkillList {
+        entries: vec![native(0, 1), native(36, 0)],
+        left: Some(1),
+        right: Some(0),
+        ..SkillList::default()
+    });
+    b.world.units.insert(p, u);
+    b.world.local_player = Some(p);
+    b.world.in_game = true;
+    let left = |b: &Bridge<ScriptedLink>| {
+        let l = b.world.units[&p].skills.as_ref().unwrap();
+        l.left_entry().map(|e| e.skill)
+    };
+    let pumps = |link: &ScriptedLink| {
+        link.script()
+            .events
+            .iter()
+            .filter(|e| **e == Event::Pump)
+            .count()
+    };
+    b.set_paused(true);
+    // No room yet: an ordinary frame.
+    link.deliver(false, &[]);
+    let r = b.frame().unwrap();
+    assert!(!r.paused);
+    assert_eq!(pumps(&link), 1);
+    // In a room: paused, no pump, the fallback ran.
+    b.world.units.get_mut(&p).unwrap().position = Some((10, 10));
+    link.deliver(true, &[&[0x05]]);
+    let frames = b.world.frames;
+    let r = b.frame().unwrap();
+    assert!(r.paused && !r.ticked && r.chunks == 0, "{r:?}");
+    assert_eq!(pumps(&link), 1, "no pump");
+    assert_eq!(b.world.frames, frames + 1);
+    assert_eq!(left(&b), Some(0), "the fallback ran once");
+    assert!(b.world.in_game, "the waiting 0x05 is not received");
+    // Unpaused: the next frame pumps and receives.
+    b.set_paused(false);
+    let r = b.frame().unwrap();
+    assert!(!r.paused && r.chunks == 1);
+    assert_eq!(pumps(&link), 2);
+    assert!(!b.world.in_game);
+}

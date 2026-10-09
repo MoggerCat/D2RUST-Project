@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::BridgeResource;
 use d2_client::rules::OpenMode;
 use d2_client::world_view::WorldViewState;
@@ -42,8 +42,9 @@ impl Clock for StepClock {
 
 // Covers: specs/drlg/levels.md §9 r2, §9 r3, §9 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_app_game_runs_3000_ticks_while_an_unvisited_level_is_freed() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -53,6 +54,7 @@ fn the_app_game_runs_3000_ticks_while_an_unvisited_level_is_freed() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -63,7 +65,7 @@ fn the_app_game_runs_3000_ticks_while_an_unvisited_level_is_freed() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.world_mut()
         .resource_mut::<WorldViewState>()
         .feed
@@ -125,10 +127,11 @@ fn server_player(server: &app_support::Server<StepClock>) -> Option<(i32, i32)> 
 
 // Covers: specs/client/model.md §3 r3, §12 r2; specs/sim/intents-events.md §2.4 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
     use d2_client::app::play::{add_walk, predict_link};
     use d2_client::bridge::predict::Speeds;
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -138,6 +141,7 @@ fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -150,7 +154,7 @@ fn walking_east_out_of_the_town_the_map_follows_into_the_blood_moor() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {

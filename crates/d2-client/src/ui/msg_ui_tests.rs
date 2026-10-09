@@ -127,7 +127,10 @@ fn waypoint_menu_b7852() {
     // No room in the model: tab 0.
     assert_eq!(st.tab, Some(0));
     let out = u.take_outcome();
-    assert_eq!(out.skipped, [skip::INPUT_RESET, skip::WAYPOINT_ROWS]);
+    // r2.2: the input reset is asked of the host, not skipped.
+    assert_eq!(out.skipped, [skip::WAYPOINT_ROWS]);
+    assert!(u.take_input_reset());
+    assert!(!u.take_input_reset());
     // Jump 1 (§4.3) with the left slot: the cursor effect is reported.
     assert!(out
         .effects
@@ -341,6 +344,9 @@ fn npc_dialog(cursor_item: bool) -> NpcDialog {
         interact: true,
         f4b1a10: None,
         cursor_item,
+        level: 1,
+        unidentified: 0,
+        expansion: false,
         npc_monsters: vec![UnitKey::new(1, 6)],
     }
 }
@@ -447,6 +453,44 @@ fn npc_dialog_answer_is_kept_for_the_bridge() {
         Some((Box::new(d), DialogCase::B2 { m: 0 }))
     );
     assert_eq!(u.take_outcome().skipped, [skip::NPC_DIALOG_UI]);
+}
+
+// Covers: specs/client/msg-ui.md §16 r4; specs/audio/triggers.md §10 r1, §10 r2
+#[test]
+fn npc_dialog_branches_ask_for_speech() {
+    let w = world(false);
+    let run = |text: Output, d: NpcDialog| {
+        let mut u = ui();
+        u.apply_output(&text, &w).unwrap();
+        u.take_outcome();
+        u.apply_output(&Output::NpcDialog(Box::new(d)), &w).unwrap();
+        u.take_outcome().sounds
+    };
+    let npc = UnitKey::new(1, 6);
+    // B2: the dialog line of m (`0x004A10E0(U, m, 1)`).
+    assert_eq!(
+        run(npc_text(1, 1, 0, 0x25), npc_dialog(false)),
+        [SoundRequest::NpcDialogLine {
+            npc,
+            class: 148,
+            key: 0x25
+        }]
+    );
+    // B1 (a cursor item): none.
+    assert_eq!(run(npc_text(1, 1, 0, 0x25), npc_dialog(true)), []);
+    // B6: no text line, an `interact` class: the NPC's greeting.
+    let greeting = SoundRequest::NpcGreeting { npc, class: 148 };
+    assert_eq!(
+        run(npc_text(1, 1, 0, 0xFFFF), npc_dialog(false)),
+        [greeting]
+    );
+    // B4 (no `interact`) and B5 (`0x004B1A10` ≠ 0): none.
+    let mut d = npc_dialog(false);
+    d.interact = false;
+    assert_eq!(run(npc_text(1, 1, 0, 0xFFFF), d), []);
+    let mut d = npc_dialog(false);
+    d.f4b1a10 = Some(1);
+    assert_eq!(run(npc_text(1, 1, 0, 0xFFFF), d), []);
 }
 
 fn record(t: u8, guid: u32, entries: &[(u8, u16)]) -> Output {

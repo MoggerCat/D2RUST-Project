@@ -1,7 +1,8 @@
 // Spec: specs/client/ui.md
 //! Window → frame coordinate mapping (spec §A4).
 //!
-//! The 800×600 image is presented scaled by an integer factor and centered
+//! The 800×600 image (640×480 under `play --res 640x480`,
+//! [`Presentation::for_frame`]) is presented scaled by an integer factor and centered
 //! with black bars (`render-pipeline.md` §A9). A cursor position in window
 //! pixels maps back by the inverse: subtract the bar, divide by the scale
 //! with integer division, clamp to the frame. Positions in the bars are
@@ -14,7 +15,7 @@ use super::geom::{Point, FRAME_H, FRAME_W};
 pub enum FrameError {
     /// `render-pipeline.md` §A9 only defines integer scales ≥ 1; a window
     /// smaller than the frame has none (open question in the notes).
-    #[error("window {w}×{h} is smaller than the 800×600 frame")]
+    #[error("window {w}×{h} is smaller than the frame")]
     TooSmall { w: u32, h: u32 },
 }
 
@@ -31,17 +32,31 @@ pub enum FramePos {
 pub struct Presentation {
     pub window_w: u32,
     pub window_h: u32,
-    /// Largest integer factor with `800·scale ≤ w` and `600·scale ≤ h`.
+    /// The frame `fw × fh` (800 × 600, or 640 × 480).
+    pub frame_w: u32,
+    pub frame_h: u32,
+    /// Largest integer factor with `fw·scale ≤ w` and `fh·scale ≤ h`.
     pub scale: u32,
-    /// Left bar width: `(w − 800·scale) / 2`, rounded down (ours).
+    /// Left bar width: `(w − fw·scale) / 2`, rounded down (ours).
     pub left: u32,
-    /// Top bar height: `(h − 600·scale) / 2`, rounded down (ours).
+    /// Top bar height: `(h − fh·scale) / 2`, rounded down (ours).
     pub top: u32,
 }
 
 impl Presentation {
+    /// The 800 × 600 frame in a `window_w × window_h` window.
     pub fn new(window_w: u32, window_h: u32) -> Result<Self, FrameError> {
-        let scale = (window_w / u32::from(FRAME_W)).min(window_h / u32::from(FRAME_H));
+        Self::for_frame(window_w, window_h, u32::from(FRAME_W), u32::from(FRAME_H))
+    }
+
+    /// A `frame_w × frame_h` frame in a `window_w × window_h` window.
+    pub fn for_frame(
+        window_w: u32,
+        window_h: u32,
+        frame_w: u32,
+        frame_h: u32,
+    ) -> Result<Self, FrameError> {
+        let scale = (window_w / frame_w.max(1)).min(window_h / frame_h.max(1));
         if scale == 0 {
             return Err(FrameError::TooSmall {
                 w: window_w,
@@ -51,9 +66,11 @@ impl Presentation {
         Ok(Self {
             window_w,
             window_h,
+            frame_w,
+            frame_h,
             scale,
-            left: (window_w - u32::from(FRAME_W) * scale) / 2,
-            top: (window_h - u32::from(FRAME_H) * scale) / 2,
+            left: (window_w - frame_w * scale) / 2,
+            top: (window_h - frame_h * scale) / 2,
         })
     }
 
@@ -67,6 +84,22 @@ impl Presentation {
         )
     }
 
+    /// The offset (physical pixels, x right, y up) from the window's
+    /// centre to the centre of the presented image placed with its
+    /// top-left at ([`Self::left`], [`Self::top`]): what a sprite centred
+    /// on the window must move by so the image sits where
+    /// [`Self::to_frame`] maps the cursor (`seams/bridge-app.md` §2.7).
+    /// Non-zero (a half pixel) only with an odd leftover width or height.
+    pub fn centre_offset(&self) -> (f32, f32) {
+        let s = self.scale as f32;
+        let cx = self.left as f32 + self.frame_w as f32 * s / 2.0;
+        let cy = self.top as f32 + self.frame_h as f32 * s / 2.0;
+        (
+            cx - self.window_w as f32 / 2.0,
+            self.window_h as f32 / 2.0 - cy,
+        )
+    }
+
     /// Maps a window pixel (physical, top-left origin) to the frame.
     pub fn to_frame(&self, x: i64, y: i64) -> FramePos {
         let s = i64::from(self.scale);
@@ -74,7 +107,7 @@ impl Presentation {
         // infinities included) stays outside instead of wrapping.
         let dx = x.saturating_sub(i64::from(self.left));
         let dy = y.saturating_sub(i64::from(self.top));
-        let (fw, fh) = (i64::from(FRAME_W), i64::from(FRAME_H));
+        let (fw, fh) = (i64::from(self.frame_w), i64::from(self.frame_h));
         if dx < 0 || dy < 0 || dx >= fw * s || dy >= fh * s {
             return FramePos::Outside;
         }

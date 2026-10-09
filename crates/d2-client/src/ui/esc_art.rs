@@ -13,15 +13,14 @@
 //! d2rs-own, unverified (REC-257): the disabled look (draw mode 1) and
 //! the dark slider rectangles of §O4 r2 have no field in the image
 //! request and are not drawn; the `pentspin` frame follows the client
-//! tick (one step per two ticks, the original's > 50 ms); Window Mode has
+//! clock ([`PentClock`]: the original's > 50 ms rule); Window Mode has
 //! no art and stays text; `textslid` is the key-config screen's, not
 //! this menu's.
 
-use super::options_menu::{Kind, MenuId, OptionsMenu, Row, HALF};
+use super::options_menu::{Kind, MenuId, OptionsMenu, Row};
 use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
-use crate::ui::geom::Point;
+use crate::ui::geom::{Point, Rect};
 use crate::ui::panels::UiFiles;
-use crate::ui::FRAME;
 
 /// Prefix of a `UiFiles` name under `data\local\ui\eng\`.
 pub const LOCAL_PREFIX: &str = "*local\\";
@@ -133,7 +132,7 @@ fn frames(w: i32) -> i32 {
 }
 
 /// Every frame of `name` from cel position (x, y).
-fn art(files: &UiFiles, out: &mut dyn UiDrawSink, name: &str, w: i32, x: i32, y: i32) {
+fn art(files: &UiFiles, out: &mut dyn UiDrawSink, clip: Rect, name: &str, w: i32, x: i32, y: i32) {
     let Some(file) = files.id(name) else { return };
     for k in 0..frames(w) {
         out.push(UiDraw::Image(ImageRequest {
@@ -142,7 +141,8 @@ fn art(files: &UiFiles, out: &mut dyn UiDrawSink, name: &str, w: i32, x: i32, y:
                 frame: k as u32,
             },
             at: Point::new(x + 256 * k, y),
-            clip: FRAME,
+            clip,
+            look: crate::ui::CelLook::PLAIN,
         }));
     }
 }
@@ -151,10 +151,37 @@ fn local(name: &str) -> String {
     format!("{LOCAL_PREFIX}{name}")
 }
 
-/// The `pentspin` counter for a client tick: one step per 50 ms
-/// (two 25 Hz ticks), d2rs-own.
-pub fn pent_frame(tick: u64) -> u32 {
-    ((tick / 2) % 8) as u32
+/// The `pentspin` counter (§O4 r3, `0x00454850`): it advances by one,
+/// modulo 8, once per draw at which more than 50 ms have passed since the
+/// last advance (the first draw advances at once). The clock is the
+/// client tick times [`CLIENT_TICK_MS`](crate::rules::camera::CLIENT_TICK_MS)
+/// (d2rs-own, unverified); a 25 Hz draw sequence steps every 2nd draw, a
+/// 60 Hz one every 4th.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PentClock {
+    frame: u32,
+    last_ms: Option<u64>,
+}
+
+impl PentClock {
+    /// One draw at `now_ms`: advances when > 50 ms passed; returns the
+    /// frame to draw.
+    pub fn draw(&mut self, now_ms: u64) -> u32 {
+        match self.last_ms {
+            None => self.last_ms = Some(now_ms),
+            Some(last) if now_ms.saturating_sub(last) > 50 => {
+                self.frame = (self.frame + 1) % 8;
+                self.last_ms = Some(now_ms);
+            }
+            Some(_) => {}
+        }
+        self.frame
+    }
+
+    /// The client tick's milliseconds.
+    pub fn ms_of_tick(tick: u64) -> u64 {
+        tick * u64::from(crate::rules::camera::CLIENT_TICK_MS)
+    }
 }
 
 /// Draws the art of row `i` (label, value or slider); `false`: the row
@@ -168,24 +195,25 @@ pub fn draw_row(files: &UiFiles, m: &OptionsMenu, i: usize, out: &mut dyn UiDraw
     if files.id(&name).is_none() {
         return false;
     }
+    let (half, clip) = (m.half(), m.screen.rect());
     let yb = m.baseline(i);
     match def.kind {
-        Kind::Title | Kind::Action => art(files, out, &name, w, HALF - 1 - (w >> 1), yb),
+        Kind::Title | Kind::Action => art(files, out, clip, &name, w, half - 1 - (w >> 1), yb),
         Kind::Choice(_) => {
             let Some((vn, vw)) = value(def.row, m.value(i) as usize) else {
                 return false;
             };
-            art(files, out, &name, w, HALF - 230, yb);
-            art(files, out, &local(vn), vw, HALF + 230 - vw, yb);
+            art(files, out, clip, &name, w, half - 230, yb);
+            art(files, out, clip, &local(vn), vw, half + 230 - vw, yb);
         }
         Kind::Slider { style, .. } => {
-            art(files, out, &name, w, HALF - 230, yb);
+            art(files, out, clip, &name, w, half - 230, yb);
             let y = m.slider_y(i);
             let bar = if style == 1 { BAR_C } else { BAR };
-            art(files, out, bar, 290, HALF - 60, y);
+            art(files, out, clip, bar, 290, half - 60, y);
             // Skull at X0 + t, y − 1 (− 1 more for style 0).
             let sy = y - 1 - i32::from(style == 0);
-            art(files, out, SKULL, 28, HALF - 60 + m.slider_t(i), sy);
+            art(files, out, clip, SKULL, 28, half - 60 + m.slider_t(i), sy);
         }
     }
     true
@@ -193,18 +221,19 @@ pub fn draw_row(files: &UiFiles, m: &OptionsMenu, i: usize, out: &mut dyn UiDraw
 
 /// The pentagrams at the selected row (§O4 r3): the left one spins the
 /// other way, drawn right-aligned in its 52 px cell.
-pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, tick: u64, out: &mut dyn UiDrawSink) {
+pub fn draw_pents(files: &UiFiles, m: &OptionsMenu, f: u32, out: &mut dyn UiDrawSink) {
     let Some(file) = files.id(PENTSPIN) else {
         return;
     };
-    let f = pent_frame(tick);
+    let (half, clip) = (m.half(), m.screen.rect());
     let left = if f == 0 { 0 } else { 8 - f };
     let y = m.pentagram_y();
-    for (frame, x) in [(left, HALF - 52 - 249), (f, HALF + 249)] {
+    for (frame, x) in [(left, half - 52 - 249), (f, half + 249)] {
         out.push(UiDraw::Image(ImageRequest {
             image: ImageRef { file, frame },
             at: Point::new(x, y),
-            clip: FRAME,
+            clip,
+            look: crate::ui::CelLook::PLAIN,
         }));
     }
 }
@@ -221,12 +250,12 @@ mod tests {
     }
 
     /// (name, frame, x, y) of every image drawn.
-    fn draws(f: &UiFiles, m: &OptionsMenu, tick: u64) -> Vec<(String, u32, i32, i32)> {
+    fn draws(f: &UiFiles, m: &OptionsMenu, frame: u32) -> Vec<(String, u32, i32, i32)> {
         let mut out: Vec<UiDraw> = Vec::new();
         for i in 0..m.rows().len() {
             assert!(draw_row(f, m, i, &mut out) || m.rows()[i].row == Row::WindowMode);
         }
-        draw_pents(f, m, tick, &mut out);
+        draw_pents(f, m, frame, &mut out);
         out.iter()
             .filter_map(|d| match d {
                 UiDraw::Image(r) => Some((
@@ -257,7 +286,7 @@ mod tests {
         assert_eq!(d[5], ("cursor\\pentspin".into(), 0, 99, 336));
         assert_eq!(d[6], ("cursor\\pentspin".into(), 0, 649, 336));
         // Later frame: the left one spins the other way.
-        let d = draws(&f, &m, 6);
+        let d = draws(&f, &m, 3);
         assert_eq!((d[5].1, d[6].1), (5, 3));
     }
 
@@ -295,5 +324,50 @@ mod tests {
         let d = draws(&f, &m, 0);
         let v = d.iter().find(|e| e.0.starts_with("*local\\h")).unwrap();
         assert_eq!(v.2, 630 - 57);
+    }
+
+    // Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r4
+    #[test]
+    fn pentagrams_and_clip_follow_the_screen() {
+        use crate::ui::layout::Screen;
+        let f = files();
+        for (screen, h, left_y) in [(Screen::R800, 400, 336), (Screen::R640, 320, 276)] {
+            let mut m = OptionsMenu::default();
+            m.screen = screen;
+            m.open();
+            let mut out: Vec<UiDraw> = Vec::new();
+            draw_pents(&f, &m, 0, &mut out);
+            let at: Vec<(i32, i32)> = out
+                .iter()
+                .filter_map(|d| match d {
+                    UiDraw::Image(r) => {
+                        assert_eq!(r.clip, screen.rect());
+                        Some((r.at.x, r.at.y))
+                    }
+                    _ => None,
+                })
+                .collect();
+            // Pentagrams at h − 301 and h + 249; Game menu, Return to Game
+            // selected: y_top + 51 (800: 99 / 649 at y 336, spec §O4 r4).
+            let y = m.pentagram_y();
+            assert_eq!(y, left_y);
+            assert_eq!(at, [(h - 301, y), (h + 249, y)]);
+        }
+    }
+
+    // Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r3
+    #[test]
+    fn the_pentagram_steps_when_more_than_50_ms_passed() {
+        // 25 Hz draws (40 ms): the first draw steps at once, then every 2nd.
+        let mut c = PentClock::default();
+        let frames: Vec<u32> = (0..7).map(|i| c.draw(PentClock::ms_of_tick(i))).collect();
+        assert_eq!(frames, [0, 0, 1, 1, 2, 2, 3]);
+        // 60 Hz draws (16.67 ms): every 4th.
+        let mut c = PentClock::default();
+        let frames: Vec<u32> = (0..9).map(|i| c.draw(i * 50 / 3)).collect();
+        assert_eq!(frames, [0, 0, 0, 0, 1, 1, 1, 1, 2]);
+        // The counter wraps at 8.
+        let mut c = PentClock::default();
+        assert_eq!((0..40).map(|i| c.draw(i * 60)).last(), Some(7));
     }
 }

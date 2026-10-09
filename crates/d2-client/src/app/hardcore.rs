@@ -19,8 +19,9 @@
 //!
 //! PROVISIONAL (M22; REC-126): this preview also saves when the death
 //! screen comes up (the DT start), so the penalties are on disk even if
-//! the window closes during the death animation; both from the app,
-//! because the server has no save path of its own. Leaving a dead hardcore character closes the
+//! the window closes during the death animation; both asked by the app
+//! ([`SaveHandle`]) and written by the server's character storage
+//! (`save::FileStore`), because the server's DD save is not wired yet. Leaving a dead hardcore character closes the
 //! game (the original returns to the character screen). d2rs-own,
 //! unverified.
 
@@ -107,10 +108,15 @@ fn leave_dead(
 pub fn add_hardcore(app: &mut App, hardcore: bool) {
     app.insert_resource(HardcoreRun(hardcore)).add_systems(
         Update,
+        // `client-frame.md` §1 r8 (q-fix-flow-client-order C5): the death
+        // screen's state is written first; the save at death and the
+        // hardcore leave read it the same frame.
         (
-            save_on_death,
+            save_on_death.after(super::death::death_screen),
             save_at_dd,
-            leave_dead.run_if(resource_exists::<BridgeResource>),
+            leave_dead
+                .after(super::death::death_screen)
+                .run_if(resource_exists::<BridgeResource>),
         ),
     );
 }

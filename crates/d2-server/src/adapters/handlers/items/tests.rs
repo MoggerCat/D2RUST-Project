@@ -59,6 +59,15 @@ const T_AMULET: u16 = 12;
 const CUBE: usize = 0;
 const RING: usize = 1;
 const AMULET: usize = 2;
+/// A tome, a scroll (`world/vendors.md` §7.1 r7), arrows and a bow
+/// (§7.1 r8, §7.1.1); itemtypes ids of `items/inventory.md` D3 where
+/// it names them (18 `book`, 22 `scro`, 27 `bow`, 45 `weap`).
+const TOME: usize = 3;
+const SCROLL: usize = 4;
+const ARROWS: usize = 5;
+const BOW: usize = 6;
+const T_BOWQ: u16 = 5;
+const T_BOW: u16 = 27;
 const GAME_SEED: u32 = 0x5EED;
 /// The player's class (sorceress: inventory record 2, 10 × 4; the cube
 /// page is record 9, 3 × 4: `inventory.md` §1.3).
@@ -120,6 +129,7 @@ fn equiv() -> EquivMatrix {
     for c in [T_RING, T_BOX, T_AMULET] {
         set(usize::from(c), usize::from(ty::MISC));
     }
+    set(usize::from(T_BOW), 45);
     m
 }
 
@@ -136,7 +146,7 @@ fn item_rec(t: u16, code: &[u8; 4]) -> ItemRec {
 fn tables() -> ItemTables {
     let mut ratio = Itemratio::decode(&[0u8; Itemratio::SIZE]);
     ratio.version = 1;
-    let itemtypes = (0..N_TYPES)
+    let mut itemtypes: Vec<Itemtypes> = (0..N_TYPES)
         .map(|_| {
             let mut t = Itemtypes::decode(&[0u8; Itemtypes::SIZE]);
             t.class = 0xFF;
@@ -147,11 +157,21 @@ fn tables() -> ItemTables {
             t
         })
         .collect();
+    // The bow shoots the arrows' type (`inventory.md` §4.7 r2).
+    itemtypes[usize::from(T_BOW)].shoots = T_BOWQ;
     ItemTables {
         items: vec![
             item_rec(T_BOX, b"box "),
             item_rec(T_RING, b"rin "),
             item_rec(T_AMULET, b"amu "),
+            item_rec(ty::BOOK, b"tbk "),
+            item_rec(ty::SCRO, b"tsc "),
+            ItemRec {
+                stackable: 1,
+                maxstack: 500,
+                ..item_rec(T_BOWQ, b"aqv ")
+            },
+            item_rec(T_BOW, b"sbw "),
         ],
         itemtypes,
         equiv: equiv(),
@@ -236,15 +256,44 @@ fn inv_tables() -> InvTables {
             rec(b"box ", T_BOX, 2, 2),
             rec(b"rin ", T_RING, 1, 1),
             rec(b"amu ", T_AMULET, 1, 1),
+            InvItemRec {
+                stackable: 1,
+                maxstack: 20,
+                ..rec(b"tbk ", ty::BOOK, 1, 2)
+            },
+            rec(b"tsc ", ty::SCRO, 1, 1),
+            InvItemRec {
+                stackable: 1,
+                maxstack: 500,
+                ..rec(b"aqv ", T_BOWQ, 1, 3)
+            },
+            InvItemRec {
+                twohanded: 1,
+                wclass: *b"bow ",
+                ..rec(b"sbw ", T_BOW, 2, 3)
+            },
         ],
-        itemtypes: vec![
-            InvTypeRec {
-                class: 7,
-                ..InvTypeRec::default()
-            };
-            N_TYPES
-        ],
+        itemtypes: {
+            let mut t = vec![
+                InvTypeRec {
+                    class: 7,
+                    ..InvTypeRec::default()
+                };
+                N_TYPES
+            ];
+            // The ring on either ring finger, the arrows and the bow in
+            // either hand (`inventory.md` §4.1).
+            for (ty, a, b) in [(T_RING, 6, 7), (T_BOWQ, 4, 5), (T_BOW, 4, 5)] {
+                let r = &mut t[usize::from(ty)];
+                r.body = 1;
+                r.bodyloc1 = a;
+                r.bodyloc2 = b;
+            }
+            t[usize::from(T_BOWQ)].quiver = 1;
+            t
+        },
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -374,6 +423,7 @@ fn action_tables() -> ActionTables {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     }
 }
 
@@ -470,6 +520,13 @@ impl T {
     }
     fn guid(&mut self, u: UnitId) -> u32 {
         self.units().get(u).unwrap().guid
+    }
+    fn set_stat(&mut self, u: UnitId, s: u16, v: i32) {
+        let sys = &mut self.host.game.events.sys;
+        sys.stats.unit_set(&mut sys.hooks, u, s, v, 0);
+    }
+    fn stat(&mut self, u: UnitId, s: u16) -> i32 {
+        self.host.game.events.sys.stats.unit_total(u, s, 0)
     }
     /// The player's inventory in the host's one inventory model.
     fn inventory(&mut self) -> &mut Inventory {

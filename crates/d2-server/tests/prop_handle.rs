@@ -489,6 +489,7 @@ fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -621,6 +622,7 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     };
     let mut hooks = ActionHooks::new(
         Arc::new(tables),
@@ -927,6 +929,7 @@ fn inv_tables(items: &[([u8; 4], u16, u8, u8)], n_types: usize, equiv: EquivMatr
             n_types
         ],
         equiv,
+        books: Vec::new(),
     }
 }
 
@@ -1092,6 +1095,7 @@ fn empty_action_tables() -> ActionTables {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     }
 }
 
@@ -1526,6 +1530,7 @@ mod trade {
             },
             levels: Vec::new(),
             skill_modes: Vec::new(),
+            overlay_count: 0,
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),
@@ -1746,7 +1751,7 @@ impl Digest for ActionGame {
             h.game_seed,
             h.waypoints,
             h.mode_target,
-            self.world.arrivals,
+            h.arrivals,
             self.world.faults,
             player_digest(self)
         )

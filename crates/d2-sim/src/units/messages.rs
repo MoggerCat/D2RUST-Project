@@ -1,4 +1,4 @@
-// Spec: specs/sim/intents-events.md §7.2, §7.8, §7.9, §8 (unit add / remove, room and session message layouts)
+// Spec: specs/sim/intents-events.md §7.2, §7.8, §7.9, §8 (unit add / remove, room and session message layouts); specs/client/msg-stats-items.md §5 r1 (0x3E); specs/client/msg-skills.md §5 r1 (0x22); specs/client/msg-units.md §8 r3–r5 (0x5B, 0x5C, 0x65)
 //! The byte layouts of the S→C messages a client gets when units come
 //! into or leave its rooms (`intents-events.md` §7.2, §7.8, §7.9) and
 //! during the single-player session sequence (§8): pure builders, the
@@ -32,6 +32,18 @@ pub fn game_flags(difficulty: u8, arena_flags: u32, expansion: bool, ladder: boo
         u8::from(ladder),
     ]
 }
+
+/// S→C 0x8D AssignPlayerToParty (`0x0053DF00`, 7 bytes,
+/// `server-messages.tsv`): GUID u32@1, party u16@5.
+pub fn assign_player_to_party(guid: u32, party: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let p = party.to_le_bytes();
+    [0x8D, g[0], g[1], g[2], g[3], p[0], p[1]]
+}
+
+/// No party (`0x00554630`'s answer for a player in none; recorded in
+/// 0x5B and 0x75 as 0xFFFF).
+pub const NO_PARTY: u16 = 0xFFFF;
 
 /// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
 /// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
@@ -102,6 +114,82 @@ pub fn update_oskill(
     m[9] = base;
     m[10] = bonus;
     m
+}
+
+/// S→C 0x20 StatUpdate (`0x0053C1D0`, 10 bytes, `client/msg-stats-items.md`
+/// §1 r4): player GUID u32@1, stat u8@5, value u32@6.
+// PROVISIONAL (REC-415): no spec names a caller of `0x0053C1D0`, so no
+// d2rs code sends it; the builder is the TSV layout; settled by the
+// static caller search on PC 1 (`docs/handoff/pc1-data.md` Step 4).
+pub fn stat_update(guid: u32, stat: u8, value: u32) -> [u8; 10] {
+    let mut m = [0u8; 10];
+    m[0] = 0x20;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5] = stat;
+    m[6..10].copy_from_slice(&value.to_le_bytes());
+    m
+}
+
+/// S→C 0x93 (`0x0053C6F0`, 8 bytes, `client/msg-skills.md` §9): player
+/// GUID u32@1, bonus u8@5 (signed on the client, 0x80 = +128), element
+/// u8@6 (0 = any), page u8@7 (4 = any).
+// PROVISIONAL (REC-415): no spec names a caller of `0x0053C6F0`, so no
+// d2rs code sends it; settled by the static caller search on PC 1.
+pub fn skill_bonus(guid: u32, bonus: u8, element: u8, page: u8) -> [u8; 8] {
+    let mut m = [0u8; 8];
+    m[0] = 0x93;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5] = bonus;
+    m[6] = element;
+    m[7] = page;
+    m
+}
+
+/// S→C 0x73 (`0x0059FEE0`, 32 bytes, `missiles/missiles.md` §R2.4;
+/// the field roles are the client reader's, `client/msg-units.md` §7
+/// r6): class u16@5, x u32@7, y u32@0xB, the path's first point x u32@0xF
+/// and y u32@0x13 (0 when none), the current frame u16@0x17, owner type
+/// u8@0x19 and GUID u32@0x1A, level u8@0x1E, pierce index u8@0x1F;
+/// bytes 1–4 are not written.
+// PROVISIONAL (REC-414): which unit fields fill the u32 positions
+// (read as the path's 16.16 position and the first point's cell), and
+// that the level is the missile data's level cut to a byte; the spec
+// names the fields but not their units; settled by a 1.14d recording of
+// a `ClientSend` missile's add message.
+#[allow(clippy::too_many_arguments)]
+pub fn client_missile(
+    class: u16,
+    pos: (u32, u32),
+    first: (u32, u32),
+    frame: u16,
+    owner: (u8, u32),
+    level: u8,
+    pierce: u8,
+) -> [u8; 32] {
+    let mut m = [0u8; 32];
+    m[0] = 0x73;
+    m[5..7].copy_from_slice(&class.to_le_bytes());
+    m[7..11].copy_from_slice(&pos.0.to_le_bytes());
+    m[11..15].copy_from_slice(&pos.1.to_le_bytes());
+    m[15..19].copy_from_slice(&first.0.to_le_bytes());
+    m[19..23].copy_from_slice(&first.1.to_le_bytes());
+    m[23..25].copy_from_slice(&frame.to_le_bytes());
+    m[25] = owner.0;
+    m[26..30].copy_from_slice(&owner.1.to_le_bytes());
+    m[30] = level;
+    m[31] = pierce;
+    m
+}
+
+/// S→C 0x11 (`0x0053D850`, `intents-events.md` §7.3 r2 step 9): unit
+/// type u8@1, GUID u32@2, overlay id u16@6.
+pub fn report_kill(unit_type: u8, guid: u32, overlay: u16) -> [u8; 8] {
+    let mut b = [0u8; 8];
+    b[0] = 0x11;
+    b[1] = unit_type;
+    b[2..6].copy_from_slice(&guid.to_le_bytes());
+    b[6..8].copy_from_slice(&overlay.to_le_bytes());
+    b
 }
 
 /// S→C 0x0A RemoveUnit (`0x00571600` → `0x0053BDA0`, §7.8 rule 3.1):
@@ -345,6 +433,154 @@ pub fn unit_states(
     ];
     b.extend(stream);
     b
+}
+
+/// The width field of S→C 0x3E (`client/msg-stats-items.md` §5 r1): 1 bit
+/// a; a = 0 → 8 bits; else 1 bit b, then 16 (b = 0) or 32 bits.
+///
+/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): the
+/// sender picks the narrowest width that holds the value (≤ 0xFF → 8,
+/// ≤ 0xFFFF → 16, else 32); no spec gives `0x0053D130`'s choice.
+fn write_sized(w: &mut BitWriter, v: u32) {
+    if v <= 0xFF {
+        w.write(0, 1);
+        w.write(v, 8);
+    } else if v <= 0xFFFF {
+        w.write(1, 1);
+        w.write(0, 1);
+        w.write(v, 16);
+    } else {
+        w.write(1, 1);
+        w.write(1, 1);
+        w.write(v, 32);
+    }
+}
+
+/// S→C 0x3E UpdateItemStats (`0x0053D130(client, item, 1, stat, value,
+/// param)`, `client/msg-stats-items.md` §5 r1): size u8@1 (2 + the
+/// stream's bytes), then the LSB-first stream from byte 2: item GUID
+/// (sized), set flag 1, stat 9 bits, value (sized, two's complement for a
+/// negative value), param (1 bit c: 8 (c = 0) or 16 bits).
+///
+/// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): widths are
+/// the narrowest that hold the field ([`write_sized`]); the param is 8
+/// bits when it is ≤ 0xFF.
+pub fn update_item_stat(guid: u32, stat: u16, value: i32, param: u16) -> Vec<u8> {
+    let mut w = BitWriter::new();
+    write_sized(&mut w, guid);
+    w.write(1, 1);
+    w.write(u32::from(stat) & 0x1FF, 9);
+    write_sized(&mut w, value as u32);
+    if param <= 0xFF {
+        w.write(0, 1);
+        w.write(u32::from(param), 8);
+    } else {
+        w.write(1, 1);
+        w.write(u32::from(param), 16);
+    }
+    let mut b = vec![0x3E, (2 + w.bytes.len()) as u8];
+    b.extend(w.bytes);
+    b
+}
+
+/// S→C 0x22 UpdateItemSkill (`0x0053C520`, 12 bytes,
+/// `client/msg-skills.md` §5 r1): unit type u8@1, GUID u32@3, skill
+/// u16@7, quantity u8@9, flag u8@11 = 1 when the unit has state 7 at
+/// send. Bytes 2 and 10 are not written by the sender (0 here).
+pub fn update_item_skill(
+    unit_type: u8,
+    guid: u32,
+    skill: u16,
+    quantity: u8,
+    state7: bool,
+) -> [u8; 12] {
+    let g = guid.to_le_bytes();
+    let s = skill.to_le_bytes();
+    [
+        0x22,
+        unit_type,
+        0,
+        g[0],
+        g[1],
+        g[2],
+        g[3],
+        s[0],
+        s[1],
+        quantity,
+        0,
+        u8::from(state7),
+    ]
+}
+
+/// S→C 0x5A EventMessage of a join (code 2) or leave (code 3), 40 bytes
+/// (`0x0053C850`, §2.5 rule 2, §8.3): u8@2 = 4, u32@3 = 0, u8@7 = 0, the
+/// character name @8 (16 bytes); single player has no account name, so
+/// @0x18–@0x27 stay 0.
+pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
+    let mut m = [0u8; 40];
+    m[0] = 0x5A;
+    m[1] = code;
+    m[2] = 4;
+    m[8..24].copy_from_slice(name);
+    m
+}
+
+/// S→C 0x5B PlayerJoined (`0x0053C940`, `client/msg-units.md` §8 r3, 36
+/// bytes here): size u16@1, GUID u32@3, class u8@7, name @8 (16 bytes),
+/// level u16@0x18 (stat 12), party id u16@0x1A (0xFFFF: no party),
+/// u16@0x1C = u16@0x1E = 0, u16@0x20 = 0 and the two strings empty (the
+/// client fields +0x45E / +0x460 / +0x464 only the legacy save loader
+/// writes, `formats/d2s-legacy.md` §2 r5).
+pub fn player_joined(guid: u32, class: u8, name: &[u8; 16], level: u16, party: u16) -> Vec<u8> {
+    let mut m = vec![0u8; 36];
+    m[0] = 0x5B;
+    m[1..3].copy_from_slice(&36u16.to_le_bytes());
+    m[3..7].copy_from_slice(&guid.to_le_bytes());
+    m[7] = class;
+    m[8..24].copy_from_slice(name);
+    m[0x18..0x1A].copy_from_slice(&level.to_le_bytes());
+    m[0x1A..0x1C].copy_from_slice(&party.to_le_bytes());
+    m
+}
+
+/// S→C 0x5C PlayerLeft (`0x0053CA90`, 5 bytes, §2.5 rule 2): GUID u32@1
+/// of the leaving player.
+pub fn player_left(guid: u32) -> [u8; 5] {
+    let g = guid.to_le_bytes();
+    [0x5C, g[0], g[1], g[2], g[3]]
+}
+
+/// S→C 0x65 PlayerKillCount (`0x0053D9C0`, 7 bytes,
+/// `client/msg-units.md` §8 r5): GUID u32@1, count u16@5.
+pub fn player_kill_count(guid: u32, count: u16) -> [u8; 7] {
+    let g = guid.to_le_bytes();
+    let c = count.to_le_bytes();
+    [0x65, g[0], g[1], g[2], g[3], c[0], c[1]]
+}
+
+/// S→C 0x57 NpcEnchants (`0x0053D880`, 14 bytes, `intents-events.md`
+/// §7.3 rule 2 step 10): GUID u32@1, type u8@5 = 1, the name seed u16@6,
+/// u16@8 = umod list bytes 0 | 1 << 8, u16@10 = byte 2, u16@12 = 1 when
+/// type flag 4 is set (`monsters/umod-callbacks.md` §28.4).
+pub fn npc_enchants(guid: u32, name_seed: u16, umods: [u8; 3], flag4: bool) -> [u8; 14] {
+    let g = guid.to_le_bytes();
+    let n = name_seed.to_le_bytes();
+    [
+        0x57,
+        g[0],
+        g[1],
+        g[2],
+        g[3],
+        1,
+        n[0],
+        n[1],
+        umods[0],
+        umods[1],
+        umods[2],
+        0,
+        u8::from(flag4),
+        0,
+    ]
 }
 
 #[cfg(test)]

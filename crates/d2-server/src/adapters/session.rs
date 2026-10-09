@@ -398,6 +398,12 @@ pub fn enter_game<D: ActionEvents, W>(
             .x
             .send(player, &msg::set_skill(0, guid, 0, h.skill, h.item));
     }
+    // Rule 3.1 (e): the quest entry's messages (0x5E, 0x28, 0x29, 0x89).
+    if let Some(quest) = a.sys.hooks.session.join_quest.remove(&player) {
+        for m in &quest {
+            a.sys.hooks.x.send(player, m);
+        }
+    }
     // Rules 3.2–3.7.
     let x = &mut a.sys.hooks.x;
     x.send(player, &msg::unit_ref(0x0B, 0, guid));
@@ -412,10 +418,18 @@ pub fn enter_game<D: ActionEvents, W>(
     for m in &stats {
         x.send(player, m);
     }
-    // Rule 3.5: the player's item messages (the loader's, in send order).
+    // Rule 3.5: the player's item messages (the loader's, in send order),
+    // then flag-ex bit 21: the first tick's per-client update runs the
+    // inventory refresh (`intents-events.md` §8.3, S→C 0x48).
     for m in items.iter().flatten() {
         x.send(player, m);
     }
+    if items.is_some() {
+        if let Some(r) = a.sys.units.get_mut(player) {
+            r.flags2 |= d2_sim::wiring::action::INVENTORY_REFRESH_EX;
+        }
+    }
+    let x = &mut a.sys.hooks.x;
     for (i, k) in entry.hotkeys.iter().enumerate() {
         if usize::try_from(k.skill).is_ok_and(|sk| sk < skills) {
             x.send(

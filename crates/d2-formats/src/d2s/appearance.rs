@@ -192,27 +192,127 @@ impl ReferenceSlots {
         Self(vec![RefSlot::default(); REFERENCE_ENTRIES])
     }
 
-    /// The 1.14d slots as §1 r3 describes their effect: the weapon
-    /// tokens fill 4–56, the throwing potions skip to 125–134 while the
-    /// helms start at 57, so slots 57–124 are `weap` slots; no other slot
-    /// is reserved.
-    // PROVISIONAL (formats/d2s-appearance.md §1 r2, §1 r3, Open
-    // question 3; IT-6; REC-91): the
-    // table's bytes are not in the spec; this reconstruction gives the
-    // anchors of §1 r3 (`hax` 4 … `ktr` 45, `cap` 57, `buc` 79, potions
-    // 125–134) but not the second `ktr` at 243 (edge case 4). Settled by
-    // reading `0x00744CA8` from the 1.14d image, or by the IT-6 saves.
-    pub fn provisional_1_14d() -> Self {
-        let mut s = Self::none();
-        for slot in &mut s.0[57..=124] {
-            slot.weap = true;
-        }
-        s
+    /// The 1.14d reference table (`0x00744CA8`): [`REFERENCE_TYPES`]
+    /// under the game's itemtypes is-a matrix `m` (§1 r2 step 4). On the
+    /// 1.14d tables it gives the slot classes the Constants summarise
+    /// (checked on the user's install: `d2-server` `character_save`
+    /// `the_image_reference_table_on_the_users_install`).
+    pub fn game(m: &IsA) -> Self {
+        Self::from_types(&reference_types(), m)
     }
 
     fn get(&self, i: usize) -> RefSlot {
         self.0.get(i).copied().unwrap_or_default()
     }
+}
+
+/// The item type of each slot of the 1.00 reference table `0x00744CA8`
+/// (256 × 8 bytes, the type at +4; `formats/d2s-appearance.md`
+/// Constants, read from the 1.14d image at file offset 0x344CA8), as
+/// (first slot, last slot, type) runs covering 0..=255.
+pub const REFERENCE_TYPES: [(u8, u8, i32); 91] = [
+    (0, 3, 1),
+    (4, 10, 37),
+    (11, 26, 3),
+    (27, 30, 2),
+    (31, 33, 16),
+    (34, 36, 15),
+    (37, 39, 19),
+    (40, 40, 37),
+    (41, 42, 2),
+    (43, 45, 25),
+    (46, 46, 29),
+    (47, 47, 43),
+    (48, 49, 30),
+    (50, 50, 36),
+    (51, 51, 28),
+    (52, 53, 30),
+    (54, 54, 36),
+    (55, 56, 31),
+    (57, 58, 30),
+    (59, 62, 38),
+    (63, 66, 32),
+    (67, 69, 33),
+    (70, 71, 30),
+    (72, 75, 33),
+    (76, 79, 27),
+    (80, 83, 26),
+    (84, 84, 28),
+    (85, 85, 34),
+    (86, 87, 28),
+    (88, 88, 34),
+    (89, 89, 31),
+    (90, 91, 34),
+    (92, 93, 35),
+    (94, 94, 43),
+    (95, 95, 29),
+    (96, 96, 30),
+    (97, 97, 36),
+    (98, 98, 24),
+    (99, 100, 38),
+    (101, 101, 42),
+    (102, 102, 32),
+    (103, 105, 30),
+    (106, 106, 33),
+    (107, 110, 27),
+    (111, 111, 26),
+    (112, 112, 28),
+    (113, 113, 34),
+    (114, 114, 28),
+    (115, 116, 35),
+    (117, 117, 1),
+    (118, 119, 3),
+    (120, 120, 2),
+    (121, 121, 3),
+    (122, 123, 40),
+    (124, 125, 19),
+    (126, 127, 16),
+    (128, 129, 15),
+    (130, 130, 30),
+    (131, 131, 28),
+    (132, 132, 43),
+    (133, 133, 29),
+    (134, 134, 3),
+    (135, 136, 28),
+    (137, 138, 36),
+    (139, 140, 30),
+    (141, 142, 32),
+    (143, 145, 33),
+    (146, 147, 34),
+    (148, 148, 32),
+    (149, 149, 33),
+    (150, 151, 24),
+    (152, 153, 26),
+    (154, 154, 36),
+    (155, 164, 28),
+    (165, 168, 25),
+    (169, 169, 36),
+    (170, 172, 24),
+    (173, 179, 36),
+    (180, 193, 30),
+    (194, 197, 32),
+    (198, 198, 42),
+    (199, 199, 43),
+    (200, 200, 42),
+    (201, 201, 43),
+    (202, 211, 33),
+    (212, 217, 34),
+    (218, 222, 26),
+    (223, 230, 27),
+    (231, 234, 35),
+    (235, 241, 37),
+    (242, 255, 3),
+];
+
+/// [`REFERENCE_TYPES`] by slot.
+pub fn reference_types() -> [i32; 256] {
+    let mut out = [0; 256];
+    for &(a, b, t) in &REFERENCE_TYPES {
+        for slot in &mut out[usize::from(a)..=usize::from(b)] {
+            *slot = t;
+        }
+    }
+    out
 }
 
 /// The token table (`0x0096CC68`, built by `0x0063D710`): 255 entries of
@@ -285,8 +385,8 @@ impl TokenTable {
     /// §2 r1 (`0x0063D900`): the first entry 1..254 whose code is `a` or
     /// `b`; none → 0. An entry never filled has code 0, so a zero code
     /// matches the first unfilled entry (the original's comparison).
-    // PROVISIONAL (formats/d2s-appearance.md §2 r1, Open question 4;
-    // IT-6; REC-92): an empty `a` is compared like any code.
+    // An empty `a` is compared like any code (§2 r1, Open question 4,
+    // answered).
     pub fn lookup(&self, a: [u8; 4], b: [u8; 4]) -> u8 {
         let (a, b) = (code_u32(a), code_u32(b));
         (1..TOKEN_ENTRIES)

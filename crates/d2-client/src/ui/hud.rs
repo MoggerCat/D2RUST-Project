@@ -34,6 +34,7 @@ use super::{class_u8, left, SharedRef, EMPTY};
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
 use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
+use crate::ui::layout::Screen;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::control::belt::BeltColor;
 use crate::ui::panels::control::buttons::{
@@ -42,12 +43,11 @@ use crate::ui::panels::control::buttons::{
 };
 use crate::ui::panels::control::globes::{
     exp_bar, life_globe, mana_globe, stamina_bar, ExpIn, GlobeDraw, GlobeFile, GlobeSmoothing,
-    LifeIn, ManaIn, NumbersIn, StaminaColor, StaminaIn,
+    LifeIn, ManaIn, NumbersIn, StaminaColor, StaminaIn, TextToggle,
 };
 use crate::ui::panels::control::input::{CtrlEffect, CtrlInput, InputEnv, UpFacts};
 use crate::ui::panels::control::minipanel::{self, MiniAction, MiniPanel, PlayerFacts, UI_MINI};
 use crate::ui::panels::{PanelOutput, UiFiles};
-use crate::ui::FRAME;
 
 /// The HUD adapter's id: not a UI state, open for good (like the border).
 pub const HUD_PANEL: PanelId = PanelId(0x101);
@@ -146,6 +146,8 @@ pub struct HudTables {
     pub icons: BTreeMap<u16, (u8, u8)>,
     /// `experience` rows: row 0 `MaxLvl`, row L + 1 level L, 7 classes.
     pub experience: Vec<[u32; 7]>,
+    /// The states with flag bit 24 (`stambarblue`, §4 r2).
+    pub stambarblue: Vec<u8>,
 }
 
 impl HudTables {
@@ -177,6 +179,8 @@ pub struct HudState {
     pub belt: super::hud_belt::HudBelt,
     /// The new-stats / new-skills pressed flags (§8).
     pub new_btns: NewButtons,
+    /// The play bindings, for the tips' key names ([`key_names`]).
+    pub bindings: Option<crate::controls::Bindings>,
 }
 
 impl Default for HudState {
@@ -192,6 +196,7 @@ impl Default for HudState {
             select_left: true,
             belt: Default::default(),
             new_btns: NewButtons::default(),
+            bindings: None,
         }
     }
 }
@@ -199,6 +204,29 @@ impl Default for HudState {
 /// The adapter (installed after the border, §1 step 7).
 pub struct HudUi {
     pub(super) sh: SharedRef,
+}
+
+/// The primary and secondary key names of command `cmd` (`ui/controls.md`
+/// §3 numbering) for the run and mini-panel tips (§6 r1, §9 r6).
+/// d2rs-own, unverified: the play bindings' first two inputs and their
+/// names, not the short / long key name strings of §5 r13 (as the belt
+/// labels, REC-264); no bindings → none.
+pub fn key_names(b: Option<&crate::controls::Bindings>, cmd: i32) -> [Option<Vec<u16>>; 2] {
+    let inputs = b
+        .zip(crate::controls::keymap::action_of_cmd(cmd))
+        .map_or(&[][..], |(b, a)| b.inputs(a));
+    let name = |i: usize| inputs.get(i).map(|k| k.name().encode_utf16().collect());
+    [name(0), name(1)]
+}
+
+/// The belt facts the mini panel reads (§9 r2, r7): the belt has extra
+/// rows (`[0x007BEFA0]`) and its row count (§5 r7).
+fn belt_rows(hud: &HudState) -> (bool, u8) {
+    let st = &hud.belt.state;
+    (
+        st.extra_boxes,
+        crate::ui::panels::control::belt::row_count(st.belt_type),
+    )
 }
 
 /// The local player's key, when it is a player.
@@ -215,6 +243,7 @@ fn image(files: &UiFiles, name: &str, frame: u32, x: i32, y: i32, clip: Rect) ->
         image: ImageRef { file, frame },
         at: Point::new(x, y),
         clip,
+        look: crate::ui::CelLook::PLAIN,
     }))
 }
 
@@ -227,6 +256,11 @@ fn globe_file(f: GlobeFile) -> &'static str {
 
 /// A globe request as an image draw: a window is the cel clipped to its
 /// rows (counted from the cel's bottom row y).
+/// The play screen as the clip of a full-screen draw.
+fn screen_clip() -> Rect {
+    Screen::play().rect()
+}
+
 fn globe_draw(files: &UiFiles, d: &GlobeDraw) -> Option<UiDraw> {
     match *d {
         GlobeDraw::Window {
@@ -239,10 +273,12 @@ fn globe_draw(files: &UiFiles, d: &GlobeDraw) -> Option<UiDraw> {
             ..
         } => {
             let top = y - skip - lines + 1;
-            let clip = Rect::new(0, top, FRAME.w, u16::try_from(lines).ok()?);
+            let clip = Rect::new(0, top, screen_clip().w, u16::try_from(lines).ok()?);
             image(files, globe_file(file), frame, x, y, clip)
         }
-        GlobeDraw::Cel { file, frame, x, y } => image(files, globe_file(file), frame, x, y, FRAME),
+        GlobeDraw::Cel { file, frame, x, y } => {
+            image(files, globe_file(file), frame, x, y, screen_clip())
+        }
     }
 }
 
@@ -295,7 +331,7 @@ impl HudUi {
     ) -> Option<UiDraw> {
         let (class, cel) = *tables.icons.get(&skill)?;
         let name = skill_icon_file(if class > 6 { 7 } else { class }).to_ascii_lowercase();
-        image(files, &name, u32::from(cel), at.0, at.1, FRAME)
+        image(files, &name, u32::from(cel), at.0, at.1, screen_clip())
     }
 }
 
@@ -390,11 +426,12 @@ impl Panel for HudUi {
         let mouse = (sh.mouse.x, sh.mouse.y);
         let run = run_button(w, h, hud.running, hud.input.run_pressed, mouse);
         out.extend_one(cel(files, "panel\\runbutton", run));
-        // §4 r2 stamina bar (state group 24 is not in the model: gold).
+        // §4 r2 stamina bar: blue with a `stambarblue` state.
         let (stamina, stamina_max) = (stat(10), stat(11));
         let shown = hud.smoothing.records[2].shown(stamina, stamina_max, c, false);
         let stamina_shown = shown;
-        let bar = stamina_bar(shown, stamina_max, false, w, h);
+        let blue = hud.tables.stambarblue.iter().any(|&s| has(s));
+        let bar = stamina_bar(shown, stamina_max, blue, w, h);
         let frame = match bar.color {
             StaminaColor::Red => 0,
             StaminaColor::Gold => 1,
@@ -413,7 +450,7 @@ impl Panel for HudUi {
         let benv = BtnEnv {
             w,
             h,
-            res2: true,
+            res2: sh.config.screen.res2(),
             open_mode: 0,
         };
         for (which, points, pressed) in [
@@ -435,10 +472,13 @@ impl Panel for HudUi {
             }
         }
         // §9 the mini panel with state 0x15 open.
+        let mut mini_layout = None;
         if mini_open {
             let open = |ui: u8| sh.states.is_open(ui);
-            let sides = minipanel::sides(&open, false, 1);
+            let (extra, rows) = belt_rows(hud);
+            let sides = minipanel::sides(&open, extra, rows);
             hud.mini.set_sides(&sides);
+            mini_layout = minipanel::layout(sides.left_blocked, sides.right_blocked);
             if let Some(((ax, ay), buttons)) =
                 hud.mini.draw(sides.left_blocked, sides.right_blocked, w, h)
             {
@@ -448,7 +488,7 @@ impl Panel for HudUi {
                     0,
                     ax,
                     ay,
-                    FRAME,
+                    screen_clip(),
                 ));
                 for b in buttons {
                     out.extend_one(image(
@@ -457,21 +497,27 @@ impl Panel for HudUi {
                         b.frame,
                         b.x,
                         b.y,
-                        FRAME,
+                        screen_clip(),
                     ));
                 }
             }
         }
-        // Tool tips (§4 r1, §6 r1/r4, §8 r1), last so they draw on top.
+        // Tool tips (§4 r1, §6 r1/r4, §8 r1, §9 r6), last so they draw on
+        // top.
+        let bindings = hud.bindings.as_ref();
         super::hud_tips::draw_tips(
             &super::hud_tips::TipIn {
                 w,
                 h,
                 mouse,
+                res2,
                 mini_open,
                 state9_open: sh.states.is_open(9),
                 exp: exp_in,
                 strings: ctx.strings,
+                fonts: sh.fonts.as_ref(),
+                keys: &|cmd| key_names(bindings, cmd),
+                mini: mini_layout.map(|l| (l, &hud.mini)),
             },
             out,
         );
@@ -498,6 +544,7 @@ impl Panel for HudUi {
                 },
                 strings: ctx.strings,
                 width_a: &|t| fonts.and_then(|f| f.width_a(1, t)).unwrap_or(0),
+                fonts,
             },
             out,
         );
@@ -559,27 +606,53 @@ impl Panel for HudUi {
         if mini_open && at.y < h - 47 {
             let open = |ui: u8| sh.states.is_open(ui);
             let mouse = (at.x, at.y);
+            let cursor_item = crate::bridge::items::cursor_item(world).is_some();
+            let (extra, rows) = belt_rows(&sh.hud);
+            let state9 = open(9);
+            // d2rs-own, unverified: the cursor mode is read as 7 (no
+            // cursor mode in the model; with no cursor item the reset
+            // has nothing to do).
             let (acts, consumed) = if down {
                 sh.hud
                     .mini
-                    .press(w, h, mouse, false, false, 1, false, &player)
+                    .press(w, h, mouse, cursor_item, extra, rows, state9, &player)
             } else {
                 sh.hud
                     .mini
-                    .release(w, h, mouse, false, 7, false, 1, &player, &open)
+                    .release(w, h, mouse, cursor_item, 7, extra, rows, &player, &open)
             };
             for a in acts {
                 match a {
                     MiniAction::Ui(o) => sh.outputs.push(o),
-                    MiniAction::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
-                    // d2rs-own, unverified: the game menu button opens ui 9.
+                    MiniAction::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
+                    // `frontend-options.md` §O1 r2: the game menu opens through
+                    // `0x0047E090(1, 0)` (`OriginalUi::open_game_menu`).
                     MiniAction::GameMenu => sh.outputs.push(PanelOutput::SetUi {
                         ui: 9,
                         mode: 0,
                         jump: false,
                     }),
-                    // The quest log has no panel in play.
-                    _ => {}
+                    // `0x0044DA40` after a release that ran a function
+                    // (`control-panel.md` §9).
+                    MiniAction::InputReset => sh.input_reset = true,
+                    // `0x004A3FE0(0)`: the quest log toggles like the Q
+                    // key, asking for the quest data when it opens
+                    // (`quest_log_ui`; d2rs-own, unverified).
+                    MiniAction::QuestLog => {
+                        let ui = super::quest_log_ui::UI_QUEST_SCREEN;
+                        let opening = !sh.states.is_open(ui);
+                        sh.outputs.push(PanelOutput::SetUi {
+                            ui,
+                            mode: 2,
+                            jump: false,
+                        });
+                        if opening {
+                            sh.outputs.push(PanelOutput::Intent(
+                                super::quest_log_ui::request_quest_data(),
+                            ));
+                        }
+                    }
+                    MiniAction::CursorReset => {}
                 }
             }
             return if consumed {
@@ -593,10 +666,20 @@ impl Panel for HudUi {
         let res2 = sh.config.screen.res2();
         let at_px = (at.x, at.y);
         if alive && sh.hud.belt.over(world, (w, h), res2, at_px) {
-            if !down {
-                for i in sh.hud.belt.click(world, res2, at_px) {
-                    sh.outputs.push(PanelOutput::Intent(i));
+            if down {
+                // §10 r1: a press over the belt records `[0x007BEFA4]`.
+                sh.hud.input.press_recorded = true;
+            } else {
+                // §10 r2: no press recorded → no belt click; always
+                // cleared after the release.
+                if sh.hud.input.press_recorded {
+                    for i in sh.hud.belt.click(world, res2, at_px) {
+                        sh.outputs.push(PanelOutput::Intent(i));
+                    }
                 }
+                sh.hud.input.press_recorded = false;
+                sh.hud.input.menu_pressed = false;
+                sh.hud.input.run_pressed = false;
             }
             return UiResponse::Consumed;
         }
@@ -604,7 +687,7 @@ impl Panel for HudUi {
         let benv = BtnEnv {
             w,
             h,
-            res2: true,
+            res2: sh.config.screen.res2(),
             open_mode: 0,
         };
         let unspent = local(world).map(|k| (world.total(k, 4, 0), world.total(k, 5, 0)));
@@ -655,13 +738,21 @@ impl Panel for HudUi {
         for eff in effects {
             match eff {
                 CtrlEffect::Ui(o) => sh.outputs.push(o),
-                CtrlEffect::Sound(_) => sh.outputs.push(PanelOutput::ClickSound),
+                CtrlEffect::Sound(id) => sh.outputs.push(PanelOutput::Sound(id as i32)),
                 CtrlEffect::Send(i) => sh.outputs.push(PanelOutput::Intent(i)),
                 CtrlEffect::SkillSelect(l) => sh.hud.select_left = l,
                 CtrlEffect::ToggleRun => sh.hud.run_toggles += 1,
-                CtrlEffect::StoreRegistry { .. }
-                | CtrlEffect::CursorMode6
-                | CtrlEffect::BeltClick => {}
+                // §3 r5: stored at once (`settings.toml`, written by
+                // the host as an Options change).
+                CtrlEffect::StoreRegistry { which, on } => {
+                    let s = &mut sh.esc.menu.settings;
+                    match which {
+                        TextToggle::Hp => s.show_hp_text = u8::from(on),
+                        TextToggle::Mp => s.show_mp_text = u8::from(on),
+                    }
+                    sh.esc.menu.changed = true;
+                }
+                CtrlEffect::CursorMode6 | CtrlEffect::BeltClick => {}
             }
         }
         if consumed {
@@ -673,7 +764,7 @@ impl Panel for HudUi {
 }
 
 fn cel(files: &UiFiles, name: &str, b: ButtonCel) -> Option<UiDraw> {
-    image(files, name, b.frame, b.x, b.y, FRAME)
+    image(files, name, b.frame, b.x, b.y, screen_clip())
 }
 
 /// Pushes an optional draw.

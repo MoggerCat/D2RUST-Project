@@ -15,7 +15,7 @@ use d2_client::app::death::{add_death, DeathScreen};
 use d2_client::app::hardcore::add_hardcore;
 use d2_client::app::play::{add_client_data, add_game, add_preview, send_create_game_for};
 use d2_client::app::save;
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
 use d2_client::bridge::modes::player_mode;
@@ -24,6 +24,8 @@ use d2_client::world_view::tile_assets::TileAssets;
 use d2_server::seams::Clock;
 use d2_sim::units::hooks::Sim;
 use d2_sim::units::modes::player_event1;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -77,7 +79,7 @@ struct Outcome {
 }
 
 fn run(hardcore: bool) -> Outcome {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(
@@ -94,6 +96,7 @@ fn run(hardcore: bool) -> Outcome {
         .unwrap();
     let dyn_link: DynLink = Box::new(Shared(link.clone()));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>()
@@ -166,6 +169,7 @@ fn run(hardcore: bool) -> Outcome {
 // Covers: specs/sim/intents-events.md §9 r6
 // Covers: specs/formats/d2s.md §2.2 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
     let Outcome {
         dropped,
@@ -183,8 +187,9 @@ fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
     );
 }
 
-// Covers: specs/sim/intents-events.md §9 r6
+// Covers: specs/sim/intents-events.md §9 r6; specs/formats/d2s.md §2.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_softcore_death_respawns_and_the_save_stays_alive() {
     let Outcome {
         dropped,
@@ -195,6 +200,13 @@ fn a_softcore_death_respawns_and_the_save_stays_alive() {
     assert!(dropped.is_empty());
     assert!(!left);
     assert!(!dead);
-    assert_eq!(status & d2_formats::d2s::status::DEAD, 0);
+    // `d2s.md` §2.3: both death starts set 0x08 for every player, softcore
+    // too (measured 0x0028 after a town respawn); the loader refuses a
+    // dead character only when it is hardcore (§2.2 r5), so it stays
+    // playable.
+    assert_eq!(
+        status & d2_formats::d2s::status::DEAD,
+        d2_formats::d2s::status::DEAD
+    );
     assert_eq!(status & d2_formats::d2s::status::HARDCORE, 0);
 }

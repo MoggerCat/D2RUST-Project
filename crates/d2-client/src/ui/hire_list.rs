@@ -17,18 +17,20 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect, FRAME};
+use super::geom::{Point, Rect};
 use super::messages::msg_u32s;
-use super::original::OriginalUi;
+use super::messages::Metrics;
+use super::original::game_messages::Measure;
+use super::original::npc_box::push_menu_draws;
+use super::original::{FontMeasure, OriginalUi};
 use super::panel::{ClientIntent, Panel, UiEvent};
 use super::panel::{PanelId, UiCtx, UiResponse, WidgetId};
 use super::panels::npc_menu::{
-    hire_choose, hire_geometry, hire_row_text, ChooseFacts, HireAction, HireStats, HIRE_BOX,
-    STR_BACK, STR_YOUR_GOLD,
+    hire_box, hire_choose, hire_geometry, hire_row_text, ChooseFacts, HireAction, HireHandler,
+    HireStats, HIRE_BOX, HIRE_LIST,
 };
 use super::text::TextOpts;
 use super::PointerButton;
-use crate::bridge::output::Output;
 use crate::bridge::world::{ClientWorld, KindData};
 
 /// The hire list panel id (one past the border panel).
@@ -52,7 +54,6 @@ pub type StatsFn = dyn Fn(u16, u32, u32) -> Option<HireStats>;
 
 /// The list state, shared between [`OriginalUi`](super::original::OriginalUi)
 /// (fed by the bridge outputs) and the panel.
-#[derive(Default)]
 pub struct HireState {
     pub offers: Vec<Offer>,
     /// The list is up for this NPC GUID.
@@ -61,10 +62,45 @@ pub struct HireState {
     /// The list closed by a hire: the reset the server sends right after
     /// it does not open the list again.
     pub hired: bool,
+    /// Back was chosen (`0x004B5C20`, `menus.md` §3.2): the NPC menu is
+    /// rebuilt at the next poll.
+    pub back: bool,
+    /// A C→S 0x36 went out (`0x004B1E80`, §3.4): the menu state := 10 and
+    /// the waiting note opens at the next poll.
+    pub sent: bool,
+    /// A choose asked for the confirm dialog (`0x004B3610`, §3.4): (NPC
+    /// GUID, record name), opened at the next poll.
+    pub confirm: Option<(u32, u16)>,
+    /// `[0x00725494]` (S→C 0x9B; 0xFFFF: no dead mercenary).
+    pub merc_state: u16,
     pub screen: (i32, i32),
+    /// The fonts the box measures (set at install).
+    pub fonts: Option<FontMeasure>,
+}
+
+impl Default for HireState {
+    fn default() -> Self {
+        Self {
+            offers: Vec::new(),
+            up: None,
+            stats: None,
+            hired: false,
+            back: false,
+            sent: false,
+            confirm: None,
+            merc_state: 0xFFFF,
+            screen: (0, 0),
+            fonts: None,
+        }
+    }
 }
 
 impl HireState {
+    /// The whole screen: the clip of every draw.
+    fn screen_rect(&self) -> Rect {
+        Rect::new(0, 0, self.screen.0 as u16, self.screen.1 as u16)
+    }
+
     /// S→C 0x4F: the list is reset.
     pub fn reset(&mut self) {
         self.offers.clear();
@@ -87,27 +123,6 @@ pub type SharedHire = Rc<RefCell<HireState>>;
 /// The panel.
 pub struct HireListUi {
     pub st: SharedHire,
-}
-
-fn utf16s(s: &str) -> Vec<u16> {
-    s.encode_utf16().collect()
-}
-
-/// `%d` replaced by `n`.
-fn fmt_d(fmt: &[u16], n: i32) -> Vec<u16> {
-    let pat: Vec<u16> = utf16s("%d");
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < fmt.len() {
-        if fmt[i..].starts_with(&pat) {
-            out.extend(utf16s(&n.to_string()));
-            i += 2;
-        } else {
-            out.push(fmt[i]);
-            i += 1;
-        }
-    }
-    out
 }
 
 fn local_gold(world: &ClientWorld) -> i32 {
@@ -141,16 +156,45 @@ impl HireListUi {
         Rect::new(pos.0, pos.1, HIRE_BOX.0 as u16, HIRE_BOX.1 as u16)
     }
 
-    /// The row index at `p`, or `Some(None)` for the Back row.
+    /// The row index at `p`, or `Some(None)` for the Back item. The list
+    /// widget (a child of the box, §3.3) takes the point first; the Back
+    /// item's band is the menu box's (`npc_box`, d2rs-own hit band).
     fn row_at(&self, p: Point) -> Option<Option<usize>> {
         let st = self.st.borrow();
         let (pos, list) = hire_geometry(st.screen.0, st.screen.1);
-        let back_y = pos.1 + 315;
-        if p.y >= back_y && p.y < back_y + 21 {
-            return Some(None);
+        // Row i's text sits on y = list y + 15 (i + 1): its band is the 15
+        // pixels above (d2rs-own).
+        let k = (p.y - list.1 - 1) / ROW_H;
+        let in_list = p.x >= list.0 && p.x < list.0 + HIRE_LIST.0 && p.y > list.1;
+        if in_list && (k as usize) < st.offers.len() {
+            return Some(Some(k as usize));
         }
-        let k = (p.y - list.1) / ROW_H;
-        (p.y >= list.1 && (k as usize) < st.offers.len()).then_some(Some(k as usize))
+        let bx = hire_box(st.screen.0, st.screen.1, 0, &|_| Vec::new(), &NoMeasure).ok()?;
+        let back = bx
+            .items
+            .iter()
+            .position(|i| i.handler == Some(HireHandler::Back))?;
+        let top = pos.1 + bx.items[..back].iter().map(|i| i.height).sum::<i32>();
+        (p.y > top && p.y <= top + bx.items[back].height).then_some(None)
+    }
+}
+
+/// Widths of 0: the hire box is fixed size (p5 = 0), so only the item x
+/// offsets read the metrics.
+struct NoMeasure;
+
+impl Metrics for NoMeasure {
+    fn wrap(&self, _: u16, t: &[u16], _: i32) -> Vec<Vec<u16>> {
+        vec![t.to_vec()]
+    }
+    fn width_a(&self, _: u16, _: &[u16]) -> i32 {
+        0
+    }
+    fn width_c(&self, _: u16, _: &[u16]) -> i32 {
+        0
+    }
+    fn font_height(&self, _: u16) -> i32 {
+        16
     }
 }
 
@@ -174,26 +218,35 @@ impl Panel for HireListUi {
                 .map(<[u16]>::to_vec)
                 .unwrap_or_default()
         };
-        let (pos, list) = hire_geometry(st.screen.0, st.screen.1);
+        let (_, list) = hire_geometry(st.screen.0, st.screen.1);
         let text = |text: Vec<u16>, at: Point, color: u16| {
             UiDraw::Text(TextRequest {
                 text,
                 at,
                 style: TextStyle { font: 1, color },
                 opts: TextOpts::default(),
-                clip: FRAME,
+                clip: st.screen_rect(),
             })
         };
-        out.push(text(
-            fmt_d(&strings(STR_YOUR_GOLD), local_gold(ctx.world)),
-            Point::new(pos.0 + 20, pos.1 + 21),
-            4,
-        ));
+        // §3.2: the box (gold line, Back) is the spec menu box.
+        let m = Measure(st.fonts.as_ref());
+        if let Ok(bx) = hire_box(
+            st.screen.0,
+            st.screen.1,
+            local_gold(ctx.world),
+            &strings,
+            &m,
+        ) {
+            let mut spin = 0;
+            push_menu_draws(bx.draw(&mut spin, &m), st.screen_rect(), out);
+        }
+        // §3.3: the list widget's rows (its scroll and columns are not
+        // drawn: d2rs-own).
         let level = local_level(ctx.world);
         if st.offers.is_empty() {
             out.push(text(
                 strings(STR_NO_MERCS),
-                Point::new(list.0 + 10, list.1),
+                Point::new(list.0 + 10, list.1 + ROW_H),
                 0,
             ));
         }
@@ -204,15 +257,10 @@ impl Panel for HireListUi {
             let (left, _right) = hire_row_text(o.name, &stats, None, &strings);
             out.push(text(
                 left,
-                Point::new(list.0 + 10, list.1 + ROW_H * i as i32),
+                Point::new(list.0 + 10, list.1 + ROW_H * (i as i32 + 1)),
                 0,
             ));
         }
-        out.push(text(
-            strings(STR_BACK),
-            Point::new(pos.0 + 20, pos.1 + 330),
-            0,
-        ));
     }
 
     fn hit(&self, p: Point) -> Option<WidgetId> {
@@ -242,7 +290,10 @@ impl Panel for HireListUi {
             return UiResponse::Consumed;
         };
         let Some(row) = hit else {
-            self.st.borrow_mut().up = None;
+            // Back (`0x004B5C20`): close both, rebuild the NPC menu.
+            let mut st = self.st.borrow_mut();
+            st.up = None;
+            st.back = true;
             return UiResponse::Consumed;
         };
         let offer = self.st.borrow().offers.get(row).copied();
@@ -250,17 +301,18 @@ impl Panel for HireListUi {
             return UiResponse::Consumed;
         };
         let expansion = ctx.world.expansion != 0;
-        // d2rs-own, unverified: the player's current hireling state is not
-        // read, so the "no hireling" / "state clear" facts are true and
-        // the choose sends at once (`menus.md` §3.4 first branch).
+        // §3.4: `0x00478F20(P, 7)` = −1 (no hireling record of the
+        // player); the merc state reads `[0x00725494]` = 0xFFFF only
+        // (`0x00478EE0(P, 7)` is not in the client model: d2rs-own).
+        let me = ctx.world.local().map(|u| u.key);
         let c = hire_choose(&ChooseFacts {
             row,
             item_value: row,
             npc_guid: npc,
             record_name: offer.name,
-            no_hireling: true,
+            no_hireling: ctx.world.hireling_guid(me) == u32::MAX,
             classic_game: !expansion,
-            merc_state_clear: true,
+            merc_state_clear: self.st.borrow().merc_state == 0xFFFF,
         });
         match c.action {
             HireAction::Hire { send } => {
@@ -268,13 +320,20 @@ impl Panel for HireListUi {
                     let mut st = self.st.borrow_mut();
                     st.up = None;
                     st.hired = true;
+                    st.sent = true;
                 }
                 match send {
                     super::panels::PanelOutput::Intent(i) => UiResponse::Intent(i),
                     _ => UiResponse::Consumed,
                 }
             }
-            _ => UiResponse::Consumed,
+            HireAction::Confirm => {
+                let mut st = self.st.borrow_mut();
+                st.up = None;
+                st.confirm = Some((npc, offer.name));
+                UiResponse::Consumed
+            }
+            HireAction::None => UiResponse::Consumed,
         }
     }
 }
@@ -302,41 +361,12 @@ impl OriginalUi {
     pub fn hire_list(&self) -> std::cell::Ref<'_, HireState> {
         self.hire.borrow()
     }
-
-    /// d2rs-own, unverified: until the NPC menu box calls
-    /// [`Self::open_hire_list`], the server's list reset (S→C 0x4F, sent
-    /// when a seller is talked to) opens the list for the seller nearest
-    /// to the local player.
-    pub(super) fn hire_auto_open(&mut self, o: &Output, world: &ClientWorld) {
-        if !matches!(o, Output::HireListReset) {
-            return;
-        }
-        let mut h = self.hire.borrow_mut();
-        if std::mem::take(&mut h.hired) || h.up.is_some() {
-            return;
-        }
-        let (px, py) = world.local().and_then(|u| u.position).unwrap_or((0, 0));
-        let d = |u: &crate::bridge::world::ClientUnit| {
-            let (x, y) = u.position.unwrap_or((u16::MAX, u16::MAX));
-            (i64::from(x) - i64::from(px)).pow(2) + (i64::from(y) - i64::from(py)).pow(2)
-        };
-        h.up = world
-            .units
-            .values()
-            .filter(|u| {
-                u.key.unit_type == crate::bridge::world::MONSTER
-                    && d2_sim::world::npc::SELLERS
-                        .iter()
-                        .any(|&c| u32::from(c) == u.class)
-            })
-            .min_by_key(|u| d(u))
-            .map(|u| u.key.guid);
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bridge::output::Output;
     use crate::bridge::world::{ClientUnit, UnitKey, MONSTER, PLAYER};
     use crate::ui::layout::Screen;
     use crate::ui::original::UiConfig;
@@ -360,9 +390,22 @@ mod tests {
         w
     }
 
+    /// [`world`] with the local unit a player (the list draws only then).
+    fn player_world() -> ClientWorld {
+        let mut w = world();
+        let pk = w.local_player.unwrap();
+        w.units.get_mut(&pk).unwrap().kind =
+            KindData::Player(crate::bridge::world::PlayerData::default());
+        w
+    }
+
     fn setup() -> (OriginalUi, UiRoot) {
+        setup_at(Screen::R800)
+    }
+
+    fn setup_at(screen: Screen) -> (OriginalUi, UiRoot) {
         let config = UiConfig {
-            screen: Screen::R800,
+            screen,
             expansion_installed: true,
         };
         let ui = OriginalUi::new(config, None).unwrap();
@@ -384,12 +427,17 @@ mod tests {
         root.dispatch(e, &ctx);
     }
 
-    // Covers: specs/ui/menus.md §3 r4
+    // The list opens from the menu's Hire option only (§3.1; the server's
+    // 0x4F / 0x4E fill it, they no longer open it: the d2rs-own auto-open
+    // for the nearest seller is gone with the spec NPC menu).
+    // Covers: specs/ui/menus.md §3 r1, §3 r4
     #[test]
-    fn the_server_list_opens_for_the_nearest_seller_and_a_row_sends_0x36() {
+    fn the_hire_option_opens_the_list_and_a_row_sends_0x36() {
         let w = world();
         let (mut ui, mut root) = setup();
         ui.apply_output(&Output::HireListReset, &w).unwrap();
+        assert_eq!(ui.hire_list().up, None, "the server's reset opens nothing");
+        ui.open_hire_list(77);
         ui.apply_output(
             &Output::HireOffer {
                 name: 3000,
@@ -406,7 +454,7 @@ mod tests {
             &w,
         )
         .unwrap();
-        assert_eq!(ui.hire_list().up, Some(77), "the seller beside the player");
+        assert_eq!(ui.hire_list().up, Some(77));
         assert_eq!(ui.hire_list().offers.len(), 2);
         // Row 1 of the list at 800 × 600: list y 120, rows 15 high.
         release(&mut root, &w, 200, 120 + 15 + 3);
@@ -417,10 +465,77 @@ mod tests {
         assert_eq!(ui.hire_list().up, None);
     }
 
+    // Covers: specs/ui/menus.md §3 r4
+    #[test]
+    fn the_list_sits_by_the_screen_at_640_and_800() {
+        // Spec §3.3: list x = (W − 490) / 2, y = (H − 40) / 2 − 160.
+        for (screen, x, y) in [(Screen::R800, 155, 120), (Screen::R640, 75, 60)] {
+            let w = player_world();
+            let (mut ui, mut root) = setup_at(screen);
+            ui.open_hire_list(77);
+            ui.apply_output(&Output::HireListReset, &w).unwrap();
+            for name in [3000, 3001] {
+                ui.apply_output(&Output::HireOffer { name, seed: 5 }, &w)
+                    .unwrap();
+            }
+            assert_eq!(ui.hire_list().screen, (screen.w, screen.h));
+            // Every draw is clipped to the screen, not to 800 × 600.
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<crate::ui::UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let texts: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    crate::ui::UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!texts.is_empty());
+            assert!(texts.iter().all(|c| *c == screen.rect()));
+            // Row 1 of the list under the list's own origin.
+            release(&mut root, &w, x + 45, y + 15 + 3);
+            assert_eq!(root.take_intents(), vec![hire_intent(77, 3001)]);
+        }
+    }
+
+    // Covers: specs/ui/menus.md §2 r1
+    #[test]
+    fn the_npc_menu_clips_to_the_screen_at_640_and_800() {
+        for screen in [Screen::R800, Screen::R640] {
+            let w = player_world();
+            let (mut ui, mut root) = setup_at(screen);
+            ui.open_npc_menu(77, KASHYA, 1, &w);
+            ui.npc_menu_poll(&w, &mut root, &NoStrings);
+            assert!(ui.npc_menu().is_some(), "the box is built");
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<crate::ui::UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let clips: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    crate::ui::UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!clips.is_empty(), "{screen:?}");
+            assert!(clips.iter().all(|c| *c == screen.rect()), "{screen:?}");
+        }
+    }
+
+    // Covers: specs/ui/menus.md §3 r2
     #[test]
     fn back_closes_without_a_message() {
         let w = world();
         let (mut ui, mut root) = setup();
+        ui.open_hire_list(77);
         ui.apply_output(&Output::HireListReset, &w).unwrap();
         ui.apply_output(
             &Output::HireOffer {
@@ -433,6 +548,7 @@ mod tests {
         release(&mut root, &w, 200, 85 + 315 + 5);
         assert!(root.take_intents().is_empty());
         assert_eq!(ui.hire_list().up, None);
+        assert!(ui.hire_list().back, "the NPC menu is rebuilt");
     }
 
     #[test]

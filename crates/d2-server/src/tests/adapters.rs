@@ -334,3 +334,68 @@ fn single_player_host_frame() {
     let p = host.game.player_fields(w.player).unwrap();
     assert_eq!(p.data, Some(PlayerData { last_accept: 0 }));
 }
+
+/// A world that knows where its units are (the action wiring's path
+/// records), for the point / unit parse refresh.
+#[derive(Default)]
+struct LiveWorld(std::collections::BTreeMap<UnitId, UnitFacts>);
+
+impl<D> crate::adapters::handlers::world::WorldHost<D> for LiveWorld {
+    fn live_facts(&mut self, _game: &Game, _events: &mut D, unit: UnitId) -> Option<UnitFacts> {
+        self.0.get(&unit).copied()
+    }
+    fn fault(&mut self, _fault: crate::adapters::handlers::world::WorldFault) {}
+}
+
+/// q-proto-audit (rubber-banding): the app stages its player at (0, 0)
+/// act 0 and the tick only moves the staged position. The parse of
+/// §2.4 rules 3–4 reads the world's live position and act whenever the
+/// world has the unit, so an in-range walk is accepted (not refused, and
+/// no S→C 0x15 after 25 frames) and a target in the player's real act is
+/// not "other act".
+// Covers: specs/sim/intents-events.md §2.4 r3
+#[test]
+fn point_parse_reads_the_live_position_over_a_stale_staged_one() {
+    let w = world(Unspecified);
+    let (player, monster) = (w.player, w.monster);
+    let m = guid(&w.sim, monster);
+    let mut live = LiveWorld::default();
+    let at = |act, x, y| UnitFacts {
+        act,
+        pos: Pos { x, y },
+        owner: None,
+    };
+    live.0.insert(player, at(1, 5000, 4000));
+    live.0.insert(monster, at(1, 5030, 4000));
+    let mut sim = SimGame::with_world(w.sim.game, Unspecified, live);
+    sim.join(0, Some(player), None, client_state::IN_GAME)
+        .unwrap();
+    sim.set_player(player, ALIVE_PLAYER);
+    // The join's staged copy: (0, 0), act 0 (`single_player.rs` join).
+    sim.set_unit(player, at(0, 0, 0));
+    sim.set_unit(monster, at(0, 0, 0));
+    let mut out = crate::buffers::ClientBuffers::default();
+    let walk = [0x01, 0xBA, 0x13, 0xA0, 0x0F]; // (5050, 4000): in range
+    for frame in [0, 30] {
+        sim.game.frame = frame;
+        let code = crate::dispatch::dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &walk, 5);
+        assert_eq!(code, ResultCode::Done, "frame {frame}");
+    }
+    assert_eq!(sim.resyncs, Vec::<ClientId>::new());
+    assert_eq!(sim.point_state(0).unwrap().player, Pos { x: 5000, y: 4000 });
+    let mut unit = vec![0x04, 1, 0, 0, 0];
+    unit.extend_from_slice(&m.to_le_bytes());
+    let code = crate::dispatch::dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &unit, 9);
+    assert_eq!(code, ResultCode::Done);
+    assert_eq!(
+        sim.unit_target(0, 1, m),
+        UnitTarget::At {
+            player: Pos { x: 5000, y: 4000 },
+            target: Pos { x: 5030, y: 4000 },
+        }
+    );
+    // Out of range (51 sub-tiles) is still refused.
+    let far = [0x01, 0xBB, 0x13, 0xA0, 0x0F];
+    let code = crate::dispatch::dispatch(&mut sim, &ProtoSizes, &mut out, 0, ALIVE, &far, 5);
+    assert_eq!(code, ResultCode::Refused);
+}

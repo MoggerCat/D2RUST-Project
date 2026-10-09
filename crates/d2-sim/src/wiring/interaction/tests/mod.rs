@@ -518,7 +518,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         self.transactions.push((p, t));
     }
@@ -546,14 +545,14 @@ impl VendorRest for Rest {
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
         Vec::new()
     }
-    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
     fn add_to_tome(&mut self, _: UnitId, _: i32) {}
-    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
-    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+    fn can_belt(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {

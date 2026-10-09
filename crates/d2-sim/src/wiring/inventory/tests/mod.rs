@@ -259,11 +259,19 @@ pub fn inv_tables() -> InvTables {
                 useable: r.6,
                 stackable: r.7,
                 maxstack: r.8,
+                // `pSpell` of the live `misc.txt` rows (`items/use.md` §3).
+                pspell: match &r.0 {
+                    b"tsc " | b"tbk " => 2,
+                    b"isc " => 1,
+                    b"hp1 " | b"hp2 " => 3,
+                    _ => 0,
+                },
                 ..InvItemRec::default()
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -396,9 +404,6 @@ impl MovePending for Rest {
     }
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.sent.push((player, bytes));
-    }
-    fn send_item_stat(&mut self, _: Owner, item: Guid, stat: u16) {
-        self.log.push(format!("send_item_stat {item} {stat}"));
     }
 }
 

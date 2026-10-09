@@ -3,9 +3,9 @@
 //! (resolution, window mode) and `controls.toml` (key bindings, §A6). The
 //! Esc menu's Options entry reads and writes them.
 //!
-//! PROVISIONAL (REC-172): the original's default key table has no
-//! `Preset::Original` data in the tree yet, so a missing `controls.toml`
-//! is written from the `dev` preset. The window mode row and the
+//! A missing `controls.toml` is written from the `original` preset
+//! (`ui/controls.md` §3, §B4); the `dev` preset applies only when a file
+//! names it. The window mode row and the
 //! `[video] window_mode` key are d2rs-own (the 1.14d menu has none).
 // d2rs-own, unverified
 
@@ -72,6 +72,10 @@ pub struct Settings {
     pub automap_centers: u8,
     pub automap_party: u8,
     pub automap_party_names: u8,
+    /// `Show HP Text` / `Show MP Text` (`ui/control-panel.md` §3 r5: the
+    /// control panel's globe text toggles, stored at once).
+    pub show_hp_text: u8,
+    pub show_mp_text: u8,
 }
 
 impl Default for Settings {
@@ -94,12 +98,14 @@ impl Default for Settings {
             automap_centers: 1,
             automap_party: 1,
             automap_party_names: 1,
+            show_hp_text: 0,
+            show_mp_text: 0,
         }
     }
 }
 
 /// The integer keys: `(section, key, min, max)`, §O7 r2 order.
-pub const INT_KEYS: [(&str, &str, i64, i64); 16] = [
+pub const INT_KEYS: [(&str, &str, i64, i64); 18] = [
     ("audio", "master_volume", 0, 100),
     ("audio", "music_volume", 0, 100),
     ("audio", "mixer", 0, 2),
@@ -116,6 +122,8 @@ pub const INT_KEYS: [(&str, &str, i64, i64); 16] = [
     ("automap", "centers", 0, 1),
     ("automap", "party", 0, 1),
     ("automap", "party_names", 0, 1),
+    ("hud", "show_hp_text", 0, 1),
+    ("hud", "show_mp_text", 0, 1),
 ];
 
 impl Settings {
@@ -146,7 +154,9 @@ impl Settings {
             12 => self.automap_fade.into(),
             13 => self.automap_centers.into(),
             14 => self.automap_party.into(),
-            _ => self.automap_party_names.into(),
+            15 => self.automap_party_names.into(),
+            16 => self.show_hp_text.into(),
+            _ => self.show_mp_text.into(),
         }
     }
 
@@ -168,7 +178,9 @@ impl Settings {
             12 => self.automap_fade = v as u8,
             13 => self.automap_centers = v as u8,
             14 => self.automap_party = v as u8,
-            _ => self.automap_party_names = v as u8,
+            15 => self.automap_party_names = v as u8,
+            16 => self.show_hp_text = v as u8,
+            _ => self.show_mp_text = v as u8,
         }
     }
 }
@@ -198,6 +210,18 @@ pub fn controls_path(dir: &Path) -> PathBuf {
     dir.join("controls.toml")
 }
 
+/// The folder of `controls.toml`: the folder of `spec_path`, the
+/// `<config_dir>/d2rs/controls.toml` of `client/ui.md` §A6 that the
+/// Configure Controls screen saves to
+/// ([`crate::ui::front_end::screens::controls::config_path`]), so a
+/// rebind is what the next start loads; `fallback` when the platform has
+/// no config dir.
+pub fn controls_dir(spec_path: Option<&Path>, fallback: &Path) -> PathBuf {
+    spec_path
+        .and_then(Path::parent)
+        .map_or_else(|| fallback.to_path_buf(), Path::to_path_buf)
+}
+
 /// Parse `settings.toml`. Strict: an unknown key, a wrong type or an
 /// out-of-range value is an error naming the key.
 pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
@@ -209,7 +233,7 @@ pub fn parse_settings(text: &str) -> Result<Settings, ConfigError> {
     for (k, item) in doc.as_table().iter() {
         match k {
             "version" => version = item.as_integer(),
-            "audio" | "video" | "automap" => {
+            "audio" | "video" | "automap" | "hud" => {
                 let t = item
                     .as_table_like()
                     .ok_or_else(|| bad(format!("[{k}] must be a table")))?;
@@ -297,13 +321,14 @@ pub fn save_settings(dir: &Path, s: &Settings) -> Result<(), ConfigError> {
 }
 
 /// Load `controls.toml` from `dir`; a missing file is created from the
-/// `dev` preset (PROVISIONAL, REC-172) and returned.
+/// `original` preset (`client/ui.md` §A6, `ui/controls.md` §B4) and
+/// returned. The `dev` preset is used only when a file names it.
 pub fn load_controls(dir: &Path) -> anyhow::Result<Bindings> {
     let path = controls_path(dir);
     if !path.exists() {
-        let preset = Preset::Dev;
-        let bindings = preset.bindings().expect("dev preset");
-        let file = ControlsFile::from_effective(preset, &bindings).expect("dev preset");
+        let preset = Preset::Original;
+        let bindings = preset.bindings().expect("original preset");
+        let file = ControlsFile::from_effective(preset, &bindings).expect("original preset");
         write_atomic(&path, &controls::write(&file))?;
         return Ok(bindings);
     }
@@ -334,9 +359,21 @@ impl WindowMode {
     }
 }
 
+/// The window size of the play frame: always the frame itself
+/// (`rules::camera::FrameSize::play`, 800 × 600 or `play --res 640x480`).
+/// The Resolution row stores its value but "the frame stays 800 × 600"
+/// (`ui/frontend-options.md` §O8), so the window never follows the row on
+/// its own: window and frame follow one setting, and the cursor mapping
+/// ([`crate::ui::Presentation::for_frame`]) always has a window at least
+/// as large as the frame.
+pub fn play_window_size() -> (u32, u32) {
+    let f = crate::rules::camera::FrameSize::play();
+    (f.width as u32, f.height as u32)
+}
+
 /// The primary window the settings ask for (before the app starts).
 pub fn window_for(s: &Settings) -> bevy::window::Window {
-    let (w, h) = s.window_size();
+    let (w, h) = play_window_size();
     bevy::window::Window {
         title: "d2rs".into(),
         resolution: bevy::window::WindowResolution::new(w, h),
@@ -381,7 +418,7 @@ pub fn apply_settings(
     }
     for mut w in &mut windows {
         w.mode = new.window_mode.bevy();
-        let (width, height) = new.window_size();
+        let (width, height) = play_window_size();
         w.resolution.set(width as f32, height as f32);
     }
 }
@@ -414,6 +451,24 @@ mod tests {
         std::fs::remove_dir_all(&d).unwrap();
     }
 
+    // Covers: specs/ui/frontend-options.md §o8-d2rs-stubs-rows-drawn-and-navigated-like-the-original-value-kept-in-settings-toml-no-effect
+    #[test]
+    fn the_window_follows_the_frame_not_the_resolution_row() {
+        use crate::ui::Presentation;
+        // The default frame is 800 × 600; a stored Resolution of 640 × 480
+        // must not shrink the window below it (the cursor mapping refuses
+        // a window smaller than the frame).
+        let low = Settings {
+            resolution: 0,
+            ..Settings::default()
+        };
+        assert_eq!(low.window_size(), (640, 480));
+        let (w, h) = play_window_size();
+        let f = crate::rules::camera::FrameSize::play();
+        assert_eq!((w as i32, h as i32), (f.width, f.height));
+        assert!(Presentation::for_frame(w, h, f.width as u32, f.height as u32).is_ok());
+    }
+
     #[test]
     fn settings_are_strict() {
         for bad in [
@@ -429,6 +484,19 @@ mod tests {
         ] {
             assert!(parse_settings(bad).is_err(), "{bad}");
         }
+    }
+
+    // Play loads `controls.toml` from the folder the Configure Controls
+    // screen saves to (`<config_dir>/d2rs/`); the save-folder parent only
+    // when the platform has no config dir.
+    // Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
+    #[test]
+    fn controls_dir_is_the_configure_controls_folder() {
+        let spec = Path::new("/cfg/d2rs/controls.toml");
+        let fallback = Path::new("/docs/d2rs");
+        assert_eq!(controls_dir(Some(spec), fallback), Path::new("/cfg/d2rs"));
+        assert_eq!(controls_path(&controls_dir(Some(spec), fallback)), spec);
+        assert_eq!(controls_dir(None, fallback), fallback);
     }
 
     #[test]

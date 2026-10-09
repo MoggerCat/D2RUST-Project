@@ -16,7 +16,7 @@ use super::super::geom::Point;
 use super::super::inv_grid::GridRecord;
 use super::super::layout::Screen;
 use super::inv_items::ItemsUi;
-use super::{cel, PanelOutput, UiFiles};
+use super::{PanelOutput, UiFiles};
 use crate::bridge::items::{self, mode};
 use crate::bridge::world::ClientWorld;
 
@@ -34,7 +34,10 @@ pub fn stash_record(expansion: bool, screen: &Screen) -> usize {
     }
 }
 
-/// d2rs-own, unverified: the measured record 12 / 28 corner (module doc).
+/// d2rs-own, unverified: the measured record 12 / 28 rectangle (module
+/// doc): (74, 244, 82, 313) / (154, 324, 142, 373), so right = left + 170
+/// and bottom = top + rows · 29 − 1 (`seams/item-grids.md` §2.5: every
+/// accepted pixel names a cell inside the grid).
 pub fn fallback_stash_grid(expansion: bool, screen: &Screen) -> GridRecord {
     let (dx, dy) = if screen.res2() { (80, 60) } else { (0, 0) };
     let rows: u8 = if expansion { 8 } else { 4 };
@@ -42,9 +45,9 @@ pub fn fallback_stash_grid(expansion: bool, screen: &Screen) -> GridRecord {
         grid_x: 6,
         grid_y: rows,
         left: 74 + dx,
-        right: 74 + dx + 6 * 29,
+        right: 74 + dx + 170,
         top: 82 + dy,
-        bottom: 82 + dy + i32::from(rows) * 29,
+        bottom: 82 + dy + i32::from(rows) * 29 - 1,
         cell_w: 29,
         cell_h: 29,
     }
@@ -79,7 +82,7 @@ impl ItemsUi {
                 continue;
             };
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-            out.push(cel(a.file, 0, x, y + a.gh));
+            out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
         }
     }
 

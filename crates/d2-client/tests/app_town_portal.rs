@@ -1,7 +1,7 @@
 // Spec: specs/world/objects.md (§5.5, §12), specs/skills/bodies-3.md (§4.4), specs/client/model.md (§8 rule 7)
 //! Town Portal in the app's own synthetic game, headless (task
 //! `q-town-portal`, `docs/handoff/q-town-portal.md`). The player stands in
-//! the Den of Evil (reached through its warp tile, as `app_level_warp.rs`);
+//! the Blood Moor of Evil (reached through its warp tile, as `app_level_warp.rs`);
 //! the Town Portal use (`ActionSim::open_town_portal`, what the scroll's
 //! C→S 0x20 ends in) makes the portal pair: the field portal reaches the
 //! client (S→C 0x51), a click on it (C→S 0x13) moves the player to the
@@ -14,9 +14,8 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game};
-use d2_client::app::single_player::{self, GameData};
-use d2_client::bridge::predict::Speeds;
-use d2_client::bridge::world::{UnitKey, OBJECT, TILE};
+use d2_client::app::single_player;
+use d2_client::bridge::world::{UnitKey, OBJECT};
 use d2_client::bridge::BridgeResource;
 use d2_server::seams::Clock;
 use d2_sim::units::UnitType;
@@ -65,8 +64,9 @@ fn server_portals(server: &app_support::Server<StepClock>) -> usize {
 
 // Covers: specs/world/objects.md §12 r6; specs/world/objects.md §12 r8; specs/world/objects.md §12 r11; specs/world/objects.md §12 r12; specs/world/objects.md §5.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -76,19 +76,24 @@ fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     let (link, tap) = predict_link(Box::new(SharedLink(server.clone())));
     add_game(&mut app, link, false).unwrap();
-    add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+    add_walk(
+        &mut app,
+        tap,
+        single_player::walk_speeds(&data, &single_player::Character::New).unwrap(),
+    );
     send_create_game(&mut app).unwrap();
     add_client_data(
         &mut app,
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -114,16 +119,14 @@ fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
             .map(|(k, _)| *k)
     };
 
-    // Into the Den through its warp tile.
-    let entrance = find(&app, TILE, single_player::BLOOD_MOOR_TO_DEN).expect("the cave entrance");
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .interact(entrance)
-        .unwrap();
-    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
-        step(&mut app);
-    }
+    // Out of town into the Blood Moor on foot.
+    app_support::walk_into(
+        &mut app,
+        &server,
+        &ms,
+        single_player::ACT1_TOWN,
+        single_player::BLOOD_MOOR,
+    );
     for _ in 0..30 {
         step(&mut app);
     }
@@ -161,13 +164,13 @@ fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
     assert_eq!(server_portals(&server), 2, "the pair stays on the way in");
     let town_portal = find(&app, OBJECT, 59).expect("the town portal reached the client");
 
-    // Click the town portal: back in the Den, the pair is gone.
+    // Click the town portal: back in the Blood Moor, the pair is gone.
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0
         .interact(town_portal)
         .unwrap();
-    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
+    while server_level(&server) != Some(single_player::BLOOD_MOOR) {
         step(&mut app);
     }
     for _ in 0..30 {
@@ -184,7 +187,7 @@ fn a_town_portal_takes_the_player_to_town_and_back_and_goes() {
 
 /// The synthetic game booted up to the Blood Moor, as the test above.
 fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -194,25 +197,31 @@ fn boot() -> (App, app_support::Server<StepClock>, Arc<AtomicU32>) {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     let (link, tap) = predict_link(Box::new(SharedLink(server.clone())));
     add_game(&mut app, link, false).unwrap();
-    add_walk(&mut app, tap, Some(Speeds { walk: 6, run: 9 }));
+    add_walk(
+        &mut app,
+        tap,
+        single_player::walk_speeds(&data, &single_player::Character::New).unwrap(),
+    );
     send_create_game(&mut app).unwrap();
     add_client_data(
         &mut app,
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     (app, server, ms)
 }
 
 // Covers: specs/world/objects.md §12 r13; specs/client/msg-units.md §8 r7; specs/sim/intents-events.md §6 r6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
     let (mut app, server, ms) = boot();
     let mut steps = 0;
@@ -251,16 +260,15 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
     assert!(!cast(&server), "no field level yet");
     assert_eq!(server_portals(&server), 0);
 
-    // Into the Den, cast there: the owner name rides with the portal.
-    let entrance = find_all(&app, TILE, single_player::BLOOD_MOOR_TO_DEN)[0];
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .interact(entrance)
-        .unwrap();
-    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
-        step(&mut app);
-    }
+    // Into the Blood Moor, cast there: the owner name rides with the
+    // portal.
+    app_support::walk_into(
+        &mut app,
+        &server,
+        &ms,
+        single_player::ACT1_TOWN,
+        single_player::BLOOD_MOOR,
+    );
     for _ in 0..30 {
         step(&mut app);
     }
@@ -293,7 +301,7 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         step(&mut app);
     }
 
-    // A cast in town: the pair leads back to the Den.
+    // A cast in town: the pair leads back to the Blood Moor.
     assert!(cast(&server), "a pair to the last field level");
     assert_eq!(server_portals(&server), 2, "the old pair was replaced");
     for _ in 0..10 {
@@ -307,7 +315,7 @@ fn casting_in_town_opens_to_the_last_field_level_and_the_owner_name_arrives() {
         .0
         .interact(near[0])
         .unwrap();
-    while server_level(&server) != Some(single_player::DEN_OF_EVIL) {
+    while server_level(&server) != Some(single_player::BLOOD_MOOR) {
         step(&mut app);
     }
     let b = &app.world().resource::<BridgeResource>().0;

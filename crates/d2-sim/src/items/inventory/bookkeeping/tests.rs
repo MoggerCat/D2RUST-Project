@@ -723,3 +723,27 @@ fn weapon_bookkeeping_right_side_uses_the_other_hand_weapon() {
     weapon_bookkeeping(&mut w, U).unwrap();
     assert_eq!(w.mouse[1], Some((0, -1)));
 }
+
+/// `0x0055C070(n)`: the tome's skill quantity += n (not the tome's own
+/// quantity), S→C 0x22 (`inventory-moves.md` §8.1 step 4, §7.20).
+// Covers: specs/items/inventory-moves.md §7.20, §8.1 r4
+#[test]
+fn item_skill_add_adds_n_to_the_tomes_skill() {
+    let mut w = W::player();
+    w.add(it(1), tome(12));
+    w.skills.insert(TP, 12);
+    assert_eq!(item_skill_add(&mut w, U, it(1), 1), Ok(true));
+    assert_eq!(w.skills[&TP], 13);
+    assert_eq!(w.log, [format!("0x22 {TP} 13")]);
+    // Not a tome or scroll: nothing.
+    w.add(
+        it(2),
+        It {
+            ty: 3,
+            book: Some(TP),
+            ..It::default()
+        },
+    );
+    assert_eq!(item_skill_add(&mut w, U, it(2), 4), Ok(false));
+    assert_eq!(w.skills[&TP], 13);
+}

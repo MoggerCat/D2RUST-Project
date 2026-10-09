@@ -57,7 +57,9 @@ fn say(ctl: &mut QuestControl, f: &mut Fake, n: UnitId, msg: u16) {
 }
 
 fn heard(f: &Fake, class: u16) -> bool {
-    f.players[&P1].quests.intro[usize::from(f.difficulty)].contains(&class)
+    f.players[&P1]
+        .quests
+        .heard(usize::from(f.difficulty), class)
 }
 
 // Covers: specs/world/quests-act5-2.md §9
@@ -106,7 +108,7 @@ fn event0_by_player_class() {
     }
     // Other NPCs: nothing; intro bit set: nothing.
     assert!(text(&mut ctl, &mut f, LARZUK_U).is_empty());
-    f.p(P1).quests.intro[0].insert(514);
+    f.p(P1).quests.hear(0, 514);
     assert!(text(&mut ctl, &mut f, NIHL_U).is_empty());
     // Reached through the dispatch for a player in Act V.
     let mut list = TextList::new();
@@ -174,7 +176,7 @@ fn active_and_status_functions() {
     let i = ctl.find(40).unwrap();
     assert!(super::active(&ctl, &mut f, i, P1, 513, 0));
     assert!(!super::active(&ctl, &mut f, i, P1, 514, 0));
-    f.p(P1).quests.intro[0].insert(513);
+    f.p(P1).quests.hear(0, 513);
     assert!(!super::active(&ctl, &mut f, i, P1, 513, 0));
     let pf = f.flags(P1);
     assert_eq!(super::status(&ctl, &mut f, i, P1, &pf, 0x0058_6C40), None);

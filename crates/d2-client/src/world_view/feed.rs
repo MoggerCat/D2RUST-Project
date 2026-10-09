@@ -30,10 +30,11 @@ use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
-use crate::rules::camera::shake_offsets;
+use crate::rules::camera::{shake_offsets, FrameAnchor};
 use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
+use crate::rules::lighting::records::LightList;
 use crate::rules::lighting::view::{FrameLight, LitRules, LookFeed};
 use crate::rules::{
     Camera, FrameSize, MapTile, OpenMode, OriginalView, Shake, UnitPosition, ViewSource,
@@ -128,6 +129,14 @@ pub trait ViewFeed: ViewSource {
     fn prepare(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) -> Result<(), ViewError> {
         Ok(())
     }
+
+    /// The drawn frame's light pass (`render/lighting.md` §6.4, once per
+    /// drawn frame after [`Self::prepare`]): `lights` is the client's
+    /// kept light list (`ClientWorld::lights`, §6.3), handed out of the
+    /// world for the pass, which updates its records (positions, radius
+    /// walks, dead records removed, kind-2 caches built and kept). The
+    /// default builds no light map and leaves the list alone.
+    fn light_frame(&mut self, _world: &ClientWorld, _lights: &mut LightList) {}
 
     /// The facts of a room unit the draw order reads (`draw-order.md` §3
     /// r4, §5) that the client model does not hold: unit flags (+0xC4),
@@ -382,20 +391,45 @@ pub fn frame_camera<F: ViewFeed + ?Sized>(
     Ok(camera_and_mode(world, feed)?.map(|(camera, _)| camera))
 }
 
-/// [`frame_camera`] and the open mode it was computed with.
-fn camera_and_mode<F: ViewFeed + ?Sized>(
+/// [`frame_camera`] and the open mode it was computed with: the frame's
+/// one camera (`seams/world-screen.md` §2.2), to be handed to
+/// [`build_frame_placed`] and to every other reader of the frame.
+pub fn camera_and_mode<F: ViewFeed + ?Sized>(
     world: &ClientWorld,
     feed: &mut F,
 ) -> Result<Option<(Camera, OpenMode)>, ViewError> {
-    let Some(player) = feed.player(world)? else {
+    let anchor = frame_anchor(world, feed)?;
+    camera_at(world, &*feed, anchor)
+}
+
+/// The frame's one camera from its `anchor` ([`frame_anchor`]) under the
+/// feed's open mode (`seams/world-screen.md` §2.2), or `None` without an
+/// anchor. The host computes it once, after the UI has set the frame's
+/// open mode, and hands it to the pick, the labels, the corpse clicks,
+/// the automap and [`build_frame_placed`].
+pub fn camera_at<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &F,
+    anchor: Option<FrameAnchor>,
+) -> Result<Option<(Camera, OpenMode)>, ViewError> {
+    let Some(anchor) = anchor else {
         return Ok(None);
     };
     let mode = feed.open_mode(world)?;
+    Ok(Some((anchor.camera(FrameSize::play(), mode), mode)))
+}
+
+/// The frame's local-player position and shake (camera §3, §8;
+/// `seams/world-screen.md` §2.4), or `None` without a local player.
+pub fn frame_anchor<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &mut F,
+) -> Result<Option<FrameAnchor>, ViewError> {
+    let Some(player) = feed.player(world)? else {
+        return Ok(None);
+    };
     let shake = frame_shake(world, feed)?;
-    Ok(Some((
-        Camera::new(FrameSize::D2RS, mode, player.client(), shake),
-        mode,
-    )))
+    Ok(Some(FrameAnchor { player, shake }))
 }
 
 /// The open mode whose frames draw no world (`render/composition.md` §3
@@ -420,6 +454,24 @@ where
     F: ViewFeed + ?Sized,
 {
     let placed = camera_and_mode(world, feed)?;
+    build_frame_placed(world, ui, rules, feed, assets, placed)
+}
+
+/// [`build_frame`] under a camera already computed by
+/// [`camera_and_mode`] for this frame (`seams/world-screen.md` §2.2:
+/// the pick, labels and the world draw read the same camera).
+pub fn build_frame_placed<R, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    feed: &mut F,
+    assets: &ViewAssets,
+    placed: Option<(Camera, OpenMode)>,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    F: ViewFeed + ?Sized,
+{
     let mut frame = build_placed(world, ui, rules, feed, assets, placed)?;
     frame.camera = placed.map(|(camera, _)| camera);
     Ok(frame)
@@ -451,9 +503,11 @@ where
             Some(source) => {
                 let mut frame =
                     build_lit(world, ui, rules, camera, &source, source.source, assets)?;
+                frame.slots = Some(source.units.clone());
                 // Passes 4 and 9 (`draw-order-2.md` §11.6, §11.7) join the
                 // sorted list by their keys.
                 let sky = source.source.sky_items(&source.sky, assets)?;
+                frame.sky = source.sky.sky.clone();
                 if !sky.is_empty() {
                     frame.items.extend(sky);
                     crate::scene::order(&mut frame.items);
@@ -553,6 +607,15 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for NoCamera<'_, R
                 unit.key.unit_type, unit.key.guid
             ),
         ))
+    }
+
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &d2_formats::cof::Cof,
+    ) -> Result<Vec<super::SlotCall>, ViewError> {
+        self.rules.unit_slot_calls(unit, pose, cof)
     }
 
     fn component_frame(

@@ -18,9 +18,8 @@
 //!   (only the tool-tip y `H + sy − 100` / `H + sy − 223` is given), and
 //!   whether the cube close button also calls `SetUIState(0x1A, off)`:
 //!   [`cube_close`] sends 0x4F 0x17 only, as §12.6 states.
-//! - Open: §12.4 the animation cel is drawn in draw mode 3 and
-//!   `ImageRequest` has no draw-mode field: the frame is exposed as a query
-//!   ([`HoradricAnim::frame`], [`horadric_pos`]) for the sink. Whether
+//! - §12.4: the frame is exposed as a query ([`HoradricAnim::frame`],
+//!   [`horadric_pos`]); the cube adapter draws it in mode 3. Whether
 //!   frame 30 is drawn once before the stop, and how the "last step" tick
 //!   is initialised when the animation starts, are not stated: here the
 //!   caller passes the start tick, and the step that reaches 30 stops the
@@ -176,7 +175,8 @@ pub struct CubePanel {
 }
 
 impl CubePanel {
-    /// §12.2–§12.3: when the cube item is gone, returns `SetUIState(0x1A,
+    /// §12.2–§12.3: when the local player is missing or dead
+    /// (`player_ok` false), returns `SetUIState(0x1A,
     /// off)` and C→S 0x4F 0x17 and draws nothing; else draws the art
     /// quads, the close button and the transmute button and returns
     /// nothing. (§12.2 gives no `jump`; the cube is a full-kind state, for
@@ -185,10 +185,10 @@ impl CubePanel {
         &self,
         t: &PanelTables,
         env: &PanelEnv,
-        cube_present: bool,
+        player_ok: bool,
         out: &mut dyn UiDrawSink,
     ) -> Vec<PanelOutput> {
-        if !cube_present {
+        if !player_ok {
             // `panels-2.md` §20 r4: the close hook sends the latched 0x17,
             // then `0x0048F183` sends it again: two messages.
             return vec![
@@ -310,6 +310,7 @@ mod tests {
                     x.style.font,
                     x.style.color,
                 ),
+                UiDraw::Rect(r) => panic!("rectangle {r:?}"),
             })
             .collect()
     }
@@ -408,7 +409,7 @@ mod tests {
 
     // Covers: specs/ui/panels.md §12 r2
     #[test]
-    fn cube_gone_closes_and_draws_nothing() {
+    fn dead_or_absent_player_closes_and_draws_nothing() {
         let t = PanelTables::load().unwrap();
         let mut out: Vec<UiDraw> = Vec::new();
         let o = CubePanel::default().draw(&t, &env(Screen::R800, true), false, &mut out);

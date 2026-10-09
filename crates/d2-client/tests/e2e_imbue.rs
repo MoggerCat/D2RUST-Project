@@ -213,6 +213,7 @@ impl Fx {
             },
             levels: Vec::new(),
             skill_modes: Vec::new(),
+            overlay_count: 0,
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),
@@ -494,6 +495,11 @@ fn charsi_imbues_the_cursor_item_and_the_quest_reward_is_taken() {
             .with(&mut sim.game, |_, v| v.set_base(player, LEVEL, 10));
     }
     pickup(&mut fx, buckler);
+    // The dialog takes no click within 400 ms of its open (`messages.md`
+    // §11 r5): the client frames run on (40 ms each).
+    for _ in 0..10 {
+        fx.step(&[]);
+    }
     assert_eq!(
         fx.sim_ref()
             .world
@@ -547,6 +553,11 @@ fn charsi_refuses_without_the_quest_reward() {
     assert!(!fx.bridge.frame().unwrap().ticked);
     fx.sim().world.tables.items[BUC].bitfield1 |= 1;
     pickup(&mut fx, buckler);
+    // The dialog takes no click within 400 ms of its open (`messages.md`
+    // §11 r5): the client frames run on (40 ms each).
+    for _ in 0..10 {
+        fx.step(&[]);
+    }
     let f = imbue(&mut fx, buckler);
     let r: Vec<_> = f.received.iter().filter(|m| m[0] == 0x58).collect();
     assert_eq!(r.len(), 1);
@@ -601,7 +612,8 @@ fn menu_click_to_imbue_done() {
     .unwrap();
     let mut root = UiRoot::new(Box::new(NoPanelRules));
     ui.install(&mut root).unwrap();
-    ui.open_npc_menu(ng, 154, 10);
+    ui.open_npc_menu(ng, 154, 10, fx.bridge.world());
+    ui.npc_menu_poll(fx.bridge.world(), &mut root, &NoStrings);
     let menu = ui.npc_menu().expect("the menu is up");
     assert!(
         menu.rows
@@ -629,29 +641,27 @@ fn menu_click_to_imbue_done() {
         }
         root.forward(&mut fx.bridge).unwrap()
     };
-    // The third row (Talk, Trade, Imbue) of the box at (300, 150).
+    // The Imbue row (Talk, Trade, Imbue) of the spec box.
     let k = menu
         .rows
         .iter()
         .position(|r| r.kind == Some(d2_client::ui::layout::OptionKind::Imbue))
-        .unwrap() as i32;
-    assert_eq!(
-        click(
-            &mut fx,
-            &mut ui,
-            &mut root,
-            Point::new(310, 150 + 20 + 20 * k + 5)
-        ),
-        0
-    );
+        .unwrap();
+    let at = ui.npc_menu_row_point(k).expect("the Imbue row");
+    assert_eq!(click(&mut fx, &mut ui, &mut root, at), 0);
     assert!(
         ui.npc_menu().is_none() && ui.npc_menu_up(),
         "the dialog replaced the menu"
     );
 
     pickup(&mut fx, buckler);
+    // The dialog takes no click within 400 ms of its open (`messages.md`
+    // §11 r5): the client frames run on (40 ms each).
+    for _ in 0..10 {
+        fx.step(&[]);
+    }
     // The fixture's client model has no item stream, so the placing click
-    // (covered by the unit test of `imbue_ui`) goes through its seam.
+    // (covered by the unit test of `npc_talk`) goes through its seam.
     ui.imbue_place(fx.guid(buckler));
     assert_eq!(
         click(&mut fx, &mut ui, &mut root, Point::new(130, 230)),

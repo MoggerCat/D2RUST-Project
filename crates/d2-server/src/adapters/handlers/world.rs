@@ -32,7 +32,6 @@ mod hireling_host;
 mod item_approach;
 mod item_save;
 mod npc_approach;
-mod sentry_drive;
 mod wired;
 
 #[cfg(test)]
@@ -179,8 +178,8 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
     ),
     (
         0x4C,
-        "world/cube.md §10 (item-use spec, not written; handlers/items.rs)",
-        Status::OtherModule("items"),
+        "world/cube.md §10: Transmogrify `0x0056C6A0`, owner the item-use spec (not written; which item the always-sent 0x3F names is not stated); handlers/items.rs takes only 0x2A and 0x4F",
+        Status::NoOwner,
     ),
     (
         0x4D,
@@ -691,6 +690,23 @@ impl WaypointCall for WaypointOperate {
         };
         data.operate(w, object, &facts, self.player)?;
         Ok(Some(0))
+    }
+}
+
+/// The quest entry `0x00546270(game, player, mode)` (`world/quests.md`
+/// §3): the join's call, mode 0 for a loaded character and mode 1 then 0
+/// for a new one. An error is the original's fatal assert, returned as
+/// text.
+pub struct QuestEnter {
+    pub player: UnitId,
+    pub mode: u8,
+}
+
+impl QuestCall for QuestEnter {
+    type Out = Result<(), String>;
+    fn call<W: QuestWorld>(self, ctl: &mut QuestControl, w: &mut W) -> Self::Out {
+        ctl.player_enters(w, self.player, self.mode)
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -1241,8 +1257,7 @@ pub fn preview_inv_parts(tables: InvTables) -> InvParts {
     // PROVISIONAL (REC-161, d2rs-own, unverified): worn items feed the
     // wearer's stats, set bonuses included (`wiring/inventory/item_link.rs`).
     parts.state.link_item_stats = true;
-    // PROVISIONAL (REC-266, d2rs-own, unverified): the weapon in use is the
-    // right-hand item (the play host has the skill lists it needs).
-    parts.state.weapon_hand_fallback = true;
+    // The item-move effects (gold rest pile, 0x5D) on the desk.
+    parts.state.move_effects = true;
     parts
 }

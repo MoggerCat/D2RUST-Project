@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::{UnitKey, TILE};
 use d2_client::bridge::BridgeResource;
@@ -42,8 +42,9 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
 
 // Covers: specs/sim/path-placement.md §12.2 r1; specs/sim/path-placement.md §12.2 r5; specs/sim/path-placement.md §12.2 r6; specs/client/model.md §8 r7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -53,6 +54,7 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -65,7 +67,7 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -96,7 +98,14 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
             .world()
             .units
             .iter()
-            .find(|(k, u)| k.unit_type == TILE && u.class == single_player::BLOOD_MOOR_TO_DEN)
+            .find(|(k, u)| {
+                k.unit_type == TILE
+                    && u.class
+                        == app_support::warp_id(
+                            single_player::BLOOD_MOOR,
+                            single_player::DEN_OF_EVIL,
+                        )
+            })
             .map(|(k, _)| *k)
     };
     let entrance: UnitKey = tile(&app).expect("the Blood Moor's cave entrance reached the client");
@@ -121,10 +130,9 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
     let b = &app.world().resource::<BridgeResource>().0;
     assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
     assert!(
-        b.world()
-            .units
-            .iter()
-            .any(|(k, u)| k.unit_type == TILE && u.class == single_player::DEN_TO_BLOOD_MOOR),
+        b.world().units.iter().any(|(k, u)| k.unit_type == TILE
+            && u.class
+                == app_support::warp_id(single_player::DEN_OF_EVIL, single_player::BLOOD_MOOR)),
         "the Den's way back is in the client's model"
     );
 }

@@ -1,4 +1,4 @@
-// Spec: specs/skills/use.md §1–§7; specs/skills/bodies.md (BodyWorld); specs/missiles/missiles.md §R2; specs/sim/units.md §4.1; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
+// Spec: specs/skills/use.md §1–§7; specs/skills/bodies.md (BodyWorld); specs/missiles/missiles.md §R2; specs/sim/units.md §4.1, §4.2; specs/sim/tick.md §5.2–§5.4; specs/sim/stat-lists.md §4, §8.1, §9.2
 //! Skill use → missiles, combat and the timers: the seams of
 //! [`crate::skills::use_`] on the action wiring's providers.
 //!
@@ -33,6 +33,7 @@ use crate::skills::use_::{
 use crate::skills::{KickItems, ManaUnits, SkillEntry, SkillUnits};
 use crate::stats::lists::{ListId, RemoveCallback};
 use crate::tick::events::event;
+use crate::units::anim::{self, Form};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionSim, Pending, View, WiringError};
@@ -139,33 +140,75 @@ pub struct UseView<'a, X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
-    /// The weapon-type test `0x00643F80` of `use_state` rule 5
-    /// (`client/stat-lists.md` §2 r8): the skill's `itypea1` against the
-    /// items at body locations 4 and 5, `etypea1` excluded.
-    // PROVISIONAL (REC-176): the spec names `itypea1` / `etypea1`; the
-    // columns `itypea2`, `itypea3` and `etypea2` are read the same way
-    // (a crossbow satisfies Magic Arrow's `itypea2`), and the hands
-    // combine as "some hand holds a wanted item that is not excluded".
-    // No wanted type (0xFFFF, or 0 of a blank test row) asks nothing.
+    /// The item type test `0x00643F80` of `use_state` test 5 (`use.md`
+    /// §2 "Item type test"): the skill's sets a (`itypea1..3`,
+    /// `etypea1..2`) and b (`itypeb1..3`, `etypeb1..2`) against the items
+    /// at body locations 4 (A) and 5 (B).
+    // PROVISIONAL (q-fix-real-item-type-test): "no inventory → fail"
+    // (rule 2) and the matched item's rules (item flags 0x4000 / 0x100,
+    // the `shoots` ammo test) are not applied: the host's item flags and
+    // `shoots` type are not wired here (`item_shoots` answers false).
     fn weapon_type_ok(&self, u: UnitId, skill: i32) -> bool {
         let Some(r) = self.cv.v.h.tables.skills.skill(skill) else {
-            return true;
+            return false;
         };
-        let set = |v: u16| (v != 0 && v != 0xFFFF).then_some(i32::from(v));
-        let want: Vec<i32> = [r.itypea1, r.itypea2, r.itypea3]
-            .into_iter()
-            .filter_map(set)
-            .collect();
-        let not: Vec<i32> = [r.etypea1, r.etypea2].into_iter().filter_map(set).collect();
-        if want.is_empty() {
+        // i16 columns, ≤ 0 = none.
+        let v = |x: u16| i32::from(x as i16);
+        let a = HandSet {
+            itypes: [v(r.itypea1), v(r.itypea2), v(r.itypea3)],
+            etypes: [v(r.etypea1), v(r.etypea2)],
+        };
+        let b = HandSet {
+            itypes: [v(r.itypeb1), v(r.itypeb2), v(r.itypeb3)],
+            etypes: [v(r.etypeb1), v(r.etypeb2)],
+        };
+        // Rule 1.
+        if a.etypes[0] <= 0 && a.itypes[0] <= 0 {
             return true;
         }
-        [4u8, 5].into_iter().any(|loc| {
-            self.item_at(u, loc).is_some_and(|i| {
-                want.iter().any(|&t| self.item_is(i, t)) && !not.iter().any(|&t| self.item_is(i, t))
-            })
-        })
+        let (mut ha, mut hb) = (self.item_at(u, 4), self.item_at(u, 5));
+        // Rule 3: Left Hand Throw / Swing leave the weapon in use out.
+        if skill == 4 || skill == 5 {
+            let w = self.current_weapon(u);
+            if ha.is_some() && ha == w {
+                ha = None;
+            } else if hb.is_some() && hb == w {
+                hb = None;
+            }
+        }
+        // `hand(s, X, Y)` `0x00643D90`.
+        let hand = |s: &HandSet, x: Option<UnitId>, y: Option<UnitId>| match x {
+            None => {
+                if s.etypes[0] <= 0 && s.itypes[0] <= 0 {
+                    return true;
+                }
+                [45, 46, 67].contains(&a.itypes[0])
+                    && b.itypes[0] <= 0
+                    && !y.is_some_and(|y| self.item_is(y, 45))
+            }
+            Some(x) => {
+                let listed =
+                    |t: &[i32]| t.iter().copied().take_while(|&t| t > 0).collect::<Vec<_>>();
+                if listed(&s.etypes).into_iter().any(|t| self.item_is(x, t)) {
+                    return false;
+                }
+                let want = listed(&s.itypes);
+                want.is_empty() || want.into_iter().any(|t| self.item_is(x, t))
+            }
+        };
+        // Rule 4.
+        if hand(&a, ha, hb) {
+            hand(&b, hb, ha)
+        } else {
+            hand(&b, ha, hb) && hand(&a, hb, ha)
+        }
     }
+}
+
+/// One item-type set of a skill row (`use.md` §2).
+struct HandSet {
+    itypes: [i32; 3],
+    etypes: [i32; 2],
 }
 
 impl<X: Pending + UseRest> ActionSim<X> {
@@ -217,6 +260,16 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     }
     fn error(&mut self, e: WiringError) {
         self.cv.v.h.errors.push(e);
+    }
+    /// A §4.2 variant (`sim/units.md`) on the unit's own animation
+    /// fields: cancel its type-0 / type-1 events, reschedule, set +0x44.
+    fn anim_variant(&mut self, u: UnitId, form: Form) {
+        let Some(rec) = self.cv.v.units.get_mut(u) else {
+            return;
+        };
+        if let Err(e) = anim::run(self.cv.game, u, &mut rec.anim, form) {
+            self.error(WiringError::Unit(e.into()));
+        }
     }
 }
 
@@ -964,8 +1017,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         let game = &mut *self.cv.game;
         self.cv.v.h.x.quantity_timer(game, item);
     }
+    /// S→C 0x3E (`0x0053D130(client, item, 1, s, v, 0)`) to the unit's
+    /// client through the transport seam ([`Pending::send`]).
+    /// PROVISIONAL (`client/msg-stats-items.md` §5 r1.3; REC-400): field
+    /// widths, see `units::messages::update_item_stat`.
     fn send_item_stat(&mut self, u: UnitId, item: UnitId, s: u16, v: i32) {
-        self.xm().send_item_stat(u, item, s, v);
+        let guid = self.cv.v.units.get(item).map_or(0, |r| r.guid);
+        let msg = crate::units::messages::update_item_stat(guid, s, v, 0);
+        Pending::send(self.xm(), u, &msg);
     }
     fn attack_cleanup(&mut self, u: UnitId) {
         self.xm().attack_cleanup(u);
@@ -1046,8 +1105,28 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn blood_mana(&mut self, u: UnitId, cost: i32) {
         self.xm().blood_mana(u, cost);
     }
+    /// `0x00571AA0`: an 0xA3 record {n, k, lvl, unit, T, r, 0} on `u`
+    /// (`bodies.md` §2.14 step 5; x = the roll, y = 0), the unit queued for
+    /// update (`intents-events.md` §7.9 rule 2).
     fn queue_progressive(&mut self, u: UnitId, msg: bodies::ProgressiveMsg<UnitId>) {
-        self.xm().queue_progressive(u, msg);
+        use crate::wiring::action::event_records::EventRecord;
+        let units = &self.cv.v.units;
+        let of = |id: UnitId| {
+            units
+                .get(id)
+                .map_or((0, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+        };
+        let r = EventRecord::Progressive {
+            charges: msg.charges,
+            skill: msg.skill,
+            level: msg.level,
+            unit: of(msg.unit),
+            target: of(msg.target),
+            x: msg.roll,
+            y: 0,
+        };
+        self.cv.v.h.event_records.push(u, r);
+        let _ = self.cv.game.lists.queue_update(u);
     }
     // ---- batch 2 and 3
 
@@ -1058,6 +1137,40 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         if let bodies::BodyEffect::EndlessProgressive { unit, skill, step } = e {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
+        }
+        // Find Item `0x005A8000` (`treasure.md` §3.6) on the game's drop
+        // state ([`super::super::action::ActionHooks::object_drops`]); a
+        // game without it drops nothing. The quality value is ignored.
+        if let bodies::BodyEffect::TreasureDrop { corpse, killer, .. } = e {
+            let cv = &mut self.cv;
+            if let Some(mut d) = cv.v.h.object_drops.take() {
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                crate::wiring::economy::find_item_drop(
+                    &mut *cv.v.h,
+                    &mut sim,
+                    &mut d,
+                    &mut crate::wiring::economy::StartSpot,
+                    corpse,
+                    killer,
+                );
+                cv.v.h.object_drops = Some(d);
+            }
+            return;
+        }
+        // `0x00571B70` (`bodies-2.md` §2.13): the 0xA5 record on the unit,
+        // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        if let bodies::BodyEffect::MsgA5 { u, skill } = e {
+            use crate::wiring::action::event_records::EventRecord;
+            let r = EventRecord::Landing {
+                skill: skill as u16,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
         }
         if let Some(e) = self.pet_effect(e) {
             self.xm().body_effect(e);
@@ -1206,14 +1319,18 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn skill_sequence(&self, u: UnitId) -> Option<Vec<[u8; 6]>> {
         self.x().skill_sequence(u)
     }
+    /// `0x0056E210` → `0x00553B10` (`sim/units.md` §4.2 variants).
     fn anim_rewind(&mut self, u: UnitId, p: i32) {
-        self.xm().anim_rewind(u, p);
+        self.anim_variant(u, Form::Percent(p));
     }
+    /// `0x00553C70` (`sim/units.md` §4.2 variants).
     fn anim_restart(&mut self, u: UnitId, v: i32) {
-        self.xm().anim_restart(u, v);
+        self.anim_variant(u, Form::Frames(v));
     }
+    /// `0x00553DC0` (`sim/units.md` §4.2 variants): Leap's and Leap
+    /// Attack's frame-10 rewind, Whirlwind's frame 3.
     fn anim_from(&mut self, u: UnitId, f: i32) {
-        self.xm().anim_from(u, f);
+        self.anim_variant(u, Form::StartFrame(f));
     }
     /// `0x00620BB0`.
     fn unit_room(&self, u: UnitId) -> Option<RoomId> {
@@ -1530,6 +1647,40 @@ impl<X: Pending + UseRest> EventWorld for UseView<'_, X> {
         self.cv.v.h.x.event_corpse_near(game, t0)
     }
     fn queue_item_cast(&mut self, u: UnitId, msg: ItemCastMsg) {
+        // `0x005717C0` / `0x00571840`: the 0x99 / 0x9A record on the unit,
+        // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        // PROVISIONAL (REC-413): the wire level byte is the cast level
+        // clamped to a byte and w (u16) is the `aim` flag; the record
+        // bytes are not spelled out in the specs; settled by a 1.14d
+        // recording of an item-cast skill (`events.txt` item cast).
+        use crate::wiring::action::event_records::EventRecord;
+        let r = match msg {
+            ItemCastMsg::Unit {
+                skill,
+                level,
+                target,
+                aim,
+            } => EventRecord::CastOnUnit {
+                skill: skill as u16,
+                level: level.clamp(0, 255) as u8,
+                target: (target.0 as u8, target.1),
+                w: u16::from(aim),
+            },
+            ItemCastMsg::Point {
+                skill,
+                level,
+                at,
+                aim,
+            } => EventRecord::CastOnPoint {
+                skill: skill as u32,
+                level: level.clamp(0, 255) as u8,
+                x: at.0 as u16,
+                y: at.1 as u16,
+                w: u16::from(aim),
+            },
+        };
+        self.cv.v.h.event_records.push(u, r);
+        let _ = self.cv.game.lists.queue_update(u);
         self.xm().queue_item_cast(u, msg);
     }
     fn raise_test(&self, v: UnitId) -> bool {

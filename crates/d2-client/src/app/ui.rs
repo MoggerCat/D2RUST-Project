@@ -93,10 +93,21 @@ pub fn inv_area(r: &Inventory) -> InvArea {
 /// the world view's UI (root with the wired panels, `dev` bindings, art
 /// loader), [`UiSounds`] for the audio frame, and [`PanelArtRules`] over
 /// [`UnitRules`] over the placeholder rules, with the unit art loader
-/// ([`install_unit_rules`]). The 800 × 600 frame is resolution mode 2.
+/// ([`install_unit_rules`]). The play frame's screen ([`Screen::play`]):
+/// resolution mode 2 (800 × 600) unless `play --res 640x480`.
 pub fn add_original_ui(app: &mut App, parts: UiParts) -> Result<(), OriginalUiError> {
     let looks = unit_looks(parts.source.as_ref());
     add_original_ui_with(app, parts, looks)
+}
+
+/// The `levels` `LevelName` keys for the waypoint rows
+/// ([`OriginalUi::set_level_names`]); nothing without the original UI.
+pub fn set_level_names(app: &mut App, names: Vec<String>) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_level_names(names);
+        }
+    }
 }
 
 /// The levels' waypoint indexes for the installed waypoint menu
@@ -127,7 +138,7 @@ pub fn add_original_ui_with(
     looks: UnitLooks,
 ) -> Result<(), OriginalUiError> {
     let config = UiConfig {
-        screen: Screen::R800,
+        screen: Screen::play(),
         expansion_installed: parts.expansion_installed,
     };
     let mut original = OriginalUi::new(config, parts.inv_areas)?;
@@ -146,7 +157,7 @@ pub fn add_original_ui_with(
     let mut ui = WorldViewUi::new(root, Box::new(NoStrings));
     ui.original = Some(original);
     ui.bindings = crate::ui::front_end::screens::controls::saved_bindings()
-        .or_else(|| Preset::Dev.bindings());
+        .or_else(|| Preset::Original.bindings());
     ui.art = Some(PanelArtLoader::new(parts.source.clone(), files.clone()));
     ui.text = Some(TextAssetLoader {
         source: parts.source.clone(),

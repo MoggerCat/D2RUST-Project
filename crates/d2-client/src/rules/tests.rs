@@ -435,6 +435,7 @@ impl ViewRules for Fixture {
             cof: CanonicalPath::new(COF).unwrap(),
             dir: 0,
             frame: 0,
+            dir64: 0,
         }))
     }
 
@@ -644,6 +645,31 @@ fn cpu_golden_scene_through_original_view() {
     assert_eq!(got, want);
 }
 
+// Covers: specs/render/unit-composite.md §4
+#[test]
+fn units_failing_the_cof_box_pre_test_are_not_drawn() {
+    let (world, mut assets, scene) = golden_scene();
+    let view = OriginalView::new(camera(0, pos(1000, 2000)), &Fixture, &scene);
+    let path = CanonicalPath::new(COF).unwrap();
+    // Final (X, Y): player (400, 292), object (520, 340); W − 1 = 799.
+    // x_min 398: 798 < 799 for the player, 918 for the object.
+    assets.cofs.get_mut(&path).unwrap().x_min = 398;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (1, 1));
+    // x_min 399: 799 is not < 799.
+    assets.cofs.get_mut(&path).unwrap().x_min = 399;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (0, 2));
+    // y_max + Y ≥ 0: −292 keeps the player, −293 drops it.
+    let c = assets.cofs.get_mut(&path).unwrap();
+    (c.x_min, c.y_max) = (0, -292);
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (2, 0));
+    assets.cofs.get_mut(&path).unwrap().y_max = -293;
+    let f = world_view::build(&world, &[], &view, &assets).unwrap();
+    assert_eq!((f.units_drawn, f.units_hidden), (1, 1));
+}
+
 // M08: moving the player by one client pixel changes exactly the
 // non-player pixels.
 // Covers: specs/render/camera.md §3
@@ -692,14 +718,17 @@ fn wall_blocks_culled_in_mode_2() {
     // Block 0 at x 336 (< 368: culled), block 1 at 368 (kept).
     let d = view.tile(&tile, &image).unwrap().unwrap();
     assert_eq!((d.x, d.y, d.clip), (336, 360, Rect::new(368, 360, 32, 32)));
-    // Both culled: no draw.
+    // Both culled: the drawer is still called, with no pixel (a call-only
+    // draw, facts-render §5 r12).
     let tile = map_tile(
         (0, 0),
         TileList::Wall,
         "wall",
         vec![block(-184), block(-216)],
     );
-    assert_eq!(view.tile(&tile, &image).unwrap(), None);
+    let d = view.tile(&tile, &image).unwrap().unwrap();
+    assert!(d.is_call_only());
+    assert_eq!((d.x, d.y), (336, 360));
     // A culled block overlapping the kept ones cannot be one clip.
     let tile = map_tile(
         (0, 0),
@@ -746,11 +775,11 @@ fn wall_blocks_culled_in_mode_1_lit_and_translucent() {
         // Block 0 at x 399 (kept), block 1 at 431 (culled).
         let d = view.tile(&tile, &image).unwrap().unwrap();
         assert_eq!((d.x, d.clip), (399, Rect::new(399, 360, 32, 32)));
-        // A block at x 400 alone: skipped.
+        // A block at x 400 alone: skipped (the call stays, without pixels).
         let mut tile = map_tile((0, 0), TileList::Wall, "wall", vec![block(280)]);
         tile.blend = blend;
         let image = filled(32, 32, 280, 0, 1);
-        assert_eq!(view.tile(&tile, &image).unwrap(), None);
+        assert!(view.tile(&tile, &image).unwrap().unwrap().is_call_only());
     }
 }
 
@@ -785,13 +814,17 @@ fn roofs_and_floors_are_not_culled_per_block() {
     }
 }
 
-// Units have no view-rectangle test: a unit far outside the view is still
+// Units have no view-rectangle test: a unit far outside the view whose
+// COF box still reaches into the frame (`unit-composite.md` §4) is
 // placed; its pixels are cut by the frame clip only.
 // Covers: specs/render/camera.md §7, §10
 #[test]
 fn units_are_not_culled_by_the_view() {
-    let (world, assets, mut scene) = golden_scene();
+    let (world, mut assets, mut scene) = golden_scene();
     scene.tiles.clear();
+    // A COF box reaching 5,000 pixels left of the unit.
+    let path = CanonicalPath::new(COF).unwrap();
+    assets.cofs.get_mut(&path).unwrap().x_min = -5_000;
     // The object 2,000 client pixels right of the player.
     scene.units[1].1 = UnitPosition::Static {
         sx: 163 + 125,
@@ -843,7 +876,7 @@ fn the_preview_edge_clip_places_a_cut_cel() {
 // Per-block shade (shading §4, lighting §11 r2: each 32-pixel block has
 // its own light): one draw per block clipped to it, the gradient moved to
 // the block's screen position; a culled block (camera §7) draws nothing.
-// Covers: specs/render/shading.md §4 r4; specs/render/lighting.md §11 r2
+// Covers: specs/render/shading.md §4 r4; specs/render/lighting.md §11 r2, §11 r3
 #[test]
 fn tile_blocks_draw_one_item_per_block() {
     use crate::scene::{GradientKind, LightGradient, MapId};
@@ -894,9 +927,29 @@ fn tile_blocks_draw_one_item_per_block() {
     assert_eq!(draws[1].blend, BlendOp::IndexTableSrcRow(MapId(9)));
     let g = draws[1].shade.gradient().unwrap();
     assert_eq!((g.x, g.y), (whole.x + 32, 360));
-    assert!(draws
-        .iter()
-        .all(|d| (d.x, d.y, &d.frame) == (whole.x, whole.y, &whole.frame)));
+    // shading.md §4 r4: each block draws its own image (frame 1 + i of
+    // the tile's set) at its own position, so it lights only its pixels.
+    let at: Vec<_> = draws.iter().map(|d| (d.x, d.y, d.frame.index)).collect();
+    assert_eq!(at, vec![(whole.x, 360, 1), (whole.x + 32, 360, 2)]);
+    assert!(draws.iter().all(|d| d.frame.set == whole.frame.set));
+    // A shade of a block the tile does not have, in order: an error.
+    let mut wrong = shades;
+    wrong.reverse();
+    assert!(view.tile_draws(&tile, &image, &wrong).is_err());
+    // A floor gradient shade shorter than its block (rows 0…14, shading §4
+    // floors r3–r4) names that block; the draw covers the shade's rows.
+    let mut short = shades;
+    short[1].block.height = 15;
+    let draws = view.tile_draws(&tile, &image, &short).unwrap();
+    assert_eq!(draws[1].clip, Rect::new(whole.x + 32, 360, 32, 15));
+    assert_eq!(draws[1].frame.index, 2);
+    // Taller than the block, or at another x: not that block.
+    let mut tall = shades;
+    tall[1].block.height = 33;
+    assert!(view.tile_draws(&tile, &image, &tall).is_err());
+    // A left-out block (wall alpha) keeps the others' indexes.
+    let draws = view.tile_draws(&tile, &image, &shades[1..]).unwrap();
+    assert_eq!((draws[0].x, draws[0].frame.index), (whole.x + 32, 2));
     // No per-block shade: the whole tile, unchanged.
     assert_eq!(view.tile_draws(&tile, &image, &[]).unwrap(), vec![whole]);
     // Mode 2: block 0 culled (x 336 < 368), only block 1 drawn.
@@ -904,4 +957,68 @@ fn tile_blocks_draw_one_item_per_block() {
     let draws = view.tile_draws(&tile, &image, &shades).unwrap();
     assert_eq!(draws.len(), 1);
     assert_eq!(draws[0].clip, Rect::new(368, 360, 32, 32));
+    assert_eq!((draws[0].x, draws[0].frame.index), (368, 2));
+}
+
+// facts-render §5 r12, camera §7: a floor handed at X = −80 passes the
+// whole-tile test but its blocks all lie left of the frame: the floor
+// drawer is still called (1.14d's draw log, scene a1-town-arrival-ama, has
+// such rows at X −80) and draws nothing; one outside the rectangle is not
+// called.
+#[test]
+fn an_off_frame_floor_inside_the_view_rectangle_is_a_call() {
+    use crate::rules::view::BlockShade;
+    let c = camera(0, pos(0, 0));
+    let scene = Scene {
+        units: Vec::new(),
+        tiles: Vec::new(),
+    };
+    let view = OriginalView::new(c, &Fixture, &scene);
+    let image = filled(160, 80, 0, 0, 1);
+    let cell = (-50..50)
+        .flat_map(|x| (-50..50).map(move |y| (x, y)))
+        .find(|&(x, y)| {
+            let h = c.tile_handed(TileList::Floor, x, y);
+            h.0 == -80 && (0..520).contains(&h.1)
+        })
+        .expect("a cell at X -80");
+    let block = |x, y| BlockRect {
+        x,
+        y,
+        width: 32,
+        height: 15,
+    };
+    let blocks = vec![block(0, 0), block(64, 32), block(128, 64)];
+    let tile = map_tile(cell, TileList::Floor, "floor", blocks.clone());
+    let shades: Vec<_> = blocks
+        .iter()
+        .map(|&b| BlockShade {
+            block: b,
+            shade: ShadeChain::EMPTY,
+            blend: BlendOp::Opaque,
+        })
+        .collect();
+    let draws = view.tile_draws(&tile, &image, &shades).unwrap();
+    assert_eq!(draws.len(), 1, "{draws:?}");
+    assert!(draws[0].is_call_only());
+    assert_eq!(draws[0].key, tile.key);
+    // A block reaching into the frame: drawn, no call-only draw.
+    let mut wide = tile.clone();
+    wide.blocks.push(block(160, 0));
+    let mut more = shades.clone();
+    more.push(BlockShade {
+        block: block(160, 0),
+        shade: ShadeChain::EMPTY,
+        blend: BlendOp::Opaque,
+    });
+    let draws = view.tile_draws(&wide, &image, &more).unwrap();
+    assert_eq!(draws.len(), 1);
+    assert!(!draws[0].is_call_only());
+    // Outside the §7 rectangle: no call at all.
+    let far = (-50..50)
+        .flat_map(|x| (-50..50).map(move |y| (x, y)))
+        .find(|&(x, y)| !c.floor_roof_visible(c.tile_handed(TileList::Floor, x, y)))
+        .expect("a culled cell");
+    let tile = map_tile(far, TileList::Floor, "floor", blocks);
+    assert!(view.tile_draws(&tile, &image, &shades).unwrap().is_empty());
 }

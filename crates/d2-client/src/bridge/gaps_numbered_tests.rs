@@ -196,6 +196,8 @@ fn client_world_holds_only_stated_fields() {
         ladder,
         game_flags,
         act,
+        // `render/composition.md` §3 step 4: the 0x03 loads handled.
+        act_loads: _,
         in_game,
         unloaded,
         exit_requested,
@@ -225,6 +227,8 @@ fn client_world_holds_only_stated_fields() {
         // `render/lighting.md` §10 r4; `client/msg-units.md` §8 r9;
         // `client/msg-stats-items.md` §5 r6–r7.
         overrides,
+        quest_availability,
+        rooms_loaded,
         roster,
         roster_inactive,
         weapon_set,
@@ -248,6 +252,7 @@ fn client_world_holds_only_stated_fields() {
     assert!(local_walk.is_none());
     assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
+    assert!(quest_availability.is_none() && rooms_loaded.is_empty());
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
@@ -304,8 +309,11 @@ fn client_world_holds_only_stated_fields() {
         flag_4,
         // `client/model.md` §18 rule 1, §8 rule 4 (+0xB0).
         hit_class,
+        // `world/objects-client.md` §25 r8 (+0x4C).
+        speed,
     } = ClientUnit::new(key);
     assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
+    assert_eq!(speed, None);
     assert_eq!(hit_class, 0);
     assert!(skills.is_none() && !quest_untargetable);
     assert!(turned_toward.is_none() && !path_stopped);

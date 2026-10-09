@@ -36,7 +36,6 @@ use crate::ui::panels::inventory::UI_INVENTORY;
 use crate::ui::panels::stash_cube::UI_STASH;
 use crate::ui::panels::{utf16, PanelOutput};
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 /// The adapter's id: not a UI state, open for good.
 pub const GOLD_PANEL: PanelId = PanelId(0x110);
@@ -124,7 +123,7 @@ impl GoldDialogUi {
                     .push(PanelOutput::Intent(ClientIntent::from_message(
                         &ClickButton { button, p1, p2 },
                     )));
-                sh.outputs.push(PanelOutput::ClickSound);
+                sh.outputs.push(PanelOutput::Sound(0xDD));
             }
             _ => {}
         }
@@ -220,7 +219,7 @@ impl Panel for GoldDialogUi {
     }
 
     fn rect(&self) -> Rect {
-        FRAME
+        self.sh.borrow().config.screen.rect()
     }
 
     fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -229,6 +228,7 @@ impl Panel for GoldDialogUi {
             return;
         };
         let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+        let clip = sh.config.screen.rect();
         let (bx, by) = (box_left(w), box_top(h));
         if let Some(file) = sh.tables.files.id(FILL_FILE) {
             let (tw, th) = (FILL_W as i32, FILL_H as i32);
@@ -242,6 +242,7 @@ impl Panel for GoldDialogUi {
                         image: ImageRef { file, frame: DARK },
                         at: Point::new(x, y),
                         clip: Rect::new(x, y, cw as u16, ch as u16),
+                        look: crate::ui::CelLook::PLAIN,
                     }));
                     x += tw;
                 }
@@ -258,7 +259,7 @@ impl Panel for GoldDialogUi {
                     block_w: Some(BOX_W),
                     mode: 5,
                 },
-                clip: FRAME,
+                clip,
             }));
         };
         // String 4033 `strDropGoldHowMuch`, in English until the string
@@ -283,7 +284,7 @@ impl Panel for GoldDialogUi {
                     block_w: Some(i32::from(r.w)),
                     mode: 5,
                 },
-                clip: FRAME,
+                clip,
             }));
         }
     }

@@ -67,9 +67,16 @@ pub struct FakeTypes {
     pub warp_units: Vec<(i32, i32)>,
     /// What the door unit hook answers (record flag 0x20).
     pub door_flag: bool,
+    /// Levels whose generation streams their rooms on a client copy
+    /// (`preset.md` §3.2 step 4).
+    pub automap_levels: Vec<u32>,
 }
 
 impl LevelTypes for FakeTypes {
+    fn automap_streams(&self, drlg: &Drlg, level: LevelIdx) -> bool {
+        self.automap_levels.contains(&drlg.level(level).id)
+    }
+
     fn create_act_levels(&mut self, drlg: &mut Drlg, data: &DrlgData) -> Result<(), DrlgError> {
         for id in self.act_levels.clone() {
             drlg.get_or_alloc_level(data, self, id)?;
@@ -189,6 +196,7 @@ pub fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 

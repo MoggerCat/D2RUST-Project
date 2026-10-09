@@ -170,6 +170,7 @@ impl ViewRules for Fuzz {
             cof: path(if g & 0x8 != 0 { RANDOM_COF } else { COF }),
             dir: ((g >> 4) % 3) as usize,
             frame: ((g >> 6) % 3) as usize,
+            dir64: 0,
         }))
     }
 
@@ -300,6 +301,7 @@ fn ui_draws(n: u8) -> Vec<UiDraw> {
                 },
                 at: d2_client::ui::Point::new(i32::from(i) * 40, 500),
                 clip: d2_client::ui::Rect::new(0, 0, 800, 600),
+                look: d2_client::ui::CelLook::PLAIN,
             })
         })
         .collect()
@@ -454,6 +456,10 @@ proptest! {
             });
             let bridge = Bridge::with_dispatch(link, d).unwrap();
             let mut app = App::new();
+            // A fixed host clock (`objects-client.md` §25 r6): no wall time.
+            app.insert_resource(d2_client::bridge::mirror::ScriptedClock(std::sync::Arc::new(
+                std::sync::atomic::AtomicU32::new(1000),
+            )));
             app.add_plugins(MinimalPlugins)
                 .add_plugins(BridgePlugin)
                 .insert_resource(BridgeResource(bridge));

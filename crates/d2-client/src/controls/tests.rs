@@ -210,11 +210,6 @@ fn rejections_carry_their_line() {
             3,
             ErrorKind::UnknownPreset("mine".into()),
         ),
-        (
-            "version = 1\npreset = \"original\"\n",
-            2,
-            ErrorKind::PresetUnavailable("original"),
-        ),
         ("version = 1\n", 1, ErrorKind::MissingPreset),
         (
             "version = \"1\"\npreset = \"dev\"\n",
@@ -294,7 +289,84 @@ fn from_effective_is_minimal_and_round_trips() {
     assert_eq!(file.unbind, vec![Action::ClearScreen]);
     assert_eq!(file.effective().unwrap(), b);
     assert_eq!(parse(&write(&file)).unwrap().1, b);
-    assert_eq!(ControlsFile::from_effective(Preset::Original, &b), None);
+    // The original preset exists (`client/ui.md` §A6): the same bindings
+    // written over it round-trip too.
+    let over = ControlsFile::from_effective(Preset::Original, &b).unwrap();
+    assert_eq!(over.effective().unwrap(), b);
+    assert_eq!(parse(&write(&over)).unwrap().1, b);
+}
+
+// `preset = "original"` is the original's default key configuration
+// (before: rejected as unavailable).
+// Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 text
+#[test]
+fn the_original_preset_parses() {
+    let b = ok("version = 1\npreset = \"original\"\n");
+    assert_eq!(Some(b.clone()), Preset::Original.bindings());
+    assert!(b.find_clash().is_none());
+    assert_eq!(b.inputs(Action::ToggleCharacter), &[Key::A, Key::C]);
+    assert_eq!(
+        b.inputs(Action::ToggleAutomap),
+        &[Key::Tab, Key::MouseMiddle]
+    );
+}
+
+/// `ui/controls.md` §B4 r1: the 1140-byte default table built from
+/// `key-commands.tsv` (entries in `file_pos` order, slot 1 then slot 0;
+/// i32 cmd, u16 key or 0xFFFF, i32 slot).
+fn tsv_table() -> Vec<u8> {
+    let tsv = include_str!("../../../../specs/ui/key-commands.tsv");
+    let mut entries = vec![(0i32, original::UNBOUND, 0i32); original::TABLE_LEN];
+    let key = |f: &str| match f {
+        "-" => original::UNBOUND,
+        f => u16::from_str_radix(&f[2..f.find(':').unwrap()], 16).unwrap(),
+    };
+    for line in tsv.lines().skip(1) {
+        let c: Vec<&str> = line.split('\t').collect();
+        let cmd: i32 = c[0].parse().unwrap();
+        let pos: usize = c[8].parse().unwrap();
+        let (one, zero) = ((cmd, key(c[3]), 1), (cmd, key(c[4]), 0));
+        // command 1: slot 0 first (controls.md §3.4, measured on Game.exe)
+        let (first, second) = if cmd == 1 { (zero, one) } else { (one, zero) };
+        entries[2 * pos] = first;
+        entries[2 * pos + 1] = second;
+    }
+    let mut out = Vec::new();
+    for (cmd, k, slot) in entries {
+        out.extend_from_slice(&cmd.to_le_bytes());
+        out.extend_from_slice(&k.to_le_bytes());
+        out.extend_from_slice(&slot.to_le_bytes());
+    }
+    out
+}
+
+// The `original` preset's bindings, written back into the table form
+// (each command's action: slot 1 = first input, slot 0 = second), equal
+// the table built from `key-commands.tsv`: 57 commands, 114 bindings.
+// Covers: specs/ui/controls.md §b4-original-defaults-check-client-ui-md-b4 r1
+#[test]
+fn the_original_preset_is_the_tsv_table() {
+    let b = Preset::Original.bindings().unwrap();
+    let mut t = original::BindingTable::defaults();
+    for e in t.0.iter_mut() {
+        e.key = original::UNBOUND;
+    }
+    for e in t.0.iter_mut() {
+        let a = keymap::action_of_cmd(e.cmd).expect("every command has an action");
+        let i = if e.slot == 1 { 0 } else { 1 };
+        e.key = b
+            .inputs(a)
+            .get(i)
+            .map_or(original::UNBOUND, |&k| keymap::key_to_vk(k).unwrap());
+    }
+    let bytes = t.to_bytes();
+    assert_eq!(bytes.len(), original::TABLE_BYTES);
+    assert_eq!(bytes, tsv_table());
+    // Every command maps to its own action.
+    let mut seen: Vec<Action> = (0..57).filter_map(keymap::action_of_cmd).collect();
+    seen.sort();
+    seen.dedup();
+    assert_eq!(seen.len(), 57);
 }
 
 // Covers: specs/client/ui.md §a6-controls-file-d2controls-1-m20 r3

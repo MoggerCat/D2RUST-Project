@@ -25,6 +25,7 @@ pub mod combat;
 pub mod death;
 pub mod dispatch;
 pub mod dying;
+pub mod event_records;
 pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
@@ -66,27 +67,15 @@ use crate::units::hooks::{Sim, UnitData};
 use crate::units::modes::UnitError;
 use crate::units::record::Units;
 use crate::units::UnitId;
-use crate::world::waypoints::WaypointRecords;
+use crate::world::waypoints::{ArrivalList, WaypointData, WaypointRecords};
 
-pub use dispatch::ActionSim;
+pub use dispatch::{ActionSim, INVENTORY_REFRESH_EX};
 pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{
     ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
 };
 pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
-
-/// A laid trap (d2rs-own, unverified; REC-233): the skill that laid it, its
-/// level and the shots left.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Sentry {
-    pub owner: UnitId,
-    pub skill: i32,
-    pub level: i32,
-    pub shots: i32,
-    /// The frame of the next possible shot.
-    pub next: i32,
-}
 
 /// The tables the action modules read (typed `d2_data` records).
 #[derive(Debug, Clone)]
@@ -100,6 +89,9 @@ pub struct ActionTables {
     pub levels: Vec<Levels>,
     /// `Sk1mode..Sk8mode` per monstats row ([`crate::monsters::ai::skill_modes`]).
     pub skill_modes: Vec<[u8; 8]>,
+    /// `overlay` record count (data tables +0xBC0): the bound of the
+    /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
+    pub overlay_count: i32,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -172,6 +164,9 @@ pub struct ActionHooks<X> {
     pub ai_info: GameInfo,
     /// Combat lists (unit +0xAC, `damage.md` §3 step 3), first = newest.
     pub combat_lists: BTreeMap<UnitId, Vec<CombatEntry>>,
+    /// The pending event records of the units (unit +0xEC,
+    /// `intents-events.md` §7.9 rule 2).
+    pub event_records: event_records::EventRecords,
     /// The process-wide element hit-class byte `0x0088CAD0`.
     pub hit_class: u8,
     /// The game seed of `rng.md` §5.3 (unit allocation).
@@ -188,6 +183,13 @@ pub struct ActionHooks<X> {
     pub items: crate::wiring::economy::ItemStore,
     /// Waypoint records per player (player data +0x1C, `waypoints.md` §2).
     pub waypoints: BTreeMap<UnitId, WaypointRecords>,
+    /// The object control's arrival list (`waypoints.md` §7.1): written
+    /// by travel (the host's C→S 0x49), read by init function 17.
+    pub arrivals: ArrivalList,
+    /// The waypoint tables init function 17 runs on (`waypoints.md`
+    /// §5.1) inside the object's creation (`objects.md` §3 rule 6);
+    /// `None`: the init route goes to [`Pending::object_route`].
+    pub waypoint_init: Option<Arc<WaypointData>>,
     /// The object control (game +0x10F0, `objects.md` §2), the object
     /// tables and the host tick ([`objects`]). `None` (the default): not
     /// created ([`ActionSim::create_objects`]); the object routes keep
@@ -244,6 +246,10 @@ pub struct ActionHooks<X> {
     /// COF name. `None`: no record for any unit (as before the table is
     /// given).
     pub anim_data: Option<Arc<AnimData>>,
+    /// The monsters' skill sequences (`skills/sequences.md` §1 rules 2
+    /// and 5: monstats slot sequences and `monseq`), loaded for a monster
+    /// in mode 14. `None`: a monster's mode 14 plays its AnimData record.
+    pub monster_sequences: Option<Arc<crate::skills::sequences::MonsterSequences>>,
     /// `experience.txt` / `charstats.txt` of the experience on a kill
     /// (`combat/vitals.md` §4). `None`: no experience is given.
     pub vitals: Option<Arc<VitalsTables>>,
@@ -320,9 +326,13 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
-    /// The laid traps (d2rs-own, unverified; q-assassin-gaps, REC-233):
-    /// the host's sentry think shoots and spends their shots.
-    pub sentries: BTreeMap<UnitId, Sentry>,
+    /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
+    /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
+    /// when missing, base level := v) gives a monster: skill id → base
+    /// level. The AI reads them (`monsters/ai-bodies-6.md` §14 `Skill1`
+    /// entry and level); a monster without one asks
+    /// [`Pending::ai_skill_entry`].
+    pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
@@ -370,11 +380,14 @@ impl<X> ActionHooks<X> {
             ai: Some(AiStore::new()),
             ai_info: GameInfo::default(),
             combat_lists: BTreeMap::new(),
+            event_records: Default::default(),
             hit_class: 0,
             game_seed,
             uniques: crate::items::UniqueBits::default(),
             items: crate::wiring::economy::ItemStore::new(),
             waypoints: BTreeMap::new(),
+            arrivals: ArrivalList::default(),
+            waypoint_init: None,
             objects: None,
             objects_out: false,
             portals: Default::default(),
@@ -387,6 +400,7 @@ impl<X> ActionHooks<X> {
             act_changes: Vec::new(),
             removed_items: Vec::new(),
             anim_data: None,
+            monster_sequences: None,
             vitals: None,
             mode_target: None,
             monster_request: 0,
@@ -405,7 +419,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
-            sentries: BTreeMap::new(),
+            monster_skills: BTreeMap::new(),
             inactive: None,
             x,
             orphan_seed: Seed::init(),

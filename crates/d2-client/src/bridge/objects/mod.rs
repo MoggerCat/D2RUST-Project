@@ -58,6 +58,9 @@ pub struct ObjClientRow {
     pub frame_delta: [u16; 8],
     /// `CycleAnim0`–`7`.
     pub cycle_anim: [u8; 8],
+    /// `Sync` (+0x175): ≠ 0 → the speed is `FrameDelta` without a draw
+    /// (`world/objects.md` §4 r3).
+    pub sync: u8,
     /// `SizeX` (+0xD0): the object's unit size (`sim/path-placement.md`
     /// §3).
     pub size_x: u32,
@@ -109,6 +112,7 @@ impl ObjClientRow {
                 o.cycleanim6,
                 o.cycleanim7,
             ],
+            sync: o.sync,
             size_x: o.sizex,
             env_effect: o.enveffect,
             selectable: [
@@ -131,6 +135,15 @@ impl ObjClientRow {
     /// One row per decoded `objects` row, by class.
     pub fn rows(objects: &[d2_data::tables::Objects]) -> Vec<Self> {
         objects.iter().map(Self::from_row).collect()
+    }
+
+    /// `data/fixups.md` §13 r2 on a row read from the raw table:
+    /// `FrameCnt` := value << 8 (wrapping), frames in 1/256 units.
+    pub fn frame_counts_fixed(mut self) -> Self {
+        for c in &mut self.frame_cnt {
+            *c = c.wrapping_shl(8);
+        }
+        self
     }
 }
 
@@ -196,6 +209,9 @@ pub struct ClientObjects {
     pub latches: Latches,
     /// The client GUID counter `[0x00711F30]` of `0x00466730`.
     pub next_guid: u32,
+    /// The missile fields of the set-C missiles
+    /// (`super::client_missiles`, `missiles/client.md` §C1).
+    pub missiles: super::client_missiles::ClientMissiles,
 }
 
 /// A unit and the set it is in.
@@ -309,13 +325,19 @@ impl Cx<'_> {
         if u.mode != m {
             u.mode = m;
             u.frame = 0;
+            u.speed = None;
         }
         Ok(())
     }
 
     /// `reinit(U)` (`0x00624390`): frame := 0.
+    /// TODO(spec: world/objects-client.md §25 r5, REC-440): whether this
+    /// re-init draws a new speed on the client ([`anim_setup`]) is not
+    /// measured; the speed falls back to `FrameDelta[mode]` meanwhile.
     pub fn reinit(&mut self) -> Result<(), HandlerError> {
-        self.u()?.frame = 0;
+        let u = self.u()?;
+        u.frame = 0;
+        u.speed = None;
         Ok(())
     }
 
@@ -362,6 +384,35 @@ fn frame_cnt(row: &ObjClientRow, m: u32) -> Result<u32, HandlerError> {
         .ok_or(HandlerError::Invalid(
             "object mode past the eight objects.txt modes",
         ))
+}
+
+/// The animation set-up of a client object in mode `m` (`world/objects.md`
+/// §4 r1–r4, `0x00624390`'s object branch, on U's client seed;
+/// `world/objects-client.md` §25 r8): frame := `Start[m]` · 256; speed
+/// := `FrameDelta[m]` when `Sync` ≠ 0, else `roll(d >> 3)` + d − (d >> 4)
+/// (d = `FrameDelta[m]` read as i16; `roll(n < 1)` draws nothing),
+/// clamped to 0..=0x7FFF. A unit without a client seed in the model (no
+/// client DRLG) gets no speed (`FrameDelta[m]` then).
+pub fn anim_setup(u: &mut ClientUnit, row: &ObjClientRow, m: u32) -> Result<(), HandlerError> {
+    let i = m as usize;
+    if i >= 8 {
+        return Err(HandlerError::Invalid("object mode past 7"));
+    }
+    u.frame = i32::from(row.start[i]) << 8;
+    let d = i32::from(row.frame_delta[i] as i16);
+    if row.sync != 0 {
+        u.speed = Some(d);
+        return Ok(());
+    }
+    let Some((lo, hi)) = u.seed else {
+        u.speed = None;
+        return Ok(());
+    };
+    let mut s = Seed::new(lo, hi);
+    let r = s.roll(d >> 3) as i32;
+    u.seed = Some((s.lo, s.hi));
+    u.speed = Some(r.wrapping_add(d).wrapping_sub(d >> 4).clamp(0, 0x7FFF));
+    Ok(())
 }
 
 /// One step of a unit's client seed; the new low word.
@@ -417,9 +468,9 @@ fn row_of(
 /// `world/objects-client.md` §26.6: frame += speed, a non-cycling mode
 /// clamps at its last frame).
 ///
-/// PROVISIONAL (objects-client.md §26.16; REC-45): the speed is the
-/// class's `FrameDelta[mode]` (the speed source `0x00470610` is not
-/// traced); a cycling mode wraps (frame − `FrameCnt`, modulo); a mode
+/// The speed is U's own (+0x4C, [`anim_setup`]); a unit without one
+/// (no setup ran) steps by the class's `FrameDelta[mode]`.
+/// PROVISIONAL (objects-client.md §26.16; REC-45): a cycling mode wraps (frame − `FrameCnt`, modulo); a mode
 /// with `FrameCnt` 0 does not advance; and the end of a non-cycling mode
 /// 1 sets mode 2 (`set_mode`, then the graphics refresh), the transition
 /// §26.2, §26.7 and §26.16 name.
@@ -432,9 +483,10 @@ pub fn generic_step(cx: &mut Cx<'_>) -> Result<(), HandlerError> {
         return Ok(());
     }
     let i = m as usize;
-    let speed = i32::from(cx.row.frame_delta[i]);
+    let delta = i32::from(cx.row.frame_delta[i]);
     let cycle = cx.row.cycle_anim[i] != 0;
     let u = cx.u()?;
+    let speed = u.speed.unwrap_or(delta);
     u.frame = u.frame.wrapping_add(speed);
     if u.frame < cnt {
         return Ok(());
@@ -583,17 +635,26 @@ pub fn create_client_unit(
 }
 
 /// The client-only removal `0x00465F00(GUID, type)` (`model.md` §5 rule
-/// 5): unlink from set C and free; a key not in set C: nothing.
+/// 5): unlink from set C and free; a key not in set C: nothing. The free
+/// is recorded for its `UnitFreed` output (`client/bridge.md` §10 r3.1
+/// (a): every unit free, set C too).
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
-    w.objclient.set_c.remove(&key)
+    let u = w.objclient.set_c.remove(&key)?;
+    w.objclient.missiles.remove(&key);
+    w.freed.push((key, true));
+    Some(u)
 }
 
 /// `0x006416D0(a, b)` (`missiles/missiles.md` §R9.5) over client units:
 /// per axis |Δ| − (size(a) / 2 + size(b) / 2), floored at 0, then
 /// (2·max + min) / 2. Positions are the client cells.
 pub fn distance(a: &ClientUnit, size_a: i32, b: &ClientUnit, size_b: i32) -> i32 {
-    let (ax, ay) = a.cell();
-    let (bx, by) = b.cell();
+    distance_at(a.cell(), size_a, b.cell(), size_b)
+}
+
+/// [`distance`] between two cells.
+pub fn distance_at(a: (u16, u16), size_a: i32, b: (u16, u16), size_b: i32) -> i32 {
+    let ((ax, ay), (bx, by)) = (a, b);
     d2_sim::world::objects::chests::reach_distance(
         (i32::from(ax), i32::from(ay)),
         size_a,

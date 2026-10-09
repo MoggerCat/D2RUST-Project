@@ -166,6 +166,7 @@ fn tables() -> InvTables {
         items,
         itemtypes,
         equiv,
+        books: Vec::new(),
     }
 }
 
@@ -1044,6 +1045,29 @@ fn requirements_stats() {
     assert!(requirements_met(&w, &t, Some(s), PLAYER, false));
 }
 
+// Covers: specs/items/inventory.md §4.2 r3, §4.2 r4
+#[test]
+fn requirements_q1_dexterity_has_no_link_test() {
+    let (mut t, mut w, s) = req_setup();
+    // Q1: reqdex 50, dex 55, item not linked, a socketed +10 dex filler.
+    t.items[R_SWORD].reqdex = 50;
+    w.unit_stats.insert((PLAYER, stat::STRENGTH), 100);
+    w.unit_stats.insert((PLAYER, stat::DEXTERITY), 55);
+    w.p(s).active = false;
+    w.p(s).contribution.insert(stat::DEXTERITY, 10);
+    // Dexterity: no link test, 55 − 10 < 50 → fail (equipping only).
+    assert!(requirements_met(&w, &t, Some(s), PLAYER, false));
+    assert!(!requirements_met(&w, &t, Some(s), PLAYER, true));
+    // Strength (reqstr 50, str 55, filler str 10): unlinked → no
+    // subtraction → passes.
+    t.items[R_SWORD].reqdex = 0;
+    t.items[R_SWORD].reqstr = 50;
+    w.unit_stats.insert((PLAYER, stat::STRENGTH), 55);
+    w.p(s).contribution.clear();
+    w.p(s).contribution.insert(stat::STRENGTH, 10);
+    assert!(requirements_met(&w, &t, Some(s), PLAYER, true));
+}
+
 // Covers: specs/items/inventory.md §4.2 r6
 #[test]
 fn requirements_identified_book_class() {
@@ -1323,6 +1347,7 @@ fn equip_from_cursor_steps() {
     assert!(equip_put(
         &mut h.inv,
         &mut h.w,
+        &h.t,
         r2,
         7,
         cmd::INDIRECT_SWAP_BODY
@@ -1624,3 +1649,42 @@ mod answer_tests;
 mod gap_tests;
 #[path = "mutant_tests.rs"]
 mod mutant_tests;
+
+// Covers: specs/world/quests-act3-2.md §11.5 r1, §11.5 r2
+#[test]
+fn weapon_in_use_link_and_unlink() {
+    use super::weapon::{weapon_link, weapon_unlink};
+    let mut h = hands();
+    let at = |h: &mut Hands, id, r, loc| {
+        let u = h.equip(id, r, loc);
+        h.w.items.get_mut(&u).unwrap().body_loc = loc;
+        u
+    };
+    // r1: the first usable weapon in a hand becomes the weapon in use.
+    let a = at(&mut h, 20, R_SWORD, body::RIGHT_HAND);
+    weapon_link(&mut h.inv, &h.w, &h.t, a);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // A second one leaves it (the first wielded weapon stays).
+    let b = at(&mut h, 21, R_SWORD, body::LEFT_HAND);
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // Not a weapon: nothing.
+    let helm = at(&mut h, 22, R_HELM, body::HEAD);
+    weapon_link(&mut h.inv, &h.w, &h.t, helm);
+    assert_eq!(h.inv.weapon_guid, h.w.d(a).guid);
+    // r2: taking the weapon in use off hands +0x1C to the other hand.
+    weapon_unlink(&mut h.inv, &h.w, &h.t, a);
+    assert_eq!(h.inv.weapon_guid, h.w.d(b).guid);
+    // r1: the weapon in use linked again → −1 (W is the item itself).
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+    // r1: a weapon that is not usable (unidentified) clears +0x1C when
+    // it held it, and never becomes the weapon in use.
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, h.w.d(b).guid);
+    h.w.items.get_mut(&b).unwrap().flags = 0;
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+    weapon_link(&mut h.inv, &h.w, &h.t, b);
+    assert_eq!(h.inv.weapon_guid, NO_GUID);
+}

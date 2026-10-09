@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use d2_client::app::play::add_game;
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio};
 use d2_client::app::ui::{add_original_ui, UiParts};
 use d2_client::assets::path::MemorySource;
@@ -28,6 +28,8 @@ use d2_client::controls::Action;
 use d2_client::ui::{ActionId, UiEvent};
 use d2_client::world_view::{UiSounds, WorldViewState, WorldViewUi};
 use d2_server::seams::Clock;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -72,6 +74,14 @@ fn panel_files() -> MemorySource {
         ("panel\\800borderframe", 10),
         ("panel\\800ctrlpnl7", 6),
         ("panel\\goldcoinbtn", 2),
+        // The cursor cels, drawn every frame (`panels-3.md` §23 r1).
+        ("cursor\\gaunt", 1),
+        ("cursor\\grasp", 8),
+        ("cursor\\ohand", 8),
+        ("cursor\\orotate", 8),
+        ("cursor\\ppress", 8),
+        ("cursor\\protate", 8),
+        ("cursor\\buysell", 10),
     ] {
         s.insert(&format!("data\\global\\ui\\{name}.dc6"), dc6(frames));
     }
@@ -89,11 +99,17 @@ fn sound_table() -> SoundTableData {
 
 // Covers: specs/ui/panels.md §2 r2, §4 r2, §4 r3, §5, §6 r1; specs/audio/sound-table.md §6.1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn hotkey_opens_the_inventory_in_the_apps_frame() {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -134,13 +150,15 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     let state = app.world().resource::<WorldViewState>();
     let last = state.last.unwrap();
     // Inventory art 4 + gold button 1 + close 1, right border 5, control
-    // panel 6 (no local player: no HUD overlay).
-    assert_eq!((last.items, last.ui_unhandled), (17, 1));
-    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6 + 2);
+    // panel 6 (no local player: no HUD overlay), the cursor cel last
+    // (`panels-3.md` §23 r9–r10: `protate`, 8 frames loaded).
+    assert_eq!((last.items, last.ui_unhandled), (18, 1));
+    assert_eq!(state.assets.frames.len(), 8 + 12 + 10 + 6 + 2 + 8);
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!(state.feed.open_mode(world).unwrap().get(), 1);
 
-    // Toggle again: closed, mode 0; only the control panel is drawn.
+    // Toggle again: closed, mode 0; only the control panel and the cursor
+    // are drawn.
     app.world_mut()
         .non_send_mut::<WorldViewUi>()
         .queue
@@ -149,7 +167,7 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
     let state = app.world().resource::<WorldViewState>();
-    assert_eq!(state.last.unwrap().items, 6);
+    assert_eq!(state.last.unwrap().items, 7);
     let world = app.world().resource::<BridgeResource>().0.world();
     assert_eq!(state.feed.open_mode(world).unwrap().get(), 0);
 

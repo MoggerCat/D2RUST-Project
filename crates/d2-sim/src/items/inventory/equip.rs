@@ -62,7 +62,12 @@ fn stat_ok<W: InvWorld + ?Sized>(
     if v < 1 || v < req {
         return false;
     }
-    if equipping && w.item_active_on(item, unit) {
+    // Strength (step 3) tests the stat-list link (`0x00625820`,
+    // `0x0062EBF1`) before subtracting the socket contribution; dexterity
+    // (step 4, `0x0062EC4A`–`0x0062EC75`) goes straight to `0x0062B450(2)`
+    // with no link test. The asymmetry is reproduced.
+    let linked = id != stat::STRENGTH || w.item_active_on(item, unit);
+    if equipping && linked {
         let v = v - w.own_contribution(item, unit, id);
         if v < 1 || v < req {
             return false;
@@ -140,6 +145,17 @@ pub fn requirements_met<W: InvWorld + ?Sized>(
 
 fn is_type<W: InvWorld + ?Sized>(w: &W, t: &InvTables, item: UnitId, ty: i16) -> bool {
     w.item(item).is_some_and(|d| t.is_type(d.record, ty))
+}
+
+/// One-or-two-handed for a unit (`0x0062A1E0`, §4.4 step 4) of an item
+/// of class `record`, for a unit of kind `unit`.
+///
+/// PROVISIONAL (`inventory.md` §4.4 r4, REC-289): no spec gives the body
+/// of `0x0062A1E0`; read as items `1or2handed` ≠ 0 held by a player of
+/// class 4 (barbarian). Settled by a capture of `0x0062A1E0`.
+pub fn one_or_two_handed_for(t: &InvTables, record: usize, unit: Option<UnitKind>) -> bool {
+    matches!(unit, Some(UnitKind::Player { class: BARBARIAN }))
+        && t.item(record).is_some_and(|r| r.onetwohanded != 0)
 }
 
 /// Hands compatible (`0x0063DBC0`, §4.4) of `a` and `b` for `unit`.
@@ -417,6 +433,7 @@ impl EquipOutcome {
 pub fn equip_put<W: InvWorld + ?Sized>(
     inv: &mut Inventory,
     w: &mut W,
+    t: &InvTables,
     item: UnitId,
     loc: u8,
     flag: u32,
@@ -433,6 +450,9 @@ pub fn equip_put<W: InvWorld + ?Sized>(
         d.body_loc = loc;
     }
     if !swap {
+        // The weapon-in-use link `0x0063D1D0` (writes only +0x1C), then
+        // the stat link and refresh.
+        super::weapon::weapon_link(inv, w, t, item);
         w.stat_link(unit, item);
         w.stat_refresh(unit);
     }
@@ -489,7 +509,7 @@ pub fn equip_from_cursor<W: InvWorld + ?Sized>(
         w.weapon_in_use_update(unit);
     }
     // Step 5.
-    if !equip_put(inv, w, item, loc, cmd::EQUIP) {
+    if !equip_put(inv, w, t, item, loc, cmd::EQUIP) {
         return EquipOutcome::REFUSED;
     }
     EquipOutcome::OK
@@ -526,6 +546,7 @@ pub fn equip_without_cursor<W: InvWorld + ?Sized>(
     if let Some(d) = w.item_mut(item) {
         d.body_loc = loc;
     }
+    super::weapon::weapon_link(inv, w, t, item);
     w.stat_link(unit, item);
     inv.put_cursor(w, None);
     w.stat_refresh(unit);

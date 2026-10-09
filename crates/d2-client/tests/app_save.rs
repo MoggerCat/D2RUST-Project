@@ -8,10 +8,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::save::{self, SaveHandle};
-use d2_client::app::single_player::{self, Character, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, Character, DEFAULT_SEED};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_formats::d2s::{self, Body, D2s, Header, ReadOptions, StatEntry, StatSave, Stats};
 use d2_server::adapters::character::LoadContext;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -35,7 +37,7 @@ impl d2s::SaveTables for Tables {
     /// A new character carries its start cube (REC-244): the entries
     /// are read with the synthetic item tables.
     fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
-        let items = d2_client::app::synthetic_items::item_tables();
+        let items = app_support::live().tables.item_tables().unwrap();
         d2_sim::items::bitstream::read::read_save_entry(buf, &items)
             .map(|e| e.len)
             .map_err(|e| e.to_string())
@@ -88,7 +90,7 @@ fn joined(
 ) -> d2_client::app::server_thread::ThreadLink<single_player::Link<StepClock>> {
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut link, _) = single_player::start_with(
-        GameData::Synthetic,
+        app_support::game_data(),
         DEFAULT_SEED,
         character.clone(),
         StepClock(ms.clone()),
@@ -116,8 +118,10 @@ fn handle(character: &Character, path: &std::path::Path) -> SaveHandle {
         link,
         save::base_save(character),
         Arc::new(Tables),
+        None,
         path.into(),
-    );
+    )
+    .unwrap();
     h
 }
 
@@ -131,6 +135,7 @@ fn temp(name: &str) -> std::path::PathBuf {
 /// A save joins, is written, and reads back as the same character.
 // Covers: specs/formats/d2s.md §1 r4, §7.1 r1; specs/formats/d2s-load.md §2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_loaded_character_round_trips_through_the_save() {
     let base = synthetic_save();
     let character = Character::Save(
@@ -176,6 +181,7 @@ fn a_loaded_character_round_trips_through_the_save() {
 /// Saving again keeps the previous file as `.bak`.
 // Covers: specs/formats/d2s.md §1 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_second_save_keeps_a_backup() {
     let character = Character::Save(
         Box::new(synthetic_save()),
@@ -196,6 +202,7 @@ fn a_second_save_keeps_a_backup() {
 /// `--new`: a fresh character is written to `<name>.d2s` and loads again.
 // d2rs-own, unverified
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_character_is_written_to_its_own_file() {
     let character = single_player::new_character("barbarian", "Conan").unwrap();
     let dir = temp("new");
@@ -254,7 +261,8 @@ fn live_values_overlay_the_base() {
     assert!(!got.iter().any(|e| e.0 == 14));
     assert_eq!(out.header.level, 6);
     assert_eq!(out.header.save_time, 777);
-    assert_eq!(out.header.create_time, 777);
+    // The create time is never set by a game save (§2.2 r10, edge case 11).
+    assert_eq!(out.header.create_time, base.header.create_time);
     assert_eq!(out.body.unwrap().quests.records, rec);
     // No live stats (a game with no stat table): the base stays as it is.
     let kept = save::apply_live(&base, &save::Live::default(), 1);
@@ -267,6 +275,7 @@ fn live_values_overlay_the_base() {
 // Covers: specs/world/waypoints.md §3 r1, §3 r2
 // d2rs-own, unverified
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn waypoints_round_trip_through_the_save() {
     let mut base = synthetic_save();
     // Waypoints 0 (default), 5 and 20 in Normal; 3 in Nightmare.
@@ -290,8 +299,10 @@ fn waypoints_round_trip_through_the_save() {
         joined(character),
         synthetic_save(),
         Arc::new(Tables),
+        None,
         file.clone(),
-    );
+    )
+    .unwrap();
     h.save().unwrap();
     let opts = ReadOptions {
         expansion: true,
@@ -345,4 +356,74 @@ fn extra_values_overlay_the_body() {
     );
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.skills[2], 20);
+}
+
+/// A new expansion character's file ends `6A 66 6B 66 00` like the game's
+/// (§1 rule 2, §8.4 rule 4, §8.5 rule 3); a classic one has neither.
+// Covers: specs/formats/d2s.md §8.4 r4, §8.5 r3
+#[test]
+fn a_new_character_writes_jf_and_kf_in_an_expansion_game() {
+    let exp = single_player::GAME_SETUP.expansion;
+    let base = save::base_save(&Character::New);
+    let body = base.body.as_ref().unwrap();
+    assert_eq!(body.hireling_items.is_some(), exp);
+    assert_eq!(body.golem.is_some(), exp);
+}
+
+/// A loaded 0x5C–0x5E file is saved as 0x60 with the bit-field stats
+/// (`d2s.md` §1 r6, §2.1, §7.1 r7: the game writes only 0x60); the file
+/// writes and reads back as 0x60.
+// Covers: specs/formats/d2s.md §1 r6, §7.1 r7
+#[test]
+fn an_old_version_save_is_written_as_0x60() {
+    let mut base = synthetic_save();
+    base.header.version = 0x5C;
+    base.body.as_mut().unwrap().stats = Stats::Mask {
+        mask: vec![0x0F, 0x10],
+        values: vec![(0, 25), (1, 0), (3, 22), (12, 5)],
+    };
+    let live = save::Live {
+        stats: vec![(0, 30), (12, 6)],
+        ..Default::default()
+    };
+    let out = save::apply_live(&base, &live, 1);
+    assert_eq!(out.header.version, 0x60);
+    let Stats::Bits(e) = &out.body.as_ref().unwrap().stats else {
+        panic!("bit-field stats")
+    };
+    let got: Vec<(u16, u16, i32)> = e.iter().map(|e| (e.id, e.layer, e.value)).collect();
+    assert_eq!(got, [(0, 0, 30), (3, 0, 22), (12, 0, 6)]);
+    let bytes = d2s::write(&out, &Tables).unwrap();
+    let opts = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let back = d2s::read(&bytes, &opts, &Tables).unwrap();
+    assert_eq!(back.header.version, 0x60);
+    // M08: a 0x60 base is left as it is.
+    let same = save::apply_live(&synthetic_save(), &live, 1);
+    assert_eq!(same.header.version, 0x60);
+}
+
+/// The store refuses to overwrite an old file whose item records would
+/// pass through as loaded (old bit layout under a 0x60 header).
+// Covers: specs/formats/d2s.md §1 r6
+#[test]
+fn old_item_records_that_pass_through_are_named() {
+    let mut base = synthetic_save();
+    let item = d2s::ItemEntry {
+        bytes: vec![0x4A, 0x4D, 0, 0],
+    };
+    base.body.as_mut().unwrap().items = vec![item.clone()];
+    // No inventory model: the loaded list would pass through.
+    assert!(save::old_items_pass_through(&base, &save::Live::default()));
+    // The running game rewrote the list.
+    let mut live = save::Live::default();
+    live.extra.items = Some(vec![item]);
+    assert!(!save::old_items_pass_through(&base, &live));
+    // No item at all: nothing passes through.
+    assert!(!save::old_items_pass_through(
+        &synthetic_save(),
+        &save::Live::default()
+    ));
 }

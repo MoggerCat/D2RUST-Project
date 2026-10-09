@@ -540,11 +540,25 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
         self.h.x.ai_class_for_level(game, room, class)
     }
+    /// A summoned monster's entry ([`ActionHooks::monster_skills`]): its
+    /// base level (no bonus source on a monster entry); else the seam.
     fn skill_level(&self, unit: UnitId, skill: i32, highest: bool) -> Option<i32> {
-        self.h.x.ai_skill_level(unit, skill, highest)
+        match self.h.monster_skills.get(&unit) {
+            Some(m) => m.get(&skill).copied(),
+            None => self.h.x.ai_skill_level(unit, skill, highest),
+        }
     }
+    /// A summoned monster's entry: the id and its mode, fixed when the
+    /// entry is created (`skills/use.md` §5.1: a monster's `monanim`).
     fn skill_entry(&self, unit: UnitId, skill: i32) -> Option<(i32, u8)> {
-        self.h.x.ai_skill_entry(unit, skill)
+        match self.h.monster_skills.get(&unit) {
+            Some(m) => {
+                m.get(&skill)?;
+                let mode = self.h.tables.skills.skill(skill)?.monanim;
+                Some((skill, mode))
+            }
+            None => self.h.x.ai_skill_entry(unit, skill),
+        }
     }
     fn hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
         self.h.x.ai_hand_skill(unit, right)
@@ -697,8 +711,14 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn wisp_buff(&mut self, game: &mut Game, target: UnitId, value: i32, expire: i32) {
         self.h.x.ai_wisp_buff(game, target, value, expire);
     }
+    /// `0x00571C00`: an 0xA4 record (class u16) on the unit, the unit
+    /// queued for update (`intents-events.md` §7.9 rule 2).
     fn preload_class(&mut self, game: &mut Game, unit: UnitId, class: i32) {
-        self.h.x.ai_preload_class(game, unit, class);
+        let r = super::event_records::EventRecord::Preload {
+            class: class as u16,
+        };
+        self.h.event_records.push(unit, r);
+        let _ = game.lists.queue_update(unit);
     }
     fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         self.h.x.ai_wisp_find(game, unit)
@@ -718,6 +738,20 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// `0x00646CA0(unit, calc, skill, level)`: the calc column on the
+    /// unit (`data/calc-expressions.md`, `skills/levels.md`).
+    fn skill_calc(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        skill: i32,
+        calc: u32,
+        level: i32,
+    ) -> i32 {
+        let t = self.h.tables.clone();
+        let mut cv = self.combat(game);
+        crate::skills::eval_skill(&mut cv, &t.skills, Some(unit), calc, skill, level)
+    }
     /// `0x00622AA0(a, b, mask)` with the path provider; else the seam's
     /// default (clear).
     fn line_blocked_mask(&self, game: &Game, a: UnitId, b: UnitId, mask: u16) -> bool {

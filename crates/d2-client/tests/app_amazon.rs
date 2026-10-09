@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::app::weapons::{class, Hands, ItemFacts};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
@@ -30,6 +30,8 @@ use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::{StatData, StatLists, StatTable};
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -106,8 +108,12 @@ struct Game {
 impl Game {
     fn joined() -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(|l| {
@@ -273,6 +279,9 @@ impl Game {
                         right: Some(bow),
                         left: Some(quiver),
                         weapon: Some(bow),
+                        // The COF weapon class `bow` (`unit-composite.md`
+                        // §2.1).
+                        cof: 1,
                     },
                 );
                 w.items.insert(
@@ -397,6 +406,7 @@ fn shoot(g: &mut Game) -> (Vec<Vec<u8>>, usize, String) {
 
 // Covers: specs/skills/bodies.md §3.4, §2.5; specs/skills/use.md §5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_takes_an_arrow_and_shoots_the_missile() {
     let mut g = Game::joined();
     let (_, quiver) = g.equip(30);
@@ -411,6 +421,7 @@ fn a_bow_skill_takes_an_arrow_and_shoots_the_missile() {
 
 // Covers: specs/skills/bodies.md §3.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_without_arrows_does_not_start() {
     let mut g = Game::joined();
     let (_, quiver) = g.equip(0);
@@ -422,6 +433,7 @@ fn a_bow_skill_without_arrows_does_not_start() {
 
 // Covers: specs/skills/bodies.md §3.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_bow_skill_with_bare_hands_does_not_start() {
     let mut g = Game::joined();
     let (_, most, _) = shoot(&mut g);
@@ -435,6 +447,7 @@ fn a_bow_skill_with_bare_hands_does_not_start() {
 // unit-target skill (the start function `srvst 5` reads the kept target
 // of a targetable monster; the attack mode runs and ends), not the damage.
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn jab_on_a_monster_starts_the_attack_mode_and_ends_it() {
     let mut g = Game::joined();
     g.select_right(JAB);

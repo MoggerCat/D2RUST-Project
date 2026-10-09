@@ -84,6 +84,7 @@ fn item_actions() {
             flags: 0,
             props: Vec::new(),
             charm: false,
+            unlinked: false,
         })
     );
     // A fatal action and an ignored one.
@@ -230,4 +231,56 @@ fn item_header_and_cursor_writes() {
     m.recv(&ground(0x0E, 2, 6));
     assert_eq!(cursor(&m), None);
     assert!(m.log.rejected.is_empty());
+}
+
+/// `ui/panels-2.md` §20 r7: an `hst ` or `qf2 ` the local player gets in
+/// page 3 (0x9C action 4) hands the Horadric start to the UI; a gem
+/// there, or an `hst ` on page 0, does not.
+// Covers: specs/ui/panels-2.md §20 r7
+#[test]
+fn a_staff_in_page_3_starts_the_horadric_animation() {
+    use crate::bridge::output::Output;
+    let stored = |guid: u8, page: u32, code: &[u8; 4]| {
+        let mut b = vec![0x9C, 0x04, 0, 0x10, guid, 0, 0, 0];
+        let bits: Vec<(u32, u32)> = vec![
+            (0x10, 32),
+            (101, 10),
+            (0, 3),
+            (0, 4),
+            (0, 4),
+            (0, 4),
+            (page + 1, 3),
+            (u32::from_le_bytes(*code), 32),
+        ];
+        let mut out = Vec::new();
+        let mut pos = 0usize;
+        for (v, n) in bits {
+            for i in 0..n {
+                if pos / 8 == out.len() {
+                    out.push(0);
+                }
+                out[pos / 8] |= (((v >> i) & 1) as u8) << (pos % 8);
+                pos += 1;
+            }
+        }
+        b.extend(out);
+        b[2] = b.len() as u8;
+        b
+    };
+    let horadric = |m: &Model| {
+        m.out
+            .iter()
+            .filter_map(|o| match o {
+                Output::HoradricItem { code } => Some(*code),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut m = with_local();
+    m.recv(&stored(5, 3, b"gsw "));
+    m.recv(&stored(6, 0, b"hst "));
+    assert!(horadric(&m).is_empty());
+    m.recv(&stored(7, 3, b"hst "));
+    m.recv(&stored(8, 3, b"qf2 "));
+    assert_eq!(horadric(&m), [*b"hst ", *b"qf2 "]);
 }

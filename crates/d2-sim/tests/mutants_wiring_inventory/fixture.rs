@@ -233,6 +233,7 @@ pub fn inv_tables() -> InvTables {
             .collect(),
         itemtypes,
         equiv: equiv(),
+        books: Vec::new(),
     }
 }
 
@@ -450,7 +451,7 @@ impl MovePending for Rest {
     fn rest_pile(&mut self, player: Owner, rest: i32) {
         self.note(format!("rest_pile {} {rest}", og(player)));
     }
-    fn book_count_changed(&mut self, player: Owner, n: i32) {
+    fn book_count_changed(&mut self, player: Owner, _book: Guid, n: i32) {
         self.note(format!("book_count_changed {} {n}", og(player)));
     }
     fn use_item(&mut self, player: Owner, target: Owner, item: Guid) -> bool {
@@ -499,9 +500,6 @@ impl MovePending for Rest {
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {
         self.note(format!("send {} {bytes:?}", og(player)));
         self.sent.push((player, bytes));
-    }
-    fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {
-        self.note(format!("send_item_stat {} {item} {stat}", og(player)));
     }
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         self.note(format!("item_bits {item} {flags} {page}"));

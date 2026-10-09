@@ -20,7 +20,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::predict::Speeds;
@@ -202,8 +202,9 @@ fn drawn_now(app: &App) -> bool {
 
 // Covers: specs/render/draw-order.md §9; specs/render/unit-composite.md §6 r2; specs/ui/controls.md §6 r7; specs/ui/panels-2.md §17 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_play_preview_draws_walks_and_opens_the_character_panel() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(
@@ -215,6 +216,7 @@ fn the_play_preview_draws_walks_and_opens_the_character_panel() {
     .unwrap();
     let source = Arc::new(files());
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -232,7 +234,7 @@ fn the_play_preview_draws_walks_and_opens_the_character_panel() {
         levels,
         TileAssets::new(Some(source.clone()), None),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     add_act_palettes(
         &mut app,
         ActPalettes {

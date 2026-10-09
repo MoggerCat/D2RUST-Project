@@ -41,6 +41,7 @@ use d2_sim::monsters::init::GameInfo;
 use d2_sim::rng::Seed;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::lists::client_state;
+use d2_sim::units::messages as msg;
 use d2_sim::units::{RoomId, UnitId, UnitType};
 use d2_sim::wiring::action::objects::ObjectRoute;
 use d2_sim::wiring::action::{ActionHooks, Pending};
@@ -551,7 +552,8 @@ fn game_creation_then_the_real_join() {
     // `dwObjSeed`), 0x53, game entry: 0x07 of the spawn room, the room switch's
     // 0x07 per room of its adjacency array (the town has one room, no
     // unit in it), 0x15 at the spawn search's point (flag 1), 0x7E; then
-    // the first tick: the room is ready, 0x04 (`tick.md` §6 rule 6).
+    // the first tick: the room is ready, 0x04 (`tick.md` §6 rule 6), and
+    // the join sequence.
     let p = fx.player;
     let g = fx.guid(p).to_le_bytes();
     let (x, y) = fx.pos(p);
@@ -577,7 +579,9 @@ fn game_creation_then_the_real_join() {
     place.extend((y as u16).to_le_bytes());
     place.push(1);
     let states = vec![0xAA, 0, g[0], g[1], g[2], g[3], 8, 0xFF];
+    let level = fx.sim().events.action.sys.stats.unit_total(p, 12, 0) as u16;
     let proximity = vec![0x76, 0, g[0], g[1], g[2], g[3]];
+    let relator2 = vec![0x48, 0, 0, g[0], g[1], g[2], g[3], 0, 0, 0, 0];
     assert_eq!(
         fx.joined,
         vec![
@@ -592,7 +596,27 @@ fn game_creation_then_the_real_join() {
             reveal,
             place,
             vec![0x7E, 0, 0, 0, 0],
-            vec![0x04]
+            // The town's preset waypoint (`drlg::TOWN_WAYPOINT`, objects
+            // row 0, the town room at the origin), created by the object
+            // pass of the room population (`population.md` §11.1;
+            // PROVISIONAL q-fix-real-preset-objects): its S→C 0x51.
+            {
+                let (_, _, wx, wy) = test_fixtures::drlg::TOWN_WAYPOINT;
+                let mut m = vec![0x51, 2, 1, 0, 0, 0, 0, 0];
+                m.extend((wx as u16).to_le_bytes());
+                m.extend((wy as u16).to_le_bytes());
+                m.extend([0, 0]);
+                m
+            },
+            vec![0x04],
+            // q-fix-flow-server (`sim/tick.md` §6 rule 4): the
+            // inventory refresh's 0x48, then the join sequence (§8.3):
+            // 0x5B, 0x65, 0x8D, the join 0x5A.
+            relator2,
+            msg::player_joined(fx.guid(p), CLASS as u8, &name(), level, 0xFFFF),
+            msg::player_kill_count(fx.guid(p), 0).to_vec(),
+            vec![0x8D, g[0], g[1], g[2], g[3], 0xFF, 0xFF],
+            msg::player_event(2, &name()).to_vec(),
         ],
         "{:02x?}",
         fx.joined

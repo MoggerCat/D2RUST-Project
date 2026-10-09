@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::UnitKey;
 use d2_client::bridge::BridgeResource;
@@ -41,20 +41,28 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_act_iii_waypoint_takes_the_player_to_spider_forest() {
-    // Spider Forest is waypoint 19 (`waypoints.tsv`).
-    travel(75, 19, 76, 2);
+    travel(75, 76, 2);
 }
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_act_v_waypoint_takes_the_player_to_rigid_highlands() {
-    // Rigid Highlands is waypoint 31 (`waypoints.tsv`).
-    travel(single_player::ACT5_TOWN, 31, 111, 4);
+    travel(single_player::ACT5_TOWN, 111, 4);
 }
 
-fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
-    let data = GameData::Synthetic;
+/// From the waypoint of `town` (act `act`, 0-based) to the field level
+/// `field`, whose waypoint index is its `levels` `Waypoint`.
+fn travel(town: u32, field: u32, act: u8) {
+    let wp_index = u32::from(
+        app_support::waypoints()
+            .map
+            .index_of_level(field)
+            .expect("the field has a waypoint"),
+    );
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -64,6 +72,7 @@ fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
     .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -76,7 +85,7 @@ fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -116,21 +125,7 @@ fn travel(town: u32, wp_index: u32, field: u32, act: u8) {
     assert_eq!(level(&app), Some(town as u16));
     let b = &app.world().resource::<BridgeResource>().0;
     assert_eq!(b.world().act.as_ref().map(|a| a.act), Some(act));
-    let wp: UnitKey = b
-        .world()
-        .units
-        .iter()
-        .find(|(k, _)| k.unit_type == 2)
-        .map(|(k, _)| *k)
-        .expect("the town waypoint is in the client's model");
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .interact(wp)
-        .unwrap();
-    for _ in 0..10 {
-        step(&mut app);
-    }
+    let wp: UnitKey = app_support::operate_town_waypoint(&mut app, &server, &ms);
     let mut m = vec![0x49];
     m.extend_from_slice(&wp.guid.to_le_bytes());
     m.extend_from_slice(&field.to_le_bytes());

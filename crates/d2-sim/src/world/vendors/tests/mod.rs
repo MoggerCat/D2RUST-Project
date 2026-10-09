@@ -734,17 +734,17 @@ impl VendorWorld for Fake {
     fn equipped_items(&self, _player: UnitId) -> Vec<UnitId> {
         self.equipped.iter().map(|&g| UnitId(g)).collect()
     }
-    fn find_tome(&self, _player: UnitId, _scroll: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _player: UnitId, _scroll: UnitId) -> Option<(UnitId, i32)> {
         self.tome.map(|(g, f)| (UnitId(g), f))
     }
     fn add_to_tome(&mut self, tome: UnitId, k: i32) {
         let q = self.get(tome.0, stat::QUANTITY);
         self.set(tome.0, stat::QUANTITY, q + k);
     }
-    fn find_partial_stack(&self, _player: UnitId, _item: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _player: UnitId, _item: UnitId) -> Option<(UnitId, i32)> {
         self.stack.map(|(g, f)| (UnitId(g), f))
     }
-    fn can_belt(&self, _player: UnitId, _item: UnitId) -> bool {
+    fn can_belt(&mut self, _player: UnitId, _item: UnitId) -> bool {
         self.belt
     }
     fn put_in_belt(&mut self, _player: UnitId, _item: UnitId) -> bool {

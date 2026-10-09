@@ -14,12 +14,17 @@ use crate::scene::Rect;
 pub const PANEL_HEIGHT: i32 = 40;
 /// Client tick in milliseconds (§9, `0x0070EF1C`).
 pub const TICK_MS: u32 = 40;
+/// The client tick in milliseconds, the one constant every client clock
+/// reads (d2rs-own clock, unverified; `q-fix-prov-frame-clock`).
+pub const CLIENT_TICK_MS: u32 = TICK_MS;
 /// Tile cell size in client pixels (§2): `sx = (tx − ty) × 80`.
 pub const CELL_HALF_WIDTH: i32 = 80;
 pub const CELL_HALF_HEIGHT: i32 = 40;
 
-/// The frame W × H (§1). d2rs draws 800 × 600 only (EARLY_DECISIONS 9);
-/// the rules are written for any size so the spec's 640 × 480 vectors run.
+/// The frame W × H (§1). d2rs draws 800 × 600 by default (EARLY_DECISIONS
+/// 9); `play --res 640x480` runs the 640 × 480 frame ([`FrameSize::play`]),
+/// and the rules are written for any size so the spec's 640 × 480 vectors
+/// run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FrameSize {
     pub width: i32,
@@ -27,16 +32,26 @@ pub struct FrameSize {
 }
 
 impl FrameSize {
-    /// Resolution mode 2, the only one d2rs supports.
+    /// Resolution mode 2, the d2rs default.
     pub const D2RS: FrameSize = FrameSize {
         width: 800,
         height: 600,
     };
-    /// Resolution mode 0 (1.14d only; kept for the spec's vectors).
+    /// Resolution mode 0 (`play --res 640x480`; the spec's 640 × 480 vectors).
     pub const LOW: FrameSize = FrameSize {
         width: 640,
         height: 480,
     };
+
+    /// The resolution mode of the frame (§1): 0 for 640 × 480, 2 for
+    /// 800 × 600.
+    pub fn resolution_mode(&self) -> u32 {
+        if *self == Self::LOW {
+            0
+        } else {
+            2
+        }
+    }
 
     /// Play-area height `H − 40` (§1).
     pub fn play_height(&self) -> i32 {
@@ -47,6 +62,42 @@ impl FrameSize {
     pub fn rect(&self) -> Rect {
         Rect::new(0, 0, self.width as u32, self.height as u32)
     }
+
+    /// The frame the play path draws: [`FrameSize::D2RS`] unless
+    /// [`FrameSize::set_play`] chose another before the app started.
+    /// d2rs-own (decision q-fix-ui-draw-sink): the original keeps its
+    /// display size in globals set once per video mode
+    /// (`GeneralDisplayWidth/Height`, §1); d2rs sets it once per process
+    /// from `play --res`, so the 640 × 480 rules run in play.
+    pub fn play() -> FrameSize {
+        PLAY_FRAME.get().copied().unwrap_or(FrameSize::D2RS)
+    }
+
+    /// Chooses the play frame (resolution mode 0 or 2 of §1) once per
+    /// process; a second call with another size is refused (the frame of a
+    /// running app never changes).
+    pub fn set_play(size: FrameSize) -> Result<(), PlayFrameError> {
+        if size != FrameSize::D2RS && size != FrameSize::LOW {
+            return Err(PlayFrameError::Unsupported(size));
+        }
+        let now = *PLAY_FRAME.get_or_init(|| size);
+        if now != size {
+            return Err(PlayFrameError::AlreadySet { now, asked: size });
+        }
+        Ok(())
+    }
+}
+
+/// The play frame of [`FrameSize::play`].
+static PLAY_FRAME: std::sync::OnceLock<FrameSize> = std::sync::OnceLock::new();
+
+/// Errors of [`FrameSize::set_play`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum PlayFrameError {
+    #[error("frame {0:?} is neither 800 × 600 nor 640 × 480 (§1 resolution modes 2, 0)")]
+    Unsupported(FrameSize),
+    #[error("the play frame is already {now:?}; {asked:?} refused")]
+    AlreadySet { now: FrameSize, asked: FrameSize },
 }
 
 /// The screen open mode 0–3 (§1, `D2Client_ScreenOpenMode`); which panels
@@ -170,6 +221,25 @@ pub enum TileList {
     Roof {
         roof_height: i32,
     },
+}
+
+/// The inputs of the frame's one camera besides the open mode (§3, §8):
+/// the local player's position and the shake offsets, decided once per
+/// frame (`seams/world-screen.md` §2.2, §2.4). Every reader that builds a
+/// camera or places the local player takes this one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FrameAnchor {
+    /// The local player's position (the walk prediction in `play`).
+    pub player: UnitPosition,
+    /// `(dx, dy)` of §8, `(0, 0)` when no shake runs.
+    pub shake: (i32, i32),
+}
+
+impl FrameAnchor {
+    /// The frame's camera in open mode `mode` (§3).
+    pub fn camera(&self, size: FrameSize, mode: OpenMode) -> Camera {
+        Camera::new(size, mode, self.player.client(), self.shake)
+    }
 }
 
 /// The camera of one drawn frame (§3): computed once, from the local

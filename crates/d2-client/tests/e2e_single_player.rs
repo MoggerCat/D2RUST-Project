@@ -389,6 +389,7 @@ impl Fx {
             combat: combat_tables(),
             levels: levels(),
             skill_modes: vec![[0; 8]],
+            overlay_count: 0,
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1524,10 +1525,11 @@ fn run_with(game_seed: u32) -> Transcript {
     // pass (in the NPC inventory, the price, gold, no cursor item in the
     // player's inventory); the purchase loop (§7.1 rule 9) copies the
     // store cap (§7.3, on the inventory model), pays (§9.1, §9.2 by
-    // hand: 100·AC/5, sell mult 1024), and auto-places the copy in the
-    // backpack (`0x00560200`, "send"): 0x2A code 0, kind 4, the copy's
-    // GUID; the copy's 0x9C action 4 in the tick's update pass. The
-    // permanent cap stays in the store (rule 12).
+    // hand: 100·AC/5, sell mult 1024), and, no weapon in use and the
+    // head empty, the equip try of §7.1.1 puts the copy on the head
+    // (`inventory.md` §4.9): 0x2A code 0, kind 4, the copy's GUID; the
+    // copy's 0x9D action 6 in the tick's update pass (`vendors.md` OQ3's
+    // expectation). The permanent cap stays in the store (rule 12).
     let price = 100 * fx.stat(*store.last().unwrap(), ARMORCLASS) / 5;
     let store_cap = fx.guid(*store.last().unwrap());
     let buy = bytes(&BuyItem {
@@ -1545,18 +1547,11 @@ fn run_with(game_seed: u32) -> Transcript {
     let bg = fx.guid(bought);
     gold_now -= price;
     let mut want = vec![tx(4, 0, bg, gold_now)];
-    want.extend(pass(vec![x9c(0x04, bg)]));
+    want.extend(pass(vec![x9d(0x06, bg)]));
     assert_eq!(streams(&fx, &frames[29].2), want);
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap, fx.cube, bought]);
-    // The client's model: the copy (action 4) is a stored backpack item,
-    // not a store item (this harness has no local player to own it).
-    assert!(
-        d2_client::bridge::items::items(fx.bridge.world())
-            .iter()
-            .any(|i| i.key.guid == bg && !i.store && i.mode == 0 && i.page == 0),
-        "the bought copy {bg} is in the client's backpack"
-    );
+    assert_eq!(fx.mode(bought), 1, "worn");
 
     // 21. Sell the player's stored buckler (re-sellable, not a
     // permanent code): §7.2 rule 8 copies it into the store (restored,
@@ -1729,7 +1724,7 @@ fn run_with(game_seed: u32) -> Transcript {
     let log = fx.pending().log.clone();
     assert_eq!(log.last(), Some(&format!("warp {} {GATE} 0", player.0)));
     assert_eq!(fx.sim_ref().game.lists.active_rooms(0).len(), 5);
-    let arrivals = &fx.sim_ref().world.action.arrivals.0;
+    let arrivals = &fx.sim_ref().events.action.sys.hooks.arrivals.0;
     assert_eq!(arrivals.len(), 1);
     assert_eq!((arrivals[0].x, arrivals[0].y), PLAYER_AT);
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
@@ -1739,10 +1734,10 @@ fn run_with(game_seed: u32) -> Transcript {
     // 0x27, 0x29, 0x28 twice (frames 17, 28), 0x2A four times (frames
     // 28–31), handled
     // (`client/msg-ui.md` §5, §12, §16, §18), and Akara's harness add
-    // (0xAC, `akara_add`); 0x9C eight times (frames 20, 21, 26,
-    // 27, 29, 32, 33, 34), 0x9D four times (22, 23, 24, 34), 0x47 and
+    // (0xAC, `akara_add`); 0x9C seven times (frames 20, 21, 26,
+    // 27, 32, 33, 34), 0x9D five times (22, 23, 24, 29, 34), 0x47 and
     // 0x48 eleven times each are applied (`client/msg-stats-items.md`).
-    // The 0x9C made the four items it names (the bought cap too); 0x9D needs the local player, which
+    // The 0x9C made the three items it names; 0x9D (the bought cap's too) needs the local player, which
     // this staged game never announces (no 0x59 / 0x0B), so it changes
     // nothing (§2 rule 3); the join's four 0x07 (frame 2) are rejected,
     // fatal 0x58A (no client act: this staged game sends no 0x03); the
@@ -1757,7 +1752,7 @@ fn run_with(game_seed: u32) -> Transcript {
         .flat_map(|f| f.2.iter())
         .filter(|m| m[0] == 0x9C && m[1] == 11)
         .collect();
-    assert_eq!(client, (37, 36, 6 + shown.len()));
+    assert_eq!(client, (37, 36, 5 + shown.len()));
     assert_eq!(w.local_player, None);
     let object = d2_client::bridge::world::UnitKey::new(d2_client::bridge::world::OBJECT, wp);
     assert!(w.units.contains_key(&object));

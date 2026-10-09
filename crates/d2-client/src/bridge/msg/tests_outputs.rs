@@ -359,7 +359,10 @@ fn outputs_keep_message_order_and_capture_at_receive() {
                 code: 0x10,
                 dead_or_absent: true
             },
-            Output::UnitFreed { unit: npc }
+            Output::UnitFreed {
+                unit: npc,
+                client_only: false
+            }
         ]
     );
 }
@@ -383,7 +386,16 @@ fn every_model_unit_free_appends_one_unit_freed() {
     );
     assert_eq!(
         outs(&m),
-        [Output::UnitFreed { unit: b }, Output::UnitFreed { unit: a }]
+        [
+            Output::UnitFreed {
+                unit: b,
+                client_only: false
+            },
+            Output::UnitFreed {
+                unit: a,
+                client_only: false
+            }
+        ]
     );
     assert!(m.w.freed.is_empty());
 }

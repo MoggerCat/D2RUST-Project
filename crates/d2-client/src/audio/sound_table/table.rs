@@ -90,6 +90,8 @@ pub struct SoundTableData {
     /// `Indoors` (+0x18) of each `soundenviron` record (§2), the input of
     /// the thunder occlusion (§6.4 r2).
     indoors: Vec<u8>,
+    /// The `soundenviron` records (§2), by row.
+    environ: Vec<SoundEnvironRow>,
 }
 
 impl SoundTableData {
@@ -137,7 +139,13 @@ impl SoundTableData {
             entries,
             song_range,
             indoors: environ.iter().map(|r| r.indoors).collect(),
+            environ: environ.to_vec(),
         }
+    }
+
+    /// The `soundenviron` records, by row (§2).
+    pub fn env_rows(&self) -> &[SoundEnvironRow] {
+        &self.environ
     }
 
     /// `Indoors` of each `soundenviron` record, by row (§2).
@@ -220,12 +228,16 @@ impl SoundTableData {
         if n <= 3 && roll(n + 1) == 0 {
             k -= 1;
         }
-        loop {
+        // Bounded: with a real seed a miss has probability <= 1/2 per draw, so
+        // 64 misses never happen; a roll stuck at 0 (no client seed yet,
+        // `SoundSystem::roll`) would otherwise spin forever.
+        for _ in 0..64 {
             let v = id.wrapping_add(roll(n) as i32);
             if !e.history[..k].contains(&v) {
                 return v;
             }
         }
+        id
     }
 
     /// History update (`0x004E0213`, §4 r4) on the requested id's record.

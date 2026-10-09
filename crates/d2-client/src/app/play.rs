@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md (§7, §8), specs/client/render-pipeline.md (A1, A9)
+// Spec: specs/client/bridge.md (§7, §8), specs/client/render-pipeline.md (A1, A9), specs/flows/save-exit.md (§1, §4)
 //! `d2-client play`: a window running the local single-player game.
 //!
 //! Each Bevy frame: the bridge frame in `PreUpdate` (`pump` the
@@ -58,7 +58,7 @@ use super::ui;
 use crate::bridge::drlg::DrlgSource;
 use crate::bridge::mirror::DynLink;
 use crate::bridge::predict::{PredictLink, WalkTap};
-use crate::bridge::world::{ClientTables, LevelRow};
+use crate::bridge::world::LevelRow;
 use crate::bridge::{Bridge, BridgeError, BridgePlugin, BridgeResource};
 use crate::world_view::node::NodeRuns;
 use crate::world_view::object_label::ObjectLabels;
@@ -100,7 +100,8 @@ pub fn add_game(app: &mut App, link: DynLink, gpu: bool) -> Result<(), BridgeErr
             Box::new(Unspecified),
             Box::new(ModelFeed::<NoFeed>::default()),
         ))
-        .add_systems(Last, log_progress);
+        .add_systems(Last, log_progress)
+        .add_systems(Update, super::save::end_of_game);
     sound::add_audio(app, AudioParts::empty());
     // The position check's visibility predicate over no unit art (every
     // unit reads as not visible, the check corrects); `run` installs it
@@ -152,10 +153,7 @@ pub fn add_client_data(app: &mut App, drlg: DrlgSource, levels: Vec<LevelRow>) {
     let world = app.world_mut();
     let mut bridge = world.resource_mut::<BridgeResource>();
     bridge.0.set_drlg_source(Some(drlg));
-    bridge.0.set_tables(ClientTables {
-        levels: levels.clone(),
-        ..ClientTables::default()
-    });
+    bridge.0.set_levels(levels.clone());
     let mut state = world.resource_mut::<WorldViewState>();
     state.feed = Box::new(ModelFeed {
         levels: Some(levels),
@@ -192,7 +190,11 @@ pub fn add_preview_tinted(
     lights: Option<crate::world_view::light_sources::LightRows>,
     tints: Option<crate::world_view::state_tint::StateTints>,
 ) {
-    let weather = WeatherView::new(tiles.source());
+    let link = app
+        .world_mut()
+        .get_resource_or_insert_with(crate::audio::driver::SoundLink::default)
+        .clone();
+    let weather = WeatherView::new(tiles.source()).with_sound(link);
     let mut preview = Preview::new(tiles);
     preview.light.sources = lights.map(std::sync::Arc::new);
     preview.light.set_tints(tints.map(std::sync::Arc::new));
@@ -312,10 +314,61 @@ pub struct PlayConfig {
     /// The 0x67 flags the front end chose (`front_start`); `None`: the
     /// character's own.
     pub start_flags: Option<u32>,
+    /// `--dump-draws DIR --at-tick N` (`specs/tools/facts-render.md` §5):
+    /// write one frame's rendering facts, then exit.
+    pub dump: Option<crate::facts::export::DumpRequest>,
+    /// `--input SCRIPT` (`specs/tools/facts-render.md` §5 r11): scripted
+    /// pointer input in place of the window's.
+    pub input: Option<Vec<crate::world_view::input_script::Step>>,
 }
 
 #[derive(Resource)]
 struct ExitAfter(u32);
+
+/// What `run` does once `app.run()` returned: first the leave through
+/// the server ([`leave_game`]: every way out saves, `flows/save-exit.md`
+/// §2), then the automap teardown. Nothing here needs a resource to exist:
+/// a missing [`BridgeResource`] leaves nothing (`Ok(false)`), a missing
+/// [`WorldViewState`] has no automap to tear down. Returns
+/// [`leave_game`]'s result.
+pub fn after_run(world: &mut bevy::ecs::world::World) -> Result<bool, BridgeError> {
+    let left = match world.get_resource_mut::<BridgeResource>() {
+        Some(mut b) => leave_game(&mut b.0),
+        None => Ok(false),
+    };
+    if let Some(a) = world
+        .get_resource_mut::<WorldViewState>()
+        .and_then(|s| s.into_inner().automap.as_mut())
+    {
+        if let Err(e) = a.teardown() {
+            eprintln!("play: the automap was NOT saved: {e}");
+        }
+    }
+    left
+}
+
+/// Leaves the game through the server after the app stopped
+/// (`flows/save-exit.md` §1 r2 – §4 r1): a client still in game sends
+/// C→S 0x69 ([`Bridge::save_and_exit`]) and runs bridge frames until the
+/// server's 0x05 takes it out of the game (at most 100 frames: the drain
+/// of the next server frame answers it). Returns whether the client is
+/// out of the game. PROVISIONAL (REC-291): the window close of 1.14d
+/// runs the same exit path (`ui/frontend-options.md` §O3, `WM_CLOSE`);
+/// its chain is `flows/save-exit.md` OQ1. d2rs-own, unverified.
+pub fn leave_game<L: crate::bridge::link::ServerLink>(
+    bridge: &mut Bridge<L>,
+) -> Result<bool, BridgeError> {
+    if bridge.world().in_game && !bridge.world().exit_requested {
+        bridge.save_and_exit()?;
+    }
+    for _ in 0..100 {
+        if !bridge.world().in_game {
+            return Ok(true);
+        }
+        bridge.frame()?;
+    }
+    Ok(!bridge.world().in_game)
+}
 
 fn exit_after(limit: Res<ExitAfter>, mut seen: Local<u32>, mut exit: MessageWriter<AppExit>) {
     *seen += 1;
@@ -333,26 +386,185 @@ fn wall_seconds() -> i32 {
         .map_or(0, |d| d.as_secs() as i32)
 }
 
+/// What [`add_live_client`] wires besides the link: the character and
+/// how the game was asked for, and the server's published state.
+pub struct LiveClient<'a> {
+    /// The user's files (`GameData::Live`).
+    pub data: &'a std::sync::Arc<single_player::LiveData>,
+    /// The character the join loads (its 0x67, `send_create_game_flags`).
+    pub request: &'a single_player::Character,
+    /// The 0x67 flags the front end chose; `None`: the character's own.
+    pub start_flags: Option<u32>,
+    /// The store prices the server host publishes (`Started::prices`).
+    pub prices: crate::ui::original::ShopPrices,
+    /// The walk speeds of the character (`single_player::walk_speeds`).
+    pub speeds: Option<crate::bridge::predict::Speeds>,
+    pub hardcore: bool,
+    /// Where the automap is saved (next to the character save).
+    pub automap_files: Option<super::automap::SaveFiles>,
+    /// The GPU compositor's node (the window); `false` headless.
+    pub gpu: bool,
+}
+
+/// The play game's client on the user's files, on `link`: the bridge
+/// with every client table, the world view with the preview over the
+/// archives' tiles, palettes, lights and tints, the items, missiles,
+/// automap, original UI, strings, HUD tables, shop prices, hireling
+/// stats, the original sound layer, the walk prediction, visibility,
+/// loading overlay, death and hardcore screens. `run` calls it after
+/// the window plugins; the headless tests call it on `MinimalPlugins`,
+/// so a test runs the same client `d2-client play` runs.
+pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::Result<()> {
+    let d = c.data;
+    let data = GameData::Live(d.clone());
+    let archives = d.archives.clone();
+    let drlg_source = single_player::client_drlg_source(&data);
+    let level_rows = single_player::client_level_rows(&data);
+    let waypoint_map = single_player::client_waypoint_map(&data);
+    let level_names = single_player::client_level_names(&data);
+    let object_rows = single_player::client_object_rows(&data);
+    let object_names = single_player::client_object_names(&data);
+    let automap_source = super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?;
+    let hire_rows = d.tables.hire_rows().map_err(anyhow::Error::msg)?;
+    let (link, tap) = predict_link(link);
+    add_game(app, link, c.gpu)?;
+    send_create_game_flags(app, c.request, c.start_flags)?;
+    add_client_data(app, drlg_source, level_rows.clone());
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_object_rows(object_rows);
+    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+        state.object_labels = ObjectLabels::new(object_names);
+    }
+    let skills = single_player::client_skill_rows(archives.as_ref())?;
+    let skill_tables = single_player::client_skill_tables(archives.as_ref())?;
+    let class_skills = single_player::client_class_skills(archives.as_ref())?;
+    {
+        let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
+        bridge.0.set_skill_rows(skills);
+        bridge.0.set_class_skills(class_skills);
+        bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
+    }
+    let units = single_player::client_unit_rows(archives.as_ref())?;
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_unit_rows(units);
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_wall_seconds(wall_seconds);
+    // The preview draws the light map at quality 2 (high,
+    // `preview_light`): the model's missile lights follow it.
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_high_light_quality(true);
+    let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
+    let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
+    let lights = crate::world_view::light_sources::load(archives.as_ref())
+        .map_err(|e| {
+            warn!("light rows (d2rs-own, unverified): {e}; level ambients from the environment")
+        })
+        .ok();
+    let tints = super::missile_art::state_tints(archives.as_ref())
+        .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
+        .ok();
+    add_preview_tinted(app, level_rows, tiles, lights, tints);
+    // Pass 1's level background (`draw-order-2.md` §12; the summit's
+    // time seed is PROVISIONAL REC-420, `background_view`).
+    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+        state.background_view = Some(crate::world_view::background_view::BackgroundView::new(
+            archives.source(),
+            Some(crate::world_view::background_view::summit_seed_now()),
+        ));
+    }
+    match crate::world_view::unit_facts::load(archives.as_ref()) {
+        Ok(t) => {
+            if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+                state.feed.set_unit_fact_tables(t);
+            }
+        }
+        Err(e) => warn!("unit facts tables: {e}; draw order uses the preview fills only"),
+    }
+    let mut item_parts = super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
+    match d
+        .tables
+        .item_tables()
+        .map_err(|e| e.to_string())
+        .and_then(|t| super::items::item_tips(archives.as_ref(), t))
+    {
+        Ok(t) => {
+            app.world_mut()
+                .resource_mut::<BridgeResource>()
+                .0
+                .set_item_tables(std::sync::Arc::new(super::items::TableDecoder(t.tables())));
+            item_parts.tips = Some(t);
+        }
+        Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
+    }
+    // The equip-box click's §4.3 tables (`ui::panels::inv_items` `equip`).
+    match d2_sim::items::inventory::InvTables::from_fixed(&d.tables.fixed) {
+        Ok(t) => item_parts.inv_tables = Some(std::sync::Arc::new(t)),
+        Err(e) => warn!("inventory tables: {e}; equipment boxes take no clicks"),
+    }
+    super::items::add_items(app, archives.source(), item_parts);
+    let effects = super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;
+    super::missile_art::add_missiles(app, archives.source(), effects);
+    palette::add_act_palettes(app, palettes);
+    super::automap::add_automap(
+        app,
+        automap_source,
+        c.automap_files,
+        archives.source(),
+        true,
+    );
+    let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
+    ui::add_original_ui(app, parts)?;
+    let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
+        .map_err(anyhow::Error::msg)?;
+    super::strings::install_strings(app, strings);
+    super::hud::install_hud_tables(app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+    super::hud::install_char_tables(app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+    super::hud::install_skill_tree_tables(app, archives.as_ref()).map_err(anyhow::Error::msg)?;
+    ui::set_waypoint_map(app, waypoint_map);
+    ui::set_level_names(app, level_names);
+    ui::set_shop_prices(app, c.prices);
+    super::hire_stats::install_hire_stats(app, hire_rows, true);
+    let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
+    let audio = GameAudio::new(AudioParts::original(archives.source(), table));
+    // The unit sounds' tables (`audio/unit_feed.rs`): `monsounds`, the
+    // animation of each unit's mode (REC-430).
+    let looks = std::sync::Arc::new(
+        crate::world_view::unit_assets::UnitLooks::live(archives.as_ref())
+            .map_err(anyhow::Error::msg)?,
+    );
+    let unit_rows = crate::audio::unit_feed::UnitSoundRows::live(
+        archives.as_ref(),
+        looks,
+        std::sync::Arc::new(d.tables.anim.clone()),
+    )
+    .map_err(anyhow::Error::msg)?;
+    if let Some(driver) = &audio.driver {
+        driver
+            .lock()
+            .map_err(|_| anyhow::anyhow!("audio state poisoned"))?
+            .set_unit_rows(std::sync::Arc::new(unit_rows));
+    }
+    app.insert_resource(audio);
+    add_walk(app, tap, c.speeds);
+    super::visibility::add_visibility(app);
+    super::loading_overlay::add_loading(app, Some(archives.source()));
+    super::death::add_death(app);
+    super::hardcore::add_hardcore(app, c.hardcore);
+    Ok(())
+}
+
 /// Opens the window and runs the game until it is closed.
 pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
-    let archives = match &config.data {
-        GameData::Live(d) => Some(d.archives.clone()),
-        GameData::Synthetic => None,
-    };
-    let item_lookup = match &config.data {
-        GameData::Live(d) => Some(d.tables.item_tables().map_err(|e| e.to_string())),
-        GameData::Synthetic => None,
-    };
-    let drlg_source = single_player::client_drlg_source(&config.data);
-    let level_rows = single_player::client_level_rows(&config.data);
-    let waypoint_map = single_player::client_waypoint_map(&config.data);
-    let object_rows = single_player::client_object_rows(&config.data);
-    let object_names = single_player::client_object_names(&config.data);
+    let GameData::Live(live) = config.data.clone();
     let request = config.character.clone();
-    let loading_files = match &config.data {
-        GameData::Live(d) => Some(d.archives.source()),
-        GameData::Synthetic => None,
-    };
     // d2rs-own, unverified: the map files sit next to the character save.
     let automap_files = config.save_path.as_deref().and_then(|p| {
         Some(super::automap::SaveFiles {
@@ -361,16 +573,6 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             name: p.file_stem()?.to_string_lossy().into_owned(),
         })
     });
-    let automap_source = match &config.data {
-        GameData::Live(d) => {
-            Some(super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?)
-        }
-        GameData::Synthetic => None,
-    };
-    let hire_rows = match &config.data {
-        GameData::Live(d) => d.tables.hire_rows().map_err(anyhow::Error::msg)?,
-        GameData::Synthetic => Vec::new(),
-    };
     let speeds = single_player::walk_speeds(&config.data, &config.character)?;
     let mut save_base = save::base_save(&config.character);
     let hardcore =
@@ -378,11 +580,12 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
     if hardcore {
         save_base.header.status |= d2_formats::d2s::status::HARDCORE;
     }
-    let save_tables: Option<std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync>> =
-        match &config.data {
-            GameData::Live(d) => Some(std::sync::Arc::new(d.save.clone())),
-            GameData::Synthetic => None,
-        };
+    let save_tables: std::sync::Arc<dyn d2_formats::d2s::SaveTables + Send + Sync> =
+        std::sync::Arc::new(live.save.clone());
+    // `d2s.md` §2.8: the server's saves rebuild the appearance bytes.
+    let appearance = Some(std::sync::Arc::new(
+        save::appearance_tables(&live.tables.fixed).map_err(anyhow::Error::msg)?,
+    ));
     let (mut link, started) = single_player::start_with(
         config.data,
         config.seed,
@@ -393,10 +596,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
     // Before the app exists, so not through Bevy's log.
-    println!(
-        "single player: seed {}, waypoint unit {:?} (GUID {})",
-        config.seed, started.waypoint, started.waypoint_guid
-    );
+    println!("single player: seed {}", config.seed);
     let mut app = App::new();
     // d2rs-own, unverified: the config folder is next to the saves; a bad
     // settings.toml or controls.toml stops here (no silent default).
@@ -408,9 +608,18 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
             .unwrap_or_else(super::save::default_save_dir),
     );
     let settings = super::config::load_settings(&cfg_dir)?;
-    let bindings = super::config::load_controls(&cfg_dir)?;
+    let bindings = super::config::load_controls(&super::config::controls_dir(
+        crate::ui::front_end::screens::controls::config_path().as_deref(),
+        &cfg_dir,
+    ))?;
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(super::config::window_for(&settings)),
+        // The game draws its own cursor (`ui/panels-3.md` §23,
+        // `ui::original::cursor_ui`): the OS cursor is hidden.
+        primary_cursor_options: Some(bevy::window::CursorOptions {
+            visible: false,
+            ..default()
+        }),
         ..default()
     }));
     app.insert_resource(super::config::ConfigRes {
@@ -419,139 +628,52 @@ pub fn run(config: PlayConfig) -> anyhow::Result<AppExit> {
         bindings,
     })
     .add_systems(Update, super::config::apply_settings);
-    let (link, saver): (DynLink, Option<save::SaveHandle>) = match (config.save_path, save_tables) {
-        (Some(path), Some(tables)) => {
-            let (link, handle) = save::share(link, save_base, tables, path);
+    let (link, saver): (DynLink, Option<save::SaveHandle>) = match config.save_path {
+        Some(path) => {
+            let (link, handle) = save::share(link, save_base, save_tables, appearance, path)?;
             (Box::new(link), Some(handle))
         }
-        (path, _) => {
-            if path.is_some() {
-                println!("play: no save tables (synthetic data): the character is not saved");
-            }
-            (Box::new(link), None)
-        }
+        None => (Box::new(link), None),
     };
-    let (link, tap) = predict_link(link);
     if let Some(h) = &saver {
         app.insert_resource(h.clone());
     }
-    add_game(&mut app, link, true)?;
-    send_create_game_flags(&mut app, &request, config.start_flags)?;
-    add_client_data(&mut app, drlg_source, level_rows.clone());
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_object_rows(object_rows);
-    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
-        state.object_labels = ObjectLabels::new(object_names);
-    }
-    if let Some(archives) = archives {
-        let skills = single_player::client_skill_rows(archives.as_ref())?;
-        let skill_tables = single_player::client_skill_tables(archives.as_ref())?;
-        let class_skills = single_player::client_class_skills(archives.as_ref())?;
-        {
-            let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
-            bridge.0.set_skill_rows(skills);
-            bridge.0.set_class_skills(class_skills);
-            bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
-        }
-        let units = single_player::client_unit_rows(archives.as_ref())?;
-        app.world_mut()
-            .resource_mut::<BridgeResource>()
-            .0
-            .set_unit_rows(units);
-        app.world_mut()
-            .resource_mut::<BridgeResource>()
-            .0
-            .set_wall_seconds(wall_seconds);
-        let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
-        let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
-        let lights = crate::world_view::light_sources::load(archives.as_ref())
-            .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
-            .ok();
-        let tints = super::missile_art::state_tints(archives.as_ref())
-            .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
-            .ok();
-        add_preview_tinted(&mut app, level_rows, tiles, lights, tints);
-        match crate::world_view::unit_facts::load(archives.as_ref()) {
-            Ok(t) => {
-                if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
-                    state.feed.set_unit_fact_tables(t);
-                }
-            }
-            Err(e) => warn!("unit facts tables: {e}; draw order uses the preview fills only"),
-        }
-        let mut item_parts =
-            super::items::item_parts(archives.as_ref()).map_err(anyhow::Error::msg)?;
-        if let Some(lookup) = item_lookup {
-            match lookup.and_then(|t| super::items::item_tips(archives.as_ref(), t)) {
-                Ok(t) => {
-                    app.world_mut()
-                        .resource_mut::<BridgeResource>()
-                        .0
-                        .set_item_tables(std::sync::Arc::new(super::items::TableDecoder(
-                            t.tables(),
-                        )));
-                    item_parts.tips = Some(t);
-                }
-                Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
-            }
-        }
-        super::items::add_items(&mut app, archives.source(), item_parts);
-        let effects =
-            super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;
-        super::missile_art::add_missiles(&mut app, archives.source(), effects);
-        palette::add_act_palettes(&mut app, palettes);
-        if let Some(source) = automap_source {
-            super::automap::add_automap(&mut app, source, automap_files, archives.source(), true);
-        }
-        let parts = ui::UiParts::live(archives.clone()).map_err(anyhow::Error::msg)?;
-        ui::add_original_ui(&mut app, parts)?;
-        let strings = super::strings::TableStrings::load(archives.as_ref(), super::strings::LANG)
-            .map_err(anyhow::Error::msg)?;
-        super::strings::install_strings(&mut app, strings);
-        super::hud::install_hud_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
-        super::hud::install_char_tables(&mut app, archives.as_ref()).map_err(anyhow::Error::msg)?;
-        super::hud::install_skill_tree_tables(&mut app, archives.as_ref())
-            .map_err(anyhow::Error::msg)?;
-        ui::set_waypoint_map(&mut app, waypoint_map);
-        ui::set_shop_prices(&mut app, started.prices.clone());
-        super::hire_stats::install_hire_stats(&mut app, hire_rows, true);
-        let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;
-        app.insert_resource(GameAudio::new(AudioParts::original(
-            archives.source(),
-            table,
-        )));
-    } else {
-        super::synthetic_client::install(&mut app);
-        add_preview(&mut app, level_rows, TileAssets::default());
-    }
-    add_walk(&mut app, tap, speeds);
-    super::visibility::add_visibility(&mut app);
-    super::loading_overlay::add_loading(&mut app, loading_files);
-    super::death::add_death(&mut app);
-    super::hardcore::add_hardcore(&mut app, hardcore);
+    add_live_client(
+        &mut app,
+        link,
+        LiveClient {
+            data: &live,
+            request: &request,
+            start_flags: config.start_flags,
+            prices: started.prices,
+            speeds,
+            hardcore,
+            automap_files,
+            gpu: true,
+        },
+    )?;
     sound::add_output(&mut app);
+    if let Some(steps) = config.input {
+        app.insert_resource(crate::world_view::input_script::InputScript::new(steps));
+    }
+    if let Some(request) = config.dump {
+        app.insert_resource(crate::world_view::present::DrawDump::new(request))
+            .insert_resource(crate::bridge::mirror::DrawnTick::default());
+    }
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))
             .add_systems(Update, exit_after);
     }
     let exit = app.run();
-    if let Some(a) = app
-        .world_mut()
-        .resource_mut::<WorldViewState>()
-        .automap
-        .as_mut()
-    {
-        if let Err(e) = a.teardown() {
-            eprintln!("play: the automap was NOT saved: {e}");
-        }
-    }
-    if let Some(h) = saver {
-        match h.save() {
-            Ok(()) => println!("play: saved the character to {}", h.path().display()),
-            Err(e) => eprintln!("play: the character was NOT saved: {e}"),
-        }
+    let left = after_run(app.world_mut());
+    match (&saver, left) {
+        (Some(h), Ok(true)) => println!(
+            "play: left the game; the server's leave wrote {}",
+            h.path().display()
+        ),
+        (None, Ok(_)) => {}
+        (_, Ok(false)) => eprintln!("play: the server never answered the leave"),
+        (_, Err(e)) => eprintln!("play: the leave failed: {e}"),
     }
     Ok(exit)
 }

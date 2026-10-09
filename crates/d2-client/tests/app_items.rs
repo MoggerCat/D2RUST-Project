@@ -8,10 +8,12 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::bridge::{belt, items, Bridge};
 use d2_client::controls::Action;
 use d2_client::ui::{ActionId, UiEvent};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -63,10 +65,15 @@ fn item_world(action: u8, guid: u32, s: &[u8]) -> Vec<u8> {
 
 // Covers: specs/client/msg-stats-items.md §2 r6; specs/ui/controls.md §7 r2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn item_messages_fill_the_model_and_the_belt_key_and_pickup_reach_the_server() {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let mut bridge = Bridge::new(link).unwrap();
     let frame = |b: &mut Bridge<_>| {
         ms.fetch_add(40, Ordering::SeqCst);
@@ -108,9 +115,10 @@ fn item_messages_fill_the_model_and_the_belt_key_and_pickup_reach_the_server() {
     // 1 is not ready and sends nothing.
     let keys =
         [Action::BeltSlot3, Action::BeltSlot1].map(|a| UiEvent::Action(ActionId(a.index() as u16)));
-    assert_eq!(belt::send_keys(&mut bridge, &keys).unwrap(), 1);
+    let no_ui = belt::KeyFacts::default();
+    assert_eq!(belt::send_keys(&mut bridge, &keys, no_ui).unwrap(), 1);
     assert_eq!(
-        belt::key_message(bridge.world(), 2),
+        belt::key_message(bridge.world(), 2, no_ui),
         Some(vec![0x26, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     );
     // The pick-up intent of the ground item is a valid C→S message.

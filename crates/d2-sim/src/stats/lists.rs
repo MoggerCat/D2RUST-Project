@@ -1576,6 +1576,23 @@ impl StatLists {
             .find(|&c| self.l(c).flags & flags != 0)
     }
 
+    /// The overlay id a monster update sends (`intents-events.md` §7.3
+    /// r2 step 9): the unit's list has the remove-overlay flag
+    /// (`0x00625A20`), its overlay list (flag 0x80, `0x00625760`) holds
+    /// stat 178 `unit_dooverlay` at layer 0. `None`: nothing to send.
+    /// PROVISIONAL (REC-410): the value is read as the list's base value
+    /// (`0x00625A50` is not spelled out; an overlay list is not extended,
+    /// so base and total agree); settled by a 1.14d recording of a
+    /// monster with an overlay (the 0x11 bytes).
+    pub fn overlay_to_send(&self, unit: UnitId) -> Option<i32> {
+        let r = self.unit_list(unit)?;
+        if self.flags(r) & flag::REMOVE_OVERLAY == 0 {
+            return None;
+        }
+        let o = self.list_by_flags(r, flag::OVERLAY)?;
+        Some(self.base(o, 178, 0))
+    }
+
     /// By state and flags `0x006257D0`(unit, s, flags) (§9.3): the unit's
     /// list missing or not extended → none; the parked chain when flags
     /// has SET, else the active chain; the first list whose state is `s`

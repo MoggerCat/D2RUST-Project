@@ -58,7 +58,7 @@ pub fn object_chest_drop<X: Pending, F: FreeSpot>(
         sim.data.expansion,
         std::mem::take(&mut h.uniques),
     );
-    let facts = fields.treasure_facts(d.living_players, d.players_setting);
+    let facts = fields.treasure_facts(super::death::living_players(sim), d.players_setting);
     let area = area_level(levels, level, fields.difficulty, fields.expansion);
     let drop_by = dropper(sim.units, sim.stats, Some(object), area, x, y);
     let rec = operator.map(|r| {
@@ -71,7 +71,8 @@ pub fn object_chest_drop<X: Pending, F: FreeSpot>(
         )
     });
     // §7 rule 2: the start offset when a room exists there.
-    let start = match room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3)) {
+    let start_room = room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3));
+    let start = match start_room {
         Some(_) => (x + 2, y + 3),
         None => (x, y),
     };
@@ -99,9 +100,11 @@ pub fn object_chest_drop<X: Pending, F: FreeSpot>(
             Spots {
                 inner: spots,
                 room,
+                start_room,
                 start,
             },
-        );
+        )
+        .with_unit(object);
         let out = chest_drop(
             &data,
             &facts,
@@ -169,5 +172,15 @@ impl FreeSpot for StartSpot {
             x: start.0,
             y: start.1,
         })
+    }
+    /// The start spot in the start's room.
+    fn free_spot_with_start_room(
+        &mut self,
+        _: Option<crate::units::RoomId>,
+        start_room: Option<crate::units::RoomId>,
+        start: (i32, i32),
+        origin: (i32, i32),
+    ) -> Option<super::DropSpot> {
+        self.free_spot(start_room, start, origin)
     }
 }

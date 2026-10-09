@@ -4,7 +4,7 @@
 use super::*;
 use crate::bridge::items::ItemArtRow;
 use crate::bridge::world::{ClientUnit, ItemData, ItemRecord, KindData, PlayerData, UnitKey};
-use crate::ui::draw::{ImageRef, UiDraw};
+use crate::ui::draw::UiDraw;
 
 pub(crate) const PLAYER: UnitKey = UnitKey::new(0, 1);
 
@@ -101,6 +101,7 @@ fn ui() -> (ItemsUi, UiFiles) {
         inv_h: h,
         inv_file: f.into(),
         flippy_file: String::new(),
+        beltable: f == "invhp1",
     };
     art.0.insert(*b"hp1 ", row(1, 1, "invhp1"));
     art.0.insert(*b"qui ", row(2, 3, "invqlt"));
@@ -145,6 +146,47 @@ fn a_grid_item_draws_at_its_cell() {
     let f = files.id("*items\\invhp1").unwrap();
     // Cell (2, 3): top-left (100 + 58, 200 + 87); cel at top + h (29).
     assert_eq!(images(&out), vec![(f, 0, 158, 316)]);
+}
+
+// Covers: specs/ui/inventory.md §8 r4
+#[test]
+fn an_ethereal_item_draws_in_mode_1_and_others_in_mode_5() {
+    let (u, files) = ui();
+    let mut w = world(
+        &[
+            (7, mode::STORED, (0, 2, 3, 1), b"hp1 "),
+            (8, mode::STORED, (0, 4, 3, 1), b"hp1 "),
+        ],
+        None,
+    );
+    // Item flag 0x400000 (ethereal) on item 8: header byte 2, bit 0x40.
+    if let KindData::Item(d) = &mut w.units.get_mut(&UnitKey::new(items::ITEM, 8)).unwrap().kind {
+        d.last.as_mut().unwrap().stream[2] |= 0x40;
+    }
+    let l = u.layout(Some(0), &Screen::R640).unwrap();
+    let mut out: Vec<UiDraw> = Vec::new();
+    u.draw_panel(&w, &files, &l, &mut out);
+    let looks: Vec<(i32, crate::ui::CelLook)> = out
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Image(i) => Some((i.at.x, i.look)),
+            _ => None,
+        })
+        .collect();
+    // Cells (2, 3) and (4, 3): x 158 and 216; no tips, so no colour map.
+    assert_eq!(
+        looks,
+        vec![
+            (158, crate::ui::CelLook::PLAIN),
+            (
+                216,
+                crate::ui::CelLook {
+                    mode: 1,
+                    remap: crate::ui::Remap::None
+                }
+            ),
+        ]
+    );
 }
 
 // Covers: specs/ui/inventory.md §6 r2
@@ -245,21 +287,32 @@ fn the_cursor_cell_centres_an_even_item() {
     // 2 × 3 item, graphic 58 × 87, mouse at (200, 250): c = (14 − 100 +
     // 200) / 29 = 3, minus 1 → 2; r = (250 − 200) / 29 = 1, minus 1 → 0.
     assert_eq!(
-        cursor_cell_for(&g, Point::new(200, 250), (2, 3), (58, 87)),
+        grid_cursor_cell(&g, Point::new(200, 250), (2, 3), (58, 87)),
         Some((2, 0))
     );
     // Leaves the grid on the right: none.
     assert_eq!(
-        cursor_cell_for(&g, Point::new(385, 250), (2, 3), (58, 87)),
+        grid_cursor_cell(&g, Point::new(385, 250), (2, 3), (58, 87)),
         None
     );
 }
 
-// Covers: specs/ui/inventory.md §10 r5
+// Covers: specs/ui/panels-3.md §29 r1, §29 r3
 #[test]
 fn equipment_box_clicks_send_equip_swap_and_unequip() {
-    let (u, files) = ui();
+    let (mut u, files) = ui();
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    u.inv_tables = Some(std::sync::Arc::new(super::equip::tests::tables()));
     let at = Point::new(30, 50);
+    // §4.2 r3–r5: strength, dexterity and level of at least 1.
+    let world = |i: &[Fixture], c| {
+        let mut w = world(i, c);
+        let p = w.units.get_mut(&PLAYER).unwrap();
+        for s in [0, 2, 12] {
+            p.stats.insert(s, 1);
+        }
+        w
+    };
     let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"qui ")], Some(9));
     let want = ClientIntent::from_message(&items::equip(9, 3)).0;
     assert_eq!(want[0], 0x1A);
@@ -277,6 +330,9 @@ fn equipment_box_clicks_send_equip_swap_and_unequip() {
         intents(&u.press(&w, &files, &layout(), at)),
         vec![vec![0x1C, 3, 0]]
     );
+    // Without the inventory tables the check cannot run: nothing is sent.
+    u.inv_tables = None;
+    assert!(u.press(&w, &files, &layout(), at).is_empty());
 }
 
 fn stash_grid() -> GridRecord {
@@ -379,6 +435,7 @@ mod belt {
         BeltParts {
             records,
             types: BTreeMap::new(),
+            beltable: [*b"hp1 "].into(),
         }
     }
 
@@ -405,12 +462,46 @@ mod belt {
         };
         let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         // Nothing hovered yet: no tip.
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
-        // Over box 1 (left 461, top 562): the tip anchors at (left + 14, top).
+        assert!(b.hover_tip(&w, &tips).is_none());
+        // Over box 1 (left 461, top 562): the pop-up's point is (left + 14,
+        // top), colour 0, centred (§5 r8, r14).
         b.draw_list(&w, (800, 600), false, (470, 570), true);
-        let (lines, at) = b.hover_tip(&w, &tips);
-        assert!(!lines.is_empty(), "the hovered potion has a tip");
-        assert_eq!(at, (475, 562));
+        let t = b
+            .hover_tip(&w, &tips)
+            .expect("the hovered potion has a tip");
+        assert_eq!((t.x, t.y, t.color, t.centered), (475, 562, 0, true));
+        // T ends with the name in colour 0 (`Prefix(N, 0)`).
+        let name = &tips.lines(
+            crate::bridge::items::stream(
+                &w,
+                w.units.keys().copied().find(|k| k.unit_type == 4).unwrap(),
+            )
+            .unwrap(),
+        )[0]
+        .text;
+        let mut tail = vec![0xFF, u16::from(b'c'), u16::from(b'0')];
+        tail.extend_from_slice(name);
+        assert!(
+            t.text.ends_with(&tail),
+            "{:?}",
+            String::from_utf16_lossy(&t.text)
+        );
+        // §5 r8: the short text, not the item tool tip: `Prefix(S, 3)`
+        // then `Prefix(N, 0)` of the name and the property lines.
+        let stream = crate::bridge::items::stream(
+            &w,
+            w.units.keys().copied().find(|k| k.unit_type == 4).unwrap(),
+        )
+        .unwrap();
+        let full: Vec<String> = tips
+            .lines(stream)
+            .iter()
+            .map(|l| String::from_utf16_lossy(&l.text))
+            .collect();
+        // The tool tip's requirement line is not part of it; a plain cap
+        // has no property lines, so T is the name alone.
+        assert_eq!(full, ["Cap", "Required Level: 3"]);
+        assert_eq!(String::from_utf16_lossy(&t.text), "\u{ff}c0Cap");
         // An item on the cursor hides it (§5 r8).
         let w = compact(world(
             &[
@@ -419,11 +510,11 @@ mod belt {
             ],
             Some(9),
         ));
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
+        assert!(b.hover_tip(&w, &tips).is_none());
         // Off the belt the hover ends.
         let w = compact(world(&[(7, mode::BELT, (0, 1, 0, 0), b"cap ")], None));
         b.draw_list(&w, (800, 600), false, (10, 10), true);
-        assert!(b.hover_tip(&w, &tips).0.is_empty());
+        assert!(b.hover_tip(&w, &tips).is_none());
     }
 
     // Covers: specs/ui/control-panel.md §5 r4
@@ -487,32 +578,60 @@ mod belt {
         assert_eq!(b.state.hover_item, Some(7));
     }
 
+    // With a worn belt of type 0 and an item on the cursor, the popped
+    // belt's hovered box is outlined: empty and the item fits a belt →
+    // green; occupied (a swap possible) → yellow; drawn after the slots.
+    // Covers: specs/ui/control-panel.md §5 r5
+    #[test]
+    fn the_cursor_item_highlights_the_hovered_belt_box() {
+        use crate::ui::panels::control::belt::{BeltColor, BeltDraw};
+        let boxes = parts().records[2].boxes.clone();
+        let mut b = HudBelt {
+            parts: BeltParts {
+                records: vec![BeltRecord { boxes }; 14],
+                types: BTreeMap::from([(*b"lbl ", 0)]),
+                beltable: [*b"hp1 "].into(),
+            },
+            ..Default::default()
+        };
+        let w = world(
+            &[
+                (6, mode::BODY, (8, 0, 0, 0), b"lbl "),
+                (7, mode::BELT, (0, 1, 0, 0), b"hp1 "),
+                (9, mode::CURSOR, (0, 0, 0, 0), b"hp1 "),
+            ],
+            Some(9),
+        );
+        let last_box = |d: &[BeltDraw]| match d.last() {
+            Some(BeltDraw::Box { rect, color }) => Some((rect.x, rect.y, rect.w, *color)),
+            _ => None,
+        };
+        let d = b.draw_list(&w, (800, 600), false, (440, 570), true);
+        assert_eq!(last_box(&d), Some((430, 562, 29, BeltColor::Green)));
+        let d = b.draw_list(&w, (800, 600), false, (470, 570), true);
+        assert_eq!(last_box(&d), Some((461, 562, 29, BeltColor::Yellow)));
+        // Without a cursor item: no outline on the empty box.
+        let w = world(&[(6, mode::BODY, (8, 0, 0, 0), b"lbl ")], None);
+        let d = b.draw_list(&w, (800, 600), false, (440, 570), true);
+        assert_eq!(last_box(&d), None);
+    }
+
     // Covers: specs/ui/control-panel.md §5 r4
     #[test]
     fn a_hovered_belt_slot_paints_its_highlight_rect() {
-        use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE};
-        use crate::ui::panels::control::belt::BeltColor;
-        let (u, mut files) = ui();
-        files.add(FILL_FILE);
+        let (mut u, files) = ui();
+        // The palette's tint colours: red 40, green 41, blue 42, yellow 43.
+        u.tint_colors = Some([40, 41, 42, 43, 44]);
         let w = world(&[(7, mode::BELT, (0, 1, 0, 0), b"hp1 ")], None);
         let mut b = HudBelt {
             parts: parts(),
             ..Default::default()
         };
-        let fill = files.id(FILL_FILE).expect("fill file");
-        let green = BELT_FILL_BASE + BeltColor::Green as u32;
-        let tiles = |out: &[UiDraw]| -> Vec<(i32, i32, u16, u16)> {
+        // `0x0046EFD0(x, y, 29, 29, green, 0)`: (x0, y0, x1, y1, colour, mode).
+        let tiles = |out: &[UiDraw]| -> Vec<(i32, i32, i32, i32, u8, u8)> {
             out.iter()
                 .filter_map(|d| match d {
-                    UiDraw::Image(i)
-                        if i.image
-                            == (ImageRef {
-                                file: fill,
-                                frame: green,
-                            }) =>
-                    {
-                        Some((i.clip.x, i.clip.y, i.clip.w, i.clip.h))
-                    }
+                    UiDraw::Rect(r) => Some((r.x0, r.y0, r.x1, r.y1, r.color, r.mode)),
                     _ => None,
                 })
                 .collect()
@@ -531,8 +650,8 @@ mod belt {
             true,
             &mut out,
         );
-        // 29 x 29 at (461, 562): an 18-high tile and an 11-high tile.
-        assert_eq!(tiles(&out), vec![(461, 562, 29, 18), (461, 580, 29, 11)]);
+        // 29 x 29 at (461, 562), green, mode 0 (§5 r4).
+        assert_eq!(tiles(&out), vec![(461, 562, 490, 591, 41, 0)]);
     }
 
     // Covers: specs/ui/control-panel.md §5 r4
@@ -597,6 +716,47 @@ mod belt {
         let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
         let out = u.press(&w, &files, &layout(), Point::new(160, 290));
         assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+    }
+
+    // Covers: specs/ui/inventory.md §10 r3
+    #[test]
+    fn a_ctrl_click_never_lifts_a_grid_item() {
+        let (mut u, files) = ui();
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"hp1 ")], None);
+        // Without Ctrl the click lifts (0x19); with it, no store: nothing.
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x19, 7, 0, 0, 0]]);
+        u.ctrl = true;
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert!(intents(&out).is_empty());
+    }
+
+    // Covers: specs/seams/item-grids.md §2.8
+    #[test]
+    fn the_belt_test_reads_the_tables_not_a_code_list() {
+        let (mut u, files) = ui();
+        u.shift = true;
+        // A scroll: its type is beltable in the tables (not in the old list).
+        u.art.0.insert(
+            *b"isc ",
+            ItemArtRow {
+                inv_w: 1,
+                inv_h: 1,
+                inv_file: "invisc".into(),
+                flippy_file: String::new(),
+                beltable: true,
+            },
+        );
+        assert!(fits_belt(&u.art, Some(*b"isc ")));
+        assert!(!fits_belt(&u.art, Some(*b"qui ")));
+        assert!(!fits_belt(&u.art, None));
+        let w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"isc ")], None);
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_eq!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
+        // The same item with a non-beltable type is picked up (0x19).
+        u.art.0.get_mut(b"isc ").unwrap().beltable = false;
+        let out = u.press(&w, &files, &layout(), Point::new(160, 290));
+        assert_ne!(intents(&out), vec![vec![0x63, 7, 0, 0, 0]]);
     }
 }
 
@@ -760,13 +920,18 @@ fn the_cube_grid_draws_page_3_and_sends_the_page_3_intents() {
     assert!(u.press_cube(&w, &files, &g, Point::new(5, 5)).is_empty());
 }
 
-/// The (x, y, w, h) of the tiles of fill frame `frame`.
-fn tiles(files: &UiFiles, d: &[UiDraw], frame: u32) -> Vec<(i32, i32, u16, u16)> {
-    let fill = files.id(crate::ui::original::hud::FILL_FILE).expect("fill");
+/// The tint palette indices of the tests: refused, fits, usable, swap,
+/// unidentified (`inventory.md` §2 r1).
+const TINTS: [u8; 5] = [40, 41, 42, 43, 44];
+
+/// The (x, y, w, h) of the mode-0 rectangles of colour `color`
+/// (`inventory.md` §2 r2: `0x0046EFD0(x, y, w, h, color, 0)`).
+fn tiles(d: &[UiDraw], color: u8) -> Vec<(i32, i32, i32, i32)> {
     d.iter()
         .filter_map(|d| match d {
-            UiDraw::Image(i) if i.image.file == fill && i.image.frame == frame => {
-                Some((i.clip.x, i.clip.y, i.clip.w, i.clip.h))
+            UiDraw::Rect(r) if r.color == color => {
+                assert_eq!(r.mode, 0, "tints draw in mode 0 (§2 r2)");
+                Some((r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0))
             }
             _ => None,
         })
@@ -775,7 +940,7 @@ fn tiles(files: &UiFiles, d: &[UiDraw], frame: u32) -> Vec<(i32, i32, u16, u16)>
 
 /// A cap (requires level 3) worn in the head box, the player at `level`;
 /// the mouse at `mouse`.
-fn cap_tints(level: i32, mouse: Point) -> (UiFiles, Vec<UiDraw>) {
+fn cap_tints(level: i32, mouse: Point) -> Vec<UiDraw> {
     let (mut u, mut files) = ui();
     u.art.0.insert(
         *b"cap ",
@@ -784,10 +949,11 @@ fn cap_tints(level: i32, mouse: Point) -> (UiFiles, Vec<UiDraw>) {
             inv_h: 2,
             inv_file: "invcap".into(),
             flippy_file: String::new(),
+            beltable: false,
         },
     );
     u.tips = Some(crate::ui::item_tip::tests::tips());
-    files.add(crate::ui::original::hud::FILL_FILE);
+    u.tint_colors = Some(TINTS);
     u.register_files(&mut files);
     let mut w = world(&[(8, mode::BODY, (1, 0, 0, 0), b"cap ")], None);
     w.units.get_mut(&PLAYER).unwrap().stats.insert(12, level);
@@ -799,43 +965,36 @@ fn cap_tints(level: i32, mouse: Point) -> (UiFiles, Vec<UiDraw>) {
         h: 18,
     };
     let mut out: Vec<UiDraw> = Vec::new();
-    u.draw_tints(&w, &files, &l, mouse, &mut out);
-    (files, out)
+    u.draw_tints(&w, &l, mouse, &mut out);
+    out
 }
 
 // Covers: specs/ui/inventory.md §6 r4, §2 r1
 #[test]
 fn an_equipped_item_over_the_players_level_paints_the_red_tint() {
-    use crate::ui::original::hud::BELT_FILL_BASE;
-    let (files, out) = cap_tints(1, Point::new(0, 0));
-    assert_eq!(tiles(&files, &out, BELT_FILL_BASE), vec![(30, 40, 58, 18)]);
+    let out = cap_tints(1, Point::new(0, 0));
+    assert_eq!(tiles(&out, TINTS[0]), vec![(30, 40, 58, 18)]);
 }
 
 // Covers: specs/ui/inventory.md §6 r4
 #[test]
 fn a_usable_identified_equipped_item_paints_no_tint() {
-    let (files, out) = cap_tints(3, Point::new(0, 0));
+    let out = cap_tints(3, Point::new(0, 0));
     assert!(out.is_empty(), "{} fills", out.len());
-    let _ = files;
 }
 
 // Covers: specs/ui/inventory.md §6 r4, §2 r1
 #[test]
 fn a_hovered_equipped_item_paints_the_green_tint() {
-    use crate::ui::original::hud::BELT_FILL_BASE;
-    let (files, out) = cap_tints(1, Point::new(40, 45));
-    assert_eq!(
-        tiles(&files, &out, BELT_FILL_BASE + 1),
-        vec![(30, 40, 58, 18)]
-    );
-    assert!(tiles(&files, &out, BELT_FILL_BASE).is_empty());
+    let out = cap_tints(1, Point::new(40, 45));
+    assert_eq!(tiles(&out, TINTS[1]), vec![(30, 40, 58, 18)]);
+    assert!(tiles(&out, TINTS[0]).is_empty());
 }
 
 // Covers: specs/ui/inventory.md §3 r3
 #[test]
 fn grid_items_paint_blue_usable_and_red_refused_tints() {
-    use crate::ui::original::hud::BELT_FILL_BASE;
-    let (mut u, mut files) = ui();
+    let (mut u, _) = ui();
     u.art.0.insert(
         *b"cap ",
         ItemArtRow {
@@ -843,10 +1002,11 @@ fn grid_items_paint_blue_usable_and_red_refused_tints() {
             inv_h: 1,
             inv_file: "invcap".into(),
             flippy_file: String::new(),
+            beltable: false,
         },
     );
     u.tips = Some(crate::ui::item_tip::tests::tips());
-    files.add(crate::ui::original::hud::FILL_FILE);
+    u.tint_colors = Some(TINTS);
     let w = |level| {
         let mut w = world(&[(7, mode::STORED, (0, 2, 3, 1), b"cap ")], None);
         w.units.get_mut(&PLAYER).unwrap().stats.insert(12, level);
@@ -854,12 +1014,17 @@ fn grid_items_paint_blue_usable_and_red_refused_tints() {
     };
     let l = layout();
     let (mut ok, mut bad) = (Vec::new(), Vec::new());
-    u.draw_tints(&w(3), &files, &l, Point::new(0, 0), &mut ok);
-    u.draw_tints(&w(1), &files, &l, Point::new(0, 0), &mut bad);
-    // Cell (2, 3): (158, 287), 29 x 29 = an 18-high and an 11-high tile.
-    let cell = vec![(158, 287, 29, 18), (158, 305, 29, 11)];
-    assert_eq!(tiles(&files, &ok, BELT_FILL_BASE + 2), cell);
-    assert_eq!(tiles(&files, &bad, BELT_FILL_BASE), cell);
+    u.draw_tints(&w(3), &l, Point::new(0, 0), &mut ok);
+    u.draw_tints(&w(1), &l, Point::new(0, 0), &mut bad);
+    // Cell (2, 3): one 29 × 29 rectangle at (158, 287).
+    let cell = vec![(158, 287, 29, 29)];
+    assert_eq!(tiles(&ok, TINTS[2]), cell);
+    assert_eq!(tiles(&bad, TINTS[0]), cell);
+    // No palette given: no tint (the colours are the palette's, §2 r1).
+    u.tint_colors = None;
+    let mut none = Vec::new();
+    u.draw_tints(&w(1), &l, Point::new(0, 0), &mut none);
+    assert!(none.is_empty());
 }
 
 // Covers: specs/ui/inventory.md §2 r1

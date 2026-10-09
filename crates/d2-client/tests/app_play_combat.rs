@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::click::{screen_to_world, ClickView};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
@@ -27,6 +27,8 @@ use d2_client::controls::click::{skill_flag, ClickState, Kind};
 use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_server::seams::Clock;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -73,8 +75,9 @@ fn monster_at(app: &App, guid: u32) -> (u16, u16) {
 
 // Covers: specs/ui/controls.md §6 r8
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_monster_walks_and_a_left_click_on_it_attacks() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(
@@ -90,6 +93,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         sent: sent.clone(),
     };
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -113,9 +117,11 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         }]);
         b.0.set_unit_rows(UnitRows {
             monsters: vec![Some(MonsterClass {
+                // monstats `Velocity` 16: path velocity 0x1000 at 100 %.
                 setup: Some(MonsterSetup {
                     is_att: true,
                     is_sel: true,
+                    velocity: 16,
                     ..MonsterSetup::default()
                 }),
                 ..MonsterClass::default()
@@ -134,7 +140,9 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
     // S→C 0x94 (skill 0 at level 1) and 0x23 (skill 0 left), as
     // `app_play_e2e.rs`; then 0xAC: monster 77 of class 0, four sub-tiles
     // east of the player, life 128; then 0x67: walk (code 1) to six
-    // more sub-tiles east at velocity 0x1000 (one sub-tile a tick).
+    // more sub-tiles east at velocity percent 100 (stat 67; with the
+    // class's `Velocity` 16 one sub-tile a tick,
+    // `seams/movement-prediction.md` §2.4 r3).
     let mut msgs = vec![0x94, 1];
     msgs.extend_from_slice(&guid.to_le_bytes());
     msgs.extend_from_slice(&[0, 0, 1]);
@@ -155,7 +163,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
     walk.extend_from_slice(&(mx + 6).to_le_bytes());
     walk.extend_from_slice(&my.to_le_bytes());
     walk.extend_from_slice(&[0, 0, 0]);
-    walk.extend_from_slice(&0x1000u16.to_le_bytes());
+    walk.extend_from_slice(&100u16.to_le_bytes());
     walk.push(0);
     msgs.extend(walk);
     app.world_mut()
@@ -197,6 +205,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         mouse,
         game_menu_open: false,
         pick: false,
+        shake: (0, 0),
     };
     sent.lock().unwrap().clear();
     let mut st = ClickState::default();

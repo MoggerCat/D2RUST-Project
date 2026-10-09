@@ -77,8 +77,9 @@ pub struct DeathDrops {
     /// go back there (one unique-bit store per game, shared with the
     /// host's economy); `uniques` here is left empty.
     pub fields: GameFields,
-    /// Living players and the `players` setting (`treasure.md` Inputs).
-    pub living_players: i32,
+    /// The `players` setting `S` (`treasure.md` Inputs, §5.4 step 2), 0–8
+    /// ([`DeathDrops::set_players`]). The living-player count is the
+    /// game's ([`living_players`]).
     pub players_setting: i32,
     /// Created items with their spots, in creation order.
     pub placed: Vec<(UnitId, DropSpot)>,
@@ -100,13 +101,19 @@ impl DeathDrops {
         Self {
             tables,
             fields,
-            living_players: 1,
             players_setting: 0,
             placed: Vec::new(),
             failures: Vec::new(),
             errors: Vec::new(),
             picks: Arc::default(),
             pick_errors: Vec::new(),
+        }
+    }
+
+    /// The `players` command `0x00535780`: values above 8 are ignored.
+    pub fn set_players(&mut self, n: i32) {
+        if n <= 8 {
+            self.players_setting = n;
         }
     }
 
@@ -117,23 +124,53 @@ impl DeathDrops {
     }
 }
 
+/// The player count `0x00535790` (`treasure.md` §5.4 step 2, OQ7): the
+/// players of the game's player list that are not dead (`0x005541B0`,
+/// `sim/units.md` §2).
+pub fn living_players(sim: &Sim<'_>) -> i32 {
+    sim.game
+        .lists
+        .units_of_type(UnitType::Player)
+        .into_iter()
+        .filter(|&u| sim.units.get(u).is_some_and(|r| !r.is_dead()))
+        .count() as i32
+}
+
 /// Seam: the free-spot search `0x0064E810`(room, start, origin, 1,
 /// 0x3E01, 0x801, 1) of §7 step 2, used when the path provider or its
 /// walk-back field is off. Items of one walk are placed one after
 /// another.
 pub trait FreeSpot {
+    /// `room` is U's room (`0x00555DEC`: never the start lookup's).
     fn free_spot(
         &mut self,
         room: Option<RoomId>,
         start: (i32, i32),
         origin: (i32, i32),
     ) -> Option<DropSpot>;
+
+    /// [`Self::free_spot`] with the room the start lookup (`0x00463740`)
+    /// found for `start`, for a seam without its own room search (a
+    /// d2rs fill that keeps the start spot needs the start's room).
+    /// Default: [`Self::free_spot`], the hint unread.
+    fn free_spot_with_start_room(
+        &mut self,
+        room: Option<RoomId>,
+        _start_room: Option<RoomId>,
+        start: (i32, i32),
+        origin: (i32, i32),
+    ) -> Option<DropSpot> {
+        self.free_spot(room, start, origin)
+    }
 }
 
-/// §7 step 2 with the start offset done by the caller.
+/// §7 step 2 with the start offset done by the caller: `room` is U's
+/// room, `start_room` the room the start lookup found (none: the start
+/// is U's position).
 pub(super) struct Spots<'s, F> {
     pub(super) inner: &'s mut F,
     pub(super) room: Option<RoomId>,
+    pub(super) start_room: Option<RoomId>,
     pub(super) start: (i32, i32),
 }
 
@@ -152,7 +189,12 @@ impl<X: Pending, F: FreeSpot> DropPlacer<ActionHooks<X>> for Spots<'_, F> {
     ) -> Option<DropSpot> {
         let h = &mut *econ.hooks;
         let Some(field) = h.paths.as_ref().and_then(|p| p.field.clone()) else {
-            return self.inner.free_spot(self.room, self.start, (x, y));
+            return self.inner.free_spot_with_start_room(
+                self.room,
+                self.start_room.or(self.room),
+                self.start,
+                (x, y),
+            );
         };
         match floor_drop(
             &h.drlg,
@@ -191,12 +233,8 @@ impl<X: Pending, F: FreeSpot> DropPlacer<ActionHooks<X>> for Spots<'_, F> {
 /// death target `target` (`R`). Returns the created items (also
 /// appended to [`DeathDrops::placed`]).
 ///
-/// TODO(treasure.md §3.1): the collision word at a position outside
-/// every room grid is read as 0. TODO(treasure.md §7 step 2): the free
-/// spot search gets the room the start-offset search found, else the
-/// monster's room (with the provider, the floor drop's rule 1 finds the
-/// same start from that room: both lookups are the room and its
-/// adjacent rooms).
+/// TODO(treasure.md §3.1): without the path provider the collision word
+/// at a position outside every room grid is read as 0 (with it: 0x27).
 pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -204,6 +242,35 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     spots: &mut F,
     unit: UnitId,
     target: Option<UnitId>,
+) -> Vec<UnitId> {
+    drop_of(h, sim, d, spots, unit, target, false)
+}
+
+/// Find Item `0x005A8000` (`treasure.md` §3.6): §3.2–§3.5 with the corpse
+/// `corpse` as U (its unit seed), the caster as R and F = 1, without the
+/// gate of §3.1. Returns the created items (also appended to
+/// [`DeathDrops::placed`]).
+pub fn find_item_drop<X: Pending, F: FreeSpot>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    d: &mut DeathDrops,
+    spots: &mut F,
+    corpse: UnitId,
+    caster: UnitId,
+) -> Vec<UnitId> {
+    drop_of(h, sim, d, spots, corpse, Some(caster), true)
+}
+
+/// [`monster_death_drop`] (`find_item` false: the gate first) and
+/// [`find_item_drop`] (true: no gate, F = 1).
+fn drop_of<X: Pending, F: FreeSpot>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    d: &mut DeathDrops,
+    spots: &mut F,
+    unit: UnitId,
+    target: Option<UnitId>,
+    find_item: bool,
 ) -> Vec<UnitId> {
     let Some(r) = sim.units.get(unit) else {
         return Vec::new();
@@ -214,15 +281,23 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     }
     let (x, y) = h.path_position(unit);
     let room = sim.game.lists.unit(unit).and_then(|e| e.room());
-    let collision = room
-        .and_then(|rm| h.drlg.collision(sim.game, rm, x, y))
-        .unwrap_or(0);
-    match monster_drop_gate(flags, u32::from(collision & GATE_MASK), class) {
-        Ok(true) => {}
-        Ok(false) => return Vec::new(),
-        Err(e) => {
-            d.errors.push(e);
-            return Vec::new();
+    if !find_item {
+        // `0x0064CB30` (§3.1): with the path provider, the cell's room
+        // among the monster's room and its adjacent rooms; no such room,
+        // no record or no grid → 0x27 (no drop).
+        let collision = if h.paths.is_some() {
+            crate::path::collision::point_value(&h.drlg, room, x, y, GATE_MASK)
+        } else {
+            room.and_then(|rm| h.drlg.collision(sim.game, rm, x, y))
+                .unwrap_or(0)
+        };
+        match monster_drop_gate(flags, u32::from(collision & GATE_MASK), class) {
+            Ok(true) => {}
+            Ok(false) => return Vec::new(),
+            Err(e) => {
+                d.errors.push(e);
+                return Vec::new();
+            }
         }
     }
     let at = h.tables.clone();
@@ -254,9 +329,9 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         _ => false,
     };
     let start_room = room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3));
-    let (spot_room, start) = match start_room {
-        Some(rm) => (Some(rm), (x + 2, y + 3)),
-        None => (room, (x, y)),
+    let start = match start_room {
+        Some(_) => (x + 2, y + 3),
+        None => (x, y),
     };
     let mut fields = GameFields::from_action(
         h.game_seed,
@@ -264,7 +339,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
         sim.data.expansion,
         std::mem::take(&mut h.uniques),
     );
-    let facts = fields.treasure_facts(d.living_players, d.players_setting);
+    let facts = fields.treasure_facts(living_players(sim), d.players_setting);
     let data = TreasureData {
         tcs: &t.tcs,
         items: &t.treasure_items,
@@ -275,7 +350,7 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
     let md = MonsterDrop {
         monstats: m,
         rank,
-        find_item: false,
+        find_item,
     };
     // The game's one item store, lent out of the hooks for the drop.
     let mut items = std::mem::take(&mut h.items);
@@ -294,10 +369,12 @@ pub fn monster_death_drop<X: Pending, F: FreeSpot>(
             &mut econ,
             Spots {
                 inner: spots,
-                room: spot_room,
+                room,
+                start_room,
                 start,
             },
-        );
+        )
+        .with_unit(unit);
         let out = monster_drop(
             &data,
             &facts,

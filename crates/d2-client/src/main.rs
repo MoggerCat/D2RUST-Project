@@ -1,25 +1,29 @@
 //! d2-client entry point.
 //!
 //! Usage:
-//!   d2-client [play]     [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
+//!   d2-client [play]     [--res 800x600|640x480] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]
 //!   d2-client view       [--ds1 PATH] [--wall-base N] [--frames N]
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
+//!   d2-client play       ... --dump-draws DIR [--at-tick N] [--input SCRIPT]
+//!   d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]
 //!
 //! `play` (the default) opens a window running the local single-player game: the
 //! in-process server (`d2-server` host over the wired `d2-sim`) pumped
 //! once per frame through the bridge, the world view composed by the GPU
 //! compositor's render-graph node. With $D2_GAME_DIR set it reads the
 //! game's `levels` and `objects` tables and generates its levels from the
-//! user's DS1 / DT1 files (unless `--synthetic`); otherwise it uses
-//! synthetic tables and levels. `--save` joins with a character save
-//! (read with the user's tables: needs $D2_GAME_DIR) instead of a new
-//! sorceress. `--new CLASS NAME` joins with a new character of that class
+//! user's DS1 / DT1 files; without $D2_GAME_DIR (or `--native DIR`) it
+//! stops with an error naming D2_GAME_DIR (there is no invented game).
+//! `--save` joins with a character save (read with the user's tables)
+//! instead of a new sorceress. `--new CLASS NAME` joins with a new character of that class
 //! (a name or 0–6: amazon, sorceress, necromancer, paladin, barbarian,
 //! druid, assassin) and name (1–15 of A–Z, a–z, 0–9, `-`, `_`), held in
 //! memory only: nothing is written to disk (decision D3, a stand-in for
-//! the unspecified select / create screens).
+//! the unspecified select / create screens). `--res 640x480` runs the game
+//! in the 640 × 480 frame (resolution mode 0: camera, panels, hit tests,
+//! window); the default is 800 × 600 (`client/ui.md` §A5).
 //! `view` opens a window (pan: arrows/WASD, zoom: mouse wheel). `verify`
 //! runs the render cases (`crates/d2-client/render-cases/*.toml`, spec
 //! `client/render-pipeline.md` §A10): per case, CPU reference vs GPU, byte
@@ -33,6 +37,14 @@
 //! `--perturb N` corrupts N reference pixels per case: each must fail with
 //! exactly N. Every case (map and synthetic) runs on one headless compute
 //! compositor. `cpu-render` writes the CPU reference image only.
+//! `play --dump-draws DIR [--at-tick N]` writes the rendering facts
+//! (`specs/tools/facts-render.md` §5) of the first drawn frame at server
+//! tick N or later (default 1) to DIR and exits (skips the front end).
+//! `play --input "move X Y; wait N; click X Y; rclick X Y"` plays the
+//! steps as pointer input, timed in server ticks, in place of the window's
+//! pointer (`facts-render.md` §5 r11).
+//! `facts-compare` reports the first difference between a 1.14d scene's
+//! facts and a d2rs dump (§6): exit 0 match, 1 diverged, 2 partial, 3 error.
 //!
 //! Game files are read from $D2_GAME_DIR. Output images go under the
 //! gitignored `game/` folder by default; they contain game graphics and must
@@ -69,10 +81,9 @@ struct Options {
     cases: Vec<String>,
     /// `view`, `play`: close after this many frames (smoke test).
     frames: Option<u32>,
-    /// `play`: game seed.
-    seed: u32,
-    /// `play`: synthetic tables even with $D2_GAME_DIR set.
-    synthetic: bool,
+    /// `play`: the fixed game seed (`--seed N`); `None`: a save's map
+    /// seed or the default (`single_player::game_seed`).
+    seed: Option<u32>,
     /// `play --save`: the character save the join loads.
     save: Option<PathBuf>,
     /// `play --difficulty normal|nightmare|hell|0-2`.
@@ -86,6 +97,24 @@ struct Options {
     /// `play --new`: the folder the new character's `<name>.d2s` goes in.
     save_dir: Option<PathBuf>,
     hardcore: bool,
+    /// `play --dump-draws DIR`: the facts export (`facts-render.md` §5).
+    dump_draws: Option<PathBuf>,
+    /// `play --at-tick N`: the dump's first server tick.
+    at_tick: Option<u64>,
+    /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
+    input: Option<Vec<d2_client::world_view::input_script::Step>>,
+    /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
+    res: Option<d2_client::rules::camera::FrameSize>,
+}
+
+/// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
+fn parse_res(s: &str) -> Result<d2_client::rules::camera::FrameSize> {
+    use d2_client::rules::camera::FrameSize;
+    match s {
+        "800x600" => Ok(FrameSize::D2RS),
+        "640x480" => Ok(FrameSize::LOW),
+        _ => bail!("--res {s}: use 800x600 or 640x480"),
+    }
 }
 
 fn parse_view(s: &str) -> Result<cpu::View> {
@@ -117,8 +146,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         case_dir: None,
         cases: Vec::new(),
         frames: None,
-        seed: d2_client::app::single_player::DEFAULT_SEED,
-        synthetic: false,
+        seed: None,
         difficulty: 0,
         save: None,
         new: None,
@@ -126,6 +154,10 @@ fn parse_options(args: &[String]) -> Result<Options> {
         source: None,
         save_dir: None,
         hardcore: false,
+        res: None,
+        dump_draws: None,
+        at_tick: None,
+        input: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -142,9 +174,16 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--out" => o.out = Some(PathBuf::from(value()?)),
             "--perturb" => o.perturb = value()?.parse().context("--perturb")?,
             "--frames" => o.frames = Some(value()?.parse().context("--frames")?),
-            "--seed" => o.seed = value()?.parse().context("--seed")?,
-            "--synthetic" => o.synthetic = true,
+            "--seed" => o.seed = Some(value()?.parse().context("--seed")?),
             "--hardcore" => o.hardcore = true,
+            "--dump-draws" => o.dump_draws = Some(PathBuf::from(value()?)),
+            "--at-tick" => o.at_tick = Some(value()?.parse().context("--at-tick")?),
+            "--input" => {
+                o.input = Some(
+                    d2_client::world_view::input_script::parse(value()?)
+                        .map_err(|e| anyhow::anyhow!("--input: {e}"))?,
+                )
+            }
             "--save" => o.save = Some(PathBuf::from(value()?)),
             "--native" => o.native = Some(PathBuf::from(value()?)),
             "--source" => o.source = Some(value()?.clone()),
@@ -156,6 +195,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
                     })?;
             }
             "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
+            "--res" => o.res = Some(parse_res(value()?)?),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -174,6 +214,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
     }
     if o.save.is_some() && o.new.is_some() {
         bail!("--save and --new cannot be combined");
+    }
+    if o.at_tick.is_some() && o.dump_draws.is_none() {
+        bail!("--at-tick needs --dump-draws DIR");
     }
     Ok(o)
 }
@@ -399,13 +442,13 @@ fn select_data(
     )
     .map_err(anyhow::Error::msg)?;
     let native = match &choice {
-        d2_client::assets::SourceChoice::Native(dir) if !o.synthetic => Some(dir.clone()),
+        d2_client::assets::SourceChoice::Native(dir) => Some(dir.clone()),
         _ => None,
     };
     let dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
     let data = match &native {
         Some(dir) => single_player::GameData::select_native(dir)?,
-        None => single_player::GameData::select(dir.as_deref(), o.synthetic)?,
+        None => single_player::GameData::select(dir.as_deref())?,
     };
     let origin = match &native {
         Some(dir) => format!("native folder {}", dir.display()),
@@ -421,28 +464,30 @@ fn play(o: Options) -> Result<()> {
     use d2_client::app::front_host::{run_front_end, FrontArt};
     use d2_client::app::front_start::{front_host, Entry, StartChoice};
     use d2_client::ui::front_end::Outcome;
-    if o.save.is_some() || o.new.is_some() || o.frames.is_some() {
+    if let Some(res) = o.res {
+        d2_client::rules::camera::FrameSize::set_play(res)?;
+        println!("play: frame {} x {}", res.width, res.height);
+    }
+    if o.save.is_some() || o.new.is_some() || o.frames.is_some() || o.dump_draws.is_some() {
         let (data, dir, origin) = select_data(&o)?;
         return play_once(&o, data, dir, origin, None, None);
     }
     let mut first = true;
     loop {
         let (data, dir, origin) = select_data(&o)?;
-        let (art, expansion) = match &data {
-            d2_client::app::single_player::GameData::Live(d) => {
-                use d2_data::bin::TableFiles;
-                let mut art = FrontArt::new(d.archives.source());
-                if let Ok(t) = d2_client::app::strings::TableStrings::load(
-                    d.archives.as_ref(),
-                    d2_client::app::strings::LANG,
-                ) {
-                    art = art.with_strings(move |id| {
-                        u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default()
-                    });
-                }
-                (Some(art), d.archives.lod())
+        let (art, expansion) = {
+            use d2_data::bin::TableFiles;
+            let d2_client::app::single_player::GameData::Live(d) = &data;
+            let mut art = FrontArt::new(d.archives.source());
+            if let Ok(t) = d2_client::app::strings::TableStrings::load(
+                d.archives.as_ref(),
+                d2_client::app::strings::LANG,
+            ) {
+                art = art.with_strings(move |id| {
+                    u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default()
+                });
             }
-            d2_client::app::single_player::GameData::Synthetic => (None, true),
+            (Some(art), d.archives.lod())
         };
         let saves = o
             .save_dir
@@ -475,18 +520,16 @@ fn play_once(
     choice: Option<d2_client::app::front_start::StartChoice>,
 ) -> Result<()> {
     use d2_client::app::{play, single_player};
-    match &data {
-        single_player::GameData::Live(d) => println!(
-            "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
-            d.waypoints.levels.len(),
-            d.waypoints.objects.len(),
-            d.waypoints.object_class,
-            d.files.ds1.0.len(),
-            d.files.subs.0.len(),
-            d.files.dt1.0.len()
-        ),
-        single_player::GameData::Synthetic => println!("play: synthetic tables and levels"),
-    }
+    let single_player::GameData::Live(d) = &data;
+    println!(
+        "play: game data from {origin} ({} levels, {} objects, waypoint object class {}; level files: {} DS1, {} lvlsub DS1, {} DT1)",
+        d.waypoints.levels.len(),
+        d.waypoints.objects.len(),
+        d.waypoints.object_class,
+        d.files.ds1.0.len(),
+        d.files.subs.0.len(),
+        d.files.dt1.0.len()
+    );
     // Before the window opens: a bad folder or a name taken stops here.
     let start = d2_client::app::play_start::resolve(
         &d2_client::app::play_start::CliStart {
@@ -507,12 +550,21 @@ fn play_once(
     println!("play: difficulty {}", start.difficulty);
     let result = play::run(play::PlayConfig {
         data,
-        seed: o.seed,
+        seed: d2_client::app::single_player::game_seed(&start.character, o.seed),
         character: start.character,
         exit_after: o.frames,
         save_path: start.save_path,
         start_flags: start.start_flags,
         hardcore: start.hardcore,
+        dump: o
+            .dump_draws
+            .clone()
+            .map(|dir| d2_client::facts::export::DumpRequest {
+                dir,
+                at_tick: o.at_tick.unwrap_or(1),
+                command: std::env::args().collect::<Vec<_>>().join(" "),
+            }),
+        input: o.input.clone(),
     })?;
     match result {
         bevy::app::AppExit::Success => Ok(()),
@@ -520,14 +572,49 @@ fn play_once(
     }
 }
 
+/// `facts-compare ORIGINAL D2RS [--ignore COL,...]` (`facts-render.md`
+/// §6): exit 0 match, 1 diverged, 2 partial, 3 error.
+fn facts_compare(args: &[String]) -> i32 {
+    let mut dirs = Vec::new();
+    let mut ignore = Vec::new();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--ignore" => match it.next() {
+                Some(v) => ignore.extend(v.split(',').map(|c| c.trim().to_owned())),
+                None => {
+                    eprintln!("facts-compare: --ignore needs a value");
+                    return 3;
+                }
+            },
+            _ => dirs.push(PathBuf::from(a)),
+        }
+    }
+    let [original, d2rs] = &dirs[..] else {
+        eprintln!("usage: d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...]");
+        return 3;
+    };
+    match d2_client::facts::compare::compare_dirs(original, d2rs, &ignore) {
+        Ok(outcome) => {
+            println!("{outcome}");
+            outcome.exit_code()
+        }
+        Err(e) => {
+            eprintln!("facts-compare: ERROR: {e}");
+            3
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
+        Some("facts-compare") => std::process::exit(facts_compare(&args[1..])),
         Some("cpu-render") => cpu_render(parse_options(&args[1..])?),
         Some("verify") => verify(parse_options(&args[1..])?),
         Some("play") | None => play(parse_options(args.get(1..).unwrap_or(&[]))?),
         Some("view") => view(parse_options(&args[1..])?),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--synthetic] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--dump-draws DIR [--at-tick N]] [--res 800x600|640x480] [--input SCRIPT]"),
     }
 }
 
@@ -557,6 +644,51 @@ mod tests {
         assert!(parse_options(&args(&["--new", "amazon"])).is_err());
         assert!(parse_options(&args(&["--new"])).is_err());
         assert!(parse_options(&args(&["--new", "0", "A", "--save", "x.d2s"])).is_err());
+    }
+
+    #[test]
+    fn input_takes_a_script() {
+        use d2_client::world_view::input_script::Step;
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let o = parse_options(&args(&["--input", "wait 3; click 600 300"])).unwrap();
+        assert_eq!(o.input.as_deref().map(<[Step]>::len), Some(2));
+        assert!(parse_options(&args(&["--input", "fly 1 2"])).is_err());
+        assert!(parse_options(&args(&["--input"])).is_err());
+    }
+
+    #[test]
+    fn res_takes_the_two_frames() {
+        use d2_client::rules::camera::FrameSize;
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(parse_options(&[]).unwrap().res, None);
+        let o = parse_options(&args(&["--res", "640x480"])).unwrap();
+        assert_eq!(o.res, Some(FrameSize::LOW));
+        let o = parse_options(&args(&["--res", "800x600"])).unwrap();
+        assert_eq!(o.res, Some(FrameSize::D2RS));
+        assert!(parse_options(&args(&["--res", "1024x768"])).is_err());
+        assert!(parse_options(&args(&["--res"])).is_err());
+    }
+
+    #[test]
+    fn dump_draws_takes_a_dir_and_a_tick() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let o = parse_options(&args(&["--dump-draws", "d", "--at-tick", "40"])).unwrap();
+        assert_eq!(
+            (o.dump_draws, o.at_tick),
+            (Some(PathBuf::from("d")), Some(40))
+        );
+        assert!(parse_options(&args(&["--at-tick", "40"])).is_err());
+        assert!(parse_options(&args(&["--dump-draws"])).is_err());
+    }
+
+    #[test]
+    fn facts_compare_usage_errors_exit_3() {
+        assert_eq!(facts_compare(&[]), 3);
+        assert_eq!(facts_compare(&["a".into(), "--ignore".into()]), 3);
+        assert_eq!(
+            facts_compare(&["/no/such/a".into(), "/no/such/b".into()]),
+            3
+        );
     }
 
     #[test]

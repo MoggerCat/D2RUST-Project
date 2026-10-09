@@ -10,11 +10,12 @@
 //!   the local player, else the facing toward the walk target or the last
 //!   position change, else 0), mapped to the COF row with §3 r3's
 //!   expected count (`UnitArt::expected_directions`);
-//! - frame: the model's +0x44 frame when set, else the COF's animation
-//!   rate advanced by the server tick count (the client model runs no
-//!   animation yet);
-//! - no COF box pre-test (§4: the screen position is the placement
-//!   hook's; the view clips at the frame edge);
+//! - frame: objects take the model's +0x44 frame as is (§3 r2; the
+//!   client object update animates it); players, monsters and missiles
+//!   the COF's animation rate advanced by the server tick count (the
+//!   client model runs no animation for them yet);
+//! - the COF box pre-test (§4) is the view's (`OriginalView`, which
+//!   knows the final screen position);
 //! - draw key: pass 6 at major / minor 0 when the source states no draw
 //!   order (`OriginalView` overwrites it when it does);
 //! - shade: none (full bright, `shading.md` §3 r1 `v = 0xFF`); blend:
@@ -24,19 +25,23 @@
 
 use std::sync::Arc;
 
-use crate::bridge::world::ClientWorld;
+use crate::bridge::world::{ClientWorld, OBJECT};
 use crate::bridge::ClientUnit;
+use d2_formats::cof::Cof;
+
 use crate::composite::{
     ComponentDraw, ComponentFrame, ComponentRequest, CompositeError, UnitParams,
 };
 use crate::frames::IndexFrame;
 use crate::rules::draw_order::OrderKey;
-use crate::rules::unit_composite::{component_cel, frame_index, unit_direction, CompositeKind};
+use crate::rules::unit_composite::{
+    component_cel, file_format, frame_index, unit_direction, CompositeKind,
+};
 use crate::scene::{order::pass, BlendOp, DrawItem, ItemTag, Rect, ShadeChain};
 use crate::ui::{ImageRequest, TextRequest};
 
 use super::unit_assets::{component_codes, unit_cof, SharedUnitArt, UnitLooks};
-use super::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
+use super::{SlotCall, TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewError, ViewRules};
 
 /// `rules` with the unit composite hooks of the play preview.
 pub struct UnitRules<R> {
@@ -49,12 +54,15 @@ impl<R> UnitRules<R> {
     /// The COF frame of `unit` this tick (module doc: d2rs-own,
     /// unverified).
     fn frame(world: &ClientWorld, unit: &ClientUnit, frames: u8, rate: u32) -> usize {
-        let frames = usize::from(frames.max(1));
-        if unit.frame > 0 {
-            return frame_index(unit.frame as u32) % frames;
+        // §3 r2: +0x44 >> 8 as is (no bound, §3 r6) where the model
+        // animates the unit: objects (the client object update,
+        // `world/objects-client.md` §26 generic step).
+        if unit.key.unit_type == OBJECT {
+            return frame_index(unit.frame as u32);
         }
         // d2rs-own, unverified (D1): 8.8 animation rate per tick.
-        ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames as u64) as usize
+        let frames = u64::from(frames.max(1));
+        ((world.server_ticks.wrapping_mul(u64::from(rate)) >> 8) % frames) as usize
     }
 }
 
@@ -97,6 +105,7 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         Ok(Some(UnitPose {
             cof: path,
             dir: usize::from(dir.cof_dir),
+            dir64: dir.dir64,
             frame: if art.spin == Some(unit.key) {
                 super::skill_motion::spin_frame(
                     world.server_ticks,
@@ -150,6 +159,46 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
     ) -> Result<ComponentFrame, CompositeError> {
         self.component_slot_frame(unit, pose, req)?
             .ok_or_else(|| unresolved(req, "component frame", "the slot draws nothing".into()))
+    }
+
+    /// §6 r4: the slots whose request succeeds but whose file is in no
+    /// archive (the loader's `None` entry); 1.14d still calls the drawer.
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &Cof,
+    ) -> Result<Vec<SlotCall>, ViewError> {
+        let art = self.art.read().unwrap_or_else(|e| e.into_inner());
+        let unit = &*art.posed(unit);
+        let Some(name) = unit_cof(&self.looks, unit) else {
+            return Ok(Vec::new());
+        };
+        let slots = crate::composite::slot_order(cof, pose.dir, pose.frame).map_err(|error| {
+            ViewError::Unit {
+                unit_type: unit.key.unit_type,
+                guid: unit.key.guid,
+                error,
+            }
+        })?;
+        let mut calls = Vec::new();
+        for slot in slots {
+            let Some(codes) = component_codes(&self.looks, unit, &name, &cof.layers[slot.layer])
+            else {
+                continue;
+            };
+            if let Some(None) = art.files.get(&codes.name()) {
+                let format = file_format(&codes, unit.class, unit.mode as u8);
+                if let Ok(path) = codes.path(format) {
+                    calls.push(SlotCall {
+                        slot: slot.slot,
+                        layer: slot.layer,
+                        path,
+                    });
+                }
+            }
+        }
+        Ok(calls)
     }
 
     /// §5.1, §6: a failed request or a file that did not load draws

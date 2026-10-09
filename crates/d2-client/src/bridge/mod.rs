@@ -1,4 +1,4 @@
-// Spec: specs/client/bridge.md, specs/client/model.md (§4, §5, §6 rule 8, §7 rule 3)
+// Spec: specs/client/bridge.md, specs/client/model.md (§4, §5, §6 rule 8, §7 rule 3), specs/flows/save-exit.md (§1 r2)
 //! The only link between the Bevy app and the game. Outbound: requests
 //! become 1.14d C→S bytes built with `d2-proto` ([`intent`]). Inbound: the
 //! S→C bytes the server delivers are split with `d2-proto` and dispatched
@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
 pub mod dispatch;
@@ -41,6 +42,7 @@ pub mod passive;
 mod passive_tests;
 pub mod predict;
 pub mod receive;
+pub mod skill_fallback;
 pub mod skills;
 pub mod update;
 pub mod world;
@@ -50,10 +52,13 @@ mod gaps_numbered_tests;
 #[cfg(test)]
 mod local_tests;
 #[cfg(test)]
+mod seam_movement_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tests_c2cli;
 
+use crate::rules::lighting::records::LightList;
 use d2_proto::transport::SplitError;
 use d2_proto::{FixedMessage, PROTOCOL_VERSION};
 
@@ -108,6 +113,8 @@ pub struct FrameReport {
     pub answered: usize,
     /// UI and sound outputs the frame's handlers made (spec §10).
     pub outputs: usize,
+    /// A paused frame (spec §8 rule 5): no pump, no receive.
+    pub paused: bool,
 }
 
 /// The bridge: a server link, the client world model and the dispatch
@@ -120,6 +127,8 @@ pub struct Bridge<L> {
     log: ReceiveLog,
     /// The frame's UI and sound outputs, in order (spec §10 rule 1).
     outputs: Vec<Output>,
+    /// UI state 9 or 11 is open ([`Bridge::set_paused`]).
+    paused: bool,
 }
 
 impl<L: ServerLink> Bridge<L> {
@@ -145,6 +154,7 @@ impl<L: ServerLink> Bridge<L> {
             inputs: ModelInputs::default(),
             log: ReceiveLog::default(),
             outputs: Vec::new(),
+            paused: false,
         })
     }
 
@@ -153,10 +163,34 @@ impl<L: ServerLink> Bridge<L> {
         self.send_bytes(&intent::encode(msg))
     }
 
+    /// Save and Exit Game (`flows/save-exit.md` §1 r2): C→S 0x69 through
+    /// the exit send `0x00477EE0` (system queue, no duplicate filter),
+    /// then `exit_requested` := 1. The client stays in the game until the
+    /// server's 0x05 (§4 r1).
+    pub fn save_and_exit(&mut self) -> Result<Sent, BridgeError> {
+        let sent = self.send_bytes(&[0x69])?;
+        self.world.exit_requested = true;
+        Ok(sent)
+    }
+
     /// Sends C→S bytes after the classifier check (spec §4 rules 2–3).
     pub fn send_bytes(&mut self, msg: &[u8]) -> Result<Sent, BridgeError> {
         let queue = intent::route(msg)?;
         Ok(self.link.send(queue, msg)?)
+    }
+
+    /// Whether the single-player game is paused: UI state 9 (the Esc
+    /// menu) or 11 is open (spec §8 rule 5, `flows/client-frame.md` §1
+    /// rule 2). Set by the app before each frame.
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+    }
+
+    /// A pass held by the app's draw pacing (`specs/tools/facts-render.md`
+    /// §5 r13, `play --dump-draws` only): it counts as a frame and does
+    /// nothing else: no pump, no receive, no update pass.
+    pub fn held_frame(&mut self) {
+        self.world.frames += 1;
     }
 
     /// One bridge frame: pump the server, receive and dispatch every
@@ -165,8 +199,30 @@ impl<L: ServerLink> Bridge<L> {
     /// the C→S messages the model answered with. A refused chunk ends the
     /// frame with an error; chunks after it in the same receive are not
     /// processed (a fatal assert in 1.14d). The frame's outputs wait in
-    /// the bridge for [`Self::take_outputs`] (spec §10 rule 4).
+    /// the bridge for [`Self::take_outputs`] (spec §10 rule 4). A paused
+    /// frame ([`Self::set_paused`]) runs only the skill fallback.
     pub fn frame(&mut self) -> Result<FrameReport, BridgeError> {
+        // A paused pass (spec §8 rule 5, `flows/client-frame.md` §1 rule
+        // 2: UI state 9 or 11, the local player in a room): no pump (no
+        // server frame), no receive, no update pass; only the skill
+        // fallback, once. The pass still counts as a frame.
+        // After Save and Exit the passes run until the server's answer
+        // (`flows/save-exit.md` §1 r3): no pause holds them.
+        if self.paused
+            && !self.world.exit_requested
+            && self.world.local().is_some_and(|u| u.position.is_some())
+        {
+            self.world.frames += 1;
+            let before = self.log.rejected.len();
+            if let Err(error) = skill_fallback::skill_fallback(&mut self.world, &self.inputs) {
+                self.log.rejected.push(receive::Rejected { id: 0, error });
+            }
+            return Ok(FrameReport {
+                paused: true,
+                rejected: self.log.rejected.len() - before,
+                ..FrameReport::default()
+            });
+        }
         // A dialog-reply slot the UI layer did not answer after the last
         // frame's outputs carries no message (`msg-ui.md` §16 r4.3: no
         // case was handed back, so no C→S 0x31).
@@ -202,6 +258,10 @@ impl<L: ServerLink> Bridge<L> {
         if pumped.ticked && self.world.in_game {
             let before = self.log.rejected.len();
             report.drained = self.update_pass();
+            // The last step of the drawn pass (spec §8 rule 5).
+            if let Err(error) = skill_fallback::skill_fallback(&mut self.world, &self.inputs) {
+                self.log.rejected.push(receive::Rejected { id: 0, error });
+            }
             report.rejected += self.log.rejected.len() - before;
         }
         report.answered = self.send_outgoing()?;
@@ -381,6 +441,12 @@ impl<L: ServerLink> Bridge<L> {
         self.inputs.tables = tables;
     }
 
+    /// The `Levels.txt` rows (`model.md` §11 rule 4); the other tables
+    /// stay (the skill rows bound earlier survive).
+    pub fn set_levels(&mut self, levels: Vec<world::LevelRow>) {
+        self.inputs.tables.levels = levels;
+    }
+
     /// The unit-message rows (`msg-units.md` §1.2 r7, §1.3 r3,
     /// `model.md` §15 r1): `monstats` / `monstats2`, `itemstatcost` send
     /// columns, `objects.txt` and `shrines.txt`; the other tables stay.
@@ -391,12 +457,20 @@ impl<L: ServerLink> Bridge<L> {
         t.stats = rows.stats;
         t.objects = rows.objects;
         t.shrines = rows.shrines;
+        t.states = rows.states;
+        t.missiles = rows.missiles;
     }
 
     /// The host's wall-clock seconds `0x00410A80` (`render/lighting.md`
     /// §10 r4).
     pub fn set_wall_seconds(&mut self, f: fn() -> i32) {
         self.inputs.wall_seconds = Some(f);
+    }
+
+    /// The light quality `[0x0072A348]` ≠ 0 (`render/lighting.md` §5):
+    /// client missiles get lights (§8 missile row).
+    pub fn set_high_light_quality(&mut self, high: bool) {
+        self.inputs.high_light_quality = high;
     }
 
     /// The skills tables of the passive refresh (`msg-skills.md` §2 r4).
@@ -464,12 +538,13 @@ impl<L: ServerLink> Bridge<L> {
         self.world.recache_local_room(x, y)
     }
 
-    /// The play preview's predicted sub-tile of the local player, for the
-    /// position check ([`ClientWorld::set_local_walk`],
-    /// [`ClientWorld::predicted`]). d2rs-own, unverified. PROVISIONAL
-    /// (`client/model.md` OQ2; REC-51, REC-277).
-    pub fn set_local_walk(&mut self, cell: Option<(u16, u16)>) {
-        self.world.set_local_walk(cell);
+    /// The play preview's predicted precise position of the local player
+    /// and its walk / run mode, for the position check
+    /// ([`ClientWorld::set_local_walk`], [`ClientWorld::predicted`]).
+    /// d2rs-own, unverified. PROVISIONAL (`client/model.md` OQ2; REC-51,
+    /// REC-277).
+    pub fn set_local_walk(&mut self, pos: Option<(u32, u32)>, mode: Option<u32>) {
+        self.world.set_local_walk(pos, mode);
     }
 
     /// Installs the item tables the model decodes item streams with.
@@ -479,6 +554,15 @@ impl<L: ServerLink> Bridge<L> {
 
     pub fn world(&self) -> &ClientWorld {
         &self.world
+    }
+
+    /// A drawn frame's light pass (`render/lighting.md` §6.4): `pass` gets
+    /// the model and the client's kept light list (§6.3), taken out of the
+    /// model for the pass and put back after it.
+    pub fn light_frame(&mut self, pass: impl FnOnce(&ClientWorld, &mut LightList)) {
+        let mut lights = std::mem::take(&mut self.world.lights);
+        pass(&self.world, &mut lights);
+        self.world.lights = lights;
     }
 
     /// The client DRLG, writable: a test seam for fixture collision (a
@@ -497,7 +581,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The play preview's monster motion on the model (d2rs-own,
     /// unverified; [`motion`]).
     pub fn preview_motion(&mut self, m: &mut motion::MonsterMotion) {
-        m.frame(&mut self.world);
+        m.frame(&mut self.world, &self.inputs.tables.monsters);
     }
 
     pub fn log(&self) -> &ReceiveLog {

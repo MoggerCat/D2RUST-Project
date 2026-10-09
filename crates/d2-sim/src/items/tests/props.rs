@@ -52,6 +52,17 @@ fn func19_charges_vectors() {
     }
 }
 
+/// §5 r9: a `param` outside the skills table charges skill 0.
+// Covers: specs/items/properties.md §5 r9
+#[test]
+fn func19_skill_outside_the_table_is_skill_0() {
+    let (t, i) = charge_tables();
+    let mut it = item(i, 4242);
+    run(&t, &mut it, rec(0, 99, 0, 1));
+    // c = 5, layer (0 << 6) + 1.
+    assert_eq!(it.stats.item_list(CHARGED, 1), 1283);
+}
+
 // Covers: specs/items/properties.md §5 r8
 #[test]
 fn func18_by_time_vectors() {
@@ -64,6 +75,56 @@ fn func18_by_time_vectors() {
     let mut it = item(i, 1);
     run(&t, &mut it, rec(0, 5, -300, 900));
     assert_eq!(it.stats.item_list(268, 0), 4_190_211);
+}
+
+/// Open question 5: functions 18 and 19 write with the plain list set:
+/// no `valshift` (the vectors of §Test vectors stay unshifted).
+// Covers: specs/items/properties.md §5 r8, §5 r9
+#[test]
+fn func18_func19_set_without_valshift() {
+    let mut t = tables();
+    let i = push_item(&mut t, item_rec(RING, b"rin "));
+    t.properties = vec![prop1(18, 268), prop1(19, CHARGED)];
+    t.skills = vec![SkillRec::default(); 4];
+    t.valshift[268] = 8;
+    t.valshift[usize::from(CHARGED)] = 8;
+    let mut it = item(i, 1);
+    run(&t, &mut it, rec(0, 1, -50, 50));
+    assert_eq!(it.stats.item_list(268, 0), 1_254_201);
+    let mut it = item(i, 4242);
+    run(&t, &mut it, rec(1, 3, 0, 1));
+    assert_eq!(it.stats.item_list(CHARGED, (3 << 6) + 1), 1283);
+}
+
+/// §5 rule 3 with a foreign owner (§11: owner = the player, I = the set
+/// item): I is still an item, so the small-bonus rule applies and the
+/// base is reset.
+// Covers: specs/items/properties.md §5 r3, §11
+#[test]
+fn func7_set_bonus_on_item() {
+    let mut t = tables();
+    let i = weapon(&mut t, 1, 2);
+    t.properties = vec![prop1(7, stat::MAXDAMAGE_PERCENT)];
+    let mut partial = [PropRec::NONE; 8];
+    partial[0] = rec(0, 0, 10, 10);
+    t.sets = vec![SetRec {
+        count: 3,
+        version: 0,
+        partial,
+        full: [PropRec::NONE; 8],
+    }];
+    t.setitems = vec![SetItemRec::default()];
+    let mut it = item(i, 1);
+    it.file_index = 0;
+    let key = ListKey {
+        state: 165,
+        flags: 0,
+    };
+    let mut owner = FakeStats::default();
+    set_bonuses(&t, &mut it, 0b11, &mut owner, key);
+    assert_eq!(owner.lists[&key].get(&(stat::MAXDAMAGE, 0)), Some(&1));
+    assert_eq!(owner.lists[&key].get(&(stat::MAXDAMAGE_PERCENT, 0)), None);
+    assert_eq!(it.stats.base(stat::MAXDAMAGE, 0), 2, "base reset");
 }
 
 // Covers: specs/items/properties.md §5 text
@@ -215,6 +276,7 @@ fn set_bonus_records() {
     full[0] = rec(15, 0, 1, 1);
     t.sets = vec![SetRec {
         count: 6,
+        version: 0,
         partial,
         full,
     }];
@@ -332,20 +394,70 @@ fn gem_filler_and_runeword() {
     assert_eq!(runeword_match(&t, &it, &[r1, r2]), Some(1));
     assert_eq!(runeword_match(&t, &it, &[r2, r1]), None);
     assert_eq!(runeword_match(&t, &it, &[r1]), None);
+    // §10.2: I = the filler (a rune), O = the socketed item's stats.
+    let mut filler = item(r2, 1);
     assert!(crate::items::props::activate_runeword(
-        &t, &mut it, 1, false
+        &t,
+        &mut filler,
+        &mut it.stats,
+        1,
+        false
     ));
-    assert_ne!(it.flags & flag::RUNEWORD, 0);
     let k = ListKey {
         state: 171,
         flags: 0x40,
     };
     assert_eq!(it.stats.list_get(k, 52, 0), 9);
+    assert_eq!(
+        filler.stats.list_get(k, 52, 0),
+        0,
+        "the filler's lists stay"
+    );
     assert!(!crate::items::props::activate_runeword(
-        &t, &mut it, 1, false
+        &t,
+        &mut filler,
+        &mut it.stats,
+        1,
+        false
     ));
     it.quality = q::MAGIC;
     assert_eq!(runeword_match(&t, &it, &[r1, r2]), None);
+}
+
+/// §10.2: a ranged runeword property rolls on the filler's item seed
+/// (I), not the socketed item's (O), and lands in O's state-171 list.
+// Covers: specs/items/properties.md §10.2
+#[test]
+fn a_runeword_roll_draws_on_the_filler_seed() {
+    let mut t = tables();
+    let s = push_item(&mut t, item_rec(AXE, b"axe "));
+    let r = push_item(&mut t, item_rec(ty::RUNE, b"r01 "));
+    t.properties = vec![prop1(1, 52)];
+    let mut props = [PropRec::NONE; 7];
+    props[0] = rec(0, 0, 1, 100);
+    t.runes = vec![RuneRec {
+        complete: 1,
+        props,
+        ..Default::default()
+    }];
+    let (mut filler, mut socketed) = (item(r, 7), item(s, 9));
+    let (fseed, sseed) = (filler.item_seed, socketed.item_seed);
+    let mut want = fseed;
+    let v = crate::items::props::roll_value(&mut want, 1, 100);
+    assert!(crate::items::props::activate_runeword(
+        &t,
+        &mut filler,
+        &mut socketed.stats,
+        0,
+        false
+    ));
+    let k = ListKey {
+        state: 171,
+        flags: 0x40,
+    };
+    assert_eq!(socketed.stats.list_get(k, 52, 0), v);
+    assert_eq!(filler.item_seed, want, "one draw on the filler's seed");
+    assert_eq!(socketed.item_seed, sseed, "none on the socketed item's");
 }
 
 // Covers: specs/items/properties.md §12

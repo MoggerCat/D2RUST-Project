@@ -459,13 +459,14 @@ fn dec_quantity_uses_one_from_the_right_hand_stack() {
     let r = fx.sim.skill_use(&mut fx.game, |w| dec_quantity(w, p));
     assert_eq!(r, 1);
     assert_eq!(fx.sim.with(&mut fx.game, |_, v| v.stat(i, QUANTITY)), 0);
+    let guid = fx.sim.sys.units.get(i).unwrap().guid;
     assert!(fx
         .sim
         .sys
         .hooks
         .x
-        .log
-        .contains(&format!("0x3E {} {} 70 0", p.0, i.0)));
+        .msgs
+        .contains(&(p, crate::units::messages::update_item_stat(guid, 70, 0, 0))));
     // Quantity 0: stays 0, returns 0.
     let r = fx.sim.skill_use(&mut fx.game, |w| dec_quantity(w, p));
     assert_eq!(r, 0);

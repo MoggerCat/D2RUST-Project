@@ -299,8 +299,23 @@ pub fn component_codes(
         component_token,
         armor,
         base_mode_token(looks, kind, mode),
-        name.weapon_class,
+        layer_weapon_class(layer).unwrap_or(name.weapon_class),
     )
+}
+
+/// The weapon class of a component file name (§6 r1): the COF layer's
+/// own (`weaponClass`, nul-padded in the file), not the unit's §2.1 class.
+/// PROVISIONAL (REC-441, measured: 1.14d's `a1-town-arrival-ama` draws
+/// `amTNhth.cof`'s layers as `AMTRlitTN1ht`, ..., `AMRAlitTNhth`, each
+/// with its layer's class). An empty layer class keeps the unit's.
+fn layer_weapon_class(layer: &CofLayer) -> Option<Code> {
+    let mut c = layer.weapon_class;
+    for b in &mut c {
+        if *b == 0 {
+            *b = b' ';
+        }
+    }
+    (c != *b"    ").then_some(c)
 }
 
 /// One loaded component file: its format, directions `Df` and frames per
@@ -561,7 +576,8 @@ impl UnitArtLoader {
                 };
                 let d = u8::try_from(dcc.directions.len()).map_err(|_| "too many directions")?;
                 for dir in 0..d {
-                    sets.push(FrameSet::from_dcc(&dcc, dir).map_err(|e| e.to_string())?);
+                    let set = FrameSet::from_dcc(&dcc, dir).map_err(|e| e.to_string())?;
+                    sets.push(sprite_cache_limit(set));
                 }
                 (d, dcc.frames_per_direction as usize)
             }
@@ -600,6 +616,25 @@ impl UnitArtLoader {
             cels,
         ))
     }
+}
+
+/// Largest DCC frame side the sprite cache draws
+/// (`render/sprite-placement.md` §3, `formats/dcc.md` §Frame size limit).
+pub const SPRITE_CACHE_SIDE: u32 = 256;
+
+/// A component DCC direction as the sprite cache gives it
+/// (`render/sprite-placement.md` §3, PROVISIONAL): a frame wider or taller
+/// than [`SPRITE_CACHE_SIDE`] has no cel, so it draws nothing; the frame
+/// stays in the set as an empty image, keeping every other index.
+pub fn sprite_cache_limit(mut set: FrameSet) -> FrameSet {
+    for f in &mut set.frames {
+        if f.width > SPRITE_CACHE_SIDE || f.height > SPRITE_CACHE_SIDE {
+            f.width = 0;
+            f.height = 0;
+            f.pixels = Vec::new();
+        }
+    }
+    set
 }
 
 /// The cel fields w, h, xoff, yoff of every frame (`render/sprite-placement.md`
@@ -647,4 +682,28 @@ type StoredFile = (CanonicalPath, FileFacts, Vec<Vec<CelBox>>);
 enum Loaded {
     Dcc(d2_formats::dcc::Dcc),
     Dc6(d2_formats::dc6::Dc6),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::frames::IndexFrame;
+
+    fn frame(w: u32, h: u32) -> IndexFrame {
+        IndexFrame::new(w, h, -4, -7, vec![1; (w * h) as usize]).unwrap()
+    }
+
+    // render/sprite-placement.md §3 (PROVISIONAL): a DCC frame with w > 256
+    // or h > 256 draws nothing; frames up to 256 × 256 draw unchanged.
+    #[test]
+    fn sprite_cache_drops_frames_over_256() {
+        let set = FrameSet {
+            frames: vec![frame(256, 256), frame(257, 1), frame(1, 257), frame(3, 2)],
+        };
+        let out = sprite_cache_limit(set.clone());
+        assert_eq!(out.frames[0], set.frames[0]);
+        assert!(out.frames[1].is_empty() && out.frames[1].pixels.is_empty());
+        assert!(out.frames[2].is_empty() && out.frames[2].pixels.is_empty());
+        assert_eq!(out.frames[3], set.frames[3]);
+    }
 }

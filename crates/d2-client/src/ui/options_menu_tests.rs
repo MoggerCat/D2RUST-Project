@@ -76,6 +76,27 @@ fn row_tops_follow_the_position_table() {
     assert_eq!(tops(MenuId::Automap), [103, 148, 193, 238, 283, 328, 373]);
 }
 
+// Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r4
+#[test]
+fn row_tops_at_640_follow_the_position_table() {
+    let tops = |m| {
+        let mut o = menu_at(m);
+        o.screen = Screen::R640;
+        (0..o.rows().len()).map(|i| o.y_top(i)).collect::<Vec<_>>()
+    };
+    // The 640 × 480 column of the table (h = 320).
+    assert_eq!(tops(MenuId::Game), [125, 175, 225]);
+    assert_eq!(tops(MenuId::Options), [75, 125, 175, 225, 275]);
+    assert_eq!(tops(MenuId::Sound), [20, 65, 110, 155, 200, 245, 290, 335]);
+    assert_eq!(tops(MenuId::Automap), [43, 88, 133, 178, 223, 268, 313]);
+    let mut o = menu_at(MenuId::Game);
+    assert_eq!(o.half(), 400);
+    o.screen = Screen::R640;
+    assert_eq!(o.half(), 320);
+    // Row hit-test follows the same y: the second row's top at 640.
+    assert_eq!(o.row_at(o.y_top(1) + 3 + 3), Some(1));
+}
+
 // Covers: specs/ui/frontend-options.md §o5-input-handler-table-0x006d6030-7-entries-registered-while-ui-9-is-open r4
 #[test]
 fn up_skips_the_disabled_rows_of_the_sound_menu() {
@@ -196,4 +217,21 @@ fn click_activates_on_release_and_hover_selects() {
     o.press(pt(400, 150));
     o.release(pt(400, 340));
     assert_eq!(o.menu, MenuId::Options);
+}
+
+// Party Names is enabled only while Show Party is on (`0x004577B0`).
+// Covers: specs/ui/frontend-options.md §o2-menu-records-and-the-tree r3
+#[test]
+fn party_names_is_enabled_only_while_the_party_is_shown() {
+    let mut o = menu_at(MenuId::Automap);
+    let names = row_of(&o, Row::MapNames);
+    let mut s = Settings {
+        automap_party: 1,
+        ..Settings::default()
+    };
+    o.set_settings(s);
+    assert!(o.enabled(names));
+    s.automap_party = 0;
+    o.set_settings(s);
+    assert!(!o.enabled(names));
 }

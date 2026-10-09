@@ -354,6 +354,7 @@ fn wired_game_on_live_tables_runs_100_ticks() {
         combat: CombatTables::from_bin(&l.bin).expect("combat tables"),
         levels: rows::<Levels>(),
         skill_modes: skill_modes(table("monstats")),
+        overlay_count: i32::try_from(table("overlay").count).unwrap_or(i32::MAX),
     };
     let vitals = Arc::new(VitalsTables::from_bin(&l.bin).expect("vitals tables"));
     let mut hooks = ActionHooks::new(
@@ -494,4 +495,32 @@ fn wired_game_on_live_tables_runs_100_ticks() {
     // Full life, no regeneration stat: life unchanged (`stat-lists.md` §10.1 step 3).
     assert_eq!(s.events.action.sys.stats.unit_total(player, 6, 0), life);
     println!("frame {}; messages queued: {}", s.game.frame, sink.queued);
+}
+
+// ---- render/draw-order-2.md OQ 2: the act edge floor records ------------------------
+
+/// The act edge floor record (`render/draw-order-2.md` §14, open question
+/// 2; `levels.md` §2 rule 3): acts I–III find their key in the base
+/// library the loader read (a miss is fatal 0x44C in the original); the
+/// first entry in reverse file order is a floor (orientation 0).
+// Intended claim (unconfirmed until the first local run): render/draw-order-2.md §14.
+#[test]
+#[ignore = "needs original game files in D2_GAME_DIR"]
+fn act_edge_floor_records_resolve_in_the_base_libraries() {
+    use d2_sim::drlg::tiles::{first_entry, ACT_EDGE_TILE};
+    use d2_sim::drlg::TileSource;
+    for (act, e) in ACT_EDGE_TILE.iter().enumerate() {
+        let Some((path, key)) = e else {
+            assert!(act >= 3, "acts I–III have an edge record");
+            continue;
+        };
+        let tiles = live()
+            .files
+            .dt1
+            .dt1(path)
+            .unwrap_or_else(|| panic!("act {act}: base library not loaded"));
+        let i = first_entry(tiles, *key).unwrap_or_else(|| panic!("act {act}: no {key:?}"));
+        assert_eq!(tiles[i as usize].orientation, 0, "act {act}");
+        eprintln!("act {act}: tile {i} of {} ({:?})", tiles.len(), key);
+    }
 }

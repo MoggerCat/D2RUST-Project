@@ -3,37 +3,27 @@
 //! §3 r2–r3) and the equipped items (§6 r4). Drawn before the item
 //! graphics, so each graphic lands over its tint.
 //!
-//! PROVISIONAL (REC-271, d2rs-own, unverified): the original draws the
-//! tint as a translucent fill (blend kind 2 over the destination, §2 r3);
-//! the UI sprite path has no blend, so it is painted with the opaque
-//! `d2rs\hudfill` tiles of the rectangle primitive
-//! ([`crate::ui::original::esc_menu::push_fill`]) in the tint's colour
-//! (frames [`BELT_FILL_BASE`] + the tint index for tints 0–3,
-//! [`UNIDENTIFIED_FILL`] for 4). Read for the requirement check: strength,
-//! dexterity and level from the tables (REC-242, requirement stat
+//! Each tint is the UI rectangle primitive `0x0046EFD0(x, y, w, h,
+//! colour, 0)` (§2 r2): draw mode 0, blend kind 2, `A2[256·d + c]` over
+//! the destination (§2 r3), the colour the act palette's nearest entry of
+//! §2 r1 ([`ItemsUi::tint_colors`]). Read for the requirement check:
+//! strength, dexterity and level from the tables (REC-242, requirement stat
 //! modifiers not applied). Not read: the shooter / quiver term of §6 r4,
 //! `0x004C2240`, `0x0062A4E0`, the quest-item term of §3 r3, the
 //! transmogrify cursor (state 8), and the placement tint for a cursor
 //! item (§4); with an item on the cursor nothing is hovered.
 
-use super::super::draw::UiDrawSink;
+use super::super::draw::{RectRequest, UiDraw, UiDrawSink};
 use super::super::geom::{Point, Rect};
 use super::super::inv_grid::{
     equip_item_tint, grid_item_tint, hovered_tint, EquipItemFacts, GridItemFacts, Tint,
 };
 use super::inv_items::{InvLayout, ItemsUi};
-use super::UiFiles;
 use crate::bridge::items::{self, mode, ItemView};
 use crate::bridge::world::ClientWorld;
-use crate::ui::original::hud::{BELT_FILL_BASE, FILL_FILE, UNIDENTIFIED_FILL};
 
-/// The `hudfill` frame of a tint.
-pub fn fill_frame(t: Tint) -> u32 {
-    match t {
-        Tint::Unidentified => UNIDENTIFIED_FILL,
-        t => BELT_FILL_BASE + t as u32,
-    }
-}
+/// The tint's draw mode (§2 r2): blend kind 2, the 25 % alpha table.
+pub const TINT_MODE: u8 = 0;
 
 fn contains(r: &Rect, p: Point) -> bool {
     p.x >= r.x && p.x < r.x + i32::from(r.w) && p.y >= r.y && p.y < r.y + i32::from(r.h)
@@ -63,18 +53,24 @@ impl ItemsUi {
     pub fn draw_tints(
         &self,
         world: &ClientWorld,
-        files: &UiFiles,
         layout: &InvLayout,
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
-        let Some(file) = files.id(FILL_FILE) else {
+        let Some(colors) = self.tint_colors else {
             return;
         };
         let g = &layout.grid;
         let hover_ok = items::cursor_item(world).is_none();
         let mut paint = |t: Tint, r: Rect| {
-            crate::ui::original::esc_menu::push_fill(out, file, fill_frame(t), r);
+            out.push(UiDraw::Rect(RectRequest::sized(
+                r.x,
+                r.y,
+                i32::from(r.w),
+                i32::from(r.h),
+                colors[t as usize],
+                TINT_MODE,
+            )));
         };
         for it in items::local_items(world) {
             match it.mode {

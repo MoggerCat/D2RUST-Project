@@ -1,10 +1,13 @@
 // Spec: specs/items/quality.md
 //! The itemratio quality roll (§3), the quality dispatch with its
 //! overrides, downgrade chain and finishing steps (§4–§5), and the
-//! low-quality, superior, unique and set routines (§6–§9).
+//! low-quality, superior, unique and set routines (§6–§9), with their
+//! format-0 branches (§10: legacy items of version-0x47 saves).
 
 use super::affixes;
-use super::create::{class_skill_mods, ethereal_roll, has_durability, normal, socket_roll};
+use super::create::{
+    class_skill_mods, ethereal_roll, has_durability, normal_by_format, socket_roll,
+};
 use super::props::{apply_quality_row, apply_set_item, apply_unique};
 use super::tables::ItemTables;
 use super::{flag, q, req, stat, ty, Fatal, Item, ItemGame, ItemRequest, ItemStats, UniqueBits};
@@ -38,18 +41,20 @@ pub fn ratio_row(t: &ItemTables, item: usize, limit: u16) -> Option<usize> {
     best.map(|(i, _)| i)
 }
 
-/// Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`, §3).
+/// Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`, §3; format
+/// 0: §10.1).
 pub fn roll_quality<S>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> Result<u8, Fatal> {
     if item.format >= 1 && rq.quality != q::NONE {
         return Ok(rq.quality);
     }
-    // TODO(items generation.md OQ 1): format-0 quality roll unspecified;
-    // the format ≥ 1 rules run for it.
     let limit = if item.format == 0 { 0 } else { 100 };
     let row = ratio_row(t, item.record, limit).ok_or(Fatal::NoRatioRow)?;
     let rec = t.item(item.record).ok_or(Fatal::NoItemRecord)?;
     if rec.quest != 0 {
         return Ok(q::NORMAL);
+    }
+    if item.format == 0 {
+        return roll_quality_legacy(t, item, rq, row);
     }
     let mut l = rq.ilvl;
     if t.is_type(item.record, ty::MISC as i16) {
@@ -70,6 +75,44 @@ pub fn roll_quality<S>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> 
         let d = l.checked_div(div as i32).ok_or(Fatal::DivideByZero)?;
         let c = (base as i32).wrapping_sub(d);
         if c < 1 || item.item_seed.roll(c) == 0 {
+            return Ok(quality);
+        }
+    }
+    Ok(if rq.flags2 & req::SUPERIOR != 0 {
+        q::SUPERIOR
+    } else {
+        q::LOW
+    })
+}
+
+/// §10.1: the format-0 columns, after the ratio row and the `quest` test.
+/// L is the request ilvl unadjusted; unique, rare and set have no
+/// divisor; c < 1 becomes 1, so every quality is still drawn.
+fn roll_quality_legacy<S>(
+    t: &ItemTables,
+    item: &mut Item<S>,
+    rq: &ItemRequest,
+    row: usize,
+) -> Result<u8, Fatal> {
+    let l = rq.ilvl;
+    let rr = &t.itemratio[row];
+    // (base, divisor); divisor None: no division. Divided in order, so a
+    // divisor 0 is fatal only when its quality is reached.
+    let cols = [
+        (rr.unique, None),
+        (rr.rare, None),
+        (rr.set, None),
+        (rr.magic, Some(rr.magicdivisor)),
+        (rr.hiquality, Some(rr.hiqualitydivisor)),
+        (rr.normal, Some(rr.normaldivisor)),
+    ];
+    for (&quality, (base, div)) in RATIO_ORDER.iter().zip(cols) {
+        let d = match div {
+            None => l,
+            Some(d) => l.checked_div(d as i32).ok_or(Fatal::DivideByZero)?,
+        };
+        let c = (base as i32).wrapping_sub(d);
+        if item.item_seed.roll(c.max(1)) == 0 {
             return Ok(quality);
         }
     }
@@ -106,6 +149,7 @@ fn dur_factor<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, f: i32) {
 /// Runs the routine of quality `x` (2, 3, 4 or 6 in a downgrade).
 fn routine<S: ItemStats>(
     t: &ItemTables,
+    game: &dyn ItemGame,
     item: &mut Item<S>,
     rq: &ItemRequest,
     x: u8,
@@ -115,7 +159,7 @@ fn routine<S: ItemStats>(
         q::MAGIC => affixes::magic(t, item, rq),
         q::RARE => affixes::rare(t, item, rq),
         _ => {
-            normal(t, item, rq)?;
+            normal_by_format(t, game, item, rq)?;
             true
         }
     })
@@ -125,6 +169,7 @@ fn routine<S: ItemStats>(
 /// routine failed; `s` is the saved low word.
 fn downgrade<S: ItemStats>(
     t: &ItemTables,
+    game: &dyn ItemGame,
     item: &mut Item<S>,
     rq: &mut ItemRequest,
     s: u32,
@@ -139,7 +184,7 @@ fn downgrade<S: ItemStats>(
         item.quality = x;
         rq.quality = x;
         s = save(item);
-        if routine(t, item, rq, x)? {
+        if routine(t, game, item, rq, x)? {
             return Ok(());
         }
     }
@@ -189,21 +234,21 @@ pub fn dispatch<S: ItemStats>(
         q::LOW => {
             let s = save(item);
             if !low_quality(t, item, rq) {
-                downgrade(t, item, rq, s, &[q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::NORMAL])?;
             }
         }
-        q::NORMAL => normal(t, item, rq)?,
+        q::NORMAL => normal_by_format(t, game, item, rq)?,
         q::SUPERIOR => {
             item.file_index = -1;
             let s = save(item);
             if !superior(t, item, rq) {
-                downgrade(t, item, rq, s, &[q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::NORMAL])?;
             }
         }
         q::MAGIC => {
             let s = save(item);
             if !affixes::magic(t, item, rq) {
-                downgrade(t, item, rq, s, &[q::SUPERIOR, q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::SUPERIOR, q::NORMAL])?;
             }
         }
         q::SET => {
@@ -211,7 +256,7 @@ pub fn dispatch<S: ItemStats>(
             let s = save(item);
             if !set_item(t, item, rq) {
                 dur_factor(t, item, 2);
-                downgrade(t, item, rq, s, &[q::MAGIC, q::SUPERIOR, q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::MAGIC, q::SUPERIOR, q::NORMAL])?;
             }
         }
         q::RARE => {
@@ -219,7 +264,7 @@ pub fn dispatch<S: ItemStats>(
             item.rare_suffix = 0;
             let s = save(item);
             if !affixes::rare(t, item, rq) {
-                downgrade(t, item, rq, s, &[q::MAGIC, q::SUPERIOR, q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::MAGIC, q::SUPERIOR, q::NORMAL])?;
             }
         }
         q::UNIQUE => {
@@ -227,7 +272,14 @@ pub fn dispatch<S: ItemStats>(
             let s = save(item);
             if !unique(t, game, item, rq) {
                 dur_factor(t, item, 3);
-                downgrade(t, item, rq, s, &[q::RARE, q::MAGIC, q::SUPERIOR, q::NORMAL])?;
+                downgrade(
+                    t,
+                    game,
+                    item,
+                    rq,
+                    s,
+                    &[q::RARE, q::MAGIC, q::SUPERIOR, q::NORMAL],
+                )?;
             }
         }
         q::CRAFTED | q::TEMPERED => {
@@ -240,10 +292,15 @@ pub fn dispatch<S: ItemStats>(
                 affixes::tempered(t, item)
             };
             if !ok {
-                downgrade(t, item, rq, s, &[q::NORMAL])?;
+                downgrade(t, game, item, rq, s, &[q::NORMAL])?;
             }
         }
         _ => return Ok(false),
+    }
+    // A legacy property function's fatal (`properties.md` §14): the
+    // original exits.
+    if let Some(f) = item.fatal {
+        return Err(f);
     }
     // Finishing (§4 step 5).
     if !(q::LOW..=q::TEMPERED).contains(&item.quality) {
@@ -265,8 +322,11 @@ pub fn dispatch<S: ItemStats>(
     Ok(true)
 }
 
-/// Low quality (`0x005C2FB0` → `0x005C2D40`, §6).
+/// Low quality (`0x005C2FB0` → `0x005C2D40`, §6; format 0: §10.2).
 pub fn low_quality<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> bool {
+    if item.format < 1 {
+        return low_quality_legacy(t, item);
+    }
     item.file_index = item.item_seed.roll(t.n_lowquality as i32) as i32;
     if has_durability(t, item) {
         let d = t.item(item.record).map_or(0, |r| u32::from(r.durability));
@@ -301,6 +361,56 @@ pub fn low_quality<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRe
     };
     class_skill_mods(t, item, rq);
     result
+}
+
+/// Low quality, format 0 (`0x005C2AF0`, §10.2): durability / 3, base
+/// damage and defense (the throw stats from their totals), no class
+/// skill mods.
+fn low_quality_legacy<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) -> bool {
+    // "No lowqualityitems table": d2rs holds the table as a row count; an
+    // empty one stands for none.
+    let Some(d) = t.item(item.record).map(|r| u32::from(r.durability)) else {
+        return false;
+    };
+    if t.n_lowquality == 0 {
+        return false;
+    }
+    item.file_index = item.item_seed.roll(t.n_lowquality as i32) as i32;
+    if has_durability(t, item) {
+        let m = (d / 3).max(1) as i32;
+        let mut v = item.unit_seed.roll(m >> 1) as i32 + (m >> 1);
+        if v == 0 {
+            v = 1;
+        }
+        item.stats.set_base(stat::DURABILITY, 0, v);
+        item.stats.set_base(stat::MAXDURABILITY, 0, m);
+    }
+    let scale = |item: &mut Item<S>, s: u16, floor: i32, total: bool| {
+        let cur = if total {
+            item.stats.stat(s, 0)
+        } else {
+            item.stats.base(s, 0)
+        };
+        let v = (cur.wrapping_mul(75) / 100).max(floor);
+        item.stats.set_base(s, 0, v);
+    };
+    if t.is_type(item.record, ty::WEAP as i16) {
+        scale(item, stat::MAXDAMAGE, 2, false);
+        scale(item, stat::MINDAMAGE, 1, false);
+        scale(item, stat::SECONDARY_MAXDAMAGE, 2, false);
+        scale(item, stat::SECONDARY_MINDAMAGE, 1, false);
+        if t.itype_of(item.record).is_some_and(|it| it.throwable != 0) {
+            // `0x005C0D40`: the swapped bounds of §6, from the totals.
+            scale(item, stat::THROW_MINDAMAGE, 2, true);
+            scale(item, stat::THROW_MAXDAMAGE, 1, true);
+        }
+        true
+    } else if t.is_type(item.record, ty::ARMO as i16) {
+        scale(item, stat::ARMORCLASS, 1, false);
+        true
+    } else {
+        false
+    }
 }
 
 /// Superior row fits (`0x0065E7D0`, §7.1).
@@ -373,14 +483,28 @@ fn mark_unique(bits: &mut UniqueBits, idx: u32, nolimit: bool, quest: bool) -> b
     true
 }
 
-/// Unique (`0x005566B0`, §8).
+/// Unique (`0x005566B0`, §8; format 0: §10.3).
 pub fn unique<S: ItemStats>(
     t: &ItemTables,
     game: &mut dyn ItemGame,
     item: &mut Item<S>,
     rq: &ItemRequest,
 ) -> bool {
-    // TODO(items generation.md OQ 1): format 0's durability × 5 unspecified.
+    if item.format < 1 && has_durability(t, item) {
+        // §10.3 step 1: durability × 5, before the pick.
+        let d = item
+            .stats
+            .stat(stat::DURABILITY, 0)
+            .wrapping_mul(5)
+            .min(255);
+        let m = item
+            .stats
+            .base(stat::MAXDURABILITY, 0)
+            .wrapping_mul(5)
+            .min(255);
+        item.stats.set_base(stat::DURABILITY, 0, d);
+        item.stats.set_base(stat::MAXDURABILITY, 0, m);
+    }
     let Some(rec) = t.item(item.record).cloned() else {
         return false;
     };
@@ -400,6 +524,26 @@ pub fn unique<S: ItemStats>(
         return true;
     }
     let (l6a, l74) = game.ladder_flags();
+    if item.format < 1 {
+        // §10.3 step 3 (unreachable in 1.14d: format 0 comes only with a
+        // forced request): the first fitting row; no `lvl` test, no
+        // weights, no draw, no marking.
+        let quest = rec.quest != 0;
+        let pick = t.uniques.iter().enumerate().position(|(i, u)| {
+            u.version < 100
+                && u.enabled
+                && (l6a || l74 || !u.ladder)
+                && u.code == rec.code
+                && (quest || !game.uniques().get(i as u32))
+        });
+        let Some(i) = pick else {
+            return false;
+        };
+        item.file_index = i as i32;
+        item.flags &= !flag::IDENTIFIED;
+        apply_unique(t, item);
+        return true;
+    }
     let ilvl = item.item_level();
     let mut cands: Vec<(usize, u32)> = Vec::new();
     let mut total = 0u32;
@@ -454,8 +598,11 @@ pub fn unique<S: ItemStats>(
     false
 }
 
-/// Set item (`0x005C2940` → `0x005C25C0`, §9).
+/// Set item (`0x005C2940` → `0x005C25C0`, §9; format 0: §10.4).
 pub fn set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemRequest) -> bool {
+    if item.format < 1 {
+        return set_item_legacy(t, item);
+    }
     let Some(code) = t.item(item.record).map(|r| r.code) else {
         return false;
     };
@@ -494,6 +641,58 @@ pub fn set_item<S: ItemStats>(t: &ItemTables, item: &mut Item<S>, rq: &ItemReque
             }
             pick
         }
+    };
+    item.file_index = row as i32;
+    item.flags &= !flag::IDENTIFIED;
+    apply_set_item(t, item);
+    true
+}
+
+/// The setitems rows attached to sets row `set` (its +0x110 list, count
+/// +0x0C): the rows of that set in record order, at most 6
+/// (`data/fixups.md` §6), cut at the set's count.
+fn set_members(t: &ItemTables, set: usize) -> impl Iterator<Item = usize> + '_ {
+    let count = t.sets.get(set).map_or(0, |s| s.count.clamp(0, 6) as usize);
+    t.setitems
+        .iter()
+        .enumerate()
+        .filter(move |(_, si)| usize::try_from(si.set).ok() == Some(set))
+        .map(|(i, _)| i)
+        .take(6)
+        .take(count)
+}
+
+/// Set item, format 0 (`0x005C2740`, §10.4).
+fn set_item_legacy<S: ItemStats>(t: &ItemTables, item: &mut Item<S>) -> bool {
+    let Some(code) = t.item(item.record).map(|r| r.code) else {
+        return false;
+    };
+    let s0 = save(item);
+    // Step 2: durability × 2, no durability test.
+    let d = item
+        .stats
+        .stat(stat::DURABILITY, 0)
+        .wrapping_mul(2)
+        .min(255);
+    let m = item
+        .stats
+        .base(stat::MAXDURABILITY, 0)
+        .wrapping_mul(2)
+        .min(255);
+    item.stats.set_base(stat::DURABILITY, 0, d);
+    item.stats.set_base(stat::MAXDURABILITY, 0, m);
+    let n = t.sets.iter().take_while(|s| s.version < 100).count();
+    let k = item.item_seed.roll(n as i32) as usize;
+    let mut found = None;
+    for j in 0..n {
+        let set = (k + j) % n;
+        if let Some(i) = set_members(t, set).find(|&i| t.setitems[i].item == code) {
+            found = Some(i);
+        }
+    }
+    let Some(row) = found else {
+        item.item_seed = Seed::init_low(s0);
+        return false;
     };
     item.file_index = row as i32;
     item.flags &= !flag::IDENTIFIED;

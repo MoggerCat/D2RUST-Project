@@ -346,7 +346,8 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     let msg = &msg[..size.min(msg.len())];
     let (game, events) = (&mut sim.game, &mut sim.events);
     let (run, sent, portals, walks) = sim.world.moves(game, events, MoveRun { player, msg })?;
-    // REC-117: a used Town Portal scroll / tome opens its pair.
+    // A used Town Portal scroll / tome opens its pair (`items/use.md` §4,
+    // `world/objects-2.md` §27.1 steps 5–9 on the action wiring).
     for p in portals {
         sim.world.town_portal(game, events, p);
     }

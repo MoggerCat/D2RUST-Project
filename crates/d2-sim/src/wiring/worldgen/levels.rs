@@ -114,6 +114,11 @@ impl WorldTypes {
         self.presets.get(&act)
     }
 
+    /// [`Self::act_presets`], mutable.
+    pub fn act_presets_mut(&mut self, act: u8) -> Option<&mut Presets> {
+        self.presets.get_mut(&act)
+    }
+
     /// The outdoor state of an act, if any.
     pub fn act_outdoor(&self, act: u8) -> Option<&Outdoor> {
         self.outdoor.get(&act)
@@ -210,6 +215,20 @@ impl LevelTypes for AllocView<'_> {
 }
 
 impl LevelTypes for WorldTypes {
+    /// `preset.md` §3.2 step 4, generic branch (the lvlprest `AutoMap` of
+    /// the level's preset row; towns 40, 103, 109 take the town-automap
+    /// branch, which streams nothing).
+    fn automap_streams(&self, drlg: &Drlg, level: LevelIdx) -> bool {
+        let lv = drlg.level(level);
+        if lv.drlg_type != DRLG_PRESET || matches!(lv.id, 40 | 103 | 109) {
+            return false;
+        }
+        self.preset_data
+            .def_for_level(lv.id)
+            .and_then(|row| self.preset_data.def(row).ok())
+            .is_some_and(|d| d.automap != 0)
+    }
+
     /// The act placer `0x00678AD0` (`outdoor.md` §2), then the preset
     /// directions it decided (`outdoor.md` §2.3 step 4, the overwrite of
     /// `preset.md` §3.1) written into the preset infos. Allocation inits
@@ -460,6 +479,10 @@ impl SharedTypes {
 }
 
 impl LevelTypes for SharedTypes {
+    fn automap_streams(&self, drlg: &Drlg, level: LevelIdx) -> bool {
+        self.0.borrow().automap_streams(drlg, level)
+    }
+
     fn create_act_levels(&mut self, drlg: &mut Drlg, data: &DrlgData) -> Result<(), DrlgError> {
         self.0.borrow_mut().create_act_levels(drlg, data)
     }

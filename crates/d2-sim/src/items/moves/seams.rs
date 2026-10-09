@@ -399,8 +399,9 @@ pub trait MovePending {
     fn merge_allowed(&self, src: Guid) -> bool {
         false
     }
-    /// Book count change `0x0055C070(n)`.
-    fn book_count_changed(&mut self, player: Owner, n: i32) {}
+    /// Book count change `0x0055C070(n)` of the tome `book` (§8.1 step 4:
+    /// `inventory.md` §5.5 skill quantity += n, S→C 0x22).
+    fn book_count_changed(&mut self, player: Owner, book: Guid, n: i32) {}
 
     // ---- item use (`0x005BF240`: item-use spec, unwritten) ----------------
 
@@ -442,8 +443,9 @@ pub trait MovePending {
     /// Set or clear a quest flag of the player's record for the current
     /// difficulty (`0x0065C360` / `0x0065C3A0`; §7.11 step 4).
     fn set_quest_flag(&mut self, player: Owner, quest: u8, flag: u8, on: bool) {}
-    /// `0x005458E0` after a quest item use (§7.11 step 4).
-    fn quest_item_used(&mut self, player: Owner) {}
+    /// `0x005458E0(player, chain)` after a quest item use (§7.11 step 4:
+    /// S→C 0x5D `5D chain 02 00 0000` to the player's client).
+    fn quest_item_used(&mut self, player: Owner, chain: u8) {}
     /// `0x0058A0A0` (§7.11 step 4, `tr2`).
     fn quest_tr2_used(&mut self, player: Owner) {}
     /// Skills and stats reset `0x00570360`, `0x00570C80` (§7.11 step 4,
@@ -533,12 +535,21 @@ pub trait MovePending {
 
     /// Queue a message to the player's client now.
     fn send(&mut self, player: Owner, bytes: Vec<u8>) {}
-    /// S→C 0x3E for an item stat (`0x0053D130`; layout not written).
+    /// S→C 0x3E for an item stat (`0x0053D130`): the wired desk builds it
+    /// with `units::messages::update_item_stat` and sends it through
+    /// [`MovePending::send`]. Default: nothing.
     fn send_item_stat(&mut self, player: Owner, item: Guid, stat: u16) {}
     /// Item bit stream (`0x006313E0`, OQ1) with item flags OR-ed with
     /// `flags` and the page shown as `page`. Default: empty.
     fn item_bits(&self, item: Guid, flags: u32, page: u8) -> Vec<u8> {
         Vec::new()
+    }
+    /// The bit stream of a store item shown to its trading client
+    /// (`0x0053EF30` with 0x38): the alt-code record (`bitstream.md`
+    /// §4.1 r4) exactly when the item's quality is 4–9 and it lacks item
+    /// flag 0x10. Default: the plain stream.
+    fn store_item_bits(&self, item: Guid, page: u8) -> Vec<u8> {
+        self.item_bits(item, 0, page)
     }
     /// Store messages 0x38 / 0x39 of the dispatcher's first step
     /// (`world/vendors.md`). Default: none.

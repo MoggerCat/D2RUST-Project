@@ -15,7 +15,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::app::visibility::add_visibility;
 use d2_client::assets::path::MemorySource;
@@ -271,7 +271,7 @@ fn click(app: &mut App, at: Point) {
 /// unit art of [`files`] and the play app's visibility predicate
 /// (`add_visibility`, as `app::play::run` installs it).
 fn play_app(ms: &Arc<AtomicU32>) -> (App, Server) {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let (link, _) = single_player::start_with(
         data.clone(),
@@ -282,6 +282,7 @@ fn play_app(ms: &Arc<AtomicU32>) -> (App, Server) {
     .unwrap();
     let source = Arc::new(files());
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
@@ -300,7 +301,7 @@ fn play_app(ms: &Arc<AtomicU32>) -> (App, Server) {
         levels,
         TileAssets::new(Some(source.clone()), None),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     add_act_palettes(
         &mut app,
         ActPalettes {
@@ -404,6 +405,23 @@ fn diagonal_walk() -> (Vec<String>, usize) {
         end.0 != start.0 && end.1 != start.1,
         "the walk moved both axes: {start:?} → {end:?}"
     );
+    // The position check compares with the client's own path cell
+    // (`seams/movement-prediction.md` §2.9 r2), which the server's 0x96
+    // of a diagonal walk mostly shares on one axis: a server point one
+    // sub-tile off it on both axes (inside the tolerance) reaches rule 6
+    // and its predicate.
+    let off = d2_sim::path::walk::messages::walk_verify(
+        100,
+        (end.0 + 1) as u16,
+        (end.1 + 1) as u16,
+        0,
+        0,
+    );
+    {
+        let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
+        bridge.0.receive_chunk(&off).unwrap();
+        bridge.0.update_pass();
+    }
     let refused = app
         .world()
         .resource::<BridgeResource>()
@@ -419,6 +437,7 @@ fn diagonal_walk() -> (Vec<String>, usize) {
 
 // Covers: specs/client/model.md §6 r6, §13 r6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_diagonal_walk_checks_0x96_through_the_view_predicate() {
     let (refused, calls) = diagonal_walk();
     assert!(refused.is_empty(), "S→C 0x96 refused: {refused:?}");

@@ -12,6 +12,7 @@
 pub mod click;
 #[cfg(test)]
 mod click_tests;
+pub mod keymap;
 mod names;
 pub mod original;
 #[cfg(test)]
@@ -35,8 +36,9 @@ pub enum Preset {
     /// d2rs development preset. **Not** the original's default key
     /// configuration and unverified by design: it is ours.
     Dev,
-    /// The original's default key configuration (§B4). Rejected by the
-    /// parser until `specs/ui/controls.md` exists.
+    /// The original's default key configuration (§B4, `ui/controls.md`
+    /// §3: the 57 commands' 114 default bindings), plus the inputs with no
+    /// command ([`FIXED_INPUTS`]). The play default.
     Original,
 }
 
@@ -52,9 +54,50 @@ impl Preset {
     pub fn bindings(self) -> Option<Bindings> {
         match self {
             Preset::Dev => Some(dev_preset()),
-            Preset::Original => None,
+            Preset::Original => Some(original_preset()),
         }
     }
+}
+
+/// The inputs of the actions that are not key-table commands: the fixed
+/// left / right buttons (`ui/controls.md` §4.3 r1) and the chat and panel
+/// inputs (d2rs-own, as in the `dev` preset).
+pub const FIXED_INPUTS: &[(Action, &[Key])] = {
+    use Action as A;
+    use Key as K;
+    &[
+        (A::MoveAttack, &[K::MouseLeft]),
+        (A::UseRightSkill, &[K::MouseRight]),
+        (A::ChatSend, &[K::Enter, K::NumpadEnter]),
+        (A::ChatCancel, &[K::Escape]),
+        (A::ChatHistoryPrev, &[K::Up]),
+        (A::ChatHistoryNext, &[K::Down]),
+        (A::PanelSelect, &[K::MouseLeft]),
+        (A::PanelAlt, &[K::MouseRight]),
+        (A::PanelClose, &[K::Escape]),
+    ]
+};
+
+/// The `original` preset: every command of `original::COMMANDS` with its
+/// slot-1 then slot-0 default key (`ui/controls.md` §3, §B4), then
+/// [`FIXED_INPUTS`].
+fn original_preset() -> Bindings {
+    let mut b = Bindings::empty();
+    for &(action, keys) in FIXED_INPUTS {
+        b.set(action, keys);
+    }
+    for c in &original::COMMANDS {
+        let Some(action) = keymap::action_of_cmd(i32::from(c.cmd)) else {
+            continue;
+        };
+        let keys: Vec<Key> = [c.key1, c.key2]
+            .into_iter()
+            .filter(|&k| k != original::UNBOUND)
+            .filter_map(keymap::vk_to_key)
+            .collect();
+        b.set(action, &keys);
+    }
+    b
 }
 
 /// The `dev` preset table (d2rs, unverified; not the original's defaults).
@@ -548,12 +591,7 @@ fn parse_raw(text: &str) -> Result<(RawFile, usize), ControlsError> {
 fn resolve_names(raw: &RawFile) -> Result<(ControlsFile, Lines), ControlsError> {
     let preset = match raw.preset.name.as_str() {
         "dev" => Preset::Dev,
-        "original" => {
-            return Err(ControlsError::at(
-                raw.preset.line,
-                ErrorKind::PresetUnavailable(Preset::Original.name()),
-            ))
-        }
+        "original" => Preset::Original,
         other => {
             return Err(ControlsError::at(
                 raw.preset.line,

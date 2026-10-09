@@ -532,6 +532,7 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -1163,6 +1164,7 @@ impl Fx {
             combat: combat_tables(),
             levels: levels(),
             skill_modes: vec![[0; 8]],
+            overlay_count: 0,
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(

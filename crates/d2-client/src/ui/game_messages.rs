@@ -19,7 +19,6 @@ use crate::ui::messages::chat::{
 use crate::ui::messages::{Metrics, FONT_CHAT};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 use super::{FontMeasure, SharedRef};
 
@@ -27,7 +26,7 @@ use super::{FontMeasure, SharedRef};
 pub const MESSAGES_PANEL: PanelId = PanelId(0x111);
 
 /// Milliseconds one client frame adds to the expiry clock (module doc).
-pub const MS_PER_FRAME: u32 = 40;
+pub const MS_PER_FRAME: u32 = crate::rules::camera::CLIENT_TICK_MS;
 /// The fill file's dark frame (`hud::fill_frames`).
 const DARK: u32 = 4;
 /// UI states the draw gates read (`ui/panels.md` §2).
@@ -50,7 +49,7 @@ pub struct GameMessages {
 
 /// Font metrics from the loaded tables; without them a line is not
 /// wrapped and a unit is 8 pixels wide.
-pub(super) struct Measure<'a>(pub(super) Option<&'a FontMeasure>);
+pub(crate) struct Measure<'a>(pub(crate) Option<&'a FontMeasure>);
 
 impl Metrics for Measure<'_> {
     fn wrap(&self, font: u16, text: &[u16], max: i32) -> Vec<Vec<u16>> {
@@ -183,6 +182,7 @@ impl Panel for MessagesUi {
         let sh = &mut *sh;
         let now = (ctx.tick as u32).wrapping_mul(MS_PER_FRAME);
         let (w, open_mode) = (sh.config.screen.w, sh.states.open_mode().get());
+        let clip = sh.config.screen.rect();
         let (state_13, log_open) = (
             sh.states.is_open(UI_STATE_13),
             sh.states.is_open(UI_MESSAGE_LOG),
@@ -208,7 +208,7 @@ impl Panel for MessagesUi {
                         color: u16::try_from(l.color).unwrap_or(0),
                     },
                     opts: TextOpts::default(),
-                    clip: FRAME,
+                    clip,
                 }));
             }
         }
@@ -237,6 +237,7 @@ pub(super) fn backing(file: u32, r: &crate::ui::messages::RectDraw, out: &mut dy
                 image: ImageRef { file, frame: DARK },
                 at: Point::new(x, y),
                 clip: Rect::new(x, y, cw as u16, ch as u16),
+                look: crate::ui::CelLook::PLAIN,
             }));
             x += tw;
         }
@@ -264,8 +265,12 @@ mod tests {
     }
 
     fn setup() -> (OriginalUi, UiRoot, ClientWorld) {
+        setup_at(Screen::R800)
+    }
+
+    fn setup_at(screen: Screen) -> (OriginalUi, UiRoot, ClientWorld) {
         let config = UiConfig {
-            screen: Screen::R800,
+            screen,
             expansion_installed: true,
         };
         let ui = OriginalUi::new(config, None).unwrap();
@@ -307,6 +312,32 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    // Covers: specs/ui/messages.md §2 r1
+    #[test]
+    fn the_list_is_clipped_to_the_screen_at_640_and_800() {
+        // §2 r1: x 15, y 20 on both frames; only the clip is the screen.
+        for screen in [Screen::R800, Screen::R640] {
+            let (mut ui, root, mut w) = setup_at(screen);
+            w.frames = 10;
+            ui.apply_output(&chat(4, PLAYER, 1, "", "Hi"), &w).unwrap();
+            let ctx = UiCtx {
+                tick: 10,
+                world: &w,
+                strings: &Strs,
+            };
+            let mut out: Vec<UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let t: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    UiDraw::Text(t) if t.style.font == FONT_CHAT => Some((t.at, t.clip)),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(t, [(Point::new(15, 20), screen.rect())], "{screen:?}");
+        }
     }
 
     // Covers: specs/ui/messages.md §2 r1, §2 r4, §2 r5

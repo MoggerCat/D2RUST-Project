@@ -4,8 +4,9 @@
 //! run (§5), the client pass (§6) and the periodic steps (§7).
 //!
 //! The host schedule (§1) and the wall-clock, host-only parts (§8: frame-
-//! rate statistics, heartbeat, character save) belong to `d2-server` and
-//! are not here. d2-sim owns the step order, the list iteration and the
+//! rate statistics, heartbeat) belong to `d2-server` and are not here; the
+//! client pass's character save (§6 rule 3) is raised here as
+//! [`Game::character_save_due`] and written by `d2-server`. d2-sim owns the step order, the list iteration and the
 //! flags; the bodies of steps whose behaviour is owned by specs not yet
 //! written (environment, population, messages, quests, items, AI, ...)
 //! are hooks: [`TickHooks`] and, for timer events, [`EventDispatch`].
@@ -28,6 +29,8 @@ pub mod period {
     pub const ROOM_DEACTIVATION: i32 = 12;
     pub const FREE_INACTIVE_ROOMS: i32 = 11;
     pub const EXPIRED_ITEMS: i32 = 1500;
+    /// The client pass's character save (§6 rule 3).
+    pub const CHARACTER_SAVE: i32 = 8192;
 }
 
 /// Room inactivity counter threshold for step 9: deactivate when > 10.
@@ -164,6 +167,16 @@ pub trait TickHooks: EventDispatch {
 
 /// One tick (`0x0052D870`, §3): frame += 1, then steps 1–11 in order.
 pub fn tick<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
+    tick_through_timers(game, hooks);
+    tick_from_client_pass(game, hooks);
+}
+
+/// The first half of [`tick`]: frame += 1 and steps 1–4, ending with the
+/// timer queue. A host whose unit work runs inside step 4 but outside
+/// [`EventDispatch`] runs it between this and [`tick_from_client_pass`],
+/// so its messages reach the same tick's client pass
+/// (`flows/server-tick.md` §2 rule 2).
+pub fn tick_through_timers<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     // Step 0. The debug trap switch on game +0x1DC8 is never set in
     // normal play and is not modelled.
     game.frame = game.frame.wrapping_add(1);
@@ -171,6 +184,11 @@ pub fn tick<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     // Step 2 (frame-rate statistics) is wall-clock only (§8).
     room_pass(game, hooks);
     run_timer_events(game, hooks);
+}
+
+/// The second half of [`tick`]: steps 5–11, from the client pass to the
+/// periodic steps.
+pub fn tick_from_client_pass<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
     client_pass(game, hooks);
     room_update_queues(game, hooks);
     removal_records(game, hooks);
@@ -279,9 +297,15 @@ pub fn run_timer_events<D: EventDispatch + ?Sized>(game: &mut Game, dispatch: &m
     }
 }
 
-/// Step 5, the client pass (`0x0052D440`, §6). The arena assert, the
-/// heartbeat and the 8192-frame save are host-only (§8).
+/// Step 5, the client pass (`0x0052D440`, §6). The arena assert and the
+/// heartbeat are host-only (§8). The 8192-frame save (rule 3) runs in
+/// single player too (no heartbeat drop is modelled, so only the frame
+/// decides): it is raised as [`Game::character_save_due`], before the
+/// per-client loop, for the host's character storage to write.
 fn client_pass<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
+    if is_due(game.frame, period::CHARACTER_SAVE) {
+        game.character_save_due = true;
+    }
     let mut cur = game.lists.client_first();
     while let Some(c) = cur {
         // Next saved before the body (unit-order.md §7.3).

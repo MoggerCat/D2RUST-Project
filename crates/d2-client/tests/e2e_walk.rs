@@ -159,6 +159,7 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -263,6 +264,7 @@ fn tables() -> ActionTables {
         },
         levels: Vec::new(),
         skill_modes: Vec::new(),
+        overlay_count: 0,
     }
 }
 

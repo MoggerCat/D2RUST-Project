@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -29,6 +29,8 @@ use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 use d2_sim::skills::use_::bodies::{BodyStat, BodyTables};
 use d2_sim::stats::{StatData, StatLists, StatTable, StateTable};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -123,8 +125,12 @@ impl Game {
     /// `skill` is the row under test; `fill` sets its columns.
     fn joined(skill: usize, fill: impl FnOnce(&mut Skills) + Send + 'static) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(move |l| {
@@ -317,6 +323,7 @@ impl Game {
 
 // Covers: specs/skills/bodies.md §8.6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn teeth_spends_mana_and_makes_missiles() {
     let mut g = Game::joined(TEETH, |r| {
         r.srvdofunc = 8;
@@ -332,6 +339,7 @@ fn teeth_spends_mana_and_makes_missiles() {
 
 // Covers: specs/skills/bodies.md §8.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn poison_nova_makes_a_ring_of_missiles() {
     let mut g = Game::joined(POISON_NOVA, |r| {
         r.srvdofunc = 22;
@@ -344,6 +352,7 @@ fn poison_nova_makes_a_ring_of_missiles() {
 
 // Covers: specs/skills/bodies.md §4.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn bone_armor_turns_its_state_on() {
     let mut g = Game::joined(BONE_ARMOR, |r| {
         r.srvdofunc = 18;
@@ -358,6 +367,7 @@ fn bone_armor_turns_its_state_on() {
 
 // Covers: specs/skills/bodies.md §8.9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn clay_golem_summons_a_pet() {
     let mut g = Game::joined(CLAY_GOLEM, |r| {
         r.srvdofunc = 56;

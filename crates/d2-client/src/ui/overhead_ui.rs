@@ -7,8 +7,9 @@
 //! points and the draw requests.
 // d2rs-own, unverified: the overhead counter `[0x007BF20E]` steps once
 // per client frame (the bridge frame count, 25 Hz) instead of once per
-// text pass; the unit's pixel point is the camera of the model's cell of
-// the local player (no predicted walk, no shake) and the unit's feet; the
+// text pass; the unit's pixel point is the unit's feet under the frame's
+// one camera (`seams/world-screen.md` §2.2: the host's
+// [`FrameAnchor`], the local player at its drawn position); the
 // text of a player bubble is read as Latin-1; the backing is the HUD's
 // dark fill tiles instead of `DrawRectangle`.
 
@@ -16,9 +17,9 @@ use std::collections::BTreeMap;
 
 use super::game_messages::{backing, wide, Measure};
 use super::SharedRef;
-use crate::bridge::hover::feet;
+use crate::bridge::hover::unit_feet;
 use crate::bridge::world::{ClientWorld, UnitKey, PLAYER};
-use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
+use crate::rules::camera::{moving_to_client, Camera, FrameAnchor, FrameSize, OpenMode};
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::messages::overhead::{
@@ -27,7 +28,6 @@ use crate::ui::messages::overhead::{
 use crate::ui::messages::FONT_CHAT;
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 /// The adapter's id: not a UI state, open for good.
 pub const OVERHEAD_PANEL: PanelId = PanelId(0x112);
@@ -39,6 +39,9 @@ pub struct Bubbles {
     records: BTreeMap<UnitKey, OverheadRecord>,
     counter: u32,
     last_tick: Option<u64>,
+    /// The frame's local-player position and shake, set by the host
+    /// before the UI frame (`seams/world-screen.md` §2.2, §2.4).
+    pub(super) anchor: Option<FrameAnchor>,
 }
 
 impl Bubbles {
@@ -73,13 +76,38 @@ impl Bubbles {
     }
 }
 
-/// The camera of the local player's model cell (as the world clicks build
-/// it); none without a local player.
-fn camera(w: &ClientWorld, open_mode: u8) -> Option<Camera> {
-    let (x, y) = w.local()?.cell();
-    let at = moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000);
+/// The frame's camera (`seams/world-screen.md` §2.2): from the host's
+/// anchor; without one (no host), the local player's own position
+/// ([`ClientWorld::local_position`]) with no shake. None without a local
+/// player.
+fn camera(w: &ClientWorld, anchor: Option<FrameAnchor>, open_mode: u8) -> Option<Camera> {
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
-    Some(Camera::new(FrameSize::D2RS, mode, at, (0, 0)))
+    if let Some(a) = anchor {
+        return Some(a.camera(FrameSize::play(), mode));
+    }
+    let (x16, y16) = w.local_position()?;
+    Some(Camera::new(
+        FrameSize::play(),
+        mode,
+        moving_to_client(x16, y16),
+        (0, 0),
+    ))
+}
+
+/// A unit's feet under the frame's camera: the local player at the
+/// anchor's position, the one it is drawn at (`seams/world-screen.md`
+/// §2.4), every other unit at its draw anchor by type (§2.5).
+fn unit_point(
+    w: &ClientWorld,
+    cam: &Camera,
+    anchor: Option<FrameAnchor>,
+    key: UnitKey,
+    cell: (u16, u16),
+) -> (i32, i32) {
+    match anchor {
+        Some(a) if w.local_player == Some(key) => cam.unit_draw(a.player.client(), (0, 0)),
+        _ => unit_feet(cam, key.unit_type, cell),
+    }
 }
 
 /// The panel that draws the bubbles (module doc).
@@ -104,8 +132,10 @@ impl Panel for OverheadUi {
             return;
         }
         let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+        let clip = sh.config.screen.rect();
         let open_mode = sh.states.open_mode().get();
-        let Some(cam) = camera(ctx.world, open_mode) else {
+        let anchor = sh.bubbles.anchor;
+        let Some(cam) = camera(ctx.world, anchor, open_mode) else {
             return;
         };
         let fill = sh.tables.files.id(super::hud::FILL_FILE);
@@ -123,7 +153,7 @@ impl Panel for OverheadUi {
             let Some(cell) = unit.position else {
                 continue;
             };
-            let (ux, uy) = feet(&cam, cell);
+            let (ux, uy) = unit_point(ctx.world, &cam, anchor, *key, cell);
             let kind = if key.unit_type == PLAYER {
                 UnitKind::Player
             } else {
@@ -165,7 +195,7 @@ impl Panel for OverheadUi {
                             color: u16::try_from(l.color).unwrap_or(0),
                         },
                         opts: TextOpts::default(),
-                        clip: FRAME,
+                        clip,
                     }));
                 }
             }
@@ -216,8 +246,12 @@ mod tests {
     };
 
     fn setup() -> (OriginalUi, UiRoot, ClientWorld) {
+        setup_at(Screen::R800)
+    }
+
+    fn setup_at(screen: Screen) -> (OriginalUi, UiRoot, ClientWorld) {
         let config = UiConfig {
-            screen: Screen::R800,
+            screen,
             expansion_installed: true,
         };
         let ui = OriginalUi::new(config, None).unwrap();
@@ -332,6 +366,31 @@ mod tests {
         assert!(texts(&root, &w, past + 2).is_empty());
     }
 
+    // Covers: specs/ui/messages.md §5 r3
+    #[test]
+    fn a_bubble_is_clipped_to_the_screen_at_640_and_800() {
+        for screen in [Screen::R800, Screen::R640] {
+            let (mut ui, root, w) = setup_at(screen);
+            ui.apply_output(&chat5(ME, "hi"), &w).unwrap();
+            let ctx = UiCtx {
+                tick: 1,
+                world: &w,
+                strings: &crate::ui::NoStrings,
+            };
+            let mut out: Vec<UiDraw> = Vec::new();
+            root.draw(&ctx, &mut out);
+            let clips: Vec<_> = out
+                .iter()
+                .filter_map(|d| match d {
+                    UiDraw::Text(t) => Some(t.clip),
+                    _ => None,
+                })
+                .collect();
+            assert!(!clips.is_empty(), "{screen:?}");
+            assert!(clips.iter().all(|c| *c == screen.rect()), "{screen:?}");
+        }
+    }
+
     // Covers: specs/client/msg-ui.md §21
     #[test]
     fn the_overhead_clear_removes_the_bubble() {
@@ -341,5 +400,49 @@ mod tests {
         ui.apply_output(&Output::OverheadClear { unit: ME }, &w)
             .unwrap();
         assert!(texts(&root, &w, 2).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod anchor_tests {
+    use super::*;
+    use crate::bridge::world::ClientUnit;
+    use crate::rules::camera::UnitPosition;
+
+    // Covers: specs/seams/world-screen.md §2.2
+    // Covers: specs/seams/world-screen.md §2.4
+    #[test]
+    fn the_local_players_bubble_stands_on_the_drawn_player() {
+        let me = UnitKey::new(PLAYER, 1);
+        let mut w = ClientWorld::default();
+        let mut u = ClientUnit::new(me);
+        u.position = Some((100, 100));
+        w.units.insert(me, u);
+        w.local_player = Some(me);
+        let c = |s: u32| (s << 16) | 0x8000;
+        let anchor = FrameAnchor {
+            player: UnitPosition::Moving {
+                x16: c(103),
+                y16: c(100),
+            },
+            shake: (0, 0),
+        };
+        for mode in 0..=3 {
+            let cam = camera(&w, Some(anchor), mode).unwrap();
+            // The frame's camera, from the predicted position.
+            let at = moving_to_client(c(103), c(100));
+            assert_eq!(
+                cam,
+                Camera::new(FrameSize::D2RS, OpenMode::new(mode).unwrap(), at, (0, 0))
+            );
+            // The player's feet: where the player is drawn (camera.md §4).
+            assert_eq!(
+                unit_point(&w, &cam, Some(anchor), me, (100, 100)),
+                (400 + cam.view.shift_x, 292)
+            );
+        }
+        // Without a host anchor: the model cell (the strict path).
+        let cam = camera(&w, None, 0).unwrap();
+        assert_eq!(unit_point(&w, &cam, None, me, (100, 100)), (400, 292));
     }
 }

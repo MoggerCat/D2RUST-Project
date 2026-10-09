@@ -121,16 +121,21 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// What the inventory rules queued during vendor calls (receiving
     /// unit, bytes), sent after the rest's messages ([`WorldHost::take_sent`]).
     pub(super) inv_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The messages the systems sent so far, in production order
+    /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
+    /// `sim/intents-events.md` §1 r3).
+    pub(super) outbox: Vec<(UnitId, Vec<u8>)>,
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
+    /// An approach arrival's 0x13 is running ([`WiredWorld::handler_work`]
+    /// starts no approach for it).
+    pub(super) arriving: bool,
     /// d2rs-own, unverified (REC-244): item codes a new character gets
     /// after its charstats start items, one each, to the inventory (the
     /// play preview names the Horadric Cube, `box `, which charstats
     /// does not give). Empty: the original's start items only.
     pub start_extra: Vec<[u8; 4]>,
-    /// The levels the quest events last saw the players in.
-    quest_levels: quest_events::QuestLevels,
 }
 
 impl<R, S> WiredWorld<R, S> {
@@ -195,9 +200,10 @@ impl<R, S> WiredWorld<R, S> {
             interact_classes: Vec::new(),
             now,
             inv_sent: Vec::new(),
+            outbox: Vec::new(),
             item_queued: Vec::new(),
+            arriving: false,
             start_extra: Vec::new(),
-            quest_levels: Default::default(),
         }
     }
 
@@ -328,8 +334,6 @@ impl<R, S> WiredWorld<R, S> {
 
 mod quest_events;
 
-/// 0x9C action of a store item shown to the client (`vendors.md` §3.1).
-const STORE_ITEM_ACTION: u8 = 11;
 /// 0x9C action of a store item a purchase took from the NPC's grid
 /// (`vendors.md` §7.1 rule 10: "next frame 0x9C action 12 for GUID 0x12").
 const STORE_TAKEN_ACTION: u8 = 12;
@@ -382,7 +386,9 @@ fn flush_shown<X: Pending, R: TradeRest>(
     let mut d = parts.desk(&mut *desk.econ);
     for item in items {
         // PROVISIONAL: a failed encode skips the item.
-        let _ = d.send_item_world(player, item, STORE_ITEM_ACTION, 0);
+        // `inventory-moves.md` §6.2 store check: the store stream
+        // (alt-code for an unidentified quality 4–9 gamble item).
+        let _ = d.send_store_item(player, item);
     }
     inv_take_sent(&mut d)
         .into_iter()
@@ -585,6 +591,82 @@ impl<R: TradeRest + Default + 'static, S> WiredWorld<R, S> {
 }
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The host's unit work of one tick, run at the end of tick step 4
+    /// (after the timer queue, before the client pass): in 1.14d each of
+    /// these runs inside a timer event of step 4 (movement, the kill, the
+    /// death mode), so its messages go out with the same tick's client
+    /// pass (`flows/server-tick.md` §2 rule 2; `sim/tick.md` §5.7). In
+    /// order: the approach arrivals (a run that stopped in this tick's
+    /// step 4, so after frame += 1), the item pick-up arrivals, the
+    /// players' death starts (`vitals.md` §4.8), the corpses' items, the
+    /// pet deaths, the approach runs requested, the hireling calls (NPC
+    /// act changes included), the pet follows, the hirelings' stand-in
+    /// think. d2rs-own, unverified: the order within this block; that it
+    /// runs after the whole timer queue rather than inside the event that
+    /// raised it (the host's parts are not lent to the timer events).
+    ///
+    /// Each step's sends join the outbox before the next one runs
+    /// ([`WiredWorld::collect_sent`]).
+    pub(super) fn timer_step_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
+    where
+        Self: WorldHost<D>,
+        D::X: Outbox,
+    {
+        self.arrivals(game, events);
+        self.collect_sent(events);
+        self.item_arrivals(game, events);
+        self.collect_sent(events);
+        events.action().player_deaths(game);
+        self.collect_sent(events);
+        self.corpse_fill(game, events);
+        self.collect_sent(events);
+        self.pet_deaths(game, events);
+        self.collect_sent(events);
+        self.approaches(game, events);
+        self.collect_sent(events);
+        self.hireling_calls(game, events);
+        self.collect_sent(events);
+        self.pet_follows(game, events);
+        self.collect_sent(events);
+        self.drive_hirelings(game, events);
+        self.collect_sent(events);
+    }
+
+    /// The unit work a C→S handler raised, run when the handler returns
+    /// (inside the drain, `flows/server-tick.md` §1 rule 1): pet deaths,
+    /// the approach runs requested, the hireling calls (NPC travel's act
+    /// change, `flows/act-change.md` §1, `world/npc.md` §8.3), the pet
+    /// follows. In 1.14d these run inside the handler itself.
+    /// An approach arrival's own 0x13 starts no new approach
+    /// ([`WiredWorld::arrivals`]).
+    pub(super) fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        self.pet_deaths(game, events);
+        if self.arriving {
+            self.state.approaches.clear();
+        } else {
+            self.approaches(game, events);
+        }
+        self.hireling_calls(game, events);
+        self.pet_follows(game, events);
+    }
+
+    /// Moves what the systems sent since the last call into the one
+    /// outbox: the action wiring's sends, then what the inventory rules
+    /// queued, then the rest's (NPC, vendor and quest messages). Called
+    /// after each step that sends, so the outbox holds a tick's messages
+    /// in production order (`seams/sim-server.md` §2.2); one system
+    /// runs per step, and within a vendor call the inventory messages
+    /// precede its 0x2A (`vendors.md` §7 "Message order").
+    pub(super) fn collect_sent<D: ActionEvents>(&mut self, events: &mut D)
+    where
+        D::X: Outbox,
+    {
+        let mut sent = events.action().hooks().x.take_sent();
+        self.outbox.append(&mut sent);
+        self.outbox.append(&mut self.inv_sent);
+        self.outbox.extend(self.rest.take_sent());
+    }
+
     /// The pet follows `0x005754B0` the placements queued
     /// (`path-placement.md` §10 rule 6, `ActionHooks::pet_follows`, on
     /// from the first frame): `hirelings.md` §6 rule 1 on the hireling
@@ -848,6 +930,7 @@ where
             ((), flush_shown(desk, inv))
         });
         self.inv_sent.extend(sent);
+        self.handler_work(game, events);
         Some(out)
     }
 
@@ -942,31 +1025,36 @@ where
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
     /// allocation and object event 7 inside its timer event, in the tick
     /// that runs them (`quests-act1-rest.md` §9 item 7; `tick.md` §3).
+    /// The host's unit work ([`WiredWorld::timer_step_work`]) runs at the
+    /// end of step 4, after the timer queue and before the client pass
+    /// (`flows/server-tick.md` §2 rule 2), so its messages reach the same
+    /// tick's client pass.
     fn run_tick(&mut self, game: &mut Game, events: &mut D)
     where
         D: d2_sim::tick::EventDispatch + d2_sim::tick::TickHooks,
     {
-        self.arrivals(game, events);
-        self.item_arrivals(game, events);
-        self.lend_quests(events, |_, ev| d2_sim::tick::tick(game, ev));
+        self.lend_quests(events, |_, ev| d2_sim::tick::tick_through_timers(game, ev));
+        self.collect_sent(events);
+        self.timer_step_work(game, events);
+        self.lend_quests(events, |_, ev| {
+            d2_sim::tick::tick_from_client_pass(game, ev)
+        });
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
+        self.collect_sent(events);
     }
 
     /// The quest routes queued outside a lent call (a quest call's own
-    /// allocations, [`quest_objects`]), before the tick's sends are taken.
+    /// allocations, [`quest_objects`]), before the tick's sends are taken;
+    /// then the quest events (PROVISIONAL, REC-129).
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
+        // Each step's sends join the outbox before the next step runs
+        // (production order, `seams/sim-server.md` §2.2).
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
+        self.collect_sent(events);
         self.run_quest_events(game, events);
-        // A player with no life starts dying (`vitals.md` §4.8).
-        events.action().player_deaths(game);
-        self.corpse_fill(game, events);
-        self.pet_deaths(game, events);
-        self.approaches(game, events);
-        self.hireling_calls(game, events);
-        self.pet_follows(game, events);
-        self.drive_hirelings(game, events);
+        self.collect_sent(events);
     }
 
     /// The quest control on the desk's economy and rest
@@ -1236,18 +1324,18 @@ where
         WorldHost::<D>::vitals_sync(&mut self.action, game, events, client, staged, queued)
     }
 
-    /// The action wiring's sends (waypoints, tick paths), then what the
-    /// inventory rules queued in vendor calls, then the rest's (NPC,
-    /// vendor and quest messages); one system runs per message, so the
-    /// systems never interleave. A vendor call's inventory messages (a
-    /// targeting reset's 0x3F, placement and 0x9D sends) come before its
-    /// 0x2A, the last call of each buy pass, sell or repair (`vendors.md`
-    /// §7 "Message order").
+    /// The outbox in production order ([`WiredWorld::collect_sent`]):
+    /// the tick's steps in turn; for a handled message, the action
+    /// wiring's sends (waypoints, tick paths), then what the inventory
+    /// rules queued in vendor calls, then the rest's (NPC, vendor and
+    /// quest messages); one system runs per message, so the systems never
+    /// interleave. A vendor call's inventory messages (a targeting
+    /// reset's 0x3F, placement and 0x9D sends) come before its 0x2A, the
+    /// last call of each buy pass, sell or repair (`vendors.md` §7
+    /// "Message order").
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
-        let mut sent = events.action().hooks().x.take_sent();
-        sent.append(&mut self.inv_sent);
-        sent.extend(self.rest.take_sent());
-        sent
+        self.collect_sent(events);
+        std::mem::take(&mut self.outbox)
     }
 
     /// The action wiring's object host tick, and [`WiredWorld::now`] (the

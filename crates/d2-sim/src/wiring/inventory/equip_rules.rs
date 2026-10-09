@@ -79,6 +79,29 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.note_equip(r);
     }
 
+    /// Book count change `0x0055C070(n)` on the rules
+    /// ([`bk::item_skill_add`]).
+    pub fn run_item_skill_add(&mut self, owner: UnitId, book: UnitId, n: i32) {
+        let r = bk::item_skill_add(self, owner, book, n);
+        self.note_equip(r);
+    }
+
+    /// `0x0055E0D0(S)` on the rules ([`bk::skill_decrement`]).
+    pub fn run_skill_decrement(&mut self, owner: UnitId, skill: i32) {
+        let r = bk::skill_decrement(self, owner, skill);
+        self.note_equip(r);
+    }
+
+    /// The player has skill S (`0x006439B0`): its quantity slot exists.
+    pub fn owns_skill(&self, owner: UnitId, skill: i32) -> bool {
+        bk::EquipWorld::skill_quantity(self, owner, skill).is_some()
+    }
+
+    /// `0x00576E40` on the rules ([`bk::item_skill_remove`]).
+    pub fn run_item_skill_remove(&mut self, owner: UnitId, item: UnitId, n: i32) {
+        bk::item_skill_remove(self, owner, item, n);
+    }
+
     /// §5.5 cube recount `0x0055FA40` on the rules.
     pub fn run_cube_recount(&mut self, owner: UnitId) {
         let r = bk::cube_recount(self, owner);
@@ -153,14 +176,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         self.state.inventories.get(&u)?.body_item(loc)
     }
     fn weapon_in_use(&self, u: UnitId) -> Option<UnitId> {
+        // +0x1C, written by the body link / unlink (`world/quests-act3-2.md`
+        // §11.5 rules 1–2, `items::inventory::weapon`).
         let inv = self.state.inventories.get(&u)?;
-        // d2rs-own, unverified (REC-266): `weapon_hand_fallback`.
-        self.item_unit(inv.weapon_guid).or_else(|| {
-            self.state
-                .weapon_hand_fallback
-                .then(|| inv.body_item(body::RIGHT_HAND))
-                .flatten()
-        })
+        self.item_unit(inv.weapon_guid)
     }
     fn add_unit_stat(&mut self, u: UnitId, stat: u16, d: i32) {
         self.econ
@@ -221,10 +240,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
     fn stat_linked(&self, u: UnitId, i: UnitId) -> bool {
         InvWorld::item_active_on(self, i, u)
     }
+    /// `0x0055D970`: the weapon-in-use link `0x0063D1D0`, then the stat
+    /// link.
     fn stat_link(&mut self, u: UnitId, i: UnitId) {
+        self.weapon_link_on(u, i, true);
         InvWorld::stat_link(self, u, i)
     }
+    /// The body unlink `0x0063D2B0` (+0x1C, §11.5 rule 2), then the stat
+    /// unlink.
     fn stat_unlink(&mut self, u: UnitId, i: UnitId) {
+        self.weapon_link_on(u, i, false);
         if self.unlink_item_stats(u, i) {
             return;
         }
@@ -268,9 +293,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         let o = self.owner_or_none(u);
         self.rest.learn_skill(o, skill)
     }
+    /// S→C 0x22 (`0x0053C520`, `client/msg-skills.md` §5 r1) to U's
+    /// client through the rest's transport: U's type and GUID, the skill,
+    /// the quantity's low byte, flag 1 when U has state 7 at send. A unit
+    /// without a record sends nothing.
     fn send_skill_quantity(&mut self, u: UnitId, skill: i32, q: i32) {
-        let o = self.owner_or_none(u);
-        self.rest.send_skill_quantity(o, skill, q)
+        let Some(o) = self.owner_of(u) else {
+            return;
+        };
+        let state7 = self.econ.stats.has_state(u, 7);
+        let msg =
+            crate::units::messages::update_item_skill(o.ty, o.guid, skill as u16, q as u8, state7);
+        self.rest.send(o, msg.to_vec())
     }
     fn mouse_skill(&self, u: UnitId, left: bool) -> Option<SkillRef> {
         self.rest.mouse_skill(self.owner_or_none(u), left)

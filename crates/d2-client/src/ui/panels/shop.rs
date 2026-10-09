@@ -26,8 +26,6 @@
 //! - Open: the "`0x004B3500()` ≠ 0" flag that hides the captions is an
 //!   input ([`ShopPanel::captions_hidden`]); its meaning is not stated.
 
-use d2_proto::client::TerminateEntityChat;
-
 use super::menu_box::{MenuBox, MenuError, MenuParams};
 use super::{emit_static_draws, no_extra, text, PanelEnv, PanelOutput, PanelTables, TextMeasure};
 use crate::ui::draw::UiDrawSink;
@@ -264,11 +262,11 @@ impl ShopPanel {
             .collect()
     }
 
-    /// Closing the shop ends the interaction: C→S 0x30 with the NPC GUID
-    /// (§14.5, `0x004B3C20`).
+    /// Closing the shop ends the interaction: C→S 0x30 `[u32 1][u32 G]`
+    /// (§14.5, `0x004B3C20`; `client/model.md` §17 r1 step 5).
     pub fn close_intent(&self) -> Vec<PanelOutput> {
-        vec![PanelOutput::Intent(ClientIntent::from_message(
-            &TerminateEntityChat { id: self.npc_guid },
+        vec![PanelOutput::Intent(ClientIntent(
+            super::npc::msg_chat_end(self.npc_guid).to_vec(),
         ))]
     }
 }
@@ -791,6 +789,7 @@ mod tests {
                     D::I(t.files.name(file).unwrap().into(), frame, i.at.x, i.at.y)
                 }
                 UiDraw::Text(x) => D::T(x.text, x.at.x, x.at.y, x.style.font, x.style.color),
+                UiDraw::Rect(r) => panic!("rectangle {r:?}"),
             })
             .collect()
     }
@@ -858,14 +857,15 @@ mod tests {
         assert!(p.button_cels(&Screen::R800).is_empty());
     }
 
-    // Partial: §14 r5 (close of the shop only).
+    // Partial: §14 r5 (close of the shop only); the bytes are
+    // `0x004B3C20`'s 30 [1 u32][GUID u32] (§14.9).
     #[test]
     fn shop_close_sends_0x30() {
         let o = panel().close_intent();
         assert_eq!(
             o,
             vec![PanelOutput::Intent(ClientIntent(vec![
-                0x30, 0, 0, 0, 0, 7, 0, 0, 0
+                0x30, 1, 0, 0, 0, 7, 0, 0, 0
             ]))]
         );
     }

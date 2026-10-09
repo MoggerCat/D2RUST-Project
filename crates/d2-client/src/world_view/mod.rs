@@ -29,10 +29,12 @@
 //! reads the model.
 
 pub mod automap_view;
+pub mod background_view;
 pub mod corpse_click;
 pub mod disguise;
 pub mod feed;
 pub mod ground_items;
+pub mod input_script;
 pub mod interact;
 pub mod light_sources;
 pub mod missiles;
@@ -80,12 +82,13 @@ use crate::frames::{
 };
 use crate::gpu_compositor::{self, Gpu, GpuError};
 use crate::scene::{
-    self, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, ItemTag, MapTable, Rect, SceneError,
-    ShadeChain,
+    self, BlendOp, DrawItem, DrawKey, FrameCycle, FrameId, ItemTag, MapId, MapTable, Rect,
+    SceneError, ShadeChain,
 };
 
 pub use feed::{
-    blank_screen, build_frame, frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
+    blank_screen, build_frame, build_frame_placed, camera_and_mode, camera_at, frame_anchor,
+    frame_camera, FeedLight, NoCamera, NoFeed, RunningShake, ViewFeed,
 };
 pub use model_feed::ModelFeed;
 pub use present::{UiSounds, WorldViewGpu, WorldViewPlugin, WorldViewState, WorldViewUi};
@@ -98,6 +101,13 @@ pub use ui_bind::{
 /// the world it shows is the camera's (render-pipeline §B7), decided by
 /// the [`ViewRules`] placement hooks, not by the view rectangle.
 pub const VIEW: Rect = Rect::FRAME;
+
+/// The region the play path composes: the whole play frame
+/// ([`crate::rules::camera::FrameSize::play`]); [`VIEW`] unless
+/// `play --res 640x480` chose the 640 × 480 frame.
+pub fn play_view() -> Rect {
+    crate::rules::camera::FrameSize::play().rect()
+}
 
 /// Errors of a world-view frame. Strict (METHODS M07): a frame the rules
 /// cannot fully answer fails as a whole; nothing is skipped or defaulted.
@@ -175,6 +185,14 @@ pub struct ViewAssets {
     /// feed has them: unit shadows (`blend-modes.md` §5) read the zero and
     /// alpha maps. `None`: no shadow is drawn.
     pub shades: Option<crate::rules::shading::ShadeTables>,
+    /// Row `c` = every entry `c` (`rules::blend::color_row`), rows
+    /// `base … base + 255`, once a UI rectangle needs them
+    /// (`blend-modes.md` §8 r2; [`ui_bind::ensure_rects`]).
+    pub color_rows: Option<MapId>,
+    /// The 8 item palette files' 21 maps each (`render/shading.md` §6 r4):
+    /// map `c` of file `t` is row `base + 21·(t − 1) + c`, once a UI cel
+    /// with an item colour needs them ([`panel_art::PanelArtLoader`]).
+    pub item_palettes: Option<MapId>,
 }
 
 impl ViewAssets {
@@ -187,6 +205,8 @@ impl ViewAssets {
             maps: MapTable::new(),
             palette,
             shades: None,
+            color_rows: None,
+            item_palettes: None,
         }
     }
 
@@ -219,6 +239,9 @@ pub struct UnitPose {
     pub cof: CanonicalPath,
     pub dir: usize,
     pub frame: usize,
+    /// `dir64` after the §3 r4 snap (`render/unit-composite.md`): the
+    /// cel context's direction (`specs/tools/facts-render.md` §2 r3).
+    pub dir64: u8,
 }
 
 /// One map tile draw, fully answered by [`ViewRules::tiles`].
@@ -235,6 +258,41 @@ pub struct TileDraw {
     pub key: DrawKey,
     /// Debug label (`ItemTag::Tile`).
     pub cell: (i32, i32),
+}
+
+/// A composite slot whose file is in no archive ([`ViewRules::unit_slot_calls`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlotCall {
+    /// The slot index (the draw key's `sub`).
+    pub slot: u8,
+    /// The COF layer of the slot's component.
+    pub layer: usize,
+    /// The component file the call names.
+    pub path: CanonicalPath,
+}
+
+/// A cel draw call that puts no pixel in the frame: a [`SlotCall`] keyed
+/// in the unit's pass (or its shadow pass). Logged in
+/// [`WorldFrame::unit_calls`], never composed (`tools/facts-render.md` §5
+/// r15).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitCall {
+    pub key: DrawKey,
+    pub tag: ItemTag,
+    pub path: CanonicalPath,
+    /// The cel context's direction ([`UnitPose::dir64`]).
+    pub dir64: u8,
+    pub frame: usize,
+    /// The shadow pass call (`CelDrawShadow`).
+    pub shadow: bool,
+}
+
+impl TileDraw {
+    /// A drawer call that puts no pixel in the frame (empty clip): logged
+    /// in [`WorldFrame::calls`], never composed (`tools/facts-render.md` §5 r12).
+    pub fn is_call_only(&self) -> bool {
+        self.clip.width == 0 || self.clip.height == 0
+    }
 }
 
 /// The original-behavior questions of the world view, one hook per
@@ -276,6 +334,18 @@ pub trait ViewRules {
         req: &ComponentRequest<'_>,
     ) -> Result<ComponentFrame, CompositeError>;
 
+    /// `render/unit-composite.md` §4: whether the composite of `unit` with
+    /// `pose` passes the COF box pre-test at its final screen position.
+    /// The default (no camera) passes every unit.
+    fn unit_box_visible(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        Ok(true)
+    }
+
     /// The unit's shadow draws (`render/blend-modes.md` §5 r1–r3), keyed
     /// at the shadow pass slot `at` (`draw-order.md` §6 r3; `None` until
     /// `OriginalView` fills it from the frame's draw order), from the
@@ -291,6 +361,26 @@ pub trait ViewRules {
         _assets: &ViewAssets,
     ) -> Result<Vec<DrawItem>, ViewError> {
         Ok(Vec::new())
+    }
+
+    /// The slots of `unit`'s composite whose component request succeeds
+    /// but whose file is in no archive (`render/unit-composite.md` §6 r4):
+    /// they draw nothing, but 1.14d still makes the cel draw call (and the
+    /// shadow call), which the rendering facts log
+    /// (`tools/facts-render.md` §5 r15). The default has none.
+    fn unit_slot_calls(
+        &self,
+        _unit: &ClientUnit,
+        _pose: &UnitPose,
+        _cof: &Cof,
+    ) -> Result<Vec<SlotCall>, ViewError> {
+        Ok(Vec::new())
+    }
+
+    /// The unit's shadow pass slot (`draw-order.md` §6 r3), the key of
+    /// its shadow calls; `None` (the default) draws no shadow call.
+    fn unit_shadow_key(&self, _unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        None
     }
 
     /// The component's frame, or `None` when the slot draws nothing
@@ -419,6 +509,27 @@ pub struct WorldFrame {
     /// `None` without one. Read back by [`visibility`] (the origin
     /// getters of `client/model.md` §13 r1 return the last drawn frame's).
     pub camera: Option<crate::rules::camera::Camera>,
+    /// Pass 9's calls in call order (`draw-order-2.md` §11.7: the flash or
+    /// the particle lines), drawn as the items of
+    /// [`weather_view::is_sky_call_path`]; read by the facts export
+    /// (`tools/facts-render.md` §5 r10), which writes one row per call.
+    pub sky: Vec<crate::rules::draw_order::weather::SkyDraw>,
+    /// Tile drawer calls that put no pixel in the frame
+    /// ([`TileDraw::is_call_only`]), as items with an empty clip, sorted
+    /// by key; not composed. Read by the facts export (§5 r12).
+    pub calls: Vec<DrawItem>,
+    /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
+    /// GUID, for the rendering facts (`specs/tools/facts-render.md` §5
+    /// r14).
+    pub unit_dirs: BTreeMap<u32, u8>,
+    /// Cel draw calls without pixels (a component file in no archive),
+    /// sorted by key; not composed. Read by the facts export (§5 r15).
+    pub unit_calls: Vec<UnitCall>,
+    /// The units' draw slots of the frame's draw order (`draw-order.md`
+    /// §3 r4, §5, §10); `None` when no order was computed (no map feed).
+    /// The layers drawn after the build (ground items) take their keys
+    /// from it.
+    pub slots: Option<BTreeMap<crate::bridge::world::UnitKey, crate::rules::draw_order::UnitSlot>>,
 }
 
 /// The C7 resolver of one unit: the hooks. Frame ids are not a hook: they
@@ -483,6 +594,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     assets: &ViewAssets,
 ) -> Result<WorldFrame, ViewError> {
     let mut items = Vec::new();
+    let mut calls = Vec::new();
 
     for (index, t) in rules.tiles(world, assets)?.into_iter().enumerate() {
         let at = |error| ViewError::Tile {
@@ -499,10 +611,16 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             x: t.cell.0,
             y: t.cell.1,
         };
-        items.push(item);
+        if t.is_call_only() {
+            calls.push(item);
+        } else {
+            items.push(item);
+        }
     }
 
     let (mut units_drawn, mut units_hidden) = (0, 0);
+    let mut unit_dirs = BTreeMap::new();
+    let mut unit_calls = Vec::new();
     for unit in world.units.values() {
         let Some(pose) = rules.unit_pose(world, unit)? else {
             units_hidden += 1;
@@ -512,6 +630,10 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .cofs
             .get(&pose.cof)
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
+        if !rules.unit_box_visible(unit, &pose, cof)? {
+            units_hidden += 1;
+            continue;
+        }
         let params = rules.unit_params(world, unit, &pose)?;
         let resolver = UnitResolver {
             rules,
@@ -535,6 +657,24 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         let shadows = rules.unit_shadows(world, unit, &pose, None, &draws, assets)?;
         items.extend(draws.into_iter().map(|d| d.item));
         items.extend(shadows);
+        unit_dirs.insert(unit.key.guid, pose.dir64);
+        let shadow_at = rules.unit_shadow_key(unit);
+        for c in rules.unit_slot_calls(unit, &pose, cof)? {
+            let call = |pass, major, minor, shadow| -> Result<UnitCall, ViewError> {
+                Ok(UnitCall {
+                    key: DrawKey::new(pass, major, minor, c.slot).map_err(ViewError::Scene)?,
+                    tag: params.tag,
+                    path: c.path.clone(),
+                    dir64: pose.dir64,
+                    frame: pose.frame,
+                    shadow,
+                })
+            };
+            unit_calls.push(call(params.pass, params.major, params.minor, false)?);
+            if let (Some(at), true) = (shadow_at, cof.layers[c.layer].shadow != 0) {
+                unit_calls.push(call(at.pass, at.major, at.minor, true)?);
+            }
+        }
         units_drawn += 1;
     }
 
@@ -546,25 +686,36 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
         units_drawn,
         units_hidden,
         camera: None,
+        sky: Vec::new(),
+        calls: {
+            scene::order(&mut calls);
+            calls
+        },
+        unit_dirs,
+        unit_calls: {
+            unit_calls.sort_by_key(|c| c.key);
+            unit_calls
+        },
+        slots: None,
     })
 }
 
 /// CPU reference image of a built frame (§A8): RGBA8, alpha 255,
-/// `VIEW.width × VIEW.height`.
+/// [`play_view`] sized.
 pub fn compose_cpu(frame: &WorldFrame, assets: &ViewAssets) -> Result<Vec<u8>, ViewError> {
     Ok(scene::compose_rgba(
         &frame.items,
         &assets.frames,
         &assets.maps,
         &assets.palette,
-        VIEW,
+        play_view(),
     )?)
 }
 
 /// One frame of the frame cycle on the CPU reference (`composition.md`
 /// §3): `cycle.compose` with the plan of `blank_screen`, the draws onto
 /// the persistent framebuffer; returns the presented RGBA8 image through
-/// the frame palette (§4). The cycle must be `VIEW` sized. On error the
+/// the frame palette (§4). The cycle must be [`play_view`] sized. On error the
 /// cycle is unchanged.
 pub fn compose_cycle_cpu(
     cycle: &mut FrameCycle,
@@ -577,13 +728,14 @@ pub fn compose_cycle_cpu(
     Ok(scene::to_rgba(indices, &assets.palette))
 }
 
-/// The world view composes `VIEW`; a cycle of another size has no frame
-/// mapping.
+/// The world view composes [`play_view`]; a cycle of another size has no
+/// frame mapping.
 fn check_cycle(cycle: &FrameCycle) -> Result<(), ViewError> {
-    if cycle.view() != VIEW {
+    let view = play_view();
+    if cycle.view() != view {
         return Err(SceneError::BaseSize {
             len: cycle.pixels().len(),
-            pixels: u64::from(VIEW.width) * u64::from(VIEW.height),
+            pixels: u64::from(view.width) * u64::from(view.height),
         }
         .into());
     }
@@ -649,7 +801,7 @@ impl GpuAtlas {
         frame: &WorldFrame,
         assets: &ViewAssets,
     ) -> Result<gpu_compositor::Packed, ViewError> {
-        let bins = scene::bin(&frame.items, &assets.frames, &assets.maps, VIEW)?;
+        let bins = scene::bin(&frame.items, &assets.frames, &assets.maps, play_view())?;
         Ok(gpu_compositor::pack(
             &frame.items,
             &bins,

@@ -3314,7 +3314,7 @@ pub static SERVER_MESSAGES: [ServerMessage; 181] = [
     ServerMessage { id: 0x57, name: "NpcEnchants", size: SizeRule::Fixed(14), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "type", ty: FieldType::U8, offset: Some(5) }, Field { name: "name", ty: FieldType::U16, offset: Some(6) }, Field { name: "umod0", ty: FieldType::U8, offset: Some(8) }, Field { name: "umod1", ty: FieldType::U8, offset: Some(9) }, Field { name: "umod2", ty: FieldType::U16, offset: Some(10) }, Field { name: "flag", ty: FieldType::U16, offset: Some(12) }], senders: &[0x0053D880], client_handler: Some(0x0045E400), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x58, name: "OpenUi", size: SizeRule::Fixed(7), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "code", ty: FieldType::U8, offset: Some(5) }, Field { name: "effect", ty: FieldType::U8, offset: Some(6) }], senders: &[0x0053D8D0], client_handler: Some(0x0045E490), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x59, name: "AssignPlayer", size: SizeRule::Fixed(26), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }, Field { name: "class", ty: FieldType::U8, offset: Some(5) }, Field { name: "name", ty: FieldType::Cstr16, offset: Some(6) }, Field { name: "x", ty: FieldType::U16, offset: Some(22) }, Field { name: "y", ty: FieldType::U16, offset: Some(24) }], senders: &[0x0053E8F0], client_handler: Some(0x0045E4C0), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
-    ServerMessage { id: 0x5A, name: "EventMessage", size: SizeRule::Fixed(40), layout: &[Field { name: "code", ty: FieldType::U8, offset: Some(1) }, Field { name: "", ty: FieldType::U8, offset: Some(2) }, Field { name: "", ty: FieldType::U32, offset: Some(3) }, Field { name: "name", ty: FieldType::Cstr16, offset: Some(8) }], senders: &[0x0053C850], client_handler: Some(0x0045E070), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
+    ServerMessage { id: 0x5A, name: "EventMessage", size: SizeRule::Fixed(40), layout: &[Field { name: "code", ty: FieldType::U8, offset: Some(1) }, Field { name: "", ty: FieldType::U8, offset: Some(2) }, Field { name: "", ty: FieldType::U32, offset: Some(3) }, Field { name: "name", ty: FieldType::Cstr16, offset: Some(8) }, Field { name: "account", ty: FieldType::Cstr16, offset: Some(24) }], senders: &[0x0053C850], client_handler: Some(0x0045E070), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5B, name: "PlayerJoined", size: SizeRule::Field { width: Width::U16, offset: 1, mul: 1, add: 0, cap: None, min: 34 }, layout: &[Field { name: "size", ty: FieldType::U16, offset: Some(1) }, Field { name: "guid", ty: FieldType::U32, offset: Some(3) }, Field { name: "class", ty: FieldType::U8, offset: Some(7) }, Field { name: "name", ty: FieldType::Cstr16, offset: Some(8) }, Field { name: "level", ty: FieldType::U16, offset: Some(24) }, Field { name: "party", ty: FieldType::U16, offset: Some(26) }, Field { name: "", ty: FieldType::U16, offset: Some(28) }, Field { name: "", ty: FieldType::U16, offset: Some(30) }, Field { name: "", ty: FieldType::U16, offset: Some(32) }, Field { name: "str1", ty: FieldType::Cstr, offset: Some(34) }, Field { name: "str2", ty: FieldType::Cstr, offset: None }], senders: &[0x0053C940], client_handler: Some(0x0045E4E0), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5C, name: "PlayerLeft", size: SizeRule::Fixed(5), layout: &[Field { name: "guid", ty: FieldType::U32, offset: Some(1) }], senders: &[0x0053CA90], client_handler: Some(0x0045E530), client_unit_handler: None, produced_by: ProducedBy::Session, confirmed: Confirmed::Yes },
     ServerMessage { id: 0x5D, name: "QuestItemState", size: SizeRule::Fixed(6), layout: &[Field { name: "chain", ty: FieldType::U8, offset: Some(1) }, Field { name: "flags", ty: FieldType::U8, offset: Some(2) }, Field { name: "status", ty: FieldType::U8, offset: Some(3) }, Field { name: "extra", ty: FieldType::U16, offset: Some(4) }], senders: &[0x0053D710], client_handler: Some(0x0045E540), client_unit_handler: None, produced_by: ProducedBy::Sim, confirmed: Confirmed::Yes },
@@ -5617,6 +5617,8 @@ pub mod server {
         pub f3: u32,
         /// `cstr16` at 8.
         pub name: [u8; 16],
+        /// `cstr16` at 24.
+        pub account: [u8; 16],
     }
 
     impl FixedMessage for EventMessage {
@@ -5629,6 +5631,7 @@ pub mod server {
                 f2: u8_at(b, 2),
                 f3: u32_at(b, 3),
                 name: bytes16_at(b, 8),
+                account: bytes16_at(b, 24),
             })
         }
         fn write(&self, out: &mut [u8]) {
@@ -5637,6 +5640,7 @@ pub mod server {
             put_u8(out, 2, self.f2);
             put_u32(out, 3, self.f3);
             put_bytes16(out, 8, &self.name);
+            put_bytes16(out, 24, &self.account);
         }
     }
 

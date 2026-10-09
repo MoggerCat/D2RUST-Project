@@ -302,12 +302,32 @@ impl SkillTreePanel {
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
+        self.draw_with_points(t, env, view, mouse, None, out);
+    }
+
+    /// [`Self::draw`] with the free-points number (`panels-2.md` §19 r3,
+    /// r6: after the background, before the icons) when `uninterruptable`
+    /// is given (the player's state 54).
+    pub fn draw_with_points(
+        &self,
+        t: &PanelTables,
+        env: &PanelEnv,
+        view: &dyn SkillTreeView,
+        mouse: Point,
+        uninterruptable: Option<bool>,
+        out: &mut dyn UiDrawSink,
+    ) {
         self.drawn.set(true);
         let tab = self.tab;
         let extra = move |c: Cond| matches!(c, Cond::Tab(n) if n == tab);
         let cond = env.cond(false, &extra);
         let class = view.class();
         emit_static_draws(t, PanelKey::Ui(UI_SKILLTREE), &cond, class, &|_| true, out);
+        if let Some((n, at, font, color)) =
+            uninterruptable.and_then(|u| self.free_points_number(&env.screen, view, u))
+        {
+            out.push(text(utf16(&n), at.x, at.y, font, color));
+        }
         for icon in self.icons(&env.screen, view, mouse) {
             out.push(icon.image);
             if let Some(l) = icon.level {
@@ -390,13 +410,15 @@ impl SkillTreePanel {
             if let Some(t) = tab_at(&s, p) {
                 if t != self.tab {
                     self.tab = t;
-                    d.out.push(PanelOutput::ClickSound);
+                    // Id 6 (`client/ui.md` §B8.1, `0x004ABA32`).
+                    d.out.push(PanelOutput::Sound(6));
                 }
             }
         }
         if view.class().is_some_and(|c| close_hit(&s, c, self.tab, p)) {
             self.close_pressed = true;
-            d.out.push(PanelOutput::ClickSound);
+            // Id 4 (`client/ui.md` §B8.1, `0x004ABAD8`).
+            d.out.push(PanelOutput::Sound(4));
         }
         if in_col {
             d.consumed = true;
@@ -407,7 +429,8 @@ impl SkillTreePanel {
                     .map(|(e, _)| e.skill);
                 if let Some(skill) = hit {
                     self.pressed = Some(skill);
-                    d.out.push(PanelOutput::ClickSound);
+                    // Id 5 (`client/ui.md` §B8.1, `0x004ABBF1`).
+                    d.out.push(PanelOutput::Sound(5));
                 }
             }
         }
@@ -797,7 +820,7 @@ mod tests {
         v0.free = 0;
         assert_eq!(
             p.mouse_down(&e, &v0, Point::new(580, 460)),
-            vec![PanelOutput::ClickSound]
+            vec![PanelOutput::Sound(4)]
         );
         assert!(p.close_pressed);
         let mut out: Vec<UiDraw> = Vec::new();
@@ -1003,13 +1026,13 @@ mod tests {
         p.drawn.set(true);
         assert_eq!(
             p.mouse_down(&e, &v, Point::new(700, 200)),
-            vec![PanelOutput::ClickSound]
+            vec![PanelOutput::Sound(6)]
         );
         assert_eq!(p.tab, 3);
         assert!(p.mouse_down(&e, &v, Point::new(700, 200)).is_empty());
         assert_eq!(
             p.mouse_down(&e, &v, Point::new(700, 500)),
-            vec![PanelOutput::ClickSound]
+            vec![PanelOutput::Sound(6)]
         );
         assert_eq!(p.tab, 1);
     }
@@ -1024,7 +1047,7 @@ mod tests {
         p.drawn.set(true);
         assert_eq!(
             p.mouse_down(&e, &v, Point::new(500, 230)),
-            vec![PanelOutput::ClickSound]
+            vec![PanelOutput::Sound(5)]
         );
         assert_eq!(p.pressed, Some(0x1A));
         let r = p.mouse_up(&e, &v, Point::new(510, 240));
@@ -1163,10 +1186,7 @@ mod tests {
         assert!(d.consumed);
         assert!(p.close_pressed);
         assert_eq!(p.pressed, Some(0x2B));
-        assert_eq!(
-            d.out,
-            vec![PanelOutput::ClickSound, PanelOutput::ClickSound]
-        );
+        assert_eq!(d.out, vec![PanelOutput::Sound(4), PanelOutput::Sound(5)]);
         // an already pressed icon is not pressed again
         let mut q = drawn_panel();
         q.pressed = Some(0x1A);

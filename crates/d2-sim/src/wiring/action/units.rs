@@ -1,4 +1,4 @@
-// Spec: specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
+// Spec: specs/formats/d2s.md §2.3; specs/combat/vitals.md §4.8 r1, §4.8 r2; specs/sim/units.md §3, §4.1, §4.3, §4.5, §4.6, §5, §6; specs/monsters/init.md §5, §22; specs/monsters/umod-callbacks.md §2; specs/formats/animdata.md §3–§5; specs/sim/stat-lists.md §4, §8, §9; specs/monsters/ai.md §1; specs/missiles/missiles.md §R3
 //! The unit side of the wiring: the unit hooks of [`ActionHooks`] (the
 //! missile class handler for missile events, the AI think and reset for
 //! monster events 2 and 10, the state-54 rule before a think is
@@ -25,12 +25,15 @@ use crate::units::hooks::{Sim, UnitHooks};
 use crate::units::lifecycle::{AllocRequest, LifecycleHooks};
 use crate::units::modes::UnitError;
 use crate::units::modes::MONSTER_MODES;
-use crate::units::record::{flags2, AnimRecord, ANIM_EVENTS};
+use crate::units::record::{flags2, AnimRecord, Sequence, ANIM_EVENTS};
 use crate::units::{UnitId, UnitType};
 
 use super::combat::HIRELING_CLASSES;
 use super::monsters::umod_mode;
 use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
+
+/// The client status word's dead bit (`formats/d2s.md` §2.3).
+pub const STATUS_DEAD: u16 = 0x08;
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -120,19 +123,25 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
     /// `0x00580EC0`: the death penalties at `0x00580F59`
     /// (`vitals.md` §4.6, [`super::death`]).
+    /// Then the client status bit 0x08 at `0x00580F83`, softcore too
+    /// (`formats/d2s.md` §2.3, `vitals.md` §4.8 rule 1.4).
     fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_penalties(sim, unit);
+        sim.game.lists.set_player_status(unit, STATUS_DEAD);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
     /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
     /// at `0x0057FD25` in every game type (`hirelings-2.md` §15 rule 1):
     /// queued for the host that holds the hireling lists
     /// ([`ActionHooks::owner_deaths`]).
+    /// Then the client status bit 0x08 at `0x0057FD46` (`formats/d2s.md`
+    /// §2.3, `vitals.md` §4.8 rule 2).
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
         if let Some(q) = self.owner_deaths.as_mut() {
             q.push(unit);
         }
+        sim.game.lists.set_player_status(unit, STATUS_DEAD);
     }
     /// `0x0057FB70` ([`super::death`]; the experience it returns is not
     /// read by the 0x16 caller).
@@ -143,6 +152,46 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// (`units.md` §4.1, `animdata.md` §5).
     fn anim_record(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<AnimRecord> {
         self.anim_lookup(sim, unit).map(|r| anim_record(&r))
+    }
+
+    /// `0x00621260` with the lookup `0x00663310` (`skills/sequences.md`
+    /// §1–§2) for a player in mode 18: the used skill's `seqnum` and the
+    /// unit's COF weapon class ([`Pending::composit_weapon_class`], the
+    /// class the animation names use) pick the frame list; its event bytes,
+    /// length · 256 and speed 256. A monster in mode 14: its class's slot
+    /// of the used skill picks the `monseq` list
+    /// ([`ActionHooks::monster_sequences`], §1 rules 2 and 5). `None`
+    /// (the plain animation): no used skill, `seqnum` 0, a null list.
+    fn load_sequence(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<Sequence> {
+        let rec = sim.units.get(unit)?;
+        if rec.ty == UnitType::Monster {
+            let used = self.used_skill_of(unit)?;
+            let class = usize::try_from(rec.class).ok()?;
+            let frames = self.monster_sequences.as_ref()?.lookup(class, used.skill)?;
+            return Some(Sequence {
+                frame_count: (frames.len() as i32) * 256,
+                speed: 256,
+                pos: 0,
+                events: frames.iter().map(|f| f.event).collect(),
+            });
+        }
+        if rec.ty != UnitType::Player {
+            return None;
+        }
+        let used = self.used_skill_of(unit)?;
+        let row = self
+            .tables
+            .skills
+            .skills
+            .get(usize::try_from(used.skill).ok()?)?;
+        let class = usize::try_from(self.x.composit_weapon_class(unit)).ok()?;
+        let frames = crate::skills::sequences::lookup(row.seqnum, class)?;
+        Some(Sequence {
+            frame_count: (frames.len() as i32) * 256,
+            speed: 256,
+            pos: 0,
+            events: frames.iter().map(|f| f.event).collect(),
+        })
     }
 
     /// `0x00623F50` (`units.md` §4.3) from the record's speed (+0x0C).
@@ -349,6 +398,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         );
     }
 
+    /// `0x00571A10`(unit, f) (`stat-lists.md` §10.1, `stats.md` §9.3): the
+    /// 0xAB record {f} on the unit, the unit queued for update
+    /// (`intents-events.md` §7.9 rule 2).
+    fn send_life_fraction(&mut self, sim: &mut Sim<'_>, unit: UnitId, fraction: i32) {
+        use super::event_records::EventRecord;
+        let life = fraction.clamp(0, 255) as u8;
+        self.event_records.push(unit, EventRecord::NpcHeal { life });
+        let _ = sim.game.lists.queue_update(unit);
+    }
+
     /// Object events (`units.md` §6.4) on the object state
     /// ([`super::objects`]); a game without one keeps the default.
     fn object_event(&mut self, sim: &mut Sim<'_>, unit: UnitId, event: u8) {
@@ -385,6 +444,9 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     }
     fn town_room(&self, game: &Game, room: crate::units::RoomId) -> bool {
         self.drlg.in_town(game, room)
+    }
+    fn room_level(&self, game: &Game, room: crate::units::RoomId) -> Option<u32> {
+        self.drlg.level_id(game, room)
     }
     fn path_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         self.path_has(unit).then(|| self.path_position(unit))
@@ -539,7 +601,8 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     }
 
     /// The per-kind state of the action modules leaves with the unit:
-    /// AI control (`AiStore::remove`), missile data, combat list; then
+    /// AI control (`AiStore::remove`), a summon's skill entries, missile
+    /// data, combat list; then
     /// the lent monster world's part (monster data, minion list, owner
     /// link); an object's object data.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
@@ -567,6 +630,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             }
         }
         self.path_free(unit, ty, mode);
+        self.monster_skills.remove(&unit);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
         }
@@ -696,6 +760,17 @@ impl<X: Pending> View<'_, X> {
         x: i32,
         y: i32,
     ) -> Option<UnitId> {
+        let u = self.allocate_unadded(game, req)?;
+        if req.ty == UnitType::Object && self.h.objects_out {
+            return Some(u);
+        }
+        self.add_allocated(game, u, req, x, y).then_some(u)
+    }
+
+    /// [`View::allocate`] up to step 7 (the kind init included): the
+    /// unit is not added yet. Its caller runs what the allocator runs
+    /// before `SUNIT_Add` and then [`View::add_allocated`].
+    pub fn allocate_unadded(&mut self, game: &mut Game, req: &AllocRequest) -> Option<UnitId> {
         let mut seed = self.h.game_seed;
         let outer = self.h.deferred_inits.replace(Vec::new());
         let r = {
@@ -716,12 +791,7 @@ impl<X: Pending> View<'_, X> {
             self.object_init(game, u);
         }
         match r {
-            Ok(Some(u)) => {
-                if req.ty == UnitType::Object && self.h.objects_out {
-                    return Some(u);
-                }
-                self.add_allocated(game, u, req, x, y).then_some(u)
-            }
+            Ok(Some(u)) => Some(u),
             Ok(None) => None,
             Err(e) => {
                 self.unit_error(e);
@@ -755,7 +825,57 @@ impl<X: Pending> View<'_, X> {
             return false;
         }
         self.path_place(game, u, x, y);
+        if self.h.paths.is_some() {
+            self.monster_added(game, u);
+        }
         true
+    }
+
+    /// The monster branch of `SUNIT_Add` after the path
+    /// (`monsters/init.md` §4.1 step 1): `0x005735A0` (path velocity :=
+    /// monstats `Velocity` · 256, `0x00648690`; then the monster mode set
+    /// `0x005A7C20` of the creation mode, whose start function
+    /// schedules the first think, `ai.md` §1.3), then the think restart
+    /// `0x00573780` (`ai.md` §1.5 r1: the recorded "+aidel, cancel, +2"
+    /// pairs). Not a monster: nothing.
+    ///
+    /// PROVISIONAL (REC-442): the gate `0x00553160(unit)` of step 1.2
+    /// (else the room clean-up `0x00553220`) is not specified; d2rs
+    /// always restarts the think, as every recorded creation did. The
+    /// request's target point (x, y) is not passed: the creation modes'
+    /// start functions d2rs reaches (NU) do not read it.
+    fn monster_added(&mut self, game: &mut Game, u: UnitId) {
+        let Some((class, mode)) = self
+            .units
+            .get(u)
+            .filter(|r| r.ty == UnitType::Monster)
+            .map(|r| (r.class, r.mode))
+        else {
+            return;
+        };
+        let velocity = self
+            .h
+            .tables
+            .combat
+            .monstats
+            .get(class as usize)
+            .map_or(0, |m| i32::from(m.velocity))
+            << 8;
+        self.h.path_set_velocity(u, velocity);
+        let r = {
+            let mut sim = Sim {
+                game: &mut *game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode)
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
+            return;
+        }
+        self.think_restart(game, u);
     }
 
     /// The allocation room of a unit between steps 7 and 8 (`units.md`

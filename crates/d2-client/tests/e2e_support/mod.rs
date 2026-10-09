@@ -242,9 +242,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, item: UnitId, stat: u16) {
-        self.log.push(format!("item stat {} {stat}", item.0));
-    }
     /// S→C 0x2A through its builder `0x0053D740` (`npc.md` §9).
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
@@ -286,14 +283,14 @@ impl VendorRest for Rest {
     fn equipped_items(&self, _: UnitId) -> Vec<UnitId> {
         unreachable!("{MODEL}")
     }
-    fn find_tome(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_tome(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
     fn add_to_tome(&mut self, _: UnitId, _: i32) {}
-    fn find_partial_stack(&self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
+    fn find_partial_stack(&mut self, _: UnitId, _: UnitId) -> Option<(UnitId, i32)> {
         None
     }
-    fn can_belt(&self, _: UnitId, _: UnitId) -> bool {
+    fn can_belt(&mut self, _: UnitId, _: UnitId) -> bool {
         false
     }
     fn put_in_belt(&mut self, _: UnitId, _: UnitId) -> bool {
@@ -788,6 +785,7 @@ pub fn inv_tables(t: &ItemTables, sizes: &[(u8, u8)]) -> InvTables {
             .collect(),
         itemtypes,
         equiv: t.equiv.clone(),
+        books: Vec::new(),
     }
 }
 

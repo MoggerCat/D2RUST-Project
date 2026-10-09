@@ -38,11 +38,11 @@
 |   11. Act V (`0x0067E600`) | 753–844 |
 |   12. Rooms | 845–880 |
 | Constants & data dependencies | 881–903 |
-| Randomness | 904–925 |
-| Edge cases & original bugs | 926–947 |
-| Test vectors | 948–1122 |
-| Provenance | 1123–1163 |
-| Open questions | 1164–1261 |
+| Randomness | 904–926 |
+| Edge cases & original bugs | 927–948 |
+| Test vectors | 949–1123 |
+| Provenance | 1124–1164 |
+| Open questions | 1165–1262 |
 <!-- /index -->
 
 ## Summary
@@ -912,7 +912,8 @@ with R0 ∈ {1, 3} (Act I) and throughout the jungle placer (Act III).
 recorded): build-list rolls of each new border preset while stamping
 borders (§6) → substitution type 0 shuffles → river/cliff draws (§7.2) →
 substitution types 1, 2 (`roll(groups)` for type 1, shuffles, variant
-rolls) → FarAway or cave-entrance shuffle + its build-list roll →
+rolls; a replacement's stamps make no build-list roll,
+`outdoor-tilesub.md` §2.3) → FarAway or cave-entrance shuffle + its build-list roll →
 substitution type 3 → path jitter per path (§7.5.2) → waypoint shuffle →
 shrine `&3` + shuffle → special presets (each placer's shuffle, then its
 build-list roll; cottage `&3`/`&1`) → per cell row-major: preset cell =

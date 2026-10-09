@@ -72,8 +72,25 @@ use crate::rules::camera::OpenMode;
 /// are), so [`UiRoot::sync_states`] leaves it open.
 pub const BORDER_PANEL: PanelId = PanelId(0x100);
 
-/// The click sound of §10.2: `0x004B9A00(0, 0, 0)` = request id 0, no
-/// unit, delay 0 (`audio/triggers.md` §1 r1).
+/// The Esc-closable states (`panels.md` §2 r9, flag table `0x006D6378`
+/// = 1), in the close-all's order i = 0 … 37.
+pub const ESC_CLOSABLE: [u8; 27] = [
+    1, 2, 3, 4, 5, 9, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x12, 0x14, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B,
+    0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x24, 0x25,
+];
+
+/// The states the game menu's open remembers and its close reopens
+/// (`frontend-options.md` §O1 r2: keep = 1).
+pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
+
+/// The step-10 overlays' adapter (hover tips, then the cursor item), drawn
+/// after every other panel (`ui/panels.md` §5 step 10, `panels-3.md` §23
+/// r9): not a UI state, open for good.
+pub const TOP_PANEL: PanelId = PanelId(0x113);
+
+/// The click sound `0x004B9A00(0, 0, 0)` = request id 0 (silent), no unit,
+/// delay 0 (`audio/triggers.md` §1 r1), at the sites `client/ui.md`
+/// §B8.1 does not list with a constant id 1–6, 15, 16.
 pub const CLICK_SOUND_ID: i32 = 0;
 
 /// Panels and inputs not wired, each with the input the client model or
@@ -96,25 +113,24 @@ pub const PENDING: &[(&str, &str)] = &[
          `original_tests.rs::stash_gold_withdraw_and_deposit_send_0x4f`)",
     ),
     (
-        "inventory tints (translucency) and empty-slot pictures (§9.4, `inventory.md` §2–§6)",
+        "inventory tints (translucency) (`inventory.md` §2–§6)",
         "the equipped and grid item tints and the hover tint are painted by \
          `ItemsUi::draw_tints` as opaque `hudfill` tiles (REC-271: the UI sprite path has no \
-         A2 blend); the shooter / quiver and cursor-item tints are not read and the \
-         empty-slot pictures (§9.4 table) are not drawn",
+         A2 blend); the shooter / quiver and cursor-item tints are not read",
     ),
     (
         "skill tree hover description and the no-points message (§10.5, §10.7)",
-        "icons, level numbers, the flag mask and the point spend (C→S 0x3B) are wired \
-         ([`skill_tree_ui`]); the point cost is 1 (`skpoints` formula not evaluated, \
-         REC-270); the tab tool tips, the free-points box and the no-points message are \
-         not wired",
+        "icons, level numbers, the flag mask, the point spend (C→S 0x3B), the free-points \
+         number and the tab / close tool tips are wired ([`skill_tree_ui`], `SkillTreeUi`); \
+         the point cost is 1 (`skpoints` formula not evaluated, REC-270); the hover \
+         description and the no-points message are not wired",
     ),
     (
-        "waypoint menu panel (ui 0x14, §13 r2–r7): tab gates",
+        "waypoint menu panel (ui 0x14, §13 r2–r7): row names",
         "the panel is installed and covered (`waypoint_ui`; \
-         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`; the row and tab \
-         text come from the string table by id); the tab gates read the client quest flags \
-         (`msg-ui.md` open question 4, tab 0 only): every act tab is shown (d2rs-own)",
+         `app_play_npc.rs::clicking_the_waypoint_walks_there_and_interacts`); the tabs read \
+         the client quest flags (`menus.md` §1.4, §13.3); the row text is the `levels` \
+         `LevelName` key through the string table (`0x00453E70` not specified, d2rs-own)",
     ),
     (
         "hotkeys for other states (escape menu, chat, automap, party; the quest log, ToggleQuests, is \
@@ -134,7 +150,7 @@ pub struct UiConfig {
 }
 
 /// One `inventory.bin` `inv` rectangle (§4.4, §9.2): left, right
-/// (exclusive), top, bottom.
+/// (exclusive), top, bottom (inclusive).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InvArea {
     pub left: i32,
@@ -144,11 +160,11 @@ pub struct InvArea {
 }
 
 impl InvArea {
-    /// The right panel's click area (§4.4). Bottom is read exclusive like
-    /// right: the spec does not say (handoff `impl-ui-panels` §3).
+    /// The right panel's click area (§4.4): left ≤ x < right, top ≤ y ≤
+    /// bottom (`panels-2.md` §18 r2: bottom inclusive).
     pub fn rect(&self) -> Rect {
         let w = u16::try_from(self.right - self.left).unwrap_or(0);
-        let h = u16::try_from(self.bottom - self.top).unwrap_or(0);
+        let h = u16::try_from(self.bottom - self.top + 1).unwrap_or(0);
         Rect::new(self.left, self.top, w, h)
     }
 }
@@ -175,6 +191,14 @@ struct Facts {
     player: Option<PlayerLife>,
     /// An expansion game (`[0x007A04F4]`).
     expansion_game: bool,
+    /// The local player (`0x00463DD0`), for player events.
+    local: Option<UnitKey>,
+    /// A local player with a room (`0x00620BB0`; d2rs-own: read as a
+    /// position), for the waypoint close hook.
+    player_room: bool,
+    /// The local player has a hireling (`0x00478F20(P, 7)` ≠ −1), for the
+    /// hireling key (`ui/controls.md` §3 cmd 54).
+    has_hireling: bool,
 }
 
 impl Facts {
@@ -189,6 +213,9 @@ impl Facts {
                 dead: u.mode == 0x11,
             }),
             expansion_game: world.expansion != 0,
+            local: local.map(|u| u.key),
+            player_room: local.is_some_and(|u| u.position.is_some()),
+            has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
         }
     }
 }
@@ -205,6 +232,12 @@ struct Shared {
     mouse: Point,
     /// Panel outputs of the event being routed, in order.
     outputs: Vec<PanelOutput>,
+    /// An input reset `0x0044DA40` was asked for since the host last took
+    /// it ([`OriginalUi::take_input_reset`]).
+    input_reset: bool,
+    /// Clear Screen closed nothing: the automap part is the host's
+    /// ([`OriginalUi::take_clear_automap`]).
+    clear_automap: bool,
     /// The fonts' glyph widths (character values and name line); none:
     /// no text is drawn.
     fonts: Option<FontMeasure>,
@@ -225,6 +258,9 @@ struct Shared {
     waypoint_open: Option<WaypointOpen>,
     /// The Esc game menu's state ([`esc_menu`]).
     esc: esc_menu::EscState,
+    /// The ui states the game menu's open closed and reopens at its close
+    /// (`frontend-options.md` §O1 r2–r3, `0x00713060`).
+    esc_kept: Vec<u8>,
     /// The quest log's inputs ([`quest_log_ui`]).
     quest: quest_log_ui::QuestInputs,
     /// The inventory gold button and the drop-gold dialog ([`gold_dialog`]).
@@ -238,6 +274,19 @@ struct Shared {
     cube_opened: bool,
     /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
     cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
+    /// The mouse cursor machine (`panels-3.md` §23), drawn last by
+    /// [`TopUi`], and the local copy of the client seed its step draws on.
+    cursor: RefCell<super::cursor::Cursor>,
+    cursor_seed: std::cell::Cell<Option<u64>>,
+    /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
+    /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
+    client_quest: [u8; 96],
+    /// `levels` `LevelName` keys by level id (the waypoint rows' text,
+    /// `waypoint_ui`).
+    level_names: Vec<String>,
+    /// `0x0048A540` ran (an `hst ` / `qf2 ` arrived in page 3): the
+    /// animation starts at the cube's next draw.
+    horadric_start: std::cell::Cell<bool>,
 }
 
 impl Shared {
@@ -307,8 +356,11 @@ pub struct OriginalUi {
     pub(super) hire: super::hire_list::SharedHire,
     /// The NPC shop (`shop_ui`, `panels-2.md` §14 r4).
     shop: shop_ui::SharedShop,
-    /// The NPC menu (`ui/npc_menu_ui.rs`, `menus.md` §2).
-    pub(super) npcm: super::npc_menu_ui::SharedNpcMenu,
+    /// The NPC menu (`npc_box`, `menus.md` §2).
+    pub(super) npcm: npc_box::SharedNpcMenu,
+    /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
+    /// handed to the root ([`Self::flush_hooks`]).
+    hook_intents: Vec<super::ClientIntent>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -344,6 +396,8 @@ impl OriginalUi {
         tables.files.extend(esc_art::esc_files());
         tables.files.extend(quest_log_ui::quest_files());
         tables.files.extend(cube_ui::cube_files());
+        tables.files.extend(npc_talk::socket_files());
+        tables.files.extend(cursor_files());
         tables.files.extend(skill_tree_ui::icon_files());
         let shared = Shared {
             tables,
@@ -354,9 +408,14 @@ impl OriginalUi {
                 class: None,
                 player: None,
                 expansion_game: false,
+                local: None,
+                player_room: false,
+                has_hireling: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
+            input_reset: false,
+            clear_automap: false,
             fonts: None,
             resist_penalties: None,
             char_tables: Default::default(),
@@ -366,12 +425,24 @@ impl OriginalUi {
             waypoint_map: None,
             waypoint_open: None,
             esc: esc_menu::EscState::default(),
+            esc_kept: Vec::new(),
             quest: quest_log_ui::QuestInputs::default(),
             gold: gold_dialog::GoldState::default(),
             messages: Default::default(),
             bubbles: Default::default(),
             cube_opened: false,
             cube_anim: Default::default(),
+            // §23 r3: init with adj 0 (the only caller passes 0).
+            cursor: RefCell::new(super::cursor::Cursor::init(
+                0,
+                config.screen.w,
+                config.screen.h,
+                0,
+            )),
+            cursor_seed: std::cell::Cell::new(None),
+            client_quest: [0; 96],
+            level_names: Vec::new(),
+            horadric_start: Default::default(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
@@ -383,6 +454,7 @@ impl OriginalUi {
             hire: super::hire_list::SharedHire::default(),
             shop: shop_ui::SharedShop::default(),
             npcm: Default::default(),
+            hook_intents: Vec::new(),
         })
     }
 
@@ -391,10 +463,33 @@ impl OriginalUi {
     /// control panel (step 7).
     pub fn install(&self, root: &mut UiRoot) -> Result<(), UiError> {
         let sh = &self.shared;
+        // `panels.md` §5 (draw order = add order; the root routes the
+        // last-added first): step 4 the quest log (ui 0x0F), step 5 the
+        // inventory family, step 6 skill tree, character and waypoint,
+        // step 7 the border and control panel with the HUD overlays, step
+        // 9 the NPC menu family (ui 8: menu box, hire box) and ui 0x0E. The
+        // Esc menu (step 1) stays above: its input routing is coupled to
+        // the add order (q-fix-ui-input).
+        root.add(Box::new(quest_log_ui::QuestLogUi {
+            sh: sh.clone(),
+            log: Default::default(),
+        }))?;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
             shop: self.shop.clone(),
             panel: InventoryPanel::default(),
+        }))?;
+        root.add(Box::new(stash_ui::StashUi {
+            sh: sh.clone(),
+            input: Default::default(),
+        }))?;
+        root.add(Box::new(shop_ui::ShopUi {
+            sh: sh.clone(),
+            st: self.shop.clone(),
+        }))?;
+        root.add(Box::new(cube_ui::CubeUi {
+            sh: sh.clone(),
+            input: Default::default(),
         }))?;
         root.add(Box::new(SkillTreeUi {
             sh: sh.clone(),
@@ -409,46 +504,47 @@ impl OriginalUi {
             panel: Default::default(),
             seq: 0,
         }))?;
-        root.add(Box::new(quest_log_ui::QuestLogUi {
-            sh: sh.clone(),
-            log: Default::default(),
-        }))?;
-        root.add(Box::new(stash_ui::StashUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
-        root.add(Box::new(shop_ui::ShopUi {
-            sh: sh.clone(),
-            st: self.shop.clone(),
-        }))?;
-        root.add(Box::new(cube_ui::CubeUi {
-            sh: sh.clone(),
-            input: Default::default(),
-        }))?;
         root.add(Box::new(BorderUi { sh: sh.clone() }))?;
+        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
         root.add(Box::new(super::hire_list::HireListUi {
             st: self.hire.clone(),
         }))?;
         root.open(super::hire_list::HIRE_PANEL)?;
-        root.add(Box::new(super::npc_menu_ui::NpcMenuUi {
+        root.add(Box::new(npc_box::NpcMenuUi {
+            sh: sh.clone(),
+            shop: self.shop.clone(),
             st: self.npcm.clone(),
             hire: self.hire.clone(),
         }))?;
-        root.open(super::npc_menu_ui::NPC_MENU_PANEL)?;
-        root.add(Box::new(hud::HudUi { sh: sh.clone() }))?;
+        root.add(Box::new(npc_talk::SocketUi {
+            sh: sh.clone(),
+            st: self.npcm.clone(),
+        }))?;
         root.add(Box::new(gold_dialog::GoldDialogUi { sh: sh.clone() }))?;
         root.add(Box::new(game_messages::MessagesUi { sh: sh.clone() }))?;
         root.open(game_messages::MESSAGES_PANEL)?;
         root.add(Box::new(overhead_ui::OverheadUi { sh: sh.clone() }))?;
         root.open(overhead_ui::OVERHEAD_PANEL)?;
-        root.add(Box::new(esc_menu::EscMenuUi { sh: sh.clone() }))?;
+        root.add(Box::new(esc_menu::EscMenuUi {
+            sh: sh.clone(),
+            pent: Default::default(),
+        }))?;
+        // Step 10 and the cursor draw: over the control panel overlays
+        // (step 7–8) and every panel (`panels.md` §5, `panels-3.md` §23 r9).
+        root.add(Box::new(TopUi { sh: sh.clone() }))?;
         // Not a UI state: open for good.
         root.open(BORDER_PANEL)?;
         root.open(hud::HUD_PANEL)?;
+        root.open(TOP_PANEL)?;
         root.open(gold_dialog::GOLD_PANEL)?;
         root.sync_states(&sh.borrow().states);
         let sc = sh.borrow().config.screen;
-        self.hire.borrow_mut().screen = (sc.w, sc.h);
+        {
+            let shr = sh.borrow();
+            let mut h = self.hire.borrow_mut();
+            h.screen = (sc.w, sc.h);
+            h.fonts = shr.fonts.clone();
+        }
         self.npcm.borrow_mut().screen = (sc.w, sc.h);
         Ok(())
     }
@@ -464,6 +560,7 @@ impl OriginalUi {
     /// DC6 the frame's assets must then hold
     /// ([`crate::world_view::ui_bind::TextAssetLoader`]).
     pub fn set_fonts(&mut self, fonts: FontMeasure) {
+        self.hire.borrow_mut().fonts = Some(fonts.clone());
         self.shared.borrow_mut().fonts = Some(fonts);
     }
 
@@ -514,14 +611,45 @@ impl OriginalUi {
         self.shared.borrow_mut().items.layouts = Some(layouts);
     }
 
+    /// The equipment rectangles by `inventory.bin` record: the empty
+    /// equipment-slot pictures (`panels.md` §9.4; a hand's two-handed test
+    /// reads the inventory tables, [`Self::set_inv_tables`]). Call before
+    /// handing the files to the art loader (the pictures' files are
+    /// registered here).
+    pub fn set_equip_rects(&mut self, rects: Vec<super::panels::inventory::EquipRects>) {
+        let mut sh = self.shared.borrow_mut();
+        if !rects.is_empty() {
+            for f in super::panels::inventory::background_files() {
+                sh.tables.files.add(f);
+            }
+        }
+        sh.items.equip_rects = Some(rects);
+    }
+
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
     }
 
+    /// The act palette (`render/composition.md` §4) the UI's tint colours
+    /// are matched in (`ui/inventory.md` §2 r1), set by the host each frame.
+    pub fn set_palette(&mut self, palette: &d2_formats::palette::Palette) {
+        let p: Vec<[u8; 3]> = palette.colors.iter().map(|c| [c.r, c.g, c.b]).collect();
+        self.shared.borrow_mut().items.tint_colors = super::inv_grid::tint_indices(&p);
+    }
+
+    /// The frame's local-player position and shake (the world view's
+    /// one camera, `seams/world-screen.md` §2.2), set before each UI frame.
+    pub fn set_frame_anchor(&mut self, anchor: Option<crate::rules::camera::FrameAnchor>) {
+        self.shared.borrow_mut().bubbles.anchor = anchor;
+    }
+
     /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
+    /// The run and mini-panel tips' key names too (`hud::key_names`).
     pub fn set_belt_keys(&mut self, b: &crate::controls::Bindings) {
-        self.shared.borrow_mut().hud.belt.set_keys(b);
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.belt.set_keys(b);
+        sh.hud.bindings = Some(b.clone());
     }
 
     /// The item tool tips' tables and strings (`item_tip`).
@@ -529,9 +657,24 @@ impl OriginalUi {
         self.shared.borrow_mut().items.tips = Some(tips);
     }
 
+    /// The inventory tables of the equip-box click (`inv_items` `equip`).
+    pub fn set_inv_tables(&mut self, t: std::sync::Arc<d2_sim::items::inventory::InvTables>) {
+        self.shared.borrow_mut().items.inv_tables = Some(t);
+    }
+
     /// Shift is held (set by the host each frame, `inv_items`).
     pub fn set_shift(&mut self, shift: bool) {
         self.shared.borrow_mut().items.shift = shift;
+    }
+
+    /// Whether Shift was held at the last [`Self::set_shift`].
+    pub fn shift_held(&self) -> bool {
+        self.shared.borrow().items.shift
+    }
+
+    /// Ctrl is held (set by the host each frame, `inv_items`).
+    pub fn set_ctrl(&mut self, ctrl: bool) {
+        self.shared.borrow_mut().items.ctrl = ctrl;
     }
 
     /// Measured item graphic frame sizes by `invfile` (lower case).
@@ -552,8 +695,36 @@ impl OriginalUi {
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
         self.refresh_facts(world);
+        self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
+            self.track_grid_hover(world, p);
+        }
+    }
+
+    /// The hover handler `0x00487000` (`inventory.md` §5) of every open
+    /// item grid under `p`: the inventory (page 0), stash (page 4) and
+    /// cube (page 3) grids, so the grid click reads the kept cursor cell
+    /// (§5 r3, §10 r4).
+    fn track_grid_hover(&self, world: &ClientWorld, p: Point) {
+        use super::states::id;
+        let sh = self.shared.borrow();
+        let s = sh.config.screen;
+        let files = &sh.tables.files;
+        if sh.states.is_open(id::STASH) {
+            let g = sh.items.stash_grid(sh.env().exp, &s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::stash_items::STASH_PAGE, p);
+        }
+        if sh.states.is_open(id::CUBE) {
+            let g = sh.items.cube_grid(&s);
+            sh.items
+                .track_hover(world, files, &g, super::panels::cube_items::CUBE_PAGE, p);
+        }
+        if sh.states.is_open(id::INVENTORY) {
+            if let Some(l) = sh.items.layout(Facts::of(world).class, &s) {
+                sh.items.track_hover(world, files, &l.grid, 0, p);
+            }
         }
     }
 
@@ -576,17 +747,57 @@ impl OriginalUi {
             match o {
                 PanelOutput::Intent(i) => root.queue_intent(i),
                 // A refused call (returns 0) changes nothing (§2.4).
-                PanelOutput::SetUi { ui, mode, jump } => {
-                    self.set_ui(u32::from(ui), u32::from(mode), jump)?;
+                // The mini panel's menu button opens the game menu through
+                // `0x0047E090(1, 0)` (`frontend-options.md` §O1 r2).
+                PanelOutput::SetUi { ui, mode: 0, .. }
+                    if ui == super::states::id::ESC_MENU && !self.is_open(ui) =>
+                {
+                    self.open_game_menu()?;
                 }
-                PanelOutput::ClickSound => {
-                    self.outcome.sounds.push(SoundRequest::Ui(CLICK_SOUND_ID))
+                PanelOutput::SetUi { ui, mode, jump } => {
+                    let was_menu = ui == super::states::id::ESC_MENU && self.is_open(ui);
+                    // The panel's outputs already carry its own close
+                    // hook's message (`stash_input`, `waypoint`).
+                    self.set_ui_from(u32::from(ui), u32::from(mode), jump, Some(ui))?;
+                    // Return to Game closes the menu through
+                    // `0x0047E200(1)` (`frontend-options.md` §O1 r3).
+                    if was_menu && !self.is_open(ui) {
+                        self.restore_game_menu_states()?;
+                    }
+                }
+                PanelOutput::Sound(id) => self.outcome.sounds.push(SoundRequest::Ui(id)),
+                PanelOutput::PlayerEvent(event) => {
+                    let local = self.shared.borrow().facts.local;
+                    if let Some(unit) = local {
+                        self.outcome
+                            .sounds
+                            .push(SoundRequest::PlayerEvent { unit, event });
+                    }
                 }
             }
         }
         if let (Routed::Unhandled, UiEvent::Action(a)) = (routed, e) {
             if a == ActionId(Action::GameMenu.index() as u16) {
                 self.game_menu_key()?;
+            } else if a == ActionId(Action::ClearScreen.index() as u16) {
+                // Command 38 (`0x0044C6B0`, `panels.md` §2 r9): the
+                // close-all (0, 1); when it closed nothing, the automap
+                // re-centre and the close-all with the automap (the host).
+                if !self.close_all(true)? {
+                    self.shared.borrow_mut().clear_automap = true;
+                }
+            } else if a == ActionId(Action::ToggleHireling.index() as u16) {
+                // Command 54 (`0x00469170`): an expansion game, a hireling
+                // and the expansion installed (`0x00408F20`).
+                let ok = {
+                    let sh = self.shared.borrow();
+                    sh.facts.expansion_game
+                        && sh.facts.has_hireling
+                        && sh.config.expansion_installed
+                };
+                if ok {
+                    self.set_ui(u32::from(super::states::id::MERC_INV), 2, true)?;
+                }
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
                 // Hireling keys pass jump 1, every other hot key 0; mode 2
@@ -600,47 +811,150 @@ impl OriginalUi {
                 }
             }
         }
+        self.flush_hooks(root);
         root.sync_states(&self.shared.borrow().states);
         Ok(())
     }
 
-    /// Esc (command 56, `controls.md` §3): the open menu closes; else the
-    /// open panels close; else the menu opens. Which panels Esc closes is
-    /// d2rs-own, unverified (`0x00456300` is not specified).
+    /// Hands the close hooks' messages to the root, in call order.
+    pub fn flush_hooks(&mut self, root: &mut UiRoot) {
+        for i in self.hook_intents.drain(..) {
+            root.queue_intent(i);
+        }
+    }
+
+    /// The close hook `0x00455AE0(ui)` (`panels.md` §2 r6), the parts
+    /// that send: stash (ui 0x19, `0x00489EE0`, §11 r5, r7: only in
+    /// inventory mode 0x0C / 0x0D, mode := 0, C→S 0x4F 0x12), cube (ui
+    /// 0x1A, `0x0048A500`: mode := 0, the latched 0x4F 0x17 of
+    /// `0x0048A050`, §12 r7) and waypoint (ui 0x14, `0x0049CF50`: the
+    /// latched 0x49 level 0, `menus.md` §1.5, with a player and its
+    /// room). `send` false: the caller's outputs carry the message
+    /// already (a panel's own close path); the mode is still reset.
+    ///
+    /// d2rs-own reading: the latches (`[0x007BCE9C]`-family cube close
+    /// sent, `[0x007BF085]`) live in the panels; every panel path that
+    /// sets one closes its state in the same outputs (and its hook runs
+    /// with `send` false), so on any other close the latch is clear and
+    /// the hook sends. "Its room" is read as the local player having a
+    /// position.
+    fn close_hook(&mut self, ui: u8, send: bool) {
+        use super::states::id;
+        let msg = match ui {
+            id::STASH => {
+                if !matches!(
+                    self.msg.inventory_mode,
+                    msg_ui::MODE_STASH | msg_ui::MODE_STASH_2
+                ) {
+                    return;
+                }
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x12,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::CUBE => {
+                self.msg.inventory_mode = 0;
+                super::ClientIntent::from_message(&d2_proto::client::ClickButton {
+                    button: 0x17,
+                    p1: 0,
+                    p2: 0,
+                })
+            }
+            id::WAYPOINT => {
+                let sh = self.shared.borrow();
+                let Some(open) = sh.waypoint_open.filter(|_| sh.facts.player_room) else {
+                    return;
+                };
+                super::ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp {
+                    wp: open.guid,
+                    level: 0,
+                })
+            }
+            _ => return,
+        };
+        if send {
+            self.hook_intents.push(msg);
+        }
+    }
+
+    /// Esc (command 56, `frontend-options.md` §O1 r2–r4): with ui 9 open
+    /// the menu closes and the remembered states reopen (§O1 r3); else
+    /// the close-all `0x00456300(0, 1)` (`panels.md` §2 r9) runs and the
+    /// menu opens only when it closed nothing (§O1 r2). The command's
+    /// no-op while an NPC interaction or a modal text screen is active is
+    /// not modelled (the NPC menu is not ui 8 in play).
     fn game_menu_key(&mut self) -> Result<(), OriginalUiError> {
         use super::states::id;
-        const CLOSEABLE: [u8; 17] = [
-            id::INVENTORY,
-            id::CHARACTER,
-            3,
-            id::SKILL_TREE,
-            id::NEW_STATS,
-            id::NEW_SKILLS,
-            id::NPC_MENU,
-            id::NPC_SHOP,
-            id::QUEST_SCREEN,
-            id::INI_SCROLL,
-            id::QUEST_LOG,
-            id::WAYPOINT,
-            id::PARTY,
-            id::STASH,
-            id::CUBE,
-            id::MERC_INV,
-            id::RECIPE_SCROLL,
-        ];
         if self.is_open(id::ESC_MENU) {
             self.set_ui(u32::from(id::ESC_MENU), 1, false)?;
+            self.restore_game_menu_states()?;
             return Ok(());
         }
+        if !self.close_all(true)? {
+            self.open_game_menu()?;
+        }
+        Ok(())
+    }
+
+    /// The close-all `0x00456300(0, jump)` (`panels.md` §2 r9) of the
+    /// Esc-closable states; whether it closed one.
+    fn close_all(&mut self, jump: bool) -> Result<bool, UiStateError> {
         let mut closed = false;
-        for ui in CLOSEABLE {
+        for ui in ESC_CLOSABLE {
             if self.is_open(ui) {
-                self.set_ui(u32::from(ui), 1, true)?;
+                self.set_ui(u32::from(ui), 1, jump)?;
                 closed = true;
             }
         }
-        if !closed {
-            self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+        Ok(closed)
+    }
+
+    /// Show Items (command 37, `ui/controls.md` §3): the down handler sets
+    /// ui 0x0D on, the up handler off; `held` is the input's state this
+    /// pass, a change runs the handler.
+    pub fn set_show_items(&mut self, held: bool) -> Result<(), UiStateError> {
+        const UI_SHOW_ITEMS: u8 = 0x0D;
+        if held != self.is_open(UI_SHOW_ITEMS) {
+            self.set_ui(u32::from(UI_SHOW_ITEMS), if held { 0 } else { 1 }, false)?;
+        }
+        Ok(())
+    }
+
+    /// Whether Clear Screen closed nothing since the last call (its
+    /// automap part, `panels.md` §2 r9, is the host's).
+    pub fn take_clear_automap(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().clear_automap)
+    }
+
+    /// `0x0047E090(save 1, menu 0)` (`frontend-options.md` §O1 r2): every
+    /// ui but 0 and 9 closes, the open ones of [`GAME_MENU_KEEP`] are
+    /// remembered, then ui 9 opens.
+    fn open_game_menu(&mut self) -> Result<(), OriginalUiError> {
+        use super::states::id;
+        let mut kept = Vec::new();
+        for ui in 0..=37u8 {
+            if ui == id::GAME || ui == id::ESC_MENU || !self.is_open(ui) {
+                continue;
+            }
+            if GAME_MENU_KEEP.contains(&ui) {
+                kept.push(ui);
+            }
+            self.set_ui(u32::from(ui), 1, false)?;
+        }
+        self.shared.borrow_mut().esc_kept = kept;
+        self.set_ui(u32::from(id::ESC_MENU), 0, false)?;
+        Ok(())
+    }
+
+    /// `0x0047E200(1)` after ui 9 closed (`frontend-options.md` §O1 r3):
+    /// the states remembered at the open reopen with jump 0.
+    fn restore_game_menu_states(&mut self) -> Result<(), OriginalUiError> {
+        let kept = std::mem::take(&mut self.shared.borrow_mut().esc_kept);
+        for ui in kept {
+            self.set_ui(u32::from(ui), 0, false)?;
         }
         Ok(())
     }
@@ -705,8 +1019,13 @@ impl OriginalUi {
     }
 
     /// The settings the Esc menu's Options page shows (`app::config`).
+    /// The control panel's text toggles are read from them at start
+    /// (`control-panel.md` §3 r5, `0x004967F0`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
-        self.shared.borrow_mut().esc.menu.set_settings(s);
+        let mut sh = self.shared.borrow_mut();
+        sh.esc.menu.set_settings(s);
+        sh.hud.input.show_hp = s.show_hp_text != 0;
+        sh.hud.input.show_mp = s.show_mp_text != 0;
     }
 
     /// The settings after a change on the Options page, once per change.
@@ -717,16 +1036,46 @@ impl OriginalUi {
 
     /// `SetUIState(ui, mode, jump)` with the model's gate facts; effects
     /// are kept for [`Self::take_outcome`].
+    /// Every state it closes runs its close hook ([`Self::close_hook`]);
+    /// the hooks' messages leave at the next [`Self::flush_hooks`].
     pub fn set_ui(&mut self, ui: u32, mode: u32, jump: bool) -> Result<bool, UiStateError> {
-        let mut sh = self.shared.borrow_mut();
-        let mut env = sh.gate_env();
-        let r = sh
-            .states
-            .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
-        // The Esc menu always reopens on its first page.
-        if ui == u32::from(esc_menu::ESC_PANEL.0) {
-            sh.esc.menu.open();
-            sh.esc.controls = None;
+        self.set_ui_from(ui, mode, jump, None)
+    }
+
+    /// [`Self::set_ui`] for a panel's `SetUi` output: the close hook of
+    /// `own` sends nothing (the panel's outputs carry its message); the
+    /// other states the gate closes run theirs in full.
+    fn set_ui_from(
+        &mut self,
+        ui: u32,
+        mode: u32,
+        jump: bool,
+        own: Option<u8>,
+    ) -> Result<bool, UiStateError> {
+        let start = self.outcome.effects.len();
+        let r = {
+            let mut sh = self.shared.borrow_mut();
+            let mut env = sh.gate_env();
+            let r = sh
+                .states
+                .set(ui, mode, jump, &mut env, &mut self.outcome.effects);
+            // The Esc menu always reopens on its first page.
+            if ui == u32::from(esc_menu::ESC_PANEL.0) {
+                sh.esc.menu.screen = sh.config.screen;
+                sh.esc.menu.open();
+                sh.esc.controls = None;
+            }
+            r
+        };
+        let closed: Vec<u8> = self.outcome.effects[start..]
+            .iter()
+            .filter_map(|e| match e {
+                UiEffect::Closed(u) => Some(*u),
+                _ => None,
+            })
+            .collect();
+        for u in closed {
+            self.close_hook(u, own != Some(u));
         }
         r
     }
@@ -742,6 +1091,13 @@ impl OriginalUi {
         let mut sh = self.shared.borrow_mut();
         sh.mouse.x = x;
         Some(sh.mouse)
+    }
+
+    /// Whether an input reset `0x0044DA40` was asked for since the last
+    /// call (`client/msg-ui.md` §2 r2.2, `control-panel.md` §9): the host
+    /// applies it to the world clicks (`ClickState::input_reset`).
+    pub fn take_input_reset(&mut self) -> bool {
+        std::mem::take(&mut self.shared.borrow_mut().input_reset)
     }
 
     /// The effects and sounds since the last call.
@@ -771,6 +1127,8 @@ pub fn hotkey_state(a: ActionId) -> Option<u8> {
         (Action::ToggleCharacter, UI_CHARACTER),
         (Action::ToggleSkillTree, UI_SKILLTREE),
         (Action::ToggleQuests, quest_log_ui::UI_QUEST_SCREEN),
+        // Command 3 (`0x00468980`): SetUIState(0x18, toggle, 0).
+        (Action::ToggleMessageLog, 0x18),
     ]
     .into_iter()
     .find(|(action, _)| action.index() == i)
@@ -834,9 +1192,11 @@ impl Panel for InventoryUi {
         };
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
+        // §9.4: the empty equipment slots' pictures, under the items.
+        sh.items
+            .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
-            sh.items
-                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
+            sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
@@ -868,12 +1228,15 @@ impl Panel for InventoryUi {
                 self.panel.press(&sh.tables, &s, at);
                 let class = Facts::of(ctx.world).class;
                 if let Some(l) = sh.items.layout(class, &s) {
-                    // The shop's repair button is down: repair, not pick up.
+                    // With the shop up a player item is sold or repaired
+                    // (`menus.md` §4.5 grid / body-location callers), not
+                    // picked up.
                     let under = sh.items.item_under(ctx.world, &l.grid, &l, at);
-                    let taken = shop_ui::ShopUi::repair_click(
+                    let taken = shop_ui::ShopUi::player_item_click(
                         &mut sh,
                         &mut self.shop.borrow_mut(),
                         ctx.world,
+                        ctx.strings,
                         under.as_ref(),
                     );
                     if taken {
@@ -954,25 +1317,87 @@ fn class_u8(class: Option<u32>) -> Option<u8> {
     class.and_then(|c| u8::try_from(c).ok()).filter(|&c| c < 7)
 }
 
-/// Skill tree (ui 4, §10): back art per class and tab, tabs, close.
+/// Skill tree (ui 4, §10): back art per class and tab, tabs, close, the
+/// free-points number and the close / tab tool tips (`panels-2.md` §19).
 struct SkillTreeUi {
     sh: SharedRef,
     panel: SkillTreePanel,
 }
+
+/// The `uninterruptable` state: the free-points number in colour 1
+/// (`panels-2.md` §19 r3).
+const STATE_UNINTERRUPTABLE: u8 = 54;
 
 impl Panel for SkillTreeUi {
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_SKILLTREE))
     }
 
+    /// The right half above the control panel: the tab-1 band reaches
+    /// y = H − 49 (§10 r2), past the inventory area's bottom; the press
+    /// and release handlers decide what they consume.
     fn rect(&self) -> Rect {
-        self.sh.borrow().right_area().unwrap_or(EMPTY)
+        let sh = self.sh.borrow();
+        if sh.right_area().is_none() {
+            return EMPTY;
+        }
+        let s = sh.config.screen;
+        Rect::new(s.w / 2, 0, (s.w - s.w / 2) as u16, (s.h - 47) as u16)
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        self.panel.draw(&sh.tables, &sh.env(), &view, sh.mouse, out);
+        let uninterruptable = ctx
+            .world
+            .local()
+            .is_some_and(|u| u.states.contains(&STATE_UNINTERRUPTABLE));
+        self.panel.draw_with_points(
+            &sh.tables,
+            &sh.env(),
+            &view,
+            sh.mouse,
+            Some(uninterruptable),
+            out,
+        );
+        let s = sh.config.screen;
+        let tab = self.panel.tab;
+        // §19 r5: `strClose` queued (the pop-up text) in the close
+        // rectangle.
+        if let Some(class) = view.class() {
+            if super::panels::skilltree::close_hit(&s, class, tab, sh.mouse) {
+                if let (Some(at), Some(t)) = (
+                    super::panels::skilltree::close_tool_tip_at(&s, class, tab),
+                    ctx.strings.get_id(cube_ui::STR_CLOSE),
+                ) {
+                    let fonts = sh.fonts.as_ref();
+                    hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), fonts, out);
+                }
+            }
+        }
+        // §19 r4: the tab tool tip, at once: the rectangle (colour (0, 0,
+        // 0) nearest: palette index 0, mode 6) and the text, Font16,
+        // left-aligned.
+        if let Some(tip) = super::panels::skilltree::tab_tool_tip(&s, tab, sh.mouse) {
+            if let Some(t) = ctx.strings.get_id(tip.string) {
+                let (x0, y0, x1, y1) = tip.rect;
+                out.push(super::draw::UiDraw::Rect(super::draw::RectRequest {
+                    x0,
+                    y0,
+                    x1,
+                    y1,
+                    color: 0,
+                    mode: 6,
+                }));
+                out.push(text(
+                    t.to_vec(),
+                    tip.text_at.x,
+                    tip.text_at.y,
+                    super::panels::skilltree::FONT16,
+                    0,
+                ));
+            }
+        }
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -986,23 +1411,32 @@ impl Panel for SkillTreeUi {
         let mut sh = self.sh.borrow_mut();
         let env = sh.env();
         let view = ModelSkillTree::of(&sh, ctx.world);
-        match left(e) {
+        let s = sh.config.screen;
+        let input = |at: Point| super::panels::skilltree::InputCtx {
+            over_belt: sh
+                .hud
+                .belt
+                .over(ctx.world, (s.w, s.h), s.res2(), (at.x, at.y)),
+            has_player: ctx.world.local().is_some(),
+        };
+        let consumed = match left(e) {
             Some((true, at)) => {
-                let out = self.panel.mouse_down(&env, &view, at);
-                sh.outputs.extend(out);
-                UiResponse::Consumed
+                let d = self.panel.mouse_down_ctx(&env, &view, at, input(at));
+                sh.outputs.extend(d.out);
+                d.consumed
             }
             Some((false, at)) => {
-                let r = self.panel.mouse_up(&env, &view, at);
+                let r = self.panel.mouse_up_ctx(&env, &view, at, input(at));
                 sh.outputs.extend(r.out);
                 // §10.8: x ≤ W / 2 is not consumed.
-                if r.consumed {
-                    UiResponse::Consumed
-                } else {
-                    UiResponse::Ignored
-                }
+                r.consumed
             }
-            None => UiResponse::Consumed,
+            None => true,
+        };
+        if consumed {
+            UiResponse::Consumed
+        } else {
+            UiResponse::Ignored
         }
     }
 }
@@ -1073,6 +1507,23 @@ impl FontMeasure {
     pub fn max_width(&self, font: u16, text: &[u16]) -> Option<i32> {
         let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
         super::text::max_width(&g, text).ok()
+    }
+}
+
+impl FontMeasure {
+    /// The pop-up text draw of `0x00502280(text, at, k, centre)` in font
+    /// `font` (`ui/control-panel.md` §5 r14); `None` without the font or
+    /// for a code with no glyph record.
+    pub fn popup(
+        &self,
+        font: u16,
+        text: &[u16],
+        at: Point,
+        centre: bool,
+        screen: (i32, i32),
+    ) -> Option<super::text::FramedText> {
+        let g = super::text::GlyphLookup::new(self.tables.get(&font)?);
+        super::text::popup_text(&g, text, at, centre, screen).ok()
     }
 }
 
@@ -1200,35 +1651,8 @@ pub fn name_line(
 
 impl CharacterUi {
     /// Art and close button only (no fonts or no local player).
-    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
-        let env = sh.env();
-        let t = &sh.tables;
-        // Draw rows in file order: the close rows with the close
-        // button's pressed flag; rows needing panel words (stat points)
-        // do not apply without them.
-        for r in t.rows(CHARACTER) {
-            if r.kind != RowKind::Draw {
-                continue;
-            }
-            let pressed = r.item == "close" && self.panel.close_pressed;
-            let cond = env.cond(pressed, &no_extra);
-            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
-            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
-        }
-    }
-}
-
-impl Panel for CharacterUi {
-    fn id(&self) -> PanelId {
-        PanelId(u16::from(UI_CHARACTER))
-    }
-
-    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
-    fn rect(&self) -> Rect {
-        character::area(&self.sh.borrow().config.screen)
-    }
-
-    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    /// The panel without the close tip (`Panel::draw`).
+    fn draw_panel(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         let expansion = ctx.world.expansion != 0;
         let penalties = match (&sh.resist_penalties, expansion) {
@@ -1276,6 +1700,50 @@ impl Panel for CharacterUi {
         name_line(name, &env.screen, fonts, out);
     }
 
+    fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {
+        let env = sh.env();
+        let t = &sh.tables;
+        // Draw rows in file order: the close rows with the close
+        // button's pressed flag; rows needing panel words (stat points)
+        // do not apply without them.
+        for r in t.rows(CHARACTER) {
+            if r.kind != RowKind::Draw {
+                continue;
+            }
+            let pressed = r.item == "close" && self.panel.close_pressed;
+            let cond = env.cond(pressed, &no_extra);
+            let one = |x: &super::layout::LayoutRow| std::ptr::eq(x, r);
+            emit_static_draws(t, CHARACTER, &cond, None, &one, out);
+        }
+    }
+}
+
+impl Panel for CharacterUi {
+    fn id(&self) -> PanelId {
+        PanelId(u16::from(UI_CHARACTER))
+    }
+
+    /// §4.4: x in [`sx`, `W / 2 − 1`], y in [`sy`, `H + sy − 49`].
+    fn rect(&self) -> Rect {
+        character::area(&self.sh.borrow().config.screen)
+    }
+
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        self.draw_panel(ctx, out);
+        // §8 r2: `strClose` at (sx + 143, H + sy − 95) while the mouse is
+        // in the close rectangle, as the pop-up text. d2rs-own,
+        // unverified: centred (the x is the button's middle; the call's
+        // centre flag is not in the spec).
+        let sh = self.sh.borrow();
+        let s = sh.config.screen;
+        let over = super::panels::character::close_rect(&sh.tables, &s)
+            .is_some_and(|r| r.contains(sh.mouse));
+        if let (true, Some(t)) = (over, ctx.strings.get_id(cube_ui::STR_CLOSE)) {
+            let at = Point::new(s.sx() + 143, s.h + s.sy() - 95);
+            hud_tips::push_popup(t.to_vec(), at, 0, true, (s.w, s.h), sh.fonts.as_ref(), out);
+        }
+    }
+
     fn hit(&self, _p: Point) -> Option<WidgetId> {
         None
     }
@@ -1321,23 +1789,66 @@ impl Panel for BorderUi {
         EMPTY
     }
 
-    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+    fn draw(&self, _ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
         draw_border_and_ctrlpnl(&sh.tables, &sh.env(), out);
-        // The cursor item last (`panels-3.md` §23 r9).
-        sh.items
-            .draw_cursor(ctx.world, &sh.tables.files, (29, 29), sh.mouse, out);
-        // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
-        if let Some(tips) = sh.items.tips.as_ref() {
-            let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
-            if !lines.is_empty() {
-                let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-                let at = Point::new(at.0, at.1);
-                item_tip::draw_tip(&lines, at, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
-            }
+    }
+
+    fn hit(&self, _p: Point) -> Option<WidgetId> {
+        None
+    }
+
+    fn event(&mut self, _e: UiEvent, _ctx: &UiCtx) -> UiResponse {
+        UiResponse::Ignored
+    }
+}
+
+/// The hover tips (`panels.md` §5 step 10, `0x00503000`) and the cursor
+/// item (`panels-3.md` §23 r9, drawn after the UI pass): after the border
+/// and control panel (step 7), the HUD overlays and every other panel, so
+/// a held item or a tip over the control panel stays on top. Its area is
+/// empty: it takes no event.
+struct TopUi {
+    sh: SharedRef,
+}
+
+impl Panel for TopUi {
+    fn id(&self) -> PanelId {
+        TOP_PANEL
+    }
+
+    fn rect(&self) -> Rect {
+        EMPTY
+    }
+
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        let sh = self.sh.borrow();
+        // The belt item's hover text (`hud_belt`, `control-panel.md` §5
+        // r8) as the r14 pop-up, in the belt's font 1 (§5 r4).
+        if let Some(t) = sh
+            .items
+            .tips
+            .as_ref()
+            .and_then(|tips| sh.hud.belt.hover_tip(ctx.world, tips))
+        {
+            let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+            hud_tips::push_popup(
+                t.text,
+                Point::new(t.x, t.y),
+                u16::from(t.color),
+                t.centered,
+                (w, h),
+                sh.fonts.as_ref(),
+                out,
+            );
         }
-        // The item tool tip over everything (`item_tip`).
-        if sh.states.is_open(UI_INVENTORY) {
+        // The item tool tip over everything (`item_tip`), while the
+        // inventory family is drawn (`panels.md` §5 step 5: with the stash,
+        // the cube or the shop too, not only flag 1).
+        let family = super::root::INVENTORY_FAMILY
+            .iter()
+            .any(|&u| sh.states.is_open(u));
+        if family {
             let class = Facts::of(ctx.world).class;
             let lines = sh.items.hover_lines(
                 ctx.world,
@@ -1356,6 +1867,9 @@ impl Panel for BorderUi {
                 out,
             );
         }
+        // The cursor last: the item's graphic or the type's cel
+        // (`panels-3.md` §23 r9–r11, `cursor_ui`).
+        cursor_ui::draw(&sh, ctx, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
@@ -1391,8 +1905,15 @@ pub mod hud_tips;
 
 #[path = "cube_ui.rs"]
 pub(super) mod cube_ui;
+#[path = "cursor_ui.rs"]
+pub mod cursor_ui;
 #[path = "msg_ui.rs"]
 pub mod msg_ui;
+#[path = "npc_box.rs"]
+pub mod npc_box;
+#[path = "npc_talk.rs"]
+pub mod npc_talk;
+use cursor_ui::cursor_files;
 #[path = "quest_log_ui.rs"]
 pub mod quest_log_ui;
 #[cfg(test)]

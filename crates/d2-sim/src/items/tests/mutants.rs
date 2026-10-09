@@ -898,9 +898,9 @@ fn runeword_server_rows() {
         (1, false, true),
         (1, true, true),
     ] {
-        let mut it = item(i, 1);
+        let (mut filler, mut it) = (item(i, 1), item(i, 1));
         assert_eq!(
-            activate_runeword(&t, &mut it, row, ladder),
+            activate_runeword(&t, &mut filler, &mut it.stats, row, ladder),
             want,
             "{row} {ladder}"
         );
@@ -925,6 +925,7 @@ fn set_bonus_full_set() {
     full[0] = rec(15, 0, 1, 1);
     t.sets = vec![SetRec {
         count: 3,
+        version: 0,
         partial,
         full,
     }];

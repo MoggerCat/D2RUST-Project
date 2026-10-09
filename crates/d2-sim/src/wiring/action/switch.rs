@@ -19,8 +19,9 @@
 //! Every message goes to the client's player ([`Pending::send`]).
 //!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - missile 0x73 (`0x0059FEE0`), item 0x9C (the item world is not
-//!   reachable from the action wiring, as for §7.1);
+//! - item 0x9C (the item world is not reachable from the action wiring,
+//!   as for §7.1); missile 0x73 (`0x0059FEE0`) is sent with PROVISIONAL
+//!   field sources (REC-414, [`View::missile_add`]);
 //! - player part B for another player (`0x005489F0`, `0x005484B0`,
 //!   multiplayer only, §7.9 rule 5) and the inventory messages
 //!   `0x00534F80`; the corpse 0x74 is sent with PROVISIONAL fields
@@ -53,6 +54,11 @@ pub struct SessionState {
     /// rule 3.5: 0x9C, 0x9D), queued by the loader and sent once by the
     /// join after the stat messages.
     pub join_items: BTreeMap<UnitId, Vec<Vec<u8>>>,
+    /// The quest entry's messages of the join (`intents-events.md` §8.2
+    /// rule 3.1 (e): 0x5E, 0x28, 0x29, 0x89 from `0x00546270`), queued by
+    /// the loader and sent by the join after the loader's other messages,
+    /// before rule 3.2.
+    pub join_quest: BTreeMap<UnitId, Vec<Vec<u8>>>,
 }
 
 /// S→C 0x59 AssignPlayer (`0x0053E8F0`, 26 bytes, §7.2 part A): GUID
@@ -171,6 +177,21 @@ impl<X: Pending> View<'_, X> {
     /// §7.8 rule 2.3: every monster of the room gets `0x00573780`
     /// ([`ai::client_entered_room`]). No AI store: nothing.
     fn wake_room_monsters(&mut self, game: &mut Game, room: RoomId) {
+        self.with_ai(game, |game, cx| ai::client_entered_room(game, cx, room));
+    }
+
+    /// The think restart `0x00573780` of one monster
+    /// ([`ai::update_ai_callback`]). No AI store: nothing.
+    pub(super) fn think_restart(&mut self, game: &mut Game, unit: UnitId) {
+        self.with_ai(game, |game, cx| ai::update_ai_callback(game, cx, unit));
+    }
+
+    /// Runs `f` with the lent AI store on this view. No AI store: nothing.
+    fn with_ai(
+        &mut self,
+        game: &mut Game,
+        f: impl FnOnce(&mut Game, &mut ai::Ctx<'_, View<'_, X>>),
+    ) {
         let Some(mut store) = self.h.ai.take() else {
             return;
         };
@@ -191,7 +212,7 @@ impl<X: Pending> View<'_, X> {
                 store: &mut store,
                 world: &mut v,
             };
-            ai::client_entered_room(game, &mut cx, room);
+            f(game, &mut cx);
         }
         self.h.ai = Some(store);
     }
@@ -223,14 +244,65 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
             }
             UnitType::Monster => self.monster_add(game, receiver, unit),
+            UnitType::Missile => self.missile_add(game, receiver, unit),
             // Module docs: not specified far enough.
-            UnitType::Missile | UnitType::Item => {}
+            UnitType::Item => {}
         }
+    }
+
+    /// The missile add message 0x73 (`0x0059FEE0`, §7.2 part A,
+    /// `missiles/missiles.md` §R2.4): only for a `ClientSend` row, an
+    /// existing owner and a moving path (`0x006486C0(path)` ≠ 0, the
+    /// path velocity).
+    // PROVISIONAL (REC-414): "moving" is read as a non-zero dynamic-path
+    // velocity; the first point is `points[0]` when the path has points;
+    // see [`messages::client_missile`].
+    fn missile_add(&mut self, game: &Game, receiver: UnitId, unit: UnitId) {
+        let Some(d) = self.h.missiles.as_ref().and_then(|s| s.get(unit)).cloned() else {
+            return;
+        };
+        if !self
+            .h
+            .tables
+            .missiles
+            .get(usize::from(d.class))
+            .is_some_and(|r| r.clientsend)
+        {
+            return;
+        }
+        let Some(owner) = d.owner else {
+            return;
+        };
+        if game.lists.find_unit(owner.ty, owner.guid).is_none() {
+            return;
+        }
+        let Some(p) = self.h.paths.as_ref().and_then(|p| p.dynamic(unit)) else {
+            return;
+        };
+        if p.velocity == 0 {
+            return;
+        }
+        let first = if p.point_count > 0 {
+            (u32::from(p.points[0].x), u32::from(p.points[0].y))
+        } else {
+            (0, 0)
+        };
+        let pierce = self.stats.unit_total(unit, 328, 0) as u8;
+        let m = messages::client_missile(
+            d.class,
+            (p.precise_x, p.precise_y),
+            first,
+            d.current as u16,
+            (owner.ty as u8, owner.guid),
+            d.level as u8,
+            pierce,
+        );
+        self.h.x.send(receiver, &m);
     }
 
     /// Player part B as far as it is specified (§7.2, §7.9): the unit's
     /// states (0xAA, `0x00570E30`), its pending event records
-    /// (`0x00571CD0`: d2rs keeps none, so nothing) and the overhead text
+    /// (`0x00571CD0`, [`View::send_event_records`]) and the overhead text
     /// (`0x00571620`).
     pub fn player_part_b(&mut self, game: &Game, receiver: UnitId, unit: UnitId) {
         let Some(e) = game.lists.unit(unit) else {
@@ -242,6 +314,7 @@ impl<X: Pending> View<'_, X> {
         }
         let states = self.unit_states_message(ty, guid, unit);
         self.h.x.send(receiver, &states);
+        self.send_event_records(game, receiver, unit);
         self.overhead_message(receiver, unit, ty, guid);
     }
 
