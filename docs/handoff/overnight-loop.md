@@ -12,7 +12,7 @@ session report or the hourly check-in).
    (q-cloud-game).
 3. Open `q-fix-*` rows in `docs/handoff/build-queue.tsv` from the audits
    (ui, render, seam, flow, audio, items, proto, save, prov).
-Cloud REC ids for new provisional points: REC-400..499, next free REC-460 (420s and 450s: q-fix-render-rest, 430s: q-fix-audio-sounds, 440s: q-cloud-game) (below 300 is
+Cloud REC ids for new provisional points: REC-400..499, next free REC-470 (460s: q-fix-items-play, 420s and 450s: q-fix-render-rest, 430s: q-fix-audio-sounds, 440s: q-cloud-game) (below 300 is
 used up; 300..399 belong to PC 1). Rows that need the binary or a spec
 decision are not cloud work: list
 them for PC 1 in `docs/handoff/pc1-data.md` §Step 4 and skip.
