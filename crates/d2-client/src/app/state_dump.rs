@@ -500,7 +500,7 @@ mod tests {
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
     }
 
-    // Covers: specs/tools/poke.md §2 r6 (the record's fields)
+    // Covers: specs/tools/poke.md §2 r6
     #[test]
     fn poke_record_lines() {
         use d2_sim::poke::PokeResult;

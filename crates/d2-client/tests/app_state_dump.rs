@@ -87,8 +87,8 @@ fn every_n_keeps_the_multiples_of_n() {
         .collect();
     assert_eq!(frames, [r#""f":3"#, r#""f":6"#]);
 }
-
-// Covers: specs/tools/poke.md §2 r6 (state-dump --poke: after frame f − 1's
+// Covers: specs/tools/poke.md §2 r6
+// (state-dump --poke: after frame f − 1's snapshot, before frame f)
 // snapshot, before frame f)
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
