@@ -49,7 +49,9 @@ pub use data::{DoorTables, DrlgData, LevelDef, WallClass, WallRemap, WarpDef};
 pub use level::{BuildCursor, Drlg, Dungeon, Level, SpawnTile, WarpRecord};
 pub use logic::{CoordRec, LogicGrids, LogicInfo};
 pub use room::{DrlgRoom, RoomKind, WarpLink};
-pub use seams::{ActRooms, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource};
+pub use seams::{
+    ActRooms, ClientPreset, LevelTypes, NoLevelTypes, PresetUnit, Services, TileInfo, TileSource,
+};
 pub use tiles::{CellGrid, GridPass, RoomGrids, RoomTiles, TileRecord, TileRef};
 
 /// A DRLG room (RoomEx) of one [`Drlg`], by slot. Slots are never reused.

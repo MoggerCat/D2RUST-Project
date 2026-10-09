@@ -323,6 +323,9 @@ pub struct PlayConfig {
     /// `--poke` / `--poke-file` (`specs/tools/poke.md` §5 rule 2): pokes
     /// applied on the server thread between frames; empty: none.
     pub pokes: Vec<super::poke::Entry>,
+    /// `--send "<f> <Name> f=v..."` (`specs/tools/scenario-diff.md` §3
+    /// r12): C→S messages injected on the server thread after frame f − 1.
+    pub sends: Vec<super::send::SendEntry>,
 }
 
 #[derive(Resource)]
@@ -617,7 +620,7 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
     if hardcore {
         link.with(|l| l.host_mut().game.events.action.hooks().x.hardcore = true)?;
     }
-    super::poke::install(&mut link, config.pokes)?;
+    super::send::install(&mut link, config.pokes, config.sends)?;
     // Before the app exists, so not through Bevy's log.
     println!("single player: seed {}", config.seed);
     let mut app = App::new();
