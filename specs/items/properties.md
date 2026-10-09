@@ -26,22 +26,22 @@
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–117 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 118–127 |
 |   4. Shared helpers | 128–181 |
-|   5. Property functions | 182–236 |
-|   6. Superior (mode 1) and affixes (mode 0) | 237–241 |
-|   7. Uniques (mode 3) | 242–245 |
-|   8. Set items | 246–256 |
-|   9. Socket fillers (`0x0055C2C0`) | 257–276 |
-|   10. Runewords | 277–335 |
-|   11. Set bonuses (`0x00660120`) | 336–348 |
-|   12. Craft property lists (`0x00660240`) | 349–355 |
-|   13. Set-item state update (`0x00663CC0`) | 356–418 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 419–486 |
-| Constants & data dependencies | 487–496 |
-| Randomness | 497–502 |
-| Edge cases & original bugs | 503–512 |
-| Test vectors | 513–531 |
-| Provenance | 532–551 |
-| Open questions | 552–641 |
+|   5. Property functions | 182–253 |
+|   6. Superior (mode 1) and affixes (mode 0) | 254–258 |
+|   7. Uniques (mode 3) | 259–262 |
+|   8. Set items | 263–273 |
+|   9. Socket fillers (`0x0055C2C0`) | 274–293 |
+|   10. Runewords | 294–352 |
+|   11. Set bonuses (`0x00660120`) | 353–365 |
+|   12. Craft property lists (`0x00660240`) | 366–372 |
+|   13. Set-item state update (`0x00663CC0`) | 373–435 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 436–503 |
+| Constants & data dependencies | 504–513 |
+| Randomness | 514–519 |
+| Edge cases & original bugs | 520–529 |
+| Test vectors | 530–548 |
+| Provenance | 549–568 |
+| Open questions | 569–658 |
 <!-- /index -->
 
 ## Summary
@@ -228,6 +228,23 @@ Rules beyond the table:
    (skill << shift) + (level & mask) with the global shift and mask at
    table +0xC6C / +0xC70 (the itemstatcost layer split,
    `sim/stats.md`). Return c.
+   The roll (`0x0045C3E0` on the item seed, `0x0065F7F7`–`0x0065F80E`)
+   is the only draw, so r ranges 0 … c − c/8 − 1 and the creation value
+   9 … c for c = 67. This is the **creation** value only. A store or
+   gamble item is repaired right after creation (`world/vendors.md` §3.1
+   step 4, §5.1 step 7: `0x005761C0`, which calls the recharge
+   `0x0055FE80` unconditionally at `0x00576231`,
+   `items/generation.md` §12.2), and the recharge sets every stat-204
+   entry below its max to the max. So a store item always shows
+   current = c, whatever r was. Read 2026-10-09 for
+   `traces/checks/items-vendor-akara-buy.check` frame 20: Akara's 7th
+   store item (guid 8, magic, prefix 1156 Beryl, suffix 552 "of Teeth",
+   ilvl 6; `mod1` charged, param 67, min −60, max −10) has level
+   (6 − 1) / 9 = 0 → 1, c = 60 + 60/8 = 67, layer 0x10C1 (67 << 6 + 1).
+   1.14d shows 67 / 67 because of the recharge. d2rs shows 65 (its
+   creation roll, r = 56) because its play host's recharge is a stub. The
+   item seeds are equal and the draw order is not involved (the magic
+   routine's order is confirmed in `items/affixes.md` §6).
 10. **20:** add stat 152 := 1 (when itemstatcost has > 152 rows). Return 1.
 11. **23:** item not yet ethereal and has durability → apply ethereal
     (`items/generation.md` §8.2), return 1; else 0.

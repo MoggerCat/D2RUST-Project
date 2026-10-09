@@ -1,0 +1,27 @@
+check 1
+# De Seis seal (object 394) on a WingN1 game (seed 1: the level seed picks the north
+# arm file WingN1; the boss spot seal + (-39,+33) = (7734,5188) lies in a lava room
+# west of the arm). quests-act4.md §5.4: the spot room, then the free-spot search
+# (quests-helpers.md §1), whose room lookups (0x00463740) see active rooms only.
+# The player goes to the seal with `goto` (not a comparison point, poke.md §6 r5:
+# compare the seal mode, dummy 131 and De Seis 312 below, not the walk).
+# The state channel's first divergence (f36, a Sanctuary monster's mode 8 vs 2)
+# is monster AI, not this check's subject.
+# loaded: the player is moved into the arm room south of the seal (f300-f330),
+# back to the seal (f350) and operates at f380: 1.14d opens the seal,
+# dummy 131 GUID 139 at (7770,5218), De Seis GUID 105; d2rs identical.
+name a4-deseis-seal-loaded
+save PtSorD --class sor --expansion --level 50 --skill 8=20 --right-skill 44 --stat 8=128000 --stat 9=128000 --waypoints all --quests acts=3 --act 3 --difficulty normal
+seed 1
+ticks 560
+seconds 600
+channels state
+at 5 poke warp 108
+at 6 poke stat @player 7 0 7680000
+at 7 poke stat @player 6 0 7680000
+at 20 poke goto preset 108 2:394
+at 300 poke pos @player 7770 5185
+at 310 poke pos @player 7770 5226
+at 330 poke pos @player 7770 5185
+at 350 poke pos @player 7770 5152
+at 380 send InteractWithEntity type=2 id=@2:394

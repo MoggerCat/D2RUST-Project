@@ -1,0 +1,12 @@
+check 1
+# Save channel (scenario-diff.md §3 rule 13): a fresh expansion Amazon,
+# 20 idle ticks in the Rogue Encampment, then Save and Exit (C->S 0x69
+# before frame 21's tick on both sides). Compares the written .d2s byte
+# for byte (save time +0x30 and the checksum normalised).
+# Spec: specs/tools/scenario-diff.md, specs/formats/d2s.md.
+name save-fresh-ama
+save SavAma --class ama --expansion
+seed 1234
+ticks 20
+seconds 240
+channels save
