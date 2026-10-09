@@ -1,5 +1,81 @@
 # Coordinator resume — playable-build loop (2026-10-08)
 
+## State at pause (2026-10-09 ~15:50 UTC, end of the day run)
+
+The user paused every session to continue later. Each session was told to
+push and write its hand-back `docs/handoff/<branch>.md` (done / in
+progress / next / open RECs / repro commands). Read those first.
+
+**Goal set by the user:** "99% playable": the whole game can be played
+start to finish with the 1.14d experience (exact match stays the bar,
+rule 10).
+
+**Measure:** `python3 tools/playthrough/playthrough.py --all --json out.json`
+(per-act milestones; teleport-based) and
+`traces/playthrough/classes.play --class all --difficulty all` (matrix,
+`docs/handoff/playability-matrix.md`). Last table: I 12/17, II 12/15,
+III 13–14/14, IV 7/12, V 9/13 (V's Anya / Nihlathak / Throne Baal are
+reached on the install in tests/play_act5.rs; the sweep hops are the
+limit).
+
+**Top blockers for the next run (owner area in brackets):**
+1. Cast/attack input lock: after one attack or cast the local player
+   stays in mode 7 and `bridge::click::can_act` refuses every later click
+   (18/21 class cells) [skills cast / client input, q-diff-skills-2].
+2. Killed monsters stand back up (mode 1, hp 0), bosses included
+   [q-diff-combat-a1; q-fix-p4-death-cleanup].
+3. Client crash: `path/walk/geom.rs:197` direction_vector index from
+   `MonsterMotion::frame` in Cold Plains (autoplay probe, frame 3265)
+   [client tracks, q-fix-p6-client-arrival-guids].
+4. Player position desync / walk re-target on a click while walking
+   (soak + side-by-side a1-walk-s) [same owner].
+5. Esc in an NPC dialog sends no 0x30 and breaks later talks [client UI].
+6. Town objects gone after a waypoint return [progression,
+   q-fix-pc1-proto-items].
+7. Shop buy "no room"; belt potions not in the client model after load
+   [items, q-fix-server-store-fill].
+8. CI depcheck red: `d2-sim/src/debug/rng_trace.rs` thread_local
+   [q-tool-state-diff]. Blocks a release to main; add `cargo run -p
+   depcheck` to the gate once fixed.
+9. Tools: `goto` must land on a free, missile-passable cell; the sweep
+   needs hops ≤16 [q-tool-checkpoints / playthrough].
+
+**Fixed today (in staging):** save-start act + Act III seed, monster melee
+damage (exact hp vs 1.14d), Act I arrival (205 creations, 90 frames),
+item generation incl. affixes (36 items), object collision footprints,
+Larzuk / barbarian rescue, run animation, control panel, Den / Cave 1
+equal 160 frames, 11 + 16 skill checks, real-data rigs (214/222).
+
+**Tools now in the repo:** scenario-diff (all channels take pokes, sends,
+shared input), playthrough (+ class × difficulty), `tools/coord/`
+(sync.sh, route.py, owners.tsv, realdata.py, playtable.py),
+`tools/soak/`, `tools/sidebyside/` (pages go to the PRIVATE repo
+`reports/side-by-side/`), `tools/coverage-map/`, `tools/perf/`,
+checkpoints + goto, the Windows build workflow (artifact
+`d2rs-windows-<sha8>` per staging push; `docs/PLAYTEST.md`). The
+autoplay bot was dropped by the user; only `d2-client autoplay-host` and
+the fixed probe route remain as a real-input smoke test.
+
+**How the coordinator ran the loop (scripts in
+`tools/coord/coordinator/`):** `gate.sh` (fmt, clippy -D warnings on
+4 crates, nextest, coverage, spec_index, conflict markers),
+`gatepush.sh <tag>` (gate, push to staging only on `GATE fail=0` and a
+fast-forward; cleans the cache under 9 GB free), `mergebatch.sh b…`
+(merge onto staging, union docs, auto-resolve spec index tables, regen
+indexes; abort a branch on any other conflict), `autoloop.sh` (merges
+every branch in `branches.txt` that is ahead, gates, pushes; unattended).
+They assume the repo at /home/user/D2RUST-Project and write logs next to
+themselves; copy them to a scratch dir before use. Never run a merge in
+the gate's worktree while a gate runs.
+
+**Session rules that worked:** report only on fixed blockers / blocked /
+done; stay in your area (owners.tsv); sync every 30 min; REC blocks per
+session (see each hand-back); PC 1 questions as unnumbered
+`[session] title` items in pc1-data.md Step 4 (the coordinator numbers
+them; last number 46). PC 1: one `Game.exe` open at a time
+(`%TEMP%\d2-game.lock`, pc1-data.md top).
+
+
 Everything a new coordinator session (any account) needs to pick up the
 overnight build loop. The loop itself is in the repo: the shared session
 rules are `docs/handoff/build-loop.md`, the task rows are

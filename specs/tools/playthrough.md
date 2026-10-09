@@ -28,16 +28,16 @@
 | Inputs | 55–62 |
 | Outputs / state changes | 63–74 |
 | Rules | 75–76 |
-|   1. Objective file `playthrough 1` | 77–98 |
-|   2. Predicates | 99–122 |
-|   3. Verdict per milestone | 123–138 |
-|   4. Class × difficulty matrix | 139–206 |
-| Constants & data dependencies | 207–212 |
-| Randomness | 213–217 |
-| Edge cases & original bugs | 218–225 |
-| Test vectors | 226–233 |
-| Provenance | 234–245 |
-| Open questions | 246–267 |
+|   1. Objective file `playthrough 1` | 77–110 |
+|   2. Predicates | 111–134 |
+|   3. Verdict per milestone | 135–150 |
+|   4. Class × difficulty matrix | 151–218 |
+| Constants & data dependencies | 219–224 |
+| Randomness | 225–229 |
+| Edge cases & original bugs | 230–237 |
+| Test vectors | 238–245 |
+| Provenance | 246–257 |
+| Open questions | 258–281 |
 <!-- /index -->
 
 ## Summary
@@ -95,6 +95,18 @@ hide the ones after it.
    to the last one. `grid` goes row by row from the (−R, −R) corner,
    serpentine. A sweep exists because units only exist in active rooms
    near a player. A refused `pos` is expected and is not a blocker.
+5. **checkpoint** (2026-10-09). `checkpoint <name>` in a milestone
+   replaces `use <save>`: the save is built from
+   `traces/checkpoints/<name>.checkpoint` (`tools/checkpoints.md` §3),
+   the milestone's difficulty defaults to the checkpoint's, and the
+   checkpoint's start pokes run first, so they are `@p0`, `@p1`, … and
+   the milestone's own pokes follow. A milestone has exactly one of
+   `use` and `checkpoint`.
+6. **goto.** `goto <frame> unit [<type>:]<class>` or `goto <frame>
+   preset <level> [<type>:]<class>` is `poke <frame> goto …`
+   (`poke.md` §6): the walk to the target. Its record is written when
+   it lands (GUID = the target's, so `g @pI` names the target) or fails
+   (a refused poke: `stuck`).
 
 ### 2. Predicates
 
@@ -263,4 +275,6 @@ install's tables with `mpq-tool extract`.
    walks instead of interacting (`scenario-diff.md` Open question 4).
    Until an NPC-interaction input or poke exists they are expected
    blockers whose evidence is the quest bit still clear.
-4. Acts II–V objective files are not written yet.
+4. Acts II–V objective files are written (`act2.play` … `act5.play`);
+   `act4-forge.play` (2026-10-09) starts every milestone from the
+   `a4-hellforge` checkpoint.

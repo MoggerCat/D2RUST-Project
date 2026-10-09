@@ -6,7 +6,10 @@
 //!   tick) the 1.14d recorder and `d2-client state-dump` both write.
 //! - `rng_trace` (`rng-trace` feature, off by default): the log of every
 //!   seeded draw (`specs/tools/rng-trace.md`).
+//! - [`coverage`] (`coverage-map` feature, off by default): behaviour
+//!   coverage counters (`specs/tools/coverage-map.md`).
 
+pub mod coverage;
 #[cfg(feature = "rng-trace")]
 pub mod rng_trace;
 pub mod state;

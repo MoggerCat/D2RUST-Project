@@ -49,7 +49,8 @@
 //! rendering facts (`specs/tools/facts-render.md` §5) of the first drawn
 //! frame at server tick N or later (default 1) to DIR and exits (skips the
 //! front end); several ticks write DIR/tick-N each, `--dump-image` adds the
-//! composed frame as `frame.png` (§5 r19).
+//! composed frame as `frame.png` (§5 r19). `play --sound-log FILE` writes
+//! every sound request call (§5 r20).
 //! `play --input "move X Y; wait N; click X Y; rclick X Y"` plays the
 //! steps as pointer input, timed in server ticks, in place of the window's
 //! pointer (`facts-render.md` §5 r11).
@@ -120,6 +121,8 @@ struct Options {
     at_tick: Option<Vec<u64>>,
     /// `play --dump-image`: each dump also writes `frame.png` (§5 r19).
     dump_image: bool,
+    /// `play --sound-log FILE`: every sound request call (§5 r20).
+    sound_log: Option<PathBuf>,
     /// `play --input SCRIPT`: scripted pointer input (`facts-render.md` §5 r11).
     input: Option<Vec<d2_client::world_view::input_script::Step>>,
     /// `play --res 800x600|640x480`: the play frame (default 800 × 600).
@@ -183,6 +186,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         dump_draws: None,
         at_tick: None,
         dump_image: false,
+        sound_log: None,
         input: None,
         pokes: Vec::new(),
         sends: Vec::new(),
@@ -207,6 +211,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--dump-draws" => o.dump_draws = Some(PathBuf::from(value()?)),
             "--at-tick" => o.at_tick = Some(parse_ticks(value()?)?),
             "--dump-image" => o.dump_image = true,
+            "--sound-log" => o.sound_log = Some(PathBuf::from(value()?)),
             "--input" => {
                 o.input = Some(
                     d2_client::world_view::input_script::parse(value()?)
@@ -638,6 +643,7 @@ fn play_once(
         input: o.input.clone(),
         pokes: o.pokes.clone(),
         sends: o.sends.clone(),
+        sound_log: o.sound_log.clone(),
     })?;
     match result.exit {
         bevy::app::AppExit::Success => Ok(result.to_menu),
@@ -702,7 +708,13 @@ fn state_dump(args: &[String]) -> Result<()> {
 fn main() -> Result<()> {
     use d2_client::launch;
     launch::install_crash_log();
+    // tools/perf: D2_PERF_OUT turns the timing on (server ticks, frames).
+    d2_client::app::perf::enable_from_env();
     let result = run();
+    // tools/coverage-map: this thread's counters (a no-op unless d2-sim
+    // has the `coverage-map` feature and D2_COVERAGE_DIR is set).
+    d2_sim::debug::coverage::flush();
+    d2_client::app::perf::write_report();
     if let Err(e) = &result {
         launch::write_error(e);
         pause_if_console();
@@ -751,7 +763,7 @@ fn run() -> Result<()> {
         Some("view") => view(parse_options(&args[1..])?),
         // Proves the crash log (`launch`, windows-build.yml smoke step).
         Some("crash-test") => panic!("crash-test: a deliberate panic to check d2rs-crash.log"),
-        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|soak|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
+        _ => bail!("usage: d2-client [view|verify|cpu-render|play|facts-compare|state-dump|soak|autoplay-host] [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out PATH] [--case NAME] [--cases DIR] [--perturb N] [--seed N] [--frames N] [--difficulty normal|nightmare|hell] [--save FILE.d2s | --new CLASS NAME [--save-dir DIR]] [--native DIR] [--source native|mpq] [--game-dir DIR] [--dump-draws DIR [--at-tick N[,M...]] [--dump-image]] [--sound-log FILE] [--res 800x600|640x480] [--input SCRIPT] [--poke \"F DIRECTIVE ARGS\"]... [--poke-file FILE]"),
     }
 }
 
@@ -828,6 +840,8 @@ mod tests {
         assert_eq!((o.at_tick, o.dump_image), (Some(vec![2, 40, 73]), true));
         assert!(parse_options(&args(&["--dump-draws", "d", "--at-tick", "40,40"])).is_err());
         assert!(parse_options(&args(&["--dump-draws", "d", "--at-tick", "40,"])).is_err());
+        let o = parse_options(&args(&["--sound-log", "s.tsv"])).unwrap();
+        assert_eq!(o.sound_log, Some(PathBuf::from("s.tsv")));
     }
 
     #[test]
