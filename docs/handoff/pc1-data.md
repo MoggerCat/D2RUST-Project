@@ -317,6 +317,17 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+- **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
+    `combat/hit.md` §7.1 says players carry it, and the recording shows
+    it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
+    39) with a 0xA8 of state 105 one frame later, but no spec names the
+    call site. Read the character load of the join (`0x005344B0` /
+    `0x00534520`, the allocation's per-kind init `0x005348C0`) for the
+    `0x005543B0(player, 2, v)` call: where it runs relative to the unit
+    seed and the stats, its v argument, and whether a corpse (player
+    unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
+    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
 
 
 42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.

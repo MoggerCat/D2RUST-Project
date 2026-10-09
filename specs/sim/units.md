@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–420 |
-|   4. Modes and mode schedules | 421–900 |
-|   5. Event dispatch | 901–915 |
-|   6. Events per kind | 916–1038 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1039–1060 |
-|   8. Collision line between two units | 1061–1065 |
-| Constants & data dependencies | 1066–1082 |
-| Randomness | 1083–1090 |
-| Edge cases & original bugs | 1091–1111 |
-| Test vectors | 1112–1171 |
-| Provenance | 1172–1258 |
-| Open questions | 1259–1338 |
+|   4. Modes and mode schedules | 421–952 |
+|   5. Event dispatch | 953–967 |
+|   6. Events per kind | 968–1090 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1091–1112 |
+|   8. Collision line between two units | 1113–1117 |
+| Constants & data dependencies | 1118–1134 |
+| Randomness | 1135–1142 |
+| Edge cases & original bugs | 1143–1163 |
+| Test vectors | 1164–1223 |
+| Provenance | 1224–1310 |
+| Open questions | 1311–1390 |
 <!-- /index -->
 
 ## Summary
@@ -694,6 +694,58 @@ start; `0x005A7C20` never writes it itself.
 
 Draws: only the bonefetish branch (U's seed, one `roll`, plus the
 missile creation's own); the siege-beast skill use per its spec.
+
+**What keeps a dead monster dead** (2026-10-09, read from `0x005A7C20`,
+`0x005541B0`, `0x005A73E0`, `0x005A75C0`, `0x005A7F80`, `0x005B1740`;
+the playthrough's "returns to mode 1 with hp 0" question):
+
+- *Sequence.* The kill requests mode 0 through the mode set
+   `0x005A7C20` → DT start (rule 1): mode 0, the death clean-up, the
+   treasure gate. DT schedules its animation events (mode table:
+   schedules = yes). DT event 0 sets mode 12 at once (every monster but
+   BaseId 78, which waits for the animation end); otherwise DT event 1
+   at the animation end sets mode 12 (rule 3). Mode 12 is set by the
+   plain mode set `0x00553570`, never by a request, and DD schedules
+   nothing (mode table: schedules = no), so no event of U runs after
+   it unless something else schedules one.
+- *Why the AI stops.* There is **no** dead test in the think: the
+   class event handler `0x005A7F80` drops a type-2 event only for a
+   frozen **live** unit (`0x005541B0` = 0), and the think body
+   `0x005B1740` runs whatever AI the control names. What stops it is
+   that no think exists: the death clean-up's `0x005738D0(game, U)`
+   cancels U's type-2 (think) and type-3 events (rule 1.2, last call),
+   and none of the type-2 schedulers runs for a dead U afterwards:
+   `0x00573780` returns for mode 0 or 12 (`monsters/ai.md` §1.2); the
+   freeze end `0x0057B170` does nothing for a dead unit (`ai.md` §1.1);
+   the neutral start `0x005A73E0`, the knockback end and every AI
+   tactic run only from a mode start or a think, which a dead U no
+   longer gets; the damage path refuses a dead defender
+   (`combat/damage.md` §5.2, `0x005541B0`).
+- *A mode request to a dead monster.* `0x005A7C20` does **not** refuse
+   it. With U dead (`0x005541B0`(U) = 1: U null, flag 0x10000 (+0xC6
+   bit 0), or a monster in mode 0 or 12): it skips the path stop
+   `0x00649400`; for a mode ≠ 3 it still writes the path target and
+   runs the movement set-up; then it runs the requested mode's start:
+   - a start that returns 0 (WL / RN with no path point, a GH class
+     without mode 3, A/S with a moving mode and no point): skill
+     cleared, then, because the requested mode is not 0 or 12 and U is
+     dead, `0x005A7C20` **returns 1 with the mode unchanged**;
+   - GH start: U in mode 0 or 12 → returns 1, mode unchanged (rule 6);
+   - the NU start `0x005A73E0` sets **mode 1** and schedules a think
+     (f + `aidel`, 0 → 15); the attack / skill start `0x005A75C0`
+     (modes 4, 5, 7, 8, 9) sets its mode whenever it does not return 0
+     (rule 7); the other starts as their rules state. So a mode-1 or attack request on a dead monster
+     *does* bring it out of mode 12 with hp 0; 1.14d never makes one,
+     because of the previous point.
+   A request for mode 0 or 12 on a dead unit runs DT start / DD start
+   again (DD start skips the clean-up when U is in mode 0, rule 4).
+- *The symptom's shape.* A think left pending at death fires
+   `aidel` frames later (15 for the Act I monsters, `ai.md` §1.3); the
+   AI's first idle (`0x005DE080`, `ai.md` §1.2: "if the anim mode is
+   not neutral, first a mode change to neutral") requests mode 1 →
+   point 3 → mode 1 with hp 0. So a death start without the
+   `0x005738D0` cancel shows exactly "mode 1, hp 0, about 15 frames
+   after death".
 
 **The other start and event functions** (1.14d-read 2026-10-08,
 `0x005A7490`–`0x005A7891`, `0x005A8490`–`0x005A872F`). Same calling

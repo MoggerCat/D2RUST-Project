@@ -930,6 +930,7 @@ fn inv_tables(items: &[([u8; 4], u16, u8, u8)], n_types: usize, equiv: EquivMatr
         ],
         equiv,
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

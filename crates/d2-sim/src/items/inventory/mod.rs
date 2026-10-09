@@ -55,7 +55,7 @@ pub use grid::{
     place_in_page, place_in_page_from_cursor, search, weight,
 };
 pub use levelreq::{level_requirement, AffixReq, LevelReqItem, LevelReqUnit};
-pub use tables::InvTables;
+pub use tables::{InvTables, ItemUseTables};
 
 /// Inventory signature (inventory +0x00). Every accessor of the original
 /// checks it; in d2rs the type system guarantees it, so it is kept as a

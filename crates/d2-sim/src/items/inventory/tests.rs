@@ -167,6 +167,7 @@ fn tables() -> InvTables {
         itemtypes,
         equiv,
         books: Vec::new(),
+        item_use: Default::default(),
     }
 }
 

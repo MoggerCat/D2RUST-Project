@@ -304,7 +304,8 @@ pub trait UnitHooks: StatHost {
     /// hover/chat spec.
     fn free_hover(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
-    /// After the type-12 expiry walk (`stat-lists.md` §10.4) of `unit`:
-    /// the remove callbacks of the lists it freed (§8.2 rule 6) run here.
+    /// After the type-12 expiry walk (`stat-lists.md` §10.4) of `unit`,
+    /// and after the regeneration tick frees a potion list (§10.1): the
+    /// remove callbacks of the lists freed (§8.2 rule 6) run here.
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 }
