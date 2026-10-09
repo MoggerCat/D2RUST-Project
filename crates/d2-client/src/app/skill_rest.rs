@@ -117,6 +117,7 @@ impl SkillStore {
 }
 
 impl LocalSeams {
+        seqinput: s.seqinput,
     fn note(&mut self, s: String) {
         self.skills.log.push(s);
     }

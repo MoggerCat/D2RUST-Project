@@ -103,17 +103,40 @@ impl RunMods {
 
 /// `0x00464600(P, skill)` (§6 r4 kind 0): 0 when P holds a cursor item
 /// or is not a player, or in mode 0, 4, 7–12, 17 or 19; mode 13 with
-/// class 3, mode 14 with class 6, modes 15–16 with classes 4–6.
-/// PROVISIONAL (ui/controls.md §6 r4, `0x004645B0`; controls-0001): mode
-/// 18 (sequence), whose answer `0x004645B0(skill)` decides, reads as 0.
-pub fn can_act(is_player: bool, cursor_item: bool, mode: u32, class: u32) -> bool {
+/// class 3, mode 14 with class 6, modes 15–16 with classes 4–6; mode 18
+/// (sequence) as `0x004645B0` decides ([`sequence_can_act`]).
+/// `used`: P's used skill's `(anim, seqinput)` (skill list +0x10), `None`
+/// when there is none; `event_index`: unit +0x38 >> 8.
+pub fn can_act(
+    is_player: bool,
+    cursor_item: bool,
+    mode: u32,
+    class: u32,
+    used: Option<(u8, u8)>,
+    event_index: u32,
+) -> bool {
     if !is_player || cursor_item {
         return false;
     }
+    if mode == 18 {
+        return sequence_can_act(used, event_index);
+    }
     !matches!(
         (mode, class),
-        (0 | 4 | 7..=12 | 17 | 18 | 19, _) | (13, 3) | (14, 6) | (15 | 16, 4..=6)
+        (0 | 4 | 7..=12 | 17 | 19, _) | (13, 3) | (14, 6) | (15 | 16, 4..=6)
     )
+}
+
+/// `0x004645B0` (`ui/controls.md` §6 r4): no used skill → act; its `anim`
+/// not 18 → act; `seqinput` 0 or 255 → no; else act iff the frame event
+/// index has reached `seqinput`.
+pub fn sequence_can_act(used: Option<(u8, u8)>, event_index: u32) -> bool {
+    match used {
+        None => true,
+        Some((anim, _)) if anim != 18 => true,
+        Some((_, 0 | 255)) => false,
+        Some((_, seq)) => event_index >= u32::from(seq),
+    }
 }
 
 impl ModelClick<'_> {
@@ -143,16 +166,14 @@ impl ModelClick<'_> {
     }
 }
 
-/// Screen → world subtile (`0x0045AFF0`): the inverse of the unit draw
-/// (`render/camera.md` §4) and of the static projection (§2).
-/// PROVISIONAL (ui/controls.md §6 r2: `0x0045AFF0` is named, not
-/// specified; controls-0001): screen (sx, sy) → client (sx + cx_u −
-/// shift_x, sy + cy_u − 8) → subtile ((px + 2·py) / 32, (2·py − px) / 32)
-/// floored.
+/// Screen → world subtile (`0x0045AFF0`, `render/camera.md` §4 "Screen →
+/// world"): client (sx + cx_u − shift_x, sy + cy_u), no −8 (not the exact
+/// inverse of the unit draw), then subtile ((px + 2·py) >> 5,
+/// (2·py − px) >> 5), floored. d2rs renders no perspective.
 pub fn screen_to_world(cam: &Camera, sx: i32, sy: i32) -> (i32, i32) {
     let p = ClientPos {
         x: sx + cam.unit.x - cam.view.shift_x,
-        y: sy + cam.unit.y - 8,
+        y: sy + cam.unit.y,
     };
     (
         (p.x + 2 * p.y).div_euclid(32),
@@ -224,11 +245,21 @@ impl ClickWorld for ModelClick<'_> {
         let Some(p) = self.world.local() else {
             return false;
         };
+        let used = p
+            .skills
+            .as_ref()
+            .and_then(|l| l.entries.get(l.current?))
+            .map(|e| {
+                let r = self.inputs.tables.skills.get(usize::from(e.skill));
+                r.map_or((0, 0), |r| (r.anim, r.seqinput))
+            });
         can_act(
             p.key.unit_type == PLAYER,
             self.world.use_cursor.is_some(),
             p.mode,
             p.class,
+            used,
+            p.event_index,
         )
     }
     fn left_skill(&self) -> Option<SkillRef> {
@@ -644,6 +675,50 @@ mod tests {
             screen_to_world(&shaken, at.0, at.1),
             screen_to_world(&cam((0, 0)), at.0, at.1)
         );
+    }
+
+    // Covers: specs/render/camera.md §4 (Screen → world)
+    #[test]
+    fn screen_to_world_has_no_minus_8() {
+        let cam = |x, y| {
+            Camera::new(
+                FrameSize::D2RS,
+                OpenMode::NONE,
+                crate::rules::camera::ClientPos { x, y },
+                (0, 0),
+            )
+        };
+        let (w, h) = (FrameSize::D2RS.width, FrameSize::D2RS.height);
+        let shift = cam(0, 0).view.shift_x;
+        let want = |x: i32, y: i32| ((x + 2 * y) >> 5, (2 * y - x) >> 5);
+        // The drawn foot point (W/2 + shift, H/2 - 8) maps to client
+        // (P_x, P_y + 8): +1/2 subtile on both axes before the floor.
+        for (px, py) in [(0, 0), (16, 0), (-40, -24), (7, -3)] {
+            let c = cam(px, py);
+            assert_eq!(
+                screen_to_world(&c, w / 2 + shift, h / 2 - 8),
+                want(px, py + 8)
+            );
+        }
+        // A negative-floor case: client (-40, -16) -> (-72 >> 5, 8 >> 5).
+        assert_eq!(want(-40, -16), (-3, 0));
+        assert_eq!(
+            screen_to_world(&cam(-40, -24), w / 2 + shift, h / 2 - 8),
+            (-3, 0)
+        );
+    }
+
+    // Covers: specs/ui/controls.md §6 r4 (0x004645B0)
+    #[test]
+    fn sequence_mode_gates_on_the_frame_event_index() {
+        let act = |used, ev| can_act(true, false, 18, 0, used, ev);
+        assert!(!act(Some((18, 4)), 3));
+        assert!(act(Some((18, 4)), 4));
+        assert!(!act(Some((18, 0)), 9));
+        assert!(!act(Some((18, 255)), 9));
+        assert!(act(Some((7, 4)), 0), "a non-SQ used skill acts");
+        assert!(act(None, 0), "no used skill acts");
+        assert!(!can_act(true, true, 18, 0, None, 0), "cursor item wins");
     }
 
     // Covers: specs/ui/controls.md §6 r8
