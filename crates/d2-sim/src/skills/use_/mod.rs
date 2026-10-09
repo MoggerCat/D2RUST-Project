@@ -837,17 +837,15 @@ pub fn attack_frame_event<W: UseWorld>(
     arg2: i32,
 ) -> i32 {
     w.set_event_arg(u, arg2);
-    let run_do = if w.used_skill_flags(u) & SKILL_MOVING != 0 {
-        if w.step_path(u) == 2 {
-            let f = w.used_skill_flags(u);
-            w.set_used_skill_flags(u, f | SKILL_ARRIVED);
-            true
-        } else {
-            false
-        }
-    } else {
-        w.unit_flags(u) & FLAG_MISSILE_FIRED == 0 && matches!(arg1, 1 | 2)
-    };
+    // Rule 2: a moving skill steps its path on every event; finished →
+    // the do at once. Any other result falls through to rule 3, so the
+    // do also runs on the way (`0x005804B1` → `0x005804BE`, REC-232).
+    let arrived = w.used_skill_flags(u) & SKILL_MOVING != 0 && w.step_path(u) == 2;
+    if arrived {
+        let f = w.used_skill_flags(u);
+        w.set_used_skill_flags(u, f | SKILL_ARRIVED);
+    }
+    let run_do = arrived || (w.unit_flags(u) & FLAG_MISSILE_FIRED == 0 && matches!(arg1, 1 | 2));
     if run_do {
         if let Some(e) = w.used_skill(u) {
             let l = skill_level(w, t, Some(u), Some(&e), true);

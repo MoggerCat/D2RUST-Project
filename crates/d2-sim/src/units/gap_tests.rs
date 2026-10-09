@@ -501,6 +501,7 @@ fn removal_order() {
 /// monster staying in mode 1; nothing scheduled), preparing the
 /// animation, and the animated and movement start tails.
 // Covers: specs/sim/units.md §4.1
+// Covers: specs/skills/sequences.md §2
 #[test]
 fn setting_a_mode() {
     let (mut game, mut sys) = animated();
@@ -583,6 +584,7 @@ fn setting_a_mode() {
     let seq = Sequence {
         frame_count: 5 * 256,
         speed: 256,
+        pos: 0,
         events: vec![0, 1, 0, 0, 0],
     };
     sys.hooks.sequence = Some(seq.clone());
@@ -600,6 +602,14 @@ fn setting_a_mode() {
         let a = &sys.units.get(u).expect("u").anim;
         assert_eq!(a.sequence.is_some(), loaded, "mode {mode}");
         assert_eq!(a.frame, if loaded { 777 } else { 0 }, "mode {mode}");
+        // +0x48: the sequence's count · 256 (`skills/sequences.md` §2),
+        // else the AnimData record's frames · 256.
+        let want = if loaded {
+            5 * 256
+        } else {
+            (ten_frames().frames as i32) * 256
+        };
+        assert_eq!(a.frame_count, want, "mode {mode}");
     }
     // Monster 14 without a sequence: the plain branch.
     sys.hooks.sequence = None;

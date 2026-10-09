@@ -1652,6 +1652,12 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             pierce: m.pierce,
             last_collide: m.lastcollide,
             clt_do_func: m.pcltdofunc,
+            loop_anim: m.loopanim != 0,
+            flicker: m.flicker,
+            collide_type: m.collidetype,
+            always_explode: m.alwaysexplode != 0,
+            explosion_missile: m.explosionmissile as i16,
+            clt_hit_func: m.pclthitfunc as i16,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
@@ -1694,6 +1700,7 @@ struct GameParts {
     items: ItemTables,
     vendors: VendorTables,
     anim: Option<Arc<AnimData>>,
+    monster_sequences: Option<Arc<d2_sim::skills::sequences::MonsterSequences>>,
     vitals: Option<Arc<VitalsTables>>,
     /// The skill bodies' table data (`ActionHooks::bodies`: pet types,
     /// state groups); `None`: synthetic.
@@ -1727,6 +1734,7 @@ impl GameParts {
             items: t.item_tables()?,
             vendors: t.vendor_tables()?,
             anim: Some(Arc::new(t.anim.clone())),
+            monster_sequences: Some(Arc::new(t.monster_sequences()?)),
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
@@ -1796,6 +1804,7 @@ pub fn build_with(
     };
     let mut hooks = ActionHooks::new(Arc::new(parts.action), world, Seed::init_low(seed), seams);
     hooks.anim_data = parts.anim;
+    hooks.monster_sequences = parts.monster_sequences;
     // The server's animation names follow the client art's name rules.
     hooks.x.looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
         .ok()

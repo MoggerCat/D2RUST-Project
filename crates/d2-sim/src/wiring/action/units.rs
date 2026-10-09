@@ -158,11 +158,24 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// §1–§2) for a player in mode 18: the used skill's `seqnum` and the
     /// unit's COF weapon class ([`Pending::composit_weapon_class`], the
     /// class the animation names use) pick the frame list; its event bytes,
-    /// length · 256 and speed 256. `None` (the plain mode-18 animation):
-    /// no used skill, `seqnum` 0, a null list. Monsters in mode 14
-    /// (`monseq`, §1 rule 5) have no provider yet: `None`.
+    /// length · 256 and speed 256. A monster in mode 14: its class's slot
+    /// of the used skill picks the `monseq` list
+    /// ([`ActionHooks::monster_sequences`], §1 rules 2 and 5). `None`
+    /// (the plain animation): no used skill, `seqnum` 0, a null list.
     fn load_sequence(&mut self, sim: &Sim<'_>, unit: UnitId) -> Option<Sequence> {
-        if sim.units.get(unit)?.ty != UnitType::Player {
+        let rec = sim.units.get(unit)?;
+        if rec.ty == UnitType::Monster {
+            let used = self.used_skill_of(unit)?;
+            let class = usize::try_from(rec.class).ok()?;
+            let frames = self.monster_sequences.as_ref()?.lookup(class, used.skill)?;
+            return Some(Sequence {
+                frame_count: (frames.len() as i32) * 256,
+                speed: 256,
+                pos: 0,
+                events: frames.iter().map(|f| f.event).collect(),
+            });
+        }
+        if rec.ty != UnitType::Player {
             return None;
         }
         let used = self.used_skill_of(unit)?;
@@ -176,6 +189,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         Some(Sequence {
             frame_count: (frames.len() as i32) * 256,
             speed: 256,
+            pos: 0,
             events: frames.iter().map(|f| f.event).collect(),
         })
     }
@@ -587,7 +601,8 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
     }
 
     /// The per-kind state of the action modules leaves with the unit:
-    /// AI control (`AiStore::remove`), missile data, combat list; then
+    /// AI control (`AiStore::remove`), a summon's skill entries, missile
+    /// data, combat list; then
     /// the lent monster world's part (monster data, minion list, owner
     /// link); an object's object data.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
@@ -615,6 +630,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             }
         }
         self.path_free(unit, ty, mode);
+        self.monster_skills.remove(&unit);
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
         }

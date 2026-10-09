@@ -454,6 +454,12 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         .resource_mut::<BridgeResource>()
         .0
         .set_wall_seconds(wall_seconds);
+    // The preview draws the light map at quality 2 (high,
+    // `preview_light`): the model's missile lights follow it.
+    app.world_mut()
+        .resource_mut::<BridgeResource>()
+        .0
+        .set_high_light_quality(true);
     let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
     let lights = crate::world_view::light_sources::load(archives.as_ref())

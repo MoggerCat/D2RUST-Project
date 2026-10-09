@@ -42,6 +42,9 @@ const MAXDAMAGE: u16 = 22;
 /// Frames between swings, and between walk re-issues.
 const SWING: i32 = 20;
 const REPATH: i32 = 10;
+/// monstats `AI` AssassinSentry (`monsters/ai-bodies-6.md` §14): the laid
+/// traps, which their own AI thinks for.
+const AI_ASSASSIN_SENTRY: u16 = 101;
 
 /// Which think a hireling gets in play (`q-fix-prov-hireling-search`): one
 /// whose AI control holds the owner link takes the real Hireable think,
@@ -112,13 +115,23 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         });
-        // The laid traps do not follow: their own think shoots.
-        let traps: BTreeSet<UnitId> = events
-            .action()
-            .with(game, |_, v| v.h.sentries.keys().copied().collect());
+        // The laid traps do not follow: their own AI (AssassinSentry,
+        // `monsters/ai-bodies-6.md` §14) thinks for them.
+        let traps: BTreeSet<UnitId> = events.action().with(game, |_, v| {
+            pets.iter()
+                .map(|&(m, _)| m)
+                .filter(|&m| {
+                    let class = usize::try_from(AiUnits::class(v, m)).unwrap_or(usize::MAX);
+                    v.h.tables
+                        .combat
+                        .monstats
+                        .get(class)
+                        .is_some_and(|r| r.ai == AI_ASSASSIN_SENTRY)
+                })
+                .collect()
+        });
         mercs.extend(pets.into_iter().filter(|(m, _)| !traps.contains(m)));
         let frame = game.frame;
-        self.drive_sentries(game, events, &mercs);
         if mercs.is_empty() {
             return;
         }
@@ -216,8 +229,7 @@ pub(super) fn think<X: Pending>(
 
 /// The nearest living hostile monster within squared distance `sight` of
 /// `from` (never a friend, a hireling, a seller, or in a town room), as
-/// (squared distance, unit). Shared by the followers' think and the
-/// traps' ([`super::sentry_drive`]).
+/// (squared distance, unit), for the followers' think.
 pub(super) fn nearest_hostile<X: Pending>(
     v: &mut View<'_, X>,
     g: &Game,

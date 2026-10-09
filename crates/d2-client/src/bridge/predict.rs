@@ -612,6 +612,15 @@ impl WalkTap {
     fn push(&self, w: Walk) {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).push(w);
     }
+
+    /// Records `msg` when it is a walk intent ([`walk_of`]), as
+    /// [`PredictLink`] does for what it sends: for a sender that reaches
+    /// the server another way (a test rig's direct link).
+    pub fn record(&self, msg: &[u8]) {
+        if let Some(w) = walk_of(msg) {
+            self.push(w);
+        }
+    }
 }
 
 /// A [`ServerLink`] that records the walk intents sent through it for
@@ -656,9 +665,7 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
 
     fn send(&mut self, queue: SendQueue, msg: &[u8]) -> Result<Sent, LinkError> {
         let sent = self.inner.send(queue, msg)?;
-        if let Some(w) = walk_of(msg) {
-            self.walks.push(w);
-        }
+        self.walks.record(msg);
         Ok(sent)
     }
 

@@ -841,7 +841,7 @@ impl AiSummons for Fake {
     fn hireling_row(&self, _: &Game, _: i32, _: i32) -> Option<HireRow> {
         self.y.hire_row
     }
-    fn skill_calc(&self, _: UnitId, skill: i32, _: u32, level: i32) -> i32 {
+    fn skill_calc(&mut self, _: &mut Game, _: UnitId, skill: i32, _: u32, level: i32) -> i32 {
         let _ = (skill, level);
         self.y.calc
     }
