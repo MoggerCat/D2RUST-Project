@@ -361,6 +361,9 @@ pub struct OriginalUi {
     /// The C→S messages of the close hooks (`panels.md` §2 r6) not yet
     /// handed to the root ([`Self::flush_hooks`]).
     hook_intents: Vec<super::ClientIntent>,
+    /// The key mode `0x007A7418` and its keep-key-up flag
+    /// (`ui/controls.md` §4.1 r1, r5), moved by the open / close hooks.
+    key_mode: (u8, bool),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -459,6 +462,8 @@ impl OriginalUi {
             shop: shop_ui::SharedShop::default(),
             npcm: Default::default(),
             hook_intents: Vec::new(),
+            // Game start `0x0046AC70`: mode 1.
+            key_mode: (1, false),
         })
     }
 
@@ -1098,6 +1103,7 @@ impl OriginalUi {
             }
             r
         };
+        self.track_key_mode(start);
         let closed: Vec<u8> = self.outcome.effects[start..]
             .iter()
             .filter_map(|e| match e {
@@ -1109,6 +1115,36 @@ impl OriginalUi {
             self.close_hook(u, own != Some(u));
         }
         r
+    }
+
+    /// The key mode after the open / close hooks of `effects[start..]`
+    /// (`ui/controls.md` §4.1 r5, `key_mode_for`), in effect order.
+    fn track_key_mode(&mut self, start: usize) {
+        use crate::controls::original::{key_mode_for, KeyModeEvent};
+        let events: Vec<KeyModeEvent> = self.outcome.effects[start..]
+            .iter()
+            .filter_map(|e| match e {
+                UiEffect::Opened(u) => Some(KeyModeEvent::UiOpen(*u)),
+                UiEffect::Closed(u) => Some(KeyModeEvent::UiClose(*u)),
+                _ => None,
+            })
+            .collect();
+        for ev in events {
+            let open = |u: u8| self.shared.borrow().states.is_open(u);
+            if let Some(m) = key_mode_for(ev, &open) {
+                self.key_mode = m;
+            }
+        }
+    }
+
+    /// The key mode now: 0 while the key-config screen is open (§4.1 r5:
+    /// it opens in mode 0, key-up not kept), else the hooks' mode.
+    pub fn key_mode(&self) -> u8 {
+        if self.controls_open() {
+            0
+        } else {
+            self.key_mode.0
+        }
     }
 
     /// The cursor jump the pending effects ask for (§4.3,
@@ -1230,6 +1266,16 @@ impl Panel for InventoryUi {
         sh.items
             .draw_equip_backgrounds(ctx.world, &sh.tables.files, class, &sh.config.screen, out);
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
+            // `inventory.md` §4: the placement tint under the items.
+            sh.items.draw_placement_tint(
+                ctx.world,
+                &sh.tables.files,
+                &l.grid,
+                0,
+                sh.mouse,
+                sh.config.screen.h,
+                out,
+            );
             sh.items
                 .draw_items(ctx.world, &sh.tables.files, &l, sh.mouse, out);
         }

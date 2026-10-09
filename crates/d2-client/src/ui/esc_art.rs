@@ -10,15 +10,14 @@
 //! The widths are the spec's (§O2 r3): the original reads them from the
 //! DC6 headers; multi-frame images tile at 256 px.
 //!
-//! d2rs-own, unverified (REC-257): the disabled look (draw mode 1) and
-//! the dark slider rectangles of §O4 r2 have no field in the image
-//! request and are not drawn; the `pentspin` frame follows the client
-//! clock ([`PentClock`]: the original's > 50 ms rule); Window Mode has
-//! no art and stays text; `textslid` is the key-config screen's, not
+//! The disabled look (draw mode 1, §O4) and the dark slider rectangles
+//! (§O4 r2, [`RectRequest::sized`]) go through the sink's draw mode and
+//! rectangle. d2rs-own, unverified (REC-257): the `pentspin` frame follows the client
+//! clock ([`PentClock`]: the original's > 50 ms rule); `textslid` is the key-config screen's, not
 //! this menu's.
 
 use super::options_menu::{Kind, MenuId, OptionsMenu, Row};
-use crate::ui::draw::{ImageRef, ImageRequest, UiDraw, UiDrawSink};
+use crate::ui::draw::{CelLook, ImageRef, ImageRequest, RectRequest, Remap, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panels::UiFiles;
 
@@ -35,7 +34,7 @@ pub const PENT_WIDTHS: [i32; 8] = [51, 43, 27, 9, 23, 40, 50, 52];
 /// An image and its total width.
 pub type Art = (&'static str, i32);
 
-/// The label image of a row (§O2 r3); `None`: no art (Window Mode).
+/// The label image of a row (§O2 r3); `None`: no art.
 pub fn label(menu: MenuId, row: Row) -> Option<Art> {
     Some(match row {
         Row::Options => ("options", 160),
@@ -69,7 +68,6 @@ pub fn label(menu: MenuId, row: Row) -> Option<Art> {
         Row::MapCenter => ("automapcenter", 336),
         Row::MapParty => ("automapparty", 194),
         Row::MapNames => ("automappartynames", 190),
-        Row::WindowMode => return None,
     })
 }
 
@@ -131,8 +129,24 @@ fn frames(w: i32) -> i32 {
     (w + 255) / 256
 }
 
-/// Every frame of `name` from cel position (x, y).
-fn art(files: &UiFiles, out: &mut dyn UiDrawSink, clip: Rect, name: &str, w: i32, x: i32, y: i32) {
+/// The draw mode of an enabled row (§O4 r1: mode 5, normal).
+const DRAW_MODE_ENABLED: u8 = 5;
+/// The draw mode of a disabled row (§O4 r1: mode 1, 50 % blend).
+const DRAW_MODE_DISABLED: u8 = 1;
+
+/// Every frame of `name` from cel position (x, y) with the row's draw
+/// `mode` (§O4 r1).
+#[allow(clippy::too_many_arguments)]
+fn art_mode(
+    files: &UiFiles,
+    out: &mut dyn UiDrawSink,
+    clip: Rect,
+    name: &str,
+    w: i32,
+    x: i32,
+    y: i32,
+    mode: u8,
+) {
     let Some(file) = files.id(name) else { return };
     for k in 0..frames(w) {
         out.push(UiDraw::Image(ImageRequest {
@@ -142,7 +156,10 @@ fn art(files: &UiFiles, out: &mut dyn UiDrawSink, clip: Rect, name: &str, w: i32
             },
             at: Point::new(x + 256 * k, y),
             clip,
-            look: crate::ui::CelLook::PLAIN,
+            look: CelLook {
+                mode,
+                remap: Remap::None,
+            },
             call: crate::ui::draw::CelCall::Draw,
         }));
     }
@@ -198,23 +215,53 @@ pub fn draw_row(files: &UiFiles, m: &OptionsMenu, i: usize, out: &mut dyn UiDraw
     }
     let (half, clip) = (m.half(), m.screen.rect());
     let yb = m.baseline(i);
+    // §O4 r1: mode 5 if enabled else 1, for every cel of the row.
+    let mode = if m.enabled(i) {
+        DRAW_MODE_ENABLED
+    } else {
+        DRAW_MODE_DISABLED
+    };
     match def.kind {
-        Kind::Title | Kind::Action => art(files, out, clip, &name, w, half - 1 - (w >> 1), yb),
+        Kind::Title | Kind::Action => {
+            art_mode(files, out, clip, &name, w, half - 1 - (w >> 1), yb, mode)
+        }
         Kind::Choice(_) => {
             let Some((vn, vw)) = value(def.row, m.value(i) as usize) else {
                 return false;
             };
-            art(files, out, clip, &name, w, half - 230, yb);
-            art(files, out, clip, &local(vn), vw, half + 230 - vw, yb);
+            art_mode(files, out, clip, &name, w, half - 230, yb, mode);
+            art_mode(files, out, clip, &local(vn), vw, half + 230 - vw, yb, mode);
         }
         Kind::Slider { style, .. } => {
-            art(files, out, clip, &name, w, half - 230, yb);
+            art_mode(files, out, clip, &name, w, half - 230, yb, mode);
             let y = m.slider_y(i);
+            // §O4 r2: the two dark rectangles (colour 0), mode 1 / 2 left
+            // of the knob's right edge and 1 / 0 right of it (style 1 / 0);
+            // the row mode does not apply to them.
+            let t = m.slider_t(i);
+            let (left, right) = if style == 1 { (1, 1) } else { (2, 0) };
+            let x0 = half - 59;
+            out.push(UiDraw::Rect(RectRequest::sized(
+                x0,
+                y - 30,
+                t + 12,
+                30,
+                0,
+                left,
+            )));
+            out.push(UiDraw::Rect(RectRequest::sized(
+                x0 + t + 12,
+                y - 30,
+                half + 230 - (x0 + t + 12),
+                30,
+                0,
+                right,
+            )));
             let bar = if style == 1 { BAR_C } else { BAR };
-            art(files, out, clip, bar, 290, half - 60, y);
+            art_mode(files, out, clip, bar, 290, half - 60, y, mode);
             // Skull at X0 + t, y − 1 (− 1 more for style 0).
             let sy = y - 1 - i32::from(style == 0);
-            art(files, out, clip, SKULL, 28, half - 60 + m.slider_t(i), sy);
+            art_mode(files, out, clip, SKULL, 28, half - 60 + t, sy, mode);
         }
     }
     true
@@ -255,7 +302,7 @@ mod tests {
     fn draws(f: &UiFiles, m: &OptionsMenu, frame: u32) -> Vec<(String, u32, i32, i32)> {
         let mut out: Vec<UiDraw> = Vec::new();
         for i in 0..m.rows().len() {
-            assert!(draw_row(f, m, i, &mut out) || m.rows()[i].row == Row::WindowMode);
+            assert!(draw_row(f, m, i, &mut out));
         }
         draw_pents(f, m, frame, &mut out);
         out.iter()
@@ -314,6 +361,73 @@ mod tests {
         assert_eq!(knob.3, y_top + 36 - 2);
         // Pentagrams at the selected row.
         assert_eq!(d.last().unwrap().3, y_top + 49);
+    }
+
+    // Covers: specs/ui/frontend-options.md §o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-ui-draw-0x00456f46 r2
+    #[test]
+    fn slider_rectangles_precede_the_bar_and_a_disabled_row_draws_mode_1() {
+        let f = files();
+        let mut m = OptionsMenu::default();
+        m.open();
+        m.menu = MenuId::Sound;
+        let half = m.half();
+        let mut out: Vec<UiDraw> = Vec::new();
+        assert!(draw_row(&f, &m, 1, &mut out));
+        let rects: Vec<&RectRequest> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Rect(r) => Some(r),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(rects.len(), 2);
+        let (t, y) = (m.slider_t(1), m.slider_y(1));
+        // x [h − 59, h − 59 + t + 12), y [Y − 30, Y); then to h + 230.
+        assert_eq!((rects[0].x0, rects[0].y0), (half - 59, y - 30));
+        assert_eq!((rects[0].x1, rects[0].y1), (half - 59 + t + 12, y));
+        assert_eq!((rects[1].x0, rects[1].x1), (half - 59 + t + 12, half + 230));
+        assert!(rects.iter().all(|r| r.color == 0));
+        // §O4 r2 order: label, rectangles, bar, skull.
+        let first_rect = out
+            .iter()
+            .position(|d| matches!(d, UiDraw::Rect(_)))
+            .unwrap();
+        let last_rect = out
+            .iter()
+            .rposition(|d| matches!(d, UiDraw::Rect(_)))
+            .unwrap();
+        assert!(out[..first_rect]
+            .iter()
+            .all(|d| matches!(d, UiDraw::Image(_))));
+        assert!(!out[..first_rect].is_empty());
+        assert!(out[last_rect + 1..].len() >= 2);
+        assert!(out[last_rect + 1..]
+            .iter()
+            .all(|d| matches!(d, UiDraw::Image(_))));
+        let enabled = m.enabled(1);
+        let modes: Vec<u8> = out
+            .iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(r) => Some(r.look.mode),
+                _ => None,
+            })
+            .collect();
+        let want = if enabled { 5 } else { 1 };
+        assert!(modes.iter().all(|&x| x == want), "{modes:?}");
+        // A disabled row (Sound is disabled in d2rs) draws mode 1.
+        m.menu = MenuId::Sound;
+        let dis = (0..m.rows().len()).find(|&i| !m.enabled(i) && m.rows()[i].kind != Kind::Title);
+        if let Some(i) = dis {
+            let mut out: Vec<UiDraw> = Vec::new();
+            draw_row(&f, &m, i, &mut out);
+            assert!(out
+                .iter()
+                .filter_map(|d| match d {
+                    UiDraw::Image(r) => Some(r.look.mode),
+                    _ => None,
+                })
+                .all(|x| x == 1));
+        }
     }
 
     #[test]

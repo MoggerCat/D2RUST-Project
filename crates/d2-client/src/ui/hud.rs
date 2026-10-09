@@ -351,6 +351,9 @@ impl HudUi {
         skill: u16,
         at: (i32, i32),
     ) -> Option<UiDraw> {
+        // PROVISIONAL (REC-720): `control-panel.md` §7 r2 draws the icon with
+        // the colored cel draw and the state of `0x004A8D30` as `k`; that
+        // routine is not specified, so `image` gives the plain draw (k 0).
         let (class, cel) = *tables.icons.get(&skill)?;
         let name = skill_icon_file(if class > 6 { 7 } else { class }).to_ascii_lowercase();
         // The skill buttons' icons are the colour (palette) cel draw

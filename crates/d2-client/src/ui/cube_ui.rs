@@ -122,6 +122,16 @@ impl Panel for CubeUi {
         }
         if anim.grid_visible() {
             let g = sh.items.cube_grid(&sh.config.screen);
+            // Spec: specs/ui/inventory.md §4 (placement tint).
+            sh.items.draw_placement_tint(
+                ctx.world,
+                &sh.tables.files,
+                &g,
+                crate::ui::panels::cube_items::CUBE_PAGE,
+                sh.mouse,
+                sh.config.screen.h,
+                out,
+            );
             sh.items
                 .draw_cube(ctx.world, &sh.tables.files, &g, sh.mouse, out);
         }

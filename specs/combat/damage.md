@@ -32,15 +32,15 @@
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 300–401 |
 |   5. Application | 402–592 |
 |   6. Hit class and hit recovery | 593–623 |
-|   7. Reaction and death trigger | 624–725 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 726–789 |
-|   9. Durability `0x0057D3D0` | 790–811 |
-| Constants & data dependencies | 812–833 |
-| Randomness | 834–866 |
-| Edge cases & original bugs | 867–901 |
-| Test vectors | 902–934 |
-| Provenance | 935–960 |
-| Open questions | 961–1010 |
+|   7. Reaction and death trigger | 624–729 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 730–793 |
+|   9. Durability `0x0057D3D0` | 794–815 |
+| Constants & data dependencies | 816–837 |
+| Randomness | 838–870 |
+| Edge cases & original bugs | 871–905 |
+| Test vectors | 906–938 |
+| Provenance | 939–964 |
+| Open questions | 965–1014 |
 <!-- /index -->
 
 ## Summary
@@ -670,7 +670,11 @@ except inside the get-hit test (§6.2).
       form request (E, mode 13, tA, gA, 0). Return.
    2. F has 0x200 (evade): state 68 (`evade`) list; s, E as above;
       skill `stsound` (+0xFC, i16) > 0 → sound event 12 (`0x00553380(D,
-      12, D)`, `audio/triggers.md`). Return.
+      12, D)`, `audio/triggers.md`). Return. **Only** the sound: no E
+      flags write and no unit form request (asm `0x0057D206`–`0x0057D26D`:
+      list `0x006256B0(D, 0x44)`, s = stat 0x15E, E `0x006439F0`, row
+      `0x0045C4B0`, `stsound` test, `0x00553380`, return; 2026-10-09).
+      E none or row none → return.
    3. F has 0x10 or 0x8000 (block / weapon block): F has 0x4000 →
       return. frame − stat 95 (`lastblockframe`) > `item_fasterblockrate`
       (102) / 8 (toward zero) + 15 → point form (no skill, mode 9 `BL`,

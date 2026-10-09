@@ -771,11 +771,12 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     u.click(&w, orow(1));
     let t = texts(&u);
     assert_eq!(art_names(&u, &w)[0], "*local\\videooptions");
-    assert!(t.contains(&"Window Mode".to_string()));
-    // Video rows (tops 70 + 45 k for 9 rows): Window Mode is row 2.
+    // frontend-options.md §O8: the Video menu has no Window Mode row.
+    assert!(!t.contains(&"Window Mode".to_string()));
+    // Video exp rows: title, Resolution, Light Quality, ...: row 2.
     let m = u.ui.shared.borrow().esc.menu.clone();
     let wm = Point::new(400, m.y_top(2) + 20);
-    // Window Mode cycles and reports the change once; the value round-trips
+    // Light Quality cycles and reports the change once; the value round-trips
     // through the config text (§O7).
     assert!(u.ui.take_settings_change().is_none());
     u.ui.take_outcome();
@@ -783,7 +784,7 @@ fn the_menu_tree_returns_saves_exits_and_swallows_clicks() {
     // A choice entry activated: sound 1 (§15 r5).
     assert_eq!(u.ui.take_outcome().sounds, [SoundRequest::Ui(1)]);
     let s = u.ui.take_settings_change().unwrap();
-    assert_eq!(s.window_mode, crate::app::config::WindowMode::Borderless);
+    assert_eq!(s.light_quality, 0);
     assert!(u.ui.take_settings_change().is_none());
     let back = crate::app::config::parse_settings(&crate::app::config::write_settings(&s));
     assert_eq!(back.unwrap(), s);
@@ -2219,5 +2220,26 @@ mod equip_backgrounds_play {
         w.units.get_mut(&me).unwrap().mode = 1;
         assert!(pictures(&u, &w, "panel\\inv_armor").is_empty());
         assert!(pictures(&u, &w, "panel\\inv_weapons").is_empty());
+    }
+}
+
+// Key mode (`0x007A7418`): 1 at game start, 0 with the chat open (key-up
+// kept), 2 with the stash open, back to 1 on close; ui 5 closing while
+// the stash is open leaves the mode alone (PROVISIONAL REC-726 for the
+// Esc and non-command exemption in the host filter).
+// Covers: specs/ui/controls.md §4.1 r5
+#[test]
+fn the_ui_hooks_move_the_key_mode() {
+    let mut u = ui(Some(areas()), true);
+    assert_eq!(u.ui.key_mode(), 1);
+    if u.ui.set_ui(5, 0, false).expect("chat on") {
+        assert_eq!(u.ui.key_mode(), 0);
+        u.ui.set_ui(5, 1, false).expect("chat off");
+        assert_eq!(u.ui.key_mode(), 1);
+    }
+    if u.ui.set_ui(25, 0, false).expect("stash on") && u.ui.is_open(25) {
+        assert_eq!(u.ui.key_mode(), 2);
+        u.ui.set_ui(25, 1, false).expect("stash off");
+        assert_eq!(u.ui.key_mode(), 1);
     }
 }
