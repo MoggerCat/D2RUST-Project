@@ -35,24 +35,24 @@
 |   5. Client update pass | 250–395 |
 |   6. Position check (`0x004804E0`) | 396–439 |
 |   7. Session messages | 440–637 |
-|   8. Mode requests | 638–723 |
-|   9. Room-in-sight messages | 724–758 |
-|   10. Bit reader | 759–773 |
-|   11. Current act and level (join and later) | 774–819 |
-|   12. Client DRLG and the room of a point | 820–861 |
-|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
-|   14. Pet list and the hireling GUID | 914–978 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 979–1068 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1069–1103 |
-|   17. Model writes made by 1.14d UI code | 1104–1250 |
-|   18. Audio driver inputs and the client object functions | 1251–1281 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1282–1510 |
-| Constants & data dependencies | 1511–1523 |
-| Randomness | 1524–1539 |
-| Edge cases & original bugs | 1540–1564 |
-| Test vectors | 1565–1622 |
-| Provenance | 1623–1727 |
-| Open questions | 1728–1907 |
+|   8. Mode requests | 638–730 |
+|   9. Room-in-sight messages | 731–765 |
+|   10. Bit reader | 766–780 |
+|   11. Current act and level (join and later) | 781–826 |
+|   12. Client DRLG and the room of a point | 827–868 |
+|   13. Visibility predicate (`0x004DBF20`) | 869–920 |
+|   14. Pet list and the hireling GUID | 921–985 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 986–1075 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1076–1110 |
+|   17. Model writes made by 1.14d UI code | 1111–1257 |
+|   18. Audio driver inputs and the client object functions | 1258–1288 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1289–1517 |
+| Constants & data dependencies | 1518–1530 |
+| Randomness | 1531–1546 |
+| Edge cases & original bugs | 1547–1571 |
+| Test vectors | 1572–1629 |
+| Provenance | 1630–1734 |
+| Open questions | 1735–1914 |
 <!-- /index -->
 
 ## Summary
@@ -680,6 +680,13 @@ position check of the local player.
 
    A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
    neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.
+   PROVISIONAL: on the local player, every code but the walks 0x00,
+   0x01, 0x17, 0x18 and the interact sender 0x02 ends the walk the
+   client predicts (open question 2): the player stands from that
+   request on (because the client steps its path only in a walking mode
+   and the server stops its player's walk on the same mode change; a hit
+   or death while walking otherwise walks the client on alone); settled
+   by REC-1250.
 5. **Object** (`0x004BD6D0`): code 3 → `0x004BCF60(U, record)` (object
    mode change: lights `render/lighting.md` §8), then `0x004BD650` when
    `0x00621B00(U)`; code 0x15 → `0x004BD5C0(record)`; any other code is

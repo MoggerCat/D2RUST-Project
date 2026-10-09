@@ -461,6 +461,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
   think; `monsters/init.md` §4 lists none.
 
 - [q-fix-room-links] After a waypoint return to a town, does 1.14d populate only the rooms near the player (far NPCs/objects appear on approach), as d2rs does? Drive town -> waypoint -> back, snapshot units at +50 and +600 frames (`docs/handoff/q-fix-room-links.md`).
+- [q-fix-walk-desync] Client object footprints (REC-1251): does the 0x51 object init `0x004BC720` (or what it calls) stamp the object's footprint on the client room grid, with which shape (`SizeX` × `SizeY` box?) and mask (`0x006209D0` as the server?), and only when `HasCollision[mode]` ≠ 0? Answer into `client/msg-units.md` §1.3 r2.
+- [q-fix-walk-desync] Local player hit while walking (REC-1250): after S→C 0x0D code 6 (get-hit) to the own client in mode 2 / 3 / 6, does `0x00461250` / the update `0x00463390` stop the client unit's path (no more steps after the hit), and does it resume the old walk after mode 4 ends? Answer into `client/model.md` §8 r4.
 
 ## How to check a behaviour in one command
 
