@@ -237,27 +237,6 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     fill `own`. Write the answer into `sim/units.md` (or the owner spec)
     and the §2 row of `state-snapshot.md`.
 
-## How to check a behaviour in one command
-
-A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
-names the save, seed, ticks and input. One command builds the save with
-`d2s-tool`, runs 1.14d with the recorders and d2rs with the same save and
-seed, and prints the first difference per channel (game state first):
-
-```
-py tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
-py tools/scenario-diff/scenario_diff.py <check> --orig-only        # only record 1.14d
-py tools/scenario-diff/scenario_diff.py <check> --reuse            # re-compare what is in the work dir
-```
-
-On PC 1 the recorders run with `py` directly (no Wine); the 1.14d save is
-copied to `%USERPROFILE%\Saved Games\Diablo II` (`D2_SAVE_DIR` overrides).
-The state channel's report starts with `FIRST DIVERGENCE: frame N <unit>
-field K: 1.14d A vs d2rs B`, then the next 20, then the first frame per
-field; read the state report before any draw list. Two snapshot files
-compare alone with `py tools/trace-recorder/state_diff.py ORIG D2RS`.
-For a new behaviour, add a `.check` file (copy `a1-town-arrival-ama.check`)
-rather than a hand-run recipe.
 22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
     questions 1–4; until answered these directives are gaps on 1.14d):
     register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
@@ -287,6 +266,55 @@ rather than a hand-run recipe.
     motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
     other points that session lists there. Answer into
     `render/unit-composite.md` §8 and the client missile specs.
+
+## How to check a behaviour in one command
+
+A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)
+names the save, seed, ticks, input and channels. One command builds the
+save with `d2s-tool`, runs 1.14d with one recorder per channel and d2rs
+with the same save, seed and input, and prints the first difference per
+channel. Read the state report first: a state divergence is found at the
+tick it happens, a draw difference only where it reaches a pixel.
+
+Windows (PC 1; recorders run with `py` directly, no Wine; `D2_GAME_DIR`
+defaults to `game\` in the repo; the save goes to `%USERPROFILE%\Saved
+Games\Diablo II`, `D2_SAVE_DIR` overrides):
+
+```
+py tools\scenario-diff\scenario_diff.py traces\checks\a1-town-arrival-ama.check
+```
+
+Linux / cloud (1.14d under Wine; setup once: `tools/cloud-game/README.md`):
+
+```
+python3 tools/scenario-diff/scenario_diff.py traces/checks/a1-town-arrival-ama.check
+```
+
+| Channel | Worked example | 1.14d recorder | d2rs side | Comparator | First line of the report |
+|---|---|---|---|---|---|
+| `state` | `a1-town-arrival-ama.check` | `record_state.py` | `d2-client state-dump` | `state_diff.py` | `FIRST DIVERGENCE: frame N <unit> field K: 1.14d A vs d2rs B` |
+| `state` + `input` | `walk-town-ama.check` (`input frame 10; click 600 300`) | same, with `--input` | `state-dump --input` | `state_diff.py` | as above |
+| `rng` | `rng-town-arrival-ama.check` | `record_rng.py --frames` + `rng_owners.py` | `state-dump --rng` (feature `rng-trace`, built by the tool) | `rng_diff.py` | frame, owner (`game`, `unit T:G`), draw index, both sides' sites |
+| `packets` | `packets-town-arrival-ama.check` | `record_packets.py --ticks` | `state-dump --packets` | `packets_diff.py` (masks: `specs/tools/scenario-masks.tsv`) | frame, stream (`c2s`, `s2c`), message, byte offset |
+| `draws` | `draws-town-arrival-ama.check` (`draws-at 73`) | `record_frames.py` + `facts_render.py` | `play --dump-draws --at-tick` | `d2-client facts-compare --ignore tick` | `draws.tsv` row and column |
+| pokes | `poke-fallen-town.check` (`at <frame> poke ...`) | `poke.py` in the recorders | `state-dump --poke` | per channel | — |
+
+Options: `--channels state,rng` (override the file), `--orig-only` /
+`--d2rs-only` (one side), `--reuse` (keep outputs in
+`traces/raw/check-<name>/`, re-compare), `--dry-run` (print the
+commands), `--next N`. Exit code: the worst channel's (0 match, 1
+diverged, 2 partial, 3 error). Each comparator also runs alone on two
+files (`py tools/trace-recorder/state_diff.py ORIG D2RS`, `rng_diff.py`,
+`packets_diff.py`).
+
+Known limits: the d2rs side has no hover model (a click on a unit is a
+ground click) and no `key` steps headless; the click target can differ
+by a sub-tile (`scenario-diff.md` OQ 3); 1.14d draws a timing-dependent
+set of ticks, so `draws-at` falls back to its last drawn tick at or
+before it; `rng` and `packets` with pokes or frame input are partial on
+1.14d. For a new behaviour, add a `.check` file (copy the example of the
+channel) rather than a hand-run recipe, and paste the report's first
+lines into the `q-fix-*` row.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
