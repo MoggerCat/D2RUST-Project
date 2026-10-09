@@ -1556,7 +1556,10 @@ mod tests {
         assert!(sw.asked.borrow().is_empty());
         assert!(!sw.blocked(key) && !sw.indoors() && sw.client_seed().is_none());
         assert_eq!(sw.asked.borrow().len(), 3);
-        assert!(PENDING.len() >= 6);
+        assert!(
+            PENDING.len() >= 4,
+            "the not-wired list shrank only with wiring"
+        );
     }
 
     // Covers: specs/audio/sound-table.md §6.4 r2; specs/audio/environment.md §1 r2

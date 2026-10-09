@@ -47,3 +47,5 @@ ProgSound not requested, 413 greeting mode.
 
 `D2_GAME_DIR=$HOME/game cargo test -p d2-client --test audio_unit_sounds
 --test play_smoke -- --ignored`
+
+Gate note: `play_smoke::the_live_run` fails identically on the parent commit 56796e3 ('monster 3 died: life Some(256)', play_smoke.rs:778); not from this branch. No remote `staging` branch exists; the branch is based on the staging tip 56796e3, so there was nothing to merge.
