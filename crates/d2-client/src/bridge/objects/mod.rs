@@ -243,6 +243,12 @@ pub struct ClientObjects {
     /// read them (`super::client_missiles::stamp_unit_footprints`), by
     /// room.
     pub unit_grids: BTreeMap<d2_sim::units::RoomId, d2_sim::drlg::CollisionGrid>,
+    /// The client missiles' sound calls not yet handed out
+    /// (`super::output::Output::MissileSound`).
+    pub missile_sounds: Vec<super::client_missiles::MissileSound>,
+    /// Monster type flag 0x80 (+0x16) while the umod 29 hook makes its
+    /// copies (`monsters/umod-callbacks.md` §28.2).
+    pub multishot_guard: std::collections::BTreeSet<UnitKey>,
 }
 
 /// A unit and the set it is in.

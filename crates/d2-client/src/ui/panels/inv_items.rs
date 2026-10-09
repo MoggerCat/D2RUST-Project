@@ -296,28 +296,60 @@ impl ItemsUi {
         layout: &InvLayout,
         out: &mut dyn UiDrawSink,
     ) {
+        for it in items::local_items(world) {
+            if let Some(d) = self.item_draw(world, files, layout, &it) {
+                out.push(d);
+            }
+        }
+    }
+
+    /// `inventory.md` §3 r2–r3, §6: per item, its tints then its graphic
+    /// (`a1-panel-cube` rows 25–40: four cell boxes, the cube; four, the
+    /// cap; ...), grid items and equipped items in the list order.
+    pub fn draw_items(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        layout: &InvLayout,
+        mouse: Point,
+        out: &mut dyn UiDrawSink,
+    ) {
+        for it in items::local_items(world) {
+            for d in self.item_tints(world, layout, mouse, &it) {
+                out.push(d);
+            }
+            if let Some(d) = self.item_draw(world, files, layout, &it) {
+                out.push(d);
+            }
+        }
+    }
+
+    /// One item's graphic in the panel (§3 r1, §6 r2, §8 r4).
+    fn item_draw(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        layout: &InvLayout,
+        it: &ItemView,
+    ) -> Option<UiDraw> {
         let g = &layout.grid;
         let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
-        for it in items::local_items(world) {
-            let Some(a) = self.art(files, &it, cell) else {
-                continue;
-            };
-            let top_left = match it.mode {
-                mode::STORED if it.page == 0 => {
-                    let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
-                    Point::new(x, y)
+        let a = self.art(files, it, cell)?;
+        let top_left = match it.mode {
+            mode::STORED if it.page == 0 => {
+                let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
+                Point::new(x, y)
+            }
+            mode::BODY if (1..=10).contains(&it.body) => {
+                let b = layout.equip[usize::from(it.body)];
+                if b.w == 0 || b.h == 0 {
+                    return None;
                 }
-                mode::BODY if (1..=10).contains(&it.body) => {
-                    let b = layout.equip[usize::from(it.body)];
-                    if b.w == 0 || b.h == 0 {
-                        continue;
-                    }
-                    equip_draw_point(it.body, b, cell, (a.w, a.h), false)
-                }
-                _ => continue,
-            };
-            out.push(self.item_cel(world, &it, a.file, top_left.x, top_left.y + a.gh));
-        }
+                equip_draw_point(it.body, b, cell, (a.w, a.h), false)
+            }
+            _ => return None,
+        };
+        Some(self.item_cel(world, it, a.file, top_left.x, top_left.y + a.gh))
     }
 
     /// An item's graphic with its frame's top-left at (`left`, `top`)

@@ -1,0 +1,175 @@
+// Spec: specs/client/msg-stats-items.md §1 r4; specs/missiles/missiles.md §R2.4; specs/sim/intents-events.md §7.2
+//! The add messages of a player's part B (0x20 stat updates) and of a
+//! `ClientSend` missile (0x73 field sources).
+
+use super::*;
+use crate::missiles::{create_missile, param_flags, MissileParams};
+
+/// Sends the add messages of `unit` to `receiver` and returns them.
+fn add(fx: &mut Fx, receiver: UnitId, unit: UnitId) -> Vec<Vec<u8>> {
+    let s = &mut fx.sim.sys;
+    let mut v = View::of(&mut s.units, &mut s.stats, &s.data, &mut s.hooks);
+    v.add_messages(&fx.game, receiver, unit);
+    std::mem::take(&mut fx.sim.hooks().x.sent)
+        .into_iter()
+        .map(|(to, b)| {
+            assert_eq!(to, receiver);
+            b
+        })
+        .collect()
+}
+
+/// §7.2 part B (`0x005489F0`): another player's base velocity, attack
+/// rate, level, strength and dexterity (stats 67, 68, 12, 0, 2) go first
+/// as 0x20; the receiver's own part B has none.
+// Covers: specs/client/msg-stats-items.md §1 r4
+#[test]
+fn player_part_b_sends_the_five_0x20_stats_to_others_only() {
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let a = fx.a;
+    let p0 = fx.spawn(UnitType::Player, 0, a, 20, 20);
+    let p1 = fx.spawn(UnitType::Player, 0, a, 22, 20);
+    fx.stats(p1, &[(67, 0), (68, 0), (12, 5), (0, 20), (2, 25)]);
+    let g1 = fx.game.lists.unit(p1).unwrap().guid;
+    let got = add(&mut fx, p0, p1);
+    // Message 0 is the 0x59 assign; part B follows.
+    let want: Vec<Vec<u8>> = [(67u8, 0u32), (68, 0), (12, 5), (0, 20), (2, 25)]
+        .iter()
+        .map(|&(s, v)| crate::units::messages::stat_update(g1, s, v).to_vec())
+        .collect();
+    assert_eq!(got[0][0], 0x59);
+    assert_eq!(&got[1..6], &want[..]);
+    // The receiver's own part B: no 0x20.
+    let own = add(&mut fx, p0, p0);
+    assert!(own.iter().all(|m| m[0] != 0x20));
+}
+
+/// `missiles.md` §R2.4 rules 1-9: the position is the path's cells
+/// (`precise >> 16`), the first point is the target while the velocity is
+/// non-zero (else 0, 0), and the message is sent for velocity 0 too.
+// Covers: specs/missiles/missiles.md §r2-4-client-message
+#[test]
+fn client_missile_0x73_field_sources() {
+    for (velocity, first) in [(5u32, (300u32, 400u32)), (0, (0, 0))] {
+        let mut fx = Fx::new();
+        fx.sim.hooks().enable_paths().expect("embedded tables");
+        Arc::make_mut(&mut fx.sim.sys.hooks.tables).missiles[0].clientsend = true;
+        let a = fx.a;
+        let owner = fx.spawn(UnitType::Monster, 0, a, 10, 10);
+        let p0 = fx.spawn(UnitType::Player, 0, a, 20, 20);
+        let params = MissileParams {
+            owner: Some(owner),
+            origin: Some(owner),
+            class: 0,
+            flags: param_flags::TARGET_ABSOLUTE,
+            target_x: 13,
+            target_y: 10,
+            ..MissileParams::default()
+        };
+        let m = fx
+            .sim
+            .missiles(&mut fx.game, |g, cx| create_missile(g, cx, &params))
+            .unwrap()
+            .expect("created");
+        {
+            let p = fx
+                .sim
+                .sys
+                .hooks
+                .paths
+                .as_mut()
+                .and_then(|p| p.dynamic_mut(m))
+                .expect("dynamic path");
+            p.precise_x = 0x0012_3456;
+            p.precise_y = 0x0045_6789;
+            p.target_x = 300;
+            p.target_y = 400;
+            p.velocity = velocity as i32;
+        }
+        let got = add(&mut fx, p0, m);
+        assert_eq!(got.len(), 1, "velocity {velocity}");
+        let b = &got[0];
+        assert_eq!(b[0], 0x73);
+        assert_eq!(u32::from_le_bytes(b[7..11].try_into().unwrap()), 0x12);
+        assert_eq!(u32::from_le_bytes(b[11..15].try_into().unwrap()), 0x45);
+        assert_eq!(u32::from_le_bytes(b[15..19].try_into().unwrap()), first.0);
+        assert_eq!(u32::from_le_bytes(b[19..23].try_into().unwrap()), first.1);
+    }
+}
+
+/// `intents-events.md` §8.3 (`0x0052C410`, `0x0053FC70`, `0x0055B620`)
+/// with two clients: the joiner J gets C's 0x5B, its own 0x5B, one 0x65
+/// per in-game player, one 0x8D per player unit and the 0x5A; C gets
+/// J's 0x5B and the 0x5A.
+// Covers: specs/sim/intents-events.md §8.3
+#[test]
+fn join_sequence_with_two_clients_sends_per_recipient() {
+    use crate::tick::TickHooks;
+    use crate::units::lists::client_state;
+    use crate::units::messages as m;
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let p0 = fx.spawn(UnitType::Player, 1, a, 20, 20);
+    let p1 = fx.spawn(UnitType::Player, 2, a, 22, 20);
+    let _c0 = fx
+        .game
+        .lists
+        .add_client(Some(p0), Some(a), client_state::IN_GAME);
+    let c1 = fx
+        .game
+        .lists
+        .add_client(Some(p1), Some(a), client_state::IN_GAME);
+    let mut n0 = [0u8; 16];
+    n0[..3].copy_from_slice(b"Old");
+    let mut n1 = [0u8; 16];
+    n1[..3].copy_from_slice(b"New");
+    fx.sim.sys.hooks.session.names.insert(p0, n0);
+    fx.sim.sys.hooks.session.names.insert(p1, n1);
+    fx.stats(p0, &[(12, 7)]);
+    fx.stats(p1, &[(12, 9)]);
+    let (g0, g1) = (
+        fx.game.lists.unit(p0).unwrap().guid,
+        fx.game.lists.unit(p1).unwrap().guid,
+    );
+    fx.sim.hooks().x.sent.clear();
+    fx.sim.join_sequence(&mut fx.game, c1);
+    let sent = std::mem::take(&mut fx.sim.hooks().x.sent);
+    let to = |u: UnitId| -> Vec<Vec<u8>> {
+        sent.iter()
+            .filter(|(t, _)| *t == u)
+            .map(|(_, b)| b.clone())
+            .collect()
+    };
+    let j5b = |g, class, name: &[u8; 16], lvl| m::player_joined(g, class, name, lvl, m::NO_PARTY);
+    let order: Vec<u32> = fx
+        .game
+        .lists
+        .units_of_type(UnitType::Player)
+        .into_iter()
+        .map(|u| fx.game.lists.unit(u).unwrap().guid)
+        .collect();
+    // The 0x65 follow the client list's order (new clients are prepended).
+    let list: Vec<u32> = fx
+        .game
+        .lists
+        .clients()
+        .into_iter()
+        .filter_map(|c| fx.game.lists.client(c).and_then(|e| e.player))
+        .map(|p| fx.game.lists.unit(p).unwrap().guid)
+        .collect();
+    assert_eq!(list, [g1, g0]);
+    let mut want_j = vec![j5b(g0, 1, &n0, 7), j5b(g1, 2, &n1, 9)];
+    want_j.extend(list.iter().map(|&g| m::player_kill_count(g, 0).to_vec()));
+    want_j.extend(
+        order
+            .iter()
+            .map(|&g| m::assign_player_to_party(g, m::NO_PARTY).to_vec()),
+    );
+    want_j.push(m::player_event(2, &n1).to_vec());
+    assert_eq!(to(p1), want_j);
+    assert_eq!(
+        to(p0),
+        vec![j5b(g1, 2, &n1, 9), m::player_event(2, &n1).to_vec()]
+    );
+}

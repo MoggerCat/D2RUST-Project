@@ -18,7 +18,7 @@ d2s-tool: 1.14d character saves (.d2s) for local testing. Tables come from
 
   d2s-tool new --name N --class C [edit flags] -o OUT.d2s
   d2s-tool new-stub --name N --class C [--hardcore] [--expansion] [--time T] -o OUT.d2s
-  d2s-tool dump FILE.d2s [--classic|--expansion]
+  d2s-tool dump FILE.d2s [--classic|--expansion] [--items]  (--items: fields and bytes per item)
   d2s-tool check FILE.d2s [--classic|--expansion]
   d2s-tool set IN.d2s -o OUT.d2s [edit flags]
 
@@ -38,7 +38,11 @@ edit flags:
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
   --act A --difficulty D       town byte: act 0..4 of difficulty D (default 0, normal)
   --item CODE[#Q][@X,Y][:PAGE] a normal identified item (page 0 inventory, 3 cube, 4 stash;
-                               #Q: quantity Q); repeatable
+                               #Q: quantity Q); repeatable. Options after '/':
+                               /q=low|normal|superior|magic|set|rare|unique|crafted
+                               /idx=ROW (set/unique row) /ilvl=N /sock=N /unid /eth
+                               /body=1..12 (equipped; the base must fit the
+                               location, or 1.14d drops it at load) /belt=0..15
   --seed S                     game seed the items' seeds derive from (default 1)
   --map-seed S                 header map seed (new: default = the time)
   --time T                     create/save time (new: default now; set: save time)
@@ -99,6 +103,7 @@ fn parse(rest: Vec<String>) -> Result<(Edits, Common)> {
             "--game-dir" => c.game_dir = Some(a.value(&f)?.into()),
             "-o" | "--out" => c.out = Some(a.value(&f)?.into()),
             "--classic" => c.expansion_read = Some(false),
+            "--items" => crate::dump::ITEM_DETAIL.store(true, std::sync::atomic::Ordering::Relaxed),
             "--name" => e.name = Some(a.value(&f)?),
             "--class" => e.class = Some(parse_class(&a.value(&f)?)?),
             "--level" => e.level = Some(num(&a.value(&f)?, "--level")?),

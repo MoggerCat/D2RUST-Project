@@ -14,7 +14,7 @@
 //! flags below are preview fills, not facts of the original.
 
 use super::{InvDesk, InvRest};
-use crate::items::moves::{Guid, MovePending, MoveUnits, Owner};
+use crate::items::moves::{mode, unequip_detached, Guid, MovePending, MoveUnits, Owner};
 use crate::stats::lists::flag;
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::UnitId;
@@ -161,16 +161,31 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.free_item(item);
     }
 
-    /// `0x005440A0` (`quests.md` §9.2): the removal message, then the
-    /// item leaves the player (inventory, body or cursor) and is freed.
-    ///
-    /// PROVISIONAL (quests.md §9.2): the equipped branch's unequip path
-    /// is the same removal (no weapon bookkeeping).
+    /// `0x005440A0` (`quests.md` §9.2) by the item's mode: 0 stored: the
+    /// removal message (flag 0x20) with the stored page, unlink, freed;
+    /// 1 equipped: the detached take-off `0x00560CD0(.., 1)`
+    /// ([`unequip_detached`]; not freed, the next unit update sends the
+    /// removal); 4 cursor: the cursor consume `0x0055EEA0`; any other
+    /// mode (belt, ground): nothing.
     pub fn delete_held_item(&mut self, player: UnitId, item: UnitId) {
         let g = self.guid_of(item);
-        let page = self.page(g);
-        let _ = self.send_item_page(player, item, REMOVED_FLAG, page);
-        self.free_item(g);
+        match self.mode(g) {
+            mode::STORED => {
+                let page = self.page(g);
+                let _ = self.send_item_page(player, item, REMOVED_FLAG, page);
+                self.free_item(g);
+            }
+            mode::EQUIPPED => {
+                if let Some(o) = self.owner_of(player) {
+                    let loc = self.body_loc(g);
+                    let _ = unequip_detached(self, o, loc);
+                }
+            }
+            mode::CURSOR => {
+                self.take_cursor(player, item);
+            }
+            _ => {}
+        }
     }
 }
 

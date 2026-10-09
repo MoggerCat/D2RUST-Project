@@ -150,7 +150,7 @@ def vk_code(k):
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
               "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
-              "end": (0, 0)}
+              "units": (1, 1), "end": (0, 0)}
 
 
 def parse_script(text):
@@ -175,7 +175,7 @@ def parse_script(text):
             a = [int(a[0], 0), a[1]] + [int(x, 0) for x in a[2:]]
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
-                 + [float(x) for x in a[2:]])
+                 + [float(x) for x in a[2:3]] + [int(x, 0) for x in a[3:]])
         elif op not in ("shot", "dumpdrlg", "mark"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
@@ -266,9 +266,10 @@ def drlg_dump(mem, label=""):
 def nearest(mem, utype, cls):
     best = None
     for u in units_of(mem, utype):
-        if cls is not None and mem.read_u32(u + U_CLASS) not in cls:
+        # class -1 (goto) or None (clickunit `*`): any class; None also keeps living monsters only
+        if cls is not None and -1 not in cls and mem.read_u32(u + U_CLASS) not in cls:
             continue
-        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # any class: only living monsters (mode 0 death, 12 dead)
+        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # mode 0 death, 12 dead
             continue
         s = screen_of(mem, u)
         if s is None:
@@ -459,6 +460,12 @@ class AutoStart:
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
                     self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
                     yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
+            elif op == "units":
+                rows = []
+                for u in units_of(mem, a[0]):
+                    rows.append([mem.read_u32(u + 0x0C), mem.read_u32(u + U_CLASS),
+                                 client_px(mem, u), screen_of(mem, u)])
+                self.log(f"autostart: units {a[0]} " + json.dumps(rows, separators=(",", ":")))
             elif op == "dumpdrlg":
                 rec = drlg_dump(mem, a[0] if a else "")
                 self.dumps.append(rec)

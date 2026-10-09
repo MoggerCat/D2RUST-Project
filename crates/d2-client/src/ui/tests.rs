@@ -1444,3 +1444,90 @@ fn from_frame_is_the_inverse_of_to_frame() {
     let (x, y) = p.from_frame(300, 77);
     assert_eq!(p.to_frame(x, y), FramePos::Inside(Point::new(300, 77)));
 }
+
+/// A [`TestPanel`] drawn right before another panel.
+struct BeforePanel {
+    inner: TestPanel,
+    before: PanelId,
+}
+
+impl Panel for BeforePanel {
+    fn id(&self) -> PanelId {
+        self.inner.id()
+    }
+    fn rect(&self) -> Rect {
+        self.inner.rect()
+    }
+    fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
+        self.inner.draw(ctx, out);
+    }
+    fn draw_before(&self) -> Option<PanelId> {
+        Some(self.before)
+    }
+    fn hit(&self, p: Point) -> Option<WidgetId> {
+        self.inner.hit(p)
+    }
+    fn event(&mut self, e: UiEvent, ctx: &UiCtx) -> UiResponse {
+        self.inner.event(e, ctx)
+    }
+}
+
+/// `Panel::draw_before`: an open panel added after another is drawn right
+/// before it (the inventory family's cube before the inventory), its own
+/// place skipped; with the other closed it draws in place; the routing
+/// order stays the add order.
+#[test]
+fn a_draw_before_panel_draws_ahead_of_its_target_only() {
+    let log = Log::default();
+    let mut root = UiRoot::new(Box::new(NoPanelRules));
+    root.add(TestPanel::boxed(
+        1,
+        Rect::new(0, 0, 100, 100),
+        UiResponse::Ignored,
+        &log,
+    ))
+    .unwrap();
+    root.add(TestPanel::boxed(
+        2,
+        Rect::new(0, 0, 100, 100),
+        UiResponse::Ignored,
+        &log,
+    ))
+    .unwrap();
+    root.add(Box::new(BeforePanel {
+        inner: TestPanel {
+            id: PanelId(3),
+            rect: Rect::new(0, 0, 100, 100),
+            button: Button {
+                id: WidgetId(30),
+                rect: Rect::new(0, 0, 10, 10),
+                image: Some(ImageRef { file: 3, frame: 0 }),
+                pressed_image: None,
+                pressed: false,
+            },
+            answer: UiResponse::Consumed,
+            log: log.clone(),
+        },
+        before: PanelId(2),
+    }))
+    .unwrap();
+    let files = |root: &UiRoot| -> Vec<u32> {
+        let mut out: Vec<UiDraw> = Vec::new();
+        with_ctx(|ctx| root.draw(ctx, &mut out));
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Image(i) => Some(i.image.file),
+                _ => None,
+            })
+            .collect()
+    };
+    for p in 1..=3 {
+        root.open(PanelId(p)).unwrap();
+    }
+    assert_eq!(files(&root), [1, 3, 2]);
+    // Routing stays the add order: panel 3 (added last) takes the press.
+    with_ctx(|ctx| root.dispatch(press(5, 5), ctx));
+    assert_eq!(log.borrow().first().map(|e| e.0), Some(PanelId(3)));
+    root.close(PanelId(2)).unwrap();
+    assert_eq!(files(&root), [1, 3]);
+}

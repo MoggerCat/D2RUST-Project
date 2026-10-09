@@ -452,7 +452,8 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
         bridge.0.set_class_skills(class_skills);
         bridge.0.set_skill_tables(std::sync::Arc::new(skill_tables));
     }
-    let units = single_player::client_unit_rows(archives.as_ref())?;
+    let mut units = single_player::client_unit_rows(archives.as_ref())?;
+    single_player::client_monster_anims(archives.as_ref(), &mut units)?;
     app.world_mut()
         .resource_mut::<BridgeResource>()
         .0

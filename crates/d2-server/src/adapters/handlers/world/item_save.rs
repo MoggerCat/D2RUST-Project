@@ -12,6 +12,7 @@ use d2_sim::units::{UnitId, UnitType};
 use d2_sim::wiring::inventory::load::LoadFault;
 
 use super::{inv_take_sent, ActionEvents, Game, WiredWorld};
+use crate::adapters::handlers::items::moves::preview_skills::sync_oskills;
 use d2_formats::d2s::appearance::Equipment;
 
 use crate::adapters::character::save::{equipment, item_list, SaveContext};
@@ -133,6 +134,12 @@ impl<R, S> WiredWorld<R, S> {
                 };
                 inv.state.add_inventory(player, kind, guid);
             }
+            // The skill lists lent to the rest: the item-skill link's 0x22
+            // (`inventory.md` §5.5) and the stat 97 / 107 callback's 0x21
+            // (`levels.md` §7.1) of the join's item calls, in item order.
+            if !corpse {
+                super::wired::lend_skills(econ, &mut inv);
+            }
             let mut d = inv.desk(econ);
             for (i, e) in entries.iter().enumerate() {
                 let rec = match read_save_entry(&e.bytes, d.econ.tables) {
@@ -152,12 +159,35 @@ impl<R, S> WiredWorld<R, S> {
                     Ok(u) => r.items.push(u),
                     Err(f) => r.faults.push(format!("item {i}: {}", fault(&f))),
                 }
+                // The stat callback of this item's attach (`levels.md`
+                // §7.1), so its 0x21 follows the item's own messages.
+                if !corpse {
+                    if let Some(mut st) = d.rest.take_skills() {
+                        let mut sent = Vec::new();
+                        let o = d2_sim::items::moves::Owner::player(guid);
+                        if st.lists.contains_key(&o) {
+                            sync_oskills(
+                                &mut st,
+                                o,
+                                |sl, stat, skill| {
+                                    d.econ.stats.unit_total(sl.unit, stat, skill as u16)
+                                },
+                                &mut sent,
+                            );
+                        }
+                        d.rest.queue_sent(sent);
+                        d.rest.stage_skills(st, d.tables);
+                    }
+                }
             }
             d.sync_out();
             r.sent = inv_take_sent(&mut d)
                 .into_iter()
                 .filter_map(|(u, b)| Some((u?, b)))
                 .collect();
+            if !corpse {
+                super::wired::return_skills(econ, &mut inv, false);
+            }
         });
         self.inventory = Some(inv);
         r

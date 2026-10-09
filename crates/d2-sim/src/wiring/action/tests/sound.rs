@@ -231,7 +231,7 @@ fn monster_update_sends_npc_enchants() {
 }
 
 /// `intents-events.md` §7.9 rule 2: the 0x99 / 0x9A / 0xA5 / 0xAB records
-/// carry the unit they sit on; 0xAB is not sent for a revived unit; the
+/// carry the unit they sit on; 0xAB is not sent for a unit with flag 0x8000 or one the receiver may not attack; the
 /// 0x99 record of a target absent from the receiver's rooms is the
 /// 17-byte 0x9A (`0x0053D530` with flag 1, §3.5 rule 5).
 // Covers: specs/sim/intents-events.md §7.9 r2, §3.5 r5
@@ -291,14 +291,25 @@ fn pending_skill_event_records_0x99_0x9a_0xa5_0xab() {
         })
         .collect();
     assert_eq!(got, want);
-    // A revived unit (flag 0x80000000): no 0xAB; the others are sent.
-    reset(&mut fx, 0x8000_0000);
+    // Flag 0x8000 (soft hit): no 0xAB; the others are sent.
+    reset(&mut fx, 0x8000);
     fx.sim.send_unit_update(&mut fx.game, c, m);
     let got: Vec<_> = std::mem::take(&mut fx.sim.hooks().x.sent)
         .into_iter()
         .map(|(_, b)| b[0])
         .collect();
-    assert_eq!(got, [0x99, 0x9A, 0xA5]);
+    assert!(!got.contains(&0xAB));
+    assert!([0x99, 0x9A, 0xA5].iter().all(|id| got.contains(id)));
+    // A unit the receiver may not attack (own hireling): no 0xAB.
+    reset(&mut fx, 0);
+    fx.sim.hooks().x.peaceful.push(m);
+    fx.sim.send_unit_update(&mut fx.game, c, m);
+    let got: Vec<_> = std::mem::take(&mut fx.sim.hooks().x.sent)
+        .into_iter()
+        .map(|(_, b)| b[0])
+        .collect();
+    assert!(!got.contains(&0xAB));
+    assert!([0x99, 0x9A, 0xA5].iter().all(|id| got.contains(id)));
 }
 
 /// `intents-events.md` §7.3 rule 2 step 9: a unit whose list has the
