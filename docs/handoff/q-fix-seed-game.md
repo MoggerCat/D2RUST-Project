@@ -42,7 +42,7 @@ first differing draw or unit.
 | dru-volcano | state f34 missile 3:1 seed | state: no difference, 70 frames; rng only the creation draw | q-fix-seed-order |
 | ass-shadow-master | state f28 game seed | state f48 monster 1:8 (418 Shadow Master) mode 7 vs 1 | skills / pet AI |
 | a3-warp-durance-ama | state f21, 1.14d +3 units (chests 181, 183, orb monster) | state f21, 1.14d +1 unit: monster 366 (Compelling Orb's) at (4496, 1811) | act 3 quests (below, Open 4) |
-| combat-* (12) | state f5 game seed | unchanged | q-fix-seed-order (Blood Moor population) |
+| combat-* (12) | state f5 game seed | unchanged here; fixed on `claude/q-fix-seed-order` @ c44cf57b (Act I path floor, `outdoor.md` §7.5.3: tile-substitution draws → room seeds → population) | q-fix-seed-order |
 | milestone-izual | state f28 game seed | unchanged | population (Open 2) |
 | a3-warp-kurast-sewers-ama | state f21 game seed | unchanged | population (Open 2) |
 | milestone-act5-entry | state f26 monster 1:5 (Larzuk) seed | unchanged | act 5 quests (Open 5) |
@@ -54,8 +54,10 @@ first differing draw or unit.
 1. **combat-* frame 5.** Every game-seed draw through frame 5 matches
    value for value; 1.14d has 2 more because after the third density run
    it allocates 4 units (a pack) where d2rs allocates 2; monster 1:10 is
-   class 19 on 1.14d vs 5 on d2rs (the room-seed class pick). Sent to
-   q-fix-seed-order.
+   class 19 on 1.14d vs 5 on d2rs. Root cause (q-fix-seed-order,
+   c44cf57b): no Act I path floor, so 3 Blood Moor rooms had other
+   active-room seeds. The frame-2 creation-draw report was an rng tool
+   attribution artifact, fixed there too.
 2. **Population elsewhere.** `milestone-izual` f28 (Plains of Despair):
    the first differing unit is 1:25 class 298 at another spot (pack
    placement), then pack sizes differ. `a3-warp-kurast-sewers-ama` f21:
