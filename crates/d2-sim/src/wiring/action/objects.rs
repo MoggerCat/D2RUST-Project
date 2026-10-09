@@ -38,6 +38,7 @@ use crate::world::objects::{
     ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, StateList, StateRequest,
     UpdateMessage,
 };
+use crate::world::quests::act2::q4::JerhynStep;
 
 use super::{Pending, View, WiringError};
 use crate::path::record::ObjectShape;
@@ -130,6 +131,28 @@ pub trait QuestObjectHost<X> {
         let _ = (game, v, player, npc, class, interact);
         false
     }
+    /// The Jerhyn AI hooks of `ai-bodies.md` §9.9 step 2
+    /// (`world/quests-act2.md` §10): `0x0059F570` (palace active),
+    /// `0x0059F580` (palace NPC state, the AI unit at its path position
+    /// `at`), `0x0059B6E0` (guard moving) and the success of
+    /// [`JerhynStep::PlaceAt`]. Defaults: no quest state (active, (1, 0),
+    /// not moving).
+    fn jerhyn_palace_active(&mut self) -> bool {
+        true
+    }
+    fn jerhyn_npc_state(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        at: (i32, i32),
+    ) -> JerhynStep {
+        let _ = (game, v, at);
+        JerhynStep::Out(1, 0)
+    }
+    fn guard_moving(&mut self) -> bool {
+        false
+    }
+    fn jerhyn_placed(&mut self) {}
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }

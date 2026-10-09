@@ -487,28 +487,33 @@ pub fn walk_in_radius<W: AiHost + ?Sized>(
     ok
 }
 
-/// The point `0x005DE4E0` walks to: from the unit at `u` toward `t` by
-/// k = min(a, dist − b) of the no-size distance dist, each axis
-/// `u + Δ·k / dist` rounded to the nearest (halves away from zero);
-/// `None` when k ≤ 0 or dist = 0.
-/// PROVISIONAL (§7.2, REC-501): the geometry is D2MOO's and unread in
-/// 1.14d; this reading reproduces the three recorded walks of Warriv at
-/// the Rogue Encampment arrival (`-seed 1234`, player at (4873, 4228)):
-/// from (4866, 4235) with (a, b) = (3, 2) to (4868, 4233); from
-/// (4868, 4233) with (2, 2) to (4869, 4232); from (4869, 4232) with
-/// (1, 2) to (4870, 4231). Settled by `pc1-data.md` Step 4 "walk in
-/// radius geometry".
-pub fn radius_point(u: (i32, i32), t: (i32, i32), a: i32, b: i32) -> Option<(i32, i32)> {
-    let dist = distance_no_size(u, t);
-    let k = a.min(dist - b);
-    if dist == 0 || k <= 0 {
-        return None;
+/// The point `0x005DE4E0` walks to (§7.2, 1.14d-confirmed, settles
+/// REC-501): d := the full-size distance from the unit at `u` (size
+/// `size`) to `t` (`0x005DC380`); s := −1 when d < b, else +1; k :=
+/// min(|d − b|, a); ax, ay := |t − u| per axis, n := max(ax + ay, k);
+/// when n > 0, kx := ax·k / n, ky := ay·k / n (truncated), then while
+/// kx + ky < k both grow by 1. The point is u + sign(t − u)·(kx, ky)·s
+/// (sign 0 on an equal axis). No early exit: k = 0, or `t` on `u`, gives
+/// `u` itself.
+pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> (i32, i32) {
+    let d = distance_full_size(u, size, t);
+    let s = if d < b { -1 } else { 1 };
+    let k = (d - b).abs().min(a);
+    let (ax, ay) = ((t.0 - u.0).abs(), (t.1 - u.1).abs());
+    let n = (ax + ay).max(k);
+    let (mut kx, mut ky) = (0, 0);
+    if n > 0 {
+        kx = ax * k / n;
+        ky = ay * k / n;
+        while kx + ky < k {
+            kx += 1;
+            ky += 1;
+        }
     }
-    let step = |d: i32| {
-        let n = d * k;
-        (2 * n + n.signum() * dist) / (2 * dist)
-    };
-    Some((u.0 + step(t.0 - u.0), u.1 + step(t.1 - u.1)))
+    (
+        u.0 + (t.0 - u.0).signum() * kx * s,
+        u.1 + (t.1 - u.1).signum() * ky * s,
+    )
 }
 
 /// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):

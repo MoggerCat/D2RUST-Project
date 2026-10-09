@@ -24,6 +24,7 @@ use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
 use super::{Pending, View, WiringError};
 use crate::world::objects::Dispatch;
+use crate::world::quests::act2::q4::JerhynStep;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
@@ -330,9 +331,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
     /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
-    /// No point (k ≤ 0 or t on the unit) → the request is still made, at
-    /// the unit's own cell (§7.5 rule 8, REC-665): no path, neutral, and
-    /// the think at f + `aidel`.
+    /// A point on the unit's own cell (k = 0 or t on the unit) is still
+    /// requested (§7.5 rule 8, REC-665): no path, neutral, and the think
+    /// at f + `aidel`.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -344,7 +345,8 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         let at = self.h.path_position(unit);
         let to = self.h.path_position(target);
-        let (x, y) = crate::monsters::ai::radius_point(at, to, a, b).unwrap_or(at);
+        let size = self.path_size(unit);
+        let (x, y) = crate::monsters::ai::radius_point(at, size, to, a, b);
         AiModes::set_path_steps(self, unit, 1);
         self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
@@ -569,14 +571,34 @@ impl<X: Pending> AiQuests for View<'_, X> {
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         self.h.x.drehya_wait(game)
     }
+    /// The lent quest control's A2Q4 hooks (`world/quests-act2.md` §10);
+    /// without one (a host without quests) [`Pending`]'s.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
-        self.h.x.jerhyn_palace_active(game)
+        match self.h.quest_host.as_mut() {
+            Some(q) => q.jerhyn_palace_active(),
+            None => self.h.x.jerhyn_palace_active(game),
+        }
     }
-    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
-        self.h.x.jerhyn_npc_state(game, unit)
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> JerhynStep {
+        let Some(mut host) = self.h.quest_host.take() else {
+            let (a, b) = self.h.x.jerhyn_npc_state(game, unit);
+            return JerhynStep::Out(a, b);
+        };
+        let at = self.h.path_position(unit);
+        let r = host.jerhyn_npc_state(game, self, at);
+        self.h.quest_host = Some(host);
+        r
+    }
+    fn jerhyn_placed(&mut self, _game: &mut Game) {
+        if let Some(q) = self.h.quest_host.as_mut() {
+            q.jerhyn_placed();
+        }
     }
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
-        self.h.x.guard_moving(game, unit)
+        match self.h.quest_host.as_mut() {
+            Some(q) => q.guard_moving(),
+            None => self.h.x.guard_moving(game, unit),
+        }
     }
     fn alkor_bird(&mut self, game: &mut Game) -> bool {
         self.h.x.alkor_bird(game)

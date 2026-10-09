@@ -863,3 +863,125 @@ fn palace_hooks() {
     assert!(!q4::guard_moved(&mut ctl) && !q4::blocker_open(&ctl));
     assert_eq!(q4::guard_target(&ctl), None);
 }
+
+// Covers: specs/world/quests-act2.md §10 (`0x0059F570` → `0x0059F510`,
+// `0x0059DFB0`)
+#[test]
+fn jerhyn_palace_active_hook() {
+    let (mut ctl, _f, i) = setup();
+    // No palace Jerhyn (+0x0D = 0): active, the AI goes on.
+    assert!(q4::jerhyn_palace_active(&ctl));
+    ctl.records[i].extra.a2.q4.jerhyn_palace = true;
+    ctl.records[i].not_intro = true;
+    ctl.records[i].state = 1;
+    let r8 = ctl.find(8).unwrap();
+    ctl.records[r8].not_intro = true;
+    ctl.records[r8].state = 2;
+    let r13 = ctl.find(13).unwrap();
+    // Chain 13 not-intro with state < 4 (`0x0059DFB0` = 0) and every
+    // other test holding: held at the palace (false).
+    ctl.records[r13].not_intro = true;
+    ctl.records[r13].state = 3;
+    assert!(!q4::jerhyn_palace_active(&ctl));
+    // Each failing test answers true.
+    ctl.records[r13].not_intro = false;
+    assert!(q4::jerhyn_palace_active(&ctl));
+    ctl.records[r13].not_intro = true;
+    ctl.records[r13].state = 4;
+    assert!(q4::jerhyn_palace_active(&ctl));
+    ctl.records[r13].state = 3;
+    ctl.records[r8].state = 5;
+    assert!(q4::jerhyn_palace_active(&ctl));
+    ctl.records[r8].state = 2;
+    ctl.records[i].state = 2;
+    assert!(q4::jerhyn_palace_active(&ctl));
+    ctl.records[i].state = 1;
+    ctl.records[i].not_intro = false;
+    assert!(q4::jerhyn_palace_active(&ctl));
+}
+
+// Covers: specs/world/quests-act2.md §10 (`0x0059F580`)
+#[test]
+fn jerhyn_npc_state_hook() {
+    use q4::JerhynStep;
+    let (mut ctl, mut f, i) = setup();
+    // R11 intro, or no palace Jerhyn: (1, 0).
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    ctl.records[i].not_intro = true;
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    ctl.records[i].extra.a2.q4.jerhyn_palace = true;
+    // `0x0059D7C0` ≠ 0 (chain 13 not past state 1 as not-intro): (1, 0).
+    let r13 = ctl.find(13).unwrap();
+    ctl.records[r13].not_intro = false;
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    ctl.records[r13].not_intro = true;
+    ctl.records[r13].state = 0;
+    // +0x12 clear and `0x0059D7E0` false: (1, 0).
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    // Game 12.13: (1, 0) before anything else.
+    ctl.game.set(12, 13);
+    ctl.records[i].extra.a2.q4.palace_walk = true;
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    ctl.game = Default::default();
+    // +0x12 set, +0x13 clear, nobody near the blocker: (0, 1).
+    ctl.records[i].extra.a2.q4.blocker_x = 100;
+    ctl.records[i].extra.a2.q4.blocker_y = 100;
+    f.xy.insert(P1, (300, 300));
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(0, 1)
+    );
+    // A player near: walk to the blocker point, +0x13 := 1, +0x12 := 0.
+    f.xy.insert(P1, (100, 100));
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Walk(100, 100)
+    );
+    assert!(x4(&ctl, i).palace_walked && !x4(&ctl, i).palace_walk);
+    // +0x12 clear again: (1, 0).
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(1, 0)
+    );
+    // +0x12 set, +0x13 set, +0x0F clear, no blocker: (0, 1).
+    ctl.records[i].extra.a2.q4.palace_walk = true;
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (0, 0)),
+        JerhynStep::Out(0, 1)
+    );
+    // Blocker made, farther than 2: +0x19 := 1, +0x18 := 0, walk there.
+    ctl.records[i].extra.a2.q4.blocker_made = true;
+    ctl.records[i].extra.a2.q4.guard_pos = true;
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (90, 100)),
+        JerhynStep::Walk(100, 100)
+    );
+    assert!(x4(&ctl, i).guard_pos2 && !x4(&ctl, i).guard_pos);
+    // Within 2, the blocker object missing: (0, 1), no placement.
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (99, 100)),
+        JerhynStep::Out(0, 1)
+    );
+    // The placement's success: +0x0F, +0x14 := 1; then (1, 0).
+    q4::jerhyn_placed(&mut ctl);
+    assert!(x4(&ctl, i).guard_moved && x4(&ctl, i).palace_placed);
+    assert_eq!(
+        q4::jerhyn_npc_state(&mut ctl, &mut f, (99, 100)),
+        JerhynStep::Out(1, 0)
+    );
+}
