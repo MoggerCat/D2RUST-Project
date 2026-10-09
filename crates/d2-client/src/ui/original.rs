@@ -82,6 +82,7 @@ pub const ESC_CLOSABLE: [u8; 27] = [
 /// The states the game menu's open remembers and its close reopens
 /// (`frontend-options.md` §O1 r2: keep = 1).
 pub const GAME_MENU_KEEP: [u8; 6] = [6, 7, 10, 17, 21, 35];
+
 /// The step-10 overlays' adapter (hover tips, then the cursor item), drawn
 /// after every other panel (`ui/panels.md` §5 step 10, `panels-3.md` §23
 /// r9): not a UI state, open for good.
@@ -563,6 +564,19 @@ impl OriginalUi {
     /// The `belts.bin` records and the belts' types (`hud_belt`).
     pub fn set_belt_parts(&mut self, parts: hud_belt::BeltParts) {
         self.shared.borrow_mut().hud.belt.parts = parts;
+    }
+
+    /// The act palette (`render/composition.md` §4) the UI's tint colours
+    /// are matched in (`ui/inventory.md` §2 r1), set by the host each frame.
+    pub fn set_palette(&mut self, palette: &d2_formats::palette::Palette) {
+        let p: Vec<[u8; 3]> = palette.colors.iter().map(|c| [c.r, c.g, c.b]).collect();
+        self.shared.borrow_mut().items.tint_colors = super::inv_grid::tint_indices(&p);
+    }
+
+    /// The frame's local-player position and shake (the world view's
+    /// one camera, `seams/world-screen.md` §2.2), set before each UI frame.
+    pub fn set_frame_anchor(&mut self, anchor: Option<crate::rules::camera::FrameAnchor>) {
+        self.shared.borrow_mut().bubbles.anchor = anchor;
     }
 
     /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
@@ -1081,8 +1095,7 @@ impl Panel for InventoryUi {
         panel.draw(&sh.tables, &sh.env(), gold, out);
         let class = Facts::of(ctx.world).class;
         if let Some(l) = sh.items.layout(class, &sh.config.screen) {
-            sh.items
-                .draw_tints(ctx.world, &sh.tables.files, &l, sh.mouse, out);
+            sh.items.draw_tints(ctx.world, &l, sh.mouse, out);
             sh.items.draw_panel(ctx.world, &sh.tables.files, &l, out);
         }
     }
@@ -1618,14 +1631,24 @@ impl Panel for TopUi {
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let sh = self.sh.borrow();
-        // The belt item's tip (`hud_belt`, `control-panel.md` §5 r8).
-        if let Some(tips) = sh.items.tips.as_ref() {
-            let (lines, at) = sh.hud.belt.hover_tip(ctx.world, tips);
-            if !lines.is_empty() {
-                let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-                let at = Point::new(at.0, at.1);
-                item_tip::draw_tip(&lines, at, (w, h), sh.fonts.as_ref(), &sh.tables.files, out);
-            }
+        // The belt item's hover text (`hud_belt`, `control-panel.md` §5
+        // r8) as the r14 pop-up, in the belt's font 1 (§5 r4).
+        if let Some(t) = sh
+            .items
+            .tips
+            .as_ref()
+            .and_then(|tips| sh.hud.belt.hover_tip(ctx.world, tips))
+        {
+            let (w, h) = (sh.config.screen.w, sh.config.screen.h);
+            hud_tips::push_popup(
+                t.text,
+                Point::new(t.x, t.y),
+                u16::from(t.color),
+                t.centered,
+                (w, h),
+                sh.fonts.as_ref(),
+                out,
+            );
         }
         // The item tool tip over everything (`item_tip`).
         if sh.states.is_open(UI_INVENTORY) {

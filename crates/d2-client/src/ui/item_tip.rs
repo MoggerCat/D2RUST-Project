@@ -103,6 +103,12 @@ pub struct ItemTips {
     pub(super) monstats: Vec<u16>,
     /// Gems `letter` per gems row (§3.12).
     pub(super) gem_letters: Vec<String>,
+    /// `transformcolor` of each magic prefix / suffix row, and
+    /// `invtransform` of each set / unique row (`render/shading.md` §6 r4).
+    pub(super) prefix_color: Vec<u8>,
+    pub(super) suffix_color: Vec<u8>,
+    pub(super) set_inv_color: Vec<u8>,
+    pub(super) unique_inv_color: Vec<u8>,
     pub(super) strings: Arc<dyn StringLookup + Send + Sync>,
 }
 
@@ -171,6 +177,7 @@ impl ItemTips {
                         maxstack: r.maxstack,
                         wclass: r.wclass,
                         wclass2: r.f_2handedwclass,
+                        inv_trans: r.invtrans,
                     });
                 }
             };
@@ -265,6 +272,22 @@ impl ItemTips {
                 .map(|r| key(&r.class))
                 .collect(),
             gem_letters: rows::<Gems>(set)?.iter().map(|r| key(&r.letter)).collect(),
+            prefix_color: rows::<Magicprefix>(set)?
+                .iter()
+                .map(|r| r.transformcolor)
+                .collect(),
+            suffix_color: rows::<Magicsuffix>(set)?
+                .iter()
+                .map(|r| r.transformcolor)
+                .collect(),
+            set_inv_color: rows::<Setitems>(set)?
+                .iter()
+                .map(|r| r.invtransform)
+                .collect(),
+            unique_inv_color: rows::<Uniqueitems>(set)?
+                .iter()
+                .map(|r| r.invtransform)
+                .collect(),
             montype: rows::<Montype>(set)?.iter().map(|r| r.strplur).collect(),
             monstats: rows::<Monstats>(set)?.iter().map(|r| r.namestr).collect(),
             strings,
@@ -275,6 +298,53 @@ impl ItemTips {
         let k = names.get(i)?;
         let t = self.strings.get(k)?;
         Some(String::from_utf16_lossy(t))
+    }
+
+    /// The inventory picture's item colour `(t, c)` (`0x0062C100(0, item,
+    /// …, inv 1)`, `render/shading.md` §6 r4, `ui/inventory.md` §8 r4):
+    /// `t` = the code's `InvTrans`, `c` by quality: magic / rare affix
+    /// `transformcolor` (suffix slots, then prefix slots; 0xFF none), set /
+    /// unique `invtransform`; then [`crate::rules::shading::item_color`].
+    /// None: no map. Not read (d2rs-own, unverified: the model holds
+    /// neither): the automagic affix and the socketed gem `transform` of
+    /// qualities 1, 2, 3, 8, which give no map here.
+    pub fn inv_color(&self, stream: &[u8]) -> Option<(u8, u8)> {
+        self.inv_color_of(&self.bits(stream)?)
+    }
+
+    pub(super) fn inv_color_of(&self, b: &ItemBits) -> Option<(u8, u8)> {
+        let t = self.codes.get(&b.code)?.inv_trans;
+        let qf = &b.quality_fields;
+        // Affix id = row + 1 (0: none, [`Self::magic_name`]).
+        let affix = |table: &[u8], id: u16| {
+            let row = usize::from(id).checked_sub(1)?;
+            table.get(row).copied().filter(|&c| c != 0xFF)
+        };
+        let row = |table: &[u8]| {
+            qf.file_index
+                .and_then(|i| table.get(usize::try_from(i).ok()?).copied())
+        };
+        let c = match b.quality {
+            d2_sim::items::q::MAGIC => {
+                let (p, x) = qf.magic?;
+                affix(&self.suffix_color, x).or_else(|| affix(&self.prefix_color, p))
+            }
+            d2_sim::items::q::RARE => {
+                let slots = qf.rare_slots?;
+                slots
+                    .iter()
+                    .find_map(|&(_, x)| affix(&self.suffix_color, x))
+                    .or_else(|| {
+                        slots
+                            .iter()
+                            .find_map(|&(p, _)| affix(&self.prefix_color, p))
+                    })
+            }
+            d2_sim::items::q::SET => row(&self.set_inv_color),
+            d2_sim::items::q::UNIQUE => row(&self.unique_inv_color),
+            _ => None,
+        }?;
+        crate::rules::shading::item_color(t, c)
     }
 
     /// The name of magic affix id `id` as sent (`items/affixes.md` §1 r1

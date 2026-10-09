@@ -188,7 +188,11 @@ fn frames(u: &OriginalUi, root: &UiRoot, w: &ClientWorld, tick: u64) -> Vec<u32>
     let horadric = u.shared.borrow().tables.files.id("menu\\horadric").unwrap();
     out.iter()
         .filter_map(|d| match d {
-            UiDraw::Image(i) if i.image.file == horadric => Some(i.image.frame),
+            UiDraw::Image(i) if i.image.file == horadric => {
+                // §12.4: draw mode 3, no remap.
+                assert_eq!((i.look.mode, i.look.remap), (3, crate::ui::Remap::None));
+                Some(i.image.frame)
+            }
             _ => None,
         })
         .collect()

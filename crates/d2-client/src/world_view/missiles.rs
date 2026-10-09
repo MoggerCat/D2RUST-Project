@@ -53,7 +53,7 @@ use crate::bridge::predict::{cell_centre, facing};
 use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MONSTER};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::blend::{cel_ops, missile_mode, overlay_mode, MODE_OPAQUE};
-use crate::rules::camera::{moving_to_client, Camera, ClientPos, FrameSize};
+use crate::rules::camera::{moving_to_client, Camera, ClientPos, FrameSize, UnitPosition};
 use crate::rules::draw_order::{tile_of, DrawGrid, UnitSlot};
 use crate::rules::placement::place;
 use crate::rules::unit_composite::{file_direction, unit_offset, TableOffset};
@@ -364,7 +364,7 @@ impl Missiles {
 
     /// Starts the effects of every new cast request in the model. The
     /// first call only learns the requests already there.
-    fn observe(&mut self, world: &ClientWorld) {
+    fn observe(&mut self, world: &ClientWorld, at: &dyn Fn(&ClientUnit) -> Option<(u32, u32)>) {
         let learn = !self.started;
         self.started = true;
         self.seen.retain(|k, _| world.units.contains_key(k));
@@ -381,19 +381,26 @@ impl Missiles {
             }
         }
         for (key, req) in casts {
-            self.start_cast(world, key, req);
+            self.start_cast(world, key, req, at);
         }
     }
 
-    fn start_cast(&mut self, world: &ClientWorld, key: UnitKey, req: ModeRequest) {
+    fn start_cast(
+        &mut self,
+        world: &ClientWorld,
+        key: UnitKey,
+        req: ModeRequest,
+        at: &dyn Fn(&ClientUnit) -> Option<(u32, u32)>,
+    ) {
         let Some(unit) = world.units.get(&key) else {
             return;
         };
-        let Some(cell) = unit.position else { return };
+        // The caster where it is drawn (the local player at the frame's
+        // one position, `camera.md` §2).
+        let Some(origin) = at(unit) else { return };
         let Ok(skill) = usize::try_from(req.record[0]) else {
             return;
         };
-        let origin = cell_centre(cell);
         if let Some(&id) = self.rows.skill_overlay.get(skill) {
             if let Some((art, row)) = self.overlay_art(id, false) {
                 let life = Self::ticks_of(row.frames, row.anim_rate.max(1));
@@ -605,20 +612,22 @@ impl Missiles {
     }
 
     /// The draws of the live effects and the state overlays whose art is
-    /// resident, under `camera`, in creation order.
+    /// resident, under `camera`, in creation order; a unit's overlays at
+    /// `at(unit)`, the 16.16 position the unit is drawn at.
     pub fn draws(
         &self,
         world: &ClientWorld,
         camera: &Camera,
         assets: &ViewAssets,
+        at: &dyn Fn(&ClientUnit) -> Option<(u32, u32)>,
     ) -> Vec<MissileDraw> {
         let mut found: Vec<(u32, DrawItem, Join)> = Vec::new();
         for fx in &self.live {
             let at = fx
                 .follow
                 .and_then(|k| world.units.get(&k))
-                .and_then(|u| u.position)
-                .map_or(fx.at, cell_centre);
+                .and_then(at)
+                .unwrap_or(fx.at);
             let age = world.server_ticks.saturating_sub(fx.born);
             let p = Placing {
                 art: &fx.art,
@@ -646,7 +655,7 @@ impl Missiles {
                 let Some((art, _)) = self.overlay_art(oid, true) else {
                     continue;
                 };
-                let Some(cell) = unit.position else { continue };
+                let Some(unit_at) = at(unit) else { continue };
                 let tag = TAG_BASE
                     | 0x0080_0000
                     | (unit.key.guid & 0xFFFF) << 4
@@ -654,7 +663,7 @@ impl Missiles {
                 let back = art.pre_draw.unwrap_or(false);
                 let p = Placing {
                     art: &art,
-                    at: cell_centre(cell),
+                    at: unit_at,
                     dir64: 0,
                     age: world.server_ticks,
                     life: u64::MAX,
@@ -744,9 +753,11 @@ impl Missiles {
     }
 
     /// Runs the layer for this frame and adds its draws to a built
-    /// `frame` (re-sorted by key), under the camera of `feed`
-    /// (`camera.md` §3, no shake). No local player, or open mode 3 (no
-    /// world): nothing. Never fails the frame; returns log lines.
+    /// `frame` (re-sorted by key), under the frame's one camera
+    /// (`frame.camera`, `seams/world-screen.md` §2.2, §2.6), each unit at
+    /// the position `feed` draws it at (the local player at its predicted
+    /// position, `camera.md` §2). No camera, or open mode 3 (no world):
+    /// nothing. Never fails the frame; returns log lines.
     pub fn add_to_frame<F: ViewFeed + ?Sized>(
         &mut self,
         world: &ClientWorld,
@@ -758,7 +769,8 @@ impl Missiles {
         if self.rows.is_empty() {
             return Vec::new();
         }
-        self.observe(world);
+        let at = |u: &ClientUnit| unit_at(feed, u);
+        self.observe(world, &at);
         self.advance(world);
         let mut log = self.ensure(world, assets);
         let camera = match (feed.player(world), feed.open_mode(world)) {
@@ -774,7 +786,7 @@ impl Missiles {
             }
             _ => return log,
         };
-        self.last = self.draws(world, &camera, assets);
+        self.last = self.draws(world, &camera, assets, &at);
         let Some(slots) = &frame.slots else {
             // No draw order (no map feed): after every other unit.
             if !self.last.is_empty() {
@@ -802,6 +814,16 @@ impl Missiles {
         }
         self.last = keyed.into_iter().map(|(d, _)| d).collect();
         log
+    }
+}
+
+/// The 16.16 position `feed` draws `unit` at (`camera.md` §2): moving
+/// units as stated (the local player at its predicted position), static
+/// units and unresolved ones at their model sub-tile centre.
+fn unit_at<F: ViewFeed + ?Sized>(feed: &F, unit: &ClientUnit) -> Option<(u32, u32)> {
+    match feed.unit_position(unit) {
+        Ok(UnitPosition::Moving { x16, y16 }) => Some((x16, y16)),
+        _ => unit.position.map(cell_centre),
     }
 }
 
