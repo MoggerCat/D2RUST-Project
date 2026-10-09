@@ -336,11 +336,13 @@ fn a_kill_sends_0x69_code_8_then_code_9_at_the_death_end() {
         &a.frames[..BEFORE]
     );
     // The values this fixture gives, as literal bytes: the first unit
-    // (GUID 1), a path that never had a target and was never turned
-    // (a, b, d = 0, as the recorded `69 1b000000 08 0000 0000 38 06` of
-    // frame 2882 has (a, b) = 0), e = the fixture's +0xB0; code 9 at the
-    // cell (24, 20) where it was allocated (the room centre + (4, 0)).
-    assert_eq!(a.code8, [0x69, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, B0]);
+    // (GUID 1), a path whose only target is the one the creation's mode
+    // request wrote, the spawn cell (24, 20) (`monsters/init.md` §4.1
+    // step 1.1; 1.14d state snapshots read an idle spawned monster's
+    // path target as its spawn point), never turned (d = 0), e = the
+    // fixture's +0xB0; code 9 at the cell (24, 20) where it was
+    // allocated (the room centre + (4, 0)).
+    assert_eq!(a.code8, [0x69, 1, 0, 0, 0, 8, 24, 0, 20, 0, 0, B0]);
     assert_eq!(a.code9, [0x69, 1, 0, 0, 0, 9, 24, 0, 20, 0, 0, 0]);
     assert_eq!(a.kill_frame, BEFORE as i32);
     // Determinism: a second game is identical.
