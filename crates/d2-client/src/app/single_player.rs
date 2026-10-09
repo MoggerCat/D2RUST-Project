@@ -1150,6 +1150,22 @@ fn load_world_files(files: &GameFiles, levels: &LevelTables) -> Result<WorldFile
     )?)
 }
 
+/// `ExpField.D2` (`path-placement.md` §7.3): the walk-back field the floor
+/// drop of items, monsters' and chests' alike, tests its spots with.
+fn load_expfield(files: &GameFiles) -> Result<Arc<d2_sim::path::search::ExpField>, BuildError> {
+    use d2_sim::path::search::ExpField;
+    let err = |m: String| BuildError::Tables(format!("{}: {m}", ExpField::PATH));
+    let path = CanonicalPath::new(ExpField::PATH).map_err(|e| err(e.to_string()))?;
+    match files.read_native(&path) {
+        Some(Ok(NativeAsset::ExpField(f))) => ExpField::from_cells(f.height, f.width, f.cells)
+            .map(Arc::new)
+            .ok_or_else(|| err("cell count does not match its header".into())),
+        Some(Ok(_)) => Err(err("wrong kind".into())),
+        Some(Err(e)) => Err(err(e.to_string())),
+        None => Err(err("in no archive".into())),
+    }
+}
+
 /// Everything the game reads from the user's files, loaded up front.
 #[derive(Debug)]
 pub struct LiveData {
@@ -1167,6 +1183,9 @@ pub struct LiveData {
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
     pub save: SaveData,
+    /// The floor drop's walk-back field (`data\global\ExpField.D2`,
+    /// `path-placement.md` §7.3), set on the path provider of every game.
+    pub expfield: Arc<d2_sim::path::search::ExpField>,
     /// The archive set itself (the client's other readers: sounds).
     pub archives: Arc<GameFiles>,
 }
@@ -1188,6 +1207,7 @@ impl LiveData {
             Some(Err(e)) => return Err(BuildError::Tables(format!("AnimData.d2: {e}"))),
             None => return Err(BuildError::Tables("AnimData.d2: in no archive".into())),
         };
+        let expfield = load_expfield(&archives)?;
         let tables = GameTables::from_loaded(bins, anim)?;
         let levels = LevelTables::from_fixed(&tables.fixed)?;
         let files = load_world_files(&archives, &levels)?;
@@ -1199,6 +1219,7 @@ impl LiveData {
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
+            expfield,
             archives,
         })
     }
@@ -1973,6 +1994,11 @@ pub fn build_with(
     hooks
         .enable_paths()
         .map_err(|e| BuildError::Setup(format!("path tables: {e:?}")))?;
+    // The floor drop's walk-back field (`path-placement.md` §7.3): monster
+    // and chest drops search their spot with it (`treasure.md` §7 step 2).
+    if let Some(paths) = hooks.paths.as_mut() {
+        paths.field = Some(d.expfield.clone());
+    }
     // The inactive store (`units.md` §3.3–§3.4): a room the tick frees
     // keeps its units' records, and its next build restores them.
     hooks.enable_inactive_store();
