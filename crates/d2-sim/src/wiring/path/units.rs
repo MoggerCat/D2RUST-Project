@@ -413,6 +413,45 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
+    /// The death clean-up's footprint step (`units.md` §4.6 rule 1.2):
+    /// the class's monstats2 flag 0x13 (`deadCol`) clear → the dead-body
+    /// footprint `0x00649F70(U, 1)` (`skills/bodies-3.md` §3.9): the
+    /// footprint removed (forced), a 3 × 3 box of mask 0x8000 stamped at
+    /// the path position, the path snapped to its sub-tile centre. A unit
+    /// without a dynamic path: nothing.
+    pub fn death_footprint(&mut self, unit: UnitId) {
+        let dead_col = self
+            .units
+            .get(unit)
+            .and_then(|r| self.h.tables.combat.monstats.get(r.class as usize))
+            .and_then(|m| {
+                self.h
+                    .tables
+                    .combat
+                    .monstats2
+                    .get(usize::from(m.monstatsex))
+            })
+            .is_some_and(|m2| m2.deadcol);
+        if dead_col {
+            return;
+        }
+        let Some((room, x, y)) = self
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .map(|d| (d.room, d.x(), d.y()))
+        else {
+            return;
+        };
+        self.path_remove_footprint(unit, true);
+        crate::path::collision::box_apply(&mut self.h.drlg, room, x, y, (3, 3), 0x8000, true);
+        if let Some(d) = self.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
+            d.precise_x = crate::path::coords::to_fp16_center(x);
+            d.precise_y = crate::path::coords::to_fp16_center(y);
+        }
+    }
+
     /// monstats `Velocity` and `npc` of a monster (`pathing.md` §8.1).
     pub fn monster_velocity(&self, unit: UnitId) -> MonsterVelocity {
         self.units

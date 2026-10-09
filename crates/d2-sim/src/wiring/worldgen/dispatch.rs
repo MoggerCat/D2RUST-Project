@@ -145,9 +145,12 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
         // The first pass: the object presets (PROVISIONAL,
         // q-fix-real-preset-objects; `View::spawn_preset_objects`).
-        self.host(game, |h| {
-            let WorldHost { game, v, .. } = h;
-            v.spawn_preset_objects(game, r);
+        // With the world state lent to the action hooks: a quest object's
+        // init runs inside its allocation and may allocate a monster
+        // (Larzuk, the caged barbarians, `quests-act5.md` §3.8, §4.7),
+        // whose type init needs the monster world.
+        self.with(game, |g, v| {
+            v.spawn_preset_objects(g, r);
         });
         self.population(game, |cx| preset::place_presets(cx, r));
         // PROVISIONAL (REC-99): the warp tile units of the room's presets.

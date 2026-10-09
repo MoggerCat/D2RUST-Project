@@ -535,6 +535,10 @@ pub struct LocalSeams {
     /// control once per tick (`Pending::publish_not_intro`): the not-intro
     /// test `0x005444B0` of population and the missile bodies.
     pub not_intro: BTreeMap<u8, bool>,
+    /// The caged barbarians' group states by GUID (counting, portal
+    /// GUID), published by the quest control once per tick
+    /// (`Pending::publish_rescue`).
+    pub rescue: BTreeMap<u32, (bool, Option<u32>)>,
     /// The players' hands and the facts of the items in them
     /// ([`super::weapons`], q-amazon).
     pub weapons: super::weapons::Weapons,
@@ -781,6 +785,17 @@ impl Pending for LocalSeams {
     }
     fn publish_not_intro(&mut self, records: &[(u8, bool)]) {
         self.not_intro = records.iter().copied().collect();
+    }
+    /// d2rs-own, unverified (REC-799): the prisoner AI's hooks with an
+    /// effect run on the quest control after the tick.
+    fn queue_quest_event(&mut self, e: d2_sim::wiring::action::QuestEvent) {
+        self.quest_events.push(e);
+    }
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        self.rescue.get(&guid).copied().unwrap_or((false, None))
+    }
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {
+        self.rescue = barbarians.iter().map(|&(g, c, p)| (g, (c, p))).collect();
     }
     /// d2rs-own, unverified (REC-796): Tyrael's spawn runs on the quest
     /// control after the tick, not inside the missile body.

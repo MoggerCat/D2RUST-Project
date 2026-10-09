@@ -27,7 +27,35 @@ impl Act5 {
     /// A barbarian in Harrogath, strong enough to kill a boss in a few
     /// swings.
     fn new() -> Act5 {
-        let mut rig = Rig::new("barbarian", &[]);
+        // Attack (skill 0) and the barbarian's Bash (126).
+        let mut rig = Rig::new("barbarian", &[0, 126]);
+        if std::env::var_os("PLAY_DEBUG").is_some() {
+            let b = &rig
+                .app
+                .world()
+                .resource::<d2_client::bridge::BridgeResource>()
+                .0;
+            eprintln!("after join: {:?}", b.log().rejected);
+        }
+        // Both hands on Attack, as a new character's (the rig's list
+        // reset leaves them unset).
+        rig.with(|sim, p| {
+            let list = sim
+                .events
+                .action
+                .sys
+                .hooks
+                .skill_lists
+                .get_mut(&p)
+                .expect("list");
+            let i = list
+                .view()
+                .iter()
+                .position(|e| e.skill == 0)
+                .expect("attack");
+            list.left = Some(i);
+            list.right = Some(i);
+        });
         rig.with(|sim, p| {
             sim.events
                 .action
@@ -131,11 +159,91 @@ impl Act5 {
         })
     }
 
-    /// Moves the player next to `(x, y)` (poke `pos`).
+    /// Puts the player at the first free spot of a small ring around
+    /// `(x, y)` (poke `pos`, which reaches the player's room and its
+    /// neighbours). False: none.
+    fn hop(&mut self, x: i32, y: i32) -> bool {
+        for r in [0, 2, 4, 7] {
+            for (dx, dy) in [
+                (r, r),
+                (r, 0),
+                (0, r),
+                (-r, 0),
+                (0, -r),
+                (-r, -r),
+                (r, -r),
+                (-r, r),
+            ] {
+                if self.poke(&format!("pos @player {} {}", x + dx, y + dy)) == "ok" {
+                    self.rig.step(3);
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Moves the player next to `(x, y)` in hops of at most 16 sub-tiles
+    /// (staging: the rooms on the way come into play as on foot).
     fn stand_by(&mut self, (x, y): (i32, i32)) {
-        let r = self.poke(&format!("pos @player {} {}", x + 2, y + 2));
-        assert_eq!(r, "ok", "pos");
-        self.rig.step(4);
+        for _ in 0..200 {
+            let (px, py) = self.rig.pos();
+            let (dx, dy) = (x + 2 - px, y + 2 - py);
+            if dx.abs() <= 3 && dy.abs() <= 3 {
+                return;
+            }
+            let (sx, sy) = (dx.clamp(-16, 16), dy.clamp(-16, 16));
+            if !self.hop(px + sx, py + sy) && !self.hop(px + sx / 2, py + sy / 2) {
+                // Blocked straight on: sidestep.
+                if !self.hop(px + sy.signum() * 8, py - sx.signum() * 8) {
+                    panic!("stuck at ({px}, {py}) on the way to ({x}, {y})");
+                }
+            }
+        }
+        panic!("did not reach ({x}, {y})");
+    }
+
+    /// The centres of the player's level's rooms, nearest first.
+    fn level_rooms(&mut self) -> Vec<(i32, i32)> {
+        let p = self.rig.pos();
+        let mut v = self.rig.with(|sim, p| {
+            let h = sim.events.action.hooks();
+            let room = sim.game.lists.unit(p).and_then(|e| e.room());
+            let lvl = room.and_then(|r| h.drlg.level_id(&sim.game, r)).unwrap();
+            let d = h.drlg.dungeon.acts[4].as_ref().unwrap();
+            let l = d.find_level(lvl).unwrap();
+            d.level_rooms(l)
+                .into_iter()
+                .map(|r| {
+                    let t = d.room(r).rect;
+                    ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
+                })
+                .collect::<Vec<_>>()
+        });
+        v.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
+        v
+    }
+
+    /// Visits the level's rooms until a unit of `ty` / `classes` exists;
+    /// then stands next to it. Its id, GUID and position.
+    fn find(&mut self, ty: UnitType, classes: &[u32]) -> (UnitId, u32, (i32, i32)) {
+        let mut found = self.units(ty, classes);
+        if found.is_empty() {
+            for c in self.level_rooms() {
+                self.stand_by(c);
+                self.rig.step(2);
+                found = self.units(ty, classes);
+                if !found.is_empty() {
+                    break;
+                }
+            }
+        }
+        let &(u, guid, at) = found
+            .first()
+            .unwrap_or_else(|| panic!("unit {ty:?} {classes:?} in the level"));
+        self.stand_by(at);
+        self.rig.step(10);
+        (u, guid, self.units(ty, classes).first().map_or(at, |e| e.2))
     }
 
     /// Attacks the monster (C→S 0x06, the left skill on a unit) until it
@@ -154,11 +262,27 @@ impl Act5 {
                 .rig
                 .with(move |sim, _| sim.events.action.sys.hooks.path_position(m));
             self.stand_by(at);
+            self.strengthen();
             let mut msg = vec![0x06];
             msg.extend(1u32.to_le_bytes());
             msg.extend(guid.to_le_bytes());
             self.rig.send(&msg);
             self.rig.step(25);
+            if std::env::var_os("PLAY_DEBUG").is_some() {
+                let hp = self.rig.life(m);
+                let pm = self.rig.mode();
+                let mm = self
+                    .rig
+                    .with(move |sim, _| sim.events.action.sys.units.get(m).map(|u| u.mode));
+                let pos = self.rig.pos();
+                let me = self.rig.player();
+                let php = self.rig.life(me);
+                eprintln!("player hp {php}");
+                eprintln!(
+                    "kill {guid}: hp {hp} mode {mm:?} at {at:?}; player mode {pm} at {pos:?}; {}",
+                    self.rig.errors()
+                );
+            }
         }
         assert!(self.dead(m), "monster {guid} killed");
     }
@@ -210,8 +334,8 @@ fn harrogath_holds_its_npcs_and_the_act_v_records() {
     // Larzuk, Anya (in town only after her rescue), Malah, Nihlathak,
     // Qual-Kehk, Cain.
     for class in [511u32, 513, 514, 515, 520] {
-        let u = a.units(UnitType::Monster, &[class]);
-        assert!(!u.is_empty(), "NPC {class} in Harrogath");
+        let (_, guid, _) = a.find(UnitType::Monster, &[class]);
+        assert!(a.client_has(1, guid), "the client holds NPC {class}");
     }
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }
@@ -229,36 +353,7 @@ fn shenk_dies_and_the_siege_completes() {
         let rows: Vec<d2_data::tables::Superuniques> = d.tables.rows().expect("superuniques");
         rows[42].class as u32
     };
-    let mut found = a.units(UnitType::Monster, &[shenk_class]);
-    if found.is_empty() {
-        let rooms = a.rig.with(|sim, p| {
-            let h = sim.events.action.hooks();
-            let room = sim.game.lists.unit(p).and_then(|e| e.room());
-            let lvl = room.and_then(|r| h.drlg.level_id(&sim.game, r)).unwrap();
-            let d = h.drlg.dungeon.acts[4].as_ref().unwrap();
-            let l = d.find_level(lvl).unwrap();
-            d.level_rooms(l)
-                .into_iter()
-                .map(|r| {
-                    let t = d.room(r).rect;
-                    ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
-                })
-                .collect::<Vec<_>>()
-        });
-        for c in rooms {
-            a.stand_by(c);
-            a.rig.step(2);
-            found = a.units(UnitType::Monster, &[shenk_class]);
-            if !found.is_empty() {
-                break;
-            }
-        }
-    }
-    let &(shenk, guid, at) = found
-        .first()
-        .expect("Shenk spawned in the Bloody Foothills");
-    a.stand_by(at);
-    a.rig.step(10);
+    let (shenk, guid, _) = a.find(UnitType::Monster, &[shenk_class]);
     assert!(a.client_has(1, guid), "the client sees Shenk");
     a.kill(shenk, guid);
     a.rig.step(30);
@@ -269,5 +364,97 @@ fn shenk_dies_and_the_siege_completes() {
     );
     // Back to Larzuk: the reward (35.0) is given at his chat.
     a.warp(HARROGATH);
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+}
+
+// Covers: specs/world/quests-act5.md §4.6, §4.7, §4.10
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_caged_barbarians_are_rescued() {
+    let mut a = Act5::new();
+    a.warp(111);
+    // Walk the Frigid Highlands' rooms; at each cage (object 473) break
+    // its door (monster 434) and wait for its five barbarians to leave.
+    let mut done: Vec<(i32, i32)> = Vec::new();
+    for c in a.level_rooms() {
+        if done.len() == 3 {
+            break;
+        }
+        a.stand_by(c);
+        a.rig.step(2);
+        let cages: Vec<_> = a
+            .units(UnitType::Object, &[473])
+            .into_iter()
+            .filter(|k| !done.iter().any(|&d| test_fixtures::host::cheb(d, k.2) < 10))
+            .collect();
+        let Some(&(_, _, at)) = cages.first() else {
+            continue;
+        };
+        done.push(at);
+        a.stand_by(at);
+        a.rig.step(5);
+        let near = |a: &mut Act5, class: u32| -> Vec<(UnitId, u32, (i32, i32))> {
+            a.units(UnitType::Monster, &[class])
+                .into_iter()
+                .filter(|d| test_fixtures::host::cheb(d.2, at) < 20)
+                .collect()
+        };
+        assert_eq!(
+            near(&mut a, 534).len(),
+            5,
+            "five barbarians at the cage {at:?}"
+        );
+        let &(door, guid, _) = near(&mut a, 434).first().expect("the cage's door");
+        a.kill(door, guid);
+        // The barbarians see the open door and a portal opens by it.
+        a.rig.step(60);
+        // Out of their way (the player standing by the portal blocks it).
+        let me = a.rig.pos();
+        a.stand_by((me.0 + 12, me.1 + 12));
+        // They walk out.
+        for _ in 0..60 {
+            a.strengthen();
+            a.rig.step(25);
+            if std::env::var_os("PLAY_DEBUG").is_some() {
+                let dm = a
+                    .rig
+                    .with(move |sim, _| sim.events.action.sys.units.get(door).map(|u| u.mode));
+                let portals: Vec<_> = a
+                    .units(UnitType::Object, &[189])
+                    .iter()
+                    .map(|o| o.2)
+                    .collect();
+                let bpos: Vec<_> = near(&mut a, 534).iter().map(|b| b.2).collect();
+                eprintln!("  portal at {portals:?}, barbarians at {bpos:?}");
+                let barbs: Vec<_> = near(&mut a, 534)
+                    .iter()
+                    .map(|b| {
+                        let u = b.0;
+                        a.rig
+                            .with(move |sim, _| sim.events.action.sys.units.get(u).map(|r| r.mode))
+                    })
+                    .collect();
+                let rescue = a
+                    .rig
+                    .with(|sim, _| sim.events.action.sys.hooks.x.rescue.len());
+                let p = a.rig.pos();
+                eprintln!("cage {at:?} me {p:?}: door {dm:?} portals {portals:?} barbs {barbs:?} published {rescue} chain {:?}", a.chain(32));
+            }
+            if near(&mut a, 534).is_empty() {
+                break;
+            }
+        }
+        assert!(
+            near(&mut a, 534).is_empty(),
+            "the cage's barbarians left; chain 32 {:?}",
+            a.chain(32)
+        );
+    }
+    assert_eq!(done.len(), 3, "three cages in the Frigid Highlands");
+    assert!(
+        a.flag(36, 1),
+        "rescue done (36.1); chain 32 {:?}",
+        a.chain(32)
+    );
     assert!(a.rejected().is_empty(), "{:?}", a.rejected());
 }

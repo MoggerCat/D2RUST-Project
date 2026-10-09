@@ -641,11 +641,18 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn unit_position(&self, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         let e = &*self.inner.econ;
         match e.game.lists.unit(unit) {
-            Some(u) => {
-                let room = u.room()?;
-                let (x, y) = e.hooks.path_position(unit);
-                Some((x, y, room))
-            }
+            Some(u) => match u.room() {
+                Some(room) => {
+                    let (x, y) = e.hooks.path_position(unit);
+                    Some((x, y, room))
+                }
+                // An object whose init runs inside its allocation
+                // (`quests-act5.md` §3.8: Larzuk's dummy).
+                None => match e.hooks.object_alloc_spot(unit)? {
+                    (x, y, Some(room)) => Some((x, y, room)),
+                    _ => None,
+                },
+            },
             None => self.inner.unit_position(unit),
         }
     }
@@ -654,6 +661,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn unit_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         let e = &*self.inner.econ;
         match e.game.lists.unit(unit) {
+            Some(u) if u.room().is_none() => match e.hooks.object_alloc_spot(unit) {
+                Some((x, y, _)) => Some((x, y)),
+                None => Some(e.hooks.path_position(unit)),
+            },
             Some(_) => Some(e.hooks.path_position(unit)),
             None => self.inner.unit_position(unit).map(|(x, y, _)| (x, y)),
         }
@@ -695,7 +706,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             .free_spot_at(room, x, y, size, mask, radius, limit)
     }
     /// `0x005B2F20`: a monster unit allocated in a DRLG room through the
-    /// action wiring (`units.md` §3.1); else the rest's.
+    /// action wiring (`units.md` §3.1); else the rest's. PROVISIONAL
+    /// (REC-798): the spread `r` (population §9's placement around the
+    /// point and its draws) is not applied: Larzuk stands at the free
+    /// spot, 1.14d 3 sub-tiles away (`a5-town-arrival-bar.check`).
     fn spawn_monster(
         &mut self,
         room: RoomId,

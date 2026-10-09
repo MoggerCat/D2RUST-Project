@@ -49,6 +49,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         let mut lair = None;
         let mut summit = None;
         let mut not_intro = Vec::new();
+        let mut rescue = Vec::new();
         self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -70,6 +71,13 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                         QuestEvent::AncientsDisarm => act5::q5::disarm(q),
                         QuestEvent::BaalToStairs => act5::q6::chamber_open(q, w),
                         QuestEvent::AnyaOpenPortal { unit } => act5::q4::anya_ai_portal(q, w, unit),
+                        // REC-799: the prisoner AI's hooks (`quests-act5.md`
+                        // §4.7, §4.10).
+                        QuestEvent::WussieLeft { guid } => act5::q2::group_count_guid(q, guid),
+                        QuestEvent::WussieRescue { player, unit } => {
+                            act5::q2::rescue(q, w, player, unit)
+                        }
+                        QuestEvent::WussieWait => act5::q2::rescue_status(q, w),
                         // REC-796: Tyrael's spawn from the baalfx missile,
                         // at the missile's position of the call.
                         QuestEvent::SpawnTyrael {
@@ -146,6 +154,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 // open them with, so a fresh game stays passable.
                 summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
                 not_intro = q.records.iter().map(|r| (r.chain, r.not_intro)).collect();
+                rescue = act5::q2::barbarian_states(q);
             });
         });
         if let Some(open) = lair {
@@ -156,6 +165,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         if !not_intro.is_empty() {
             events.action().sys.hooks.x.publish_not_intro(&not_intro);
+            events.action().sys.hooks.x.publish_rescue(&rescue);
         }
     }
 }

@@ -28,6 +28,27 @@ use crate::world::objects::Dispatch;
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
 
+impl<X: Pending> View<'_, X> {
+    /// `0x00588E10` (`quests-act5.md` §4.10): a dead (mode 12) prison
+    /// door (class 434) among the units of the rooms adjacent to `u`'s
+    /// room (the room itself included).
+    fn dead_prison_door_near(&self, game: &Game, u: UnitId) -> bool {
+        use crate::path::collision::CollisionRooms;
+        let Some(room) = game.lists.unit(u).and_then(|e| e.room()) else {
+            return false;
+        };
+        let d = &self.h.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .flat_map(|r| game.lists.room_units(r))
+            .any(|m| {
+                self.units.get(m).is_some_and(|r| {
+                    r.ty == crate::units::UnitType::Monster && r.class == 434 && r.mode == 12
+                })
+            })
+    }
+}
+
 impl<X: Pending> AiUnits for View<'_, X> {
     fn seed(&mut self, unit: UnitId) -> &mut Seed {
         View::seed(self, unit)
@@ -759,8 +780,18 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
         self.h.x.ai_kill(game, unit, killer);
     }
+    /// The unit leaves its room and is removed (`0x00555600`, `units.md`
+    /// §3.2: the caged barbarians at their portal, Baal at the stairs);
+    /// every player is told (S→C 0x0A), as the quest host's removal.
     fn remove_unit(&mut self, game: &mut Game, unit: UnitId) {
-        self.h.x.ai_remove_unit(game, unit);
+        let Some((ty, guid)) = game.lists.unit(unit).map(|u| (u.ty as u8, u.guid)) else {
+            return self.h.x.ai_remove_unit(game, unit);
+        };
+        let msg = crate::units::messages::remove_unit(ty, guid);
+        for p in game.lists.units_of_type(crate::units::UnitType::Player) {
+            self.h.x.send(p, &msg);
+        }
+        self.remove(game, unit);
     }
     fn link_clone(&mut self, game: &mut Game, unit: UnitId, clone: UnitId) {
         self.h.x.ai_link_clone(game, unit, clone);
@@ -827,6 +858,52 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
+    /// from the quest control's published states
+    /// ([`Pending::quest_rescue`]); the calls with an effect queued for
+    /// it ([`Pending::queue_quest_event`]); `0x00588E10` read here. Other
+    /// hooks keep the default.
+    fn quest_hook(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        player: Option<UnitId>,
+        hook: crate::monsters::ai::QuestHook,
+    ) -> bool {
+        use super::QuestEvent;
+        use crate::monsters::ai::QuestHook;
+        let guid = game.lists.unit(unit).map_or(0, |e| e.guid);
+        match hook {
+            QuestHook::WussieLeaving => self.h.x.quest_rescue(guid).0,
+            QuestHook::WussieLeave => {
+                self.h.x.queue_quest_event(QuestEvent::WussieLeft { guid });
+                false
+            }
+            QuestHook::WussieCanRescue => self.dead_prison_door_near(game, player.unwrap_or(unit)),
+            QuestHook::WussieRescue => {
+                if let Some(player) = player {
+                    self.h
+                        .x
+                        .queue_quest_event(QuestEvent::WussieRescue { player, unit });
+                }
+                false
+            }
+            QuestHook::WussieWait => {
+                self.h.x.queue_quest_event(QuestEvent::WussieWait);
+                false
+            }
+            _ => false,
+        }
+    }
+    /// `0x00588D60`: the group's portal when spawned and existing.
+    fn rescue_portal(&mut self, game: &mut Game, unit: UnitId) -> Option<Option<UnitId>> {
+        let guid = game.lists.unit(unit)?.guid;
+        let portal = self.h.x.quest_rescue(guid).1?;
+        let o = game
+            .lists
+            .find_unit(crate::units::UnitType::Object, portal)?;
+        Some(Some(o))
+    }
     /// `0x00646CA0(unit, calc, skill, level)`: the calc column on the
     /// unit (`data/calc-expressions.md`, `skills/levels.md`).
     fn skill_calc(

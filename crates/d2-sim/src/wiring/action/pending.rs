@@ -99,6 +99,14 @@ pub enum QuestEvent {
         x: i32,
         y: i32,
     },
+    /// A caged barbarian left through its group's portal (`0x00588880`
+    /// from the prisoner AI, `quests-act5.md` §4.10), by GUID (the unit is
+    /// removed in the same call).
+    WussieLeft { guid: u32 },
+    /// The prisoner AI's rescue `0x005888D0(game, P, unit)` (§4.7).
+    WussieRescue { player: UnitId, unit: UnitId },
+    /// The prisoner AI's wait hook `0x00588DD0` (§4.10).
+    WussieWait,
     /// C→S 0x44 reached `0x005852E0` (`quests-act2-2.md` §3.2): `player`
     /// puts `item` (GUID, 0: none) into the object with GUID `object`
     /// (`action` 2 cancel, 3 insert).
@@ -1746,6 +1754,19 @@ pub trait Pending {
     /// The quest control's not-intro bytes `(chain, not_intro)` of every
     /// record (for [`Self::quest_not_intro`]). Default: nothing.
     fn publish_not_intro(&mut self, records: &[(u8, bool)]) {}
+    /// A quest event for the quest control (`take_quest_events`).
+    /// Default: dropped.
+    fn queue_quest_event(&mut self, e: QuestEvent) {}
+    /// A caged barbarian's group state by GUID (`quests-act5.md` §4.10):
+    /// (`0x00588830` the group counter ≠ 0 in a not-intro record, the
+    /// group's portal GUID when `0x00588D60` would find it spawned).
+    /// Default: (false, none).
+    fn quest_rescue(&self, guid: u32) -> (bool, Option<u32>) {
+        (false, None)
+    }
+    /// The quest control's caged-barbarian states (GUID, counting,
+    /// portal) of every group, once per tick. Default: nothing.
+    fn publish_rescue(&mut self, barbarians: &[(u32, bool, Option<u32>)]) {}
     /// `0x0058E920(game, room, missile)` from a missile body (Tyrael's
     /// spawn, `quests-act5-2.md` §8.8). Default: nothing.
     fn missile_spawn_tyrael(&mut self, room: Option<RoomId>, missile: UnitId, x: i32, y: i32) {}
