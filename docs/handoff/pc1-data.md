@@ -149,3 +149,12 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 10. **Node order and asserts of the client 0x92 handler `0x004C23E0`**
     (REC-416): the order of the inventory nodes it walks and what `0x0063E0B0`
     does at its end; `client/msg-stats-items.md` §5 r5.
+11. **Format-0 property wrapper `0x0065FE10` (REC-289 (5),
+    q-fix-items-play)**: (a) the sixth argument of `0x0065FEC0` (the
+    apply type, `items/properties.md` §2) at each static caller other
+    than the affix roller (`0x005C12F0`), §11 and §12: which value each
+    passes (d2rs passes 0); (b) `0x0065DD80`: is the `param` > 3 test
+    signed, and is a negative `param` clamped or used as is; (c) does
+    the craft list (`0x00660240`, mode 7) call `0x0065FE10` or
+    `0x0065FD70` directly (§2 says directly, §14 lists §12 among the
+    wrapper's callers). Answer into `items/properties.md` §2 / §14.
