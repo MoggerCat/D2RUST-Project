@@ -76,3 +76,7 @@ Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
 run only the changed crate's tests while iterating and the full gate before
 each push, push every 2–4 fixes, report in one short message per push, and
 send binary-only questions to pc1-data.md instead of stopping.
+
+PC 1 items: sessions add new `pc1-data.md` Step 4 items without a number, as
+"- **[session] title**"; the coordinator numbers them at merge (two
+sessions picking the same next number collided twice on 2026-10-09).

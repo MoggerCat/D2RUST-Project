@@ -1,0 +1,19 @@
+# A town set-up for a spawn check (specs/tools/poke.md §2; run on 1.14d by
+# tools/trace-recorder/poke.py, on d2rs by d2-sim::poke). Ticks are relative:
+# tick 0 is the first server tick after client 0 reaches state 4.
+#
+# Tick 1: a fallen (monstats 19, specs/monsters/ai.md §9 table, as in
+# traces/scenarios/champion-pack.scenario) spawned normal 3 sub-tiles right of
+# and below the player (scenario.md §3.1), then its unit seed fixed so its
+# first draws are the same on both sides whatever the game seed did.
+# Tick 2: a brazier (objects row 39, specs/audio/triggers.md Test vectors)
+# left of the player, and the act's time of day set to period 2, tick 0
+# (specs/render/lighting.md §9.1: the value creation gives).
+# Tick 3: the game seed fixed (sim/rng.md §5.2), so every later draw of it
+# is comparable.
+poke 1
+at 1 spawn 19 @x+3 @y+3 normal
+at 1 seed-unit @1:19 0x12345678 666
+at 2 object 39 @x-3 @y+3
+at 2 time 2 0
+at 3 seed-game 0x00001234 666
