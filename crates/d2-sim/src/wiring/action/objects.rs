@@ -112,18 +112,22 @@ pub trait QuestObjectHost<X> {
     ) {
         let _ = (game, v, player, from, to);
     }
-    /// The quest active test `0x00544590(game, player, npc)` of the NPC
-    /// scan callback (`world/quests.md` §6.4, `monsters/ai.md` §5.3):
-    /// true when an active function of the player's act passed, which
-    /// also sent S→C 0x8A. Default: false (nothing sent).
-    fn npc_active_test(
+    /// The quest active test `0x00544590(game, player, npc)`
+    /// (`world/quests.md` §6.4) for the NPC AI's interact gate
+    /// (`monsters/ai.md` §5.3 scan 2): `class` and `interact` are the
+    /// NPC's monstats class and flag. True after the 0x8A send. Default:
+    /// false.
+    #[allow(clippy::too_many_arguments)]
+    fn npc_wants_interact(
         &mut self,
         game: &mut Game,
         v: &mut View<'_, X>,
         player: UnitId,
         npc: UnitId,
+        class: u16,
+        interact: bool,
     ) -> bool {
-        let _ = (game, v, player, npc);
+        let _ = (game, v, player, npc, class, interact);
         false
     }
     /// For the host taking its parts back.

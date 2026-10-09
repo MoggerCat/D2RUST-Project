@@ -137,3 +137,84 @@ No new Step 4 items on staging with the tags `[seed-order]`,
 `[recording-2]` or `[proto-items]`, and none about towns, NPCs, quests
 or waypoints, as of the last pull (2026-10-09). Staging is polled every
 30 minutes.
+
+## Round 3 (2026-10-09; 1.14d runs under the lock)
+
+- **Item 1 — act and game seed for a save outside Act I.** Written into
+  `specs/sim/intents-events.md` §8.2 rule 8.
+  - Act: the save header read `0x0056A090` writes client +0x1AC from
+    town byte +0xA8 + difficulty (& 0x7F, ≥ 5 → 0), the last write
+    before the join builds the act (`0x0052C210`) and enters the town.
+  - Game seed: act creation draws nothing from it. Before the first
+    town unit there are only the four creation derivations and the
+    player's unit seed (plus two steps per loaded item); then frame 2's
+    room population in the client act's town.
+  - Two 1.14d recordings under the lock confirm it (`record_rng.py
+    --frames --ticks 4 --auto SceAct2|ScnAma --seed 1234`): SceAct2
+    enters level 40; both runs have the same five draws, and the first
+    frame-2 unit draws 108806926 in both; Act I has 24 frame-2 unit
+    draws, Act II 12.
+  - Trap: with `-seed N` the DRLG seed and the game seed start equal,
+    so match draws by owner, not by value.
+  - d2rs has the act rule (`d2-server` `adapters/character.rs`), so the
+    act-0 start is a wiring gap; q-prov-data implements it (no new row
+    from here).
+- **Item 2 — what keeps a dead monster dead.** Written into
+  `specs/sim/units.md` §4.6 "What keeps a dead monster dead", with a
+  pointer in `monsters/ai.md` §1.1.
+  - Sequence: request 0 → DT start (clean-up) → DT event 0 / 1 sets 12
+    with the plain set → DD schedules nothing.
+  - The think has no dead test. The DT start's clean-up cancels the
+    unit's type-2 / 3 events (`0x005738D0`), and no scheduler runs for
+    a dead unit afterwards.
+  - The mode set `0x005A7C20` does not refuse a dead unit. A start that
+    fails leaves the mode unchanged (dead → return 1); the GH start
+    keeps mode 0/12; but the NU start sets mode 1 and an attack / skill
+    start sets its mode.
+  - d2rs's `monster_death_start` has no clean-up, so the think pending
+    at death fires `aidel` (15) frames later, idles, requests neutral,
+    and gets mode 1 with hp 0: exactly the symptom. Row
+    `q-fix-p4-death-cleanup`.
+- **Item 3 — right click: cast or walk.** `specs/ui/controls.md` §6
+  rules 4–11 already held the full decision. The new rule 12 sums it
+  up for the right button as a truth table: skill = the right skill,
+  rng = `range(P, skill)`, U after the re-pick, hostility.
+  - Ground with rng ≠ 1 → use check → C→S 0x0C. A failed check sends
+    nothing; Attack with no mana falls through to a walk.
+  - Ground with h2h → walk.
+  - Hostile monster with rng 0 / 2 → 0x0D. With rng 1 / 4 → 0x0D in
+    melee range, else walk to the unit.
+  - Stand Still forces 0x0C.
+  - A dead monster, or an object without `TargetItem`, counts as ground.
+  `d2-client` `controls/click.rs` follows this order, so a build where
+  every right click walks has rng resolving to 1 (range lookup / `both`
+  resolution) or a right skill of Attack (id 0). In `Patch_D2` Fire
+  Bolt and Frost Nova are range `none`, so on the ground they must send
+  0x0C. No q-fix row: the skills-2 session is bisecting the regression,
+  and this rule is the check for its fix.
+- **Item 4 — my live runs** (under the lock, Windows, SceSor /
+  `-seed 1234`).
+  1. *Warriv's node pick.* 1.14d (`record_rng.py --frames --ticks 120`,
+     `record_packets.py --ticks 120`, `record_state.py --ticks 50`):
+     - Warriv takes no node pick: one unit-seed draw only (frame 2,
+       `0x00573F8F` `roll(1)`).
+     - 0x8A `8a 01 07000000` at every think (24, 45, 56, 67, 87, 107):
+       the interact gate passes for this save.
+     - The walks are step 7's walk in radius: to (4868, 4233) at 24,
+       (4869, 4232) at 45, (4870, 4231) at 56, stop at 67.
+     
+     d2rs: `d2-client state-dump` (the release binary built 2026-10-09
+     16:26, no rebuild) equals 1.14d for Warriv on every frame 22–47
+     (mode, position, fraction, target) and has the same walks to 120.
+     So the scene note (tick 42) is stale; there is no Warriv
+     difference in the current build. Written into `ai-bodies.md` §9.9
+     (replacing my round-2 guess). `q-fix-p3-npc-interact-gate` is
+     still right for saves where the test fails, but it doesn't change
+     this arrival.
+  2. *C→S 0x67 mask.* Not run: `q-fix-tool-c2s-masks` hasn't landed on
+     staging (`packets_diff.py` still masks only s2c), so the check
+     would show the known 0x67 divergence. Run 2 of "Live runs for
+     PC1-C" stays queued for after that row.
+- **Item 5 (round 3).** No Step 4 items with `[seed-order]`,
+  `[recording-2]`, `[proto-items]`, `[q-fix-pc1-day3-a-r2]` or
+  `[prov-data]` on staging yet; polling every 30 minutes.

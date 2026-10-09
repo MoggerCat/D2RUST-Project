@@ -41,17 +41,17 @@
 |   3. Game entry: picking the quest set | 405–452 |
 |   4. Events and dispatch | 453–537 |
 |   5. Quest updater and timers (tick step 8) | 538–559 |
-|   6. Status reporting | 560–738 |
-|   7. NPC dialog hooks | 739–771 |
-|   8. Act transitions, warps and portals | 772–859 |
-|   9. Quest items, rewards and helpers | 860–1052 |
-|   11. Acts II–V | 1053–1069 |
-| Constants & data dependencies | 1070–1084 |
-| Randomness | 1085–1112 |
-| Edge cases & original bugs | 1113–1131 |
-| Test vectors | 1132–1163 |
-| Provenance | 1164–1192 |
-| Open questions | 1193–1265 |
+|   6. Status reporting | 560–741 |
+|   7. NPC dialog hooks | 742–774 |
+|   8. Act transitions, warps and portals | 775–862 |
+|   9. Quest items, rewards and helpers | 863–1055 |
+|   11. Acts II–V | 1056–1072 |
+| Constants & data dependencies | 1073–1087 |
+| Randomness | 1088–1115 |
+| Edge cases & original bugs | 1116–1134 |
+| Test vectors | 1135–1166 |
+| Provenance | 1167–1195 |
+| Open questions | 1196–1268 |
 <!-- /index -->
 
 ## Summary
@@ -684,16 +684,19 @@ of them; (b) the 0x8A rate is the NPC's think rate while a player is
 within 15; (c) an NPC with no room: `0x005DDF20` returns 0 (not the
 NPC) without scanning.
 
-d2rs: `QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
-implements steps 3–6 with the 0x8A send and returns the result; its
-`records` are kept newest first (§2.3), so the walk from index 0 is
-this order; the act is `unit_act(player)` (equal to the client's
-except during an act change). The AI's `nearest_player`
-(`wiring/action/ai.rs`) runs the callback above and calls it through
-the lent quest host (`QuestObjectHost::npc_active_test`) for an
-`interact` NPC, so step 2 is the caller's test. Checked against
-1.14d: `traces/checks/packets-town-arrival-ama.check` (`8a 01
-07000000` at frame 24, every S→C message of 40 frames equal).
+d2rs (q-fix-p3-npc-interact-gate, 2026-10-09):
+`QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
+implements steps 2–6 and returns the bool (the caller passes the NPC
+class's monstats `interact` flag for step 2); `records` is in list
+order, so its index walk is newest → oldest. The AI seam
+`AiSummons::npc_wants_interact` returns the bool and reaches the lent
+quest control (`QuestObjectHost::npc_wants_interact`, `QuestLoan`);
+`nearest_player` (`wiring/action/ai.rs`) runs the gate above. Step 4
+takes the act from `unit_act(player)`: the sim has no client act
+(PROVISIONAL, REC-860). Edge (c) (no room → 0) is not modelled: d2rs
+returns the NPC itself. The 0x8A send is checked against 1.14d:
+`traces/checks/packets-town-arrival-ama.check` (`8a 01 07000000` at
+frame 24, every S→C message of 40 frames equal).
 
 #### 6.5 S→C 0x89 UniqueEvent
 

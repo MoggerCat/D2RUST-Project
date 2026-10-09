@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–271 |
-|   4. The table (`sequences.tsv`) | 272–303 |
-|   5. Users in 1.14d | 304–320 |
-| Constants & data dependencies | 321–329 |
-| Randomness | 330–333 |
-| Edge cases & original bugs | 334–353 |
-| Test vectors | 354–368 |
-| Provenance | 369–383 |
-| Open questions | 384–389 |
+|   3. Frame queries | 112–289 |
+|   4. The table (`sequences.tsv`) | 290–321 |
+|   5. Users in 1.14d | 322–338 |
+| Constants & data dependencies | 339–347 |
+| Randomness | 348–351 |
+| Edge cases & original bugs | 352–371 |
+| Test vectors | 372–386 |
+| Provenance | 387–401 |
+| Open questions | 402–407 |
 <!-- /index -->
 
 ## Summary
@@ -236,9 +236,21 @@ Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
    direction (`sim/pathing.md` §9.4). Measured: the first step is on
    update 3 (request update = 0; the update whose advance reaches
    sequence position 3), the last (partial) step on update
-   a = 2 + ⌈(path length << 16) / step⌉. PROVISIONAL (REC-815): why
-   updates 1 and 2 do not step is not read (r1 above would step from
-   update 1).
+   a = 2 + ⌈(path length << 16) / step⌉. Read (REC-815, 2026-10-09):
+   nothing in the client chain holds the step. The start's path compute
+   `0x00649970` sets path flag 0x20, the point count +0x28 and +0x24 :=
+   0, then `0x00648690` sets velocity +0x7C; machine step 1 calls
+   `0x004807C0` → `0x00650840` from update 1 (E flags & 1, mode row kind
+   2). `0x00650840` (`0x00650869`–`0x00650897`) needs flag 0x20, +0x28 >
+   0, +0x7C ≠ 0, `0x006503F0` (point path: true), +0x24 < +0x28 and a
+   non-zero step vector (`0x006502D0`); **any failed gate ends the
+   path** (`0x006507B0`: snap to the sub-tile centre, flag 0x20 and
+   +0x24 / +0x28 := 0, return 0 = arrived), so a no-move step cannot
+   occur and return "moving". PROVISIONAL (REC-900): the 2-update
+   delay is not explained by `0x00463390` / `0x004C9120` / `0x00650840`;
+   open: whether the start runs later than the click for this request
+   (e.g. `0x004C52E0` / `0x004648F0` target not ready) or the
+   recorder's `px` is not path +0x00. N below uses the measured a.
 2. Do while moving (flags & 3 = 1): +0x38 := 3·256, +0x48 := 0x500
    (loop A1 3–6). Rate 256: +0x48 runs 2048 − 256·i to 256 at update 7,
    then 1024, 768, 512, 256 per loop; it is 256 after the advance of
@@ -262,12 +274,18 @@ Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
    +14): steps on 3..40, a = 40, N = 40 (measured 40). Both arrivals fall
    on a loop end, so these facts equally fit "ends on the arrival
    update" (N = a); the binary read above (no end in `0x004C9320`) gives
-   the rounding. Settles REC-671. PROVISIONAL (REC-816): in both
-   recordings +0x3C reads 213 after update N − 1 (`s` column), so the
-   update-N advance by +0x3C would leave +0x48 = 43; the mode change on
-   update N may then come from a server mode message (queued, `client/
-   model.md` §4 r5) rather than step 5 — same N either way while server
-   and client run the same loop; a whirl with a mod 4 ≠ 0 decides it.
+   the rounding. Settles REC-671. Settled (REC-816, 2026-10-09): the
+   update-N mode change is machine step 5. The facts' `f` / `F` / `s`
+   columns are +0x44 / +0x48 / +0x4C, not +0x38 / +0x48 / +0x3C: `f`
+   reads 768 at sequence index 4 (A1.3) and 1536 at index 7 (A1.6,
+   event 7:1), where +0x38 would read 1024 / 1792. The 213 after update
+   N − 1 is the rate `0x00623F50` (`sim/units.md` §4.7) taking the
+   velocity branch (`0x006214A0`: mode 18 is V-skill and E flags & 1,
+   not 0x1000; player w = 213), which writes only the speed +0x4C; +0x3C
+   is written only by the cast and attack branches. So +0x3C stays 256,
+   the update-N advance leaves +0x48 = 0 and `0x006217C0` (+0x30 ≠ 0:
+   +0x48 < 1) ends the mode through `0x004611F0`; the local player gets
+   no server skill message (local-player rule 3 above).
 
 ### 4. The table (`sequences.tsv`)
 

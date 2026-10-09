@@ -110,20 +110,22 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
     }
 
-    fn npc_active_test(
+    fn npc_wants_interact(
         &mut self,
         game: &mut Game,
         v: &mut View<'_, X>,
         player: UnitId,
         npc: UnitId,
+        class: u16,
+        interact: bool,
     ) -> bool {
-        let Some(class) = v.units.get(npc).map(|r| r.class as u16) else {
-            return false;
+        let call = LoanCall::NpcWantsInteract {
+            player,
+            npc,
+            class,
+            interact,
         };
-        matches!(
-            self.on_world(game, v, LoanCall::NpcActive { player, npc, class }),
-            LoanOut::Active(true)
-        )
+        self.on_world(game, v, call) == LoanOut::Active(true)
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
@@ -180,17 +182,20 @@ enum LoanCall<'c> {
     Route(&'c QuestObjectCall),
     /// Quest event 3 CHANGEDLEVEL (`world/quests.md` §4.1).
     ChangedLevel { player: UnitId, from: u32, to: u32 },
-    /// The NPC active test `0x00544590` (`world/quests.md` §6.4).
-    NpcActive {
+    /// The quest active test (`world/quests.md` §6.4).
+    NpcWantsInteract {
         player: UnitId,
         npc: UnitId,
         class: u16,
+        interact: bool,
     },
 }
 
 /// What a [`LoanCall`] gave back.
+#[derive(Debug, PartialEq, Eq)]
 enum LoanOut {
     Run(QuestObjectRun),
+    /// The active test's answer.
     Active(bool),
 }
 
@@ -212,11 +217,14 @@ fn on_host<'e, X: Pending, R: QuestRest>(
             quests.changed_level(&mut w, player, from, to);
             LoanOut::Run(QuestObjectRun::Ran)
         }
-        // A quest fault (the set not picked: fatal in 1.14d) is false.
-        LoanCall::NpcActive { player, npc, class } => LoanOut::Active(
-            quests
-                .npc_wants_interact(&mut w, player, npc, class)
-                .unwrap_or(false),
+        // The set not picked (the fatal 0x7F4) answers false.
+        LoanCall::NpcWantsInteract {
+            player,
+            npc,
+            class,
+            interact,
+        } => LoanOut::Active(
+            quests.npc_wants_interact(&mut w, player, npc, class, interact) == Ok(true),
         ),
     }
 }

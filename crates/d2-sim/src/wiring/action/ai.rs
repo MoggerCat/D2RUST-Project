@@ -27,6 +27,26 @@ use crate::world::objects::Dispatch;
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
 
+impl<X: Pending> View<'_, X> {
+    /// A monster's class and its monstats `interact` flag (flags byte
+    /// +0xD bit 1, `ai.md` §5.3); `None` for a non-monster.
+    fn npc_interact(&self, unit: UnitId) -> Option<(u16, bool)> {
+        let r = self
+            .units
+            .get(unit)
+            .filter(|r| r.ty == crate::units::UnitType::Monster)?;
+        let class = u16::try_from(r.class).ok()?;
+        let interact = self
+            .h
+            .tables
+            .combat
+            .monstats
+            .get(usize::from(class))
+            .is_some_and(|m| m.interact);
+        Some((class, interact))
+    }
+}
+
 impl<X: Pending> AiUnits for View<'_, X> {
     fn seed(&mut self, unit: UnitId) -> &mut Seed {
         View::seed(self, unit)
@@ -419,14 +439,15 @@ impl<X: Pending> AiTargets for View<'_, X> {
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
     /// list order) with the callback `0x005DDE80`: d := the full-size
-    /// distance `0x005DC380(npc, C)`; d > 15 → skip; an NPC without
-    /// monstats `interact` takes C; with it, C is taken only when the
-    /// quest active test `0x00544590` holds (`world/quests.md` §6.4,
-    /// [`super::QuestObjectHost::npc_active_test`], which sends S→C 0x8A
-    /// when it passes; no quest host lent: false) and d < the best d
-    /// (0x7FFFFFFF). Taking stops the scan. "Close" when d < 4; the unit
-    /// itself when none is taken.
+    /// distance `0x005DC380` (the NPC's size subtracted per axis, clamped
+    /// at 0); d > 15 → skip. An NPC without the monstats `interact` flag
+    /// takes the first such player; with it, the quest active test
+    /// (`world/quests.md` §6.4, [`AiSummons::npc_wants_interact`], which
+    /// sends 0x8A on true) runs for each such player in scan order and
+    /// the first true is taken. Taking stops the scan. "Close" when d < 4;
+    /// the unit itself when none.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
+        use crate::monsters::ai::AiSummons as _;
         use crate::path::collision::CollisionRooms;
         let Some(room) = game.lists.unit(unit).and_then(|e| e.room()) else {
             return (unit, false);
@@ -439,38 +460,24 @@ impl<X: Pending> AiTargets for View<'_, X> {
             rooms.insert(0, room);
         }
         let players = super::dying::client_players(game);
-        let candidates: Vec<UnitId> = rooms
-            .into_iter()
-            .flat_map(|r| game.lists.room_units(r))
-            .filter(|p| players.contains(p))
-            .collect();
-        let interact = self
-            .units
-            .get(unit)
-            .and_then(|r| self.h.tables.combat.monstats(r.class as i32))
-            .is_some_and(|m| m.interact);
         let at = self.h.path_position(unit);
         let size = self.path_size(unit);
-        const BEST: i32 = 0x7FFF_FFFF;
-        for p in candidates {
+        let interact = self.npc_interact(unit).is_some_and(|(_, i)| i);
+        let mut scan = Vec::new();
+        for r in rooms {
+            scan.extend(
+                game.lists
+                    .room_units(r)
+                    .into_iter()
+                    .filter(|p| players.contains(p)),
+            );
+        }
+        for p in scan {
             let dist = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(p));
             if dist > 15 {
                 continue;
             }
-            let take = if interact {
-                let active = match self.h.quest_host.take() {
-                    Some(mut host) => {
-                        let r = host.npc_active_test(game, self, p, unit);
-                        self.h.quest_host = Some(host);
-                        r
-                    }
-                    None => false,
-                };
-                active && dist < BEST
-            } else {
-                true
-            };
-            if take {
+            if !interact || self.npc_wants_interact(game, p, unit) {
                 return (p, dist < 4);
             }
         }
@@ -820,6 +827,23 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// The quest active test `0x00544590(game, player, npc)`
+    /// (`world/quests.md` §6.4) on the game's quest control, lent to the
+    /// hooks while the tick runs ([`super::ActionHooks::quest_host`]):
+    /// true when an active function wants the player to talk to `unit`
+    /// (and 8A 01 <GUID> was sent). No lent control (a host without
+    /// quests): false, no send.
+    fn npc_wants_interact(&mut self, game: &mut Game, player: UnitId, unit: UnitId) -> bool {
+        let Some((class, interact)) = self.npc_interact(unit) else {
+            return false;
+        };
+        let Some(mut host) = self.h.quest_host.take() else {
+            return false;
+        };
+        let r = host.npc_wants_interact(game, self, player, unit, class, interact);
+        self.h.quest_host = Some(host);
+        r
+    }
     /// `0x00646CA0(unit, calc, skill, level)`: the calc column on the
     /// unit (`data/calc-expressions.md`, `skills/levels.md`).
     fn skill_calc(

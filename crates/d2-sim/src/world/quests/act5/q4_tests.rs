@@ -366,7 +366,8 @@ fn anya_wants_to_talk() {
     ctl.picked = true;
     ctl.records[i].state = 1;
     f.p(P1).quests.flags[0].set(37, 0);
-    ctl.npc_wants_interact(&mut f, P1, ANYA_U, 512).unwrap();
+    ctl.npc_wants_interact(&mut f, P1, ANYA_U, 512, true)
+        .unwrap();
     assert_eq!(f.sent, [(P1, hex("8A 01 40000000"))]);
 }
 

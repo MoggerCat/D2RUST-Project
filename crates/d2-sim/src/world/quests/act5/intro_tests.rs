@@ -184,6 +184,7 @@ fn active_and_status_functions() {
     // 0x8A for Malah through the record's active function.
     let mut f = fake();
     ctl.picked = true;
-    ctl.npc_wants_interact(&mut f, P1, MALAH_U, 513).unwrap();
+    ctl.npc_wants_interact(&mut f, P1, MALAH_U, 513, true)
+        .unwrap();
     assert_eq!(f.sent, [(P1, hex("8A 01 41000000"))]);
 }
