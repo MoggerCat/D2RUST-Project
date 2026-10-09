@@ -121,6 +121,9 @@ struct Options {
     /// `play --poke "<f> <directive> ..."` (repeatable) and `--poke-file
     /// FILE` (`specs/tools/poke.md` §5 rule 2), in the order given.
     pokes: Vec<d2_client::app::poke::Entry>,
+    /// `play --send "<f> <Name> <field>=<value>..." | "<f> hex <bytes>"`
+    /// (repeatable; `specs/tools/scenario-diff.md` §3 r12).
+    sends: Vec<d2_client::app::send::SendEntry>,
 }
 
 /// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
@@ -175,6 +178,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         at_tick: None,
         input: None,
         pokes: Vec::new(),
+        sends: Vec::new(),
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -204,6 +208,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--poke" => o
                 .pokes
                 .push(d2_client::app::poke::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
+            "--send" => o
+                .sends
+                .push(d2_client::app::send::parse_send_arg(value()?).map_err(anyhow::Error::msg)?),
             "--poke-file" => {
                 let path = value()?;
                 let text =
@@ -606,6 +613,7 @@ fn play_once(
             }),
         input: o.input.clone(),
         pokes: o.pokes.clone(),
+        sends: o.sends.clone(),
     })?;
     match result.exit {
         bevy::app::AppExit::Success => Ok(result.to_menu),
