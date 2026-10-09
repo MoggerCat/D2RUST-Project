@@ -14,6 +14,12 @@ Output: one JSON line per record in traces/raw/<time>-state.jsonl
 (format `state-1`, specs/tools/state-snapshot.md §1). `--selftest` runs
 the snapshot reader on a synthetic process image (no game, any OS).
 
+Pokes (`poke.py`, specs/tools/poke.md §2 rule 6): `--poke "<f> <directive>
+<args>..."` (repeatable) runs at the 0x0052FD1E stop whose game +0xA8 =
+f - 1, after that stop's snapshot, so the snapshot of frame f is the first
+with its effect; each result is a `{"k":"poke","f",...}` line between the
+two snapshots (state_diff.py skips the kind). `--poke-file` as poke.py.
+
 The game process is always terminated when this script ends (time limit,
 Ctrl+C, any error, and kill-on-exit if the debugger dies).
 
@@ -32,6 +38,7 @@ import time
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the scripts
 import autostart  # noqa: E402  (unattended start, input script; imports on any OS)
+import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
 
 TOOL = "trace-recorder record_state 0.1.0"
 FORMAT = "state-1"
@@ -509,6 +516,16 @@ def selftest():
           f"exactly their keys; {quiet} unread bytes change nothing")
 
 
+def selftest_poke_options(ap):
+    """--poke on this recorder's command line becomes a poke layer (poke.py)."""
+    a = ap.parse_args(["--poke", "4 spawn 19 @x+3 @y+3 normal", "--poke",
+                       "4 seed-unit @1:19 0x12345678 666", "--ticks", "5"])
+    layer = poke.PokeLayer.from_args(a)
+    assert [(s.f, s.d) for s in layer.abs] == [(4, "spawn"), (4, "seed-unit")]
+    assert poke.PokeLayer.from_args(ap.parse_args([])) is None
+    print("selftest ok: --poke lines make a poke layer")
+
+
 # --- main ---------------------------------------------------------------------
 
 def main():
@@ -524,10 +541,13 @@ def main():
     ap.add_argument("--selftest", action="store_true", help="check the snapshot reader on a synthetic game, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
+    poke.add_options(ap)
     a = ap.parse_args()
     if a.selftest:
         selftest()
+        selftest_poke_options(ap)
         return
+    layer = poke.PokeLayer.from_args(a)
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     out = a.out or os.path.join(
@@ -538,12 +558,21 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
+    if layer:
+        layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f
     try:
         r.run()
     except KeyboardInterrupt:
         print("interrupted; game terminated", file=sys.stderr)
     for n in r.notes:
         print("note:", n)
+    if layer:
+        for x in layer.results:
+            print(f"poke: f {x['f']} {x['d']}: {x['r']}"
+                  + (f" guid {x['guid']}" if "guid" in x else "")
+                  + (f" ({x['note']})" if x.get("note") else ""))
+        if layer.pending():
+            print(f"note: {len(layer.pending())} poke(s) not reached")
     for k, v in r.reader_notes.items():
         print(f"note: {k} ({v} units)")
     print(f"wrote {out}: {r.snaps} snapshots, {r.ticks} ticks")

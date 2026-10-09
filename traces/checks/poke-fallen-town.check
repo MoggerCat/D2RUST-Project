@@ -1,0 +1,20 @@
+check 1
+# A fallen (monstats 19, normal) poked next to the player in the Rogue
+# Encampment, then its first 50 ticks compared (specs/tools/poke.md §2
+# rule 6, test vector "poke-fallen-town"): ScnAma, -seed 1234, no input.
+# Before frame 4 (after frame 3's snapshot): the game seed and the
+# player's unit seed are set first, so the spawn draws from equal seeds
+# on both sides whatever came before (d2rs is one game-seed step behind
+# from the join, poke.md Test vectors), then the party is spawned.
+# Compare the units with GUID 8-11 (the party) frame by frame; the town's
+# own units carry the join difference.
+# Spec: specs/tools/scenario-diff.md.
+name poke-fallen-town
+save ScnAma --class ama --expansion
+seed 1234
+ticks 54
+seconds 240
+channels state
+at 4 poke seed-game 0x00001234 666
+at 4 poke seed-unit @player 0x00000055 666
+at 4 poke spawn 19 @x+3 @y+3 normal

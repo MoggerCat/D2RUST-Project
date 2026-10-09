@@ -784,7 +784,7 @@ fn skeleton_like<W: AiHost + ?Sized>(
     } else if cx.chance(u, cx.aip(p, 1)) {
         match (pat, t) {
             (Pattern::Wraith, Some(tt)) => {
-                cx.world.walk_in_radius(game, u, tt, 12, 0);
+                walk_in_radius(game, cx, u, tt, 12, 0);
             }
             (Pattern::Wraith, None) => {}
             _ => {

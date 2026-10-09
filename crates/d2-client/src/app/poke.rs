@@ -117,35 +117,16 @@ impl Schedule {
         {
             self.anchor = Some(frame);
         }
-        let Some((player, _)) = local_player(s) else {
+        if local_player(s).is_none() {
             return;
-        };
-        let waypoints: BTreeSet<u32> = s
-            .world
-            .action
-            .waypoints
-            .as_ref()
-            .map(|w| {
-                w.objects
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, o)| o.operate_fn == 23)
-                    .map(|(i, _)| i as u32)
-                    .collect()
-            })
-            .unwrap_or_default();
+        }
         let anchor = self.anchor;
         let (due, later): (Vec<Entry>, Vec<Entry>) = std::mem::take(&mut self.pending)
             .into_iter()
             .partition(|e| due_after(e.when, anchor).is_some_and(|f| frame >= f));
         self.pending = later;
         for e in due {
-            let env = poke::Env {
-                player,
-                waypoint_classes: &waypoints,
-                items: Some(&s.world.tables),
-            };
-            let r = poke::apply_op(&mut s.game, &mut s.events, &env, &e.op);
+            let r = apply_now(s, &e.op);
             let late = match due_after(e.when, anchor) {
                 Some(f) if frame > f => format!(" (late: due after frame {f})"),
                 _ => String::new(),
@@ -162,6 +143,82 @@ impl Schedule {
                 }
             );
         }
+    }
+}
+
+/// The `objects` rows with operate function 23 (`@wp`, `world/waypoints.md` §5).
+fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
+    s.world
+        .action
+        .waypoints
+        .as_ref()
+        .map(|w| {
+            w.objects
+                .iter()
+                .enumerate()
+                .filter(|(_, o)| o.operate_fn == 23)
+                .map(|(i, _)| i as u32)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Runs `op` on `s` now (`poke.md` §5): the local player is `@player`,
+/// `@wp` and `item` use the game's own tables. No local player yet:
+/// `unresolved @player`.
+pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
+    let Some((player, _)) = local_player(s) else {
+        return poke::PokeResult::Unresolved("@player".into());
+    };
+    let waypoints = waypoint_classes(s);
+    let env = poke::Env {
+        player,
+        waypoint_classes: &waypoints,
+        items: Some(&s.world.tables),
+    };
+    poke::apply_op(&mut s.game, &mut s.events, &env, op)
+}
+
+/// The keyword a `poke` record names (`d`): the directive's, or `spawn`.
+pub fn op_keyword(op: &PokeOp) -> &'static str {
+    match op {
+        PokeOp::Directive(d) => d.keyword(),
+        PokeOp::Spawn(_) => "spawn",
+    }
+}
+
+/// The `poke` record of an absolute `--poke` result (`poke.md` §2 r6,
+/// §3 r3; the fields `poke.py` writes on 1.14d): `f` the frame the poke
+/// precedes, `frame` = f − 1, `i` its index among the pokes run at that
+/// point, `d`, `r`, `guid` when `ok` created a unit, `note` for
+/// `unresolved` / `gap`, `src` the canonical directive.
+pub fn record_line(f: i32, i: usize, op: &PokeOp, r: &poke::PokeResult) -> String {
+    use d2_sim::debug::state::json_string;
+    let mut o = format!(
+        "{{\"k\":\"poke\",\"f\":{f},\"frame\":{},\"i\":{i},\"d\":{},\"r\":{}",
+        f - 1,
+        json_string(op_keyword(op)),
+        json_string(r.code())
+    );
+    match r {
+        poke::PokeResult::Ok(Some(g)) => o.push_str(&format!(",\"guid\":{g}")),
+        poke::PokeResult::Unresolved(n) | poke::PokeResult::Gap(n) => {
+            o.push_str(&format!(",\"note\":{}", json_string(n)));
+        }
+        _ => {}
+    }
+    o.push_str(&format!(",\"src\":{}}}", json_string(&op.to_string())));
+    o
+}
+
+/// The server thread runs the poke between two frames (`poke.md` §2 r6).
+impl<C: d2_server::seams::Clock + Send + 'static> crate::bridge::poke::PokeTarget
+    for ThreadLink<Link<C>>
+{
+    type Error = ThreadStopped;
+    fn poke(&mut self, op: &PokeOp) -> Result<poke::PokeResult, Self::Error> {
+        let op = op.clone();
+        self.with(move |l| apply_now(&mut l.host_mut().game, &op))
     }
 }
 

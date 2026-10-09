@@ -244,8 +244,8 @@ pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
 
 /// The 0x67 u32@0x27 of a classic character.
 ///
-/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
-/// expansion bit 20.
+/// Bit 2 alone, without the expansion bit 20 (`client/model.md` §7 r9;
+/// recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
@@ -2040,11 +2040,14 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s
-            .events
-            .action
-            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
-        else {
+        let Some(player) = s.events.action.with(&mut s.game, |g, v| {
+            // `units.md` §3.1 r4.1: the load draws the player's unit
+            // seed (`0x00552DF0`) right after the allocation, before
+            // the save's or the start items and the act's DRLG.
+            let p = v.allocate(g, &req, 0, 0)?;
+            v.init_player_seed(p);
+            Some(p)
+        }) else {
             s.events
                 .action
                 .hooks()
