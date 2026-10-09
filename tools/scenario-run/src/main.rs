@@ -2,7 +2,7 @@
 //! `scenario-run`:
 //!
 //! ```text
-//! scenario-run run <script> [--synthetic | --game-dir <dir>] [-o <trace>]
+//! scenario-run run <script> [--synthetic | --game-dir <dir>] [--save-dir <dir>] [-o <trace>]
 //! scenario-run compare <original.trace.jsonl> <d2rs.trace.jsonl>
 //! scenario-run check <script>...
 //! ```
@@ -22,7 +22,7 @@ use scenario_run::{run, Data};
 
 fn usage() -> ! {
     eprintln!(
-        "usage:\n  scenario-run run <script> [--synthetic | --game-dir <dir>] [-o <trace>]\n  scenario-run compare <original> <d2rs>\n  scenario-run check <script>..."
+        "usage:\n  scenario-run run <script> [--synthetic | --game-dir <dir>] [--save-dir <dir>] [-o <trace>]\n  scenario-run compare <original> <d2rs>\n  scenario-run check <script>..."
     );
     std::process::exit(3)
 }
@@ -43,12 +43,14 @@ fn cmd_run(args: &[String]) -> Result<ExitCode> {
     let mut synthetic = false;
     let mut game_dir = std::env::var_os("D2_GAME_DIR").map(PathBuf::from);
     let mut out = None;
+    let mut save_dir = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--synthetic" => synthetic = true,
             "--game-dir" => game_dir = Some(it.next().unwrap_or_else(|| usage()).into()),
             "-o" => out = Some(PathBuf::from(it.next().unwrap_or_else(|| usage()))),
+            "--save-dir" => save_dir = Some(PathBuf::from(it.next().unwrap_or_else(|| usage()))),
             _ if script.is_none() && !a.starts_with('-') => script = Some(PathBuf::from(a)),
             _ => usage(),
         }
@@ -66,6 +68,8 @@ fn cmd_run(args: &[String]) -> Result<ExitCode> {
     } else {
         bail!("no game data: give --game-dir, set D2_GAME_DIR, or pass --synthetic");
     };
+    let mut data = data;
+    data.save_dir = save_dir;
     let r = run(&s, &data)?;
     for n in &r.notes {
         eprintln!("note: {n}");

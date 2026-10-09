@@ -170,17 +170,64 @@ pub struct SessionFlow<D, W> {
     pub requests: BTreeMap<ClientId, CreateGame>,
     /// The game's name (game +0x2A, from the creating 0x67).
     pub game_name: Option<[u8; 16]>,
-    /// Game +0x28, the game's id in the game table (u16@0x33 of 0xB2).
-    ///
-    /// PROVISIONAL (intents-events.md §2.5 r3; no REC): d2rs has no game
-    /// table; 0 unless the caller sets it.
+    /// Game +0x28, the game's id in the game table (u16@0x33 of 0xB2):
+    /// 0 before a game is created, then the id [`GameIds`] gave it.
     pub game_id: u16,
+    /// The process-wide id counter and the table slots in use
+    /// (`0x0052C170`, `intents-events.md` §2.5 r3).
+    pub ids: GameIds,
     /// Save uploads by client (§2.5 rule 4).
     pub uploads: BTreeMap<ClientId, Upload>,
     /// Clients whose record +0x504 is set by 0x70 (§2.5 rule 6; read only
     /// by the host heartbeat).
     pub heartbeat_flag: BTreeSet<ClientId>,
     pub faults: Vec<(ClientId, SessionFault)>,
+}
+
+/// The game table's ids (`0x0052C170`, `intents-events.md` §2.5 r3): a
+/// counter (initially 1) names the next id to try; ids run 1 ..= 0x400
+/// and wrap to 1; the first id from the counter whose slot is free is
+/// taken and the counter moves past it; none free: 0 (no game).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GameIds {
+    next: u16,
+    used: BTreeSet<u16>,
+}
+
+impl Default for GameIds {
+    fn default() -> Self {
+        Self {
+            next: 1,
+            used: BTreeSet::new(),
+        }
+    }
+}
+
+impl GameIds {
+    /// The ids' upper bound (the table has 1,024 slots).
+    pub const MAX: u16 = 0x400;
+
+    /// Takes the next free id, 0 when the table is full.
+    pub fn alloc(&mut self) -> u16 {
+        let mut id = self.next;
+        for _ in 0..Self::MAX {
+            if id == 0 || id > Self::MAX {
+                id = 1;
+            }
+            if !self.used.contains(&id) {
+                self.used.insert(id);
+                self.next = if id >= Self::MAX { 1 } else { id + 1 };
+                return id;
+            }
+            id += 1;
+        }
+        0
+    }
+
+    /// Frees `id`'s slot (the game is destroyed); the counter stays.
+    pub fn release(&mut self, id: u16) {
+        self.used.remove(&id);
+    }
 }
 
 impl<D, W> SessionFlow<D, W> {
@@ -190,6 +237,7 @@ impl<D, W> SessionFlow<D, W> {
             requests: BTreeMap::new(),
             game_name: None,
             game_id: 0,
+            ids: GameIds::default(),
             uploads: BTreeMap::new(),
             heartbeat_flag: BTreeSet::new(),
             faults: Vec::new(),
@@ -344,7 +392,11 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
             return;
         };
         self.requests.insert(client, *r);
-        self.game_name.get_or_insert(r.game_name);
+        if self.game_name.is_none() {
+            // The game is created with this 0x67 (`0x00530A67`).
+            self.game_name = Some(r.game_name);
+            self.game_id = self.ids.alloc();
+        }
         let g = game_setup(r);
         let flags = msg::game_flags(g.difficulty, g.arena_flags, g.expansion, g.ladder);
         // Rules 3–6.
@@ -404,6 +456,11 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
             .map(|e| e.guid);
         // Cannot fail: the client is joined.
         let _ = s.leave(client);
+        // The last client gone: the game ends and its id slot is free.
+        if self.requests.is_empty() {
+            self.game_name = None;
+            self.ids.release(std::mem::take(&mut self.game_id));
+        }
         // The remaining clients in state 4, client-list order (the leaver
         // is already unlinked, so it gets neither message).
         let in_game: Vec<ClientId> = s
@@ -583,5 +640,40 @@ impl<D: ActionEvents, W> SessionRunner<D, W> for SessionFlow<D, W> {
     }
     fn flow(&self) -> &SessionFlow<D, W> {
         self
+    }
+}
+
+#[cfg(test)]
+mod game_id_tests {
+    use super::*;
+
+    /// `intents-events.md` §2.5 r3: the first game of a process has id 1,
+    /// the next 2; a freed id is reused only when the counter wraps to it.
+    #[test]
+    fn ids_start_at_one_and_count_up() {
+        let mut ids = GameIds::default();
+        assert_eq!((ids.alloc(), ids.alloc()), (1, 2));
+        ids.release(1);
+        assert_eq!(ids.alloc(), 3);
+    }
+
+    /// Ids run 1 ..= 0x400 and wrap to 1, skipping taken slots; a full
+    /// table gives 0.
+    #[test]
+    fn ids_wrap_and_skip_taken_slots() {
+        let mut ids = GameIds::default();
+        let all: Vec<u16> = (0..0x400).map(|_| ids.alloc()).collect();
+        assert_eq!(all[0], 1);
+        assert_eq!(all[0x3FF], 0x400);
+        assert_eq!(ids.alloc(), 0, "no slot free");
+        ids.release(5);
+        assert_eq!(ids.alloc(), 5, "the wrapped counter finds the free slot");
+    }
+
+    /// The 0xB2 entry carries the id at u16@0x33.
+    #[test]
+    fn game_list_entry_carries_the_id() {
+        let e = game_list_entry(b"game\0\0\0\0\0\0\0\0\0\0\0\0", 1, 2);
+        assert_eq!(u16::from_le_bytes([e[0x33], e[0x34]]), 2);
     }
 }

@@ -23,18 +23,18 @@
 | Outputs / state changes | 59–65 |
 | Rules | 66–67 |
 |   1. Files and header | 68–89 |
-|   2. `draws.tsv` | 90–133 |
-|   3. `frame.tsv` | 134–166 |
-|   4. `sprites.tsv` | 167–182 |
-|   5. d2rs export | 183–290 |
-|   6. Comparison | 291–313 |
-|   7. Requests | 314–325 |
-| Constants & data dependencies | 326–329 |
-| Randomness | 330–333 |
-| Edge cases & original bugs | 334–341 |
-| Test vectors | 342–350 |
-| Provenance | 351–355 |
-| Open questions | 356–370 |
+|   2. `draws.tsv` | 90–136 |
+|   3. `frame.tsv` | 137–169 |
+|   4. `sprites.tsv` | 170–189 |
+|   5. d2rs export | 190–312 |
+|   6. Comparison | 313–350 |
+|   7. Requests | 351–362 |
+| Constants & data dependencies | 363–366 |
+| Randomness | 367–370 |
+| Edge cases & original bugs | 371–378 |
+| Test vectors | 379–387 |
+| Provenance | 388–392 |
+| Open questions | 393–407 |
 <!-- /index -->
 
 ## Summary
@@ -117,8 +117,11 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    question 3), `dir` = `-`, `tile` = `orientation.main.sub.rarity` of
    the tile header, `x`, `y` = the X, Y arguments, `w h xoff yoff` = `-`,
    `mode` = the alpha argument for `TileDrawTrans` else `-`, `light` =
-   the light digest the recorder logged (16 hex digits, no `0x`), `pal` =
-   `-`.
+   the light digest the recorder logged (16 hex digits, no `0x`), or `?`
+   when the converter runs with `--tile-light unknown` (the scene
+   recordings of `tools/cloud-game/scenes.py` do: the 768-byte floor light
+   read differs between two runs of the same frame, bytes the game does
+   not set; `docs/handoff/q-facts-scenes.md` finding 1), `pal` = `-`.
 5. `unit`: `unit` = `type:guid` of the unit (decimal), `x`, `y` = the
    first two stack arguments (client x, y), `light` = EDX as hex; every
    other column `-`.
@@ -179,6 +182,10 @@ then numbers), no duplicates.
 2. Two producers' rows for the same key must be equal; the 1.14d file
    merges every scene, so a key present twice with different values is
    an error of the producer.
+3. Two branches' 1.14d sprite tables are joined with the converter,
+   never by hand: `facts_render.py --merge-sprites A.tsv B.tsv` writes
+   their union by r2 (a key with two different rows is an error and
+   nothing is written); its command line goes in the header.
 
 ### 5. d2rs export
 
@@ -188,7 +195,10 @@ composition, through `d2-client` only (game logic untouched).
 
 1. Rows come from the sorted `DrawItem` list. Consecutive items with the
    same tag, frame and position (the per-block draws of one tile,
-   `client/render-pipeline.md` §A3) are one row. Before the first item of
+   `client/render-pipeline.md` §A3) are one row; two tile records of one
+   cell (two draw keys) stay two rows, as 1.14d calls the drawer per
+   record (revision 2026-10-09: `a4-town-pandemonium-fortress` rows
+   12–13). Before the first item of
    each run of items tagged with the same unit, one `unit` row.
 2. A frame of a DT1 part is a tile op; of a direction part a cel op;
    `file` / `dir` / `frame` come from the frame store's owner of the
@@ -240,11 +250,12 @@ composition, through `d2-client` only (game logic untouched).
    in place of the 1×1 line-pixel and flash items d2rs composes them
    with (those items write no row): `DrawLine` for a line, `DrawBox` for
    the flash (`DrawRectangle` `0x004F6300`), `x`, `y` = x0, y0 and `mode`
-   = the color (`blend-modes.md` §8 r1–r2), every other column `-`. The
+   = the color (`blend-modes.md` §8 r1–r2), `at` = `pass9` (§6 r5),
+   every other column `-`. The
    rows stand where the first such item is, else (every pixel
    off-screen) before the first item of a later pass, else at the end.
    Other primitives (`DrawBox`, `DrawBoxAlpha`, `Util*`) are written only
-   for primitives d2rs draws; it draws no other yet (the 1.14d arrival
+   for primitives d2rs draws (r16: the UI rectangles); it drew no other (the 1.14d arrival
    scene also has the stamina bar box `0x0046EFE9` of
    `ui/control-panel.md` §4 and a hover-label box `0x005031C1`), so those
    rows are real divergences, not export gaps.
@@ -261,7 +272,12 @@ composition, through `d2-client` only (game logic untouched).
    `autostart.py --input` brought it: steps separated by `;`, `wait N`
    (N server ticks; autostart's `wait` counts seconds), `move X Y`,
    `click X Y`, `rclick X Y` (800 × 600 frame pixels; a click is cursor,
-   press, and the release on the next tick). The steps are the window's
+   press, and the release on the next tick), `key K` (revision
+   2026-10-09, q-scenes-compare: the panel scenes open panels by key; K
+   as autostart's `key`: a letter or digit, `ESC`, `TAB`, `ENTER`,
+   `SPACE`, or a virtual key in hex; the window's key press on that tick,
+   its bound world action then its typed character, without using up
+   the tick). The steps are the window's
    pointer events (the window's own pointer is ignored while a script
    runs), delivered once per new server tick. Scenes match by place, not
    by timing: a script waits until the walk is over before the dumped
@@ -287,10 +303,17 @@ composition, through `d2-client` only (game logic untouched).
    never composed; the export writes it at its key like an item (the
    unit row of §5 r1 included): `file`, `dir` (r14), `frame`; every
    measured column `?`; no `sprites.tsv` row.
+16. A UI rectangle (`ui/inventory.md` §2 r2: `0x0046EFD0` →
+   `DrawRectangle`, call site `0x0046EFE9`; d2rs: an item of a
+   `d2rs/ui/rect/WxH` frame set) is a `DrawBox` row: `x`, `y` = its
+   left, top, `mode` = its colour (the item's colour row; `?` without
+   the colour rows), every other column `-`; one row per rectangle
+   (revision 2026-10-09, `a1-panel-cube`: the item tints).
 
 ### 6. Comparison
 
-`d2-client facts-compare <original dir> <d2rs dir> [--ignore COL,...]`.
+`d2-client facts-compare <original dir> <d2rs dir> [--ignore COL,...]
+[--skip-weather]`.
 The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
 `<original dir>/../../sprites.tsv` (`facts/render/sprites.tsv`).
 
@@ -310,6 +333,20 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    full rows); 2 partial (no difference, some cells unmeasured: prints
    the counts per column); 3 error (a file missing or malformed: prints
    which and why).
+5. `--skip-weather` (REC-510): pass 9's rows are left out on both
+   sides before r2, for scenes whose 1.14d rain is not reproducible
+   (`docs/handoff/q-facts-scenes.md`: two runs of the same tick draw
+   other particles). A pass-9 row is a `DrawLine` or `DrawBox` row
+   whose `at` is in [`0x00473470`, `0x00473F50`) on the 1.14d side (the
+   particle draw `0x00473470` and pass 9 `0x00473910`,
+   `draw-order-2.md` §11.7), and a row whose `at` is `pass9` on the d2rs
+   side (§5 r10). A difference's `row` then counts the remaining rows;
+   its printed rows keep their `i`. The presented frame holds the
+   particles too: such a compare also passes `--ignore index_sha256`.
+   PROVISIONAL: the call sites
+   measured so far are `0x0047368E` (rain lines) and `0x00473585`
+   (snow lines, Harrogath), both in the particle draw; settled by a
+   scene recorded with the lightning flash (REC-510).
 
 ### 7. Requests
 

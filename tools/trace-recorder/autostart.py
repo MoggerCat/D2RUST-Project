@@ -45,7 +45,8 @@ SCRIPT [--seed N] [--input SCRIPT]`; standalone:
 
 Input script: `;`-separated commands, run in order once the player is in
 a level: `wait S`, `move X Y`, `click X Y`, `rclick X Y`, `hold X Y S`
-(left button down S seconds), `key K [S]` (K: a letter or digit, or
+(left button down S seconds), `waitticks N` (wait N server ticks of the recorder, not seconds),
+`mark NAME` (note `autostart: mark NAME ticks=N` in the recording's notes), `key K [S]` (K: a letter or digit, or
 ESC, TAB, ENTER, SPACE, SHIFT, CTRL, ALT, F1..F12, or a number), `shot
 NAME` (PNG of the client area into the shot directory), `goto T C[,C..]
 [S DX DY]` (walk to the nearest unit of type T and one of the classes C,
@@ -148,7 +149,8 @@ def vk_code(k):
 
 SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2), "hold": (3, 3),
               "key": (1, 2), "text": (1, 99), "shot": (0, 1), "waitlevel": (1, 2),
-              "goto": (2, 5), "dumpdrlg": (0, 1), "units": (1, 1), "end": (0, 0)}
+              "goto": (2, 5), "dumpdrlg": (0, 1), "waitticks": (1, 1), "mark": (1, 1), "clickunit": (2, 4), "rclickunit": (2, 4),
+              "units": (1, 1), "end": (0, 0)}
 
 
 def parse_script(text):
@@ -169,10 +171,12 @@ def parse_script(text):
             a = [raw.strip()[4:].strip()]
         elif op == "key":
             a = [vk_code(a[0])] + [float(x) for x in a[1:]]
+        elif op in ("clickunit", "rclickunit"):
+            a = [int(a[0], 0), a[1]] + [int(x, 0) for x in a[2:]]
         elif op == "goto":
             a = ([int(a[0], 0), tuple(int(c, 0) for c in a[1].split(","))]
                  + [float(x) for x in a[2:3]] + [int(x, 0) for x in a[3:]])
-        elif op not in ("shot", "dumpdrlg"):
+        elif op not in ("shot", "dumpdrlg", "mark"):
             a = [float(x) if "." in x else int(x, 0) for x in a]
         out.append((op, a))
     return out
@@ -198,6 +202,12 @@ def screen_of(mem, unit):
     pp, up = (client_px(mem, p) if p else None), client_px(mem, unit)
     if pp is None or up is None:
         return None
+    # the drawn camera: the frame's unit origin (record_frames UNIT_ORIGIN_X / _Y), when the
+    # process has it; else the player-centred projection of camera.md
+    ox = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A520C)))[0]
+    oy = struct.unpack("<i", struct.pack("<I", mem.read_u32(0x7A5208)))[0]
+    if (ox, oy) != (0, 0) and abs(ox - pp[0]) < 1000 and abs(oy - pp[1]) < 1000:
+        return (up[0] - ox, up[1] - oy)
     return (up[0] - pp[0] + VIEW_W // 2, up[1] - pp[1] + VIEW_H // 2 - 8)
 
 
@@ -256,7 +266,10 @@ def drlg_dump(mem, label=""):
 def nearest(mem, utype, cls):
     best = None
     for u in units_of(mem, utype):
-        if -1 not in cls and mem.read_u32(u + U_CLASS) not in cls:
+        # class -1 (goto) or None (clickunit `*`): any class; None also keeps living monsters only
+        if cls is not None and -1 not in cls and mem.read_u32(u + U_CLASS) not in cls:
+            continue
+        if cls is None and mem.read_u32(u + 0x10) in (0, 12):   # mode 0 death, 12 dead
             continue
         s = screen_of(mem, u)
         if s is None:
@@ -363,15 +376,21 @@ class AutoStart:
     def send(self, mem, msg, wp, lp):
         hwnd = self.window(mem)
         if hwnd:
+            if msg == WM_MOUSEMOVE and os.name == "nt":
+                # the game reads the real pointer for hover and cursor draws (the cursor of the
+                # frame records stays at the window centre when only messages are posted)
+                pt = W.POINT(lp & 0xFFFF, (lp >> 16) & 0xFFFF)
+                user32.ClientToScreen(hwnd, C.byref(pt))
+                user32.SetCursorPos(pt.x, pt.y)
             post(hwnd, msg, wp, lp)
 
     def click(self, mem, x, y, right=False):
         down, up, mk = ((WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) if right
                         else (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
         self.send(mem, WM_MOUSEMOVE, 0, lparam(x, y))
-        yield 0.03
+        yield 0.4      # the game finds the hovered unit in a frame (about 12 per second under Wine)
         self.send(mem, down, mk, lparam(x, y))
-        yield 0.05
+        yield 0.25     # held across at least one game frame (a click shorter than a frame can be lost)
         self.send(mem, up, 0, lparam(x, y))
 
     def run(self, mem, script=None):
@@ -380,6 +399,15 @@ class AutoStart:
             self.played.append((round(self.clock() - self.t0, 2), op, a))
             if op == "wait":
                 yield a[0]
+            elif op == "waitticks":
+                # server ticks of the recorder (its `ticks` counter), not wall-clock seconds:
+                # under Wine the game runs about 5x slower than real time, so scripted input
+                # lands on the same ticks only when it waits on ticks
+                until = getattr(mem, "ticks", 0) + a[0]
+                while getattr(mem, "ticks", 0) < until:
+                    yield 0.01
+            elif op == "mark":
+                self.log(f"autostart: mark {a[0]} ticks={getattr(mem, 'ticks', 0)}")
             elif op == "move":
                 self.send(mem, WM_MOUSEMOVE, 0, lparam(*a))
             elif op in ("click", "rclick"):
@@ -421,6 +449,17 @@ class AutoStart:
                          f"position {player_pos(mem)}")
             elif op == "goto":
                 yield from self.goto(mem, *a)
+            elif op in ("clickunit", "rclickunit"):
+                # click the nearest unit (utype, cls; `*` = any class) where it is drawn now (no
+                # walking); rclickunit with the right button
+                best = nearest(mem, a[0], None if a[1] == "*" else tuple(int(c, 0) for c in a[1].split(",")))
+                if best is None:
+                    self.log(f"autostart: clickunit {a[0]}:{a[1]} not found")
+                else:
+                    x, y = screen_of(mem, best[1])
+                    dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
+                    self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x + dx}, {y + dy})")
+                    yield from self.click(mem, x + dx, y + dy, op == "rclickunit")
             elif op == "units":
                 rows = []
                 for u in units_of(mem, a[0]):
@@ -451,14 +490,18 @@ class AutoStart:
                 continue
             _, u, (x, y) = best
             if 60 <= x <= VIEW_W - 60 and 60 <= y <= VIEW_H - 120:
-                still = self.clock() + 3
-                last = player_pos(mem)
+                # stand-still test on the recorder's ticks when it has them (under Wine the
+                # game runs about 5x slower than real time: 3 s are 15 ticks, not 75)
+                tk = getattr(mem, "ticks", None)
+                still = self.clock() + 3 if tk is None else self.clock() + 40
+                last, since = player_pos(mem), tk
                 while self.clock() < still:
                     yield 0.25
                     now = player_pos(mem)
-                    if now == last:
+                    if now != last:
+                        last, since = now, getattr(mem, "ticks", None)
+                    elif tk is None or getattr(mem, "ticks", 0) - since >= 8:
                         break
-                    last = now
                 x, y = screen_of(mem, u)
                 self.log(f"autostart: goto {utype}:{cls} clicks ({x + dx}, {y + dy}), "
                          f"unit guid {mem.read_u32(u + 0x0C)}, player {player_pos(mem)}")
@@ -683,6 +726,7 @@ def selftest():
     assert parse_script("wait 1; click 10 20; key r 0.5; text hi there; goto 2 119") == [
         ("wait", [1]), ("click", [10, 20]), ("key", [ord("R"), 0.5]), ("text", ["hi there"]),
         ("goto", [2, (119,)])]
+    assert parse_script("waitticks 25; mark a1") == [("waitticks", [25]), ("mark", ["a1"])]
     for bad in ("jump 1", "click 1", "wait"):
         try:
             parse_script(bad)
@@ -757,6 +801,25 @@ def selftest():
     s3.clock.t = 0
     drive(s3, m, s3.clock, 0.5)                                # forced? mode is 1: no
     assert png_rgb(1, 1, [b"\1\2\3"]).startswith(b"\x89PNG")
+    # waitticks waits on the recorder's tick counter (not the clock); mark notes the tick
+    notes = []
+    s4 = AutoStart(after=0, script="waitticks 3; mark m1; end", log=notes.append, clock=Clock())
+    m.m[GAME_MODE] = 4
+    m.ticks = 10
+    s4.send = lambda *a: None
+    for i in range(40):
+        s4.clock.t += 0.1
+        s4.poll(m)
+    assert not s4.done and not any("mark" in n for n in notes), notes
+    m.ticks = 12
+    s4.clock.t += 0.1
+    s4.poll(m)
+    assert not s4.done, "waitticks 3 ended at 2 ticks"
+    m.ticks = 13
+    for i in range(5):
+        s4.clock.t += 0.1
+        s4.poll(m)
+    assert any(n == "autostart: mark m1 ticks=13" for n in notes) and s4.done, notes
     print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
           "arrival from the player chain, click / text timing, waitlevel, goto projection "
           "(camera.md), wrong class not found, end")

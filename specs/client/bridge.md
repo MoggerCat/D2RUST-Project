@@ -46,13 +46,13 @@
 |   7. Bevy mirror | 255–273 |
 |   8. Frame pacing | 274–312 |
 |   9. Versioning | 313–323 |
-|   10. Client outputs (bridge → UI and audio) | 324–509 |
-| Constants & data dependencies | 510–524 |
-| Randomness | 525–528 |
-| Edge cases & original bugs | 529–537 |
-| Test vectors | 538–568 |
-| Provenance | 569–579 |
-| Open questions | 580–620 |
+|   10. Client outputs (bridge → UI and audio) | 324–510 |
+| Constants & data dependencies | 511–525 |
+| Randomness | 526–529 |
+| Edge cases & original bugs | 530–538 |
+| Test vectors | 539–569 |
+| Provenance | 570–580 |
+| Open questions | 581–621 |
 <!-- /index -->
 
 ## Summary
@@ -506,6 +506,7 @@ model state: 1.14d's handler calls a UI or sound function directly
 | `ObjectSound` | the call (mode sound: unit key, set S or C, class, mode; request: id, unit; player event: player key, event) | update | audio | `world/objects-client.md` §25 r2, §26, §28 r3; `client/model.md` §8 rule 7 |
 | `ObjectFx` | the call (graphics refresh, graphics load, overlay create / remove, object light, client skill start) with the values read | update | effects | `world/objects-client.md` §26, §28 r3; `render/overlay.md` §5; `render/lighting.md` open question 11 |
 | `HoradricItem` | item code 4 bytes | 0x9C (actions 0x04, 0x0B, 0x0C; 0x15 with header mode 0: an `hst ` / `qf2 ` placed in the local player's page 3) | UI | `ui/panels-2.md` §20 r7 |
+| `MissileSound` | the call (request: sound id, missile key; owner group stop: owner key, sound id 314; travel detach: missile key, sound id) | update | audio | `missiles/client.md` §C4 r28, §C9 r4.4, r6; `audio/triggers.md` §8 r3 |
 
 ## Constants & data dependencies
 

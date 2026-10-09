@@ -22,13 +22,13 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `check_stats.py` | Replays a stats recording through a model of those specs: must predict every callback, expiry and regeneration value and reproduce every snapshot; `--perturb-snap N`, `--perturb-cb N` must fail at the changed record; `--selftest` runs a hand-built recording of the specs' test vectors; `--files game` checks the specs' itemstatcost facts on the 1.14d table |
 | `record_state.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick entry hook only, plus the tick return `0x0052FD1E`): after every server tick (or every N-th) writes the game seed and every server unit (type, GUID, class, mode, position, fraction, target, direction, animation frame / count / speed, unit seed, act, level id, life / mana / stamina and base stats) to `traces/raw/<time>-state.jsonl` (gitignored; format `state-1`); `--selftest` checks the reader on a synthetic game (exact records, every source byte perturbed). Spec: `specs/tools/state-snapshot.md` |
 | `check_units.py` | Checks the per-kind timer-event rules U1–U11 of `specs/sim/units.md` on a tick recording (tables from a `dump_tables.py` directory); `--perturb N` must fail at the changed record; `--selftest` runs a hand-built recording |
-| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation) and the stability count. Spec: `specs/render/capture.md` |
+| `record_frames.py` | Launches `game/Game.exe -w -ns` under the debugger (base: `record_tick.py`), and at each in-game `EndScene` (`0x4F6190`) reads the 8-bit index framebuffer and the GDI palette, ties the frame to the last server tick and logs the camera/player, level, cursor, seed, light-quality and weather state, and with `--draws-every N` every draw call of every N-th frame; writes `traces/raw/<time>-frames.jsonl` (format `frames-raw-3`: also per cel draw the cel header w/h/xoff/yoff from the rasterizer, per tile draw its DT1 file and index, `compfile` records naming unit component files, the player's direction) and palettized PNGs `frame-<seq>.png` to `game/captures/<time>/` (both gitignored); prints the stability verdict (`capture.md` §7); `--selftest` checks the PNG writer, the state readers (perturbation), the stability count and the front-end mode. `--front-end --front-end-script SCRIPT`: no game start; every `EndScene` call is a frame (any caller: menu `0x4F9A67`, loading `0x4567D4`, in game `0x44CB4F`; numbered `present`, no tick, no game state unless in game), D2Win cel files named through `0x4FA9B0`; SCRIPT is autostart's input script with `shot NAME [change|0xRET]` (capture the next presented frame with its draw log as scene NAME; `change`: the next frame from another caller, e.g. the loading screen), mouse and keys as X input under Wine (`--x-input`). Spec: `specs/render/capture.md` (§2a) |
 | `facts_join.py` | Turns one `record_packets.py` raw file (`packets-raw-1`) into message facts (`join-facts-1`): every C→S message the client sent and every S→C message queued, with frame, id, size, caller and bytes, from the start through `--frames N` (default 2: the join) or a later window (`--from F --frames 0`, `--skip` ids), into `facts/join/<name>.tsv` (or `--out-dir`) with the command and the run in the header. q-prov-recording |
-| `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
+| `facts_render.py` | Turns one `record_frames.py` capture (`frames-raw-3`; `frames-raw-2` with the raw-3 cells `?`) into rendering facts in the format of `specs/tools/facts-render.md` §1–§4 (read by `d2-client facts-compare`): `facts/render/scenes/<scene>/draws.tsv` (every draw call of one frame), `frame.tsv` (state and the index / palette digests) and `facts/render/sprites.tsv` (distinct cel file, direction, frame with the cel's w, h, xoff, yoff; merged). Measurements and digests only; `--shot NAME` picks a `--front-end` shot (game keys `-`, `tick` `?`); `--selftest`. Plan: `docs/handoff/pc1-data.md` Step 3 |
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
-| `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
+| `poke.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook plus the tick return `0x0052FD1E`): runs poke directives (`specs/tools/poke.md`) between two server ticks, calling the game's own creation functions or writing the state field; `--poke-file FILE` (ticks relative to F0), `--poke "F D ..."` (absolute frame), `--forms FILE` (call forms, `CALL_FORMS`); writes `traces/raw/<time>-poke.jsonl` (format `poke-raw-1`, gitignored); `PokeLayer` / `add_options` for other recorders; `--selftest` |
 
 ## Use
 
@@ -97,6 +97,30 @@ game runs far slower (entering Act 1 takes over 40 s instead of ~2 s);
 new event kind, `rng_draw`, whose data fields are listed in the converter
 and in `specs/sim/rng.md` (Test vectors). `tick` is 0 (untimed), and the
 1.14d `site` is kept for reference and listed in `compare.ignore`.
+
+## record_frames.py --front-end: the front-end scenes
+
+The 4 front-end scenes in one run (cloud: under `tools/cloud-game/run.sh --python
+--seconds 150 -- ...` with `--game 'Z:\root\game\Game.exe'`; the menu is up about 20 s
+after launch under the recorder; times are for Wine, PC 1 is faster):
+
+```
+py tools/trace-recorder/record_frames.py --seconds 140 --front-end --front-end-script \
+  "wait 25; shot main-menu; wait 5; click 400 307; wait 10; shot char-select; wait 5; click 117 498; \
+   wait 12; shot char-create; wait 5; click 97 555; wait 10; shot loading change; key ENTER; wait 25; end"
+for s in main-menu char-select char-create loading; do
+  py tools/trace-recorder/facts_render.py traces/raw/<time>-frames.jsonl --shot $s; done
+```
+
+`shot NAME` arms the draw hooks at the next `EndScene` and captures the frame after it
+(a frame is everything drawn between two `EndScene` calls, so the loading frame's
+`ClearScreen` before its `StartDraw` is logged); `shot NAME change` keeps logging until a
+frame comes from another `EndScene` caller than the one it was armed at (the loading
+screen after OK / Enter). Character select needs a save (`prepare_saves.sh`: ScnAma is
+the selected slot); `key ENTER` there starts the game. Under Wine the clicks and keys go
+as X input (`xdotool`, the steps of `tools/cloud-game/xinput.sh`; `--x-input auto`), on
+Windows by `PostMessage`. The footer notes list every `EndScene` caller with its first
+present.
 
 ## autostart.py: unattended start and scripted input
 
@@ -377,34 +401,91 @@ reached state 4 (client list game +0x88, state +0x04;
 `original-hooks.md` §1 rule 5), or `--start-frame F0`. Calls follow
 `original-hooks-spawn.md` §5: one RWX scratch page with an INT3 return
 trap at +0, the full thread context (FPU and SSE included) saved, the
-arguments written above the return address, ECX / EDX set, EIP = the
-entry; at the trap the next call starts again from the saved context, and
-after the last one the saved context is restored and the hook's byte is
-stepped over as for any INT3. Debug events of other threads during a call
-go to the recorder's own handler.
+arguments written above the return address, the registers of the
+function's call form set (any of EAX, EBX, ECX, EDX, ESI, EDI; the others
+keep the saved values), EIP = the entry; at the trap the next call starts
+again from the saved context, and after the last one the saved context is
+restored and the hook's byte is stepped over as for any INT3. Debug events
+of other threads during a call go to the recorder's own handler.
 
-| Directive | 1.14d |
+| Directive | 1.14d (`CALL_FORMS` names) |
 |---|---|
-| `object` | allocator `0x00555230` (ECX 2, EDX class; x, y, game, room, 1, mode, 0) |
-| `superunique` | `0x005A49B0` (ECX game, EDX room; x, y, row) |
-| `missile` | `0x0059FA30` (ECX game, EDX = a 0x5C-byte record in the scratch page: flags 0x21, owner, origin = owner, class, x, y, tx, ty, skill, level) |
-| `spawn` | `normal`: entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `champion`: entry 1 then entry 5 `0x005A48C0` with the umod; `random-boss`: entry 3 `0x005A43E0` (champion allowed 1); `unique` with umods: gap |
+| `object` | `alloc` `0x00555230` (ECX 2, EDX class; x, y, game, room, 1, mode, 0) |
+| `superunique` | `superunique` `0x005A49B0` (ECX game, EDX room; x, y, row) |
+| `missile` | `missile` `0x0059FA30` (ECX game, EDX = a 0x5C-byte record in the scratch page: flags 0x21, owner, origin = owner, class, x, y, tx, ty, skill, level) |
+| `spawn` | `scenario.md` §3.1 sequences. `normal`: `spawn` entry 1 `0x005B2F20` (mode 1, spread −1, flags 0); `random-boss`: `random_boss` `0x005A43E0` (no list, champion allowed, no warp check), then `champion_minions` `0x0054E1E0` (ESI boss, EDI game; cl 0, class); `champion`: `boss_spawn` `0x005A09E0` (EDI game, EBX class; room, cl 0, x, y, GUID −1, warp 0), `champion_mark` `0x005A48C0` with the umod, `champion_minions`; `unique`: `boss_spawn`, the umods appended to monster data (unit +0x14) +0x1C while fewer than 9, then `boss_minions` `0x005A2120` (ECX 3, EDX cl 0, EAX 6; game, boss, 1). Forms: `monsters/init.md` §25.1, §25.3 |
 | `seed-game`, `seed-unit`, `time` | field writes: game +0xD0; unit +0x20/+0x24; environment record +0x00 / +0x08 of the player's act |
 | `freeze` | the debugger sleeps at the stop |
-| `pos`, `warp`, `item`, `stat`, `state` | gap (`poke.md` Open questions) |
+| `pos` | `teleport` `0x00650BE0`(unit path, room, x, y), else `place` `0x00554EA0`(game, unit, room, x, y, exact 1, alt 0); room by entry 6 from the unit's room; only unit types 0, 1, 3. Gap until a form is filled (item 22 (a)) |
+| `warp` | `warp` `0x0053AEC0`(game, player, level, tile; tile default 0). Gap (item 22 (b)) |
+| `item` | index = the first combined items record whose code (+0x80) matches (array header `0x0096CA58`: count, records; 424-byte records; `items/treasure.md` §9.1, `data/loading.md` §6–§9; no `0x00633640` call); then `item_create` `0x00558D90`(game, request, 0) with a 0x84-byte request at scratch +0x200: unit 0, game, ilvl (default 1), item, mode 3, x, y, room (entry 6), init flags 1, format (game +0x78), quality (0 or 1–8), rest 0. Gap (item 22 (c)) |
+| `stat` | `stat_set` `0x00627260`(unit, stat, value, layer); a unit with +0x5C = 0 → `failed`. Gap (item 22 (d)) |
+| `state` | `state_set` `0x00639DB0`(unit, state, 1/0): toggle and update-queue insert. Gap (item 22 (d)) |
 
-The room for `object`, `superunique` and `spawn` comes from entry 6
+The room for `object`, `superunique`, `spawn` and `item` comes from entry 6
 `0x00463740` (ECX = the player's room, EDX = x; y); 0 gives `failed`.
 References (`@player`, `@<type>[:<class>][#n]`, `<type>/<guid>`, `@x±N`,
 `@y±N`) are resolved on the hash lists at the stop; `@wp` is a gap.
+
+### Call forms (`CALL_FORMS`, `FIELDS`, `--forms`)
+
+Every function a directive calls is one entry of `CALL_FORMS` in
+`poke.py`: `Fn(address, argument names, result, cited spec, pc1-data
+item, form)`. The argument names are what `poke.py` supplies (e.g.
+`warp`: `game`, `player`, `level`, `tile`); the form says where each goes:
+
+```python
+Form(regs={"ecx": "game", "edx": "player"}, stack=["level", "tile"], ret=8, result="bool")
+```
+
+`regs` maps EAX/EBX/ECX/EDX/ESI/EDI to an argument; `stack` lists the
+stack arguments, first at [ESP+4]; either may hold a literal int the spec
+names; each argument is placed exactly once; `ret` is the callee's `ret N`
+(0 or 4 × stack count; the call does not need it); `result` is what EAX
+means when the entry leaves it open (`unit`: created unit, 0 = failed;
+`bool`: 0 = failed; `none`: ignored). `form=None` is a gap: every
+directive calling that function returns `gap` naming the function, its
+address and its pc1-data item. `FIELDS` holds the record offsets and table
+addresses the directives read (item format, items array, umod list); None
+there is a gap too.
+
+Gaps today: `teleport`, `place` (`pos`), `warp`, `item_create`, `stat_set`,
+`state_set` (`docs/handoff/pc1-data.md` Step 4 item 22 (a)–(d)). The spawn
+kinds' functions (item 22 (e)) are already stated in `monsters/init.md`
+§25.1 and filled.
+
+PC 1, for each answered function:
+
+1. Write the form into the owning spec (e.g. `world/waypoints.md` §7 r5)
+   and remove its gap row in `specs/tools/poke.md` §1.
+2. Try it without editing `poke.py`: a `--forms` file,
+   ```json
+   {"format": "poke-forms-1",
+    "forms": {"warp": {"regs": {"ecx": "game", "edx": "player"}, "stack": ["level", "tile"], "ret": 8}},
+    "fields": {}}
+   ```
+   (`null` for a form sets it back to a gap; `fields` overrides `FIELDS`
+   entries) and run
+   `py tools/trace-recorder/poke.py --forms forms.json --auto ScnAma --seed 1234 --poke "400 warp 2"`;
+   check the `poke` record (`r`, `eax`) and the game state. A form that
+   names an unknown register or argument, or places one twice, stops the
+   run before the game starts.
+3. Copy the form into its `CALL_FORMS` entry (replace `None`, cite the
+   spec section in `cite`), run `py tools/trace-recorder/poke.py --selftest`
+   (it validates every form; the fake-process checks use their own forms,
+   so they stay green), then run the directive on 1.14d once more without
+   `--forms` and commit.
+
 Options: `--seconds`, `--after N` (stop N frames after the last poke,
 default 50), `--snap-every N` and `--tick-records` (keep `record_tick`
 snapshots / all its hooks; default off), `--out`, the autostart options.
 
 Raw format `poke-raw-1` (JSON lines, key `k`): `header` (format, tool,
 date, `Game.exe` SHA-256, args), `poke_file` (path, SHA-256, start frame,
-steps), `game`, `tick` (as `tick-raw-1`), `poke_f0` (F0 and how it was
+steps, the `--forms` file path and SHA-256, the forms and fields in
+force), `game`, `tick` (as `tick-raw-1`), `poke_f0` (F0 and how it was
 found), `poke` (one per directive: `f` = the frame the poke precedes,
 `frame` = game +0xA8 at the stop, `t` for poke-file lines, `i` (index in
 the stop), `d`, `r` (`ok`, `failed`, `unresolved`, `gap`), `guid` and
-`eax` for a created unit, `args` as resolved, `note`, `src`), `footer`.
+`eax` for a created unit, `via` for `pos` (`teleport` / `place`), `args`
+as resolved, `note`, `src`), `footer`.

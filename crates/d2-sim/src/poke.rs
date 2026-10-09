@@ -28,6 +28,7 @@ use crate::monsters::init::{self, InitHost as _};
 use crate::monsters::population::{placement, preset, spawn as pop_spawn};
 use crate::units::{RoomId, UnitId, UnitType};
 use crate::wiring::economy::{Economy, GameFields, ItemSpawn};
+use crate::wiring::path::act_change;
 use crate::wiring::path::place::level_warp;
 use crate::wiring::path::PathCtx;
 use crate::wiring::worldgen::dispatch::WorldSim;
@@ -1112,15 +1113,18 @@ fn run<X: WorldPending>(
         Directive::Warp { level, tile } => {
             let player = env.player;
             let tile = tile.unwrap_or(0);
+            // `0x0053AEC0` (`waypoints.md` §7 rule 5): the same-act warp,
+            // else the act change `0x0053ACC0` (§11).
             let r = sim.lend(|a| {
                 a.with(game, |g, v| {
                     level_warp(PathCtx::of(v, g), player, *level, tile)
+                        .unwrap_or_else(|| act_change::run(PathCtx::of(v, g), player, *level, tile))
                 })
             });
-            match r {
-                Some(true) => PokeResult::Ok(None),
-                Some(false) => PokeResult::Failed,
-                None => PokeResult::Gap("warp to another act: level_warp has no act change".into()),
+            if r {
+                PokeResult::Ok(None)
+            } else {
+                PokeResult::Failed
             }
         }
         Directive::Item {

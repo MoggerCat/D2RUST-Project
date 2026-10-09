@@ -261,7 +261,10 @@ pub struct Predict {
     dir: Option<u8>,
     /// The local player's stamina (stat 10) is zero: the server walks
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
-    /// prediction does too. d2rs-own, unverified (client prediction).
+    /// prediction does too. The 1.14d client ends its run on model stat
+    /// 10 = 0, i.e. server raw stamina < 256 (`client/model.md` OQ2,
+    /// `seams/movement-prediction.md` §2.5 r3); the server runs while raw
+    /// is 1..255, a gap the position check corrects.
     exhausted: bool,
     /// The local player's level at the last observation.
     level: Option<u16>,
@@ -592,8 +595,14 @@ impl Predict {
     /// The player mode the view shows while the prediction moves: 2
     /// (walk) or 3 (run); `None`: the model's mode.
     pub fn mode(&self) -> Option<u32> {
-        self.walk
-            .map(|w| if w.run && !self.exhausted { 3 } else { 2 })
+        // A walk in a town room is the town walk 6 (`pathing.md` §1.5
+        // r2), as the client path's mode request sets it.
+        let town = self.path.mode() == 6;
+        self.walk.map(|w| match (w.run && !self.exhausted, town) {
+            (true, _) => 3,
+            (false, true) => 6,
+            (false, false) => 2,
+        })
     }
 }
 
@@ -682,6 +691,29 @@ impl<L: ServerLink> ServerLink for PredictLink<L> {
 mod tests {
     use super::*;
     use crate::bridge::world::ClientUnit;
+
+    // Covers: specs/sim/pathing.md §1.5 r2
+    /// The drawn mode of a predicted walk: the town walk 6 when the client
+    /// path's mode request made it one (`a1-walk-n`: 1.14d draws
+    /// `soshlittwhth`, d2rs drew mode 2 `wl`); a run stays 3 in town
+    /// (`q-facts-scenes.md` finding 3).
+    #[test]
+    fn a_walk_in_town_is_drawn_in_the_town_walk_mode() {
+        let to = WalkTo::Point(1, 2);
+        let mode = |run, path| {
+            Predict {
+                walk: Some(Walk { to, run }),
+                path: ClientPath::with_mode(path),
+                ..Predict::default()
+            }
+            .mode()
+        };
+        assert_eq!(mode(false, 6), Some(6));
+        assert_eq!(mode(false, 2), Some(2));
+        assert_eq!(mode(true, 3), Some(3));
+        assert_eq!(mode(true, 6), Some(3));
+        assert_eq!(Predict::default().mode(), None);
+    }
 
     // Synthetic fixture: charstats-shaped speeds (walk 6, run 9; the
     // values of `sim/pathing.md` case V1 / §8.2).
@@ -1095,6 +1127,22 @@ mod tests {
         assert_eq!(p.mode(), Some(2));
         let walked = p.position().unwrap().0 - run_at;
         assert_eq!(walked, 6 * 0x1000);
+    }
+
+    // Covers: specs/seams/movement-prediction.md §2.5 r3; specs/client/model.md §6
+    #[test]
+    fn a_raw_stamina_below_256_walks_on_the_client() {
+        // Server raw stamina 100 reaches the model as 0x96 stamina
+        // 100 >> 8 = 0: the client walks while the server (raw > 0)
+        // still runs. The gap is 1.14d's own.
+        let raw: i32 = 100;
+        let (mut w, key) = world_at(100, 100);
+        w.units.get_mut(&key).unwrap().stats.insert(10, raw >> 8);
+        let mut p = Predict::new();
+        p.observe(&w);
+        p.walk(walk_point(110, 100, true));
+        p.tick(&w, SPEEDS);
+        assert_eq!(p.mode(), Some(2));
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {

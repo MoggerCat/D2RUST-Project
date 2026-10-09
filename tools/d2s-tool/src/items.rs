@@ -49,12 +49,93 @@ pub struct ItemSpec {
     /// `#Q`: quantity (stat 70) set after creation, for a part stack
     /// (a test set-up, not a §10.4 step).
     pub qty: Option<i32>,
+    /// `/` options (test set-ups beyond §10.4, see [`ItemOpts`]).
+    pub opts: ItemOpts,
+}
+
+/// Where an item goes when it is not stored on a page.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Place {
+    /// Mode 0 on `page` (the default).
+    #[default]
+    Stored,
+    /// Mode 1 at body location 1..=12 (`inventory.md` §1.3).
+    Body(u8),
+    /// Mode 2 in belt slot 0..=15 (the stream's x, `bitstream.md` B1).
+    Belt(u8),
+}
+
+/// `/q=QUALITY`, `/idx=ROW`, `/ilvl=N`, `/sock=N`, `/unid`, `/eth`,
+/// `/body=LOC`, `/belt=SLOT`: the creation request's quality (forced),
+/// set / unique row, item level, a socket count, and the flags /
+/// placement written after creation. Test set-ups for recordings; the
+/// quality and affix draws are the creation's own (`generation.md`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ItemOpts {
+    pub quality: Option<u8>,
+    pub index: Option<i32>,
+    pub ilvl: Option<i32>,
+    pub sockets: Option<i32>,
+    pub unidentified: bool,
+    pub ethereal: bool,
+    pub place: Place,
+}
+
+impl ItemOpts {
+    fn parse(text: &str, whole: &str) -> Result<Self> {
+        let mut o = ItemOpts::default();
+        for w in text.split('/').filter(|w| !w.is_empty()) {
+            let (k, v) = w.split_once('=').unwrap_or((w, ""));
+            let n = |v: &str| {
+                v.parse::<i32>()
+                    .map_err(|_| anyhow!("bad number {v:?} in {whole:?}"))
+            };
+            match k {
+                "q" => {
+                    o.quality = Some(match v {
+                        "low" => q::LOW,
+                        "normal" => q::NORMAL,
+                        "superior" => q::SUPERIOR,
+                        "magic" => q::MAGIC,
+                        "set" => q::SET,
+                        "rare" => q::RARE,
+                        "unique" => q::UNIQUE,
+                        "crafted" => q::CRAFTED,
+                        _ => bail!("quality {v:?} in {whole:?}"),
+                    })
+                }
+                "idx" => o.index = Some(n(v)?),
+                "ilvl" => o.ilvl = Some(n(v)?),
+                "sock" => o.sockets = Some(n(v)?),
+                "unid" => o.unidentified = true,
+                "eth" => o.ethereal = true,
+                "body" => {
+                    let b = n(v)?;
+                    if !(1..=12).contains(&b) {
+                        bail!("body location {b} in {whole:?}: 1..=12");
+                    }
+                    o.place = Place::Body(b as u8);
+                }
+                "belt" => {
+                    let b = n(v)?;
+                    if !(0..=15).contains(&b) {
+                        bail!("belt slot {b} in {whole:?}: 0..=15");
+                    }
+                    o.place = Place::Belt(b as u8);
+                }
+                _ => bail!("unknown item option {k:?} in {whole:?}"),
+            }
+        }
+        Ok(o)
+    }
 }
 
 impl std::str::FromStr for ItemSpec {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(whole: &str) -> Result<Self> {
+        let (s, opts) = whole.split_once('/').unwrap_or((whole, ""));
+        let opts = ItemOpts::parse(opts, whole)?;
         let (rest, page) = match s.rsplit_once(':') {
             Some((r, p)) => (
                 r,
@@ -105,6 +186,7 @@ impl std::str::FromStr for ItemSpec {
             at,
             page,
             qty,
+            opts,
         })
     }
 }
@@ -362,29 +444,99 @@ pub fn make_item(
                 hardcore: Some(o.hardcore),
             }),
         }),
-        ilvl: if o.level < 2 { 1 } else { o.level },
+        ilvl: s.opts.ilvl.unwrap_or(if o.level < 2 { 1 } else { o.level }),
         item: idx as i32,
         format: game.item_format(),
-        quality: q::NORMAL,
+        quality: s.opts.quality.unwrap_or(q::NORMAL),
+        force: s.opts.index.is_some(),
+        index: s.opts.index.map_or(0, |i| i + 1),
         flags2: req::NO_SOCKETS | req::NEVER_ETHEREAL,
         ..ItemRequest::default()
     };
     let created = create_item(it, game, &mut rq, false, MapStats::default(), 0)
         .map_err(|e| anyhow!("creating {:?}: {e}", code_str(&s.code)))?;
     let mut item = created.item;
-    item.flags |= flag::IDENTIFIED;
-    // Step 2.2: the flag-0x40 list is removed.
-    item.stats.lists.remove(&ListKey::ITEM);
+    if let Some(want) = s.opts.quality {
+        if item.quality != want {
+            bail!(
+                "{:?}: quality {} asked, creation gave {} (no row fits?)",
+                code_str(&s.code),
+                want,
+                item.quality
+            );
+        }
+    }
+    // A set / unique item's row must name this base (or no code check
+    // is possible): a mismatch is reported, never written.
+    let row_code = match item.quality {
+        q::SET => usize::try_from(item.file_index)
+            .ok()
+            .and_then(|i| it.setitems.get(i))
+            .map(|r| r.item),
+        q::UNIQUE => usize::try_from(item.file_index)
+            .ok()
+            .and_then(|i| it.uniques.get(i))
+            .map(|r| r.code),
+        _ => None,
+    };
+    if let Some(c) = row_code {
+        if c != rec.code && c != rec.normcode {
+            bail!(
+                "{:?}: creation chose {} row {} whose item is {:?}",
+                code_str(&s.code),
+                if item.quality == q::SET {
+                    "set"
+                } else {
+                    "unique"
+                },
+                item.file_index,
+                code_str(&c)
+            );
+        }
+    }
+    if s.opts.unidentified {
+        item.flags &= !flag::IDENTIFIED;
+    } else {
+        item.flags |= flag::IDENTIFIED;
+    }
+    if s.opts.ethereal {
+        item.flags |= flag::ETHEREAL;
+    }
+    if let Some(n) = s.opts.sockets {
+        // 1.14d's load cuts a larger count to the base's `gemsockets`
+        // (recorded: a buckler written with 2 is re-saved with 1).
+        if n < 1 || n > i32::from(rec.gemsockets) {
+            bail!(
+                "{:?}: sock={n}: the base allows 1..={} (gemsockets)",
+                code_str(&s.code),
+                rec.gemsockets
+            );
+        }
+        item.flags |= flag::SOCKETED;
+        item.stats.set_base(stat::NUMSOCKETS, 0, n);
+    }
+    // Step 2.2: the flag-0x40 list is removed (start items, normal
+    // quality); a better item keeps its property list.
+    if item.quality <= q::NORMAL {
+        item.stats.lists.remove(&ListKey::ITEM);
+    }
     // Step 2.4: stackable → quantity := total max stack.
     if rec.stackable != 0 {
         let extra = item.stats.stat(stat::EXTRA_STACK, 0);
         let max = (rec.maxstack as i32).wrapping_add(extra).min(511);
         item.stats.set_base(stat::QUANTITY, 0, max);
     }
-    // Step 2.6: inventory placement (page := the page, find free or at).
+    // Step 2.6: inventory placement (page := the page, find free or at);
+    // a body or belt item takes no grid cell.
     let (w, h) = (rec.invwidth, rec.invheight);
-    let (x, y) = pages.place(t, o, s, w, h)?;
-    item.inv_page = s.page;
+    let (imode, body_loc, (x, y), page) = match s.opts.place {
+        Place::Stored => (mode::STORED, 0, pages.place(t, o, s, w, h)?, s.page),
+        // A game save writes an equipped item's x as its body location
+        // (recorded: 1.14d re-save of d2s-tool items, q-prov-recording).
+        Place::Body(b) => (mode::EQUIPPED, b, (i32::from(b), 0), 0xFF),
+        Place::Belt(b) => (mode::BELT, 0, (i32::from(b), 0), 0xFF),
+    };
+    item.inv_page = page;
     // Then: quantity 250 for itemtype 5, else durability := max
     // durability; then a quiver (itemtype `quiver` ≠ 0) gets 100.
     if it.is_type(idx, 5) {
@@ -402,15 +554,35 @@ pub fn make_item(
     // The writer's view (as `wiring::inventory::bits` projects it).
     let is = |k: u16| it.is_type(idx, k as i16);
     let st = &item.stats;
-    let main = st.lists.get(&ListKey::ITEM).map(|l| {
-        l.iter()
-            .map(|(&(id, layer), &v)| StatEntry {
-                stat: id,
-                param: layer,
-                value: v,
+    let entries = |k: &ListKey| {
+        st.lists.get(k).map(|l| {
+            l.iter()
+                .map(|(&(id, layer), &v)| StatEntry {
+                    stat: id,
+                    param: layer,
+                    value: v,
+                })
+                .collect::<Vec<_>>()
+        })
+    };
+    let main = entries(&ListKey::ITEM);
+    // Set lists by state (`bitstream.md` §4.6 rule 1: flags 0x2040, else 0x40).
+    let mut sets: [Option<Vec<StatEntry>>; 5] = Default::default();
+    for (slot, &state) in sets
+        .iter_mut()
+        .zip(d2_sim::items::bitstream::SET_STATES.iter())
+    {
+        *slot = entries(&ListKey {
+            state: state as u16,
+            flags: 0x2040,
+        })
+        .or_else(|| {
+            entries(&ListKey {
+                state: state as u16,
+                flags: ListKey::ITEM.flags,
             })
-            .collect()
-    });
+        });
+    }
     // `d2s.md` §8.2 rule 7, edge case 17: the flags a game save of a
     // loaded character holds (0x2000 cleared by the load).
     let view = StreamItem {
@@ -418,11 +590,11 @@ pub fn make_item(
         alt: false,
         compact: rec.compactsave != 0,
         version: item.format,
-        mode: u32::from(mode::STORED),
+        mode: u32::from(imode),
         x,
         y,
-        body_loc: 0,
-        page: s.page,
+        body_loc,
+        page,
         code: rec.code,
         base_code: rec.normcode,
         ear_class: item.file_index,
@@ -458,6 +630,7 @@ pub fn make_item(
         total_quantity: st.stat(stat::QUANTITY, 0),
         total_quest_diff: st.stat(stat::QUESTITEMDIFFICULTY, 0),
         main,
+        sets,
         // bitstream.md §4.1 rule 7: unit +0x28, the init seed
         // (`sim/units.md`, `sim/rng.md` §5.3).
         unit28: item.init_seed,

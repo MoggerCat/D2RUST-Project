@@ -2,8 +2,10 @@
 //! Identify from a scroll or tome (C→S 0x27 `UseItemAction`, the
 //! `use_item` seam).
 //!
-//! The item-use spec (`0x005BF240`) is unwritten, so the effect is
-//! PROVISIONAL (`docs/HANDOFF.md` §7, REC-113): a scroll of identify
+//! The item-use spec (`0x005BF240`) is unwritten; the effect below is
+//! recorded (REC-113, 2026-10-09, `facts/items/a1-town-identify.tsv`:
+//! a scroll and a tome on unidentified magic items, the tome on an
+//! identified one): a scroll of identify
 //! (`isc`) or a tome of identify (`ibk`) used on a stored or equipped
 //! item that is not identified sets the identified flag (`generation.md`
 //! §1.1, item flag 0x10) and marks the item changed (item flag 0x1), so
@@ -12,8 +14,12 @@
 //! (`bitstream.md` §4.3). The scroll's consumption and the tome's charge
 //! are the 0x27 handler's (§7.18 steps 7–9).
 //!
-//! d2rs-own, unverified: the two codes and the "already identified is
-//! not used" answer are preview fills.
+//! Recorded: the target's next update is 0x9D action 0x15 with flags
+//! 0x10 | 0x1; the used scroll leaves with the 0x20 removal; the tome
+//! loses one charge (0x3E) and sends 0x22 (skill 218), 0x7C and the
+//! targeting reset 0x3F; an identified target gets only the reset and
+//! 0x7C, nothing is used. The two codes stay d2rs-own (the use table
+//! `0x00741790`'s entry 1, `items/use.md` §3).
 
 use super::{InvDesk, InvRest};
 use crate::items::inventory::mode;

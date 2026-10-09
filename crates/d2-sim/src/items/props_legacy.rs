@@ -295,7 +295,8 @@ fn run<S: ItemStats>(
             if rec.min > rec.max {
                 return Err(Fatal::LegacyByTime(0x444));
             }
-            if rec.param > 3 {
+            // Unsigned compare (`cmp 3 / ja`): a negative param is fatal.
+            if (rec.param as u32) > 3 {
                 return Err(Fatal::LegacyByTime(0x44C));
             }
             let a_ = rec.min.wrapping_add(256);
@@ -306,8 +307,6 @@ fn run<S: ItemStats>(
             if b as u32 > 0x3FF {
                 return Err(Fatal::LegacyByTime(0x44E));
             }
-            // PROVISIONAL (M22; REC-289): a negative `param` passes the
-            // checks; it is used as is (function 18 would clamp it to 0).
             let v = rec
                 .param
                 .wrapping_add(b.wrapping_mul(1024).wrapping_add(a_).wrapping_mul(4));

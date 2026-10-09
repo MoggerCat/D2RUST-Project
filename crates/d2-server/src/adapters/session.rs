@@ -57,9 +57,12 @@
 //! has its record, so it gets 0x5F and the two 0x23 (item 0), after the
 //! load's own 0x23; a caller without a record gets no 0x5F and no 0x23.
 //!
+//! The loader's item calls' S→C 0x22 / 0x21 (rule 3.1 (c)) follow 0x94
+//! and precede the stub load's 0x23, in the save's item order.
+//!
 //! Not sent, because no spec gives them (named, not guessed):
-//! - the loader's other messages after 0x94 (rule 3.1: 0x22, 0x21,
-//!   0x23, 0x5E, 0x28, 0x29 from the loader's callees);
+//! - the loader's other messages after 0x94 (rule 3.1: 0x23, 0x5E, 0x28,
+//!   0x29 from the loader's callees; the 0x23 of the stub load is sent);
 //! - the item messages of rule 3.5 and the update-list reset of rule 3.10
 //!   (the item world is not reachable from the session), and
 //!   `0x0058A0A0` of an expansion game;
@@ -387,6 +390,21 @@ pub fn enter_game<D: ActionEvents, W>(
             a.sys.hooks.x.send(player, &m);
         }
     }
+    // Rule 3.1 (c): the loader's item calls send S->C 0x22 (the item-skill
+    // link of a scroll or tome, `inventory.md` §5.5) and 0x21 (the stat
+    // 97 / 107 callback, `levels.md` §7.1), in the save's item order,
+    // after 0x94 and before the 0x23; the other item messages (0x9C,
+    // 0x9D) are rule 3.5's.
+    let mut items = a.sys.hooks.session.join_items.remove(&player);
+    if let Some(list) = items.as_mut() {
+        let (loader, rest): (Vec<_>, Vec<_>) = std::mem::take(list)
+            .into_iter()
+            .partition(|m| matches!(m.first(), Some(0x21 | 0x22)));
+        *list = rest;
+        for m in &loader {
+            a.sys.hooks.x.send(player, m);
+        }
+    }
     // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
     if let Some(h) = entry.load_skill {
         a.sys
@@ -409,7 +427,6 @@ pub fn enter_game<D: ActionEvents, W>(
     // Rule 3.4 (the array is cleared only by the room update queue,
     // `stat-lists.md` §11 rule 3, so rule 3.8 sends the same values).
     let stats = stat_messages(&a.sys.stats.mod_values(player));
-    let items = a.sys.hooks.session.join_items.remove(&player);
     let x = &mut a.sys.hooks.x;
     for m in &stats {
         x.send(player, m);
@@ -448,7 +465,13 @@ pub fn enter_game<D: ActionEvents, W>(
     for m in vitals_sync::join_run(a, &s.game, id, (0, 0)) {
         a.sys.hooks.x.send(player, &m);
     }
-    // Rule 4.
+    // Rule 4: the client's act slot is built when empty (`0x0053AFB0`;
+    // only acts 1 and 2 are made at game creation, so a save standing in
+    // Act III–V has none yet).
+    s.game
+        .lists
+        .ensure_act(entry.act)
+        .map_err(|_| JoinError::NoAct(entry.act))?;
     a.sys
         .hooks
         .x

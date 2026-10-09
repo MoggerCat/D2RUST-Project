@@ -19,8 +19,10 @@ mod host;
 mod identify;
 mod link;
 mod load;
+mod merc;
 mod mutant_tests;
 mod queries;
+mod quest_delete;
 mod save_index;
 mod socket;
 mod stack;
@@ -310,6 +312,8 @@ pub struct Rest {
     /// `room_at` answer.
     pub room_at: bool,
     pub in_town: bool,
+    /// `has_used_skill` answers the opposite (the 0x61 proceeds).
+    pub merc_ready: bool,
     pub two_handed: BTreeSet<Guid>,
     /// `use_item` answer.
     pub use_ok: bool,
@@ -336,6 +340,9 @@ impl MovePending for Rest {
     }
     fn room_at(&self, _: i32, _: i32) -> bool {
         self.room_at
+    }
+    fn has_used_skill(&self, _: Owner) -> bool {
+        !self.merc_ready
     }
     fn free_spot(
         &self,
