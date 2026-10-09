@@ -1,0 +1,10 @@
+check 1
+# Act III start with no quest state (a level-1 sorceress, town byte act III),
+# idle: the save-start game seed (q-prov-data; a4-start-noquest-sor matches).
+# Spec: specs/tools/scenario-diff.md.
+name a3-start-noquest-sor
+save NoQA3 --class sor --expansion --act 2
+seed 1234
+ticks 30
+seconds 240
+channels state
