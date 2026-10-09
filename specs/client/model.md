@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–298 |
-|   6. Position check (`0x004804E0`) | 299–342 |
-|   7. Session messages | 343–518 |
-|   8. Mode requests | 519–604 |
-|   9. Room-in-sight messages | 605–639 |
-|   10. Bit reader | 640–654 |
-|   11. Current act and level (join and later) | 655–700 |
-|   12. Client DRLG and the room of a point | 701–742 |
-|   13. Visibility predicate (`0x004DBF20`) | 743–794 |
-|   14. Pet list and the hireling GUID | 795–848 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 849–938 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 939–973 |
-|   17. Model writes made by 1.14d UI code | 974–1120 |
-|   18. Audio driver inputs and the client object functions | 1121–1151 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1152–1380 |
-| Constants & data dependencies | 1381–1393 |
-| Randomness | 1394–1409 |
-| Edge cases & original bugs | 1410–1434 |
-| Test vectors | 1435–1492 |
-| Provenance | 1493–1596 |
-| Open questions | 1597–1755 |
+|   5. Client update pass | 250–370 |
+|   6. Position check (`0x004804E0`) | 371–414 |
+|   7. Session messages | 415–590 |
+|   8. Mode requests | 591–676 |
+|   9. Room-in-sight messages | 677–711 |
+|   10. Bit reader | 712–726 |
+|   11. Current act and level (join and later) | 727–772 |
+|   12. Client DRLG and the room of a point | 773–814 |
+|   13. Visibility predicate (`0x004DBF20`) | 815–866 |
+|   14. Pet list and the hireling GUID | 867–920 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 921–1010 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1011–1045 |
+|   17. Model writes made by 1.14d UI code | 1046–1192 |
+|   18. Audio driver inputs and the client object functions | 1193–1223 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1224–1452 |
+| Constants & data dependencies | 1453–1465 |
+| Randomness | 1466–1481 |
+| Edge cases & original bugs | 1482–1506 |
+| Test vectors | 1507–1564 |
+| Provenance | 1565–1668 |
+| Open questions | 1669–1827 |
 <!-- /index -->
 
 ## Summary
@@ -278,7 +278,8 @@ position check of the local player.
    `0x00463CC0` runs rule 2's per-unit step (`0x00480810`), then looks
    the unit up again in its C set; still present: type 2 →
    `0x004BDEE0` once more, result ignored (`world/objects-client.md`
-   §25 r3), type 1 → `0x0046D780` (Phase 6); other types nothing.
+   §25 r3), type 1 → `0x0046D780` (critter AI, rule 6.4); other types
+   nothing. C monsters: rule 6.
 4. d2rs order for the queue drains: types in the order above (S only:
    missiles 3, players 0, monsters 1, objects 2, items 4), then
    `GUID & 0x7F` ascending, then GUID descending.
@@ -295,6 +296,77 @@ position check of the local player.
    answers.
    How a server unit (the local player's hireling) gets both bits after
    a teleport: §16.
+6. **C monsters** (client-made monsters; read 2026-10-09 from the 1.14d
+   disassembly). The server never allocates them (no 0xAC, no server
+   seed); they live in set C (§2 r1) and are walked last by rule 3.
+   1. **When**: the client update `0x0044C790` first calls the room
+      pass `0x0044C750` (before the unit update `0x00465AA0`): for each
+      room of the client act's active-room list (`0x0061A180(act)`,
+      next +0x7C) whose flags (+0x34) bit 0 is clear, in order: critters
+      `0x0046C460(room)` (`monsters/population.md` §11.7), client
+      presets `0x00466820(room)` (r6.2), `0x0046BE60(room)` (level 8
+      only, with `[0x007A745C]` set: `0x0046AF70`), then bit 0 := 1. So a
+      room is populated once, on the first update pass after the client
+      activates it.
+   2. **Client presets** `0x00466820(room)`: each DS1 preset of the room
+      (`0x00619FD0`, next +0x0C) whose flag (+0x1C, the DS1 v > 5 unit
+      flags word) has bit 0 set → `0x00466730(class +0x04, x +0x08 +
+      room x, y +0x18 + room y, type +0x14, mode +0x00)` (room subtile
+      origin `0x00619730`).
+   3. **Creator** `0x00466730(class, x, y, type, mode)`: GUID :=
+      `[0x00711F30]` + 1 (−1 wraps to 0), stored back. The counter's
+      .data initial value is **1** (first client GUID 2) and nothing
+      else writes it: it is never reset, across games of one process.
+      Type 1 → `0x00466360` with the record {GUID, class, x, y, 0, 0,
+      **mode := 1** (the type word is reused as the mode slot)}, no path
+      data, no umods, flags |= 0x600000 (`client/msg-units.md` §3 r2:
+      the 0xAC create, set-up `0x004AE8D0` mode 1 NU, unit seed from the
+      room at (x, y), §12 r5). Other types → `0x00465FD0(GUID, class,
+      x, y, type, mode)` with flags |= 0x600000. The chickens of the Act 1
+      arrival (GUIDs 93–95, `docs/handoff/pc1-data.md` Step 4 item 30)
+      are the 92nd–94th creations of the process. PROVISIONAL
+      (REC-660): which earlier creations (client missiles, client DS1
+      presets, other rooms' critters) take GUIDs 2–92 is not traced.
+   4. **Critter AI** `0x0046D780(U)` (from `0x00463CC0`, once per update
+      pass, after U's per-unit step). T = monster data +0x30 (think
+      timer, `0x004AE110`; starts 0, PROVISIONAL REC-661: not traced
+      through `0x004AE8D0`). `idle` = `0x0046CB40`: code 7 request at
+      U's own position (`0x004AFF60`, §19: |Δ| ≤ 1 → neutral fallback).
+      `step(d, code, r4)` = `0x0046C960`: two draws of U's seed (+0x20),
+      x' = x ± d by bit 0 of the first, y' = y ± d by the second, then
+      request `code` with {x', y', 0, path type, r4, path byte}.
+
+      ```text
+      if T > 0: T -= 1; return
+      P, D = nearest of the 8 player slots [0x007A7470] (0x0046C720:
+             slot set, mode not 0 or 12, path distance 0x006416D0)
+      if P none: if local player [0x007A6A70] none: T = 25; idle; return
+                 D = 0x7FFFFFFF
+      if D > 30: T = min(D - 15, 200); idle; return
+      if monstats zoo (flag 22, 0x00457490): 0x0046D660(U); return
+      by class: 149 chicken, 268 bug -> chicken_ai(U)       // 0x0046CCD0
+                151/269/283/339 0x0046D110, 157/158/319 0x0046CE40,
+                159 0x0046CDC0, 227 0x0046D070, 318 0x0046D280,
+                556 0x0046D310, 574 0x0046D450, 278-282 nothing,
+                other -> idle
+      chicken_ai(U):
+          if U.mode != 1: return
+          V, d = nearest unit in the rooms near U (0x0046C570 with
+                 0x0046C600: a player, or a monster not class 149/556,
+                 alive, not U; path distance)
+          if V none: return
+          footprint mask 0x3C01 (0x00648C30)
+          if d < 4: mask 0xC01; flee from V (0x0046C7D0): s = sign(U - V)
+                    per axis; cell U + s free (size 1, U's move mask) ->
+                    request 0x0C (S1) to U + 4s, r4 = 120
+                    else step(4, 0x0C, 120)
+          else if seed % 100 < 30: step(2, 1, 0)             // walk, WL
+          else T = 5
+      ```
+
+      Code 1 = walk to point (§19 r4, mode 2 WL); code 0x0C = mode 8
+      S1 with the move test. The recorded chickens' WL from tick 8 is
+      the code-1 step.
 
 ### 6. Position check (`0x004804E0`)
 

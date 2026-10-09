@@ -351,6 +351,10 @@ rather than a hand-run recipe.
 
 22. **Poke call forms** (q-tool-poke, `specs/tools/poke.md` Open
     questions 1–4; until answered these directives are gaps on 1.14d):
+22. **Poke call forms** (q-tool-poke): (a)–(d) *answered* 2026-10-09
+    from the asm into the owning specs and `poke.py` `CALL_FORMS`; first
+    1.14d run of the five directives is REC-655 (HANDOFF §7). Was
+    (`specs/tools/poke.md` Open questions 1–4):
     register / stack form and `ret` of (a) `0x00554EA0(game, unit, room,
     x, y, exact, alt)` or the teleport path `0x00650BE0` (`pos`,
     `path-placement.md` §10 / §6 r4); (b) the level warp
@@ -612,3 +616,76 @@ Then the rest:
 31. **Door step 0x004BCB20** (q-fix-pc1-client-ui) Specify the object door step (REC-725): what it does per update for an `IsDoor` non-cycling mode (frame advance, mode change, collision / sound calls), for `world/objects-client.md` §25 r9.2.1.
 32. **NPC introduction handler 0x004B41E0** (q-fix-pc1-client-ui) Read which text record the "introduction" topic plays (REC-727; d2rs plays record 0 of the intro entry) and whether it sets +0x11 or the talk flag like "gossip" (`messages.md` §6 r3 / OQ4).
 33. **Gamble buy 0x32 u32@9** (q-fix-pc1-client-ui) menus.md §4.2 r2 says `[0x007C0DB0]` is only ever written with 0, so a buy in a Gamble window would send transaction 0; the server read (vendors.md §7.1 rule 2) accepts a gamble item only with transaction 2. Record or read what a real Gamble buy sends (C→S 0x32 u32@9) so q-fix-shop-gamble-flag-dead can be settled either way (REC-729; the click env keeps the OR 2 meanwhile).
+
+## Hand-back — PC 1 day 2, 2026-10-09 (branch `claude/local-pc1-day2`)
+
+**Done** (items 21–40; answers in the owner specs with addresses):
+- 22: poke call forms for pos / warp / item / stat / state are in
+  `poke.py` `CALL_FORMS` and the specs. Run once on 1.14d (PC 1): all
+  five returned `ok` with no fault (REC-655; the level after `warp 2` was
+  not logged).
+- 30 / 34: town critters are client-made from the Levels.txt `cmon` /
+  `cpct` columns, rolled on the client room seed, in a room pass before
+  the unit update. Original bug: all four `camt` fields parse into one
+  field. Client GUID counter: pre-increment from a .data 1, never reset.
+  The critter AI walks 30% of the time. Specs: `client/model.md` §5 r6,
+  `monsters/population.md` §11.7.
+- 27: the nearest-player scan uses the full-size distance ≤ 15, the first
+  qualifying player wins, and the `interact` quest gate applies. Walk in
+  radius: own geometry, no early exit (REC-500 / 501 settled; d2rs
+  differs).
+- 21: owner links for a pet / hireling (AI control +0x2C / +0x30), a
+  missile (+0x94 / +0x98 while +0xC8 bit 0x400 is set) and an item
+  (inventory +0x08). Written to `sim/units.md` and `state-snapshot.md`
+  §2.
+- 29: 0x69 code 8 sends the path **end** (last path point, or (0, 0)),
+  not the path target (REC-594 settled; d2rs and its tests differ).
+- 35–40:
+  - action-frame tests skipped with argument 0 (REC-700, matches);
+  - only the frame advance writes +0x4E (REC-701, d2rs differs);
+  - client leap / whirl machine (REC-702 / 704 match; REC-703 step
+    matches, end rule open as REC-671);
+  - meleeonly mask applies only to `both` → rng;
+  - Evade only plays a sound;
+  - a monster's missile weapon is the plain first weapon.
+- 24: client timed arc ORs flag 2, the vz division form; motion getters
+  return value >> 11 (REC-540 / 541 / 545 / 548 settled).
+- 25: potion entry 3 body. 170 / 51 frames are the fill time at
+  calc1·256·class factor / len; the regen tick frees the list when full
+  (REC-102 settled).
+- 28: the 0x8E join flag is the constant 1 (d2rs matches).
+- 31: door step for opening / closing. 32: introduction record by class
+  (Malah / Nihlathak / Qual-Kehk special cases), sets +0x11 like gossip.
+- 33: a gamble buy sends t = 2. The handlers at `0x004B3D40` /
+  `0x004B42B0` write the flag 1 / 0 (the earlier static export missed
+  them). **`q-fix-shop-gamble-flag-dead` is withdrawn**; d2rs's OR 2 is
+  right.
+- 26: `traces/sim/tick/sim-0009.json` re-recorded with the mouse outside
+  the window. The player stays in its arrival room (the old run changed
+  rooms at 121 / 241 / 351); `convert_tick --check` reports 0 errors.
+
+**Left**
+- 23: run `traces/pokes/spawn-town.poke` with a screenshot (not asked in
+  this run).
+- Still PROVISIONAL:
+  - REC-660: client GUIDs 2–92 (needs a runtime count);
+  - REC-661: critter think-timer start;
+  - REC-665: mode request to own position;
+  - REC-670: local input path for mode 18;
+  - REC-671: whirl end rule;
+  - REC-680: Blood Golem life share.
+- Not traced: the other critter handlers (rat, bat).
+
+**New q-fix rows (build-queue.tsv)**
+- **Combat:** `q-fix-p4-mon-frame-code`, `q-fix-p4-mon-missile-weapon`,
+  `q-fix-p4-evade-sound-only`, `q-fix-p4-range-meleeonly`,
+  `q-fix-p4-whirl-end`.
+- **AI and world:** `q-fix-p3-npc-nearest-player`,
+  `q-fix-p3-walk-in-radius`, `q-fix-p3-death-path-end`,
+  `q-fix-real-town-critters` (now concrete), `q-fix-real-client-guid-start`,
+  `q-fix-real-critter-ai`.
+- **Items, missiles, UI:** `q-fix-p5-potion-entry3`, `q-fix-p5-timed-arc-or`,
+  `q-fix-p5-motion-getters-shift`, `q-fix-p6-object-door-step`,
+  `q-fix-p6-npc-intro-record`.
+- **Tools:** `q-fix-p3-state-own`.
+- **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
