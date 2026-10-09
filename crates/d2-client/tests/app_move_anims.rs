@@ -9,10 +9,11 @@ mod app_support;
 
 use d2_client::app::play::add_walk;
 use d2_client::app::single_player;
-use d2_client::bridge::predict::{Speeds, WalkTap};
+use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::BridgeResource;
 use d2_client::rules::unit_composite::MotionRecord;
 use d2_client::world_view::skill_motion::{leap_record, SkillMotion};
+use d2_client::world_view::walk::PreviewWalk;
 use real_rig::Rig;
 
 /// The install's `skills.txt` `Id`s.
@@ -29,7 +30,7 @@ fn speeds() -> Speeds {
 
 fn rig_with_walk(skills: &[usize]) -> Rig {
     let mut r = Rig::new("barbarian", skills);
-    add_walk(&mut r.app, WalkTap::default(), Some(speeds()));
+    add_walk(&mut r.app, r.tap.clone(), Some(speeds()));
     r.leave_town();
     r.strengthen();
     r
@@ -57,10 +58,12 @@ fn the_leap_draw_height_follows_the_timed_arc_frame_by_frame() {
     for _ in 0..60 {
         r.step(1);
         if d == 0 {
-            // The distance `0x006417F0` of the request's point.
+            // The distance `0x006417F0` of the request's point from the
+            // client unit's own path cell (the walk prediction).
             let w = r.app.world().resource::<BridgeResource>().0.world();
             let u = w.local().unwrap();
-            if let (Some(q), Some(at)) = (u.last_mode_request, u.position) {
+            let cell = r.app.world().resource::<PreviewWalk>().predict.cell();
+            if let (Some(q), Some(at)) = (u.last_mode_request, cell) {
                 let (dx, dy) = (
                     (q.record[2] - i32::from(at.0)).abs(),
                     (q.record[3] - i32::from(at.1)).abs(),

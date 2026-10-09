@@ -1,4 +1,4 @@
-// Spec: specs/skills/bodies.md (§2.14, §8.8, §8.10), specs/monsters/ai-bodies-6.md (§14)
+// Spec: specs/skills/bodies.md (§2.14, §6.2, §6.5, §8.3, §8.8, §8.10), specs/monsters/ai-bodies-6.md (§14)
 //! Assassin gaps in the play host (q-assassin-gaps), on the user's
 //! install (`real_rig`): a finisher spends the charges, Dragon Claw
 //! wants a claw in each hand, and a laid sentry shoots its skill at a
@@ -107,29 +107,40 @@ fn dragon_claw_needs_a_claw_in_each_hand() {
     assert!(hurt > 0, "two claws strike");
 }
 
+/// monstats `AI` AssassinSentry (`ai-bodies-6.md` §14): the laid traps.
+const AI_ASSASSIN_SENTRY: u16 = 101;
+
+/// The living laid traps: monsters of AssassinSentry classes, not dying
+/// or dead.
 fn traps(r: &mut Rig) -> Vec<UnitId> {
     r.with(|sim, _| {
-        sim.events
-            .action
-            .sys
-            .hooks
-            .sentries
-            .keys()
-            .copied()
+        let s = &sim.events.action.sys;
+        sim.game
+            .lists
+            .units_of_type(UnitType::Monster)
+            .into_iter()
+            .filter(|&m| {
+                s.units.get(m).is_some_and(|u| {
+                    !u.is_dead()
+                        && s.hooks
+                            .tables
+                            .combat
+                            .monstats
+                            .get(u.class as usize)
+                            .is_some_and(|c| c.ai == AI_ASSASSIN_SENTRY)
+                })
+            })
             .collect()
     })
 }
 
+/// The first trap's shots left: its AI's charge count (§14 param 1;
+/// −1 until its first think counts them).
 fn shots_left(r: &mut Rig) -> Option<i32> {
-    r.with(|sim, _| {
-        sim.events
-            .action
-            .sys
-            .hooks
-            .sentries
-            .values()
-            .next()
-            .map(|s| s.shots)
+    let t = *traps(r).first()?;
+    r.with(move |sim, _| {
+        let c = sim.events.action.sys.hooks.ai.as_ref()?.control(t)?;
+        Some(c.params[1])
     })
 }
 
@@ -137,8 +148,11 @@ fn shots_left(r: &mut Rig) -> Option<i32> {
 fn lay(r: &mut Rig, skill: usize) {
     r.select_right(skill);
     r.right_click_point(5, 0);
-    for _ in 0..60 {
-        if !traps(r).is_empty() {
+    // Until the trap's first think has counted its shots (`ai-bodies-6.md`
+    // §14 charges step 2; the summon's think timer is at F + 25,
+    // `bodies.md` §6.2 step 8).
+    for _ in 0..90 {
+        if shots_left(r).is_some_and(|s| s >= 0) {
             break;
         }
         r.step(1);

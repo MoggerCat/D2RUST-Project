@@ -757,7 +757,14 @@ pub trait AiSummons {
 
     /// `0x00646CA0(unit, calc, skill, level)`: a skills calc column
     /// (`data/calc-expressions.md`). Default: 0.
-    fn skill_calc(&self, _unit: UnitId, _skill: i32, _calc: u32, _level: i32) -> i32 {
+    fn skill_calc(
+        &mut self,
+        _game: &mut Game,
+        _unit: UnitId,
+        _skill: i32,
+        _calc: u32,
+        _level: i32,
+    ) -> i32 {
         0
     }
     /// The mode of the unit's entry of `skill` with owner −1
