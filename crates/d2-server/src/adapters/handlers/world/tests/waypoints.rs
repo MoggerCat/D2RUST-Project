@@ -133,6 +133,7 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -525,6 +526,30 @@ fn missing_object_and_other_act() {
     let (code, got) = send(&mut fx.host, &Fx::msg(far, 0));
     assert_eq!(code, ResultCode::Invalid);
     assert!(got.is_empty());
+    fx.assert_clean();
+}
+
+// Covers: specs/seams/sim-server.md §2.5
+#[test]
+fn a_staged_players_act_follows_the_world_each_tick() {
+    let mut fx = fixture(0, 0);
+    // The fixture's spawn point (20, 20).
+    let pos = crate::seams::Pos { x: 20, y: 20 };
+    // Staged with an act the world no longer has it in (as after a
+    // cross-act warp): the waypoint of its own act reads as another act.
+    fx.host.game.set_unit(
+        fx.player,
+        crate::adapters::UnitFacts {
+            act: 1,
+            pos,
+            owner: None,
+        },
+    );
+    fx.host.clock.0 += 40;
+    assert!(fx.host.frame().unwrap().ticked);
+    fx.open_menu();
+    let (code, _) = send(&mut fx.host, &Fx::msg(fx.wp, 0));
+    assert_ne!(code, ResultCode::Invalid, "refused as another act");
     fx.assert_clean();
 }
 

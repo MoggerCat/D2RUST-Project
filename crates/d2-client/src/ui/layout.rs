@@ -102,6 +102,18 @@ impl Screen {
         res_mode: 2,
     };
 
+    /// The screen of the play frame
+    /// ([`crate::rules::camera::FrameSize::play`]): [`Screen::R640`] for
+    /// 640 × 480, else [`Screen::R800`].
+    pub fn play() -> Screen {
+        let f = crate::rules::camera::FrameSize::play();
+        if (f.width, f.height) == (Screen::R640.w, Screen::R640.h) {
+            Screen::R640
+        } else {
+            Screen::R800
+        }
+    }
+
     pub fn res2(&self) -> bool {
         self.res_mode == 2
     }

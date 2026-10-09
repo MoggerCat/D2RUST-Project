@@ -210,7 +210,7 @@ fn images(app: &App) -> Vec<(String, u32, i32, i32, u16)> {
                 i.at.y,
                 i.clip.h,
             )),
-            UiDraw::Text(_) => None,
+            UiDraw::Text(_) | UiDraw::Rect(_) => None,
         })
         .collect()
 }

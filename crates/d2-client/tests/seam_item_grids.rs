@@ -14,7 +14,7 @@ use d2_client::ui::layout::Screen;
 use d2_client::ui::original::inventory_record;
 use d2_client::ui::panels::cube_items::cube_record;
 use d2_client::ui::panels::shop::shop_tabs;
-use d2_client::ui::panels::stash_items::stash_record;
+use d2_client::ui::panels::stash_items::{fallback_stash_grid, stash_record};
 use d2_proto::item_bits::{self, CodeFacts, IscSave, ItemLookup, Location};
 use d2_sim::items::bitstream::{self, Isc, StreamItem};
 use d2_sim::items::inventory::{grid_record, UnitKind};
@@ -172,7 +172,16 @@ fn measured() -> Vec<(&'static str, GridRecord)> {
 // Covers: specs/seams/item-grids.md §2.5
 #[test]
 fn every_accepted_pixel_names_an_in_grid_cell() {
-    for (name, g) in measured() {
+    let mut grids = measured();
+    for (name, expansion, screen) in [
+        ("fallback 12", true, Screen::R640),
+        ("fallback 28", true, Screen::R800),
+        ("fallback 8", false, Screen::R640),
+        ("fallback 24", false, Screen::R800),
+    ] {
+        grids.push((name, fallback_stash_grid(expansion, &screen)));
+    }
+    for (name, g) in grids {
         for y in g.top - 2..=g.bottom + 2 {
             for x in g.left - 2..=g.right + 2 {
                 let p = Point::new(x, y);
@@ -190,6 +199,14 @@ fn every_accepted_pixel_names_an_in_grid_cell() {
             }
         }
     }
+}
+
+// Covers: specs/seams/item-grids.md §2.5
+#[test]
+fn the_stash_fallback_is_the_measured_record() {
+    let m = measured();
+    assert_eq!(fallback_stash_grid(true, &Screen::R640), m[2].1);
+    assert_eq!(fallback_stash_grid(true, &Screen::R800), m[3].1);
 }
 
 // Covers: specs/seams/item-grids.md §2.7

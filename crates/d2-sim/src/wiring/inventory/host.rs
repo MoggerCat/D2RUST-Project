@@ -185,6 +185,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         deferred::send_item_world(self, o, g, action, flags)
     }
 
+    /// The shown store item (`vendors.md` §4 step 3) to the trading
+    /// player: S→C 0x9C action 0x0B with the store stream
+    /// (`deferred::store_item_message`), queued now.
+    pub fn send_store_item(&mut self, player: UnitId, item: UnitId) -> Result<(), MoveFatal> {
+        let (Some(o), g) = (self.owner_of(player), self.guid_of(item)) else {
+            return Ok(());
+        };
+        for m in deferred::store_item_message(self, g)? {
+            MovePending::send(self, o, m);
+        }
+        Ok(())
+    }
+
     /// Direct S→C 0x9D action 5 (`0x0053D010`, §6.4) for an item of the
     /// owner, queued now through `MovePending::send`: the stored page set
     /// to `shown` first (`0x00628320`), item flags OR-ed with `flags` in

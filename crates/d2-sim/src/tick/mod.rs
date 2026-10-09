@@ -4,8 +4,9 @@
 //! run (§5), the client pass (§6) and the periodic steps (§7).
 //!
 //! The host schedule (§1) and the wall-clock, host-only parts (§8: frame-
-//! rate statistics, heartbeat, character save) belong to `d2-server` and
-//! are not here. d2-sim owns the step order, the list iteration and the
+//! rate statistics, heartbeat) belong to `d2-server` and are not here; the
+//! client pass's character save (§6 rule 3) is raised here as
+//! [`Game::character_save_due`] and written by `d2-server`. d2-sim owns the step order, the list iteration and the
 //! flags; the bodies of steps whose behaviour is owned by specs not yet
 //! written (environment, population, messages, quests, items, AI, ...)
 //! are hooks: [`TickHooks`] and, for timer events, [`EventDispatch`].
@@ -28,6 +29,8 @@ pub mod period {
     pub const ROOM_DEACTIVATION: i32 = 12;
     pub const FREE_INACTIVE_ROOMS: i32 = 11;
     pub const EXPIRED_ITEMS: i32 = 1500;
+    /// The client pass's character save (§6 rule 3).
+    pub const CHARACTER_SAVE: i32 = 8192;
 }
 
 /// Room inactivity counter threshold for step 9: deactivate when > 10.
@@ -279,9 +282,15 @@ pub fn run_timer_events<D: EventDispatch + ?Sized>(game: &mut Game, dispatch: &m
     }
 }
 
-/// Step 5, the client pass (`0x0052D440`, §6). The arena assert, the
-/// heartbeat and the 8192-frame save are host-only (§8).
+/// Step 5, the client pass (`0x0052D440`, §6). The arena assert and the
+/// heartbeat are host-only (§8). The 8192-frame save (rule 3) runs in
+/// single player too (no heartbeat drop is modelled, so only the frame
+/// decides): it is raised as [`Game::character_save_due`], before the
+/// per-client loop, for the host's character storage to write.
 fn client_pass<H: TickHooks + ?Sized>(game: &mut Game, hooks: &mut H) {
+    if is_due(game.frame, period::CHARACTER_SAVE) {
+        game.character_save_due = true;
+    }
     let mut cur = game.lists.client_first();
     while let Some(c) = cur {
         // Next saved before the body (unit-order.md §7.3).

@@ -221,8 +221,9 @@ pub enum Output {
     /// A model unit free (S→C 0x0A and every free path of
     /// `client/model.md` §2 r5; §10 r3.1 (a)), in free order: the audio
     /// layer detaches the unit's requests without force
-    /// (`audio/triggers-2.md` §19 r5).
-    UnitFreed { unit: UnitKey },
+    /// (`audio/triggers-2.md` §19 r5). `client_only`: a unit of set C
+    /// (`model.md` §5 rule 5).
+    UnitFreed { unit: UnitKey, client_only: bool },
     /// The client object update's audio calls (`world/objects-client.md`
     /// §28 r3; mode sound calls, requests, the player event sound), in
     /// update order.
@@ -447,7 +448,12 @@ impl Output {
 /// frees after the handler's own outputs), the bridge once more before
 /// it hands the list over.
 pub fn move_freed(world: &mut super::world::ClientWorld, outputs: &mut Vec<Output>) {
-    outputs.extend(world.freed.drain(..).map(|unit| Output::UnitFreed { unit }));
+    outputs.extend(
+        world
+            .freed
+            .drain(..)
+            .map(|(unit, client_only)| Output::UnitFreed { unit, client_only }),
+    );
 }
 
 /// The sink of one handler call: outputs in the handler's call order
@@ -844,7 +850,10 @@ mod tests {
                 hook: 0,
                 values: [0; 2],
             },
-            Output::UnitFreed { unit: k },
+            Output::UnitFreed {
+                unit: k,
+                client_only: false,
+            },
             Output::ObjectSound(ObjSound::Request { id: 0, unit: obj }),
             Output::ObjectFx(ObjFx::GfxLoad { class: 0, flag: 0 }),
         ]

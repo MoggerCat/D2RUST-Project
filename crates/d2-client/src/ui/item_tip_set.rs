@@ -1,134 +1,151 @@
-// Spec: specs/items/properties.md (§11 set bonuses), specs/ui/inventory.md (§5 hover state)
-//! The set bonus stats of the item tool tip: what a set gives at each
-//! number of worn pieces and for the full set, computed with the
-//! simulation's own set-bonus rule (`d2_sim::items::props::set_bonuses`)
-//! into a recording stat list.
-//!
-//! PROVISIONAL (REC-242): the tip lists every step of the set (green)
-//! and the full-set bonus (orange) whatever the player wears, because the
-//! tip builder behind `0x0048DD90` is unwritten; settled by the set item
-//! hover capture (`ui/text.md` capture `text-0002`). d2rs-own,
-//! unverified.
+// Spec: specs/ui/item-tips.md (§9 set item tip `0x0048D1D0`)
+//! The tool tip of an identified set item: only the bonus lists the
+//! client has received are shown (CLAUDE.md rule 7: the client never
+//! computes set bonuses). The item's partial lists 165 + k come with its
+//! stream (`items/bitstream.md` §4.6), the owner's state 165–170 lists
+//! with S→C 0xA8 / 0xAA (`client/stat-lists.md` §3), and which pieces
+//! are worn or owned from the host ([`super::item_tip_build::SetCtx`]).
+//! Unverified until the `text-0002` set capture cases run (rule 10).
 
-use std::collections::BTreeMap;
+use super::item_tip::color;
+use super::item_tip_build::{pfx, Build, TipText};
+use super::item_tip_desc::{sid, DescNames};
+use super::item_tip_props::{self as props, StatList};
 
-use d2_proto::item_bits::Stat;
-use d2_sim::items::props::set_bonuses;
-use d2_sim::items::{Item, ItemStats, ItemTables, ListKey};
-use d2_sim::rng::Seed;
+/// First set state (`0x006DBD70`: 165–170).
+const SET_STATE: u8 = 165;
 
-/// A stat list that records what the property rules write.
-#[derive(Default)]
-struct Recorder(BTreeMap<(u16, u16), i32>);
-
-impl ItemStats for Recorder {
-    fn has_stats(&self) -> bool {
-        true
-    }
-    fn stat(&self, id: u16, layer: u16) -> i32 {
-        self.0.get(&(id, layer)).copied().unwrap_or(0)
-    }
-    fn base(&self, id: u16, layer: u16) -> i32 {
-        self.stat(id, layer)
-    }
-    fn set_base(&mut self, id: u16, layer: u16, value: i32) {
-        self.0.insert((id, layer), value);
-    }
-    fn has_list(&self, _: ListKey) -> bool {
-        true
-    }
-    fn list_set(&mut self, _: ListKey, id: u16, layer: u16, value: i32) {
-        self.0.insert((id, layer), value);
-    }
-    fn list_add(&mut self, _: ListKey, id: u16, layer: u16, value: i32) {
-        *self.0.entry((id, layer)).or_default() += value;
-    }
-    fn list_get(&self, _: ListKey, id: u16, layer: u16) -> i32 {
-        self.stat(id, layer)
-    }
-}
-
-/// The bonuses of the set of setitems row `item_row`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SetBonuses {
-    /// Pieces needed for the full set.
-    pub count: u32,
-    /// `(pieces, stats)` for 2 … `count − 1` pieces.
-    pub partial: Vec<(u32, Vec<Stat>)>,
-    /// The full-set bonus stats.
-    pub full: Vec<Stat>,
-}
-
-fn record(t: &ItemTables, item_row: i32, pieces: u32) -> BTreeMap<(u16, u16), i32> {
-    let mut item = Item {
-        record: 0,
-        format: 0,
-        ilvl: 0,
-        quality: 5,
-        file_index: item_row,
-        prefix: [0; 3],
-        suffix: [0; 3],
-        rare_prefix: 0,
-        rare_suffix: 0,
-        auto_affix: 0,
-        flags: 0,
-        inv_page: 0xFF,
-        gfx: 0,
-        unit_seed: Seed { lo: 0, hi: 0 },
-        init_seed: 0,
-        item_seed: Seed { lo: 0, hi: 0 },
-        start_seed: 0,
-        name: [0; 16],
-        ear_level: 0,
-        stats: Recorder::default(),
+/// §6 text of one received list (state ≠ 0: no runeword list, no
+/// fillers), multi-line.
+fn described(build: &Build, l: &StatList, undead: bool) -> Vec<u16> {
+    let args = props::PropArgs {
+        undead,
+        multi: true,
+        label: &[],
     };
-    let mut owner = Recorder::default();
-    let mask = if pieces >= 32 {
-        u32::MAX
-    } else {
-        (1 << pieces) - 1
-    };
-    set_bonuses(t, &mut item, mask, &mut owner, ListKey::ITEM);
-    owner.0
+    let item = props::PropItem::default();
+    props::property_text(build.tips(), &build.view(), &item, l, &args)
 }
 
-fn stats(
-    t: &ItemTables,
-    now: &BTreeMap<(u16, u16), i32>,
-    before: &BTreeMap<(u16, u16), i32>,
-) -> Vec<Stat> {
-    now.iter()
-        .filter_map(|(&(id, layer), &v)| {
-            let d = v - before.get(&(id, layer)).copied().unwrap_or(0);
-            let shift = t.valshift.get(usize::from(id)).copied().unwrap_or(0);
-            let value = i64::from(d) >> shift;
-            (value != 0).then_some(Stat {
-                stat: id,
-                param: u32::from(layer),
-                raw: value as u32,
-                save_add: 0,
-            })
-        })
-        .collect()
+/// The item's received list of set state 165 + `k`.
+fn item_state_list(build: &Build, k: usize) -> Option<StatList> {
+    let list = build.bits().lists.get(1 + k)?.as_ref()?;
+    Some(build.tips().stat_list(list))
 }
 
-/// The bonuses of the set that setitems row `item_row` belongs to;
-/// `None` when the row or its set is unknown.
-pub fn bonuses(t: &ItemTables, item_row: usize) -> Option<SetBonuses> {
-    let set = usize::try_from(t.setitems.get(item_row)?.set).ok()?;
-    let count = u32::try_from(t.sets.get(set)?.count).ok()?;
-    let row = item_row as i32;
-    let mut prev = record(t, row, 1);
+/// §9: the set item tip.
+pub(super) fn set_tip(build: &Build) -> TipText {
+    let t = build.tips();
+    let b = build.bits();
+    let ctx = build.ctx();
+    let s = |id: u16| t.string(id);
+    let nl = s(sid::NL);
+    let row = b.quality_fields.file_index.map(|i| i as usize);
+    let rec = row.and_then(|r| t.lookup.setitems.get(r));
+    let set_id = rec.map(|r| r.set);
+    let owner = ctx.unit.or(ctx.player);
+    let mut text = Vec::new();
+    // r1: member list.
+    let mut members = Vec::new();
+    if let Some(set) = set_id {
+        for (i, m) in t.lookup.setitems.iter().enumerate() {
+            if m.set != set {
+                continue;
+            }
+            let name = t.key_text(&t.set, i).unwrap_or_default();
+            let tpl = s(super::item_tip_build::tid::NAME_SET);
+            let mut line = fill0(&tpl, &name);
+            line.extend(&nl);
+            let k = if ctx.set.owned.contains(&(i as u32)) {
+                color::GREEN
+            } else {
+                color::RED
+            };
+            members.extend(pfx(line, k));
+        }
+    }
+    text.extend(pfx(members, color::GREEN));
+    // r2: set name.
+    let set_name = set_id
+        .and_then(|i| usize::try_from(i).ok())
+        .and_then(|i| t.set_names.get(i))
+        .map(|&id| [s(id), nl.clone()].concat())
+        .unwrap_or_default();
+    text.extend(pfx(set_name, color::GOLD));
+    // r3: the owner's active set-wide bonuses, on an equipped piece.
+    if b.mode == 1 {
+        if let (Some(u), Some(set)) = (owner, set_id) {
+            for state in SET_STATE..=SET_STATE + 5 {
+                let Some(l) = u.state_list(state) else {
+                    continue;
+                };
+                if l.get(71, 0) != i32::from(set) {
+                    continue;
+                }
+                let d = described(build, &l, false);
+                if !d.is_empty() {
+                    text.extend(&nl);
+                    text.extend(pfx(d, color::GOLD));
+                }
+            }
+        }
+    }
+    // r4.
+    text.extend(&nl);
+    // r5: the item's partial lists the worn pieces switch on.
     let mut partial = Vec::new();
-    for k in 2..count {
-        let now = record(t, row, k);
-        partial.push((k, stats(t, &now, &prev)));
-        prev = now;
+    match rec.map(|r| r.add_func) {
+        Some(1) => {
+            let mask = ctx.set.worn_without;
+            let n = usize::from(rec.map_or(0, |r| r.slot));
+            for i in 0..=5usize {
+                if i == n || mask & (1 << i) == 0 {
+                    continue;
+                }
+                let k = if i > n { i - 1 } else { i };
+                if let Some(l) = item_state_list(build, k) {
+                    partial.extend(described(build, &l, false));
+                }
+            }
+        }
+        Some(2) => {
+            let worn = ctx.set.worn_with.count_ones() as usize;
+            for k in 0..worn.saturating_sub(1) {
+                if let Some(l) = item_state_list(build, k) {
+                    partial.extend(described(build, &l, false));
+                }
+            }
+        }
+        _ => {}
     }
-    let full = record(t, row, count.max(1));
-    Some(SetBonuses {
-        count,
-        partial,
-        full: stats(t, &full, &prev),
-    })
+    text.extend(pfx(partial, color::GREEN));
+    // r6: the item's own blue lines.
+    text.extend(pfx(
+        [build.eth_sockets(), build.own_props()].concat(),
+        color::BLUE,
+    ));
+    // r7: the base block; the class line is red only for a player of
+    // another class.
+    let class = t
+        .lookup
+        .find_code(b.code)
+        .and_then(|i| t.lookup.itype_of(i))
+        .map_or(7, |ty| ty.class);
+    let other = owner.is_some_and(|u| u.unit_type() == 0 && u.class() != u32::from(class));
+    text.extend(build.set_base_block(other));
+    // r8.
+    let text = build.set_store_lines(text);
+    TipText {
+        text,
+        color: color::WHITE,
+    }
+}
+
+/// 10089 `%0` filled with `name`.
+fn fill0(tpl: &[u16], name: &[u16]) -> Vec<u16> {
+    let pat = [u16::from(b'%'), u16::from(b'0')];
+    match tpl.windows(2).position(|w| w == pat) {
+        Some(i) => [&tpl[..i], name, &tpl[i + 2..]].concat(),
+        None => tpl.to_vec(),
+    }
 }

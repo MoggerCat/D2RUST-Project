@@ -181,3 +181,10 @@ evidence; a trial that fails is removed or rewritten, not kept.
 - Check: progress answers name what is left and how sure the estimate is.
 - Here: the coordinator's reports (`docs/handoff/coordinator-resume.md`) and answers to the user.
 - Status: trial — adopted 2026-10-08 by the user's decision; proven when estimates track what the next releases actually needed.
+
+## M25 Falsifiable guesses with an oracle early
+- Rule: Write every behavior as a precise, testable claim (exact values, order, units), mark every guess as a guess with what would settle it, and put a check against the reference into the loop from the first week; then a wrong claim is a hypothesis one comparison can settle, and its correction is an edit, not a rewrite.
+- Why: a wrong but labeled, precise claim costs one comparison and one small edit and teaches where the analysis was thin; the same wrong claim unlabeled, vague or never compared spreads silently into everything built on it (thousands of green tests on invented data, a build that did not play).
+- Check: every guess is greppable with its settling check; every area has a comparison against the reference that can fail; a mismatch is traced to one labeled claim and fixed there, in the spec or the code, never by changing the expected value to pass.
+- Here: `PROVISIONAL` / REC ids (M22) with their settling captures; the oracle is 1.14d: the private data repo, traces, `scenario-run compare`, `d2-client facts-compare`, 1.14d under Wine in the cloud (`tools/cloud-game/`); lesson of 2026-10-08 in `docs/HANDOFF.md` §8 (the oracle came after the code instead of with it).
+- Status: trial — adopted 2026-10-08 by the user's decision; proven when the real-data comparisons settle provisional points with local edits to the spec or code only.

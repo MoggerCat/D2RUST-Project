@@ -20,6 +20,8 @@
 //! the line color, `blend-modes.md` §8 r1); the flash is a rectangle
 //! frame of the clipped size, mode 5 (opaque).
 
+use crate::audio::driver::{SoundLink, WeatherSound};
+use crate::rules::draw_order::weather::ThunderSound;
 use std::sync::Arc;
 
 use d2_formats::dc6::Dc6;
@@ -106,6 +108,9 @@ pub struct WeatherView {
     color_maps: Option<Vec<MapId>>,
     /// Why the weather is off (logged once by the caller).
     failure: Option<String>,
+    /// The sound layer the thunder step requests from
+    /// (`audio/triggers.md` §12).
+    thunder: Option<SoundLink>,
 }
 
 impl std::fmt::Debug for WeatherView {
@@ -131,7 +136,14 @@ impl WeatherView {
             origin: None,
             color_maps: None,
             failure: None,
+            thunder: None,
         }
+    }
+
+    /// The sound layer for the thunder step's request of sound 202.
+    pub fn with_sound(mut self, link: SoundLink) -> Self {
+        self.thunder = Some(link);
+        self
     }
 
     pub fn weather(&self) -> &Weather {
@@ -163,13 +175,17 @@ impl WeatherView {
             update_count: self.update_count,
             mud: level.mud,
             sky: Some(SkyFrame {
-                frame: FrameSize::D2RS,
+                frame: FrameSize::play(),
                 mode: OpenMode::NONE,
                 shift_x: 0,
                 level,
                 frame_rate: FRAME_RATE,
                 low_quality: false,
             }),
+            thunder: self
+                .thunder
+                .as_mut()
+                .map(|t| t as &mut (dyn ThunderSound + Send + Sync)),
         })
     }
 
@@ -183,6 +199,11 @@ impl WeatherView {
         mode: OpenMode,
         assets: &mut ViewAssets,
     ) {
+        // The rain rule's input (`audio/environment.md` §6, OQ 4): not
+        // active unless this frame's update ran with a rain level.
+        if let Some(l) = &self.thunder {
+            l.set_weather(WeatherSound::default());
+        }
         if self.failure.is_some() {
             return;
         }
@@ -220,7 +241,7 @@ impl WeatherView {
         let delta = self.camera_delta(local_at, mode);
         let input = UpdateInput {
             update_count: self.update_count,
-            frame: FrameSize::D2RS,
+            frame: FrameSize::play(),
             camera_delta: delta,
             day_period: DAY_PERIOD,
             video_mode: VIDEO_MODE,
@@ -231,6 +252,10 @@ impl WeatherView {
         };
         if let Err(e) = self.weather.update(Some(player), &input) {
             return self.fail(e.to_string());
+        }
+        if let Some(l) = &self.thunder {
+            let active = !self.weather.snow_mode && level.rain;
+            l.set_weather(WeatherSound::new(active, self.weather.intensity_256));
         }
         if self.weather.lightning_on {
             if let Err(m) = self.ensure_flash(mode, assets) {
@@ -336,11 +361,11 @@ impl WeatherView {
     }
 
     fn ensure_flash(&self, mode: OpenMode, assets: &mut ViewAssets) -> Result<(), String> {
-        let key = flash_key(FrameSize::D2RS, mode);
+        let key = flash_key(FrameSize::play(), mode);
         if assets.frames.contains(&key) {
             return Ok(());
         }
-        let (w, h) = flash_size(FrameSize::D2RS, mode);
+        let (w, h) = flash_size(FrameSize::play(), mode);
         let frame = IndexFrame::new(w, h, 0, 0, vec![1; w as usize * h as usize])
             .map_err(|e| e.to_string())?;
         assets
@@ -362,7 +387,7 @@ impl WeatherView {
             return (0, 0);
         };
         let player = UnitPosition::Moving { x16, y16 }.client();
-        let cam = Camera::new(FrameSize::D2RS, mode, player, (0, 0)).unit;
+        let cam = Camera::new(FrameSize::play(), mode, player, (0, 0)).unit;
         let now = (cam.x, cam.y);
         let delta = self.origin.map_or((0, 0), |o| (now.0 - o.0, now.1 - o.1));
         self.origin = Some(now);
@@ -406,7 +431,7 @@ impl WeatherView {
                         })?;
                         let g = gdi_rectangle(
                             tables,
-                            FrameSize::D2RS,
+                            FrameSize::play(),
                             maps[usize::from(SkyDraw::FLASH_COLOR)],
                             x0,
                             y0,
@@ -416,7 +441,7 @@ impl WeatherView {
                         )
                         .map_err(|e| unresolved("lightning flash", e.to_string()))?;
                         if let Some(g) = g {
-                            let id = assets.id(&flash_key(FrameSize::D2RS, mode), 0)?;
+                            let id = assets.id(&flash_key(FrameSize::play(), mode), 0)?;
                             let mut item = g.item(id);
                             item.key = sky_key(minor)?;
                             minor += 1;
@@ -438,8 +463,8 @@ impl WeatherView {
                         for (x, y) in pixels {
                             if x < 0
                                 || y < 0
-                                || x >= FrameSize::D2RS.width
-                                || y >= FrameSize::D2RS.height
+                                || x >= FrameSize::play().width
+                                || y >= FrameSize::play().height
                             {
                                 continue;
                             }

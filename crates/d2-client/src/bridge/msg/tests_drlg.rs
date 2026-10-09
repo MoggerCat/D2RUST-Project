@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use d2_sim::drlg::room::LinkAt;
-use d2_sim::drlg::tiles::{cell, FIXED_LIBRARY};
+use d2_sim::drlg::tiles::{cell, ACT_EDGE_TILE, FIXED_LIBRARY};
 use d2_sim::drlg::{
     CellGrid, Drlg, DrlgData, DrlgError, DrlgRoomId, GridPass, LevelDef, LevelIdx, LevelTypes,
     RoomGrids, RoomKind, TileInfo, TileRect,
@@ -74,6 +74,20 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: light_direction(o),
+    }
+}
+
+/// `render/lighting.md` Open question 8: the light direction every 1.14d
+/// DT1 header carries for an orientation.
+fn light_direction(orientation: u32) -> u32 {
+    match orientation {
+        1 | 5 | 8 | 10 => 1,
+        2 | 6 | 9 | 11 => 2,
+        0 | 3 | 4 | 12..=14 => 3,
+        7 => 4,
+        15 => 5,
+        o => o - 10,
     }
 }
 
@@ -96,6 +110,11 @@ fn source() -> DrlgSource {
     t.insert(FIXED_LIBRARY[0].to_vec(), vec![]);
     t.insert(FIXED_LIBRARY[1].to_vec(), vec![]);
     t.insert(FIXED_LIBRARY[2].to_vec(), vec![tile(10, 0, 0, 0)]);
+    // Act I's base library: key (0, 0, 0) at indexes 0 and 2.
+    t.insert(
+        ACT_EDGE_TILE[0].unwrap().0.to_vec(),
+        vec![tile(0, 0, 0, 1), tile(1, 0, 0, 0), tile(0, 0, 0, 3)],
+    );
     DrlgSource {
         data: Arc::new(data),
         tiles: Arc::new(d2_server::world_data::Dt1Files(t)),
@@ -231,9 +250,12 @@ fn rooms_come_in_sight_and_go() {
     m.recv(&sight(false, 200, 200));
     assert_eq!(m.rejected().len(), 1);
     assert_eq!(m.w.rooms_in_sight.len(), 6);
-    // A new 0x03 frees the act and builds a new one.
+    // A new 0x03 frees the act and builds a new one; each handled 0x03
+    // counts as an act load (`render/composition.md` §3 step 4).
+    let loads = m.w.act_loads;
     m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
     assert_eq!(m.w.active_rooms, Some(Vec::new()));
+    assert_eq!(m.w.act_loads, loads + 1);
 }
 
 // Covers: specs/client/model.md §2 r6, §2 r7, §12 r5
@@ -548,10 +570,10 @@ impl crate::world_view::ViewFeed for ZeroFacts {
     }
 }
 
-// Covers: specs/render/draw-order.md §9, §3 r2; specs/drlg/rooms.md §9.3 text; specs/sim/unit-order.md §5 r7
+// Covers: specs/render/draw-order.md §9, §3 r2, §5 r3; specs/drlg/rooms.md §9.3 text; specs/sim/unit-order.md §5 r7; specs/render/draw-order-2.md §14
 #[test]
 fn near_rooms_come_from_the_client_drlg() {
-    use crate::rules::draw_order::{TileArray, REC_DRAWN};
+    use crate::rules::draw_order::{TileArray, REC_DRAWN, UNIT_DRAWN, UNIT_EX_VISIBLE};
     use crate::world_view::model_feed::ModelFeed;
     use crate::world_view::ViewFeed;
     let mut m = model();
@@ -597,6 +619,10 @@ fn near_rooms_come_from_the_client_drlg() {
         (room.floors[0].dt1.roof_height, room.floors[0].dt1.height),
         (0, 0)
     );
+    // The DT1 light direction crosses the sim seam (`lighting.md` §11 r2):
+    // a floor's orientation 0 carries direction 3.
+    assert_eq!(room.floors[0].dt1.orientation, 0);
+    assert_eq!(room.floors[0].dt1.light_direction, 3);
     // The unit list in the client's order (newest first), the model's
     // facts over the inner feed's.
     let keys: Vec<UnitKey> = room.units.iter().map(|u| u.key).collect();
@@ -607,6 +633,10 @@ fn near_rooms_come_from_the_client_drlg() {
     // hand): the flags persist into the next frame's build, the order
     // goes back to the client's list.
     room_mut(near, k).floors[0].flags |= REC_DRAWN;
+    // The order's unit bits (`draw-order.md` §5 r3, r4): the monster
+    // passed the sight test and was drawn.
+    room_mut(near, k).units[0].facts.flag_ex |= UNIT_EX_VISIBLE;
+    room_mut(near, k).units[0].facts.flags |= UNIT_DRAWN;
     room_mut(near, k).units.reverse();
     room_mut(near, k).units_sorted = true;
     let orders = feed.take_unit_orders();
@@ -618,8 +648,34 @@ fn near_rooms_come_from_the_client_drlg() {
     assert_ne!(near.rooms[k].floors[0].flags & REC_DRAWN, 0);
     let keys: Vec<UnitKey> = near.rooms[k].units.iter().map(|u| u.key).collect();
     assert_eq!(keys, [UnitKey::new(PLAYER, 1), UnitKey::new(MONSTER, 6)]);
+    // The unit bits persist into the next frame's facts; the player has
+    // none yet.
+    let (p, mo) = (&near.rooms[k].units[0].facts, &near.rooms[k].units[1].facts);
+    assert_eq!((p.flag_ex & UNIT_EX_VISIBLE, p.flags & UNIT_DRAWN), (0, 0));
+    assert_eq!(
+        (mo.flag_ex & UNIT_EX_VISIBLE, mo.flags & UNIT_DRAWN),
+        (UNIT_EX_VISIBLE, UNIT_DRAWN)
+    );
+    // The player's path sub-tile, and Act I's edge floor record: the
+    // first entry of key (0, 0, 0) in reverse file order, index 2
+    // (`draw-order-2.md` §14, open question 2).
+    assert_eq!(near.player_subtile, (46, 6));
+    let edge = near.edge.unwrap();
+    assert_eq!(
+        (
+            edge.flags,
+            edge.dt1.orientation,
+            edge.dt1.main,
+            edge.dt1.sub
+        ),
+        (0, 0, 0, 0)
+    );
     // Each record's DT1 entry is (path, index in file order).
     let map = feed.map.as_ref().unwrap();
+    assert_eq!(
+        map.entry(0, TileArray::Edge, 0),
+        Some(&(ACT_EDGE_TILE[0].unwrap().0.to_vec(), 2))
+    );
     assert_eq!(
         map.entry(k, TileArray::Floor, 0),
         Some(&(b"floor.dt1".to_vec(), 0))
@@ -628,6 +684,94 @@ fn near_rooms_come_from_the_client_drlg() {
     let mut bare = ModelFeed::<crate::world_view::feed::NoFeed>::default().with_map();
     bare.levels = Some(vec![LevelRow::default(); 4]);
     assert!(bare.near_rooms(&m.w).is_err());
+}
+
+// Covers: specs/render/draw-order-2.md §15 r2
+#[test]
+fn the_preview_runs_the_sight_test_over_the_client_drlg() {
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::unit_facts::UnitFactTables;
+    use crate::world_view::ViewFeed;
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(6, 46, 20));
+    let mut feed = ModelFeed::new(ZeroFacts)
+        .with_map()
+        .with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    let mut los_draw = vec![false; 4];
+    los_draw[2] = true;
+    feed.set_unit_fact_tables(UnitFactTables {
+        unflat_dead: vec![Some(false)],
+        monster_size: vec![Some(1)],
+        los_draw,
+        ..UnitFactTables::default()
+    });
+    // The facts of the monster through both preview paths (the feed's
+    // `unit_facts` and the near-room build), which must agree.
+    fn hidden(
+        feed: &mut ModelFeed<ZeroFacts>,
+        w: &super::super::world::ClientWorld,
+    ) -> Option<bool> {
+        let monster = &w.units[&UnitKey::new(MONSTER, 6)];
+        let by_feed = feed.unit_facts(w, monster).unwrap().sight_hidden;
+        let near = feed.near_rooms(w).unwrap().unwrap();
+        let in_room = near
+            .rooms
+            .iter()
+            .flat_map(|r| &r.units)
+            .find(|u| u.key == monster.key)
+            .map(|u| u.facts.sight_hidden);
+        assert_eq!(in_room, Some(by_feed));
+        by_feed
+    }
+    // An open line: the monster is seen.
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+    // A sight-blocking cell (collision 0x2) on the line hides it in a
+    // `LOSDraw` level (the preview answered "seen" for every unit).
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 14).unwrap() |= bits::VISIBLE;
+    // The near-room build is per drawn frame.
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(true));
+    // `LOSDraw` 0: every unit passes.
+    feed.unit_tables.as_mut().unwrap().los_draw[2] = false;
+    m.w.frames += 1;
+    assert_eq!(hidden(&mut feed, &m.w), Some(false));
+}
+
+// Covers: specs/seams/bridge-app.md §2.10
+#[test]
+fn a_new_client_drlg_drops_the_tile_draw_state() {
+    use crate::rules::draw_order::REC_DRAWN;
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::ViewFeed;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts).with_map();
+    let mut rows = vec![LevelRow::default(); 4];
+    rows[2].draw_edges = true;
+    feed.levels = Some(rows);
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    room_mut(near, 0).floors[0].flags |= REC_DRAWN;
+    // Same DRLG next frame: the flag is kept.
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_ne!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
+    // A new client DRLG (another 0x03; here the same act with a new init
+    // seed, so the act's tile libraries stay) whose room slots are the
+    // same: nothing carried.
+    m.w.drlg.as_mut().unwrap().drlg.init_seed ^= 1;
+    m.w.frames += 1;
+    let near = feed.near_rooms(&m.w).unwrap().unwrap();
+    assert_eq!(near.rooms[0].floors[0].flags & REC_DRAWN, 0);
 }
 
 fn room_mut(
@@ -734,4 +878,88 @@ fn the_predicted_walk_recaches_the_local_players_room() {
     assert_eq!(m.w.local_room(), None);
     assert!(m.w.recache_local_room(46, 6));
     assert_eq!(room_of(&m), Some(rect(1)));
+}
+
+/// 0x9C `action` for item `guid` with a stream head of `mode` at (x, y)
+/// (`bitstream.md` §2–§4.1).
+fn item_9c(action: u8, guid: u8, mode: u32, x: u16, y: u16) -> Vec<u8> {
+    let mut b = vec![0x9C, action, 0, 0x10, guid, 0, 0, 0];
+    let mut bits: Vec<(u32, u32)> = vec![(0x10, 32), (101, 10), (mode, 3)];
+    if matches!(mode, 3 | 5) {
+        bits.extend([(u32::from(x), 16), (u32::from(y), 16)]);
+    } else {
+        bits.extend([(0, 4), (0, 4), (0, 4), (0, 3)]);
+    }
+    let mut out = Vec::new();
+    let mut pos = 0usize;
+    for (v, n) in bits {
+        for i in 0..n {
+            if pos / 8 == out.len() {
+                out.push(0);
+            }
+            out[pos / 8] |= (((v >> i) & 1) as u8) << (pos % 8);
+            pos += 1;
+        }
+    }
+    b.extend(out);
+    b[2] = b.len() as u8;
+    b
+}
+
+// Covers: specs/sim/unit-order.md §5 r6
+#[test]
+fn ground_items_join_the_room_of_their_point() {
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let own = m.w.local_room().copied().unwrap();
+    let item = UnitKey::new(4, 5);
+    // Dropped (mode 3) at the player's feet: at the head of the room's
+    // list (the item mode set's insert).
+    m.recv(&item_9c(0x03, 5, 3, 47, 6));
+    assert!(m.rejected().is_empty(), "{:?}", m.rejected());
+    assert_eq!(m.w.room_units.room_of(item), Some(own.room));
+    assert_eq!(m.w.room_units.list(own.room)[0], item);
+    // Picked up to the cursor (mode 4): it leaves the room.
+    m.recv(&item_9c(0x01, 5, 4, 0, 0));
+    assert_eq!(m.w.room_units.room_of(item), None);
+    // A point in no active room: in no list.
+    m.recv(&item_9c(0x03, 6, 3, 2000, 2000));
+    assert_eq!(m.w.room_units.room_of(UnitKey::new(4, 6)), None);
+}
+
+// Covers: specs/render/lighting.md §9.2 r1, §10 r5
+#[test]
+fn each_client_update_steps_the_environment_and_the_overrides() {
+    use crate::rules::lighting::environment::{Ambient, PeriodTables};
+    let mut m = model();
+    let lit = Ambient {
+        i: 90,
+        r: 10,
+        g: 20,
+        b: 30,
+    };
+    m.inputs.tables.levels[2].ambient = lit;
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    assert_eq!(m.w.player_level(), Some(2));
+    let periods = PeriodTables::builtin().unwrap();
+    let mut env = m.w.environment.expect("the act's record");
+    m.w.overrides.den_counter = 0;
+    m.w.overrides.start_darkness(2, 1, 2, 2);
+    let mut overrides = m.w.overrides;
+    for _ in 0..3 {
+        m.drain();
+        // The same steps by hand, level 2 (§9.2 r1; §10 r5 r3 base = the
+        // leveldefs ambient, which has a colour).
+        overrides.update_darkness(lit, 2);
+        overrides.update_counters();
+        env.update(&periods, 2);
+        assert_eq!(m.w.environment, Some(env));
+        assert_eq!(m.w.overrides, overrides);
+    }
+    assert_eq!(m.w.overrides.den_counter, 3);
+    assert_eq!(m.w.overrides.darkness.map(|d| d.c), Some(3));
 }

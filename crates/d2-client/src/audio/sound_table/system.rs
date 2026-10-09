@@ -1664,6 +1664,14 @@ impl SoundSystem {
         }
     }
 
+    /// The units with a non-empty request list (U +0x78).
+    pub fn attached_units(&self) -> impl Iterator<Item = UnitKey> + '_ {
+        self.unit_lists
+            .iter()
+            .filter(|(_, l)| !l.is_empty())
+            .map(|(&k, _)| k)
+    }
+
     /// `unit`'s request list (U +0x78, `triggers-2.md` §19 r1–r2, r6),
     /// newest first, as (handle, current id): waiting, playing and
     /// ended-not-yet-freed requests; a handle whose request was freed

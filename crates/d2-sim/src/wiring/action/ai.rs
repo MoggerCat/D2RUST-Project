@@ -697,8 +697,14 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn wisp_buff(&mut self, game: &mut Game, target: UnitId, value: i32, expire: i32) {
         self.h.x.ai_wisp_buff(game, target, value, expire);
     }
+    /// `0x00571C00`: an 0xA4 record (class u16) on the unit, the unit
+    /// queued for update (`intents-events.md` §7.9 rule 2).
     fn preload_class(&mut self, game: &mut Game, unit: UnitId, class: i32) {
-        self.h.x.ai_preload_class(game, unit, class);
+        let r = super::event_records::EventRecord::Preload {
+            class: class as u16,
+        };
+        self.h.event_records.push(unit, r);
+        let _ = game.lists.queue_update(unit);
     }
     fn wisp_find(&mut self, game: &mut Game, unit: UnitId) -> Vec<UnitId> {
         self.h.x.ai_wisp_find(game, unit)

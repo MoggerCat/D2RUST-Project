@@ -25,6 +25,7 @@ pub mod combat;
 pub mod death;
 pub mod dispatch;
 pub mod dying;
+pub mod event_records;
 pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
@@ -172,6 +173,9 @@ pub struct ActionHooks<X> {
     pub ai_info: GameInfo,
     /// Combat lists (unit +0xAC, `damage.md` §3 step 3), first = newest.
     pub combat_lists: BTreeMap<UnitId, Vec<CombatEntry>>,
+    /// The pending event records of the units (unit +0xEC,
+    /// `intents-events.md` §7.9 rule 2).
+    pub event_records: event_records::EventRecords,
     /// The process-wide element hit-class byte `0x0088CAD0`.
     pub hit_class: u8,
     /// The game seed of `rng.md` §5.3 (unit allocation).
@@ -377,6 +381,7 @@ impl<X> ActionHooks<X> {
             ai: Some(AiStore::new()),
             ai_info: GameInfo::default(),
             combat_lists: BTreeMap::new(),
+            event_records: Default::default(),
             hit_class: 0,
             game_seed,
             uniques: crate::items::UniqueBits::default(),

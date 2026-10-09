@@ -20,8 +20,7 @@ const INTROS: [(u16, u8, &[u32]); 6] = [
 /// The intro bit (`0x005723C0`) of `class` for the game difficulty.
 fn heard<W: QuestWorld>(w: &mut W, player: UnitId, class: u16) -> bool {
     let d = usize::from(w.difficulty());
-    w.quests(player)
-        .is_some_and(|q| q.intro[d].contains(&class))
+    w.quests(player).is_some_and(|q| q.heard(d, class))
 }
 
 /// Dispatches the chain's callbacks; false = no body (unhandled).
@@ -55,7 +54,7 @@ pub(super) fn callback<W: QuestWorld>(
             if let Some(&(class, _, _)) = hit {
                 let d = usize::from(w.difficulty());
                 if let Some(q) = w.quests(p) {
-                    q.intro[d].insert(class);
+                    q.hear(d, class);
                 }
             }
         }

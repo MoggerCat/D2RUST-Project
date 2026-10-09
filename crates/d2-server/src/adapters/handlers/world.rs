@@ -179,8 +179,8 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
     ),
     (
         0x4C,
-        "world/cube.md §10 (item-use spec, not written; handlers/items.rs)",
-        Status::OtherModule("items"),
+        "world/cube.md §10: Transmogrify `0x0056C6A0`, owner the item-use spec (not written; which item the always-sent 0x3F names is not stated); handlers/items.rs takes only 0x2A and 0x4F",
+        Status::NoOwner,
     ),
     (
         0x4D,

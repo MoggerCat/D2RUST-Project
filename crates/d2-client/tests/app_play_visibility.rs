@@ -404,6 +404,23 @@ fn diagonal_walk() -> (Vec<String>, usize) {
         end.0 != start.0 && end.1 != start.1,
         "the walk moved both axes: {start:?} → {end:?}"
     );
+    // The position check compares with the client's own path cell
+    // (`seams/movement-prediction.md` §2.9 r2), which the server's 0x96
+    // of a diagonal walk mostly shares on one axis: a server point one
+    // sub-tile off it on both axes (inside the tolerance) reaches rule 6
+    // and its predicate.
+    let off = d2_sim::path::walk::messages::walk_verify(
+        100,
+        (end.0 + 1) as u16,
+        (end.1 + 1) as u16,
+        0,
+        0,
+    );
+    {
+        let mut bridge = app.world_mut().resource_mut::<BridgeResource>();
+        bridge.0.receive_chunk(&off).unwrap();
+        bridge.0.update_pass();
+    }
     let refused = app
         .world()
         .resource::<BridgeResource>()

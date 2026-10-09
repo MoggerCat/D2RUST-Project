@@ -1,4 +1,4 @@
-// Spec: specs/client/model.md (§4 rules 5–6, §5), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2)
+// Spec: specs/client/model.md (§4 rules 5–6, §5), specs/drlg/rooms.md (§4.6 rule 1, last paragraph), specs/world/objects-client.md (§25 r2–r3, §28 r2), specs/render/lighting.md (§9.2 r1, §10 r5)
 //! The client update pass: in a frame whose pump ran a server tick, while
 //! `in_game`, each unit's queue is drained in the 1.14d unit order and
 //! every queued message goes to its unit handler. Before an object's
@@ -18,7 +18,7 @@
 //! prediction (the local player follows the server position).
 
 use super::dispatch::{Dispatch, Handle, HandlerError, UnitMessage};
-use super::msg::lighting::object_light_of;
+use super::msg::lighting::{lighting_update, object_light_of};
 use super::objects::{self, ObjFx, ObjUnit};
 use super::output::{move_freed, Output, Outputs};
 use super::receive::{ReceiveLog, Rejected};
@@ -126,6 +126,10 @@ pub fn update_pass(
     if let Err(error) = drlg_update(world) {
         // Not a message: recorded under the client update's own id 0.
         // A DRLG error is a fatal error of the original's code.
+        log.rejected.push(Rejected { id: 0, error });
+    }
+    // `render/lighting.md` §9.2 r1, §10 r5: once per client update.
+    if let Err(error) = lighting_update(world, &inputs.tables.levels) {
         log.rejected.push(Rejected { id: 0, error });
     }
     move_freed(world, outputs);

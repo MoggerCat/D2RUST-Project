@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::items::moves::stat::{DURABILITY, QUANTITY};
+use crate::units::messages::update_item_stat;
 
 /// `dst` stored in page 0 with quantity `qd`, `src` on the cursor with
 /// quantity `qs`; drained.
@@ -31,13 +32,17 @@ fn stack_over_the_max_fills_dst() {
     w.rest.log.clear();
     assert_eq!(w.handle(&msg(0x21, &[src, dst])), Ok(0));
     assert_eq!((qty(&w, dst), qty(&w, src)), (12, 3));
+    // S→C 0x3E built by the desk (`units::messages::update_item_stat`)
+    // from the new base quantities, through the rest's transport.
+    let me = w.me();
     assert_eq!(
-        w.rest.log,
+        w.rest.sent,
         [
-            format!("send_item_stat {dst} 70"),
-            format!("send_item_stat {src} 70"),
+            (me, update_item_stat(dst, QUANTITY, 12, 0)),
+            (me, update_item_stat(src, QUANTITY, 3, 0)),
         ]
     );
+    assert_eq!(w.rest.log, Vec::<String>::new());
     assert_eq!(w.data(dst).flags & 0x8, 0x8);
     assert_eq!(w.inventory().cursor(), w.unit(src));
     assert_eq!(item_msgs(&w.drain()), [(0x9C, 0x0A, dst)]);
@@ -62,7 +67,15 @@ fn stack_merge_frees_the_source() {
     assert!(!w.state.items.contains_key(&su));
     let mut clear = vec![0x42, 4];
     clear.extend_from_slice(&src.to_le_bytes());
-    assert_eq!(w.rest.sent, [(w.me(), clear)]);
+    let me = w.me();
+    assert_eq!(
+        w.rest.sent,
+        [
+            (me, update_item_stat(dst, DURABILITY, 7, 0)),
+            (me, update_item_stat(dst, QUANTITY, 15, 0)),
+            (me, clear)
+        ]
+    );
     assert_eq!(item_msgs(&w.drain()), [(0x9C, 0x0A, dst)]);
     assert!(w.state.errors.is_empty());
 }

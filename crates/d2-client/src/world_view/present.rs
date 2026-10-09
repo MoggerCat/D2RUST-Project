@@ -36,6 +36,7 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
@@ -58,7 +59,7 @@ use super::node::{add_node, ComposeJob, NodeIndices};
 use super::panel_art::PanelArtLoader;
 use super::ui_bind::{run_ui_with, world_clicks, TextAssetLoader, UiQueue, UiRules};
 use super::walk::PreviewWalk;
-use super::{compose_cycle_cpu, GpuAtlas, ViewAssets, ViewRules, VIEW};
+use super::{compose_cycle_cpu, play_view, GpuAtlas, ViewAssets, ViewRules};
 use crate::scene::{FrameCycle, FramePlan};
 
 /// Render layer of the presented frame and its camera, so the world view
@@ -82,7 +83,7 @@ pub struct WorldViewState {
     pub assets: ViewAssets,
     pub rules: Box<dyn WorldRules + Send + Sync>,
     pub feed: Box<dyn ViewFeed + Send + Sync>,
-    /// The persistent index framebuffer (`composition.md` §3), `VIEW`
+    /// The persistent index framebuffer (`composition.md` §3), [`play_view`]
     /// sized: the last presented frame once committed.
     pub cycle: FrameCycle,
     /// Counts of the last frame, for logs and tests.
@@ -117,6 +118,19 @@ pub struct WorldViewState {
     pub object_labels: super::object_label::ObjectLabels,
     /// The last drawn frame's camera (`super::visibility`).
     pub camera: super::visibility::SharedCamera,
+    /// The model's act loads already handed to the cycle
+    /// ([`note_act_loads`]).
+    act_loads: u64,
+}
+
+/// `composition.md` §3 step 4: each S→C 0x03 the model handled since the
+/// last call sets the post-draw clear counter to 1 (`0x0044E100`), so the
+/// next presented frame is all index 0.
+pub fn note_act_loads(cycle: &mut FrameCycle, seen: &mut u64, loads: u64) {
+    if loads != *seen {
+        *seen = loads;
+        cycle.set_post_clear(1);
+    }
 }
 
 impl WorldViewState {
@@ -129,8 +143,8 @@ impl WorldViewState {
             assets,
             rules,
             feed,
-            cycle: FrameCycle::new(VIEW.width, VIEW.height)
-                .expect("VIEW is taller than the uncleared band"),
+            cycle: FrameCycle::new(play_view().width, play_view().height)
+                .expect("the play frame is taller than the uncleared band"),
             last: None,
             click: Default::default(),
             automap: None,
@@ -145,6 +159,7 @@ impl WorldViewState {
             missiles: Default::default(),
             object_labels: Default::default(),
             camera: Default::default(),
+            act_loads: 0,
         }
     }
 }
@@ -203,6 +218,12 @@ pub struct WorldViewUi {
     pub text: Option<TextAssetLoader>,
     /// Last cursor position sent, so moves are reported once.
     cursor: Option<FramePos>,
+    /// The last cursor position inside the frame: a button released
+    /// outside the frame is released there (`ui/controls.md` §6 r1).
+    last_at: crate::ui::Point,
+    /// The window lost the focus since the last pass (`ui/controls.md`
+    /// §4.3 r3): the held world buttons are released.
+    focus_lost: bool,
 }
 
 impl WorldViewUi {
@@ -216,6 +237,8 @@ impl WorldViewUi {
             art: None,
             text: None,
             cursor: None,
+            last_at: crate::ui::Point::new(0, 0),
+            focus_lost: false,
         }
     }
 }
@@ -420,15 +443,14 @@ fn automap_facts(
     open_mode: u8,
 ) -> crate::ui::automap::FrameFacts {
     use crate::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
-    let at = world.local().map_or(Default::default(), |p| {
-        let (x, y) = p.cell();
-        moving_to_client((u32::from(x) << 16) | 0x8000, (u32::from(y) << 16) | 0x8000)
-    });
+    let at = world
+        .local_position()
+        .map_or(Default::default(), |(x, y)| moving_to_client(x, y));
     let mode = OpenMode::new(open_mode).unwrap_or(OpenMode::NONE);
-    let cam = Camera::new(FrameSize::D2RS, mode, at, (0, 0));
+    let cam = Camera::new(FrameSize::play(), mode, at, (0, 0));
     crate::ui::automap::FrameFacts {
-        width: FrameSize::D2RS.width,
-        height: FrameSize::D2RS.height,
+        width: FrameSize::play().width,
+        height: FrameSize::play().height,
         open_mode,
         mini_down: false,
         unit_origin: cam.unit,
@@ -455,7 +477,7 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
             at,
             event,
         },
-        &Output::UnitFreed { unit } => SoundRequest::UnitFreed { unit },
+        &Output::UnitFreed { unit, client_only } => SoundRequest::UnitFreed { unit, client_only },
         Output::ObjectSound(ObjSound::Mode {
             unit,
             class,
@@ -500,6 +522,10 @@ fn init_gpu(mut commands: Commands, wanted: Res<GpuWanted>, mut tried: Local<boo
 /// buttons routed as-is (their meanings: `ui/controls.md` §7 r5,
 /// [`crate::ui::PointerButton`]).
 /// Keyboard actions come from the controls layer (C9), not wired here.
+/// A button released outside the frame is still released (at the last
+/// frame position), and a lost window focus is noted for the world
+/// release of `ui/controls.md` §4.3 r3.
+#[allow(clippy::too_many_arguments)]
 fn ui_input(
     ui: Option<NonSendMut<WorldViewUi>>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -507,24 +533,84 @@ fn ui_input(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     walk: Option<ResMut<PreviewWalk>>,
     time: Option<Res<Time>>,
+    focus: Option<Res<Messages<bevy::window::WindowFocused>>>,
+    mut focus_cursor: Local<MessageCursor<bevy::window::WindowFocused>>,
+    wheel: Option<Res<Messages<bevy::input::mouse::MouseWheel>>>,
+    mut wheel_cursor: Local<MessageCursor<bevy::input::mouse::MouseWheel>>,
+    mut wheel_acc: Local<crate::controls::original::WheelAccumulator>,
 ) -> Result {
     let (Some(mut ui), Ok(window)) = (ui, windows.single()) else {
         return Ok(());
     };
-    // d2rs-own, unverified (D2): Stand Still (command 36) is held while
-    // a key bound to it is down (`ui/controls.md` §4.3 r1).
-    if let (Some(mut walk), Some(bindings), Some(keys)) = (walk, &ui.bindings, keys.as_deref()) {
-        let held = bindings
-            .inputs(crate::controls::Action::StandStill)
-            .iter()
-            .any(|k| {
-                edge::KEY_CODES
-                    .iter()
-                    .any(|&(c, key)| key == *k && keys.pressed(c))
-            });
-        if walk.run.stand_still != held {
-            walk.run.stand_still = held;
+    if let Some(m) = focus.as_deref() {
+        if focus_cursor.read(m).any(|e| !e.focused) {
+            ui.focus_lost = true;
         }
+    }
+    use crate::controls::{Action, Key};
+    // An input is down: a key, or the middle / X buttons.
+    let down = |k: Key| {
+        let key = keys.as_deref().is_some_and(|ks| {
+            edge::KEY_CODES
+                .iter()
+                .any(|&(c, key)| key == k && ks.pressed(c))
+        });
+        key || match k {
+            Key::MouseMiddle => buttons.pressed(MouseButton::Middle),
+            Key::Mouse4 => buttons.pressed(MouseButton::Back),
+            Key::Mouse5 => buttons.pressed(MouseButton::Forward),
+            _ => false,
+        }
+    };
+    // Stand Still (command 36) and Run (command 34) are held while an
+    // input bound to them is down (`ui/controls.md` §3, §4.3 r1–r2: the
+    // down handler sets, the up handler clears; VK 0x10–0x12 both sides).
+    // The Run down handler's walk → run switch of a walking player (mode
+    // 3, C→S 0x53 / 0x54) is not modelled: the flag reaches the next
+    // world click (`RunMods::word`).
+    if let (Some(mut walk), Some(bindings)) = (walk, &ui.bindings) {
+        let still = edge::action_held(bindings, Action::StandStill, &down);
+        if walk.run.stand_still != still {
+            walk.run.stand_still = still;
+        }
+        let run = edge::action_held(bindings, Action::Run, &down);
+        if walk.run.run_held != run {
+            walk.run.run_held = run;
+        }
+    }
+    // Show Items (command 37): ui 0x0D on while held, off on the release.
+    let show = ui
+        .bindings
+        .as_ref()
+        .is_some_and(|b| edge::action_held(b, Action::ShowItems, &down));
+    if let Some(o) = ui.original.as_mut() {
+        o.set_show_items(show)?;
+    }
+    // The middle and X buttons and the wheel call their bound command
+    // (`ui/controls.md` §4.2 r2–r3): no panel takes them.
+    if let Some(bindings) = ui.bindings.clone() {
+        let mut pointer = Vec::new();
+        for (b, k) in [
+            (MouseButton::Middle, Key::MouseMiddle),
+            (MouseButton::Back, Key::Mouse4),
+            (MouseButton::Forward, Key::Mouse5),
+        ] {
+            if buttons.just_pressed(b) {
+                pointer.push(k);
+            }
+        }
+        if let Some(m) = wheel.as_deref() {
+            for e in wheel_cursor.read(m) {
+                // Windows units: 120 per notch.
+                let delta = match e.unit {
+                    bevy::input::mouse::MouseScrollUnit::Line => (e.y * 120.0) as i32,
+                    bevy::input::mouse::MouseScrollUnit::Pixel => e.y as i32,
+                };
+                pointer.extend(edge::wheel_key(&mut wheel_acc, delta));
+            }
+        }
+        let actions = edge::input_actions(&bindings, &pointer);
+        ui.queue.0.extend(actions);
     }
     // d2rs-own, unverified: Shift held, for the shift-click to the belt.
     if let (Some(o), Some(keys)) = (ui.original.as_mut(), keys.as_deref()) {
@@ -545,9 +631,7 @@ fn ui_input(
                 }
                 let vk = match c {
                     KeyCode::Escape => Some(27),
-                    _ => {
-                        edge::key_of(c).and_then(crate::ui::front_end::screens::controls::key_to_vk)
-                    }
+                    _ => edge::key_of(c).and_then(crate::controls::keymap::key_to_vk),
                 };
                 if let Some(vk) = vk {
                     o.controls_key(vk, now);
@@ -576,15 +660,22 @@ fn ui_input(
         ui.queue.0.push(e);
         ui.cursor = Some(pos);
     }
-    let FramePos::Inside(at) = pos else {
-        return Ok(());
+    // A press needs the cursor in the frame; a release outside it (a
+    // black bar, outside the window) still ends the button, at the last
+    // frame position (left up reads the current mouse anyway, §6 r1).
+    let inside = match pos {
+        FramePos::Inside(p) => {
+            ui.last_at = p;
+            true
+        }
+        FramePos::Outside => false,
     };
+    let at = ui.last_at;
     for (bevy, button) in [
         (MouseButton::Left, PointerButton::Left),
         (MouseButton::Right, PointerButton::Right),
-        (MouseButton::Middle, PointerButton::Middle),
     ] {
-        if buttons.just_pressed(bevy) {
+        if inside && buttons.just_pressed(bevy) {
             ui.queue.0.push(UiEvent::Press { button, at });
         }
         if buttons.just_released(bevy) {
@@ -594,11 +685,34 @@ fn ui_input(
     Ok(())
 }
 
+/// The world releases of a lost focus (`ui/controls.md` §4.3 r3): left
+/// up (kind 2) while left is held, right up (kind 5) while right is held,
+/// each unless `events` already releases that button.
+pub fn focus_releases(
+    st: &crate::controls::click::ClickState,
+    events: &[UiEvent],
+    at: crate::ui::Point,
+) -> Vec<UiEvent> {
+    let released = |b: PointerButton| {
+        events
+            .iter()
+            .any(|e| matches!(e, UiEvent::Release { button, .. } if *button == b))
+    };
+    [
+        (st.left_held, PointerButton::Left),
+        (st.right_held, PointerButton::Right),
+    ]
+    .into_iter()
+    .filter(|&(held, b)| held && !released(b))
+    .map(|(_, button)| UiEvent::Release { button, at })
+    .collect()
+}
+
 fn rgba_image(rgba: Vec<u8>) -> Image {
     let mut image = Image::new(
         Extent3d {
-            width: VIEW.width,
-            height: VIEW.height,
+            width: play_view().width,
+            height: play_view().height,
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
@@ -610,10 +724,10 @@ fn rgba_image(rgba: Vec<u8>) -> Image {
     image
 }
 
-/// UI frame, draw list, composition, image update: once per presented
-/// server tick (camera §9). Before the first tick, and on Bevy frames
-/// whose bridge frame ran no tick, nothing is drawn and pending UI input
-/// waits for the next drawn frame.
+/// UI input and world clicks every client loop pass (`ui/controls.md` §6
+/// r2, r6: the held repeat and the per-pass latch run per pass, not per
+/// server tick); draw list, composition and image update once per
+/// presented server tick (camera §9). Before the first tick nothing runs.
 #[allow(clippy::too_many_arguments)]
 fn world_view_frame(
     mut commands: Commands,
@@ -626,23 +740,26 @@ fn world_view_frame(
     mut images: ResMut<Assets<Image>>,
     mut sounds: Option<ResMut<UiSounds>>,
     mut walk: Option<ResMut<PreviewWalk>>,
-    mut exit: MessageWriter<AppExit>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut dump: Option<ResMut<DrawDump>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
-    if tick == 0 || state.last.is_some_and(|l| l.server_tick == tick) {
+    if tick == 0 {
         return Ok(());
     }
-    // The previous GPU frame is the base of this one: commit its indices
-    // first, or wait for them.
-    if let Some(g) = gpu.as_deref_mut() {
+    // A new server tick is drawn; the previous GPU frame is the base of
+    // this one: commit its indices first, or draw on a later pass.
+    let mut draw = !state.last.is_some_and(|l| l.server_tick == tick);
+    if let (true, Some(g)) = (draw, gpu.as_deref_mut()) {
         if let Some((seq, plan)) = g.pending {
-            let Some(back) = indices.as_ref().and_then(|i| i.take(seq)) else {
-                return Ok(());
-            };
-            state.cycle.commit(plan, back)?;
-            g.pending = None;
+            match indices.as_ref().and_then(|i| i.take(seq)) {
+                Some(back) => {
+                    state.cycle.commit(plan, back)?;
+                    g.pending = None;
+                }
+                None => draw = false,
+            }
         }
     }
     let state = &mut *state;
@@ -673,9 +790,12 @@ fn world_view_frame(
                     s.0.extend(outcome.sounds);
                 }
                 state.feed.set_ui_open_mode(original.open_mode());
-                // The Esc menu's "Save and Exit Game" (d2rs-own, unverified).
+                // The Esc menu's "Save and Exit Game" (`flows/save-exit.md`
+                // §1 r2): C→S 0x69; the app ends on the server's answer.
                 if original.take_exit_request() {
-                    crate::app::save::request_save_and_exit(&mut exit);
+                    if let Err(e) = crate::app::save::request_save_and_exit(&mut bridge.0) {
+                        warn!("save and exit: {e}");
+                    }
                 }
                 // Configure Controls over the game (`ui::controls_host`).
                 let expansion = original.expansion_installed();
@@ -690,10 +810,10 @@ fn world_view_frame(
                     original.set_belt_keys(b);
                 }
             }
-            if let Some(art) = &ui.art {
+            if let (true, Some(art)) = (draw, &ui.art) {
                 art.ensure(&frame.draws, &mut state.assets)?;
             }
-            if let Some(text) = &ui.text {
+            if let (true, Some(text)) = (draw, &ui.text) {
                 text.ensure(&frame.draws, &mut state.assets)?;
             }
             let mouse = match ui.cursor {
@@ -701,13 +821,13 @@ fn world_view_frame(
                 _ => (0, 0),
             };
             let view = crate::bridge::click::ClickView {
-                size: crate::rules::camera::FrameSize::D2RS,
+                size: crate::rules::camera::FrameSize::play(),
                 open_mode: ui.original.as_ref().map_or(0, |o| o.open_mode().get()),
                 // `[0x007A521C]` = H − 40 (`ui/automap.md` §9).
-                right_panel_bottom: crate::rules::camera::FrameSize::D2RS.play_height(),
+                right_panel_bottom: crate::rules::camera::FrameSize::play().play_height(),
                 // PROVISIONAL (ui/controls.md §6 r7; controls-0001):
                 // `0x00454970()` is not specified: the play area H − 40.
-                skill_y_limit: crate::rules::camera::FrameSize::D2RS.play_height(),
+                skill_y_limit: crate::rules::camera::FrameSize::play().play_height(),
                 mouse,
                 game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
@@ -750,7 +870,7 @@ fn world_view_frame(
                     .object_labels
                     .draw(bridge.0.world(), c, hover, ui.strings.as_ref())
             }) {
-                if let Some(text) = &ui.text {
+                if let (true, Some(text)) = (draw, &ui.text) {
                     text.ensure(std::slice::from_ref(&label), &mut state.assets)?;
                 }
                 frame.draws.push(label);
@@ -761,6 +881,18 @@ fn world_view_frame(
                     .take_clicks(&mut bridge.0, cam.as_ref(), &frame.unhandled)?;
             let unhandled = state.ground_items.take_clicks(&mut bridge.0, &unhandled)?;
             crate::bridge::belt::send_keys(&mut bridge.0, &frame.unhandled)?;
+            // The input reset `0x0044DA40` (`client/msg-ui.md` §2 r2.2):
+            // held := 0 before this pass's clicks.
+            if ui.original.as_mut().is_some_and(|o| o.take_input_reset()) {
+                state.click.input_reset();
+            }
+            // Focus lost (`ui/controls.md` §4.3 r3): the left / right
+            // release of a held button, unless this pass releases it.
+            let mut unhandled = unhandled;
+            if std::mem::take(&mut ui.focus_lost) {
+                let at = crate::ui::Point::new(mouse.0, mouse.1);
+                unhandled.extend(focus_releases(&state.click, &unhandled, at));
+            }
             let outs = world_clicks(
                 &mut bridge.0,
                 &mut state.click,
@@ -772,13 +904,17 @@ fn world_view_frame(
             for o in &outs {
                 debug!("world click: {o:?}");
             }
-            if let Some(w) = walk.as_deref() {
-                // d2rs-own, unverified (D1, D2): the pending interaction.
-                let pressed = frame
-                    .unhandled
-                    .iter()
-                    .any(|e| matches!(e, UiEvent::Press { .. }));
+            let pressed = frame
+                .unhandled
+                .iter()
+                .any(|e| matches!(e, UiEvent::Press { .. }));
+            if walk.is_some() {
                 state.interact.note(&outs, pressed);
+            }
+            if let (true, Some(w)) = (draw, walk.as_deref()) {
+                // d2rs-own, unverified (D1, D2): the pending interaction
+                // (its frame counts drawn ticks; the note runs below on
+                // every pass).
                 let walking = w.predict.walking().is_some();
                 for o in state.interact.frame(&mut bridge.0, walking)? {
                     debug!("interact: {o:?}");
@@ -794,6 +930,38 @@ fn world_view_frame(
                         a.toggle(&automap_facts(bridge.0.world(), view.open_mode));
                     }
                 }
+                // `ui/controls.md` §3 cmds 8–11, 45 (`ui/automap.md` §8
+                // r2): F9 re-centre, F10 fade, F11 party, F12 names, V the
+                // minimap side.
+                let f = automap_facts(bridge.0.world(), view.open_mode);
+                let mut spare = crate::ui::automap::options::MemoryStore::default();
+                let store: &mut dyn crate::ui::automap::OptionStore =
+                    match state.automap_view.as_mut() {
+                        Some(v) => v.store_mut(),
+                        None => &mut spare,
+                    };
+                for e in &frame.unhandled {
+                    use crate::controls::Action as A;
+                    let UiEvent::Action(id) = *e else {
+                        continue;
+                    };
+                    match A::ALL.get(usize::from(id.0)) {
+                        Some(A::CenterAutomap) => a.map.centre(&f),
+                        Some(A::ToggleAutomapFade) => a.map.options.cycle_fade(store),
+                        Some(A::ToggleAutomapParty) => a.map.options.toggle_party(store),
+                        Some(A::ToggleAutomapNames) => a.map.options.toggle_party_names(store),
+                        Some(A::ToggleMinimap) => a.map.options.toggle_left(store),
+                        _ => {}
+                    }
+                }
+                // Space with nothing to close (`panels.md` §2 r9):
+                // `0x00457640(0)`, then the close-all with the automap.
+                if ui.original.as_mut().is_some_and(|o| o.take_clear_automap()) {
+                    a.map.cleared(&f);
+                    if a.open {
+                        a.toggle(&f);
+                    }
+                }
             }
             // `ui/controls.md` §3 cmd 44: no swap while ui 0x0C, 0x17 or
             // 0x19 is open.
@@ -804,10 +972,16 @@ fn world_view_frame(
             if swap_ok {
                 super::swap_key::send_swaps(&frame.unhandled, &mut bridge.0)?;
             }
+            // `ui/controls.md` §3 cmds 27–33, 55: C→S 0x3F with 0x19 + k
+            // (0x20 for Say 7X).
+            super::swap_key::send_says(&frame.unhandled, &mut bridge.0)?;
             Some(frame)
         }
         None => None,
     };
+    if !draw {
+        return Ok(());
+    }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
     let built = build_frame(
@@ -817,6 +991,12 @@ fn world_view_frame(
         state.feed.as_mut(),
         &state.assets,
     );
+    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
+    // client's room lists, on every frame the fill ran, the frames whose
+    // image is not built included (`seams/bridge-app.md` §2.8).
+    for (room, order) in state.feed.take_unit_orders() {
+        bridge.0.set_room_order(room, &order);
+    }
     let mut frame = match built {
         Ok(f) => f,
         // d2rs-own, unverified (D1): the preview keeps running; the
@@ -864,12 +1044,9 @@ fn world_view_frame(
         let near = state.feed.near_rooms(world)?;
         a.frame(world, near)?;
     }
-    // `sim/unit-order.md` §5 rule 7: the fill's Y sort persists in the
-    // client's room lists.
-    for (room, order) in state.feed.take_unit_orders() {
-        bridge.0.set_room_order(room, &order);
-    }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
+    let loads = bridge.0.world().act_loads;
+    note_act_loads(&mut state.cycle, &mut state.act_loads, loads);
     if let Some(d) = dump.as_deref_mut().filter(|d| !d.done) {
         d.seen += 1;
         if tick >= d.request.at_tick {
@@ -925,8 +1102,8 @@ fn world_view_frame(
             let mut image = if use_gpu {
                 {
                     let mut image = Image::new_target_texture(
-                        VIEW.width,
-                        VIEW.height,
+                        play_view().width,
+                        play_view().height,
                         TextureFormat::Rgba8UnormSrgb,
                         None,
                     );
@@ -935,7 +1112,10 @@ fn world_view_frame(
                     image
                 }
             } else {
-                rgba_image(vec![0; (VIEW.width * VIEW.height * 4) as usize])
+                rgba_image(vec![
+                    0;
+                    (play_view().width * play_view().height * 4) as usize
+                ])
             };
             image.sampler = ImageSampler::nearest();
             let image = images.add(image);
@@ -996,7 +1176,9 @@ fn world_view_frame(
 }
 
 /// Integer presentation scale (§A9; same factor as `ui::Presentation`, so
-/// the cursor mapping matches), converted to logical units for Bevy.
+/// the cursor mapping matches), converted to logical units for Bevy; the
+/// image's top-left sits at the presentation's (left, top)
+/// (`Presentation::centre_offset`, `seams/bridge-app.md` §2.7).
 fn present_scale(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut sprites: Query<&mut Transform, With<WorldViewSprite>>,
@@ -1008,7 +1190,40 @@ fn present_scale(
         return;
     };
     let s = p.scale as f32 / window.scale_factor();
+    let (dx, dy) = p.centre_offset();
     for mut t in &mut sprites {
         t.scale = Vec3::new(s, s, 1.0);
+        t.translation.x = dx / window.scale_factor();
+        t.translation.y = dy / window.scale_factor();
+    }
+}
+
+#[cfg(test)]
+mod act_load_tests {
+    use super::*;
+    use crate::scene::{FrameImage, MapTable};
+
+    // Covers: specs/render/composition.md §3
+    #[test]
+    fn the_frame_after_an_act_load_presents_all_index_0() {
+        // The spec's vector: framebuffer all 5, BlankScreen 1, nothing
+        // drawn, 800 × 600, counter 1 → all 0, counter back to 0.
+        let mut c = FrameCycle::with_pixels(800, 600, vec![5; 800 * 600]).unwrap();
+        let mut seen = 0;
+        note_act_loads(&mut c, &mut seen, 0);
+        assert_eq!(c.post_clear(), 0, "no 0x03 yet");
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 1);
+        let none: Vec<FrameImage> = Vec::new();
+        let out = c.compose(true, &[], &none, &MapTable::default()).unwrap();
+        assert!(out.iter().all(|&p| p == 0));
+        assert_eq!(c.post_clear(), 0);
+        // The same count again: no clear; the next frame keeps rows
+        // 553–599 (BlankScreen clears rows 0–552 only).
+        note_act_loads(&mut c, &mut seen, 1);
+        assert_eq!(c.post_clear(), 0);
+        // Two loads before one frame: one cleared frame.
+        note_act_loads(&mut c, &mut seen, 3);
+        assert_eq!(c.post_clear(), 1);
     }
 }

@@ -186,7 +186,7 @@ fn a_hardcore_death_drops_the_client_and_marks_the_save_dead() {
     );
 }
 
-// Covers: specs/sim/intents-events.md §9 r6
+// Covers: specs/sim/intents-events.md §9 r6; specs/formats/d2s.md §2.3
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_softcore_death_respawns_and_the_save_stays_alive() {
@@ -199,6 +199,13 @@ fn a_softcore_death_respawns_and_the_save_stays_alive() {
     assert!(dropped.is_empty());
     assert!(!left);
     assert!(!dead);
-    assert_eq!(status & d2_formats::d2s::status::DEAD, 0);
+    // `d2s.md` §2.3: both death starts set 0x08 for every player, softcore
+    // too (measured 0x0028 after a town respawn); the loader refuses a
+    // dead character only when it is hardcore (§2.2 r5), so it stays
+    // playable.
+    assert_eq!(
+        status & d2_formats::d2s::status::DEAD,
+        d2_formats::d2s::status::DEAD
+    );
     assert_eq!(status & d2_formats::d2s::status::HARDCORE, 0);
 }

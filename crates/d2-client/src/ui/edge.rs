@@ -11,11 +11,20 @@ use bevy::window::Window;
 
 use super::frame::{FrameError, FramePos, Presentation};
 use super::panel::{ActionId, UiEvent};
-use crate::controls::{Bindings, Context, Key};
+use crate::controls::original::{WheelAccumulator, WHEEL_UP};
+use crate::controls::{Action, Bindings, Context, Key};
 
-/// The presentation for a window's current physical size.
+/// The presentation of the play frame
+/// ([`crate::rules::camera::FrameSize::play`]) for a window's current
+/// physical size.
 pub fn presentation(window: &Window) -> Result<Presentation, FrameError> {
-    Presentation::new(window.physical_width(), window.physical_height())
+    let frame = crate::rules::camera::FrameSize::play();
+    Presentation::for_frame(
+        window.physical_width(),
+        window.physical_height(),
+        frame.width as u32,
+        frame.height as u32,
+    )
 }
 
 /// The window pixel holding a physical cursor position: Bevy reports it
@@ -160,13 +169,59 @@ pub fn key_of(code: KeyCode) -> Option<Key> {
 /// world context to an action becomes [`UiEvent::Action`], in `pressed`
 /// order (§A4: actions come from the bindings, never from raw keys).
 pub fn key_actions(bindings: &Bindings, pressed: &[KeyCode]) -> Vec<UiEvent> {
-    pressed
-        .iter()
-        .filter_map(|&c| key_of(c))
-        .filter_map(|k| bindings.action_for(Context::World, k))
+    let keys: Vec<Key> = pressed.iter().filter_map(|&c| key_of(c)).collect();
+    input_actions(bindings, &keys)
+}
+
+/// The world actions of portable inputs, in order: keys, the middle / X
+/// buttons and the wheel steps (`ui/controls.md` §4.2: they call the
+/// bound command's handler, no panel takes them). VK 0x10–0x12 cover
+/// both sides (§3, §4.3 r2): a right Shift / Ctrl / Alt not bound itself
+/// is its left key.
+pub fn input_actions(bindings: &Bindings, keys: &[Key]) -> Vec<UiEvent> {
+    keys.iter()
+        .filter_map(|&k| {
+            bindings
+                .action_for(Context::World, k)
+                .or_else(|| bindings.action_for(Context::World, left_side(k)?))
+        })
         .filter_map(|a| u16::try_from(a.index()).ok())
         .map(|i| UiEvent::Action(ActionId(i)))
         .collect()
+}
+
+/// The left key of a right modifier (VK 0x10–0x12 name both).
+pub fn left_side(k: Key) -> Option<Key> {
+    match k {
+        Key::RightShift => Some(Key::LeftShift),
+        Key::RightCtrl => Some(Key::LeftCtrl),
+        Key::RightAlt => Some(Key::LeftAlt),
+        _ => None,
+    }
+}
+
+/// Whether an input bound to `action` is held: `down` answers per key
+/// (both sides for the modifiers, `ui/controls.md` §4.3 r2).
+pub fn action_held(bindings: &Bindings, action: Action, down: &dyn Fn(Key) -> bool) -> bool {
+    bindings.inputs(action).iter().any(|&k| {
+        down(k)
+            || match k {
+                Key::LeftShift => down(Key::RightShift),
+                Key::LeftCtrl => down(Key::RightCtrl),
+                Key::LeftAlt => down(Key::RightAlt),
+                _ => false,
+            }
+    })
+}
+
+/// A wheel event of `delta` (Windows units, 120 per notch) through the
+/// accumulator of `ui/controls.md` §4.2 r3: the wheel key it fires, if
+/// any (one per event).
+pub fn wheel_key(acc: &mut WheelAccumulator, delta: i32) -> Option<Key> {
+    match acc.event(delta, true)? {
+        WHEEL_UP => Some(Key::MouseWheelUp),
+        _ => Some(Key::MouseWheelDown),
+    }
 }
 
 /// The typed characters of the keys pressed this frame, for the text
@@ -218,7 +273,7 @@ pub fn key_chars(pressed: &[KeyCode]) -> Vec<UiEvent> {
 #[cfg(test)]
 mod key_tests {
     use super::*;
-    use crate::controls::{Action, Preset};
+    use crate::controls::Preset;
 
     // Covers: specs/client/ui.md §a4-input-actions
     #[test]
@@ -263,5 +318,72 @@ mod key_tests {
                 UiEvent::Action(ActionId(Action::ToggleSkillTree.index() as u16)),
             ]
         );
+    }
+
+    fn act(a: Action) -> UiEvent {
+        UiEvent::Action(ActionId(a.index() as u16))
+    }
+
+    // The original preset: A / C character, B / I inventory, M message
+    // log, N clear text, V minimap, O hireling, F9–F12 automap, Ctrl run,
+    // the middle button automap, X1 show items, X2 run lock; right Ctrl
+    // is Ctrl.
+    // Covers: specs/ui/controls.md §3 row1, §3 row2, §3 row4, §3 row8, §3 row19, §3 row22, §4.2 r2, §4.3 r2
+    #[test]
+    fn original_keys_become_their_commands() {
+        let b = Preset::Original.bindings().unwrap();
+        use Key as K;
+        let keys = [
+            K::A,
+            K::B,
+            K::M,
+            K::N,
+            K::V,
+            K::O,
+            K::F9,
+            K::F10,
+            K::F11,
+            K::F12,
+            K::RightCtrl,
+            K::MouseMiddle,
+            K::Mouse4,
+            K::Mouse5,
+        ];
+        assert_eq!(
+            input_actions(&b, &keys),
+            vec![
+                act(Action::ToggleCharacter),
+                act(Action::ToggleInventory),
+                act(Action::ToggleMessageLog),
+                act(Action::ClearTextMessages),
+                act(Action::ToggleMinimap),
+                act(Action::ToggleHireling),
+                act(Action::CenterAutomap),
+                act(Action::ToggleAutomapFade),
+                act(Action::ToggleAutomapParty),
+                act(Action::ToggleAutomapNames),
+                act(Action::Run),
+                act(Action::ToggleAutomap),
+                act(Action::ShowItems),
+                act(Action::ToggleRun),
+            ]
+        );
+        assert!(action_held(&b, Action::Run, &|k| k == K::RightCtrl));
+        assert!(!action_held(&b, Action::Run, &|k| k == K::LeftShift));
+    }
+
+    // Wheel +240 in one event: one step, command 39 (skill up) once.
+    // Covers: specs/ui/controls.md §4.2 r3, §3 row24, §3 row25
+    #[test]
+    fn a_wheel_event_fires_one_skill_step() {
+        let b = Preset::Original.bindings().unwrap();
+        let mut acc = WheelAccumulator::default();
+        let k = wheel_key(&mut acc, 240);
+        assert_eq!(k, Some(Key::MouseWheelUp));
+        assert_eq!(input_actions(&b, &[k.unwrap()]), vec![act(Action::SkillUp)]);
+        assert_eq!(wheel_key(&mut acc, 60), None);
+        assert_eq!(wheel_key(&mut acc, -200), Some(Key::MouseWheelDown));
+        let down = input_actions(&b, &[Key::MouseWheelDown]);
+        assert_eq!(down, vec![act(Action::SkillDown)]);
     }
 }

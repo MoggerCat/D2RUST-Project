@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §2, §5; specs/sim/unit-order.md §2.5, §3; specs/audio/triggers-2.md §14
+// Spec: specs/sim/tick.md §2, §5, §6; specs/sim/unit-order.md §2.5, §3; specs/audio/triggers-2.md §14
 //! One game's simulation state as far as Phase 3 has specified it: the
 //! frame counter, the unit/room/client lists and the timer queue, plus the
 //! operations that touch more than one of them.
@@ -29,6 +29,11 @@ pub struct Game {
     /// Unit sound-event slots, unit flag 0x400 (`audio/triggers-2.md`
     /// §14, [`crate::units::sound`]).
     pub sounds: SoundEvents,
+    /// The client pass asked for the character save of every client with
+    /// a player (`tick.md` §6 rule 3, `0x0052CA10`): the save writes a
+    /// file, so the host (`d2-server`'s character storage) runs it and
+    /// clears this after the tick.
+    pub character_save_due: bool,
 }
 
 impl Game {

@@ -1,8 +1,11 @@
-// Spec: specs/formats/d2s.md (§1 writer, §7 stats), specs/formats/d2s-load.md
+// Spec: specs/formats/d2s.md (§1 writer, §7 stats), specs/formats/d2s-load.md, specs/flows/save-exit.md (§1 r2, §2 r2, §3 r1, §4 r1)
 //! Saving the played character (stitch-save; `d2-client play`).
 //!
-//! The game writes the player's `.d2s` on window close and on an explicit
-//! save. Where it goes: `play --save <file>` writes that file;
+//! The server writes the player's `.d2s` (`flows/save-exit.md`): the
+//! app installs a [`FileStore`] as the server's character storage, and
+//! the server runs it in the leave of C→S 0x69 (Save and Exit,
+//! [`request_save_and_exit`]) before its 0x05, and every 8192 frames.
+//! Where it goes: `play --save <file>` writes that file;
 //! `play --new <class> <name>` writes `<name>.d2s` in a d2rs-own save
 //! folder ([`default_save_dir`], or `--save-dir`; never inside the game
 //! install).
@@ -24,8 +27,12 @@ use bevy::app::AppExit;
 use bevy::prelude::{MessageWriter, Resource};
 use d2_formats::d2s::{self, Body, D2s, Header, SaveTables, StatEntry, Stats};
 
+use d2_server::adapters::storage::CharacterStore;
+use d2_server::seams::ClientId;
+use d2_sim::wiring::worldgen::WorldSim;
+
 use super::server_thread::ThreadLink;
-use super::single_player::{self, Character, Link, Sim};
+use super::single_player::{self, Character, Link, LocalSeams, Sim, World};
 use crate::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 
 /// The base stats saved from the live player (`formats/d2s.md` §7:
@@ -140,10 +147,15 @@ fn fresh(class: u8, name: &[u8], difficulty: u8) -> D2s {
     };
     // Town per difficulty: act 0 of the current one (§2.5).
     header.towns[usize::from(difficulty).min(2)] = 0x80;
+    // §1 rule 2, §8.4 rule 4, §8.5 rule 3: an expansion game's file always
+    // ends `6A 66 6B 66 00` when there is no hireling and no golem.
+    let expansion = header.status & d2s::status::EXPANSION != 0;
     D2s {
         header,
         body: Some(Body {
             skills: vec![0; usize::from(header_skill_count())],
+            hireling_items: expansion.then_some(None),
+            golem: expansion.then(d2s::Golem::default),
             ..Body::default()
         }),
     }
@@ -158,6 +170,9 @@ fn now_secs() -> u32 {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as u32)
 }
+
+/// One NPC bit field per difficulty (`formats/d2s.md` §6).
+pub type NpcField = [[u8; 8]; 3];
 
 /// What the running game says about the player at save time.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -175,6 +190,17 @@ pub struct Live {
     pub hardcore_dead: bool,
     /// The character is hardcore.
     pub hardcore: bool,
+    /// The status bits the game set on the player's client
+    /// (`ClientEntry::status_set`, `formats/d2s.md` §2.3: 0x08 at every
+    /// death start, softcore too); the save ORs them in.
+    pub status_set: u16,
+    /// The game's map seed (game +0x7C, the DRLG init seed of act 0:
+    /// `formats/d2s.md` §2.1 +0xAB); `None`: no DRLG (synthetic data).
+    pub map_seed: Option<u32>,
+    /// The NPC fields A (first talk) and B (introduced) per difficulty
+    /// (`formats/d2s.md` §6, `PlayerQuests::first_talk` / `intro`);
+    /// `None`: no quest record for the player.
+    pub npcs: Option<(NpcField, NpcField)>,
 }
 
 /// Reads [`Live`] from the game's local player.
@@ -192,6 +218,12 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
     if stats.iter().any(|&(id, v)| id == LEVEL_STAT && v <= 0) {
         stats.clear();
     }
+    let npcs = sim
+        .world
+        .rest
+        .quests
+        .get(&player)
+        .map(|q| (q.first_talk, [0, 1, 2].map(|d| q.intro_bits(d))));
     let quests = sim.world.rest.quests.get(&player).map(|q| {
         let mut out = [[0u8; 96]; 3];
         for (rec, f) in out.iter_mut().zip(&q.flags) {
@@ -210,13 +242,35 @@ pub fn read_live(sim: &mut Sim) -> Result<Live, SaveError> {
         .units
         .get(player)
         .is_some_and(|u| u.mode == 0 || u.mode == 17);
+    let status_set = sim
+        .game
+        .lists
+        .clients()
+        .into_iter()
+        .filter_map(|c| sim.game.lists.client(c))
+        .filter(|e| e.player == Some(player))
+        .fold(0, |a, e| a | e.status_set);
+    let map_seed = sim
+        .events
+        .action
+        .sys
+        .hooks
+        .drlg
+        .dungeon
+        .acts
+        .first()
+        .and_then(Option::as_ref)
+        .map(|d| d.init_seed);
     Ok(Live {
+        npcs,
+        map_seed,
         stats,
         quests,
         extra,
         gaps,
         hardcore,
         hardcore_dead: hardcore && down,
+        status_set,
     })
 }
 
@@ -252,6 +306,11 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     if let Some(records) = &live.quests {
         body.quests.records = *records;
     }
+    // §6 rule 1: the writer copies A and B of each difficulty.
+    if let Some((a, b)) = live.npcs {
+        body.npcs.a = a;
+        body.npcs.b = b;
+    }
     super::save_full::apply_extra(body, &live.extra);
     super::save_gaps::apply_gaps(&mut save, &live.gaps);
     if let Some(&(_, level)) = live.stats.iter().find(|s| s.0 == LEVEL_STAT) {
@@ -262,9 +321,29 @@ pub fn apply_live(base: &D2s, live: &Live, now: u32) -> D2s {
     if live.hardcore {
         save.header.status |= d2s::status::HARDCORE;
     }
+    // The client word's bits set in game (§2.3: the writer copies the
+    // client word, which no code clears).
+    save.header.status |= live.status_set;
+    // +0xAB is game +0x7C (§2.1): the seed the game was built with.
+    if let Some(seed) = live.map_seed {
+        save.header.map_seed = seed;
+    }
     super::hardcore::mark_dead(&mut save, live.hardcore, live.hardcore_dead);
-    if save.header.create_time == 0 {
-        save.header.create_time = now;
+    // +0x2C stays as loaded: the game never sets the create time, so every
+    // game-written save holds 0 there (§2.2 rule 10, edge case 11).
+    // §1 r6, §2.1, §7.1 r7: the game writes only 0x60, with the bit-field
+    // stats; a loaded 0x5C–0x5E file is upgraded (its item records are
+    // the sim's 1.14d ones, or [`FileStore`] refuses the save,
+    // [`old_items_pass_through`]).
+    if save.header.version < d2s::VERSION {
+        save.header.version = d2s::VERSION;
+        if let Some(body) = save.body.as_mut() {
+            if let Stats::Mask { .. } = body.stats {
+                let mut entries = body.stats.entries();
+                entries.sort_by_key(|e| (e.id, e.layer));
+                body.stats = Stats::Bits(entries);
+            }
+        }
     }
     save.header.save_time = now;
     save
@@ -333,8 +412,59 @@ impl<C: d2_server::seams::Clock + Send + 'static> ServerLink for SharedLink<C> {
     }
 }
 
-/// The save of the running game, callable from the app (a menu, the
-/// window close). Cloning shares the same game and file.
+/// The server's character writer of the app's game (`d2-server`
+/// `adapters::storage`): the server runs it in the leave of C→S 0x69
+/// before S→C 0x05 and every 8192 frames (`flows/save-exit.md` §2 r2,
+/// §3 r1); it reads the running game ([`read_live`]), lays it over
+/// `base` ([`apply_live`]) and writes `path` ([`write_file`]).
+pub struct FileStore {
+    pub path: PathBuf,
+    pub base: D2s,
+    pub tables: Arc<dyn SaveTables + Send + Sync>,
+}
+
+/// Whether a save of `base` (a loaded file) with `live` would carry item
+/// records as loaded: a list the running game cannot read back (no
+/// inventory model, no hireling or golem unit) passes through. For a
+/// 0x5C–0x5E file those records are in the old bit layout
+/// (`items/bitstream-legacy.md`) and cannot sit under the 0x60 header the
+/// writer gives the file (`formats/d2s.md` §1 r6).
+pub fn old_items_pass_through(base: &D2s, live: &Live) -> bool {
+    let Some(b) = &base.body else {
+        return false;
+    };
+    (live.extra.items.is_none() && !b.items.is_empty())
+        || (live.extra.corpses.is_none() && b.corpses.iter().any(|c| !c.items.is_empty()))
+        || (live.gaps.hireling_items.is_none()
+            && matches!(&b.hireling_items, Some(Some(v)) if !v.is_empty()))
+        || (live.gaps.golem.is_none() && b.golem.as_ref().is_some_and(|g| g.item.is_some()))
+}
+
+impl CharacterStore<WorldSim<LocalSeams>, World> for FileStore {
+    fn save(&mut self, sim: &mut Sim, _client: ClientId) -> Result<(), String> {
+        let live = read_live(sim).map_err(|e| e.to_string())?;
+        // A 0x5C–0x5E file whose item records would pass through as
+        // loaded is not overwritten (the file and its `.bak` stay).
+        if self.base.header.version < d2s::VERSION && old_items_pass_through(&self.base, &live) {
+            return Err(format!(
+                "{}: a version {:#x} save whose items the game cannot rewrite is not overwritten",
+                self.path.display(),
+                self.base.header.version
+            ));
+        }
+        write_file(
+            &self.path,
+            &apply_live(&self.base, &live, now_secs()),
+            &*self.tables,
+        )
+        .map_err(|e| e.to_string())
+    }
+}
+
+/// A save the app asks of the running game (the death saves,
+/// [`super::hardcore`]): the server's `0x0052CA10` with its installed
+/// [`FileStore`], run on the server thread between frames. Cloning
+/// shares the same game and file.
 #[derive(Clone, Resource)]
 pub struct SaveHandle {
     path: PathBuf,
@@ -353,36 +483,70 @@ impl SaveHandle {
     }
 }
 
-/// `link` shared with a [`SaveHandle`] that writes `path` with `base`
-/// ([`base_save`]) and the `tables` of the game.
+/// Installs a [`FileStore`] that writes `path` with `base`
+/// ([`base_save`]) and the `tables` of the game as the server's character
+/// storage, and shares `link` with a [`SaveHandle`] over it.
 pub fn share<C: d2_server::seams::Clock + Send + 'static>(
-    link: ThreadLink<Link<C>>,
+    mut link: ThreadLink<Link<C>>,
     base: D2s,
     tables: Arc<dyn SaveTables + Send + Sync>,
     path: PathBuf,
-) -> (SharedLink<C>, SaveHandle) {
+) -> Result<(SharedLink<C>, SaveHandle), SaveError> {
+    let store = FileStore {
+        path: path.clone(),
+        base,
+        tables,
+    };
+    link.with(move |l| l.host_mut().game.set_storage(Box::new(store)))
+        .map_err(|e| SaveError::Server(e.to_string()))?;
     let shared = Arc::new(Mutex::new(link));
     let handle = shared.clone();
-    let file = path.clone();
     let save = move || {
-        let live = {
-            let mut link = handle.lock().unwrap_or_else(|e| e.into_inner());
-            link.with(|l| read_live(&mut l.host_mut().game))
-                .map_err(|e| SaveError::Server(e.to_string()))??
-        };
-        write_file(&file, &apply_live(&base, &live, now_secs()), &*tables)
+        let mut link = handle.lock().unwrap_or_else(|e| e.into_inner());
+        let saved = link
+            .with(|l| l.host_mut().game.save_characters())
+            .map_err(|e| SaveError::Server(e.to_string()))?;
+        match saved.into_iter().next() {
+            None => Err(SaveError::NoPlayer),
+            Some((_, r)) => r.map_err(|e| SaveError::Server(e.to_string())),
+        }
     };
-    (
+    Ok((
         SharedLink(shared),
         SaveHandle {
             path,
             save: Arc::new(save),
         },
-    )
+    ))
 }
 
-/// The Esc game menu's hook (stitch-hud): closes the game; `play::run`
-/// saves the character when the app has stopped, on every way out.
-pub fn request_save_and_exit(exit: &mut MessageWriter<AppExit>) {
-    exit.write(AppExit::Success);
+/// The Esc game menu's Save and Exit Game (`flows/save-exit.md` §1 r2):
+/// C→S 0x69 on the system queue and the model's `exit_requested`. The
+/// server saves and answers 0x05, 0x06; [`end_of_game`] then closes the
+/// app.
+pub fn request_save_and_exit<L: ServerLink>(
+    bridge: &mut crate::bridge::Bridge<L>,
+) -> Result<(), crate::bridge::BridgeError> {
+    bridge.save_and_exit().map(|_| ())
+}
+
+/// The client's end of the game (`flows/save-exit.md` §4 r1): the
+/// server's 0x05 took the client out of the game (`in_game` false) and
+/// the exit is asked (0x06, or the Save and Exit send): the app closes.
+/// PROVISIONAL (`ui/frontend-menus.md` §F1.3, REC-200): the original
+/// returns to character select; `play` has no front end around the game
+/// yet, so it ends.
+pub fn end_of_game(
+    bridge: Option<bevy::prelude::Res<crate::bridge::BridgeResource>>,
+    mut exit: MessageWriter<AppExit>,
+    mut done: bevy::prelude::Local<bool>,
+) {
+    let Some(b) = bridge else {
+        return;
+    };
+    let w = b.0.world();
+    if !*done && w.exit_requested && !w.in_game {
+        *done = true;
+        exit.write(AppExit::Success);
+    }
 }

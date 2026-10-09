@@ -312,7 +312,7 @@ fn game_start<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, args: 
         (r.status, r.state) = (1, 2);
     } else {
         let d = usize::from(w.difficulty());
-        let heard = w.quests(p).is_some_and(|q| q.intro[d].contains(&MALAH));
+        let heard = w.quests(p).is_some_and(|q| q.heard(d, MALAH));
         let r = &mut ctl.records[i];
         if heard && r.state == 0 && r.not_intro {
             r.state = 1;

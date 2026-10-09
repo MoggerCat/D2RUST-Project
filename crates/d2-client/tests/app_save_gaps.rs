@@ -74,6 +74,7 @@ fn gaps_round_trip_through_a_written_file() {
             Slot::encode(59, false, 2).unwrap(),
         ]),
         town: Some((1, 3)),
+        hotkeys: None,
         hireling_items: Some(vec![item(1), item(2)]),
         golem: Some(Some(item(7))),
         swap: Some((
@@ -173,7 +174,9 @@ fn mouse_skills_select_with_their_item() {
         ..SkillList::default()
     };
     let slots = mouse_slots(&list, &guids);
-    assert_eq!(slots[0], Slot::encode(36, true, 2).unwrap());
+    // No 0x8000 left flag on a mouse word (§2.4 rule 3).
+    assert_eq!(slots[0], Slot::encode(36, false, 2).unwrap());
+    assert_eq!(slots[0].code, 36);
     assert_eq!(slots[1], Slot::encode(59, false, 0).unwrap());
     // The loaded list starts with nothing selected.
     let (l, r) = (list.left.take(), list.right.take());
@@ -265,9 +268,121 @@ fn weapon_switch_trades_the_mouse_pairs() {
     assert_eq!((list.left, list.right), (Some(1), Some(2)));
     assert_eq!((list.swap_left, list.swap_right), (Some(0), Some(1)));
     let swap = d2_client::app::save_gaps::swap_slots(&list, &[500]);
-    assert_eq!(swap[0], Slot::encode(36, true, 0).unwrap());
+    assert_eq!(swap[0], Slot::encode(36, false, 0).unwrap());
     assert_eq!(swap[1], Slot::encode(37, false, 0).unwrap());
     list.switch_weapons();
     assert!(!list.weapon_switch);
     assert_eq!(list.left, Some(0));
+}
+
+/// The bytes of a written mouse pair (§2.4 rule 3, test vectors): the left
+/// skill 36 on a native entry is `24 00 00 00` at +0x78 (no 0x8000 flag),
+/// the swap pair (36 left, 0 right) with the switch byte set is
+/// `24 00 00 00` / `00 00 00 00` at +0x80 / +0x84 and `01 00 00 00` at +0x10.
+// Covers: specs/formats/d2s.md §2.4 r3
+#[test]
+fn mouse_words_have_no_left_flag_in_the_file() {
+    let list = SkillList {
+        entries: vec![entry(0, -1), entry(36, -1)],
+        left: Some(1),
+        right: Some(0),
+        swap_left: Some(1),
+        swap_right: Some(0),
+        weapon_switch: true,
+        ..SkillList::default()
+    };
+    let mut save = base();
+    let gaps = Gaps {
+        mouse: Some(mouse_slots(&list, &[])),
+        swap: Some((d2_client::app::save_gaps::swap_slots(&list, &[]), true)),
+        ..Gaps::default()
+    };
+    apply_gaps(&mut save, &gaps);
+    let b = save.header.to_bytes();
+    assert_eq!(&b[0x78..0x7C], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x7C..0x80], &[0, 0, 0, 0]);
+    assert_eq!(&b[0x80..0x84], &[0x24, 0, 0, 0]);
+    assert_eq!(&b[0x84..0x88], &[0, 0, 0, 0]);
+    assert_eq!(&b[0x10..0x14], &[1, 0, 0, 0]);
+}
+
+/// A hireling block without a readable item list saves the empty list
+/// (`jf` cannot be omitted while `kf` follows); with the bare marker the
+/// loader would take the next marker for the list (22). A list without a block is
+/// dropped to the marker alone (§8.4 rule 2).
+// Covers: specs/formats/d2s.md §8.4 r2
+#[test]
+fn jf_and_the_hireling_block_agree() {
+    let t = Tables;
+    let o = ReadOptions {
+        expansion: true,
+        game: None,
+    };
+    let mut save = base();
+    save.body.as_mut().unwrap().hireling_items = Some(None);
+    apply_gaps(&mut save, &Gaps::default());
+    assert_eq!(
+        save.body.as_ref().unwrap().hireling_items,
+        Some(Some(vec![]))
+    );
+    let f = d2s::write(&save, &t).unwrap();
+    assert!(d2s::read(&f, &o, &t).is_ok());
+
+    let mut save = base();
+    save.header.hireling = Hireling::default();
+    save.body.as_mut().unwrap().hireling_items = Some(Some(vec![item(1)]));
+    apply_gaps(&mut save, &Gaps::default());
+    assert_eq!(save.body.as_ref().unwrap().hireling_items, Some(None));
+    let f = d2s::write(&save, &t).unwrap();
+    assert!(d2s::read(&f, &o, &t).is_ok());
+}
+
+/// §2.4 rules 1, 2, 4, 6.1: a hot key's item GUID is saved as its
+/// 1-based inventory position and loaded back as the GUID at that
+/// position; no item, an unknown GUID or a position past the end is
+/// "no item".
+// Covers: specs/formats/d2s.md §2.4 r1, §2.4 r2, §2.4 r4, §2.4 r6
+#[test]
+fn hotkey_items_are_saved_as_positions_and_loaded_as_guids() {
+    use d2_client::app::save_gaps::{hotkey_slots, loaded_hotkeys};
+    use d2_formats::d2s::Slot;
+    use d2_server::adapters::handlers::player::HotKey;
+    let guids = [40u32, 41, 42];
+    let mut keys = [HotKey::UNBOUND; 16];
+    keys[0] = HotKey {
+        skill: 36,
+        left: false,
+        item: 42,
+    };
+    keys[1] = HotKey {
+        skill: 7,
+        left: true,
+        item: u32::MAX,
+    };
+    keys[2] = HotKey {
+        skill: 9,
+        left: false,
+        item: 99,
+    };
+    let slots = hotkey_slots(&keys, &guids);
+    assert_eq!(slots[0], Slot { code: 36, item: 3 });
+    assert_eq!(
+        slots[1],
+        Slot {
+            code: 0x8007,
+            item: 0
+        }
+    );
+    assert_eq!(slots[2], Slot { code: 9, item: 0 });
+    assert_eq!(slots[3], Slot::NONE);
+    let back = loaded_hotkeys(&slots, &guids);
+    assert_eq!((back[0].skill, back[0].flag, back[0].item), (36, false, 42));
+    assert_eq!(
+        (back[1].skill, back[1].flag, back[1].item),
+        (7, true, u32::MAX)
+    );
+    assert_eq!(back[3].skill, -1);
+    // An index past the loaded list resolves to −1.
+    let past = loaded_hotkeys(&[Slot { code: 5, item: 4 }; 16], &guids);
+    assert_eq!(past[0].item, u32::MAX);
 }

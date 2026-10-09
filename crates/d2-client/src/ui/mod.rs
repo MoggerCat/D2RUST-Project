@@ -28,8 +28,11 @@ pub mod hire_list;
 pub mod imbue_ui;
 pub mod inv_grid;
 pub mod item_tip;
+pub mod item_tip_build;
 pub mod item_tip_desc;
+pub mod item_tip_props;
 pub mod item_tip_set;
+pub mod item_tip_world;
 pub mod layout;
 pub mod messages;
 pub mod npc_menu_ui;
@@ -55,7 +58,10 @@ mod tests_c2ui;
 #[cfg(test)]
 mod tests_fdesc;
 
-pub use draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
+pub use draw::{
+    CelLook, ImageRef, ImageRequest, RectRequest, Remap, TextRequest, TextStyle, UiDraw,
+    UiDrawSink, DRAW_MODE_OPAQUE,
+};
 pub use frame::{FrameError, FramePos, Presentation};
 pub use geom::{Point, Rect, FRAME, FRAME_H, FRAME_W};
 pub use panel::{

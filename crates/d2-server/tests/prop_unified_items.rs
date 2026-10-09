@@ -250,6 +250,7 @@ fn tile(orientation: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 
@@ -758,7 +759,6 @@ impl VendorRest for Rest {
     }
     fn recharge(&mut self, _: UnitId) {}
     fn repair_broken(&mut self, _: UnitId) {}
-    fn send_item_stat(&mut self, _: UnitId, _: UnitId, _: u16) {}
     fn send_transaction(&mut self, p: UnitId, t: Transaction) {
         let m = npc::transaction(t.kind, t.code, t.guid, t.gold as u32);
         self.sent.push((p, m.to_vec()));

@@ -1,4 +1,4 @@
-// Spec: specs/render/draw-order.md (§3, §8, §9), specs/drlg/rooms.md (§6, §9.3), specs/drlg/levels.md (§11.3 step 9, §11.4), specs/sim/unit-order.md (§5 rules 6–8)
+// Spec: specs/render/draw-order.md (§3, §5, §8, §9), specs/render/draw-order-2.md (§14), specs/drlg/rooms.md (§6, §9.3), specs/drlg/levels.md (§11.3 step 9, §11.4), specs/sim/unit-order.md (§5 rules 6–8)
 //! The §9 map-tile feed of `draw-order.md` from the client DRLG: the
 //! near-room array of the local player's active room (its adjacency array,
 //! `rooms.md` §6), per room the tile rectangle, sub-tile origin, the three
@@ -9,7 +9,10 @@
 //!
 //! The draw writes record flags (0x20000, the fade bits) and fade bytes
 //! back into the records, where they persist between frames: [`MapState`]
-//! keeps them per (room, array, record) while the room stays active. The
+//! keeps them per (room, array, record) while the room stays active, and
+//! the units' flag 0x10000000 and flag-ex 0x80 per unit while it lives
+//! (`draw-order.md` §5 r3: the sight test of frame N gates the shadow
+//! entry of frame N + 1). The
 //! fill's Y sort of each room's unit list (`unit-order.md` §5 rule 7)
 //! persists in the client's list: [`MapState::take_unit_orders`] hands
 //! the sorted orders to the bridge.
@@ -21,7 +24,7 @@ use crate::bridge::world::{ClientWorld, LevelRow, UnitKey};
 use crate::bridge::ClientUnit;
 use crate::rules::draw_order::{
     Dt1Facts, Fade, LevelFacts, Logical, NearRooms, Room, RoomUnit, TileArray, TileRecord,
-    TileRect, UnitFacts,
+    TileRect, UnitFacts, UNIT_DRAWN, UNIT_EX_VISIBLE,
 };
 
 use super::ViewError;
@@ -49,6 +52,17 @@ pub struct MapState {
     /// DT1 entry.
     entries: Vec<[Vec<Dt1Entry>; 3]>,
     draw: BTreeMap<(DrlgRoomId, u8, usize), DrawState>,
+    /// The client DRLG the draw state belongs to: its act and init seed
+    /// ([`Self::drlg_key`]). Room slots are reused by a new act's DRLG,
+    /// so a change drops the draw state (`seams/bridge-app.md` §2.10).
+    drlg: Option<(u8, u32)>,
+    /// The unit bits the order writes and the next frame reads
+    /// (`draw-order.md` §5 r3, r4): flag 0x10000000 and flag-ex 0x80 of
+    /// each unit, as the last frame left them.
+    unit_draw: BTreeMap<UnitKey, (u32, u32)>,
+    /// The DT1 entry of the act's edge floor record (`draw-order-2.md`
+    /// §14), `None` in acts IV and V.
+    edge: Option<Dt1Entry>,
 }
 
 fn array_slot(a: TileArray) -> u8 {
@@ -56,6 +70,7 @@ fn array_slot(a: TileArray) -> u8 {
         TileArray::Wall => 0,
         TileArray::Floor => 1,
         TileArray::Shadow => 2,
+        TileArray::Edge => 3,
     }
 }
 
@@ -78,6 +93,14 @@ impl MapState {
         facts: impl Fn(&ClientUnit) -> Result<UnitFacts, ViewError>,
     ) -> Result<Option<&mut NearRooms>, ViewError> {
         if self.stamp != Some(world.frames) {
+            let key = Self::drlg_key(world);
+            if key != self.drlg {
+                // A new client DRLG (an act change, 0x03): the old act's
+                // records are freed with it, their flags and fades too.
+                self.near = None;
+                self.draw.clear();
+                self.drlg = key;
+            }
             self.save();
             self.rebuild(world, levels, facts)?;
             self.stamp = Some(world.frames);
@@ -85,8 +108,16 @@ impl MapState {
         Ok(self.near.as_mut())
     }
 
+    /// The identity of the model's client DRLG: (act, init seed).
+    fn drlg_key(world: &ClientWorld) -> Option<(u8, u32)> {
+        world.drlg.as_ref().map(|d| (d.drlg.act, d.drlg.init_seed))
+    }
+
     /// The DT1 entry of a record of near room `room`.
     pub fn entry(&self, room: usize, array: TileArray, record: usize) -> Option<&Dt1Entry> {
+        if array == TileArray::Edge {
+            return self.edge.as_ref();
+        }
         self.entries
             .get(room)?
             .get(usize::from(array_slot(array)))?
@@ -114,12 +145,22 @@ impl MapState {
         out
     }
 
-    /// Keeps the last frame's record flags and fades.
+    /// Keeps the last frame's record flags and fades, and the units' draw
+    /// bits.
     fn save(&mut self) {
         let Some(near) = &self.near else {
             return;
         };
         for (ri, room) in near.rooms.iter().enumerate() {
+            for u in &room.units {
+                self.unit_draw.insert(
+                    u.key,
+                    (
+                        u.facts.flags & UNIT_DRAWN,
+                        u.facts.flag_ex & UNIT_EX_VISIBLE,
+                    ),
+                );
+            }
             let id = self.rooms[ri];
             for (array, recs) in [
                 (TileArray::Wall, &room.walls),
@@ -143,10 +184,13 @@ impl MapState {
         self.near = None;
         self.rooms.clear();
         self.entries.clear();
+        self.edge = None;
         let active = world.active_rooms.as_deref().unwrap_or(&[]);
         // A room no longer active has freed its records.
         self.draw
             .retain(|(id, _, _), _| active.iter().any(|a| a.room == *id));
+        // A freed unit's bits go with it.
+        self.unit_draw.retain(|k, _| world.units.contains_key(k));
         let (Some(cd), Some(own)) = (world.drlg.as_ref(), world.local_room().copied()) else {
             return Ok(());
         };
@@ -205,6 +249,7 @@ impl MapState {
                                 roof_height: i32::from(info.roof_height),
                                 height: info.height,
                                 material: info.material,
+                                light_direction: info.light_direction,
                             },
                             fade,
                             logical,
@@ -215,7 +260,7 @@ impl MapState {
                     match array {
                         TileArray::Wall => room.walls = out,
                         TileArray::Floor => room.floors = out,
-                        TileArray::Shadow => room.shadows = out,
+                        TileArray::Shadow | TileArray::Edge => room.shadows = out,
                     }
                 }
             }
@@ -226,10 +271,14 @@ impl MapState {
                         format!("unit {key:?} listed but not in the model"),
                     )
                 })?;
-                room.units.push(RoomUnit {
-                    key,
-                    facts: facts(unit)?,
-                });
+                let mut f = facts(unit)?;
+                // `draw-order.md` §5 r3, r4: the bits of the last frame's
+                // draw (the sight test's 0x80 gates this frame's shadow).
+                if let Some(&(flags, ex)) = self.unit_draw.get(&key) {
+                    f.flags = f.flags & !UNIT_DRAWN | flags;
+                    f.flag_ex = f.flag_ex & !UNIT_EX_VISIBLE | ex;
+                }
+                room.units.push(RoomUnit { key, facts: f });
             }
             rooms.push(room);
             self.rooms.push(id);
@@ -238,7 +287,8 @@ impl MapState {
         // `[0x007C8A08]` / `[0x007C8A10]`: the player's path sub-tile / 5;
         // `[0x007C8A0C]`: `0x0061B130` (`levels.md` §11.4) from the
         // player's room: none → 0, else the record index at the point.
-        let (sx, sy) = world.local().map_or((0, 0), ClientUnit::cell);
+        // The local player's own cell (`seams/world-screen.md` §2.2).
+        let (sx, sy) = world.local_cell().unwrap_or((0, 0));
         let (sx, sy) = (i32::from(sx), i32::from(sy));
         let player_logical = match world.cell_lookup(&own, sx, sy) {
             None => 0,
@@ -253,9 +303,38 @@ impl MapState {
                     format!("level {} past the Levels rows", own.level),
                 )
             })?;
+        // The act's edge floor record (`draw-order-2.md` §14, open question
+        // 2): its lookup failing matters only to a level that draws edges.
+        let edge = match cd.edge_tile() {
+            Ok(t) => t,
+            Err(m) if row.draw_edges => return Err(unresolved("act edge record", m)),
+            Err(_) => None,
+        };
+        let edge = edge.map(|t| {
+            self.edge = Some((t.path, t.index));
+            // Filled at position 0 from a zeroed record (`0x0066DDE0`).
+            TileRecord {
+                tile: (0, 0),
+                flags: 0,
+                ty: 0,
+                dt1: Dt1Facts {
+                    orientation: t.info.orientation,
+                    main: t.info.main,
+                    sub: t.info.sub,
+                    roof_height: i32::from(t.info.roof_height),
+                    height: t.info.height,
+                    material: t.info.material,
+                    light_direction: t.info.light_direction,
+                },
+                fade: Fade::OPAQUE,
+                logical: None,
+            }
+        });
         self.near = Some(NearRooms {
             rooms,
             player_tile: (sx / 5, sy / 5),
+            player_subtile: (sx, sy),
+            edge,
             player_logical,
             level: LevelFacts {
                 id: u32::from(own.level),

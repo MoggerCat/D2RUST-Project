@@ -262,8 +262,8 @@ impl ShopPanel {
             .collect()
     }
 
-    /// Closing the shop ends the interaction: C→S 0x30 with the NPC GUID
-    /// (§14.5, `0x004B3C20`).
+    /// Closing the shop ends the interaction: C→S 0x30 `[u32 1][u32 G]`
+    /// (§14.5, `0x004B3C20`; `client/model.md` §17 r1 step 5).
     pub fn close_intent(&self) -> Vec<PanelOutput> {
         vec![PanelOutput::Intent(ClientIntent(
             super::npc::msg_chat_end(self.npc_guid).to_vec(),
@@ -789,6 +789,7 @@ mod tests {
                     D::I(t.files.name(file).unwrap().into(), frame, i.at.x, i.at.y)
                 }
                 UiDraw::Text(x) => D::T(x.text, x.at.x, x.at.y, x.style.font, x.style.color),
+                UiDraw::Rect(r) => panic!("rectangle {r:?}"),
             })
             .collect()
     }

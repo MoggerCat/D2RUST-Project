@@ -143,10 +143,6 @@ impl Pending for Open {
     fn item_stackable(&self, item: UnitId) -> bool {
         self.stackable.contains(&item)
     }
-    fn send_item_stat(&mut self, unit: UnitId, item: UnitId, stat: u16, value: i32) {
-        self.log
-            .push(format!("0x3E {} {} {stat} {value}", unit.0, item.0));
-    }
     fn set_ai_state(&mut self, unit: UnitId, k: i32) {
         self.log.push(format!("ai {} {k}", unit.0));
     }
@@ -328,6 +324,7 @@ fn tile(o: u32, main: u32, sub: u32, rarity: u32) -> TileInfo {
         subtile_flags: [0; 25],
         roof_height: 0,
         height: 0,
+        light_direction: 0,
     }
 }
 

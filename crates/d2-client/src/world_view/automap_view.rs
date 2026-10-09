@@ -52,6 +52,12 @@ pub struct AutomapView {
 }
 
 impl AutomapView {
+    /// The option store the key commands write (`ui/controls.md` §3
+    /// cmds 9–11, 45).
+    pub fn store_mut(&mut self) -> &mut MemoryStore {
+        &mut self.store
+    }
+
     pub fn new(source: Arc<dyn FileSource>, expansion: bool) -> Self {
         AutomapView {
             source,
@@ -140,15 +146,14 @@ impl AutomapView {
         if !session.open || world.act.is_none() {
             return log;
         }
-        let pos = player.position.unwrap_or((0, 0));
-        let at = moving_to_client(
-            (u32::from(pos.0) << 16) | 0x8000,
-            (u32::from(pos.1) << 16) | 0x8000,
-        );
-        let cam = crate::rules::camera::Camera::new(FrameSize::D2RS, open_mode, at, (0, 0));
+        // The local player's one position of the frame
+        // (`seams/world-screen.md` §2.2).
+        let (x16, y16) = world.local_position().unwrap_or((0x8000, 0x8000));
+        let at = moving_to_client(x16, y16);
+        let cam = crate::rules::camera::Camera::new(FrameSize::play(), open_mode, at, (0, 0));
         let facts = FrameFacts {
-            width: FrameSize::D2RS.width,
-            height: FrameSize::D2RS.height,
+            width: FrameSize::play().width,
+            height: FrameSize::play().height,
             open_mode: open_mode.get(),
             mini_down: false,
             unit_origin: cam.unit,

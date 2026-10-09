@@ -45,8 +45,9 @@ fn npc_menu_opens_a_real_store_and_buy_pays_real_gold() {
     assert_ne!(it.flags & flag::IDENTIFIED, 0);
     assert_ne!(w.units.get(item).unwrap().flags2 & unit_flag::VENDOR, 0);
     assert_eq!(w.rest.store, [(class::AKARA, item)]);
-    // §3.1 rule 4's repair needs an identified item (§9.2 rule 0) and
-    // rule 5 identifies it afterwards: the created durability stays.
+    // §3.1 rule 4's repair needs an identified item (§9.2 rule 0): the
+    // creation `0x00559CE0` identifies it (`generation.md` §10.2); the
+    // new cap is already at full durability.
     let max = w.stat(item, st::MAXDURABILITY);
     assert_eq!(max, 12);
     // The price from the item's real fields and stats (§9.2).
@@ -101,6 +102,31 @@ fn npc_menu_opens_a_real_store_and_buy_pays_real_gold() {
         w.rest.transactions.last().unwrap().1.code,
         npc_code::NO_GOLD
     );
+    w.assert_clean();
+}
+
+// Covers: specs/world/vendors.md §3.1 r2, §5.1 r7; specs/items/generation.md §10.2
+#[test]
+fn store_item_creation_is_never_ethereal_and_identified() {
+    use crate::world::vendors::VendorWorld;
+    // An expansion game: the ethereal roll runs for item format >= 100.
+    let mut w = World::new(true);
+    w.rest.item_format = 101;
+    let npc = w.npc(class::AKARA);
+    // `0x00559CE0` called with never-ethereal 1 (request flags2 0x02): no
+    // store or gamble item is ethereal; on success item flag 0x10.
+    for _ in 0..200 {
+        let item = w
+            .desk(|d, _| {
+                let mut v = d.vendors(None);
+                v.npc = Some(npc);
+                VendorWorld::create_item(&mut v, class::AKARA, CAP, q::NORMAL, 6)
+            })
+            .expect("cap created");
+        let f = w.items.get(item).unwrap().flags;
+        assert_eq!(f & flag::ETHEREAL, 0, "store item ethereal");
+        assert_ne!(f & flag::IDENTIFIED, 0, "store item not identified");
+    }
     w.assert_clean();
 }
 

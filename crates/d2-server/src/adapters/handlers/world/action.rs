@@ -272,7 +272,13 @@ where
             return None;
         }
         let act = game.lists.room(e.room()?)?.act;
-        let (x, y) = events.action().hooks().path_position(unit);
+        // A unit without a path reads (0, 0): not a position (the tick's
+        // `unit_positions` skips it the same way).
+        let hooks = events.action().hooks();
+        if !hooks.path_has(unit) {
+            return None;
+        }
+        let (x, y) = hooks.path_position(unit);
         Some(crate::adapters::UnitFacts {
             act,
             pos: crate::seams::Pos { x, y },

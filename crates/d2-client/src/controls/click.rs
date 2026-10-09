@@ -168,6 +168,16 @@ impl ClickState {
     pub fn end_pass(&mut self) {
         self.latch = false;
     }
+
+    /// The input reset `0x0044DA40` (`client/msg-ui.md` §2 r2.2): left
+    /// and right held := 0, so no held repeat follows (the button states
+    /// `[0x0070F234]` / `[0x0070F2BC]` := up are the edge's; the hover
+    /// clear `0x00466FE0` and `[0x007A066C]`, `[0x007A0670]` are not
+    /// modelled).
+    pub fn input_reset(&mut self) {
+        self.left_held = false;
+        self.right_held = false;
+    }
 }
 
 /// The click record `C` (§6 r2).

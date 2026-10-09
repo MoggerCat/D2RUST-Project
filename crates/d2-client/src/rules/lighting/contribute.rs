@@ -323,14 +323,23 @@ pub fn cached(
         rec.cache = build_cache(rec, sub, |x, y| world.owner_blocks(&owner, x, y));
         rec.cache_valid = true;
     }
+    cached_contribution(map, rec, colored);
+    Ok(())
+}
+
+/// §7.4 r2: §7.1 r2–r6 with `S` from a record's built cache (§7.4 r1,
+/// `cache_valid` set); nothing when §7.1 r1–r2 give nothing.
+pub fn cached_contribution(map: &mut LightMap, rec: &LightRecord, colored: bool) {
+    let r = rec.radius;
+    if !(1..=255).contains(&r) {
+        return;
+    }
     let Some(w) = window(map, rec.x, rec.y, r) else {
-        return Ok(());
+        return;
     };
     let side = 2 * (r >> 3) + 1;
-    let rec: &LightRecord = rec;
     spread(map, rec, r, w, colored, |j, i, b| {
         let s = rec.cache[(j * side + i) as usize];
         shaded_value(b, s)
     });
-    Ok(())
 }

@@ -94,6 +94,7 @@ pub(crate) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect
                 image: ImageRef { file, frame },
                 at: Point::new(x, y),
                 clip: Rect::new(x, y, cw as u16, ch as u16),
+                look: crate::ui::CelLook::PLAIN,
             }));
             x += w;
         }
@@ -242,8 +243,10 @@ impl Panel for EscMenuUi {
         }
         for ev in m.take_events() {
             match ev {
-                MenuEvent::CursorPass => {}
-                MenuEvent::CursorSelect => sh.outputs.push(PanelOutput::ClickSound),
+                // `sound-table-2.md` §15 r5, `triggers-2.md` §17: 1 at a
+                // choice / slider / arrow change, 2 at an action entry.
+                MenuEvent::CursorPass => sh.outputs.push(PanelOutput::Sound(1)),
+                MenuEvent::CursorSelect => sh.outputs.push(PanelOutput::Sound(2)),
                 MenuEvent::SaveAndExit => sh.esc.exit_requested = true,
                 MenuEvent::Close => sh.outputs.push(PanelOutput::SetUi {
                     ui: 9,

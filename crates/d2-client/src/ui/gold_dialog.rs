@@ -124,7 +124,7 @@ impl GoldDialogUi {
                     .push(PanelOutput::Intent(ClientIntent::from_message(
                         &ClickButton { button, p1, p2 },
                     )));
-                sh.outputs.push(PanelOutput::ClickSound);
+                sh.outputs.push(PanelOutput::Sound(0xDD));
             }
             _ => {}
         }
@@ -242,6 +242,7 @@ impl Panel for GoldDialogUi {
                         image: ImageRef { file, frame: DARK },
                         at: Point::new(x, y),
                         clip: Rect::new(x, y, cw as u16, ch as u16),
+                        look: crate::ui::CelLook::PLAIN,
                     }));
                     x += tw;
                 }

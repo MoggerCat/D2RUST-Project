@@ -157,7 +157,7 @@ pub const COLD_PLAINS: u32 = 3;
 /// init runs on arrival). d2rs-own, unverified (q-waypoint-travel).
 pub const STONY_FIELD: u32 = 4;
 /// The Den of Evil (act 0): the cave entrance in the Blood Moor is a
-/// level warp ([`BLOOD_MOOR_TO_DEN`] / [`DEN_TO_BLOOD_MOOR`]).
+/// level warp (its `lvlwarp` id is the `levels` row's `Warp` of the Den slot).
 pub const DEN_OF_EVIL: u32 = 8;
 pub const ACT2_TOWN: u32 = 40;
 /// Harrogath (act 4, the fifth act; `levels` row 109).
@@ -174,6 +174,31 @@ pub const PANDEMONIUM_FORTRESS: u32 = 103;
 pub const CATACOMBS_4: u32 = 37;
 /// The default game seed.
 pub const DEFAULT_SEED: u32 = 1234;
+
+/// The map seed the game is built with (game +0x7C; the DRLG seed of
+/// `sim/rng.md` §5.4). `fixed` is `play --seed N`, the fixed-seed switch
+/// (game +0x84 := 1): it wins. Otherwise a loaded save whose town byte
+/// for the game's difficulty has 0x80 gives its saved map seed
+/// (`formats/d2s.md` §2.2 rule 8, +0xAB). Otherwise [`DEFAULT_SEED`].
+/// PROVISIONAL (REC-291): 1.14d draws a fresh seed for a new character
+/// (`time_value`, `rng.md` §5.2); d2rs keeps the fixed default so dev
+/// runs and draw dumps stay reproducible. d2rs-own, unverified.
+pub fn game_seed(character: &Character, fixed: Option<u32>) -> u32 {
+    if let Some(n) = fixed {
+        return n;
+    }
+    match character {
+        Character::Save(save, ctx) => {
+            let t = save.header.towns[usize::from(ctx.difficulty).min(2)];
+            if t & 0x80 != 0 {
+                save.header.map_seed
+            } else {
+                DEFAULT_SEED
+            }
+        }
+        _ => DEFAULT_SEED,
+    }
+}
 /// Game +0x6A of a single-player game: 3 (`rng.md` §5 open question,
 /// answered: the client's create message carries 3, stored at +0x6A).
 pub const GAME_TYPE: u8 = 3;
@@ -1353,12 +1378,29 @@ pub fn client_object_names(data: &GameData) -> Vec<String> {
 
 /// The `Levels.txt` fields the client reads (`client/model.md` §11
 /// rules 3–4: `Pal`, `Act`, `BlankScreen`; `audio/environment.md` §1 r2:
-/// `SoundEnv`), one row per level id, from the game's `levels` table.
+/// `SoundEnv`), one row per level id, from the game's `levels` table,
+/// with the `leveldefs` ambient (`render/lighting.md` §3.1 r2).
 pub fn client_level_rows(data: &GameData) -> Vec<LevelRow> {
+    // `leveldefs` by level id (`render/lighting.md` §3.1 r2); a missing
+    // table or row reads no colour (the environment applies).
+    let GameData::Live(d) = data;
+    let defs = d
+        .tables
+        .rows::<d2_data::tables::Leveldefs>()
+        .unwrap_or_default();
     data.tables()
         .levels
         .iter()
-        .map(|l| LevelRow {
+        .enumerate()
+        .map(|(n, l)| LevelRow {
+            ambient: defs.get(n).map_or_else(Default::default, |d| {
+                crate::rules::lighting::environment::Ambient {
+                    i: d.intensity,
+                    r: d.red,
+                    g: d.green,
+                    b: d.blue,
+                }
+            }),
             pal: l.pal,
             act: l.act,
             blank_screen: l.blankscreen != 0,
@@ -1960,11 +2002,17 @@ fn loader(
                 (entry, PlayerQuests::default())
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
-                Ok((entry, report)) => {
+                Ok((mut entry, report)) => {
                     // q-save-full: the save's items, made on the wired host.
                     let items_ok = super::save_full::join_items(s, player, save);
                     let corpses_ok = super::save_full::join_corpses(s, player, save);
                     super::save_gaps::join_gaps(s, player, save);
+                    // `d2s.md` §2.4 rules 4–6: the hot keys, their item
+                    // indices resolved over the loaded inventory list.
+                    entry.hotkeys = super::save_gaps::loaded_hotkeys(
+                        &save.header.hotkeys,
+                        &s.world.item_guids(player),
+                    );
                     let log = &mut s.events.action.hooks().x.log;
                     log.extend(
                         report
@@ -1972,6 +2020,8 @@ fn loader(
                             .iter()
                             .filter(|u| !(items_ok && u.step == "items"))
                             .filter(|u| !(corpses_ok && u.step == "corpse"))
+                            // Applied below, with the quest record.
+                            .filter(|u| u.step != "npc fields")
                             .map(|u| format!("join: save load: {u:?}")),
                     );
                     // Load §2 quests row (`0x0056A370` → `0x0065C4D0`,
@@ -1985,6 +2035,12 @@ fn loader(
                                 Ok(f) => quests.flags[d] = f,
                                 Err(e) => log.push(format!("join: save load: quests {d}: {e}")),
                             }
+                        }
+                        // `d2s.md` §6 rule 1 (reader `0x0056A470`): fields A
+                        // and B back into the player's NPC record.
+                        quests.first_talk = body.npcs.a;
+                        for (d, &b) in body.npcs.b.iter().enumerate() {
+                            quests.set_intro_bits(d, b);
                         }
                     }
                     (entry, quests)
@@ -2083,6 +2139,32 @@ pub fn start_with<C: Clock + Send + 'static>(
 #[cfg(test)]
 mod new_character_tests {
     use super::*;
+
+    // Covers: specs/formats/d2s.md §2.2 r8
+    #[test]
+    fn the_map_seed_comes_from_the_switch_then_the_save() {
+        let saved = |town: u8, difficulty: u8| {
+            let mut s = d2_formats::d2s::D2s::new_stub(b"Seed", 1, 0x20, 0).unwrap();
+            s.header.map_seed = 0x2468_ACE0;
+            s.header.towns[usize::from(difficulty)] = town;
+            Character::Save(
+                Box::new(s),
+                LoadContext {
+                    difficulty,
+                    map_seed_applies: false,
+                },
+            )
+        };
+        // The town byte's 0x80 for the game's difficulty restores it.
+        assert_eq!(game_seed(&saved(0x80, 0), None), 0x2468_ACE0);
+        assert_eq!(game_seed(&saved(0x82, 2), None), 0x2468_ACE0);
+        // Without 0x80 (or on another difficulty): not restored.
+        assert_eq!(game_seed(&saved(0x00, 0), None), DEFAULT_SEED);
+        // `--seed N` (game +0x84 = 1) wins.
+        assert_eq!(game_seed(&saved(0x80, 0), Some(7)), 7);
+        assert_eq!(game_seed(&Character::New, None), DEFAULT_SEED);
+        assert_eq!(game_seed(&Character::New, Some(9)), 9);
+    }
 
     // Covers: specs/sim/intents-events.md §2.5 r1
     #[test]
