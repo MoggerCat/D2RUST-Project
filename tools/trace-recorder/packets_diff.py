@@ -4,7 +4,7 @@ frame and print the first divergence, then the next N, then a summary
 (specs/tools/packets-trace.md §3, specs/sim/intents-events.md §6).
 
     python3 packets_diff.py ORIG.packets.jsonl D2RS.packets.jsonl [--next 20]
-        [--streams c2s,s2c,buf] [--from F] [--to F] [--masks TSV]
+        [--streams c2s,s2c,buf] [--from F] [--to F] [--masks TSV] [--json FILE]
     python3 packets_diff.py --selftest
 
 Per frame window F (intents-events.md §6 rule 1: from the end of tick
@@ -396,6 +396,36 @@ def report(divs, summary, nm, masks, nxt, out=print):
     return 0
 
 
+VERDICTS = {0: "MATCH", 1: "DIVERGED", 2: "PARTIAL", 3: "ERROR"}
+
+
+def summary(divs, s, code):
+    """The machine-readable summary (`--json FILE`, format diff-summary-1;
+    specs/tools/scenario-diff.md §4): frame windows compared, windows with
+    no divergence in any stream, the verdict and the first divergence."""
+    bad = {d["window"] for d in divs}
+    first = None
+    if divs:
+        d = divs[0]
+        text = f"frame {d['window']} stream {d['stream']} #{d['index']} {d['where']}"
+        if "expected" in d:
+            text += f": 1.14d {d['expected']} vs d2rs {d['got']}"
+        m = d.get("a") or d.get("b")
+        if m and d["stream"] != "buf" and m["bytes"]:
+            text += f" (id {m['bytes'][0]:#04x})"
+        first = {"frame": d["window"], "text": text}
+    return {"format": "diff-summary-1", "channel": "packets", "tool": "packets_diff.py",
+            "code": code, "verdict": VERDICTS[code], "frames_compared": s["windows"],
+            "frames_equal": s["windows"] - len(bad), "records": s["records"],
+            "differences": len(divs), "first": first}
+
+
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
+        f.write("\n")
+
+
 # --- self-test ----------------------------------------------------------------
 
 def synthetic(frames=4):
@@ -464,7 +494,9 @@ def selftest():
     divs, s = diff(o, d, masks)
     assert not divs and report(divs, s, nm, masks, 0, quiet) == 0, divs
     assert s["masked"] > 0
-    ok, missed = 1, []
+    sm = summary(divs, s, 0)
+    assert (sm["frames_compared"], sm["frames_equal"], sm["first"]) == (4, 4, None), sm
+    ok, missed = 2, []
     # every byte of every message record of the d2rs side, perturbed
     for i, r in enumerate(d):
         if not r.get("bytes") or r["type"] not in ("c2s", "c2s_sys", "s2c", "net"):
@@ -503,11 +535,16 @@ def selftest():
             ("buf", lambda p: next(r for r in p if r["type"] == "net").update(size=7), "size")):
         p = copy.deepcopy(d)
         mutate(p)
-        divs, _ = diff(o, p, masks)
+        divs, s = diff(o, p, masks)
         if not divs or divs[0]["where"] != where:
             missed.append(f"{what}: {divs[:1]}")
         else:
             ok += 1
+            sm = summary(divs, s, 1)
+            bad = len({x["window"] for x in divs})
+            if sm["frames_equal"] != sm["frames_compared"] - bad or not sm["first"] \
+                    or sm["first"]["frame"] != divs[0]["window"] or bad < 1:
+                missed.append(f"{what}: summary {sm}")
     # the key of a keyed mask is compared, and its row then does not apply
     p = copy.deepcopy(d)
     r = next(r for r in p if r.get("bytes", "").startswith("5004"))
@@ -577,6 +614,8 @@ def main(argv=None):
     ap.add_argument("--masks", default=MASKS)
     ap.add_argument("--keep-transport", action="store_true",
                     help="also compare the transport rows (ping, pong, 0xAE-0xB4)")
+    ap.add_argument("--json", default=None, metavar="FILE",
+                    help="also write a machine-readable summary (diff-summary-1) here")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args(argv)
     if a.selftest:
@@ -592,6 +631,9 @@ def main(argv=None):
         masks = read_masks(a.masks)
     except (PacketsError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
+        if a.json:
+            write_json(a.json, {"format": "diff-summary-1", "channel": "packets", "code": 3,
+                                "verdict": "ERROR", "error": str(e)})
         return 3
     print(f"1.14d: {a.orig} ({len(ro)} records, {ho.get('tool')})")
     print(f"d2rs:  {a.d2rs} ({len(rd)} records, {hd.get('tool')})")
@@ -601,7 +643,10 @@ def main(argv=None):
                    None if a.keep_transport else transport_rows())
     if hd.get("gaps") or ho.get("gaps"):
         s["partial"].append("a side lists gaps")
-    return report(divs, s, names(), masks, a.next)
+    code = report(divs, s, names(), masks, a.next)
+    if a.json:
+        write_json(a.json, summary(divs, s, code))
+    return code
 
 
 if __name__ == "__main__":
