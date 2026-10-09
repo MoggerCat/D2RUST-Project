@@ -69,8 +69,11 @@ to 500..599, ten per session:
 | q-prov-recording-2 (the d2-client `recording` points; q-prov-recording takes the rest) | 570–579 | Opus |
 | q-tool-state-diff (per-tick unit state diff; one-command scenario diff) | 580–589 | Opus |
 | q-tool-poke (state injection on both sides; test-install patch variants) | 590–599 | Opus |
+| q-fix-pc1-combat (missile damage, hit reactions, attack event 0, hireling range, AI rows) | 700–709 | Opus |
+| q-fix-pc1-proto-items (PC 1 protocol, items/quests, hireling/pet rows) | 710–719 | Sonnet |
+| q-fix-pc1-client-ui (check-own-position, screen-to-world y, client and UI rows) | 720–729 | Sonnet |
 
-Next free cloud id: REC-700 (PC 1 took REC-600..654 as its day block). Session cap raised to 13 for the PC 1 rows (2026-10-09 09:20).
+Next free cloud id: REC-730 (PC 1 took REC-600..654 as its day block). Session cap raised to 13 for the PC 1 rows (2026-10-09 09:20).
 
 Speed (user, 2026-10-09 08:00): sessions work in parallel with subagents,
 run only the changed crate's tests while iterating and the full gate before
