@@ -55,7 +55,7 @@ def main():
                     f"name {name}",
                     f"save {save} --class ama --expansion --act {actn} --quests {qs(quests, diff)} --difficulty {diff} --difficulty-unlocked {diff}",
                     "seed 1234", f"difficulty {diff}", "ticks 400", "seconds 900", "channels state items",
-                ] + (["variant blood-moor-empty"] if bm else []) + [
+                ] + (["variant blood-moor-empty-nh"] if bm else []) + [
                     "at 4 poke warp %d" % (2 if bm else lvl),
                     "at 30 poke seed-game 0x00001234 666",
                     "at 30 poke seed-unit @player 0x00000055 666",

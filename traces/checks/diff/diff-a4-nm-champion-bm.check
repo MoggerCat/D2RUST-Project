@@ -9,7 +9,7 @@ difficulty nightmare
 ticks 400
 seconds 900
 channels state items
-variant blood-moor-empty
+variant blood-moor-empty-nh
 at 4 poke warp 2
 at 30 poke seed-game 0x00001234 666
 at 30 poke seed-unit @player 0x00000055 666
