@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–389 |
-|   8. Chests and breakables | 390–525 |
-|   9. Shrines | 526–641 |
-|   10. Doors, operate 8 (`0x00581D40`) | 642–665 |
-|   11. Wells, operate 22 (`0x005858A0`) | 666–697 |
-|   12. Portals, operate 15 (`0x00584870`) | 698–768 |
-|   13. Torch, operate 11 (`0x005843D0`) | 769–773 |
-|   14. Client messages | 774–801 |
-|   15. Not covered yet | 802–816 |
-|   16.–18. Moved | 817–823 |
-| Constants & data dependencies | 824–870 |
-| Randomness | 871–917 |
-| Edge cases & original bugs | 918–984 |
-| Test vectors | 985–1023 |
-| Provenance | 1024–1081 |
-| Open questions | 1082–1131 |
+|   7. Operate dispatch | 324–448 |
+|   8. Chests and breakables | 449–584 |
+|   9. Shrines | 585–700 |
+|   10. Doors, operate 8 (`0x00581D40`) | 701–724 |
+|   11. Wells, operate 22 (`0x005858A0`) | 725–756 |
+|   12. Portals, operate 15 (`0x00584870`) | 757–827 |
+|   13. Torch, operate 11 (`0x005843D0`) | 828–832 |
+|   14. Client messages | 833–860 |
+|   15. Not covered yet | 861–875 |
+|   16.–18. Moved | 876–882 |
+| Constants & data dependencies | 883–929 |
+| Randomness | 930–976 |
+| Edge cases & original bugs | 977–1043 |
+| Test vectors | 1044–1082 |
+| Provenance | 1083–1149 |
+| Open questions | 1150–1203 |
 <!-- /index -->
 
 ## Summary
@@ -334,18 +334,52 @@ case `0x00548B00` (player; range and walk rules in `world/waypoints.md`
 3. Operator present and not in interact range (`0x00623660`) → return 1.
 4. Else run §7.2 and return 1.
 
-The interact range test `0x00623660` of rule 3 is read as always in
-range for a player operator (the play host's seam,
-`LocalSeams::object_in_range`). Measured (REC-94,
-`facts/objects/objanim-a1-town.tsv` run r3): 1.14d's client calls
-`0x00623660(P, O)` on every frame of its walk to the object and sends
-C→S 0x13 on the first frame it returns 1 (waypoint 119: player sub-tile
-(4895, 4212), waypoint (4899, 4209); stash 267: (4869, 4228) against
-(4866, 4229)); the server's two calls for that 0x13 (§7.3 r4 and this
-rule) then return 1. The test's own formula (it differs by object size:
-the waypoint answered at a distance of 4, the stash only at 3) is not
-written here; a Ghidra read of `0x00623660` is queued in
-`docs/handoff/pc1-data.md` Step 4. The player's interact info needs no staging before
+**Interact range** `R(U, O)` (`0x00623660`, rule 3; r3, 2026-10-09,
+static asm). Positions are whole sub-tiles: for unit types 2, 4 and 5
+the static path's +0x0C / +0x10, for players and monsters the dynamic
+path's words +0x02 / +0x06 (no fraction); no path reads 0. Sizes come
+from `0x00620510` (X) and `0x006205A0` (Y): object = `objects.txt`
+`SizeX` / `SizeY` (record +0xD0 / +0xD4), player 2, item 1, monster and
+missile from their own records.
+
+1. O absent or not an object (type ≠ 2) → 0.
+2. Unit distance `0x00641530(U, O)` (`sim/pathing.md` §9.5) = 0 → 1.
+3. Box origin (bx, by) := (O.x − SizeX/2, O.y − SizeY/2), halves
+   truncated.
+4. SizeX < 1 or SizeY < 1: 1 iff bx − 1 ≤ U.x ≤ bx + 1 and
+   by − 1 ≤ U.y ≤ by + 1; else 0.
+5. U.x outside [bx − 2, bx + SizeX + 2] or U.y outside
+   [by − 2, by + SizeY + 2] → 0.
+6. U's X size > 2 (unsigned) → 1.
+7. by − 1 ≤ U.y ≤ by + SizeY + 1 → 1.
+8. The two outer rows (U.y = by − 2 or by + SizeY + 2) cut the corners:
+   1 iff bx − 1 ≤ U.x ≤ bx + SizeX + 1.
+
+So a player is in range anywhere in the object's footprint widened by 2
+sub-tiles on each side, less the four corner cells' outer column. The
+box is asymmetric about the object's position (x: −2 − SizeX/2 …
+SizeX − SizeX/2 + 2). It fits run r3 of REC-94
+(`facts/objects/objanim-a1-town.tsv`): waypoint 119 (5 × 5) at
+(4899, 4209) has x band [4895, 4904], y band [4205, 4214]; the player
+at (4895, 4212) (offset 4 / 3) is in a middle row → 1; at offset 5 x is
+4894 → 0 (rule 5). Stash 267 (1 × 1) at (4866, 4229): x band
+[4864, 4869]; the player at (4869, 4228) (offset 3 / 1) → 1, offset 4 →
+0. Rule 2 gives 1 for the waypoint at once when both offsets are ≤ 3
+(size term 2/2 + 5/2 = 3), and for the stash when `dist8_unit` has a
+negative entry (offsets ≤ 2 / 0 and ≤ 1 / 1).
+
+Callers: server C→S 0x13 object case `0x00548B78` (§7.3 rule 4; 0 →
+walk to the object with `0x00548A50`, player mode 3 toward (2, GUID),
+and operate on arrival; nothing is refused or sent), this entry
+`0x00584540` (rule 3; 0 → return 1 with no operate: only reached from
+§7.3 after its own test passed, or from monster AI and skills); client
+`0x00461890` (object with a skill, `ui/controls.md` §6), `0x00461DC0`
+(interact sender) and `0x00480C80` (pending action, `client/model.md`
+§20): the client polls it each frame of its walk and sends 0x13 on the
+first 1, so both server calls of that 0x13 see 1. d2rs reads it as
+always 1 for a player (`LocalSeams::object_in_range`,
+`crates/d2-client/src/app/single_player.rs`); a 0x13 from outside the box
+operates at once where 1.14d walks the player there first. The player's interact info needs no staging before
 the operate: §7.2 rule 2 refuses an active one, and the waypoint's
 operate sets it itself (`waypoints.md` §5.2 step 3).
 
@@ -383,6 +417,31 @@ The handler's result (`sim/intents-events.md`), in order:
    `sim/pathing.md`) → 0.
 5. Else stop P's path (`0x00648730`) and run §7.1 (`0x00584540(game,
    P, 2, GUID)`): its result 0 (object gone) → 3, else → 0.
+
+#### 7.4 Call forms (2026-10-09, static asm; `tools/poke.md` §4 rule 10)
+
+| Function | Registers | Stack from [ESP+4] | `ret` | EAX | Proof |
+|---|---|---|---|---|---|
+| C→S 0x13 handler `0x0054AA90` | ECX game, EDX player | message (id, u32 type @1, u32 GUID @5), size 9 | 8 | §7.3 code; 2 for type > 5 | `0x0054AA93`, `0x0054AAA6`–`0x0054AAAF`, `ret 8` at `0x0054AACB` |
+| §7.3 `0x00548B00` | ECX player, EDX unit type (2) | GUID, walk flag (0x13: 0), game | 0xC | §7.3 code | `0x0054AABE`–`0x0054AAC4`; object case `0x00548B19` (table `0x00548E8C`); `ret 0xC` at `0x00548BB6`, `0x00548BD9` |
+| §7.1 `0x00584540` | ECX game, EDX operator (0 = none: no range test) | unit type (low 16 bits read, `0x0058454B`), GUID | 8 | 0 no unit; 1 refused or done (§7.2's out word) | `0x00548B9A`–`0x00548BA2` call site; `0x00584549` / `0x00584551`; `ret 8` at `0x00584564`, `0x005845C0` |
+| §7.2 `0x00584420` | ECX game, EDX operator | unit type (low 16 bits), GUID, pointer to a u32 out word (set to 1 first, `0x0058443A`) | 0xC | 0 refused or no operate function; else the operate function's own result | call site `0x0058459B`–`0x005845B2`; `0x0058442C` EBX := ECX, `0x00584431` EDI := EDX; `ret 0xC` at `0x005844AA`, `0x00584516` |
+
+The operate function is called (`0x0058450E`) with ECX = a 0x14-byte
+record on §7.2's stack {game, object, operator, control
+(`0x00546FA0`), class} and EDX = the `OperateFn` number.
+
+**Operating at once.** §7.2 `0x00584420` with the player as operator
+is the deepest entry that keeps the player tests: it skips §7.3's
+distance > 50, object mode ≥ 8 and range / line tests and the walk,
+and §7.1's range test. Needs: the object exists (GUID in the object
+list); the player's interact info inactive (`0x00554100` = 0), player
+data +0x4C = 0 and no cursor item unless class 267 (§7.2 rule 2); the
+out word writable. §7.3 also stops the player's path (`0x00648730`)
+first; a direct call leaves it moving. §7.1 with operator 0 skips the
+range test as well but hands the operate function no operator (the
+waypoint's operate sets the operator's interact info,
+`world/waypoints.md` §5.2 step 3), so it is no substitute.
 
 So an operate or a walk gives 0; the operate function's own result
 never reaches this value.
@@ -1023,6 +1082,9 @@ lists of §2 from the live `shrines.txt`.
 
 ## Provenance
 
+- §7.4 call forms (2026-10-09): `0x0054AA90`, `0x00548B00`,
+  `0x00584540`, `0x00584420` in `all.asm`, at the instruction addresses
+  cited in the table.
 - 1.14d `Game.exe`, read with `tools/ghidra/disasm.py` and the Ghidra
   export: init dispatch `0x0054F5D0`, control `0x00546C60`/`0x00546FA0`/
   `0x00546FB0`, inits `0x0054F9D0`, `0x0054F770`, `0x0054FBB0`,
@@ -1078,6 +1140,12 @@ lists of §2 from the live `shrines.txt`.
   order; 1.14d differs: no null-operator return. Recording `obj1`
   (`docs/handoff/local-buddy-q9-rec.md`, `record_objects.py` 0.1.0)
   confirmed §4 rule 5.
+- §7.1 r3 interact range (2026-10-09, pc1-day4, static asm):
+  `0x00623660`, `0x00641530`, `0x00620510`, `0x006205A0`,
+  `0x006488C0`, `0x00648900`, call sites `0x00548B78`, `0x00584597`,
+  `0x00461890`, `0x00461DC0`, `0x00480C80` (all `call 0x623660` in
+  `all.asm`); `objects.txt` 119 / 267 `SizeX`/`SizeY` (`patch_d2`);
+  checked against REC-94 run r3.
 
 ## Open questions
 
@@ -1108,7 +1176,11 @@ lists of §2 from the live `shrines.txt`.
    (`world/objects-2.md` §19).
 10. **Needs recording**: fire event 0's direct mode write (§18.1): confirm with a packets
     trace that clients see no 1 → 2 update for fires.
-    PROVISIONAL: clients see no 1 → 2 update for fires (because event 0 writes the mode directly, §18.1); settled by REC-07.
+    Settled for the binary (1.14d-read 2026-10-09, REC-07; the packets trace stays the
+    conformance check): clients see no 1 → 2 update for fires. `0x00581700` stores +0x10 := 2
+    at `0x00581717` and otherwise calls only `0x00620BB0`, the control getter `0x00546FA0`, burn
+    `0x00581680` (damage `0x005DFA00`) and the scheduler `0x005417D0`; none sets flag 0x1 or
+    queues the unit (`0x0064C040`), so the §14 update pass sends no 0x0E for it.
 11. **Answered**: owner cells of init 51 and operate 48 are §18.4, init
     13 is §17 (CODE-TABLE CHANGE commit).
 12. **Answered** for this spec: the 0x58 builder is `0x0053D8D0`; the

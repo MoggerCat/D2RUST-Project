@@ -426,13 +426,13 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)
     }
+    /// Room +0x38..+0x44 (`0x0061AFA0`'s ring, [`super::monster_death`]):
+    /// each slot's GUID as a monster.
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
-        match self.h.last_dead.get(&room) {
-            Some(ring) => ring.slots.map(|s| {
-                s.and_then(|(u, guid)| game.lists.unit(u).filter(|e| e.guid == guid).map(|_| u))
-            }),
-            None => self.h.x.last_dead(game, room),
-        }
+        game.lists.room(room).map_or([None; 4], |r| {
+            r.dead_guids
+                .map(|g| game.lists.find_unit(crate::units::UnitType::Monster, g))
+        })
     }
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         self.h.x.footprint_ok(game, class, room, x, y)

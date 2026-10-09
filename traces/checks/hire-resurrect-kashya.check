@@ -1,0 +1,22 @@
+check 1
+# Act 1 hireling death and resurrect (q-chk-hirelings, REC-1516): hire as hire-kashya.check, then
+# the hireling's life (stat 6) is poked to 0 at frame 40 (death: world/hirelings.md §8; S->C 0x9B with the
+# resurrect cost, §13), the player goes back to the seller (poke goto) and resurrects it with C->S 0x62
+# (npc.md §7.4; cost min((L*L/2)*15, 50000), hirelings.md §9: life full, state cleanup, stats resent,
+# pet follow to the player).
+# Spec: specs/tools/scenario-diff.md.
+name hire-resurrect-kashya
+save ScnHr1 --class bar --expansion --level 30 --gold 100000
+seed 1234
+ticks 130
+seconds 500
+channels state
+at 4 poke goto unit 1:150
+at 8 send InteractWithEntity type=1 id=@1:150
+at 10 send InitEntityChat id=@1:150
+at 14 send HireMerc npc=@1:150 merc=3411
+at 40 poke stat @1:271 6 0 0
+at 70 poke goto unit 1:150
+at 80 send InteractWithEntity type=1 id=@1:150
+at 82 send InitEntityChat id=@1:150
+at 86 send ResurrectMerc npc=@1:150
