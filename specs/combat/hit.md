@@ -25,13 +25,13 @@
 |   4. Melee result flags | 195–219 |
 |   5. Block chance | 220–242 |
 |   6. Block, weapon block, dodge, avoid, evade | 243–300 |
-|   7. Hostility and melee range | 301–363 |
-| Constants & data dependencies | 364–380 |
-| Randomness | 381–392 |
-| Edge cases & original bugs | 393–413 |
-| Test vectors | 414–438 |
-| Provenance | 439–464 |
-| Open questions | 465–486 |
+|   7. Hostility and melee range | 301–370 |
+| Constants & data dependencies | 371–387 |
+| Randomness | 388–399 |
+| Edge cases & original bugs | 400–420 |
+| Test vectors | 421–445 |
+| Provenance | 446–471 |
+| Open questions | 472–493 |
 <!-- /index -->
 
 ## Summary
@@ -326,7 +326,14 @@ players and monsters → stat 172 `alignment` in the unit's state-105
 (`alignment`) list (`0x006256B0`, `0x00625420`), 0 without the list;
 other unit types → 2. Players carry state 105 with 172 = 2
 (`client/msg-units.md` test vector); monsters by monstats `Align`
-(`monsters/population.md` §9.6 rule 4).
+(`monsters/population.md` §9.6 rule 4). The player's is set by the
+character load of the join, before its add messages: its first 0xAA
+already carries the list (`sim/intents-events.md` §7.9 rule 1, recorded
+`-022633` seq 103 and `traces/checks/packets-town-arrival-ama.check`
+seq 39), and the next frame sends 0xA8 of state 105 (the setter's
+"resend", §3.5 rule 6 `0x0055448A`). The call site inside the load is
+not identified (`docs/handoff/pc1-data.md` Step 4); d2rs sets it right
+after the player's unit seed (PROVISIONAL, REC-750).
 
 #### 7.2 In melee range `0x00622C40(a, b, extra)`
 
