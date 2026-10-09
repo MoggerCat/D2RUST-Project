@@ -31,7 +31,21 @@ messages.
 |---|---|---|---|
 | 62 | [q-fix-d9-arcane] A2Q4 event 3 with new level 74 | From the binary (`0x0059F0D2`–`0x0059F17C`): the level-74 branch returns on every path, so the old-level-40 block never runs for a move into 74; level 50 falls through. REC-1405 settled, d2rs right (`world/quests-act2.md` §6.6, `quests-act2-2.md` §2 item 3) | — |
 
+## D — REC-1150 and binary-settleable PROVISIONALs
+
+- **REC-1150 settled by recording** (`tools/poke.md` §4 rule 10): direct
+  operate `0x00584420` at the tick-return stop vs C→S 0x13 sent for the
+  same frame, on a spawned chest (class 5) in the Act I town: all 40
+  state snapshots equal (every unit field, game seed); chest mode 2 from
+  the same snapshot. No row (tool spec only; `operate` can go into
+  `CALL_FORMS` as proposed).
+- `grep PROVISIONAL | grep ghidra|binary|address` leaves three, none
+  settleable by a binary read: `drlg/outdoor-tilesub.md` (heap history),
+  `formats/d2s-legacy.md` REC-44 (needs 1.07/1.08 saves, deferred),
+  `ui/control-panel.md` REC-610 (D3D/Glide run, full-screen OK needed).
+
 ## Recordings (local, `traces/raw/`, not committed)
 
 `check-hire-kashya/orig.{state,rng}.jsonl` (scenario_diff `--orig-only
---channels state,rng` of the q-chk-hirelings check `hire-kashya`).
+--channels state,rng` of the q-chk-hirelings check `hire-kashya`);
+`rec1150/{send2,poke2}.state.jsonl` (REC-1150).
