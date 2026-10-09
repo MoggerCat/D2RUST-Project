@@ -319,7 +319,16 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn class_has_mode(&self, class: i32, mode: u8) -> bool {
         self.h.x.class_has_mode(class, mode)
     }
+    /// `0x00553380(unit, sound, to)` ([`crate::units::sound::queue_sound`]:
+    /// S→C 0x2C in the tick's client pass), then [`Pending::play_sound`].
+    /// Recorded: `a2-npc-warriv-talk` frame 41, Jerhyn's greeting (§9.9
+    /// interaction step 6) `2c 01 01000000 1200`.
     fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        if let Ok(event) = u16::try_from(sound) {
+            if let Err(e) = crate::units::sound::queue_sound(game, unit, event, to) {
+                self.unit_error(crate::game::GameError::from(e).into());
+            }
+        }
         self.h.x.play_sound(game, unit, sound, to);
     }
     /// `0x005A8520` get-hit branch: mode change to get-hit (3).

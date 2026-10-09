@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–951 |
+|   9. Per-AI behaviours | 29–952 |
 <!-- /index -->
 
 ## Summary
@@ -268,7 +268,8 @@ unsigned. "Walk to (x, y)" = `0x005DED90`; "walk step 0" = `0x005DEF30`
    also when nothing was scheduled.
 5. P = 0 or P = the NPC → return 0.
 6. d < 3 or d > 23: stop the path. If param 1 = 0: param 1 := 60; if P
-   is a player, sound 18 on the NPC toward P (`0x00553380(NPC, 18, P)`),
+   is a player, sound 18 on the NPC toward P (`0x00553380(NPC, 18, P)`;
+   recorded `a2-npc-warriv-talk` frame 41, Jerhyn `2c 01 01000000 1200`),
    idle 20, return 1. If param 1 ≠ 0: negative → 0, positive → minus 1.
    Idle 20, return 1.
 7. 3 ≤ d ≤ 23: home check `0x005E6860(16)`: H = `0x0058EEF0(10, 0)`;

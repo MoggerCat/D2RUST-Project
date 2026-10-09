@@ -33,21 +33,21 @@
 | Outputs / state changes | 78–85 |
 | Rules | 86–87 |
 |   1. NPC control and records | 88–142 |
-|   2. Starting an interaction (C→S 0x13) | 143–236 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 237–275 |
-|   4. Menu actions (C→S 0x38) | 276–334 |
-|   5. Healing on chat open | 335–370 |
-|   6. Cain identify (C→S 0x34) | 371–399 |
-|   7. Mercenaries | 400–522 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 523–602 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 603–636 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 637–648 |
-| Constants & data dependencies | 649–661 |
-| Randomness | 662–674 |
-| Edge cases & original bugs | 675–750 |
-| Test vectors | 751–773 |
-| Provenance | 774–824 |
-| Open questions | 825–883 |
+|   2. Starting an interaction (C→S 0x13) | 143–245 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 246–284 |
+|   4. Menu actions (C→S 0x38) | 285–343 |
+|   5. Healing on chat open | 344–379 |
+|   6. Cain identify (C→S 0x34) | 380–408 |
+|   7. Mercenaries | 409–531 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 532–611 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 612–645 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 646–657 |
+| Constants & data dependencies | 658–670 |
+| Randomness | 671–683 |
+| Edge cases & original bugs | 684–759 |
+| Test vectors | 760–782 |
+| Provenance | 783–833 |
+| Open questions | 834–892 |
 <!-- /index -->
 
 ## Summary
@@ -214,6 +214,15 @@ the results 1 below are internal only):
 
 Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
 1720, 1751, 3570).
+
+Entry order of the 0x27 list (recorded 2026-10-09,
+`items-vendor-akara-buy` frame 15, Akara): `(0, 64), (0, 11)` where the
+quest dispatch adds 11, then 64, i.e. newest first. d2rs reads the add
+`0x006612F0` as a prepend (as the client's build `0x00661510`,
+`client/msg-ui.md` §16 r9) and the writer `0x00661480` as a walk from
+the head. PROVISIONAL (REC-1634): one recording with two entries from
+two records; a list with two entries of one table would tell a prepend
+from a reversed dispatch.
 
 **Call forms** (2026-10-09, static asm; used by `tools/poke.md` §4
 rule 10). All run on the game thread and return with the stack popped

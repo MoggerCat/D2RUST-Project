@@ -1285,7 +1285,8 @@ fn npc_info_0x27_one_layout() {
         }
     }
     // npc.md §2 step 5 (`world/npc.rs` 0x27 type 1 + the 34 list bytes of
-    // `encode_text_list`, d2rs-own in `app/npc_seams.rs`).
+    // `encode_text_list` in `app/npc_seams.rs`: newest entry first,
+    // REC-1634).
     for c in sweep(700).chunks(7) {
         let n = (c[0] % 8) as usize;
         let list: Vec<(u16, u32)> = c.iter().take(n).map(|&v| (v as u16, v >> 24)).collect();
@@ -1295,7 +1296,7 @@ fn npc_info_0x27_one_layout() {
         s[2..6].copy_from_slice(&c[6].to_le_bytes());
         s[6..].copy_from_slice(&crate::app::npc_seams::encode_text_list(&list));
         let mut p = base(1, c[6], n.min(7) as u8, 0, 0);
-        let mut e = list.iter().take(7).map(|&(st, k)| (k as u8, st));
+        let mut e = list.iter().rev().take(7).map(|&(st, k)| (k as u8, st));
         let mut next = || e.next().unwrap_or_default();
         (p.kind0, p.str0) = next();
         (p.kind1, p.str1) = next();
