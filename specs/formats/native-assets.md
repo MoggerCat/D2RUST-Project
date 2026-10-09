@@ -37,7 +37,7 @@
 | Edge cases & original bugs | 657–667 |
 | Test vectors | 668–678 |
 | Provenance | 679–689 |
-| Open questions | 690–713 |
+| Open questions | 690–716 |
 <!-- /index -->
 
 ## Summary
@@ -701,8 +701,11 @@ not re-measured here. No `re/` or `../refs/` read.
    `patch-layers.md` (owner) — not designed yet (§6 r3).
 5. DT1 assembled vs block-strip layout: PROVISIONAL assembled, settled by
    the fallback count of the §7.2 run (§2.3 r3).
-6. `tbl` hash rebuild from element order: PROVISIONAL, settled by C-TBL
-   on the §7.2 run (§2.6 r3).
+6. `tbl` hash rebuild from element order: **settled** (2026-10-09,
+   q-prov-data): on the real install all 21 string tables of `d2data.mpq`,
+   `d2exp.mpq` and `Patch_D2.mpq` (font `.tbl` files excluded) pass C-TBL
+   and the rebuild from element order equals the stored slots in every
+   one (`crates/d2-native/tests/real_tbl.rs`, ignored test).
 7. `monstats` 707 override: PROVISIONAL, settled by `field-types.md` Open
    question 7 (§2.8 r3).
 8. Whether the shipped mod format may ever carry a non-indexed (RGBA)
