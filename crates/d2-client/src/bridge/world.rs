@@ -603,6 +603,13 @@ impl UnitOrigin {
     }
 }
 
+/// A screen shake started by a model rule (`render/camera.md` §8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ShakeStart {
+    pub shake: crate::rules::camera::Shake,
+    pub start_tick: u64,
+}
+
 /// The client world model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClientWorld {
@@ -687,6 +694,10 @@ pub struct ClientWorld {
     /// (`missiles/client.md` §C13); set by the play app on each drawn
     /// frame (`Bridge::set_unit_origin`), `None` before the first.
     pub unit_origin: Option<UnitOrigin>,
+    /// The running screen shake (`render/camera.md` §8: one at a time,
+    /// `0x00476A80` restarts it), started on server tick `start_tick` (the
+    /// d2rs time base, §9); `None` before the first.
+    pub shake: Option<ShakeStart>,
     /// `[0x007A0498]`: client updates that ran the DRLG part
     /// (`rooms.md` §4.6, last paragraph: += 1 first, level free on every
     /// multiple of 13).
@@ -858,6 +869,18 @@ impl ClientWorld {
     /// no client DRLG, no local player or an unplaced one.
     pub fn local_room(&self) -> Option<&ActiveRoom> {
         self.unit_room(self.local_player?)
+    }
+
+    /// `0x00476A80(A, t1, t2, t3)` (`render/camera.md` §8): a shake with
+    /// peak A, attack t1, sustain t2 and release t3 (ms) starts now,
+    /// replacing a running one; t2 = 0 starts nothing.
+    pub fn start_shake(&mut self, peak: u32, attack: u32, sustain: u32, release: u32) {
+        if let Some(shake) = crate::rules::camera::Shake::start(peak, attack, sustain, release) {
+            self.shake = Some(ShakeStart {
+                shake,
+                start_tick: self.server_ticks,
+            });
+        }
     }
 
     /// Room of a point (`0x00465420`, §2 rule 7, §12 rule 2) for a point
@@ -1210,6 +1233,9 @@ pub struct MonsterClass {
     /// the client search's skip test, `missiles/client-bodies-2.md` §B9
     /// r3).
     pub no_aura: bool,
+    /// `monstats` flag 10 `inTown` (with `npc`: the monster can be in
+    /// town, the footprint pattern of `sim/path-placement.md` §3).
+    pub in_town: bool,
     /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).

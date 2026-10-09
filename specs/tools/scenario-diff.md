@@ -132,3 +132,5 @@ d2rs-own tool; no 1.14d fact.
    behaviour needs C→S input beyond the bridge's own answers (a skill
    cast, a click on a unit) has no d2rs side yet
    (`traces/checks/poke-firebolt.check`).
+   Until it does, the state channel runs d2rs without the `input d2rs`
+   line and reports at best partial (never a match).
