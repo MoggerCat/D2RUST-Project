@@ -43,17 +43,17 @@
 | Inputs | 72–78 |
 | Outputs / state changes | 79–87 |
 | Rules | 88–89 |
-|   1. Directives | 90–124 |
-|   2. Poke files | 125–147 |
-|   3. In scenarios | 148–162 |
-|   4. The 1.14d side (`poke.py`) | 163–211 |
-|   5. The d2rs side (`d2-sim::poke`) | 212–226 |
-| Constants & data dependencies | 227–239 |
-| Randomness | 240–246 |
-| Edge cases & original bugs | 247–256 |
-| Test vectors | 257–268 |
-| Provenance | 269–274 |
-| Open questions | 275–282 |
+|   1. Directives | 90–125 |
+|   2. Poke files | 126–148 |
+|   3. In scenarios | 149–163 |
+|   4. The 1.14d side (`poke.py`) | 164–212 |
+|   5. The d2rs side (`d2-sim::poke`) | 213–227 |
+| Constants & data dependencies | 228–240 |
+| Randomness | 241–247 |
+| Edge cases & original bugs | 248–257 |
+| Test vectors | 258–269 |
+| Provenance | 270–275 |
+| Open questions | 276–283 |
 <!-- /index -->
 
 ## Summary
@@ -108,6 +108,7 @@ cannot run the directive, §4). Results are written as `poke` records
 | `seed-unit` | `<ref> <lo> <hi>` | set a unit's seed | write u32 lo, hi at unit +0x20, +0x24 (`rng.md` §5.3; `original-hooks.md` §4) | the unit record's `seed.set(lo, hi)` |
 | `time` | `<period 0..5> <ticks>` | set the time of day of the player's act | write the environment record (act +0x04; acts at game +0xBC + 4·act): +0x00 period, +0x08 ticks (`render/lighting.md` §9.1) | `ActEntry.environment` `period`, `ticks` |
 | `pos` | `<ref> <x> <y>` | teleport a unit | `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0; `path-placement.md` §6 r4), else `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0; §10); room by entry 6 from the unit's room | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
+| `hop` | `<ref> <x> <y>` | d2rs-own test aid (playthrough sweeps): move the unit at most 16 sub-tiles per axis toward (x, y) from where it stands, to the first spot of a fixed candidate list where a `pos` moves it: rings of radius 0, 2, 4, 7 (8 directions) around the full step, then around the half step, then a sidestep of 8 to either side across the step; `ok` when the unit moved (or is within 1 of the point), `failed` when no candidate did | each candidate as `pos`; moved = the path's sub-tile position changed (`poke.py` `hop_candidates`) | `poke::hop_candidates` and `WalkCtx::teleport` per candidate; a refused candidate's path error is dropped |
 | `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | `0x0053AEC0` (ECX game, EDX player; level, tile; `ret 8`; EAX not a status: `ok`; `world/waypoints.md` §7 r5) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
 | `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | `0x00558D90` (ECX game, EDX request; use seed 0; `ret 4`; EAX the item; `items/generation.md` §3) with request spawn mode 3, x, y, room (entry 6), item = the combined index of the code (§4 rule 8) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
 | `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | `0x00627260` (stack: unit, s, value, layer; `ret 0x10`; `sim/stat-lists.md` §5 r2) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |

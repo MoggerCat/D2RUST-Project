@@ -74,8 +74,15 @@ hide the ones after it.
    (cx, cy), `step` sub-tiles apart, ending back at (cx, cy). `spiral`
    (the default) goes outward from the centre, so each target is next
    to the last one. `grid` goes row by row from the (−R, −R) corner,
-   serpentine. A sweep exists because units only exist in active rooms
-   near a player. A refused `pos` is expected and is not a blocker.
+   serpentine. The player walks to each target with `hop @player x y`
+   pokes (`tools/poke.md` §1), one every `every` frames, ceil(d / 16) + 1
+   per leg (d the distance between targets): a hop moves at most 16
+   sub-tiles per axis from where the player stands, to the first free
+   spot of a ring around the step (q-play-act5's walk,
+   `tests/play_act5.rs`); a blocked hop leaves the player there and the
+   next tries again. The run is extended to the sweep's last hop + 10
+   frames. A sweep exists because units only exist in active rooms near
+   a player. A refused `pos` is expected and is not a blocker.
 
 ### 2. Predicates
 

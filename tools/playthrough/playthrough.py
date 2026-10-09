@@ -162,8 +162,9 @@ def _nargs(rest, n, where, usage):
     return t
 
 
-def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
-    """`sweep F0 EVERY R STEP` (spec §1): absolute `pos @player` pokes from
+def sweep_targets(f0, every, radius, step, cx, cy, mode="spiral"):
+    """The sweep's target points (spec §1 r4); sweep_pokes walks them in hops.
+    Original form: absolute `pos @player` pokes from
     frame F0, one every EVERY frames, on a square spiral outward from
     (cx, cy) (the player's position before F0; a probe run finds it),
     STEP sub-tiles apart, out to half-side R, then back to (cx, cy). Each
@@ -179,7 +180,7 @@ def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
         for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
             arm = [(cx + dx * i * step, cy + dy * i * step) for i in range(1, n + 1)]
             pts += arm + arm[-2::-1] + [(cx, cy)]
-        return [f"{f0 + k * every} pos @player {px} {py}" for k, (px, py) in enumerate(pts) if px >= 0 and py >= 0]
+        return [(px, py) for px, py in pts if px >= 0 and py >= 0]
     if mode == "grid":
         # rows of the square, serpentine, from the (-R, -R) corner
         pts = []
@@ -187,7 +188,7 @@ def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
             xs = range(-n, n + 1) if (row + n) % 2 == 0 else range(n, -n - 1, -1)
             pts += [(cx + i * step, cy + row * step) for i in xs]
         pts.append((cx, cy))
-        return [f"{f0 + k * every} pos @player {px} {py}" for k, (px, py) in enumerate(pts) if px >= 0 and py >= 0]
+        return [(px, py) for px, py in pts if px >= 0 and py >= 0]
     pts, x, y = [], 0, 0
     dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
     leg, d = 1, 0
@@ -201,7 +202,28 @@ def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
             d += 1
         leg += 1
     pts.append((cx, cy))
-    return [f"{f0 + k * every} pos @player {px} {py}" for k, (px, py) in enumerate(pts) if px >= 0 and py >= 0]
+    return [(px, py) for px, py in pts if px >= 0 and py >= 0]
+
+
+HOP = 16  # largest move of one `hop` poke per axis (poke.md §1, d2_sim::poke::HOP)
+
+
+def sweep_pokes(f0, every, radius, step, cx, cy, mode="spiral"):
+    """`sweep F0 EVERY R STEP` (spec §1 r4): the targets of sweep_targets,
+    walked with `hop @player x y` pokes, one every EVERY frames. A hop
+    moves the player at most HOP sub-tiles per axis toward the target, to
+    the first free spot around the step (poke.md §1 `hop`), from wherever
+    the player stands; a blocked hop leaves it there and the next one
+    tries again. Each leg gets ceil(distance / HOP) + 1 hops."""
+    pts = sweep_targets(f0, every, radius, step, cx, cy, mode)
+    out, k, prev = [], 0, (cx, cy)
+    for tx, ty in pts:
+        n = -(-max(abs(tx - prev[0]), abs(ty - prev[1])) // HOP) + 1
+        for _ in range(n):
+            out.append(f"{f0 + k * every} hop @player {tx} {ty}")
+            k += 1
+        prev = (tx, ty)
+    return out
 
 
 def _rel(base, d):
@@ -409,7 +431,7 @@ def evaluate(m, snaps, pokes):
     where = f"player lv {pl.get('lv')} m {pl.get('m')} at ({pl.get('x')},{pl.get('y')})"
     # a refused sweep step is expected (spec §1 sweep); any other poke's
     # refusal is the blocker's evidence
-    failed_pokes = [q for q in pokes if q.get("r") != "ok" and not str(q.get("src", "")).startswith("pos @player ")]
+    failed_pokes = [q for q in pokes if q.get("r") != "ok" and not str(q.get("src", "")).startswith(("pos @player ", "hop @player "))]
     if failed_pokes:
         q = failed_pokes[0]
         return {"status": "missing-unit" if q.get("r") == "unresolved" else "stuck", "frame": f,
@@ -473,8 +495,11 @@ def run_milestone(m, play, client, d2s, work, game_dir):
         pl = player_of(snaps[-1]) if snaps else None
         if not pl or "x" not in pl:
             return {"status": "stuck", "frame": f0 - 1, "evidence": "sweep probe: no player position"}
-        pokes += sweep_pokes(f0, every, radius, step, pl["x"], pl["y"], mode)
+        sw = sweep_pokes(f0, every, radius, step, pl["x"], pl["y"], mode)
+        pokes += sw
         pokes.sort(key=lambda p: int(p.split()[0]))
+        if sw:  # the run covers the whole sweep (spec §1 r4)
+            m["run_ticks"] = max(m.get("run_ticks", m["ticks"]), int(sw[-1].split()[0]) + 10)
         if m["find"]:
             found = find_probe(m, pokes, save, client, work, game_dir)
             if isinstance(found, dict):
@@ -527,9 +552,10 @@ def find_probe(m, pokes, save, client, work, game_dir):
 
 def shift_after_find(m, pokes, found):
     """The run after a `find` at frame F: the sweep stops at F (its later
-    `pos` pokes are dropped), `poke +N` runs at F + N and `frame +N` of
-    the input script is frame F + N."""
-    keep = [p for p in pokes if not (p.split()[1:3] == ["pos", "@player"] and int(p.split()[0]) > found)]
+    `hop` / `pos` pokes of the player are dropped), `poke +N` runs at F + N
+    and `frame +N` of the input script is frame F + N."""
+    keep = [p for p in pokes if not (p.split()[1:3] in (["hop", "@player"], ["pos", "@player"])
+                                     and int(p.split()[0]) > found)]
     for p in m["pokes"]:
         if p.startswith("+"):
             n, _, d = p.partition(" ")
@@ -827,17 +853,26 @@ milestone walk
     assert qa["ever"] and (qa["slot"], qa["bit"], qa["want"]) == (7, 0, True), qa
     assert not qb["ever"] and (qb["slot"], qb["bit"], qb["want"]) == (1, 13, False), qb
     # sweep: serpentine grid around the centre, back to it, absolute
-    sw = sweep_pokes(10, 2, 60, 30, 1000, 2000)
-    assert len(sw) == 25 and sw[0] == "10 pos @player 1030 2000", sw[0]
-    assert sw[1] == "12 pos @player 1030 2030" and sw[-1] == "58 pos @player 1000 2000", sw
-    gr = sweep_pokes(10, 2, 60, 30, 1000, 2000, "grid")
-    assert gr[0] == "10 pos @player 940 1940" and gr[5] == "20 pos @player 1060 1970", gr
-    cr = sweep_pokes(10, 1, 60, 30, 1000, 2000, "cross")
-    assert [q.split(None, 1)[1] for q in cr[:4]] == ["pos @player 1030 2000", "pos @player 1060 2000",
-                                                     "pos @player 1030 2000", "pos @player 1000 2000"], cr
-    assert len(cr) == 16 and cr[-1] == "25 pos @player 1000 2000", cr
-    pts = {tuple(map(int, q.split()[3:])) for q in sw}
-    assert pts == {(1000 + 30 * i, 2000 + 30 * j) for i in range(-2, 3) for j in range(-2, 3)}, pts
+    sw = sweep_targets(10, 2, 60, 30, 1000, 2000)
+    assert len(sw) == 25 and sw[0] == (1030, 2000) and sw[1] == (1030, 2030), sw
+    assert sw[-1] == (1000, 2000), sw
+    gr = sweep_targets(10, 2, 60, 30, 1000, 2000, "grid")
+    assert gr[0] == (940, 1940) and gr[5] == (1060, 1970), gr
+    cr = sweep_targets(10, 1, 60, 30, 1000, 2000, "cross")
+    assert cr[:4] == [(1030, 2000), (1060, 2000), (1030, 2000), (1000, 2000)], cr
+    assert len(cr) == 16 and cr[-1] == (1000, 2000), cr
+    assert set(sw) == {(1000 + 30 * i, 2000 + 30 * j) for i in range(-2, 3) for j in range(-2, 3)}
+    # hops: one `hop` per frame toward each target, ceil(d / HOP) + 1 per leg
+    hp = sweep_pokes(10, 2, 60, 30, 1000, 2000)
+    assert hp[0] == "10 hop @player 1030 2000" and hp[1] == "12 hop @player 1030 2000", hp[:3]
+    assert hp[3] == "16 hop @player 1030 2030", hp[:4]
+    assert len({q.split()[0] for q in hp}) == len(hp) and hp[-1].endswith("hop @player 1000 2000")
+    assert sum(1 for q in hp if q.endswith(" 1030 2000")) == 3  # 30 away: 2 hops + 1
+    # a find at frame 14 drops the later sweep hops, keeps the rest, places +N
+    mf = {"pokes": ["5 warp 83", "+2 pos @1:345 @x+3 @y"], "input": None, "ticks": 100}
+    kept, _ = shift_after_find(mf, ["5 warp 83"] + hp, 14)
+    assert [q for q in kept if " hop " in q] == hp[:3], kept[:6]
+    assert "16 pos @1:345 @x+3 @y" in kept and mf["run_ticks"] == 100, (kept, mf)
     print("playthrough selftest: ok")
     return 0
 
