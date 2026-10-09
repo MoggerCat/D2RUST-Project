@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–326 |
-|   6. Comparison | 327–364 |
-|   7. Requests | 365–376 |
-| Constants & data dependencies | 377–380 |
-| Randomness | 381–384 |
-| Edge cases & original bugs | 385–392 |
-| Test vectors | 393–401 |
-| Provenance | 402–406 |
-| Open questions | 407–421 |
+|   5. d2rs export | 190–327 |
+|   6. Comparison | 328–377 |
+|   7. Requests | 378–389 |
+| Constants & data dependencies | 390–393 |
+| Randomness | 394–397 |
+| Edge cases & original bugs | 398–405 |
+| Test vectors | 406–414 |
+| Provenance | 415–419 |
+| Open questions | 420–434 |
 <!-- /index -->
 
 ## Summary

@@ -790,6 +790,17 @@ impl<L: super::poke::PokeTarget> super::poke::PokeTarget for PredictLink<L> {
     }
 }
 
+/// Scripted messages pass through (`state-dump --send`).
+impl<L: super::inject::InjectTarget> super::inject::InjectTarget for PredictLink<L> {
+    type Error = L::Error;
+    fn inject(
+        &mut self,
+        msg: &conformance::scenario::script::StepMsg,
+    ) -> Result<super::inject::Injected, L::Error> {
+        self.inner.inject(msg)
+    }
+}
+
 /// Snapshots pass through (`state-dump`).
 impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> {
     type Error = L::Error;
