@@ -44,7 +44,14 @@ milestone hephasto-killed
 milestone forge-smashed
   checkpoint a4-hellforge
   deadline 450
-  note needs the soulstone placed on the forge and the hammer's hits (quests-act4.md §4.6): no headless input for it yet; expected blocker with 27.1 clear
+  note quests-act4.md §4.6: the soulstone on the forge (operate, mode 0 -> 1 -> 2 after FrameCnt1), then a hammer (an item poke, picked up and wielded: 0x16, 0x1A) and three hits
+  poke 40 operate @2:376
+  poke 120 item hfh @x+2 @y
+  poke 125 msg 0x16 4 @p3 0
+  poke 130 msg 0x1A @p3 4
+  poke 140 operate @2:376
+  poke 150 operate @2:376
+  poke 160 operate @2:376
   need ever quest 27 1 set
 
 milestone forge-done
