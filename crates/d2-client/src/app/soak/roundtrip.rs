@@ -178,7 +178,10 @@ pub fn timeless(mut s: D2s) -> D2s {
     s.header.save_time = 0;
     s.header.checksum = 0;
     if let Some(d2_formats::d2s::Stats::Bits(v)) = s.body.as_mut().map(|b| &mut b.stats) {
-        let max = v.iter().find(|e| e.id == 11 && e.layer == 0).map(|e| e.value);
+        let max = v
+            .iter()
+            .find(|e| e.id == 11 && e.layer == 0)
+            .map(|e| e.value);
         if let (Some(m), Some(st)) = (max, v.iter_mut().find(|e| e.id == 10 && e.layer == 0)) {
             st.value = m;
         }
