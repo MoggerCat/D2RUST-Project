@@ -925,13 +925,20 @@ fn f0_legacy_property_table() {
     for (r, code) in [
         (rec(195, 1, 50, -50), 0x444),
         (rec(195, 4, 1, 2), 0x44C),
+        // Unsigned compare: a negative param is fatal too, no stat set.
+        (rec(195, -1, 1, 2), 0x44C),
         (rec(195, 1, -300, 2), 0x44D),
         (rec(195, 1, 1, 900), 0x44E),
     ] {
         let mut it = f0(ring, 1);
         ap(&t, &mut it, 0, r);
         assert_eq!(it.fatal, Some(Fatal::LegacyByTime(code)));
+        assert_eq!(l(&it, 268), 0);
     }
+    // param 3 still sets.
+    let mut it = f0(ring, 1);
+    ap(&t, &mut it, 0, rec(195, 3, 1, 2));
+    assert_eq!(l(&it, 268), (((2 + 256) << 10 | (1 + 256)) * 4) + 3);
     // `0x0065E2D0`: stat 83 with layer 0–4, 5, 6.
     let mut it = f0(ring, 1);
     ap(&t, &mut it, 0, rec(69, 0, 4, 4));

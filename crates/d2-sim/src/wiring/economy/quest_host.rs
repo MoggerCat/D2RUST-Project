@@ -200,6 +200,28 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
 }
 
 impl<X: Pending, R: QuestRest> HostQuests<'_, '_, X, R> {
+    /// `0x00597A20(game, U)` (`vendors-2.md` §10.1 rule 6): true when U's
+    /// flags 2 (+0xC8) has bit 0x400000 or 0x800000, or any GUID on U's
+    /// inventory update list (+0x2C) names a live item unit.
+    pub(super) fn trade_locked(&mut self, player: UnitId) -> bool {
+        const TRADE_BITS: u32 = 0x40_0000 | 0x80_0000;
+        if self
+            .inner
+            .econ
+            .units
+            .get(player)
+            .is_some_and(|r| r.flags2 & TRADE_BITS != 0)
+        {
+            return true;
+        }
+        let guids = self
+            .inventory
+            .as_deref()
+            .map(|i| i.update_guids(player))
+            .unwrap_or_default();
+        guids.into_iter().any(|g| self.unit_by_guid(4, g).is_some())
+    }
+
     /// `0x005466B0` (`quests.md` §9.1) on the lent inventory model
     /// ([`quest_reward`]): create, place, else drop next to the player
     /// when droppable, else free.
@@ -887,7 +909,7 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
         e.hooks.object_drops = Some(d);
     }
     /// `0x00585970(game, object, 'gld ', 2)`
-    /// ([`super::drop_helpers::code_drop`], PROVISIONAL there).
+    /// ([`super::drop_helpers::code_drop`], §20.7).
     fn drop_gold(&mut self, object: UnitId) {
         let gold = u32::from_le_bytes(*b"gld ");
         if self
@@ -1210,10 +1232,8 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// partner gone → 0x77 0x0C; with the partner, buttons 5 and 6 and
     /// those outside 2–8 do nothing, the other trade buttons are the
     /// player-trade flow's (no spec, §10.3: the rest).
-    ///
-    /// PROVISIONAL (world/vendors-2.md §10.1 rule 5; REC-none): with the
-    /// partner gone `0x00597A20(game, P)` is read as 0 (its body is not
-    /// written), so 0x77 0x0C is sent.
+    /// With the partner gone, `0x00597A20(game, P)` ([`Self::trade_locked`])
+    /// ≠ 0 sends nothing, else 0x77 0x0C (rule 5).
     fn trade_button(&mut self, player: UnitId, button: u8) {
         if self.inner.econ.units.get(player).is_none() {
             return;
@@ -1225,7 +1245,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             0x12..=0x14 | 0x17 | 0x18 => self.inner.trade_button(player, button),
             _ if ty != 0 => self.send(player, &trade_action(0x0D)),
             _ if self.player_by_guid(guid).is_none() => {
-                self.send(player, &trade_action(0x0C));
+                if !self.trade_locked(player) {
+                    self.send(player, &trade_action(0x0C));
+                }
             }
             2..=4 | 7 | 8 => self.inner.trade_button(player, button),
             _ => {}
