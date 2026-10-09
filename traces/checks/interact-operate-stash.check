@@ -1,0 +1,16 @@
+check 1
+# `operate` (specs/tools/poke.md §1, §4 rule 10, §5 rule 4): the Rogue
+# Encampment stash (objects 267, at (4866, 4229) in this town) from the
+# start position (4873, 4228), ScnAma, -seed 1234, no input. Before frame
+# 4 one `operate @2:267`: the server's dispatcher run at once with 0x13
+# {2, stash GUID} on both sides; out of operate range the handler walks the
+# player to it and operates on arrival (world/objects.md §7.3). Frames
+# 4-30 compare the player's walk, the stash's mode and the S->C replies.
+# Spec: specs/tools/scenario-diff.md.
+name interact-operate-stash
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 300
+channels state packets
+at 4 poke operate @2:267

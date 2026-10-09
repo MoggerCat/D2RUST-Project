@@ -34,6 +34,10 @@ pub fn death_start<X: Pending>(
     if modes::set_mode(sim, h, unit, MODE_DT).is_err() {
         return false;
     }
+    // `0x00547E50` (`population.md` §13 item 3): the region's kill count,
+    // so the Den of Evil quest sees the level cleared.
+    let alignment = h.x.alignment(unit);
+    h.with_monster_world(|w, _| w.count_death(unit, alignment));
     // Step 1.2 (`units.md` §4.6), before the gate: the clean-up (the
     // corpse footprint the gate's collision test sees, the thinks
     // cancelled).
