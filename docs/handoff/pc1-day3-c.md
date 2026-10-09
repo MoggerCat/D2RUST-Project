@@ -197,3 +197,16 @@ The harness should test class and position, not GUID.
   The quest helper `preset_superunique_spawn` only allocates the unit and
   skips the superunique path: placement search, mods, minions. The Act III
   council uses the same helper.
+
+## Round 3 — Windows runs Wine could not make
+
+- **REC-222 keys during loading: settled** (`ui/frontend-loading.md` L8 rule 3). Method: a scratch
+  debugger probe on `record_state.py` (not committed). Breakpoints: loading draw `0x004565E0`, key-down
+  `0x0046A840`, Esc command `0x004690B0`, the server tick. The probe posts the key from the first
+  loading-draw stop; the act change is `poke 50 warp 40` from ScnAma `-seed 1234`.
+  - **Act change, Esc:** the handler ran at frame 49 and ui 9 became 1. The server ran one more tick
+    (50) and then none for 50 s, and the loading draws stopped too: the load waits for the menu.
+  - **Act change, F1:** dispatched to `0x0046A840`, and the load continued.
+  - **Game start, Esc at the first loading draw (before 0x01):** reached no handler; the game started
+    normally.
+  - d2rs takes no input while loading: `q-fix-p6-loading-keys`.
