@@ -157,38 +157,11 @@ pub const ETHEREAL: u32 = 0x0040_0000;
 /// The draw mode of an ethereal item graphic (§8 r4): 50 % alpha.
 pub const ETHEREAL_MODE: u8 = 1;
 
-/// d2rs-own, unverified: whether an item code is a belt-able potion
-/// (`hp1`–`hp5`, `mp1`–`mp5`, `rvs`, `rvl`, `vps`, `yps`, `wms`, the
-/// throwing potions `gps`/`gpm`/`gpl`/`ops`/`opm`/`opl`); the server
-/// still checks the move (`inventory-moves.md` §7.24).
-pub fn fits_belt(code: Option<[u8; 4]>) -> bool {
-    let Some(c) = code else {
-        return false;
-    };
-    matches!(
-        &c[..3],
-        b"hp1"
-            | b"hp2"
-            | b"hp3"
-            | b"hp4"
-            | b"hp5"
-            | b"mp1"
-            | b"mp2"
-            | b"mp3"
-            | b"mp4"
-            | b"mp5"
-            | b"rvs"
-            | b"rvl"
-            | b"vps"
-            | b"yps"
-            | b"wms"
-            | b"gps"
-            | b"gpm"
-            | b"gpl"
-            | b"ops"
-            | b"opm"
-            | b"opl"
-    )
+/// Whether an item code fits a belt box: the type's itemtypes `beltable`
+/// and a 1 x 1 size, as the server reads it (`seams/item-grids.md` §2.8,
+/// `inventory-moves.md` §3.3). The server still checks the move.
+pub fn fits_belt(art: &ItemArtRows, code: Option<[u8; 4]>) -> bool {
+    code.and_then(|c| art.get(c)).is_some_and(|r| r.beltable)
 }
 
 /// An item's graphic: file id, footprint in cells, frame size.
@@ -480,7 +453,7 @@ impl ItemsUi {
             stackable_onto: false,
             book_kind: None,
             sellable: false,
-            fits_belt: fits_belt(i.code),
+            fits_belt: fits_belt(&self.art, i.code),
         };
         let (mc, mr) = g.mouse_cell(at);
         let under_view = at_cell(mc as i32, mr as i32);
