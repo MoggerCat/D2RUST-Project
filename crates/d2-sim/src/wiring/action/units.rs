@@ -77,16 +77,26 @@ impl<X: Pending> ActionHooks<X> {
         sim: &Sim<'_>,
         unit: UnitId,
     ) -> Option<(UnitType, u32, u32)> {
-        let r = sim.units.get(unit)?;
+        self.draw_identity_in(sim.units, sim.stats, unit)
+    }
+
+    /// [`Self::draw_identity`] on the unit records and stat lists.
+    pub(crate) fn draw_identity_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> Option<(UnitType, u32, u32)> {
+        let r = units.get(unit)?;
         let own = (r.ty, r.class, r.mode);
         if r.flags2 & flags2::DISGUISE == 0 {
             return Some(own);
         }
-        let states = &sim.stats.data().states;
+        let states = &stats.data().states;
         let Some(&(_, gfx, class)) = states
             .gfx_states()
             .iter()
-            .find(|&&(s, ..)| sim.stats.has_state(unit, s))
+            .find(|&&(s, ..)| stats.has_state(unit, s))
         else {
             return Some(own);
         };
@@ -126,6 +136,33 @@ impl<X: Pending> ActionHooks<X> {
             }
             _ => (UnitType::Player, class, r.mode),
         })
+    }
+
+    /// The frame bonus `0x00623B10` (`units.md` §4.7 "Frame bonus",
+    /// through [`crate::units::anim_rate::frame_bonus`]): the draw
+    /// identity (T, C, M), dual-wield capability `0x006235A0` (player
+    /// class 4 or 6, monster class 417 or 418), the attack weapon
+    /// `0x00623990(U, 1)` and its type class `0x00629FE0`
+    /// ([`Pending::item_type_class`]).
+    pub(crate) fn frame_bonus_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> i32 {
+        let Some((t, c, m)) = self.draw_identity_in(units, stats, unit) else {
+            return 0;
+        };
+        let dual = match t {
+            UnitType::Player => matches!(c, 4 | 6),
+            UnitType::Monster => matches!(c, 417 | 418),
+            _ => false,
+        };
+        let tc = self
+            .x
+            .attack_weapon(unit)
+            .map(|w| self.x.item_type_class(w));
+        crate::units::anim_rate::frame_bonus(t as u8, c, m, dual, tc)
     }
 
     /// Steps 3–5 and 8–10 of `0x00623F50` (`units.md` §4.7, through
@@ -414,7 +451,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .path_has(unit)
             .then(|| UnitHooks::anim_rate(self, sim, unit));
         let record = UnitHooks::anim_record(self, sim, unit);
-        let bonus = self.x.frame_bonus(unit);
+        let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
         let Some(r) = sim.units.get_mut(unit) else {
             return;
         };
@@ -473,8 +510,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
 
     /// `0x00623B10` (`units.md` §4.3).
-    fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
-        self.x.frame_bonus(unit)
+    fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {
+        self.frame_bonus_in(sim.units, sim.stats, unit)
     }
 
     fn has_path(&mut self, _: &Sim<'_>, unit: UnitId) -> bool {

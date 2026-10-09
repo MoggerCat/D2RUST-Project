@@ -999,6 +999,9 @@ impl Pending for LocalSeams {
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
     }
+    fn item_type_class(&self, item: UnitId) -> u32 {
+        self.weapons.type_class(item)
+    }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
     }

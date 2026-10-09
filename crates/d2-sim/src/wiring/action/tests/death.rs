@@ -107,11 +107,13 @@ fn a_name_not_in_the_file_gets_the_default_record() {
     // = 100; `units.md` §4.7 step 8 reads it in mode 7).
     fx.stats(p, &[(68, 100)]);
     animate(&mut fx, p, 7);
-    // §3: frames 2048, speed 256, no events → only the end, at
-    // f + 2048.
+    // §3: frames 2048, speed 256, no events → only the end. The
+    // Sorceress's A1 without a weapon has frame bonus 1 (§4.7 "Frame
+    // bonus": table `0x006E8E60`, type class 0), so the schedule starts
+    // at index 1 and ends at f + 2047 (§4.2).
     let r = fx.sim.sys.units.get(p).unwrap();
     assert_eq!(r.anim.record.unwrap().frames, 2048);
-    assert_eq!(fx.timers(p), [(event::END_ANIM, 2048)]);
+    assert_eq!(fx.timers(p), [(event::END_ANIM, 2047)]);
     fx.assert_clean();
 }
 
@@ -1160,4 +1162,28 @@ fn a_champion_drops_from_column_2_by_its_monster_data() {
     };
     assert_eq!(run(true), 1);
     assert_eq!(run(false), 0);
+}
+
+/// `units.md` §4.7 "Frame bonus" on the mode start (§4.1: +0x44 := bonus
+/// · 256): A1 without a weapon gives 1 for the Amazon and Sorceress
+/// (type class 0), 0 for the Barbarian; mode 1 gives 0. Recorded:
+/// `check-combat-melee-fallen-msg` f34, the Amazon's A1 at +0x44 = 256.
+// Covers: specs/sim/units.md §4.7 text
+#[test]
+fn player_attack_starts_at_the_frame_bonus() {
+    for (class, mode, frame) in [(0, 7, 256), (1, 8, 256), (4, 7, 0), (0, 1, 0)] {
+        let mut fx = Fx::new();
+        with_anim(&mut fx);
+        let p = fx.spawn(UnitType::Player, class, fx.a, 10, 10);
+        let s = &mut fx.sim.sys;
+        let mut sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        modes::set_mode(&mut sim, &mut s.hooks, p, mode).unwrap();
+        let f = fx.sim.sys.units.get(p).unwrap().anim.frame;
+        assert_eq!(f, frame, "class {class} mode {mode}");
+    }
 }
