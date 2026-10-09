@@ -326,7 +326,7 @@ class Runner:
         game = os.path.join(self.game_dir, "Game.exe")
         rec = [os.path.join(REC, script), "--game", game, "--seconds", str(c["seconds"]),
                "--ticks", str(ticks or c["ticks"]), "--auto", c["char"], "--seed", str(c["seed"]),
-               "--out", out] + args + self.poke_args() + self.send_args()
+               "--difficulty", c["difficulty"], "--out", out] + args + self.poke_args() + self.send_args()
         for frame, text in sends:
             rec += ["--send", f"{frame} {text}"]
         if self.orig_input():
@@ -709,6 +709,13 @@ def selftest():
     assert "record_state.py" in joined and "--auto ScnAma --seed 1234" in joined
     assert "state-dump --save /tmp/w/ScnAma.d2s --seed 1234" in joined
     assert "state_diff.py" in joined and "--ignore fr" in joined
+    # the check's difficulty reaches both sides (1.14d: autostart's config +0x210 write)
+    assert "--difficulty normal" in next(x for x in r.log if "record_state.py" in x)
+    nm = Runner(parse(GOOD + "difficulty nightmare\n"), "/tmp/w", dry=True)
+    nm.next = 5
+    nm.state("/tmp/w/ScnAma.d2s", {"orig", "d2rs"})
+    assert "--difficulty nightmare" in next(x for x in nm.log if "record_state.py" in x)
+    assert "--difficulty nightmare" in next(x for x in nm.log if "state-dump" in x)
     # the poke line reaches both sides as --poke "<frame> <directive args>"
     poke = "--poke '5 pos @player 4880 4230'"
     rec_line = next(x for x in r.log if "record_state.py" in x)

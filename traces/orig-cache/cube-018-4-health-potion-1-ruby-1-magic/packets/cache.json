@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-018-4-health-potion-1-ruby-1-magic",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "7c8556a7d861849813f7b61a82bbbf8b45ac979b2814e464885f60e6a889a241",
+   "size": 46294
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "5699e5dfb8b4126a47caa1bdb5cee79b95996cc66aa33d381267298fd8dbeea9",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "277f331bc997e9a2308089965f2ae30e61cee8024c7a37ff9d403dca3e29b3bf"
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "channel": "rng",
+ "check": "gen-missile-206",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnSor",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "8 spawn 179 @x+6 @y normal",
+  "--poke",
+  "12 missile 206 @x @y @x+6 @y skill 35 20"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "306a3e9541cae6526669484d12bba2081801606e8d39ad0f4035c262894aefe4",
+   "size": 1464783
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "e7a75ee1259315677da055b269587aa0c6c8a51f41ecba6fe5df1c1f5e1d979f",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "163279ff197d8ac1c0fb5ea9daedfb396a382280151c03826e560666747f2efd",
+  "save": "58d80df5bf2c4c82ebcb500135829c6c12fb55c13a30b8de9e0a35697ab2f95f"
+ }
+}

@@ -293,6 +293,9 @@ pub struct Predict {
     /// The model's living monsters, stamped on the client path's grids
     /// ([`Self::set_others`]).
     others: Vec<super::client_path::OtherUnit>,
+    /// The model's objects with collision in their mode, stamped with
+    /// them ([`Self::set_others`]).
+    objects: Vec<super::client_path::OtherObject>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -370,6 +373,7 @@ impl Predict {
                 waypoint: self.waypoint,
                 since: None,
                 others: std::mem::take(&mut self.others),
+                objects: std::mem::take(&mut self.objects),
                 path: ClientPath::default(),
                 path_for: None,
             };
@@ -405,6 +409,23 @@ impl Predict {
         };
         if p.mode_requests != self.requests {
             self.requests = p.mode_requests;
+            // A request that sets a mode other than walk / run ends the
+            // walk under way: get-hit (code 6, mode 4), death (8, 9),
+            // a skill (0x12–0x16), knockback (0x14), … (`client/model.md`
+            // §8 r4); the client steps the path only in a walking mode,
+            // as the server stops its player's walk on the same mode
+            // change. The walk codes (0x00, 0x01, 0x17, 0x18) and the
+            // interact sender (0x02, no mode) keep it.
+            // PROVISIONAL (client/model.md §8 r4, OQ2; REC-1250): that the
+            // 1.14d client unit stands from that request on; settled by a
+            // recording of the client unit's path under a hit while
+            // walking.
+            if p.last_mode_request
+                .is_some_and(|r| !matches!(r.code, 0x00 | 0x01 | 0x02 | 0x17 | 0x18))
+            {
+                self.walk = None;
+                self.path_for = None;
+            }
             // A waypoint arrival (`world/waypoints.md` §7 r7): 1.14d takes
             // the 0x15 point and never walks to the 0x0D's x + 3, y + 3
             // (the teleport zeroes the path, `sim/path-placement.md` §6
@@ -546,7 +567,7 @@ impl Predict {
                 self.path_for = None;
                 return false;
             }
-            self.path.stamp_others(t, drlg, &self.others);
+            self.path.stamp_others(t, drlg, &self.others, &self.objects);
             if !self.path.request(t, drlg, speeds, own, to, walk.run) {
                 // No path: the server's request stands still too.
                 self.walk = None;
@@ -554,7 +575,7 @@ impl Predict {
                 return true;
             }
         }
-        self.path.stamp_others(t, drlg, &self.others);
+        self.path.stamp_others(t, drlg, &self.others, &self.objects);
         let moving = self.path.tick(t, drlg, speeds, own, Some(to));
         if let Some((x, y)) = self.path.position() {
             let now = (i64::from(x), i64::from(y));
@@ -634,10 +655,16 @@ impl Predict {
         };
     }
 
-    /// The model's living monsters whose footprints the client path
-    /// sees (`msg-units.md` §3 r2), set before each [`Self::frame`].
-    pub fn set_others(&mut self, others: Vec<super::client_path::OtherUnit>) {
+    /// The model's living monsters (`msg-units.md` §3 r2) and colliding
+    /// objects whose footprints the client path sees, set before each
+    /// [`Self::frame`].
+    pub fn set_others(
+        &mut self,
+        others: Vec<super::client_path::OtherUnit>,
+        objects: Vec<super::client_path::OtherObject>,
+    ) {
         self.others = others;
+        self.objects = objects;
     }
 
     /// The server tick the walk under way started on (`sim/units.md`
@@ -1197,11 +1224,12 @@ mod tests {
         request(&mut w, key, 1, 1013, 23);
         p.frame(&w, [walk_point(30, 20, false)], false, SPEEDS);
         assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(30, 20)));
-        // Not a walk request: no server walk.
+        // Not a walk request: no server walk, and its mode (0xD) ends the
+        // walk under way (§8 r4).
         request(&mut w, key, 1, 25, 25);
         request(&mut w, key, 0x19, 25, 25);
         p.frame(&w, [], false, SPEEDS);
-        assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(30, 20)));
+        assert_eq!(p.walking(), None);
         // The same request again is still a new one.
         request(&mut w, key, 1, 25, 25);
         p.frame(&w, [], false, SPEEDS);
@@ -1209,6 +1237,39 @@ mod tests {
         request(&mut w, key, 1, 25, 25);
         p.frame(&w, [], false, SPEEDS);
         assert_eq!(p.walking().map(|w| w.to), Some(WalkTo::Point(25, 25)));
+    }
+
+    // Covers: specs/client/model.md §8 r4
+    #[test]
+    fn a_hit_or_death_request_ends_the_walk_and_a_walk_code_keeps_it() {
+        let (mut w, key) = world_at(100, 100);
+        let mut p = Predict::new();
+        p.frame(&w, [walk_point(120, 100, false)], true, SPEEDS);
+        let at = p.position();
+        // The interact sender (code 2) sets no mode: the walk goes on.
+        request(&mut w, key, 0x02, 4, 9);
+        p.frame(&w, [], true, SPEEDS);
+        assert!(p.walking().is_some());
+        assert_ne!(p.position(), at);
+        // Get-hit (code 6, mode 4): the player stands from here.
+        request(&mut w, key, 0x06, 101, 100);
+        p.frame(&w, [], true, SPEEDS);
+        let stood = p.position();
+        assert_eq!(p.walking(), None);
+        assert_eq!(p.mode(), None);
+        p.frame(&w, [], true, SPEEDS);
+        assert_eq!(p.position(), stood);
+        // A new click walks again; death (code 8) ends it as well.
+        p.frame(&w, [walk_point(120, 100, false)], true, SPEEDS);
+        assert!(p.walking().is_some());
+        request(&mut w, key, 0x08, 101, 100);
+        p.frame(&w, [], true, SPEEDS);
+        assert_eq!(p.walking(), None);
+        // A skill start (0x15 / 0x16, the local cast of a click) too.
+        p.frame(&w, [walk_point(120, 100, true)], true, SPEEDS);
+        request(&mut w, key, 0x16, 0, 0);
+        p.frame(&w, [], true, SPEEDS);
+        assert_eq!(p.walking(), None);
     }
 
     #[test]

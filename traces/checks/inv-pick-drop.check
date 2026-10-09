@@ -1,0 +1,14 @@
+check 1
+# Inventory flow (inv.*): one ground item made by poke `item` (game seed fixed), picked up with
+# C->S 0x16, then moved by the sends below; state, packets and items compare both sides.
+# Authored by q-run-items. Spec: specs/tools/scenario-diff.md, specs/tools/poke.md, specs/items/inventory-moves.md.
+name inv-pick-drop
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels state packets items
+at 4 poke seed-game 0x00001234 666
+at 4 poke item hp1 @x+1 @y
+at 10 send PickItem type=4 id=@4 cursor=0
+at 14 send DropItem item=@4

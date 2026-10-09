@@ -356,8 +356,35 @@ impl ClickWorld for ModelClick<'_> {
             .get(&u)
             .is_some_and(|u| (u.class as usize) < self.inputs.tables.objects.len())
     }
+    /// `0x00641530(P, U)` (`sim/pathing.md` §9.5, the server's own
+    /// function: the item, NPC and player decisions of §6 r9.2 and the
+    /// server's walk-or-act test of the same message agree on it), from
+    /// the local player's own cell; sizes `sim/path-placement.md` §3 (a
+    /// monster's `monstats2` `SizeX`).
     fn distance(&self, u: UnitKey) -> i32 {
-        self.path_distance(u)
+        let size = |c: &super::world::ClientUnit| match c.key.unit_type {
+            super::world::MONSTER => self
+                .inputs
+                .tables
+                .monsters
+                .get(c.class as usize)
+                .and_then(|r| r.as_ref())
+                .map_or(0, |r| i32::from(r.size_x)),
+            _ => super::objects::unit_size(c, &self.inputs.objclient.rows),
+        };
+        match (
+            self.world.units.get(&u),
+            self.world.local(),
+            self.own_position(),
+        ) {
+            (Some(u), Some(p), Some((x, y))) => super::objects::unit_distance_at(
+                u.cell(),
+                size(u),
+                ((x >> 16) as u16, (y >> 16) as u16),
+                size(p),
+            ),
+            _ => i32::MAX,
+        }
     }
     fn path_distance(&self, u: UnitKey) -> i32 {
         let rows = &self.inputs.objclient.rows;
@@ -1052,5 +1079,40 @@ mod tests {
         hold.extend_from_slice(&122u32.to_le_bytes());
         hold.extend_from_slice(&100u32.to_le_bytes());
         assert_eq!(w.outgoing, vec![hold], "no walk to the NPC");
+    }
+
+    // Covers: specs/ui/controls.md §6 r9; specs/sim/pathing.md §9.5
+    #[test]
+    fn the_interact_distance_is_the_unit_distance() {
+        use crate::bridge::world::ITEM;
+        // The player at (100, 100), a ground item at (101, 105): the
+        // size-reduced 0x006416D0 reads 4 (an at-once pick-up), the unit
+        // distance 0x00641530 of the decision reads more than 4, so the
+        // client walks to the item first, as the server's 0x16 test
+        // (`items/inventory-moves.md` §7.1 r2) would walk the player.
+        let mut w = world();
+        let item = UnitKey::new(ITEM, 6);
+        let mut u = ClientUnit::new(item);
+        u.position = Some((101, 105));
+        u.mode = 3;
+        w.units.insert(item, u);
+        let inputs = ModelInputs::default();
+        let c = ModelClick {
+            world: &w,
+            inputs: &inputs,
+            view: view((0, 0)),
+            local_at: None,
+        };
+        assert_eq!(c.path_distance(item), 4);
+        let t = super::super::predict::path_tables().unwrap();
+        let d = d2_sim::path::walk::geom::unit_distance(
+            t,
+            d2_sim::path::coords::Point::new(101, 105),
+            1,
+            d2_sim::path::coords::Point::new(100, 100),
+            2,
+        );
+        assert_eq!(c.distance(item), d);
+        assert!(d > 4, "{d}");
     }
 }

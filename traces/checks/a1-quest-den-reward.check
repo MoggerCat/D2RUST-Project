@@ -1,0 +1,15 @@
+check 1
+# Den of Evil reward (quests-act1.md §10, world/quests.md §7.3): save with 1.1
+# (Den cleared, reward pending); talk to Akara (148), msg 76: 1.0 set,
+# 1.1 cleared. Quest flags on the state channel (q), 0x5D on packets.
+name a1-quest-den-reward
+save PtDen --class ama --expansion --quests 1.1
+seed 1234
+ticks 60
+seconds 300
+channels state packets
+at 4 poke goto unit 1:148
+at 14 send InteractWithEntity type=1 id=@1:148
+at 16 send InitEntityChat id=@1:148
+at 18 send QuestMessage npc=@1:148 msg=76
+at 20 send TerminateEntityChat id=@1:148

@@ -1,4 +1,4 @@
-// Spec: specs/sim/tick.md §2, §5, §6; specs/sim/unit-order.md §2.5, §3; specs/audio/triggers-2.md §14
+// Spec: specs/sim/tick.md §2, §5, §6; specs/sim/unit-order.md §2.5, §3; specs/audio/triggers-2.md §14; specs/monsters/ai.md §5.2
 //! One game's simulation state as far as Phase 3 has specified it: the
 //! frame counter, the unit/room/client lists and the timer queue, plus the
 //! operations that touch more than one of them.
@@ -34,6 +34,44 @@ pub struct Game {
     /// file, so the host (`d2-server`'s character storage) runs it and
     /// clears this after the tick.
     pub character_save_due: bool,
+    /// The target-node lists' inserted nodes (game +0x10F8, `ai.md` §5.2).
+    pub target_nodes: TargetNodes,
+}
+
+/// The nodes of the game's 10 target-node lists (game +0x10F8, `ai.md`
+/// §5.2) that units joined through `0x005B1990` (slots 8 and 9: good
+/// NPCs, bone walls) or `0x005B1900` (a player's attached units), in list
+/// order. A slot 0–7 head (the player, `0x005B1880`) is the host's
+/// (`AiTargets::target_nodes`); the head is not stored here.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TargetNodes {
+    slots: [Vec<UnitId>; 10],
+}
+
+impl TargetNodes {
+    /// `0x005B1990(game, unit, 0, slot)`: the node pushed at the head of
+    /// list `slot` (so lists 8 and 9 run newest first). A slot outside
+    /// 0–9 adds nothing.
+    pub fn push_front(&mut self, slot: i32, unit: UnitId) {
+        if let Some(list) = usize::try_from(slot)
+            .ok()
+            .and_then(|s| self.slots.get_mut(s))
+        {
+            list.insert(0, unit);
+        }
+    }
+
+    /// `0x005B1A90`: the unit's node unlinked from whichever list holds it.
+    pub fn remove(&mut self, unit: UnitId) {
+        for list in &mut self.slots {
+            list.retain(|&u| u != unit);
+        }
+    }
+
+    /// The inserted nodes of list `slot`, in list order.
+    pub fn slot(&self, slot: usize) -> &[UnitId] {
+        self.slots.get(slot).map_or(&[], Vec::as_slice)
+    }
 }
 
 impl Game {
@@ -61,6 +99,7 @@ impl Game {
         self.lists.remove_unit(unit)?;
         self.timers.remove_unit(unit);
         self.sounds.clear(unit);
+        self.target_nodes.remove(unit);
         Ok(())
     }
 

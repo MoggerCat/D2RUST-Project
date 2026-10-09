@@ -614,6 +614,28 @@ impl Headless {
         }
     }
 
+    /// The prediction as `play` hands it to the model after its walk frame
+    /// (`world_view::walk_room::preview_walk_room`): the local player's
+    /// room recached at the predicted sub-tile, and the prediction
+    /// recorded for the position check's rule 8 (`Bridge::set_local_walk`,
+    /// REC-277), so a server point the client part has not reached is
+    /// taken, not answered with C→S 0x5F. No prediction: nothing.
+    ///
+    /// d2rs-own, unverified. PROVISIONAL (client/model.md OQ2; REC-51,
+    /// REC-1385: the headless state-dump client follows the server's walk
+    /// and point as the play preview does; the 1.14d client's own player
+    /// stands at the server player's point at every check of
+    /// milestone-anya and combat-cold-plains-wp).
+    pub fn sync_local<L: ServerLink>(&self, bridge: &mut Bridge<L>) {
+        let Some((predict, _, _)) = self.walk.as_ref() else {
+            return;
+        };
+        if let Some((x, y)) = predict.cell() {
+            bridge.recache_local_room(x, y);
+        }
+        bridge.set_local_walk(predict.position(), predict.mode());
+    }
+
     /// After each bridge frame: [`Headless::observe`], then on a server
     /// tick the pending interaction's frame (`play` runs it once per
     /// drawn tick, `world_view::interact`): once the walk toward the
@@ -1321,6 +1343,23 @@ mod tests {
                 link.sent.lock().unwrap().as_slice(),
                 [vec![0x26, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
             );
+        }
+
+        // Covers: specs/tools/state-snapshot.md §3 r4
+        /// With a prediction the model records it for the position check
+        /// (rule 8 takes the server's point); without one nothing is set.
+        #[test]
+        fn sync_local_records_the_prediction_for_the_check() {
+            let (mut b, _) = scene();
+            let plain = Headless::new(Vec::new()).unwrap();
+            plain.sync_local(&mut b);
+            assert!(b.world().predicted(b.world().local().unwrap()).is_none());
+            let mut h = Headless::new(Vec::new())
+                .unwrap()
+                .with_prediction(WalkTap::default(), None);
+            h.observe(b.world(), false);
+            h.sync_local(&mut b);
+            assert!(b.world().predicted(b.world().local().unwrap()).is_some());
         }
     }
 }

@@ -253,6 +253,12 @@ impl Presets {
         self.rooms.get_mut(&room)?.units.get_mut(index)?.path.take()
     }
 
+    /// The path of the room's preset unit `index`, kept (a copy, as
+    /// `0x006660B0` makes for the quest map-AI stores).
+    pub fn unit_path(&self, room: DrlgRoomId, index: usize) -> Option<Vec<PathPoint>> {
+        self.rooms.get(&room)?.units.get(index)?.path.clone()
+    }
+
     pub fn room_units(&self, room: DrlgRoomId) -> &[PresetUnit] {
         self.rooms.get(&room).map_or(&[], |r| r.units.as_slice())
     }

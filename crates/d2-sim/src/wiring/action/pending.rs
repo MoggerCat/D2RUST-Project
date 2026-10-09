@@ -150,9 +150,10 @@ pub trait Pending {
     fn anim_rate(&self, unit: UnitId, speed: Option<u32>) -> i16 {
         0
     }
-    /// The frame bonus `0x00623B10` (table `0x006E8E60` by class and
-    /// weapon type, `units.md` §4.3; animation-rate spec, not written).
-    fn frame_bonus(&self, unit: UnitId) -> i32 {
+    /// The type class `0x00629FE0` of an item (`units.md` §4.7 "Frame
+    /// bonus"; `render/unit-composite.md` §2.1: its `wclass` in table
+    /// `0x007446A0`, else 0). Default: 0.
+    fn item_type_class(&self, item: UnitId) -> u32 {
         0
     }
 

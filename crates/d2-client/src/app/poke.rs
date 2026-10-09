@@ -248,8 +248,14 @@ pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
     // handlers, so a quest object a directive creates (a `warp` that
     // builds an act) runs its init (`quests-act2-2.md` §2 item 1).
     let game = &mut s.game;
-    s.world
-        .lend_quests(&mut s.events, |_, ev| poke::apply_op(game, ev, &env, op))
+    let r = s
+        .world
+        .lend_quests(&mut s.events, |_, ev| poke::apply_op(game, ev, &env, op));
+    // The unit work the directive queued (a `warp`'s pet follow,
+    // `path-placement.md` §10 rule 6) runs before the next tick, as
+    // inside the 1.14d function the poke calls.
+    s.world.handler_work(&mut s.game, &mut s.events);
+    r
 }
 
 /// One step of a `goto` walk (`poke.md` §6) on `s`, with the walk's
@@ -260,6 +266,8 @@ pub fn goto_now(s: &mut Sim, t: GotoTarget, mut walk: GotoWalk) -> (poke::PokeRe
     };
     let env = poke::Env::new(player);
     let r = poke::goto_step(&mut s.game, &mut s.events, &env, &t, &mut walk);
+    // As [`apply_now`]: a step's warp follows its pets now.
+    s.world.handler_work(&mut s.game, &mut s.events);
     (r, walk)
 }
 

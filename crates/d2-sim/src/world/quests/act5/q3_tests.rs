@@ -7,9 +7,9 @@ use super::super::super::{
 };
 use super::{
     anya_dummy_event, anya_dummy_init, anya_items, anya_tier, anya_town_dummy_init,
-    apply_resist_scroll, frozen_anya_init, frozen_anya_operate, nihlathak_dummy_event,
-    nihlathak_temple_dummy_init, nihlathak_town_dummy_init, portal_event, town_cleanup,
-    use_resist_scroll, CHAIN, DREHYA, DREHYAICED, MALAH, NIHLATHAK, SLOT,
+    apply_resist_scroll, frozen_anya_init, frozen_anya_operate, map_ai_store,
+    nihlathak_dummy_event, nihlathak_temple_dummy_init, nihlathak_town_dummy_init, portal_event,
+    town_cleanup, use_resist_scroll, CHAIN, DREHYA, DREHYAICED, MALAH, NIHLATHAK, SLOT,
 };
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
@@ -741,6 +741,30 @@ fn anya_portal_modes() {
 }
 
 // ------------------------------------------------------------ §5.9
+
+// Covers: specs/world/quests-act5.md §5.8
+#[test]
+fn map_ai_store_applies_once_when_in_town() {
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    f.a5_map_ai = true;
+    // Anya not in town: the handle is only kept.
+    map_ai_store(&mut ctl, &mut f, 0x10, false);
+    assert!(f.log.is_empty() && x(&mut ctl).anya_map_ai == 0x10);
+    // In town with her unit alive: applied once.
+    f.monsters.insert(DREHYA_U, (0x41, DREHYA, kind(DREHYA)));
+    let e = x(&mut ctl);
+    e.anya_in_town = true;
+    e.anya_guid = 0x41;
+    map_ai_store(&mut ctl, &mut f, 0x11, false);
+    assert_eq!(f.log, ["map ai 65 0x11"]);
+    assert!(x(&mut ctl).anya_map_ai_applied);
+    map_ai_store(&mut ctl, &mut f, 0x12, false);
+    assert_eq!(f.log.len(), 1);
+    // Nihlathak's store keeps his own handle.
+    map_ai_store(&mut ctl, &mut f, 0x20, true);
+    assert!(x(&mut ctl).nihlathak_map_ai == 0x20 && x(&mut ctl).anya_map_ai == 0x12);
+}
 
 // Covers: specs/world/quests-act5.md §5.9, §edge-cases-original-bugs r10
 #[test]

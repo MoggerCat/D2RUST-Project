@@ -707,15 +707,15 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    before calling with a (0, 0) vector.)
 3. Δ := velocity vector. Not a missile: R := point[index] centre −
    position; if |R.x| ≤ M and |R.y| ≤ M with M = max(|Δx|, |Δy|): Δ := R
-   and "reaches the point".
-   PROVISIONAL: "not a missile" reads as "not the straight missile path
-   (type 4)": missiles on the point paths of §11.2 / §11.3 (charged bolt,
-   blessed hammer) reach their points too (because in 1.14d, Wine
-   2026-10-09, `pal-blessed-hammer.check` frame 31 and
-   `sor-charged-bolt.check` frame 27, the missile lands exactly on a
-   point's centre, xf = yf = 0x8000, and the next step heads for the
-   following point; without the test it overshoots and turns back);
-   settled by REC-1643 (read the test at `0x00650660`).
+   and "reaches the point". PROVISIONAL: missiles snap too (because the
+   1.14d recording `dru-tornado` shows the tornado, path type 10 with
+   point 0 = its start cell, keep its exact position on its first tick
+   while its facing turns to point 1, then fly straight to point 1:
+   frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
+   2.5 aim give; also the charged bolt and blessed hammer of
+   `sor-charged-bolt.check` frame 27 / `pal-blessed-hammer.check` frame
+   31 land exactly on point centres, q-fix-skills-4cls REC-1643); settled
+   by a read of `0x00650660` (REC-1391).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path

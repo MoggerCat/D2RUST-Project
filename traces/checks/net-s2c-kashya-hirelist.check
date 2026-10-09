@@ -1,0 +1,13 @@
+check 1
+# Kashya hire list: goto the NPC, interact, open the chat, hire-list action, close (as a2-npc-greiz-hirelist); packets compares S->C 0x4E MercForHire, 0x4F StartMercList and 0x58 OpenUi (q-run-net, REC-1754).
+name net-s2c-kashya-hirelist
+save ScnAma --class ama --expansion --gold 10000
+seed 1234
+ticks 50
+seconds 240
+channels packets
+at 4 poke goto unit 1:150
+at 14 send InteractWithEntity type=1 id=@1:150
+at 16 send InitEntityChat id=@1:150
+at 18 send EntityAction action=3 npc=@1:150 item=0
+at 21 send TerminateEntityChat id=@1:150

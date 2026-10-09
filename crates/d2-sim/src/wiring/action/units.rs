@@ -100,16 +100,26 @@ impl<X: Pending> ActionHooks<X> {
         sim: &Sim<'_>,
         unit: UnitId,
     ) -> Option<(UnitType, u32, u32)> {
-        let r = sim.units.get(unit)?;
+        self.draw_identity_in(sim.units, sim.stats, unit)
+    }
+
+    /// [`Self::draw_identity`] on the unit records and stat lists.
+    pub(crate) fn draw_identity_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> Option<(UnitType, u32, u32)> {
+        let r = units.get(unit)?;
         let own = (r.ty, r.class, r.mode);
         if r.flags2 & flags2::DISGUISE == 0 {
             return Some(own);
         }
-        let states = &sim.stats.data().states;
+        let states = &stats.data().states;
         let Some(&(_, gfx, class)) = states
             .gfx_states()
             .iter()
-            .find(|&&(s, ..)| sim.stats.has_state(unit, s))
+            .find(|&&(s, ..)| stats.has_state(unit, s))
         else {
             return Some(own);
         };
@@ -149,6 +159,33 @@ impl<X: Pending> ActionHooks<X> {
             }
             _ => (UnitType::Player, class, r.mode),
         })
+    }
+
+    /// The frame bonus `0x00623B10` (`units.md` §4.7 "Frame bonus",
+    /// through [`crate::units::anim_rate::frame_bonus`]): the draw
+    /// identity (T, C, M), dual-wield capability `0x006235A0` (player
+    /// class 4 or 6, monster class 417 or 418), the attack weapon
+    /// `0x00623990(U, 1)` and its type class `0x00629FE0`
+    /// ([`Pending::item_type_class`]).
+    pub(crate) fn frame_bonus_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> i32 {
+        let Some((t, c, m)) = self.draw_identity_in(units, stats, unit) else {
+            return 0;
+        };
+        let dual = match t {
+            UnitType::Player => matches!(c, 4 | 6),
+            UnitType::Monster => matches!(c, 417 | 418),
+            _ => false,
+        };
+        let tc = self
+            .x
+            .attack_weapon(unit)
+            .map(|w| self.x.item_type_class(w));
+        crate::units::anim_rate::frame_bonus(t as u8, c, m, dual, tc)
     }
 
     /// Steps 3–5 and 8–10 of `0x00623F50` (`units.md` §4.7, through
@@ -302,6 +339,24 @@ pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
 }
 
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// Monster death by regeneration (`stat-lists.md` §10.1 step 6): the
+    /// kill `0x0057CCB0` with the poison / open-wounds owner, then the
+    /// death events `0x005C0C30`.
+    // PROVISIONAL (stat-lists.md §10.1 step 6, REC-1260): "the death
+    // events" read as `damage.md` §5.2 step 15's pair, killed (10) on the
+    // unit then kill (9) on the killer, with no damage record; settled by
+    // a 1.14d trace of a poison kill with an item kill event.
+    fn monster_death(&mut self, sim: &mut Sim<'_>, unit: UnitId, killer: Option<UnitId>) {
+        use crate::combat::{EV_KILL, EV_KILLED};
+        let mut v = View::of(sim.units, sim.stats, sim.data, self);
+        let mut cv = v.combat(sim.game);
+        super::reaction::kill_by(&mut cv, unit, killer);
+        cv.fire_unit_event(EV_KILLED, Some(unit), killer, None);
+        if let Some(k) = killer {
+            cv.fire_unit_event(EV_KILL, Some(k), Some(unit), None);
+        }
+    }
+
     /// Runs the queued remove callbacks of the lists the expiry walk
     /// freed (`stat-lists.md` §8.2 rule 6, `skills/bodies.md` §2.8).
     // PROVISIONAL (REC-263; d2rs-own, unverified): the bodies of the shrine
@@ -453,7 +508,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .path_has(unit)
             .then(|| UnitHooks::anim_rate(self, sim, unit));
         let record = UnitHooks::anim_record(self, sim, unit);
-        let bonus = self.x.frame_bonus(unit);
+        let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
         let Some(r) = sim.units.get_mut(unit) else {
             return;
         };
@@ -512,8 +567,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
 
     /// `0x00623B10` (`units.md` §4.3).
-    fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
-        self.x.frame_bonus(unit)
+    fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {
+        self.frame_bonus_in(sim.units, sim.stats, unit)
     }
 
     fn has_path(&mut self, _: &Sim<'_>, unit: UnitId) -> bool {
@@ -1342,9 +1397,9 @@ impl<X: Pending> View<'_, X> {
             stats: self.stats,
             data: self.data,
         };
-        let r = crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode);
+        let r = crate::units::modes::monster_set_mode_started(&mut sim, &mut *self.h, u, mode);
         match r {
-            Ok(()) => true,
+            Ok(started) => started,
             Err(e) => {
                 self.unit_error(e);
                 false

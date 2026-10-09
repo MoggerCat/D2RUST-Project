@@ -1,0 +1,26 @@
+check 1
+# Smashing the Mephisto soulstone on the Hellforge (quests-act4.md §4.6):
+# ScnAm4 (Act IV start) with quests 25.0 27.2 27.3, -seed 1234. Pokes: warp
+# 107 and walk to the forge (goto preset), an `mss ` on the ground picked up
+# (0x16, to the inventory) and put on the forge (`operate`, mode 0 -> 1 ->
+# 2), an `hfh ` picked up to the cursor and swapped onto the weapon hand
+# (0x16, 0x1D), then three `operate` hits: mode 3, 27.1 and 27.13, gems.
+# Compares the forge's mode, the quest flags and the dropped items.
+# Spec: specs/tools/scenario-diff.md.
+name a4-hellforge-smash
+save ScnAm4 --class ama --expansion --act 3 --quests acts=3 --quests 25.0 --quests 27.2 --quests 27.3
+seed 1234
+ticks 330
+seconds 1200
+channels state
+at 5 poke warp 107
+at 20 poke goto preset 107 2:376
+at 70 poke item mss @x+2 @y
+at 75 poke msg 0x16 4 @4 0
+at 80 poke operate @2:376
+at 160 poke item hfh @x+2 @y
+at 170 poke msg 0x16 4 @4 1
+at 175 poke msg 0x1D @4 4
+at 190 poke operate @2:376
+at 200 poke operate @2:376
+at 210 poke operate @2:376

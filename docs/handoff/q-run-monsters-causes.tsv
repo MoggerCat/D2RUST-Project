@@ -1,0 +1,18 @@
+#q-run-monsters causes 1
+cause	rows	example	classes
+state monster field m	87	frame 31 monster 1:8 class 69, field m: 1.14d 2 vs d2rs 1	69 70 71 72 77 104 133 134 135 161 163 164
+state player field fc	33	frame 145 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0	140 142 143 144 188 238 239 240 309 391 479 480
+state monster field fr	28	frame 100 monster 1:8 class 117, field fr: 1.14d 3328 vs d2rs 4608	117 128 129 304 305 306 311 360 361 469 470 471
+state monster field tx	17	frame 31 monster 1:8 class 39, field tx: 1.14d 5145 vs d2rs 5143	39 41 42 376 395 439 440 441 442 443 610 611
+state player field m	9	frame 125 player 0:1 class 0, field m: 1.14d 5 vs d2rs 4	64 65 66 189 466 529 618 619 645
+state monster field x	8	frame 38 monster 1:8 class 492, field x: 1.14d 5146 vs d2rs 5148	492 493 494 495 496 688 689 714
+state monster field s	6	frame 31 monster 1:8 class 11, field s: 1.14d [4094205064, 1004892389] vs d2rs [2409280208, 8913528]	11 12 13 14 102 132
+state frame N game, field seed: N.Nd [N, N] vs dNrs [N, N]	6	frame 41 game, field seed: 1.14d [2714123707, 838425138] vs d2rs [2793620638, 1943]	190 191 192 193 194 681
+state player field hp	5	frame 35 player 0:1 class 0, field hp: 1.14d 12509 vs d2rs 12441	93 95 654 655 718
+state player field s	5	frame 42 player 0:1 class 0, field s: 1.14d [1944982531, 35] vs d2rs [85, 666]	595 598 605 606 607
+state monster field ty	4	frame 31 monster 1:8 class 110, field ty: 1.14d 4261 vs d2rs 4262	110 112 113 608
+state player field sp	4	frame 71 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64	295 629 630 652
+state missile field lvl	4	frame 45 missile 3:1 class 502, field lvl: 1.14d 2 vs d2rs 1	530 531 532 533
+rng frame N, game, draw #N, field missing: N.Nd site NxNeN vs dNrs site No	3	frame 29, game, draw #1, field missing: 1.14d site 0x552e31 vs d2rs site None	540 541 542
+rng unit-type 1 draw #4 field n: 1.14d site 0x56e132 vs d2rs site d2rs-site	3	frame 112, unit 1:8, draw #4, field n: 1.14d site 0x56e132 vs d2rs site crates/d2-sim/src/skills/levels.rs:1123	615 616 723
+state frame N missile N:N class N/N, field cl: N.Nd N vs dNrs N	1	frame 44 missile 3:1 class 24/22, field cl: 1.14d 24 vs d2rs 22	60
