@@ -266,12 +266,10 @@ pub fn event_shake(code: u8, start_tick: u64) -> Option<RunningShake> {
 
 /// Client missile 372 `diablo appears` (function 37, `0x004D6540`) at
 /// frames left 150 calls `0x00476A80(25, 0, 4000, 0)` (camera §8 fifth
-/// row).
-// PROVISIONAL (render/camera.md §8): of the ten call sites only this one
-// and `event_shake` start a shake; the other rows start none; settled by
-// REC-62 (HIGH-PRIORITY CAPTURE: each shaking frame draws twice from the
-// client player seed). The client missile layer that reaches it is
-// Phase 6 effects.
+/// row). The model starts this and the other rows' shakes itself
+/// (`ClientWorld::shake`: S→C 0x5A code 0x12 and the client missile
+/// functions 12, 29, 31, 36, 37, 38, 54, 66); the play feed reads it
+/// (`ModelFeed::shake`). Their draws on the player seed stay REC-62.
 pub fn diablo_appears_shake(frames_left: u32, start_tick: u64) -> Option<RunningShake> {
     if frames_left != 150 {
         return None;

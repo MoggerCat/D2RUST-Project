@@ -32,6 +32,7 @@ edit flags:
   --gold G                     stat 14 (0..=level*10000)
   --skill INDEX=LEVEL          skill byte INDEX of the class list; repeatable
   --all-skills LEVEL           every skill byte
+  --left-skill ID / --right-skill ID   the mouse skill (skill id, e.g. 36 Fire Bolt)
   --quests none|all|LIST       LIST: comma-separated [diff:]acts=N or [diff:]SLOT.BIT ('all' is Pending)
   --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
@@ -114,6 +115,8 @@ fn parse(rest: Vec<String>) -> Result<(Edits, Common)> {
             "--softcore" => e.hardcore = Some(false),
             "--stat" => e.stats.push(pair(&a.value(&f)?, "--stat")?),
             "--skill" => e.skills.push(pair(&a.value(&f)?, "--skill")?),
+            "--left-skill" => e.left_skill = Some(num(&a.value(&f)?, "--left-skill")?),
+            "--right-skill" => e.right_skill = Some(num(&a.value(&f)?, "--right-skill")?),
             "--all-skills" => e.all_skills = Some(num(&a.value(&f)?, "--all-skills")?),
             "--gold" => e.gold = Some(num(&a.value(&f)?, "--gold")?),
             "--quests" => e.quests = Some(a.value(&f)?.parse()?),

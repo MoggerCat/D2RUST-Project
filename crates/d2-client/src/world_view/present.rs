@@ -788,6 +788,26 @@ fn script_input(
         ui.queue.0.extend(events);
         ui.cursor = script.cursor();
     }
+    // `key` steps: the window's key press path (`ui_input`), bound
+    // action first, then the typed character.
+    let codes: Vec<KeyCode> = script
+        .take_keys()
+        .into_iter()
+        .filter_map(|k| {
+            edge::KEY_CODES
+                .iter()
+                .find(|(_, e)| *e == k)
+                .map(|(c, _)| *c)
+        })
+        .collect();
+    if codes.is_empty() {
+        return;
+    }
+    if let Some(bindings) = &ui.bindings {
+        let actions = edge::key_actions(bindings, &codes);
+        ui.queue.0.extend(actions);
+    }
+    ui.queue.0.extend(edge::key_chars(&codes));
 }
 
 /// The world releases of a lost focus (`ui/controls.md` §4.3 r3): left

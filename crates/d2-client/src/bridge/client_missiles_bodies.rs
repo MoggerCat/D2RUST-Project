@@ -1193,3 +1193,122 @@ pub(super) fn molten_boulder(
     }
     super::wall_maker(w, env, key, row)
 }
+
+/// The shake of functions 12 and 29 (`render/camera.md` §8 rows): (A,
+/// 1000q, 1000(P2 − 2q), 1000q), q = ⌊P2 / 3⌋ (truncating).
+fn formula_shake(w: &mut ClientWorld, peak: i32, p2: i32) {
+    let q = p2 / 3;
+    w.start_shake(
+        peak as u32,
+        (1000 * q) as u32,
+        (1000 * (p2 - 2 * q)) as u32,
+        (1000 * q) as u32,
+    );
+}
+
+/// The shake starts of the client functions (`render/camera.md` §8,
+/// `missiles/client.md` §C13), then the default step:
+/// - 12 `0x004D3D30`: P1 > 0 and P2 > 0 → the formula shake (peak P1) at
+///   elapsed 0, step; else remove.
+/// - 29 `0x004D5310`: no owner → step; with one, the formula shake (peak
+///   8) when P2 > 0 and elapsed = 90; the helpers `0x004CE850`,
+///   `0x004CE530`, `0x004CECC0` are open (§C12, Open question 1).
+/// - 31 `0x004D6820`: frames left 150 → (25, 0, 4000, 0); rest open.
+/// - 36 `0x004D7400`: frames left 325 → (20, 0, 6000, 0); rest open.
+/// - 37 `0x004D6540`: frames left 150 → (25, 0, 4000, 0); 50 → sound
+///   4,638 (audio, not modelled).
+/// - 38 `0x004D6680`: the client object (type 2) with GUID d28 present
+///   and elapsed 10 → `0x004D19D0(object)` (open) and (4, 80, 80, 400).
+/// - 54 `0x004D8000`: elapsed 5 → (3, 600, 4000, 3000); rest open.
+pub(super) fn shaker(
+    w: &mut ClientWorld,
+    env: &Env,
+    key: UnitKey,
+    row: &ClientMissileRow,
+) -> Result<(), HandlerError> {
+    let Some(m) = w.objclient.missiles.get(&key).copied() else {
+        return Ok(());
+    };
+    let elapsed = m.total - m.current;
+    let [p1, p2, ..] = row.clt_param;
+    match row.clt_do_func {
+        12 => {
+            if p1 <= 0 || p2 <= 0 {
+                remove(w, key);
+                return Ok(());
+            }
+            if elapsed == 0 {
+                formula_shake(w, p1, p2);
+            }
+        }
+        29 => {
+            if m.owner.is_some_and(|o| w.units.contains_key(&o)) && p2 > 0 && elapsed == 90 {
+                formula_shake(w, 8, p2);
+            }
+        }
+        31 | 37 if m.current == 150 => w.start_shake(25, 0, 4000, 0),
+        36 if m.current == 325 => w.start_shake(20, 0, 6000, 0),
+        38 => {
+            let object =
+                super::super::world::UnitKey::new(super::super::world::OBJECT, m.d28 as u32);
+            let present = w.units.contains_key(&object) || w.objclient.set_c.contains_key(&object);
+            if present && elapsed == 10 {
+                w.start_shake(4, 80, 80, 400);
+            }
+        }
+        54 if elapsed == 5 => w.start_shake(3, 600, 4000, 3000),
+        _ => {}
+    }
+    default_step(w, env, key, row)
+}
+
+/// Function 66 `0x004D2610`, rule W (`render/camera.md` §8, worldstone
+/// shake): the owner present and its room's level 131 or 132 → m takes
+/// the owner's position, its animation advances with wrap; d28 = 0 → the
+/// shake (6, 2000, 3000, 2000); else one seed step and the shake when the
+/// new low word & 0x3F = 0; after a start d28 := 1. Then one seed step;
+/// its low word mod 10 = 0 → two more steps and `0x004D2520` (open, not
+/// run). No owner or another level → the default removal. No step.
+pub(super) fn worldstone_shake(w: &mut ClientWorld, key: UnitKey) -> Result<(), HandlerError> {
+    let Some(m) = w.objclient.missiles.get(&key).copied() else {
+        return Ok(());
+    };
+    let level = m.owner.and_then(|o| {
+        let room = w.room_units.room_of(o)?;
+        w.active_rooms
+            .as_deref()?
+            .iter()
+            .find(|r| r.room == room)
+            .map(|r| r.level)
+    });
+    let (Some(owner), Some(131 | 132)) = (m.owner.and_then(|o| w.units.get(&o)), level) else {
+        remove(w, key);
+        return Ok(());
+    };
+    let (ox, oy) = owner.cell();
+    if let Some(u) = w.objclient.set_c.get_mut(&key) {
+        u.position = Some((ox, oy));
+    }
+    if let Some(mm) = w.objclient.missiles.get_mut(&key) {
+        mm.pos = (
+            (u32::from(ox) << 16) | 0x8000,
+            (u32::from(oy) << 16) | 0x8000,
+        );
+        mm.frame += mm.anim_speed;
+        if mm.frame >= mm.anim_len {
+            mm.frame -= mm.anim_len;
+        }
+    }
+    let start = m.d28 == 0 || seed_step(w, key) & 0x3F == 0;
+    if start {
+        w.start_shake(6, 2000, 3000, 2000);
+        if let Some(mm) = w.objclient.missiles.get_mut(&key) {
+            mm.d28 = 1;
+        }
+    }
+    if seed_step(w, key).is_multiple_of(10) {
+        seed_step(w, key);
+        seed_step(w, key);
+    }
+    Ok(())
+}

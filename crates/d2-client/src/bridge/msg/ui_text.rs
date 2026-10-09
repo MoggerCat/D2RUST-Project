@@ -106,6 +106,10 @@ pub fn event_text(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
     }
     if bytes[1] == 0x12 {
         event_eclipse(w)?;
+        // r3: the UI layer's `0x00476A80(6, 4000, 10000, 4000)`
+        // (`render/camera.md` §8 first row), kept in the model so the
+        // frame's camera reads it.
+        w.start_shake(6, 4000, 10000, 4000);
     }
     let local_name = w.local_player.and_then(|k| player_name(w, k));
     msg.out.push(Output::EventText { bytes, local_name });

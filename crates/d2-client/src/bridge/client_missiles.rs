@@ -848,10 +848,10 @@ pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), H
         FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
         FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
         FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
-        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
-        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
-        // modelled; every branch steps.
-        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
+        // The shake starts of `render/camera.md` §8, then the step.
+        12 | 29 | 31 | 36 | FN_DIABLO_APPEARS | 38 | 54 => bodies::shaker(w, env, key, &row),
+        // Rule W.
+        66 => bodies::worldstone_shake(w, key),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
@@ -1334,7 +1334,12 @@ fn default_step(
 /// The client act's active rooms as read-only [`CollisionRooms`]
 /// (`sim/path-placement.md` §4): a missile's footprint mask is 0
 /// (§3 table), so its moves stamp nothing and `grid_mut` answers none.
-struct MissileRooms<'a>(&'a d2_sim::drlg::Drlg);
+/// A room's grid is its copy with the unit footprints
+/// ([`stamp_unit_footprints`]) when it has one.
+struct MissileRooms<'a>(
+    &'a d2_sim::drlg::Drlg,
+    &'a BTreeMap<RoomId, d2_sim::drlg::CollisionGrid>,
+);
 
 impl CollisionRooms for MissileRooms<'_> {
     fn subtile_rect(&self, room: RoomId) -> Option<d2_sim::drlg::TileRect> {
@@ -1353,12 +1358,103 @@ impl CollisionRooms for MissileRooms<'_> {
         self.0.active_room(n).map(|a| a.id)
     }
     fn grid(&self, room: RoomId) -> Option<&d2_sim::drlg::CollisionGrid> {
+        if let Some(g) = self.1.get(&room) {
+            return Some(g);
+        }
         let r = self.0.drlg_room_of(room)?;
         self.0.active_room(r).map(|a| &a.collision)
     }
     fn grid_mut(&mut self, _: RoomId) -> Option<&mut d2_sim::drlg::CollisionGrid> {
         None
     }
+}
+
+/// [`CollisionRooms`] writing into copies of the client act's grids.
+struct FootRooms<'a> {
+    drlg: &'a d2_sim::drlg::Drlg,
+    grids: BTreeMap<RoomId, d2_sim::drlg::CollisionGrid>,
+}
+
+impl CollisionRooms for FootRooms<'_> {
+    fn subtile_rect(&self, room: RoomId) -> Option<d2_sim::drlg::TileRect> {
+        MissileRooms(self.drlg, &self.grids).subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        MissileRooms(self.drlg, &self.grids).adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        MissileRooms(self.drlg, &self.grids).adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&d2_sim::drlg::CollisionGrid> {
+        if let Some(g) = self.grids.get(&room) {
+            return Some(g);
+        }
+        let r = self.drlg.drlg_room_of(room)?;
+        self.drlg.active_room(r).map(|a| &a.collision)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut d2_sim::drlg::CollisionGrid> {
+        if !self.grids.contains_key(&room) {
+            let r = self.drlg.drlg_room_of(room)?;
+            let g = self.drlg.active_room(r)?.collision.clone();
+            self.grids.insert(room, g);
+        }
+        self.grids.get_mut(&room)
+    }
+}
+
+/// The unit footprints of the client grids as the client missiles read
+/// them, rebuilt once per client update before the set-C missile walk:
+/// every living player and monster of the model at its sub-tile, with
+/// its pattern (`sim/path-placement.md` §3: size 0 → 0, 1 and 2 → 1, 3 →
+/// 2, others → 1; a monster that can be in town (`npc` or `inTown`)
+/// without `interact` 1 → 3, 2 → 4; players size 2, monsters `monstats2`
+/// `SizeX`) and footprint mask (player 0x80, monster 0x100; a dying or
+/// dead monster none, `client/msg-units.md` §3 r2), stamped
+/// (`0x0064EA90`, §5.1) on copies of the rooms' grids.
+///
+/// PROVISIONAL (REC-546): the 1.14d client stamps these on its grids as
+/// its units move (`sim/pathing.md` §13.3 r5); the model's grids carry
+/// none (the local player's walk prediction reads them without other
+/// units, `client/model.md` REC-277 (d)), so the missiles read a copy
+/// stamped at the units' model positions once per update.
+pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::world::MonsterClass>]) {
+    let Some(d) = w.drlg.as_ref() else {
+        w.objclient.unit_grids.clear();
+        return;
+    };
+    let mut rooms = FootRooms {
+        drlg: &d.drlg,
+        grids: BTreeMap::new(),
+    };
+    for (k, u) in &w.units {
+        if u.is_dead() {
+            continue;
+        }
+        let (size, town_npc, mask) = match k.unit_type {
+            PLAYER => (2, false, 0x80),
+            MONSTER => {
+                let c = monsters.get(u.class as usize).and_then(|c| c.as_ref());
+                let size = c.map_or(0, |c| i32::from(c.size_x));
+                let town = c.is_some_and(|c| (c.npc || c.in_town) && !c.interact);
+                (size, town, 0x100)
+            }
+            _ => continue,
+        };
+        let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) else {
+            continue;
+        };
+        let pattern = match (size, town_npc) {
+            (0, _) => 0,
+            (3, false) => 2,
+            (3, true) => 4,
+            (_, true) => 3,
+            _ => 1,
+        };
+        let room = drlg_room_at(&d.drlg, x, y);
+        d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, pattern, mask);
+    }
+    let grids = rooms.grids;
+    w.objclient.unit_grids = grids;
 }
 
 /// The active room of the client act whose sub-tile rect holds (x, y)
@@ -1413,6 +1509,7 @@ fn path_step(w: &mut ClientWorld, env: &Env, key: UnitKey) {
         .and_then(|u| env.rows.get(u.class as usize))
         .map_or(0, |r| move_mask(r.collide_type));
     let drlg = w.drlg.as_ref().map(|d| &d.drlg);
+    let unit_grids = &w.objclient.unit_grids;
     let Some(m) = w.objclient.missiles.get_mut(&key) else {
         return;
     };
@@ -1456,7 +1553,7 @@ fn path_step(w: &mut ClientWorld, env: &Env, key: UnitKey) {
         m.new_step = end_cell != old;
         return;
     };
-    let mut rooms = MissileRooms(drlg);
+    let mut rooms = MissileRooms(drlg, unit_grids);
     // 4.
     let mut q = end;
     if end_cell != old {
@@ -1525,7 +1622,7 @@ fn move_mask(collide_type: u8) -> u16 {
 fn point_value_from(w: &ClientWorld, room: Option<RoomId>, x: i32, y: i32, mask: u16) -> u32 {
     w.drlg.as_ref().map_or(0, |d| {
         u32::from(d2_sim::path::collision::point_value(
-            &MissileRooms(&d.drlg),
+            &MissileRooms(&d.drlg, &w.objclient.unit_grids),
             room,
             x,
             y,
@@ -1554,7 +1651,7 @@ fn collision_under(w: &ClientWorld, env: &Env, key: UnitKey) -> u32 {
         .map_or(0, |r| i32::from(r.size));
     let (x, y) = cell_of(m);
     u32::from(size_value(
-        &MissileRooms(&d.drlg),
+        &MissileRooms(&d.drlg, &w.objclient.unit_grids),
         m.room,
         x,
         y,
@@ -1641,8 +1738,20 @@ pub fn end_with(
         // r4.2: U's client event hooks of kind 0 (`0x004DC210`): not
         // modelled (no client event hook list in the model).
         // r4.3: the client hit function; 0 → the missile stays.
-        if !hits::call(w, env, key, unit, row.clt_hit_func)? {
-            return Ok(None);
+        match hits::call(w, env, key, unit, row.clt_hit_func) {
+            Ok(true) => {}
+            Ok(false) => return Ok(None),
+            Err(e) => {
+                // A body the model cannot run: the error is reported and
+                // the end goes on as for a non-zero result without the
+                // explosion (r7–r8), so the missile does not stay to
+                // fail again on every update (PROVISIONAL REC-547).
+                if let Some(id) = light_of(w, key) {
+                    let _ = w.lights.die(id);
+                }
+                super::objects::remove_client_unit(w, key);
+                return Err(e);
+            }
         }
         // r4.4: `HitSound` (audio, not modelled).
         // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
