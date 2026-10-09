@@ -184,7 +184,8 @@ pub struct DrawDump {
     pub request: crate::facts::export::DumpRequest,
     /// Frames drawn so far (the dump's `seq`).
     seen: u64,
-    done: bool,
+    /// The next dump of `request.at_ticks` (§5 r19); all done at its length.
+    next: usize,
 }
 
 impl DrawDump {
@@ -192,8 +193,12 @@ impl DrawDump {
         DrawDump {
             request,
             seen: 0,
-            done: false,
+            next: 0,
         }
+    }
+
+    fn done(&self) -> bool {
+        self.next >= self.request.at_ticks.len()
     }
 }
 
@@ -251,6 +256,21 @@ impl WorldViewUi {
             cursor: None,
             last_at: crate::ui::Point::new(0, 0),
             focus_lost: false,
+        }
+    }
+
+    /// The cursor position last reported to the UI (the click view's
+    /// mouse).
+    pub fn cursor(&self) -> Option<FramePos> {
+        self.cursor
+    }
+
+    /// Sets the cursor position a headless driver reported with its own
+    /// `CursorMoved` (`app::autoplay_host`, the window's `ui_input` path).
+    pub fn set_cursor(&mut self, at: FramePos) {
+        self.cursor = Some(at);
+        if let FramePos::Inside(p) = at {
+            self.last_at = p;
         }
     }
 }
@@ -1290,12 +1310,14 @@ fn world_view_frame(
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let loads = bridge.0.world().act_loads;
     note_act_loads(&mut state.cycle, &mut state.act_loads, loads);
-    if let Some(d) = dump.as_deref_mut().filter(|d| !d.done) {
+    if let Some(d) = dump.as_deref_mut().filter(|d| !d.done()) {
         d.seen += 1;
-        if tick >= d.request.at_tick {
-            d.done = true;
-            let world = bridge.0.world();
-            let open_mode = state.feed.open_mode(world).ok().map(|m| m.get());
+        let world = bridge.0.world();
+        let open_mode = state.feed.open_mode(world).ok().map(|m| m.get());
+        // §5 r19: every requested tick this frame reaches is dumped from it.
+        while !d.done() && tick >= d.request.at_ticks[d.next] {
+            let dir = d.request.dir_for(d.next);
+            d.next += 1;
             let frame_in = crate::facts::export::DumpFrame {
                 world,
                 frame: &frame,
@@ -1305,17 +1327,20 @@ fn world_view_frame(
                 open_mode,
                 seq: d.seen,
             };
-            match crate::facts::export::dump(&d.request, &frame_in) {
+            match crate::facts::export::dump(&d.request, &dir, &frame_in) {
                 Ok(()) => {
                     println!(
                         "play: rendering facts of tick {tick} ({} items) written to {}",
                         frame.items.len(),
-                        d.request.dir.display()
+                        dir.display()
                     );
-                    exit.write(AppExit::Success);
+                    if d.done() {
+                        exit.write(AppExit::Success);
+                    }
                 }
                 Err(e) => {
                     eprintln!("play: --dump-draws failed: {e}");
+                    d.next = d.request.at_ticks.len();
                     exit.write(AppExit::error());
                 }
             }

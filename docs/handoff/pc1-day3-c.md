@@ -197,3 +197,100 @@ The harness should test class and position, not GUID.
   The quest helper `preset_superunique_spawn` only allocates the unit and
   skips the superunique path: placement search, mods, minions. The Act III
   council uses the same helper.
+
+## Round 3 — Windows runs Wine could not make
+
+- **REC-222 keys during loading: settled** (`ui/frontend-loading.md` L8 rule 3). Method: a scratch
+  debugger probe on `record_state.py` (not committed). Breakpoints: loading draw `0x004565E0`, key-down
+  `0x0046A840`, Esc command `0x004690B0`, the server tick. The probe posts the key from the first
+  loading-draw stop; the act change is `poke 50 warp 40` from ScnAma `-seed 1234`.
+  - **Act change, Esc:** the handler ran at frame 49 and ui 9 became 1. The server ran one more tick
+    (50) and then none for 50 s, and the loading draws stopped too: the load waits for the menu.
+  - **Act change, F1:** dispatched to `0x0046A840`, and the load continued.
+  - **Game start, Esc at the first loading draw (before 0x01):** reached no handler; the game started
+    normally.
+  - d2rs takes no input while loading: `q-fix-p6-loading-keys`.
+
+- **Item flag 0x2000 / file index of a poked item (pc1-data area-G item 26): answered**
+  (`items/generation.md` §1.4, §3 steps 2 and 5; `items/quality.md` §1).
+  - **Flag 0x2000:** `0x00558D90` sets it when request force = 0 (`0x00558E95`), so both poke and
+    treasure items get it. The room clean-up `0x00553220` item case (`0x00553345`, tick step 6) clears
+    it after the client pass. So a drop's 0x9C carries 0x2000, while state read after the tick does not.
+  - **File index:** item data is zero-filled by `0x00627C90`, so it starts at 0. It becomes −1 only
+    through a downgrade helper (`0x00557250`), or just before superior / set / unique.
+  - **Check:** `ignore if fi` was removed from `items-ground-many.check`.
+  - **d2rs differs on both points:** `q-fix-p5-item-new-flag-file-index`.
+
+- **[prov-data] Monster think in a room with no clients: answered** (`monsters/ai.md` §1.5 r3, §2.1;
+  `ai-bodies.md` §9.9).
+  - **Where the test is:** none of `0x005A7F80`, `0x005B1740`, `0x005E7130` or the map AI tests the
+    room's clients. The test is in the room-leave `0x0053A9B0`, at `0x0053AA0A` (room +0x78 = 0 after
+    the client is removed).
+  - **What it does:** for every monster in the room, `0x005738D0` deletes the type-2 think and the
+    type-3 regen events. Nothing is rescheduled and no RNG is drawn. A client entering the room
+    restarts the think through `0x0053A8E0` → `0x00573780`.
+  - **Effect in the trace:** the Fortress NPCs' frame-24 think is cancelled at the frame-6 warp, so
+    their seeds stay unchanged.
+  - **d2rs differs:** `q-fix-p3-room-empty-think`.
+
+- **REC-223, the screen after an act-start video: settled from the call sequence** (`ui/frontend-loading.md` L10
+  rule 2, L5; edge case 8 corrected).
+  - **Run:** a first-time Warriv travel with a save whose quest word 6 bit 0 is set and word 7 is
+    clear, so the server sends 0x61 id 2. Windowed, sound on.
+  - **Video:** `0x00482EF0` ran (id 2 in ECX) at frame 296 and returned at once; Bink doesn't seem to
+    play in `-w`. Then 8 loading draws, then the first game frame at frame 296. So the loading frame
+    **is** redrawn after the video.
+  - **Who redraws it:** the room-graphics preload `0x00470070` (call `0x004700DD`, one draw per room
+    except k & 0x1F = 0). It runs from the S→C 0x04 handler `0x0045C9A0` through `0x00470B10`, which
+    holds `[0x007A8920]` = 1 for that pass only. The address is referenced only by bytes Ghidra had
+    not disassembled, so the spec had called this path dead. The no-video control (`warp 40`) shows
+    the same 8 preload draws, after the one 0x03 draw.
+  - **New PROVISIONAL:** the redrawn frames don't reload the Loading palette, so after a played video
+    they may show the palette the video player left.
+  - **d2rs differs:** it makes no preload draws and shows black after a video:
+    `q-fix-p6-loading-preload-draws`.
+  - **Pixels:** PrintWindow returns black at every loading draw, the control included, so the pixels
+    prove nothing. A full-screen pixel check of a played video remains open.
+
+- **[prov-data] Hratli's unit seed two steps at creation: answered** (`monsters/init.md` §4.2 new;
+  `world/quests-act3-2.md` §11.7 r3; the item's §3.3 pointer was wrong, that section covers Alkor).
+  - **Not the dummy code:** the spawn wrapper `0x005B2F20`, inits 49 / 50 and the first think draw
+    nothing.
+  - **The two steps come from normal creation:** `0x005B2A00` → `0x00555230` → `0x00573CB0`:
+    1. components `0x005739D0` (one roll; only TR has a choice);
+    2. HP `0x0045C3E0` at `0x00573F8F` (`roll(1)`).
+  - **Numeric check:** (4040195123, 666) → (3284026841, 1685134555) → (3975998680, 1369742535),
+    which equals the recording. Meshif 264 (a DS1 preset) gets the same two steps through the same
+    path.
+  - **d2rs differs:** the quest host's `spawn_monster` is a bare allocate:
+    `q-fix-p3-quest-spawn-creation`. It is related to `q-fix-p3-quest-superunique-spawn`.
+
+## Round 4 — REC-576 Windows points (q-prov-recording-2)
+
+- **(6) Weather frame rate `[0x007BB390]`: settled** (`render/draw-order-2.md` §11.7 r2). Read with
+  no breakpoints, 4 times a second for 30 s in the Rogue Encampment:
+  - 0 in the menus;
+  - 30–44 for about 10 s after the arrival;
+  - then 21–26, 25 in most samples.
+
+  The 0–12 seen under the debugger came from the hooks slowing the client. The ≥ 10 flash gate always
+  passes in play, so d2rs's fixed 25 matches in effect. No q-fix.
+- **(4) Hireling 0x81 fields: settled** (`client/model.md` §14 r3; `msg-units.md` OQ 7 answered).
+  - **Recording:** a scripted Kashya hire (`record_packets.py`). The save has quest word 2 bit 0 and
+    5000 gold; the script picks the first row of the hire list.
+  - **Frame 367:** C→S 0x36 (Kashya GUID 3, id 0x0D53), then S→C 0x81
+    `81 07 0f01 01000000 0d000000 083bd951 530d0000`. That is pet GUID 13, +0x24 = the list entry's
+    seed 0x51D93B08, +0x28 = hire id 0x0D53.
+  - **Frame 368:** the hireling's 0xAC. No 0x7A is sent.
+  - **d2rs matches;** only a PROVISIONAL note remains: `q-fix-p6-pet-record-settled`.
+- **(3) Audio ST-4, one-shot end tick: recorded** (`audio/sound-table.md` §6.6 r3, OQ 12).
+  - **Method:** sound on, a probe with breakpoints only at the start and the natural-end store, so
+    the client ran at full speed; 60 s of walking.
+  - **Result:** 73 footsteps (ids 2768–2771) end at start + ceil(frames / 882) + 1 ticks (+2 in a
+    third of the cases, +0 once). The end comes 30–125 ms after the sample's duration, which fits the
+    50 ms voice service thread.
+  - **d2rs** ends them 1 tick early: `q-fix-p6-oneshot-end-tick`.
+  - **ST-7 (`Async Only` completion): not recorded.** A probe on the async issue (`0x00482AFC`),
+    the pending check (`0x00482BE1`) and the collect (`0x00482BF0`) saw no hit in 60 s of town play.
+    The rows are evidently loaded before any start; a run that starts an unloaded `Async Only` id is
+    still needed (noted in OQ 13).

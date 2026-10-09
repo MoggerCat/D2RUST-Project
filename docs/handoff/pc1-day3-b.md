@@ -251,3 +251,101 @@ spawn.
   never gets unit flags 0x0E, so `missiles/flight.rs` `accepts()` rejects
   it. Also, d2rs's missile damage skips block / dodge and the monster
   crit. Row: `q-fix-c6-player-flags`.
+
+### Item 5: combat-melee-fallen and combat-potion-midfight (1.14d side recorded)
+- Run from `claude/q-tool-state-diff` at `06306f17` (now on staging) with
+  `scenario_diff.py <check> --orig-only` on PC 1. The 1.14d state and
+  packet files are in `traces/raw/check-*/` (gitignored, PC 1).
+  - Note for any PC 1 runner: the new recorders take
+    `%TEMP%\d2-game.lock` themselves. Do not hold it around
+    `scenario_diff.py`, or the recorder waits forever (two runs timed
+    out this way before the fix).
+- **combat-melee-fallen** (CmbBar, level 3, short sword):
+  - `clickunit 1 19` clicked (368, 300) at frame 39 and the click went
+    in at frame 40.
+  - The player enters mode 7 (A1) at f40. The nearest Fallen (GUID 21,
+    hp 256) dies on that one swing: mode 0 with hp 0 at f46, then mode 12
+    at f66. The player is back to mode 1 at f55.
+  - The leader (19) goes S2 at f41, as in combat-fallen-hits-player.
+- **combat-potion-midfight** (CmbPot, hp1 in belt slots 0 and 4):
+  - The player's life is poked to 2560 (10 points) at f60, and `key 1`
+    is posted at frame 70.
+  - From f70 life rises 80 per frame (hp1: 30·256 × 2 for the Barbarian / len 192 = 80,
+    `items/use.md` §3.1).
+  - A Fallen hit lands at f77 (3120 + 80 − 479 = 2721); the regen goes on
+    (4801 at f103, …).
+- The d2rs side runs with the same command without `--orig-only`; it
+  needs the d2-client from that branch (the cloud runs it).
+
+### Items 45 and 46: both sides (pc1-data Step 4)
+- Run with `scenario_diff.py <check> --reuse`: the 1.14d side is item 5's
+  recording; d2rs is the staging d2-client built on PC 1.
+- **combat-melee-fallen: the melee itself matches.**
+  - Both sides: player mode 7 at f40; the nearest Fallen (1.14d 21,
+    d2rs 19) is killed by the one swing (mode 0, hp 0 at f46, mode 12 at
+    f66); the player is back to mode 1 at f55.
+  - The leader's f41 choice still differs (A2 vs S2, the known
+    `q-fix-c2-fallen-s2-choice`), and the pack's modes follow from it.
+- **combat-potion-midfight: d2rs never drinks.**
+  - 1.14d sends C→S `26 02000000 …` in frame 69's input phase, and the
+    player's hp rises 80 a frame from f70.
+  - d2rs sends no C→S message after the join and its hp stays 2560 →
+    `q-fix-b45-belt-key-no-send`.
+  - d2rs also takes no Fallen damage (known: `q-fix-c1-monster-melee-rule`).
+- **First difference in both checks:**
+  - state, f2: save-loaded items have seed [1, 666] in d2rs, the real
+    seed in 1.14d → `q-fix-b45-save-item-seed`;
+  - packets, f1: C→S 0x67 byte 18 is 0 in 1.14d and 4 (the class) in
+    d2rs → `q-fix-b45-createxgame-byte18`.
+  - Then the Blood Moor warp population (known:
+    `q-fix-b-bloodmoor-warp-population`).
+
+### [q-fix-b-monster-combat] Quill Rat at frame 59 (answered)
+- **Correction:** my earlier note ("the rat is placed elsewhere") was
+  wrong. In 1.14d the rat is at the poke point (5147, 4267), exactly as in
+  d2rs. The arrows (missile class 0) reach it at f41–42 and f53–54 and do
+  0 damage, because ScnAma has no bow.
+- **1.14d rat lines, f30–64** (from
+  `traces/raw/check-combat-arrow-quillrat/orig.state.jsonl`, the
+  `record_state.py` output; every row x 5147, y 4267, hp 1280):
+
+  | Frames | Mode | Seed s |
+  |---|---|---|
+  | 30 | 1 | [21370634, 838424606] |
+  | 31–35 | 5 | [2409280208, 8913528] (think, 1 draw) |
+  | 36–43 | 5 | [4094205064, 1004892389] (quill 1 created at f36) |
+  | 44–45 | 1 | same |
+  | 46–58 | 1 | [1069704589, 1707661690] (quill 1's to-hit at the player at f46: a miss, 1 owner step, REC-826) |
+  | 59–63 | **5** | **[1069704589, 1707661690], unchanged** |
+  | 64 | 5 | [3163442939, 446165621] (quill 2 created) |
+
+- **Answer:** the f59 think takes A2 with no draw on the rat's seed (the
+  same seed from f46 to f63). That is `monsters/ai-bodies.md` §9.7 r8 step
+  3: AI state 3 / 19 → A2, no draw. The arrow that reached the rat at
+  f54 set state 19 even with 0 damage (a hit with no get-hit mode), and
+  the 0x005A68E0 rule turns 19 into 3 when the next non-neutral mode is
+  left.
+- So the cloud's draw count is right: no extra draws make P(35) pass,
+  because 1.14d takes no draw there. d2rs walks because it never stores
+  the AI state (`q-fix-c3-quillrat-choice`). The arrows **do** cause it:
+  they set the state. A run without arrows would differ in 1.14d too.
+
+### [q-fix-b-monster-combat] REC-890, REC-891, REC-892 (answered)
+- **REC-890:** the neutral start after a zero-length walk sends **0x6D**
+  (`0x00597E20` mode-1 case `0x00598067`–`0x005980B0` → `0x0053BB70`:
+  GUID, cell, life byte; stat 328 += 1), not 0x67 code 7.
+  `monsters/ai.md` §7.5 r8 is corrected (my REC-665 text was wrong there).
+  d2rs already matches. Correction row: `q-fix-c7-b665-correction`.
+- **REC-891:** the monster base list (`0x00574072`–`0x00574086`) is
+  `0x006251F0` with flags 1, expire 0, owner type 1 / owner GUID = the
+  unit, then `0x00626E10(unit, list, reset 1)`. It is not DYNAMIC, so
+  mindamage / maxdamage / tohit go into the totals. Spec:
+  `monsters/init.md` §6 step 12. d2rs matches.
+- **REC-892:** `0x0058F030` (ECX game, EDX unit; stack GUID, type, f1,
+  f2): f2 ≠ 0 sets control flags bit 0x2, f1 ≠ 0 sets 0x1
+  (`0x005DD230` only sets bits; it does not restart the AI). Then
+  +0x2C / +0x30 / +0x28.
+  - The death handover `0x0058F6C0` uses the bits: 0x1 alone releases
+    the pack; 0x1 + 0x2 makes the first minion the leader (`0x0058F530`).
+  - Spec: `monsters/umod-callbacks.md` §1 r5.
+  - d2rs differs: row `q-fix-c7-owner-flags`.

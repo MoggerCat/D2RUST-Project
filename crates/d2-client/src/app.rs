@@ -11,6 +11,7 @@
 
 pub mod anim_names;
 pub mod automap;
+pub mod autoplay_host;
 pub mod config;
 pub mod death;
 pub mod front_host;
@@ -26,6 +27,7 @@ pub mod monster_drop;
 pub mod npc_seams;
 pub mod packet_dump;
 pub mod palette;
+pub mod perf;
 pub mod play;
 pub mod play_start;
 pub mod poke;

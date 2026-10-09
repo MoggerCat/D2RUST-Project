@@ -646,9 +646,10 @@ pub fn cof_box_visible(cof: &Cof, x: i32, y: i32, w: u32, h: u32) -> bool {
         && i64::from(cof.y_min) + y < h - 1
 }
 
-/// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the §4 test
-/// on the sheared shadow box at the shadow position (`x`, `y`): `d` rows
-/// of `⌊(y_max − y_min) / 2⌋`, each one pixel left of the one below.
+/// `blend-modes.md` §5 r3a (REC-511): `0x004709A0(U, X, Y, 0, 1)` at the
+/// shadow position (`x`, `y`): the §4 test with the left bound moved by
+/// `d = (y_max − y_min) / 2` (C division); the y bounds are the whole
+/// COF box.
 pub fn shadow_box_visible(cof: &Cof, x: i32, y: i32, w: u32, h: u32) -> bool {
     let (x, y) = (i64::from(x), i64::from(y));
     let (w, h) = (i64::from(w), i64::from(h));
@@ -656,7 +657,7 @@ pub fn shadow_box_visible(cof: &Cof, x: i32, y: i32, w: u32, h: u32) -> bool {
     i64::from(cof.x_min) - d + x < w - 1
         && i64::from(cof.x_max) + x >= 0
         && i64::from(cof.y_max) + y >= 0
-        && i64::from(cof.y_max) - d + y < h - 1
+        && i64::from(cof.y_min) + y < h - 1
 }
 
 // ---------------------------------------------------------------------------

@@ -38,8 +38,9 @@ use crate::ui::layout::Screen;
 use crate::ui::panel::{ClientIntent, Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::control::belt::BeltColor;
 use crate::ui::panels::control::buttons::{
-    draw_800, menu_button, run_button, skill_icon_file, skill_icon_pos, skill_icon_state,
-    BtnEffect, BtnEnv, ButtonCel, NewBtn, NewButtons, SkillSide,
+    draw_800, help_caption, menu_button, run_button, skill_icon_file, skill_icon_pos,
+    skill_icon_state, BtnEffect, BtnEnv, ButtonCel, HelpButton, NewBtn, NewButtons, SkillSide,
+    UI_HELP_BUTTON,
 };
 use crate::ui::panels::control::globes::{
     exp_bar, life_globe, mana_globe, stamina_bar, ExpIn, GlobeDraw, GlobeFile, GlobeSmoothing,
@@ -76,6 +77,7 @@ pub fn hud_files() -> Vec<String> {
         "panel\\runbutton",
         "panel\\menubutton",
         "panel\\level",
+        "panel\\levelsocket",
         "panel\\minipanel",
         "panel\\minipanel_s",
         "panel\\minipanelbtn",
@@ -221,6 +223,8 @@ pub struct HudState {
     pub belt: super::hud_belt::HudBelt,
     /// The new-stats / new-skills pressed flags (§8).
     pub new_btns: NewButtons,
+    /// The help button (§11, state 0x22).
+    pub help: HelpButton,
     /// The play bindings, for the tips' key names ([`key_names`]).
     pub bindings: Option<crate::controls::Bindings>,
     /// The stamina bar's red, gold and blue: the act palette's nearest
@@ -242,6 +246,7 @@ impl Default for HudState {
             select_left: true,
             belt: Default::default(),
             new_btns: NewButtons::default(),
+            help: HelpButton::default(),
             bindings: None,
             stamina_colors: None,
         }
@@ -257,6 +262,12 @@ pub struct HudUi {
 /// §3 numbering) for the run and mini-panel tips (§6 r1, §9 r6).
 /// d2rs-own, unverified: the play bindings' first two inputs and their
 /// names, not the short / long key name strings of §5 r13 (as the belt
+/// `CfgHelp` (`ui/controls.md` §3 command 6): the help button's caption
+/// keys (`control-panel.md` §11 r3).
+const CMD_HELP: i32 = 6;
+/// The help caption's font (`control-panel.md` §11 r3: font 1).
+const HELP_FONT: u16 = 1;
+
 /// labels, REC-264); no bindings → none.
 pub fn key_names(b: Option<&crate::controls::Bindings>, cmd: i32) -> [Option<Vec<u16>>; 2] {
     let inputs = b
@@ -555,6 +566,41 @@ impl Panel for HudUi {
                 out.extend_one(HudUi::icon_draw(files, &hud.tables, e.skill, at, k));
             }
         }
+        // §11 r3 the help button: step 8's first entry, with state 0x22
+        // open (`a4-town-pandemonium-fortress` rows 258–267).
+        if sh.states.is_open(UI_HELP_BUTTON) {
+            let s = |id: u16| {
+                ctx.strings
+                    .get_id(id)
+                    .map(<[u16]>::to_vec)
+                    .unwrap_or_default()
+            };
+            let text = help_caption(key_names(hud.bindings.as_ref(), CMD_HELP), &s);
+            // Font 1, the current font after the belt (§Edge cases); without
+            // the font's width A the caption cannot be placed and is left
+            // out.
+            let text_w = sh.fonts.as_ref().and_then(|f| f.width_a(HELP_FONT, &text));
+            let states = &sh.states;
+            let drawn = hud
+                .help
+                .draw(w, h, &|ui| states.is_open(ui), text_w.unwrap_or(0));
+            if let Some(d) = drawn {
+                if text_w.is_some() && !text.is_empty() {
+                    out.push(UiDraw::Text(crate::ui::draw::TextRequest {
+                        text,
+                        at: Point::new(d.caption.0, d.caption.1),
+                        style: crate::ui::draw::TextStyle {
+                            font: HELP_FONT,
+                            color: 0,
+                        },
+                        opts: crate::ui::text::TextOpts::default(),
+                        clip: sh.config.screen.rect(),
+                    }));
+                }
+                out.extend_one(cel(files, "panel\\levelsocket", d.socket));
+                out.extend_one(cel(files, "panel\\level", d.button));
+            }
+        }
         // §8 r1 new-stats / new-skills buttons: step 8 of the UI pass, after
         // the control panel's skill buttons (§1 r3; `a4-town-pandemonium-
         // fortress` rows 256–269).
@@ -697,6 +743,19 @@ impl Panel for HudUi {
                 });
             }
             return UiResponse::Consumed;
+        }
+        // §11 r4, r5 the help button: window handlers of state 0x22, ahead
+        // of the panel rows (its box lies over the mini panel's row).
+        if sh.states.is_open(UI_HELP_BUTTON) {
+            let mouse = (at.x, at.y);
+            if down {
+                if sh.hud.help.press(w, h, mouse) {
+                    return UiResponse::Consumed;
+                }
+            } else if let Some(outs) = sh.hud.help.release(w, h, mouse) {
+                sh.outputs.extend(outs);
+                return UiResponse::Consumed;
+            }
         }
         let player = PlayerFacts {
             living: alive,

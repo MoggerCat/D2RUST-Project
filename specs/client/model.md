@@ -32,27 +32,27 @@
 |   2. Unit table | 139–188 |
 |   3. Local player | 189–211 |
 |   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–383 |
-|   6. Position check (`0x004804E0`) | 384–427 |
-|   7. Session messages | 428–625 |
-|   8. Mode requests | 626–711 |
-|   9. Room-in-sight messages | 712–746 |
-|   10. Bit reader | 747–761 |
-|   11. Current act and level (join and later) | 762–807 |
-|   12. Client DRLG and the room of a point | 808–849 |
-|   13. Visibility predicate (`0x004DBF20`) | 850–901 |
-|   14. Pet list and the hireling GUID | 902–955 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 956–1045 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1046–1080 |
-|   17. Model writes made by 1.14d UI code | 1081–1227 |
-|   18. Audio driver inputs and the client object functions | 1228–1258 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1259–1487 |
-| Constants & data dependencies | 1488–1500 |
-| Randomness | 1501–1516 |
-| Edge cases & original bugs | 1517–1541 |
-| Test vectors | 1542–1599 |
-| Provenance | 1600–1703 |
-| Open questions | 1704–1872 |
+|   5. Client update pass | 250–395 |
+|   6. Position check (`0x004804E0`) | 396–439 |
+|   7. Session messages | 440–637 |
+|   8. Mode requests | 638–723 |
+|   9. Room-in-sight messages | 724–758 |
+|   10. Bit reader | 759–773 |
+|   11. Current act and level (join and later) | 774–819 |
+|   12. Client DRLG and the room of a point | 820–861 |
+|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
+|   14. Pet list and the hireling GUID | 914–978 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 979–1068 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1069–1103 |
+|   17. Model writes made by 1.14d UI code | 1104–1250 |
+|   18. Audio driver inputs and the client object functions | 1251–1281 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1282–1510 |
+| Constants & data dependencies | 1511–1523 |
+| Randomness | 1524–1539 |
+| Edge cases & original bugs | 1540–1564 |
+| Test vectors | 1565–1622 |
+| Provenance | 1623–1727 |
+| Open questions | 1728–1907 |
 <!-- /index -->
 
 ## Summary
@@ -380,6 +380,18 @@ position check of the local player.
       Code 1 = walk to point (§19 r4, mode 2 WL); code 0x0C = mode 8
       S1 with the move test. The recorded chickens' WL from tick 8 is
       the code-1 step.
+
+      PROVISIONAL (REC-741): the zoo body `0x0046D660` and the class
+      bodies other than `chicken_ai` are not read; d2rs runs nothing for
+      them (the zoo test needs `monstats` flag 22 in the client tables).
+      PROVISIONAL (REC-742): a C monster's client path (§19 r4 with the
+      path helpers of a set-C unit) is not specified; d2rs draws the
+      step's two seed values, sets the mode the code sets (1 → 2 WL,
+      0x0C → 8 S1, code 7 at the own position → the neutral fallback)
+      and keeps the unit in its cell. Needed: the C monster's path record
+      and its walk end (positions of the recorded chickens from tick 8).
+      The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
+      the light) is not run on set C either (same REC).
 
 ### 6. Position check (`0x004804E0`)
 
@@ -942,8 +954,19 @@ player is in", the input of `render/composition.md` §3 step 2
    path `0x00465C60` ≠ 0), `0x0048A990` (`0x0048AA74`) and
    `0x00493A00` (`0x00493A0A`, a 0x2E-pixel bar); the UI owners of
    those draws take the value 100. The model stores +0x1C = 100 and
-   never changes it. REC-10 (0x81 bytes of a hireling) still confirms
-   the 0x81 field writes.
+   never changes it. **Recorded hire (REC-10, REC-576 (4), 2026-10-09,
+   PC 1 Windows, pc1-day3-c):** `record_packets.py --auto MilHire --seed
+   1234` (quest word 2 bit 0, 5000 gold; Kashya → Hire → first row):
+   the hire list 0x4E entries are `4E <u16 id> <u32 seed>` (first:
+   `4e 530d 083bd951`); C→S 0x36 `36 03000000 530d0000` (Kashya GUID 3,
+   id 0x0D53) at server frame 367; in the same frame S→C 0x81
+   `81 07 0f01 01000000 0d000000 083bd951 530d0000`: type 7, class 271,
+   owner GUID 1, pet GUID 13, u32@0xC = 0x51D93B08 (the list entry's
+   seed) and u32@0x10 = 0x00000D53 (the hire id), so +0x24 := seed,
+   +0x28 := id. **No 0x7A** is sent: 0x81 alone makes the record (rule 2
+   inside it). The hireling's S→C 0xAC (GUID 13, class 0x010F) follows
+   at frame 368, so at the 0x81 the monster is not yet in S and the
+   hireling setup runs at the 0xAC create from the record (`0x00478E40`).
 4. **Hireling GUID** (`0x00478F20(player, 7, any = 1)`, the call of
    `msg-units.md` §1.2 rule 2 and §2 rule 2): no player → −1; else the
    first record in list order with type 7 and owner GUID = the player's
@@ -1700,6 +1723,7 @@ end table `0x004B15E0`, `0x004AF6A0` (table `0x004AF858`),
 its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
 `20261006-022633-packets.jsonl`.
+- 2026-10-09 (pc1-day3-c, REC-10 / REC-576 (4)): a scripted Kashya hire recorded with `record_packets.py` on Windows; §14 rule 3.
 
 ## Open questions
 
@@ -1759,10 +1783,21 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    PROVISIONAL (play preview, path step): with a client DRLG the
    prediction steps the player's own path with the server's path code
    (`sim/pathing.md` §1.2 request, §3–§7 compute, §9.2 step) over the
-   client grids, the player's footprint on a private copy and no other
-   unit's footprint (because the 1.14d client runs the same path code
-   over the same rooms, so its walk stops where the server's does);
-   settled by REC-277 (d) with REC-51.
+   client grids, the player's footprint on a private copy (because the
+   1.14d client runs the same path code over the same rooms, so its walk
+   stops where the server's does); settled by REC-277 (d) with REC-51.
+   *Revision (2026-10-09, q-scenes-compare):* "no other unit's
+   footprint" was wrong: the 1.14d client stamps footprint mask 0x100
+   for each monster not dying or dead (`client/msg-units.md` §3 r2), and
+   `a1-walk-se` / `a1-walk-nw` stop short of Warriv's sub-tiles.
+   PROVISIONAL (play preview, other units): the private grids also carry
+   each living model monster's footprint (pattern of
+   `sim/path-placement.md` §3 from its `monstats2` size, NPC, in-town
+   and interact columns; mask 0x100), re-stamped at the model positions
+   before each request and step (because the client's footprint follows
+   the monster's own client path, which d2rs's model positions only
+   sample); settled by REC-706 (a recording of the 1.14d client grid
+   under a walking NPC).
    *Answered, stamina* (2026-10-09, static read): the 1.14d client never
    drains stamina. The run drain `0x0057F240` has one caller, the server
    path event `0x00580C20`; in client code stat 10 is written only by

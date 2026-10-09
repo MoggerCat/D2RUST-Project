@@ -21,6 +21,7 @@ pub mod click;
 pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
+pub mod critters;
 pub mod dispatch;
 pub mod drlg;
 pub mod hover;

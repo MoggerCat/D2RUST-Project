@@ -402,10 +402,13 @@ impl OriginalUi {
         tables.files.extend(npc_talk::socket_files());
         tables.files.extend(cursor_files());
         tables.files.extend(skill_tree_ui::icon_files());
-        // `control-panel.md` §9 revision (PROVISIONAL, REC-519): the mini
-        // panel (state 0x15) is open from the game's start.
+        // `control-panel.md` §9 r9 (REC-519 settled) and §11 r1: the game
+        // entry set-up `0x00456970` opens the mini panel (state 0x15) and
+        // then the help button (0x22). d2rs-own: no registry, so neither
+        // `Mini Panel` nor `Help Menu` is set at the start.
         let mut states = UiStates::new()?;
         states.force(UI_MINI_PANEL, true);
+        states.force(crate::ui::panels::control::buttons::UI_HELP_BUTTON, true);
         let shared = Shared {
             tables,
             states,
@@ -734,7 +737,12 @@ impl OriginalUi {
         self.cursor_event(e, world);
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
-            self.track_grid_hover(world, p);
+            // d2rs-own (PROVISIONAL, REC-707): a move or a press tracks
+            // the hover; a release does not, so a use press's cleared
+            // hover holds until the mouse moves (`a1-panel-cube` row 25).
+            if matches!(e, UiEvent::CursorMoved(_) | UiEvent::Press { .. }) {
+                self.track_grid_hover(world, p);
+            }
         }
     }
 

@@ -145,10 +145,13 @@ impl<X: WorldPending> TickHooks for WorldSim<X> {
     fn spawn_presets(&mut self, game: &mut Game, r: RoomId) {
         // The first walk: every non-monster preset (objects, warp tiles)
         // in list order (`drlg/rooms.md` §6 "First spawn";
-        // `View::spawn_preset_units`), then the monster walk.
-        self.host(game, |h| {
-            let WorldHost { game, v, .. } = h;
-            v.spawn_preset_units(game, r);
+        // `View::spawn_preset_units`), then the monster walk. With the
+        // world state lent to the action hooks: a quest object's init runs
+        // inside its allocation and may allocate a monster (Larzuk, the
+        // caged barbarians, `quests-act5.md` §3.8, §4.7), whose type init
+        // needs the monster world.
+        self.with(game, |g, v| {
+            v.spawn_preset_units(g, r);
         });
         self.population(game, |cx| preset::place_presets(cx, r));
         self.host(game, |h| {

@@ -1,4 +1,4 @@
-// Spec: specs/world/quests.md §9; specs/world/quests-helpers.md §4.2, §5, §7; specs/world/quests-act3.md §6; specs/world/vendors-2.md §10.1; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2
+// Spec: specs/world/quests.md §9; specs/world/quests-helpers.md §4.2, §5, §7; specs/world/quests-act3.md §6; specs/world/vendors-2.md §10.1; specs/world/quests-act1.md §10; specs/world/quests-act1-rest.md §1–§3; specs/world/quests-act2.md §1.5; specs/world/objects.md §3, §4, §7; specs/sim/tick.md §5.2; specs/world/quests-act5.md §1.1, §4.6, §5.6, §5.7, §5.9; specs/world/quests-act5-2.md §6.8, §7.6, §7.7, §8.7, §8.8
 //! [`HostQuests`]: the quests' world on the wired host. Every
 //! [`QuestWorld`] call goes to [`EconomyQuests`] (the economy plus the
 //! rest), except those the action wiring provides:
@@ -55,6 +55,13 @@ use crate::world::npc::InteractionList;
 use crate::world::quests::act2;
 use std::collections::BTreeMap;
 
+/// Stat 6 (`hitpoints`), zeroed by `0x00589340`.
+const STAT_HITPOINTS: u16 = 6;
+/// Unit mode 12 (dead).
+const MODE_DEAD: u32 = 12;
+/// Fire, lightning, cold, poison resist (`quests-act5.md` §5.7).
+const RESIST_STATS: [u16; 4] = [39, 41, 43, 45];
+
 /// [`EconomyQuests`] on the action wiring's hooks, with the calls the
 /// action wiring provides answered there (module doc), and the host
 /// parts a caller may lend for the call.
@@ -98,7 +105,6 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         e.hooks.drlg.drlg_room(e.game, room).is_some()
     }
 
-    /// Runs `f` on the action wiring's view over the economy's parts.
     /// Runs a drop helper (`objects-2.md` §20) with the game's drop state
     /// (`ActionHooks::object_drops`) lent out and the action tables'
     /// `levels`; the economy's item store, game seed and unique bits go
@@ -142,18 +148,26 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
         Some(out)
     }
 
-    /// The action view of the economy's units. The economy holds the
-    /// game seed for the call (`fields.seed`): it is handed to the hooks
-    /// for `f` (an allocation steps it, `rng.md` §5.3) and taken back
-    /// after, as [`Self::with_drop_state`] does.
+    /// Runs `f` on the action wiring's [`View`]. The economy holds the
+    /// game's item store, game seed and unique bits for the quest call
+    /// ([`QuestLoan::on_world`]): they go back to their home in the hooks
+    /// for the call and are taken again after it, so an allocation made
+    /// here (Hratli from his dummy's init, a monster's equipment) keeps
+    /// its seed draws. Without this the draws were overwritten when the
+    /// call ended (found by `a3-start-noquest-sor`: the Act III start's
+    /// game seed was one step behind 1.14d's).
     fn view<T>(&mut self, f: impl FnOnce(&mut crate::game::Game, &mut View<'_, X>) -> T) -> T {
         let e = &mut *self.inner.econ;
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.hooks.game_seed = e.fields.seed;
+        e.hooks.uniques = std::mem::take(&mut e.fields.uniques);
         let out = {
             let mut v = View::of(&mut *e.units, &mut *e.stats, e.data, &mut *e.hooks);
             f(&mut *e.game, &mut v)
         };
+        std::mem::swap(&mut e.hooks.items, &mut *e.items);
         e.fields.seed = e.hooks.game_seed;
+        e.fields.uniques = std::mem::take(&mut e.hooks.uniques);
         out
     }
 
@@ -196,6 +210,40 @@ impl<'e, 'a, X: Pending, R: QuestRest> HostQuests<'e, 'a, X, R> {
             allied,
         };
         self.view(|g, v| v.allocate(g, &req, x, y))
+    }
+
+    /// A unit of the game's lists removed at once, every player told
+    /// (S→C 0x0A; `remove_monster`'s form). False: not in the lists.
+    fn remove_now(&mut self, unit: UnitId) -> bool {
+        let e = &mut *self.inner.econ;
+        let Some((ty, guid)) = e.game.lists.unit(unit).map(|u| (u.ty as u8, u.guid)) else {
+            return false;
+        };
+        let msg = crate::units::messages::remove_unit(ty, guid);
+        for p in e.game.lists.units_of_type(UnitType::Player) {
+            e.hooks.x.send(p, &msg);
+        }
+        self.view(|g, v| v.remove(g, unit));
+        true
+    }
+
+    /// The unit's interaction ended: its record's interact info reset
+    /// (the `0x00554190` form).
+    fn end_unit_interaction(&mut self, unit: UnitId) {
+        if let Some(r) = self.inner.econ.units.get_mut(unit) {
+            r.interact.reset();
+        }
+    }
+
+    /// The vitals tables with a non-empty experience table
+    /// (`combat/vitals.md` §4.1) and the player's class.
+    fn vitals_of(
+        &self,
+        player: UnitId,
+    ) -> Option<(std::sync::Arc<crate::combat::vitals::VitalsTables>, i32)> {
+        let t = self.inner.econ.hooks.vitals.clone()?;
+        let class = self.inner.econ.units.get(player)?.class as i32;
+        (!t.experience.is_empty()).then_some((t, class))
     }
 
     /// `0x005417D0` on the game's timer queue (`tick.md` §5.2); a refused
@@ -633,6 +681,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn unit_xy(&self, unit: UnitId) -> Option<(i32, i32)> {
         let e = &*self.inner.econ;
         match e.game.lists.unit(unit) {
+            Some(u) if u.room().is_none() => match e.hooks.object_alloc_spot(unit) {
+                Some((x, y, _)) => Some((x, y)),
+                None => Some(e.hooks.path_position(unit)),
+            },
             Some(_) => Some(e.hooks.path_position(unit)),
             None => self.inner.unit_position(unit).map(|(x, y, _)| (x, y)),
         }
@@ -674,7 +726,10 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
             .free_spot_at(room, x, y, size, mask, radius, limit)
     }
     /// `0x005B2F20`: a monster unit allocated in a DRLG room through the
-    /// action wiring (`units.md` §3.1); else the rest's.
+    /// action wiring (`units.md` §3.1); else the rest's. PROVISIONAL
+    /// (REC-798): the spread `r` (population §9's placement around the
+    /// point and its draws) is not applied: Larzuk stands at the free
+    /// spot, 1.14d 3 sub-tiles away (`a5-town-arrival-bar.check`).
     fn spawn_monster(
         &mut self,
         room: RoomId,
@@ -703,15 +758,9 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// (PROVISIONAL, REC-128: the removal mode's animation is not
     /// modelled); else the rest's.
     fn remove_monster(&mut self, monster: UnitId) {
-        let e = &mut *self.inner.econ;
-        let Some((ty, guid)) = e.game.lists.unit(monster).map(|u| (u.ty as u8, u.guid)) else {
-            return self.inner.remove_monster(monster);
-        };
-        let msg = crate::units::messages::remove_unit(ty, guid);
-        for p in e.game.lists.units_of_type(UnitType::Player) {
-            e.hooks.x.send(p, &msg);
+        if !self.remove_now(monster) {
+            self.inner.remove_monster(monster)
         }
-        self.view(|g, v| v.remove(g, monster));
     }
     fn drop_preset_monster(&mut self, act: u8, class: u16) {
         self.inner.drop_preset_monster(act, class)
@@ -1334,6 +1383,220 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn free_portal_object(&mut self, portal: UnitId) {
         self.view(|g, v| v.h.x.object_remove_portal(g, portal));
     }
+    // -- Act IV / V seams (`quests-act4.md`, `quests-act5.md`,
+    // `quests-act5-2.md`) on the action wiring.
+
+    /// `0x006416D0(a, b)` (`missiles/missiles.md` §R9.5,
+    /// [`missiles::bodies::unit_distance`]) on the units' path positions
+    /// and sizes; `None` when either unit is not in the game's lists.
+    fn distance_between(&mut self, a: UnitId, b: UnitId) -> Option<i32> {
+        let lists = &self.inner.econ.game.lists;
+        if lists.unit(a).is_none() || lists.unit(b).is_none() {
+            return self.inner.distance_between(a, b);
+        }
+        Some(self.view(|_, v| missiles::bodies::unit_distance(v, a, b)))
+    }
+    /// `0x00619790`: the units of every room of the DRLG room's adjacency
+    /// array (the room itself included, `rooms.md` §6), in array order,
+    /// each room's unit list in order.
+    fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
+        use crate::path::collision::CollisionRooms;
+        if !self.drlg_room(room) {
+            return self.inner.adjacent_units(room);
+        }
+        let e = &*self.inner.econ;
+        let d = &e.hooks.drlg;
+        (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .flat_map(|r| e.game.lists.room_units(r))
+            .collect()
+    }
+    /// Unit +0x10 of a unit record.
+    fn unit_mode(&mut self, unit: UnitId) -> i32 {
+        match self.inner.econ.units.get(unit) {
+            Some(r) => r.mode as i32,
+            None => self.inner.unit_mode(unit),
+        }
+    }
+    /// "Kill in place" (`quests-act5.md` §1.1): the interaction ended,
+    /// the unit removed.
+    // PROVISIONAL (REC-790): the mode 12 set before the removal
+    // (`0x005A7C20`) and its animation are not modelled; the unit is
+    // removed at once, as `remove_monster`.
+    fn kill_in_place(&mut self, unit: UnitId) {
+        self.end_unit_interaction(unit);
+        if !self.remove_now(unit) {
+            self.inner.kill_in_place(unit)
+        }
+    }
+    /// Town cleanup `0x005893E0`: Anya's interaction ended, she leaves.
+    // PROVISIONAL (REC-790): "leaves her room without dying" is the unit
+    // removed at once (S→C 0x0A to every player); a unit kept outside
+    // any room is not modelled.
+    fn npc_leave_town(&mut self, unit: UnitId) {
+        self.end_unit_interaction(unit);
+        if !self.remove_now(unit) {
+            self.inner.npc_leave_town(unit)
+        }
+    }
+    /// `0x00589340`: Nihlathak killed in town: interaction ended, stat 6
+    /// := 0, mode 12 (`0x005A7C20`, [`View::monster_set_mode`]), room
+    /// refresh, unit flags |= 1. He stays as a corpse.
+    // PROVISIONAL (REC-791): the path free and the deletion of his AI
+    // event 2 are not modelled (the mode change's own steps run).
+    fn kill_in_town(&mut self, unit: UnitId) {
+        let is_monster = self
+            .inner
+            .econ
+            .units
+            .get(unit)
+            .is_some_and(|r| r.ty == UnitType::Monster);
+        if !is_monster || self.inner.econ.game.lists.unit(unit).is_none() {
+            return self.inner.kill_in_town(unit);
+        }
+        self.end_unit_interaction(unit);
+        self.view(|g, v| {
+            v.set_base(unit, STAT_HITPOINTS, 0);
+            v.monster_set_mode(g, unit, MODE_DEAD);
+        });
+        self.refresh_room(unit);
+        if let Some(r) = self.inner.econ.units.get_mut(unit) {
+            r.flags |= 1;
+        }
+    }
+    /// Thaw step 1 (`0x0058AAB0`): the frozen object leaves its room.
+    // PROVISIONAL (REC-790): the object is removed at once (S→C 0x0A to
+    // every player); an object kept outside any room is not modelled.
+    fn object_leave_room(&mut self, object: UnitId) {
+        if !self.remove_now(object) {
+            self.inner.object_leave_room(object)
+        }
+    }
+    /// `items.txt` `dropsound` (+0x124) of an item of the game's store.
+    fn item_drop_sound(&mut self, item: UnitId) -> i32 {
+        let e = &*self.inner.econ;
+        match e.items.get(item).and_then(|i| e.tables.item(i.record)) {
+            Some(r) => i32::from(r.dropsound),
+            None => self.inner.item_drop_sound(item),
+        }
+    }
+    /// `0x006251F0` (flags 0, owner = the player's type and GUID) +
+    /// `0x00626E10(player, list, 1)` + the four stats 39, 41, 43, 45 := v
+    /// and sent (`quests-act5.md` §5.7, open question 3: a new list each
+    /// call, they stack).
+    // PROVISIONAL (REC-792): the send `0x00548520` is the written value
+    // through `Pending::stat_sent`, one message per stat in id order.
+    fn add_resist_list(&mut self, player: UnitId, v: i32) {
+        let Some((ty, guid)) = self.inner.econ.units.get(player).map(|r| (r.ty, r.guid)) else {
+            return self.inner.add_resist_list(player, v);
+        };
+        self.view(|_, view| {
+            let l = view.stats.alloc(0, 0, ty.index() as u32, guid);
+            view.stats.attach(&mut *view.h, player, l, true);
+            for s in RESIST_STATS {
+                view.set_list_stat(l, s, v);
+            }
+            for s in RESIST_STATS {
+                view.h.x.stat_sent(player, s, v as u32);
+            }
+        });
+    }
+    /// `0x00660E50` on the player's record of the game's difficulty
+    /// ([`ActionHooks::waypoints`], the inverse of
+    /// [`Self::activate_waypoint`]). A level without a waypoint or a
+    /// player without records: not active.
+    fn waypoint_active(&mut self, player: UnitId, level: u32) -> bool {
+        use crate::world::waypoints::WaypointMap;
+        let d = usize::from(self.difficulty().min(2));
+        let h = &self.inner.econ.hooks;
+        let Some(idx) = WaypointMap::new(&h.tables.levels).index_of_level(level) else {
+            return false;
+        };
+        h.waypoints
+            .get(&player)
+            .is_some_and(|r| r.0[d].test(u32::from(idx)).unwrap_or(false))
+    }
+    /// `0x0058BEC0`: state 54 cleared (`0x005544B0`), then the Ancient
+    /// removed.
+    // PROVISIONAL (REC-790): "mode 12, out of the room, collision freed"
+    // is the unit removed at once, as `remove_monster`.
+    fn remove_ancient(&mut self, monster: UnitId) {
+        if self.inner.econ.game.lists.unit(monster).is_none() {
+            return self.inner.remove_ancient(monster);
+        }
+        self.view(|g, v| crate::wiring::action::units::clear_uninterruptable(v, g, monster));
+        self.remove_now(monster);
+    }
+    /// `0x00611830` (`combat/vitals.md` §4.1): `experience.txt` row 0 of
+    /// the player's class.
+    fn max_level(&mut self, player: UnitId) -> i32 {
+        match self.vitals_of(player) {
+            Some((t, class)) => t.max_level(class) as i32,
+            None => self.inner.max_level(player),
+        }
+    }
+    /// `0x00611800` (`combat/vitals.md` §4.1): row `level + 1` of the
+    /// player's class.
+    fn experience_threshold(&mut self, player: UnitId, level: i32) -> u32 {
+        match self.vitals_of(player) {
+            Some((t, class)) if level >= 0 && (level as usize) + 1 < t.experience.len() => {
+                t.threshold(class, level as u32)
+            }
+            _ => self.inner.experience_threshold(player, level),
+        }
+    }
+    /// `0x00570880` (`combat/vitals.md` §3,
+    /// [`crate::combat::vitals::level_up`]) on the action wiring's view.
+    fn level_up(&mut self, player: UnitId) {
+        let Some((t, _)) = self.vitals_of(player) else {
+            return self.inner.level_up(player);
+        };
+        self.view(|_, v| {
+            crate::combat::vitals::level_up(v, &t, player);
+        });
+    }
+    /// `0x0055B030`: one gold pile of `amount` at the unit on the lent
+    /// inventory model ([`QuestInventory::gold_pile`]).
+    // PROVISIONAL (REC-793): `0x0055B030` is read as `0x0055A090` with max
+    // 1, as the gold pickup's rest pile (`inventory-moves.md` §10.1).
+    fn drop_gold_amount(&mut self, at: UnitId, amount: u32) {
+        let done = match self.inventory.as_deref_mut() {
+            Some(inv) => inv.gold_pile(&mut *self.inner.econ, at, amount as i32),
+            None => false,
+        };
+        if !done {
+            self.inner.drop_gold_amount(at, amount)
+        }
+    }
+    /// `monstats.txt` row count of the action tables.
+    fn monstats_rows(&mut self) -> u32 {
+        match self.inner.econ.hooks.tables.combat.monstats.len() {
+            0 => self.inner.monstats_rows(),
+            n => n as u32,
+        }
+    }
+    /// The `zoo` column (`data/fields.tsv`: flags byte +0x0E mask 0x40) of
+    /// the class's `monstats.txt` row; a class past the table: not
+    /// eligible.
+    fn zoo_eligible(&mut self, class: u32) -> bool {
+        let m = &self.inner.econ.hooks.tables.combat.monstats;
+        if m.is_empty() {
+            return self.inner.zoo_eligible(class);
+        }
+        m.get(class as usize).is_some_and(|r| r.zoo)
+    }
+    /// `0x0053AEC0(game, player, level, arg)` through the action wiring's
+    /// level warp ([`crate::wiring::action::waypoints::level_warp`], the
+    /// waypoints' warp), `arg` the tile code.
+    fn warp_to_level(&mut self, player: UnitId, level: u32, arg: u32) {
+        if self.inner.econ.game.lists.unit(player).is_none() {
+            return self.inner.warp_to_level(player, level, arg);
+        }
+        self.view(|g, v| {
+            crate::wiring::action::waypoints::level_warp(v, g, player, level, arg as u8)
+        });
+    }
+
     /// `0x005DDFC0(game, monster, mode, x, y)` (`monsters/ai.md` §7.1: the
     /// mode request at a point, no path step set) on the action wiring's
     /// monster mode change; a unit that is not a monster: the rest's.

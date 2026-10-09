@@ -752,6 +752,35 @@ fn skip_weather_drops_pass9_rows_only() {
     assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.row == 1));
 }
 
+// Covers: specs/tools/facts-render.md §6 r5
+/// §6 r5 revision: pass 4's pool cels (1.14d `CelDraw` from the pool
+/// draw, d2rs `at` = `pools`) drop out with the weather; other cels and
+/// pool-range lines stay.
+#[test]
+fn skip_weather_drops_the_pool_cels() {
+    use super::compare::{is_weather_row, POOLS_TAG};
+    let row = |op: &str, at: &str| -> Vec<String> {
+        let mut r = vec!["-".to_owned(); DRAW_COLUMNS.len()];
+        r[1] = op.into();
+        r[16] = at.into();
+        r
+    };
+    assert!(is_weather_row(&row("CelDraw", "0x473bd0")));
+    assert!(is_weather_row(&row("CelDraw", "0x473a70")));
+    assert!(is_weather_row(&row("CelDraw", POOLS_TAG)));
+    assert!(!is_weather_row(&row("CelDraw", "0x473c00")));
+    assert!(!is_weather_row(&row("CelDraw", "0x473a6f")));
+    assert!(!is_weather_row(&row("CelDraw", "0x4713eb")));
+    assert!(!is_weather_row(&row("CelDrawShadow", "0x473bd0")));
+    assert!(!is_weather_row(&row("DrawLine", POOLS_TAG)));
+    let splash = "9 CelDraw ? 0 6 - 41 305 ? ? ? ? 3 0xffffffff 0 - 0x473bd0";
+    let ours =
+        "9 CelDraw data/global/uncompoverlays/rain3.dc6 0 1 - 720 56 11 5 -5 1 ? ? ? - pools";
+    let a = set(&[ROW0, splash, ROW1], &[], Some(&[SPRITE])).without_weather();
+    let b = set(&[ROW0, ours, ours, ROW1], &[], Some(&[SPRITE])).without_weather();
+    assert_eq!(compare(&a, &b, &[]), Outcome::Match);
+}
+
 // Covers: specs/tools/facts-render.md §5 r16
 /// A UI rectangle (`0x0046EFD0`, a d2rs `d2rs/ui/rect/WxH` item) is
 /// 1.14d's `DrawBox` row: left, top and the colour (its colour row minus
@@ -867,4 +896,34 @@ fn a_ui_cel_writes_its_wrapper_op() {
     let rows = draw_rows(&[ui(0, 10), ui(1, 20), ui(2, 30)], &cx).unwrap();
     let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();
     assert_eq!(ops, ["CelDrawEx", "CelDrawColor", "CelDraw"]);
+}
+
+/// §5 r19: `--dump-image` writes the index bytes as they are, with the
+/// palette as `PLTE` (the capture decoder reads them back unchanged).
+#[test]
+fn dump_image_keeps_indices_and_palette() {
+    let palette: Vec<u8> = (0..=255u8).flat_map(|i| [i, 255 - i, i / 2]).collect();
+    let pixels: Vec<u8> = (0..12u8).map(|i| i * 21).collect();
+    let png = export::indexed_png(4, 3, &pixels, &palette).unwrap();
+    let image = crate::verify::capture::decode_png(&png).unwrap();
+    assert_eq!((image.width, image.height), (4, 3));
+    assert_eq!(image.indices, pixels);
+    assert_eq!(image.palette, palette);
+}
+
+/// §5 r19: one tick dumps into DIR, several into DIR/tick-N.
+#[test]
+fn dump_dirs_per_tick() {
+    let req = |at_ticks: Vec<u64>| export::DumpRequest {
+        dir: "d".into(),
+        at_ticks,
+        image: false,
+        command: String::new(),
+    };
+    assert_eq!(req(vec![73]).dir_for(0), Path::new("d"));
+    let r = req(vec![2, 73]);
+    assert_eq!(
+        (r.dir_for(0), r.dir_for(1)),
+        (Path::new("d/tick-2").into(), Path::new("d/tick-73").into())
+    );
 }

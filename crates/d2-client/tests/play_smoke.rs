@@ -1970,3 +1970,65 @@ fn a_retarget_while_walking_keeps_the_precise_position() {
         "the re-target restarted at a sub-tile centre"
     );
 }
+
+// `client/msg-units.md` §3 r2 (REC-706): the client path sees the
+// model's living monsters as footprints (mask 0x100), so a walk onto a
+// town NPC's sub-tile stops short of it, as the 1.14d walk-se / walk-nw
+// recordings stop short of Warriv.
+#[test]
+#[ignore = "needs the D2 install (D2_GAME_DIR)"]
+fn the_client_path_stops_short_of_a_monster_footprint() {
+    use d2_client::bridge::client_path::{ClientPath, Own, PathTo};
+    use d2_client::bridge::predict::{MoveStats, Speeds};
+    let mut run = Run::start();
+    run.step(4);
+    let bridge = run.bridge();
+    let world = bridge.world();
+    let others = d2_client::world_view::walk::other_units(world, &bridge.inputs().tables.monsters);
+    let me = world.local_cell().expect("the player's cell");
+    let npc = *others
+        .iter()
+        .min_by_key(|u| {
+            (i32::from(u.x) - i32::from(me.0)).abs() + (i32::from(u.y) - i32::from(me.1)).abs()
+        })
+        .expect("a town NPC in the model");
+    let drlg = &world.drlg.as_ref().expect("the client DRLG").drlg;
+    let t = d2_sim::path::tables::PathTables::spec().unwrap();
+    let speeds = Speeds { walk: 6, run: 9 };
+    let own = Own {
+        stamina: 0x6400,
+        moves: MoveStats::CREATION,
+    };
+    let end = |stamp: bool| {
+        let mut p = ClientPath::default();
+        assert!(p.place(&t, drlg, me.0, me.1), "the player's room is active");
+        if stamp {
+            p.stamp_others(&t, drlg, &others);
+        }
+        let to = PathTo::Point(npc.x, npc.y);
+        assert!(
+            p.request(&t, drlg, speeds, own, to, false),
+            "the walk moves"
+        );
+        for _ in 0..400 {
+            if stamp {
+                p.stamp_others(&t, drlg, &others);
+            }
+            if !p.tick(&t, drlg, speeds, own, Some(to)) {
+                break;
+            }
+        }
+        let (x, y) = p.position().unwrap();
+        ((x >> 16) as u16, (y >> 16) as u16)
+    };
+    assert_eq!(
+        end(false),
+        (npc.x, npc.y),
+        "no footprint: the walk ends on the NPC"
+    );
+    assert_ne!(
+        end(true),
+        (npc.x, npc.y),
+        "the NPC's footprint stops the walk"
+    );
+}

@@ -105,6 +105,7 @@ pub fn create_item<S: ItemStats>(
         personalize(&mut item, rq)?;
     }
     let event3_at = replenish_timer(&item.stats, false, frame);
+    crate::cov!(Item, item.record, item.quality);
     Ok(Created { item, event3_at })
 }
 

@@ -947,6 +947,8 @@ def main():
     ap.add_argument("--draws-light", action="store_true",
                     help="with --draws-every: store tile light arrays in full, not as digests")
     ap.add_argument("--no-save", action="store_true", help="hashes and state only, no PNG files")
+    ap.add_argument("--img-dir", default=None,
+                    help="PNG folder (default game/captures/<time>); tools/sidebyside puts it outside the repo")
     ap.add_argument("--allow-any-size", action="store_true", help="also capture at 640x480")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-frames.jsonl)")
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
@@ -986,7 +988,7 @@ def main():
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = a.out or os.path.join(repo, "traces", "raw", stamp + "-frames.jsonl")
-    img_dir = None if a.no_save else os.path.join(repo, "game", "captures", stamp)
+    img_dir = None if a.no_save else (a.img_dir or os.path.join(repo, "game", "captures", stamp))
     if img_dir:
         os.makedirs(img_dir, exist_ok=True)
     # keep only the base recorder's tick hook, add ours (draw hooks: verified, armed per frame)
