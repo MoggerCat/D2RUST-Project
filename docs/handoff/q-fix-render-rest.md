@@ -32,7 +32,8 @@ missile units, so no missile lights).
 - **5. flat missiles**: done in the effect layer (row above); the real
   flag on a model missile unit waits for client missile creation.
 - **Level 74 stars** (`q-fix-render-arcane-stars`): §12 r3 names no
-  initial `last`.
+  initial `last`; filed as `draw-order-2.md` Open question 12 with the
+  local RE task (HANDOFF §5 entry 103), which also settles REC-420.
 - The stat 89 / 90 callback runs at the model's player stat messages;
   item-list aggregation of stat 89 (equipped items) reaches it only as
   far as the server's stat messages carry the total.
