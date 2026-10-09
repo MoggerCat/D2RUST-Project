@@ -22,6 +22,12 @@ if [ "${D2_NO_WINE:-0}" != "1" ]; then
   $SUDO apt-get update
   DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y --no-install-recommends \
     wine wine32:i386 wine64 xvfb x11-apps x11-utils imagemagick xdotool mingw-w64 bc
+  # d2rs' window under Xvfb without a GPU (scenario-diff draws channel,
+  # specs/tools/scenario-diff.md §3 rule 7): Vulkan on Mesa lavapipe.
+  # Measured 2026-10-09: mesa-vulkan-drivers 25.2.8-0ubuntu0.24.04.4,
+  # libxkbcommon-x11-0 1.6.0-1build1.
+  DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y --no-install-recommends \
+    mesa-vulkan-drivers libvulkan1 libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
 fi
 
 if ! command -v rustup >/dev/null 2>&1; then

@@ -32,7 +32,7 @@ pub struct ExportContext<'a> {
     pub sky: &'a [SkyDraw],
     /// Each drawn unit's cel context direction by GUID
     /// (`WorldFrame::unit_dirs`, §5 r14).
-    pub unit_dirs: &'a BTreeMap<u32, u8>,
+    pub unit_dirs: &'a BTreeMap<u64, u8>,
     /// Cel calls without pixels (`WorldFrame::unit_calls`), sorted by key;
     /// one row each, merged with the items by key (§5 r15).
     pub unit_calls: &'a [UnitCall],
@@ -168,9 +168,13 @@ fn call_rows(
     draws: &mut Vec<Vec<String>>,
 ) {
     unit_row(c.tag, c.shadow, cx, last_run, draws);
+    // §5 r17: the unit draw alone (the body failed the pre-test).
+    let Some(path) = &c.path else {
+        return;
+    };
     let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
     row[1] = if c.shadow { "CelDrawShadow" } else { "CelDraw" }.into();
-    row[2] = c.path.as_str().to_owned();
+    row[2] = path.as_str().to_owned();
     row[3] = c.dir64.to_string();
     row[4] = c.frame.to_string();
     for cell in &mut row[6..15] {
@@ -278,7 +282,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 // §5 r14: a unit cel's `dir` is the context's `dir64`, not
                 // the file direction the frame set is keyed by.
                 let d = match item.tag {
-                    ItemTag::Unit(guid) => cx.unit_dirs.get(&guid).copied().unwrap_or(d),
+                    ItemTag::Unit(_) => cx.unit_dirs.get(&item.key.slot()).copied().unwrap_or(d),
                     _ => d,
                 };
                 row[3] = d.to_string();

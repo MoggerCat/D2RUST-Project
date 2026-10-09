@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–312 |
-|   6. Comparison | 313–350 |
-|   7. Requests | 351–362 |
-| Constants & data dependencies | 363–366 |
-| Randomness | 367–370 |
-| Edge cases & original bugs | 371–378 |
-| Test vectors | 379–387 |
-| Provenance | 388–392 |
-| Open questions | 393–407 |
+|   5. d2rs export | 190–318 |
+|   6. Comparison | 319–356 |
+|   7. Requests | 357–368 |
+| Constants & data dependencies | 369–372 |
+| Randomness | 373–376 |
+| Edge cases & original bugs | 377–384 |
+| Test vectors | 385–393 |
+| Provenance | 394–398 |
+| Open questions | 399–413 |
 <!-- /index -->
 
 ## Summary
@@ -290,7 +290,8 @@ composition, through `d2-client` only (game logic untouched).
 14. A unit cel row's `dir` (and its `sprites.tsv` key) is the cel
    context's direction of §2 r3: the unit's `dir64` after the snap of
    `render/unit-composite.md` §3 r4 (`UnitPose::dir64`, kept per drawn
-   unit in `WorldFrame::unit_dirs`), not the file direction of the frame
+   unit in `WorldFrame::unit_dirs` by the unit's draw slot, not by GUID:
+   GUIDs repeat across unit types, revision 2026-10-09), not the file direction of the frame
    set (§6 r3 maps several `dir64` to one file direction). Other cel
    rows keep the frame set's direction.
 15. A composite slot whose component request succeeds but whose file is
@@ -309,6 +310,11 @@ composition, through `d2-client` only (game logic untouched).
    left, top, `mode` = its colour (the item's colour row; `?` without
    the colour rows), every other column `-`; one row per rectangle
    (revision 2026-10-09, `a1-panel-cube`: the item tints).
+17. A listed unit whose body fails the COF box pre-test
+   (`render/unit-composite.md` §4, inside the unit draw `0x00471EC0`)
+   is still a unit draw call: its `unit` row at its draw key, no cel row
+   (`WorldFrame::unit_calls` with no file; revision 2026-10-09,
+   `a1-panel-inventory` row 128: the torch 2:9 at X = 920).
 
 ### 6. Comparison
 

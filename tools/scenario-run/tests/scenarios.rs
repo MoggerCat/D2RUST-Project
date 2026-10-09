@@ -379,6 +379,7 @@ fn all_acts_data() -> &'static Data {
         Data {
             game: test_fixtures::game::GameData::from_install(&i).unwrap_or_else(|e| panic!("{e}")),
             kind: scenario_run::DataKind::Synthetic,
+            save_dir: None,
         }
     })
 }
