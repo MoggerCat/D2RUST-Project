@@ -487,7 +487,7 @@ fn children(w: &ClientWorld, class: u32) -> Vec<UnitKey> {
 fn function_4_scatters_its_sub_missiles() {
     let mut r = row(FN_SCATTER);
     // chance 1 (rnd(1) = 0 always passes), 2 per update, spread 3, S1 2.
-    (r.clt_param, r.clt_sub) = ([1, 2, 3], [2, -1, -1]);
+    (r.clt_param, r.clt_sub) = ([1, 2, 3, 0, 0], [2, -1, -1]);
     let mut child = row(FN_DEFAULT_STEP);
     child.light = 0;
     let rows = vec![ClientMissileRow::default(), r, child];
@@ -519,7 +519,7 @@ fn function_4_scatters_its_sub_missiles() {
 #[test]
 fn functions_25_and_49_emit_on_their_period() {
     let mut mist = row(FN_MIST);
-    (mist.range, mist.clt_param, mist.clt_sub) = (10, [2, 4, 3], [2, -1, -1]);
+    (mist.range, mist.clt_param, mist.clt_sub) = (10, [2, 4, 3, 0, 0], [2, -1, -1]);
     let mut child = row(FN_DEFAULT_STEP);
     child.light = 0;
     let rows = vec![ClientMissileRow::default(), mist, child];
@@ -541,7 +541,7 @@ fn functions_25_and_49_emit_on_their_period() {
     }));
     // 49: spawn facing every max(P1, 1) elapsed, owner required.
     let mut vines = row(FN_SPAWN_FACING);
-    (vines.range, vines.clt_param, vines.clt_sub) = (10, [2, 0, 0], [2, -1, -1]);
+    (vines.range, vines.clt_param, vines.clt_sub) = (10, [2, 0, 0, 0, 0], [2, -1, -1]);
     let rows = vec![ClientMissileRow::default(), vines, child];
     let mut w = ClientWorld::default();
     let p = UnitKey::new(PLAYER, 1);
@@ -566,7 +566,8 @@ fn functions_25_and_49_emit_on_their_period() {
 #[test]
 fn function_6_lays_its_wall_on_each_new_sub_tile() {
     let mut maker = row(FN_WALL_MAKER);
-    (maker.vel, maker.range, maker.clt_sub, maker.clt_param) = (16, 12, [2, 3, -1], [2, 0, 0]);
+    (maker.vel, maker.range, maker.clt_sub, maker.clt_param) =
+        (16, 12, [2, 3, -1], [2, 0, 0, 0, 0]);
     let mut fire = row(FN_DEFAULT_STEP);
     (fire.range, fire.light) = (30, 5);
     let rows = vec![ClientMissileRow::default(), maker, fire, fire];

@@ -216,6 +216,9 @@ fn client_world_holds_only_stated_fields() {
         // `drlg/rooms.md` §4.6 (last paragraph).
         room_units,
         lights,
+        // `missiles/client.md` §C13 function 2: the drawn frame's unit
+        // origin.
+        unit_origin,
         drlg_updates,
         room_allied,
         // `render/lighting.md` §9.2 r3–r4; `client/msg-skills.md` §4 r2.
@@ -256,7 +259,7 @@ fn client_world_holds_only_stated_fields() {
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
-    assert!(drlg.is_none());
+    assert!(drlg.is_none() && unit_origin.is_none());
     assert!(environment.is_none() && !eclipse_pending && skill_tree_flag.is_none());
     assert_eq!(env_period_cache, 0);
     assert!(room_allied.is_empty());
