@@ -509,6 +509,7 @@ before it; `rng` and `packets` with pokes or frame input are partial on
 1.14d. For a new behaviour, add a `.check` file (copy the example of the
 channel) rather than a hand-run recipe, and paste the report's first
 lines into the `q-fix-*` row.
+26. **Item flag 0x2000 and the default file index of a poked item** (area G, `traces/checks/items-ground-many.check`, 2026-10-09): 36 items made with the poke `item` (`poke.py` request: `0x00558D90`, spawn mode 3, force 0, use seed 0) have, on 1.14d, item flags 0x80000 only (0x2000 clear) and item data +0x28 = 0 for items with no unique / set / superior index; d2rs sets 0x2000 (`generation.md` §3 step 5, "not forced") and file index −1 (`quality.md` §1 "Clear"). The recorded kill drops carry 0x2000 in their 0x9C flags (`facts/items/a1-cold-plains-poke-kills.tsv`: 0x00A02010), so the poke request differs from the treasure request in something that clears it. Read in the creation function `0x00558D90`: what clears 0x2000 (and with which request field or caller state), and what writes the file index of a normal / magic / rare item (0 or −1, and when). Answer into `items/generation.md` §3 and `items/quality.md` §1; then drop `ignore if fi` from the check.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

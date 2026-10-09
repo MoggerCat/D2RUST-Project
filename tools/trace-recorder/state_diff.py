@@ -20,7 +20,8 @@ FORMAT = "state-1"
 # Unit fields in the order of the spec's §2 table (comparison order).
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp",
           "s", "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex",
-          "vit", "lvl", "own"]
+          "vit", "lvl", "own", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss",
+          "is"]
 TYPE_NAMES = {0: "player", 1: "monster", 2: "object", 3: "missile", 4: "item", 5: "tile"}
 
 
