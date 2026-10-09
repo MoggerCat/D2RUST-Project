@@ -173,3 +173,46 @@ fn join_sequence_with_two_clients_sends_per_recipient() {
         vec![j5b(g1, 2, &n1, 9), m::player_event(2, &n1).to_vec()]
     );
 }
+
+/// §7.3 rule 1 (`0x00580860`) for the client's own player: step 5's
+/// state messages, then step 7's stat sends of 67, 68, 12, 0, 2 whose
+/// keys are in the mod array (`stat-lists.md` §11 r4); recorded
+/// `packets-town-arrival-ama.check` frame 2 (seq 105–108): 0xA8 of
+/// state 105, `1d 0c 01`, `1d 00 14`, `1d 02 19`, nothing for 67 / 68.
+// Covers: specs/sim/intents-events.md §7.3 r1; specs/sim/stat-lists.md §11 r4
+#[test]
+fn own_player_update_sends_states_then_its_changed_stats() {
+    use crate::tick::TickHooks;
+    use crate::units::lists::client_state;
+    let mut fx = Fx::new();
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 20, 20);
+    let c = fx
+        .game
+        .lists
+        .add_client(Some(p), Some(a), client_state::IN_GAME);
+    fx.tick();
+    fx.stats(p, &[(12, 1), (0, 20), (2, 25), (67, 100), (68, 100)]);
+    fx.sim.with(&mut fx.game, |g, v| v.set_alignment(g, p, 2));
+    fx.sim.hooks().x.sent.clear();
+    fx.sim.send_unit_update(&mut fx.game, c, p);
+    let sent: Vec<Vec<u8>> = std::mem::take(&mut fx.sim.hooks().x.sent)
+        .into_iter()
+        .map(|(_, b)| b)
+        .collect();
+    // The fixture has no itemstatcost send columns, so the 0xA8 stream
+    // is the list bit and 0x1FF only (its bytes: `messages.rs` tests).
+    let guid = fx.game.lists.unit(p).unwrap().guid.to_le_bytes();
+    let mut a8 = vec![0xA8, 0];
+    a8.extend_from_slice(&guid);
+    a8.extend_from_slice(&[0x0A, 0x69, 0xFF, 0x01]);
+    assert_eq!(
+        sent,
+        [a8, vec![0x1D, 12, 1], vec![0x1D, 0, 20], vec![0x1D, 2, 25]]
+    );
+    // M08: with the mod array cleared, step 7 sends nothing.
+    fx.sim.sys.stats.clear_mods(p);
+    fx.sim.send_unit_update(&mut fx.game, c, p);
+    let sent = std::mem::take(&mut fx.sim.hooks().x.sent);
+    assert!(sent.iter().all(|(_, b)| b[0] != 0x1D), "{sent:?}");
+}

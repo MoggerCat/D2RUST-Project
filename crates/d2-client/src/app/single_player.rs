@@ -2237,7 +2237,7 @@ fn loader(
             v.init_player_seed(p);
             // `combat/hit.md` §7.1: a player is good (2), its state-105
             // list there before its first 0xAA (`intents-events.md`
-            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-732): the
             // original's call site in the join is not identified.
             v.set_alignment(g, p, 2);
             Some(p)

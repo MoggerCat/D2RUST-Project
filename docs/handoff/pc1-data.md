@@ -326,8 +326,17 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `0x005543B0(player, 2, v)` call: where it runs relative to the unit
     seed and the stats, its v argument, and whether a corpse (player
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
-    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
+- **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
+    `sim/stat-lists.md` §11 rule 4 was corrected from the recording
+    (`packets-town-arrival-ama.check` frame 2: the player update sends
+    12, 0, 2, keys in the mod array, and not 67 / 68, base 100 outside
+    it): the single-stat send runs when the key **is** in the mod array.
+    Read `0x00625870` to confirm the test's sense and say what it sends
+    for a key in the array but absent from the base array (0, as the
+    flush `0x006258D0` does, or nothing; d2rs: nothing). Answer into
+    §11 rule 4.
 
 
 42. **Control-panel help button `0x004A64C0`** (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
