@@ -520,6 +520,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The `objects.txt` rows the client object update reads
     /// (`world/objects-client.md` §28 r1); empty: no object update.
     pub fn set_object_rows(&mut self, rows: Vec<objects::ObjClientRow>) {
+        self.world.objclient.selectable = rows.iter().map(|r| r.selectable).collect();
         self.inputs.objclient.rows = rows;
     }
 

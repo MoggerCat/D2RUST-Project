@@ -1,0 +1,12 @@
+check 1
+# Save channel with a hireling: the merc-rogue-town-bar start (ScnBar,
+# expansion, level 30, Rogue Scout row 0, name 21, seed 0x12345678, 39,482
+# experience) idle for 80 ticks, then Save and Exit. Compares the written
+# .d2s byte for byte: the hireling block (+0xAF), the jf item list.
+# Spec: specs/tools/scenario-diff.md, specs/formats/d2s.md §2.5.
+name save-merc-bar
+save SavBar --class bar --expansion --level 30 --merc 0,21,0x12345678,39482
+seed 1234
+ticks 80
+seconds 240
+channels save

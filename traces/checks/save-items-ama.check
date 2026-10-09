@@ -1,0 +1,18 @@
+check 1
+# Save channel after picking items: a healing potion and a gold pile on
+# the ground next to the Amazon (poke item, the game's own creation path),
+# the shared input walks to the unit of type 4 nearest the frame centre and
+# clicks it at frame 10. Save and Exit after frame 100; the written .d2s
+# (item sections: the item the cursor holds, the gold in the stats) is
+# compared byte for byte.
+# Spec: specs/tools/scenario-diff.md, specs/formats/d2s.md.
+name save-items-ama
+save SavAma --class ama --expansion
+seed 1234
+ticks 100
+seconds 300
+channels save
+at 4 poke seed-game 0x00001234 666
+at 4 poke item hp1 @x+2 @y
+at 4 poke item gld @x+2 @y+3
+input frame 9; move 400 300; frame 10; clickunit 4 *; frame 40; move 400 300; frame 41; clickunit 4 *; frame 70; move 400 300; frame 71; clickunit 4 *

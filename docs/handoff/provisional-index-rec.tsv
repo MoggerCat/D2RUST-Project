@@ -5,7 +5,7 @@ REC-03	5714	AUTO	Runtime tables not in `dump_tables`	data	yes		0
 REC-04	5721	AUTO	Tick run over a waypoint walk with the room / unit probes	recording	no		1	
 REC-05	5728	AUTO	Act changes by waypoint: packets and palette frames	recording	no		0	
 REC-06	5735	AUTO	Waypoint object init (town waypoint after travel)	recording	no		0	
-REC-07	5742	MANUAL	Object operation and room population	recording	no		1	
+REC-07	5742	MANUAL	Object operation and room population	recording	no		0	
 REC-08	5749	MANUAL	A monster kill with a drop, pick-up and stash	recording	no		1	
 REC-09	5756	MANUAL	Combat core with stats	recording	no		0	q-drop-stale-provisional,q-fix-client-stat-callback,q-fix-dead-flag,q-fix-pet-palette
 REC-10	5763	MANUAL	Hireling session (and resurrect at an NPC)	recording	no		0	
@@ -46,7 +46,7 @@ REC-44	6236		legacy saves, cited by the specs as the capture: `formats/d2s-legac
 REC-45	6047	MANUAL	Baal's portal opening (level 131 to 132)	recording	no		5	
 REC-46	6055	MANUAL	Classic single-player start (C→S 0x67 of a classic character)	recording	no		0	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
 REC-47	6063	MANUAL	Automap in the play preview (draw modes, header, markers)	recording	no		0	
-REC-50	5939	NO RUN	client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14	binary	no		1	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
+REC-50	5939	NO RUN	client/stat-lists.md §6 r6.5 setfunc 15 (+0xC4 bit 0x80000000 reader), client/model.md §14	binary	no		0	q-fix-create-flags,q-fix-recharge-order,q-skill-fallback
 REC-51	5681	AUTO	client/model.md OQ1 and OQ2, client/msg-ui.md OQ2 (0x10000 per-caller conditions)	recording	no		27	q-fix-monster-modes
 REC-60	5872	AUTO	ui/text.md §15 r6 (scroll window, caret-inside-window case)	recording	no		5	q-fix-d2s-token-ref,q-fix-edit-scroll,q-fix-format-lookups
 REC-61	5880	NO RUN	render/camera.md OQ1 (roof block count	binary	yes		2	
@@ -150,7 +150,7 @@ REC-201	6091	MANUAL	Front end: Control draw order	recording	no		1
 REC-203	6097	MANUAL	Front end: Character-select OK condition	recording	no		0	
 REC-204	6103	MANUAL	Front end: Mouse wheel on character select	recording	no		0	q-fix-charselect-wheel,q-fix-esc-menu,q-fix-sp-pause
 REC-205	6109	MANUAL	Front end: Dead hardcore figure	recording	no		1	
-REC-206	6115	MANUAL	Front end: Legacy `Save Path` migration	recording	no		1	
+REC-206	6115	MANUAL	Front end: Legacy `Save Path` migration	recording	no		0	
 REC-207	6122	MANUAL	Front end: Slot level line text	recording	no		0	
 REC-208	6129	MANUAL	Front end: class names 10097 / 10098	data	yes		0	
 REC-209	6136	MANUAL	Front end: filter argument 2	recording	no		0	
@@ -261,13 +261,13 @@ REC-334	6382	AUTO] [MANUAL	(R-SAVE-1, R-SAVE-2, R-SAVE-3, R-SAVE-4, R-SAVE-5)	un
 REC-335	6389	AUTO hook, MANUAL placement	(R-LOS-1)	recording	no		0	
 REC-400	6392	AUTO	(R-3E-1) — wire byte layout, top of the list (M22)	unstated	no	yes	1	
 REC-401	6395	MANUAL, second client	(R-JOIN-1)	unstated	no	yes	1	
-REC-402	6398	AUTO hook	(R-CHAT15-1)	recording	no	yes	4	
-REC-404	6428	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	5	
+REC-402	6398	AUTO hook	(R-CHAT15-1)	recording	no	yes	3	
+REC-404	6428	PC 1, Ghidra read; AUTO hook	(R-SUBFILE-1)	recording	no	yes	4	
 REC-405	6715		Per-client inventory refresh without its item steps (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
 REC-406	6716		The join sequence's 0x8D (PROVISIONAL, `d2-sim` `wiring/action/dispatch.rs` `join_sequence	binary	no		1	
 REC-410	6401	AUTO hook	(R-OVL11-1)	recording	no	yes	0	
-REC-411	6404	AUTO	(R-LAND-1)	recording	no	yes	2	
-REC-412	6407	AUTO hook	(R-HEAL-1)	recording	no	yes	1	
+REC-411	6404	AUTO	(R-LAND-1)	recording	no	yes	1	
+REC-412	6407	AUTO hook	(R-HEAL-1)	recording	no	yes	0	
 REC-413	6410	AUTO	(R-CAST-1)	recording	no	yes	1	
 REC-414	6413	AUTO	(R-MISS73-1)	recording	no	yes	0	
 REC-415	6416	PC 1, Ghidra read	(R-CALLERS-1)	binary	no	yes	1	
@@ -303,7 +303,7 @@ REC-570	6684		Warp and Town Portal arrival walk-outs (follows REC-288; `d2-clien
 REC-576	6728		Cloud recording round 2026-10-09 (q-prov-recording-2, items lane) for the d2-client PROVIS	recording	no	yes	1	
 REC-592	6743		Animation re-init of a player / monster mode change (PROVISIONAL, `d2-sim` `wiring/action/	recording	no		2	
 REC-593	6744		Monster walk / run speed at the animation rate (PROVISIONAL, `d2-sim` `wiring/action/units	recording	no		2	
-REC-602	6742		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		1	
+REC-602	6742		Client run end on stamina 0 (the scale is settled: `bridge/predict.rs` is faithful and sta	recording	no		0	
 REC-655	6745		Poke call forms of `pos`, `warp`, `item`, `stat`, `state` (PROVISIONAL, `tools/trace-recor	recording	no		0	
 REC-720	6516		HUD skill-button icon state (settled 2026-10-09, q-fix-b41-skill-button-state; was PROVISI	unstated	no		0	
 REC-721	6517		Placement tint scope (PROVISIONAL, `d2-client` `ui/panels/inv_items_tint.rs` `draw_placeme	recording	no		1	
@@ -324,7 +324,7 @@ REC-746	6528		Esc / Space during an NPC interaction (PROVISIONAL, `d2-client` `u
 REC-790	6733		Act V removals on the wired host (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.rs`, M2	data	yes		6	
 REC-791	6734		Nihlathak killed in town (PROVISIONAL, `quest_host.rs` `kill_in_town`, M22): `0x00589340` 	unstated	no		1	
 REC-792	6735		Scroll of Resistance stat send (PROVISIONAL, `quest_host.rs` `add_resist_list`, M22): the 	unstated	no		1	
-REC-793	6736		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`, `quest_reward.rs` `Que	unstated	no		2	
+REC-793	6736		Baal's gold piles (PROVISIONAL, `quest_host.rs` `drop_gold_amount`, `quest_reward.rs` `Que	unstated	no		1	
 REC-795	6737		The Ancients' chain-35 link (PROVISIONAL, `d2-server` `wired/quest_events.rs`, M22; q-play	binary	no		0	
 REC-796	6738		Tyrael's spawn after the tick (PROVISIONAL, `d2-sim` `wiring/action/missiles.rs` `spawn_ty	unstated	no		0	
 REC-797	6739		The player's act byte at the join (PROVISIONAL, `d2-server` `adapters/session.rs`, M22): u	recording	no		1	
