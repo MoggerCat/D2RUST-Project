@@ -159,3 +159,19 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   - d2rs has the act rule (`d2-server` `adapters/character.rs`), so the
     act-0 start is a wiring gap; q-prov-data implements it (no new row
     from here).
+- **Item 2 — what keeps a dead monster dead.** Written into
+  `specs/sim/units.md` §4.6 "What keeps a dead monster dead", with a
+  pointer in `monsters/ai.md` §1.1.
+  - Sequence: request 0 → DT start (clean-up) → DT event 0 / 1 sets 12
+    with the plain set → DD schedules nothing.
+  - The think has no dead test. The DT start's clean-up cancels the
+    unit's type-2 / 3 events (`0x005738D0`), and no scheduler runs for
+    a dead unit afterwards.
+  - The mode set `0x005A7C20` does not refuse a dead unit. A start that
+    fails leaves the mode unchanged (dead → return 1); the GH start
+    keeps mode 0/12; but the NU start sets mode 1 and an attack / skill
+    start sets its mode.
+  - d2rs's `monster_death_start` has no clean-up, so the think pending
+    at death fires `aidel` (15) frames later, idles, requests neutral,
+    and gets mode 1 with hp 0: exactly the symptom. Row
+    `q-fix-p4-death-cleanup`.

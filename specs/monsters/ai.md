@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
