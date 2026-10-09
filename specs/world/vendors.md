@@ -33,18 +33,18 @@
 |   1. Vendor columns and per-NPC store lists | 87–141 |
 |   2. Store item level | 142–147 |
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–292 |
-|   5. Gambling | 293–369 |
-|   6. Refresh | 370–401 |
-|   7. Buying and selling | 402–595 |
-|   8. Repair | 596–650 |
-|   9. Prices | 651–850 |
-| Constants & data dependencies | 851–870 |
-| Randomness | 871–889 |
-| Edge cases & original bugs | 890–929 |
-| Test vectors | 930–952 |
-| Provenance | 953–991 |
-| Open questions | 992–1075 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–295 |
+|   5. Gambling | 296–372 |
+|   6. Refresh | 373–404 |
+|   7. Buying and selling | 405–598 |
+|   8. Repair | 599–653 |
+|   9. Prices | 654–853 |
+| Constants & data dependencies | 854–873 |
+| Randomness | 874–892 |
+| Edge cases & original bugs | 893–932 |
+| Test vectors | 933–955 |
+| Provenance | 956–994 |
+| Open questions | 995–1078 |
 <!-- /index -->
 
 ## Summary
@@ -280,7 +280,10 @@ From `npc.md` §4 (actions 1, 2):
      (gamble): vendor item flag (unit +0xC8 |= 4), flag 1 if it has
      filled sockets, add to the NPC's trade inventory
      (`0x00576C30`); the client receives one 0x9C action 11 per item
-     (recorded, frame 899). Order (handoff `impl-vendors` V14): the
+     (recorded, frame 899). They are sent by the next tick's client pass,
+     after the monster updates (recorded 2026-10-09,
+     `interact-talk-akara`: 0x13, 0x2F, 0x38 at the frame-16 poke, the
+     store records in tick 16 after Akara's 0x8A and 0x6D). Order (handoff `impl-vendors` V14): the
      walk is the NPC's (or the gamble node's) inventory item list, first
      `0x0063B2C0`, next `0x0063DFA0`, which is link order
      (`items/inventory.md` §1.4 rule 1): items in the order they were

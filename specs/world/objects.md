@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–448 |
-|   8. Chests and breakables | 449–584 |
-|   9. Shrines | 585–700 |
-|   10. Doors, operate 8 (`0x00581D40`) | 701–724 |
-|   11. Wells, operate 22 (`0x005858A0`) | 725–756 |
-|   12. Portals, operate 15 (`0x00584870`) | 757–827 |
-|   13. Torch, operate 11 (`0x005843D0`) | 828–832 |
-|   14. Client messages | 833–860 |
-|   15. Not covered yet | 861–875 |
-|   16.–18. Moved | 876–882 |
-| Constants & data dependencies | 883–929 |
-| Randomness | 930–976 |
-| Edge cases & original bugs | 977–1043 |
-| Test vectors | 1044–1082 |
-| Provenance | 1083–1149 |
-| Open questions | 1150–1203 |
+|   7. Operate dispatch | 324–456 |
+|   8. Chests and breakables | 457–592 |
+|   9. Shrines | 593–708 |
+|   10. Doors, operate 8 (`0x00581D40`) | 709–732 |
+|   11. Wells, operate 22 (`0x005858A0`) | 733–764 |
+|   12. Portals, operate 15 (`0x00584870`) | 765–835 |
+|   13. Torch, operate 11 (`0x005843D0`) | 836–840 |
+|   14. Client messages | 841–868 |
+|   15. Not covered yet | 869–883 |
+|   16.–18. Moved | 884–890 |
+| Constants & data dependencies | 891–937 |
+| Randomness | 938–984 |
+| Edge cases & original bugs | 985–1051 |
+| Test vectors | 1052–1090 |
+| Provenance | 1091–1157 |
+| Open questions | 1158–1211 |
 <!-- /index -->
 
 ## Summary
@@ -445,6 +445,14 @@ waypoint's operate sets the operator's interact info,
 
 So an operate or a walk gives 0; the operate function's own result
 never reaches this value.
+
+Recorded (2026-10-09, `interact-operate-stash`: the player 7 sub-tiles
+from stash 267, `poke operate`): the 0x13 starts a run (mode 3) at
+frame 4 whose path target is the stash's own cell (4866, 4229) (the run
+lifts the stash's footprint, `sim/pathing.md` §3 step 6, size `SizeX`
+1), the player stops at (4868, 4229) at frame 13 (unit distance 0) and
+the operate runs on arrival: S→C 0x77 0x10 (stash open) in that frame.
+d2rs equal on every state field and packet (q-fix-npc-interact).
 
 ### 8. Chests and breakables
 
