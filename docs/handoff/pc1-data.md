@@ -182,3 +182,30 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
     0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
     entry itself is wired (`world/quests.md` §3 names the caller).
+17. **Think restart gate `0x00553160`** (REC-442, q-cloud-game): in
+    SUNIT_Add's monster branch (`init.md` §4.1), when does 1.14d restart
+    the think at f + 2? d2rs always restarts it. Answer into `init.md`
+    §4.1 / `ai.md`.
+18. **Missile damage setup `0x0059F900` → `0x0064B860`**
+    (`q-fix-real-missile-damage`, from q-fix-real-skills): how a missile's
+    damage record is filled from its owner and skill; no spec exists.
+    Write `missiles/damage.md` (or a section of `missiles/missiles.md`).
+19. **Arcane Sanctuary star tick** (`draw-order-2.md` OQ 12, HANDOFF §5
+    entry 103; REC-420): the initial `last` of §12 r3 and the time / seed
+    argument form.
+20. **Windows recordings Wine cannot make** (`facts/requests.tsv`, open
+    rows from q-facts-scenes): stash panel; NPC dialog, shop and gamble
+    screens (clicks do not open them under Wine); the 4 front-end scenes;
+    Blood Moor monsters at night; Den of Evil. Record with
+    `tools/trace-recorder/record_frames.py` and `facts_render.py` as in
+    Step 3, each twice, and commit the facts.
+
+## Step 5 — spec gaps (107 provisional points no spec states)
+
+`docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
+are behaviours d2rs guessed because no spec covers them. Work them with
+`re/` per `specs/README.md`, highest impact first (crashes and wrong game
+outcomes before cosmetics), and write the answer into the owner spec
+(prose / authored pseudocode, addresses). Each answered point either
+confirms d2rs (mark the REC settled) or becomes a `q-fix-*` row. Re-run
+`py tools/provisional_index.py` after each batch.
