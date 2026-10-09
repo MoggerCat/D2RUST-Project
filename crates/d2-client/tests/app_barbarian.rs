@@ -23,6 +23,9 @@ const NATURAL_RESISTANCE: usize = 153;
 const DRAGON_TALON: usize = 255;
 const DRAGON_FLIGHT: usize = 275;
 
+/// Body location (`bodylocs`) of the left arm.
+const LEFT: u8 = 5;
+
 fn barbarian(skills: &[usize]) -> Rig {
     let mut r = Rig::new("barbarian", skills);
     r.leave_town();
@@ -42,10 +45,10 @@ fn bash_on_a_monster_costs_mana_and_hurts_it() {
     r.select_right(BASH);
     let (mana0, life0) = (r.mana(), r.life(m));
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
     assert!(r.mana() < mana0, "Bash spent mana ({errors})");
-    assert!(r.life(m) < life0, "Bash hurt the monster ({errors})");
+    assert!(low < life0, "Bash hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies.md §8.2
@@ -83,16 +86,28 @@ fn shout_and_battle_orders_put_their_state_on_the_barbarian() {
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn double_swing_hits_two_monsters_in_two_swings() {
     let mut r = barbarian(&[DOUBLE_SWING]);
+    // Double Swing's sets a and b are both `mele` (`use.md` §2): the
+    // start kit's buckler leaves the left hand for a second hand axe
+    // (staging; with one weapon its `AttackNoMana` makes it an Attack).
+    if r.worn(LEFT).is_some() {
+        r.take_off(LEFT);
+    }
+    r.wear(*b"hax ", LEFT);
     let (a, b) = (r.spawn_monster(1), r.spawn_monster(2));
     r.select_right(DOUBLE_SWING);
     let (mana0, la, lb) = (r.mana(), r.life(a), r.life(b));
     r.right_click_unit(a);
-    r.step(30);
+    let (mut lowa, mut lowb) = (la, lb);
+    for _ in 0..30 {
+        r.step(1);
+        lowa = lowa.min(r.life(a));
+        lowb = lowb.min(r.life(b));
+    }
     let errors = r.errors();
     assert!(r.mana() < mana0, "Double Swing spent mana ({errors})");
-    assert!(r.life(a) < la, "the first swing hurt the target ({errors})");
+    assert!(lowa < la, "the first swing hurt the target ({errors})");
     assert!(
-        r.life(b) < lb,
+        lowb < lb,
         "the second swing hurt the next monster ({errors})"
     );
 }
@@ -185,7 +200,7 @@ fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
         r.with(|sim, p| sim.events.action.sys.hooks.path_position(p)),
     );
     r.right_click_point(5, 0);
-    r.step(40);
+    let low = r.lowest_life(m, 40);
     let to = r.with(|sim, p| sim.events.action.sys.hooks.path_position(p));
     let errors = r.errors();
     assert_eq!(
@@ -193,7 +208,7 @@ fn leap_lands_on_the_aimed_point_and_deals_no_damage() {
         (from.0 + 5, from.1),
         "landed on the aimed point ({errors})"
     );
-    assert_eq!(r.life(m), life0, "the landing is a knockback only");
+    assert_eq!(low, life0, "the landing is a knockback only");
 }
 
 // Covers: specs/skills/bodies-2b.md §6.11, §6.12
@@ -206,10 +221,10 @@ fn leap_attack_leaps_to_the_monster_and_strikes_it() {
     let m = r.spawn_monster(6);
     let (mana0, life0) = (r.mana(), r.life(m));
     r.right_click_unit(m);
-    r.step(60);
+    let low = r.lowest_life(m, 60);
     let errors = r.errors();
     assert!(r.mana() < mana0, "Leap Attack spent mana ({errors})");
-    assert!(r.life(m) < life0, "the strike hurt the monster ({errors})");
+    assert!(low < life0, "the strike hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies-2.md §3.10, §3.11, §2.5, §2.6
@@ -223,9 +238,9 @@ fn dragon_talon_kick_hurts_a_monster() {
     let m = r.spawn_monster(1);
     let life0 = r.life(m);
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
-    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
+    assert!(low < life0, "the kick hurt the monster ({errors})");
 }
 
 // Covers: specs/skills/bodies-2b.md §7.20
@@ -239,7 +254,7 @@ fn dragon_flight_kick_hurts_a_monster() {
     let m = r.spawn_monster(1);
     let life0 = r.life(m);
     r.right_click_unit(m);
-    r.step(30);
+    let low = r.lowest_life(m, 30);
     let errors = r.errors();
-    assert!(r.life(m) < life0, "the kick hurt the monster ({errors})");
+    assert!(low < life0, "the kick hurt the monster ({errors})");
 }

@@ -24,16 +24,21 @@ use d2_client::app::single_player::{self, BuildError, Link};
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::local::{LocalLink, PendingSession};
 use d2_client::bridge::mirror::DynLink;
+use d2_client::bridge::BridgeResource;
 use d2_client::world_view::tile_assets::TileAssets;
 use d2_data::tables::Skills;
 use d2_server::adapters::ProtoSizes;
 use d2_server::host::Host;
 use d2_server::seams::Clock;
+use d2_sim::items::inventory::UnitKind;
+use d2_sim::items::moves::InventoryOps;
+use d2_sim::items::ItemRequest;
 use d2_sim::missiles::unit_flag as flags;
 use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::stat;
 use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
+use d2_sim::wiring::economy::ItemSpawn;
 
 /// `monstats` row 5, `zombie1`: a Blood Moor native.
 pub const ZOMBIE: u32 = 5;
@@ -362,6 +367,18 @@ impl Rig {
         self.stat_of(u, stat::HITPOINTS)
     }
 
+    /// Steps `frames` frames and returns the lowest life `u` had (a hit
+    /// shows there: the monster's regeneration heals it back within the
+    /// frames).
+    pub fn lowest_life(&mut self, u: UnitId, frames: usize) -> i32 {
+        let mut low = self.life(u);
+        for _ in 0..frames {
+            self.step(1);
+            low = low.min(self.life(u));
+        }
+        low
+    }
+
     /// The unit has a state list for `state`.
     pub fn has_state(&mut self, u: UnitId, state: u16) -> bool {
         self.with(move |sim, _| {
@@ -454,6 +471,116 @@ impl Rig {
             }
         }
         "not drained".into()
+    }
+
+    /// The items code worn at body location `loc` (client model; 4 right
+    /// arm, 5 left arm).
+    pub fn worn(&self, loc: u8) -> Option<[u8; 4]> {
+        let w = self.app.world().resource::<BridgeResource>().0.world();
+        d2_client::bridge::items::local_items(w)
+            .into_iter()
+            .find(|i| i.mode == 1 && i.body == loc)
+            .and_then(|i| i.code)
+    }
+
+    /// Takes the item at body location `loc` off to the cursor (C→S 0x1C)
+    /// and drops it (0x17), so the hand and the cursor are empty.
+    pub fn take_off(&mut self, loc: u8) {
+        self.send(&[0x1C, loc, 0]);
+        self.step(6);
+        let cursor = {
+            let w = self.app.world().resource::<BridgeResource>().0.world();
+            d2_client::bridge::items::cursor_item(w).map(|i| i.key.guid)
+        };
+        let guid = cursor.expect("the item on the cursor");
+        let mut m = vec![0x17];
+        m.extend_from_slice(&guid.to_le_bytes());
+        self.send(&m);
+        self.step(6);
+        assert_eq!(self.worn(loc), None, "body location {loc} is empty");
+    }
+
+    /// Staging: makes the install's item `code` (normal quality, item
+    /// level 1) and wears it at body location `loc` from the cursor (the
+    /// item moves' equip, `inventory.md`).
+    pub fn wear(&mut self, code: [u8; 4], loc: u8) {
+        let worn = self.with(move |s, owner| {
+            s.world
+                .with_economy(&mut s.game, &mut s.events, |econ, parts| {
+                    let record = econ
+                        .tables
+                        .items
+                        .iter()
+                        .position(|r| r.code == code)
+                        .expect("an items row of the code");
+                    let mut rq = ItemRequest {
+                        item: record as i32,
+                        ilvl: 1,
+                        quality: 2,
+                        format: 1,
+                        ..ItemRequest::default()
+                    };
+                    let held = ItemSpawn {
+                        room: None,
+                        mode: 4,
+                        init_flags: 1,
+                    };
+                    let item = econ.create_item(&mut rq, false, held).expect("item");
+                    let inv = parts.inventory.as_deref_mut().expect("inventory model");
+                    let (class, guid) = {
+                        let u = econ.units.get(owner).unwrap();
+                        (u.class, u.guid)
+                    };
+                    if !inv.state.inventories.contains_key(&owner) {
+                        let kind = UnitKind::Player { class: class as u8 };
+                        inv.state.add_inventory(owner, kind, guid);
+                    }
+                    let mut d = inv.desk(econ);
+                    d.sync_in();
+                    if let Some(i) = d.state.items.get_mut(&item) {
+                        i.mode = d2_sim::items::inventory::mode::CURSOR;
+                    }
+                    d.sync_out();
+                    match (d.owner_of(owner), d.guid_of(item)) {
+                        (Some(o), g) => d.equip_from_cursor(o, g, loc, true).0,
+                        _ => false,
+                    }
+                })
+        });
+        assert!(
+            worn,
+            "{} worn at body location {loc}",
+            String::from_utf8_lossy(&code)
+        );
+        self.step(4);
+    }
+
+    /// The skill id of the player's used skill entry.
+    pub fn used_skill(&mut self) -> Option<i32> {
+        self.with(|sim, p| {
+            sim.events
+                .action
+                .sys
+                .hooks
+                .used_skill_of(p)
+                .map(|e| e.skill)
+        })
+    }
+
+    /// The pets of the local player (client model).
+    pub fn pets(&self) -> usize {
+        self.app
+            .world()
+            .resource::<BridgeResource>()
+            .0
+            .world()
+            .pets
+            .len()
+    }
+
+    /// The unit has `state` (its state bits).
+    pub fn state_on(&mut self, u: UnitId, state: u16) -> bool {
+        self.with(move |sim, _| sim.events.action.sys.stats.has_state(u, u32::from(state)))
     }
 
     pub fn errors(&mut self) -> String {

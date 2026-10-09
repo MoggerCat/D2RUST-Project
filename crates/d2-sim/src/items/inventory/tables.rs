@@ -46,6 +46,10 @@ pub struct InvItemRec {
     /// (`bodies-2.md` §3.4).
     pub mindam: u8,
     pub maxdam: u8,
+    /// `wclass` / `2handedwclass` (weapons +0xC0 / +0xC4): COF weapon
+    /// class codes (`render/unit-composite.md` §2.1).
+    pub wclass: [u8; 4],
+    pub wclass2: [u8; 4],
 }
 
 macro_rules! inv_item_rec {
@@ -71,6 +75,8 @@ macro_rules! inv_item_rec {
                     levelreq: r.levelreq,
                     mindam: r.mindam,
                     maxdam: r.maxdam,
+                    wclass: r.wclass,
+                    wclass2: r.f_2handedwclass,
                 }
             }
         }

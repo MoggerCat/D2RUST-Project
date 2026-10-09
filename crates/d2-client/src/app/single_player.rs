@@ -820,7 +820,7 @@ impl Pending for LocalSeams {
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
-        self.weapons.hand_class(unit)
+        self.weapons.cof_class(unit)
     }
     fn hand_class(&self, unit: UnitId) -> i32 {
         self.weapons.hand_class(unit)
