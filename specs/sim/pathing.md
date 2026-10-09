@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 385–452 |
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
-|   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–790 |
-|   10. Messages | 791–853 |
-|   11. Missile paths (`0x00649760`) | 854–906 |
-|   12. Other path types (1.14d-read 2026-10-08) | 907–1120 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1121–1270 |
-| Constants & data dependencies | 1271–1307 |
-| Randomness | 1308–1318 |
-| Edge cases & original bugs | 1319–1366 |
-| Test vectors | 1367–1405 |
-| Provenance | 1406–1461 |
-| Open questions | 1462–1535 |
+|   8. Velocity, direction vector, facing | 501–613 |
+|   9. Per-tick movement | 614–797 |
+|   10. Messages | 798–860 |
+|   11. Missile paths (`0x00649760`) | 861–913 |
+|   12. Other path types (1.14d-read 2026-10-08) | 914–1127 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1128–1277 |
+| Constants & data dependencies | 1278–1314 |
+| Randomness | 1315–1325 |
+| Edge cases & original bugs | 1326–1373 |
+| Test vectors | 1374–1412 |
+| Provenance | 1413–1468 |
+| Open questions | 1469–1542 |
 <!-- /index -->
 
 ## Summary
@@ -525,6 +525,13 @@ animation-speed half of it belongs to the future animation-rate spec,
    (truncated), base = charstats `WalkVelocity` × 256 for players,
    monstats `Velocity` × 256 for monsters (`0x00621360`; the mode does
    not change the base).
+   PROVISIONAL: a monster drawn as a player (flag-ex disguise, first
+   gfx state with `gfxtype` 2: the draw identity `0x00645270`,
+   `units.md` §4.7) takes the charstats `WalkVelocity` of the shown class
+   (`gfxclass`) as its base (because 1.14d's Shadow Warrior, monstats
+   `Velocity` 0, walks 0x4800 a frame = 6 × 256 × 75 % in the
+   ass-shadow-warrior check); settled by the PC 1 read of `0x00621360`
+   (REC-1652).
 3. Velocity write (`0x00648690`): +0x38 := 15 only when the new value
    differs from the current velocity; velocity and max velocity (+0x84)
    := the new value always.

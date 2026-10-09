@@ -161,6 +161,9 @@ fn think_rhythm_table() {
     w.run(true, 1);
     assert_eq!(last_mode(&w), at_unit(mode::ATTACK2, w.player));
     assert!(w.thinks().is_empty());
+    // The attack's path target unit is the player (REC-1651: the mode-end
+    // request then targets the monster itself).
+    w.fake.path_target = Some(w.player);
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK2));
     assert_eq!(last_mode(&w), at_unit(mode::NEUTRAL, mon));
     w.with(|g, cx| neutral_mode_start(g, cx, mon));

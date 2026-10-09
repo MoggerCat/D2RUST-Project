@@ -478,10 +478,37 @@ impl<X: Pending> View<'_, X> {
     }
 
     /// monstats `Velocity` and `npc` of a monster (`pathing.md` §8.1).
+    ///
+    /// PROVISIONAL (REC-1652): a monster drawn as a player (flag-ex
+    /// disguise and its first gfx state with `gfxtype` 2, the draw
+    /// identity `0x00645270`, `units.md` §4.7) takes the charstats
+    /// `WalkVelocity` of the shown class as its base, `npc` clear.
+    /// Measured 1.14d: the Shadow Warrior (monstats `Velocity` 0, state
+    /// `shadowwarrior` gfxclass 6) walks 0x4800 a frame = 6 × 256 × 75 %
+    /// (ass-shadow-warrior frame 49); §8.1 does not say what `0x00621360`
+    /// reads for it.
     pub fn monster_velocity(&self, unit: UnitId) -> MonsterVelocity {
-        self.units
-            .get(unit)
-            .and_then(|r| self.h.tables.combat.monstats.get(r.class as usize))
+        let Some(r) = self.units.get(unit) else {
+            return (0, false);
+        };
+        if r.flags2 & crate::units::record::flags2::DISGUISE != 0 {
+            let states = &self.stats.data().states;
+            let shown = states
+                .gfx_states()
+                .iter()
+                .find(|&&(s, ..)| self.stats.has_state(unit, s))
+                .copied();
+            if let Some((_, 2, class)) = shown {
+                if let Some(c) = self.h.tables.combat.charstats.get(usize::from(class)) {
+                    return (i32::from(c.walkvelocity), false);
+                }
+            }
+        }
+        self.h
+            .tables
+            .combat
+            .monstats
+            .get(r.class as usize)
             .map_or((0, false), |m| (i32::from(m.velocity), m.npc))
     }
 

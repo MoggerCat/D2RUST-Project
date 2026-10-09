@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–282 |
-|   2. Think dispatch `0x005B1740` | 283–422 |
-|   3. AI control and AI tables | 423–594 |
-|   4. AI parameters | 595–613 |
-|   5. Target selection | 614–789 |
-|   6. Distances and line tests | 790–804 |
-|   7. Tactics helpers | 805–1044 |
-|   8. AI commands and minions | 1045–1071 |
-|   10. The catalogue `ai-functions.tsv` | 1072–1092 |
-| Constants & data dependencies | 1093–1116 |
-| Randomness | 1117–1138 |
-| Edge cases & original bugs | 1139–1180 |
-| Test vectors | 1181–1269 |
-| Provenance | 1270–1330 |
-| Open questions | 1331–1434 |
+|   1. Think scheduling | 97–291 |
+|   2. Think dispatch `0x005B1740` | 292–431 |
+|   3. AI control and AI tables | 432–603 |
+|   4. AI parameters | 604–622 |
+|   5. Target selection | 623–798 |
+|   6. Distances and line tests | 799–813 |
+|   7. Tactics helpers | 814–1053 |
+|   8. AI commands and minions | 1054–1080 |
+|   10. The catalogue `ai-functions.tsv` | 1081–1101 |
+| Constants & data dependencies | 1102–1125 |
+| Randomness | 1126–1147 |
+| Edge cases & original bugs | 1148–1189 |
+| Test vectors | 1190–1278 |
+| Provenance | 1279–1339 |
+| Open questions | 1340–1443 |
 <!-- /index -->
 
 ## Summary
@@ -207,6 +207,15 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
+
+PROVISIONAL: the neutral request of the last case carries no target unit
+and the point (0, 0) when the unit has no path target unit (`0x00553540`),
+so the path target point becomes (0, 0) (`0x00648AD0`, §7.5 rule 2); with
+a path target unit d2rs keeps targeting the monster itself (the point is
+not written) (because 1.14d's summons ending S1 at the animation end, the
+raven, plague poppy, vines and cycle of life checks, show path target
+(0, 0) after it, while attack ends with a target unit keep the point);
+settled by the PC 1 read of `0x005A8030`'s request record (REC-1651).
 
 #### 1.5 First think and player arrival
 

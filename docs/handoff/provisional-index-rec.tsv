@@ -340,3 +340,5 @@ REC-1360	6751		audio-diff's 1.14d voice start tick (PROVISIONAL, `tools/audio-di
 REC-1361	6752		DirectSound volume / pan conversion is f64 with truncation (PROVISIONAL, `d2-client` `app/	recording	no		2	
 REC-1362	6753		audio-diff's mixed check mixes both voice sets through d2rs' mixer (PROVISIONAL, `specs/to	unstated	no		1	
 REC-1363	6754		1.14d's DirectSound calls do not depend on Wine (PROVISIONAL, `specs/tools/audio-diff.md` 	recording	no		0	
+REC-1651	6755		Mode-end neutral request target (PROVISIONAL, `d2-sim` `monsters/ai/mod.rs` `mode_end`; `m	unstated	no		2	
+REC-1652	6756		Velocity base of a monster drawn as a player (PROVISIONAL, `d2-sim` `wiring/path/units.rs`	unstated	no		2	
