@@ -44,10 +44,11 @@ fn a_created_missile_holds_its_frames_velocity_and_target() {
     let mut none = at(100, 100);
     none.class = 9;
     assert_eq!(create(&mut w, &rows(), &none, true).unwrap(), None);
-    // Flag 1: start (100, 100); target (x, y) without flag 2 / 0x20.
-    let k = create(&mut w, &rows(), &at(100, 100), true)
-        .unwrap()
-        .unwrap();
+    // Flag 1: start (100, 100); flag 2: target 5 sub-tiles east.
+    let mut east = at(100, 100);
+    east.flags |= flag::TARGET_RELATIVE;
+    east.tx = 5;
+    let k = create(&mut w, &rows(), &east, true).unwrap().unwrap();
     assert_eq!(k.unit_type, MISSILE);
     let u = &w.objclient.set_c[&k];
     assert_eq!((u.class, u.position), (1, Some((100, 100))));
@@ -59,7 +60,14 @@ fn a_created_missile_holds_its_frames_velocity_and_target() {
     assert_eq!(m.velocity, (9 << 8) * 75 / 100);
     // r10: length AnimLen << 8, speed AnimSpeed << 4.
     assert_eq!((m.anim_len, m.anim_speed), (6 << 8, 16 << 4));
-    assert_eq!(m.target_point, (100, 100));
+    assert_eq!(m.target_point, (105, 100));
+    // Without flag 2 / 0x20 the target is the start: the path's point is
+    // the position, so its velocity is 0 (`pathing.md` §8.4 r1).
+    let k0 = create(&mut w, &rows(), &at(100, 100), true)
+        .unwrap()
+        .unwrap();
+    let m0 = w.objclient.missiles[&k0];
+    assert_eq!((m0.target_point, m0.velocity), ((100, 100), 0));
     // Flag 2: relative target; flag 0x20: absolute.
     let mut rel = at(100, 100);
     rel.flags |= flag::TARGET_RELATIVE;
@@ -290,4 +298,42 @@ fn the_aim_nudge_steps_off_the_owners_cell_by_its_direction() {
     rec.owner_dir64 = Some(20);
     let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
     assert_eq!(w.objclient.missiles[&k].target_point, (98, 100));
+}
+
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+// Covers: specs/missiles/missiles.md §r4-1-movement-in-fixed-point
+#[test]
+fn a_moving_missile_steps_along_its_path_and_ends_after_its_frames() {
+    let mut r = row(FN_DEFAULT_STEP);
+    (r.vel, r.range, r.collide_type) = (16, 20, 3);
+    let rows = vec![ClientMissileRow::default(), r];
+    let mut w = ClientWorld::default();
+    let mut rec = at(100, 100);
+    rec.flags |= flag::TARGET_RELATIVE;
+    rec.tx = 10;
+    let k = create(&mut w, &rows, &rec, true).unwrap().unwrap();
+    let m = w.objclient.missiles[&k];
+    assert_eq!(m.dir_vec.1, 0, "due east");
+    assert!(m.dir_vec.0 > 0);
+    let start = m.pos;
+    update(&mut w, &rows, k, true).unwrap();
+    let m = w.objclient.missiles[&k];
+    // §R4.1 r3: ((v × 0x400) >> 6) × dir >> 12 per update, v = (16 <<
+    // 8) × 75 / 100.
+    let v = (16 << 8) * 75 / 100;
+    let step = (((v * 0x400) >> 6) * m.dir_vec.0) >> 12;
+    assert_eq!((m.pos.0 - start.0) as i32, step);
+    assert_eq!(m.pos.1, start.1);
+    assert_eq!(
+        w.objclient.set_c[&k].position,
+        Some(((m.pos.0 >> 16) as u16, (m.pos.1 >> 16) as u16))
+    );
+    // No client DRLG: no wall; it flies its frames.
+    for _ in 0..30 {
+        update(&mut w, &rows, k, true).unwrap();
+    }
+    assert!(
+        !w.objclient.set_c.contains_key(&k),
+        "ended after its frames"
+    );
 }

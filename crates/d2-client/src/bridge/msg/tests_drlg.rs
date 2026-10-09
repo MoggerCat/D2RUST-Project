@@ -1121,3 +1121,44 @@ fn drlg_point(w: &super::super::world::ClientWorld, x: i32, y: i32) -> u32 {
         .map_or(0x27, u32::from)
         & 5
 }
+
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+#[test]
+fn a_client_missile_ends_on_a_wall_of_the_client_drlg() {
+    use crate::bridge::client_missiles::{create, flag, update, ClientMissileRow, CreateRecord};
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let rows = vec![ClientMissileRow {
+        vel: 16,
+        range: 40,
+        collide_type: 3,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    }];
+    let rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_RELATIVE,
+        x: 46,
+        y: 8,
+        ty: 10,
+        ..CreateRecord::default()
+    };
+    // A wall (collision bit 0x1) four sub-tiles south.
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 12).unwrap() |= bits::WALL;
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().expect("made");
+    let mut n = 0;
+    while m.w.objclient.set_c.contains_key(&k) {
+        let before = m.w.objclient.set_c[&k].position;
+        update(&mut m.w, &rows, k, true).unwrap();
+        n += 1;
+        assert!(n < 40, "ends before its frames run out");
+        if !m.w.objclient.set_c.contains_key(&k) {
+            // It ended on the update that reached the wall's sub-tile.
+            assert!(before.is_some_and(|(_, y)| y < 12));
+        }
+    }
+    assert!(n < 40);
+}
