@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -27,6 +27,8 @@ use d2_server::seams::{Clock, Pos};
 use d2_sim::skills::list::ListOwner;
 use d2_sim::stats::StateTable;
 use d2_sim::stats::{StatData, StatLists, StatTable};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -123,8 +125,12 @@ impl Game {
         row: impl FnOnce(&mut Skills, &mut Vec<Missiles>) + Send + 'static,
     ) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(move |l| {
@@ -278,12 +284,14 @@ fn cast_makes_missiles(srvdofunc: u16) -> usize {
 
 // Covers: specs/skills/bodies.md §3.7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn firestorm_fans_out_missiles() {
     assert!(cast_makes_missiles(117) >= 3);
 }
 
 // Covers: specs/skills/bodies.md §8.20
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn tornado_fans_out_missiles() {
     assert!(cast_makes_missiles(118) >= 3);
 }
@@ -293,6 +301,7 @@ const WOLF: u16 = 1;
 
 // Covers: specs/skills/bodies.md §8.15
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn werewolf_turns_the_player_into_the_shape_and_the_seam_sees_it() {
     let mut g = Game::joined_with(116, |r, _| {
         r.aurastate = WOLF;

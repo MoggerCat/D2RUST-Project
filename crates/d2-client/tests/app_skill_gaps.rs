@@ -17,6 +17,8 @@ use d2_sim::units::lifecycle::AllocRequest;
 use d2_sim::units::{UnitId, UnitType};
 use rig::{Cfg, Rig};
 
+mod app_support;
+
 const SKILL: usize = 3;
 
 /// A skill row that starts at once, costs nothing and works in the camp.
@@ -88,6 +90,7 @@ fn hold(r: &mut Rig, right: bool, facts: ItemFacts) -> UnitId {
 // Covers: specs/skills/bodies-2.md §3.4
 // (Smite with a shield)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn smite_with_a_shield_hurts_the_monster() {
     let mut r = game("paladin", vec![(SKILL, row(0, 150))]);
     hold(
@@ -110,6 +113,7 @@ fn smite_with_a_shield_hurts_the_monster() {
 // Covers: specs/skills/bodies-2.md §3.4
 // (step 3.1: no shield, no hit)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn smite_without_a_shield_does_nothing() {
     let mut r = game("paladin", vec![(SKILL, row(0, 150))]);
     let m = r.spawn_monster(1);
@@ -123,6 +127,7 @@ fn smite_without_a_shield_does_nothing() {
 // Covers: specs/skills/bodies.md §3.7
 // Covers: specs/skills/bodies-2.md §3.3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn sacrifice_hurts_the_monster_and_the_caster() {
     let mut s = row(29, 64);
     s.calc2 = rig::CALC_8;
@@ -140,6 +145,7 @@ fn sacrifice_hurts_the_monster_and_the_caster() {
 
 // Covers: specs/skills/bodies.md §7.6, §8.11
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn zeal_strikes_the_monster() {
     let mut s = row(37, 13);
     s.calc1 = rig::CALC_3;
@@ -210,6 +216,7 @@ fn curse(state: u16) -> Skills {
 
 // Covers: specs/skills/bodies.md §4.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_curse_puts_its_state_on_the_monster() {
     let mut r = game("necromancer", vec![(SKILL, curse(9))]);
     corpse_class(&mut r);
@@ -223,6 +230,7 @@ fn a_curse_puts_its_state_on_the_monster() {
 
 // Covers: specs/skills/bodies-2.md §4.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn corpse_explosion_hurts_the_monsters_around_the_corpse() {
     let mut s = row(17, 55);
     s.anim = 10;
@@ -243,6 +251,7 @@ fn corpse_explosion_hurts_the_monsters_around_the_corpse() {
 
 // Covers: specs/skills/bodies.md §3.6, §8.14
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn raise_skeleton_turns_a_corpse_into_a_pet() {
     let mut s = row(15, 31);
     s.anim = 10;
@@ -265,6 +274,7 @@ fn raise_skeleton_turns_a_corpse_into_a_pet() {
 
 // Covers: specs/skills/bodies-2b.md §8.6, §8.7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn revive_stands_the_corpse_up_as_a_pet() {
     let mut s = row(21, 58);
     s.anim = 10;
@@ -321,6 +331,7 @@ fn tiger_strike() -> Skills {
 
 // Covers: specs/skills/bodies.md §8.8, §2.14
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn tiger_strike_with_a_claw_hurts_and_charges() {
     let mut r = assassin(vec![(SKILL, tiger_strike())], vec![CHARGE_STATE]);
     hold(&mut r, true, claw());
@@ -338,6 +349,7 @@ fn tiger_strike_with_a_claw_hurts_and_charges() {
 // Covers: specs/client/stat-lists.md §2
 // (rule 8: the weapon-type test of use_state)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn tiger_strike_without_a_claw_is_refused() {
     let mut r = assassin(vec![(SKILL, tiger_strike())], vec![CHARGE_STATE]);
     hold(
@@ -362,6 +374,7 @@ fn tiger_strike_without_a_claw_is_refused() {
 // Covers: specs/skills/bodies.md §8.10
 // (a finisher strikes through the srvdo 34 body)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_finisher_hurts_the_monster_and_charges() {
     let mut s = row(23, 35);
     s.aurastate = CHARGE_STATE as u16;
@@ -393,6 +406,7 @@ fn missiles_seen(r: &mut Rig, ticks: usize) -> usize {
 // Covers: specs/skills/bodies.md §5
 // (the srvmissile path)
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn fire_blast_throws_a_missile() {
     let mut s = row(0, 0);
     s.anim = 10;

@@ -8,10 +8,12 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::save::{self, SaveHandle};
-use d2_client::app::single_player::{self, Character, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, Character, DEFAULT_SEED};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_formats::d2s::{self, Body, D2s, Header, ReadOptions, StatEntry, StatSave, Stats};
 use d2_server::adapters::character::LoadContext;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -35,7 +37,7 @@ impl d2s::SaveTables for Tables {
     /// A new character carries its start cube (REC-244): the entries
     /// are read with the synthetic item tables.
     fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
-        let items = d2_client::app::synthetic_items::item_tables();
+        let items = app_support::live().tables.item_tables().unwrap();
         d2_sim::items::bitstream::read::read_save_entry(buf, &items)
             .map(|e| e.len)
             .map_err(|e| e.to_string())
@@ -88,7 +90,7 @@ fn joined(
 ) -> d2_client::app::server_thread::ThreadLink<single_player::Link<StepClock>> {
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut link, _) = single_player::start_with(
-        GameData::Synthetic,
+        app_support::game_data(),
         DEFAULT_SEED,
         character.clone(),
         StepClock(ms.clone()),
@@ -133,6 +135,7 @@ fn temp(name: &str) -> std::path::PathBuf {
 /// A save joins, is written, and reads back as the same character.
 // Covers: specs/formats/d2s.md §1 r4, §7.1 r1; specs/formats/d2s-load.md §2
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_loaded_character_round_trips_through_the_save() {
     let base = synthetic_save();
     let character = Character::Save(
@@ -178,6 +181,7 @@ fn a_loaded_character_round_trips_through_the_save() {
 /// Saving again keeps the previous file as `.bak`.
 // Covers: specs/formats/d2s.md §1 r4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_second_save_keeps_a_backup() {
     let character = Character::Save(
         Box::new(synthetic_save()),
@@ -198,6 +202,7 @@ fn a_second_save_keeps_a_backup() {
 /// `--new`: a fresh character is written to `<name>.d2s` and loads again.
 // d2rs-own, unverified
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_new_character_is_written_to_its_own_file() {
     let character = single_player::new_character("barbarian", "Conan").unwrap();
     let dir = temp("new");
@@ -270,6 +275,7 @@ fn live_values_overlay_the_base() {
 // Covers: specs/world/waypoints.md §3 r1, §3 r2
 // d2rs-own, unverified
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn waypoints_round_trip_through_the_save() {
     let mut base = synthetic_save();
     // Waypoints 0 (default), 5 and 20 in Normal; 3 in Nightmare.

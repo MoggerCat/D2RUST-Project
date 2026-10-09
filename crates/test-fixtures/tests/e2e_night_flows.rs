@@ -595,6 +595,18 @@ fn game_creation_then_the_real_join() {
             reveal,
             place,
             vec![0x7E, 0, 0, 0, 0],
+            // The town's preset waypoint (`drlg::TOWN_WAYPOINT`, objects
+            // row 0, the town room at the origin), created by the object
+            // pass of the room population (`population.md` §11.1;
+            // PROVISIONAL q-fix-real-preset-objects): its S→C 0x51.
+            {
+                let (_, _, wx, wy) = test_fixtures::drlg::TOWN_WAYPOINT;
+                let mut m = vec![0x51, 2, 1, 0, 0, 0, 0, 0];
+                m.extend((wx as u16).to_le_bytes());
+                m.extend((wy as u16).to_le_bytes());
+                m.extend([0, 0]);
+                m
+            },
             vec![0x04],
             // The join sequence (§8.3): 0x5B, 0x65, the join 0x5A.
             msg::player_joined(fx.guid(p), CLASS as u8, &name(), level, 0xFFFF),

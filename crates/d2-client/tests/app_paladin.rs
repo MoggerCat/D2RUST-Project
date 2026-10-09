@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_client::bridge::LOCAL_CLIENT;
 use d2_client::rules::unit_composite::code;
@@ -22,6 +22,8 @@ use d2_sim::skills::list::ListOwner;
 use d2_sim::skills::use_::bodies::{BodyStat, BodyTables};
 use d2_sim::stats::states::StateTable;
 use d2_sim::stats::{StatData, StatLists, StatTable};
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -120,8 +122,12 @@ struct Game {
 impl Game {
     fn joined(skill: usize) -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         let mut g = Self { link, ms };
         g.link
             .with(move |l| {
@@ -297,6 +303,7 @@ fn cast_east(g: &mut Game) -> (usize, Vec<Vec<u8>>, String) {
 
 // Covers: specs/skills/use.md §5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn holy_bolt_costs_mana_and_creates_the_missile() {
     let mut g = Game::joined(HOLY_BOLT);
     let (most, got, errors) = cast_east(&mut g);
@@ -307,6 +314,7 @@ fn holy_bolt_costs_mana_and_creates_the_missile() {
 
 // Covers: specs/skills/bodies-2b.md §6.9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn blessed_hammer_spawns_its_missile_through_the_do_step() {
     let mut g = Game::joined(BLESSED_HAMMER);
     let (most, got, errors) = cast_east(&mut g);
@@ -320,6 +328,7 @@ fn blessed_hammer_spawns_its_missile_through_the_do_step() {
 
 // Covers: specs/skills/bodies.md §4.5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn might_sets_its_state_and_the_client_hears_of_it() {
     let mut g = Game::joined(MIGHT);
     let (_, got, errors) = cast_east(&mut g);
@@ -342,6 +351,7 @@ fn might_sets_its_state_and_the_client_hears_of_it() {
 
 // Covers: specs/skills/bodies-2.md §5.3, §5.4
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn charge_at_a_point_moves_the_player() {
     let mut g = Game::joined(CHARGE);
     let from = g.player_pos();

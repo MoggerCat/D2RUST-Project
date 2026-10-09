@@ -17,11 +17,13 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, DEFAULT_SEED, PLAYER_CLASS};
+use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
 use d2_data::tables::{Record, Skills};
 use d2_server::seams::Clock;
 use d2_sim::skills::SkillEntry;
+
+mod app_support;
 
 struct StepClock(Arc<AtomicU32>);
 
@@ -47,8 +49,12 @@ impl Game {
     /// session sequence.
     fn started() -> Self {
         let ms = Arc::new(AtomicU32::new(1000));
-        let (mut link, _) =
-            single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+        let (mut link, _) = single_player::start(
+            app_support::game_data(),
+            DEFAULT_SEED,
+            StepClock(ms.clone()),
+        )
+        .unwrap();
         link.with(|l| {
             let h = l.host_mut().game.events.action.hooks();
             let mut t = (*h.tables).clone();
@@ -128,6 +134,7 @@ fn native(skill: i32) -> SkillEntry {
 
 // Covers: specs/client/msg-skills.md §2 r8; specs/sim/intents-events.md §8.2 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_server_player_list_holds_its_native_skills_and_a_new_join_sends_no_0x94() {
     let mut g = Game::started();
     let got = g.join();
@@ -151,6 +158,7 @@ fn the_server_player_list_holds_its_native_skills_and_a_new_join_sends_no_0x94()
 
 // Covers: specs/skills/use.md §7; specs/client/msg-skills.md §2 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn select_skill_runs_on_the_server_skill_list() {
     let mut g = Game::started();
     g.join();
