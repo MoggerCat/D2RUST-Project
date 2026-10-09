@@ -547,6 +547,9 @@ def md_report(res):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--filter", default=None, help="glob on the check name")
+    ap.add_argument("--checks-dir", default=CHECKS_DIR,
+                    help="directory of .check files (default traces/checks; traces/checks/gen "
+                         "for the generated families)")
     ap.add_argument("--area", default=None, help="areas (first dash token of the name), comma list")
     ap.add_argument("--workers", type=int, default=max(1, min((os.cpu_count() or 2) - 1, 3)))
     ap.add_argument("--orig-cache", nargs="?", const=sd.DEFAULT_CACHE, default=None, metavar="DIR",
@@ -578,7 +581,7 @@ def main(argv=None):
     t0 = time.time()
     try:
         jobs = [] if a.no_checks else discover(
-            pattern=a.filter, areas=set(x for x in (a.area or "").split(",") if x) or None)
+            a.checks_dir, pattern=a.filter, areas=set(x for x in (a.area or "").split(",") if x) or None)
         if not a.no_checks and not jobs:
             raise SuiteError("no check matches")
         game_sha = None
