@@ -426,27 +426,35 @@ pub fn approach_tile<C: Clock + Send + 'static>(
             .find(|(k, u)| k.unit_type == d2_client::bridge::world::TILE && u.class == class)
             .map(|(k, _)| *k)
     };
-    let p = server_pos(server);
+    // The level's rooms are made as the player moves: recount them every
+    // round and walk to the nearest one not yet visited.
     let (level, act) = level_act(server);
-    let mut rooms: Vec<(i32, i32)> = with(server, move |l| {
-        let g = &mut l.host_mut().game;
-        let d = g.events.action.hooks().drlg.dungeon.acts[act]
-            .as_ref()
-            .expect("the act");
-        let lv = d.find_level(level).expect("the player's level");
-        d.level_rooms(lv)
-            .into_iter()
-            .map(|r| {
-                let t = d.room(r).rect;
-                ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
-            })
-            .collect()
-    });
-    rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
-    for c in rooms {
+    let mut visited: Vec<(i32, i32)> = Vec::new();
+    for _ in 0..60 {
         if let Some(k) = find(app) {
             return k;
         }
+        let p = server_pos(server);
+        let mut rooms: Vec<(i32, i32)> = with(server, move |l| {
+            let g = &mut l.host_mut().game;
+            let d = g.events.action.hooks().drlg.dungeon.acts[act]
+                .as_ref()
+                .expect("the act");
+            let lv = d.find_level(level).expect("the player's level");
+            d.level_rooms(lv)
+                .into_iter()
+                .map(|r| {
+                    let t = d.room(r).rect;
+                    ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
+                })
+                .collect()
+        });
+        rooms.retain(|c| !visited.contains(c));
+        rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
+        let Some(c) = rooms.first().copied() else {
+            break;
+        };
+        visited.push(c);
         walk_town_to(app, server, ms, c, 4);
     }
     find(app).unwrap_or_else(|| panic!("no tile of class {class} reached the client"))
