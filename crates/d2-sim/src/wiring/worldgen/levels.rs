@@ -420,6 +420,36 @@ impl LevelTypes for WorldTypes {
         }
     }
 
+    /// A hidden exit cell's warp tile unit `0x0066E1C0`
+    /// (`sim/path-placement.md` §12.1) in a preset room: a tile preset
+    /// unit (type 5, class = the lvlwarp `Id`) prepended to the room's
+    /// list; the tile units come from it when the room is populated
+    /// (`rooms.md` §6 "Warp tile units across deactivation"). Outdoor
+    /// rooms carry no exit cells of their own (their links are walks).
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        t: u32,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+    ) {
+        let p = self.parts(drlg.act);
+        if p.presets.room(room).is_err() {
+            return;
+        }
+        let mut view = PresetWarps {
+            drlg,
+            data,
+            presets: &mut *p.presets,
+        };
+        if let Err(e) = crate::path::warp::warp_tile_preset(&mut view, room, t, wx, wy, cell) {
+            p.errors.push(WorldgenError::Warp(e));
+        }
+    }
+
     /// A door cell's preset unit `0x0066D9E0` (`preset.md` §11) in a
     /// preset room; true when the door record gets flag 0x20
     /// ([`crate::drlg::preset::DoorOutcome::sets_record_flag`], set by the
@@ -454,6 +484,58 @@ impl LevelTypes for WorldTypes {
                 false
             }
         }
+    }
+}
+
+/// [`crate::path::place_seams::WarpTileView`] over a preset room: the room's tile rect
+/// and level, the `lvlwarp` row of the exit's slot, and the room's preset
+/// unit list.
+struct PresetWarps<'a> {
+    drlg: &'a Drlg,
+    data: &'a DrlgData,
+    presets: &'a mut Presets,
+}
+
+impl crate::path::place_seams::WarpTileView for PresetWarps<'_> {
+    type DrlgRoom = DrlgRoomId;
+
+    fn tile_rect(&self, room: DrlgRoomId) -> crate::drlg::TileRect {
+        self.drlg.room(room).rect
+    }
+
+    fn lvlwarp(
+        &self,
+        room: DrlgRoomId,
+        slot: u32,
+        letter: u8,
+    ) -> Option<crate::path::place_seams::LvlWarp> {
+        let level_id = self.drlg.level(self.drlg.room(room).level).id;
+        let row = self
+            .drlg
+            .lvlwarp_row(self.data, level_id, slot as usize, letter)
+            .ok()?;
+        let (offset_x, offset_y) = self.data.warp_offsets.get(row).copied().unwrap_or((0, 0));
+        Some(crate::path::place_seams::LvlWarp {
+            id: self.data.warps.get(row)?.id as u32,
+            offset_x,
+            offset_y,
+        })
+    }
+
+    fn add_preset_unit(&mut self, room: DrlgRoomId, ty: u8, class: u32, mode: u32, x: i32, y: i32) {
+        // The room was checked to be a preset room by the caller.
+        let _ = self.presets.add_unit_front(
+            room,
+            crate::drlg::preset::PresetUnit {
+                unit_type: u32::from(ty),
+                class: class as i32,
+                mode,
+                x,
+                y,
+                flags: 0,
+                path: None,
+            },
+        );
     }
 }
 
@@ -540,7 +622,18 @@ impl LevelTypes for SharedTypes {
             .door_unit(drlg, data, room, wx, wy, cell, orientation)
     }
 
-    fn warp_unit(&mut self, drlg: &mut Drlg, room: DrlgRoomId, wx: i32, wy: i32, cell: u32) {
-        self.0.borrow_mut().warp_unit(drlg, room, wx, wy, cell)
+    fn warp_unit(
+        &mut self,
+        drlg: &mut Drlg,
+        data: &DrlgData,
+        room: DrlgRoomId,
+        t: u32,
+        wx: i32,
+        wy: i32,
+        cell: u32,
+    ) {
+        self.0
+            .borrow_mut()
+            .warp_unit(drlg, data, room, t, wx, wy, cell)
     }
 }

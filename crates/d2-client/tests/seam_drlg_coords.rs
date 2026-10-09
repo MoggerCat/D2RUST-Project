@@ -3,8 +3,9 @@
 //! DRLG (`d2-sim`, owned by the game) and the client's copy built from
 //! S→C 0x03 and the 0x07 / 0x08 room messages
 //! (`d2_client::bridge::drlg::ClientDrlg`). Both sides are the app's
-//! own single-player game on the synthetic data, driven through the real
-//! bridge and server thread (no Bevy): after every frame each room the
+//! own single-player game on the install's data, driven through the real
+//! bridge and server thread (no Bevy; the play mode's per-frame room
+//! recache stands in for the prediction): after every frame each room the
 //! client holds active is compared with the server's room at the same
 //! point, field by field, and the local player's room is compared with
 //! the server's.
@@ -159,23 +160,16 @@ fn check_rooms(bridge: &mut Bridge<Thread>, when: &str) {
     let Some((pos, s)) = server_player(bridge) else {
         return;
     };
+    // The play mode's per-frame path step after the bridge frame
+    // (`world_view::walk_room::preview_walk_room`: the local player is
+    // linked to the room of its predicted sub-tile; a server room leave
+    // S→C 0x08 of the room it stood in unlinks it, `model.md` §3 rule 3):
+    // this rig has no prediction, so the predicted point is the server's.
+    bridge.recache_local_room(pos.0 as u16, pos.1 as u16);
     let w = bridge.world();
     let own = w.local_room().copied().unwrap_or_else(|| {
         panic!("{when}: server player at {pos:?} in {s:?}, client player in no room")
     });
-    // The local player's own walk is the client's to step (`model.md` §3
-    // rule 3; the play mode's prediction): between server positions the
-    // client's point lags the server's, so the rooms are compared where
-    // both sides hold the same point.
-    let me = w.local_player.expect("local player");
-    let cpos = w.units[&me].position.expect("placed");
-    if (i32::from(cpos.0), i32::from(cpos.1)) != pos {
-        assert!(
-            own.contains(cpos.0.into(), cpos.1.into()),
-            "{when}: client point {cpos:?} outside its room {own:?}"
-        );
-        return;
-    }
     let client_room = w.drlg.as_ref().unwrap().drlg.room(own.room);
     assert_eq!(
         (u32::from(own.level), client_room.rect),
@@ -247,45 +241,50 @@ fn client_rooms_equal_the_servers_after_the_join() {
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn client_rooms_follow_the_server_across_the_level_border() {
     let (mut bridge, ms) = start();
-    let start_pos = server_player(&mut bridge).expect("placed").0;
-    // The synthetic town room spans sub-tiles x 80..120, the Blood Moor
-    // room 120..160 (`app_level_border.rs`). Stage the charstats
-    // velocities and velocity percent of a 1.14d install, as there.
-    bridge
-        .link_mut()
-        .with(|l: &mut Link| {
-            let g = &mut l.host_mut().game;
-            let (p, _) = single_player::local_player(g).unwrap();
-            let hooks = g.events.action.hooks();
-            let mut t = (*hooks.tables).clone();
-            use d2_data::tables::{Charstats, Record};
-            let mut row = Charstats::decode(&[0u8; Charstats::SIZE]);
-            row.walkvelocity = 6;
-            row.runvelocity = 9;
-            t.combat.charstats = vec![row; 7];
-            hooks.tables = Arc::new(t);
-            let game = &mut g.game;
-            g.events.action.with(game, |_, v| v.set_base(p, 67, 100));
-        })
-        .unwrap();
-    let target = (140u16, start_pos.1 as u16);
-    bridge
-        .send(&d2_proto::client::Walk {
-            x: target.0,
-            y: target.1,
-        })
-        .unwrap();
+    // The install's own charstats and stats: nothing is staged.
+    // The route is planned over the rooms active so far: re-plan from
+    // where the player stands until it is in the Blood Moor.
     let mut levels = Vec::new();
-    for i in 0..400 {
-        ms.fetch_add(40, Ordering::SeqCst);
-        bridge.frame().unwrap();
-        check_rooms(&mut bridge, &format!("frame {i}"));
-        let (pos, room) = server_player(&mut bridge).expect("placed");
-        if levels.last() != Some(&room.level) {
-            levels.push(room.level);
-        }
-        if pos.0 == i32::from(target.0) {
-            break;
+    'walk: for _ in 0..12 {
+        let legs = bridge
+            .link_mut()
+            .with(|l: &mut Link| {
+                let g = &mut l.host_mut().game;
+                let (p, _) = single_player::local_player(g).unwrap();
+                let h = g.events.action.hooks();
+                let start = h.path_position(p);
+                let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+                let rect = |id| d.level(d.find_level(id).expect("level allocated")).rect;
+                test_fixtures::host::route(
+                    d,
+                    start,
+                    rect(single_player::ACT1_TOWN),
+                    rect(single_player::BLOOD_MOOR),
+                    12,
+                )
+            })
+            .unwrap();
+        for (x, y) in legs {
+            // Run (C→S 0x03), as the app's walk helper sends it.
+            let mut m = vec![0x03];
+            m.extend_from_slice(&(x as u16).to_le_bytes());
+            m.extend_from_slice(&(y as u16).to_le_bytes());
+            bridge.send_bytes(&m).unwrap();
+            for i in 0..200 {
+                ms.fetch_add(40, Ordering::SeqCst);
+                bridge.frame().unwrap();
+                check_rooms(&mut bridge, &format!("leg ({x}, {y}) frame {i}"));
+                let (pos, room) = server_player(&mut bridge).expect("placed");
+                if levels.last() != Some(&room.level) {
+                    levels.push(room.level);
+                }
+                if room.level == single_player::BLOOD_MOOR {
+                    break 'walk;
+                }
+                if (pos.0 - x).abs() <= 1 && (pos.1 - y).abs() <= 1 {
+                    break;
+                }
+            }
         }
     }
     assert_eq!(
