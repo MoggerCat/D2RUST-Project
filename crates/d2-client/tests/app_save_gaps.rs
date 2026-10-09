@@ -185,8 +185,9 @@ fn mouse_skills_select_with_their_item() {
     assert_eq!((list.left, list.right), (Some(2), Some(3)));
 }
 
-/// No left skill is the all-zero pair; an item past the list ends on the
-/// native entry (item GUID −1); the right skill is always written.
+/// No left skill is the all-zero pair; an item past the list looks up the
+/// owner GUID −1 (`d2s.md` §2.4 rule 6.3: exact skill and owner, no class
+/// fallback), here the native entry; skill 0 is never selected.
 #[test]
 fn absent_and_unknown_mouse_entries() {
     let list = SkillList {
@@ -202,20 +203,42 @@ fn absent_and_unknown_mouse_entries() {
         entries: vec![entry(0, -1), entry(36, -1)],
         ..SkillList::default()
     };
-    // Left skill 36 on item index 5, which the list does not have.
+    // Left skill 36 on item index 5, which the list does not have: owner
+    // −1, the native entry is found by (skill, owner) exactly.
     select_mouse(
         &mut loaded,
         &[Slot::encode(36, true, 5).unwrap(), slots[1]],
         &[],
     );
     assert_eq!((loaded.left, loaded.right), (Some(1), Some(1)));
-    // The all-zero left pair selects nothing.
+    // An entry that is not in the list (skill 40, owner GUID 77) leaves
+    // the hand as it was: no fallback to the class entry of that skill.
+    let mut kept = SkillList {
+        entries: vec![entry(0, -1), entry(36, -1), entry(40, -1)],
+        left: Some(1),
+        right: Some(1),
+        ..SkillList::default()
+    };
+    select_mouse(
+        &mut kept,
+        &[
+            Slot::encode(40, false, 1).unwrap(),
+            Slot::encode(5, false, 0).unwrap(),
+        ],
+        &[77],
+    );
+    assert_eq!(
+        (kept.left, kept.right),
+        (Some(1), Some(1)),
+        "no entry (40, 77); skill 5"
+    );
+    // The all-zero pairs (skill 0, Attack) select nothing.
     let mut none = SkillList {
         entries: vec![entry(0, -1)],
         ..SkillList::default()
     };
     select_mouse(&mut none, &[Slot::default(), Slot::default()], &[]);
-    assert_eq!((none.left, none.right), (None, Some(0)));
+    assert_eq!((none.left, none.right), (None, None));
 }
 
 /// A hireling hired since the load has no header block yet, so its list

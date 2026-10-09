@@ -1,6 +1,6 @@
 // Spec: specs/formats/d2s.md §2.2 rule 8, §2.4 (mouse skills, hotkeys r1, r2, r4, r6, r8), §8.4 (hireling items), §8.5 (golem item); specs/formats/d2s-load.md §4
 //! The save gaps of the played character (q-save-gaps): the mouse skills,
-//! the act of the town byte, the hireling's items and the Iron Golem's
+//! the hireling's items and the Iron Golem's
 //! item, read from the running game at save time ([`read_gaps`], laid over
 //! the save by [`apply_gaps`]) and made again at the join ([`join_gaps`]).
 //! The runeword refresh of a load is `InvDesk::load_entry`'s.
@@ -9,7 +9,8 @@
 //! `docs/HANDOFF.md`: the weapon-swap pair of mouse skills has no sim
 //! state (C→S 0x60 is a stub) and passes through as loaded; a skill
 //! granted by an item is not in the sim's skill list, so a mouse skill
-//! saved with an item index loads on the native entry of the same skill;
+//! saved with that item's index selects nothing on load and the hand
+//! keeps its selection (`d2s.md` §2.4 rule 6.3, q-fix-save-gaps (1));
 //! a loaded golem item is kept as loaded until a golem is summoned (the
 //! re-summon, `d2s.md` Open question 15, is not wired); the progression
 //! bits of the status word have no live source and pass through.
@@ -350,23 +351,25 @@ pub fn mouse_slots(list: &SkillList, guids: &[u32]) -> [Slot; 2] {
 /// selected on `list`.
 pub fn select_mouse(list: &mut SkillList, mouse: &[Slot], guids: &[u32]) {
     for (slot, left) in mouse.iter().zip([true, false]) {
-        // "No left skill" is the all-zero pair (§2.4 rule 3).
-        if slot.code == 0 && slot.item == 0 && left {
-            continue;
-        }
         let (skill, _, item) = slot.decode();
-        if skill < 0 {
+        // Rule 6.2: only a non-zero skill is selected (Attack never is);
+        // rule 6.3: skill 5 selects nothing.
+        if skill == 0 || skill == 5 {
             continue;
         }
         let owner = match usize::try_from(item) {
             Ok(i) if i > 0 => guids.get(i - 1).map_or(-1, |&g| g as i32),
             _ => -1,
         };
-        let idx = list.find(skill, owner).or_else(|| list.native(skill));
+        // Rule 6.3: the entry is found by skill id and owner GUID, both
+        // exact; none: that hand keeps its selection (no class fallback).
+        let Some(idx) = list.find(skill, owner) else {
+            continue;
+        };
         if left {
-            list.left = idx;
+            list.left = Some(idx);
         } else {
-            list.right = idx;
+            list.right = Some(idx);
         }
     }
 }
