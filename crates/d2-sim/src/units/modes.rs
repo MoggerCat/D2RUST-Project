@@ -561,7 +561,7 @@ pub fn monster_set_mode_started<H: UnitHooks>(
         // request other than 0 or 12 on a dead unit leaves its mode as is
         // (`0x005A7C20` returns 1); no neutral start.
         if dead && mode != monster_mode::DT && mode != monster_mode::DD {
-            return Ok(());
+            return Ok(true);
         }
         monster_neutral(sim, hooks, unit)?;
     }

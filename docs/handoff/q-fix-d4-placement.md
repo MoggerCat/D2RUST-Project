@@ -14,8 +14,11 @@ Check results after the fixes (1.14d under Wine vs d2rs, `scenario_diff.py`):
 | merc-sorc-cow | DIVERGED 3/120 (f4 `tx`) | PARTIAL 120/120 |
 | merc-barb-cow | DIVERGED 3/120 (f4 `tx`) | PARTIAL 120/120 |
 | dru-tornado | DIVERGED 29/70 (f30 `xf`) | PARTIAL 70/70 |
-| warp-cold-plains-ama | DIVERGED 9/60 (f10 `x` 5168 vs 5183) | unchanged (open, below) |
-| combat-pop-cold-plains | DIVERGED 3/400 (f4 `x`) | not re-run: same arrival point as warp-cold-plains |
+| warp-cold-plains-ama | DIVERGED 9/60 (f10 `x` 5168 vs 5183) | arrival equal; DIVERGED 12/60 (f13 monster 1:28 class 58 seed) |
+| combat-pop-cold-plains | DIVERGED 3/400 (f4 `x`) | arrival equal; DIVERGED 1/400 (f2 player `q`: recorder parity), first position difference f11 (monster 1:28 class 58, after its seed at f7) |
+
+The arrival fix came with the staging merge 0b03e942 (not this branch's
+code): after it the player lands at 1.14d's (5168, 4658) in both checks.
 
 Regression runs with the changes: ass-lightning-sentry and dru-fissure
 stay PARTIAL; ass-fire-blast (f28 game seed) and dru-volcano (f34 missile
@@ -34,8 +37,10 @@ Fixes, in the order the checks showed them:
 2. **Scan 6 took units without unit flag 0x4** (f17: the hireling chose
    the cow). `ai.md` §5.3 scan 6 rule 1 skips a candidate without
    `0x00451F30(C, 4)`; the cow (class 179) has no monstats2 `isAtt`, so
-   1.14d never targets it. `LocalSeams::secondary_target` now skips
-   units without `IS_ATT` (`not_att`, filled by `sync_seams`).
+   1.14d never targets it. `LocalSeams::secondary_candidates` (the
+   candidate list of the sim's scan, REC-1270) and its fallback
+   `secondary_target` now skip monsters without `IS_ATT` (`not_att`,
+   filled by `sync_seams`).
 3. **Mode-change result** (f33: wander then escape). PROVISIONAL
    REC-1390 (`sim/units.md` §4.6): `0x005A7C20` returns 0 when the
    requested mode's start failed and neutral ran instead, so the AI's
@@ -52,19 +57,20 @@ without the change), `target_search_tests::the_secondary_search_skips_a_unit_wit
 `without_the_provider_the_monster_does_not_move` now expects the failed
 result.
 
-Ledger part: `docs/handoff/ledger/q-fix-d4-placement.tsv` (9 rows: the
-hireling rows, the tornado rows). `ledger.py --check` reports them as
+Ledger part: `docs/handoff/ledger/q-fix-d4-placement.tsv` (10 rows: the
+hireling rows, the tornado rows, the Cold Plains level). `ledger.py --check` reports them as
 contradictions only until `checks-status.md` is regenerated from a suite
 run that includes this branch.
 
 ## Open
 
-- **warp-cold-plains-ama / combat-pop-cold-plains**: the arrival point is
-  the waypoint preset's (`drlg/levels.md` §10 rule 4); d2rs places the
-  Cold Plains waypoint (+15, +5) sub-tiles off 1.14d's, so the player
-  lands at (5183, 4663) instead of (5168, 4658). That is task 2 of
-  q-fix-a1-den-wp (session_011nm8wnAZ8dXwKuehwW9a8D), messaged at the
-  start of this session (no answer yet); not touched here, per the brief.
+- **warp-cold-plains-ama / combat-pop-cold-plains past the arrival**:
+  the next first differences are not placement. Monster 1:28 (class 58)
+  draws differently on its own seed at f7 (combat-pop) / f13 (warp):
+  monster AI (q-fix-b-monster-combat). combat-pop-cold-plains f2: the
+  1.14d recorder now writes the player's quest flags `q`, d2rs's
+  `state-dump` writes `[]` (q-tool-state-diff). The waypoint offset
+  (q-fix-a1-den-wp task 2) is gone after the staging merge.
 - **The merc-*-cow checks never exercise hireling skills**: in 1.14d the
   hireling never attacks the cow (no `isAtt`), it only follows and
   wanders. A hireling skill check needs an attackable target (e.g.

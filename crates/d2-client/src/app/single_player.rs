@@ -1127,9 +1127,10 @@ impl Pending for LocalSeams {
             None => (None, 0x7FFF_FFFF, false),
         }
     }
-    /// The live foes of `unit` in unit-key order (the scan 6 candidates;
-    /// the distance, threat class and line gates run in the sim's
-    /// `secondary_target`).
+    /// The live foes of `unit` with unit flag 0x4 in unit-key order (the
+    /// scan 6 candidates, filter `0x005DC970`'s `0x00451F30(C, 4)`,
+    /// `ai.md` §5.3 scan 6 rule 1; the distance, threat class and line
+    /// gates run in the sim's `secondary_target`).
     fn secondary_candidates(&mut self, _: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
         let side = self.player_side(unit)?;
         Some(
@@ -1140,6 +1141,7 @@ impl Pending for LocalSeams {
                         && ty == UnitType::Monster
                         && self.player_side(u) != Some(side)
                         && !self.down.contains(&u)
+                        && !self.not_att.contains(&u)
                 })
                 .map(|(&u, _)| u)
                 .collect(),
@@ -2806,6 +2808,10 @@ mod target_search_tests {
         s.sides
             .insert(UnitId(3), (UnitType::Monster, false, (120, 100)));
         assert_eq!(s.secondary_target(&mut g, UnitId(1)).0, Some(UnitId(3)));
+        assert_eq!(
+            s.secondary_candidates(&mut g, UnitId(1)),
+            Some(vec![UnitId(3)])
+        );
     }
 
     // Covers: specs/monsters/ai.md §5.2 r4
