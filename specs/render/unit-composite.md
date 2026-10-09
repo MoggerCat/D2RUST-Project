@@ -27,17 +27,17 @@
 |   3. Direction and frame | 184–232 |
 |   4. Pre-test: COF box culling | 233–242 |
 |   5. The slot loop (`0x00470EC0`) | 243–363 |
-|   6. Component file and cel | 364–397 |
-|   7. Colormap source per component | 398–422 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 423–518 |
-|   9. Single-cel units (missiles, items) | 519–533 |
-|   10. d2rs mapping | 534–548 |
-| Constants & data dependencies | 549–562 |
-| Randomness | 563–566 |
-| Edge cases & original bugs | 567–581 |
-| Test vectors | 582–602 |
-| Provenance | 603–650 |
-| Open questions | 651–714 |
+|   6. Component file and cel | 364–404 |
+|   7. Colormap source per component | 405–429 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 430–525 |
+|   9. Single-cel units (missiles, items) | 526–540 |
+|   10. d2rs mapping | 541–555 |
+| Constants & data dependencies | 556–569 |
+| Randomness | 570–573 |
+| Edge cases & original bugs | 574–588 |
+| Test vectors | 589–609 |
+| Provenance | 610–657 |
+| Open questions | 658–721 |
 <!-- /index -->
 
 ## Summary
@@ -393,7 +393,14 @@ the other acts show `med` (and `lit` for HD choice 2), and use the
    `frame` = `Ff` passes and reads the next direction's first cel).
    A file with `Df` = 2 always shows direction 0.
 4. A file that does not load leaves the slot empty (`0x006001F0` fails);
-   e.g. `lit` exists for player RH only in 14 files.
+   e.g. `lit` exists for player RH only in 14 files. The slot's cel draw
+   call is still made (measured: `tools/facts-render.md` §5 r15).
+5. PROVISIONAL (REC-441, measured): the name's weapon class is the COF
+   layer's own (`formats/cof.md`: the layer record's weapon class), not
+   the request's §2.1 class: 1.14d's `a1-town-arrival-ama` draws
+   `AMTNhth.cof`'s layers as `AMTRlitTN1ht`, `AMLGlitTN1ht`, ...,
+   `AMRAlitTNhth`, each with its layer's class. An empty layer class
+   keeps the §2.1 class (d2rs choice; no 1.14d case recorded).
 
 ### 7. Colormap source per component
 

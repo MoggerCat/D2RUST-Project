@@ -625,6 +625,7 @@ pub fn unit_pose(
             cof: name.path()?,
             dir: usize::from(direction.cof_dir),
             frame,
+            dir64: direction.dir64,
         },
         direction,
     )))

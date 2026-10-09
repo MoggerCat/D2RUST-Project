@@ -110,6 +110,7 @@ fn no_player_no_camera_and_nothing_placeable() {
         cof: crate::assets::path::CanonicalPath::new("data/global/t.cof").unwrap(),
         dir: 0,
         frame: 0,
+        dir64: 0,
     };
     let e = view
         .unit_params(&world, &world.units[&key], &pose)

@@ -141,6 +141,19 @@ impl<R: ViewRules> ViewRules for PanelArtRules<R> {
             .unit_shadows(world, unit, pose, at, draws, assets)
     }
 
+    fn unit_slot_calls(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &d2_formats::cof::Cof,
+    ) -> Result<Vec<crate::world_view::SlotCall>, ViewError> {
+        self.rules.unit_slot_calls(unit, pose, cof)
+    }
+
+    fn unit_shadow_key(&self, unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        self.rules.unit_shadow_key(unit)
+    }
+
     fn component_frame(
         &self,
         unit: &ClientUnit,
