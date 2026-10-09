@@ -1,0 +1,45 @@
+# q-fix-render-rest: kept light list, quest byte, summit background, missile sight, pick shake
+
+Session `q-fix-render-rest`, 2026-10-09, branch `claude/q-fix-render-rest`
+(from staging, merged with `claude/specs-staging-7`). Cloud, with the
+private data repo (1.14d install assembled under `$HOME/game`). Rows left
+open by `q-fix-render-light` (commits `8699e293`, `31c7ab27`),
+`q-fix-render-world.md` and `q-fix-render-overlay.md`.
+
+## Done
+
+| Row | Spec | Change | Tests |
+|---|---|---|---|
+| 1. persistent LightList | lighting.md §6.3, §6.4 r1–r5, §7.4, §8 | The model's `ClientWorld::lights` is the one kept list: 0x59 creates the player light (kind 0 local / no local yet, else 1, radius 13), 0xAC the monster light (kind 0, `MonsterClass::light` from `monstats2`, level-8 override), 0x51 the object init's light (`msg-units.md` §1.3 r2 `0x004BC720`: `Lit<mode>` / 2, kind 2). Each drawn frame `present.rs` lends the list to the feed (`Bridge::light_frame` → `ViewFeed::light_frame` → `PreviewLight::refresh`), which runs §6.4 on it: owner positions, radius walks (r2), dying records removed (r4), kind-2 caches kept until a radius step or a new room. Set-C owners are found by the light lookups (§6.4 r1). `light_sources` keeps only the level ambients. | `preview_light` `the_kept_list_walks_radii_keeps_caches_and_drops_the_dead`; `tests_units` `units_get_their_lights_at_creation` (recorded B102 / B157); install: `app_client_drlg` `monster_light_rows_come_from_the_users_monstats2` |
+| 2. client quest byte | lighting.md §10 r1, §13; msg-ui.md §14 | `ClientWorld::quest_availability` (the last 0x5E's 37 bytes), `client_quest_byte(i)`; the Den glow reads byte 1; a level-8 read before any 0x5E is the 1.14d fatal 0x60 (no light map, `PreviewLight::error`). Spec edit: `msg-ui.md` §14 r1 now names the model copy. | `the_den_glow_reads_the_clients_quest_byte`; `tests_ui_more` `the_client_keeps_the_last_0x5e_for_quest_byte_reads` |
+| 4. level background 120 | draw-order-2.md §12 l2 r1–r3 | `world_view::background_view`: `Backgrounds::pass1` for level 120, `summit01` / `cloud01` DC6 from the archives, light byte + `cel_ops` (modes 5 / 3), pass-1 keys; `order_grid` refuses only level 74 now. PROVISIONAL REC-420 (time seed). | `background_view_tests` (the §12 vector), `open_mode_3_and_level_backgrounds`; install: `app_client_drlg` `the_summit_background_draws_from_the_users_archives` |
+| 5. missiles sight-tested | draw-order.md §5 r3; draw-order-2.md §15 | `missiles::missile_hidden`: a missile effect hidden by the feed's sight test (probe missile unit on its sub-tile, `missiles` `Size`) is not drawn. | `tests_drlg` `missiles_take_the_sight_test` |
+| 6. pick camera shake | seams/world-screen.md §2.6 | `ClickView::shake` from the frame anchor: the world click inverts the shaken camera. | `click` `the_pick_inverts_the_shaken_camera` |
+
+Changed expectations (spec-driven): `tests_ui_more::record_outputs` (the
+0x5E bytes are in the model, msg-ui.md §14 r1 / lighting.md §13);
+`preview_light` tests create the player / monster lights through the
+model as 0x59 / 0xAC do (setup only); `light_sources`' per-frame rebuild
+test is replaced by `units_get_their_lights_at_creation` (no model
+missile units, so no missile lights).
+
+## Not done (rows in `build-queue.tsv`)
+
+- **3. Den lights** (`q-fix-render-den-lights`): needs client missile
+  creation (missile 287); the model has none, so the row stays written.
+- **5. flat missiles** (`q-fix-render-missile-flat`): unit flag 0x10000
+  lives on the client missile unit.
+- **Level 74 stars** (`q-fix-render-arcane-stars`): §12 r3 names no
+  initial `last`.
+- **Player light colour from states** (`q-fix-render-player-light-colour`,
+  audit F9); the stat 89 / 90 callback runs before each drawn frame, not
+  at the stat write (d2rs-own, `preview_light::player_stats`).
+- Monster `L_c` (§8 r1, component items' `lightradius`) is 0: the client
+  tables hold no item rows.
+
+## Real data
+
+The ignored `d2-client` suite on the install fails the same tests on
+this branch and on its base `40e4eb76` (GPU tests without an adapter,
+and app tests failing at their own fixtures); see the commit message of
+the push for the comparison. Local run: HANDOFF §5 entry 102.
