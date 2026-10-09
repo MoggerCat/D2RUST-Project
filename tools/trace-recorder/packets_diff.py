@@ -4,7 +4,8 @@ frame and print the first divergence, then the next N, then a summary
 (specs/tools/packets-trace.md §3, specs/sim/intents-events.md §6).
 
     python3 packets_diff.py ORIG.packets.jsonl D2RS.packets.jsonl [--next 20]
-        [--streams c2s,s2c,buf] [--from F] [--to F] [--masks TSV] [--json FILE]
+        [--streams c2s,s2c,buf] [--from F] [--to F] [--masks TSV]
+        [--masks-c2s TSV] [--json FILE]
     python3 packets_diff.py --selftest
 
 Per frame window F (intents-events.md §6 rule 1: from the end of tick
@@ -15,7 +16,8 @@ client, plus direct sends in their position) and `buf` (the buffers the
 flush handed to delivery: client and size; their bytes are the s2c
 messages, packed, §6 rule 2). Masked S->C bytes (specs/tools/
 scenario-masks.tsv, rules of specs/tools/scenario.md §6, keys read from
-the 1.14d record) are skipped.
+the 1.14d record) and masked C->S bytes (specs/tools/scenario-masks-c2s.tsv,
+§6 rule 4) are skipped.
 
 Exit codes: 0 MATCH, 1 DIVERGED, 2 PARTIAL, 3 error.
 
@@ -34,6 +36,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 SPECS = os.path.join(REPO, "specs")
 MASKS = os.path.join(SPECS, "tools", "scenario-masks.tsv")
+MASKS_C2S = os.path.join(SPECS, "tools", "scenario-masks-c2s.tsv")
 FLUSH_SITE = 0x52E3B5   # the flush's call of the net send (intents-events.md §3.2 rule 4)
 STREAMS = ("c2s", "s2c", "buf")
 CONTEXT = 8             # bytes either side of a differing offset
@@ -85,8 +88,18 @@ def names():
     return out
 
 
-def read_masks(path=MASKS):
-    """The mask table, strictly (scenario.md §6 rule 3): {id: [(key, off, len)]}."""
+def c2s_ids():
+    """The C->S ids with a row in client-messages.tsv (named, not '-')."""
+    p = os.path.join(SPECS, "sim", "client-messages.tsv")
+    with open(p, newline="", encoding="utf-8") as f:
+        return {int(r["id"], 16) for r in csv.DictReader(f, delimiter="\t") if r["name"] != "-"}
+
+
+def read_masks(path=MASKS, side="s2c"):
+    """The mask table, strictly (scenario.md §6 rules 3-4): {id: [(key,
+    off, len)]}. `side` 's2c': ids are S->C ids <= 0xB4; 'c2s': ids are
+    C->S ids of client-messages.tsv."""
+    known = c2s_ids() if side == "c2s" else None
     out = {}
     with open(path, newline="", encoding="utf-8") as f:
         lines = f.read().splitlines()
@@ -101,10 +114,13 @@ def read_masks(path=MASKS):
         sid, key, off, ln, src = cols
         try:
             mid = int(sid, 16)
-            if not sid.lower().startswith("0x") or mid > 0xB4:
+            if not sid.lower().startswith("0x"):
+                raise ValueError
+            if (mid > 0xB4) if known is None else (mid not in known):
                 raise ValueError
         except ValueError:
-            raise PacketsError(f"{path}:{n}: id must be a 0x S->C id <= 0xB4")
+            raise PacketsError(f"{path}:{n}: id must be a 0x S->C id <= 0xB4" if known is None
+                               else f"{path}:{n}: id must be a 0x C->S id of client-messages.tsv")
         k = None
         if key != "-":
             try:
@@ -135,8 +151,14 @@ def read_masks(path=MASKS):
     return out
 
 
+def load_masks(s2c=MASKS, c2s=MASKS_C2S):
+    """Both mask tables, per stream: {'s2c': table, 'c2s': table}."""
+    return {"s2c": read_masks(s2c), "c2s": read_masks(c2s, "c2s")}
+
+
 def masked(masks, b):
-    """Offsets of S->C message `b` (the original's bytes) that are masked."""
+    """Offsets of message `b` (the original's bytes) that `masks` (one
+    stream's table) masks."""
     out = set()
     if not b:
         return out
@@ -278,7 +300,7 @@ def compare_record(stream, a, b, masks):
         return "id", ia.hex() or "-", ib.hex() or "-", 0
     if a["size"] != b["size"]:
         return "size", a["size"], b["size"], 0
-    m = masked(masks, a["bytes"]) if stream == "s2c" else set()
+    m = masked(masks.get(stream, {}), a["bytes"])
     n = max(len(a["bytes"]), len(b["bytes"]))
     for k in range(n):
         if k in m:
@@ -351,7 +373,7 @@ def describe(d, nm, masks):
         lines.append(head)
         if st != "buf" and b:
             k = int(d["where"][6:-1]) if d["where"].startswith("bytes[") else 0
-            marks = masked(masks, d["a"]["bytes"]) if st == "s2c" and d.get("a") else set()
+            marks = masked(masks.get(st, {}), d["a"]["bytes"]) if d.get("a") else set()
             lines.append("    " + _hexctx(b, k, marks))
     if d.get("counts"):
         lines.append(f"  records in this frame's stream: 1.14d {d['counts'][0]}, "
@@ -485,8 +507,9 @@ def as_d2rs(recs):
 
 
 # Covers: specs/tools/packets-trace.md §3 r1, §3 r2, §3 r3, §3 r4, §3 r5, §3 r6, §4 r1
+# Covers: specs/tools/scenario.md §6 r4
 def selftest():
-    masks = read_masks()
+    masks = load_masks()
     nm = names()
     quiet = lambda *a, **k: None  # noqa: E731
     o = synthetic()
@@ -502,7 +525,8 @@ def selftest():
         if not r.get("bytes") or r["type"] not in ("c2s", "c2s_sys", "s2c", "net"):
             continue  # client-side records are not compared
         b = bytes.fromhex(r["bytes"])
-        mk = masked(masks, bytes.fromhex(o[i]["bytes"])) if r["type"] == "s2c" else set()
+        st = {"s2c": "s2c", "c2s": "c2s", "c2s_sys": "c2s"}.get(r["type"])
+        mk = masked(masks.get(st, {}), bytes.fromhex(o[i]["bytes"]))
         for k in range(len(b)):
             p = copy.deepcopy(d)
             bb = bytearray(b)
@@ -594,7 +618,64 @@ def selftest():
             os.unlink(f.name)
     # nul@ and ..n: 0x82 name after its NUL through byte 20
     m82 = bytes([0x82, 1, 2, 3, 4]) + b"ab\0" + bytes(21)
-    assert masked(masks, m82[:29]) == set(range(8, 21)), sorted(masked(masks, m82[:29]))
+    got = masked(masks["s2c"], m82[:29])
+    assert got == set(range(8, 21)), sorted(got)
+    ok += 1
+    # the C->S table: ids are C->S ids of client-messages.tsv (0x67 is
+    # one, 0x4A has no row, 0xB5 is past the table), read as strictly
+    for bad, side in (("0x4A\t-\t1\t1\tx", "c2s"), ("0xFF\t-\t1\t1\tx", "c2s"),
+                      ("0x67\t-\t1\t0\tx", "c2s")):
+        with tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False) as f:
+            f.write("id\tkey\toffset\tlength\tsource\n" + bad + "\n")
+        try:
+            read_masks(f.name, side)
+        except PacketsError:
+            ok += 1
+        else:
+            missed.append(f"c2s mask row accepted: {bad!r}")
+        finally:
+            os.unlink(f.name)
+    # C->S 0x67 (scenario.md §6 rule 4, client/model.md §7 r9): the 1.14d
+    # client leaves stack bytes after the game name NUL (through 16) and
+    # after the character name NUL (through 36); d2rs sends zeros
+    def m67(game, char, tail, gtype=0):
+        b = bytearray(46)
+        b[0] = 0x67
+        g = game + b"\0"
+        b[1:1 + len(g)] = g
+        b[1 + len(g):17] = tail[:16 - len(g)]
+        b[0x11] = gtype
+        c = char + b"\0"
+        b[0x15:0x15 + len(c)] = c
+        b[0x15 + len(c):0x25] = tail[:0x25 - 0x15 - len(c)]
+        return bytes(b)
+    junk = bytes([0x45, 0x00, 0xFA, 0x05, 0x74, 0x00, 0x0C, 0x02, 0, 0,
+                  0x20, 0xC5, 0x44, 0x00, 0x5C, 0x33])
+    got = masked(masks["c2s"], m67(b"", b"ScnAma", junk))
+    assert got == set(range(2, 17)) | set(range(0x15 + 7, 37)), sorted(got)
+    ok += 1
+
+    def one(b67):
+        return [dict(type="c2s_sys", client=1, size=46, bytes=b67.hex(), frame=None,
+                     phase="input", seq=0),
+                dict(type="tick", frame=1, phase="tick", seq=1),
+                dict(type="tick_end", frame=1, phase="post", seq=2)]
+    orig67, d2rs67 = m67(b"", b"ScnAma", junk), m67(b"", b"ScnAma", bytes(16))
+    assert orig67 != d2rs67
+    divs, s = diff(one(orig67), one(d2rs67), masks)
+    assert not divs and s["masked"] == 15 + 9, (divs[:1], s["masked"])
+    ok += 1
+    # the game type byte 0x11 is not masked
+    divs, _ = diff(one(orig67), one(m67(b"", b"ScnAma", bytes(16), gtype=3)), masks)
+    assert divs and divs[0]["stream"] == "c2s" and divs[0]["where"] == "bytes[17]", divs[:1]
+    ok += 1
+    # a byte inside the character name (before its NUL) is still compared
+    divs, _ = diff(one(orig67), one(m67(b"", b"ScnAmb", bytes(16))), masks)
+    assert divs and divs[0]["where"] == "bytes[26]", divs[:1]
+    ok += 1
+    # without the C->S table the stack bytes are reported
+    divs, _ = diff(one(orig67), one(d2rs67), {"s2c": masks["s2c"]})
+    assert divs and divs[0]["where"] == "bytes[2]", divs[:1]
     ok += 1
     if missed:
         print("packets_diff selftest FAILED:", *missed[:20], sep="\n  ")
@@ -612,6 +693,7 @@ def main(argv=None):
     ap.add_argument("--from", dest="lo", type=int, default=None)
     ap.add_argument("--to", dest="hi", type=int, default=None)
     ap.add_argument("--masks", default=MASKS)
+    ap.add_argument("--masks-c2s", default=MASKS_C2S)
     ap.add_argument("--keep-transport", action="store_true",
                     help="also compare the transport rows (ping, pong, 0xAE-0xB4)")
     ap.add_argument("--json", default=None, metavar="FILE",
@@ -628,7 +710,7 @@ def main(argv=None):
             raise PacketsError(f"--streams from {','.join(STREAMS)}")
         ho, ro, _ = load(a.orig)
         hd, rd, _ = load(a.d2rs)
-        masks = read_masks(a.masks)
+        masks = load_masks(a.masks, a.masks_c2s)
     except (PacketsError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         if a.json:
