@@ -26,25 +26,25 @@
 | Outputs / state changes | 76–85 |
 | Rules | 86–87 |
 |   1. Entry points | 88–101 |
-|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–140 |
-|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–196 |
-|   4. Recipe scroll text (0x26 type 7) | 197–212 |
-|   5. Overhead text | 213–281 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 282–346 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 347–486 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 487–499 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 500–516 |
-|   10. Other 0x50 codes (UI effects) | 517–552 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 553–634 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 635–641 |
-|   13. NPC intro table `0x00726850` (0x91) | 642–674 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 675–691 |
-| Constants & data dependencies | 692–709 |
-| Randomness | 710–714 |
-| Edge cases & original bugs | 715–735 |
-| Test vectors | 736–758 |
-| Provenance | 759–789 |
-| Open questions | 790–815 |
+|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–145 |
+|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
+|   4. Recipe scroll text (0x26 type 7) | 202–226 |
+|   5. Overhead text | 227–295 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–360 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 361–500 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 501–513 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 514–530 |
+|   10. Other 0x50 codes (UI effects) | 531–566 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 567–648 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 649–655 |
+|   13. NPC intro table `0x00726850` (0x91) | 656–688 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 689–705 |
+| Constants & data dependencies | 706–723 |
+| Randomness | 724–728 |
+| Edge cases & original bugs | 729–749 |
+| Test vectors | 750–772 |
+| Provenance | 773–803 |
+| Open questions | 804–829 |
 <!-- /index -->
 
 ## Summary
@@ -115,6 +115,11 @@ intro table `0x00726850`; `SetUIState` calls (0x0E, 0x23, 0x24, 0x25,
    the color is 4 and the record has exactly one line, the line is
    converted to 8-bit (`0x005263E0`, 256 bytes) and passed to the text
    filter object's method +0x18 (`0x00611560`; `client/msg-ui.md` OQ9).
+   The conversion is UTF-8 (`0x00526190`, table `0x007309B8`: < 0x80 →
+   1 byte, < 0x800 → 2, else 3 for a u16 unit): units are encoded in
+   order while fewer than 255 bytes are written, then a NUL (a unit
+   that starts at byte 253 or 254 may run past 255; not reachable with
+   one wrapped line of ≤ W − 70 px).
 3. If the list now holds more than 18 lines in total, the head record
    (oldest) is removed (`0x0049D490`), once per add. UI sound 6
    (`cursor_switch`) is requested with no unit. If the message log
@@ -196,12 +201,21 @@ stops at a `ÿc` that ends the string.
 
 ### 4. Recipe scroll text (0x26 type 7)
 
-1. `0x0048BBE0(text, lang, c8)`: the text, converted with
-   `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, …, 256)` (no language
+1. `0x0048BBE0(text, lang, c8)`: the text, converted in the 0x26
+   handler (`0x0049F490` at `0x0049F83E`) with
+   `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, src, 256, dst, 256)`
+   into a zeroed 256-unit buffer (exactly 256 source bytes; the copy
+   below stops at the first NUL) (no language
    check: the language loop at `0x0049F87F` computes a length it never
-   uses), is copied to `[0x007BCEA8]`, `[0x007BCEA4]` := c8, then
+   uses), is copied (`0x005267E0`, unbounded wide copy) to
+   `[0x007BCEA8]`, `[0x007BCEA4]` := c8, then
    `SetUIState(0x25, on, 0)` (state 0x25 changes only in an expansion
-   game, `ui/panels.md` §2 r3).
+   game, `ui/panels.md` §2 r3). Bytes < 0x80 convert 1:1 under any
+   ANSI code page. PROVISIONAL (REC-644): bytes ≥ 0x80 depend on the
+   machine's ACP; the reference PC reports ACP 65001 (UTF-8, registry
+   `Nls\CodePage\ACP`), under which `MB_PRECOMPOSED` may make the call
+   fail (documented ERROR_INVALID_FLAGS for UTF-8) and leave the text
+   empty; settle with a recorded 0x26 type 7 carrying a byte ≥ 0x80.
 2. Draw `0x0048BC10` (UI pass `[0x25]`, `ui/panels.md` §5 step 4), only
    while the game is an expansion game (`[0x007A04F4]`, `0x0044DCC0`)
    and state 0x25 is open: `menu\recipescroll` (`0x004520C0`, cached in

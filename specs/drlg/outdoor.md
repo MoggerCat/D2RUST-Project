@@ -40,9 +40,9 @@
 | Constants & data dependencies | 881–903 |
 | Randomness | 904–926 |
 | Edge cases & original bugs | 927–948 |
-| Test vectors | 949–1123 |
-| Provenance | 1124–1164 |
-| Open questions | 1165–1262 |
+| Test vectors | 949–1125 |
+| Provenance | 1126–1166 |
+| Open questions | 1167–1264 |
 <!-- /index -->
 
 ## Summary
@@ -1093,15 +1093,17 @@ corner pieces 8–15, 44, 51; `0x00666F3A` otherwise: straight pieces
 recorded): ring of §6 pieces (polygon V0 (0, 9), link u2 (0, 3), V1,
 V2, link u1 (9, 2), V3, link u3 (4, 9); link midpoints (0, 1), (9, 5),
 (2, 9) get 0x400 and file 3); substitution type 1 (Border - Middle)
-seq 8396 `roll(9)` = 0, seq 8447 `0x0066F8DB` lo' 1833932632 mod 10 = 2:
-group 0 variant 2 at (3, 1); type 2 (Border - Corner) seq 8644
+seq 8395 `roll(9)` = 0, seq 8446 `0x0066F8DB` lo' 1833932632 mod 10 = 2:
+group 0 variant 2 at (3, 1); type 2 (Border - Corner) seq 8643
 `0x0066F905` lo' 3559729267 & 1 = 1: group 1 (bottom-right, N 2)
 variant 1 at (6, 6), whose pattern cells (2, 3) and (3, 3) are blank →
 **the two roomless cells are (8, 9) and (9, 9)** (cell indexes 98, 99);
-cave entrance 51 at (2, 4) (seq 9481 build roll; margin 1 rules out
-(8, 1)); type 3 (Border - Border) seq 10204 and 10499 `0x0066F905`
+cave entrance 51 at (2, 4) (seq 9480 build roll; margin 1 rules out
+(8, 1)); type 3 (Border - Border) seq 10203 and 10498 `0x0066F905`
 (N 1): group 8 at (3, 6) and group 11 at (0, 5), neither with a blank;
-then 48, 44, 29, 30 (§7.4, build rolls seq 11622, 11752, 11881, 12009).
+then 48, 44, 29, 30 (§7.4, build rolls seq 11621, 11751, 11880, 12009; recorded
+`0x0067438F` roll(6) = 4, roll(1) = 0, roll(3) = 0, roll(3) = 2, then
+the first cell `0x00666F33` at 12010; corrected 2026-10-09, q-fix-cold-plains).
 Every "group g" above is the group index G of `outdoor-tilesub.md`
 §2.2 step 3: the 0-based index into that lvlsub row's DS1 group list
 (DS1 +0x50, 24-byte entries in file order; the group pointer is +0x50 +

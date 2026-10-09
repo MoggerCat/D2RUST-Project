@@ -39,20 +39,20 @@
 | Outputs / state changes | 84–90 |
 | Rules | 91–92 |
 |   1. Loop order (single player) | 93–114 |
-|   2. Client → server | 115–389 |
-|   3. Server → client | 390–626 |
-|   4. d2rs mapping and scope | 627–658 |
-|   5. Machine-readable tables | 659–695 |
-|   6. Exact-match comparison | 696–804 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 805–1280 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1281–1544 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1545–1717 |
-| Constants & data dependencies | 1718–1736 |
-| Randomness | 1737–1742 |
-| Edge cases & original bugs | 1743–1788 |
-| Test vectors | 1789–1875 |
-| Provenance | 1876–2002 |
-| Open questions | 2003–2155 |
+|   2. Client → server | 115–398 |
+|   3. Server → client | 399–635 |
+|   4. d2rs mapping and scope | 636–667 |
+|   5. Machine-readable tables | 668–704 |
+|   6. Exact-match comparison | 705–813 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1289 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1290–1553 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1554–1726 |
+| Constants & data dependencies | 1727–1745 |
+| Randomness | 1746–1751 |
+| Edge cases & original bugs | 1752–1797 |
+| Test vectors | 1798–1884 |
+| Provenance | 1885–2011 |
+| Open questions | 2012–2164 |
 <!-- /index -->
 
 ## Summary
@@ -363,7 +363,16 @@ lock `0x008846A8`; "initialised" = `[0x008846D8]` ≠ 0).
    bytes), u16@0x31 = game +0x8C, u16@0x33 = game +0x28; bytes 0x11–0x30
    are never written (stack contents; d2rs: zero). Then a terminator
    0xB2 with an empty name, u16@0x31 = 0, u16@0x33 = 0xFFFF. The client
-   ignores 0xB2 (§3.4 rule 2).
+   ignores 0xB2 (§3.4 rule 2). Game +0x28 (read 2026-10-09) is the
+   game id from `0x0052C170` at game creation (`0x00530A67`): a
+   process-wide counter (u16 `0x00731000`, initial value 1 in the
+   image) names the next id to try; ids run 1 … 0x400 and wrap to 1;
+   the first id from the counter whose slot (`0x00882D34` + 4·id) is
+   0 is taken (slot := −1) and the counter moves past it; none free →
+   0 and the game is not created. So the first game of a process has
+   id 1, the second 2, and so on. Game +0x8C is the client count: 0 at
+   game init (`0x005379A0`), +1 per client attached (`0x00539BC0`); an
+   attach with +0x8C ≥ 8 is refused (`0x00539A4E`).
 4. **0x6C save upload** (`0x0052DB00` always 1; `0x00538CE0`): the
    client record (none, or table not initialised → nothing): when its
    received count (+0x180) is 0, a buffer of `total` bytes from the

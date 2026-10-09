@@ -46,20 +46,20 @@
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
 |   7. Operate dispatch | 324–382 |
 |   8. Chests and breakables | 383–518 |
-|   9. Shrines | 519–632 |
-|   10. Doors, operate 8 (`0x00581D40`) | 633–656 |
-|   11. Wells, operate 22 (`0x005858A0`) | 657–688 |
-|   12. Portals, operate 15 (`0x00584870`) | 689–759 |
-|   13. Torch, operate 11 (`0x005843D0`) | 760–764 |
-|   14. Client messages | 765–792 |
-|   15. Not covered yet | 793–807 |
-|   16.–18. Moved | 808–814 |
-| Constants & data dependencies | 815–861 |
-| Randomness | 862–908 |
-| Edge cases & original bugs | 909–975 |
-| Test vectors | 976–1014 |
-| Provenance | 1015–1072 |
-| Open questions | 1073–1122 |
+|   9. Shrines | 519–634 |
+|   10. Doors, operate 8 (`0x00581D40`) | 635–658 |
+|   11. Wells, operate 22 (`0x005858A0`) | 659–690 |
+|   12. Portals, operate 15 (`0x00584870`) | 691–761 |
+|   13. Torch, operate 11 (`0x005843D0`) | 762–766 |
+|   14. Client messages | 767–794 |
+|   15. Not covered yet | 795–809 |
+|   16.–18. Moved | 810–816 |
+| Constants & data dependencies | 817–863 |
+| Randomness | 864–910 |
+| Edge cases & original bugs | 911–977 |
+| Test vectors | 978–1016 |
+| Provenance | 1017–1074 |
+| Open questions | 1075–1124 |
 <!-- /index -->
 
 ## Summary
@@ -525,8 +525,10 @@ outside 0 … count − 1 spawns nothing.
    flag 0x1, mode 1.
 3. Hover: free an existing hover; create one with the text of
    `"%d"`(3683 + shrine id) (`0x00661110`, lifetime 8 · length + 125
-   frames); if created: store it, queue, flag 0x100, event 6 at frame +
-   300.
+   frames; the server text is the decimal digits themselves: format
+   `"%d"` at `0x006D57BC`, `0x00583CFA`–`0x00583D26`, read 2026-10-09;
+   so length counts the digits); if created: store it, queue, flag
+   0x100, event 6 at frame + 300.
 4. Effect: code := shrine record `Code`; code < 24 (`0x00732EAC`) and
    table `0x006E1850`[code] non-null → call it; else run the refill
    effect (`0x005828E0`).
