@@ -550,60 +550,113 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         }
     }
 
-    /// Step 5, the join sequence `0x0052C410` (`intents-events.md` §8.3,
-    /// `flows/game-join.md` §3 r2): S→C 0x5B PlayerJoined (`0x0053C940`:
-    /// GUID, class, name, level = stat 12, party id 0xFFFF: d2rs has no
-    /// parties), S→C 0x65 (`0x0053FC70`: kill count 0, the recorded join
-    /// value; d2rs keeps no kill count), then the join 0x5A code 2 when
-    /// the name has a NUL in its 16 bytes; each to every client in state
-    /// 4 in client-list order, the joiner included. Between 0x65 and the
-    /// 0x5A, `0x0055B620`'s S→C 0x8D AssignPlayerToParty (recorded frame
-    /// 2 order "0x5B, 0x65, 0x8D, 0x5A"). PROVISIONAL (`intents-events.md`
-    /// §8.3; REC-401): with more than one client, which 0x5B / 0x65 the
-    /// others get is not written; d2rs sends the joiner's to each.
-    /// The 0x8D (`0x0055B620`, `intents-events.md` §8.3): single player
-    /// sends its own GUID and party 0xFFFF (none), as recorded; settled
-    /// for one client (REC-406). The multi-client 0x8D (one per player
-    /// unit, party = `0x00554630(Q)`) is q-fix-join-multiclient.
+    /// Step 5, the join sequence (`intents-events.md` §8.3, REC-401 and
+    /// REC-406 settled; `flows/game-join.md` §3 r2), J = the joiner:
+    /// `0x0052C410`: for each other client C with a player (any state,
+    /// client-list order) S→C 0x5B of P(C) to J, 0x5B of P(J) to C, then
+    /// to J one 0x8E CorpseAssign per corpse of P(C); then 0x5B of P(J)
+    /// to J. `0x0053FC70`: to J one 0x65 per state-4 client's player
+    /// (list order). `0x0055B620`: to J one 0x8D (GUID, party word; d2rs
+    /// has no parties) per player unit without state 7 (hash-bucket
+    /// order). Then the join 0x5A (code 2, when the name has a NUL in its
+    /// 16 bytes) to every state-4 client, the joiner included. A
+    /// single-player join sends 0x5B, 0x65, 0x8D, 0x5A to the one client.
+    // PROVISIONAL (no REC; `docs/handoff/pc1-data.md` Step 4): the 0x8E
+    // flag byte (1 = assign, the counterpart of the corpse-take's flag 0)
+    // is not read from `0x0053DFB0`'s caller.
     fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
+        use crate::units::lists::client_state::IN_GAME;
         use crate::units::messages as m;
-        let Some(p) = game.lists.client(client).and_then(|e| e.player) else {
+        let Some(j) = game.lists.client(client).and_then(|e| e.player) else {
             return;
         };
-        let Some(r) = self.sys.units.get(p) else {
+        let clients: Vec<(ClientId, Option<UnitId>, u32)> = game
+            .lists
+            .clients()
+            .into_iter()
+            .filter_map(|c| game.lists.client(c).map(|e| (c, e.player, e.state)))
+            .collect();
+        let joined = |a: &Self, p: UnitId| -> Option<Vec<u8>> {
+            let r = a.sys.units.get(p)?;
+            let level = a.sys.stats.unit_total(p, 12, 0) as u16;
+            let name = a
+                .sys
+                .hooks
+                .session
+                .names
+                .get(&p)
+                .copied()
+                .unwrap_or([0; 16]);
+            Some(m::player_joined(
+                r.guid,
+                r.class as u8,
+                &name,
+                level,
+                m::NO_PARTY,
+            ))
+        };
+        let Some(own) = joined(self, j) else {
             return;
         };
-        let (guid, class) = (r.guid, r.class as u8);
-        let level = self.sys.stats.unit_total(p, 12, 0) as u16;
+        let guid_of = |a: &Self, p: UnitId| a.sys.units.get(p).map_or(0, |r| r.guid);
+        // `0x0052C410`.
+        for &(c, pc, _) in &clients {
+            let Some(pc) = pc else { continue };
+            if c == client {
+                continue;
+            }
+            if let Some(theirs) = joined(self, pc) {
+                self.sys.hooks.x.send(j, &theirs);
+            }
+            self.sys.hooks.x.send(pc, &own);
+            let owner = guid_of(self, pc);
+            let corpses: Vec<u32> = self
+                .sys
+                .hooks
+                .death
+                .owners
+                .iter()
+                .filter(|&(_, &o)| o == owner)
+                .map(|(&u, _)| guid_of(self, u))
+                .collect();
+            for g in corpses {
+                let mut b = vec![0x8E, 1];
+                b.extend_from_slice(&owner.to_le_bytes());
+                b.extend_from_slice(&g.to_le_bytes());
+                self.sys.hooks.x.send(j, &b);
+            }
+        }
+        self.sys.hooks.x.send(j, &own);
+        // `0x0053FC70`: one kill count per in-game client's player.
+        for &(_, pc, state) in &clients {
+            if let (Some(pc), true) = (pc, state == IN_GAME) {
+                let kills = m::player_kill_count(guid_of(self, pc), 0);
+                self.sys.hooks.x.send(j, &kills);
+            }
+        }
+        // `0x0055B620`: one 0x8D per player unit without state 7.
+        for q in game.lists.units_of_type(UnitType::Player) {
+            if self.sys.stats.has_state(q, super::death::STATE_PLAYERBODY) {
+                continue;
+            }
+            let party = m::assign_player_to_party(guid_of(self, q), m::NO_PARTY);
+            self.sys.hooks.x.send(j, &party);
+        }
+        // The join 0x5A to every state-4 client.
         let name = self
             .sys
             .hooks
             .session
             .names
-            .get(&p)
+            .get(&j)
             .copied()
             .unwrap_or([0; 16]);
-        let joined = m::player_joined(guid, class, &name, level, m::NO_PARTY);
-        let kills = m::player_kill_count(guid, 0);
-        let party = m::assign_player_to_party(guid, m::NO_PARTY);
-        let event = name.contains(&0).then(|| m::player_event(2, &name));
-        let to: Vec<UnitId> = game
-            .lists
-            .clients()
-            .into_iter()
-            .filter_map(|c| game.lists.client(c))
-            .filter(|e| e.state == crate::units::lists::client_state::IN_GAME)
-            .filter_map(|e| e.player)
-            .collect();
-        let x = &mut self.sys.hooks.x;
-        for &t in &to {
-            x.send(t, &joined);
-            x.send(t, &kills);
-            x.send(t, &party);
-        }
-        if let Some(e) = event {
-            for &t in &to {
-                x.send(t, &e);
+        if name.contains(&0) {
+            let e = m::player_event(2, &name);
+            for &(_, pc, state) in &clients {
+                if let (Some(pc), true) = (pc, state == IN_GAME) {
+                    self.sys.hooks.x.send(pc, &e);
+                }
             }
         }
     }

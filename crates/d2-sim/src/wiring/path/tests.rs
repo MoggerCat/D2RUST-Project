@@ -313,3 +313,53 @@ fn coarse_free_box_avoids_a_monster_footprint() {
     assert_eq!(search(&mut fx), (Some(a), Point::new(28, 8)));
     fx.assert_clean();
 }
+
+/// A monster of class 0 allocated in `mode` at (x, y) of room A.
+fn spawn_monster_in_mode(fx: &mut Fx, mode: u32, x: i32, y: i32) -> UnitId {
+    let req = crate::units::lifecycle::AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: Some(fx.a),
+        add: true,
+        fixed_guid: None,
+        mode,
+        allied: false,
+    };
+    fx.sim
+        .with(&mut fx.game, |g, v| v.allocate(g, &req, x, y))
+        .expect("allocated")
+}
+
+// Covers: specs/sim/units.md §3.1 r8; specs/sim/path-placement.md §5.3 r3
+#[test]
+fn a_monster_allocated_dead_carries_the_corpse_mask() {
+    let mut fx = fx();
+    {
+        let t = Arc::make_mut(&mut fx.sim.hooks().tables);
+        let ex = usize::from(t.combat.monstats[0].monstatsex);
+        t.combat.monstats2[ex].sizex = 2;
+    }
+    // Mode 12 (dead), `deadCol` clear: pattern 5, mask 0x8000, the live
+    // mask 0x100 and its NO_PATH marker are gone.
+    let m = spawn_monster_in_mode(&mut fx, 12, 30, 10);
+    let d = path(&mut fx, m);
+    assert_eq!((d.pattern, d.foot_mask), (5, 0x8000));
+    assert_eq!(cell(&mut fx, 30, 10) & 0x8000, 0x8000);
+    assert_eq!(cell(&mut fx, 30, 10) & (0x100 | bits::NO_PATH), 0);
+    assert_eq!(cell(&mut fx, 29, 10) & 0x100, 0);
+    // Mode 0 likewise; a live mode keeps the live footprint.
+    let m0 = spawn_monster_in_mode(&mut fx, 0, 20, 10);
+    assert_eq!(path(&mut fx, m0).foot_mask, 0x8000);
+    let live = spawn_monster_in_mode(&mut fx, 1, 10, 10);
+    assert_eq!(path(&mut fx, live).foot_mask, 0x100);
+    assert_ne!(cell(&mut fx, 10, 10) & 0x100, 0);
+    // `deadCol` set: the settings are skipped.
+    {
+        let t = Arc::make_mut(&mut fx.sim.hooks().tables);
+        let ex = usize::from(t.combat.monstats[0].monstatsex);
+        t.combat.monstats2[ex].deadcol = true;
+    }
+    let keep = spawn_monster_in_mode(&mut fx, 12, 24, 10);
+    assert_eq!(path(&mut fx, keep).foot_mask, 0x100);
+    assert_ne!(cell(&mut fx, 24, 10) & 0x100, 0);
+}

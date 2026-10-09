@@ -39,20 +39,20 @@
 |   6. 800 × 600 border and control panel art (`0x00499450`) | 333–353 |
 |   7. Shared panel parts | 354–371 |
 |   8. Character panel (ui 2, left; `0x004A7D00`) | 372–474 |
-|   9. Inventory panel family (`0x0048EDF0`) | 475–535 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 536–599 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 600–635 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 636–688 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 689–746 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 747–752 |
-|   15. Event → intent summary | 753–780 |
-|   16. Machine tables | 781–815 |
-| Constants & data dependencies | 816–836 |
-| Randomness | 837–841 |
-| Edge cases & original bugs | 842–862 |
-| Test vectors | 863–903 |
-| Provenance | 904–948 |
-| Open questions | 949–1040 |
+|   9. Inventory panel family (`0x0048EDF0`) | 475–542 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 543–606 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 607–642 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 643–698 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 699–756 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 757–762 |
+|   15. Event → intent summary | 763–790 |
+|   16. Machine tables | 791–825 |
+| Constants & data dependencies | 826–846 |
+| Randomness | 847–851 |
+| Edge cases & original bugs | 852–872 |
+| Test vectors | 873–913 |
+| Provenance | 914–958 |
+| Open questions | 959–1050 |
 <!-- /index -->
 
 ## Summary
@@ -477,6 +477,13 @@ after both.
 1. Mode `[0x007BCBF0]` picks what is drawn besides the inventory: 0
    none, 1–9 NPC trade states (§14.3), 0x0B player trade, 0x0C / 0x0D
    stash (§11), 0x0E cube (§12), 0x13 other, 10 draws nothing at all.
+   Revision 2026-10-09 (q-scenes-compare, measured `a1-panel-cube`): the
+   mode's panel is drawn first, then the inventory (art §9.3, slots
+   §9.4, items, gold line and button, close button §9.6): rows 1–11 the
+   cube's art, items and buttons, rows 12–45 the inventory.
+   PROVISIONAL (REC-515): the stash and shop modes the same (because
+   the family draws one mode panel in one place; settled by a stash or
+   shop scene).
 2. Layout records: on a change of `InventoryArrangeMode` `[0x007A5218]`
    (0 for 640 × 480, 1 for 800 × 600) the client reloads the panel
    rectangles from `inventory.bin` (`0x004835B0`): the player's record
@@ -646,6 +653,9 @@ after both.
    Close button at (`sx + 275`, `H + sy − 65`) frame 10 + `[0x007BCE40]`;
    transmute button `Panel\miniconvert` frame `[0x007BCE48]` (0/1) at
    (`sx + 144`, `H + sy − 188`).
+   Draw order (measured `a1-panel-cube` rows 1–11): art, the grid's
+   items (each item's cell tints then the item, `ui/inventory.md` §3),
+   the close button, the transmute button.
 4. Transmute animation: while `[0x007BCC10]` ≠ 0, `%s\ui\menu\horadric`
    frame `n` at (W / 2, H / 2 − 1) in draw mode 3; `n` += 1 when more
    than 70 ms passed since the last step (`GetTickCount`); at `n` = 30

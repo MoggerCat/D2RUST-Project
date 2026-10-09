@@ -1,0 +1,21 @@
+# format: d2s-roundtrip-1
+# tool: cloud-game d2s_roundtrip 0.1.0
+# command: python3 tools/cloud-game/d2s_roundtrip.py <ours> <game> --args "--name GearAmb --class ama --expansion --level 30 --item rin/q=magic/body=6 --item rin/q=rare/body=7 --item amu/q=magic/body=2 --item lea/q=rare/body=3 --item vbl/q=magic/body=8 --item lbt/q=set/body=9 --item jav/q=magic/body=4 --item lrg/sock=2/body=5 --item cap@0,0/q=magic/unid --item ssd@2,0/q=unique --item rin@3,0/q=set --item amu@4,0/q=rare/unid --item hp1/belt=0 --item hp1/belt=1 --item mp1/belt=2" --out facts/saves/gear-roundtrip.tsv
+# d2s-tool new --name GearAmb --class ama --expansion --level 30 --item rin/q=magic/body=6 --item rin/q=rare/body=7 --item amu/q=magic/body=2 --item lea/q=rare/body=3 --item vbl/q=magic/body=8 --item lbt/q=set/body=9 --item jav/q=magic/body=4 --item lrg/sock=2/body=5 --item cap@0,0/q=magic/unid --item ssd@2,0/q=unique --item rin@3,0/q=set --item amu@4,0/q=rare/unid --item hp1/belt=0 --item hp1/belt=1 --item mp1/belt=2
+# run: 1.14d under Wine: the d2s-tool save loaded from character select, Save and Exit (tools/cloud-game/xinput.sh); lrg differs by item flag 0x4000 (strength requirement not met)
+item	ours	game	result
+rin mode 1 body 6 x 6 y 0 page+1 0	4a4d1000800065c40c2097e60682af4963350f952cd98380d0099cff	4a4d1000800065c40c2097e60682af4963350f952cd98380d0099cff	equal
+rin mode 1 body 7 x 7 y 0 page+1 0	4a4d1000800065e40e2097e60602e24303148f95d1afef789431390c1c0891e064c20816021802a002ff01	4a4d1000800065e40e2097e60602e24303148f95d1afef789431390c1c0891e064c20816021802a002ff01	equal
+amu mode 1 body 2 x 2 y 0 page+1 0	4a4d1000800065440410d6560782e1c9e35f0f1585bc45967263f41f	4a4d1000800065440410d6560782e1c9e35f0f1585bc45967263f41f	equal
+lea mode 1 body 3 x 3 y 0 page+1 0	4a4d10008000656406c0561606029006c44d8f91cb542ee5b2300da25b6c0003c309a214385ba0c678dc7cfd07	4a4d10008000656406c0561606029006c44d8f91cb542ee5b2300da25b6c0003c309a214385ba0c678dc7cfd07	equal
+vbl mode 1 body 8 x 8 y 0 page+1 0	4a4d100080006504116027c606821d7ebc730fc119846880838316476358ff01	4a4d100080006504116027c606821d7ebc730fc119846880838316476358ff01	equal
+lbt mode 1 body 9 x 9 y 0 page+1 0	4a4d10008000652413c02646070297cf2f364f01021ac0c060085071c8f80f46f61f80ca7f	4a4d10008000652413c02646070297cf2f364f01021ac0c060085071c8f80f46f61f80ca7f	equal
+jav mode 1 body 4 x 4 y 0 page+1 0	4a4d10008000658408a01666070256b9d11d0ff10e001010c0634205ff01	4a4d10008000658408a01666070256b9d11d0ff10e001010c0634205ff01	equal
+lrg mode 1 body 5 x 5 y 0 page+1 0	4a4d1008800065a40ac0267706827f28e7458f00031818e43f	4a4d1048800065a40ac0267706827f28e7458f00031818e43f	differs
+cap mode 0 body 0 x 0 y 0 page+1 1	4a4d000080006500003216060782183b9e320f0100d97000038364030c8aff	4a4d000080006500003216060782183b9e320f0100d97000038364030c8aff	equal
+ssd mode 0 body 0 x 2 y 0 page+1 1	4a4d10008000650004323747068298be7e2fcf91013030442043a642f1610459ec0e0a4499ff	4a4d10008000650004323747068298be7e2fcf91013030442043a642f1610459ec0e0a4499ff	equal
+rin mode 0 body 0 x 3 y 0 page+1 1	4a4d100080006500062297e606820f5caf724fa50e1044083c0cff01a8fc07	4a4d100080006500062297e606820f5caf724fa50e1044083c0cff01a8fc07	equal
+amu mode 0 body 0 x 4 y 0 page+1 1	4a4d0000800065000812d65607827775c8598f1561c3f9599285290f04100940a5e0e1050390ff	4a4d0000800065000812d65607827775c8598f1561c3f9599285290f04100940a5e0e1050390ff	equal
+hp1 mode 2 body 0 x 0 y 0 page+1 0	4a4d1000a0006508008006170302	4a4d1000a0006508008006170302	equal
+hp1 mode 2 body 0 x 1 y 0 page+1 0	4a4d1000a0006508028006170302	4a4d1000a0006508028006170302	equal
+mp1 mode 2 body 0 x 2 y 0 page+1 0	4a4d1000a000650804d006170302	4a4d1000a000650804d006170302	equal

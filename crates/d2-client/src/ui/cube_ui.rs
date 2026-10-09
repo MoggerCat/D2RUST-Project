@@ -64,6 +64,13 @@ pub(super) struct CubeUi {
 }
 
 impl Panel for CubeUi {
+    /// `ui/panels.md` §9 r1 revision: drawn before the inventory.
+    fn draw_before(&self) -> Option<PanelId> {
+        Some(PanelId(u16::from(
+            crate::ui::panels::inventory::UI_INVENTORY,
+        )))
+    }
+
     fn id(&self) -> PanelId {
         PanelId(u16::from(UI_CUBE))
     }
@@ -88,12 +95,10 @@ impl Panel for CubeUi {
         // from a draw: outputs leave only after an event, so
         // [`OriginalUi::cube_poll`] sends it. The panel draws nothing
         // that frame.
-        if !panel
-            .draw(&sh.tables, &env, cube_player_ok(ctx.world), out)
-            .is_empty()
-        {
+        if !cube_player_ok(ctx.world) {
             return;
         }
+        panel.draw_art(&sh.tables, &env, out);
         // §12.4: step on the (wrapping, 32-bit) millisecond tick, draw the
         // cel, and hold the grid back for the first 14 steps.
         let mut anim = sh.cube_anim.get();
@@ -116,8 +121,11 @@ impl Panel for CubeUi {
         }
         if anim.grid_visible() {
             let g = sh.items.cube_grid(&sh.config.screen);
-            sh.items.draw_cube(ctx.world, &sh.tables.files, &g, out);
+            sh.items
+                .draw_cube(ctx.world, &sh.tables.files, &g, sh.mouse, out);
         }
+        // §12 r3: the buttons after the grid.
+        panel.draw_buttons(&sh.tables, &env, out);
         // The button tool tips (§12 r5, `panels-2.md` §20 r3): the strict
         // button rectangles, `strClose` / `strUiMenu2` "Transmute". Drawn
         // when the string table is loaded (font 1, d2rs-own, unverified).

@@ -367,7 +367,7 @@ fn play(run: &mut Run, seed: i32) -> Played {
             q.flags[d].set(1 + d as u8, 0);
             q.flags[d].set(2, 12);
         }
-        // (5, 0): the new character's start cube (REC-244) holds (0, 0).
+        // (5, 0): clear of the new character's charstats start items.
         give(s, p, *b"hp1 ", page::INVENTORY, (5, 0));
         give(s, p, *b"mp1 ", page::INVENTORY, (3, 1));
         give(s, p, *b"rin ", page::STASH, (0, 0));
@@ -532,8 +532,8 @@ fn round_trip(class: &str, name: &str, difficulty: u8, seed: i32) {
         .unwrap()
         .with_difficulty(difficulty);
     let mut run = Run::start(&character, &file);
-    // The new character's start items (the install's charstats kit and
-    // the start cube, REC-244) are what the join leaves.
+    // The new character's start items (the install's charstats kit; no
+    // start cube, q-fix-real-start-cube) are what the join leaves.
     let kit = run.live().extra.items.as_ref().map_or(0, Vec::len);
     let played = play(&mut run, seed);
     let before = run.live();

@@ -788,6 +788,9 @@ fn tyrael_portal() {
     f.players.insert(P3, act2_player(3, 40));
     f.players.insert(P4, act2_player(4, 40));
     f.party.insert(P1, vec![P1, P3]);
+    // Clients with the classic flags and one with a higher progression.
+    f.client_flags.insert(P1, 0x0000);
+    f.client_flags.insert(P3, 0x0100);
     ctl.records[i].callbacks &= !(1 << 2);
     say(&mut ctl, &mut f, TYRAEL_U, TYRAEL1, 302);
     assert_eq!(ctl.records[i].state, 4);
@@ -804,8 +807,9 @@ fn tyrael_portal() {
         [
             "portal 10 20 59 40",
             // `0x00538680(client, 2, difficulty)` for P1, then P3.
-            "progression 1 2 0",
-            "progression 3 2 0",
+            "progression 1 0x0200",
+            // p = 1 below n = 2: raised to 0x0200.
+            "progression 3 0x0200",
         ]
     );
     let e = ex(&ctl);
@@ -952,6 +956,9 @@ fn tyrael_portal_party_members() {
     set(&mut f, P5, 14, 13);
     f.party.insert(P1, vec![P1, P2, P3, P4]);
     f.party.insert(P5, vec![P5, P6]);
+    for p in [P1, P2, P5, P6] {
+        f.client_flags.insert(p, 0);
+    }
     say(&mut ctl, &mut f, TYRAEL_U, TYRAEL1, 302);
     let progressed: Vec<&String> = f
         .log
@@ -961,10 +968,10 @@ fn tyrael_portal_party_members() {
     assert_eq!(
         progressed,
         [
-            "progression 1 2 0",
-            "progression 2 2 0",
-            "progression 5 2 0",
-            "progression 6 2 0",
+            "progression 1 0x0200",
+            "progression 2 0x0200",
+            "progression 5 0x0200",
+            "progression 6 0x0200",
         ]
     );
     for p in [P1, P2, P5, P6] {

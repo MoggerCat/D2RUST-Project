@@ -244,6 +244,9 @@ pub struct ClientUnit {
     pub interact_ms: u32,
     /// +0x44: the animation frame (signed, 8.8 fixed point; §18 rule 1).
     pub frame: i32,
+    /// +0x48: the animation's frame count (8.8), written by a monster's
+    /// mode set ([`super::monster_anim::mode_set`]); 0 otherwise.
+    pub frame_count: i32,
     /// +0x4C: an object's animation speed (8.8 per update), set by the
     /// animation set-up (`world/objects-client.md` §25 r8); `None`: no
     /// set-up ran, the generic step uses `FrameDelta[mode]`.
@@ -296,6 +299,7 @@ impl ClientUnit {
             flag_200: false,
             interact_ms: 0,
             frame: 0,
+            frame_count: 0,
             speed: None,
             flag_ex: 0,
             flag_4: false,
@@ -1236,6 +1240,15 @@ pub struct MonsterClass {
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).
     pub setup: Option<MonsterSetup>,
+    /// The AnimData record (frames, speed) of the class's composite name
+    /// in each monster mode 0–15 (`formats/animdata.md` §5, the default
+    /// record when the name has none); `None`: no name (the mode set
+    /// leaves the frame count and speed at 0).
+    pub anims: [Option<(u32, u32)>; 16],
+    /// `monstats` walk and run speeds (+0x36, +0x38 after
+    /// `data/fixups.md` §8): w of `sim/units.md` §4.7 steps 6–7.
+    pub walk_speed: u16,
+    pub run_speed: u16,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up

@@ -180,6 +180,21 @@ pub fn request_in_group(s: &dyn TriggerSound, unit: UnitKey, id: i32) -> bool {
         .any(|&(_, cur)| cur >= b && cur < b.wrapping_add(n))
 }
 
+/// The handle `0x004CA900(U, s)` finds (§19 r3): U's first request
+/// (newest first) whose current id lies in `s`'s group; none while the
+/// sound system is off.
+pub fn first_in_group(s: &dyn TriggerSound, unit: UnitKey, id: i32) -> Option<Handle> {
+    if !s.sound_on() {
+        return None;
+    }
+    let b = s.group_base(id);
+    let n = s.group_size(b);
+    s.unit_requests(unit)
+        .into_iter()
+        .find(|&(_, cur)| cur >= b && cur < b.wrapping_add(n))
+        .map(|(h, _)| h)
+}
+
 /// `0x004CA9C0(U, force)` (§19 r3, r5): detach every handle of U's list;
 /// the unit free (`0x00465870`) runs it without force first, so loops
 /// lose U and stop when U was their last unit and one-shots keep playing.

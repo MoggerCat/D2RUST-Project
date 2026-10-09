@@ -80,6 +80,32 @@ second node).
    new-character branch without start items (`single_player.rs`
    `load_save` path); 1.14d's stub load makes them (StubAma recording).
 
+## Round 2 — town NPC thinks and the client walk frame
+
+| Fix | Where | Check |
+|---|---|---|
+| Npc interaction step: every monster has an interaction block; `nearest_player` = scan 2 (client players within 15, PROVISIONAL REC-500) | `d2-sim` `wiring/action/ai.rs` | `the_nearest_client_player_within_15_is_found` |
+| Walk in radius `0x005DE4E0`: own + Δ·min(a, dist − b)/dist rounded (PROVISIONAL REC-501), with the staged velocity request | `monsters/ai/tactics.rs`, `ai.rs` | `walk_in_radius_points_follow_the_recorded_walks` (Warriv's 3 walks) |
+| Think restart gate `0x00553160` (REC-442 settled by PC 1) | `wiring/action/units.rs` | `a_monster_created_where_no_client_is_gets_no_think` |
+| Client monster anim frame: per unit, mode set → 0, §4.7 rate, first frame rolled (r6.5), stat-67 tail; PROVISIONAL REC-502, REC-503 | `d2-client` `bridge/monster_anim.rs` | `a_walk_restarts_at_0_and_steps_three_quarters_a_tick` (recorded ticks 33–89) |
+
+State: `python3 tools/scenario-diff/scenario_diff.py <check with ticks 90>`
+(Wine 1.14d vs d2rs) → no difference in m, x, y, xf, yf, seed, stats
+over 90 frames; left: monster path target at rest (`tx`, `ty`: 1.14d =
+own position, d2rs 0) and the player's `fc`, `sp`.
+
+1.14d per-frame draws for this: `record_frames.py --every 1
+--draws-every 1 --ticks 90 --auto ScnAma --seed 1234` (48 drawn frames;
+raw file in `traces/raw/`, not committed), split with `facts_render.py
+--frame N`.
+
 ## Next difference (a1-town-arrival-ama)
 
-See the section below (updated per round).
+Row 108, shadow pass order: d2rs draws Kashya's shadow (now the right
+WL frame 6) before the torch at (30, 196); 1.14d draws the torch, then
+Warriv, then Kashya (screen y order). The d2rs dump has 10 unit rows
+against 25 and `?` positions and unit keys for most: the exporter /
+draw-order side of `q-fix-render-real-npc-pose` (unit draw count).
+Also: the d2rs client never ends a monster walk (Warriv stays WL after
+his last walk; 1.14d's client mode end sets NU at frame 67: REC-503's
+end tests).

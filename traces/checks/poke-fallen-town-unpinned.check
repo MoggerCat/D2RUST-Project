@@ -1,0 +1,13 @@
+check 1
+# As poke-fallen-town, without the seed pins: the spawn draws from the
+# game seed as the game left it, so this also checks the seed order from
+# the join (q-fix-real-unit-seed-order, staging 9aa0b329; before it d2rs
+# was one game-seed step behind from frame 2, poke.md Test vectors).
+# Spec: specs/tools/scenario-diff.md, specs/tools/poke.md §2 rule 6.
+name poke-fallen-town-unpinned
+save ScnAma --class ama --expansion
+seed 1234
+ticks 54
+seconds 240
+channels state
+at 4 poke spawn 19 @x+3 @y+3 normal
