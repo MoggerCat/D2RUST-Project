@@ -28,23 +28,23 @@
 |   1. Entry points | 88–101 |
 |   2. Screen message list (`0x0049E3A0(text, color)`) | 102–145 |
 |   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
-|   4. Recipe scroll text (0x26 type 7) | 202–226 |
-|   5. Overhead text | 227–295 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–373 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 374–521 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 522–534 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 535–551 |
-|   10. Other 0x50 codes (UI effects) | 552–587 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 588–669 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 670–676 |
-|   13. NPC intro table `0x00726850` (0x91) | 677–714 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 715–731 |
-| Constants & data dependencies | 732–749 |
-| Randomness | 750–754 |
-| Edge cases & original bugs | 755–775 |
-| Test vectors | 776–798 |
-| Provenance | 799–829 |
-| Open questions | 830–857 |
+|   4. Recipe scroll text (0x26 type 7) | 202–239 |
+|   5. Overhead text | 240–308 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 309–386 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 387–534 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 535–547 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 548–564 |
+|   10. Other 0x50 codes (UI effects) | 565–600 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 601–682 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 683–689 |
+|   13. NPC intro table `0x00726850` (0x91) | 690–727 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 728–744 |
+| Constants & data dependencies | 745–762 |
+| Randomness | 763–767 |
+| Edge cases & original bugs | 768–788 |
+| Test vectors | 789–811 |
+| Provenance | 812–842 |
+| Open questions | 843–870 |
 <!-- /index -->
 
 ## Summary
@@ -216,6 +216,19 @@ stops at a `ÿc` that ends the string.
    `Nls\CodePage\ACP`), under which `MB_PRECOMPOSED` may make the call
    fail (documented ERROR_INVALID_FLAGS for UTF-8) and leave the text
    empty; settle with a recorded 0x26 type 7 carrying a byte ≥ 0x80.
+   *Measured (2026-10-09, PC 1, Windows 10 19045, `GetACP()` = 65001,
+   OEM 65001; the same call from a test program, `MultiByteToWideChar(0,
+   MB_PRECOMPOSED, …)`):* the flag does **not** fail under UTF-8 (return
+   = characters written, last error 0, the same as flags 0): bytes
+   decode as UTF-8, a valid sequence giving one character (`c3 a9` →
+   U+00E9, `"\xc3\xa9t\xc3\xa9"` → 3 characters) and each lone byte
+   ≥ 0x80 giving U+FFFD (`"caf\xe9"` → `caf` + U+FFFD). So on this PC the
+   0x26 type 7 text is the UTF-8 decode of the message bytes; under a
+   single-byte ACP (e.g. 1252) the same bytes map 1:1 through that code
+   page. A live 0x26 type 7 with such a byte was not staged (English
+   string tables hold none and no tool injects S→C messages), so the
+   game-side half (the 256-byte length and the NUL inside it) rests on
+   the asm reading above.
 2. Draw `0x0048BC10` (UI pass `[0x25]`, `ui/panels.md` §5 step 4), only
    while the game is an expansion game (`[0x007A04F4]`, `0x0044DCC0`)
    and state 0x25 is open: `menu\recipescroll` (`0x004520C0`, cached in
