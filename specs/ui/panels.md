@@ -32,27 +32,27 @@
 | Outputs / state changes | 91–95 |
 | Rules | 96–97 |
 |   1. Screen layout model | 98–134 |
-|   2. UI states and the open/close call | 135–200 |
-|   3. The conflict gate (`0x00453910`) | 201–234 |
-|   4. Slots, open mode and the view shift | 235–292 |
-|   5. UI pass order (`0x00456EE0`) | 293–332 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 333–353 |
-|   7. Shared panel parts | 354–371 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 372–474 |
-|   9. Inventory panel family (`0x0048EDF0`) | 475–542 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 543–606 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 607–642 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 643–698 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 699–756 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 757–762 |
-|   15. Event → intent summary | 763–790 |
-|   16. Machine tables | 791–825 |
-| Constants & data dependencies | 826–846 |
-| Randomness | 847–851 |
-| Edge cases & original bugs | 852–872 |
-| Test vectors | 873–913 |
-| Provenance | 914–958 |
-| Open questions | 959–1050 |
+|   2. UI states and the open/close call | 135–259 |
+|   3. The conflict gate (`0x00453910`) | 260–293 |
+|   4. Slots, open mode and the view shift | 294–351 |
+|   5. UI pass order (`0x00456EE0`) | 352–391 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 392–412 |
+|   7. Shared panel parts | 413–430 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 431–533 |
+|   9. Inventory panel family (`0x0048EDF0`) | 534–601 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 602–665 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 666–701 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 702–757 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 758–815 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 816–821 |
+|   15. Event → intent summary | 822–849 |
+|   16. Machine tables | 850–884 |
+| Constants & data dependencies | 885–905 |
+| Randomness | 906–910 |
+| Edge cases & original bugs | 911–931 |
+| Test vectors | 932–972 |
+| Provenance | 973–1017 |
+| Open questions | 1018–1109 |
 <!-- /index -->
 
 ## Summary
@@ -197,6 +197,65 @@ cursor position (cursor jump, §4.3), UI `DrawItem`s, C→S messages (§15).
    `0x0047ED4C`, the NPC menu paths `0x004B5057`, `0x004B6712`,
    `0x004B6F84`, `0x004B701C`, `0x004B70A4` and the message box
    `0x004C038A` (`ui/messages.md`).
+10. **Ui 17 (0x11, UI_QUESTLOG) is the quest-log alert button**
+    (static read 2026-10-09), not the quest panel (that is ui 15,
+    UI_QUESTSCREEN, §5 step 4). Opened only by the S→C quest-log tail
+    (`client/msg-ui.md` §1 r6.1, `0x004A2E66`) and by the game-menu
+    restore (`ui/frontend-options.md` §O1 r3).
+    - **Draw** `0x004A2A80` (§5 step 8, while the flag is set): if the
+      local player is absent or dead (`0x00463DF0` ≠ 0) it closes ui 17
+      (`SetUIState(17, off, 0)`, `0x004A2A99`) and, when the latch
+      `[0x007BF298]` is still 1, clears `[0x007BF2B0]` and the latch;
+      nothing is drawn. Else nothing is drawn while the open mode is 3
+      or ui 15 is open. Else a level-up style button: the label string
+      3928 (the Quest Log command's key-configuration label,
+      `ui/key-commands.tsv` row 4) centred over the socket, the socket
+      `Panel\Levelsocket` (`[0x007C02E0]`) frame 0, and `Panel\Level`
+      (`[0x007C02DC]`, both loaded by `0x004A6460` at the in-game UI
+      set-up) at (+3, −4) from the socket, frame 1 while
+      `[0x007BF2B0]` ≠ 0 and the cursor is in the button rect
+      (`0x004A2970`), else 0; draw mode 5. Position: row
+      `0x004A2900()` of the 20-byte table `0x007241C0` (x0, x1, y0, y1,
+      label y; y values + H − 480), x + (W − 640)/2 in open mode 2; the
+      row depends on the open mode, the resolution (`0x004F5160`) and
+      ui 2 / 6. PROVISIONAL: the table's image values (rows 0 and 2 =
+      x 40–75, all y 0; rows 1 and 3 all 0) look unfilled, so the
+      on-screen position is unread; settled by REC-1160.
+    - **Hooks**: open `0x00455720` registers the window handlers of
+      table `0x006D615C` (4 entries); close `0x00455AE0` unregisters
+      them and calls `0x004A3000` (latch 1 → 0). No other side effect.
+    - **Handlers**: left / right button down (0x201 / 0x204) →
+      `0x004A2A20`: cursor in the rect → `[0x007BF2B0]` := 1, sound
+      request `0x004B9A00(0, 0, 0)`, message consumed; else
+      `[0x007BF2B0]` := 0. Button up (0x202 / 0x205) → `0x004A4110`:
+      in the rect with `[0x007BF2B0]` set → `SetUIState(17, off, 0)`
+      (`0x004A413C`; the close hook resets the latch), the quest-log
+      toggle `0x004A3FE0(0)` (opens ui 15 from latch 0 under its 250 ms
+      / alive tests, `client/msg-ui.md` §1 r6.3), `[0x007BF2B0]` := 0,
+      consumed; else `[0x007BF2B0]` := 0.
+    - **Every way it closes**: the draw's dead-player close and the
+      button up above (the only two `SetUIState(17, …)` call sites
+      besides the open); the gate of another state (§3 r3: row 17 closes
+      it for a request of ui 0x0B, 0x0E, 0x0F, 0x18, 0x1B–0x1E, 0x20 —
+      so opening the quest panel 15 by Q or the control-panel button
+      closes it); the game-menu open (`ui/frontend-options.md` §O1 r2);
+      the in-game UI set-up `0x00456970` writes `[0x007A2804]`
+      (`0x00456A2B`, the only direct write). Not the close-all r9 (flag
+      0) nor the mini-panel loop `0x004567F0` (row 17 column 0x15 = 0).
+    - **Who blocks it** (column 17): ui 15 or 0x21 open → refused (2);
+      ui 17 itself → refused (3), so a second tail with ui 17 open does
+      nothing. Allowed under the Esc menu (C[9][17] = 0) and a modal
+      text screen (§3 r2).
+    - **Other readers of the flag**: the UI pass (§5 step 8,
+      `0x004570F7`), and the timed lower-left text list `0x0049DEE0`
+      (list `[0x007BF1EA]`), whose x is 100 instead of 15 while ui 6 or
+      ui 17 is open (`0x0049DF1F`; reading: to clear the button).
+    - d2rs (`crates/d2-client/src/ui/`): ui 17 opens and closes as a
+      flag (`msg_ui.rs` `quest_log_tail`, `original.rs` Esc paths) but
+      nothing draws it, it has no handlers, and the close hook
+      (`original.rs` `close_hook`) does not reset
+      `MsgUiState::quest_log_latch`, so once ui 17 has closed by any
+      path no later tail raises it again.
 
 ### 3. The conflict gate (`0x00453910`)
 
