@@ -1,0 +1,3 @@
+id	key	offset	length	source
+0x67	-	nul@1	..16	specs/client/model.md §7 rule 9 (builder 0x00477CA0: stack bytes after the game name NUL not written)
+0x67	-	nul@21	..36	specs/client/model.md §7 rule 9 (builder 0x00477CA0: stack bytes after the character name NUL not written)
