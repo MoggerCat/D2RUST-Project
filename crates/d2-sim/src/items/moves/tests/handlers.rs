@@ -538,20 +538,22 @@ fn stack_items() {
     assert_eq!(f.it(11).iflags, 0x8);
     assert_eq!(f.it(11).cmd, 0x100);
     assert!(f.logged("3E 11 70") && f.logged("3E 10 70"));
-    // Merge: dst := sum, 0x42 for src, src freed, cursor cleared.
+    // Merge: dst := sum, 0x42 for the player's cursor (recorded `42 00
+    // <player GUID>`, `facts/items/a1-town-item-moves.tsv`), src freed.
     f.set_stat(Owner::item(11), 70, 10);
     f.set_stat(Owner::item(10), 72, 3);
     f.set_stat(Owner::item(11), 72, 9);
     assert_eq!(run(&mut f, &m32(0x21, &[10, 11])), res::OK);
     assert_eq!(f.stat(Owner::item(11), 70), 15);
     assert_eq!(f.stat(Owner::item(11), 72), 3);
-    assert_eq!(f.sent, vec![vec![0x42, 4, 10, 0, 0, 0]]);
+    assert_eq!(f.sent, vec![vec![0x42, 0, P as u8, 0, 0, 0]]);
     assert!(f.logged("free 10"));
     assert_eq!(f.inv().cursor, None);
 }
 
 /// Two arrow quivers (no durability: `0x00629930` = 0) whose total fits
-/// merge; only the stat-72 step needs durability (PROVISIONAL REC-289).
+/// merge; only the stat-72 step needs durability (recorded, REC-289:
+/// 30 + 40 arrows merge in `facts/items/a1-town-item-moves.tsv`).
 // Covers: specs/items/inventory-moves.md §7.12
 #[test]
 fn stack_items_without_durability_merge() {
@@ -778,10 +780,15 @@ fn scroll_to_book() {
     f.set_stat(Owner::item(11), 70, 20);
     assert_eq!(run(&mut f, &m32(0x29, &[10, 11])), res::OK);
     assert_eq!(f.inv().cursor, Some(10));
+    // A full tome: nothing sent (recorded with a full `tbk`,
+    // `facts/items/a1-town-item-moves-full.tsv` frame 183).
+    assert!(f.sent.is_empty());
     f.set_stat(Owner::item(11), 70, 5);
     assert_eq!(run(&mut f, &m32(0x29, &[10, 11])), res::OK);
     assert_eq!(f.stat(Owner::item(11), 70), 6);
     assert_eq!(f.inv().cursor, None);
+    // The cursor clear names the player (recorded `42 00 <player>`).
+    assert_eq!(f.sent, vec![vec![0x42, 0, P as u8, 0, 0, 0]]);
     assert!(f.logged("free 10") && f.logged("3E 11 70") && f.logged("book 1"));
     // A wrong type is refused.
     f.item(12, mode::CURSOR);

@@ -34,25 +34,25 @@
 |   4. Receive and the unit message queue | 208–245 |
 |   5. Client update pass | 246–294 |
 |   6. Position check (`0x004804E0`) | 295–335 |
-|   7. Session messages | 336–507 |
-|   8. Mode requests | 508–593 |
-|   9. Room-in-sight messages | 594–628 |
-|   10. Bit reader | 629–643 |
-|   11. Current act and level (join and later) | 644–689 |
-|   12. Client DRLG and the room of a point | 690–731 |
-|   13. Visibility predicate (`0x004DBF20`) | 732–783 |
-|   14. Pet list and the hireling GUID | 784–837 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 838–927 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 928–962 |
-|   17. Model writes made by 1.14d UI code | 963–1109 |
-|   18. Audio driver inputs and the client object functions | 1110–1140 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1141–1361 |
-| Constants & data dependencies | 1362–1374 |
-| Randomness | 1375–1390 |
-| Edge cases & original bugs | 1391–1415 |
-| Test vectors | 1416–1473 |
-| Provenance | 1474–1577 |
-| Open questions | 1578–1716 |
+|   7. Session messages | 336–511 |
+|   8. Mode requests | 512–597 |
+|   9. Room-in-sight messages | 598–632 |
+|   10. Bit reader | 633–647 |
+|   11. Current act and level (join and later) | 648–693 |
+|   12. Client DRLG and the room of a point | 694–735 |
+|   13. Visibility predicate (`0x004DBF20`) | 736–787 |
+|   14. Pet list and the hireling GUID | 788–841 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 842–931 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 932–966 |
+|   17. Model writes made by 1.14d UI code | 967–1113 |
+|   18. Audio driver inputs and the client object functions | 1114–1144 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1145–1365 |
+| Constants & data dependencies | 1366–1378 |
+| Randomness | 1379–1394 |
+| Edge cases & original bugs | 1395–1419 |
+| Test vectors | 1420–1477 |
+| Provenance | 1478–1581 |
+| Open questions | 1582–1720 |
 <!-- /index -->
 
 ## Summary
@@ -453,7 +453,11 @@ position check of the local player.
    the menus, and u32@0x27 is: classic softcore 0x00000004, classic
    hardcore 0x00000804, expansion softcore 0x00100004, expansion
    hardcore 0x00100804 (d2s status bits 0x04 / 0x20,
-   `formats/d2s.md`). REC-46 still confirms on live bytes. Bytes after a
+   `formats/d2s.md`). Recorded (REC-46, 2026-10-09, Wine): a classic
+   softcore character made in the create screen sends 0x00000004, an
+   expansion one 0x00100004; S→C 0x01 u32@2 = 0x4 and u8@6 = 0 for the
+   classic game (`facts/join/a1-new-classic-ama.tsv`,
+   `a1-new-ama.tsv`). Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system

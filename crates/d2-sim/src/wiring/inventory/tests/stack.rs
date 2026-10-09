@@ -80,8 +80,9 @@ fn stack_merge_frees_the_source() {
     assert!(w.state.errors.is_empty());
 }
 
-/// §7.12: keys have no durability (`0x00629930` = 0); PROVISIONAL
-/// (REC-289) that gates only the stat-72 step, so they merge: dst := 7,
+/// §7.12: keys have no durability (`0x00629930` = 0); it gates only the
+/// stat-72 step, so they merge (recorded, REC-289: keys 3 + 4 in
+/// `facts/items/a1-town-item-moves.tsv`): dst := 7,
 /// src freed, dst marked (0x9C action 0xA). src = dst → 3; different
 /// classes fail §4.5 → 0. §7.13: 0x22 on an owned item → 3 (X1), on
 /// another → 1.
