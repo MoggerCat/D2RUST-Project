@@ -11,6 +11,7 @@ Token budget (hard rules):
 - Read only CLAUDE.md and the spec sections you need. Don't read other sessions' hand-backs unless named here.
 
 Work rules:
+- Read the original first (CLAUDE.md rule 3): once the private repo has re/exports/, find the 1.14d function for your behaviour (grep re/exports/functions.tsv and re/exports/index/*.tsv by name, address or string; grep re/exports/all.asm* for globals and struct offsets) and read its decompiled C before measuring or guessing. Read-only; write the Rust in your own words, never paste or line-translate it, never copy anything from re/ into the public repo; put the behaviour and the address in the spec you implement.
 - Exact match with 1.14d (CLAUDE.md rule 10): fix the first divergence; never weaken a test or a check, never ignore a field to make a check pass. Unsettled choices: PROVISIONAL with your REC ids (docs/METHODS.md M22). Facts you can't get without the Windows game or Ghidra: an unnumbered "- [NAME] title" item in docs/handoff/pc1-data.md Step 4, then move on.
 - Stay in your area; for a file another owner holds (`python3 tools/coord/route.py <path>`), note it in your hand-back.
 - Push to claude/NAME only (git push -u origin claude/NAME), after: `cargo fmt --all`, `cargo clippy -p <crates> --all-targets -- -D warnings`, `cargo nextest run -p <crates> 2>&1 | tail -30`, `python3 tools/coverage.py --check`, `python3 tools/spec_index.py --check`, `python3 tools/coord/ledger.py --check`. Run `sh tools/coord/sync.sh` before each push.
