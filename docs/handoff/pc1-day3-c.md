@@ -290,5 +290,7 @@ The harness should test class and position, not GUID.
     third of the cases, +0 once). The end comes 30–125 ms after the sample's duration, which fits the
     50 ms voice service thread.
   - **d2rs** ends them 1 tick early: `q-fix-p6-oneshot-end-tick`.
-  - **ST-7 (`Async Only` completion): not recorded.** It needs a probe on the preload pass
-    `0x00482BF0` and a sound in the async rows.
+  - **ST-7 (`Async Only` completion): not recorded.** A probe on the async issue (`0x00482AFC`),
+    the pending check (`0x00482BE1`) and the collect (`0x00482BF0`) saw no hit in 60 s of town play.
+    The rows are evidently loaded before any start; a run that starts an unloaded `Async Only` id is
+    still needed (noted in OQ 13).

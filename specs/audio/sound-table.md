@@ -1077,7 +1077,7 @@ sites, fade `0x00515F50`, front-end stream `0x00514780`, `0x00514840`,
     PROVISIONAL: end tick = start tick + ceil(frames / 882) (because
     the device plays 882 frames per 40 ms tick); settled by REC-19
     (one-shot lengths).
-13. Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
+13. (Observation 2026-10-09, pc1-day3-c: breakpoints at the async issue `0x00482AFC`, the pending check `0x00482BE1` and the collect `0x00482BF0`, 60 s of Rogue Encampment walking with sound on: none was hit, so no `Async Only` read started in that play; a run that starts an unloaded `Async Only` id is still needed.) Needs recording (ST-7, §10 r6): for `Async Only` sounds, the tick of
     the first start attempt (async read started, `0x00482AE4` path) and
     of the collecting preload pass (`0x00482BF0`, T); settles whether the
     read is always finished by the next pass at T ≡ 0 (mod 25). Binary
