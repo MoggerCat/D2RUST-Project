@@ -192,7 +192,7 @@ def save_path(char):
 
 def d2rs_dump(exe, g, ticks, script, out, display, reuse):
     done = os.path.join(out, "done.json")
-    key = {"ticks": ticks, "script": script, "char": g["char"], "seed": g["seed"]}
+    key = {"ticks": ticks, "script": script, "char": g["char"], "seed": g["seed"], "bin": bin_sha(exe)}
     if reuse and os.path.exists(done) and json.load(open(done)) == key:
         return 0
     if os.path.isdir(out):
@@ -207,6 +207,20 @@ def d2rs_dump(exe, g, ticks, script, out, display, reuse):
     code = run(argv, timeout=2400, env=env, out=os.path.join(out, "play.log"))
     json.dump(key, open(done, "w"))
     return code
+
+
+_BIN_SHA = {}
+
+
+def bin_sha(exe):
+    """The d2-client binary's sha256: a reused dump must come from the same build."""
+    if exe not in _BIN_SHA:
+        h = hashlib.sha256()
+        with open(exe, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        _BIN_SHA[exe] = h.hexdigest()
+    return _BIN_SHA[exe]
 
 
 def d2rs_dir(out, ticks, t):
@@ -460,7 +474,7 @@ group {e(r["group"])}, {e(r["char"])}, seed {r["seed"]}</span></div>
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>D2 side by side</title><style>{PAGE_CSS}</style></head><body><main>
 <h1>1.14d vs d2rs, side by side</h1>
-<p class="meta">{e(meta["date"])}; {e(meta["tool"])}; public repo {e(meta["commit"])}; command: {e(meta["command"])}</p>
+<p class="meta">{e(meta["date"])}; {e(meta["tool"])}; public repo {e(meta["commit"])}; d2-client sha256 {e(meta["d2_client_sha256"])}; command: {e(meta["command"])}</p>
 <p>{npass} of {len(results)} scenes pass (every compared tick pixel-identical and facts-compare equal).
 Pixels compare as colours after each side's palette. Pass means exact; the match % is the scene frame's equal pixels.</p>
 <table><thead><tr><th>Scene</th><th></th><th>Match</th><th>Tick / first diff</th><th>First difference (facts-compare)</th></tr></thead>
@@ -511,6 +525,7 @@ def main():
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO, capture_output=True,
                             text=True).stdout.strip()
     meta = {"date": datetime.date.today().isoformat(), "tool": VERSION, "commit": commit,
+            "d2_client_sha256": bin_sha(exe)[:16],
             "command": "python3 tools/sidebyside/build.py " + " ".join(sys.argv[1:])}
     summary = [{k: v for k, v in r.items() if k != "rows"} | {"compared": len(r.get("rows", []))} for r in results]
     json.dump({"meta": meta, "scenes": summary}, open(os.path.join(out, "summary.json"), "w"), indent=1)
