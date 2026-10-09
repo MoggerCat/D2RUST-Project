@@ -21,22 +21,22 @@
 | Inputs | 57–65 |
 | Outputs / state changes | 66–72 |
 | Rules | 73–74 |
-|   1. Terms | 75–86 |
-|   2. Drop quality (owned by `items/treasure.md` §6) | 87–92 |
-|   3. Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`) | 93–112 |
-|   4. Quality dispatch (`0x00557450`) | 113–148 |
-|   5. Downgrade (`0x005572A0` normal, `0x00557320` superior, `0x00557380` magic, `0x005573F0` rare) | 149–165 |
-|   6. Low quality (`0x005C2FB0` → `0x005C2D40`, format ≥ 1) | 166–179 |
-|   7. Superior (`0x005C2AD0` → `0x005C2970`) | 180–198 |
-|   8. Unique (`0x005566B0`) | 199–229 |
-|   9. Set item (`0x005C2940` → `0x005C25C0`, format ≥ 1) | 230–243 |
-|   10. Format-0 branches (legacy items) | 244–303 |
-| Constants & data dependencies | 304–314 |
-| Randomness | 315–327 |
-| Edge cases & original bugs | 328–346 |
-| Test vectors | 347–359 |
-| Provenance | 360–379 |
-| Open questions | 380–435 |
+|   1. Terms | 75–100 |
+|   2. Drop quality (owned by `items/treasure.md` §6) | 101–106 |
+|   3. Quality roll (`0x00556F60`, D2MOO `ITEMS_RollItemQuality`) | 107–126 |
+|   4. Quality dispatch (`0x00557450`) | 127–162 |
+|   5. Downgrade (`0x005572A0` normal, `0x00557320` superior, `0x00557380` magic, `0x005573F0` rare) | 163–179 |
+|   6. Low quality (`0x005C2FB0` → `0x005C2D40`, format ≥ 1) | 180–193 |
+|   7. Superior (`0x005C2AD0` → `0x005C2970`) | 194–212 |
+|   8. Unique (`0x005566B0`) | 213–243 |
+|   9. Set item (`0x005C2940` → `0x005C25C0`, format ≥ 1) | 244–257 |
+|   10. Format-0 branches (legacy items) | 258–317 |
+| Constants & data dependencies | 318–328 |
+| Randomness | 329–341 |
+| Edge cases & original bugs | 342–360 |
+| Test vectors | 361–373 |
+| Provenance | 374–401 |
+| Open questions | 402–457 |
 <!-- /index -->
 
 ## Summary
@@ -79,6 +79,20 @@ seed. Result 1 (success) or 0 (the item is removed by the pipeline).
 - "Save" = read the item seed's current low word (`0x00650E50`).
   "Clear" (`0x00557250`) = prefix and suffix slots 0–2 := 0, rare prefix
   and rare suffix := 0, file index := −1.
+- **File index of normal, magic and rare items.** The file index (item
+  data +0x28) is 0 when the item is allocated (`items/generation.md` §3
+  step 2) and, during creation, only these write it (setter
+  `0x00629DF0`): the elixir branch (`items/generation.md` §4), the dispatch's
+  "file index := −1" before superior, set and unique (§4), the
+  unique / set / superior / low-quality routines (§6–§10), Clear, and
+  the normal routine for ears and body parts (`items/generation.md`
+  §6.1). Clear is called **only** by the four downgrade helpers (§5;
+  calls `0x005572A9`, `0x00557323`, `0x00557389`, `0x005573F3`); the
+  dispatch's own clear (§4 step 1) keeps the file index. So a normal,
+  magic or rare item that got its quality without a downgrade keeps
+  **0**; it is −1 only when it came down from a failed routine (D(x)
+  of §4, e.g. a failed rare → magic, a failed unique → rare) or from a
+  superior / set / unique "Before" store whose routine failed.
 - `D2` (dur, max dur): stat 72 := min(F × stat 72, 255) and stat 73 :=
   min(F × base stat 73, 255) for a factor F, applied only when the item
   has durability and format ≥ 1 (the same "has durability" helper,
@@ -376,6 +390,14 @@ Synthetic, from the rules (`sim/rng.md` generator):
 - rng.md §5.3 states the re-init uses the start seed; 1.14d uses the low
   word saved before the failed routine (§5), which is also written as the
   new start seed.
+- 2026-10-09 (pc1-day3-c, read in all.asm / disasm.py; pc1-data.md
+  Step 4 item 26): §1 "File index": every caller of the setter
+  `0x00629DF0` (27 sites; the dispatch's at `0x005575CF`, `0x005576CB`,
+  `0x00557876`, Clear's at `0x0055728A`, normal routine `0x00556EAF`,
+  `0x00556ECE`); Clear's callers (`disasm.py xref 0x557250`); item data
+  zero-filled by `0x00627C90`. Matches the 1.14d recording of 36 poked
+  items (`traces/checks/items-ground-many.check`: file index 0 on every
+  normal, magic and rare item).
 
 ## Open questions
 

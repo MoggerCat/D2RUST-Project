@@ -404,10 +404,24 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 }
             }
         }
+        let is_player = v.units.get(unit).is_some_and(|r| r.ty == UnitType::Player);
         // §3.5 rule 6 / §7.3 rule 2 step 8: the changed-state messages of
-        // a unit that is not new to the client.
-        if let (Some(p), None) = (receiver, new) {
+        // a unit that is not new to the client (a player's: below).
+        if let (Some(p), None, false) = (receiver, new, is_player) {
             v.state_change_messages(p, unit);
+        }
+        if is_player {
+            // §7.3 rule 1 (`0x00580860`): steps 1 and 3 (the path part),
+            // then step 5 (any state-changed bit, whether announced or
+            // not) and step 7.
+            if v.h.paths.is_some() {
+                crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+            }
+            if let Some(p) = receiver {
+                v.state_change_messages(p, unit);
+                v.player_stat_sends(p, unit);
+            }
+            return;
         }
         if game
             .lists
@@ -434,9 +448,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             .is_some_and(|e| e.ty == UnitType::Monster)
         {
             v.monster_update(game, client, unit);
-            return;
         }
-        crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
     }
 
     /// Per-client update (`tick.md` §6 rule 5, after the unit updates):

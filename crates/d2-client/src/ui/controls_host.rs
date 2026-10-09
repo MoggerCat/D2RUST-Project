@@ -19,8 +19,8 @@ use crate::controls::keymap::action_of_cmd;
 use crate::controls::Bindings;
 use crate::ui::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::front_end::screens::controls::{
-    load_table, save_table, table_to_bindings, CfgDraw, ConfigureControls, Done, BTN_HALF, C, FONT,
-    M, T, VISIBLE, W,
+    load_table, save_table, table_to_bindings, CfgDraw, ConfigureControls, Done, BTN_H, BTN_HALF,
+    BTN_TEXT_BLOCK, C, FONT, M, T, VISIBLE, W,
 };
 use crate::ui::geom::{Point, Rect};
 use crate::ui::layout::Screen;
@@ -126,7 +126,8 @@ impl ControlsHost {
         }
         for i in 0..3 {
             let c = M + 206 * i + 103;
-            if contains(c - BTN_HALF, T + 329, 2 * BTN_HALF, 38, p) {
+            let h = BTN_HALF[i as usize];
+            if contains(c - h, T + 329, 2 * h + 1, BTN_H, p) {
                 let d = match i {
                     0 => self.model.cancel(),
                     1 => {
@@ -203,7 +204,7 @@ impl ControlsHost {
             // The buttons and the message pass their centre as x.
             let centred = y == T + 351 || y == T + 399;
             let (at_x, block) = if centred {
-                (x - BTN_HALF * 2, Some(BTN_HALF * 4))
+                (x - BTN_TEXT_BLOCK / 2, Some(BTN_TEXT_BLOCK))
             } else {
                 (x, None)
             };

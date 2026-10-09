@@ -1,0 +1,91 @@
+name: Windows build
+
+# A playable d2-client.exe for the user's own Diablo II 1.14d install
+# (docs/PLAYTEST.md). The zip holds only our compiled code and a README:
+# no game files (CLAUDE.md hard rule 1).
+on:
+  push:
+    # claude/q-tool-windows-build: temporary, to prove the workflow before
+    # it reaches staging (workflow_dispatch needs the file on main).
+    branches: [claude/specs-staging-7, main, claude/q-tool-windows-build]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # File and line numbers in the crash log's backtrace (d2rs-crash.log,
+  # read from the .pdb shipped next to the exe).
+  CARGO_PROFILE_RELEASE_DEBUG: line-tables-only
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The channel pinned in rust-toolchain.toml.
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-release
+
+      - name: Build d2-client (release)
+        run: cargo build -p d2-client --release --locked
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $sha = "${{ github.sha }}".Substring(0, 8)
+          $dir = "dist/d2rs-windows"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item target/release/d2-client.exe $dir/
+          if (Test-Path target/release/d2_client.pdb) { Copy-Item target/release/d2_client.pdb $dir/ }
+          (Get-Content tools/windows/README-PLAY.txt -Raw).
+            Replace('@COMMIT@', "${{ github.sha }}").
+            Replace('@REF@', "${{ github.ref_name }}") |
+            Set-Content -NoNewline $dir/README-PLAY.txt
+          # Rule 1: nothing but our exe, its symbols and the README.
+          Get-ChildItem $dir | ForEach-Object {
+            if ($_.Name -notin @('d2-client.exe', 'd2_client.pdb', 'README-PLAY.txt')) { throw "unexpected file $($_.Name)" }
+          }
+          "SHA=$sha" | Out-File -Append $env:GITHUB_ENV
+
+      # Starts without game files: must stop with the "no game files"
+      # error and write the crash log next to the exe.
+      - name: Smoke (no game files)
+        shell: pwsh
+        run: |
+          $exe = "dist/d2rs-windows/d2-client.exe"
+          & $exe play --new sorceress Smoke --frames 1 *> smoke.txt
+          $code = $LASTEXITCODE
+          Get-Content smoke.txt
+          if ($code -eq 0) { throw "expected a failure without game files" }
+          if (-not (Select-String -Quiet -Path smoke.txt -Pattern "no game files")) { throw "no 'no game files' message" }
+          $log = "dist/d2rs-windows/d2rs-crash.log"
+          if (-not (Test-Path $log)) { throw "no d2rs-crash.log" }
+          Get-Content $log
+          Remove-Item $log
+          # A panic: the hook writes the log with a backtrace.
+          & $exe crash-test *> crash.txt
+          if ($LASTEXITCODE -eq 0) { throw "crash-test did not fail" }
+          if (-not (Select-String -Quiet -Path $log -Pattern "backtrace:")) { throw "no backtrace in d2rs-crash.log" }
+          Get-Content $log
+          Remove-Item $log
+          # The runner's pwsh exits with the last native exit code (the
+          # deliberate panic's); every check above passed.
+          exit 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d2rs-windows-${{ env.SHA }}
+          # The artifact download is itself the zip: d2-client.exe,
+          # d2_client.pdb, README-PLAY.txt.
+          path: dist/d2rs-windows/
+          retention-days: 14
+          if-no-files-found: error

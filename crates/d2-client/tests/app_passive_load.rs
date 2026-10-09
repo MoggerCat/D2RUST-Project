@@ -80,6 +80,7 @@ fn a_loaded_increased_stamina_raises_the_maximum_stamina_from_the_join() {
         game_dir: None,
         date: Some("2026-10-09".into()),
         pokes: Vec::new(),
+        sends: Vec::new(),
         input: None,
         packets: None,
         rng: None,
