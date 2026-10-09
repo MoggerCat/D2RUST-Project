@@ -1,0 +1,18 @@
+# checkpoint-start-1 (tools/checkpoints/make.py 0.1.0; specs/tools/checkpoints.md §4)
+# command: python3 tools/checkpoints/make.py --orig --record traces/checkpoints/orig-start.tsv
+# 1.14d (record_state.py): load = the last snapshot before the first start poke; start = the last snapshot; quest bits are not read on this side (-).
+name	load	lvl	act	lv	x	y	hp	mp	quests	start	start_lv	start_x	start_y	pokes
+a1-andariel	ok	24	0	1	5663	5813	41728	36096	-	ok	37	22544	9545	warp:ok goto:ok
+a1-den	ok	6	0	1	5663	5813	14080	16640	-	ok	8	7533	5150	warp:ok
+a2-duriel	ok	30	1	40	5153	5203	50944	41782	-	ok	73	22638	15688	warp:ok goto:ok
+a2-radament	ok	26	1	40	5153	5203	44800	39728	-	ok	49	7771	8127	warp:ok goto:ok
+a2-summoner	ok	28	1	40	5153	5203	47872	40704	-	ok	74	25018	5454	warp:ok goto:ok
+a3-mephisto	ok	36	2	75	5118	5168	60160	47360	-	ok	102	17543	8067	warp:ok goto:ok
+a3-travincal	ok	34	2	75	5118	5168	57088	46336	-	ok	83	4506	1811	warp:ok goto:ok
+a4-diablo	ok	42	3	103	5048	5043	69376	53064	-	ok	108	7912	5312	warp:ok goto:ok
+a4-hellforge	ok	40	3	103	5048	5043	66304	51968	-	ok	107	7779	6133	warp:ok goto:ok
+a4-izual	ok	38	3	103	5048	5043	63232	48384	-	ok	105	5177	5217	warp:ok goto:ok
+a5-ancients	ok	54	4	109	5098	5023	80128	74496	-	ok	120	10047	12617	warp:ok goto:ok
+a5-anya	ok	46	4	109	5098	5023	72960	60160	-	ok	114	10046	6566	warp:ok goto:ok
+a5-baal	ok	60	4	109	5098	5023	86784	82796	-	ok	131	15090	5011	warp:ok goto:ok
+a5-nihlathak	ok	50	4	109	5098	5023	76544	67328	-	ok	124	12704	5019	warp:ok goto:ok

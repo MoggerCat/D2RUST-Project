@@ -54,9 +54,9 @@
 | Constants & data dependencies | 306–318 |
 | Randomness | 319–325 |
 | Edge cases & original bugs | 326–335 |
-| Test vectors | 336–349 |
-| Provenance | 350–355 |
-| Open questions | 356–363 |
+| Test vectors | 336–350 |
+| Provenance | 351–356 |
+| Open questions | 357–364 |
 <!-- /index -->
 
 ## Summary
@@ -341,6 +341,7 @@ same on both sides.
 | every directive parsed and written | the canonical text; parsing it again gives the same directive | synthetic |
 | `goto unit 5` / `goto preset 2 2:119` / `goto preset 107 376` parsed and written | canonical `goto unit 1:5`, `goto preset 2 2:119`, `goto preset 107 1:376`; `goto unit 3:5`, `goto preset 2`, `goto here 5` errors | synthetic (`d2-sim::poke` tests, `poke.py --selftest`) |
 | `goto` on a synthetic walk: target in the player's near rooms; target two rooms away; no target | `ok` with the target's GUID in 1 step; `pending`, `pending`, `ok`; `failed` "explored" | synthetic (`d2-sim::poke` tests; `poke.py --selftest` on a fake game) |
+| checkpoint `a4-hellforge` (`traces/checkpoints/`), seed 1: `5 warp 107`, `20 goto preset 107 2:376` | lands next to the Hellforge | 2026-10-09: d2rs (`state-dump`) and 1.14d under Wine (`record_state.py`): `ok` after 50 steps at f69 on both, the player at (7779, 6133), the forge at (7781, 6135), Hephasto at (7810, 6143) on both (GUIDs differ: forge 94 / 96) |
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |

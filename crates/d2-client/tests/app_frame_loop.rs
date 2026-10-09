@@ -222,9 +222,13 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // (game creation, the loader and join sequence of `game-join.md`, the
     // first tick's flush); the client applies (or queues on the unit) as
     // many (`client/bridge.md` §6 rule 3: nothing is unowned).
+    // The transport row 0x8F (the pong of the client's C→S 0x6D) is
+    // left out: d2rs's in-process link sends no 0x6D and so receives no
+    // 0x8F (`client/model.md` §7 rule 11.4; `intents-events.md` §6 rule
+    // 3 excludes transport rows from comparisons).
     let recorded = app_support::recorded_new_sor()
         .into_iter()
-        .filter(|(frame, _, _)| frame.is_none_or(|f| f <= 2))
+        .filter(|(frame, id, _)| frame.is_none_or(|f| f <= 2) && *id != 0x8F)
         .count();
     assert_eq!(joined, recorded);
     // Plus two for the Blood Moor room bordering the synthetic town: its

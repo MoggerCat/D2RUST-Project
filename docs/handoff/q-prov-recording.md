@@ -217,12 +217,25 @@ what moved it.
    `LevelMin`. Fixed: the level of the init record's room.
 3. Frame 24, town NPC seeds: 1.14d stops the town NPCs' thinks once no
    client sees their room; d2rs keeps them (map AI draws at 24, 32).
-   Measured, no spec: `q-fix-real-npc-sleep-no-client`.
+   Measured: `q-fix-real-npc-sleep-no-client`, a duplicate of `q-fix-p3-room-empty-think` (`ai.md` §1.5 r3, another session).
 
 4. `a1-warp-cave-ama` (Cave Level 1, `warp 9`), frame 21: a berserker
    champion (1:8, umod 39) at hitpoints −6144 vs 3072. 1.14d reads maxhp
    and hitpoints before writing either; d2rs re-read hitpoints after the
    maxhp write had rescaled it (`stat-lists.md` §7.2). Fixed (`raise_hp`).
+
+5. `a2-warp-sewers-ama` (Lut Gholein Sewers Level 1, `warp 47` from
+   Lut Gholein): state equal on all 160 frames (PARTIAL only through the
+   declared gaps; the Lut Gholein NPCs did not diverge either); rng
+   differs only by the creation attribution of `q-fix-tool-rng-creation-draws`.
+
+6. `a3-warp-flayer-dungeon-ama` (Flayer Dungeon Level 1, `warp 88` from
+   Kurast Docks): state equal on all 160 frames (5 objects, a warp tile).
+7. `a5-warp-crystalized-ama` (Crystalized Cavern Level 1, `warp 113`
+   from Harrogath): every level-113 unit equal on all 160 frames (15
+   monsters, 14 objects); the check's first divergence is in Harrogath at
+   frame 2 (Larzuk 1:1 class 511 at 5145,5031 vs 5142,5029), area E's
+   `a5-harrogath-arrival-ama`.
 
 So the Den of Evil's and Cave Level 1's generation, presets and
 population are equal for all 160 frames outside town (every non-player

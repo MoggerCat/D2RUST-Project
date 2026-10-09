@@ -291,6 +291,11 @@ impl Session {
         let class = setup.class;
         let object = alloc(UnitType::Object, wp_class, wp_at);
         let player = alloc(UnitType::Player, class, start);
+        // It stands in for the preset pass's waypoint (which then finds
+        // it in place): `0x005557D0` sets unit flags 0x3000000 on every
+        // unit it creates (`population.md` §11.1), so the town's freed
+        // rooms store it (`units.md` §3.3).
+        sim.action.sys.units.get_mut(object).unwrap().flags |= 0x300_0000;
         // Players are allocated in mode 0; neutral (`units.md` §2).
         sim.action.sys.units.get_mut(player).unwrap().mode = 1;
         {

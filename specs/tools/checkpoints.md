@@ -111,11 +111,17 @@ so one definition always gives the same bytes; then `d2s-tool check`
    checkpoint: name, load verdict, `lvl`, `act`, `lv`, `x`, `y`, `hp`,
    `mp`, the set quest bits, the start verdict, the start `lv`, `x`, `y`
    and the start pokes' results. These are d2rs facts only.
-4. The 1.14d side of the load check is the same save loaded by the
-   original (`tools/cloud-game/`, or PC 1): the character enters the
-   town of its act at its level, with the quest log showing the
-   definition's steps done. Queued per checkpoint in `docs/HANDOFF.md`
-   §5 until run.
+4. The 1.14d side, `--orig`: the save is copied into 1.14d's save
+   folder (`--save-dir`; default the Wine prefix's, or `%USERPROFILE%\
+   Saved Games\Diablo II` on Windows) as `<name>.d2s`, then one
+   `record_state.py --auto <name> --seed 1 --snap-every 2` run with the
+   start pokes (under Linux through `tools/cloud-game/run.sh --python`).
+   The load state is the last snapshot before the first start poke, the
+   start state the last snapshot; r2 applies except the quest bits
+   (1.14d's recorder reads no `q`, `state-snapshot.md` §2): those are
+   checked in the game's quest log (`docs/HANDOFF.md` §5).
+   `--orig --record traces/checkpoints/orig-start.tsv` writes the same
+   table for this side.
 
 ## Constants & data dependencies
 

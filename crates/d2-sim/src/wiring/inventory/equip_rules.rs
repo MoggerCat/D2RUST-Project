@@ -3,8 +3,8 @@
 //! set-item state update (`items::set_state`) on [`InvDesk`]: the
 //! inventories, the item data copies, the item store, the item tables
 //! and the stat lists (links of the set lists, park / unpark,
-//! `sim/stat-lists.md` §8.5). The skill list, the books table's skill
-//! columns, the player data mouse slots, the stat link of an item and the
+//! `sim/stat-lists.md` §8.5) and the books table's skill columns. The
+//! skill list, the player data mouse slots, the stat link of an item and the
 //! messages have no d2-sim owner: [`InvRest`]'s equipment seams.
 //!
 //! The rules run in place of the [`InvRest`] calls of the same addresses
@@ -224,9 +224,19 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
     }
     /// The books row of the spell index (item data +0x3E,
     /// [`InvDesk::spell_of`]).
+    /// books `scrollskill` / `bookskill` of the item's spell index
+    /// (`0x006374B0`, §5.5 step 1) from the desk's books table; no row →
+    /// none. A desk without the books table (tables built without it)
+    /// asks the rest.
     fn book_skill(&self, i: UnitId, scroll: bool) -> Option<i32> {
         let spell = self.spell_of(i);
-        self.rest.book_skill(spell, scroll)
+        if self.tables.books.is_empty() {
+            return self.rest.book_skill(spell, scroll);
+        }
+        let b = usize::try_from(spell)
+            .ok()
+            .and_then(|k| self.tables.books.get(k))?;
+        Some(if scroll { b.scrollskill } else { b.bookskill })
     }
     fn active_inventory_item(&self, u: UnitId, i: UnitId) -> bool {
         active_inventory_item(self, self.tables, i, u)
@@ -289,7 +299,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         let o = self.owner_or_none(u);
         self.rest.set_skill_quantity(o, skill, q)
     }
+    /// `0x00570080`, the skill-point spend (`skills/levels.md` §6.4 step
+    /// 4): cost 1 (`skpoints` is empty in every 1.14d row); base
+    /// `newskills` (5) below the cost → nothing; else stat 5 −= 1 and the
+    /// level is added (the rest's skill list). §5.5 step 3 adds the
+    /// quantity to stat 5 first, so a learned scroll skill nets 0.
     fn learn_skill(&mut self, u: UnitId, skill: i32) {
+        const NEWSKILLS: u16 = 5;
+        if self.econ.stats.unit_base(u, NEWSKILLS, 0) < 1 {
+            return;
+        }
+        self.add_unit_stat(u, NEWSKILLS, -1);
         let o = self.owner_or_none(u);
         self.rest.learn_skill(o, skill)
     }
