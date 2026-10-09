@@ -1,0 +1,40 @@
+{
+ "channel": "state",
+ "check": "gen-skill-nec-86",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnNec",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--input",
+  "frame 20; rclick 330 300"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "e31f4ca0539223e8b55df1eee047dc07ea13f88d88c2a719705846866edb654b",
+   "size": 342593
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "988f5bc0bf34fb4a57d364b4c0410c2829e71ba45f2bc26e4966814c50009017",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "f5b5aa5edf002b8ef5b664376748d3cd85cab8e54d920e88c31e1fdb2b8c2295"
+ }
+}
