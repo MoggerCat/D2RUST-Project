@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use d2_client::app::play::{add_client_data, add_game, add_walk, predict_link, send_create_game};
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::bridge::predict::Speeds;
 use d2_client::bridge::world::UnitKey;
 use d2_client::bridge::BridgeResource;
@@ -42,8 +42,9 @@ fn server_level(server: &app_support::Server<StepClock>) -> Option<u32> {
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5; specs/sim/path-placement.md §11
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn taking_a_waypoint_to_cold_plains_moves_the_player() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -65,7 +66,7 @@ fn taking_a_waypoint_to_cold_plains_moves_the_player() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {
@@ -129,8 +130,9 @@ fn taking_a_waypoint_to_cold_plains_moves_the_player() {
 
 // Covers: specs/world/waypoints.md §6.3 r2; specs/world/waypoints.md §7 r5; specs/sim/path-placement.md §11
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn taking_a_waypoint_to_an_unbuilt_level_builds_it_on_arrival() {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start(
         data.clone(),
@@ -152,7 +154,7 @@ fn taking_a_waypoint_to_an_unbuilt_level_builds_it_on_arrival() {
         single_player::client_drlg_source(&data),
         single_player::client_level_rows(&data),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.update();
     let mut steps = 0;
     let mut step = |app: &mut App| {

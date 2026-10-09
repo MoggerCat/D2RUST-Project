@@ -176,14 +176,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
         self.state.inventories.get(&u)?.body_item(loc)
     }
     fn weapon_in_use(&self, u: UnitId) -> Option<UnitId> {
+        // +0x1C, written by the body link / unlink (`world/quests-act3-2.md`
+        // §11.5 rules 1–2, `items::inventory::weapon`).
         let inv = self.state.inventories.get(&u)?;
-        // d2rs-own, unverified (REC-266): `weapon_hand_fallback`.
-        self.item_unit(inv.weapon_guid).or_else(|| {
-            self.state
-                .weapon_hand_fallback
-                .then(|| inv.body_item(body::RIGHT_HAND))
-                .flatten()
-        })
+        self.item_unit(inv.weapon_guid)
     }
     fn add_unit_stat(&mut self, u: UnitId, stat: u16, d: i32) {
         self.econ
@@ -244,10 +240,16 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> EquipWorld for InvDesk<'_, '_, H, R
     fn stat_linked(&self, u: UnitId, i: UnitId) -> bool {
         InvWorld::item_active_on(self, i, u)
     }
+    /// `0x0055D970`: the weapon-in-use link `0x0063D1D0`, then the stat
+    /// link.
     fn stat_link(&mut self, u: UnitId, i: UnitId) {
+        self.weapon_link_on(u, i, true);
         InvWorld::stat_link(self, u, i)
     }
+    /// The body unlink `0x0063D2B0` (+0x1C, §11.5 rule 2), then the stat
+    /// unlink.
     fn stat_unlink(&mut self, u: UnitId, i: UnitId) {
+        self.weapon_link_on(u, i, false);
         if self.unlink_item_stats(u, i) {
             return;
         }

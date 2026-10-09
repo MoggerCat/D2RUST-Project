@@ -4,7 +4,7 @@
 //! player mode 3 toward (type 4, GUID)), then the pick-up when the run
 //! ends. "Arrival is the movement spec's": as the NPC approach
 //! ([`super::npc_approach`]), the arrival is read from the player's mode
-//! leaving walk / run / town walk at the start of the next tick, and the
+//! leaving walk / run / town walk at the end of tick step 4, and the
 //! 0x16 handling runs again with the same cursor flag.
 //!
 //! PROVISIONAL (REC-281, d2rs-own, unverified): the arrival test and the
@@ -48,7 +48,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     }
 
     /// The queued pick-ups whose run has ended run the 0x16 handling
-    /// again (start of a tick); its messages join the inventory sends.
+    /// again (end of tick step 4, `WiredWorld::timer_step_work`); its
+    /// messages join the inventory sends.
     pub(super) fn item_arrivals<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
     where
         Self: WorldHost<D>,

@@ -15,7 +15,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player::{self};
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::hover;
@@ -215,7 +215,7 @@ fn queue(app: &mut App, e: UiEvent) {
 
 /// The play app over the synthetic game, joined, with a left skill.
 fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let (link, _) = single_player::start_with(
         data.clone(),
@@ -247,7 +247,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> App {
         levels,
         TileAssets::new(Some(source.clone()), None),
     );
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     add_act_palettes(
         &mut app,
         ActPalettes {
@@ -330,6 +330,7 @@ fn waypoint_open(app: &App) -> Option<u32> {
 
 // Covers: specs/ui/controls.md §6 r9; specs/client/model.md §8 r7
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn clicking_the_waypoint_walks_there_and_interacts() {
     let ms = Arc::new(AtomicU32::new(1000));
     let wire = Arc::new(Mutex::new(Wire::default()));

@@ -1748,7 +1748,7 @@ impl Digest for ActionGame {
             h.game_seed,
             h.waypoints,
             h.mode_target,
-            self.world.arrivals,
+            h.arrivals,
             self.world.faults,
             player_digest(self)
         )

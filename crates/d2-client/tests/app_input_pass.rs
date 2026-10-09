@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use bevy::window::{PrimaryWindow, WindowFocused};
 use d2_client::app::play_start::{self, CliStart};
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::assets::path::FileSource;
 use d2_client::ui::edge;
 use d2_client::ui::geom::Point;
@@ -108,13 +108,18 @@ impl Game {
         let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
             .join(format!("input-pass-{}", std::process::id()));
         std::env::set_var("D2RS_CONFIG_DIR", &dir);
-        let start =
-            play_start::resolve(&CliStart::default(), &GameData::Synthetic, None, None, None)
-                .unwrap();
+        let start = play_start::resolve(
+            &CliStart::default(),
+            &app_support::game_data(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         let ms = Arc::new(AtomicU32::new(1000));
         let request = start.character.clone();
         let (link, _) = single_player::start_with(
-            GameData::Synthetic,
+            app_support::game_data(),
             DEFAULT_SEED,
             start.character,
             StepClock(ms.clone()),
@@ -132,11 +137,11 @@ impl Game {
             .unwrap();
         d2_client::app::play::send_create_game_flags(&mut app, &request, start.start_flags)
             .unwrap();
-        app_support::synthetic_skill_rows(&mut app);
+        app_support::live_tables(&mut app);
         d2_client::app::play::add_client_data(
             &mut app,
-            single_player::client_drlg_source(&GameData::Synthetic),
-            single_player::client_level_rows(&GameData::Synthetic),
+            single_player::client_drlg_source(&app_support::game_data()),
+            single_player::client_level_rows(&app_support::game_data()),
         );
         d2_client::app::palette::add_act_palettes(
             &mut app,
@@ -247,6 +252,7 @@ const GROUND: Point = Point::new(300, 250);
 // (before this change the world clicks waited for the next drawn tick).
 // Covers: specs/ui/controls.md §6 r2, §6 r6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_press_is_dispatched_on_its_loop_pass() {
     let mut g = Game::start();
     g.cursor(Some(GROUND));
@@ -269,6 +275,7 @@ fn a_press_is_dispatched_on_its_loop_pass() {
 // kept walking).
 // Covers: specs/ui/controls.md §6 r1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_release_outside_the_frame_ends_the_held_button() {
     let mut g = Game::start();
     g.cursor(Some(GROUND));
@@ -289,6 +296,7 @@ fn a_release_outside_the_frame_ends_the_held_button() {
 // the left release runs.
 // Covers: specs/ui/controls.md §4.3 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_lost_focus_releases_the_held_button() {
     let mut g = Game::start();
     g.cursor(Some(GROUND));
@@ -338,6 +346,7 @@ impl Game {
 // dev preset none of these did anything.
 // Covers: specs/ui/controls.md §3 row4, §3 row22, §4.3 r1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_play_keys_are_the_original_preset() {
     let mut g = Game::start();
     assert!(!g.is_open(0x18));

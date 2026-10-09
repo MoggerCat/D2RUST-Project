@@ -160,7 +160,7 @@ fn room_switch_reveals_each_joined_room_in_adjacency_order() {
     fx.assert_clean();
 }
 
-// Covers: specs/sim/intents-events.md §7.8 r2, §7.8 r3, §7.8 r5, §7.2; specs/sim/tick.md §6 r4, §6 r6
+// Covers: specs/sim/intents-events.md §7.8 r2, §7.8 r3, §7.8 r5, §7.2, §8.3; specs/sim/tick.md §6 r4, §6 r6
 #[test]
 fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
     // A, B, C in a row (A's array {A, B}, C's {B, C}). An object and a
@@ -229,12 +229,17 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
     want.extend(adds);
     want.push(rev_b);
     want.push(vec![0x04]);
+    // q-fix-flow-server (`sim/tick.md` §6 rule 4, `intents-events.md`
+    // §8.3): after state 4 the inventory refresh's 0x48, then the join
+    // sequence 0x5B, 0x65, 0x8D, the join 0x5A.
     let gp = guid(&fx, p);
     let level = fx.sim.sys.stats.unit_total(p, 12, 0) as u16;
-    use crate::units::messages::{player_event, player_joined, player_kill_count};
-    want.push(player_joined(gp, 0, &name, level, 0xFFFF));
-    want.push(player_kill_count(gp, 0).to_vec());
-    want.push(player_event(2, &name).to_vec());
+    use crate::units::messages as m;
+    want.push(crate::items::moves::layouts::relator2(0, 0, gp));
+    want.push(m::player_joined(gp, 0, &name, level, m::NO_PARTY));
+    want.push(m::player_kill_count(gp, 0).to_vec());
+    want.push(m::assign_player_to_party(gp, m::NO_PARTY).to_vec());
+    want.push(m::player_event(2, &name).to_vec());
     assert_eq!(sent(&mut fx), want);
     assert_eq!(
         fx.game.lists.client(c).unwrap().state,
@@ -260,4 +265,93 @@ fn room_switch_sends_add_and_leave_messages_and_the_join_completes() {
     assert_eq!(sent(&mut fx), want);
     assert_eq!(fx.game.lists.room_units(a).len(), 2);
     fx.assert_clean();
+}
+
+/// The lent quest host of [`quest_event_3_runs_in_the_level_change`]:
+/// records each quest event 3 with the number of messages sent before it.
+struct LevelLog(Calls);
+
+/// (player, from, to, messages sent before the call).
+type Calls = std::rc::Rc<std::cell::RefCell<Vec<(UnitId, u32, u32, usize)>>>;
+
+impl crate::wiring::action::QuestObjectHost<TestPending> for LevelLog {
+    fn run(
+        &mut self,
+        _: &mut Game,
+        _: &mut View<'_, TestPending>,
+        _: crate::wiring::action::QuestObjectCall,
+    ) -> Option<crate::wiring::action::ObjectRoute> {
+        None
+    }
+    fn changed_level(
+        &mut self,
+        _: &mut Game,
+        v: &mut View<'_, TestPending>,
+        player: UnitId,
+        from: u32,
+        to: u32,
+    ) {
+        let n = v.h.x.sent.len();
+        self.0.borrow_mut().push((player, from, to, n));
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+}
+
+// The per-client update's level change (`sim/tick.md` §6 rule 5): the
+// player's room in another level than the client's room → quest event 3
+// CHANGEDLEVEL (from the client room's level, to the player room's) on
+// the lent quest control, before the room switch's messages; a room
+// change within one level runs none.
+// Covers: specs/sim/tick.md §6 r5; specs/flows/server-tick.md §4 r2
+#[test]
+fn quest_event_3_runs_in_the_level_change() {
+    let mut fx = Fx::with_rooms(&[
+        (1, TileRect::new(0, 0, 8, 8)),
+        (LEVEL, TileRect::new(8, 0, 8, 8)),
+        (LEVEL, TileRect::new(16, 0, 8, 8)),
+    ]);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    let _c = fx
+        .game
+        .lists
+        .add_client(Some(p), None, client_state::JOINING);
+    fx.tick();
+    let log = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    fx.sim.sys.hooks.quest_host = Some(Box::new(LevelLog(log.clone())));
+    let room_at = |fx: &Fx, x: i32| {
+        act_rooms(fx)
+            .into_iter()
+            .find(|&r| {
+                fx.sim.sys.hooks.drlg.subtiles(&fx.game, r) == Some(TileRect::new(x, 0, 40, 40))
+            })
+            .expect("room active")
+    };
+    // The first tick switched the client to A (level 1): nothing yet.
+    assert!(log.borrow().is_empty());
+    let b = room_at(&fx, 40);
+    fx.game.lists.change_room(p, b).unwrap();
+    fx.sim.sys.hooks.x.sent.clear();
+    fx.tick();
+    let got = log.borrow().clone();
+    assert_eq!(got.len(), 1, "{got:?}");
+    let (who, from, to, before) = got[0];
+    assert_eq!((who, from, to), (p, 1, LEVEL));
+    let reveal = fx
+        .sim
+        .sys
+        .hooks
+        .x
+        .sent
+        .iter()
+        .position(|(_, m)| m[0] == 0x07 || m[0] == 0x08)
+        .expect("the room switch's messages");
+    assert!(before <= reveal, "event 3 before the room switch");
+    // B → C, the same level: no event.
+    let c = room_at(&fx, 80);
+    fx.game.lists.change_room(p, c).unwrap();
+    fx.tick();
+    assert_eq!(log.borrow().len(), 1);
 }

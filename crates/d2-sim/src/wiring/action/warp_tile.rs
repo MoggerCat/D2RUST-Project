@@ -32,6 +32,9 @@ pub const HOST_MONSTER_PRESET: u32 = 6;
 /// object state's `create_object` (allocation and the §3 init).
 pub const HOST_OBJECT_PRESET: u32 = 7;
 
+/// The unit type of an object preset (DS1 object entries).
+pub const OBJECT_PRESET: u32 = 2;
+
 /// The unit type of a tile preset (`levels.md` §10.4).
 const TILE_PRESET: u32 = crate::path::warp::TILE_UNIT_TYPE as u32;
 
@@ -147,6 +150,47 @@ impl<X: Pending> View<'_, X> {
                 self.create_object(game, room, p.class, origin.x + p.x, origin.y + p.y, 0);
             }
         }
+    }
+
+    /// The first pass of `0x005559A0` (`population.md` §11.1: "places
+    /// every non-monster preset (objects, etc.; objects spec)"), object
+    /// part: an object for each type-2 preset of the active `room`'s DRLG
+    /// room, through the object state's `create_object` (allocation and
+    /// the object's init), at the preset's room sub-tile plus the room
+    /// origin. Returns the number created.
+    ///
+    /// PROVISIONAL (q-fix-real-preset-objects, `docs/handoff/q-fixture-migrate.md`):
+    /// no spec writes the object pass (its mode, the order inside the
+    /// pass, the classes it skips or swaps). d2rs creates every type-2
+    /// preset once, mode 0, in list order; a room that already holds an
+    /// object of the class at that sub-tile gets none. Settled by a
+    /// trace of the Rogue Encampment's object adds (S→C 0x51 of a join).
+    /// d2rs-own, unverified.
+    pub fn spawn_preset_objects(&mut self, game: &mut Game, room: RoomId) -> usize {
+        let Some(act) = game.lists.room(room).map(|r| r.act) else {
+            return 0;
+        };
+        let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
+            let r = d.drlg_room_of(room)?;
+            let origin = d.active_room(r)?.subtiles;
+            Some((svc.types.preset_units(d, r), origin))
+        });
+        let Some(Some((units, origin))) = found else {
+            return 0;
+        };
+        let mut n = 0;
+        for p in units.iter().filter(|p| p.unit_type == OBJECT_PRESET) {
+            let (x, y) = (origin.x + p.x, origin.y + p.y);
+            let exists = game.lists.room_units(room).into_iter().any(|u| {
+                game.lists.unit(u).is_some_and(|e| e.ty == UnitType::Object)
+                    && self.units.get(u).is_some_and(|r| r.class == p.class)
+                    && self.h.path_position(u) == (x, y)
+            });
+            if !exists && self.create_object(game, room, p.class, x, y, 0).is_some() {
+                n += 1;
+            }
+        }
+        n
     }
 
     /// The first tile unit of `class` in the active `room`'s unit list.

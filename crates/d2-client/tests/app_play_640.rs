@@ -17,7 +17,7 @@ use d2_client::app::palette::{add_act_palettes, ActPalettes};
 use d2_client::app::play::{
     add_client_data, add_game, add_preview, add_walk, predict_link, send_create_game_for,
 };
-use d2_client::app::single_player::{self, GameData};
+use d2_client::app::single_player;
 use d2_client::app::ui::{add_original_ui_with, UiParts};
 use d2_client::assets::path::MemorySource;
 use d2_client::bridge::link::{LinkError, Sent, ServerLink};
@@ -32,6 +32,8 @@ use d2_client::world_view::tile_assets::TileAssets;
 use d2_client::world_view::unit_assets::UnitLooks;
 use d2_client::world_view::{WorldViewState, WorldViewUi};
 use d2_server::seams::Clock;
+
+mod app_support;
 
 /// Records every C→S message sent through it.
 struct RecLink<L> {
@@ -231,10 +233,11 @@ fn open_mode(app: &App) -> u8 {
 
 // Covers: specs/ui/panels.md §1 r1, §1 r2, §1 r4, §1 r5; specs/render/camera.md §1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_play_path_runs_the_640_by_480_frame() {
     FrameSize::set_play(FrameSize::LOW).unwrap();
     assert_eq!(Screen::play(), Screen::R640);
-    let data = GameData::Synthetic;
+    let data = app_support::game_data();
     let character = single_player::new_character("sorceress", "Test").unwrap();
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = single_player::start_with(

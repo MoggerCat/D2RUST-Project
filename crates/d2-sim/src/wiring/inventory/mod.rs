@@ -130,12 +130,6 @@ pub struct InvState {
     /// (`stat-lists.md` §8.4 gives the attach). Off (the default): those
     /// calls go to the rest, as before.
     pub link_item_stats: bool,
-    /// The weapon in use (inventory +0x1C, `0x0063BEF0`) is the right-hand
-    /// item when +0x1C holds none, for the weapon bookkeeping of §5.8.
-    /// PROVISIONAL (REC-266, d2rs-own, unverified): nothing in the play
-    /// host writes +0x1C (the setter `0x006233A0` is the skills code's), so
-    /// without this the bookkeeping never sees a weapon. Off by default.
-    pub weapon_hand_fallback: bool,
     /// Town Portal scroll / tome uses of the call, taken by the host
     /// ([`InvDesk::take_portal_requests`]; `items/use.md` §4, the cast of
     /// `world/objects-2.md` §27.1 past its town refusal).
