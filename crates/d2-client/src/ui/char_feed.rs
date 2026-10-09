@@ -6,8 +6,8 @@
 //! Nothing here decides an outcome; it reads the model and draws.
 //!
 //! The damage value of the weapon-physical `descdam` entries (1, 7, 18,
-//! 19, 20) is `descriptions.md` §2.3 `weapon_phys` + §2.4 stat elements
-//! + the `SrcDam` scale; the attack rating of `descatt` 1 / 2 is §2.11
+//! 19, 20) is `descriptions.md` §2.3 `weapon_phys`, plus the §2.4 stat
+//! elements, then the `SrcDam` scale; the attack rating of `descatt` 1 / 2 is §2.11
 //! `AR` / §4 entry 2 with `attack_rating` (`combat/hit.md` §1). Measured
 //! against 1.14d (REC-269: `facts/client/ui/char-panel-ama-*.tsv`).
 //!

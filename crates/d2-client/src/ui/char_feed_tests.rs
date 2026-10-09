@@ -226,7 +226,7 @@ fn the_damage_block_prints_name_damage_and_attack_rating() {
 /// `facts/client/ui/char-panel-ama-l1.tsv`, `char-panel-ama-str50-dex60.tsv`
 /// and `char-panel-ama-ssd.tsv` (REC-269): damage `1-2`, `1-3`, `3-10`
 /// (Font16, y 158 / 182), attack rating `95`, `270`, `270`.
-// Covers: specs/skills/descriptions.md §2.3 r2, §2.3 r3, §2.3 r4, §2.3 r6, §2.11 text, §4 row2
+// Covers: specs/skills/descriptions.md §2.3 r2, §2.3 r3, §2.3 r4, §2.3 r6, §4 row2
 #[test]
 fn the_damage_block_matches_the_recorded_amazon() {
     use crate::bridge::items::ITEM;

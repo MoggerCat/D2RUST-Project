@@ -1040,8 +1040,8 @@ mod tests {
 
     /// The measured waypoint arrival (REC-288, `traces/client/model/
     /// client-0002.json`, Rogue Encampment → Cold Plains): after the
-    /// client's C→S 0x49 the server's 0x0D walk to the arrival point + 3,
-    /// + 3 comes with the 0x15 at (5168, 4658); 1.14d takes the 0x15
+    /// client's C→S 0x49 the server's 0x0D walk to the arrival point
+    /// (x + 3, y + 3) comes with the 0x15 at (5168, 4658); 1.14d takes the 0x15
     /// point and never walks on.
     // Covers: specs/client/model.md §8 r4; specs/world/waypoints.md §7 r7
     #[test]
