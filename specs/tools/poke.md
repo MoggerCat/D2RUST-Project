@@ -55,15 +55,15 @@
 |   1. Directives | 100–137 |
 |   2. Poke files | 138–160 |
 |   3. In scenarios | 161–175 |
-|   4. The 1.14d side (`poke.py`) | 176–312 |
-|   5. The d2rs side (`d2-sim::poke`) | 313–345 |
-|   6. `goto`: walking to a target | 346–420 |
-| Constants & data dependencies | 421–434 |
-| Randomness | 435–441 |
-| Edge cases & original bugs | 442–462 |
-| Test vectors | 463–483 |
-| Provenance | 484–494 |
-| Open questions | 495–502 |
+|   4. The 1.14d side (`poke.py`) | 176–321 |
+|   5. The d2rs side (`d2-sim::poke`) | 322–354 |
+|   6. `goto`: walking to a target | 355–429 |
+| Constants & data dependencies | 430–443 |
+| Randomness | 444–450 |
+| Edge cases & original bugs | 451–471 |
+| Test vectors | 472–492 |
+| Provenance | 493–503 |
+| Open questions | 504–511 |
 <!-- /index -->
 
 ## Summary
@@ -306,6 +306,15 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
                         "world/npc.md §3 call forms", None,
                         Form({"ecx": "game", "edx": "player"}, ["npc", "block"], 8)),
     ```
+    *Run on 1.14d (2026-10-09, PC 1, Windows):* the `operate` form was
+    called at the tick-return stop of frame 39 (scratch wrapper rerouting a
+    sentinel `stat` poke into the call; `record_packets.py --auto CkAndariel
+    --seed 1`): stack `2, 11, out` (the Rogue Encampment waypoint, GUID 11,
+    at (5680, 5793); the player at (5663, 5813), far outside the §7.1 range
+    box) → EAX 1, out word 1, and the server's next send to the client is
+    S→C 0x63 `63 0b000000 02 01 ff01 …` (the waypoint menu of GUID 11) in the
+    same frame: the form is right, and the operate skips range and walk as
+    stated.
 
     `out` is a scratch u32 (e.g. scratch +0x2F0). Every form keeps
     `ret` = 4 × stack length (rule 8).
