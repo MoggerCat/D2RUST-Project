@@ -1,0 +1,14 @@
+check 1
+# Quest 10 The Horadric Staff (s4.5): Cain msgs 335 then 336.
+name a2-quest-staff
+save ScnAm2 --class ama --expansion --act 1 --quests acts=1
+seed 1234
+ticks 44
+seconds 600
+channels state packets
+at 4 poke goto unit 1:244
+at 14 send InteractWithEntity type=1 id=@1:244
+at 16 send InitEntityChat id=@1:244
+at 18 send QuestMessage npc=@1:244 msg=335
+at 20 send QuestMessage npc=@1:244 msg=336
+at 22 send TerminateEntityChat id=@1:244

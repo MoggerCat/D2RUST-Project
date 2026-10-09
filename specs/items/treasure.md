@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 646–669 |
 | Test vectors | 670–699 |
 | Provenance | 700–724 |
-| Open questions | 725–895 |
+| Open questions | 725–902 |
 <!-- /index -->
 
 ## Summary
@@ -791,6 +791,13 @@ Real 1.14d (game-file tests, `#[ignore]`, from the live `.bin` set):
      at `0x0055A935` on a monster kill with a nodrop TC and `n` ≥ 2;
      expect 0x027F (PC = 53, RC = nearest, all masked); any other PC
      value means the evaluation is not binary64 there.
+     *Recorded for DirectDraw* (2026-10-09, PC 1, windowed `-w`, the
+     mode 1.14d uses in a window; DDRAW.dll + dxgi.dll loaded): 0x027F
+     at every server-tick return (`0x0052FD1E`) of two runs (the tick
+     runs inline on that thread, `sim/tick.md` §1 r4; the only local
+     `fldcw` pairs restore the word), MXCSR 0x1FA0. Direct3D (full
+     screen only: `-w -d3d` still loads DirectDraw) and Glide (no glide
+     DLL in the install) are not recorded; REC-610 stays open for them.
 6. Meaning of drop flags 0x04/0x10 (D2MOO: superior / normal) and their
    effect in creation: items spec.
    Answered (2026-10-07, `0x0055A550` disassembled): §7 stores `d`

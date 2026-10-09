@@ -1877,7 +1877,8 @@ fn apply_reads_the_variant_box() {
         [(803, 904, 0x800_0000), (804, 905, 0x800_0000 | 3)]
     );
     let units: Vec<_> = room.units.iter().map(|u| (u.class, u.x, u.y)).collect();
-    assert_eq!(units, [(1, 17, 27), (3, 24, 29)]);
+    // Prepended (`0x0066BF30`, measured): reverse of the file list.
+    assert_eq!(units, [(3, 24, 29), (1, 17, 27)]);
 }
 
 // ---- vertex.rs: the vertex polygon (§4) -------------------------------------

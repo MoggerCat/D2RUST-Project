@@ -1,0 +1,11 @@
+#waypoint-towns 1
+# The waypoint object of each act's town and the join position of a sorceress save, in sub-tiles.
+# Measured with d2-client state-dump (d2rs; 1.14d's value for act 1: 4899,4209, traces/checks/combat-cold-plains-wp.check):
+#   d2s-tool new --name ScnSoN --class sor --expansion [--act A --quests acts=A]; d2-client state-dump --seed 1234 --ticks 30 --poke "4 goto unit 2:<class>"
+# class = objects.txt Id with OperateFn 23 (specs/world/waypoints.md section 5); (sx, sy) = the player at frame 3.
+act	wp_class	wx	wy	sx	sy
+0	119	4899	4209	4873	4228
+1	156	5069	5084	5153	5203
+2	237	5159	5049	5118	5168
+3	398	5044	5019	5048	5043
+4	429	5114	5069	5098	5023

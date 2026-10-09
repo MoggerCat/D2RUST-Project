@@ -1,0 +1,16 @@
+check 1
+# Lightning Sentry against a monster: as ass-lightning-sentry (ScnAss, right skill 271,
+# Blood Moor without population) plus a Fallen poked 4 sub-tiles from the player at frame 10
+# (poke spawn 19), the click at the self-cast point (330, 300); the trap's missiles must hit
+# and kill it. Area F2 (q-fix-items-shop, REC-1033..).
+# Spec: specs/tools/scenario-diff.md.
+name ass-lightning-sentry-hit
+save ScnAss --class ass --expansion --level 30 --all-skills 20 --right-skill 271
+seed 1234
+ticks 160
+seconds 400
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 19 @x+4 @y normal
+input frame 20; rclick 330 300

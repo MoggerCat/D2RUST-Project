@@ -1,0 +1,19 @@
+check 1
+# The items channel (specs/tools/scenario-diff.md §3 rule 13) on gold and
+# potions made on the ground by the game's own creation path (poke `item`,
+# tools/poke.md: 1.14d 0x00558D90, d2rs create_item + ground_place) with the
+# game seed fixed first: each creates one S->C 0x9C, compared item by item
+# (creating event, frame, bit stream bytes: gold amount, compact records).
+name items-drop-gold-potion
+save ScnAma --class ama --expansion
+seed 1234
+ticks 20
+seconds 240
+channels items
+at 4 poke seed-game 0x00001234 666
+at 4 poke item gld @x+2 @y
+at 4 poke item gld @x+3 @y ilvl 30
+at 4 poke item hp1 @x+2 @y+2
+at 4 poke item mp3 @x+3 @y+2
+at 4 poke item rvs @x+4 @y+2
+at 4 poke item yps @x+2 @y+3
