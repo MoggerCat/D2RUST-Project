@@ -27,7 +27,10 @@
   client's sender, 2026-10-09) is implemented on both sides
   (`poke.py` selftest; d2-sim unit tests); its 1.14d run and the
   d2rs `state-dump` run on the real install are unverified (Test
-  vectors).
+  vectors). `operate` and `talk` (2026-10-09): the server's
+  C→S dispatcher called directly on both sides (§4 rule 10, §5 rule 4);
+  `poke.py` selftest and d2-sim / d2-client unit tests; live runs in
+  the Test vectors.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -48,22 +51,22 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 69–81 |
-| Inputs | 82–88 |
-| Outputs / state changes | 89–97 |
-| Rules | 98–99 |
-|   1. Directives | 100–137 |
-|   2. Poke files | 138–160 |
-|   3. In scenarios | 161–175 |
-|   4. The 1.14d side (`poke.py`) | 176–232 |
-|   5. The d2rs side (`d2-sim::poke`) | 233–265 |
-|   6. `goto`: walking to a target | 266–340 |
-| Constants & data dependencies | 341–354 |
-| Randomness | 355–361 |
-| Edge cases & original bugs | 362–382 |
-| Test vectors | 383–403 |
-| Provenance | 404–409 |
-| Open questions | 410–417 |
+| Summary | 72–84 |
+| Inputs | 85–91 |
+| Outputs / state changes | 92–100 |
+| Rules | 101–102 |
+|   1. Directives | 103–142 |
+|   2. Poke files | 143–165 |
+|   3. In scenarios | 166–180 |
+|   4. The 1.14d side (`poke.py`) | 181–254 |
+|   5. The d2rs side (`d2-sim::poke`) | 255–298 |
+|   6. `goto`: walking to a target | 299–373 |
+| Constants & data dependencies | 374–389 |
+| Randomness | 390–396 |
+| Edge cases & original bugs | 397–424 |
+| Test vectors | 425–448 |
+| Provenance | 449–454 |
+| Open questions | 455–462 |
 <!-- /index -->
 
 ## Summary
@@ -126,6 +129,8 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
 | `freeze` | `<seconds>` | hold the game between ticks for wall time (screenshots, a human look) | the debugger keeps the thread stopped at the hook (§4 rule 2) | no-op, `ok` (the runner owns the clock) |
 | `goto` | `unit [<type>:]<class>` \| `preset <level> [<type>:]<class>` | move the player onto a free cell next to a unit of that type (default 1, monster) and class; `preset`: the level's preset of that type and class, found as the unit its room creates, after a warp to the level when the player is elsewhere (§6) | a multi-tick walk (§6) of `warp` (`0x0053AEC0`) and placement `0x00554EA0` with exact 0 (`path-placement.md` §10: free point §7, mask 0x1C09) | the same walk: `level_warp` / `act_change::run`, then `wiring::path::place::place_unit` with exact `false` |
 | `msg` | `<id> <value>...` | one C→S game message (id 0x01..0x70) sent as the local client's, drained in the next frame: the values fill the id's fields in the order of the `layout` column of `sim/client-messages.tsv`; each is a number, `@x±N` / `@y±N` (the player's position) or a `<ref>` (its GUID). Bytes: the id, then each field little-endian at its offset (`uN` / `bitN`: into the u32 at the offset), `transport_size` bytes. Only ids with a fixed size whose layout has integer fields only (`u8`, `u16`, `u32`, `uN`, `bitN`); bytes the layout does not list (e.g. 0x49 bytes 7–8, which the server ignores) are written 0 on both sides; another id, a wrong count or a number too big for its field is an error (§2 rule 5); a resolved reference that does not fit its field is `unresolved` | the client sender `0x00478350` with the bytes (§4 rule 9); `ok` | `Host::send_game` for client 0 (§5 rule 3): `ok`, or `failed` with the reason |
+| `operate` | `<ref>` | interact with the unit (an object's operate, a portal, an NPC's interaction start) as the player: one C→S 0x13 {type, GUID} of the unit, run by the server's dispatcher at the poke point (§4 rule 10, §5 rule 4), not through the client's sender; out of operate range the handler starts the walk and operates on arrival (`world/objects.md` §7.3, `world/npc.md` §2 rule 3) | the dispatcher `0x0054D750` (ECX game, EDX player, [ESP+4] message, [ESP+8] size; EAX the result code 0–3; `sim/intents-events.md` §2.3) with 0x13 (handler `0x0054AA90`, `sim/client-messages.tsv`) | `Host::dispatch_now` (the model of `0x0054D750`) for client 0 with the same bytes |
+| `talk` | `<ref> [<choice>...]` | talk to an NPC: 0x13 {1, GUID} then 0x2F {GUID} (chat open, `world/npc.md` §2–§3), then one message per choice, in order: `trade` 0x38 {1, GUID, 0}, `gamble` 0x38 {2, GUID, 0}, `hire` 0x38 {3, GUID, the player's GUID} (the client's own form, `world/npc.md` §4), `action:<n>` 0x38 {n, GUID, 0}, `quest:<n>` 0x31 {GUID, n}, `close` 0x30 {GUID}; each run by the dispatcher now; the first call whose result is not 0 ends the directive | as `operate`, one dispatcher call per message (handlers `0x0054AA90`, `0x0054B930`, `0x0054BCA0`, `0x0054BA90`, `0x0054B9F0`) | as `operate`, one `Host::dispatch_now` per message |
 
 3. Monsters keep the scenario `spawn` step (`scenario.md` §3.1); a poke
    file writes it as `spawn <class> <x> <y> <kind> [umod <id>...]` with
@@ -229,6 +234,23 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    GUID at unit +0x0C, positions the player's path x / y ± N. The
    result is `ok`: whether the sender's duplicate filter dropped the
    message is not visible here (Edge cases 4).
+10. **`operate`, `talk`:** `CALL_FORMS` entry `dispatch`: the C→S
+    dispatcher `0x0054D750`, ECX = game, EDX = player, [ESP+4] =
+    message, [ESP+8] = size, EAX = the handler's result code
+    (`sim/intents-events.md` §2.3: the gate, then the handler; handlers
+    and their sizes `sim/client-messages.tsv`). Each message of the
+    directive (§1 rows) is written at scratch +0x300 followed by four
+    zero bytes (`world/objects.md` §7.3 rule 4 reads a u32 at +9 of the
+    9-byte 0x13) and the dispatcher is called once per message, in
+    order, at the hook (§4 rule 2; the server thread, between ticks).
+    The bytes are the `msg` encoding of the id's layout (rule 9; bytes
+    the layout does not list are 0). Result: `ok` with the target's
+    GUID when every call returned 0; else `failed` with note `<id>
+    returned <code>` for the first call that did not, and no later call
+    is made. The record carries `codes` (each call's EAX, in order).
+    The packet recorder's dispatcher hook (`record_packets.py`) sees
+    each call as a `dispatch` record; the queue entry `0x0053F3D0` is
+    not run, so there is no `c2s` or `result` record.
 
 ### 5. The d2rs side (`d2-sim::poke`)
 
@@ -262,6 +284,17 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    returns `gap` with note `msg needs the host's client queue`
    without the layout check (scenarios write messages as their own
    `msg` steps, `scenario.md`).
+4. `operate` and `talk` are not applied to the game by `d2-sim::poke`
+   either: `interact_calls` resolves the target on the state after
+   tick t − 1 and gives the handler calls of §1 (id and values in
+   layout order). The `d2-client` poke module encodes each with the
+   `msg` encoder and runs it through `Host::dispatch_now` for client 0:
+   the dispatcher (`d2-server::dispatch`, the model of `0x0054D750`)
+   called at once, outside the queues (no sender, no duplicate filter),
+   its S→C replies going to the client's buffers as in a drain, so the
+   client reads them at the next flush on both sides. Results as §4
+   rule 10. A runner without a host returns `gap` with note `operate /
+   talk need the host's dispatcher`.
 
 ### 6. `goto`: walking to a target
 
@@ -348,6 +381,8 @@ records both sides keep.
 | `0x0059FA30` | missile creator (ECX game, EDX record) | `original-hooks.md` §7.1 |
 | `0x00463740` | room of a point | `original-hooks-spawn.md` §1 |
 | `0x00478350` | client game-message sender (EDI size, [ESP+4] message; duplicate filter) | `sim/intents-events.md` §2.1 rule 1 |
+| `0x0054D750` | C→S dispatcher (ECX game, EDX player; [ESP+4] message, [ESP+8] size; EAX result 0–3) | `sim/intents-events.md` §2.3 |
+| `0x0054AA90`, `0x0054B930`, `0x0054B9F0`, `0x0054BA90`, `0x0054BCA0` | handlers of 0x13, 0x2F, 0x30, 0x31, 0x38 (reached through the dispatcher) | `sim/client-messages.tsv`, `world/npc.md` §2–§4, `world/objects.md` §7.3 |
 | game +0xD0, unit +0x20/+0x24 | game seed, unit seed | `sim/rng.md` §5 |
 | game +0xBC, act +0x04, env +0x00/+0x08 | environment record period, ticks | `render/lighting.md` §9.1 |
 | game +0xA8, +0x1120 | frame, hash lists | `original-hooks.md` §3–§4 |
@@ -380,6 +415,13 @@ same on both sides.
    both sides. Only d2rs reports a dropped message (`failed`,
    `duplicate filter`); 1.14d reports `ok`.
 
+5. `operate` / `talk` result `ok` means only that every handler
+   returned 0: the 0x13 handler returns 0 for a walk (out of operate
+   range) and for an NPC 9..50 sub-tiles away (no interaction,
+   `world/npc.md` §2 rule 3), and 0x2F returns 0 when the player is not
+   in the NPC's list. The state and packet channels show what happened;
+   a check places the player first (`goto`).
+
 ## Test vectors
 
 | Input | Expected | Source |
@@ -396,6 +438,9 @@ same on both sides.
 | `msg 0x01 @x+2 @y`, player at (5000, 4000) | bytes `01 8A 13 A0 0F` | synthetic (`d2-sim::poke` tests with a fake resolver, `d2-client` poke tests, `poke.py --selftest` on a fake process) |
 | `msg 0x06 1 @1`, the first monster's GUID 5 | bytes `06 01 00 00 00 05 00 00 00`; 1.14d: `0x00478350` with EDI = 9, [ESP+4] = scratch +0x300 | synthetic (as above) |
 | `msg 0x3C 36 1 0xFFFFFFFF`; `msg 0x51 5 1 3 7`; `msg 0x60` | `3C 24 00 00 80 FF FF FF FF`; `51 05 80 03 00 07 00 00 00`; `60` | synthetic (as above) |
+| `talk @1:148 trade hire quest:92 close`, Akara GUID 12, player GUID 1 | dispatcher calls with `13 01000000 0c000000`, `2f 00000000 0c000000`, `38 01000000 0c000000 00000000`, `38 03000000 0c000000 01000000`, `31 0c000000 5c00 0000`, `30 00000000 0c000000`, in order; `operate @wp` on waypoint GUID 18: `13 02000000 12000000` | synthetic (`d2-sim::poke` and `d2-client` poke tests, `poke.py --selftest` on a fake process: `0x0054D750` with ECX game, EDX player, stack scratch +0x300, size) |
+| `operate` / `talk` whose second call returns 1 | `failed` "0x2f returned 1", no third call | synthetic (`poke.py --selftest`) |
+| `operate`, `talk` malformed: no ref, an extra argument, an unknown choice, `quest:65536` | an error naming the line | synthetic |
 | the ids `msg` takes | 01–13, 16–2A, 2D–49, 4B–4D, 4F–54, 58, 59, 5D–63, 69–6B, 6D, 6E, 70 (from `client-messages.tsv`; both sides check the same list) | synthetic (`MSG_IDS` in both tests) |
 | `msg` with no id, id 0 or 0x71, 0x14 (no fixed size), a wrong count, 65536 in a `u16`, 2 in a `bitN` | an error naming the line | synthetic |
 | `state-dump --poke "4 msg 0x01 @x+5 @y"` twice (ScnAma, seed 1234) | first `ok`, second `failed` `duplicate filter`; the player has walked east by frame 12 | `d2-client` `app_state_dump` (real data, `#[ignore]`): unverified until the real-data gate runs it |

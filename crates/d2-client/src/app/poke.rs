@@ -239,6 +239,9 @@ pub fn goto_now(s: &mut Sim, t: GotoTarget, mut walk: GotoWalk) -> (poke::PokeRe
 /// on, `failed` "duplicate filter" when its filter dropped them,
 /// `failed` with the error when the sender refused them.
 pub fn apply_on_link<C: d2_server::seams::Clock>(l: &mut Link<C>, op: &PokeOp) -> poke::PokeResult {
+    if let PokeOp::Directive(d @ (Directive::Operate { .. } | Directive::Talk { .. })) = op {
+        return interact_on_link(l, d);
+    }
     let PokeOp::Directive(poke::Directive::Msg { id, args }) = op else {
         return apply_now(&mut l.host_mut().game, op);
     };
@@ -265,6 +268,51 @@ pub fn apply_on_link<C: d2_server::seams::Clock>(l: &mut Link<C>, op: &PokeOp) -
         Ok(None) => poke::PokeResult::FailedWith("duplicate filter".into()),
         Err(e) => poke::PokeResult::FailedWith(e.to_string()),
     }
+}
+
+/// `operate` / `talk` (`poke.md` §1, §5 rule 4): each handler call's
+/// bytes (the `msg` encoder, layouts of `sim/client-messages.tsv`) run by
+/// the server's dispatcher now (`Host::dispatch_now`), in order. `ok`
+/// with the target's GUID when every call returned 0; else `failed`
+/// naming the first id whose result was not 0, and no later call runs.
+pub fn interact_on_link<C: d2_server::seams::Clock>(
+    l: &mut Link<C>,
+    d: &Directive,
+) -> poke::PokeResult {
+    let (guid, calls) = {
+        let s = &l.host().game;
+        let Some((player, _)) = local_player(s) else {
+            return poke::PokeResult::Unresolved("@player".into());
+        };
+        let waypoints = waypoint_classes(s);
+        let env = poke::Env {
+            player,
+            waypoint_classes: &waypoints,
+            items: Some(&s.world.tables),
+        };
+        match poke::interact_calls(&s.game, &s.events, &env, d) {
+            Some(Ok(c)) => c,
+            Some(Err(reference)) => return poke::PokeResult::Unresolved(reference),
+            None => unreachable!("operate / talk only"),
+        }
+    };
+    for c in &calls {
+        let bytes = match encode_msg(c.id, &c.values) {
+            Ok(b) => b,
+            Err(e) => return poke::PokeResult::FailedWith(e),
+        };
+        match l.host_mut().dispatch_now(LOCAL_CLIENT, &bytes) {
+            Some(d2_server::seams::ResultCode::Done) => {}
+            Some(code) => {
+                return poke::PokeResult::FailedWith(format!(
+                    "{:#04x} returned {}",
+                    c.id, code as u8
+                ))
+            }
+            None => return poke::PokeResult::FailedWith("no player to dispatch for".into()),
+        }
+    }
+    poke::PokeResult::Ok(Some(guid))
 }
 
 // ---- msg: C→S layouts (`sim/client-messages.tsv`, `poke.md` §1 `msg`) ------
@@ -546,6 +594,33 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(" "),
             MSG_IDS
+        );
+    }
+
+    // Covers: specs/tools/poke.md §1 r2, §5 r4
+    #[test]
+    fn operate_and_talk_bytes_are_the_layouts_of_their_ids() {
+        let d = poke::parse_directive_text("talk @1:148 trade hire quest:92 close").unwrap();
+        let bytes: Vec<String> = poke::interact_calls_with(&d, 1, 12, 1)
+            .iter()
+            .map(|c| {
+                encode_msg(c.id, &c.values)
+                    .unwrap()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            bytes,
+            [
+                "13010000000c000000",
+                "2f000000000c000000",
+                "38010000000c00000000000000",
+                "38030000000c00000001000000",
+                "310c0000005c000000",
+                "30000000000c000000",
+            ]
         );
     }
 
