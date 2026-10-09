@@ -891,3 +891,5 @@ Then the rest:
 - **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
 
 - [q-fix-d9-arcane] Quest A2Q4 event 3 (`0x0059F0C0`): is the old-level-40 handling (start-Jerhyn removal, quick remove) skipped when the new level is 74? Recording `a2-warp-arcane-ama` keeps Jerhyn (class 201, 1:1) alive to frame 143 on 1.14d, every other warp from Lut Gholein removes him at the warp frame. d2rs skips the whole `a == 40` block for `b == 74` (REC-1405, PROVISIONAL); read the branch structure and fix `specs/world/quests-act2.md` §6.6 / `quests-act2-2.md` §2 item 3.
+
+- [rc-client-seed] Local player's client seed at game start in 1.14d: hook the roll `0x004E40A0` and the weather draws (`0x00473F50`, `0x00473E50`) and log the seed (lo, hi) before the first rain-cycle draw and at the first sound tick of `audio-town-ambience-ama` (seed 1234). Needed: after weather and sound share one seed (REC-1845), rain2 still starts at T 10 in d2rs vs T 3 in 1.14d, so the start value or the draw order before T 3 differs.

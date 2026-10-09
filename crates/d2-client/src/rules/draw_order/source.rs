@@ -84,6 +84,27 @@ pub struct WeatherFrame<'a> {
     /// (`audio/triggers.md` §12); `None`: no sound layer, no request (the
     /// request returns 0, so no position rolls).
     pub thunder: Option<&'a mut (dyn ThunderSound + Send + Sync)>,
+    /// Where the lent seed goes back when the frame ends: the client seed
+    /// the weather draws share with the sound draws (`sound-table-2.md`
+    /// §14.3 draw rows). `None`: the seed is the view's own.
+    pub commit: Option<SeedCommit<'a>>,
+}
+
+/// The write-back of a lent seed (`WeatherFrame::commit`).
+pub struct SeedCommit<'a>(pub Box<dyn FnMut(&Seed) + Send + 'a>);
+
+impl std::fmt::Debug for SeedCommit<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SeedCommit")
+    }
+}
+
+impl Drop for WeatherFrame<'_> {
+    fn drop(&mut self) {
+        if let Some(mut c) = self.commit.take() {
+            (c.0)(self.seed);
+        }
+    }
 }
 
 impl WeatherFrame<'_> {
