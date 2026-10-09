@@ -1206,6 +1206,9 @@ pub struct MonsterClass {
     /// the client search's skip test, `missiles/client-bodies-2.md` §B9
     /// r3).
     pub no_aura: bool,
+    /// `monstats` flag 10 `inTown` (with `npc`: the monster can be in
+    /// town, the footprint pattern of `sim/path-placement.md` §3).
+    pub in_town: bool,
     /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).

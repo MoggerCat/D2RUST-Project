@@ -1599,6 +1599,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
             c.no_aura = m.noaura;
+            c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
                 c.light_rgb = (x.light_r, x.light_g, x.light_b);
@@ -2036,11 +2037,14 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s
-            .events
-            .action
-            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
-        else {
+        let Some(player) = s.events.action.with(&mut s.game, |g, v| {
+            // `units.md` §3.1 r4.1: the load draws the player's unit
+            // seed (`0x00552DF0`) right after the allocation, before
+            // the save's or the start items and the act's DRLG.
+            let p = v.allocate(g, &req, 0, 0)?;
+            v.init_player_seed(p);
+            Some(p)
+        }) else {
             s.events
                 .action
                 .hooks()
