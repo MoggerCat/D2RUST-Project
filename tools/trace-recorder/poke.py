@@ -1392,6 +1392,8 @@ def main():
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     r = PokeRecorder(os.path.abspath(a.game), gargs, out, a.seconds, a.snap_every, 0)
     r.auto, r.layer, r.after = auto, layer, a.after
+    if auto and auto.has_frames():
+        auto.attach(r)  # `frame F` input steps share the tick-return stop
     layer.attach(r)
     try:
         r.run()

@@ -32,12 +32,28 @@ pub enum QueueError {
     NoDirect(u8),
 }
 
+/// One server → client message or buffer the packet tap saw, in order
+/// (`specs/tools/packets-trace.md` §2; read by [`crate::packets`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Tapped {
+    /// A message queued for a known client (`0x0053B280`).
+    Queued(ClientId, Vec<u8>),
+    /// A direct send (spec §3.3 rule 5).
+    Direct(ClientId, Vec<u8>),
+    /// A buffer popped by a flush and handed to local delivery.
+    Flushed(ClientId, Vec<u8>),
+}
+
 /// The per-client buffer lists (spec §3.2 rules 1–2). Clients are known
 /// once [`ClientBuffers::add_client`] ran; messages for any other id are
 /// ignored.
 #[derive(Debug, Default)]
 pub struct ClientBuffers {
     clients: BTreeMap<ClientId, VecDeque<Vec<u8>>>,
+    /// The packet tap: `Some` while a recorder listens; a copy of every
+    /// queued message, direct send and popped buffer. Never read by the
+    /// game.
+    tap: Option<Vec<Tapped>>,
 }
 
 impl ClientBuffers {
@@ -60,9 +76,29 @@ impl ClientBuffers {
         self.clients.get(&client)
     }
 
-    /// Pops the client's head buffer (`0x005392A0`).
+    /// Pops the client's head buffer (`0x005392A0`). Every pop is a
+    /// flush's send (the tap records it as [`Tapped::Flushed`]).
     pub fn pop(&mut self, client: ClientId) -> Option<Vec<u8>> {
-        self.clients.get_mut(&client)?.pop_front()
+        let buf = self.clients.get_mut(&client)?.pop_front()?;
+        self.note(|| Tapped::Flushed(client, buf.clone()));
+        Some(buf)
+    }
+
+    /// Turns the packet tap on (an empty log) or off (dropped).
+    pub fn set_tap(&mut self, on: bool) {
+        self.tap = on.then(Vec::new);
+    }
+
+    /// What the tap saw since the last take, in order (empty when off).
+    pub fn take_tap(&mut self) -> Vec<Tapped> {
+        self.tap.as_mut().map(std::mem::take).unwrap_or_default()
+    }
+
+    /// Appends to the tap when it is on (the closure runs only then).
+    pub(crate) fn note(&mut self, t: impl FnOnce() -> Tapped) {
+        if let Some(tap) = self.tap.as_mut() {
+            tap.push(t());
+        }
     }
 }
 
@@ -71,6 +107,9 @@ impl MessageSink for ClientBuffers {
     /// new one when there is no tail or tail + size > 0x200. Messages are
     /// never split across buffers (rule 2).
     fn queue(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        if self.tap.is_some() && self.clients.contains_key(&client) {
+            self.note(|| Tapped::Queued(client, msg.to_vec()));
+        }
         let Some(list) = self.clients.get_mut(&client) else {
             return Ok(());
         };
