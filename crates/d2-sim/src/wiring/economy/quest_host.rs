@@ -613,8 +613,17 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn quest_items(&self, player: UnitId) -> Vec<(UnitId, u8)> {
         self.inner.quest_items(player)
     }
+    /// Level 8's region from the lent monster world, the populated-room
+    /// count from the Act I DRLG (`0x0061ABF0`); the rest's answer
+    /// without a world.
     fn den_region(&self) -> (u32, u32, u32, u32) {
-        self.inner.den_region()
+        let h = &self.inner.econ.hooks;
+        match h.monster_world.as_ref().and_then(|w| w.den_counts()) {
+            Some((spawned, killed, visited)) => {
+                (spawned, killed, visited, h.drlg.populated_rooms(0, 8))
+            }
+            None => self.inner.den_region(),
+        }
     }
     fn true_tomb_level(&self) -> u32 {
         // The Act II DRLG's staff-tomb level (act index 1, `0x0061AEB0`).
