@@ -273,6 +273,11 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         self.monster_path_setup(sim, unit, mode);
     }
 
+    /// `0x005A4F50` ([`Pending::monster_mode_damage`]).
+    fn monster_mode_damage(&mut self, sim: &mut Sim<'_>, unit: UnitId, mode: u32) {
+        X::monster_mode_damage(self, sim, unit, mode);
+    }
+
     /// `0x00623B10` (`units.md` §4.3).
     fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
         self.x.frame_bonus(unit)

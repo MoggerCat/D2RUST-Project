@@ -156,6 +156,88 @@ fn a_poke_spawn_runs_before_its_frame_and_the_unit_is_in_that_snapshot() {
     assert!(lines[6].contains(&unit), "{}", lines[6]);
 }
 
+/// (frame, value) at each change of `field` of the first unit that
+/// `pick` accepts, over a dump's snapshots.
+fn changes(dump: &[u8], pick: impl Fn(&serde_json::Value) -> bool, field: &str) -> Vec<(u64, i64)> {
+    let mut out: Vec<(u64, i64)> = Vec::new();
+    for line in std::str::from_utf8(dump).unwrap().lines() {
+        let v: serde_json::Value = serde_json::from_str(line).unwrap();
+        if v["k"] != "snap" {
+            continue;
+        }
+        let f = v["f"].as_u64().unwrap();
+        let Some(u) = v["units"].as_array().unwrap().iter().find(|u| pick(u)) else {
+            continue;
+        };
+        let x = u[field].as_i64().unwrap();
+        if out.last().is_none_or(|&(_, h)| h != x) {
+            out.push((f, x));
+        }
+    }
+    out
+}
+
+/// The check's pokes (`traces/checks/combat-fallen-hits-player.check`).
+const FALLEN_POKES: [&str; 4] = [
+    "4 warp 2",
+    "30 seed-game 0x00001234 666",
+    "30 seed-unit @player 0x00000055 666",
+    "30 spawn 19 @x+2 @y normal",
+];
+
+// Covers: specs/skills/bodies-2.md §2.1; specs/monsters/umod-callbacks.md §2 r1; specs/monsters/init.md §6 r12
+// (traces/checks/combat-fallen-hits-player.check, PC1-B 2026-10-09)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_fallen_party_hits_the_player_on_the_recorded_frames() {
+    // 1.14d (PC1-B): the player's life 12800 → 12321 at frame 77, then
+    // 11866 at 98, 11397 at 124, 11039 at 137, 10560 at 173. Before the
+    // mode damage of the mode set the monsters' to-hit was 0 and the
+    // player never lost life.
+    let dump = run_with(scn_ama(), 200, 1, &FALLEN_POKES);
+    let life = changes(&dump, |u| u["ut"] == 0, "hp");
+    // The player joins at 12800 (frame 2) and loses life only on the hits.
+    assert_eq!(life.first().map(|c| c.1), Some(12800), "{life:?}");
+    assert_eq!(
+        life[1..],
+        [
+            (77, 12321),
+            (98, 11866),
+            (124, 11397),
+            (137, 11039),
+            (173, 10560)
+        ],
+        "{life:?}"
+    );
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.4 r5; specs/monsters/population.md §10.2 r1, §10.2 r3
+// (traces/checks/combat-fallen-hits-player.check, PC1-B 2026-10-09)
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_fallen_leader_shouts_on_the_recorded_frames() {
+    // The party leader (the poke's first GUID, own pack leader through
+    // the owner data `0x0058F030`): 1.14d modes from frame 41: S2 (9),
+    // NU 65, S2 90, NU 114, A2 129. Without the owner link it took A2 at
+    // 41.
+    let dump = run_with(scn_ama(), 130, 1, &FALLEN_POKES);
+    let text = std::str::from_utf8(&dump).unwrap();
+    let guid: u64 = text
+        .lines()
+        .find(|l| l.contains(r#""d":"spawn""#))
+        .and_then(|l| l.split(r#""guid":"#).nth(1))
+        .and_then(|r| r.split(',').next())
+        .unwrap()
+        .parse()
+        .unwrap();
+    let modes = changes(&dump, |u| u["ut"] == 1 && u["g"] == guid, "m");
+    assert_eq!(
+        modes[1..],
+        [(41, 9), (65, 1), (90, 9), (114, 1), (129, 5)],
+        "{modes:?}"
+    );
+}
+
 // Covers: specs/tools/scenario-diff.md §3 r12; specs/tools/scenario.md §3 r3, §3 r5, §4 r2
 // (state-dump --send: after frame f − 1's snapshot, through the bridge, no duplicate filter)
 #[test]

@@ -355,3 +355,49 @@ fn quest_event_3_runs_in_the_level_change() {
     fx.tick();
     assert_eq!(log.borrow().len(), 1);
 }
+
+// Covers: specs/sim/intents-events.md §7.8 r3; specs/sim/units.md §4.6
+#[test]
+fn a_room_left_without_clients_cancels_its_monsters_thinks() {
+    // A, B, C in a row (A's array {A, B}, C's {B, C}). The player moves
+    // from A to C: A has no client left, so its monster's type-2 and
+    // type-3 events go (`0x005738D0`); B keeps a client and its monster
+    // keeps them.
+    let mut fx = Fx::with_rooms(&[
+        (LEVEL, TileRect::new(0, 0, 8, 8)),
+        (LEVEL, TileRect::new(8, 0, 8, 8)),
+        (LEVEL, TileRect::new(16, 0, 8, 8)),
+    ]);
+    let a = fx.a;
+    let p = fx.spawn(UnitType::Player, 0, a, 10, 10);
+    let _ = fx
+        .game
+        .lists
+        .add_client(Some(p), None, client_state::JOINING);
+    fx.tick();
+    let rooms = act_rooms(&fx);
+    let find = |fx: &Fx, x: i32| {
+        rooms
+            .iter()
+            .copied()
+            .find(|&r| {
+                fx.sim.sys.hooks.drlg.subtiles(&fx.game, r) == Some(TileRect::new(x, 0, 40, 40))
+            })
+            .expect("room active")
+    };
+    let (rb, rc) = (find(&fx, 40), find(&fx, 80));
+    let ma = fx.spawn(UnitType::Monster, 0, a, 12, 12);
+    let mb = fx.spawn(UnitType::Monster, 0, rb, 52, 12);
+    let f = fx.game.frame;
+    for m in [ma, mb] {
+        for ty in [2, 3, 9] {
+            fx.game.schedule_event(m, ty, f + 30, None, 0, 0).unwrap();
+        }
+    }
+    fx.game.lists.change_room(p, rc).unwrap();
+    fx.tick();
+    let types = |fx: &Fx, m| -> Vec<u8> { fx.timers(m).into_iter().map(|(t, _)| t).collect() };
+    assert_eq!(types(&fx, ma), [9], "A: thinks and regen cancelled");
+    assert!(types(&fx, mb).contains(&2), "B keeps its client");
+    fx.assert_clean();
+}
