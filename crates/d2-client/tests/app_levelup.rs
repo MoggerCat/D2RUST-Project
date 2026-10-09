@@ -1,5 +1,5 @@
 // Spec: specs/combat/vitals.md §2–§5; specs/skills/levels.md §6.4
-//! XP and level-up on the play server (synthetic data): experience gained
+//! XP and level-up on the play server (install's data): experience gained
 //! on the server reaches the client as stat messages (level, stat points,
 //! skill points), C→S 0x3A spends a stat point and C→S 0x3B a skill point,
 //! and the client model follows every message.
@@ -10,11 +10,8 @@ use std::sync::Arc;
 use d2_client::app::server_thread::ThreadLink;
 use d2_client::app::single_player::{self, Link, DEFAULT_SEED, PLAYER_CLASS};
 use d2_client::bridge::link::{SendQueue, ServerLink};
-use d2_data::bin::BinTable;
-use d2_data::fixup::records::stat_ops;
-use d2_data::tables::{Charstats, Experience, Itemstatcost, Record, Skills};
-use d2_sim::combat::vitals::{add_experience, VitalsTables};
-use d2_sim::stats::{ClassStats, StatData, StatLists, StatTable};
+use d2_data::tables::{Charstats, Skills};
+use d2_sim::combat::vitals::add_experience;
 use d2_sim::units::UnitId;
 use d2_sim::wiring::action::View;
 
@@ -25,77 +22,6 @@ struct StepClock(Arc<AtomicU32>);
 impl d2_server::seams::Clock for StepClock {
     fn now_ms(&mut self) -> u32 {
         self.0.load(Ordering::SeqCst)
-    }
-}
-
-/// A synthetic `itemstatcost`: 359 stats, the first 16 saved.
-fn stat_data() -> Arc<StatData> {
-    let (n, size) = (359, Itemstatcost::SIZE);
-    let mut records = vec![0u8; n * size];
-    for (s, r) in records.chunks_mut(size).enumerate() {
-        for o in [0x32, 0x48, 0x4A, 0x56, 0x58, 0x5A, 0x5C] {
-            r[o..o + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
-        }
-        r[0..2].copy_from_slice(&(s as u16).to_le_bytes());
-        if s < 16 {
-            r[5] |= 0x10;
-        }
-    }
-    let mut t = BinTable {
-        name: "itemstatcost".into(),
-        source: "synthetic".into(),
-        count: n,
-        record_size: size,
-        records,
-    };
-    stat_ops(&mut t);
-    Arc::new(StatData {
-        stats: StatTable::from_fixed(&t).expect("itemstatcost"),
-        classes: vec![ClassStats::default(); 7],
-        ..StatData::default()
-    })
-}
-
-fn blank<T: Record>() -> T {
-    T::decode(&vec![0u8; T::SIZE])
-}
-
-/// Sorceress-like `charstats` (class 1) and `experience` rows
-/// (500 × level²).
-fn vitals() -> VitalsTables {
-    let charstats = (0..7)
-        .map(|_| {
-            let mut c: Charstats = blank();
-            c.str = 10;
-            c.dex = 25;
-            c.int = 35;
-            c.vit = 10;
-            c.lifeperlevel = 4;
-            c.staminaperlevel = 4;
-            c.manaperlevel = 8;
-            c.lifepervitality = 8;
-            c.staminapervitality = 4;
-            c.manapermagic = 8;
-            c.statperlevel = 5;
-            c
-        })
-        .collect();
-    let row = |v: u32| {
-        let mut e: Experience = blank();
-        e.amazon = v;
-        e.sorceress = v;
-        e.necromancer = v;
-        e.paladin = v;
-        e.barbarian = v;
-        e.druid = v;
-        e.assassin = v;
-        e
-    };
-    let mut experience = vec![row(99)];
-    experience.extend((0..=99).map(|l: u32| row(500 * l * l)));
-    VitalsTables {
-        charstats,
-        experience,
     }
 }
 
@@ -113,69 +39,7 @@ impl Game {
         self.link.pump().unwrap();
         self.link.receive()
     }
-}
 
-/// The synthetic game, joined, with vitals tables, a level-1 sorceress
-/// with 100 life, and one class skill (id 1) in the tables.
-fn joined() -> (Game, UnitId, u32) {
-    let ms = Arc::new(AtomicU32::new(1000));
-    let (mut link, _) = single_player::start(
-        app_support::game_data(),
-        DEFAULT_SEED,
-        StepClock(ms.clone()),
-    )
-    .unwrap();
-    link.send(SendQueue::System, &single_player::create_request().encode())
-        .unwrap();
-    ms.fetch_add(40, Ordering::SeqCst);
-    link.pump().unwrap();
-    link.receive();
-    link.send(SendQueue::System, &[0x6B]).unwrap();
-    ms.fetch_add(40, Ordering::SeqCst);
-    link.pump().unwrap();
-    link.receive();
-    let (p, guid) = link
-        .with(|l| {
-            let sim = &mut l.host_mut().game;
-            let (p, g) = single_player::local_player(sim).expect("joined");
-            let a = &mut sim.events.action;
-            let t = Arc::make_mut(&mut a.hooks().tables);
-            t.skills.skills.resize(2, blank::<Skills>());
-            let s: &mut Skills = &mut t.skills.skills[1];
-            s.charclass = single_player::PLAYER_CLASS as _;
-            s.ingame = true;
-            s.skpoints = d2_sim::skills::levels::NO_CALC;
-            (s.reqskill1, s.reqskill2, s.reqskill3) = (0xFFFF, 0xFFFF, 0xFFFF);
-            a.hooks().vitals = Some(Arc::new(vitals()));
-            let sys = &mut a.sys;
-            // The synthetic game has no `itemstatcost`: stats 0-15 saved.
-            sys.stats = StatLists::new(stat_data());
-            let ty = sys.units.get(p).unwrap().ty;
-            sys.stats.alloc_extended(
-                &mut sys.hooks,
-                p,
-                ty,
-                g,
-                u32::from(PLAYER_CLASS as u8),
-                0,
-                None,
-            );
-            for (s, v) in [(12u16, 1), (7, 100 << 8), (6, 100 << 8), (0, 10), (4, 0)] {
-                sys.stats.unit_set(&mut sys.hooks, p, s, v, 0);
-            }
-            sys.hooks.enable_vitals_sync();
-            (p, g)
-        })
-        .unwrap();
-    let mut g = Game { link, ms };
-    // The next ticks populate the town and put the client in game.
-    for _ in 0..3 {
-        g.tick();
-    }
-    (g, p, guid)
-}
-
-impl Game {
     /// Adds `gain` experience to the player on the server (the grant a
     /// kill ends in, `vitals.md` §4.5).
     fn gain(&mut self, p: UnitId, gain: u32) {
@@ -203,10 +67,79 @@ impl Game {
             })
             .unwrap()
     }
+
+    /// The player's class row of the install's `charstats`.
+    fn charstats(&mut self) -> Charstats {
+        self.link
+            .with(|l| {
+                let h = l.host_mut().game.events.action.hooks();
+                h.vitals.as_ref().expect("vitals").charstats[PLAYER_CLASS as usize].clone()
+            })
+            .unwrap()
+    }
+
+    /// The first skill of the player's class that a level-2 character may
+    /// learn (`reqlevel` ≤ 2, no required skill), from the install's
+    /// `skills` rows.
+    fn learnable_skill(&mut self) -> u16 {
+        self.link
+            .with(|l| {
+                let h = l.host_mut().game.events.action.hooks();
+                let none = |r: u16| r == 0xFFFF || usize::from(r) >= h.tables.skills.skills.len();
+                h.tables
+                    .skills
+                    .skills
+                    .iter()
+                    .position(|s: &Skills| {
+                        s.charclass == PLAYER_CLASS as u8
+                            && s.reqlevel <= 2
+                            && none(s.reqskill1)
+                            && none(s.reqskill2)
+                            && none(s.reqskill3)
+                    })
+                    .expect("a class skill of level 2") as u16
+            })
+            .unwrap()
+    }
+}
+
+/// The install's game, joined: the real vitals, `skills` and
+/// `itemstatcost` rows, the class's start stats and the town populated.
+fn joined() -> (Game, UnitId, u32) {
+    let ms = Arc::new(AtomicU32::new(1000));
+    let (mut link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
+    link.send(SendQueue::System, &single_player::create_request().encode())
+        .unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    let (p, guid) = link
+        .with(|l| single_player::local_player(&mut l.host_mut().game).expect("joined"))
+        .unwrap();
+    let mut g = Game { link, ms };
+    // The next ticks populate the town and put the client in game.
+    for _ in 0..3 {
+        g.tick();
+    }
+    (g, p, guid)
 }
 
 fn has(msgs: &[Vec<u8>], m: &[u8]) -> bool {
     msgs.iter().any(|x| x == m)
+}
+
+/// The 0x1D stat message of a one-byte stat (`msg-stats-items.md`).
+fn stat_msg(id: u8, v: u8) -> [u8; 3] {
+    [0x1D, id, v]
 }
 
 // Covers: specs/combat/vitals.md §3, §4.5
@@ -215,17 +148,22 @@ fn has(msgs: &[Vec<u8>], m: &[u8]) -> bool {
 fn experience_to_level_up_reaches_the_client_as_stat_messages() {
     let (mut g, p, _) = joined();
     g.tick();
+    let cs = g.charstats();
+    let (points0, skills0) = (g.stat(p, 4), g.stat(p, 5));
     g.gain(p, 500);
     let got = g.tick();
-    // Level 2, +5 stat points, +1 skill point, experience 500 (0x1B: +500).
-    assert!(has(&got, &[0x1D, 12, 2]), "{got:02X?}");
-    assert!(has(&got, &[0x1D, 4, 5]), "{got:02X?}");
-    assert!(has(&got, &[0x1D, 5, 1]), "{got:02X?}");
+    // Level 2 (`experience` row 2 is 500), `StatPerLevel` stat points, one
+    // skill point, experience 500.
     assert_eq!(g.stat(p, 12), 2);
     assert_eq!(g.stat(p, 13), 500);
+    assert_eq!(g.stat(p, 4), points0 + i32::from(cs.statperlevel));
+    assert_eq!(g.stat(p, 5), skills0 + 1);
+    assert!(has(&got, &stat_msg(12, 2)), "{got:02X?}");
+    assert!(has(&got, &stat_msg(4, g.stat(p, 4) as u8)), "{got:02X?}");
+    assert!(has(&got, &stat_msg(5, g.stat(p, 5) as u8)), "{got:02X?}");
     // Nothing repeats on the next tick.
     let again = g.tick();
-    assert!(!has(&again, &[0x1D, 12, 2]), "{again:02X?}");
+    assert!(!has(&again, &stat_msg(12, 2)), "{again:02X?}");
 }
 
 // Covers: specs/combat/vitals.md §2
@@ -235,19 +173,21 @@ fn a_stat_point_spends_on_the_server_and_is_sent_back() {
     let (mut g, p, _) = joined();
     g.gain(p, 500);
     g.tick();
+    let (str0, points) = (g.stat(p, 0), g.stat(p, 4));
+    assert!(points >= 2);
     // Strength +1 (stat 0, count − 1 = 0).
     g.link.send(SendQueue::Game, &[0x3A, 0, 0]).unwrap();
     let got = g.tick();
-    assert_eq!(g.stat(p, 0), 11);
-    assert_eq!(g.stat(p, 4), 4);
-    assert!(has(&got, &[0x1D, 0, 11]), "{got:02X?}");
-    assert!(has(&got, &[0x1D, 4, 4]), "{got:02X?}");
-    // Ten more asked, four left: the loop spends what it can, then fails
+    assert_eq!(g.stat(p, 0), str0 + 1);
+    assert_eq!(g.stat(p, 4), points - 1);
+    assert!(has(&got, &stat_msg(0, (str0 + 1) as u8)), "{got:02X?}");
+    assert!(has(&got, &stat_msg(4, (points - 1) as u8)), "{got:02X?}");
+    // More asked than left: the loop spends what it can, then fails
     // (`vitals.md` §2, result 2).
-    g.link.send(SendQueue::Game, &[0x3A, 0, 9]).unwrap();
+    g.link.send(SendQueue::Game, &[0x3A, 0, 99]).unwrap();
     g.tick();
     assert_eq!(g.stat(p, 4), 0);
-    assert_eq!(g.stat(p, 0), 15);
+    assert_eq!(g.stat(p, 0), str0 + points);
 }
 
 // Covers: specs/skills/levels.md §6.4
@@ -257,16 +197,25 @@ fn a_skill_point_adds_the_skill_and_tells_the_client() {
     let (mut g, p, guid) = joined();
     g.gain(p, 500);
     g.tick();
-    g.link.send(SendQueue::Game, &[0x3B, 1, 0]).unwrap();
+    let skill = g.learnable_skill();
+    let points = g.stat(p, 5);
+    g.link
+        .send(SendQueue::Game, &[0x3B, skill as u8, (skill >> 8) as u8])
+        .unwrap();
     let got = g.tick();
-    assert_eq!(g.stat(p, 5), 0, "the point is spent");
+    assert_eq!(g.stat(p, 5), points - 1, "the point is spent");
     let mut m = vec![0x21, 0, 0];
     m.extend_from_slice(&guid.to_le_bytes());
-    m.extend_from_slice(&[1, 0, 1, 0, 0]);
+    m.extend_from_slice(&[skill as u8, (skill >> 8) as u8, 1, 0, 0]);
     assert!(has(&got, &m), "{got:02X?}");
-    assert!(has(&got, &[0x1D, 5, 0]), "{got:02X?}");
-    // No point left: nothing more.
-    g.link.send(SendQueue::Game, &[0x3B, 1, 0]).unwrap();
-    g.tick();
+    assert!(has(&got, &stat_msg(5, (points - 1) as u8)), "{got:02X?}");
+    // The spent point is gone: asking again for a skill needing a point
+    // beyond the ones left changes nothing once they are all spent.
+    for _ in 0..points {
+        g.link
+            .send(SendQueue::Game, &[0x3B, skill as u8, (skill >> 8) as u8])
+            .unwrap();
+        g.tick();
+    }
     assert_eq!(g.stat(p, 5), 0);
 }
