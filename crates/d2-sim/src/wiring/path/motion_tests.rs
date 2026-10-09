@@ -104,7 +104,7 @@ fn a_created_monster_gets_its_first_think_at_f_plus_2() {
     fx.assert_clean();
 }
 
-// Covers: specs/monsters/init.md §4.1
+// Covers: specs/monsters/init.md §4.1 r1
 #[test]
 fn a_monster_created_where_no_client_is_gets_no_think() {
     // `0x00553160` false (the room's client count is 0): no think restart;
