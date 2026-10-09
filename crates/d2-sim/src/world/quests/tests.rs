@@ -1420,19 +1420,37 @@ fn npc_wants_interact() {
     let (mut ctl, _) = control();
     let mut f = Fake::new();
     assert_eq!(
-        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1),
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1, true),
         Err(QuestError::NotPicked)
+    );
+    // Step 2 comes before the picked test: no interact flag, false.
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1, false),
+        Ok(false)
     );
     ctl.picked = true;
     // Records are walked newest first: the Act I intro's active fn (not
-    // specified) is reached before Warriv's gossip.
-    ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1)
-        .unwrap();
-    assert_eq!(f.sent.last().unwrap().1, hex("8a 01 12000000"));
+    // specified) is reached before Warriv's gossip. A fresh player
+    // (slot 0 bit 0 clear): true, one 8A 01 <Warriv GUID>.
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1, true),
+        Ok(true)
+    );
+    assert_eq!(f.sent, [(P1, hex("8a 01 12000000"))]);
     f.sent.clear();
+    // Slot 0 bit 0 set, no other Act I active fn true: false, no send.
     f.p(P1).quests.flags[0].set(0, 0);
-    ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1)
-        .unwrap();
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1, true),
+        Ok(false)
+    );
+    assert!(f.sent.is_empty());
+    // Without the interact flag the records are not walked.
+    f.p(P1).quests.flags[0] = QuestFlags::default();
+    assert_eq!(
+        ctl.npc_wants_interact(&mut f, P1, WARRIV_U, npc::WARRIV1, false),
+        Ok(false)
+    );
     assert!(f.sent.is_empty());
 }
 

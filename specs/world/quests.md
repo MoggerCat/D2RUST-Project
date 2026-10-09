@@ -41,17 +41,17 @@
 |   3. Game entry: picking the quest set | 405–452 |
 |   4. Events and dispatch | 453–537 |
 |   5. Quest updater and timers (tick step 8) | 538–559 |
-|   6. Status reporting | 560–734 |
-|   7. NPC dialog hooks | 735–767 |
-|   8. Act transitions, warps and portals | 768–855 |
-|   9. Quest items, rewards and helpers | 856–1048 |
-|   11. Acts II–V | 1049–1065 |
-| Constants & data dependencies | 1066–1080 |
-| Randomness | 1081–1108 |
-| Edge cases & original bugs | 1109–1127 |
-| Test vectors | 1128–1159 |
-| Provenance | 1160–1188 |
-| Open questions | 1189–1261 |
+|   6. Status reporting | 560–739 |
+|   7. NPC dialog hooks | 740–772 |
+|   8. Act transitions, warps and portals | 773–860 |
+|   9. Quest items, rewards and helpers | 861–1053 |
+|   11. Acts II–V | 1054–1070 |
+| Constants & data dependencies | 1071–1085 |
+| Randomness | 1086–1113 |
+| Edge cases & original bugs | 1114–1132 |
+| Test vectors | 1133–1164 |
+| Provenance | 1165–1193 |
+| Open questions | 1194–1266 |
 <!-- /index -->
 
 ## Summary
@@ -684,12 +684,17 @@ of them; (b) the 0x8A rate is the NPC's think rate while a player is
 within 15; (c) an NPC with no room: `0x005DDF20` returns 0 (not the
 NPC) without scanning.
 
-d2rs: `QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
-implements steps 2–6 with the 0x8A send but returns nothing, walks
-`records` from index 0 (oldest first), takes the act from
-`unit_act(player)`, and is not called from the AI's `nearest_player`
-(`wiring/action/ai.rs`, which has no gate). Row
-`q-fix-p3-npc-interact-gate`.
+d2rs (q-fix-p3-npc-interact-gate, 2026-10-09):
+`QuestControl::npc_wants_interact` (`d2-sim` `world/quests.rs`)
+implements steps 2–6 and returns the bool (the caller passes the NPC
+class's monstats `interact` flag for step 2); `records` is in list
+order, so its index walk is newest → oldest. The AI seam
+`AiSummons::npc_wants_interact` returns the bool and reaches the lent
+quest control (`QuestObjectHost::npc_wants_interact`, `QuestLoan`);
+`nearest_player` (`wiring/action/ai.rs`) runs the gate above. Step 4
+takes the act from `unit_act(player)`: the sim has no client act
+(PROVISIONAL, REC-860). Edge (c) (no room → 0) is not modelled: d2rs
+returns the NPC itself.
 
 #### 6.5 S→C 0x89 UniqueEvent
 
