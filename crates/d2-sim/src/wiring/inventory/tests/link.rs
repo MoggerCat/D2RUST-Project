@@ -61,6 +61,7 @@ fn set_world() -> World {
     };
     w.tables.sets = vec![SetRec {
         count: 3,
+        version: 0,
         partial,
         full: [PropRec::NONE; 8],
     }];

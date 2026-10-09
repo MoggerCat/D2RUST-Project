@@ -457,12 +457,22 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let palettes = ActPalettes::live(archives.as_ref()).map_err(anyhow::Error::msg)?;
     let tiles = TileAssets::new(Some(archives.source()), Some(palettes.pl2.clone()));
     let lights = crate::world_view::light_sources::load(archives.as_ref())
-        .map_err(|e| warn!("light rows (d2rs-own, unverified): {e}; player light only"))
+        .map_err(|e| {
+            warn!("light rows (d2rs-own, unverified): {e}; level ambients from the environment")
+        })
         .ok();
     let tints = super::missile_art::state_tints(archives.as_ref())
         .map_err(|e| warn!("state tints (d2rs-own, unverified): {e}; no unit tinted"))
         .ok();
     add_preview_tinted(app, level_rows, tiles, lights, tints);
+    // Pass 1's level background (`draw-order-2.md` §12; the summit's
+    // time seed is PROVISIONAL REC-420, `background_view`).
+    if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
+        state.background_view = Some(crate::world_view::background_view::BackgroundView::new(
+            archives.source(),
+            Some(crate::world_view::background_view::summit_seed_now()),
+        ));
+    }
     match crate::world_view::unit_facts::load(archives.as_ref()) {
         Ok(t) => {
             if let Some(mut state) = app.world_mut().get_resource_mut::<WorldViewState>() {
@@ -486,6 +496,11 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
             item_parts.tips = Some(t);
         }
         Err(e) => warn!("item tips (d2rs-own, unverified): {e}; no tool tips"),
+    }
+    // The equip-box click's §4.3 tables (`ui::panels::inv_items` `equip`).
+    match d2_sim::items::inventory::InvTables::from_fixed(&d.tables.fixed) {
+        Ok(t) => item_parts.inv_tables = Some(std::sync::Arc::new(t)),
+        Err(e) => warn!("inventory tables: {e}; equipment boxes take no clicks"),
     }
     super::items::add_items(app, archives.source(), item_parts);
     let effects = super::missile_art::effect_rows(archives.as_ref()).map_err(anyhow::Error::msg)?;

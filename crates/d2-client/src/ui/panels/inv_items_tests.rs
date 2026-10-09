@@ -296,11 +296,22 @@ fn the_cursor_cell_centres_an_even_item() {
     );
 }
 
-// Covers: specs/ui/inventory.md §10 r5
+// Covers: specs/ui/panels-3.md §29 r1, §29 r3
 #[test]
 fn equipment_box_clicks_send_equip_swap_and_unequip() {
-    let (u, files) = ui();
+    let (mut u, files) = ui();
+    u.tips = Some(crate::ui::item_tip::tests::tips());
+    u.inv_tables = Some(std::sync::Arc::new(super::equip::tests::tables()));
     let at = Point::new(30, 50);
+    // §4.2 r3–r5: strength, dexterity and level of at least 1.
+    let world = |i: &[Fixture], c| {
+        let mut w = world(i, c);
+        let p = w.units.get_mut(&PLAYER).unwrap();
+        for s in [0, 2, 12] {
+            p.stats.insert(s, 1);
+        }
+        w
+    };
     let w = world(&[(9, mode::CURSOR, (0, 0, 0, 0), b"qui ")], Some(9));
     let want = ClientIntent::from_message(&items::equip(9, 3)).0;
     assert_eq!(want[0], 0x1A);
@@ -318,6 +329,9 @@ fn equipment_box_clicks_send_equip_swap_and_unequip() {
         intents(&u.press(&w, &files, &layout(), at)),
         vec![vec![0x1C, 3, 0]]
     );
+    // Without the inventory tables the check cannot run: nothing is sent.
+    u.inv_tables = None;
+    assert!(u.press(&w, &files, &layout(), at).is_empty());
 }
 
 fn stash_grid() -> GridRecord {

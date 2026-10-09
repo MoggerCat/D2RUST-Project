@@ -820,7 +820,7 @@ impl Pending for LocalSeams {
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
     fn composit_weapon_class(&self, unit: UnitId) -> i32 {
-        self.weapons.hand_class(unit)
+        self.weapons.cof_class(unit)
     }
     fn hand_class(&self, unit: UnitId) -> i32 {
         self.weapons.hand_class(unit)
@@ -1568,6 +1568,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
     let monstats_table = table("monstats")?;
     let monstats: Vec<Monstats> = decode_all(monstats_table).map_err(err)?;
     let monstats2 = table("monstats2")?;
+    let monstats2_rows: Vec<d2_data::tables::Monstats2> = decode_all(monstats2).map_err(err)?;
     let monsters = monstats
         .iter()
         .enumerate()
@@ -1579,6 +1580,10 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            if let Some(x) = monstats2_rows.get(link as usize) {
+                c.light = x.light;
+                c.light_rgb = (x.light_r, x.light_g, x.light_b);
+            }
             Some(c)
         })
         .collect();

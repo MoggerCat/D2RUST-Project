@@ -848,6 +848,10 @@ fn open_mode_3_and_level_backgrounds() {
     n.level.id = 74;
     let e = order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).unwrap_err();
     assert!(matches!(e, OrderError::Open { question: 1, .. }));
+    // Level 120's background is the world view's pass-1 layer
+    // (`world_view::background_view`): the rooms order as usual.
+    n.level.id = 120;
+    assert!(order_grid(&grid(), &mut n, &BTreeMap::new(), CLOCK).is_ok());
     n.level.id = 1;
     n.level.draw_edges = true;
     // Edge floors (`draw-order-2.md` §14) are the camera's part

@@ -30,6 +30,9 @@ pub struct ItemParts {
     pub belts: BeltParts,
     /// The item tool tips' tables ([`item_tips`]); none on synthetic data.
     pub tips: Option<crate::ui::item_tip::ItemTips>,
+    /// The inventory tables of the equip-box click (`ui::panels::inv_items`
+    /// `equip`); none on synthetic data.
+    pub inv_tables: Option<Arc<d2_sim::items::inventory::InvTables>>,
 }
 
 /// A table's string column (zero-terminated).
@@ -85,6 +88,7 @@ pub fn item_parts(archives: &dyn TableFiles) -> Result<ItemParts, String> {
             BeltParts::default()
         }),
         tips: None,
+        inv_tables: None,
     })
 }
 
@@ -141,6 +145,9 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
     original.set_belt_parts(parts.belts.clone());
     if let Some(tips) = &parts.tips {
         original.set_item_tips(tips.clone());
+    }
+    if let Some(t) = &parts.inv_tables {
+        original.set_inv_tables(t.clone());
     }
 }
 

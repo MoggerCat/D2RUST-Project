@@ -172,6 +172,17 @@ pub fn item_skill_link<W: EquipWorld + ?Sized>(
         }
         q = 1;
     }
+    skill_quantity_steps(w, u, s, q, add)
+}
+
+/// §5.5 steps 3–5 for skill `s` and count `q`.
+fn skill_quantity_steps<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    s: i32,
+    q: i32,
+    add: bool,
+) -> Result<bool, EquipFatal> {
     // Step 3.
     let new = match (add, w.skill_quantity(u, s)) {
         (true, Some(cur)) => cur.wrapping_add(q),
@@ -198,6 +209,70 @@ pub fn item_skill_link<W: EquipWorld + ?Sized>(
         }
     }
     Ok(true)
+}
+
+/// Book count change `0x0055C070(n)` (`inventory-moves.md` §7.12, §7.20,
+/// §8.1 step 4: "`inventory.md` §5.5 skill quantity += n, S→C 0x22"):
+/// §5.5 with the tome `i`'s skill and q := n, add = 1. Only a player
+/// owner acts; an item without a skill does nothing.
+pub fn item_skill_add<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    i: UnitId,
+    n: i32,
+) -> Result<bool, EquipFatal> {
+    if w.unit_type(u) != Some(TYPE_PLAYER) {
+        return Ok(false);
+    }
+    let Some((s, _)) = item_skill(w, i) else {
+        return Ok(false);
+    };
+    skill_quantity_steps(w, u, s, n, true)
+}
+
+/// `0x00576E40` (`world/vendors.md` §7.2 rule 9, a sold scroll or
+/// tome): the item's skill quantity −= n, floor 0, S→C 0x22, and the
+/// right skill cleared (skill 0) when it was that skill. A non-player,
+/// an item without a skill or a skill the player lacks: nothing.
+pub fn item_skill_remove<W: EquipWorld + ?Sized>(w: &mut W, u: UnitId, i: UnitId, n: i32) {
+    if w.unit_type(u) != Some(TYPE_PLAYER) {
+        return;
+    }
+    let Some((s, _)) = item_skill(w, i) else {
+        return;
+    };
+    let Some(cur) = w.skill_quantity(u, s) else {
+        return;
+    };
+    let new = cur.wrapping_sub(n).max(0);
+    w.set_skill_quantity(u, s, new);
+    w.send_skill_quantity(u, s, new);
+    if w.mouse_skill(u, false).is_some_and(|m| m.0 == s) {
+        w.select_skill(u, false, (0, -1));
+    }
+}
+
+/// Skill decrement `0x0055E0D0(S)` (`inventory-moves.md` §7.18 step 6):
+/// S's quantity − 1; below 1 → 0, and S as the right skill → skill 0
+/// (owner −1) on the right; S→C 0x22. U lacking S → fatal.
+pub fn skill_decrement<W: EquipWorld + ?Sized>(
+    w: &mut W,
+    u: UnitId,
+    s: i32,
+) -> Result<(), EquipFatal> {
+    let Some(cur) = w.skill_quantity(u, s) else {
+        return Err(EquipFatal::UnlinkSkillMissing(s));
+    };
+    let mut new = cur.wrapping_sub(1);
+    if new < 1 {
+        new = 0;
+        if w.mouse_skill(u, false).is_some_and(|m| m.0 == s) {
+            w.select_skill(u, false, (0, -1));
+        }
+    }
+    w.set_skill_quantity(u, s, new);
+    w.send_skill_quantity(u, s, new);
+    Ok(())
 }
 
 /// Recount on cube open / close (`0x0055FA40`, §5.5).

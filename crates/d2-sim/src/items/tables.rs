@@ -379,6 +379,8 @@ impl SetItemRec {
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct SetRec {
     pub count: i32,
+    /// `version` (+0x04; the format-0 set pick, `quality.md` §10.4).
+    pub version: u16,
     /// `pcode2a`, `pcode2b`, … `pcode5b`.
     pub partial: [PropRec; 8],
     /// `fcode1` … `fcode8`.
@@ -389,6 +391,7 @@ impl SetRec {
     pub fn from_record(r: &Sets, raw: &[u8]) -> Self {
         SetRec {
             count: i32::from_le_bytes([raw[0x0C], raw[0x0D], raw[0x0E], raw[0x0F]]),
+            version: r.version,
             partial: [
                 PropRec::of(r.pcode2a, r.pparam2a, r.pmin2a, r.pmax2a),
                 PropRec::of(r.pcode2b, r.pparam2b, r.pmin2b, r.pmax2b),

@@ -321,3 +321,108 @@ fn the_session_join_on_the_install() {
     );
     assert!(w.rooms_in_sight.len() >= 2);
 }
+
+// Covers: specs/render/lighting.md §8
+/// The monster light columns the model creates monster lights from
+/// (`MonsterClass::light`, `light_rgb`; §8 monster row), on the user's
+/// install: each `monstats` row carries its `MonStatsEx` row's `Light`
+/// and `light-r/g/b`, and the §8 measured facts hold (100 `monstats2`
+/// rows with `Light` > 0; the fallen shamans' 5 with 230, 168, 255).
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn monster_light_rows_come_from_the_users_monstats2() {
+    use d2_data::tables::{decode_all, Monstats, Monstats2};
+    let d = app_support::live();
+    let a = d.archives.as_ref();
+    let rows = single_player::client_unit_rows(a).unwrap();
+    let set = d2_data::bin::load_from(a, "eng").unwrap();
+    let m1: Vec<Monstats> = decode_all(set.table("monstats").unwrap()).unwrap();
+    let m2: Vec<Monstats2> = decode_all(set.table("monstats2").unwrap()).unwrap();
+    assert_eq!(m2.iter().filter(|r| r.light > 0).count(), 100);
+    let mut checked = 0;
+    for (m, class) in m1.iter().zip(&rows.monsters) {
+        let Some(class) = class else { continue };
+        let x = &m2[usize::from(m.monstatsex)];
+        assert_eq!(
+            (class.light, class.light_rgb),
+            (x.light, (x.light_r, x.light_g, x.light_b))
+        );
+        checked += 1;
+    }
+    assert!(
+        checked > 600,
+        "{checked} monstats rows with a monstats2 row"
+    );
+    assert!(rows
+        .monsters
+        .iter()
+        .flatten()
+        .any(|c| (c.light, c.light_rgb) == (5, (230, 168, 255))));
+}
+
+// Covers: specs/render/draw-order-2.md §12 l2 r2
+// Covers: specs/render/draw-order-2.md §12 l2 r3
+/// The Arreat Summit background on the user's archives: `summit01` and
+/// `cloud01` load and give the 12 mountain cels (resolution mode 2) and
+/// the 10 clouds' 20 cels, in pass 1, the clouds in draw mode 3 through
+/// the act V tables.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_summit_background_draws_from_the_users_archives() {
+    use d2_client::bridge::drlg::DrlgRoomId;
+    use d2_client::bridge::world::{ActiveRoom, ClientUnit, UnitKey};
+    use d2_client::rules::camera::{Camera, ClientPos, FrameSize};
+    use d2_client::rules::shading::ShadeTables;
+    use d2_client::scene::{order::pass, BlendOp};
+    use d2_client::world_view::background_view::BackgroundView;
+    use d2_client::world_view::{ViewAssets, WorldFrame};
+    use d2_sim::rng::Seed;
+    let d = app_support::live();
+    let pl2 = d
+        .archives
+        .source()
+        .read_file(r"data\global\palette\act5\pal.pl2")
+        .expect("act V pal.pl2")
+        .unwrap();
+    let mut assets = ViewAssets::from_pl2(&pl2).unwrap();
+    let pl2 = d2_formats::palette::Pl2::parse(&pl2).unwrap();
+    assets.shades = Some(ShadeTables::push(&mut assets.maps, &pl2));
+    let mut w = ClientWorld::default();
+    let p = UnitKey::new(0, 1);
+    let mut u = ClientUnit::new(p);
+    u.position = Some((5000, 5000));
+    w.units.insert(p, u);
+    w.local_player = Some(p);
+    w.active_rooms = Some(vec![ActiveRoom {
+        x0: 4900,
+        y0: 4900,
+        w: 200,
+        h: 200,
+        level: 120,
+        room: DrlgRoomId(1),
+    }]);
+    w.room_units.place(p, Some(DrlgRoomId(1)));
+    let mut frame = WorldFrame {
+        camera: Some(Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            ClientPos { x: 0, y: 0 },
+            (0, 0),
+        )),
+        ..WorldFrame::default()
+    };
+    let mut v = BackgroundView::new(d.archives.source(), Some(Seed::new(7, 666)));
+    let log = v.add_to_frame(&w, 0, 10_063 + 2_056, &mut assets, &mut frame);
+    assert!(log.is_empty(), "{log:?}");
+    assert_eq!(frame.items.len(), 12 + 20);
+    assert!(frame
+        .items
+        .iter()
+        .all(|i| i.key.pass() == pass::LEVEL_BACKGROUND));
+    let opaque = frame
+        .items
+        .iter()
+        .filter(|i| i.blend == BlendOp::Opaque)
+        .count();
+    assert_eq!(opaque, 12, "the mountains opaque, the clouds blended");
+}

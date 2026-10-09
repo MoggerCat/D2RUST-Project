@@ -678,6 +678,12 @@ pub struct ClientWorld {
     /// The scripted ambient override globals (`render/lighting.md` §10),
     /// written by S→C 0x89 (§10 r4).
     pub overrides: Overrides,
+    /// The 37 bytes of the last S→C 0x5E (`client/msg-ui.md` §14 r2: the
+    /// UI layer's `[0x007C0EA4..0x007C0EC8]`, with `[0x007C0ECC]` = 1 once
+    /// one arrived), held by the client for the light rules that read
+    /// client quest byte 1 (`render/lighting.md` §8 monster row, §10 r1,
+    /// §13 "override state"). `None` until the first 0x5E.
+    pub quest_availability: Option<[u8; 37]>,
     /// The active player roster `[0x007BB5C0]`, head first
     /// (`msg-units.md` §8 r1, r9).
     pub roster: Vec<RosterRecord>,
@@ -999,6 +1005,24 @@ impl ClientWorld {
     pub fn player_level(&self) -> Option<u16> {
         self.local_room().map(|r| r.level)
     }
+
+    /// Client quest byte `i` (`0x004B92E0(0, i)`): `A[i]` of the last S→C
+    /// 0x5E (`render/lighting.md` §10 r1); `None` while no 0x5E has
+    /// arrived (`[0x007C0ECC]` = 0, where 1.14d is fatal 0x60).
+    pub fn client_quest_byte(&self, i: usize) -> Option<u8> {
+        self.quest_availability.and_then(|a| a.get(i).copied())
+    }
+
+    /// The level of the active room holding `key` (its room list,
+    /// `sim/unit-order.md` §5); `None` without one.
+    pub fn unit_level(&self, key: UnitKey) -> Option<u16> {
+        let room = self.room_units.room_of(key)?;
+        self.active_rooms
+            .as_deref()?
+            .iter()
+            .find(|r| r.room == room)
+            .map(|r| r.level)
+    }
 }
 
 /// The light code's room handle of a DRLG room (one active room per
@@ -1008,8 +1032,8 @@ pub fn light_room(room: DrlgRoomId) -> RoomId {
 }
 
 /// The client world as the light code's new-room rule reads it
-/// (`render/lighting.md` §6.4). The model holds set S only, so an owner
-/// marked client-only (set C) is not found.
+/// (`render/lighting.md` §6.4): owners of set S in `units`, of set C
+/// (client-only, §6.4 r1) in `objclient.set_c`.
 impl LightRooms for ClientWorld {
     fn owner_position(&self, owner: &Owner) -> Option<(i32, i32)> {
         let (x, y) = self.light_owner(owner)?.cell();
@@ -1024,6 +1048,14 @@ impl LightRooms for ClientWorld {
 
     fn owner_room(&self, owner: &Owner) -> Option<RoomId> {
         let u = self.light_owner(owner)?;
+        if owner.client_only {
+            // d2rs-own, unverified: the model links set-C units into no
+            // room list; their room is the active room of their point
+            // (the room `objects::create_client_unit` placed them by).
+            let (x, y) = u.cell();
+            let rooms = self.active_rooms.as_deref()?;
+            return room_of_point(rooms, i32::from(x), i32::from(y)).map(|r| light_room(r.room));
+        }
         self.room_units.room_of(u.key).map(light_room)
     }
 
@@ -1038,13 +1070,15 @@ impl LightRooms for ClientWorld {
 }
 
 impl ClientWorld {
-    /// The owner lookup of `render/lighting.md` §6.4 rule 1 over set S.
-    fn light_owner(&self, owner: &Owner) -> Option<&ClientUnit> {
-        if owner.client_only {
-            return None;
-        }
+    /// The owner lookup of `render/lighting.md` §6.4 rule 1: set C when
+    /// the record's lookup flag is set, else set S.
+    pub fn light_owner(&self, owner: &Owner) -> Option<&ClientUnit> {
         let t = u8::try_from(owner.unit_type).ok()?;
-        self.units.get(&UnitKey::new(t, owner.guid))
+        let key = UnitKey::new(t, owner.guid);
+        if owner.client_only {
+            return self.objclient.set_c.get(&key);
+        }
+        self.units.get(&key)
     }
 }
 
@@ -1127,6 +1161,10 @@ pub struct MonsterClass {
     pub npc: bool,
     /// `monstats` flag bit 9 `interact` (`0x00457490(class, 9)`).
     pub interact: bool,
+    /// `monstats2` `Light` and `light-r`, `light-g`, `light-b`: the
+    /// monster light (`render/lighting.md` §8 monster row).
+    pub light: u8,
+    pub light_rgb: (u8, u8, u8),
     /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).
@@ -1229,6 +1267,7 @@ impl MonsterClass {
             npc,
             interact,
             setup: None,
+            ..MonsterClass::default()
         })
     }
 }

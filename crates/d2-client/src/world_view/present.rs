@@ -95,6 +95,9 @@ pub struct WorldViewState {
     pub automap: Option<crate::ui::automap::session::AutomapSession>,
     /// The automap's draw sink (`super::automap_view`); `None`: not drawn.
     pub automap_view: Option<super::automap_view::AutomapView>,
+    /// The level backgrounds of pass 1 (`super::background_view`,
+    /// `draw-order-2.md` §12); `None`: not drawn.
+    pub background_view: Option<super::background_view::BackgroundView>,
     /// The play preview (decision D1, [`super::preview`]): a frame whose
     /// build fails is logged (each message once) and not presented,
     /// instead of failing the app. `false`: strict (M07).
@@ -154,6 +157,7 @@ impl WorldViewState {
             click: Default::default(),
             automap: None,
             automap_view: None,
+            background_view: None,
             preview: false,
             preview_error: None,
             last_tags: Vec::new(),
@@ -931,6 +935,10 @@ fn world_view_frame(
                 game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
                 pick: state.preview,
+                // `seams/world-screen.md` §2.6: the pick inverts the
+                // frame's shaken camera (the anchor decided on a drawn
+                // tick).
+                shake: anchor.map_or((0, 0), |a| a.shake),
             };
             // d2rs-own, unverified (D2): the run lock (command 35) is the
             // toggle action no panel took; the click reads the predicted
@@ -1087,6 +1095,12 @@ fn world_view_frame(
     }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
+    // `render/lighting.md` §6.4: the drawn frame's pass over the client's
+    // kept light list (§6.3), held by the model between frames.
+    let feed = &mut state.feed;
+    bridge
+        .0
+        .light_frame(|w, lights| feed.light_frame(w, lights));
     let placed = match ui_frame {
         Some(_) => placed,
         None => super::feed::camera_at(bridge.0.world(), state.feed.as_ref(), anchor)?,
@@ -1135,6 +1149,18 @@ fn world_view_frame(
         &mut frame,
     ) {
         warn!("preview (d2rs-own, unverified): {m}");
+    }
+    // `draw-order.md` §1 row 1: the level background of pass 1.
+    if let (Some(v), Some((_, mode)), Some(at)) = (state.background_view.as_mut(), placed, anchor) {
+        for m in v.add_to_frame(
+            bridge.0.world(),
+            mode.get(),
+            at.player.client().x,
+            &mut state.assets,
+            &mut frame,
+        ) {
+            warn!("preview (d2rs-own, unverified): {m}");
+        }
     }
     // `ui/automap.md` §10: the open automap's draw pass.
     if let (Some(a), Some(v)) = (state.automap.as_mut(), state.automap_view.as_mut()) {
