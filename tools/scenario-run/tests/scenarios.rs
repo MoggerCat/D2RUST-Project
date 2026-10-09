@@ -60,6 +60,8 @@ fn starters_parse_and_round_trip() {
             "champion-pack",
             "kill-monster",
             "pickup-drop",
+            "poke-firebolt",
+            "poke-spawn-town",
             "run-cold-plains",
             "vendor-buy-sell",
             "walk-town",
@@ -93,7 +95,12 @@ fn every_starter_runs_twice_identically() {
         let c2s = a
             .records
             .iter()
-            .filter(|r| matches!(r, Record::C2s { .. } | Record::Spawn { .. }))
+            .filter(|r| {
+                matches!(
+                    r,
+                    Record::C2s { .. } | Record::Spawn { .. } | Record::Poke { .. }
+                )
+            })
             .count();
         assert_eq!(c2s, s.steps.len(), "{stem}");
         let snap: std::collections::BTreeSet<u32> = a
@@ -155,6 +162,10 @@ fn perturb(r: &mut Record) -> bool {
         }
         Record::C2s { bytes: Err(u), .. } | Record::Spawn { guid: Err(u), .. } => u.push('x'),
         Record::Spawn { guid: Ok(g), .. } => *g = g.map_or(Some(0), |g| Some(g ^ 1)),
+        Record::Poke { guid, r, .. } => match guid {
+            Some(g) => *g ^= 1,
+            None => *r = if r == "ok" { "failed" } else { "ok" }.into(),
+        },
         Record::Rng { after, .. } => after[1] ^= 1,
         Record::Draw { before, .. } => before[0] ^= 1,
         Record::Unit { life, .. } => *life += 1,
@@ -170,7 +181,12 @@ fn perturb(r: &mut Record) -> bool {
 // Covers: specs/tools/scenario.md §5 r3, §5 r4, §5 r5
 #[test]
 fn comparator_finds_every_perturbed_record_of_a_real_run() {
-    for s in [travel(), starters().remove(6).1] {
+    let walk = starters()
+        .into_iter()
+        .find(|(n, _)| n == "walk-town")
+        .expect("walk-town")
+        .1;
+    for s in [travel(), walk, synthetic("poke-spawn-town")] {
         let original = trace_of(&s, data());
         let mut checked = 0;
         for k in 0..original.records.len() {
@@ -198,6 +214,155 @@ fn comparator_finds_every_perturbed_record_of_a_real_run() {
         }
         assert!(checked > 100, "{}: {checked}", s.name);
     }
+}
+
+/// A starter with the synthetic set's rows for the 1.14d ones it names:
+/// monster class 1 (ghoul1) for the fallen (19), skill 2 (Firebolt) for
+/// Fire Bolt (36), objects row 1 (Chest) for the brazier (39).
+fn synthetic(name: &str) -> Scenario {
+    let text = std::fs::read_to_string(scenarios_dir().join(format!("{name}.scenario"))).unwrap();
+    let text = text
+        .replace("spawn 19", "spawn 1")
+        .replace("@1:19", "@1:1")
+        .replace("skill 36", "skill 2")
+        .replace("skill=36", "skill=2")
+        .replace("object 39", "object 1")
+        .replace(&format!("name {name}"), &format!("name {name}-synthetic"));
+    Scenario::parse(&text).unwrap()
+}
+
+fn pokes(t: &conformance::scenario::TraceFile) -> Vec<(u32, u32, String, String, Option<u32>)> {
+    t.records
+        .iter()
+        .filter_map(|r| match r {
+            Record::Poke { t, i, d, r, guid } => Some((*t, *i, d.clone(), r.clone(), *guid)),
+            _ => None,
+        })
+        .collect()
+}
+
+// Covers: specs/tools/poke.md §3 r1, §3 r3, §5 r1, §5 r2
+#[test]
+fn poke_spawn_town_spawns_pokes_and_records_the_monster_every_tick() {
+    let s = synthetic("poke-spawn-town");
+    let t = trace_of(&s, data());
+    let leader = t
+        .records
+        .iter()
+        .find_map(|r| match r {
+            Record::Spawn {
+                t: 1,
+                i: 0,
+                guid: Ok(Some(g)),
+            } => Some(*g),
+            _ => None,
+        })
+        .expect("the fallen is spawned at tick 1");
+    let p = pokes(&t);
+    assert_eq!(p.len(), 3, "{p:?}");
+    assert_eq!(p[0], (2, 0, "seed-unit".into(), "ok".into(), None));
+    assert_eq!(
+        (p[1].0, p[1].2.as_str(), p[1].3.as_str()),
+        (3, "object", "ok")
+    );
+    let object = p[1].4.expect("the object's GUID");
+    assert_eq!(p[2], (4, 0, "time".into(), "ok".into(), None));
+    // The monster's unit record at every tick from 1 to the end; the
+    // object's from tick 3.
+    let ticks = |ty: u32, guid: u32| -> Vec<u32> {
+        t.records
+            .iter()
+            .filter_map(|r| match r {
+                Record::Unit {
+                    t, ty: y, guid: g, ..
+                } if *y == ty && *g == guid => Some(*t),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(ticks(1, leader), (1..=s.end).collect::<Vec<_>>());
+    assert_eq!(ticks(2, object), (3..=s.end).collect::<Vec<_>>());
+    assert!(
+        t.header.gaps.iter().all(|g| !g.starts_with("poke")),
+        "{:?}",
+        t.header.gaps
+    );
+    assert_eq!(t.to_text(), trace_of(&s, data()).to_text());
+}
+
+// Covers: specs/tools/poke.md §1 r2, §3 r4
+#[test]
+fn every_directive_runs_on_d2rs_or_is_a_listed_gap() {
+    let base = "scenario 1\nname p\ngame 1.14d\nseed 0x1234\ninit 644409375\ndifficulty normal\nexpansion yes\nend 6\nchar class 1\nchar area 0 1\nrecord units stats\nsnapshot every 1\n";
+    let steps = concat!(
+        "at 1 spawn 1 @x+4 @y normal\n",
+        "at 2 poke object 1 @x-6 @y mode 0\n",
+        "at 2 poke missile 1 @x @y @x+10 @y skill 2 1\n",
+        "at 2 poke missile 1 @x @y @x+10 @y owner @1:1\n",
+        "at 2 poke seed-game 1 2\n",
+        "at 3 poke seed-unit @player 3 4\n",
+        "at 3 poke time 5 100\n",
+        "at 3 poke pos @1:1 @x+6 @y+4\n",
+        "at 3 poke item pt1 @x+2 @y ilvl 3\n",
+        "at 4 poke stat @player 14 0 777\n",
+        "at 4 poke state @player 1 on\n",
+        "at 4 poke freeze 2\n",
+        "at 4 poke superunique 0 @x+3 @y\n",
+        "at 5 poke warp 4\n",
+        "at 5 poke seed-unit @1:99 1 1\n",
+        "at 5 poke item zzz @x @y\n",
+        "at 6 poke warp 40\n",
+    );
+    let s = Scenario::parse(&format!("{base}{steps}")).unwrap();
+    let t = trace_of(&s, data());
+    let p: Vec<(String, String)> = pokes(&t)
+        .into_iter()
+        .map(|(_, _, d, r, _)| (d, r))
+        .collect();
+    let want: Vec<(&str, &str)> = vec![
+        ("object", "ok"),
+        ("missile", "ok"),
+        ("missile", "ok"),
+        ("seed-game", "ok"),
+        ("seed-unit", "ok"),
+        ("time", "ok"),
+        ("pos", "ok"),
+        ("item", "ok"),
+        ("stat", "ok"),
+        ("state", "ok"),
+        ("freeze", "ok"),
+        ("superunique", "ok"),
+        ("warp", "ok"),
+        ("seed-unit", "unresolved"),
+        ("item", "failed"),
+        ("warp", "gap"),
+    ];
+    let got: Vec<(&str, &str)> = p.iter().map(|(d, r)| (d.as_str(), r.as_str())).collect();
+    assert_eq!(got, want);
+    // The gap is in the header (§3 rule 4).
+    assert!(
+        t.header.gaps.contains(&"poke warp at 6".to_owned()),
+        "{:?}",
+        t.header.gaps
+    );
+    // The seed write and the stat write show in the records.
+    let stat = t.records.iter().find_map(|r| match r {
+        Record::Stats {
+            t: 4, ty: 0, base, ..
+        } => base.iter().find(|e| e.0 == 14).copied(),
+        _ => None,
+    });
+    assert_eq!(stat, Some((14, 0, 777)));
+    let moved = t.records.iter().find_map(|r| match r {
+        Record::Unit { t: 3, ty: 1, x, .. } => Some(*x),
+        _ => None,
+    });
+    let me = t.records.iter().find_map(|r| match r {
+        Record::Unit { t: 3, ty: 0, x, .. } => Some(*x),
+        _ => None,
+    });
+    assert_eq!(moved.zip(me).map(|(m, p)| m - p), Some(6));
+    assert_eq!(t.to_text(), trace_of(&s, data()).to_text());
 }
 
 /// `champion-pack` with the synthetic monster class 1 (ghoul1) for the
@@ -258,6 +423,49 @@ fn a_spawned_champion_pack_is_recorded() {
     let (before, after) = rng5.expect("rng at tick 5");
     assert_ne!(before, after);
     assert_eq!(t.to_text(), trace_of(&champion_pack(), data()).to_text());
+}
+
+// Covers: specs/tools/poke.md §3 r1
+#[test]
+fn poke_firebolt_casts_at_the_spawned_monster_by_reference() {
+    let s = synthetic("poke-firebolt");
+    let t = trace_of(&s, data());
+    // The cast steps resolve against the spawned monster.
+    let casts: Vec<&Record> = t
+        .records
+        .iter()
+        .filter(|r| matches!(r, Record::C2s { bytes: Ok(b), .. } if b[0] == 0x0D))
+        .collect();
+    assert_eq!(casts.len(), 2, "{casts:?}");
+    assert_eq!(t.to_text(), trace_of(&s, data()).to_text());
+}
+
+// Covers: specs/tools/poke.md §2 r1, §2 r2, §2 r3
+#[test]
+fn committed_poke_files_parse_and_round_trip() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../traces/pokes");
+    let mut n = 0;
+    for e in std::fs::read_dir(&dir).expect("traces/pokes") {
+        let path = e.expect("entry").path();
+        if path.extension().is_none_or(|x| x != "poke") {
+            continue;
+        }
+        let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
+        assert!(
+            stem.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
+            "{stem}"
+        );
+        let text = std::fs::read_to_string(&path).unwrap();
+        let f = d2_sim::poke::PokeFile::parse(&text).unwrap_or_else(|e| panic!("{stem}: {e}"));
+        assert_eq!(
+            d2_sim::poke::PokeFile::parse(&f.to_text()).unwrap(),
+            f,
+            "{stem}"
+        );
+        n += 1;
+    }
+    assert!(n >= 1);
 }
 
 // Covers: specs/tools/scenario.md §4 r10

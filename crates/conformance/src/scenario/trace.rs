@@ -58,6 +58,16 @@ pub enum Record {
         i: u32,
         guid: Result<Option<u32>, String>,
     },
+    /// A `poke` step (`tools/poke.md` §3 rule 3): the directive keyword,
+    /// the result (`ok`, `failed`, `unresolved`, `gap`) and the created
+    /// unit's GUID (only with `ok`).
+    Poke {
+        t: u32,
+        i: u32,
+        d: String,
+        r: String,
+        guid: Option<u32>,
+    },
     S2c {
         t: u32,
         client: u32,
@@ -103,6 +113,7 @@ impl Record {
         match *self {
             Self::C2s { t, .. }
             | Self::Spawn { t, .. }
+            | Self::Poke { t, .. }
             | Self::S2c { t, .. }
             | Self::Rng { t, .. }
             | Self::Draw { t, .. }
@@ -117,6 +128,7 @@ impl Record {
         match self {
             Self::C2s { .. } => "c2s",
             Self::Spawn { .. } => "spawn",
+            Self::Poke { .. } => "poke",
             Self::S2c { .. } => "s2c",
             Self::Rng { .. } => "rng",
             Self::Draw { .. } => "draw",
@@ -127,7 +139,7 @@ impl Record {
     }
 
     /// Position of the kind within a tick (FORMAT.md: `c2s`, `spawn`,
-    /// `s2c`, `rng`, `draw`, `unit`, `stats`; `end` last).
+    /// `poke`, `s2c`, `rng`, `draw`, `unit`, `stats`; `end` last).
     pub fn order(&self) -> usize {
         KINDS
             .iter()
@@ -145,6 +157,10 @@ impl Record {
                 Ok(Some(g)) => json!({"k": "spawn", "t": t, "i": i, "guid": g}),
                 Ok(None) => json!({"k": "spawn", "t": t, "i": i, "failed": true}),
                 Err(r) => json!({"k": "spawn", "t": t, "i": i, "unresolved": r}),
+            },
+            Self::Poke { t, i, d, r, guid } => match guid {
+                Some(g) => json!({"k": "poke", "t": t, "i": i, "d": d, "r": r, "guid": g}),
+                None => json!({"k": "poke", "t": t, "i": i, "d": d, "r": r}),
             },
             Self::S2c { t, client, bytes } => {
                 json!({"k": "s2c", "t": t, "c": client, "b": encode_hex(bytes)})
@@ -236,6 +252,32 @@ impl Record {
                     keys,
                 )
             }
+            "poke" => {
+                let r_ = r.str("r")?;
+                if !POKE_RESULTS.contains(&r_.as_str()) {
+                    return Err(format!("poke r {r_:?}: one of {}", POKE_RESULTS.join(", ")));
+                }
+                let guid = match o.get("guid") {
+                    None => None,
+                    Some(_) if r_ == "ok" => Some(r.u32("guid")?),
+                    Some(_) => return Err("poke guid only with r ok".into()),
+                };
+                let keys: &[&str] = if guid.is_some() {
+                    &["k", "t", "i", "d", "r", "guid"]
+                } else {
+                    &["k", "t", "i", "d", "r"]
+                };
+                (
+                    Self::Poke {
+                        t: r.u32("t")?,
+                        i: r.u32("i")?,
+                        d: r.str("d")?,
+                        r: r_,
+                        guid,
+                    },
+                    keys,
+                )
+            }
             "s2c" => (
                 Self::S2c {
                     t: r.u32("t")?,
@@ -320,7 +362,12 @@ impl Record {
 }
 
 /// Record kinds in their within-tick order.
-pub const KINDS: [&str; 7] = ["c2s", "spawn", "s2c", "rng", "draw", "unit", "stats"];
+pub const KINDS: [&str; 8] = [
+    "c2s", "spawn", "poke", "s2c", "rng", "draw", "unit", "stats",
+];
+
+/// A `poke` record's `r` values (`tools/poke.md` §3 rule 3).
+pub const POKE_RESULTS: [&str; 4] = ["ok", "failed", "unresolved", "gap"];
 
 struct Fields<'a>(&'a Map<String, Value>);
 
@@ -588,6 +635,20 @@ mod tests {
                     i: 4,
                     guid: Err("@x".into()),
                 },
+                Record::Poke {
+                    t: 0,
+                    i: 5,
+                    d: "object".into(),
+                    r: "ok".into(),
+                    guid: Some(12),
+                },
+                Record::Poke {
+                    t: 0,
+                    i: 6,
+                    d: "warp".into(),
+                    r: "gap".into(),
+                    guid: None,
+                },
                 Record::S2c {
                     t: 0,
                     client: 0,
@@ -653,6 +714,16 @@ mod tests {
             .unwrap_err()
             .message
             .contains("version 2"));
+        let bad_r = text.replacen("\"r\":\"gap\"", "\"r\":\"maybe\"", 1);
+        assert!(TraceFile::parse(&bad_r)
+            .unwrap_err()
+            .message
+            .contains("poke r"));
+        let gap_guid = text.replacen("\"r\":\"gap\"", "\"guid\":3,\"r\":\"gap\"", 1);
+        assert!(TraceFile::parse(&gap_guid)
+            .unwrap_err()
+            .message
+            .contains("only with r ok"));
         let upper = text.replacen("\"b\":\"2aff\"", "\"b\":\"2AFF\"", 1);
         assert!(TraceFile::parse(&upper)
             .unwrap_err()

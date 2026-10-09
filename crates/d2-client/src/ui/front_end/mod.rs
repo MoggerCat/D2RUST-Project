@@ -51,11 +51,11 @@ pub const FIRE: &str = r"FrontEnd\fire";
 pub const FIRE_MODE: u8 = 3;
 
 /// The fire cel drawn additively over a logo half's black base (§F1.5 r1).
-/// // d2rs-own, unverified: file names (the base names are the main menu's).
+/// File names: `frontend-menus.md` §F1.5 r1 (all four exist in `d2data.mpq`).
 pub fn fire_overlay(base: &str) -> Option<&'static str> {
     match base {
-        r"FrontEnd\BlackLeft" => Some(r"FrontEnd\FireLeft"),
-        r"FrontEnd\BlackRight" => Some(r"FrontEnd\FireRight"),
+        r"FrontEnd\D2logoBlackLeft" => Some(r"FrontEnd\D2logoFireLeft"),
+        r"FrontEnd\D2logoBlackRight" => Some(r"FrontEnd\D2logoFireRight"),
         _ => None,
     }
 }
