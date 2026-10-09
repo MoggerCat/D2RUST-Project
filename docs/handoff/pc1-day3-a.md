@@ -39,3 +39,19 @@ points: 800–814.
   (same trace, `think0` records). `specs/client/model.md` §5 r6.4.
   d2rs: the timer's default 0 matches; the AI itself is
   `q-fix-real-critter-ai`.
+
+## Round 2 (2026-10-09; no 1.14d runs in this session, PC1-C runs them)
+
+- **Item 1 — C→S 0x67 trailing bytes.** The builder `0x00477CA0` keeps
+  the message in an uncleared 0x30-byte stack local; `0x004135D0` copies
+  each name through its NUL only. Bytes 2–16 (after the empty game name)
+  and the bytes after the character name's NUL through 36 are what
+  earlier callees of `0x0044F360` left there. Three Windows recordings
+  show a callback address `0x0044C520`, a stack address `0x0019F9F0`, the
+  constant `0x0000020C` and a pointer that differs every run, so the
+  bytes are process memory, not state. The server reads both names as
+  cstr16 and ignores the rest. Answer in `specs/client/model.md` §7 r9
+  "Unwritten bytes". New C→S mask table
+  `specs/tools/scenario-masks-c2s.tsv` (`tools/scenario.md` §6 rule 4,
+  `packets-trace.md` rule 5). d2rs's zeros stay; the comparator has to
+  learn the c2s masks: row `q-fix-tool-c2s-masks`.

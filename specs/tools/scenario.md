@@ -343,6 +343,13 @@ so in its trace header's `gaps` (FORMAT.md) instead of approximating.
 3. The table is read with strict errors: five columns, a hex id that is
    an S→C id (≤ 0xB4), a key as in rule 1, a decimal offset or `nul@<n>`,
    a non-zero decimal length, `*` or `..<n>`, a non-empty source.
+4. `specs/tools/scenario-masks-c2s.tsv` is the same table for the C→S
+   bytes the original client does not write (same columns, rules 1–3;
+   the id is a C→S id of `sim/client-messages.tsv`). Its rows apply to
+   `c2s` records of that id; keys and NUL positions are read from the
+   original's record. Rows (2026-10-09): C→S 0x67 `nul@1 ..16` and
+   `nul@21 ..36`, the stack bytes after the game name and the
+   character name (`client/model.md` §7 rule 9 "Unwritten bytes").
 
 <!-- rows -->
 | id | bytes | why |

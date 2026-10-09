@@ -514,16 +514,38 @@ position check of the local player.
    | Bytes | Value | Single player (recorded seq 1, both recordings) |
    |---|---|---|
    | @0 | 0x67 | |
-   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); the bytes after the NUL keep stack contents | empty (byte 1 = 0) |
+   | @1 | game name `0x007A05DC`, copied up to its NUL (`0x004135D0`); bytes after the NUL through @0x10 unwritten (below) | empty (byte 1 = 0) |
    | @0x11 | game type: `[0x007A0610]` 0 → 3, 6 → 1, 8 → 2, else 0 | 3 (type 0) |
    | @0x12 | class: `0x0047AA20()` (`[0x00712F00]`) when `[0x00712EFC]` bit 8, else byte `[0x007A0522]` | the selected character's class |
    | @0x13 | template: C +0x20D | 0 |
    | @0x14 | difficulty: C +0x210 (0–2; read as such by `0x0044CF20`) | 0 (Normal) |
-   | @0x15 | character name `0x007A05C4`, copied up to its NUL | the character |
+   | @0x15 | character name `0x007A05C4`, copied up to its NUL; bytes after the NUL through @0x24 unwritten (below) | the character |
    | @0x25 | u16 C +0x207 (the server never reads it, `sim/intents-events.md` §2.5) | 0 |
    | @0x27 | u32 C +0x209; when it is 0 the builder first stores 4 \| 0x100000 there | 0x00100004 |
    | @0x2B, @0x2C | C +0x20E, C +0x20F (passed, never read by the server) | 0, 0 |
    | @0x2D | language id `0x00525150()` (0–13; the server refuses > 14) | 0 |
+
+   **Unwritten bytes** (2026-10-09, from the asm and three Windows
+   recordings). The message is a 0x30-byte local of the
+   builder (`[ebp-0x30]`, `sub esp, 0x30`, never cleared); `0x004135D0`
+   copies each name through its NUL and writes nothing after it, and
+   no other store touches @2–@0x10 or the character-name tail. Those
+   bytes are whatever the earlier callees of `0x0044F360` (the
+   `0x004F59A0` / `0x00451DB0` string calls, `0x004680B0`,
+   `0x00451F10`, `0x00483310`, `0x00475DF0`, the
+   `GetVersionExA`-style import `[0x006CC1F8]`) left at that depth. In
+   the recordings: @2–3 `45 00`; u32@4 a heap / data pointer that
+   differs every run (`0x007405FA`, `0x001F0310`, `0x001006E8`); u32@8
+   `0x0000020C`; u32@0x0C `0x0044C520` (a callback address,
+   `0x0044C520` has no direct caller); @0x10 `5C`; character-name tail
+   (with a 6–7-letter name) `20 C5 44 00 F0 F9 19 00 00`: `0x0044C520`
+   again and a stack address `0x0019F9F0`. Under Wine the same bytes
+   are non-zero with other values. They are process memory, not game
+   state: the server reads both names as C strings within 16 bytes
+   (`sim/intents-events.md` §2.5 rule 1, cstr16@1 / cstr16@0x15) and
+   reads none of these bytes, so no rule can reproduce them. d2rs
+   writes zeros; the packets channel masks them (`tools/scenario.md`
+   §6 rule 4, `scenario-masks-c2s.tsv`).
 
    d2rs: the app builds these bytes from its own state: name empty, type
    3, the character's class and name, template 0, the chosen difficulty,
