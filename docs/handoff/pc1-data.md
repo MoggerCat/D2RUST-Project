@@ -246,7 +246,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     sim-0009. (Item 20 note: under Wine the front end does take X input,
     `tools/cloud-game/xinput.sh`; in-game NPC menus were not tried.)
 
-28. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
+29. **Monster path target at the death message** (q-tool-poke, REC-594): 1.14d state
     snapshots read an idle spawned monster's path target (+0x10/+0x12) as
     its spawn point (`monsters/init.md` §4.1 step 1.1; check
     `traces/checks/poke-fallen-town.check`), so d2rs now writes it there;
