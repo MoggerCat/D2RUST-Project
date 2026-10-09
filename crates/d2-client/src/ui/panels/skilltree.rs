@@ -13,8 +13,8 @@
 //!   ([`SkillTreeView::icon_file`]). No icon is drawn without it.
 //! - The remap `k` of an icon (§10.3) is implemented literally in the
 //!   stated order; spec OQ4 says "exact remap `k` per state: verify by
-//!   capture". Unverified. [`UiDraw::Image`] carries no remap, so the
-//!   remap is exposed through [`SkillTreePanel::icons`] for the sink.
+//!   capture". Unverified (REC-722). The icon's [`UiDraw::Image`] carries it as
+//!   `look.remap = Remap::Palette(k)` (the colored cel draw, §10.3).
 //! - The close-button offset table `0x00724CE4` (§10.6) is only given for
 //!   amazon; other classes have no close button here
 //!   ([`close_offset`] returns `None`).
@@ -282,10 +282,17 @@ impl SkillTreePanel {
         self.tab_skills(s, view)
             .map(|(e, at)| {
                 let pressed = self.pressed == Some(e.skill);
+                let remap = self.icon_remap(view, e, at, mouse);
+                let mut image = cel(file, e.icon_cel + u32::from(pressed), at.x, at.y);
+                // The colored cel draw `0x004F64B0` with `k` (§10.3); k 0 is
+                // the plain draw (`text.md` §4.3).
+                if let UiDraw::Image(r) = &mut image {
+                    r.look.remap = crate::ui::Remap::Palette(i32::from(remap));
+                }
                 IconDraw {
                     skill: e.skill,
-                    image: cel(file, e.icon_cel + u32::from(pressed), at.x, at.y),
-                    remap: self.icon_remap(view, e, at, mouse),
+                    image,
+                    remap,
                     level: level_text(e, at),
                 }
             })
@@ -958,6 +965,28 @@ mod tests {
         let ic = p.icons(&s, &v, Point::new(0, 0));
         assert_eq!(ic.len(), 1);
         assert_eq!(ic[0].skill, 7);
+    }
+
+    // Covers: specs/ui/panels.md §10 r3
+    #[test]
+    fn icon_draw_carries_its_remap() {
+        let s = Screen::R800;
+        let v = view(vec![entry(6, 1, 2, 3)]);
+        let p = SkillTreePanel::new();
+        let out = Point::new(0, 0);
+        let ic = p.icons(&s, &v, out);
+        let want = crate::ui::Remap::Palette(i32::from(ic[0].remap));
+        let UiDraw::Image(r) = &ic[0].image else {
+            panic!("image")
+        };
+        assert_eq!((r.look.mode, r.look.remap), (5, want));
+        // Mouse strictly inside the icon: k = 3 (§10.3).
+        let ic = p.icons(&s, &v, Point::new(500, 240));
+        let UiDraw::Image(r) = &ic[0].image else {
+            panic!("image")
+        };
+        assert_eq!(ic[0].remap, 3);
+        assert_eq!(r.look.remap, crate::ui::Remap::Palette(3));
     }
 
     // Covers: specs/ui/panels.md §10 r4

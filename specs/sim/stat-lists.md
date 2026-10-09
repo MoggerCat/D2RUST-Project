@@ -26,19 +26,19 @@
 |   2. Flags (+0x10) | 125–162 |
 |   3. Stat arrays | 163–178 |
 |   4. Allocation and ownership | 179–202 |
-|   5. Base writes | 203–227 |
-|   6. Full values | 228–293 |
-|   7. Value-change notification | 294–330 |
-|   8. Chain operations | 331–438 |
-|   9. States | 439–475 |
-|   10. Timer event handlers | 476–563 |
-|   11. Mod array and stat messages | 564–581 |
-| Constants & data dependencies | 582–593 |
-| Randomness | 594–597 |
-| Edge cases & original bugs | 598–621 |
-| Test vectors | 622–658 |
-| Provenance | 659–682 |
-| Open questions | 683–713 |
+|   5. Base writes | 203–229 |
+|   6. Full values | 230–295 |
+|   7. Value-change notification | 296–332 |
+|   8. Chain operations | 333–440 |
+|   9. States | 441–479 |
+|   10. Timer event handlers | 480–567 |
+|   11. Mod array and stat messages | 568–585 |
+| Constants & data dependencies | 586–597 |
+| Randomness | 598–601 |
+| Edge cases & original bugs | 602–625 |
+| Test vectors | 626–662 |
+| Provenance | 663–686 |
+| Open questions | 687–717 |
 <!-- /index -->
 
 ## Summary
@@ -212,7 +212,9 @@ Key k = (s << 16) + layer.
    and its owner type (+0x08) is 0: mod insert (§11). Return 1.
 2. Unit wrappers: `0x00627260`(unit, s, value, layer) = set on unit
    +0x5C, then (redundant) mod insert for a player. `0x00627150`: set on
-   a non-null list.
+   a non-null list. Call form of `0x00627260` (asm, `0x0062729C`): all
+   four on the stack, [ESP+4] unit, s, value, layer; `ret 0x10`; EAX is
+   not a result (left from the set or the mod insert).
 3. **Add** (`0x00627030`(list, s, d, layer); `0x006272B0` on unit
    +0x5C): null list or d = 0 → nothing. Absent → insert 0; value += d;
    result 0 → remove. Propagate with d (null unit); extended player →
@@ -454,7 +456,9 @@ off → clear it unless another disguise state is still on (`0x0063A7B0`).
 `0x00639DB0`(unit, s, on): s outside 0 … states count − 1 → nothing
 (no toggle, no queue). Else the toggle above, then the update-queue
 insert (`unit-order.md` §6.2) **always**, whether or not the bit
-changed. 1.14d-confirmed (asm of `0x00639DB0`).
+changed. 1.14d-confirmed (asm of `0x00639DB0`). Call form: all three
+on the stack, [ESP+4] unit, s, on; `ret 0xC`; no result (EAX left as
+the states-count test or the queue insert leaves it).
 
 #### 9.3 Queries
 

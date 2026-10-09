@@ -731,7 +731,8 @@ fn ui_input(
             .map(|&(c, _)| c)
             .filter(|&c| keys.just_pressed(c))
             .collect();
-        let actions = edge::key_actions(bindings, &pressed);
+        let mode = ui.original.as_ref().map_or(1, |o| o.key_mode());
+        let actions = edge::key_actions_in_mode(bindings, &pressed, mode);
         ui.queue.0.extend(actions);
         ui.queue.0.extend(edge::key_chars(&pressed));
     }
@@ -812,7 +813,8 @@ fn script_input(
         return;
     }
     if let Some(bindings) = &ui.bindings {
-        let actions = edge::key_actions(bindings, &codes);
+        let mode = ui.original.as_ref().map_or(1, |o| o.key_mode());
+        let actions = edge::key_actions_in_mode(bindings, &codes, mode);
         ui.queue.0.extend(actions);
     }
     ui.queue.0.extend(edge::key_chars(&codes));

@@ -160,7 +160,16 @@ impl LevelTypes for FakeTypes {
         self.door_flag
     }
 
-    fn warp_unit(&mut self, _: &mut Drlg, _: DrlgRoomId, wx: i32, wy: i32, _: u32) {
+    fn warp_unit(
+        &mut self,
+        _: &mut Drlg,
+        _: &DrlgData,
+        _: DrlgRoomId,
+        _: u32,
+        wx: i32,
+        wy: i32,
+        _: u32,
+    ) {
         self.warp_units.push((wx, wy));
     }
 }

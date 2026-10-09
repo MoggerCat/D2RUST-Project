@@ -33,22 +33,22 @@
 | Rules | 121–122 |
 |   1. Conventions | 123–230 |
 |   2. Seeds | 231–249 |
-|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 250–271 |
-|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 272–319 |
-|   5. Special item kinds | 320–330 |
-|   6. Normal quality and class skill mods | 331–377 |
-|   7. Sockets | 378–409 |
-|   8. Ethereal | 410–430 |
-|   9. Forced requests, ears, names, timers | 431–464 |
-|   10. Items from a code: the create wrapper and start items | 465–535 |
-|   11. Format-0 branches (legacy items) | 536–581 |
-|   12. Repair, recharge and runeword removal | 582–668 |
-| Constants & data dependencies | 669–691 |
-| Randomness | 692–710 |
-| Edge cases & original bugs | 711–725 |
-| Test vectors | 726–741 |
-| Provenance | 742–768 |
-| Open questions | 769–859 |
+|   3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`) | 250–273 |
+|   4. Base stats (`0x00557AB0`, D2MOO `D2GAME_InitItemStats`) | 274–321 |
+|   5. Special item kinds | 322–332 |
+|   6. Normal quality and class skill mods | 333–379 |
+|   7. Sockets | 380–411 |
+|   8. Ethereal | 412–432 |
+|   9. Forced requests, ears, names, timers | 433–466 |
+|   10. Items from a code: the create wrapper and start items | 467–540 |
+|   11. Format-0 branches (legacy items) | 541–586 |
+|   12. Repair, recharge and runeword removal | 587–673 |
+| Constants & data dependencies | 674–696 |
+| Randomness | 697–715 |
+| Edge cases & original bugs | 716–730 |
+| Test vectors | 731–746 |
+| Provenance | 747–773 |
+| Open questions | 774–864 |
 <!-- /index -->
 
 ## Summary
@@ -250,7 +250,9 @@ owned by `sim/stat-lists.md`.
 ### 3. Pipeline (`0x00558D90`, D2MOO `D2GAME_CreateItemEx`)
 
 Arguments: game, request, "use seed" (true when the caller supplies
-seeds).
+seeds). Call form (asm): ECX game, EDX request; stack [ESP+4] use
+seed; `ret 4`; EAX the item unit, 0 = failed. A ground item at a point
+is this call with request spawn mode 3, x, y, room set (§Inputs).
 
 1. Classic game (game +0x70 = 0): fail if the item record is missing or
    its `version` ≥ 100.
@@ -469,6 +471,9 @@ draw. Also used by property function 23 and craft lists
 A 4-byte item code (space-padded, as in `items.txt` `code`) → the
 combined items index through the code map (`data/callbacks.md`, linker
 `0x0096BCC4`); unknown code → not found (index 0, null record).
+Call form (asm): stack [ESP+4] code (u32), &index (out); `ret 8`; EAX
+the record (index × 0x1A8 + the records pointer `0x0096CA5C`), 0 when
+not found.
 
 #### 10.2 Create from an index (`0x00559CE0`)
 

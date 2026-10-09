@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–136 |
-|   4. The table (`sequences.tsv`) | 137–168 |
-|   5. Users in 1.14d | 169–185 |
-| Constants & data dependencies | 186–194 |
-| Randomness | 195–198 |
-| Edge cases & original bugs | 199–218 |
-| Test vectors | 219–233 |
-| Provenance | 234–248 |
-| Open questions | 249–254 |
+|   3. Frame queries | 112–209 |
+|   4. The table (`sequences.tsv`) | 210–241 |
+|   5. Users in 1.14d | 242–258 |
+| Constants & data dependencies | 259–267 |
+| Randomness | 268–271 |
+| Edge cases & original bugs | 272–291 |
+| Test vectors | 292–306 |
+| Provenance | 307–321 |
+| Open questions | 322–327 |
 <!-- /index -->
 
 ## Summary
@@ -133,6 +133,79 @@ row), +3 drawn frame, +5 event byte (0 none, 1–4 the codes of `use.md`
   §15): +0x4E := 0; flag 0x4000 cleared; p = +0x38 + +0x3C, minus +0x34
   once when ≥ +0x34; +0x38 := p; +0x48 −= +0x3C; frame setup with b = the
   old +0x38; drawn mode changed → flag 0x4000 set.
+
+**Client mode-18 machine** (2026-10-09, REC-702..704; 1.14d asm). The
+client player update `0x00463390` drives a mode-18 unit by the mode row
+`0x00711E00` + 12·18 = {kind 2, advance 1, end 3}, in this order each
+client update:
+
+1. Used skill E (`0x00620250`) with flags bit 1 (moving): path step
+   `0x004807C0` (`render/camera.md` §9); "arrived" = the step returned 0
+   (`0x00650840`: no move, or the step that reached the last point). Arrived
+   → E flags |= 2 and the client do `0x004C68F0` → `0x004C6680`
+   (`cltdofunc`, table `0x00727BA8`).
+2. Not arrived, unit flag 0x40 (+0xC4) clear and +0x4E ∈ {1, 2, 3} →
+   the client do. +0x4E is the byte the previous update's advance wrote.
+3. Advance: animation not complete (`0x006217C0`: +0x48 < 1) → frame
+   advance `0x00623E00` (above).
+4. Mode 18 with flag 0x4000 → graphics refresh `0x00470610`.
+5. End: `0x006217C0` true → the neutral end (mode set by `0x004611F0`).
+
+Request timing: the 0x4C / 0x4D mode request (codes 0x16 / 0x15,
+`client/model.md` §8 rule 4 and rule 7) is a unit-queued message,
+drained after the unit's per-type update (`client/model.md` §4 r5), so
+its update loads the sequence at frame 0 (§2) and runs the client start
+(`cltstfunc` table `0x00727A90`) with **no** mode-18 machine step; the
+next update is the first step (do test on frame 0's byte, then the
+advance to frame 1). Code 0x16's record: r2 = target unit type (EDX),
+r3 = GUID (ECX) of `0x00463990` at `0x004C6ECF` (`0x004C6EB0`), r4 =
+level. PROVISIONAL (REC-670): whether the local player's own input
+path sets mode 18 earlier than the server's 0x4C / 0x4D is not read.
+
+Leap (`cltstfunc` 30 `0x004C8D90`, `cltdofunc` 43 `0x004C8C60`) and
+Leap Attack (`cltstfunc` 30, `cltdofunc` 44 `0x004C8ED0`) share start
+and hold:
+
+1. Start: target point stored in E; E flags := 0x1080.
+2. Do with flag 0x80 (frame 5, event 5:1): `0x004C85B0` (E flags :=
+   0x1101; path to the point at run speed: `charstats` +0x41 << 8, a
+   monster `monstats` +0x34 << 8) and the motion record `0x004C8670`
+   (`render/unit-composite.md` §8).
+3. Do with flag 0x100 (frame 11, event 11:1): landing check
+   `0x004C8970(E, 1)` (`audio/triggers-2.md` §13.3). Not landed
+   (record z ≠ 0 and position ≠ the point) → sequence position +0x38 :=
+   10·256 (`0x006212C0`), +0x48 := (+0x48 & ~0xFF) + 256, do returns
+   0; the advance then reaches frame 11 again with +0x4E = 1, so the
+   next update repeats the do: **frame 11 is held while airborne**, for
+   Leap and Leap Attack alike (same function, same frame-11 event).
+   Monsters: `BaseId` 78 → position 8; 540 → 10, or 12 when
+   `0x006417F0` distance < 2.
+4. E flags 0x1101 include bit 1, so machine step 1 also steps the leap
+   path; its arrival sets flag 2 and runs the do. Landed: with flag 2
+   → path end `0x004C8890`, E flags := 0; without → E flags := 0x1000
+   (not for monsters); the sequence then runs to its end. Leap Attack
+   additionally takes its target
+   (`0x00644500`); none → +0x48 := 0x400 (four frames left), else the
+   strike set-up (`0x00620C10`, `0x00623C20`, sounds).
+
+Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
+
+1. Start: player or monster only; path speed := `charstats` +0x40
+   (walk) << 8 for a player, `monstats` `Velocity` +0x32 << 8 for a
+   monster (`0x00648690` at `0x004C9291`); path computed; E flags := 1,
+   E point := the path's last point. One path step is then (0x400 ·
+   speed) >> 6 = walk << 12 (16.16 sub-tiles) along the Euclidean
+   direction (`sim/pathing.md` §9.4), from the first machine update on.
+2. Do while moving (flags & 3 = 1): +0x38 := 3·256, +0x48 := 0x500
+   (loop A1 3–6).
+3. Do on arrival (flags & 3 = 3): path stop, E flags := 0, sound stop
+   (`0x004BA840`). No rewind after this: mode 18 ends on the update whose
+   advance takes +0x48 below 1 (end kind 3), i.e. after the rest of the
+   current A1 3–6 loop. PROVISIONAL (REC-671): the measured 24 / 40
+   updates (`facts/client/anim/a1-cold-plains-whirlwind-bar.tsv`) are
+   fitted by d2rs as "ends on the arrival update"; the binary rule above
+   gives arrival + the loop's remaining frames, so a recorded arrival
+   phase is needed to tell them apart.
 
 ### 4. The table (`sequences.tsv`)
 
