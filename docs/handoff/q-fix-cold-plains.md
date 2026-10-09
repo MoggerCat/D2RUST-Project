@@ -63,8 +63,8 @@ Build-list draws: Blood Moor at seq 2562–2571, 4464, 6027, 6129, 6230,
 d2-client -p test-fixtures --all-targets -- -D warnings` clean; `cargo
 nextest run` on those crates: 7488 passed, 0 failed (169 skipped);
 ignored tests with `D2_GAME_DIR` (`nextest --run-ignored only -p d2-server
--p d2-sim`): 130 passed, 0 failed, d2-server 17 / 17 (was 9 / 17:
+-p d2-sim`): 130 passed, 0 failed: d2-server 18 / 18 (q-realdata-run: 9 / 17;
 `outdoor_levels_generate_through_the_dispatcher` and all 7
-`game_wired_host` classes now pass), d2-sim 113 / 113;
+`game_wired_host` classes now pass), d2-sim 112 / 112;
 `py tools/coverage.py --check` 0 errors (14,187 claims);
 `py tools/spec_index.py --check` clean.
