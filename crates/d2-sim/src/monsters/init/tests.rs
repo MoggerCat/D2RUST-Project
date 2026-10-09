@@ -217,6 +217,9 @@ struct Fake {
     next_seed: u32,
     /// Extra (type, parent) nestings for `montype_is` beyond equality.
     montype_nest: BTreeSet<(u16, u16)>,
+    /// The server callback's max-life rescale (`sim/stat-lists.md` §7.2
+    /// stat 7): a maxhp write sets hitpoints to new / old · current.
+    rescale_hp: bool,
 }
 
 impl Fake {
@@ -242,6 +245,7 @@ impl Fake {
             inventory: false,
             items_at: BTreeSet::new(),
             montype_nest: BTreeSet::new(),
+            rescale_hp: false,
             region: Vec::new(),
             level_id: 2,
             minions: BTreeMap::new(),
@@ -312,7 +316,15 @@ impl InitHost for Fake {
         self.s(unit, stat)
     }
     fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {
-        self.stats.insert((unit, stat), value);
+        let old = self.stats.insert((unit, stat), value).unwrap_or(0);
+        if self.rescale_hp && stat == stat::MAXHP && value != old && old > 0 {
+            let c = self.s(unit, stat::HITPOINTS);
+            if c > 0 {
+                let q = (i64::from(value) * i64::from(c) / i64::from(old.max(256))) as i32;
+                self.stats
+                    .insert((unit, stat::HITPOINTS), q.max(1).min(value));
+            }
+        }
     }
     fn alloc_ai(&mut self, unit: UnitId) {
         self.log.push(format!("alloc_ai {}", unit.0));
@@ -1392,6 +1404,15 @@ fn champion_types_and_others() {
     assert_eq!(f.s(u, stat::DAMAGEPERCENT), 270);
     assert_eq!(f.s(u, stat::ITEM_TOHIT_PERCENT), 270);
     assert_eq!(f.s(u, stat::EXPERIENCE), 100);
+    // Both read before the writes: with the max-life rescale on, the
+    // berserker of the Cave Level 1 recording (12288) ends at 3072 / 3072.
+    let w = f.monster(0, 1);
+    f.rescale_hp = true;
+    f.set_stat(w, stat::MAXHP, 12288);
+    f.set_stat(w, stat::HITPOINTS, 12288);
+    run_umod_init(&cx, &mut f, w, 39, true);
+    assert_eq!((f.s(w, stat::MAXHP), f.s(w, stat::HITPOINTS)), (3072, 3072));
+    f.rescale_hp = false;
     // 26 teleport.
     run_umod_init(&cx, &mut f, u, 26, true);
     assert_eq!(f.log.last().unwrap(), "skill 289 1 Some(4)");
