@@ -38,10 +38,13 @@ fn expansion_layout_matches_table() {
     assert_eq!(
         buttons(&f),
         [
+            // Battle.net, gateway, Other Multiplayer: enabled (§F1.4 r2:
+            // disabled only when `0x004FAC90` ≠ 0; the 1.14d screenshot
+            // draws them enabled), with no action (Phase 7+).
             (5106, 264, 324, 272, 35, true),
-            (5107, 264, 366, 272, 35, false),
-            (0, 264, 391, 272, 25, false),
-            (5108, 264, 433, 272, 35, false),
+            (5107, 264, 366, 272, 35, true),
+            (0, 264, 391, 272, 25, true),
+            (5108, 264, 433, 272, 35, true),
             (5110, 264, 528, 135, 25, true),
             (5111, 402, 528, 135, 25, true),
             (5109, 264, 568, 272, 35, true),
@@ -62,12 +65,18 @@ fn classic_layout_is_100_higher_for_first_four() {
 fn version_text_and_draw_order() {
     let f = menu(true, true);
     let d = f.draw();
-    assert!(matches!(&d[0], DrawItem::Art { file, .. } if *file == BACKGROUND));
-    assert!(matches!(&d[1], DrawItem::Art { file, .. } if *file == LOGO_LEFT));
+    // The background: 12 tiles of 256 × 256 (§F1.2, 4 × 3), frames 0–11.
+    for (t, it) in d[..12].iter().enumerate() {
+        assert!(
+            matches!(it, DrawItem::Art { file, frame, .. } if *file == BACKGROUND && *frame == t as u32),
+            "{it:?}"
+        );
+    }
+    assert!(matches!(&d[12], DrawItem::Art { file, .. } if *file == LOGO_LEFT));
     // §F1.5 r2: per logo half, the black base and then its fire overlay.
-    assert!(matches!(&d[2], DrawItem::Blend { mode: 3, .. }));
-    assert!(matches!(&d[3], DrawItem::Art { file, .. } if *file == LOGO_RIGHT));
-    assert!(matches!(&d[4], DrawItem::Blend { mode: 3, .. }));
+    assert!(matches!(&d[13], DrawItem::Blend { mode: 3, .. }));
+    assert!(matches!(&d[14], DrawItem::Art { file, .. } if *file == LOGO_RIGHT));
+    assert!(matches!(&d[15], DrawItem::Blend { mode: 3, .. }));
     match d.last().unwrap() {
         DrawItem::Text { text, .. } => assert_eq!(text, "v 1.14d"),
         other => panic!("{other:?}"),
@@ -112,8 +121,10 @@ fn button_art_states() {
         (0, 1)
     );
     assert_eq!((button_frame(c, 0, true), button_frame(c, 1, true)), (2, 3));
-    let dis = &f.controls()[4];
-    assert_eq!(button_frame(dis, 0, true), 0);
+    // A disabled button never shows its pressed frames (r4).
+    let mut dis = f.controls()[4].clone();
+    dis.enabled = false;
+    assert_eq!(button_frame(&dis, 0, true), 0);
 }
 
 #[test]
@@ -122,7 +133,8 @@ fn logo_fire_frames_loop_0_to_28() {
     let mut seen = Vec::new();
     for _ in 0..60 {
         f.tick();
-        if let DrawItem::Art { frame, .. } = f.draw()[1] {
+        // d[12]: the left logo half, after the 12 background tiles.
+        if let DrawItem::Art { frame, .. } = f.draw()[12] {
             seen.push(frame);
         }
     }

@@ -6,6 +6,7 @@
 use crate::ui::front_end::control::{Action, Control, ControlKind};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
+use crate::ui::front_end::screens::main_menu::{LOGO_LEFT, LOGO_RIGHT};
 use crate::ui::front_end::{Registry, TRADEMARK};
 
 /// Timer seconds (descriptor 3).
@@ -37,7 +38,9 @@ pub const KEYS: [u16; 18] = [
 pub const BACKGROUND: &str = "FrontEnd\\trademarkscreenEXP";
 pub const BACKGROUND_CLASSIC: &str = "FrontEnd\\trademark";
 
-/// Legal text: descriptor 4, FontFormal12, (100, 580) 600×80.
+/// Text: descriptor 4, FontFormal12, (100, 580) 600×80. The builder adds
+/// no row to it (§F1.3 trademark row names the control only), so it draws
+/// nothing; the 1.14d trademark screen shows the art and the logo alone.
 const TEXT_FONT: u16 = 5;
 
 struct Trademark;
@@ -50,16 +53,16 @@ impl Screen for Trademark {
         } else {
             BACKGROUND_CLASSIC
         };
-        let mut text = Control::new(ControlKind::Text, 100, 580, 600, 80);
-        text.font = TEXT_FONT;
+        let text = Control::new(ControlKind::Text, 100, 580, 600, 80).with_font(TEXT_FONT, 0);
         vec![
             Control::new(ControlKind::Image, 0, 599, 800, 600)
                 .with_art(art)
                 .with_keys(&KEYS)
                 .with_action(go),
             Control::timer(TIMER_SECONDS, go),
-            Control::new(ControlKind::AnimImage, 400, 120, 181, 170),
-            Control::new(ControlKind::AnimImage, 400, 120, 188, 177),
+            // Logo halves, descriptors 6 / 7 (§F1.5 r1).
+            Control::new(ControlKind::AnimImage, 400, 120, 181, 170).with_art(LOGO_LEFT),
+            Control::new(ControlKind::AnimImage, 400, 120, 188, 177).with_art(LOGO_RIGHT),
             text,
         ]
     }

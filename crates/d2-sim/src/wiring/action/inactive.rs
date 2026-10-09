@@ -1,4 +1,4 @@
-// Spec: specs/sim/units.md §3.3, §3.4 (wiring of the inactive store)
+// Spec: specs/sim/units.md §3.3, §3.4 (wiring of the inactive store); specs/drlg/rooms.md §8 r6 (warp tiles)
 //! The compress of tick step 9 (`0x005433F0`) and the restore of a
 //! room's first population (`0x00542B40`) on the action wiring: the
 //! rules of [`crate::units::inactive`] with the unit records, the stat
@@ -7,7 +7,8 @@
 //! inactive-store seams.
 //!
 //! The store is [`ActionHooks::inactive`]: `None` (the default) keeps the
-//! old behaviour (no compress, no restore);
+//! old behaviour (no compress, no restore) for every unit but warp tiles,
+//! which go to [`ActionHooks::fallback_tiles`] (PROVISIONAL, REC-230);
 //! [`ActionHooks::enable_inactive_store`] turns it on.
 //!
 //! The facts come from the game's tables where it has them (leveldefs
@@ -509,7 +510,20 @@ impl<X: Pending> View<'_, X> {
             return;
         }
         // `0x005557D0(game, room, type, class, x, y, mode, flags)`: a new
-        // unit (new GUID), unit flags 0x3000000.
+        // unit (new GUID), unit flags 0x3000000. A tile keeps its stored
+        // flags under them (`rooms.md` §8 rule 6, [`View::create_tile`]).
+        if ty == UnitType::Tile {
+            self.create_tile(
+                game,
+                room,
+                rec.class,
+                rec.x,
+                rec.y,
+                rec.mode,
+                rec.unit_flags,
+            );
+            return;
+        }
         let u = if ty == UnitType::Object {
             let mode = u8::try_from(rec.mode).unwrap_or(u8::MAX);
             match self.create_object(game, room, rec.class, rec.x, rec.y, mode) {
@@ -605,17 +619,69 @@ impl<X: Pending> View<'_, X> {
             }
         }
     }
+
+    /// Tick step 9 for a tile while the inactive store is off
+    /// ([`ActionHooks::fallback_tiles`]): the tile's record (§3.4 rule 3)
+    /// stored and the tile freed, as the store does (`rooms.md` §8 rule
+    /// 6). PROVISIONAL (REC-230); d2rs-own, unverified.
+    fn compress_fallback_tile(&mut self, game: &mut Game, room: RoomId, u: UnitId) {
+        let Some((act, at)) = self.node_key(game, room) else {
+            return;
+        };
+        let Some(r) = self.units.get(u) else {
+            return;
+        };
+        let (x, y) = self.h.path_position(u);
+        let rec = OtherRecord {
+            x,
+            y,
+            ty: UnitType::Tile as u8,
+            class: r.class,
+            mode: r.mode,
+            frame: game.frame,
+            unit_flags: r.flags,
+            flags_ex: r.flags2,
+            ..OtherRecord::default()
+        };
+        self.h.fallback_tiles.push_other(act, at, rec);
+        self.remove(game, u);
+    }
+
+    /// The restore of [`ActionHooks::fallback_tiles`] for `room`: its
+    /// tiles re-created from the list head (reverse store order), new
+    /// GUIDs, as the other records of §3.4 rule 4.3. The caller runs it
+    /// after the host's restore (monsters and items first).
+    /// PROVISIONAL (REC-230); d2rs-own, unverified.
+    pub fn restore_fallback_tiles(&mut self, game: &mut Game, room: RoomId) {
+        let Some((act, (x, y))) = self.node_key(game, room) else {
+            return;
+        };
+        let Some(node) = self.h.fallback_tiles.take(act, x, y) else {
+            return;
+        };
+        for rec in &ia::restore_order(node).others {
+            self.restore_other(game, room, rec);
+        }
+    }
 }
 
 impl<X: Pending> ActionSim<X> {
     /// Tick step 9's compress (`0x005433F0`) when the store is on.
+    /// Off: only tiles, into [`ActionHooks::fallback_tiles`].
     pub fn compress(&mut self, game: &mut Game, unit: UnitId) {
-        if self.sys.hooks.inactive.is_none() {
-            return;
-        }
         let Some(room) = game.lists.unit(unit).and_then(|e| e.room()) else {
             return;
         };
+        if self.sys.hooks.inactive.is_none() {
+            if game
+                .lists
+                .unit(unit)
+                .is_some_and(|e| e.ty == UnitType::Tile)
+            {
+                self.with(game, |g, v| v.compress_fallback_tile(g, room, unit));
+            }
+            return;
+        }
         self.with(game, |g, v| v.compress_unit(g, room, unit));
     }
 

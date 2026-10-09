@@ -24,6 +24,15 @@ pub mod mask {
     pub const ITEM_FLOOR: u32 = 0x3E01;
     /// Walk-back field: WALL, DOOR.
     pub const FIELD: u32 = 0x801;
+    /// The act change's free point `0x0064E7E0(R, &pt, size, 0x1C89, 5)`
+    /// (`world/waypoints.md` §11 step 9).
+    pub const ACT_CHANGE: u32 = 0x1C89;
+    /// The portal pair's field-search field mask (`world/objects-2.md`
+    /// §25 rule 5; the spot mask is [`ITEM_FLOOR`]).
+    pub const PORTAL_FIELD: u32 = 0xC01;
+    /// The portal pair's destination free point (`world/objects-2.md`
+    /// §25 rules 11 and 13).
+    pub const PORTAL_DEST: u32 = 0xBE11;
 }
 
 /// The value a cell without a room (or a room without a grid) reads,

@@ -387,8 +387,8 @@ pub fn level_spawn<X: Pending>(
 
 /// The same-act level warp of `0x0053AEC0` (§11, `waypoints.md` §7 rule
 /// 5): spawn point (`0x0061B060`) then `0x00554EA0(exact 0, alt 0)`.
-/// `None`: the destination is in another act (act change, owner: the
-/// act/level-change spec; the caller keeps its `Pending` route).
+/// `None`: the destination is in another act: the caller runs the act
+/// change `0x0053ACC0` ([`super::act_change::run`], `waypoints.md` §11).
 pub fn level_warp<X: Pending>(
     c: PathCtx<'_, X>,
     player: UnitId,

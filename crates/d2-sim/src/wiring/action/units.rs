@@ -750,6 +750,20 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
             }
         }
     }
+    /// [`View::town_portal_cast`] with the call's game seed lent to the
+    /// hooks; no object state: `None`.
+    fn town_portal_cast(
+        &mut self,
+        sim: &mut Sim<'_>,
+        seed: &mut crate::rng::Seed,
+        player: UnitId,
+    ) -> Option<(u32, bool)> {
+        self.objects.as_ref()?;
+        self.game_seed = *seed;
+        let r = View::of(sim.units, sim.stats, sim.data, self).town_portal_cast(sim.game, player);
+        *seed = self.game_seed;
+        Some(r)
+    }
     /// The monster type init `0x00574250` (`init.md` §5, `units.md` §3.1
     /// table: the allocator's per-kind init of a monster) on the lent
     /// monster world ([`super::monsters`]); the object data and init

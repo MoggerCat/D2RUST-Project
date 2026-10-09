@@ -8,7 +8,7 @@ Stitching session `q-warps`, branch `claude/q-warps`. Read `specs/`,
 | Link | State before | Now |
 |---|---|---|
 | DRLG warp link (`drlg/rooms.md` §3.3) and the warp tile preset (`path-placement.md` §12.1) | existed | unchanged |
-| Tile units on the server | none: population places only type-1 presets | `View::spawn_warp_tiles` (`d2-sim/src/wiring/action/warp_tile.rs`), called from `WorldSim::spawn_presets` (tick step 3): a tile unit (type 5, class = lvlwarp `Id`) per type-5 preset of an active room, once |
+| Tile units on the server | none: population places only type-1 presets | `View::spawn_preset_tiles` (`d2-sim/src/wiring/action/warp_tile.rs`), called from `WorldSim::spawn_presets` (tick step 3) before the monster walk, once per DRLG room (flag 0x4000000, `rooms.md` §8 r6; q-fix-warp-tile-unit / -restore: the live level types add the presets through `WorldTypes::warp_unit`, deactivation stores and frees the tiles, the restore re-creates them) |
 | S→C 0x09 AssignLevelWarp, client model | existed | unchanged (the tile reaches the client's `ClientWorld.units`) |
 | Client interact sender for a tile | `bridge/objects/interact.rs` ignored type 5 | sends C→S 0x13 (type 5, GUID), as for the other unit types |
 | Server 0x13 with unit type 5 | no route | `world::route` → `System::Warps` → `WorldHost::warp_tile` → `ActionSim::warp_tile_message` → `View::warp_tile_message` → `wiring::path::place::warp_player` |

@@ -142,13 +142,16 @@ fn room_change_keeps_clients_of_shared_rooms() {
 // ---- data.rs --------------------------------------------------------------
 
 /// `levels.md` §7 r1, §7 r4 and Constants: the table view keeps the
-/// lvlwarp rows in file order (`Id`, `Direction`, `LitVersion`,
-/// `Tiles`), `lvltypes` `File 1..32` NUL-trimmed, and the objects
+/// lvlwarp rows in file order (`Id`, `Direction`, `LitVersion`, `Tiles`,
+/// signed `OffsetX` / `OffsetY` at +0x1C / +0x20, `path-placement.md`
+/// §12.1 rule 3), `lvltypes` `File 1..32` NUL-trimmed, and the objects
 /// subclass per class.
 #[test]
 fn table_view_from_records() {
     let mut w = vec![0u8; Lvlwarp::SIZE];
     w[0..4].copy_from_slice(&7u32.to_le_bytes());
+    w[28..32].copy_from_slice(&(-4i32).to_le_bytes());
+    w[32..36].copy_from_slice(&6i32.to_le_bytes());
     w[36..40].copy_from_slice(&3u32.to_le_bytes());
     w[40..44].copy_from_slice(&5u32.to_le_bytes());
     w[44] = b'r';
@@ -170,6 +173,8 @@ fn table_view_from_records() {
         direction: b'r',
         lit_version: 3,
         tiles: 5,
+        offset_x: -4,
+        offset_y: 6,
     };
     assert_eq!(d.warps, [warp.clone(), warp]);
     assert_eq!(d.lvltypes.len(), 1);
@@ -222,8 +227,7 @@ fn lvlwarp_row_of_a_slot() {
     let row = |id, direction| WarpDef {
         id,
         direction,
-        lit_version: 0,
-        tiles: 0,
+        ..WarpDef::default()
     };
     dat.warps = vec![row(4, b'l'), row(9, b'l'), row(4, b'r'), row(9, b'b')];
     let mut w = World::new(dat, FakeTypes::default());

@@ -127,11 +127,12 @@ provider maps each query to the core function.
 - Objects: no objects.txt in `ActionTables`: static path, no footprint.
 - Removal's footprint clear `0x00649F50`: conditions not stated; cleared
   unconditionally.
-- `player_knockback_path`, the run stat list (`attach_run_stats`,
-  `0x00620E80`), torso speed, cursor item, door orientation, target lead
+- `player_knockback_path`, torso speed, cursor item, door orientation,
+  target lead
   (OQ4), re-path budget (OQ8), unit add / removal messages, AI room memo,
   life percent of 0x0D (`0x00621F20`), player data +0x148 / +0x14C, pets:
-  `WalkUnits` / `PlaceHost` defaults.
+  `WalkUnits` / `PlaceHost` defaults. (The run stat list,
+  `attach_run_stats` / `0x00620E80`, is wired since 2026-10-08.)
 - **FreeSpot (treasure drop `0x0064E810`)**: the provider exists
   (`wiring::path::place::floor_drop(drlg, field, room, from, size,
   fallback)`; field `PathState::field`, loaded by the host from
