@@ -211,9 +211,7 @@ mod tests {
     fn floor_cells_take_the_style_of_their_neighbour_mask() {
         let rect = TileRect::new(100, 200, 8, 8);
         let mut floor = CellGrid::new(9, 9);
-        for c in &mut floor.cells {
-            *c = 0x40002;
-        }
+        floor.cells.fill(0x40002);
         // A vertical path through tile x 103 (path-grid X 4), y 200..=208.
         path_floor(&[vec![(103, 199), (103, 210)]], rect, &mut floor);
         // Column X 4 (floor x 3): neighbours east (X 5) above, at, below
