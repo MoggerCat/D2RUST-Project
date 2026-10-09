@@ -1126,13 +1126,15 @@ pub fn order_grid(
     positions: &BTreeMap<UnitKey, ClientPos>,
     clock: FadeClock,
 ) -> Result<FrameOrder, OrderError> {
-    // Pass 1: level backgrounds.
-    if matches!(near.level.id, 74 | 120) {
+    // Pass 1: level backgrounds. Level 120's is drawn by the world view's
+    // pass-1 layer (`world_view::background_view`); level 74's stars
+    // need the initial star tick `last`, which §12 r3 does not name.
+    if near.level.id == background::ARCANE_SANCTUARY {
         return Err(open(
             1,
             format!(
                 "level {} draws a background (draw-order-2.md §12, `background`): \
-                 the recorded time seeds and the view's art path are not wired",
+                 §12 r3 names no initial star tick `last`",
                 near.level.id
             ),
         ));

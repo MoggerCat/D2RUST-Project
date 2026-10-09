@@ -324,3 +324,108 @@ pub fn darkness(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerErr
     // (`client/msg-stats-items.md` §3 rule 3).
     Ok(())
 }
+
+/// The set-S owner of a model unit (§6.1 `+0x00..+0x08`).
+fn owner_of(key: UnitKey) -> Owner {
+    Owner {
+        unit_type: u32::from(key.unit_type),
+        guid: key.guid,
+        client_only: false,
+    }
+}
+
+/// The unit's light (unit `+0x64`): the record its owner fields name.
+pub fn unit_light(
+    w: &ClientWorld,
+    key: UnitKey,
+) -> Option<crate::rules::lighting::records::LightId> {
+    let owner = owner_of(key);
+    w.lights
+        .iter()
+        .find(|(_, r)| r.owner() == Some(owner))
+        .map(|(id, _)| id)
+}
+
+/// Creates `req` as the light of `key` (`0x00474160`, §6.2 r1; position
+/// from the unit's sub-tile, §6.1 static path), replacing the light it
+/// had (§6.2 r5), then sets `req`'s target (§6.2 r3).
+fn replace_unit_light(w: &mut ClientWorld, key: UnitKey, req: sources::LightRequest) {
+    if let Some(id) = unit_light(w, key) {
+        let _ = w.lights.remove(id);
+    }
+    let Some(u) = w.units.get(&key) else {
+        return;
+    };
+    let (x, y) = u.cell();
+    let pos = (
+        unit_light_pos(i32::from(x) << 16),
+        unit_light_pos(i32::from(y) << 16),
+    );
+    let kind = match req.kind {
+        0 => LightKind::Shadowed,
+        2 => LightKind::Cached,
+        _ => LightKind::Plain,
+    };
+    let id = w.lights.create(
+        Some(owner_of(key)),
+        pos,
+        kind,
+        req.radius,
+        req.i,
+        req.r,
+        req.g,
+        req.b,
+    );
+    if let (Some(id), Some(t)) = (id, req.target) {
+        w.lights.set_target(id, t);
+    }
+}
+
+/// The player light of the player init (`0x00460BF0` → `0x00460CF0`,
+/// §8 player row): kind 0 for the local player or while no local player
+/// exists, else 1; radius 13, white.
+pub fn player_light(w: &mut ClientWorld, key: UnitKey) {
+    let local = w.local_player.is_none_or(|l| l == key);
+    replace_unit_light(w, key, sources::player_light(local));
+}
+
+/// The player stat callback's light part (`0x004609F0`, §8 player row):
+/// stat 89 `item_lightradius` sets the radius (§6.2 r2: `r` ≤ 0 does
+/// nothing) to 13 + its value; stat 90 `item_lightcolor` sets R, G, B (0
+/// → white). `stat89` / `stat90` are the unit's current values.
+pub fn player_light_stats(
+    lights: &mut crate::rules::lighting::records::LightList,
+    id: crate::rules::lighting::records::LightId,
+    stat89: i32,
+    stat90: i32,
+) {
+    // A player light is kind 0 or 1: setting the same radius again
+    // changes nothing (§6.2 r2 frees only a kind-2 cache).
+    lights.set_radius(id, sources::player_light_radius(stat89));
+    let (red, green, blue) = sources::player_light_color(stat90 as u32);
+    lights.set_color(id, sources::SOURCE_INTENSITY, red, green, blue);
+}
+
+/// The monster light (`0x004AE210` → `0x004AE2EE`, §8 monster row) of a
+/// created monster: kind 0, radius `max(L_c, Light)`, 3 in level 8 (the
+/// monster's room's level) with client quest byte 1 set and `Align` ∉
+/// {1, 2}; none when 0; replaces the unit's light.
+///
+/// `d2rs-own, unverified`: `L_c` (§8 r1, the `lightradius` of the
+/// component items) is 0, the client tables hold no item rows; a quest
+/// byte read before any 0x5E reads 0 (the spec names the fatal 0x60 only
+/// for the §10 r1 read).
+pub fn monster_light(w: &mut ClientWorld, key: UnitKey, class: &super::super::world::MonsterClass) {
+    let input = sources::MonsterLightInput {
+        l_c: 0,
+        light: i32::from(class.light),
+        rgb: class.light_rgb,
+        level: w.unit_level(key).map_or(0, u32::from),
+        quest_byte1: w.client_quest_byte(1).is_some_and(|b| b != 0),
+        client_only: false,
+        align: class.setup.map_or(0, |s| i32::from(s.align)),
+    };
+    if let Some(req) = sources::monster_light(&input) {
+        replace_unit_light(w, key, req);
+    }
+}

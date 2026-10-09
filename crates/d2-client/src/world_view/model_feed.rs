@@ -29,6 +29,7 @@ use crate::bridge::drlg::DrlgRoomId;
 use crate::bridge::world::{ClientWorld, LevelRow, UnitKey, ITEM, OBJECT, TILE};
 use crate::bridge::ClientUnit;
 use crate::rules::draw_order::{FadeClock, NearRooms, UnitFacts};
+use crate::rules::lighting::records::LightList;
 use crate::rules::{MapTile, OpenMode, UnitPosition, ViewSource};
 
 use super::feed::{NoFeed, RunningShake, ViewFeed};
@@ -408,12 +409,24 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
                 preview.log_once(format!("weather: {m}"));
             }
         }
+        r
+    }
+
+    /// Preview: the frame's light map from the kept list
+    /// ([`super::preview_light::PreviewLight::refresh`]); else the inner
+    /// feed's.
+    fn light_frame(&mut self, world: &ClientWorld, lights: &mut LightList) {
+        let local_at = self.local_at;
+        let Some(preview) = self.preview.as_mut() else {
+            return self.inner.light_frame(world, lights);
+        };
         let tables = preview
             .tiles
             .shades(world.palette_act.unwrap_or(0))
             .copied();
-        preview.light.refresh(world, local_at, tables.as_ref());
-        r
+        preview
+            .light
+            .refresh(world, lights, local_at, tables.as_ref());
     }
 
     fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {

@@ -47,6 +47,10 @@ pub struct ClickView {
     /// The `play` preview picks the hover target ([`super::hover::pick`],
     /// d2rs-own, unverified); `false`: no hover model (strict).
     pub pick: bool,
+    /// The frame's shake `(dx, dy)` (`render/camera.md` §8; the frame
+    /// anchor's): the pick inverts the shaken camera
+    /// (`seams/world-screen.md` §2.6). `(0, 0)` when no shake runs.
+    pub shake: (i32, i32),
 }
 
 /// The client model as the dispatcher reads it.
@@ -125,7 +129,7 @@ impl ModelClick<'_> {
         let (px, py) = self.own_position()?;
         let at = crate::rules::camera::moving_to_client(px, py);
         let mode = OpenMode::new(self.view.open_mode).unwrap_or(OpenMode::NONE);
-        Some(Camera::new(self.view.size, mode, at, (0, 0)))
+        Some(Camera::new(self.view.size, mode, at, self.view.shake))
     }
 
     fn skill(&self, left: bool) -> Option<SkillRef> {
@@ -542,6 +546,7 @@ mod tests {
             mouse,
             game_menu_open: false,
             pick: false,
+            shake: (0, 0),
         }
     }
 
@@ -602,6 +607,43 @@ mod tests {
             ..RunMods::default()
         };
         assert_eq!(press(ss.word(), at, None), None);
+    }
+
+    // Covers: specs/seams/world-screen.md §2.6
+    #[test]
+    fn the_pick_inverts_the_shaken_camera() {
+        let (w, inputs) = (world(), ModelInputs::default());
+        let cam = |shake| {
+            ModelClick {
+                world: &w,
+                inputs: &inputs,
+                view: ClickView {
+                    shake,
+                    ..view((0, 0))
+                },
+                local_at: None,
+            }
+            .camera()
+            .unwrap()
+        };
+        let shaken = cam((3, -5));
+        let (px, py) = w.local_position().unwrap();
+        let player = crate::rules::camera::moving_to_client(px, py);
+        assert_eq!(
+            shaken,
+            Camera::new(FrameSize::D2RS, OpenMode::NONE, player, (3, -5))
+        );
+        assert_ne!(shaken, cam((0, 0)));
+        // A pixel whose world point the shake moves: the click's world
+        // point is the shaken camera's.
+        let at = (0..800)
+            .flat_map(|x| (0..550).map(move |y| (x, y)))
+            .find(|&(x, y)| screen_to_world(&shaken, x, y) != screen_to_world(&cam((0, 0)), x, y))
+            .expect("the shake moves the world under some pixel");
+        assert_ne!(
+            screen_to_world(&shaken, at.0, at.1),
+            screen_to_world(&cam((0, 0)), at.0, at.1)
+        );
     }
 
     // Covers: specs/ui/controls.md §6 r8

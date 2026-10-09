@@ -495,3 +495,69 @@ fn assign_monster_hireling_reinit_and_source_link() {
     assert_eq!(u.state_lists[&98].get(&(354, 0)), Some(&5));
     assert_eq!(u.flag_ex & 0x400, 0x400);
 }
+
+// Covers: specs/render/lighting.md §8
+// Covers: specs/client/msg-units.md §1.3 r2
+#[test]
+fn units_get_their_lights_at_creation() {
+    use super::super::world::ObjectRow;
+    use crate::rules::lighting::records::{LightKind, LightRecord};
+    let head = |m: &Model| m.w.lights.iter().next().unwrap().1.clone();
+    let fields = |r: &LightRecord| {
+        (
+            (r.owner_type, r.owner_guid),
+            r.kind,
+            r.radius,
+            (r.i, r.r, r.g, r.b),
+        )
+    };
+    let mut m = with_monsters();
+    // 0x59 (B102): the player init's light, kind 0 while no local player
+    // exists, radius 13, white.
+    let mut b = hex("59 01 00 00 00 01 77 65 72 77 65 72 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    assert_eq!(
+        fields(&head(&m)),
+        ((0, 1), LightKind::Shadowed, 8 * 13, (255, 255, 255, 255))
+    );
+    // Another player once the local one exists: kind 1.
+    m.w.local_player = Some(P1);
+    let mut b = hex("59 02 00 00 00 01 61 00");
+    b.resize(26, 0);
+    m.recv(&b);
+    assert_eq!(
+        fields(&head(&m)),
+        ((0, 2), LightKind::Plain, 8 * 13, (255, 255, 255, 255))
+    );
+    // 0xAC (B157), class 154 with `monstats2` `Light` 5 and its colour:
+    // kind 0, radius 5.
+    m.inputs.tables.monsters[154] = Some(MonsterClass {
+        light: 5,
+        light_rgb: (230, 168, 255),
+        ..MonsterClass::default()
+    });
+    m.hex("ac 06 00 00 00 9a 00 1a 12 b9 11 80 0e 01");
+    assert_eq!(
+        fields(&head(&m)),
+        ((1, 6), LightKind::Shadowed, 8 * 5, (255, 230, 168, 255))
+    );
+    // `Light` 0: none.
+    m.inputs.tables.monsters[153] = Some(MonsterClass::default());
+    let n = m.w.lights.len();
+    m.hex("ac 07 00 00 00 99 00 1a 12 b9 11 80 0e 01");
+    assert_eq!(m.w.lights.len(), n);
+    // 0x51: the object init's light, `Lit<mode>` / 2, kind 2.
+    m.inputs.tables.objects = vec![ObjectRow::default(); 4];
+    m.inputs.tables.objects[3] = ObjectRow {
+        lit: [0, 0, 12, 0, 0, 0, 0, 0],
+        rgb: (9, 8, 7),
+        ..ObjectRow::default()
+    };
+    m.hex("51 02 07 00 00 00 03 00 10 00 10 00 02 00");
+    assert_eq!(
+        fields(&head(&m)),
+        ((2, 7), LightKind::Cached, 8 * 6, (255, 9, 8, 7))
+    );
+    assert!(m.log.rejected.is_empty(), "{:?}", m.log.rejected);
+}
