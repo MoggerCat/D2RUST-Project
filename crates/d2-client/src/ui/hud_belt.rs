@@ -10,7 +10,7 @@
 //!   column), default type 2 without one;
 //! - the resolution index of `belts.bin` is 0 below mode 2, else 1;
 //! - every belt item counts as usable, nothing is blocked; the cursor
-//!   item fits a belt by code ([`super::panels::inv_items::fits_belt`]);
+//!   item fits a belt (`BeltParts::beltable`, from the tables);
 //! - the key labels are the play bindings' key names for the belt slot
 //!   actions ([`HudBelt::set_keys`], REC-264): the first bound key; an
 //!   unbound slot has no label; the default `1`–`4` until bindings are
@@ -35,7 +35,7 @@ use crate::ui::panels::control::belt::{
     hover_text, record_index, BeltDraw, BeltEffect, BeltItem, BeltRecord, BeltSlot8, BeltState,
     CursorInfo, CursorItem, HoverText, MoveGates, SlotInfo, FONT_AFTER_BELT,
 };
-use crate::ui::panels::inv_items::{fits_belt, ItemsUi};
+use crate::ui::panels::inv_items::ItemsUi;
 use crate::ui::panels::UiFiles;
 
 /// The name N and stat lines S of an item tip (module doc): the first
@@ -61,6 +61,9 @@ pub struct BeltParts {
     pub records: Vec<BeltRecord>,
     /// Item code → `belts` row (`armor.txt` `belt`).
     pub types: BTreeMap<[u8; 4], u8>,
+    /// Item codes that fit a belt box: the type's itemtypes `beltable` and
+    /// a 1 x 1 size (`seams/item-grids.md` §2.8).
+    pub beltable: std::collections::BTreeSet<[u8; 4]>,
 }
 
 /// The belt of the HUD: the rule state and the tables.
@@ -114,12 +117,12 @@ impl HudBelt {
         }
     }
 
-    fn cursor(world: &ClientWorld) -> CursorInfo {
+    fn cursor(&self, world: &ClientWorld) -> CursorInfo {
         CursorInfo {
             mode: 0,
             item: items::cursor_item(world).map(|c| CursorItem {
                 guid: c.key.guid,
-                fits_belt: fits_belt(c.code),
+                fits_belt: c.code.is_some_and(|k| self.parts.beltable.contains(&k)),
                 swap_ok: true,
                 blocked: false,
                 put_sound: 0,
@@ -178,7 +181,7 @@ impl HudBelt {
             return Vec::new();
         };
         let slot_item = Self::slot_item(world);
-        let cursor = Self::cursor(world);
+        let cursor = self.cursor(world);
         let gates = MoveGates {
             in_game: true,
             input_blocked: false,
@@ -310,7 +313,7 @@ impl HudBelt {
                 rec,
                 at.0,
                 at.1,
-                &Self::cursor(world),
+                &self.cursor(world),
                 &Self::slot_item(world),
             )
             .into_iter()

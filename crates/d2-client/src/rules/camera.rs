@@ -14,6 +14,9 @@ use crate::scene::Rect;
 pub const PANEL_HEIGHT: i32 = 40;
 /// Client tick in milliseconds (§9, `0x0070EF1C`).
 pub const TICK_MS: u32 = 40;
+/// The client tick in milliseconds, the one constant every client clock
+/// reads (d2rs-own clock, unverified; `q-fix-prov-frame-clock`).
+pub const CLIENT_TICK_MS: u32 = TICK_MS;
 /// Tile cell size in client pixels (§2): `sx = (tx − ty) × 80`.
 pub const CELL_HALF_WIDTH: i32 = 80;
 pub const CELL_HALF_HEIGHT: i32 = 40;

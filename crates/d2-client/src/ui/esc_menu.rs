@@ -124,6 +124,8 @@ fn text(
 /// The adapter (installed last: top-most, so it takes every click).
 pub struct EscMenuUi {
     pub(super) sh: SharedRef,
+    /// The pentagram counter, advanced by the draws ([`PentClock`]).
+    pub(super) pent: std::cell::Cell<super::esc_art::PentClock>,
 }
 
 impl Panel for EscMenuUi {
@@ -215,7 +217,10 @@ impl Panel for EscMenuUi {
                 }
             }
         }
-        super::esc_art::draw_pents(&sh.tables.files, m, ctx.tick, out);
+        let mut clock = self.pent.get();
+        let f = clock.draw(super::esc_art::PentClock::ms_of_tick(ctx.tick));
+        self.pent.set(clock);
+        super::esc_art::draw_pents(&sh.tables.files, m, f, out);
     }
 
     fn hit(&self, _p: Point) -> Option<WidgetId> {
