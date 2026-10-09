@@ -30,7 +30,7 @@ use crate::bridge::world::{ClientWorld, UnitKey};
 use crate::bridge::ClientUnit;
 use crate::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
 use crate::frames::IndexFrame;
-use crate::rules::camera::shake_offsets;
+use crate::rules::camera::{shake_offsets, FrameAnchor};
 use crate::rules::draw_order::sky::SkyPasses;
 use crate::rules::draw_order::source::{ordered_source, TileArt, WeatherFrame};
 use crate::rules::draw_order::{FadeClock, NearRooms, OrderedTile, UnitFacts};
@@ -382,20 +382,45 @@ pub fn frame_camera<F: ViewFeed + ?Sized>(
     Ok(camera_and_mode(world, feed)?.map(|(camera, _)| camera))
 }
 
-/// [`frame_camera`] and the open mode it was computed with.
-fn camera_and_mode<F: ViewFeed + ?Sized>(
+/// [`frame_camera`] and the open mode it was computed with: the frame's
+/// one camera (`seams/world-screen.md` §2.2), to be handed to
+/// [`build_frame_placed`] and to every other reader of the frame.
+pub fn camera_and_mode<F: ViewFeed + ?Sized>(
     world: &ClientWorld,
     feed: &mut F,
 ) -> Result<Option<(Camera, OpenMode)>, ViewError> {
-    let Some(player) = feed.player(world)? else {
+    let anchor = frame_anchor(world, feed)?;
+    camera_at(world, &*feed, anchor)
+}
+
+/// The frame's one camera from its `anchor` ([`frame_anchor`]) under the
+/// feed's open mode (`seams/world-screen.md` §2.2), or `None` without an
+/// anchor. The host computes it once, after the UI has set the frame's
+/// open mode, and hands it to the pick, the labels, the corpse clicks,
+/// the automap and [`build_frame_placed`].
+pub fn camera_at<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &F,
+    anchor: Option<FrameAnchor>,
+) -> Result<Option<(Camera, OpenMode)>, ViewError> {
+    let Some(anchor) = anchor else {
         return Ok(None);
     };
     let mode = feed.open_mode(world)?;
+    Ok(Some((anchor.camera(FrameSize::play(), mode), mode)))
+}
+
+/// The frame's local-player position and shake (camera §3, §8;
+/// `seams/world-screen.md` §2.4), or `None` without a local player.
+pub fn frame_anchor<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &mut F,
+) -> Result<Option<FrameAnchor>, ViewError> {
+    let Some(player) = feed.player(world)? else {
+        return Ok(None);
+    };
     let shake = frame_shake(world, feed)?;
-    Ok(Some((
-        Camera::new(FrameSize::play(), mode, player.client(), shake),
-        mode,
-    )))
+    Ok(Some(FrameAnchor { player, shake }))
 }
 
 /// The open mode whose frames draw no world (`render/composition.md` §3
@@ -420,6 +445,24 @@ where
     F: ViewFeed + ?Sized,
 {
     let placed = camera_and_mode(world, feed)?;
+    build_frame_placed(world, ui, rules, feed, assets, placed)
+}
+
+/// [`build_frame`] under a camera already computed by
+/// [`camera_and_mode`] for this frame (`seams/world-screen.md` §2.2:
+/// the pick, labels and the world draw read the same camera).
+pub fn build_frame_placed<R, F>(
+    world: &ClientWorld,
+    ui: &[UiDraw],
+    rules: &R,
+    feed: &mut F,
+    assets: &ViewAssets,
+    placed: Option<(Camera, OpenMode)>,
+) -> Result<WorldFrame, ViewError>
+where
+    R: ViewRules + UiRules + ?Sized,
+    F: ViewFeed + ?Sized,
+{
     let mut frame = build_placed(world, ui, rules, feed, assets, placed)?;
     frame.camera = placed.map(|(camera, _)| camera);
     Ok(frame)

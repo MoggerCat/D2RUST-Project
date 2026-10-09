@@ -1796,9 +1796,47 @@ S9-A1–S9-A7 (S9-A1 is PC 1's recording list for PC 2) and one B pointer to
 
 Index: Done · A player · B Ghidra / spec edits · C game files and GPU · Blocked.
 
-- **q-realdata-gate (moves these runs to the cloud)**: once the private repo `MoggerCat/D2RUST-private-repo` has the commit `install: complete` (full 1.14d install plus `extracted/`), the window-free runs of `docs/LOCAL-RUN.md` Batches 1–2 (`data-tool tables` / `links`, `mpq-tool check` / `formats`, every `#[ignore]` game-file test) no longer need the developer PC. A cloud session runs `sh tools/realdata-gate.sh` (fetches and assembles the install into `$HOME/game` by itself; `--no-client` skips the Bevy crate; `--help` lists options). Look for: exit 0 and the summary line `ignored tests: N passed, 0 failed`; exit 2 means the install is not complete yet (nothing ran). Record the summary in Done and remove the matching `C<n>` entries as their rows pass. Still local: GPU and window runs (Batches 3–6), recordings, and the two `D2_TABLES_DUMP` tests. Inventory: `docs/handoff/realdata-tests.tsv`; reading guide: `docs/handoff/q-realdata-gate.md`.
+- **q-realdata-gate (moves these runs to the cloud)**: once the private repo `MoggerCat/D2RUST-private-repo` has the commit `install: complete` (full 1.14d install plus `extracted/`), the window-free runs of `docs/LOCAL-RUN.md` Batches 1–2 (`data-tool tables` / `links`, `mpq-tool check` / `formats`, every `#[ignore]` game-file test) no longer need the developer PC. A cloud session runs `sh tools/realdata-gate.sh` (fetches and assembles the install into `$HOME/game` by itself; `--no-client` skips the Bevy crate; `--help` lists options). Look for: exit 0 and the summary line `ignored tests: N passed, 0 failed`; exit 2 means the install is not complete yet (nothing ran). Record the summary in Done and remove the matching `C<n>` entries as their rows pass. Still local: GPU and window runs (Batches 3–6), recordings, and the two `D2_TABLES_DUMP` tests. Inventory: `docs/handoff/realdata-tests.tsv`; reading guide: `docs/handoff/q-realdata-gate.md`. **First run done 2026-10-08** (`docs/handoff/q-realdata-run.md`): 213 passed, 11 failed (4 root causes, rows in the build queue); cloud prerequisites there (nextest, the apt line of `tools/cloud-setup.sh`).
 
 ### Done (kept for the record)
+
+Done 2026-10-08 (cloud, branch claude/q-realdata-run from 40e9e1e; the
+first real-data gate run, `docs/handoff/q-realdata-run.md`). Install:
+private repo `install/` at `5174f0cb` assembled (0 mismatches), equal to
+`traces/reference-install.toml`. Command: `D2_GAME_DIR=$HOME/game sh
+tools/realdata-gate.sh` (release). LOCAL-RUN Batch 1 rows 1.1–1.4, 1.5,
+1.6, 1.8, 1.12 and Batch 2 rows 2.1–2.16 ran inside it.
+- Tool checks: `data-tool tables` 73 runtime tables, 72 identical, 1
+  explained, 0 mismatched, code buffers 4/4; `links` 0 broken; `mpq-tool
+  check` all blocks decode; `formats` 0 errors (cof 3,606 / 3,605 +
+  `amblxbow.cof`, dc6 1,653, dt1 256 / 250, ds1 2,372). PASS.
+- Ignored tests, run 1 (`106f4ad`): 208 passed, 29 failed; run 2
+  (`efffaf0`, after the fixes): **213 passed, 11 failed**, 15 skipped (6
+  GPU, 2 dump, 5 recording, 1 `D2_SAVE`, 1 repro). Per crate run 2:
+  d2-formats 29/29, d2-data 37/37, d2-sim 110/110 (`game_core` 12,
+  `game_drlg_tables` 12, `game_inventory_path` 6, `game_items` 8,
+  `game_monsters` 19, `game_skills` 16, `game_treasure` 16, `game_world`
+  10), d2-server 9/17, conformance 2/2, d2s-tool 1/1 (no saves), scenario-run
+  1/1, seed-finder 1/1, d2-client 23/26.
+- The 11 failures: Cold Plains 97 vs 98 rooms (`world_data` dispatcher
+  test and all 7 `game_wired_host`, `q-fix-cold-plains-rooms`), S→C 0x23
+  fatal 0x668 (`q-fix-set-skill-fatal`), `menu\horadric` frame 1 offset
+  (`q-fix-panel-horadric-offsets`), and new: Game.exe's controls table
+  holds command 1's slot-0 entry first (`q-fix-real-controls-default-order`).
+- Fixed in the session: d2s token reference slots (`ktr` 45, real table),
+  the item sweep's two spec-stated cases, the wired host's walk back, the
+  sweep / lvlprest counts the specs already state. Claims unlocked:
+  `dt1.md` §file-header-276-bytes, §tile-header-96-bytes-each-consecutive,
+  §block-header-20-bytes-each-at-the-tile-s-block-headers-offset,
+  §block-pixels; `ds1.md` §rules; `generation.md` §3 r1.
+- GPU tests on llvmpipe (software, not the real-GPU claim): 6/6 pass.
+  `play --frames 600` on the install (Xvfb, llvmpipe): data line `137
+  levels, 573 objects, waypoint object class 119; 2043 DS1, 34 lvlsub DS1,
+  241 DT1`, then the C40 render panic (draw item 653), exit 101: C40
+  reproduces in the cloud.
+- `py tools/coverage.py --check`: 13,742 claims, 0 errors; `--summary`:
+  rules 11,164 (+625 exempt), unit 9,755 (87.4%), game-file 421 (3.8%),
+  trace 80 (0.7%), **verified 501 (4.5%)**, any tier 9,863 (88.3%).
 
 Done 2026-10-08 round 2 (local PC 1, branch claude/local-pc1-s8 from 4660bf4;
 Lane B worker, Windows 10, `D2_GAME_DIR` = `d2rs\game`; release builds

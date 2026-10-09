@@ -78,6 +78,28 @@ fn world(cell: (u16, u16)) -> ClientWorld {
     w
 }
 
+/// The local player's client position (the frame's one position).
+fn at(w: &ClientWorld) -> ClientPos {
+    let (x, y) = w.local().unwrap().cell();
+    crate::rules::camera::moving_to_client(
+        (u32::from(x) << 16) | 0x8000,
+        (u32::from(y) << 16) | 0x8000,
+    )
+}
+
+/// A built frame whose camera stands on the local player.
+fn framed(w: &ClientWorld) -> WorldFrame {
+    WorldFrame {
+        camera: Some(crate::rules::camera::Camera::new(
+            FrameSize::D2RS,
+            OpenMode::NONE,
+            at(w),
+            (0, 0),
+        )),
+        ..WorldFrame::default()
+    }
+}
+
 fn near() -> NearRooms {
     let rec = TileRecord {
         tile: (0, 0),
@@ -179,9 +201,9 @@ fn an_open_automap_draws_its_cells_and_the_player_marker() {
     let mut a = assets();
     let mode = OpenMode::NONE;
     // Closed: nothing.
-    let mut frame = WorldFrame::default();
+    let mut frame = framed(&w);
     assert!(v
-        .add_to_frame(&mut s, &w, mode, &mut a, &mut frame)
+        .add_to_frame(&mut s, &w, mode, at(&w), &mut a, &mut frame)
         .is_empty());
     assert!(frame.items.is_empty());
     // Open (Tab): the cell's cel and the marker's lines.
@@ -193,7 +215,7 @@ fn an_open_automap_draws_its_cells_and_the_player_marker() {
         unit_origin: ClientPos::default(),
     };
     s.toggle(&f);
-    let log = v.add_to_frame(&mut s, &w, mode, &mut a, &mut frame);
+    let log = v.add_to_frame(&mut s, &w, mode, at(&w), &mut a, &mut frame);
     assert!(log.is_empty(), "{log:?}");
     let cels = v
         .last
@@ -211,11 +233,11 @@ fn an_open_automap_draws_its_cells_and_the_player_marker() {
     assert!(frame
         .items
         .iter()
-        .all(|i| i.key.pass() == pass::UNIDENTIFIED_9));
+        .all(|i| i.key.pass() == pass::UI && i.key.major() == pass::UI_AUTOMAP_MAJOR));
     // Closed again: nothing.
     s.toggle(&f);
-    let mut frame = WorldFrame::default();
-    v.add_to_frame(&mut s, &w, mode, &mut a, &mut frame);
+    let mut frame = framed(&w);
+    v.add_to_frame(&mut s, &w, mode, at(&w), &mut a, &mut frame);
     assert!(frame.items.is_empty());
 }
 
@@ -234,10 +256,10 @@ fn a_missing_cel_file_is_logged_once_and_not_drawn() {
     });
     let mut v = AutomapView::new(Arc::new(MemorySource::default()), true);
     let mut a = assets();
-    let mut frame = WorldFrame::default();
-    let log = v.add_to_frame(&mut s, &w, OpenMode::NONE, &mut a, &mut frame);
+    let mut frame = framed(&w);
+    let log = v.add_to_frame(&mut s, &w, OpenMode::NONE, at(&w), &mut a, &mut frame);
     assert!(log.iter().any(|l| l.contains("in no archive")), "{log:?}");
-    let log = v.add_to_frame(&mut s, &w, OpenMode::NONE, &mut a, &mut frame);
+    let log = v.add_to_frame(&mut s, &w, OpenMode::NONE, at(&w), &mut a, &mut frame);
     assert!(log.is_empty());
 }
 
@@ -245,4 +267,64 @@ fn a_missing_cel_file_is_logged_once_and_not_drawn() {
 fn bresenham_includes_both_ends() {
     assert_eq!(line((0, 0), (3, 1)), vec![(0, 0), (1, 0), (2, 1), (3, 1)]);
     assert_eq!(line((2, 2), (2, 2)), vec![(2, 2)]);
+}
+
+// Covers: specs/render/draw-order.md §1
+// Covers: specs/ui/panels.md §5 r3
+#[test]
+fn the_automap_draws_after_every_world_pass_and_before_the_panels() {
+    // The rain / snow / flash items of pass 9 and the screen fade (10)
+    // are world passes; the panel draws are the UI root's list.
+    let automap = DrawKey::new(pass::UI, pass::UI_AUTOMAP_MAJOR, 0, 0).unwrap();
+    let last_automap =
+        DrawKey::new(pass::UI, pass::UI_AUTOMAP_MAJOR, DrawKey::MINOR_MAX, 0xFF).unwrap();
+    let panels = DrawKey::new(pass::UI, pass::UI_PANELS_MAJOR, 0, 0).unwrap();
+    for world in [
+        DrawKey::new(pass::UNIDENTIFIED_9, 0, DrawKey::MINOR_MAX, 0xFF).unwrap(),
+        DrawKey::new(
+            pass::UNIDENTIFIED_9,
+            DrawKey::MAJOR_MAX,
+            DrawKey::MINOR_MAX,
+            0xFF,
+        )
+        .unwrap(),
+        DrawKey::new(
+            pass::SCREEN_FADE,
+            DrawKey::MAJOR_MAX,
+            DrawKey::MINOR_MAX,
+            0xFF,
+        )
+        .unwrap(),
+    ] {
+        assert!(world < automap, "{world:?}");
+    }
+    assert!(last_automap < panels);
+}
+
+// Covers: specs/ui/automap.md §10 r4
+// Covers: specs/render/blend-modes.md §1
+#[test]
+fn automap_cel_modes_map_to_the_alpha_tables() {
+    use crate::scene::MapId;
+    let mut a = assets();
+    // No act tables: opaque whatever the mode.
+    assert_eq!(cel_blend(&a, 0), (ShadeChain::EMPTY, BlendOp::Opaque));
+    a.shades = Some(crate::rules::shading::ShadeTables {
+        light0: MapId(0),
+        highlight: MapId(32),
+        red: MapId(33),
+        zero: MapId(34),
+        remap0: MapId(35),
+        alpha: [MapId(200), MapId(456), MapId(712)],
+        additive: MapId(968),
+        multiplicative: MapId(1224),
+        max_component: MapId(1480),
+    });
+    // m = 0 → A2 (25 %), 1 → A1 (50 %), 2 → A0 (75 %), 5 → opaque; unlit.
+    for (m, table) in [(0, 712), (1, 456), (2, 200)] {
+        let (shade, blend) = cel_blend(&a, m);
+        assert_eq!(blend, BlendOp::IndexTable(MapId(table)), "mode {m}");
+        assert_eq!(shade, ShadeChain::EMPTY, "mode {m}");
+    }
+    assert_eq!(cel_blend(&a, 5), (ShadeChain::EMPTY, BlendOp::Opaque));
 }

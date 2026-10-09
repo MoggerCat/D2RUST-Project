@@ -105,6 +105,22 @@ Branch `claude/q-fix-flow-save` (from `claude/q-tick-flow`, merged with
   `app_save::old_item_records_that_pass_through_are_named`. Local check
   still owed: a real 0x5C–0x5E save loaded and re-saved on PC 1 (row text).
 
+- `smoke_combat` hire-gate failures (0x2A code 9 instead of 11; seen
+  here on this branch *and* on the staging tip, 2–6 of 8 failing per run,
+  passing on slower machines): cause found. `bridge_frame` fed the bridge
+  `Time<Real>` whenever the app had it, and `MinimalPlugins` has it, so
+  headless tests ran the client's `GetTickCount` on wall time since the
+  app's start instead of a scripted value (`world/objects-client.md`
+  §25 r6). A fast run talked to Kashya within 200 ms of the start; the
+  monster interact gate (`client/model.md` §8 r7: `now` − U+0xD4 < 200,
+  U+0xD4 = 0 at creation) dropped the C→S 0x13, the server never set the
+  interaction, and the hire answered 9. Fix: `bridge::mirror::ScriptedNow`
+  (a scripted host clock `bridge_frame` prefers); `smoke_combat`'s step
+  sets it from its step clock. 8/8 three runs in a row; M08: the clock
+  pinned under 200 ms brings back 7 failures with code 9. Other headless
+  rigs on `MinimalPlugins` still read wall time (none known to depend on
+  it): a follow-up row could give them `ScriptedNow` too.
+
 ## Open
 
 - The save's inventory flag bit 1 clear (`inventory-moves.md` §6.1 r4).

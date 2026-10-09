@@ -126,6 +126,25 @@ fn without_prediction_the_pick_camera_is_the_draw_camera() {
 }
 
 // Covers: specs/seams/world-screen.md §2.2
+// Covers: specs/seams/world-screen.md §2.4
+#[test]
+fn with_a_prediction_every_camera_of_the_frame_is_the_draw_camera() {
+    use d2_client::world_view::{camera_at, frame_anchor};
+    let w = world_at((100, 100));
+    let mut feed = ModelFeed::<NoFeed>::default().with_preview(Preview::default());
+    feed.set_local_prediction(Some((ME, (centre(103), centre(100)))));
+    let draw = frame_camera(&w, &mut feed).unwrap().unwrap();
+    // The pick / label / corpse / automap camera: the frame's anchor
+    // under the frame's open mode, the draw camera exactly.
+    let anchor = frame_anchor(&w, &mut feed).unwrap();
+    let (pick, _) = camera_at(&w, &feed, anchor).unwrap().unwrap();
+    assert_eq!(pick, draw);
+    // It stands on the predicted sub-tile, not the model cell.
+    assert_ne!(camera_for(&w, 0), Some(draw));
+    let at = moving_to_client(centre(103), centre(100));
+    assert_eq!(draw.unit_draw(at, (0, 0)), (400, 292));
+}
+
 // Covers: specs/seams/movement-prediction.md §2.9 r1
 #[test]
 fn with_a_prediction_every_camera_is_the_draw_camera() {
