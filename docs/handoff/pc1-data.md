@@ -178,9 +178,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     quest event and which `step` each passes. Act I (`0x00596210`), Act IV
     (`0x005B4D77`, step 4, classic only) and Act III's Mephisto credit
     (`0x005BC182`) are wired.
-16. **Quest entry at the join** (`q-fix-flow-join-load`): which caller of
-    `0x00546270` single player takes (mode 0 through `0x005344B0`, or
-    mode 1) and the per-item conditions of the loader's S→C 0x22 / 0x21
-    (`intents-events.md` §8.2 r3.1 (c)); today the join sends no 0x5E,
-    0x28 (type 6) or 0x29 and runs no `PLAYER_STARTED_GAME` callback
-    (`QuestControl::player_enters` has no production caller).
+16. **Loader messages 0x22 / 0x21 at the join** (`q-fix-flow-join-load`):
+    the per-item conditions of the loader's S→C 0x22 (`0x0055C216`) and
+    0x21 (`0x0057017B`) (`intents-events.md` §8.2 r3.1 (c)); the quest
+    entry itself is wired (`world/quests.md` §3 names the caller).

@@ -20,7 +20,7 @@ Branch `claude/q-fix-audit-rest` (from staging-7). Status read from
 | q-fix-proto-one-type | refactor across d2-proto + client (bytes identical today) |
 | q-fix-proto-docs (rest) | spec-session items |
 | q-fix-save-gaps | mouse skills fallback (1); (2)-(4) hireling / golem / status credits |
-| q-fix-flow-join-load | loader 0x22/0x21/0x5E/0x28/0x29 and refused-load 0xB4 |
+| q-fix-flow-join-load | J2 done: a refused load sends the direct S->C 0xB4 with the result before the client is removed. J1 done for the quest entry: `world/quests.md` §3 names the caller single player takes (`0x005344B0`, mode 0; the stub load of a new character calls mode 1 first), so the join runs `QuestControl::player_enters` through `QuestEnter` and sends its 0x5E, 0x28 (type 6), 0x29 (0x89 when due) in rule 3.1 (e)'s place (`SessionState::join_quest`, before 0x0B); the `PLAYER_STARTED_GAME` callbacks and the chain sequence functions now run at the join. **Left**: the loader's 0x22 / 0x21 per-item conditions (`pc1-data.md` Step 4 item 16) | `synthetic_game::session_refusals_stop_the_sequence` (0xB4 bytes); real install `app_single_player::the_join_sends_the_quest_entry_messages_before_the_player_record` (twice each for a new character) |
 | q-fix-flow-client-order | C5 (Esc on dead player x3), C7 (doubled registrations) |
 | q-fix-flow-act-change | steps 1, 6, 7, 10 left open |
 | q-fix-prov-rec-ids | REC id clashes in HANDOFF |
