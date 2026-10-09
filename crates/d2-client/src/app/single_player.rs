@@ -2161,6 +2161,11 @@ fn loader(
             // the save's or the start items and the act's DRLG.
             let p = v.allocate(g, &req, 0, 0)?;
             v.init_player_seed(p);
+            // `combat/hit.md` §7.1: a player is good (2), its state-105
+            // list there before its first 0xAA (`intents-events.md`
+            // §7.9 rule 1, recorded). PROVISIONAL (REC-750): the
+            // original's call site in the join is not identified.
+            v.set_alignment(g, p, 2);
             Some(p)
         }) else {
             s.events

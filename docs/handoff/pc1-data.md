@@ -308,6 +308,17 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
+- **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
+    `combat/hit.md` §7.1 says players carry it, and the recording shows
+    it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
+    39) with a 0xA8 of state 105 one frame later, but no spec names the
+    call site. Read the character load of the join (`0x005344B0` /
+    `0x00534520`, the allocation's per-kind init `0x005348C0`) for the
+    `0x005543B0(player, 2, v)` call: where it runs relative to the unit
+    seed and the stats, its v argument, and whether a corpse (player
+    unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
+    d2rs: PROVISIONAL REC-750, set right after the unit seed
+    (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
 
 35. **`0x0063E6B0(unit, 0)`: are the action-frame tests skipped?** (REC-700) `0x005A6D50` passes the moving flag r as `0x0063E6B0`'s second argument (`skills/use.md` §5.2 "Monsters"); `skills/bodies-3.md` §5.18 step 3 gives the tests (+0x4E = 0, or no action event in the frames ((cur − speed) >> 8, cur >> 8]) for the argument 1 only. Read: what the function does with 0 (d2rs: no tests, the column by mode). Write the answer into `bodies-3.md` §5.18 step 3.
 36. **Who writes unit +0x4E from a type-0 timer's frame code?** (REC-701) trigger(U) of `0x005A7670` reads +0x4E = 1 (`skills/use.md` §5.2); `sim/units.md` §4.2 schedules event 0 with args (E[i], k) and the field table names only `0x005533D0` (0 at mode start). Read: the writer of +0x4E on the event-0 path of a monster (the unit-type dispatcher or the timer run), and whether a code-0 event writes it. Write the answer into `sim/units.md` §4.2 / §4.6.
