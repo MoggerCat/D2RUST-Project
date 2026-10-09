@@ -283,3 +283,12 @@ The harness should test class and position, not GUID.
     seed 0x51D93B08, +0x28 = hire id 0x0D53.
   - **Frame 368:** the hireling's 0xAC. No 0x7A is sent.
   - **d2rs matches;** only a PROVISIONAL note remains: `q-fix-p6-pet-record-settled`.
+- **(3) Audio ST-4, one-shot end tick: recorded** (`audio/sound-table.md` §6.6 r3, OQ 12).
+  - **Method:** sound on, a probe with breakpoints only at the start and the natural-end store, so
+    the client ran at full speed; 60 s of walking.
+  - **Result:** 73 footsteps (ids 2768–2771) end at start + ceil(frames / 882) + 1 ticks (+2 in a
+    third of the cases, +0 once). The end comes 30–125 ms after the sample's duration, which fits the
+    50 ms voice service thread.
+  - **d2rs** ends them 1 tick early: `q-fix-p6-oneshot-end-tick`.
+  - **ST-7 (`Async Only` completion): not recorded.** It needs a probe on the preload pass
+    `0x00482BF0` and a sound in the async rows.
