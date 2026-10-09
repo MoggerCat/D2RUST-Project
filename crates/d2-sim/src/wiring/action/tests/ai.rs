@@ -316,7 +316,7 @@ fn monster_with_data(fx: &mut Fx) -> UnitId {
     m
 }
 
-// Covers: specs/monsters/ai.md §3.1 "AI state" (q-fix-c3-quillrat-choice)
+// Covers: specs/monsters/ai.md §3.1 r1, §3.1 r2
 #[test]
 fn ai_state_set_by_a_reactionless_hit_and_the_mode_leave() {
     use crate::combat::{result, DamageRecord};
