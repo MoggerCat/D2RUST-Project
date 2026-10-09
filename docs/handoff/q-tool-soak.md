@@ -83,3 +83,38 @@ Not reproduced: `room:list-vs-path:Object` (Object 69 mode 2, a4-hellforge
 seed 200 of campaign 3) came from a run on the binary before the
 staging merge at 870a539f; its log does not replay it on the current
 build. Rerun the campaign to see whether it comes back.
+
+## Owners (coordinator, 2026-10-09)
+
+| Row | Owner session |
+|---|---|
+| q-fix-soak-belt-model, q-fix-soak-cursor-reload | items: session_01GXSY6R3mUS5ig6wuAQUtJP |
+| q-fix-soak-walk-pick-desync | client model / track: session_01BQSDGiWHKAbHXoWk7HThvM |
+| q-fix-soak-static-leave-room, q-fix-soak-drop-room | progression / act travel: session_01UWEn2ZtdtLRHPZRdytF7Gc (the act-change half; the pick-up and drop halves touch items) |
+
+Rows are filed; the repros were not sent to the owners (the sessions
+were paused at wrap-up). Route them with `tools/coord/route.py` on resume.
+
+## State at wrap-up and how to go on
+
+- Campaigns run: 3 (about 250 runs of 2,500 frames, about 600k frames;
+  campaign 3 with a round trip every 700 frames, 79 runs) over the 13
+  starts and 14 checkpoints. Logs were under `target/soak/` (not
+  committed).
+- Unreduced at wrap-up: `room:outside:Object` (a4-diablo checkpoint,
+  campaign 3 seed 202: Object 59 at (5163, 5067), its room RoomId(12)
+  at sub-tiles (20040, 5040)), likely the static-room family of
+  q-fix-soak-static-leave-room; and `roundtrip:live.items.count` on
+  a2-duriel seed 201 (an item lost on reload), likely
+  q-fix-soak-cursor-reload. Rerun to confirm:
+  `python3 tools/soak/soak.py run --start ck-a4-diablo --seed 202 --steps 2500 --out target/soak/x`
+  (after `python3 tools/checkpoints/make.py`), then `soak.py reduce` on
+  its log with `--sig room:outside:Object`.
+- Rerun everything: `cargo build --release -p d2-client -p d2s-tool`,
+  `python3 tools/checkpoints/make.py`, `python3 tools/soak/soak.py saves`,
+  `python3 tools/soak/soak.py roundtrip`, and
+  `python3 tools/soak/soak.py campaign --minutes N --out target/soak/campN --no-reduce --roundtrip-every 700`.
+  Reduce a new signature with `soak.py reduce LOG --sig SIG --out DIR`
+  (2–3 in parallel on a 4-core box beside the campaign). Rebuild the
+  binary only between campaigns: a campaign's logs replay on the build
+  that made them.
