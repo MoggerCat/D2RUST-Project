@@ -271,9 +271,13 @@ class StateReader:
             recp = self.u32(pa[0])
             if not recp:
                 return
-            words = struct.unpack("<%dH" % Q_SLOTS, self.read(recp, 2 * Q_SLOTS))
+            bufp = self.u32(recp)
+            if not bufp:
+                return
+            words = struct.unpack("<%dH" % Q_SLOTS, self.read(bufp, 2 * Q_SLOTS))
             self.put(rec, ua, "q", [[i, w] for i, w in enumerate(words) if w],
-                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (recp, 2 * Q_SLOTS))
+                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (recp, 4),
+                     (bufp, 2 * Q_SLOTS))
         except OSError:
             self.note("q absent: unreadable quest record link")
 
@@ -527,18 +531,20 @@ def build_world():
          [(6, 0, 50 << 8), (7, 0, 50 << 8), (8, 0, 15 << 8), (9, 0, 15 << 8), (10, 0, 84 << 8),
           (11, 0, 84 << 8), (6, 1, 7), (12, 0, 1)])
     link(hb(0, 1), P)
-    # quest records: player data -> three difficulty records (differ), game difficulty 1
+    # quest records: player data -> three difficulty bit-buffer headers (buffer pointer, bit
+    # count 0x300) -> their 96-byte buffers (differ), game difficulty 1
     m.put(P + U_DATA, "<I", 0x3A0000)
     m.put(game + G_DIFFICULTY, "<B", 1)
     for dd in range(3):
         m.put(0x3A0000 + PD_QUESTS + 4 * dd, "<I", 0x3B0000 + 0x100 * dd)
+        m.put(0x3B0000 + 0x100 * dd, "<II", 0x3C0000 + 0x100 * dd, 0x300)
         for i in range(Q_SLOTS):
-            m.put(0x3B0000 + 0x100 * dd + 2 * i, "<H", 0)
-    m.put(0x3B0100, "<H", 0x2001)
-    m.put(0x3B0100 + 2 * 7, "<H", 1)
-    m.put(0x3B0100 + 2 * 41, "<H", 0x8000)
-    m.put(0x3B0000 + 2 * 3, "<H", 5)
-    m.put(0x3B0200 + 2 * 9, "<H", 6)
+            m.put(0x3C0000 + 0x100 * dd + 2 * i, "<H", 0)
+    m.put(0x3C0100, "<H", 0x2001)
+    m.put(0x3C0100 + 2 * 7, "<H", 1)
+    m.put(0x3C0100 + 2 * 41, "<H", 0x8000)
+    m.put(0x3C0000 + 2 * 3, "<H", 5)
+    m.put(0x3C0200 + 2 * 9, "<H", 6)
     # monsters: bucket 3 holds GUID 9 then GUID 4 (walk order != sort order)
     M1, M2 = 0x330000, 0x340000
     unit(M1, 1, 9, 5, 2, 0, (3, 4), (0, 13 * 256, 0x100))
