@@ -100,3 +100,40 @@ points: 800–814.
   spot-checked, and I removed the goal-bit cells I couldn't verify. The
   harness can't read quest flags yet: row `q-tool-playthrough-quests`
   adds the state field and the `quest <slot> <bit>` predicate.
+
+## Live runs for PC1-C
+
+This session doesn't run 1.14d. Each run below is one command.
+
+1. **Warriv's node pick at the Act I arrival** (item 2; `ai-bodies.md`
+   §9.9 "Path node choice", `quests.md` §6.4):
+   ```
+   py tools\scenario-diff\scenario_diff.py traces\checks\rng-town-idle-sor.check
+   ```
+   Look for:
+   - (a) in the rng report, the first divergence owned by `unit 1:7`
+     (Warriv): its frame, and whether the 1.14d site is the map AI
+     (`0x005E7080` seed step / `0x0045C3E0` roll) or something earlier
+     (a different seed value at the same site means the seed state;
+     the same value in another frame means the think timing);
+   - (b) in the packets channel, whether 1.14d sends `8a 01 07000000`
+     (the active test passed for Warriv) and from which frame, and
+     whether d2rs does.
+   If 1.14d sends no 0x8A but walks to a node while d2rs walks in radius
+   toward the player, the cause is the interact gate
+   (`q-fix-p3-npc-interact-gate`). If both send it, the cause is the seed
+   state (`q-fix-real-unit-seed-order`).
+2. **C→S 0x67 mask** (item 1), after `q-fix-tool-c2s-masks` lands:
+   ```
+   py tools\scenario-diff\scenario_diff.py traces\checks\packets-town-arrival-ama.check
+   ```
+   Look for: the c2s stream no longer diverges at C→S 0x67 (frame 1).
+   The report's "masked bytes skipped" count includes 0x67's bytes 2–16
+   and the character-name tail.
+
+## Item 5 (round 2)
+
+No new Step 4 items on staging with the tags `[seed-order]`,
+`[recording-2]` or `[proto-items]`, and none about towns, NPCs, quests
+or waypoints, as of the last pull (2026-10-09). Staging is polled every
+30 minutes.
