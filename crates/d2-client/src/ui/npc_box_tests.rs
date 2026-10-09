@@ -165,6 +165,36 @@ fn cancel_sends_0x30_and_turns_ui_8_off() {
     assert!(ui.npc_menu().is_none());
 }
 
+// Esc (and Space) with the NPC menu up: the box consumes the key and runs
+// p1, the interaction ends (C->S 0x30), and the game menu stays shut.
+// Covers: specs/ui/panels-3.md §28 r2
+// Covers: specs/ui/frontend-options.md §O1 r2
+#[test]
+fn esc_ends_the_interaction_and_does_not_open_the_game_menu() {
+    for key in [Action::GameMenu, Action::ClearScreen] {
+        let (mut ui, mut root) = setup();
+        let w = world(AKARA, 1);
+        open(&mut ui, &mut root, &w, AKARA, 1);
+        root.take_intents();
+        send(
+            &mut ui,
+            &mut root,
+            &w,
+            UiEvent::Action(ActionId(key.index() as u16)),
+        );
+        let mut want = vec![0x30, 1, 0, 0, 0];
+        want.extend_from_slice(&NPC.to_le_bytes());
+        assert_eq!(
+            root.take_intents().iter().map(bytes).collect::<Vec<_>>(),
+            vec![want],
+            "{key:?}"
+        );
+        assert!(!ui.is_open(8));
+        assert!(!ui.is_open(9), "the game menu stays shut");
+        assert!(ui.npc_menu().is_none());
+    }
+}
+
 // With ui 8 open the gate refuses the inventory hot key (C[8][1] = 2).
 // Covers: specs/ui/panels.md §3 r3
 #[test]
