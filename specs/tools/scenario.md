@@ -28,11 +28,11 @@
 |   3. Typed messages and references | 181–236 |
 |   4. Run model | 237–295 |
 |   5. Comparison | 296–326 |
-|   6. Masks | 327–361 |
-| Edge cases & original bugs | 362–373 |
-| Test vectors | 374–389 |
-| Provenance | 390–399 |
-| Open questions | 400–439 |
+|   6. Masks | 327–368 |
+| Edge cases & original bugs | 369–380 |
+| Test vectors | 381–396 |
+| Provenance | 397–406 |
+| Open questions | 407–446 |
 <!-- /index -->
 
 ## Summary

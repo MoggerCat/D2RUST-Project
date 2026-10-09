@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–836 |
+|   9. Per-AI behaviours | 29–871 |
 <!-- /index -->
 
 ## Summary

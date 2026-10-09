@@ -34,25 +34,25 @@
 |   4. Receive and the unit message queue | 212–249 |
 |   5. Client update pass | 250–383 |
 |   6. Position check (`0x004804E0`) | 384–427 |
-|   7. Session messages | 428–603 |
-|   8. Mode requests | 604–689 |
-|   9. Room-in-sight messages | 690–724 |
-|   10. Bit reader | 725–739 |
-|   11. Current act and level (join and later) | 740–785 |
-|   12. Client DRLG and the room of a point | 786–827 |
-|   13. Visibility predicate (`0x004DBF20`) | 828–879 |
-|   14. Pet list and the hireling GUID | 880–933 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 934–1023 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1024–1058 |
-|   17. Model writes made by 1.14d UI code | 1059–1205 |
-|   18. Audio driver inputs and the client object functions | 1206–1236 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1237–1465 |
-| Constants & data dependencies | 1466–1478 |
-| Randomness | 1479–1494 |
-| Edge cases & original bugs | 1495–1519 |
-| Test vectors | 1520–1577 |
-| Provenance | 1578–1681 |
-| Open questions | 1682–1840 |
+|   7. Session messages | 428–625 |
+|   8. Mode requests | 626–711 |
+|   9. Room-in-sight messages | 712–746 |
+|   10. Bit reader | 747–761 |
+|   11. Current act and level (join and later) | 762–807 |
+|   12. Client DRLG and the room of a point | 808–849 |
+|   13. Visibility predicate (`0x004DBF20`) | 850–901 |
+|   14. Pet list and the hireling GUID | 902–955 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 956–1045 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1046–1080 |
+|   17. Model writes made by 1.14d UI code | 1081–1227 |
+|   18. Audio driver inputs and the client object functions | 1228–1258 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1259–1487 |
+| Constants & data dependencies | 1488–1500 |
+| Randomness | 1501–1516 |
+| Edge cases & original bugs | 1517–1541 |
+| Test vectors | 1542–1599 |
+| Provenance | 1600–1703 |
+| Open questions | 1704–1862 |
 <!-- /index -->
 
 ## Summary
