@@ -102,16 +102,8 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
     // The server places the entrance's tile when the player brings its
     // room into play: walk the Blood Moor's rooms nearest first until the
     // tile stands within reach and the client model holds it.
-    app_support::approach(
-        &mut app,
-        &server,
-        &ms,
-        TILE,
-        &[app_support::warp_id(
-            single_player::BLOOD_MOOR,
-            single_player::DEN_OF_EVIL,
-        )],
-    );
+    let want = app_support::warp_id(single_player::BLOOD_MOOR, single_player::DEN_OF_EVIL);
+    app_support::approach_tile(&mut app, &server, &ms, want);
     // The cave entrance is a tile unit of the client's model.
     let tile = |app: &App| {
         app.world()

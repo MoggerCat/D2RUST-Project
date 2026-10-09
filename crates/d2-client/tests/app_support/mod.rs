@@ -229,7 +229,7 @@ pub fn walk_into<C: Clock + Send + 'static>(
     assert_eq!(server_level(server), Some(to), "walked into level {to}");
 }
 
-/// The server unit of type `ty` (1 monster, 5 tile, else object) and a class of
+/// The server unit of type `ty` (1 monster, else object) and a class of
 /// `classes` nearest to the local player: its GUID and position.
 pub fn server_unit<C: Clock + Send + 'static>(
     server: &Server<C>,
@@ -243,7 +243,6 @@ pub fn server_unit<C: Clock + Send + 'static>(
         let at = g.events.action.hooks().path_position(p);
         let st = match ty {
             1 => d2_sim::units::UnitType::Monster,
-            5 => d2_sim::units::UnitType::Tile,
             _ => d2_sim::units::UnitType::Object,
         };
         let units: Vec<UnitId> = g
@@ -406,6 +405,51 @@ pub fn approach<C: Clock + Send + 'static>(
         }
     }
     panic!("unit {ty}/{classes:?} not reached");
+}
+
+/// Walks the server player's level room by room (nearest first) until the
+/// client model holds a tile unit (S→C 0x09) of `class`: a warp tile is
+/// created when its room comes into play. Its key.
+pub fn approach_tile<C: Clock + Send + 'static>(
+    app: &mut bevy::prelude::App,
+    server: &Server<C>,
+    ms: &std::sync::atomic::AtomicU32,
+    class: u32,
+) -> d2_client::bridge::world::UnitKey {
+    let find = |app: &bevy::prelude::App| {
+        app.world()
+            .resource::<d2_client::bridge::BridgeResource>()
+            .0
+            .world()
+            .units
+            .iter()
+            .find(|(k, u)| k.unit_type == d2_client::bridge::world::TILE && u.class == class)
+            .map(|(k, _)| *k)
+    };
+    let p = server_pos(server);
+    let (level, act) = level_act(server);
+    let mut rooms: Vec<(i32, i32)> = with(server, move |l| {
+        let g = &mut l.host_mut().game;
+        let d = g.events.action.hooks().drlg.dungeon.acts[act]
+            .as_ref()
+            .expect("the act");
+        let lv = d.find_level(level).expect("the player's level");
+        d.level_rooms(lv)
+            .into_iter()
+            .map(|r| {
+                let t = d.room(r).rect;
+                ((t.x * 2 + t.w) * 5 / 2, (t.y * 2 + t.h) * 5 / 2)
+            })
+            .collect()
+    });
+    rooms.sort_by_key(|&c| test_fixtures::host::cheb(c, p));
+    for c in rooms {
+        if let Some(k) = find(app) {
+            return k;
+        }
+        walk_town_to(app, server, ms, c, 4);
+    }
+    find(app).unwrap_or_else(|| panic!("no tile of class {class} reached the client"))
 }
 
 /// Runs to the unit `key` as the client does before an interact (C→S
