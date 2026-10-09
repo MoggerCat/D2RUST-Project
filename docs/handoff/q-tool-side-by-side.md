@@ -51,3 +51,20 @@ PNGs there too. Pages go to the private data repo,
 - The page compares the frames of its own recording (framed input), so a
   scene's tick and first difference can differ from `facts/render/`
   (recorded with plain steps).
+
+## Runs
+
+| Date | Page (private repo) | Public commit | Result |
+|---|---|---|---|
+| 2026-10-09 | `reports/side-by-side/2026-10-09/side-by-side.html` (27 MB, 32 scenes) | `8dd2c592` (merged with `claude/specs-staging-7`) | 0 pass. Scene-frame match: panels 93.7–99.9 %, towns a1–a5 94.9–99.1 %, walk-n 98.9 %, arrival 98.6 %; walk-s…nw 20.9–26.9 %, runs 17.7–18.7 %, Cold Plains 13.6–14.5 % (camera off: the walk / run drift and the waypoint walk of q-scenes-compare) |
+
+Findings of the first run (all on framed input, d2rs at `8dd2c592`):
+- 1.14d's first captured frame (tick 3, seq 1) is one flat colour (the
+  capture runs before the first world draw); d2rs's tick 3 already shows
+  the town, so every scene's first differing tick is 3. From tick 4 the
+  idle town is ~99.1 % equal per frame.
+- a1-walk-s: both sides walk north identically through tick 35 (tile
+  origin equal every drawn tick); after the click at 36 (frame 37) 1.14d
+  turns back south-west (x 9930 → 9926 by tick 47) while d2rs keeps
+  drifting east (9931 → 9933): the re-targeted walk's direction, not a
+  render difference. Every later walk / run scene inherits the offset.
