@@ -41,11 +41,11 @@
 |   8. Gold amount | 497–512 |
 |   9. Quest drop helper (`0x00559A30`) | 513–598 |
 | Constants & data dependencies | 599–628 |
-| Randomness | 629–645 |
-| Edge cases & original bugs | 646–669 |
-| Test vectors | 670–699 |
-| Provenance | 700–724 |
-| Open questions | 725–902 |
+| Randomness | 629–650 |
+| Edge cases & original bugs | 651–674 |
+| Test vectors | 675–704 |
+| Provenance | 705–729 |
+| Open questions | 730–907 |
 <!-- /index -->
 
 ## Summary
@@ -637,6 +637,11 @@ this order per pick:
 | 2–7 | item entry, `Q` = 0, not unique/set | `roll(chance)` `0x0045C3E0`, one per reached ladder step with chance > 0 (unique, set, rare, magic, superior, normal: at most 6) | quality |
 | 8 | slot mod 5 ≠ 0 | step, `lo'` & 0x3FF | drop flag 0x04 |
 | 9 | slot mod 6 ≠ 0 | step, `lo'` & 0x3FF | drop flag 0x10 |
+
+Each created item (gold included) also takes two **game-seed** steps in
+its allocation inside `0x00558D90` (`0x00552E31`, `0x00552E9F`;
+`sim/rng.md` §5.6 G6–G7), item after item in drop order, before its
+base stats.
 
 Then item creation (items spec: item seeds; the gold base of §8 on the new
 item unit's seed). Draws 2–9 happen before the classic throwable check

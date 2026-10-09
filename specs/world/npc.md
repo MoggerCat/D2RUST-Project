@@ -37,16 +37,16 @@
 |   4. Menu actions (C→S 0x38) | 275–333 |
 |   5. Healing on chat open | 334–361 |
 |   6. Cain identify (C→S 0x34) | 362–390 |
-|   7. Mercenaries | 391–513 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 514–593 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 594–627 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 628–639 |
-| Constants & data dependencies | 640–652 |
-| Randomness | 653–665 |
-| Edge cases & original bugs | 666–741 |
-| Test vectors | 742–764 |
-| Provenance | 765–815 |
-| Open questions | 816–874 |
+|   7. Mercenaries | 391–514 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 515–594 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 595–628 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 629–640 |
+| Constants & data dependencies | 641–653 |
+| Randomness | 654–666 |
+| Edge cases & original bugs | 667–742 |
+| Test vectors | 743–765 |
+| Provenance | 766–816 |
+| Open questions | 817–875 |
 <!-- /index -->
 
 ## Summary
@@ -465,7 +465,8 @@ name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
      the mercenary spec.
 6. Pay the price (`vendors.md` §9.1); not enough → 0x2A code 12.
 7. Create the mercenary unit near the NPC, else near the player
-   (`0x005B23C0(class, 1, 4, 0)` twice; mercenary spec); fails → code
+   (`0x005B23C0(class, 1, 4, 0)` twice; spot and draw order:
+   `hirelings.md` §3.1.1); fails → code
    15 (gold already taken).
 8. Slot hired := 1; mercenary init `0x00573270`; resend the
    list (§7.2, first = node count < 2); 0x2A code 5, flag 0, GUID =

@@ -58,15 +58,15 @@
 |   1. Directives | 103–142 |
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
-|   4. The 1.14d side (`poke.py`) | 181–346 |
-|   5. The d2rs side (`d2-sim::poke`) | 347–404 |
-|   6. `goto`: walking to a target | 405–479 |
-| Constants & data dependencies | 480–495 |
-| Randomness | 496–502 |
-| Edge cases & original bugs | 503–530 |
-| Test vectors | 531–557 |
-| Provenance | 558–568 |
-| Open questions | 569–576 |
+|   4. The 1.14d side (`poke.py`) | 181–354 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–412 |
+|   6. `goto`: walking to a target | 413–487 |
+| Constants & data dependencies | 488–503 |
+| Randomness | 504–510 |
+| Edge cases & original bugs | 511–538 |
+| Test vectors | 539–565 |
+| Provenance | 566–576 |
+| Open questions | 577–584 |
 <!-- /index -->
 
 ## Summary
@@ -268,10 +268,18 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
     message entry `0x0053F3D0` (ECX = buffer with the client id first,
     EDX = size) is not proposed: it takes the game's lock itself and
     drops the handler's code (`sim/intents-events.md` §2.2).
-    PROVISIONAL: a handler called at the tick-return stop has the same
-    effect as the same message drained by the server at the start of
-    the next frame (`msg`), apart from the frame number its events are
-    scheduled from (game +0xA8 at the stop); settled by REC-1150.
+    A handler called at the tick-return stop has the same effect as the
+    same message injected for that frame (REC-1150, settled 2026-10-09 by
+    recording): ScnHi1, `-seed 1234`, Act I town, chest class 5 spawned
+    next to the player (`object 5 @x+2 @y`, GUID 23) at frame 6, then at
+    frame 12 either `send InteractWithEntity type=2` (C→S 0x13, drained
+    after the frame-11 stop) or the direct operate `0x00584420(type 2,
+    GUID 23)` at the frame-11 stop. Every field of every unit and the game
+    seed are equal in all 40 snapshots of the two runs; the chest is in
+    mode 2 from snapshot 12 in both, so the events are scheduled from the
+    same frame (no off-by-one from game +0xA8). Probe: `probe_operate2.py`
+    (scratch; a `stat @player 65535 0 <GUID>` poke rerouted to the call)
+    until `operate` is in `CALL_FORMS`.
 
     Proposed `CALL_FORMS` entries (same `Fn` / `Form` shapes as the
     table in `poke.py`; `code` is a proposed fourth `RESULTS` kind:
