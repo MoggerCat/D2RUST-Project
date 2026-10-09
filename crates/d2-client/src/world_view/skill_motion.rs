@@ -12,9 +12,13 @@
 //!   player's animation again from frame 3 on each do; the view loops the
 //!   skill's mode from frame 3 ([`spin_frame`]).
 //!
-//! Which client event starts the arc (the callers `0x004C8D58`,
-//! `0x004C902F` are not traced) and the path speed `s` are d2rs-own,
-//! unverified: PROVISIONAL (REC-275).
+//! Recorded 2026-10-09 (`facts/client/anim/a1-cold-plains-leap-bar.tsv`):
+//! the path speed `s` is the run velocity (9 for the barbarian) and `n`
+//! one less than the quotient, as here. Which client event starts the
+//! arc differs: 1.14d creates the record at the Leap sequence's frame-5
+//! event (the 6th update of mode 18), not at the request, and the whirl
+//! lasts while mode 18 holds with the sequence's frames: PROVISIONAL
+//! (REC-275), fix queued as `q-fix-skill-motion`.
 
 use std::collections::BTreeMap;
 
@@ -76,8 +80,9 @@ pub fn leap_record(d: i32, s: i32) -> Option<MotionRecord> {
         return None;
     }
     let d = d.max(1);
-    // `n := (d << 16) / (s << 12)`, "-1 when > 1" read as: one less when
-    // above 1 (PROVISIONAL, REC-275).
+    // `n := (d << 16) / (s << 12)`, "-1 when > 1": one less when above 1
+    // (measured 2026-10-09: d 8, s 9 -> n 13; d 11 -> n 18;
+    // `facts/client/anim/a1-cold-plains-leap-bar.tsv`).
     let q = (i64::from(d) << 16) / (i64::from(s) << 12);
     let n = if q > 1 { q - 1 } else { q } as i32;
     let mut rec = MotionRecord::default();

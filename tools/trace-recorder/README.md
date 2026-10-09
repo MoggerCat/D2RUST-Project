@@ -26,6 +26,9 @@ code. Spec-role tool: the addresses it hooks are documented in
 | `autostart.py` | Unattended start for every `record_*.py`: `--auto CHAR [--seed N] [--input SCRIPT]` starts a single-player game with that expansion character (no player at the keyboard), optionally with a fixed map / game seed, then plays a scripted input (clicks, keys, screenshots) into the window; `--try CHAR` runs it alone; `--selftest` |
 | `check_drlg_acts.py` | Checks the `dumpdrlg` records of an `--auto` run against `specs/drlg/levels.md` §3–§4 (rules D1–D7); `--perturb N`; `--selftest` |
 | `dump_tables.py` | Launches `game/Game.exe` under the debugger, stops when the excel load and its fix-ups have finished, writes every loaded table and the runtime maps it knows to `traces/raw/<time>-tables/` (gitignored); compared by `data-tool dump-compare` |
+| `record_anim.py` | Subclass of `record_tick.py`'s `TickRecorder` (tick hook only): per client unit update (`0x00480810`) the player / monster mode, frame +0x44, frame count +0x48, speed +0x4C, event +0x4E, footstep stamp +0x84, path position and motion record (flags, ticks left, ox / oy / oz); every footstep call (`0x004CAF60`) and leap start (`0x004C8670`); `--arm-level N` arms the hooks only in level N; writes `traces/raw/<time>-anim.jsonl` (format `anim-raw-1`). Specs: `client/model.md` §5, `render/unit-composite.md` §8, `audio/triggers.md` §5 |
+| `anim_facts.py` | Turns one `record_anim.py` recording into `facts/client/anim/<name>.tsv` (format `anim-facts-1`): the chosen units' update, footstep and leap rows; `--selftest` |
+| `panel_text.py` | Reads the text one `record_frames.py` frame draws (glyph `CelDrawColor` draws grouped by pen y, Latin glyph frame = character) into `facts/client/ui/<name>.tsv` (format `panel-text-1`); `--selftest` |
 
 ## Use
 

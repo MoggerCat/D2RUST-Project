@@ -1,0 +1,58 @@
+# format panel-text-1
+# tool trace-recorder panel_text 0.1.0
+# recorder trace-recorder record_frames 0.3.0 (frames-raw-3), Game.exe sha256 631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf, args -w -ns -nosave -name ScnAma -seed 1234, frame 6
+# command: python3 tools/trace-recorder/panel_text.py <raw> --out facts/client/ui/char-panel-ama-l1.tsv --x-max 400 --note recorded under Wine: record_frames.py --seconds 150 --auto ScnAma --seed 1234 --every 20 --draws-every 20 --max-frames 6 --no-save --input 'wait 2; key C; wait 40; end' (ScnAma: d2s-tool new --class ama --expansion; level 1, no items; REC-269)
+# note: recorded under Wine: record_frames.py --seconds 150 --auto ScnAma --seed 1234 --every 20 --draws-every 20 --max-frames 6 --no-save --input 'wait 2; key C; wait 40; end' (ScnAma: d2s-tool new --class ama --expansion; level 1, no items; REC-269)
+y	x0	x1	color	font	text
+85	139	185	0	1	ScnAma
+85	303	352	0	1	Amazon
+104	98	121	0	0	Level
+104	175	225	0	0	Experience
+104	303	355	0	0	Next Level
+119	111	111	0	1	1
+119	198	198	0	1	0
+119	315	336	0	1	500
+153	271	302	0	0	ATTACK
+157	99	137	0	0	Strength
+158	356	366	0	1	1-2
+159	164	173	0	1	20
+161	270	305	0	0	Damage
+177	271	302	0	0	ATTACK
+182	356	366	0	1	1-2
+185	270	305	0	0	Damage
+216	277	308	0	0	ATTACK
+220	96	140	0	0	Dexterity
+220	362	370	0	1	95
+221	166	175	0	1	25
+224	279	308	0	0	Rating
+240	277	308	0	0	ATTACK
+244	362	370	0	1	95
+248	279	308	0	0	Rating
+267	280	316	0	0	Defense
+269	366	366	0	1	6
+305	100	136	0	0	Vitality
+305	260	295	0	0	Stamina
+306	322	329	0	1	84
+306	363	370	0	1	84
+307	164	173	0	1	20
+329	271	285	0	0	Life
+330	319	328	0	1	50
+330	360	369	0	1	50
+367	104	133	0	0	Energy
+367	267	288	0	0	Mana
+368	168	173	0	1	15
+368	323	328	0	1	15
+368	364	369	0	1	15
+402	299	314	0	0	Fire
+408	364	364	0	1	0
+410	280	332	0	0	Resistance
+426	298	315	0	0	Cold
+432	364	364	0	1	0
+434	280	332	0	0	Resistance
+451	285	328	0	0	Lightning
+456	364	364	0	1	0
+459	280	332	0	0	Resistance
+475	292	320	0	0	Poison
+480	364	364	0	1	0
+483	280	332	0	0	Resistance
+600	117	117	1	2	?
