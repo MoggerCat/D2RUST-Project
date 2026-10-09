@@ -835,3 +835,22 @@ fn a_client_only_free_appends_a_unit_freed_output() {
         }]
     );
 }
+
+/// `data/fixups.md` §13 r2: the client rows hold `FrameCnt` × 256; a row
+/// from the raw table is shifted once. A one-frame mode then ends on
+/// frame 0 (`End(m)` = 256 − 256), not on −255, whose frame number
+/// (`+0x44 >> 8`, unsigned) would read 0xFFFFFF.
+#[test]
+fn raw_frame_counts_are_fixed_up_once() {
+    let raw = ObjClientRow {
+        frame_cnt: [1, 2, 3, 0, 21, 0x0100_0000, 7, 8],
+        ..ObjClientRow::default()
+    };
+    let fixed = raw.frame_counts_fixed();
+    assert_eq!(
+        fixed.frame_cnt,
+        [256, 512, 768, 0, 21 * 256, 0, 7 * 256, 8 * 256]
+    );
+    let end = fixed.frame_cnt[0] as i32 - 256;
+    assert_eq!(end >> 8, 0);
+}
