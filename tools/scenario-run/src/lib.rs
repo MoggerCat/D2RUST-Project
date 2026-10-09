@@ -40,8 +40,9 @@ use d2_server::transport::{Classified, Queue, ServerQueues};
 use d2_sim::combat::vitals::init_player_stats;
 use d2_sim::drlg::{act_of_level, DrlgError};
 use d2_sim::game::Game;
-use d2_sim::monsters::init::{self, GameInfo, InitHost};
-use d2_sim::monsters::population::{placement, spawn as pop_spawn};
+use d2_sim::items::ItemTables;
+use d2_sim::monsters::init::GameInfo;
+use d2_sim::poke;
 use d2_sim::rng::Seed;
 use d2_sim::skills::SkillEntry;
 use d2_sim::stats::lists::NoHost;
@@ -188,6 +189,9 @@ struct Built {
     server: DispatchServer<Sim, ProtoSizes, NoSession>,
     player: UnitId,
     waypoint_classes: BTreeSet<u32>,
+    /// The item tables `poke item` creates from (`None`: they did not
+    /// load; the poke is then a gap).
+    items: Result<ItemTables, String>,
     gaps: Vec<String>,
 }
 
@@ -555,59 +559,31 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
         server: DispatchServer::new(g, ProtoSizes, NoSession),
         player,
         waypoint_classes,
+        items: ItemTables::from_fixed(&d.fixed).map_err(|e| e.to_string()),
         gaps,
     })
 }
 
-/// A spawn step (`scenario.md` §3.1 rule 2) at (x, y); the GUID of the
-/// unit the first call returned.
+/// A spawn step (`scenario.md` §3.1 rule 2) at (x, y) in act 0; the
+/// GUID of the unit the first call returned (`d2_sim::poke::spawn_monster`).
 fn spawn(sim: &mut Sim, sp: &Spawn, x: i32, y: i32) -> Option<u32> {
-    let game = &mut sim.game;
-    let ev = &mut sim.events;
-    // The active room that holds the point.
-    let room = game.lists.active_rooms(0).into_iter().find(|&r| {
-        ev.action
-            .sys
-            .hooks
-            .drlg
-            .subtiles(game, r)
-            .is_some_and(|s| x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h)
-    })?;
-    let class = i32::try_from(sp.class).ok()?;
-    let unit = match sp.kind {
-        SpawnKind::Normal => ev.population(game, |cx| {
-            placement::place_at(cx, room, None, x, y, class, 1, -1, 0).unit()
-        })?,
-        SpawnKind::RandomBoss => ev.population(game, |cx| {
-            let b = pop_spawn::random_boss(cx, room, None, class, true, x, y, false)?;
-            pop_spawn::champion_minions(cx, None, b, class);
-            Some(b)
-        })?,
-        SpawnKind::Champion => {
-            let b = ev.population(game, |cx| {
-                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
-            })?;
-            let umod = sp.umods[0];
-            ev.init(game, |cx, h| init::champion_pack_member(cx, h, b, umod));
-            ev.population(game, |cx| pop_spawn::champion_minions(cx, None, b, class));
-            b
-        }
-        SpawnKind::Unique => {
-            let b = ev.population(game, |cx| {
-                pop_spawn::boss_spawn(cx, room, None, x, y, None, class, false)
-            })?;
-            ev.init(game, |_, h| {
-                for &u in &sp.umods {
-                    h.monsters().entry(b).push_umod(u);
-                }
-            });
-            ev.population(game, |cx| {
-                pop_spawn::boss_minions_and_init(cx, b, 3, 6, None)
-            });
-            b
-        }
+    let kind = match sp.kind {
+        SpawnKind::Normal => poke::SpawnKind::Normal,
+        SpawnKind::RandomBoss => poke::SpawnKind::RandomBoss,
+        SpawnKind::Champion => poke::SpawnKind::Champion,
+        SpawnKind::Unique => poke::SpawnKind::Unique,
     };
-    game.lists.unit(unit).map(|e| e.guid)
+    let unit = poke::spawn_monster(
+        &mut sim.game,
+        &mut sim.events,
+        0,
+        sp.class,
+        x,
+        y,
+        kind,
+        &sp.umods,
+    )?;
+    sim.game.lists.unit(unit).map(|e| e.guid)
 }
 
 /// The raw value of (stat, layer 0) in the unit's full stat array, 0
@@ -655,6 +631,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
         mut server,
         player,
         waypoint_classes,
+        items,
         mut gaps,
     } = build(s, data)?;
     let mut notes = Vec::new();
@@ -676,9 +653,11 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
         [g.lo, g.hi]
     };
     for t in 0..=s.end {
-        // (a) Resolve and inject the steps of tick t; spawns run here.
+        // (a) Resolve and inject the steps of tick t; spawns and pokes
+        // run here, in script order (`poke.md` §3 rule 1).
         let before = seed(&server);
         let mut i = 0;
+        let mut step_records = Vec::new();
         while let Some(step) = steps.next_if(|st| st.tick == t) {
             let view = View {
                 sim: &server.game,
@@ -702,7 +681,44 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                         Err(u.reference)
                     }
                 };
-                records.push(Record::Spawn { t, i, guid });
+                step_records.push(Record::Spawn { t, i, guid });
+                i += 1;
+                continue;
+            }
+            if let StepMsg::Poke(d) = &step.msg {
+                let env = poke::Env {
+                    player,
+                    waypoint_classes: &waypoint_classes,
+                    items: items.as_ref().ok(),
+                };
+                let g = &mut server.game;
+                let r = poke::apply(&mut g.game, &mut g.events, &env, d);
+                match &r {
+                    poke::PokeResult::Ok(_) => {}
+                    poke::PokeResult::Failed => {
+                        notes.push(format!("tick {t} step {i}: poke {d}: failed"))
+                    }
+                    poke::PokeResult::Unresolved(u) => {
+                        notes.push(format!("tick {t} step {i}: poke {d}: unresolved {u}"))
+                    }
+                    poke::PokeResult::Gap(why) => {
+                        let why = match (d, &items) {
+                            (poke::Directive::Item { .. }, Err(e)) => {
+                                format!("{why} (item tables: {e})")
+                            }
+                            _ => why.clone(),
+                        };
+                        notes.push(format!("tick {t} step {i}: poke {d}: gap: {why}"));
+                        gaps.push(format!("poke {} at {t}", d.keyword()));
+                    }
+                }
+                step_records.push(Record::Poke {
+                    t,
+                    i,
+                    d: d.keyword().into(),
+                    r: r.code().into(),
+                    guid: r.guid(),
+                });
                 i += 1;
                 continue;
             }
@@ -715,7 +731,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                         )),
                         Err(e) => notes.push(format!("tick {t} step {i}: {e}")),
                     }
-                    records.push(Record::C2s {
+                    step_records.push(Record::C2s {
                         t,
                         i,
                         bytes: Ok(bytes),
@@ -723,7 +739,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
                 }
                 Err(u) => {
                     notes.push(format!("tick {t} step {i}: unresolved: {}", u.why));
-                    records.push(Record::C2s {
+                    step_records.push(Record::C2s {
                         t,
                         i,
                         bytes: Err(u.reference),
@@ -732,6 +748,10 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
             }
             i += 1;
         }
+        // Within a tick the records go `c2s`, `spawn`, `poke`
+        // (FORMAT.md; `scenario.md` §5 rule 3), each in step order.
+        step_records.sort_by_key(Record::order);
+        records.extend(step_records);
         // The dispatcher's range checks read the staged unit facts
         // (`SimGame::set_unit`, `intents-events.md` §2.4 rules 3–4):
         // staged from the sim's own units before the drain, as
