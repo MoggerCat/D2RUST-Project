@@ -85,3 +85,8 @@ GROUPS["act5out"] = {
     "script": ("waitticks 8; click 240 428; waitticks 13; click 240 428; waitticks 13; click 240 428; waitticks 13; click 240 428; waitticks 13; click 240 428; waitticks 13; click 240 428; waitticks 13; click 240 428; waitticks 13; click 272 444; waitticks 13; click 304 396; waitticks 13; click 352 340; waitticks 13; click 384 284; waitticks 41; click 230 171; waitticks 81; mark o; waitticks 10; end"),
     "scenes": {"a5-outdoor-frigid-highlands": ("o", 0)},
 }
+GROUPS["act1out"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": ("waitticks 8; click 768 324; waitticks 13; click 790 276; waitticks 13; click 790 276; waitticks 13; click 768 276; waitticks 13; click 768 276; waitticks 13; click 688 316; waitticks 13; click 576 308; waitticks 13; click 464 292; waitticks 41; click 352 284; waitticks 41; click 230 171; waitticks 81; mark o; waitticks 10; end"),
+    "scenes": {"a1-outdoor-cold-plains": ("o", 0)},
+}
