@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 985–1003 |
 | Test vectors | 1004–1035 |
 | Provenance | 1036–1064 |
-| Open questions | 1065–1135 |
+| Open questions | 1065–1137 |
 <!-- /index -->
 
 ## Summary
@@ -1078,8 +1078,10 @@ item and path-placement specs).
    game start with a breakpoint on `0x00546270`.~~ **Answered**
    (2026-10-07): §3 "Which caller runs" (`0x005345A0`, `0x005344B0`,
    `0x0056A072`): mode 0; a new-character stub gets mode 1 then mode 0.
-   The doubled 0x5E / 0x28 / 0x29 of a new character's first game is a
-   code reading: recording R-PQ-3 (`docs/handoff/pc2-rec-pc2-quests.md`).
+   The doubled 0x5E / 0x28 / 0x29 of a new character's first game is
+   recorded (R-PQ-3, 2026-10-09, Wine): a character made in the create
+   screen gets each twice in frame 1, a loaded save once
+   (`facts/join/a1-new-ama.tsv`, `a1-save-ScnAma.tsv`).
 5. (Answered: `quests-act1-rest.md` §7: bytes 13–14 are confirmed never
    written by `0x00593CB0`; d2rs writes 0 and exact-match comparison
    masks them.)

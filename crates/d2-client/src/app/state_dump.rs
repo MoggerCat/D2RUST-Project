@@ -18,7 +18,13 @@
 //! tick N, `f` = `Game::frame` = N) is taken on the server thread
 //! through [`ThreadLink::with`], reading only.
 //!
-//! Output: header, snaps, footer (§1). Two runs with the same arguments
+//! Pokes (`specs/tools/poke.md` §2 rule 6): each `--poke "<f> <directive>
+//! <args>..."` runs through the bridge ([`Bridge::poke`], on the server
+//! thread) right after the snapshot of frame f − 1, before frame f's
+//! drain; its result is a `poke` line between the two snapshots (the
+//! record `poke.py` writes on 1.14d) and a line on stderr.
+//!
+//! Output: header, snaps (and poke lines), footer (§1). Two runs with the same arguments
 //! write the same bytes but for the header's `date`. Not game logic: the
 //! clock and the date are this binary's (CLAUDE.md rule 6 binds
 //! `d2-sim`, which only reads here).
@@ -33,6 +39,7 @@ use d2_server::seams::Clock;
 use d2_sim::debug::state;
 
 use super::play_start::{self, CliStart};
+use super::poke::{self as pokes, Entry, When};
 use super::server_thread::ThreadLink;
 use super::single_player::{self, Character, GameData, Link};
 use crate::bridge::state::StateSource;
@@ -77,6 +84,8 @@ pub struct DumpArgs {
     pub game_dir: Option<PathBuf>,
     /// `--date YYYY-MM-DD` for the header, else today (UTC).
     pub date: Option<String>,
+    /// `--poke "<f> <directive> <args>..."` (repeatable): absolute frames.
+    pub pokes: Vec<Entry>,
 }
 
 /// Parses the options after `state-dump`.
@@ -90,6 +99,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         out: PathBuf::new(),
         game_dir: None,
         date: None,
+        pokes: Vec::new(),
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -108,6 +118,9 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--every" => a.every = value()?.parse().context("--every")?,
             "--out" => out = Some(PathBuf::from(value()?)),
             "--game-dir" => a.game_dir = Some(PathBuf::from(value()?)),
+            "--poke" => a
+                .pokes
+                .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
             "--date" => {
                 let v = value()?.clone();
                 if !is_date(&v) {
@@ -167,6 +180,8 @@ pub struct DumpGame {
     pub hardcore: bool,
     /// The 0x67 flags; `None`: the character's own.
     pub start_flags: Option<u32>,
+    /// The `--poke` entries, in command-line order.
+    pub pokes: Vec<Entry>,
 }
 
 impl DumpGame {
@@ -199,6 +214,7 @@ impl DumpGame {
             seed,
             hardcore,
             start_flags: start.start_flags,
+            pokes: args.pokes.clone(),
         })
     }
 }
@@ -273,7 +289,11 @@ pub fn dump<W: Write>(
     bridge.send(&request)?;
     let (mut ran, mut snaps, mut idle) = (0u32, 0u64, 0u32);
     let mut first = true;
+    // The frame the last tick ran (0: none yet) and the pokes still to run.
+    let mut last_frame = 0i32;
+    let mut pending = game.pokes;
     while ran < ticks {
+        run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
         if !std::mem::replace(&mut first, false) {
             ms.fetch_add(STEP_MS, Ordering::SeqCst);
         }
@@ -290,17 +310,46 @@ pub fn dump<W: Write>(
         idle = 0;
         ran += 1;
         let s = bridge.state_snapshot()?;
+        last_frame = s.frame;
         if s.frame.rem_euclid(every as i32) == 0 {
             writeln!(out, "{}", s.to_json_line())?;
             snaps += 1;
         }
     }
-    let notes = [format!(
+    let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
+    for e in &pending {
+        eprintln!("poke: not reached in {ran} ticks: {:?} {}", e.when, e.op);
+        notes.push(format!("poke not reached: {:?} {}", e.when, e.op));
+    }
     writeln!(out, "{}", state::footer_line(snaps, &notes))?;
     out.flush()?;
     Ok(DumpReport { ticks: ran, snaps })
+}
+
+/// Runs every pending poke due after `last_frame` (absolute `f` with
+/// f − 1 ≤ `last_frame`, `poke.md` §2 r6) through the bridge, in order,
+/// writing a `poke` line each and printing it to stderr.
+fn run_due_pokes<W: Write>(
+    bridge: &mut Bridge<DumpLink>,
+    pending: &mut Vec<Entry>,
+    last_frame: i32,
+    out: &mut W,
+) -> Result<()> {
+    let (due, later): (Vec<Entry>, Vec<Entry>) = std::mem::take(pending)
+        .into_iter()
+        .partition(|e| pokes::due_after(e.when, None).is_some_and(|f| last_frame >= f));
+    *pending = later;
+    for (i, e) in due.iter().enumerate() {
+        // state-dump takes absolute --poke frames only (never a Tick entry)
+        let When::Frame(f) = e.when else { continue };
+        let r = bridge.poke(&e.op)?;
+        let line = pokes::record_line(f, i, &e.op, &r);
+        eprintln!("poke: before frame {f}: {}: {line}", e.op);
+        writeln!(out, "{line}")?;
+    }
+    Ok(())
 }
 
 /// The server thread's snapshot, taken on the server thread between two
@@ -410,8 +459,16 @@ mod tests {
             "g",
             "--date",
             "2026-10-09",
+            "--poke",
+            "4 spawn 19 @x+3 @y+3 normal",
+            "--poke",
+            "4 seed-unit @1:19 0x12345678 666",
         ]))
         .unwrap();
+        let pokes = a.pokes.clone();
+        assert_eq!(pokes.len(), 2);
+        assert_eq!(pokes[0].when, When::Frame(4));
+        assert_eq!(pokes[1].op.to_string(), "seed-unit @1:19 305419896 666");
         assert_eq!(
             a,
             DumpArgs {
@@ -423,13 +480,42 @@ mod tests {
                 out: "o".into(),
                 game_dir: Some("g".into()),
                 date: Some("2026-10-09".into()),
+                pokes,
             }
         );
+        assert!(parse_args(&args(&[
+            "--ticks",
+            "1",
+            "--out",
+            "o",
+            "--poke",
+            "0 time 1 0"
+        ]))
+        .is_err());
+        assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--poke", "3 nope"])).is_err());
         assert!(parse_args(&args(&["--out", "o"])).is_err(), "no --ticks");
         assert!(parse_args(&args(&["--ticks", "1"])).is_err(), "no --out");
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--every", "0"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--date", "9.10.26"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
+    }
+
+    // Covers: specs/tools/poke.md §2 r6
+    #[test]
+    fn poke_record_lines() {
+        use d2_sim::poke::PokeResult;
+        let op = pokes::parse_poke_arg("4 spawn 19 @x+3 @y+3 normal")
+            .unwrap()
+            .op;
+        assert_eq!(
+            pokes::record_line(4, 0, &op, &PokeResult::Ok(Some(8))),
+            r#"{"k":"poke","f":4,"frame":3,"i":0,"d":"spawn","r":"ok","guid":8,"src":"spawn 19 @x+3 @y+3 normal"}"#
+        );
+        let op = pokes::parse_poke_arg("5 seed-unit @1:19 1 2").unwrap().op;
+        assert_eq!(
+            pokes::record_line(5, 1, &op, &PokeResult::Unresolved("@1:19".into())),
+            r#"{"k":"poke","f":5,"frame":4,"i":1,"d":"seed-unit","r":"unresolved","note":"@1:19","src":"seed-unit @1:19 1 2"}"#
+        );
     }
 
     #[test]

@@ -1206,6 +1206,13 @@ pub struct MonsterClass {
     /// `monstats2` `SizeX` (+0x08, signed): the monster's unit size
     /// (`sim/path-placement.md` §3).
     pub size_x: i8,
+    /// `monstats` flag 27 `noaura` (flags +12 bit 27, `data/fields.tsv`;
+    /// the client search's skip test, `missiles/client-bodies-2.md` §B9
+    /// r3).
+    pub no_aura: bool,
+    /// `monstats` flag 10 `inTown` (with `npc`: the monster can be in
+    /// town, the footprint pattern of `sim/path-placement.md` §3).
+    pub in_town: bool,
     /// The columns of the monster set-up `0x004AE8D0` (`msg-units.md`
     /// §1.2 r6); `None`: the tables do not give them (the set-up's table
     /// parts are not run).

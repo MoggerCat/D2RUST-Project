@@ -46,6 +46,9 @@ pub struct ItemSpec {
     pub at: Option<(i32, i32)>,
     /// Page: 0 inventory, 3 cube, 4 stash (`inventory.md` §1.2).
     pub page: u8,
+    /// `#Q`: quantity (stat 70) set after creation, for a part stack
+    /// (a test set-up, not a §10.4 step).
+    pub qty: Option<i32>,
 }
 
 impl std::str::FromStr for ItemSpec {
@@ -59,6 +62,24 @@ impl std::str::FromStr for ItemSpec {
             ),
             None => (s, 0),
         };
+        let (rest, qty) = match rest.split_once('#') {
+            Some((c, q)) => {
+                let (q, tail) = q.split_once('@').map_or((q, ""), |(a, b)| (a, b));
+                let q = q
+                    .parse::<i32>()
+                    .map_err(|_| anyhow!("bad quantity in {s:?}"))?;
+                (
+                    if tail.is_empty() {
+                        c.to_owned()
+                    } else {
+                        format!("{c}@{tail}")
+                    },
+                    Some(q),
+                )
+            }
+            None => (rest.to_owned(), None),
+        };
+        let rest = rest.as_str();
         let (code, at) = match rest.split_once('@') {
             Some((c, xy)) => {
                 let (x, y) = xy
@@ -79,7 +100,12 @@ impl std::str::FromStr for ItemSpec {
                 "page {page}: only 0 (inventory), 3 (cube) and 4 (stash) are player storage pages"
             );
         }
-        Ok(ItemSpec { code: c, at, page })
+        Ok(ItemSpec {
+            code: c,
+            at,
+            page,
+            qty,
+        })
     }
 }
 
@@ -369,6 +395,9 @@ pub fn make_item(
     }
     if it.itype_of(idx).is_some_and(|y| y.quiver != 0) {
         item.stats.set_base(stat::QUANTITY, 0, 100);
+    }
+    if let Some(q) = s.qty {
+        item.stats.set_base(stat::QUANTITY, 0, q);
     }
     // The writer's view (as `wiring::inventory::bits` projects it).
     let is = |k: u16| it.is_type(idx, k as i16);

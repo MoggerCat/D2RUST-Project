@@ -67,7 +67,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
 | `input d2rs <script>` | no | `d2-client play --input` script (server ticks) |
 | `ignore <field>...` | no, repeatable | state fields not compared (`state_diff.py --ignore`) |
-| `at <frame> poke <directive> <args...>` | no, repeatable | state injection, syntax owned by q-tool-poke (`tools/scenario.md`): applied at the drain before tick `<frame>` (absolute game frame, the `f` of `tools/state-snapshot.md`); kept verbatim and reported as not run until both sides take it |
+| `at <frame> poke <directive> <args...>` | no, repeatable | state injection (`tools/poke.md` §1, §2 rule 6; `spawn` lines as §1 rule 3): `<frame>` ≥ 1 is the absolute game frame (the `f` of `tools/state-snapshot.md`); applied after frame `<frame>` − 1 and its snapshot, before frame `<frame>`'s drain; passed in file order to every 1.14d recorder and to d2rs `state-dump` / `play` as `--poke "<frame> <directive> <args...>"` |
 
 ### 3. Run
 
@@ -87,7 +87,14 @@ state first. It is the default way to compare a behaviour with 1.14d.
    --ignore tick` (`tools/facts-render.md`).
 4. A channel with no d2rs recorder (`rng`, `packets`) is reported as not
    compared (partial), never as a match.
-5. `--orig-only` / `--d2rs-only` run one side; `--reuse` keeps outputs
+5. Pokes (§2 `at` lines) go to both sides of every channel as
+   `--poke "<frame> <directive> <args...>"`. Each side writes one
+   `poke` record per result (`{"k":"poke","f","frame","i","d","r",
+   "guid"?,"note"?,"src"}`, `tools/poke.md` §3 rule 3 with `f` for `t`)
+   into its state file, between the snapshots of frames f − 1 and f;
+   `state_diff.py` does not compare them (the snapshots after them
+   show the effect).
+6. `--orig-only` / `--d2rs-only` run one side; `--reuse` keeps outputs
    already in the work dir; `--dry-run` prints the commands.
 
 ## Constants & data dependencies
@@ -116,6 +123,14 @@ d2rs-own tool; no 1.14d fact.
 
 ## Open questions
 
-1. The `poke` directives (agreed with q-tool-poke, 2026-10-09): both
-   sides take them as a repeatable `--poke "<frame> <directive> <args>"`
-   once q-tool-poke lands them.
+1. Resolved (2026-10-09, q-tool-poke with q-tool-state-diff): the
+   `poke` directives run on both sides as a repeatable `--poke "<frame>
+   <directive> <args>"` (`record_state.py`, `record_frames.py` through
+   `poke.py`; d2rs `state-dump`, `play`), §2 and §3 rule 5.
+2. d2rs `state-dump` takes no input script (`play --input` drives the
+   Bevy pointer, which the headless run does not have): a check whose
+   behaviour needs C→S input beyond the bridge's own answers (a skill
+   cast, a click on a unit) has no d2rs side yet
+   (`traces/checks/poke-firebolt.check`).
+   Until it does, the state channel runs d2rs without the `input d2rs`
+   line and reports at best partial (never a match).

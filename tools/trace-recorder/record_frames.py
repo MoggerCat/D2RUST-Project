@@ -34,6 +34,7 @@ import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autostart  # noqa: E402  (unattended start, input script)
+import poke  # noqa: E402  (--poke / --poke-file: state injection, specs/tools/poke.md §2 rule 6)
 
 sys.dont_write_bytecode = True
 
@@ -640,6 +641,7 @@ def main():
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
+    poke.add_options(ap)
     a = ap.parse_args()
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     if a.selftest:
@@ -661,6 +663,9 @@ def main():
                           a.ticks, img_dir, max(1, a.every), a.max_frames, a.allow_any_size,
                           max(0, a.draws_every), a.draws_light)
     r.auto = auto
+    layer = poke.PokeLayer.from_args(a)
+    if layer:
+        layer.attach(r)  # arms 0x0052FD1E; {"k":"poke",...} records land in the frames file
     try:
         r.run()
     except KeyboardInterrupt:
