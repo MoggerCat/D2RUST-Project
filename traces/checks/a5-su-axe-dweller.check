@@ -1,0 +1,13 @@
+check 1
+# Act 5 superunique row 46 (class 508) spawn + kill + drops (q-chk-act5): spawned beside the player in level 110
+# (poke superunique), life set to 1, killed with a Fire Bolt missile poke. Drops are ut 4 units in the state.
+name a5-su-axe-dweller
+save ScnSo5 --class sor --expansion --act 4 --quests acts=4 --waypoints all
+seed 1234
+ticks 90
+seconds 300
+channels state
+at 4 poke warp 110
+at 12 poke superunique 46 @x+4 @y
+at 14 poke stat @1:508 6 0 256
+at 16 poke missile 58 @x @y @x+4 @y skill 36 1

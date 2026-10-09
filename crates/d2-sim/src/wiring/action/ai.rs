@@ -18,7 +18,7 @@ use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::hooks::Sim;
 use crate::units::record::flags;
-use crate::units::{RoomId, UnitId};
+use crate::units::{RoomId, UnitId, UnitType};
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
@@ -137,7 +137,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.set_base(unit, stat::HITPOINTS, life);
     }
     fn ai_state(&self, unit: UnitId) -> u32 {
-        self.h.x.ai_state(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m.ai_state,
+            None => self.h.x.ai_state(unit),
+        }
     }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
@@ -411,8 +414,11 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.units_line_blocked(game, a, b, LINE_MASK_AI)
             .unwrap_or_else(|| self.h.x.line_blocked(game, a, b))
     }
-    fn in_melee_range(&self, _: &Game, a: UnitId, b: UnitId) -> bool {
-        self.h.x.in_melee_range(a, b, 0)
+    fn in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
+        match self.monster_in_melee_range(game, a, b) {
+            Some(r) => r,
+            None => self.h.x.in_melee_range(a, b, 0),
+        }
     }
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
         self.h.x.can_reach_directly(game, unit, target)
@@ -420,8 +426,13 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)
     }
+    /// Room +0x38..+0x44 (`0x0061AFA0`'s ring, [`super::monster_death`]):
+    /// each slot's GUID as a monster.
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
-        self.h.x.last_dead(game, room)
+        game.lists.room(room).map_or([None; 4], |r| {
+            r.dead_guids
+                .map(|g| game.lists.find_unit(crate::units::UnitType::Monster, g))
+        })
     }
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         self.h.x.footprint_ok(game, class, room, x, y)
@@ -452,8 +463,82 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
+    /// `0x005DDC30` (`ai.md` §5.3) with the host's candidate list: the
+    /// scan 6 callback `0x005DCBD0` (full-size distance < 49, `nThreat`
+    /// class slots, the mask 4 line test) and the pick between main and
+    /// alternative (`0x005DD510`: no main → the alternative).
+    /// PROVISIONAL (q-fix-ass-traps, REC-1270): the filter `0x005DC970`
+    /// beyond alive / hostile and `0x005DD510`'s other branches are not
+    /// applied; settled by the ass-lightning-sentry-hit check.
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        self.h.x.secondary_target(game, unit)
+        let Some(cands) = self.h.x.secondary_candidates(game, unit) else {
+            return self.h.x.secondary_target(game, unit);
+        };
+        let at = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let mut main = (None, 0x7FFF_FFFF);
+        let mut alt = (None, 0x7FFF_FFFF);
+        for c in cands {
+            let d = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(c));
+            if d >= 49 {
+                continue;
+            }
+            let is_player = self
+                .units
+                .get(c)
+                .is_some_and(|r| r.ty == crate::units::UnitType::Player);
+            let threat = match self.units.get(c) {
+                Some(_) if is_player => 14,
+                Some(r) => self
+                    .h
+                    .tables
+                    .combat
+                    .monstats
+                    .get(r.class as usize)
+                    .map_or(0, |m| i32::from(m.threat)),
+                None => continue,
+            };
+            // PROVISIONAL (specs/monsters/ai.md §5.3 step 1, REC-1270): a
+            // monster candidate in the scanner's melee range (`0x00622C40`
+            // step 3: d ≤ 0, or d ≤ `MeleeRng` + 1; the line a → c is not
+            // tested) is skipped, whatever its states; 1.14d: a Lightning
+            // Sentry (MeleeRng 0) never picks a Fallen at distance 1.
+            if !is_player {
+                let reach = self
+                    .h
+                    .tables
+                    .combat
+                    .monstats
+                    .get(self.units.get(unit).map_or(0, |r| r.class as usize))
+                    .and_then(|m| {
+                        self.h
+                            .tables
+                            .combat
+                            .monstats2
+                            .get(usize::from(m.monstatsex))
+                    })
+                    .map_or(0, |m2| match m2.meleerng {
+                        255 => 0,
+                        r => i32::from(r),
+                    });
+                if d <= 0 || d <= reach + 1 {
+                    continue;
+                }
+            }
+            let slot = if threat >= 2 { &mut main } else { &mut alt };
+            if d >= slot.1 {
+                continue;
+            }
+            if self.line_blocked(game, unit, c) {
+                continue;
+            }
+            *slot = (Some(c), d);
+        }
+        let (t, d) = if main.0.is_some() { main } else { alt };
+        match t {
+            Some(t) => (Some(t), d, self.h.x.in_melee_range(unit, t, 0)),
+            None => (None, 0x7FFF_FFFF, false),
+        }
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
@@ -986,5 +1071,64 @@ impl<X: Pending> AiSummons for View<'_, X> {
         let rows = self.h.hireling_ai.rows.as_ref()?;
         let i = rows.row_at(self.data.expansion, u32::try_from(id).ok()?, level)?;
         rows.rows.get(i).map(|r| r.ai_row())
+    }
+}
+
+impl<X: Pending> View<'_, X> {
+    /// `0x00622C40(a, b, 0)` (`combat/hit.md` §7.2) for a monster `a`
+    /// with the path provider and a monstats2 row: reach `MeleeRng` + 1
+    /// against the unit distance `0x00641530` (`pathing.md` §9.5), then
+    /// the collision line (mask 0x804). `None`: not answerable here (the
+    /// host answers).
+    ///
+    /// PROVISIONAL (hit.md §7.3 step 3, REC-1110): `MeleeRng` 255 reads
+    /// the unit's weapon class in its current mode; monsters carry no
+    /// weapon here, so it is reach 0.
+    fn monster_in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> Option<bool> {
+        let paths = self.h.paths.as_ref()?;
+        let t = &self.h.tables.combat;
+        let class = self
+            .units
+            .get(a)
+            .filter(|r| r.ty == UnitType::Monster)?
+            .class;
+        let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
+        let rng = t.monstats2.get(usize::from(ex))?.meleerng;
+        let reach = if rng == 255 { 0 } else { i32::from(rng) };
+        let dist = |a: UnitId, b: UnitId| {
+            let pt = |u: UnitId| {
+                let (x, y) = self.h.path_position(u);
+                crate::path::Point { x, y }
+            };
+            crate::path::walk::geom::unit_distance(
+                &paths.tables,
+                pt(a),
+                self.path_size(a),
+                pt(b),
+                self.path_size(b),
+            )
+        };
+        // Step 2: the tentacle classes.
+        let tentacle = self
+            .units
+            .get(b)
+            .filter(|r| r.ty == UnitType::Monster)
+            .and_then(|r| {
+                t.monstats
+                    .get(usize::try_from(r.class).ok()?)
+                    .map(|m| m.baseid)
+            });
+        if matches!(tentacle, Some(258 | 261)) && reach + 8 > dist(a, b) {
+            return Some(true);
+        }
+        // Step 3.
+        let d = dist(a, b);
+        if d <= 0 {
+            return Some(true);
+        }
+        if reach + 1 < d {
+            return Some(false);
+        }
+        Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))
     }
 }

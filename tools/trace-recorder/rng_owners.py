@@ -24,6 +24,11 @@ Rules (rng-trace.md §2):
      the game seed's own start, and replays its states.
   6. The backward pass gives a draw to an owner only when that owner's
      forward chain did not already reach its value at the next tick.
+  7. A forward chain that began at an address-hinted draw (rule 1) of an
+     owner with no known value yet (a unit created this frame) is not a
+     chain from a known point: rule 6 does not stop the backward pass for
+     it, which then takes the draws before that one (the inline steps a
+     new monster's seed takes before its first helper draw).
 
 Standard library only; our own code.
 """
@@ -82,11 +87,13 @@ def assign(records):
     # forward (rule 2); `explained[i]`: owners whose chain reached the tick at i
     cur = {}
     explained = {}
+    loose = set()  # owners whose chain this frame began at a hinted draw (rule 7)
     for i, r in enumerate(body):
         if r["type"] == "tick":
             nxt = scan(r)
-            explained[i] = {o for o, v in nxt.items() if cur.get(o) == v}
+            explained[i] = {o for o, v in nxt.items() if cur.get(o) == v and o not in loose}
             cur = nxt
+            loose = set()
             continue
         if i in drlg:
             continue
@@ -100,6 +107,8 @@ def assign(records):
             continue
         o = owner.get(i) or pick(cur, b)
         if o:
+            if o not in cur:
+                loose.add(o)
             owner[i] = o
             cur[o] = a
     # backward (rules 3, 6)
@@ -205,7 +214,7 @@ def synthetic():
     return recs
 
 
-# Covers: specs/tools/rng-trace.md §2 r1, §2 r2, §2 r3, §2 r5, §2 r6, §4 r4
+# Covers: specs/tools/rng-trace.md §2 r1, §2 r2, §2 r3, §2 r5, §2 r6, §2 r7, §4 r4
 def selftest():
     recs = synthetic()
     counts = assign(recs)
@@ -231,7 +240,26 @@ def selftest():
     assert recs[t1 + 1]["owner"] == "other:drlg", recs[t1 + 1]
     assert recs[t1 + 2]["owner"] == "game", recs[t1 + 2]
     assert recs[t1 + 3]["owner"] == "other:inline", recs[t1 + 3]
-    print("rng_owners selftest: 3 checks passed")
+    # rule 7: a unit created mid-frame (its init hint read before the GUID is
+    # written: "1:0", not listed); an inline step on the new seed, then a
+    # hinted helper; the backward pass still takes the inline step
+    recs = synthetic()
+    t2 = [i for i, r in enumerate(recs) if r["type"] == "tick"][1]
+    n0 = (4242, 666)
+    n1 = step(n0)
+    n2 = step(n1)
+    recs[t2:t2] = [
+        {"type": "seed_set", "op": "init_low", "seed": "0x4020", "old": [1, 666],
+         "new": list(n0), "frame": 1, "unit": "1:0"},
+        {"type": "draw", "via": "inline", "op": "step", "site": "0x573a8e",
+         "before": list(n0), "after": list(n1), "frame": 1},
+        {"type": "draw", "via": "helper", "op": "roll", "seed": "0x4020", "unit": "1:9",
+         "before": list(n1), "after": list(n2), "frame": 1}]
+    recs[t2 + 3]["units"].append([1, 9, n2[0], n2[1]])
+    assign(recs)
+    got = [r["owner"] for r in recs[t2:t2 + 3]]
+    assert got == ["unit 1:9", "unit 1:9", "unit 1:9"], got
+    print("rng_owners selftest: 4 checks passed")
     return 0
 
 

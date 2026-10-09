@@ -32,13 +32,13 @@
 |   8. Chain operations | 333–440 |
 |   9. States | 441–479 |
 |   10. Timer event handlers | 480–567 |
-|   11. Mod array and stat messages | 568–595 |
-| Constants & data dependencies | 596–607 |
-| Randomness | 608–611 |
-| Edge cases & original bugs | 612–635 |
-| Test vectors | 636–672 |
-| Provenance | 673–696 |
-| Open questions | 697–727 |
+|   11. Mod array and stat messages | 568–605 |
+| Constants & data dependencies | 606–617 |
+| Randomness | 618–621 |
+| Edge cases & original bugs | 622–645 |
+| Test vectors | 646–682 |
+| Provenance | 683–706 |
+| Open questions | 707–737 |
 <!-- /index -->
 
 ## Summary
@@ -578,10 +578,12 @@ clears through the list's remove callback (§8.2.6).
 3. Clear: `0x00625960` empties the array when the unit is processed by
    the room update queue (`tick.md` §3 step 6, `0x00553220`), after the
    flush of the same tick.
-4. Single stats: `0x00625870`(unit, client, stat, sender) sends the
+4. Single stats: `0x00625870`(unit, Q, stat, sender) (Q = the
+   receiving client's player unit, `0x00537860(client, 0)` in
+   `0x00580860`; the sender `0x00548520` finds Q's client) sends the
    base value (layer 0) when the key **is** in the mod array and is
    present in the base array; used for 67, 68, 12, 0, 2 by `0x00580860`.
-   Sender arguments: (ECX unit, EDX stat, value, client).
+   Sender arguments: (ECX unit, EDX stat, value, Q).
    Corrected 2026-10-09 from the recording (the earlier text said "not
    in the mod array"): `traces/checks/packets-town-arrival-ama.check`,
    frame 2, the player's update after its join (ScnAma, full save):
@@ -589,9 +591,17 @@ clears through the list's remove callback (§8.2.6).
    2: keys the load inserted, still in the array, since the same frame
    ends with their mod flush, rule 2) and nothing for 67 / 68 (base 100
    from the load, `formats/d2s.md` §9 rule 4, never in the array: not
-   `Saved`). Whether an array key absent from the base array sends 0
-   is not settled (`docs/handoff/pc1-data.md` Step 4); d2rs sends
-   nothing.
+   `Saved`). Confirmed from the asm (2026-10-09): the unit's list
+   must be extended (+0x10 bit 31); k = stat << 16 (layer 0); the mod
+   array search `0x00624D90` (array +0x50, count +0x54) is the
+   insert-position search of rule 1 and returns −1 only when k is
+   **present**, and `0x00625870` goes on only on −1; then the base
+   array search `0x00624B90` (+0x24) returns −1 when k is absent, and
+   then **nothing is sent** (unlike the flush of rule 2, which sends 0).
+   Found → sender(ECX unit, EDX stat, value = the entry's value, the
+   second argument). So: in the mod array and in the base array → one
+   send; any other case → none. d2rs (`StatLists::single_stat`) does
+   the same.
 
 ## Constants & data dependencies
 

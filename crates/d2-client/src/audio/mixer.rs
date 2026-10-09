@@ -211,6 +211,10 @@ impl Voice {
         &self.file
     }
 
+    pub fn sound(&self) -> &Sound {
+        &self.sound
+    }
+
     pub fn params(&self) -> &VoiceParams {
         &self.params
     }

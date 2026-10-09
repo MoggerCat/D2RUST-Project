@@ -38,6 +38,14 @@ specs/sim/client-messages.tsv) at S+0x300 and calls the client sender
 the server drains it in the next frame as if the client had sent it. The
 sender's duplicate filter (wall clock) is not visible: the result is `ok`.
 
+`operate <ref>` and `talk <ref> [<choice>...]` (poke.md §1, §4 rule 11) call
+the server's C->S dispatcher 0x0054D750 (ECX game, EDX player, [ESP+4]
+message, [ESP+8] size; sim/intents-events.md §2.3) at the stop, once per
+message: 0x13 {type, GUID}; for `talk` then 0x2F and one message per choice
+(trade / gamble / hire / action:<n> -> 0x38, quest:<n> -> 0x31, close ->
+0x30). EAX is the handler's result; the first non-zero one ends the
+directive (`failed`), else `ok` with the target's GUID; `codes` lists them.
+
 Output (CLI): traces/raw/<time>-poke.jsonl (gitignored), format
 poke-raw-1: the TickRecorder header (format, tool, date, Game.exe sha256,
 args), `poke_file` (path, sha256 of the file, steps), `poke_f0`, one
@@ -89,6 +97,8 @@ CHAMPION_MARK = 0x005A48C0       # entry 5: ECX game, EDX unit; umod (§1)
 ROOM_AT = 0x00463740             # entry 6: ECX room, EDX x; y (§1; poke.md §4 rule 5)
 MISSILE = 0x0059FA30             # ECX game, EDX record (original-hooks.md §7.1)
 MISSILE_BYTES = bytes.fromhex("558BEC83EC28")  # entry bytes (original-hooks.md §7.1 rule 1)
+DISPATCH = 0x0054D750            # C->S dispatcher: ECX game, EDX player; message, size; EAX code
+                                 # (sim/intents-events.md §2.3; poke.md §4 rule 11)
 SEND = 0x00478350                # client game-message sender: EDI size, [ESP+4] message; duplicate
 #                                  filter (sim/intents-events.md §2.1 rule 1; poke.md §1 `msg`)
 
@@ -151,6 +161,7 @@ AR_COLL = 0x20                   # active room +0x20 collision record (drlg/room
 CR_X, CR_Y, CR_W, CR_H, CR_MASKS = 0x00, 0x04, 0x08, 0x0C, 0x20  # record x0, y0, w, h, u16 masks
 #                                  (drlg/rooms.md §10.3; items/treasure.md §8: index (y-y0)*w + (x-x0))
 PLAYER_MOVE = 0x1C09             # the player's move mask (sim/path-placement.md §3)
+LAND_MASK = PLAYER_MOVE | 0x4    # a landing cell has none of these: move bits + missile-blocking 0x4 (poke.md §1 `pos`; REC-1080)
 DR_NEAR, DR_NEAR_N = 0x08, 0x2C  # DRLG room near array, its count (drlg/rooms.md §1)
 DR_ACTIVE = 0x30                 # DRLG room +0x30 active room, 0 = none (drlg/rooms.md §1)
 DR_TX, DR_TY = 0x34, 0x38        # DRLG room tile x, y (drlg/rooms.md §1)
@@ -257,6 +268,9 @@ CALL_FORMS = {
                            Form({"esi": "boss", "edi": "game"}, ["cl", "class"], 8)),
     "send": Fn(SEND, ("size", "message"), "none", "sim/intents-events.md §2.1 rule 1", None,
                Form({"edi": "size"}, ["message"])),
+    "dispatch": Fn(DISPATCH, ("game", "player", "message", "size"), "none",
+                   "sim/intents-events.md §2.3", None,
+                   Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
     "boss_minions": Fn(0x005A2120, ("min", "cl", "max", "game", "unit", "minions"), "none",
                        "monsters/init.md §18, §25.1", "22 (e)",
                        Form({"ecx": "min", "edx": "cl", "eax": "max"}, ["game", "unit", "minions"], 0xC)),
@@ -503,6 +517,7 @@ POSITIONAL = {
 OPTIONAL = {  # keyword -> its argument kinds, in the table (canonical) order
     "object": {"mode": [_n("mode")]},
     "missile": {"skill": [_n("skill"), _n("level")], "owner": [("owner", "ref")]},
+    "pos": {"free": []},  # a flag: land on the nearest LAND_MASK-free cell (poke.md §1)
     "warp": {"tile": [_n("tile")]},
     "item": {"quality": [("quality", "enum", QUALITIES)], "ilvl": [_n("ilvl", 1, 99)]},
 }
@@ -518,6 +533,8 @@ def needs(d, a):
         return ["missile"], []
     if d == "msg":
         return ["send"], []
+    if d in ("operate", "talk"):
+        return ["dispatch"], []
     if d == "object":
         return room + ["alloc"], []
     if d == "superunique":
@@ -595,6 +612,15 @@ def parse_directive(toks, line):
         return d, _parse_goto(rest, line)
     if d == "msg":
         return d, _parse_msg(rest, line)
+    if d == "operate":
+        if len(rest) != 1:
+            raise PokeError(line, f"operate takes 1 argument (<ref>), got {len(rest)}")
+        return d, {"unit": parse_ref(rest[0], line, "operate unit")}
+    if d == "talk":
+        if not rest:
+            raise PokeError(line, "talk: missing argument npc")
+        return d, {"npc": parse_ref(rest[0], line, "talk npc"),
+                   "choices": [_parse_choice(t, line) for t in rest[1:]]}
     if d not in POSITIONAL:
         raise PokeError(line, f"unknown directive {d!r}")
     pos = POSITIONAL[d]
@@ -610,6 +636,10 @@ def parse_directive(toks, line):
         if kw in args or any(s[0] in args for s in opts[kw]):
             raise PokeError(line, f"{d}: {kw} given twice")
         need = opts[kw]
+        if not need:
+            args[kw] = True
+            rest = rest[1:]
+            continue
         if len(rest) < 1 + len(need):
             raise PokeError(line, f"{d} {kw}: missing argument {need[len(rest) - 1][0]}")
         for s, t in zip(need, rest[1:1 + len(need)]):
@@ -618,6 +648,45 @@ def parse_directive(toks, line):
     if d == "object":
         args.setdefault("mode", 0)  # default mode 0 (poke.md §1)
     return d, args
+
+
+TALK_ACTIONS = {"trade": 1, "gamble": 2, "hire": 3}  # 0x38 actions (world/npc.md §4)
+
+
+def _parse_choice(tok, line):
+    """A `talk` choice (poke.md §1 `talk`): (name, n) with n the 0x38 action or
+    the 0x31 message; (`close`, None)."""
+    if tok in TALK_ACTIONS:
+        return (tok, TALK_ACTIONS[tok])
+    if tok == "close":
+        return ("close", None)
+    kind, _, n = tok.partition(":")
+    if kind == "action" and n:
+        return ("action", parse_num(n, 0, U32, line, "talk action"))
+    if kind == "quest" and n:
+        return ("quest", parse_num(n, 0, 0xFFFF, line, "talk quest message"))
+    raise PokeError(line, f"talk choice {tok!r}: trade, gamble, hire, action:<n>, quest:<n> or close")
+
+
+def choice_text(c):
+    name, n = c
+    return f"{name}:{n}" if name in ("action", "quest") else name
+
+
+def interact_calls(d, args, ty, guid, player):
+    """The (id, values) handler calls of `operate` / `talk` (poke.md §1), in
+    order; values in the id's layout order (sim/client-messages.tsv)."""
+    if d == "operate":
+        return [(0x13, [ty, guid])]
+    out = [(0x13, [ty, guid]), (0x2F, [guid])]
+    for name, n in args["choices"]:
+        if name == "close":
+            out.append((0x30, [guid]))
+        elif name == "quest":
+            out.append((0x31, [guid, n]))
+        else:
+            out.append((0x38, [n, guid, player if name == "hire" else 0]))
+    return out
 
 
 def _parse_goto(rest, line):
@@ -853,9 +922,16 @@ def canonical(d, args):
         return s + ("" if not args["umods"] else " umod " + " ".join(map(str, args["umods"])))
     if d == "msg":
         return " ".join(["msg", str(args["id"])] + [_fmt(v) for v in args["values"]])
+    if d == "operate":
+        return f"operate {_fmt(args['unit'])}"
+    if d == "talk":
+        return " ".join(["talk", _fmt(args["npc"])] + [choice_text(c) for c in args["choices"]])
     out = [d] + [_fmt(args[s[0]]) for s in POSITIONAL[d]]
     for kw, specs in OPTIONAL.get(d, {}).items():
-        if specs[0][0] in args:
+        if not specs:
+            if args.get(kw):
+                out.append(kw)
+        elif specs[0][0] in args:
             out += [kw] + [_fmt(args[s[0]]) for s in specs]
     return " ".join(out)
 
@@ -1019,12 +1095,13 @@ def goto_hop(mem, dr, goal, seen, blocked=frozenset()):
     return h, key(h)
 
 
-def free_cell(mem, ar):
-    """poke.md §6 rule 3.3: the cell of active room `ar` whose collision mask has
-    none of PLAYER_MOVE, nearest the centre of its sub-tile rect (row by row from
-    the top-left, first found on a tie), or None."""
+def free_cell(mem, ar, target=None):
+    """poke.md §6 rule 3.3 / §1 `pos`: the cell of active room `ar` whose collision
+    mask has none of LAND_MASK, nearest `target` (default the centre of its
+    sub-tile rect; squared distance; row by row from the top-left, first found on
+    a tie), or None."""
     x, y, wd, ht = struct.unpack("<iiii", mem.read(ar + AR_SUB, 16))
-    cx, cy = x + wd // 2, y + ht // 2
+    cx, cy = target if target else (x + wd // 2, y + ht // 2)
     rec_ = mem.read_u32(ar + AR_COLL)
     if not rec_:
         return None
@@ -1040,9 +1117,22 @@ def free_cell(mem, ar):
                 continue
             m = struct.unpack_from("<H", grid, 2 * ((yy - y0) * cw + (xx - x0)))[0]
             d2 = (xx - cx) ** 2 + (yy - cy) ** 2
-            if not m & PLAYER_MOVE and (best is None or d2 < best[0]):
+            if not m & LAND_MASK and (best is None or d2 < best[0]):
                 best = (d2, xx, yy)
     return best[1:] if best else None
+
+
+def mask_at(mem, ar, x, y):
+    """The collision mask at sub-tile (x, y) in active room `ar`'s record, or None
+    (no record, or outside it)."""
+    rec_ = mem.read_u32(ar + AR_COLL) if ar else 0
+    if not rec_:
+        return None
+    x0, y0, cw, ch = struct.unpack("<iiii", mem.read(rec_ + CR_X, 16))
+    masks = mem.read_u32(rec_ + CR_MASKS)
+    if not masks or not (x0 <= x < x0 + cw and y0 <= y < y0 + ch):
+        return None
+    return struct.unpack("<H", mem.read(masks + 2 * ((y - y0) * cw + (x - x0)), 2))[0]
 
 
 class Unresolved(Exception):
@@ -1344,6 +1434,8 @@ class PokeLayer:
             return {"r": "gap", "note": gap_note(fns, self.forms, flds)}
         if d == "msg":
             return self._msg(rec, game, tid, saved, a)
+        if d in ("operate", "talk"):
+            return self._interact(rec, game, tid, saved, d, a)
         try:
             args, ptrs = resolve_args(rec, game, a)
         except Gap as e:
@@ -1383,6 +1475,39 @@ class PokeLayer:
             r.update({"r": "failed", "note": str(e)})
             return r
         r.update(self._result(rec, "send", eax))
+        return r
+
+    def _interact(self, rec, game, tid, saved, d, a):
+        """`operate` / `talk`: each message through the dispatcher 0x0054D750 now
+        (poke.md §4 rule 11); the first result that is not 0 ends it."""
+        try:
+            u = resolve_unit(rec, game, a["unit" if d == "operate" else "npc"])
+            player = player_of(rec, game)
+            if not player:
+                raise Unresolved("@player matches no unit")
+        except Gap as e:
+            return {"r": "gap", "note": str(e)}
+        except Unresolved as e:
+            return {"r": "unresolved", "note": str(e)}
+        ty, guid = rec.read_u32(u + U_TYPE), rec.read_u32(u + U_GUID)
+        calls = interact_calls(d, a, ty, guid, rec.read_u32(player + U_GUID))
+        S = self.page(rec)
+        r = {"args": {"unit": unit_label(rec, u)}, "codes": [], "bytes": []}
+        for mid, values in calls:
+            data = encode_msg(mid, values)
+            rec.write(S + SCRATCH_MSG, data + bytes(4))
+            r["bytes"].append(data.hex())
+            try:
+                eax = self.invoke(rec, tid, saved, "dispatch", game=game, player=player,
+                                  message=S + SCRATCH_MSG, size=len(data))
+            except CallFault as e:
+                r.update({"r": "failed", "note": str(e)})
+                return r
+            r["codes"].append(eax)
+            if eax:
+                r.update({"r": "failed", "note": f"{mid:#04x} returned {eax}"})
+                return r
+        r.update({"r": "ok", "guid": guid})
         return r
 
     def _created(self, rec, eax):
@@ -1455,6 +1580,10 @@ class PokeLayer:
                 continue
             eax = self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=rp[0], x=rp[1], y=rp[2],
                               exact=GOTO_EXACT, alt=GOTO_ALT)
+            if eax:
+                self._settle(rec, tid, saved, game, pl)
+            if eax:
+                self._settle(rec, tid, saved, game, pl)
             return {"r": "ok", "guid": guid, "eax": f"{eax:#x}"} if eax else {"r": "failed", "eax": "0x0"}
         hop = goto_hop(rec, rec.read_u32(p[2] + AR_DRLG), goal, w["seen"], w.setdefault("blocked", set()))
         if hop is None:
@@ -1475,6 +1604,20 @@ class PokeLayer:
             w["seen"].add(hkey)
             w["blocked"].add(hkey)
         return {"r": "pending"}
+
+    def _settle(self, rec, tid, saved, game, pl):
+        """poke.md §6 rule 3.2: when the player's cell has a LAND_MASK bit, place
+        again, exact 1, on the nearest free cell of its room."""
+        now = player_pos(rec, pl)
+        if not now or not now[2]:
+            return
+        m = mask_at(rec, now[2], now[0], now[1])
+        if m is not None and not m & LAND_MASK:
+            return
+        cell = free_cell(rec, now[2], (now[0], now[1]))
+        if cell and cell != (now[0], now[1]):
+            self.invoke(rec, tid, saved, "place", game=game, unit=pl, room=now[2], x=cell[0],
+                        y=cell[1], exact=1, alt=GOTO_ALT)
 
     def _item_index(self, rec, code):
         if code not in self.item_codes:
@@ -1535,6 +1678,13 @@ class PokeLayer:
             path = rec.read_u32(u + U_PATH)
             if not path:
                 return {"r": "failed", "note": "the unit has no path"}
+            if d == "pos" and a.get("free"):
+                # the nearest LAND_MASK-free cell of the room holding the point
+                room = self._room(rec, game, tid, saved, a["x"], a["y"], rec.read_u32(path + P_ROOM))
+                cell = free_cell(rec, room, (a["x"], a["y"])) if room else None
+                if cell is None:
+                    return {"r": "failed", "note": "no free missile-passable cell in the room"}
+                return self._pos(rec, game, tid, saved, u, path, *cell)
             if d == "pos":
                 return self._pos(rec, game, tid, saved, u, path, a["x"], a["y"])
             # hop (poke.md §1): the first spot of hop_candidates the unit moves to
@@ -1547,6 +1697,10 @@ class PokeLayer:
             tries = 0
             for x, y in hop_candidates(start, step):
                 tries += 1
+                room = self._room(rec, game, tid, saved, x, y, rec.read_u32(path + P_ROOM))
+                m = mask_at(rec, room, x, y) if room else None
+                if m is None or m & LAND_MASK:  # only a free, missile-passable cell (LAND_MASK)
+                    continue
                 r = self._pos(rec, game, tid, saved, u, path, x, y)
                 if here() != start:
                     r.update({"r": "ok", "to": [x, y], "tries": tries})
@@ -1899,6 +2053,10 @@ def selftest(repo):
         ("poke 1\nat 0 msg 0x01 1 2 3\n", 2), ("poke 1\nat 0 msg 0x01 65536 1\n", 2),
         ("poke 1\nat 0 msg 0x3C 1 2 3\n", 2), ("poke 1\nat 0 msg 0x01 @z 1\n", 2),
         ("poke 1\nat 0 msg 0x01 -1 2\n", 2), ("poke 1\nat 0 msg 0x01 @xx 2\n", 2),
+        ("poke 1\nat 0 operate\n", 2), ("poke 1\nat 0 operate @wp 1\n", 2),
+        ("poke 1\nat 0 operate @x\n", 2), ("poke 1\nat 0 talk\n", 2),
+        ("poke 1\nat 0 talk @1:148 sell\n", 2), ("poke 1\nat 0 talk @1:148 quest:65536\n", 2),
+        ("poke 1\nat 0 talk @1:148 action:x\n", 2),
     ]
     for text, line in bad:
         try:
@@ -1917,7 +2075,9 @@ def selftest(repo):
             "stat @player 13 0 -5", "state @1:19 11 off", "freeze 0", "spawn 19 @x+3 @y-3 normal",
             "spawn 19 1 2 champion umod 16", "spawn 19 1 2 unique umod 1 2 9",
             "spawn 0x13 1 2 random-boss", "seed-unit @wp#1 1 2", "msg 1 @x+2 @y", "msg 6 1 @1",
-            "msg 0x3C 36 1 0xFFFFFFFF", "msg 0x60", "msg 0x02 1 1/77"]
+            "msg 0x3C 36 1 0xFFFFFFFF", "msg 0x60", "msg 0x02 1 1/77",
+            "operate @wp", "operate @2:267", "talk @1:148", "talk 1/12 trade close",
+            "talk @1:148 gamble hire action:7 quest:92 close"]
     for g in good:
         d, args = parse_directive(g.split(), 1)
         d2, args2 = parse_directive(canonical(d, args).split(), 1)
@@ -1925,6 +2085,14 @@ def selftest(repo):
         n += 1
     assert canonical(*parse_directive("object 0x27 1 2".split(), 1)) == "object 39 1 2 mode 0"
     assert canonical(*parse_directive("msg 0x01 @x+2 @y".split(), 1)) == "msg 1 @x+2 @y"
+    assert canonical(*parse_directive("talk @1:148 action:0x7 quest:0x5C".split(), 1)) == \
+        "talk @1:148 action:7 quest:92"
+    assert [(i, v) for i, v in interact_calls("talk", parse_directive(
+        "talk @1:148 trade gamble hire action:7 quest:92 close".split(), 1)[1], 1, 12, 1)] == [
+        (0x13, [1, 12]), (0x2F, [12]), (0x38, [1, 12, 0]), (0x38, [2, 12, 0]), (0x38, [3, 12, 1]),
+        (0x38, [7, 12, 0]), (0x31, [12, 92]), (0x30, [12])]
+    assert interact_calls("operate", {}, 2, 18, 1) == [(0x13, [2, 18])]
+    n += 3
 
     # msg: the ids it takes (as d2-sim::poke's MSG_IDS) and the bytes (poke.md §1 `msg`)
     ok = " ".join(f"{i:02X}" for i, v in sorted(msg_layouts().items()) if not isinstance(v, str))
@@ -2033,6 +2201,9 @@ def selftest(repo):
             ({"ecx": 3, "edx": 0, "eax": 6}, [G, U, 1]),
         # sim/intents-events.md §2.1 rule 1: EDI size, [ESP+4] message
         ("send", (("size", 5), ("message", U))): ({"edi": 5}, [U]),
+        # sim/intents-events.md §2.3: ECX game, EDX player; message, size
+        ("dispatch", (("game", G), ("player", U), ("message", R), ("size", 9))):
+            ({"ecx": G, "edx": U}, [R, 9]),
         # path-placement.md §6 r4: path, unit, room, x, y all on the stack
         ("teleport", (("path", U), ("unit", G), ("room", R), ("x", 5), ("y", 6))): ({}, [U, G, R, 5, 6]),
         # path-placement.md §10: ECX game, EDX unit; room, x, y, exact, alt
@@ -2364,6 +2535,17 @@ def selftest_forms(m, game, Rec):
          [(SEND, {"edi": 9}, [S + SCRATCH_MSG])]),
         ("msg 0x06 1 @1:21", forms, {"r": "unresolved"}, []),
         ("msg 0x3A @x 1", forms, {"r": "unresolved"}, []),
+        # operate / talk: each message at S+0x300, then 0x0054D750 with ECX game, EDX player,
+        # [ESP+4] the message, [ESP+8] its size (poke.md §4 rule 11)
+        ("operate @1", forms, {"r": "ok", "guid": 5, "codes": [0], "bytes": ["130100000005000000"]},
+         [(DISPATCH, {"ecx": game, "edx": P}, [S + SCRATCH_MSG, 9])]),
+        ("talk @1 trade hire quest:92 close", forms,
+         {"r": "ok", "guid": 5, "codes": [0] * 6,
+          "bytes": ["130100000005000000", "2f0000000005000000", "38010000000500000000000000",
+                    "38030000000500000001000000", "31050000005c000000", "300000000005000000"]},
+         [(DISPATCH, {"ecx": game, "edx": P}, [S + SCRATCH_MSG, k])
+          for k in (9, 9, 13, 13, 9, 9)]),
+        ("talk @1:21", forms, {"r": "unresolved"}, []),
     ]
     for line, fm, want_r, want_calls in cases:
         r, calls, rec = run(line, fm)
@@ -2388,6 +2570,20 @@ def selftest_forms(m, game, Rec):
         if "unique" in line and "spawn" in line:  # appended after the existing umod 5
             assert rec.read(MD + FIELDS["mon_umods"], UMOD_MAX) == bytes([5, 1, 2, 9, 0, 0, 0, 0, 0])
         n += 1
+    # operate / talk: the last message is in place with four zero bytes after it; the first
+    # call whose EAX is not 0 ends the directive (poke.md §4 rule 11)
+    r, calls, rec = run("talk @1 close", forms)
+    assert rec.read(S + SCRATCH_MSG, 13).hex() == "30000000000500000000000000"
+    rec = fake()
+    lay = PokeLayer(forms=forms)
+    lay.page = lambda r_: S
+    seen = []
+    lay.call = lambda r_, tid, saved, entry, regs, stack: (seen.append(entry), 1 if len(seen) == 2 else 0)[1]
+    d, args = parse_directive("talk @1 trade".split(), 1)
+    r = lay.apply(rec, game, 1, None, Step(d, args, 1))
+    assert r["r"] == "failed" and r["note"] == "0x2f returned 1" and r["codes"] == [0, 1] \
+        and len(seen) == 2, r
+    n += 2
     # a full list stays full (at most 9)
     r, calls, rec = run("spawn 19 1 2 unique umod 1 2 3 4 5 6 7 8 9", forms)
     assert rec.read(MD + FIELDS["mon_umods"], UMOD_MAX + 1) == bytes([5, 1, 2, 3, 4, 5, 6, 7, 8, 0])
@@ -2524,6 +2720,26 @@ def selftest_goto(Rec):
     assert res["r"] == "ok" and res["guid"] == 0x40 and w["steps"] == 1, res
     assert calls == [(0x00554EA0, {"ecx": G, "edx": P}, [A[1], 55, 12, 0, 0])], calls
     n += 1
+    # a landing cell with the missile-blocking bit 0x4: placed again, exact 1, on the nearest free cell
+    r, calls = fake(), []
+    add_unit(r, MON, 1, 0x40, 156, A[1], 55, 12)
+    r.write(0x690000 + 0x100 + 2 * (12 * 40 + 55 - 40), struct.pack("<H", 0x0004))
+    res = step(layer(r, calls), r, "goto unit 156", walk())
+    assert res["r"] == "ok" and len(calls) == 2, (res, calls)
+    assert calls[1] == (0x00554EA0, {"ecx": G, "edx": P}, [A[1], 55, 11, 1, 0]), calls[1]
+    assert mask_at(r, A[1], 55, 12) == 4 and mask_at(r, A[1], 55, 11) == 0 and mask_at(r, A[1], 200, 0) is None
+    assert free_cell(r, A[1], (55, 12)) == (55, 11) and free_cell(r, A[1], (0, 0)) == (40, 0)
+    n += 1
+    # `pos … free`: parse, canonical text, duplicates and extras
+    assert canonical(*parse_directive("pos @player 5 6 free".split(), 1)) == "pos @player 5 6 free"
+    assert canonical(*parse_directive("pos @player 5 6".split(), 1)) == "pos @player 5 6"
+    for bad in ("pos @player 5 6 free free", "pos @player 5 6 near", "hop @player 5 6 free"):
+        try:
+            parse_directive(bad.split(), 1)
+            raise AssertionError(f"accepted {bad!r}")
+        except PokeError:
+            n += 1
+    n += 2
     # an object target reads the static path; another class or level is not a target
     r, calls = fake(), []
     add_unit(r, OBJ, 2, 0x41, 376, A[0], 7, 9)

@@ -33,6 +33,7 @@ save trap --name PtClsTrap --class ass --expansion --level 30 --all-skills 20 --
 save move --name PtClsMove --class sor --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {move}
 
 milestone main-skill-kill
+  only class ama,sor,nec,pal,bar,dru
   use main
   deadline 300
   poke 5 warp 2
@@ -40,6 +41,17 @@ milestone main-skill-kill
   poke 31 stat @p1 6 0 256
   input frame 40; rclick 448 324; frame 70; rclick 448 324; frame 100; rclick 448 324; frame 130; rclick 448 324; frame 160; rclick 448 324
   note the class's main skill (right) at the Quill Rat, five casts 30 frames apart; the Quill Rat is set to 1 hp so one hit kills on every difficulty (Hell monsters have thousands of hp)
+  need unit ut 1 g @p1 dead
+
+milestone main-skill-kill-trap
+  only class ass
+  use main
+  deadline 300
+  poke 5 warp 2
+  poke 30 spawn 63 @x+4 @y normal
+  poke 31 stat @p1 6 0 256
+  input frame 40; rclick 384 292; frame 70; rclick 384 292; frame 100; rclick 384 292
+  note the assassin's main skill (Lightning Sentry) laid at (x-1, y), five sub-tiles from the Quill Rat (set to 1 hp): 1.14d's trap never picks a monster in its melee range (a monster on or next to the trap), so the rat is not the click target as for the other classes (traces/checks/ass-lightning-sentry-kill.check)
   need unit ut 1 g @p1 dead
 
 milestone cast-then-walk
@@ -107,8 +119,8 @@ milestone trap-kills
   poke 5 warp 2
   poke 30 spawn 63 @x+4 @y normal
   poke 31 stat @p1 6 0 256
-  input frame 40; rclick 448 324
-  note Lightning Sentry at (x+3, y) next to the Quill Rat (set to 1 hp)
+  input frame 40; rclick 384 292
+  note Lightning Sentry at (x-1, y), five sub-tiles from the Quill Rat (off its hover box) (set to 1 hp); a monster next to the trap is not picked (see main-skill-kill-trap)
   need ever unit ut 1 cl {trapunit} present
   need unit ut 1 g @p1 dead
 
