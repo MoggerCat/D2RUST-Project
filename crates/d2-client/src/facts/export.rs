@@ -12,9 +12,11 @@ use super::{
 };
 use crate::frames::{FrameAnchor, FramePart, FrameStore, IndexFrame};
 use crate::rules::camera::{Camera, CELL_HALF_WIDTH};
+use crate::rules::draw_order::weather::SkyDraw;
 use crate::rules::placement;
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, FrameCycle, ItemTag};
+use crate::world_view::weather_view::is_sky_call_path;
 
 /// What the exporter needs besides the items.
 pub struct ExportContext<'a> {
@@ -24,6 +26,9 @@ pub struct ExportContext<'a> {
     pub view_left: Option<i32>,
     /// The unit type of a drawn unit's GUID; `None` when unknown.
     pub unit_type: &'a dyn Fn(u32) -> Option<u8>,
+    /// Pass 9's calls (`WorldFrame::sky`), written in place of their
+    /// pixel and flash items (§5 r10).
+    pub sky: &'a [SkyDraw],
 }
 
 /// `draws.tsv` and `sprites.tsv` rows (without the header and column row).
@@ -52,6 +57,9 @@ fn cel_xy(f: &IndexFrame, item: &DrawItem) -> Option<(i32, i32)> {
     (p.x == item.x && p.y == item.y).then_some((x, y))
 }
 
+/// The pass of the weather calls (`draw-order.md` §10, `draw-order-2.md` §11.7).
+const SKY_PASS: u32 = pass::UNIDENTIFIED_9;
+
 /// §5 r3 (PROVISIONAL, REC-295): the wrapper name of an item.
 fn op(tile: bool, item: &DrawItem) -> &'static str {
     let p = item.key.pass();
@@ -74,6 +82,26 @@ fn tile_xy(f: &IndexFrame, item: &DrawItem, view_left: Option<i32>) -> Option<(i
     }
 }
 
+/// §5 r10: one row per pass-9 call. `DrawLine` (x0, y0, x1, y1, color,
+/// alpha) and the flash's `DrawBox` (x0, y0, x1, y1, color, mode),
+/// `blend-modes.md` §8 r1–r2: `x`, `y` = x0, y0, `mode` = the color.
+fn sky_rows(sky: &[SkyDraw]) -> Vec<Vec<String>> {
+    sky.iter()
+        .map(|d| {
+            let (op, x, y, color) = match *d {
+                SkyDraw::Line { x0, y0, color, .. } => ("DrawLine", x0, y0, color),
+                SkyDraw::Flash { x0, y0, .. } => ("DrawBox", x0, y0, SkyDraw::FLASH_COLOR),
+            };
+            let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+            row[1] = op.into();
+            row[6] = x.to_string();
+            row[7] = y.to_string();
+            row[12] = color.to_string();
+            row
+        })
+        .collect()
+}
+
 fn num(v: Option<i32>) -> String {
     v.map_or_else(|| UNKNOWN.to_owned(), |v| v.to_string())
 }
@@ -83,7 +111,23 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut draws: Vec<Vec<String>> = Vec::new();
     let mut sprites = BTreeMap::new();
     let mut last: Option<&DrawItem> = None;
+    let mut last_tile: Option<(ItemTag, Vec<String>)> = None;
+    let mut sky = Some(sky_rows(cx.sky));
     for item in items {
+        // §5 r10: the pass-9 calls stand where their first drawing is, or
+        // before the first later pass when every line is off-screen.
+        let call_item = cx
+            .frames
+            .owner(item.frame)
+            .is_some_and(|(k, _)| is_sky_call_path(k.path()));
+        if call_item || item.key.pass() > SKY_PASS {
+            if let Some(rows) = sky.take() {
+                draws.extend(rows);
+            }
+        }
+        if call_item {
+            continue;
+        }
         // §5 r1: the per-block draws of one tile are one row.
         if last.is_some_and(|l| {
             l.tag == item.tag && l.frame == item.frame && l.x == item.x && l.y == item.y
@@ -151,7 +195,21 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 sprites.insert((key.path().to_owned(), u32::from(d), index), size);
             }
         }
+        // §5 r1: a tile's block draws are separate frames (each block with
+        // its own offsets) that give the same row: one row per tile.
+        let tile_row = matches!(key.part(), FramePart::Tile(_));
+        if tile_row
+            && last_tile
+                .as_ref()
+                .is_some_and(|(tag, r)| *tag == item.tag && *r == row)
+        {
+            continue;
+        }
+        last_tile = tile_row.then(|| (item.tag, row.clone()));
         draws.push(row);
+    }
+    if let Some(rows) = sky.take() {
+        draws.extend(rows);
     }
     for (i, r) in draws.iter_mut().enumerate() {
         r[0] = i.to_string();
@@ -165,6 +223,27 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         })
         .collect();
     Ok(Rows { draws, sprites })
+}
+
+/// §5 r9: the frame cycle's own draw calls around the items: first
+/// `StartDraw(bClear, 0, 0, 0)` with `bClear` the BlankScreen flag of the
+/// player's level (`render/composition.md` §3 step 2), last `ClearScreen(0)`
+/// when the frame's plan clears after drawing (§3 step 4). Renumbers `i`.
+pub fn add_cycle_rows(rows: &mut Rows, blank_screen: bool, clear_after: bool) {
+    let mut start = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+    start[1] = "StartDraw".into();
+    start[6] = u8::from(blank_screen).to_string();
+    start[7] = "0".into();
+    rows.draws.insert(0, start);
+    if clear_after {
+        let mut clear = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+        clear[1] = "ClearScreen".into();
+        clear[6] = "0".into();
+        rows.draws.push(clear);
+    }
+    for (i, r) in rows.draws.iter_mut().enumerate() {
+        r[0] = i.to_string();
+    }
 }
 
 /// The `frame.tsv` values d2rs knows (§5 r7–r8).
@@ -272,8 +351,18 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         frames: &d.assets.frames,
         view_left: d.frame.camera.map(|c| c.view.left),
         unit_type: &unit_type,
+        sky: &d.frame.sky,
     };
-    let rows = draw_rows(&d.frame.items, &cx)?;
+    // §5 r12: the drawer calls without pixels join the items by key.
+    let mut all = d.frame.items.clone();
+    all.extend_from_slice(&d.frame.calls);
+    crate::scene::order(&mut all);
+    let mut rows = draw_rows(&all, &cx)?;
+    add_cycle_rows(
+        &mut rows,
+        d.blank_screen,
+        d.cycle.plan(d.blank_screen).clear_after,
+    );
     // §5 r8: the CPU reference composition onto a copy of the framebuffer.
     let mut cycle = d.cycle.clone();
     let index = cycle

@@ -10,7 +10,7 @@ breakpoints, the server tick hook); this script adds the in-game draw
 entry, EndScene, the cel-file loader and the draw-call hooks. Every address
 and offset is documented in specs/render/capture.md (each constant below
 names its section). Output: one JSON line per frame in
-traces/raw/<time>-frames.jsonl (format frames-raw-2, capture.md §5) and,
+traces/raw/<time>-frames.jsonl (format frames-raw-3, capture.md §5) and,
 with --save (default), one 8-bit palettized PNG per frame in
 game/captures/<time>/ (gitignored: the images show Blizzard art).
 
@@ -37,8 +37,8 @@ import autostart  # noqa: E402  (unattended start, input script)
 
 sys.dont_write_bytecode = True
 
-TOOL = "trace-recorder record_frames 0.2.0"
-FORMAT = "frames-raw-2"
+TOOL = "trace-recorder record_frames 0.3.0"
+FORMAT = "frames-raw-3"
 
 # capture.md §2: hooks and the in-game caller
 END_SCENE = 0x4F6190
@@ -66,6 +66,20 @@ CEL_OPS = {"CelFlatSpriteDraw", "CelDraw", "CelDrawColor", "CelDrawEx", "CelDraw
            "CelDrawShadow", "CelDrawHilight"}
 RECT_OPS = {"UtilDiamond", "UtilRect"}
 CEL_CONTEXT_SIZE = 0x48
+# capture.md §3.5 (raw-3): the common cel rasterizer 0x6014C0 (sprite-placement.md §1), stdcall,
+# [ESP+4] = the cel context; the cel it draws is the context's +0x3C (orientation word, w, h,
+# xoff, yoff: the dc6.md §Frame layout)
+RASTER = 0x6014C0
+RASTER_BYTES = b"\x55\x8B\xEC\x51\x8B\x4D\x08"
+CTX_CEL = 0x3C
+# capture.md §3.6 (raw-3): unit component files, right after the path is written by 0x5FE610
+# (unit-composite.md §6 r1-r2): EBX = the path buffer, [EBP+8] = the composed name
+COMP_PATH_DCC, COMP_PATH_DCC_BYTES = 0x5FE77C, b"\x83\x4E\x44\x01"
+COMP_PATH_DC6, COMP_PATH_DC6_BYTES = 0x5FE7A8, b"\xB8\x01\x00\x00\x00"
+# capture.md §3.5: loaded DT1 list (0x110-byte records: path, +0x104 library, +0x10C next);
+# library: tile count +0x10C, tile array +0x110, 0x60 bytes per tile
+DT1_LIST = 0x8ADBB4
+DT1_TILE_SIZE = 0x60
 # capture.md §3.1: framebuffer and palette (GDI driver)
 FB_PTR, FB_W, FB_H = 0x7C9154, 0x7C9138, 0x7C913C
 COLOR_TABLE = 0x989C40            # 256 x (B, G, R, 0)
@@ -219,19 +233,51 @@ def read_tile(mem, tile):
             "sub": u32(mem, tile + 0x1C), "rarity": u32(mem, tile + 0x20)}
 
 
+def read_cel_header(mem, cel):
+    """The cel the rasterizer draws (dc6.md §Frame layout): orientation word, w, h, xoff, yoff."""
+    flip, w, h, xoff, yoff = struct.unpack("<Iiiii", mem.read(cel, 20))
+    return {"flip": flip, "w": w, "h": h, "xoff": xoff, "yoff": yoff}
+
+
+def read_dt1_list(mem, limit=4096):
+    """capture.md §3.5: every loaded DT1 as (tile array, count, path)."""
+    out, rec, seen = [], u32(mem, DT1_LIST), set()
+    while rec and rec not in seen and len(out) < limit:
+        seen.add(rec)
+        path = mem.read(rec, 260).split(b"\0")[0].decode("latin-1")
+        lib = u32(mem, rec + 0x104)
+        if lib:
+            out.append((u32(mem, lib + 0x110), u32(mem, lib + 0x10C), path))
+        rec = u32(mem, rec + 0x10C)
+    return out
+
+
+def dt1_lookup(libs, tile):
+    """(path, tile index) of a drawn tile header, or None."""
+    for tiles, count, path in libs:
+        if tiles <= tile < tiles + DT1_TILE_SIZE * count:
+            return path, (tile - tiles) // DT1_TILE_SIZE
+    return None
+
+
 def read_cel_context(mem, ctx):
     raw = mem.read(ctx, CEL_CONTEXT_SIZE)
-    return {"raw": raw.hex(), "frame": struct.unpack_from("<i", raw, 0)[0],
+    return {"raw": raw.hex(), "ctx": f"{ctx:#x}", "frame": struct.unpack_from("<i", raw, 0)[0],
             "dir": struct.unpack_from("<i", raw, 0x40)[0],
             "file": f"{struct.unpack_from('<I', raw, 0x34)[0]:#x}",
             "tokens": [text4(raw[o:o + 4]) for o in (0x18, 0x1C, 0x20, 0x24, 0x28)]}
 
 
-def read_draw(mem, name, args, light_full=False):
-    """One draw call: arguments plus the record each pointer argument names."""
+def read_draw(mem, name, args, light_full=False, libs=None):
+    """One draw call: arguments plus the record each pointer argument names. `libs`
+    (read_dt1_list) names a tile's DT1 file and index (raw-3)."""
     rec = {"op": name}
     if name in TILE_OPS:
         rec["tile"] = read_tile(mem, args[0]) if args[0] else None
+        hit = dt1_lookup(libs, args[0]) if (libs is not None and args[0]) else None
+        if rec["tile"] is not None and libs is not None:
+            rec["tile"]["dt1"] = hit[0] if hit else None
+            rec["tile"]["index"] = hit[1] if hit else None
         rec["a"] = [struct.unpack("<i", struct.pack("<I", v))[0] for v in args[1:]]
         light = args[1] if name == "FloorTileDraw" else (args[3] if name != "ShadowTileDraw" else 0)
         if light:
@@ -282,6 +328,8 @@ def make_recorder(rt):
             self.keys = []         # stability records (capture.md §7)
             self.start = None      # state read at the in-game draw entry
             self.draws = None      # draw log of the current frame, or None
+            self.libs = None       # DT1 list of the current frame (raw-3)
+            self.raster_other = 0  # rasterizer calls not matched to the last cel op
             self.armed = set()
             self.meta = {"k": "capture", "images": os.path.basename(img_dir) if img_dir else None,
                          "every": every, "draws_every": draws_every, "state_key": list(STATE_KEY)}
@@ -290,13 +338,13 @@ def make_recorder(rt):
         def arm(self, addr):
             if addr not in self.bp_orig:
                 self.bp_orig[addr] = self.read(addr, 1)[0]
-            if addr in DRAWS or addr == UNIT_DRAW:
+            if addr in DRAWS or addr in (UNIT_DRAW, RASTER):
                 return
             self.write(addr, rt.rr.INT3)
             self.armed.add(addr)
 
         def set_draw_hooks(self, on):
-            for addr in list(DRAWS) + [UNIT_DRAW]:
+            for addr in list(DRAWS) + [UNIT_DRAW, RASTER]:
                 if on and addr not in self.armed:
                     self.write(addr, rt.rr.INT3)
                     self.armed.add(addr)
@@ -314,6 +362,7 @@ def make_recorder(rt):
             self.start = {"seed": read_seed(self, unit), "cursor": read_cursor(self)}
             want = self.draws_every and self.seen % self.draws_every == 0
             self.draws = [] if want else None
+            self.libs = None       # DT1 list, read at the frame's first tile draw
             self.set_draw_hooks(bool(want))
 
         def draw_call(self, addr, ctx):
@@ -327,14 +376,31 @@ def make_recorder(rt):
             else:
                 name, n = DRAWS[addr]
                 args = list(struct.unpack(f"<{n}I", self.read(ctx.Esp + 4, 4 * n)))
-                rec = read_draw(self, name, args, self.light_full)
+                if name in TILE_OPS and self.libs is None:
+                    self.libs = read_dt1_list(self)
+                rec = read_draw(self, name, args, self.light_full, self.libs)
                 rec["at"] = f"{ret - 5:#x}"
             self.draws.append(rec)
+
+        def raster(self, ctx):
+            """The cel the last cel op draws (raw-3): attached to that draw when the context
+            matches; any other rasterizer call is counted in the frame's `raster_other`."""
+            if self.draws is None:
+                return
+            cctx = self.u32(ctx.Esp + 4)
+            cel = self.u32(cctx + CTX_CEL) if cctx else 0
+            last = self.draws[-1] if self.draws else None
+            c = last.get("cel") if last else None
+            if c and c.get("ctx") == f"{cctx:#x}" and "hdr" not in c and cel:
+                c["hdr"] = read_cel_header(self, cel)
+            else:
+                self.raster_other += 1
 
         def capture(self, ctx):
             if self.u32(ctx.Esp) != IN_GAME_RET:
                 return
             draws, self.draws = self.draws, None
+            raster_other, self.raster_other = self.raster_other, 0
             self.set_draw_hooks(False)
             self.seen += 1
             if (self.seen - 1) % self.every:
@@ -359,6 +425,7 @@ def make_recorder(rt):
                 rec["image"] = name
             if draws is not None:
                 rec["draws"] = draws
+                rec["raster_other"] = raster_other
             self.keys.append({k: rec.get(k) for k in STATE_KEY + ("index_sha256",)})
             self.emit(rec)
             self.frames += 1
@@ -385,6 +452,7 @@ def make_recorder(rt):
                 if path and p["type"] == 0:
                     p["fixed"] = list(struct.unpack("<2I", self.read(path, 8)))
                     p["client"] = list(struct.unpack("<2i", self.read(path + 8, 8)))
+                    p["dir"] = self.read(path + 0x64, 1)[0]   # direction byte (capture.md §3.5)
                 st["player"] = p
                 st["seed_end"] = read_seed(self, unit)
             st["level"] = read_level(self, unit)
@@ -408,6 +476,12 @@ def make_recorder(rt):
             elif addr == CEL_LOADED:
                 path = self.read(ctx.Ebp - 0x108, 0x104).split(b"\0")[0].decode("latin-1")
                 self.emit({"k": "celfile", "ptr": f"{self.u32(ctx.Ebp - 4):#x}", "path": path})
+            elif addr in (COMP_PATH_DCC, COMP_PATH_DC6):
+                name = self.read(self.u32(ctx.Ebp + 8), 64).split(b"\0")[0].decode("latin-1")
+                path = self.read(ctx.Ebx, 260).split(b"\0")[0].decode("latin-1")
+                self.emit({"k": "compfile", "name": name, "path": path})
+            elif addr == RASTER:
+                self.raster(ctx)
             elif addr in DRAWS or addr == UNIT_DRAW:
                 self.draw_call(addr, ctx)
             else:
@@ -499,6 +573,41 @@ def selftest():
         changed = sorted(k for k in before if before[k] != after[k])
         assert changed == [field], f"{addr:#x}: changed {changed}, expected [{field}]"
 
+    # raw-3 readers: cel header, DT1 list and tile lookup (M08: each source byte changes its field)
+    cel, rec1, rec2, lib1, lib2 = 0xB000, 0xC000, 0xC400, 0xD000, 0xD400
+    m.put(cel, "<Iiiii", 1, 34, 50, -3, 7)
+    assert read_cel_header(m, cel) == {"flip": 1, "w": 34, "h": 50, "xoff": -3, "yoff": 7}
+    for off, field in ((0, "flip"), (4, "w"), (8, "h"), (0xC, "xoff"), (0x10, "yoff")):
+        before = read_cel_header(m, cel)
+        m.b[cel + off] ^= 1
+        changed = sorted(k for k, v in read_cel_header(m, cel).items() if before[k] != v)
+        m.b[cel + off] ^= 1
+        assert changed == [field], (off, changed)
+    for i, ch in enumerate(b"data\\global\\tiles\\a.dt1"):
+        m.b[rec1 + i] = ch
+    for i, ch in enumerate(b"b.dt1"):
+        m.b[rec2 + i] = ch
+    m.put(DT1_LIST, "<I", rec1)
+    m.put(rec1 + 0x104, "<I", lib1)
+    m.put(rec1 + 0x10C, "<I", rec2)
+    m.put(rec2 + 0x104, "<I", lib2)
+    m.put(lib1 + 0x10C, "<II", 3, 0x20000)
+    m.put(lib2 + 0x10C, "<II", 10, 0x30000)
+    libs = read_dt1_list(m)
+    assert libs == [(0x20000, 3, "data\\global\\tiles\\a.dt1"), (0x30000, 10, "b.dt1")], libs
+    assert dt1_lookup(libs, 0x20000 + 2 * 0x60) == ("data\\global\\tiles\\a.dt1", 2)
+    assert dt1_lookup(libs, 0x20000 + 3 * 0x60) is None          # one past the count
+    assert dt1_lookup(libs, 0x30000 + 9 * 0x60 + 0x5F) == ("b.dt1", 9)
+    m.put(0x20000 + 0x60 + 0x14, "<IIII", 1, 2, 3, 4)
+    d = read_draw(m, "TileDrawLit", [0x20000 + 0x60, 10, 20, 0, 0], libs=libs)
+    assert (d["tile"]["dt1"], d["tile"]["index"], d["tile"]["main"]) == ("data\\global\\tiles\\a.dt1", 1, 2)
+    m.b[lib1 + 0x110 + 1] ^= 1                                   # tile array moved: no file
+    assert read_draw(m, "TileDrawLit", [0x20000 + 0x60, 10, 20, 0, 0],
+                     libs=read_dt1_list(m))["tile"]["dt1"] is None
+    m.b[lib1 + 0x110 + 1] ^= 1
+    m.put(rec1 + 0x10C, "<I", rec1)                              # a cyclic list ends
+    assert len(read_dt1_list(m)) == 1
+
     # stability (capture.md §7): singletons never count; one changed hash fails exactly one key
     recs = [{"player": {"cur": c}, "index_sha256": hh} for c, hh in
             ((0, "a"), (0, "a"), (1, "b"), (1, "b"), (2, "c"))]
@@ -507,6 +616,7 @@ def selftest():
     assert stability(recs) == (2, 4, 1, "FAIL"), stability(recs)
     assert stability(recs[:2] + recs[4:])[3] == "NOT ENOUGH"
     print("selftest ok: PNG keeps indices and palette; a 1-byte change changes the hash; "
+          "raw-3 cel header, DT1 list and tile lookup; "
           f"{len(cases)} state fields each follow exactly their source bytes; stability counts "
           "only repeated keys and reports exactly the changed key")
 
@@ -544,7 +654,8 @@ def main():
     # keep only the base recorder's tick hook, add ours (draw hooks: verified, armed per frame)
     rt.EXPECT = {rt.TICK: rt.EXPECT[rt.TICK], END_SCENE: END_SCENE_BYTES,
                  FRAME_START: FRAME_START_BYTES, CEL_LOADED: CEL_LOADED_BYTES,
-                 UNIT_DRAW: UNIT_DRAW_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
+                 UNIT_DRAW: UNIT_DRAW_BYTES, RASTER: RASTER_BYTES, COMP_PATH_DCC: COMP_PATH_DCC_BYTES,
+                 COMP_PATH_DC6: COMP_PATH_DC6_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds,
                           a.ticks, img_dir, max(1, a.every), a.max_frames, a.allow_any_size,

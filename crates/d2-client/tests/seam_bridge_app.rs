@@ -84,6 +84,10 @@ fn ui_click_sound(mut sounds: ResMut<UiSounds>, mut pushed: ResMut<Pushed>) {
 fn a_ui_sound_asked_for_in_update_is_taken_by_the_same_frames_audio_frame() {
     let bridge = Bridge::new(Box::new(Ticking) as DynLink).unwrap();
     let mut app = App::new();
+    // A fixed host clock (`objects-client.md` §25 r6): no wall time.
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(
+        std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1000)),
+    ));
     app.add_plugins(MinimalPlugins)
         .add_plugins(BridgePlugin)
         .insert_resource(BridgeResource(bridge))
@@ -107,6 +111,10 @@ fn a_ui_sound_asked_for_in_update_is_taken_by_the_same_frames_audio_frame() {
     let counts = |audio: bool| {
         let bridge = Bridge::new(Box::new(Ticking) as DynLink).unwrap();
         let mut app = App::new();
+        // A fixed host clock (`objects-client.md` §25 r6): no wall time.
+        app.insert_resource(d2_client::bridge::mirror::ScriptedClock(
+            std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1000)),
+        ));
         app.add_plugins(MinimalPlugins)
             .add_plugins(BridgePlugin)
             .insert_resource(BridgeResource(bridge))

@@ -101,6 +101,7 @@ fn hotkey_opens_the_inventory_in_the_apps_frame() {
     )
     .unwrap();
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();

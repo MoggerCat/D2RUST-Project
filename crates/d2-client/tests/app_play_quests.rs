@@ -16,7 +16,6 @@ use d2_client::app::single_player::{self, GameData};
 use d2_client::bridge::hover;
 use d2_client::bridge::link::{LinkError, Pumped, SendQueue, Sent, ServerLink};
 use d2_client::bridge::mirror::DynLink;
-use d2_client::bridge::mirror::ScriptedNow;
 use d2_client::bridge::BridgeResource;
 use d2_client::controls::Action;
 use d2_client::rules::camera::{moving_to_client, Camera, FrameSize, OpenMode};
@@ -68,7 +67,6 @@ impl Clock for StepClock {
 
 fn step(app: &mut App, ms: &AtomicU32, n: usize) {
     for _ in 0..n {
-        app.insert_resource(ScriptedNow(ms.load(Ordering::SeqCst)));
         app.update();
         ms.fetch_add(40, Ordering::SeqCst);
     }
@@ -98,6 +96,7 @@ fn play_app(ms: &Arc<AtomicU32>, wire: &Arc<Mutex<Wire>>) -> (App, Server<StepCl
     .unwrap();
     let server: Server<StepClock> = Arc::new(Mutex::new(link));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
