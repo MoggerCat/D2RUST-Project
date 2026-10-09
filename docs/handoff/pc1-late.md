@@ -136,12 +136,36 @@ messages.
   add's sound and never consumes EventText: row
   `q-fix-pc1late-screen-message-sound`.
 
-## C — numbered items
+- **F1 done (REC-1363 Windows run, for q-fix-audio / q-tool-audio-diff)**:
+  `record_audio.py --auto ScnAma --seed 1234 --ticks 250` on Windows 10
+  with sound; capture and voices committed (digests only) in
+  `traces/audio/win/`; result in `tools/audio-diff.md` Open questions 1.
+  22 voices (Wine: 23). T 0: level song, sound 6 (`0x0049E58A`, as F2
+  says), an object voice (id 2599); the stereo ambience bed starts at
+  **T 3** on Windows vs T 0 reported under Wine (a stream voice: thread
+  timing). **For the cloud**: `audio_diff.py compare` this voices file
+  against your `orig.voices.jsonl` of `audio-town-ambience-ama` (not in
+  the repo, so not done here); REC-1363 stays open until then.
+- **G**: no other unnumbered `- [session]` item is left in Step 4 / 5
+  (Step 4's three are A2a, A2b and F1; the `[q-fix-d9-arcane]` line was
+  a duplicate of item 62 and now says so; Step 5 is the standing
+  provisional-index instruction, not an item). Every `q-*` branch's
+  `- [q-…]` question is answered (59, 61, 63, 64 duplicates).
 
-| # | Item | Answer | Rows |
-|---|---|---|---|
+## Numbered items
+
+None new (G): no unanswered `- [q-…]` item was left to number from 65.
+
+## Rows added
+
+`q-fix-pc1late-secondary-target`, `-vision-token`, `-orb-spawn`,
+`-larzuk-map-ai`, `-walk-radius`, `-gamble-place`, `-audio-first-tick`,
+`-screen-message-sound`. PROVISIONAL opened: REC-1453 (D1). Tool fix:
+`tools/trace-recorder/record_state.py` `q` (C).
 
 ## Recordings (local, `traces/raw/`, not committed)
 
 `check-join-act2-quests-ama/orig.state.jsonl` (fixed `q`),
-`pc1late-quest-normalise/` (C, the §1.6 normalisation save).
+`pc1late-quest-normalise/` (C, the §1.6 normalisation save),
+`audio-town-win.jsonl` + `game/captures/audio-town-win{,-v}/` (F1 blobs
+and PCM, never committed).
