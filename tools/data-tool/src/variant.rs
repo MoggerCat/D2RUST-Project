@@ -24,7 +24,7 @@
 //!
 //! Exit 0 ok, 1 findings or a failed check, 2 usage or I/O.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, ensure, Context, Result};
@@ -421,6 +421,20 @@ fn candidates(
     Ok(out)
 }
 
+/// `live` with the bytes where `patched` differs from `base` taken from
+/// `patched`; `None` when the three lengths are not equal.
+fn overlay(live: &[u8], base: &[u8], patched: &[u8]) -> Option<Vec<u8>> {
+    if live.len() != base.len() || base.len() != patched.len() {
+        return None;
+    }
+    Some(
+        live.iter()
+            .zip(base.iter().zip(patched))
+            .map(|(&l, (&b, &p))| if b == p { l } else { p })
+            .collect(),
+    )
+}
+
 /// The excel half of the §2 rule 4 check: the variant install loads
 /// with `d2-data`, and every patched file resolves to `patch_d2` with the
 /// expected digest.
@@ -523,11 +537,13 @@ fn build(stack_path: &Path, game: &Path, out: Option<PathBuf>) -> Result<i32> {
     let mut data = base.clone();
     findings.extend(apply_stack(&mut data, &layers, sp));
     let mut compiled = None;
+    let mut base_compiled = None;
     if !has_errors(&findings) {
         let live = bin::load(&set, bin::DEFAULT_LANGUAGE).context("loading the live set")?;
         let r = compile_patched(&base, &data, &live);
         findings.extend(r.findings);
         compiled = r.compiled;
+        base_compiled = compile_patched(&base, &base, &live).compiled;
     }
     patch::sort_report(&mut findings);
     crate::patch::print(&findings);
@@ -536,13 +552,48 @@ fn build(stack_path: &Path, game: &Path, out: Option<PathBuf>) -> Result<i32> {
         _ => return Ok(1),
     };
 
-    // The patched set (§2 rule 2).
-    let patched: Vec<BinFile> = candidates(&set, &compiled)?
+    // The patched set (§2 rule 2): files the stack changes. Where the
+    // base compile differs from the live file (an explained difference of
+    // `data-tool tables`), the variant file is the live file with only the
+    // bytes the stack changes replaced; with a different size that is
+    // impossible and the build stops.
+    let Some(base_compiled) = base_compiled else {
+        eprintln!("error: the base tables do not compile");
+        return Ok(1);
+    };
+    let base_files: BTreeMap<String, (Vec<u8>, bool)> = candidates(&set, &base_compiled)?
         .into_iter()
-        .filter_map(|(f, differs)| differs.then_some(f))
+        .map(|(f, differs)| (f.file, (f.bytes, differs)))
         .collect();
+    let mut patched: Vec<BinFile> = Vec::new();
+    let mut inexact = Vec::new();
+    for (mut f, _) in candidates(&set, &compiled)? {
+        let Some((base_bytes, base_differs)) = base_files.get(&f.file) else {
+            continue;
+        };
+        if *base_bytes == f.bytes {
+            continue;
+        }
+        if *base_differs {
+            let live = read_excel(&set, &f.file)?
+                .map(|(_, b)| b)
+                .unwrap_or_default();
+            match overlay(&live, base_bytes, &f.bytes) {
+                Some(b) => f.bytes = b,
+                None => inexact.push(f.file.clone()),
+            }
+        }
+        patched.push(f);
+    }
+    if !inexact.is_empty() {
+        eprintln!(
+            "error: {}: the base compile differs from the live file and the patch changes the size; a variant would not be exact",
+            inexact.join(", ")
+        );
+        return Ok(1);
+    }
     if patched.is_empty() {
-        println!("note: no compiled .bin differs from the live one; the variant equals the base");
+        println!("note: the stack changes no compiled .bin; the variant equals the base");
     }
     for f in &patched {
         println!("patched {} (live from {})", f.file, f.source);
@@ -670,6 +721,16 @@ mod tests {
     use super::*;
     use d2_formats::mpq::writer::{FileOptions, MpqWriter};
 
+    // Covers: specs/tools/test-variants.md §2 r2
+    #[test]
+    fn overlay_keeps_live_bytes_the_patch_does_not_change() {
+        let live = [1, 9, 3, 4];
+        let base = [1, 2, 3, 4];
+        assert_eq!(overlay(&live, &base, &[1, 2, 7, 4]), Some(vec![1, 9, 7, 4]));
+        assert_eq!(overlay(&live, &base, &base), Some(live.to_vec()));
+        assert_eq!(overlay(&live, &base, &[1, 2, 3]), None);
+    }
+
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("variant-unit-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
@@ -750,7 +811,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/tools/test-variants.md §2 rule 3 (probe), mpq.md §5
+    // Covers: specs/tools/test-variants.md §2 r3
     #[test]
     fn new_name_takes_first_free_probe_slot() {
         let count = 16u32;
@@ -786,7 +847,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/tools/test-variants.md Edge cases 1
+    // Covers: specs/tools/test-variants.md §2 r1
     #[test]
     fn empty_patch_list_is_identity() {
         let base = base_writer().to_bytes().unwrap();
@@ -796,7 +857,7 @@ mod tests {
         assert!(check_archive(&b, &v, &[]).unwrap().is_empty());
     }
 
-    // Covers: specs/tools/test-variants.md §2 rule 4
+    // Covers: specs/tools/test-variants.md §2 r4
     #[test]
     fn perturbed_append_is_reported_for_that_file_only() {
         let base = base_writer().to_bytes().unwrap();

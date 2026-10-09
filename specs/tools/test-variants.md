@@ -51,8 +51,14 @@ link, else copy), except `patch_d2.mpq`, which is rewritten (§2), and
 
 1. Apply the stack to the base tables and compile (`patch-layers.md`
    §5, §7). Any error finding stops the build (exit 1).
-2. The patched set is the tables whose compiled `.bin` differs from the
-   live `.bin` the base install loads (`loading.md` §2: P → X → D).
+2. The patched set is the tables whose compiled `.bin` after the stack
+   differs from the compiled `.bin` of the base tables. The file written
+   is the live `.bin` the base install loads (`loading.md` §2: P → X →
+   D) with exactly the bytes the stack changed replaced, so a difference
+   between the base compile and the live file that `data-tool tables`
+   explains (e.g. a `monstats` string key, `field-types.md` §10) stays as
+   1.14d ships it. A stack that changes the size of such a file stops
+   the build (exit 1).
 3. `patch_d2.mpq` of the variant is the base `patch_d2.mpq` with one
    change per patched table `data\global\excel\<table>.bin`:
    - the file's data is appended after the last byte the base archive

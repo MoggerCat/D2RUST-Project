@@ -66,7 +66,7 @@ fn s(p: &Path) -> &str {
 
 const MONSTATS: &str = "d2patch 1\ntable monstats\nset beast1 MaxGrp 3 -> 4\n";
 
-// Covers: specs/tools/test-variants.md §2, §3, Test vectors 1
+// Covers: specs/tools/test-variants.md §2, §3
 #[test]
 fn build_one_set_on_monstats_then_check() {
     let game = &built().dir;
@@ -134,7 +134,7 @@ fn build_one_set_on_monstats_then_check() {
     assert_eq!(code, 0, "{text}");
 }
 
-// Covers: specs/tools/test-variants.md Edge cases 1, Test vectors 3
+// Covers: specs/tools/test-variants.md §2 r1
 #[test]
 fn empty_stack_builds_the_base() {
     let game = &built().dir;
@@ -142,7 +142,10 @@ fn empty_stack_builds_the_base() {
     let out = out_dir("empty");
     let (code, text) = run(&["build", s(&st), "--game", s(game), "--out", s(&out)]);
     assert_eq!(code, 0, "{text}");
-    assert!(text.contains("note: no compiled .bin differs"), "{text}");
+    assert!(
+        text.contains("note: the stack changes no compiled .bin"),
+        "{text}"
+    );
     assert_eq!(
         std::fs::read(out.join("patch_d2.mpq")).unwrap(),
         std::fs::read(game.join("patch_d2.mpq")).unwrap()
