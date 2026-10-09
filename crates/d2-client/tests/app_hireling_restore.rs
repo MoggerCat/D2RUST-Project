@@ -86,7 +86,7 @@ fn dump(ticks: u32) -> String {
 }
 
 /// The unit record of (type, GUID) in the snapshot of frame `f`.
-fn unit<'a>(text: &'a str, f: u32, ty: u32, guid: u32) -> Option<&'a str> {
+fn unit(text: &str, f: u32, ty: u32, guid: u32) -> Option<&str> {
     let snap = text
         .lines()
         .find(|l| l.starts_with(&format!(r#"{{"k":"snap","f":{f},"#)))?;
