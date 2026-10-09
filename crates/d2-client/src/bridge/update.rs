@@ -37,8 +37,9 @@ pub fn update_pass(
 ) -> usize {
     let mut applied = 0;
     let order = update_order(&world.units);
-    // §5 rule 3: S missiles first, then the C missiles (their update is
-    // Phase 6) and the C objects; then the other S types.
+    // §5 rule 3: S missiles first, then the C missiles
+    // (`missiles/client.md` §C6) and the C objects; then the other S
+    // types.
     let missiles = order
         .iter()
         .take_while(|k| k.unit_type == super::world::MISSILE)
@@ -47,6 +48,7 @@ pub fn update_pass(
     for (i, &key) in order.iter().enumerate() {
         if i >= missiles && !c_objects_done {
             c_objects_done = true;
+            c_missiles(world, inputs, log, outputs);
             c_objects(world, inputs, log, outputs);
         }
         let local = world.local_player == Some(key);
@@ -119,6 +121,7 @@ pub fn update_pass(
         }
     }
     if !c_objects_done {
+        c_missiles(world, inputs, log, outputs);
         c_objects(world, inputs, log, outputs);
     }
     // TODO(spec: model.md §5 rule 3): the C monsters walk last; their
@@ -139,6 +142,28 @@ pub fn update_pass(
 /// The C objects' walk (`0x00463CC0`, §5 rule 3): each runs the object
 /// update (call site A), then, still in set C, the dispatch once more
 /// (call site B). Errors are recorded under the update's id 0.
+/// The C missiles' walk (§5 rule 3, before the C objects): each runs the
+/// client missile dispatch `0x004D2C70` (`missiles/client.md` §C6).
+fn c_missiles(
+    world: &mut ClientWorld,
+    inputs: &ModelInputs,
+    log: &mut ReceiveLog,
+    outputs: &mut Vec<Output>,
+) {
+    for key in objects::c_order(world, super::world::MISSILE) {
+        let r = super::client_missiles::update(
+            world,
+            &inputs.tables.missiles,
+            key,
+            inputs.high_light_quality,
+        );
+        if let Err(error) = r {
+            log.rejected.push(Rejected { id: 0, error });
+        }
+    }
+    move_freed(world, outputs);
+}
+
 fn c_objects(
     world: &mut ClientWorld,
     inputs: &ModelInputs,

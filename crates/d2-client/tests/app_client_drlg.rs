@@ -501,3 +501,42 @@ fn the_den_light_missile_creates_from_the_users_rows() {
     let (_, light) = w.lights.iter().next().unwrap();
     assert_eq!((light.owner_guid, light.radius), (k.guid, 80));
 }
+
+// Covers: specs/missiles/client.md §c6-per-update-dispatch-0x004d2c70
+/// The client missile update on the user's rows: the Den light (287,
+/// function 23) never expires; an `arrow` (row 0, function 1) ends
+/// after its frames (`Range`) and its light, if any, dies.
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn client_missiles_update_on_the_users_rows() {
+    use d2_client::bridge::client_missiles::{create, flag, update, CreateRecord};
+    let d = app_support::live();
+    let rows = single_player::client_unit_rows(d.archives.as_ref()).unwrap();
+    let missiles = &rows.missiles;
+    assert_eq!(missiles[0].clt_do_func, 1);
+    let mut w = ClientWorld::default();
+    let rec = |class| CreateRecord {
+        flags: flag::POSITION,
+        class,
+        x: 100,
+        y: 100,
+        ..CreateRecord::default()
+    };
+    let den = create(&mut w, missiles, &rec(287), true).unwrap().unwrap();
+    let arrow = create(&mut w, missiles, &rec(0), true).unwrap().unwrap();
+    let frames = w.objclient.missiles[&arrow].current;
+    assert_eq!(frames, i32::from(missiles[0].range));
+    for n in 1..=frames {
+        update(&mut w, missiles, arrow, true).unwrap();
+        update(&mut w, missiles, den, true).unwrap();
+        assert_eq!(
+            w.objclient.set_c.contains_key(&arrow),
+            n < frames,
+            "update {n}"
+        );
+    }
+    for _ in 0..1000 {
+        update(&mut w, missiles, den, true).unwrap();
+    }
+    assert!(w.objclient.set_c.contains_key(&den));
+}

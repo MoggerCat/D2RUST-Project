@@ -6,11 +6,21 @@
 //! own fields (frames, animation, velocity, target, skill, owner, pierce
 //! count) are kept in [`ClientMissile`] beside the set-C unit.
 //!
-//! Not modelled here (each named where it would run): the path and the
-//! motion record (§C3 r14–r15, r17, r19, r21: the model has no path for
-//! set-C units; velocity and target are kept), the init callback (r27),
-//! the sounds (r28: audio), the umod callback (r29), the per-update
-//! dispatch and the client functions (§C6–§C13), the removals (§C10).
+//! Each client update runs [`update`] on every set-C missile (§C6): the
+//! light flicker, the row's client function (bodies 1, 11, 23 here), the
+//! end `0x004D2D70` ([`end`], §C9) and the default removal (§C10 r1).
+//!
+//! Not modelled (each named where it would run): the path and the motion
+//! record (§C3 r14–r15, r17, r19, r21; §C7 r3, r5, r10, r12: the model
+//! has no path for set-C units, so a missile does not move and finds no
+//! wall or unit; velocity and target are kept), the init callback (§C4
+//! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
+//! town tests (§C6 r4, §C7 r8: no town flag in the client level rows),
+//! the second pass (§C7 r13), the client hit functions (§C9 r4.3: a
+//! handler error when a row names one), and every client function but
+//! 1, 11 and 23 (the missile is then left as it is). The aim nudge
+//! (§C2 r8) reads the owner's direction from the record
+//! ([`CreateRecord::owner_dir64`]; none given is a handler error).
 
 use std::collections::BTreeMap;
 
@@ -45,6 +55,17 @@ pub struct ClientMissileRow {
     pub last_collide: bool,
     /// `pCltDoFunc` (§C6 r5).
     pub clt_do_func: u16,
+    /// `LoopAnim` (§C7 r4).
+    pub loop_anim: bool,
+    /// `Flicker` (§C6 r2, `render/lighting.md` §8).
+    pub flicker: u8,
+    /// `CollideType` (§C1 mode, §C7 r9).
+    pub collide_type: u8,
+    /// `AlwaysExplode`, `ExplosionMissile` (i16), `pCltHitFunc` (i16)
+    /// (§C9).
+    pub always_explode: bool,
+    pub explosion_missile: i16,
+    pub clt_hit_func: i16,
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -79,6 +100,10 @@ pub struct CreateRecord {
     pub range: i32,
     /// +0x50 light byte (§C4 r26).
     pub light: u8,
+    /// The owner's direction (`0x00620100`, 0…63) for the aim nudge
+    /// (§C2 r8), as the caller reads it from the unit's drawn pose
+    /// (`world_view::UnitPose::dir64`); the model holds no client path.
+    pub owner_dir64: Option<u8>,
 }
 
 /// Record flags (§R2.1).
@@ -126,6 +151,8 @@ pub struct ClientMissile {
     pub owner: Option<UnitKey>,
     /// Stat 328, the pierce count (§C4 r24).
     pub pierce: u32,
+    /// Unit flag 0x10000 (set by functions 2 and 11, §C13).
+    pub flat: bool,
 }
 
 /// The client missiles of set C, by key.
@@ -151,7 +178,10 @@ pub fn create(
     let (x, y) = if rec.flags & flag::POSITION != 0 {
         (rec.x, rec.y)
     } else {
-        let Some(o) = rec.origin.and_then(|k| w.units.get(&k)) else {
+        let Some(o) = rec
+            .origin
+            .and_then(|k| w.units.get(&k).or_else(|| w.objclient.set_c.get(&k)))
+        else {
             return Ok(None);
         };
         let (x, y) = o.cell();
@@ -211,7 +241,8 @@ pub fn create(
         };
     }
     // r8: the aim. Owner none: nothing.
-    let target = rec.target;
+    let mut target = rec.target;
+    let (mut tx, mut ty) = (tx, ty);
     if v != 0 {
         if let Some(owner) = rec.owner {
             let o_cell = w.units.get(&owner).map(|u| u.cell());
@@ -219,16 +250,25 @@ pub fn create(
                 None => (tx, ty) == (x, y),
                 Some(t) if t != owner => {
                     let t_cell = w.units.get(&t).map(|u| u.cell());
-                    t_cell.is_some() && t_cell == o_cell
+                    let same = t_cell.is_some() && t_cell == o_cell;
+                    if same {
+                        target = None;
+                    }
+                    same
                 }
                 Some(_) => false,
             };
             if nudge {
-                // `0x004C51E0` reads the owner's direction (`0x00620100`),
-                // which the model does not hold.
-                return Err(HandlerError::Invalid(
+                // `0x004C51E0`: d := owner direction >> 3; (tx, ty) :=
+                // owner position + (DX[d], DY[d]).
+                const DX: [i32; 8] = [0, -1, -2, -1, 0, 1, 2, 1];
+                const DY: [i32; 8] = [2, 1, 0, -1, -2, -1, 0, 1];
+                let dir = rec.owner_dir64.ok_or(HandlerError::Invalid(
                     "missiles/client.md §C2 r8: the aim nudge needs the owner's direction",
-                ));
+                ))?;
+                let d = usize::from((dir & 63) >> 3);
+                let (ox, oy) = o_cell.unwrap_or_default();
+                (tx, ty) = (i32::from(ox) + DX[d], i32::from(oy) + DY[d]);
             }
             let aim = match target.and_then(|t| w.units.get(&t)) {
                 Some(t) => {
@@ -418,6 +458,234 @@ fn missile_light(
         g,
         b,
     );
+}
+
+/// The client functions the model runs (§C12): the default step (1)
+/// and the bodies of §C13 named here.
+pub const FN_DEFAULT_STEP: u16 = 1;
+pub const FN_FLAT_AT_END: u16 = 11;
+pub const FN_DEN_LIGHT: u16 = 23;
+
+/// The per-update dispatch `0x004D2C70` (§C6) of the set-C missile `key`.
+pub fn update(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
+        return Ok(());
+    };
+    // r1.
+    let Some(row) = rows.get(class as usize).copied() else {
+        remove(w, key);
+        return Ok(());
+    };
+    // r2.
+    if row.flicker != 0 {
+        flicker(w, key, &row);
+    }
+    // r5 (r3–r4: the room and the town test are not modelled).
+    match row.clt_do_func {
+        FN_DEFAULT_STEP => default_step(w, rows, key, &row, lights),
+        FN_FLAT_AT_END => {
+            // §C13 11: at the animation end flag 0x10000 and the light
+            // removed; else step. No countdown at the end.
+            let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+            if m.frame + m.anim_speed >= m.anim_len {
+                if let Some(m) = w.objclient.missiles.get_mut(&key) {
+                    m.flat = true;
+                }
+                remove_light(w, key);
+                Ok(())
+            } else {
+                default_step(w, rows, key, &row, lights)
+            }
+        }
+        FN_DEN_LIGHT => {
+            // §C13 23: frames left < 100 → 500; step (never expires).
+            if let Some(m) = w.objclient.missiles.get_mut(&key) {
+                if m.current < 100 {
+                    m.current = 500;
+                }
+            }
+            default_step(w, rows, key, &row, lights)
+        }
+        // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
+        _ => Ok(()),
+    }
+}
+
+/// The light flicker `0x004CD1C0` (`render/lighting.md` §8): when the
+/// frame has bits 0x300 clear, the missile has a light and its radius ≥
+/// `Light`: target := `Light` + rnd(`Flicker`) on the missile's seed.
+fn flicker(w: &mut ClientWorld, key: UnitKey, row: &ClientMissileRow) {
+    let frame = w.objclient.missiles.get(&key).map_or(0, |m| m.frame);
+    if frame & 0x300 != 0 {
+        return;
+    }
+    let Some(id) = light_of(w, key) else {
+        return;
+    };
+    if w.lights.radius(id).unwrap_or(0) < i32::from(row.light) {
+        return;
+    }
+    let Some(u) = w.objclient.set_c.get_mut(&key) else {
+        return;
+    };
+    let Some((lo, hi)) = u.seed else {
+        return;
+    };
+    let mut seed = Seed::new(lo, hi);
+    let r = seed.roll(i32::from(row.flicker)) as i32;
+    u.seed = Some((seed.lo, seed.hi));
+    w.lights.set_target(id, i32::from(row.light) + r);
+}
+
+/// The default step `0x004D30C0` (§C7) without the path (module doc).
+fn default_step(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    row: &ClientMissileRow,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    let Some(m) = w.objclient.missiles.get_mut(&key) else {
+        return Ok(());
+    };
+    // r1.
+    let active = m.current <= m.activate;
+    // r2.
+    if active && m.total - m.current > i32::from(row.init_steps) {
+        if let Some(u) = w.objclient.set_c.get_mut(&key) {
+            u.flag_ex &= !FLAG_EX_NOT_DRAWN;
+        }
+    }
+    let m = w.objclient.missiles.get_mut(&key).expect("checked above");
+    // r4.
+    if active {
+        if !row.loop_anim {
+            if m.frame + m.anim_speed < m.anim_len {
+                m.frame += m.anim_speed;
+            }
+        } else if row.sub_loop != 0
+            && m.current > i32::from(row.anim_len) - i32::from(row.sub_stop) + 1
+        {
+            m.frame += m.anim_speed;
+            if m.frame >= i32::from(row.sub_stop) << 8 {
+                m.frame += (i32::from(row.sub_start) - i32::from(row.sub_stop)) << 8;
+            }
+        } else {
+            m.frame += m.anim_speed;
+            if m.frame >= m.anim_len {
+                m.frame -= m.anim_len;
+            }
+        }
+    }
+    // r6.
+    m.current -= 1;
+    if m.current < 1 {
+        end(w, rows, key, false, lights)?;
+    }
+    // r7–r12: the town clamp, walls and units need the path.
+    Ok(())
+}
+
+/// The end `0x004D2D70(m, none, forced)` (§C9) of a missile that hit no
+/// unit. Returns the explosion missile made, if any.
+pub fn end(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    key: UnitKey,
+    forced: bool,
+    lights: bool,
+) -> Result<Option<UnitKey>, HandlerError> {
+    let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
+        return Ok(None);
+    };
+    let row = rows.get(class as usize).copied().unwrap_or_default();
+    let m = w.objclient.missiles.get(&key).copied().unwrap_or_default();
+    let mut x = None;
+    // r3: no unit, not forced, no `AlwaysExplode` → r5.
+    if forced || row.always_explode {
+        // r4.3.
+        if row.clt_hit_func > 0 && row.clt_hit_func < 81 {
+            return Err(HandlerError::Invalid(
+                "missiles/client.md §C9 r4.3: client hit functions are not modelled",
+            ));
+        }
+        // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
+        // owner m's owner (none → none), origin m.
+        if row.explosion_missile >= 0 {
+            if let Some(owner) = m.owner {
+                let rec = CreateRecord {
+                    flags: flag::TARGET_ABSOLUTE,
+                    owner: Some(owner),
+                    origin: Some(key),
+                    class: row.explosion_missile as u32,
+                    skill: m.skill,
+                    level: m.level,
+                    ..CreateRecord::default()
+                };
+                x = create(w, rows, &rec, lights)?;
+                if let Some(xk) = x {
+                    // X's direction: rnd(64) on X's seed for 146
+                    // `spidergoo`, else m's (the motion copy is not
+                    // modelled).
+                    let dir = if row.explosion_missile == 146 {
+                        let u = w.objclient.set_c.get_mut(&xk).expect("just made");
+                        u.seed.map(|(lo, hi)| {
+                            let mut s = Seed::new(lo, hi);
+                            let d = s.roll(64) as u8;
+                            u.seed = Some((s.lo, s.hi));
+                            d
+                        })
+                    } else {
+                        Some(m.direction)
+                    };
+                    if let (Some(d), Some(xm)) = (dir, w.objclient.missiles.get_mut(&xk)) {
+                        xm.direction = d;
+                    }
+                }
+            }
+        }
+    }
+    // r7: m's light dies (`0x00474470`, `render/lighting.md` §6.2 r6).
+    if let Some(id) = light_of(w, key) {
+        let _ = w.lights.die(id);
+    }
+    // r8 (r = 3): m removed from set C.
+    super::objects::remove_client_unit(w, key);
+    Ok(x)
+}
+
+/// The default removal `0x004CD390` (§C10 r1): the light removed, the
+/// unit removed.
+pub fn remove(w: &mut ClientWorld, key: UnitKey) {
+    remove_light(w, key);
+    super::objects::remove_client_unit(w, key);
+}
+
+fn light_owner(key: UnitKey) -> Owner {
+    Owner {
+        unit_type: u32::from(MISSILE),
+        guid: key.guid,
+        client_only: true,
+    }
+}
+
+fn light_of(w: &ClientWorld, key: UnitKey) -> Option<crate::rules::lighting::records::LightId> {
+    let owner = light_owner(key);
+    w.lights
+        .iter()
+        .find(|(_, r)| r.owner() == Some(owner))
+        .map(|(id, _)| id)
+}
+
+fn remove_light(w: &mut ClientWorld, key: UnitKey) {
+    if let Some(id) = light_of(w, key) {
+        let _ = w.lights.remove(id);
+    }
 }
 
 #[cfg(test)]
