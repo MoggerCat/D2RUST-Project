@@ -150,6 +150,11 @@ fn c_missiles(
     log: &mut ReceiveLog,
     outputs: &mut Vec<Output>,
 ) {
+    // `missiles/client.md` §C9 r4.1: the client's state-86 lists count
+    // down first (PROVISIONAL REC-545).
+    super::client_missiles::tick_just_hit(world);
+    // PROVISIONAL REC-546: the unit footprints the missiles read.
+    super::client_missiles::stamp_unit_footprints(world, &inputs.tables.monsters);
     for key in objects::c_order(world, super::world::MISSILE) {
         let env = super::client_missiles::Env {
             rows: &inputs.tables.missiles,

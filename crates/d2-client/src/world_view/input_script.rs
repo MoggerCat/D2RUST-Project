@@ -6,6 +6,8 @@
 //! so a scene reaches the same place on every run. Client input only:
 //! nothing here decides an outcome.
 
+use crate::controls::keymap::vk_to_key;
+use crate::controls::Key;
 use crate::ui::{FramePos, Point, PointerButton, UiEvent};
 
 /// One step of a script.
@@ -18,9 +20,30 @@ pub enum Step {
     /// `click X Y` / `rclick X Y`: cursor there, press, and the release
     /// on the next tick.
     Click(PointerButton, Point),
+    /// `key K`: the key pressed on this tick, as the window's key press
+    /// (its bound world action and its typed character). K is a letter
+    /// or digit, `ESC`, `TAB`, `ENTER`, `SPACE`, or a Windows virtual key
+    /// in hex (`0xC0`), as `autostart.py`'s `key`.
+    Key(Key),
 }
 
-/// Parses `wait N; move X Y; click X Y; rclick X Y` (steps separated by
+/// The virtual key of a `key` step's name (`autostart.py`'s names).
+fn key_vk(name: &str) -> Option<u16> {
+    match name.to_ascii_uppercase().as_str() {
+        "ESC" => Some(0x1B),
+        "TAB" => Some(0x09),
+        "ENTER" => Some(0x0D),
+        "SPACE" => Some(0x20),
+        n if n.len() == 1 && n.as_bytes()[0].is_ascii_alphanumeric() => {
+            Some(u16::from(n.as_bytes()[0]))
+        }
+        n => n
+            .strip_prefix("0X")
+            .and_then(|h| u16::from_str_radix(h, 16).ok()),
+    }
+}
+
+/// Parses `wait N; move X Y; click X Y; rclick X Y; key K` (steps separated by
 /// `;`, blank steps ignored). Coordinates are 800 × 600 frame pixels.
 pub fn parse(text: &str) -> Result<Vec<Step>, String> {
     let mut steps = Vec::new();
@@ -59,6 +82,14 @@ pub fn parse(text: &str) -> Result<Vec<Step>, String> {
             "move" => Step::Move(point(args)?),
             "click" => Step::Click(PointerButton::Left, point(args)?),
             "rclick" => Step::Click(PointerButton::Right, point(args)?),
+            "key" => match args {
+                [k] => Step::Key(
+                    key_vk(k)
+                        .and_then(vk_to_key)
+                        .ok_or_else(|| format!("`{}`: unknown key `{k}`", raw.trim()))?,
+                ),
+                _ => return Err(format!("`{}`: needs K", raw.trim())),
+            },
             _ => return Err(format!("`{}`: unknown step `{op}`", raw.trim())),
         });
     }
@@ -73,6 +104,7 @@ pub struct InputScript {
     resume_at: u64,
     release: Option<(PointerButton, Point)>,
     cursor: Option<Point>,
+    keys: Vec<Key>,
 }
 
 impl InputScript {
@@ -83,12 +115,19 @@ impl InputScript {
             resume_at: 0,
             release: None,
             cursor: None,
+            keys: Vec::new(),
         }
     }
 
     /// Where the script put the cursor last.
     pub fn cursor(&self) -> Option<FramePos> {
         self.cursor.map(FramePos::Inside)
+    }
+
+    /// The keys of the `key` steps run since the last call, in order
+    /// (the caller turns them into the window's key events).
+    pub fn take_keys(&mut self) -> Vec<Key> {
+        std::mem::take(&mut self.keys)
     }
 
     /// Whether every step has run.
@@ -117,6 +156,7 @@ impl InputScript {
                     out.push(UiEvent::CursorMoved(p));
                     self.cursor = Some(p);
                 }
+                Step::Key(k) => self.keys.push(k),
                 Step::Click(button, at) => {
                     out.push(UiEvent::CursorMoved(at));
                     out.push(UiEvent::Press { button, at });
@@ -157,10 +197,37 @@ mod tests {
             "wait -3",
             "wait",
             "click a b",
+            "key",
+            "key F1X",
+            "key 0xZZ",
+            "key I J",
         ] {
             assert!(parse(bad).is_err(), "{bad}");
         }
         assert_eq!(parse(" ; ").unwrap(), []);
+        assert_eq!(
+            parse("key I; key esc; key TAB; key 0xC0; key 7").unwrap(),
+            [
+                Step::Key(Key::I),
+                Step::Key(Key::Escape),
+                Step::Key(Key::Tab),
+                Step::Key(Key::Grave),
+                Step::Key(Key::Digit7),
+            ]
+        );
+    }
+
+    #[test]
+    fn keys_run_on_their_tick_without_using_it_up() {
+        let mut s = InputScript::new(parse("wait 2; key I; move 1 2; wait 1; key C").unwrap());
+        assert_eq!(s.events(1), []);
+        assert_eq!(s.take_keys(), []);
+        assert_eq!(s.events(3), [UiEvent::CursorMoved(p(1, 2))]);
+        assert_eq!(s.take_keys(), [Key::I]);
+        assert_eq!(s.take_keys(), []);
+        assert_eq!(s.events(4), []);
+        assert_eq!(s.take_keys(), [Key::C]);
+        assert!(s.done());
     }
 
     #[test]

@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py /home/user/D2RUST-Project/traces/raw/20261009-024913-frames.jsonl --scene a5-town-harrogath --frame 26 --tile-light unknown --out /home/user/D2RUST-Project/facts/render; game: 1.14d
+key	value
+seq	26
+tick	43
+w	800
+h	600
+act	4
+level	109
+player_x	1200
+player_y	80976
+tile_origin_x	800
+tile_origin_y	80696
+unit_origin_x	800
+unit_origin_y	80692
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	243
+index_sha256	f83fee87c3a57534750b8d9af2239e9e68621da526e6a4ca53a32545db764537
+palette_sha256	d499258817f8281e4b66f08c5e0eb1b177cf299b98136200b8d671a1cbd6f855

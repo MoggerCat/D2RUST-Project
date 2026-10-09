@@ -1015,10 +1015,10 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
         }
         add_iflags(w, dst, iflag::STACK_FULL);
     } else {
-        // PROVISIONAL (§7.12, REC-289): `0x00629930(src)` ("has
-        // durability") read as gating only the stat-72 step, as §8.1's
-        // auto-stack states it; the whole merge under it would keep
-        // quivers and keys from ever merging.
+        // §7.12: `0x00629930(src)` ("has durability") gates only the
+        // stat-72 step, as §8.1's auto-stack states it: keys (3 + 4) and
+        // arrow quivers (30 + 40) merge in 1.14d (recorded, REC-289:
+        // `facts/items/a1-town-item-moves.tsv`).
         if w.merge_allowed(src) {
             let ds = w.stat(s, stat::DURABILITY);
             if ds < w.stat(d, stat::DURABILITY) {
@@ -1033,7 +1033,11 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
             w.book_count_changed(p, dst, qs);
         }
         w.set_cursor(p, None);
-        w.send(p, layouts::clear_cursor(Owner::ITEM, src));
+        // S→C 0x42 names the player whose cursor clears (recorded:
+        // `facts/items/a1-town-item-moves.tsv`, `42 00 <player GUID>`;
+        // `client/msg-stats-items.md` §3 rule 1 acts only on the local
+        // player).
+        w.send(p, layouts::clear_cursor(p.ty, p.guid));
         w.free_item(src);
     }
     mark(w, p, dst, cmd::ADD_QUANTITY);
@@ -1436,6 +1440,12 @@ pub fn scroll_into_book<W: MoveWorld>(
         w.remove_from_room(scroll);
         w.free_item(scroll);
         w.set_cursor(p, None);
+        if sm == mode::CURSOR {
+            // Recorded (`facts/items/a1-town-item-moves.tsv`): a cursor
+            // scroll put into its tome clears the player's cursor with
+            // S→C 0x42 before the tome's 0x3E.
+            w.send(p, layouts::clear_cursor(p.ty, p.guid));
+        }
     }
     w.set_stat(b, stat::QUANTITY, q.wrapping_add(1));
     w.send_item_stat(p, book, stat::QUANTITY);

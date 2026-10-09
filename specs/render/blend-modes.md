@@ -24,16 +24,16 @@
 |   2. Blend-table orientation (per drawer) | 92–127 |
 |   3. Draw mode of a composite unit component | 128–173 |
 |   4. Single-cel units and overlays | 174–185 |
-|   5. Shadows (the darkening blend) | 186–248 |
-|   6. Translucent walls and roofs | 249–283 |
-|   7. d2rs answers | 284–294 |
-|   8. Lines and rectangles (GDI) | 295–329 |
-| Constants & data dependencies | 330–338 |
-| Randomness | 339–342 |
-| Edge cases & original bugs | 343–357 |
-| Test vectors | 358–391 |
-| Provenance | 392–420 |
-| Open questions | 421–447 |
+|   5. Shadows (the darkening blend) | 186–267 |
+|   6. Translucent walls and roofs | 268–302 |
+|   7. d2rs answers | 303–313 |
+|   8. Lines and rectangles (GDI) | 314–348 |
+| Constants & data dependencies | 349–357 |
+| Randomness | 358–361 |
+| Edge cases & original bugs | 362–376 |
+| Test vectors | 377–410 |
+| Provenance | 411–439 |
+| Open questions | 440–466 |
 <!-- /index -->
 
 ## Summary
@@ -215,7 +215,7 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    Compared with the unit draw (`camera.md` §4) the shadow is 2 pixels
    left and moves by half the height `oz` in both x and y instead of
    taking `oz` in y. Then the COF box pre-test `0x004709A0` (as
-   `unit-composite.md` §4) and the same draw identity, COF, direction
+   `unit-composite.md` §4; but see the revision below) and the same draw identity, COF, direction
    and frame as the unit (`0x00645270`, `0x0064F380`,
    `unit-composite.md` §2–§3; the linked-unit inventory rule of
    `unit-composite.md` §1.1 applies); every layer `i` of the COF
@@ -224,6 +224,25 @@ non-zero is drawn through slot `+0x90` (`0x004F6540`; GDI `0x006C87E0` →
    skips the layer. Perspective mode only (not GDI): the position comes
    from `0x004F6760`, `Y − 8` for the local player when the camera
    follows it, and `±W/4` per open mode.
+   Revision 2026-10-09 (q-scenes-compare, measured): the shadow is not
+   culled with the unit's body. 1.14d draws shadows whose unit fails
+   the body pre-test and whose own (X, Y) fails the box test as written
+   above: `a1-run-ne` / `a1-run-se` draw the waypoint's shadow at X = 980
+   (`wponhth.cof` box x min −115: −115 + 980 ≥ W − 1), `a1-panel-inventory`
+   the torch's at X = 918 (x min −75, open mode 1), each with no body
+   row. PROVISIONAL (REC-511): the shadow's pre-test is the box test of
+   `unit-composite.md` §4 on the sheared shadow box, independent of the
+   body's: with `(X, Y)` the shadow position above and `d = ⌊(y max −
+   y min) / 2⌋` (the shadow's row count, each row one pixel left of the
+   one below), the box is x from `X + x min − d` to `X + x max`, y from
+   `Y + y max − d` to `Y + y max`, drawn when `x lo < W − 1`, `x hi ≥ 0`,
+   `y hi ≥ 0`, `y lo < H − 1`. It fits every shadow of the recorded
+   scenes, e.g. `a1-panel-inventory` (open mode 1): torch (`toonhth`
+   box −75..13 × −108..5) at X = 918 drawn (918 − 75 − 56 = 787), rogue
+   (`rgnuhth` −43..29 × −62..7) at X = 918 not drawn (841), torch at
+   X = 1094 not drawn, torches at X = −26 and −170 not drawn (x max).
+   Because only the shear explains the torch / rogue pair at the same X;
+   settled by the pre-test's arguments at `0x00471620` (PC 1).
 4. Single-cel shadow (`0x00471450`, types ≥ 3): same skips; objects need
    `Draw` (`+0x150`) ≠ 0 and `BlocksLight` of the object's mode
    (`+0x118 + mode`) ≠ 0, then add Xoffset / Yoffset;

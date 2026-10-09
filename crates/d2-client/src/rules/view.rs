@@ -23,7 +23,7 @@ use crate::world_view::{TileDraw, UiRules, UiSprite, UnitPose, ViewAssets, ViewE
 use super::camera::{Camera, TileList, UnitPosition};
 use super::draw_order::{OrderKey, UnitSlot};
 use super::placement;
-use super::unit_composite::cof_box_visible;
+use super::unit_composite::{cof_box_visible, shadow_box_visible};
 
 /// One DT1 block's rectangle in tile coordinates (`b.x`, `b.y`, size),
 /// for the per-block wall culling of camera §7.
@@ -433,6 +433,38 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         Ok(cof_box_visible(
             cof,
             x,
+            y,
+            size.width as u32,
+            size.height as u32,
+        ))
+    }
+
+    /// `blend-modes.md` §5 r3 revision (PROVISIONAL, REC-511): the box
+    /// test on the sheared shadow box at the shadow position (2 pixels
+    /// left of the body's; `oz` = 0 assumed), types 0–2.
+    fn unit_shadow_box_visible(
+        &self,
+        unit: &ClientUnit,
+        pose: &UnitPose,
+        cof: &Cof,
+    ) -> Result<bool, ViewError> {
+        if unit.key.unit_type > 2 {
+            return Ok(true);
+        }
+        let at = self
+            .source
+            .unit_position(unit)
+            .map_err(|m| unresolved("unit position", CAMERA, m))?
+            .client();
+        let extra = self
+            .source
+            .unit_offset(unit, pose)
+            .map_err(|m| unresolved("unit offset", CAMERA, m))?;
+        let (x, y) = self.camera.unit_draw(at, extra);
+        let size = self.camera.size;
+        Ok(shadow_box_visible(
+            cof,
+            x - 2,
             y,
             size.width as u32,
             size.height as u32,

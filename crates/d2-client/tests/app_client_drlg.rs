@@ -625,6 +625,7 @@ fn the_users_client_missiles_run_their_functions() {
 
 /// The client functions the model runs (`missiles/client.md` §C12), in
 /// order.
-const RUN: [u16; 18] = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 23, 25, 43, 49, 59, 60, 63, 65,
+const RUN: [u16; 37] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 17, 18, 19, 20, 23, 25, 27, 37, 39, 43, 44, 45, 46, 47,
+    48, 49, 51, 52, 53, 58, 59, 60, 63, 65, 68,
 ];

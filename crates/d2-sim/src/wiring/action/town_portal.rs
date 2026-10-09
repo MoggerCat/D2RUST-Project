@@ -17,13 +17,14 @@
 //! else 0), links the two, owns both by the player, and sets player data
 //! +0x48 to the field portal's GUID, so §12 rule 12 removes the pair
 //! when the player arrives from town. A cast in town, or a cast without
-//! a town spawn, creates nothing; the scroll is still used. A new cast
-//! removes the player's previous pair.
+//! a town spawn, creates nothing. A new cast removes the player's
+//! previous pair.
 //!
-//! PROVISIONAL (REC-243, in-town cast): the original's last-field-level
-//! source is unwritten; a cast in a town opens the pair to the field
-//! level of the player's latest cast there (near portal in town, far
-//! portal at that level's spawn point); none yet → nothing is made.
+//! A cast in a town makes nothing: the item-use dispatcher refuses it
+//! before any cost (`items/use.md` §4; recorded under Wine in the Rogue
+//! Encampment, also with a field pair open: `3F FF <item> FF FF` and
+//! `7C 04 <item>` only; `facts/items/a1-town-portal-cold-plains.tsv`
+//! frame 362; q-fix-real-tp-town-cast, REC-243 (1) withdrawn).
 // d2rs-own, unverified
 
 use std::collections::BTreeMap;
@@ -48,8 +49,6 @@ pub struct PortalLinks {
     partner: BTreeMap<UnitId, UnitId>,
     /// The player's field portal (player data +0x48 holds its GUID).
     field: BTreeMap<UnitId, UnitId>,
-    /// The field level of the player's latest cast there.
-    last_field: BTreeMap<UnitId, u32>,
     /// Portals the object call removed, freed when it returns.
     doomed: Vec<UnitId>,
 }
@@ -63,15 +62,6 @@ impl PortalLinks {
     /// The field portal of `player`'s pair.
     pub fn field_portal(&self, player: UnitId) -> Option<UnitId> {
         self.field.get(&player).copied()
-    }
-
-    /// The field level `player` last cast a Town Portal in.
-    pub fn last_field_level(&self, player: UnitId) -> Option<u32> {
-        self.last_field.get(&player).copied()
-    }
-
-    fn set_last_field_level(&mut self, player: UnitId, level: u32) {
-        self.last_field.insert(player, level);
     }
 
     fn link(&mut self, player: UnitId, field: UnitId, town: UnitId) {
@@ -110,33 +100,25 @@ impl<X: Pending> View<'_, X> {
         let room = game.lists.unit(player)?.room()?;
         let level = self.h.drlg.level_id(game, room)?;
         let guid = game.lists.unit(player)?.guid;
-        let in_town = crate::drlg::is_town(level);
-        // The level the pair leads to from the player's side: the act's
-        // town from the field, the last field level cast from when in a
-        // town (module docs, REC-243).
-        let far_level = if in_town {
-            self.h.portals.last_field_level(player)?
-        } else {
-            crate::drlg::TOWN_LEVELS[usize::from(crate::drlg::act_of_level(level))]
-        };
+        // A town cast is refused by the item-use dispatcher before any
+        // cost; this is its belt (module docs).
+        if crate::drlg::is_town(level) {
+            return None;
+        }
+        let far_level = crate::drlg::TOWN_LEVELS[usize::from(crate::drlg::act_of_level(level))];
         if let Some(old) = self.h.portals.field_portal(player) {
             self.remove_portal_pair(game, old, Some(player));
         }
         let (px, py) = self.h.path_position(player);
         let (nroom, nx, ny) = self.portal_spot(room, px, py)?;
         let (froom, fx, fy) = self.town_spot(game, far_level)?;
-        // `near` is next to the player; `far` at the other end. In the
-        // field the near one is the field portal (what rule 12 removes
-        // the pair from); in town the far one is.
+        // `near` (the field portal) is next to the player, `far` in town.
         let near = self.create_object(game, nroom, TOWN_PORTAL_CLASS, nx, ny, 1)?;
         let Some(far) = self.create_object(game, froom, TOWN_PORTAL_CLASS, fx, fy, 2) else {
             self.remove_and_tell(game, near, None);
             return None;
         };
-        let (field, dest) = if in_town { (far, near) } else { (near, far) };
-        if !in_town {
-            self.h.portals.set_last_field_level(player, level);
-        }
+        let (field, dest) = (near, far);
         self.h.portals.link(player, field, dest);
         let st = self.h.objects.as_mut()?;
         for (portal, to) in [(near, far_level), (far, level)] {
