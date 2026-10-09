@@ -3,7 +3,8 @@ name: CI
 # Branch pushes are covered by their pull request; this saves Actions minutes.
 on:
   push:
-    branches: [main]
+    # Merge batches and staging get a full CI run as a second gate (coordinator, 2026-10-09).
+    branches: [main, claude/specs-staging-7, 'claude/integ-*']
   pull_request:
 
 env:

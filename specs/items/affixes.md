@@ -23,19 +23,19 @@
 |   3. Magic affix roller (`0x005C1560`, format ≥ 1) | 96–133 |
 |   4. Fit tests | 134–159 |
 |   5. Rare name pick (`0x005C1AB0`, format ≥ 1) | 160–167 |
-|   6. Magic item (`0x005565E0`) | 168–183 |
-|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 184–203 |
-|   8. Crafted item (`0x005C21D0`) | 204–225 |
-|   9. Tempered item (dispatch case 9) | 226–247 |
-|   10. Charm (`0x00556A60`, from the normal routine) | 248–261 |
-|   11. Automagic (finishing step, `0x00557450`) | 262–268 |
-|   12. Format-0 routines (legacy items) | 269–348 |
-| Constants & data dependencies | 349–365 |
-| Randomness | 366–381 |
-| Edge cases & original bugs | 382–420 |
-| Test vectors | 421–439 |
-| Provenance | 440–462 |
-| Open questions | 463–501 |
+|   6. Magic item (`0x005565E0`) | 168–194 |
+|   7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1) | 195–214 |
+|   8. Crafted item (`0x005C21D0`) | 215–236 |
+|   9. Tempered item (dispatch case 9) | 237–258 |
+|   10. Charm (`0x00556A60`, from the normal routine) | 259–272 |
+|   11. Automagic (finishing step, `0x00557450`) | 273–279 |
+|   12. Format-0 routines (legacy items) | 280–359 |
+| Constants & data dependencies | 360–376 |
+| Randomness | 377–392 |
+| Edge cases & original bugs | 393–431 |
+| Test vectors | 432–450 |
+| Provenance | 451–473 |
+| Open questions | 474–512 |
 <!-- /index -->
 
 ## Summary
@@ -180,6 +180,17 @@ p := request prefix[0], s := request suffix[0], forced := false.
 So a magic item without preferences has a prefix with 1/2 chance and,
 if it has one, a suffix with 1/2 chance; with no prefix the suffix is
 forced.
+
+Draw order (read 2026-10-09). Both calls go through the wrapper
+`0x005C18E0` with assign = 1. The roller (§3) assigns the chosen row's
+properties itself, as its last act (`0x0065FEC0` mode 0 after
+`0x005C18A3`), so the item seed sees: prefix coin, prefix pick, the
+prefix's property draws (`mod1` → `mod3` in record order, §3 of
+`items/properties.md`), then the suffix's coin, pick and property draws,
+then class skill mods (`0x005C1260`). It is **not** the rare item's
+"choose all, then roll P0 S0 …" order (§7). The charge difference of
+`items-vendor-akara-buy` is the store recharge (`items/properties.md`
+§5 rule 9), not this order.
 
 ### 7. Rare item (`0x005C21A0` → `0x005C1BF0`, format ≥ 1)
 

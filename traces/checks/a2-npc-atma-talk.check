@@ -1,0 +1,13 @@
+check 1
+# Act II NPC atma (monstats 176), talk: goto the NPC, interact (0x13),
+# open the chat (0x2F), the menu action, close (0x30); state + packets.
+name a2-npc-atma-talk
+save ScnAm2 --class ama --expansion --gold 10000 --act 1 --quests acts=1
+seed 1234
+ticks 50
+seconds 300
+channels state packets
+at 4 poke goto unit 1:176
+at 14 send InteractWithEntity type=1 id=@1:176
+at 16 send InitEntityChat id=@1:176
+at 18 send TerminateEntityChat id=@1:176

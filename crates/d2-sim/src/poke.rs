@@ -167,6 +167,76 @@ pub enum Directive {
         id: u8,
         args: Vec<MsgArg>,
     },
+    /// Interact with a unit (§1 `operate`): C→S 0x13 with its type and
+    /// GUID, run by the server's dispatcher now.
+    Operate {
+        unit: UnitArg,
+    },
+    /// Talk to an NPC (§1 `talk`): C→S 0x13 and 0x2F, then one message
+    /// per choice, each run by the server's dispatcher now, in order.
+    Talk {
+        npc: UnitArg,
+        choices: Vec<TalkChoice>,
+    },
+}
+
+/// One menu choice of `talk` (§1 `talk`): the C→S message it sends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TalkChoice {
+    /// `trade`: 0x38 action 1.
+    Trade,
+    /// `gamble`: 0x38 action 2.
+    Gamble,
+    /// `hire`: 0x38 action 3, item field the player's GUID (`npc.md` §4).
+    Hire,
+    /// `action:<n>`: 0x38 action n, item field 0.
+    Action(u32),
+    /// `quest:<n>`: 0x31 with message n.
+    Quest(u16),
+    /// `close`: 0x30.
+    Close,
+}
+
+impl TalkChoice {
+    fn parse(t: &str) -> Result<Self, String> {
+        Ok(match t {
+            "trade" => Self::Trade,
+            "gamble" => Self::Gamble,
+            "hire" => Self::Hire,
+            "close" => Self::Close,
+            _ => match t.split_once(':') {
+                Some(("action", n)) => Self::Action(num(n)?),
+                Some(("quest", n)) => Self::Quest(ranged(n, 0, 0xFFFF, "quest message")? as u16),
+                _ => {
+                    return Err(format!(
+                        "talk choice {t:?}: trade, gamble, hire, action:<n>, quest:<n> or close"
+                    ))
+                }
+            },
+        })
+    }
+}
+
+impl fmt::Display for TalkChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Trade => write!(f, "trade"),
+            Self::Gamble => write!(f, "gamble"),
+            Self::Hire => write!(f, "hire"),
+            Self::Action(n) => write!(f, "action:{n}"),
+            Self::Quest(n) => write!(f, "quest:{n}"),
+            Self::Close => write!(f, "close"),
+        }
+    }
+}
+
+/// One server handler call of `operate` / `talk` (§1, §5 rule 4): a C→S
+/// id and its field values in the order of its `layout` column
+/// (`sim/client-messages.tsv`); the host side builds the bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HandlerCall {
+    pub id: u8,
+    pub values: Vec<u32>,
 }
 
 /// The target of a `goto` (§6 rule 1).
@@ -199,7 +269,7 @@ pub struct GotoWalk {
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 15] = [
+pub const KEYWORDS: [&str; 17] = [
     "object",
     "superunique",
     "missile",
@@ -215,6 +285,8 @@ pub const KEYWORDS: [&str; 15] = [
     "freeze",
     "goto",
     "msg",
+    "operate",
+    "talk",
 ];
 
 impl Directive {
@@ -236,6 +308,8 @@ impl Directive {
             Self::Freeze { .. } => "freeze",
             Self::Goto(_) => "goto",
             Self::Msg { .. } => "msg",
+            Self::Operate { .. } => "operate",
+            Self::Talk { .. } => "talk",
         }
     }
 }
@@ -695,6 +769,21 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 .collect::<Result<Vec<_>, _>>()?;
             Directive::Msg { id, args }
         }
+        "operate" => Directive::Operate {
+            unit: unit_arg(exact(1, "<ref>")?[0])?,
+        },
+        "talk" => {
+            let Some((npc, choices)) = args.split_first() else {
+                return Err("`talk` needs an NPC: `talk <ref> [<choice>...]`".into());
+            };
+            Directive::Talk {
+                npc: unit_arg(npc)?,
+                choices: choices
+                    .iter()
+                    .map(|t| TalkChoice::parse(t))
+                    .collect::<Result<_, _>>()?,
+            }
+        }
         k => {
             return Err(format!(
                 "unknown directive {k:?}: one of {}",
@@ -785,6 +874,13 @@ impl fmt::Display for Directive {
                 write!(f, " {id}")?;
                 for a in args {
                     write!(f, " {a}")?;
+                }
+            }
+            Self::Operate { unit } => write!(f, " {unit}")?,
+            Self::Talk { npc, choices } => {
+                write!(f, " {npc}")?;
+                for c in choices {
+                    write!(f, " {c}")?;
                 }
             }
         }
@@ -1206,6 +1302,61 @@ pub fn msg_values_with(
     args.iter().copied().map(resolve).collect()
 }
 
+/// The `gap` note of `operate` / `talk` where the runner has no host (§5
+/// rule 4).
+pub const INTERACT_GAP: &str = "operate / talk need the host's dispatcher";
+
+/// The handler calls of `operate` / `talk` (§1, §5 rule 4) with the
+/// references resolved on the current state; `None` for another
+/// directive. `Err`: the reference that matched no unit.
+pub fn interact_calls<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    env: &Env<'_>,
+    d: &Directive,
+) -> Option<Result<(u32, Vec<HandlerCall>), String>> {
+    let unit = match d {
+        Directive::Operate { unit } => *unit,
+        Directive::Talk { npc, .. } => *npc,
+        _ => return None,
+    };
+    let target = |u: UnitArg| -> Result<(u32, u32), String> {
+        let id = resolve_unit(u, game, sim, env)?;
+        let e = game.lists.unit(id).ok_or_else(|| u.to_string())?;
+        Ok((e.ty as u32, e.guid))
+    };
+    Some((|| {
+        let (ty, guid) = target(unit)?;
+        let player = guid_of(game, env.player).ok_or_else(|| "@player".to_string())?;
+        Ok((guid, interact_calls_with(d, ty, guid, player)))
+    })())
+}
+
+/// [`interact_calls`] with the target (unit type, GUID) and the player's
+/// GUID resolved: the messages of §1 `operate` / `talk`, in order.
+pub fn interact_calls_with(d: &Directive, ty: u32, guid: u32, player: u32) -> Vec<HandlerCall> {
+    let call = |id: u8, values: &[u32]| HandlerCall {
+        id,
+        values: values.to_vec(),
+    };
+    match d {
+        Directive::Operate { .. } => vec![call(0x13, &[ty, guid])],
+        Directive::Talk { choices, .. } => {
+            let mut v = vec![call(0x13, &[ty, guid]), call(0x2F, &[guid])];
+            v.extend(choices.iter().map(|c| match *c {
+                TalkChoice::Trade => call(0x38, &[1, guid, 0]),
+                TalkChoice::Gamble => call(0x38, &[2, guid, 0]),
+                TalkChoice::Hire => call(0x38, &[3, guid, player]),
+                TalkChoice::Action(n) => call(0x38, &[n, guid, 0]),
+                TalkChoice::Quest(m) => call(0x31, &[guid, u32::from(m)]),
+                TalkChoice::Close => call(0x30, &[guid]),
+            }));
+            v
+        }
+        _ => Vec::new(),
+    }
+}
+
 fn run<X: WorldPending>(
     game: &mut Game,
     sim: &mut WorldSim<X>,
@@ -1452,6 +1603,8 @@ fn run<X: WorldPending>(
         // §5 rule 3: the message goes through the host's client sender;
         // a runner without one cannot run it.
         Directive::Msg { .. } => PokeResult::Gap(MSG_GAP.into()),
+        // §5 rule 4: the handlers are the host's dispatcher.
+        Directive::Operate { .. } | Directive::Talk { .. } => PokeResult::Gap(INTERACT_GAP.into()),
     })
 }
 
@@ -1774,6 +1927,11 @@ mod tests {
         "msg 6 1 @1",
         "msg 60 36 1 4294967295",
         "msg 96",
+        "operate @wp",
+        "operate @2:267",
+        "talk @1:148",
+        "talk 1/12 trade close",
+        "talk @1:148 gamble hire action:7 quest:92 close",
     ];
 
     // Covers: specs/tools/poke.md §1 r1, §1 r2, §3 r2
@@ -1864,6 +2022,13 @@ mod tests {
             ("msg 0x01 @z 1", "a unit is"),
             ("msg 0x01 -1 2", "bad number"),
             ("msg 0x01 @x+0 2", "zero offset"),
+            ("operate", "takes 1"),
+            ("operate @wp 1", "takes 1"),
+            ("operate @x", "a unit is"),
+            ("talk", "needs an NPC"),
+            ("talk @1:148 sell", "talk choice"),
+            ("talk @1:148 quest:65536", "quest message 65536"),
+            ("talk @1:148 action:x", "bad number"),
             ("", "empty"),
         ] {
             let e = parse_directive_text(line).unwrap_err();
@@ -1907,6 +2072,41 @@ mod tests {
             assert_eq!(e.line, line, "{bad:?}: {e}");
             assert!(e.message.contains(needle), "{bad:?}: {e}");
         }
+    }
+
+    // Covers: specs/tools/poke.md §1 r2, §5 r4
+    #[test]
+    fn operate_and_talk_are_the_handler_calls_in_order() {
+        let calls = |line: &str, ty, guid| {
+            let d = parse_directive_text(line).unwrap();
+            interact_calls_with(&d, ty, guid, 1)
+                .into_iter()
+                .map(|c| (c.id, c.values))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(calls("operate @wp", 2, 18), [(0x13, vec![2, 18])]);
+        assert_eq!(
+            calls("talk @1:148", 1, 12),
+            [(0x13, vec![1, 12]), (0x2F, vec![12])]
+        );
+        assert_eq!(
+            calls(
+                "talk @1:148 trade gamble hire action:7 quest:92 close",
+                1,
+                12
+            ),
+            [
+                (0x13, vec![1, 12]),
+                (0x2F, vec![12]),
+                (0x38, vec![1, 12, 0]),
+                (0x38, vec![2, 12, 0]),
+                (0x38, vec![3, 12, 1]),
+                (0x38, vec![7, 12, 0]),
+                (0x31, vec![12, 92]),
+                (0x30, vec![12]),
+            ]
+        );
+        assert!(calls("freeze 1", 1, 12).is_empty());
     }
 
     // Covers: specs/tools/poke.md §5 r3

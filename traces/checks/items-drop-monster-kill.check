@@ -1,0 +1,19 @@
+check 1
+# The items channel (specs/tools/scenario-diff.md §3 rule 13) on a monster
+# kill: the seeds and the fallen of combat-kill-fallen (monstats 19, normal,
+# Blood Moor after warp 2 at frame 4), two Fire Bolts kill it, then the
+# items its death drops (S->C 0x9C, items/treasure.md) are compared item by
+# item with 1.14d, bit stream bytes. The save's own items at join (none:
+# no starting equipment beyond the class kit) come first in both lists.
+name items-drop-monster-kill
+save ScnAma --class ama --expansion
+seed 1234
+ticks 146
+seconds 300
+channels items
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y+3 normal
+at 34 poke missile 58 @x @y @x+3 @y+3 skill 36 20
+at 40 poke missile 58 @x @y @x+3 @y+2 skill 36 20

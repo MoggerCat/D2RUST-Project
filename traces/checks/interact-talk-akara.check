@@ -1,0 +1,21 @@
+check 1
+# `talk` (specs/tools/poke.md §1, §4 rule 10, §5 rule 4): Akara (monstats
+# 148) in the Rogue Encampment, ScnAma, -seed 1234, no input. The player is
+# poked towards her as in items-vendor-akara-buy.check (each point inside a
+# room already active), last to (4928, 4210), within the 0x13 start
+# distance (world/npc.md §2 rule 4). Then before frame 16 one `talk`: the
+# server's dispatcher run at once with 0x13 {1, Akara}, 0x2F (chat open,
+# npc.md §3), 0x38 action 1 (trade, §4), on both sides; frames 16-30
+# compare the NPC state and the S->C replies (0x27, 0x29, 0x28, the store).
+# Spec: specs/tools/scenario-diff.md.
+name interact-talk-akara
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 300
+channels state packets
+at 4 poke pos @player 4888 4228
+at 7 poke pos @player 4903 4224
+at 10 poke pos @player 4918 4216
+at 13 poke pos @player 4928 4210
+at 16 poke talk @1:148 trade

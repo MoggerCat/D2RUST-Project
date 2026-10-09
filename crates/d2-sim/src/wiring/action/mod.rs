@@ -30,6 +30,7 @@ pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
 pub mod monster_add;
+pub mod monster_death;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
@@ -277,6 +278,9 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The unit whose death clean-up ran in the DT start running now
+    /// ([`monster_death::death_cleanup`]).
+    pub death_cleaned: Option<UnitId>,
     /// The mode of the monster mode change running now (the record's
     /// mode, `units.md` §4.6), for the start functions that read it (the
     /// attack / skill start `0x005A75C0`, rule 7).
@@ -436,6 +440,7 @@ impl<X> ActionHooks<X> {
             monster_sequences: None,
             vitals: None,
             mode_target: None,
+            death_cleaned: None,
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,

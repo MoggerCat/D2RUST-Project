@@ -275,12 +275,17 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The units on (x, y), searched in `room` and its adjacency array.
-    ///
-    /// TODO(missiles.md §R4 step 9): the search order of `0x00641CB0` is
-    /// not specified; rooms in adjacency order (the room first), units in
-    /// room-list order.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId> {
+    /// `0x00641CB0(room, x, y, accept, arg, r)` without the accept call
+    /// (`sim/path-placement.md` §4 rule 6): `r` outside 1..3 finds none;
+    /// the room and its adjacency array (the room first), units in
+    /// room-list order; players in mode 0 / 17 and monsters in mode 0 /
+    /// 12 are skipped, objects, items and tiles never found; a unit of
+    /// size `s` (> 3 counts 3, ≤ 0 skipped) is found when the query
+    /// shape of size `r` overlaps its shape (rule 5's table).
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
+        if !(1..=3).contains(&r) {
+            return Vec::new();
+        }
         let adjacent = game
             .lists
             .room(room)
@@ -289,7 +294,31 @@ impl<X: Pending> MissileRooms for View<'_, X> {
         std::iter::once(room)
             .chain(adjacent.into_iter().filter(|&r| r != room))
             .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.path_position(u) == (x, y))
+            .filter(|&u| {
+                let Some(rec) = self.units.get(u) else {
+                    return false;
+                };
+                match rec.ty {
+                    UnitType::Player if matches!(rec.mode, 0 | 17) => return false,
+                    UnitType::Monster if matches!(rec.mode, 0 | 12) => return false,
+                    UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                    _ => return false,
+                }
+                let s = self.path_size(u).min(3);
+                if s <= 0 {
+                    return false;
+                }
+                let (ux, uy) = self.h.path_position(u);
+                let (dx, dy) = ((x - ux).abs(), (y - uy).abs());
+                match (r, s) {
+                    (1, 1) => dx == 0 && dy == 0,
+                    (1, 2) | (2, 1) => dx + dy <= 1,
+                    (1, 3) | (3, 1) => dx <= 1 && dy <= 1,
+                    (2, 2) => dx + dy <= 2,
+                    (2, 3) | (3, 2) => (dx <= 2 && dy <= 1) || (dx <= 1 && dy <= 2),
+                    _ => dx <= 2 && dy <= 2,
+                }
+            })
             .collect()
     }
 }
@@ -368,8 +397,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
     /// then `apply(game, owner, unit, missile = 1, record)` (`damage.md`
     /// §5.2) and the reaction (§7.1). No owner: nothing (`0x005AD730`).
     ///
-    /// TODO(missiles.md §R6.1 step 5): the hit flags made from missile
-    /// data flags 1 and 2 are not applied here.
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -449,6 +476,12 @@ impl<X: Pending> View<'_, X> {
             merge_hit_class(rec, u32::from(row.hitclass));
         }
         rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
+        let data_flags = self
+            .h
+            .missiles
+            .as_ref()
+            .and_then(|s| s.get(missile))
+            .map_or(0, |d| d.flags);
         let mut w = self.combat(game);
         // `0x005AD730` order (`missiles.md` §R6.1): block/dodge on the
         // unit's seed (avoid 1, block = physical != 0), the hit-class
@@ -466,6 +499,13 @@ impl<X: Pending> View<'_, X> {
             rec.result &= !result::HIT;
         }
         combat::monster_crit(&mut w, &t.combat, owner, unit, rec);
+        // Step 5: missile data flags 1, 2 → hit flags 0x20, 0x80.
+        if data_flags & 1 != 0 {
+            rec.hit_flags |= 0x20;
+        }
+        if data_flags & 2 != 0 {
+            rec.hit_flags |= 0x80;
+        }
         if rec.result & result::HIT != 0 {
             combat::apply(&mut w, &t.combat, owner, unit, true, rec);
         }
@@ -478,9 +518,6 @@ impl<X: Pending> View<'_, X> {
     /// soft-hit, the knockback roll on the missile's seed) or-ed into a
     /// copy of the record, then the damage part of `0x005ADCD0`. The
     /// caller has checked the owner.
-    ///
-    /// TODO(missiles.md §R6.1 step 5): as in `apply_damage`, the hit
-    /// flags from missile data flags 1, 2 are not applied.
     pub fn missile_record_hit(
         &mut self,
         game: &mut Game,

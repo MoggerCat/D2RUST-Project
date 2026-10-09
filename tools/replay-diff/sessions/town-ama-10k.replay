@@ -1,0 +1,66 @@
+check 1
+# replay-diff session (specs/tools/replay-diff.md): 10,000 frames (400 s of
+# game time) of town play in the Rogue Encampment, ScnAma (level 1 amazon),
+# seed 1234. Before frame 4 the game seed is fixed and five items are put on
+# the ground next to the player (as items-ground-pokes); the input picks them
+# up (clickunit 4 *), walks toward the waypoint (object class 119), clicks it
+# and walks away (no ESC: with no panel open it opens the single-player menu,
+# which pauses 1.14d), then walks (run toggled with R), talks to the nearest
+# NPC (clickunit 1 *) and walks away, revisits the waypoint. 1.14d plays
+# the input; d2rs gets the C->S messages 1.14d sent, frame by frame.
+# Input generated once by a fixed LCG (seed 1370) walk over the screen.
+name town-ama-10k
+save ScnAma --class ama --expansion
+seed 1234
+ticks 10000
+seconds 7000
+at 4 poke seed-game 0x00001234 666
+at 4 poke item hp1 @x+2 @y
+at 4 poke item cap @x+3 @y quality magic ilvl 30
+at 4 poke item gld @x+2 @y+2
+at 4 poke item lea @x+3 @y+2 quality rare ilvl 40
+at 4 poke item r05 @x+4 @y+2
+input frame 12; key R; frame 20; clickunit 4 *; frame 70; clickunit 4 *; frame 120; clickunit 4 *
+input+ frame 170; clickunit 4 *; frame 220; clickunit 4 *; frame 270; click 700 200; frame 320; click 700 200
+input+ frame 370; clickunit 2 119; frame 470; click 150 450; frame 520; click 244 244; frame 565; click 197 273
+input+ frame 599; clickunit 1 *; frame 719; click 233 218; frame 759; click 344 250; frame 830; click 479 243
+input+ frame 864; click 368 237; frame 941; clickunit 2 119; frame 1041; click 350 390; frame 1081; click 264 343
+input+ frame 1113; key R; frame 1119; click 562 321; frame 1170; click 440 352; frame 1214; click 310 282
+input+ frame 1267; clickunit 1 *; frame 1387; click 400 436; frame 1427; click 493 303; frame 1463; click 648 252
+input+ frame 1538; click 632 200; frame 1614; clickunit 2 119; frame 1714; click 589 351; frame 1754; click 513 203
+input+ frame 1789; key R; frame 1795; click 166 294; frame 1855; click 323 381; frame 1916; click 310 262
+input+ frame 1966; clickunit 1 *; frame 2086; click 328 219; frame 2126; click 413 166; frame 2163; click 166 363
+input+ frame 2231; click 445 343; frame 2300; clickunit 2 119; frame 2400; click 177 215; frame 2440; click 184 200
+input+ frame 2506; key R; frame 2512; click 321 175; frame 2543; click 489 237; frame 2583; click 492 324
+input+ frame 2652; clickunit 1 *; frame 2772; click 599 373; frame 2812; click 489 190; frame 2876; click 317 411
+input+ frame 2927; click 324 385; frame 2965; clickunit 2 119; frame 3065; click 481 228; frame 3105; click 528 268
+input+ frame 3174; key R; frame 3180; click 446 158; frame 3234; click 182 372; frame 3277; click 423 235
+input+ frame 3351; clickunit 1 *; frame 3471; click 154 222; frame 3511; click 507 207; frame 3544; click 161 348
+input+ frame 3620; click 498 238; frame 3665; clickunit 2 119; frame 3765; click 692 321; frame 3805; click 126 314
+input+ frame 3875; key R; frame 3881; click 235 332; frame 3932; click 305 277; frame 3988; click 189 205
+input+ frame 4041; clickunit 1 *; frame 4161; click 256 255; frame 4201; click 327 177; frame 4249; click 663 260
+input+ frame 4318; click 153 207; frame 4366; clickunit 2 119; frame 4466; click 446 204; frame 4506; click 354 437
+input+ frame 4585; key R; frame 4591; click 198 199; frame 4641; click 219 387; frame 4718; click 488 155
+input+ frame 4772; clickunit 1 *; frame 4892; click 429 199; frame 4932; click 225 264; frame 4983; click 676 309
+input+ frame 5039; click 565 195; frame 5096; clickunit 2 119; frame 5196; click 387 194; frame 5236; click 582 391
+input+ frame 5266; key R; frame 5272; click 513 305; frame 5345; click 189 341; frame 5391; click 352 347
+input+ frame 5466; clickunit 1 *; frame 5586; click 447 195; frame 5626; click 350 173; frame 5684; click 583 304
+input+ frame 5741; click 320 166; frame 5773; clickunit 2 119; frame 5873; click 453 220; frame 5913; click 288 359
+input+ frame 5978; key R; frame 5984; click 324 368; frame 6032; click 427 342; frame 6091; click 509 303
+input+ frame 6127; clickunit 1 *; frame 6247; click 482 222; frame 6287; click 589 196; frame 6328; click 481 402
+input+ frame 6398; click 529 295; frame 6447; clickunit 2 119; frame 6547; click 531 193; frame 6587; click 183 334
+input+ frame 6625; key R; frame 6631; click 573 337; frame 6662; click 541 186; frame 6692; click 323 341
+input+ frame 6767; clickunit 1 *; frame 6887; click 462 399; frame 6927; click 501 312; frame 6957; click 207 223
+input+ frame 6994; click 624 293; frame 7068; clickunit 2 119; frame 7168; click 491 225; frame 7208; click 285 394
+input+ frame 7255; key R; frame 7261; click 484 266; frame 7331; click 646 370; frame 7374; click 293 400
+input+ frame 7418; clickunit 1 *; frame 7538; click 578 172; frame 7578; click 459 232; frame 7633; click 486 183
+input+ frame 7681; click 619 295; frame 7724; clickunit 2 119; frame 7824; click 355 398; frame 7864; click 291 179
+input+ frame 7934; key R; frame 7940; click 468 322; frame 7983; click 630 336; frame 8023; click 528 406
+input+ frame 8078; clickunit 1 *; frame 8198; click 256 359; frame 8238; click 374 244; frame 8302; click 509 162
+input+ frame 8355; click 673 350; frame 8391; clickunit 2 119; frame 8491; click 223 356; frame 8531; click 448 394
+input+ frame 8602; key R; frame 8608; click 186 213; frame 8664; click 474 233; frame 8741; click 566 389
+input+ frame 8783; clickunit 1 *; frame 8903; click 566 241; frame 8943; click 231 309; frame 9006; click 409 223
+input+ frame 9052; click 163 373; frame 9125; clickunit 2 119; frame 9225; click 239 223; frame 9265; click 348 381
+input+ frame 9331; key R; frame 9337; click 592 279; frame 9412; click 282 241; frame 9462; click 519 345
+input+ frame 9499; clickunit 1 *; frame 9619; click 643 302; frame 9659; click 220 346; frame 9695; click 372 378
+input+ frame 9768; click 308 249; frame 9810; clickunit 2 119; frame 9910; click 496 377
