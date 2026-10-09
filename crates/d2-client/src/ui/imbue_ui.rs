@@ -16,7 +16,8 @@
 //! Charsi's menu.
 
 use super::draw::{TextRequest, TextStyle, UiDraw, UiDrawSink};
-use super::geom::{Point, Rect, FRAME};
+use super::geom::{Point, Rect};
+use super::layout::Screen;
 use super::messages::socket::{BUTTONS, MOUSE_WINDOW, STR_OK};
 use super::panel::{ClientIntent, UiCtx, UiEvent, UiResponse};
 use super::panels::npc::msg_chat_end;
@@ -100,7 +101,7 @@ impl Imbue {
                 at,
                 style: TextStyle { font: 1, color: 0 },
                 opts: TextOpts::default(),
-                clip: FRAME,
+                clip: Screen::play().rect(),
             }));
         };
         text(

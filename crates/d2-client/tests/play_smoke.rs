@@ -165,6 +165,7 @@ impl Run {
         let server = Arc::new(Mutex::new(link));
         let wire = Arc::new(Mutex::new(Wire::default()));
         let mut app = App::new();
+        app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
             .init_resource::<ButtonInput<MouseButton>>();
@@ -1095,15 +1096,47 @@ fn the_live_run() {
     );
     assert_eq!(saved.header.towns[0] & 0x80, 0x80, "the Normal town byte");
     // `d2s.md` §2.8: the server's save rebuilt the appearance bytes from
-    // the equipped items (a new character's base has none, all 0xFF): the
-    // `sb1 ` (`1hs`) in hand is the weapon in use (inventory +0x1C, set by
-    // the body link, `quests-act3-2.md` §11.5 r1), so it is the right-hand
-    // owner (`d2s-appearance.md` §4 r1) and draws in RH as token 4, the
-    // first weapon slot after `lit` / `med` / `hvy` (§1 r3: `hax` 4 in
-    // 1.14d); no other part, no colour.
-    let mut want = [0xFF; 16];
-    want[d2_formats::d2s::appearance::part::RH] = 4;
-    assert_eq!(saved.header.components, want, "appearance components");
+    // the equipped items (a new character's base has none). With nothing
+    // equipped they are 32 x 0xFF (§2.8 r2); a weapon in the right hand
+    // is the weapon in use (inventory +0x1C, the body link,
+    // `quests-act3-2.md` §11.5 r1), so the right-hand owner
+    // (`d2s-appearance.md` §4 r1), and draws in RH as its own token (§2:
+    // `alternategfx`, then `code`).
+    {
+        let a = d2_client::app::save::appearance_tables(&live.tables.fixed).unwrap();
+        let c = saved.header.components;
+        let worn: Vec<&([u8; 4], u8, u8)> = before.2.iter().filter(|i| i.1 == 1).collect();
+        if worn.is_empty() {
+            assert_eq!(c, [0xFF; 16], "nothing equipped: appearance components");
+        }
+        if let Some(&&(code, _, _)) = worn.iter().find(|i| i.2 == 4) {
+            let g = a.items.iter().find(|g| g.code == code).expect("the record");
+            let token = a.tokens.lookup(g.alternategfx, g.code);
+            assert_eq!(
+                c[d2_formats::d2s::appearance::part::RH],
+                token,
+                "the right-hand weapon's token in RH: {c:02X?}"
+            );
+        }
+    }
+    // The file alone gives the same bytes (`d2s-tool resave`'s path,
+    // `equipment_of_save`: the load's reading of the items and its
+    // weapon-in-use links) as the running game's rebuild.
+    {
+        let tables = live.tables.item_tables().unwrap();
+        let a = d2_client::app::save::appearance_tables(&live.tables.fixed).unwrap();
+        let items = &saved.body.as_ref().unwrap().items;
+        let eq = d2_server::adapters::character::save::equipment_of_save(items, &tables, &a)
+            .expect("the saved items read back");
+        let mut again = (**saved).clone();
+        again.header.components = [1; 16];
+        again.header.rebuild_appearance(&eq, &a);
+        assert_eq!(
+            (again.header.components, again.header.colours),
+            (saved.header.components, saved.header.colours),
+            "the file's own rebuild"
+        );
+    }
     assert_eq!(saved.header.colours, [0xFF; 16], "appearance colours");
     assert_eq!(
         single_player::game_seed(&character, None),
@@ -1414,4 +1447,137 @@ fn a_blocked_run_is_drawn_where_the_server_stops() {
         test_fixtures::host::cheb(drawn, s) <= 2,
         "the drawn player stopped there too: {drawn:?} / {s:?}"
     );
+}
+
+/// One request the sound layer took on the play path: the server tick it
+/// was first seen at, its requested group base, units and start tick.
+#[derive(Debug, Clone)]
+struct Heard {
+    server_tick: u64,
+    base: i32,
+    units: Vec<UnitKey>,
+    start_tick: u32,
+}
+
+#[derive(Resource, Default)]
+struct Listened {
+    handles: std::collections::BTreeSet<u32>,
+    heard: Vec<Heard>,
+}
+
+/// Records every new request of the audio driver after each frame.
+fn listen(
+    audio: Res<d2_client::app::sound::GameAudio>,
+    bridge: Res<BridgeResource>,
+    mut out: ResMut<Listened>,
+) {
+    let Some(driver) = audio.driver.as_ref() else {
+        return;
+    };
+    let d = driver.lock().unwrap();
+    let table = d.system().table();
+    let tick = bridge.0.world().server_ticks;
+    for r in d.system().requests() {
+        if r.handle != 0 && out.handles.insert(r.handle) {
+            out.heard.push(Heard {
+                server_tick: tick,
+                base: table.base(r.id),
+                units: r.units.clone(),
+                start_tick: r.start_tick,
+            });
+        }
+    }
+}
+
+// Covers: specs/audio/triggers.md §5 r2, §10 r2; specs/client/msg-ui.md §16 r4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_play_path_steps_and_speaks() {
+    let mut run = Run::start();
+    run.app
+        .init_resource::<Listened>()
+        .add_systems(Last, listen);
+    let me = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .local_player
+        .expect("the local player");
+    let class = run.app.world().resource::<BridgeResource>().0.world().units[&me].class;
+    // Running to Akara: the sorceress's footsteps (class record 1:
+    // `Footstep` base 2,720, +24 when running, +4 (k − 1) on a material).
+    let akara = run.approach(1, u32::from(d2_sim::world::npc::class::AKARA));
+    run.run_to_unit(akara);
+    let steps: Vec<Heard> = run
+        .app
+        .world()
+        .resource::<Listened>()
+        .heard
+        .iter()
+        .filter(|h| h.units == [me])
+        .cloned()
+        .collect();
+    let table_base = |run: &Run, id: i32| {
+        let audio = run
+            .app
+            .world()
+            .resource::<d2_client::app::sound::GameAudio>();
+        let d = audio.driver.as_ref().unwrap().lock().unwrap();
+        d.system().table().base(id)
+    };
+    assert_eq!(class, 1, "a sorceress");
+    let bases: Vec<i32> = [
+        2720, 2724, 2728, 2732, 2736, 2740, 2744, 2748, 2752, 2756, 2760, 2764,
+    ]
+    .iter()
+    .map(|&id| table_base(&run, id))
+    .collect();
+    let footsteps: Vec<&Heard> = steps.iter().filter(|h| bases.contains(&h.base)).collect();
+    assert!(
+        footsteps.len() >= 4,
+        "the player's footsteps on the way: {steps:?}"
+    );
+    // Interact: the NPC dialog branch speaks on the player, after the walk.
+    let before = run.app.world().resource::<Listened>().heard.len();
+    run.bridge().interact(akara).unwrap();
+    run.until("the NPC menu", 400, |r| {
+        r.app
+            .world()
+            .non_send::<WorldViewUi>()
+            .original
+            .as_ref()
+            .unwrap()
+            .npc_menu()
+            .is_some()
+    });
+    // Akara's text list names the dialog line m (`msg-ui.md` §16 r9, branch
+    // B2: `0x004A10E0(U, m, 1)`); its speech is `npc-speech.tsv`'s sound of
+    // that key (§10 r2), requested on the player with delay 5.
+    let m = run
+        .app
+        .world()
+        .non_send::<WorldViewUi>()
+        .original
+        .as_ref()
+        .unwrap()
+        .npc_text()
+        .expect("the NPC text list")
+        .m();
+    let sound = d2_client::audio::triggers::tables::NpcSpeech::spec().sound(i32::from(m));
+    assert!(sound > 0, "a speech line for text key {m}");
+    let want = table_base(&run, sound);
+    let said: Vec<Heard> = run.app.world().resource::<Listened>().heard[before..]
+        .iter()
+        .filter(|h| h.units == [me] && h.base == want)
+        .cloned()
+        .collect();
+    assert_eq!(said.len(), 1, "Akara's dialog line once: {said:?}");
+    assert!(
+        said[0].start_tick > said[0].server_tick as u32
+            && said[0].start_tick <= said[0].server_tick as u32 + 5,
+        "delay 5 from the sound tick: {said:?}"
+    );
+    run.check("spoke");
 }

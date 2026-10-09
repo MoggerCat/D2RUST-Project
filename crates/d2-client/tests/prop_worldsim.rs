@@ -178,6 +178,7 @@ impl Fx {
             combat: combat_tables(),
             levels: levels(),
             skill_modes: vec![[0; 8]],
+            overlay_count: 0,
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(

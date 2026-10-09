@@ -17,14 +17,13 @@
 //! §O1 r4).
 
 use super::hud::{FILL_FILE, FILL_H, FILL_W};
-use super::options_menu::{Kind, MenuEvent, OptionsMenu, HALF};
+use super::options_menu::{Kind, MenuEvent, OptionsMenu};
 use super::{left, SharedRef};
 use crate::ui::draw::{ImageRef, ImageRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::{Point, Rect};
 use crate::ui::panel::{Panel, PanelId, UiCtx, UiEvent, UiResponse, WidgetId};
 use crate::ui::panels::{utf16, PanelOutput};
 use crate::ui::text::TextOpts;
-use crate::ui::FRAME;
 
 /// The panel's id: the UI state number (§3.1).
 pub const ESC_PANEL: PanelId = PanelId(9);
@@ -77,7 +76,6 @@ impl EscState {
 }
 
 /// A row's label x and the value / slider geometry, §O4 r1.
-const LABEL_X: i32 = HALF - 230;
 const VALUE_BLOCK: i32 = 130;
 
 /// The menu draws over the world with no backdrop (§O4, PROVISIONAL REC-212),
@@ -102,7 +100,14 @@ pub(crate) fn push_fill(out: &mut dyn UiDrawSink, file: u32, frame: u32, r: Rect
     }
 }
 
-fn text(out: &mut dyn UiDrawSink, s: &str, at: Point, color: u16, centered_in: Option<i32>) {
+fn text(
+    out: &mut dyn UiDrawSink,
+    clip: Rect,
+    s: &str,
+    at: Point,
+    color: u16,
+    centered_in: Option<i32>,
+) {
     out.push(UiDraw::Text(TextRequest {
         text: utf16(s),
         at,
@@ -112,7 +117,7 @@ fn text(out: &mut dyn UiDrawSink, s: &str, at: Point, color: u16, centered_in: O
             block_w: centered_in,
             mode: 5,
         },
-        clip: FRAME,
+        clip,
     }));
 }
 
@@ -126,9 +131,9 @@ impl Panel for EscMenuUi {
         ESC_PANEL
     }
 
-    // Modal: the whole frame.
+    // Modal: the whole screen.
     fn rect(&self) -> Rect {
-        FRAME
+        self.sh.borrow().config.screen.rect()
     }
 
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
@@ -143,6 +148,7 @@ impl Panel for EscMenuUi {
         let sh = self.sh.borrow();
         let m = &sh.esc.menu;
         let file = sh.tables.files.id(FILL_FILE);
+        let (half, clip) = (m.half(), m.screen.rect());
         for (i, def) in m.rows().iter().enumerate() {
             if super::esc_art::draw_row(&sh.tables.files, m, i, out) {
                 continue;
@@ -159,29 +165,51 @@ impl Panel for EscMenuUi {
                 Kind::Title | Kind::Action => {
                     text(
                         out,
+                        clip,
                         def.label,
                         Point::new(0, yb - 12),
                         color,
-                        Some(super::options_menu::W),
+                        Some(m.screen.w),
                     );
                 }
                 Kind::Choice(_) => {
-                    text(out, def.label, Point::new(LABEL_X, yb - 12), color, None);
+                    text(
+                        out,
+                        clip,
+                        def.label,
+                        Point::new(half - 230, yb - 12),
+                        color,
+                        None,
+                    );
                     let v = def.values[m.value(i) as usize];
-                    let x = HALF + 230 - VALUE_BLOCK;
-                    text(out, v, Point::new(x, yb - 12), color, Some(VALUE_BLOCK));
+                    let x = half + 230 - VALUE_BLOCK;
+                    text(
+                        out,
+                        clip,
+                        v,
+                        Point::new(x, yb - 12),
+                        color,
+                        Some(VALUE_BLOCK),
+                    );
                 }
                 Kind::Slider { .. } => {
-                    text(out, def.label, Point::new(LABEL_X, yb - 12), color, None);
+                    text(
+                        out,
+                        clip,
+                        def.label,
+                        Point::new(half - 230, yb - 12),
+                        color,
+                        None,
+                    );
                     if let Some(file) = file {
                         let y = m.slider_y(i);
                         // Track from h − 60 to h + 230, skull at h − 60 + t.
-                        push_fill(out, file, WHITE, Rect::new(HALF - 60, y - 14, 290, 2));
+                        push_fill(out, file, WHITE, Rect::new(half - 60, y - 14, 290, 2));
                         push_fill(
                             out,
                             file,
                             GOLD,
-                            Rect::new(HALF - 60 + m.slider_t(i), y - 20, 12, 14),
+                            Rect::new(half - 60 + m.slider_t(i), y - 20, 12, 14),
                         );
                     }
                 }

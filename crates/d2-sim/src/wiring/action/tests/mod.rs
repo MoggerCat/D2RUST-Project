@@ -377,6 +377,7 @@ fn tables() -> ActionTables {
         combat: combat_tables(vec![monster_class()]),
         levels: vec![blank::<Levels>(); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     }
 }
 

@@ -253,6 +253,7 @@ fn the_play_path_runs_the_640_by_480_frame() {
     };
     let source = Arc::new(files());
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();

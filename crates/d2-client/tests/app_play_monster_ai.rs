@@ -127,6 +127,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         combat,
         levels: vec![blank(); 150],
         skill_modes: vec![[0; 8]],
+        overlay_count: 0,
     });
     s.hooks.anim_data = Some(Arc::new(anim_data()));
     // The server's animation names follow the client art's name rules
@@ -213,6 +214,7 @@ fn attacks_until_the_player_dies(seed: u32) {
     let link = Arc::new(Mutex::new(link));
     let dyn_link: DynLink = Box::new(Shared(link.clone()));
     let mut app = App::new();
+    app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>()

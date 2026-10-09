@@ -589,8 +589,8 @@ fn player_move_to_target_0x0f_0x10_one_layout() {
 // Covers: specs/client/msg-units.md §6
 #[test]
 fn report_kill_0x11_one_layout() {
-    // No d2-sim producer (§7.9 rule 9's 0x11 is not built): d2_proto
-    // encode against the client handler.
+    // d2-sim `report_kill` (monster update step 9) == d2_proto encode ==
+    // what the client handler reads.
     let mut r = Rig::new();
     r.m.inputs.tables.overlay_count = 0x1_0000;
     let mut check = |ty: u8, guid: u32, overlay: u16| {
@@ -600,6 +600,10 @@ fn report_kill_0x11_one_layout() {
             overlay,
         };
         let b = p.encode();
+        assert_eq!(
+            d2_sim::units::messages::report_kill(ty, guid, overlay)[..],
+            b[..]
+        );
         assert_eq!(parse(&b).unwrap(), S2c::ReportKill(p));
         let k = UnitKey::new(ty, guid);
         r.put(k);
@@ -947,11 +951,13 @@ fn set_stat_0x1d_0x1e_0x1f_one_layout() {
 // Covers: specs/client/msg-stats-items.md §1 r4
 #[test]
 fn stat_update_0x20_one_layout() {
-    // No d2-sim producer: d2_proto encode against the client handler.
+    // d2-sim `stat_update` (no caller yet, PROVISIONAL REC-415) ==
+    // d2_proto encode == the client handler.
     let mut r = Rig::new();
     let mut check = |guid: u32, stat: u8, value: u32| {
         let p = gen::StatUpdate { guid, stat, value };
         let b = p.encode();
+        assert_eq!(sim::stat_update(guid, stat, value).to_vec(), b.to_vec());
         assert_eq!(parse(&b).unwrap(), S2c::StatUpdate(p));
         let k = UnitKey::new(PLAYER, guid);
         r.put(k);
