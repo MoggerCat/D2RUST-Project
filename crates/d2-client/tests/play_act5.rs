@@ -351,7 +351,7 @@ fn shenk_dies_and_the_siege_completes() {
     let shenk_class = {
         let d = app_support::live();
         let rows: Vec<d2_data::tables::Superuniques> = d.tables.rows().expect("superuniques");
-        rows[42].class as u32
+        rows[42].class
     };
     let (shenk, guid, _) = a.find(UnitType::Monster, &[shenk_class]);
     assert!(a.client_has(1, guid), "the client sees Shenk");
