@@ -133,6 +133,13 @@ struct Options {
     /// `play --send "<f> <Name> <field>=<value>..." | "<f> hex <bytes>"`
     /// (repeatable; `specs/tools/scenario-diff.md` §3 r12).
     sends: Vec<d2_client::app::send::SendEntry>,
+    /// Internal (`play` launcher): run the front end once and write its
+    /// choice to this file.
+    menu_once: Option<PathBuf>,
+    /// Internal: the front end opens on the main menu (after a game).
+    after_game: bool,
+    /// Internal: start the game with the choice the front end wrote here.
+    start_choice: Option<PathBuf>,
 }
 
 /// `800x600` or `640x480`, the two frames of resolution modes 2 and 0.
@@ -190,6 +197,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
         input: None,
         pokes: Vec::new(),
         sends: Vec::new(),
+        menu_once: None,
+        after_game: false,
+        start_choice: None,
     };
     let mut it = args.iter();
     while let Some(flag) = it.next() {
@@ -249,6 +259,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
             }
             "--save-dir" => o.save_dir = Some(PathBuf::from(value()?)),
             "--res" => o.res = Some(parse_res(value()?)?),
+            "--menu-once" => o.menu_once = Some(PathBuf::from(value()?)),
+            "--after-game" => o.after_game = true,
+            "--start-choice" => o.start_choice = Some(PathBuf::from(value()?)),
             "--new" => {
                 let class = value()?.clone();
                 let name = it
@@ -527,56 +540,174 @@ fn select_data(
 
 /// `play`: the front end (main menu) first, then the game; Save and Exit
 /// returns to the main menu (REC-200), the game's window closing ends the
-/// program (REC-291). `--new`, `--save` and `--frames` skip the front end
-/// (a shortcut straight into the game).
+/// program (REC-291). `--new`, `--save`, `--frames` and `--dump-draws`
+/// skip the front end (a shortcut straight into the game).
+///
+/// The windowing library allows one event loop per process, so the menu
+/// and the game each run in a child process of this one (`--menu-once`,
+/// `--start-choice`); this process only launches them in turn. A game
+/// whose window closed writes `exit` to the choice file: the program ends.
 fn play(o: Options) -> Result<()> {
-    use d2_client::app::front_host::{run_front_end, FrontArt};
-    use d2_client::app::front_start::{front_host, Entry, StartChoice};
-    use d2_client::ui::front_end::Outcome;
     if let Some(res) = o.res {
         d2_client::rules::camera::FrameSize::set_play(res)?;
         println!("play: frame {} x {}", res.width, res.height);
+    }
+    if let Some(out) = &o.menu_once {
+        return menu_once(&o, out);
+    }
+    if let Some(file) = &o.start_choice {
+        let (choice, menu_difficulty) = read_choice(file)?;
+        let (data, dir, origin) = select_data(&o)?;
+        if !play_once(&o, data, dir, origin, menu_difficulty, Some(choice))? {
+            std::fs::write(file, "exit\n")
+                .with_context(|| format!("writing {}", file.display()))?;
+        }
+        return Ok(());
     }
     if o.save.is_some() || o.new.is_some() || o.frames.is_some() || o.dump_draws.is_some() {
         let (data, dir, origin) = select_data(&o)?;
         return play_once(&o, data, dir, origin, None, None).map(|_| ());
     }
-    let mut first = true;
-    loop {
-        let (data, dir, origin) = select_data(&o)?;
-        let (art, expansion) = {
-            use d2_data::bin::TableFiles;
-            let d2_client::app::single_player::GameData::Live(d) = &data;
-            let mut art = FrontArt::new(d.archives.source());
-            if let Ok(t) = d2_client::app::strings::TableStrings::load(
-                d.archives.as_ref(),
-                d2_client::app::strings::LANG,
-            ) {
-                art = art.with_strings(move |id| {
-                    u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default()
-                });
-            }
-            (Some(art), d.archives.lod())
-        };
-        let saves = o
-            .save_dir
-            .clone()
-            .unwrap_or_else(d2_client::app::save::default_save_dir);
-        // After a game: the main menu (§F1.3, REC-200, recorded).
-        let entry = if first { Entry::First } else { Entry::MainMenu };
-        let (host, handles) = front_host(&saves, art, expansion, entry);
-        first = false;
-        d2_client::launch::note("front end (main menu)");
-        match run_front_end(host) {
-            Outcome::Exit => return Ok(()),
-            Outcome::GameLoad(g) => {
-                let choice = StartChoice::resolve(g, &handles, &saves);
-                if !play_once(&o, data, dir, origin, g.difficulty, choice)? {
-                    return Ok(());
-                }
-            }
+    let exe = std::env::current_exe().context("the program's own path")?;
+    let file = std::env::temp_dir().join(format!("d2rs-menu-choice-{}.txt", std::process::id()));
+    // The children inherit $D2_GAME_DIR (set by `run`).
+    let pass = |c: &mut std::process::Command| {
+        if let Some(seed) = o.seed {
+            c.arg("--seed").arg(seed.to_string());
         }
+        if let Some(res) = o.res {
+            c.arg("--res").arg(format!("{}x{}", res.width, res.height));
+        }
+        if let Some(d) = &o.save_dir {
+            c.arg("--save-dir").arg(d);
+        }
+        if let Some(d) = &o.native {
+            c.arg("--native").arg(d);
+        }
+        if let Some(s) = &o.source {
+            c.arg("--source").arg(s);
+        }
+    };
+    let mut after_game = false;
+    loop {
+        let _ = std::fs::remove_file(&file);
+        let mut menu = std::process::Command::new(&exe);
+        menu.arg("play").arg("--menu-once").arg(&file);
+        if after_game {
+            menu.arg("--after-game");
+        }
+        pass(&mut menu);
+        d2_client::launch::note("front end (main menu)");
+        let status = menu.status().context("starting the menu")?;
+        if !status.success() {
+            bail!("the menu exited with {status}");
+        }
+        let text = std::fs::read_to_string(&file).unwrap_or_default();
+        if text.trim().is_empty() || text.starts_with("exit") {
+            let _ = std::fs::remove_file(&file);
+            return Ok(());
+        }
+        let mut game = std::process::Command::new(&exe);
+        game.arg("play").arg("--start-choice").arg(&file);
+        pass(&mut game);
+        let status = game.status().context("starting the game")?;
+        if !status.success() {
+            eprintln!("play: the game exited with {status}; back to the menu");
+        } else if std::fs::read_to_string(&file)
+            .unwrap_or_default()
+            .starts_with("exit")
+        {
+            // The game's window closed (REC-291).
+            let _ = std::fs::remove_file(&file);
+            return Ok(());
+        }
+        after_game = true;
     }
+}
+
+/// `play --menu-once FILE`: one front-end run; writes `exit` or the start
+/// choice ([`write_choice`]) to `FILE`.
+fn menu_once(o: &Options, out: &std::path::Path) -> Result<()> {
+    use d2_client::app::front_host::{run_front_end, FrontArt};
+    use d2_client::app::front_start::{front_host, Entry, StartChoice};
+    use d2_client::ui::front_end::Outcome;
+    let (data, _dir, _origin) = select_data(o)?;
+    let (art, expansion) = {
+        use d2_data::bin::TableFiles;
+        let d2_client::app::single_player::GameData::Live(d) = &data;
+        let mut art = FrontArt::new(d.archives.source());
+        if let Ok(t) = d2_client::app::strings::TableStrings::load(
+            d.archives.as_ref(),
+            d2_client::app::strings::LANG,
+        ) {
+            art = art
+                .with_strings(move |id| u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default());
+        }
+        (Some(art), d.archives.lod())
+    };
+    let saves = o
+        .save_dir
+        .clone()
+        .unwrap_or_else(d2_client::app::save::default_save_dir);
+    // After a game: the main menu (§F1.3, REC-200, recorded).
+    let entry = if o.after_game {
+        Entry::MainMenu
+    } else {
+        Entry::First
+    };
+    let (host, handles) = front_host(&saves, art, expansion, entry);
+    let text = match run_front_end(host) {
+        Outcome::Exit => "exit\n".to_owned(),
+        Outcome::GameLoad(g) => match StartChoice::resolve(g, &handles, &saves) {
+            Some(c) => write_choice(&c, g.difficulty),
+            None => "exit\n".to_owned(),
+        },
+    };
+    std::fs::write(out, text).with_context(|| format!("writing {}", out.display()))?;
+    Ok(())
+}
+
+/// The start choice as `key=value` lines (one process to the next).
+fn write_choice(c: &d2_client::app::front_start::StartChoice, menu: Option<u8>) -> String {
+    let mut s = String::new();
+    s += &format!("name={}\n", c.name);
+    s += &format!("class={}\n", c.class);
+    s += &format!("status={}\n", c.status);
+    s += &format!("difficulty={}\n", c.difficulty);
+    if let Some(p) = &c.save {
+        s += &format!("save={}\n", p.display());
+    }
+    s += &format!("file={}\n", c.file.display());
+    if let Some(d) = menu {
+        s += &format!("menu_difficulty={d}\n");
+    }
+    s
+}
+
+fn read_choice(
+    file: &std::path::Path,
+) -> Result<(d2_client::app::front_start::StartChoice, Option<u8>)> {
+    let text =
+        std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
+    let get = |k: &str| {
+        text.lines()
+            .find_map(|l| l.strip_prefix(k).and_then(|r| r.strip_prefix('=')))
+            .map(str::to_owned)
+    };
+    let need = |k: &str| get(k).with_context(|| format!("{}: no {k}", file.display()));
+    let choice = d2_client::app::front_start::StartChoice {
+        name: need("name")?,
+        class: need("class")?.parse().context("class")?,
+        status: need("status")?.parse().context("status")?,
+        difficulty: need("difficulty")?.parse().context("difficulty")?,
+        save: get("save").map(PathBuf::from),
+        file: PathBuf::from(need("file")?),
+    };
+    let menu = match get("menu_difficulty") {
+        Some(d) => Some(d.parse().context("menu_difficulty")?),
+        None => None,
+    };
+    Ok((choice, menu))
 }
 
 /// One game; `Ok(true)`: back to the front end (Save and Exit), `Ok(false)`:

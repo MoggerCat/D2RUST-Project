@@ -103,6 +103,9 @@ fn a_name_not_in_the_file_gets_the_default_record() {
         .names
         .insert((UnitType::Player, 7), *b"SOA1HTH\0");
     let p = fx.spawn(UnitType::Player, 1, fx.a, 10, 10);
+    // A loaded player's attack rate (`d2s-load.md` §2 post-load: stat 68
+    // = 100; `units.md` §4.7 step 8 reads it in mode 7).
+    fx.stats(p, &[(68, 100)]);
     animate(&mut fx, p, 7);
     // §3: frames 2048, speed 256, no events → only the end, at
     // f + 2048.
@@ -229,6 +232,32 @@ fn a_killing_missile_runs_the_kill_and_gives_experience() {
     assert_eq!(fx.sim.hooks().mode_target, None);
     assert_eq!(fx.stat(p, EXPERIENCE), 100);
     fx.assert_clean();
+}
+
+/// `units.md` §4.6 rule 1.2 ("What keeps a dead monster dead"): the
+/// death clean-up's `0x005738D0` cancels the monster's pending think
+/// (type 2) and regeneration (type 3) events, so a think scheduled
+/// before the kill never runs on the dead unit (the playthrough's
+/// "killed monsters stand back up").
+// Covers: specs/sim/units.md §4.6 r1
+#[test]
+fn the_death_start_cancels_the_pending_think_and_regeneration() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    let f0 = fx.game.frame;
+    for ev in [event::AI_THINK, event::STAT_REGEN] {
+        fx.game
+            .schedule_event(m, u32::from(ev), f0 + 15, None, 0, 0)
+            .unwrap();
+    }
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    let f = fx.game.frame;
+    assert_eq!(fx.timers(m), [(event::END_ANIM, f + 4)]);
 }
 
 /// `hirelings.md` §8 rule 1: the kill (flag 1) queues the killed monster

@@ -20,7 +20,7 @@ pub mod startup;
 
 use crate::ui::geom::Point;
 
-pub use control::{Action, Control, ControlKind};
+pub use control::{Action, Control, ControlKind, TextRow};
 pub use flow::{FlowCtx, GameLoad, Next, Trigger};
 pub use screen::{FrontCtx, Placeholder, Registry, Screen};
 pub use screens::ids::*;
@@ -45,13 +45,25 @@ pub fn logo_frame(now_ms: u64, created_ms: u64) -> u32 {
     (now_ms.saturating_sub(created_ms) / 40 % 29) as u32
 }
 
+/// The palette of the character-create screen (`fechar`, "front end
+/// character"). PROVISIONAL (§F1.6 r1 names `fechar` only as compared
+/// against by `0x0042F2E0`; the builder `0x00435580` loads no palette in
+/// the trace): chosen because the 1.14d screenshot of the create screen
+/// matches the `charactercreationscreenEXP` art drawn with `fechar` (mean
+/// RGB error 13 against 25 and more for every other palette of d2data).
+pub const FECHAR_PALETTE: [&str; 2] = [
+    r"data\global\palette\fechar\pal.dat",
+    r"data\global\palette\fechar\pal.pl2",
+];
+
 /// The create screen's fire cel (§F3.2): itself the additive layer.
 pub const FIRE: &str = r"FrontEnd\fire";
 /// Draw mode of every fire overlay (§F1.5 r2): additive.
 pub const FIRE_MODE: u8 = 3;
 
 /// The fire cel drawn additively over a logo half's black base (§F1.5 r1).
-/// File names: `frontend-menus.md` §F1.5 r1 (all four exist in `d2data.mpq`).
+/// File names: `frontend-menus.md` §F1.5 r1 (`0x006D4014`–`0x006D4074`;
+/// all four exist in `d2data.mpq`).
 pub fn fire_overlay(base: &str) -> Option<&'static str> {
     match base {
         r"FrontEnd\D2logoBlackLeft" => Some(r"FrontEnd\D2logoFireLeft"),
@@ -119,6 +131,12 @@ pub enum DrawItem {
         /// A button label (§F1.1 r5): centered in the button, baseline
         /// from its height; `None` for a plain text control.
         label: Option<Label>,
+        /// Text colour `k` (`ui/text.md` §5; 0 none).
+        color: i32,
+        /// A text control's row (§F1.1 r8): laid out in the control box
+        /// (`at` = the control's x, bottom y); `None`: a plain `DrawText`
+        /// pen at `at`.
+        boxed: Option<TextBox>,
     },
     /// A blended layer: frame `frame` of `file` drawn with draw mode
     /// `mode` (3 = additive) at (x, bottom y) plus the DC6 frame offsets
@@ -128,6 +146,9 @@ pub enum DrawItem {
         frame: u32,
         at: Point,
         mode: u8,
+        /// Drawn with the frame's bottom-left at `at`, its offsets not
+        /// applied (the create fire, [`FIRE_AT_BOX`]).
+        boxed: bool,
     },
     /// A dark filled box (menu panels).
     Rect { at: Point, w: i32, h: i32 },
@@ -141,7 +162,31 @@ pub struct Label {
     pub w: u16,
     pub h: u16,
     pub pressed: bool,
+    /// The second label string (flag 0x40); 0 none.
+    pub second: u32,
 }
+
+/// A text control's box and the row this item is (§F1.1 r8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TextBox {
+    pub w: u16,
+    pub h: u16,
+    /// Margins mx, my (descriptor [5], [6]).
+    pub mx: i32,
+    pub my: i32,
+    /// Descriptor [11]: 2 centred, 0x10 right aligned, 0x20 / 1 no wrap.
+    pub flags: u16,
+    /// Rows added before this one (its first row's index).
+    pub row: u16,
+}
+
+/// The create fire (descriptor 178 / 179, a type-3 control without an
+/// anim table) is drawn with each frame's bottom-left at the control's
+/// (x, bottom y), the frame offsets not applied. PROVISIONAL (§F3.1
+/// table; §F3.3 r3 covers the anim-table case only): the 1.14d create
+/// screenshot shows the fire at columns 345–454, bottom row 470; with the
+/// offsets (−34, 132) of `fire.dc6` it would sit at 311–420, rows 476–602.
+pub const FIRE_AT_BOX: bool = true;
 
 pub struct FrontEnd {
     registry: Registry,
@@ -320,8 +365,8 @@ impl FrontEnd {
         };
         self.controls = screen.build(&mut ctx);
         screen.sync(&mut self.controls);
-        if screen.loads_sky_palette() {
-            self.palette = Some(SKY_PALETTE);
+        if let Some(p) = screen.palette() {
+            self.palette = Some(p);
         }
         self.entered.push(id);
     }
@@ -409,10 +454,13 @@ impl FrontEnd {
                     }
                 }
             }
+            // The topmost (last created) control holding the key: a pop-up
+            // (list A) is asked before the screen under it (list B).
             FrontInput::Key(k) => {
                 let hit = self
                     .controls
                     .iter()
+                    .rev()
                     .find(|c| c.enabled && c.action != Action::None && c.takes_key(k))
                     .map(|c| c.action);
                 if let Some(a) = hit {
@@ -462,7 +510,7 @@ impl FrontEnd {
             match c.kind {
                 ControlKind::Image => {
                     if let Some(file) = c.art {
-                        out.push(DrawItem::Art { file, frame: 0, at });
+                        out.extend(image_tiles(file, c.x, c.y, c.w, c.h));
                     }
                 }
                 ControlKind::AnimImage => {
@@ -474,6 +522,7 @@ impl FrontEnd {
                                 frame,
                                 at,
                                 mode: FIRE_MODE,
+                                boxed: FIRE_AT_BOX,
                             });
                         } else {
                             out.push(DrawItem::Art { file, frame, at });
@@ -483,6 +532,7 @@ impl FrontEnd {
                                     frame,
                                     at,
                                     mode: FIRE_MODE,
+                                    boxed: false,
                                 });
                             }
                         }
@@ -491,9 +541,23 @@ impl FrontEnd {
                 ControlKind::Button => {
                     if let Some(file) = c.art {
                         let tiles = control::button_tiles(c.w, c.h);
+                        // §F1.1 r4: tiles draw left to right at +256 px.
                         for t in 0..tiles {
                             let frame = control::button_frame(t, tiles, pressed, c.enabled, false);
-                            out.push(DrawItem::Art { file, frame, at });
+                            let at = Point::new(c.x + 256 * t as i32, c.y);
+                            if c.enabled {
+                                out.push(DrawItem::Art { file, frame, at });
+                            } else {
+                                // r4: a disabled button without flag 0x20
+                                // draws its up frames with draw mode 1.
+                                out.push(DrawItem::Blend {
+                                    file,
+                                    frame,
+                                    at,
+                                    mode: 1,
+                                    boxed: false,
+                                });
+                            }
                         }
                     }
                     if c.string_id != 0 {
@@ -506,20 +570,79 @@ impl FrontEnd {
                                 w: c.w,
                                 h: c.h,
                                 pressed,
+                                second: c.second_label,
                             }),
+                            color: 0,
+                            boxed: None,
                         });
                     }
                 }
-                ControlKind::Text => out.push(DrawItem::Text {
-                    string_id: c.string_id,
-                    text: c.text.clone().unwrap_or_default(),
-                    font: c.font,
-                    at,
-                    label: None,
-                }),
+                ControlKind::Text => out.extend(text_rows(c)),
                 ControlKind::EditBox | ControlKind::Timer => {}
             }
         }
         out
     }
+}
+
+/// The rows of a text control, one item each (§F1.1 r8): a control nothing
+/// was added to draws nothing. An empty first row followed by others still
+/// takes its row (it is added, and draws nothing).
+fn text_rows(c: &Control) -> Vec<DrawItem> {
+    let first = (c.has_text() || !c.more_rows.is_empty()).then(|| TextRow {
+        string_id: c.string_id,
+        text: c.text.clone().unwrap_or_default(),
+        color: c.color,
+    });
+    first
+        .into_iter()
+        .chain(c.more_rows.iter().cloned())
+        .enumerate()
+        .map(|(i, r)| DrawItem::Text {
+            string_id: r.string_id,
+            text: r.text,
+            font: c.font,
+            at: Point::new(c.x, c.y),
+            label: None,
+            color: r.color,
+            boxed: Some(TextBox {
+                w: c.w,
+                h: c.h,
+                mx: c.margin.0,
+                my: c.margin.1,
+                flags: c.flags,
+                // d2rs-own: rows a wrap adds before this one are not
+                // counted (every multi-row control here has short rows).
+                row: i as u16,
+            }),
+        })
+        .collect()
+}
+
+/// An image control's cel cut in 256 × 256 tiles (§F1.1 r4, §F1.4 table:
+/// e.g. an 800 × 600 background is 4 × 3 frames, left to right, top to
+/// bottom): one draw per tile. PROVISIONAL (§F1.1 r3 gives the control's
+/// bottom edge only): tile row r is drawn at cel Y = (y − h + 1) + the
+/// heights of rows 0..=r, so the art covers rows y − h + 2 … y + 1, one row
+/// below the control box; every 1.14d screenshot (main menu, character
+/// select, create) has screen row 0 black and the background one row lower
+/// than a y − h + 1 top, while the buttons (drawn at their y) match.
+fn image_tiles(file: &'static str, x: i32, y: i32, w: u16, h: u16) -> Vec<DrawItem> {
+    let (w, h) = (i32::from(w.max(1)), i32::from(h.max(1)));
+    let cols = (w + 255) / 256;
+    let rows = (h + 255) / 256;
+    let top = y - h + 1;
+    let mut out = Vec::with_capacity((cols * rows) as usize);
+    for r in 0..rows {
+        let row_h = (h - 256 * r).min(256);
+        let bottom = top + 256 * r + row_h;
+        for c in 0..cols {
+            out.push(DrawItem::Art {
+                file,
+                frame: (r * cols + c) as u32,
+                at: Point::new(x + 256 * c, bottom),
+            });
+        }
+    }
+    out
 }

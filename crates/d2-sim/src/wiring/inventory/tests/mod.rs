@@ -17,6 +17,7 @@ mod gold;
 mod ground;
 mod host;
 mod identify;
+mod item_use;
 mod link;
 mod load;
 mod merc;
@@ -320,6 +321,10 @@ pub struct Hooks {
     pub corpse_pickups: Vec<(UnitId, UnitId)>,
     /// The answer of the corpse pickup's steps 1–2 (§12.1).
     pub corpse_allowed: bool,
+    /// The Town Portal cast's answer (`None`: no cast host) and the
+    /// players it was asked for.
+    pub cast: Option<(u32, bool)>,
+    pub casts: Vec<UnitId>,
 }
 impl StatHost for Hooks {
     fn list_removed(
@@ -344,7 +349,17 @@ impl UnitHooks for Hooks {
         self.corpse_allowed
     }
 }
-impl LifecycleHooks for Hooks {}
+impl LifecycleHooks for Hooks {
+    fn town_portal_cast(
+        &mut self,
+        _: &mut crate::units::hooks::Sim<'_>,
+        _: &mut Seed,
+        player: UnitId,
+    ) -> Option<(u32, bool)> {
+        self.casts.push(player);
+        self.cast
+    }
+}
 
 /// The seams without a provider: answers set by the test, every call
 /// logged in order.

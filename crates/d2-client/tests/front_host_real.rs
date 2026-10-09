@@ -72,6 +72,7 @@ fn fire_overlay_is_the_pl2_additive_table_in_index_space() {
             frame,
             at,
             mode: 3,
+            boxed: false,
         },
     ];
     let mut art = FrontArt::new(app_support::live().archives.source());

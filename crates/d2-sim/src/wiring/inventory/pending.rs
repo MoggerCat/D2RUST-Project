@@ -172,6 +172,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
         self.open_cube_desk(player, cube)
     }
+    /// `0x0055E000` (§7.11 step 3, §7.18 step 9): the removal message
+    /// (flag 0x20), then the item leaves its inventory and is freed
+    /// ([`InvDesk::remove_used_item`]); an item without a unit: the
+    /// rest's.
     fn consume_item(&mut self, player: Owner, item: Guid) {
         // A used identify scroll leaves the grid; a used Town Portal
         // scroll too (`items/use.md` §4: the caller's consumption,

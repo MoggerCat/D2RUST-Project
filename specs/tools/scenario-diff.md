@@ -28,7 +28,7 @@
 | Edge cases & original bugs | 500–518 |
 | Test vectors | 519–535 |
 | Provenance | 536–539 |
-| Open questions | 540–576 |
+| Open questions | 540–579 |
 <!-- /index -->
 
 ## Summary
@@ -550,6 +550,9 @@ d2rs-own tool; no 1.14d fact.
    `clickunit` / `rclickunit` in the shared form (§2 rule 4.5, both
    sides), the hover pick and the world keys headless (§3 rule 8.2);
    UI panels stay unsupported headless.
+   Input that is a fixed-size C→S message can also be injected on an
+   exact frame on both sides with `at <f> poke msg <id> <value>...`
+   (`poke.md` §1 `msg`).
 3. The screen → world click point (`ui/controls.md` §6 r2,
    `0x0045AFF0`, PROVISIONAL controls-0001) is not 1.14d's: measured
    (2026-10-09, ScnAma seed 1234, eight clicks from a standing player,

@@ -1176,8 +1176,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // The death animation: 4 frames → event 1 at 19. Tick 1's room
     // switch woke the monster created by that tick's room pass
     // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
-    // 1 + 2; Idle → the next think at 203), which is still pending.
-    assert_eq!(fx.timers(monster), [(1, 19), (2, 203)]);
+    // 1 + 2; Idle → the next think at 203); the death clean-up's
+    // `0x005738D0` cancelled that think (`units.md` §4.6 rule 1.2).
+    assert_eq!(fx.timers(monster), [(1, 19)]);
 
     // 5a. The drop (`treasure.md` §3): the death start's gate passes
     // (no flag 0x20000, no wall / door at the monster's sub-tile); TC 1
