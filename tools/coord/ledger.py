@@ -71,6 +71,10 @@ class Repo:
             and not os.path.relpath(p, root).replace(os.sep, "/").startswith("specs/tools/"))
         self.checks = sorted(os.path.basename(p)[:-6] for p in
                              glob.glob(os.path.join(root, "traces", "checks", "*.check")))
+        # generated checks (tools/check-gen) may be named in `checks`; they are not
+        # part of the completeness rule above
+        self.gen_checks = sorted(os.path.basename(p)[:-6] for p in
+                                 glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
         self.messages = []
         for d, f in (("c2s", "client-messages.tsv"), ("s2c", "server-messages.tsv")):
             p = os.path.join(root, "specs", "sim", f)
@@ -136,7 +140,7 @@ def check_row(r, repo):
         if p and not os.path.exists(os.path.join(repo.root, p)):
             e.append(f"{at}: spec '{p}' does not exist")
     for c in split_list(r["checks"]):
-        if not any(fnmatch_name(c, k) for k in repo.checks):
+        if not any(fnmatch_name(c, k) for k in repo.checks + repo.gen_checks):
             e.append(f"{at}: check '{c}' matches no traces/checks/*.check")
     if not VERDICT_RE.match(r["last_verdict"]):
         e.append(f"{at}: last_verdict '{r['last_verdict']}' not MATCH|PARTIAL|DIVERGED@N|-")
