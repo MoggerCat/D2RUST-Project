@@ -24,35 +24,36 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 58–75 |
-| Inputs | 76–85 |
-| Outputs / state changes | 86–92 |
-| Rules | 93–94 |
-|   1. Model contents | 95–138 |
-|   2. Unit table | 139–188 |
-|   3. Local player | 189–211 |
-|   4. Receive and the unit message queue | 212–249 |
-|   5. Client update pass | 250–395 |
-|   6. Position check (`0x004804E0`) | 396–439 |
-|   7. Session messages | 440–637 |
-|   8. Mode requests | 638–723 |
-|   9. Room-in-sight messages | 724–758 |
-|   10. Bit reader | 759–773 |
-|   11. Current act and level (join and later) | 774–819 |
-|   12. Client DRLG and the room of a point | 820–861 |
-|   13. Visibility predicate (`0x004DBF20`) | 862–913 |
-|   14. Pet list and the hireling GUID | 914–978 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 979–1068 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1069–1103 |
-|   17. Model writes made by 1.14d UI code | 1104–1250 |
-|   18. Audio driver inputs and the client object functions | 1251–1281 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1282–1510 |
-| Constants & data dependencies | 1511–1523 |
-| Randomness | 1524–1539 |
-| Edge cases & original bugs | 1540–1564 |
-| Test vectors | 1565–1622 |
-| Provenance | 1623–1727 |
-| Open questions | 1728–1907 |
+| Summary | 59–76 |
+| Inputs | 77–86 |
+| Outputs / state changes | 87–93 |
+| Rules | 94–95 |
+|   1. Model contents | 96–139 |
+|   2. Unit table | 140–189 |
+|   3. Local player | 190–212 |
+|   4. Receive and the unit message queue | 213–250 |
+|   5. Client update pass | 251–416 |
+|   6. Position check (`0x004804E0`) | 417–460 |
+|   7. Session messages | 461–658 |
+|   8. Mode requests | 659–744 |
+|   9. Room-in-sight messages | 745–779 |
+|   10. Bit reader | 780–794 |
+|   11. Current act and level (join and later) | 795–840 |
+|   12. Client DRLG and the room of a point | 841–882 |
+|   13. Visibility predicate (`0x004DBF20`) | 883–934 |
+|   14. Pet list and the hireling GUID | 935–999 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1000–1089 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1090–1124 |
+|   17. Model writes made by 1.14d UI code | 1125–1330 |
+|   18. Audio driver inputs and the client object functions | 1331–1361 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1362–1591 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1592–1752 |
+| Constants & data dependencies | 1753–1765 |
+| Randomness | 1766–1781 |
+| Edge cases & original bugs | 1782–1806 |
+| Test vectors | 1807–1864 |
+| Provenance | 1865–1970 |
+| Open questions | 1971–2166 |
 <!-- /index -->
 
 ## Summary
@@ -257,7 +258,7 @@ position check of the local player.
    (`client/bridge.md` §8 rule 1).
 2. Per unit (`0x00480810`): unless the unit is not the local player
    and has unit flag 0x800000 (rule 5), run the per-type update
-   (player `0x00463390`, monster `0x004B13A0`, object `0x004BDFF0`,
+   (player `0x00463390`, §20; monster `0x004B13A0`, object `0x004BDFF0`,
    missile `0x004D2C70` (`missiles/client.md` §C6), item `0x004C1AD0`; Phase 6), then look the unit
    up again by (type, GUID) in its own set and, if it still exists,
    drain its queue (§4 rule 5).
@@ -392,6 +393,26 @@ position check of the local player.
       and its walk end (positions of the recorded chickens from tick 8).
       The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
       the light) is not run on set C either (same REC).
+      *Recorded, REC-742 (2026-10-09, PC 1, Windows; scratch poll probe of
+      set C `0x007A5270`, no breakpoints, ScnAma `-seed 1234`, 25 s after
+      arrival):* 15 chickens (class 149: GUIDs 2–7, 90–95, 122–124), all
+      created in mode 1 with path count 0 and target (0, 0). Only the two
+      nearest the player, 93 at (4871, 4242) and 94 at (4877, 4254),
+      ever change mode or target; the other 13 keep mode 1, cell and
+      target for the whole run. A walk is mode 2 with a one-point path
+      (+0x24 / +0x28 = 0 / 1) to a target **2 sub-tiles away on a
+      diagonal** (e.g. (4871, 4242) → (4869, 4244) → (4871, 4246) →
+      (4869, 4244) → (4871, 4246) → (4873, 4248) → (4875, 4246) → (4877,
+      4244)); it ends in mode 1 with count 0 either on the target (4
+      walks, ~1.2 s each) or **one sub-tile short** of it (94: (4877,
+      4254) → target (4875, 4252), stopped at (4876, 4253) after 0.6 s;
+      93: (4875, 4246) → (4877, 4244), stopped at (4876, 4245)). After a
+      stop short, every later think writes a new diagonal ±2 target into
+      path +0x10 / +0x12 but leaves count 0 and mode 1 (no walk): 94 from
+      1.5 s and 93 from 12.1 s stay in their cell to the end (about 4 new
+      targets per 10 s each). So the C monster's walk does use the path
+      (target, one point, compute that can fail or stop on collision),
+      and d2rs's "keep the unit in its cell" matches only the idle ones.
 
 ### 6. Position check (`0x004804E0`)
 
@@ -1108,7 +1129,8 @@ as a model rule; the bridge reproduces it as a `ClientWorld` operation
 with exactly this effect, at the point of 1.14d order where the UI
 function runs. Rules 1–3 run when the UI layer performs the 1.14d UI
 function that contains them (`client/msg-ui.md` §16, `ui/messages.md`
-§11, §13, §14); the UI request reaches the model through the
+§11, §13, §14), and rule 7 when the click action runs (`ui/controls.md`
+§6 r9.2); the UI request reaches the model through the
 bridge (`client/bridge.md` §10 r10: the UI layer returns the write as a
 request, the bridge applies it before the next message; §10 r6 stands). Rule 4 is model-side and decided here. "Flag bit n" is
 the unit flag word +0xC4 (`client/msg-ui.md` OQ2 owns the full word;
@@ -1247,6 +1269,64 @@ bit 0x2 is the bit of `client/msg-ui.md` §1 r4 and §16).
    and applies the UI's model-write requests (rule 1's parts of `E`)
    before the pass continues, so later units' updates and queue drains
    see the writes as in 1.14d.
+7. **NPC hold** (the NPC tail of the interact sender `0x00461DC0`,
+   `0x004620BE`–`0x00462118`; when it runs: `ui/controls.md` §6 r9.2
+   "tail", a click action on a monster whose `monstats` row has `npc`
+   and `interact`). In 1.14d order: U's path stop (`0x00648730`); C→S
+   **0x59** [type][GUID][x][y] with U's current position (`0x00478700`,
+   send path); **U's monster data +0x28 |= 1** (`0x0046210B`, U type 1
+   with monster data); **mode set `0x00480E70(U, 1)`** (§19 r1). Read
+   2026-10-09: this is the only instruction of `Game.exe` that sets bit
+   0. Every other write of the word is a clear: rule 1.7
+   (`0x004B3CEB`), and `0x004AE0A0(U, 0)` (word := 0) at the client
+   creation `0x00466360` (`0x004664B0`), the 0xAC set-up `0x004AE8D0`
+   (`0x004AEB71`) and the re-init `0x004AEDD0` (`0x004AF047`);
+   `0x00460730` (set / clear of bits of the word) has no caller and no
+   pointer in the image. So "NPC busy" (§19 r4) holds from the click
+   that starts an interaction with that NPC until its end `E` (rule 1),
+   and, while it holds, the NPC's walk requests (§19 r4 codes 0x00,
+   0x01, 0x07, 0x17, 0x18), the tail's non-NU check (§19 r6) and the
+   walk resume (§19 r8.3) all leave it in NU.
+   The click is refused while P holds a cursor item (`0x00464600`,
+   `ui/controls.md` §6 r4), and a left down / up inside an open panel
+   never reaches the dispatcher (§6 r1 there), so taking or placing an
+   item in the inventory panel cannot set the bit.
+   PROVISIONAL: in the panel scene of `docs/handoff/pc1-data.md`
+   (q-fix-real-unit-seed-order, SceSor seed 1234, Warriv (1, 7) drawn
+   in NU from tick 56 while the server walks him 56–67) the client's
+   fallback is read as this NPC busy bit left set by an earlier
+   interaction, or the code-0x01 path compute `0x004804A0` →
+   `0x00649970` returning 0 (§19 r4: both lead to F); no other branch of
+   code 0x01 changes the mode (because no 1.14d instruction outside this
+   rule sets the bit, and the scene's inputs, as listed, start no
+   interaction); settled by REC-1110 (Warriv's monster data +0x28, mode,
+   +0x44 and client path +0x24 / +0x28 at ticks 50–60 of that scene, and
+   whether the 0x67 at 56 reaches his queue).
+   *Run 2026-10-09 (PC 1, Windows, no debugger breakpoints, poll probe
+   every 30–50 ms):* SceSor `-seed 1234` with the scene's inputs in
+   seconds (I at 0.8 s after arrival, click (678, 330) at 2.0 s, (563,
+   250) at 2.4 s, I at 3.0 s) does **not** reproduce: the client walks
+   Warriv (mode 2, 7.43–9.15 s, three sub-tile walks to (4870, 4231)),
+   his monster data +0x28 reads 0 in every sample and the local
+   player stays in mode 5. So the bit is not set in this scene at
+   normal speed; the recorded NU is more likely a timing effect of the
+   scene's recorder (breakpoint-driven, the client falls behind the
+   server) than a rule. REC-1110 stays open for a frame-anchored rerun
+   under the same recorder reading +0x28 and the receive queue.
+   *Rerun under the recorder (2026-10-09, PC 1, Windows,
+   `record_frames.py --auto SceSor --seed 1234 --every 1 --draws-every 1
+   --no-save --input "waitticks 20; key I; waitticks 30; click 678 330;
+   waitticks 10; click 563 250; waitticks 15; key I; waitticks 20;
+   end"`):* the drop **does** reproduce: Warriv (1, 7) is drawn in WL
+   from tick 24 (frame restarts at 40 and 45, the second and third
+   one-sub-tile walks) to tick 55, then NU (frame 0) from tick 56 to the
+   end at 90 at client point (10192, 72816), i.e. the walk the server
+   starts at 56 is not shown. So the client-side fallback depends on the
+   client's timing against the server (the recorder stops the client at
+   every draw), not on the panel input. A candidate to read next: the
+   code-0x07 position test of §19 r4 (|x − r0| ≤ 1 and |y − r1| ≤ 1 →
+   F), which a one-sub-tile walk meets whenever the client has already
+   reached the previous end point when the request is dispatched.
 
 ### 18. Audio driver inputs and the client object functions
 
@@ -1323,7 +1403,8 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    the **neutral fallback** `0x004AE1D0`: U a monster with mode 1…15,
    ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490`), mode set 1;
    any other mode → nothing. "NPC busy" = monster data +0x28 bit 0
-   (`0x004AE080(U, 1)`, §17 r1.7). Missing record where a row says
+   (`0x004AE080(U, 1)`; set only by the NPC hold §17 r7, cleared by
+   §17 r1.7 and at creation / set-up / re-init). Missing record where a row says
    "fatal n" → fatal assert n.
 
    | Code | Body (in order) |
@@ -1507,6 +1588,167 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
     flags it reads (walk flag 0x2000, NPC busy, +0xB0, life stat 6,
     stat 67); effects outside the model (overlays, missiles, sounds,
     lights, motion) are outputs to their owners.
+
+### 20. Player mode steps (`0x00463390`) and the local player's next action
+
+Read 2026-10-09 from the 1.14d disassembly (`0x00463390`–`0x0046370C`;
+the Ghidra decompile drops the EDX mode argument of `0x00480E70`). The
+player update of §5 r2 (every player, local or not; before its queue
+drain) is the only code that ends a player's animated mode. For the
+local player nothing else does: the server sends its own client no
+message for the server-side end (`sim/pathing.md` §10 r2: the NU / TN
+row and the skill rows return for the own client, the skill rows except
+with E-flags 0x4, a dodge / avoid), so the client ends A1 and the other
+skill modes itself.
+
+1. **Mode record** `0x00711E00` + 12·mode {path kind, anim kind, end
+   kind} (20 rows, read from the image):
+
+   | Mode | 0 DT | 1 NU | 2 WL | 3 RN | 4 GH | 5 TN | 6 TW | 7 A1 | 8 A2 | 9 BL |
+   |---|---|---|---|---|---|---|---|---|---|---|
+   | kinds | 0,2,0 | 0,0,0 | 1,0,1 | 1,0,1 | 0,1,2 | 0,0,0 | 1,0,1 | 2,1,3 | 2,1,3 | 0,1,2 |
+
+   | Mode | 10 SC | 11 TH | 12 KK | 13 S1 | 14 S2 | 15 S3 | 16 S4 | 17 DD | 18 SQ | 19 KB |
+   |---|---|---|---|---|---|---|---|---|---|---|
+   | kinds | 2,1,3 | 2,1,3 | 2,1,3 | 0,1,2 | 2,1,3 | 2,1,3 | 2,1,3 | 0,2,0 | 2,1,3 | 1,3,1 |
+
+   No class or skill exception: the row is read by mode alone. End kinds
+   2 and 3 are the same test here.
+2. **Update** of player U, in order ("complete" = `0x006217C0`: no
+   sequence → frame +0x44 + speed +0x4C ≥ frame count +0x48; sequence
+   (+0x30 ≠ 0) → +0x48 < 1; "advance" = `0x00623E00`, which wraps an
+   AnimData frame at the count and writes the event byte +0x4E,
+   `audio/triggers-2.md` §15 r1):
+   1. Path kind 1: A := path step `0x004807C0` (1 when `0x00650840`
+      returns 0: the path ended); U the local player → room update
+      `0x00460DE0` (`0x0061ACD0` at U's position); footstep
+      `0x004CAF60` (`audio/`).
+   2. Path kind 2 and a used skill E (`0x00620250`): E-flags
+      (`0x006446A0`) bit 0 → path step; ended → E-flags |= 2 and the
+      client do `0x004C68F0` (`skills/sequences.md` §3); local → room
+      update. Then, unless that path step ended, flags bit 0x40 clear
+      and +0x4E ∈ {1, 2, 3} (the previous advance's event byte) → the
+      do (`audio/triggers-2.md` §15 r2).
+   3. Anim by anim kind: 0 → advance; 1 → advance unless complete (so
+      the frame never wraps: it stops on the last step); 2 → complete →
+      +0x44 := +0x48 − 0x100 and +0x4C := 0 (hold the last frame), else
+      advance; 3 → +0x44 := 0x100, +0x4C := 0 (KB holds frame 1).
+   4. Mode 18 with flags bit 0x4000 → graphics refresh `0x00470610`.
+   5. End test by end kind: 1 → A of step 1; 2, 3 → complete (after
+      step 3's advance); 0 → never (DT, NU, TN, DD).
+   6. Ended: mode 19 (KB) → rule 4. Else U a player with player data
+      whose pending code +0x154 ≠ 0 (`0x00463625`) → +0x150 := 1
+      (`0x004636AE`) and **the mode is kept** (the frame held by
+      step 3; rule 6 runs the pending action). Else **the mode end**
+      (rule 3).
+   7. Always: the room-change step (§17 r6, path flag), path
+      `0x00648640`, mode 3 → the local run-out `0x00463260` (stamina
+      stat 10 = 0 → a walk request), state group `0x0063A340` → sound
+      `0x004C72F0`, then `0x00460F10` (U in NU / TN standing on a cell
+      blocked for mask 0xC01: moved to the nearest free point,
+      `0x0064E7B0`, `0x004654C0`). These are not mode rules.
+3. **Mode end** (`0x0046362D`–`0x004636A8`): the cast light is
+   detached and removed (`0x00643A00(U, 0)` → `0x004743D0`); the skill
+   end `0x004611F0(U is the local player)` (E-flags bit 0 → E-flags |= 2
+   and the do; else, for a unit other than the local player with flags
+   bit 0x40 clear, the do); used skill := none (`0x00620210(U, 0)`);
+   path `0x00648DC0`; N := 5 (TN) when U's room is a town room
+   (`0x0061AB00(0x00620BB0(U))` ≠ 0), else 1 (NU); the dead flag is
+   cleared (`0x004647D0`; `0x00464820`'s result is unused); flags |= 2;
+   **mode set `0x00480E70(U, N)`** (§19 r1: a new mode, so the
+   animation restarts). The end never chooses WL / RN: a held button or
+   a path continues only through a new request (rules 5–6).
+4. **KB end** (`0x00463519`–`0x00463613`): p := U's position (path
+   +0x0C / +0x10 for a static path, else `0x006488C0` / `0x00648900`);
+   path stop `0x00650590`, `0x00648DC0`; the cast light and skill end as
+   rule 3; used skill := none; path stop again (mode is still 19),
+   `0x00648DC0`; +0xB0 := 0; **mode set `0x00480E70(U, 4)`** (GH);
+   position check `check(U, p.x, p.y, 1, 0, 0)` (§6). GH (0,1,2) then
+   ends by rule 3.
+5. **Next action** (the local player). The click gate `0x00464600`
+   (`ui/controls.md` §6 r4) refuses modes 0, 4, 7–12, 17, 19, mode 13
+   with class 3, 14 with class 6, 15–16 with classes 4–6, and decides
+   mode 18 by `seqinput` (`0x004645B0`); NU / TN pass. The mode end
+   runs inside the client update `0x0044C790`; the loop pass's input
+   part (button handlers, the held repeat `0x0044F039` / `0x0044F046`,
+   `ui/controls.md` §6 r6) runs before that pass's receive and update.
+   So the **first click or held repeat that acts is the one of the loop
+   pass after the update that ended the mode**; a repeat in the same
+   pass as that update already ran (refused). The request gate
+   `0x00480BA0` inside `0x00481030` then passes because the used skill
+   is none. A held left button on a monster in melee range therefore
+   chains A1 → (end, NU) → A1 with one NU update between, each new
+   attack a fresh mode set from NU (frame restart) and a new C→S held
+   code (0x09 / 0x08, `ui/controls.md` §6 r7). Mode 18 may also act
+   before its end when `0x004645B0` passes, but `0x00480BA0` still
+   refuses unless the used skill's row has `interrupt` (row +7 &
+   `[0x006CE284]`) — nothing is sent then and the pending record is
+   unchanged.
+6. **Pending action** (player data +0x150 flag, +0x154 code, +0x158
+   type, +0x15C GUID; set by "pend", `ui/controls.md` §6 r9.2, and by
+   `0x004812E0`; cleared by `0x0045C470`, by `0x00481030` after its
+   request, by S→C 0x04 §7 r5 and §17 r1.1). Run by `0x00481600` from
+   the client loop at `0x0044F126`, once per pass in which a 40 ms client
+   tick is due and `in_game`, before the server tick and the receive:
+   flag 0 → nothing. Else read the three fields, look up (type, GUID)
+   (`0x00463990`), clear the record (`0x0045C470`); code 0x13 with type 5
+   → `0x0044DAA0`, `0x0044DAD0` (UI); no unit or code 0 → stop. By type
+   (0 `0x00481400`, 1 `0x004814A0`, 2 `0x004815A0`; other types:
+   `0x00451F30` = 0 → `0x00467A70`, stop): a live target with flags
+   bit 0x2 clear → `0x00467A70`, stop; a dead target (`0x00464820`):
+   type 0 with `0x0047A4F0` ≠ 0 → the action at once, else stop; type 1
+   only when the side's skill row (left for codes 5–0xB, right for
+   0xC–0x12) has `TargetCorpse`, else stop; then, still out of reach
+   (`0x00480C80`: melee range `0x00622C40`, objects `0x00623660` and
+   `0x00622B50(…, 0x804)`, `srvdofunc` 0x13 skills `0x00461AC0`) →
+   `0x004812E0`: when `0x00480BA0` passes, mode request walk to the unit
+   (code 0 / 0x18 by the run flag `0x0044BEC0` & 8) and C→S 0x02 / 0x04
+   [type][GUID]; then the record is set again (1, code, type, GUID) in
+   either case; in reach → `0x00481030(code, P, type, GUID)` (the
+   action itself). So a walk that arrives with a pending action keeps
+   WL (rule 2.6) until the next tick's `0x00481600` starts the action
+   from WL; an attack mode that ends with a pending record (an edge:
+   the attack sender clears it) is kept one update longer.
+7. **Duration.** For anim kind 1 / end kind 2–3 (A1, A2, SC, TH, KK,
+   S2–S4, GH, BL, S1) with start frame f0 (the mode set's +0x44,
+   `sim/units.md` §4.1), count F and speed s > 0 (+0x4C, the rate
+   `0x00623F50`, `sim/units.md` §4.7), the mode ends in update
+   n = max(1, ⌈(F − f0) / s⌉ − 1) after the start (update 1 = the first
+   client update after the click, `skills/sequences.md` §3 local rule
+   4); s = 0 never ends. Mode 18: `skills/sequences.md` §3 (the same
+   rules 2.5 and 3 end it).
+
+   ```text
+   player_update(U):
+       k = MODE_ROW[U.mode]                  // {path, anim, end}
+       A = 0
+       if k.path == 1: A = path_step(U)      // 1 = path ended
+       if k.path == 2 and E = used_skill(U):
+           ended = false
+           if E.flags & 1: if path_step(U): E.flags |= 2; do(U); ended = true
+           if not ended and not U.flags & 0x40 and U.event in 1..=3: do(U)
+       match k.anim:
+           0: advance(U)
+           1: if not complete(U): advance(U)
+           2: if complete(U): U.frame = U.count - 256; U.speed = 0 else advance(U)
+           3: U.frame = 256; U.speed = 0
+       ended = match k.end { 1: A, 2 | 3: complete(U), 0: false }
+       if ended:
+           if U.mode == KB: kb_end(U)                       // -> GH
+           elif U is player and U.pdata and U.pdata.code != 0: U.pdata.flag = 1
+           else:
+               remove_cast_light(U); skill_end(U, U is local)
+               U.used_skill = none
+               mode_set(U, in_town(U.room) ? TN : NU)       // flags |= 2
+   // loop pass: input (clicks, held repeat; gate 0x00464600) ->
+   //            pending 0x00481600 (tick passes) -> server tick ->
+   //            receive -> client update (player_update ... drains)
+   ```
+8. d2rs: the bridge runs rules 1–4 as the player's per-type update in
+   the update pass (§5 r2, before the drain), with the player's +0x44 /
+   +0x48 / +0x4C set at each player mode set (AnimData of the player's
+   COF for the mode, `sim/units.md` §4.1, rate §4.7); rules 5–6 belong
+   to the click layer (`ui/controls.md` §6) and read the mode it leaves.
 
 ## Constants & data dependencies
 
@@ -1724,6 +1966,7 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `0x0047AA30`, `0x0047AA20`; the recorded C→S 0x67 is seq 1 of
 `20261006-022633-packets.jsonl`.
 - 2026-10-09 (pc1-day3-c, REC-10 / REC-576 (4)): a scripted Kashya hire recorded with `record_packets.py` on Windows; §14 rule 3.
+- 2026-10-09 (pc1-day4, static asm): §20 from `0x00463390`–`0x0046370C` (mode record table `0x00711E00`, 20 × 12 bytes, read from the image with `re/scripts/rd.py`), `0x004611F0`, `0x006217C0`, `0x00623E00`, `0x004807C0`, `0x00460DE0`, `0x00460F10`, `0x00463260` (entries only); next action `0x00464600`, `0x004645B0`, `0x00480BA0`, `0x00481030`, loop `0x0044EFA0` (`0x0044F039`–`0x0044F167`); pending `0x00481600`, `0x00481400`, `0x004814A0`, `0x004815A0`, `0x004812E0`, `0x00480C80`, `0x0045C470`, `0x00460780`. §17 r7: `0x00461DC0` (`0x004620BE`–`0x00462118`), the +0x28 writers `0x004AE0A0` (callers `0x004664B0`, `0x004AEB71`, `0x004AF047`), `0x004B3CEB`, `0x00460730` (no reference: byte search of the image).
 
 ## Open questions
 
@@ -1798,6 +2041,22 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    the monster's own client path, which d2rs's model positions only
    sample); settled by REC-706 (a recording of the 1.14d client grid
    under a walking NPC).
+   *Recorded, REC-706* (2026-10-09, PC 1, Windows; scratch poll probe
+   with no breakpoints, ScnAma `-seed 1234`, 46 distinct samples 30–50
+   ms apart while Warriv (class 155) walks (4866, 4235) → (4870, 4231),
+   mode 2 from t 7.44 s to 9.16 s, one sub-tile per server path step):
+   the client grid of his room (sub-tile rect (4840, 4200, 40, 40), read
+   room +0x20 → header, masks at header +0x20) holds mask 0x100 on
+   exactly the plus pattern (centre and its 4 neighbours) around the
+   sub-tile **containing the client path position** (path +0x00 / +0x04
+   >> 16) in every sample, idle and walking; the five cells move in the
+   same sample in which the position crosses into the next sub-tile
+   (e.g. 4866.99 → 4867.10), never with the server's target (path
+   +0x10, one sub-tile ahead). No other cell near him carries 0x100. So
+   d2rs's choice (re-stamp at the client path position before each
+   step) matches when the model position is the client path position
+   and the stamp follows each sub-tile change; the pattern for Warriv is
+   the plus (`sim/path-placement.md` §3).
    *Answered, stamina* (2026-10-09, static read): the 1.14d client never
    drains stamina. The run drain `0x0057F240` has one caller, the server
    path event `0x00580C20`; in client code stat 10 is written only by

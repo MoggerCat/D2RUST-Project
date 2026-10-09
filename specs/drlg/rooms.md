@@ -33,16 +33,16 @@
 |   4. Status and activation | 207–396 |
 |   5. Active room creation (`0x006422A0`, `0x00619890`) | 397–430 |
 |   6. Adjacency array order (owner of `unit-order.md` §9) | 431–446 |
-|   7. Room clients and the inactivity counter | 447–467 |
-|   8. Deactivation (tick step 9) | 468–585 |
-|   9. Room tile grid | 586–1229 |
-|   10. Collision map from tiles | 1230–1316 |
-| Constants & data dependencies | 1317–1331 |
-| Randomness | 1332–1349 |
-| Edge cases & original bugs | 1350–1367 |
-| Test vectors | 1368–1418 |
-| Provenance | 1419–1470 |
-| Open questions | 1471–1593 |
+|   7. Room clients and the inactivity counter | 447–471 |
+|   8. Deactivation (tick step 9) | 472–589 |
+|   9. Room tile grid | 590–1233 |
+|   10. Collision map from tiles | 1234–1320 |
+| Constants & data dependencies | 1321–1335 |
+| Randomness | 1336–1353 |
+| Edge cases & original bugs | 1354–1371 |
+| Test vectors | 1372–1422 |
+| Provenance | 1423–1474 |
+| Open questions | 1475–1597 |
 <!-- /index -->
 
 ## Summary
@@ -454,7 +454,11 @@ A populated room that is removed and built again starts with flag bit 0:
    new room's adjacency array as it stands after that change's builds, and
    removed from rooms of the old array missing from the new one. Later
    changes of the array (other clients' activations, removals) do not
-   update membership.
+   update membership. So +0x78 counts the clients that can see the room
+   (it is in their current room's array), not those standing in it; the
+   add is called only from the room switch's join (`0x0053A8E0`), the
+   remove from its leave (`0x0053A9B0`) and `0x0053AB80`. The monster
+   think cancel at count 0 is `sim/intents-events.md` §7.8 rule 3.2.
 2. **Inactivity counter** (`0x0061A790`, room +0x0C; tick open question
    4): each call sets it to 0 if the client count is non-zero, else adds
    1; returns the new value. Its only caller is tick step 9
