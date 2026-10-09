@@ -22,14 +22,14 @@
 | Rules | 62–63 |
 |   1. Files | 64–69 |
 |   2. Syntax | 70–141 |
-|   3. Run | 142–442 |
-|   4. Suite | 443–538 |
-| Constants & data dependencies | 539–542 |
-| Randomness | 543–546 |
-| Edge cases & original bugs | 547–570 |
-| Test vectors | 571–589 |
-| Provenance | 590–593 |
-| Open questions | 594–642 |
+|   3. Run | 142–452 |
+|   4. Suite | 453–548 |
+| Constants & data dependencies | 549–552 |
+| Randomness | 553–556 |
+| Edge cases & original bugs | 557–580 |
+| Test vectors | 581–599 |
+| Provenance | 600–603 |
+| Open questions | 604–652 |
 <!-- /index -->
 
 ## Summary
@@ -439,6 +439,16 @@ state first. It is the default way to compare a behaviour with 1.14d.
        with `frames_compared` = items compared (the larger count),
        `frames_equal` = items without a difference, plus `items_orig`,
        `items_d2rs`.
+    5. First runs (2026-10-09, 1.14d under Wine, recorders of rule 9):
+       `items-vendor-akara-stock` (Akara's store, frame 20): 41 items on
+       both sides, same order, codes, frame and action 0x0B; 39 streams
+       identical, items #7 and #12 (wands) differ only in the charged
+       skill (stat 204, param 4289: current charges 67 = max on 1.14d,
+       65 and 64 on d2rs). `items-drop-gold-potion` (6 poked ground
+       items, frame 4): same order, frame, action 0x00, positions and gold
+       amounts; every stream lacks flag 0x10 (identified) on d2rs.
+       `items-drop-monster-kill`: 1.14d drops gold at frame 36, d2rs a
+       stamina potion (`vps`) at frame 37.
 
 ### 4. Suite
 
