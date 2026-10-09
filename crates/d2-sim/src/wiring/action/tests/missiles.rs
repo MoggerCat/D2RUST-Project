@@ -293,3 +293,63 @@ fn allocation_steps_game_seed_guid_and_init() {
     assert_eq!(f & (unit_flag::BIT1 | unit_flag::IS_VALID_TARGET), 0);
     assert_eq!(s.fx.timers(m), [(0, -1)]);
 }
+
+/// `missiles.md` §R4 step 9 / `path-placement.md` §4 rule 6: the unit
+/// search takes the unit's size (path shape) against the missile's: a
+/// unit one sub-tile beside the line is hit when the shapes overlap, two
+/// away it is not, and a dead one (player mode 0) on the line is
+/// skipped. Recorded: `check-combat-champion-pack` f58, the fire bolt
+/// kills the fallen at (5145, 4264) from its path cell (5144, 4264).
+// Covers: specs/sim/path-placement.md §4 r6
+#[test]
+fn missile_unit_search_uses_the_shapes_and_skips_the_dead() {
+    let probe = |dy: i32, dead: bool| {
+        let mut s = shot();
+        // The shot's own target leaves the line.
+        let t = s.target;
+        s.fx.sim.sys.units.get_mut(t).unwrap().mode = 0;
+        let victim = s.fx.spawn(UnitType::Player, 0, s.fx.a, 13, 10 + dy);
+        s.fx.stats(
+            victim,
+            &[
+                (ARMORCLASS, 100),
+                (LEVEL_STAT, 8),
+                (st::MAXHP, 25600),
+                (st::HITPOINTS, 25600),
+            ],
+        );
+        // A player's shape is size 2 (`path-placement.md` §3).
+        s.fx.sim.hooks().x.sizes.insert(victim, 2);
+        if dead {
+            s.fx.sim.sys.units.get_mut(victim).unwrap().mode = 0;
+        }
+        let size = s.fx.sim.with(&mut s.fx.game, |_, v| v.path_size(victim));
+        // The line's cell carries the player bit, as the victim's plus
+        // footprint stamps it (also with the victim on the cell).
+        let room = s.fx.a;
+        let game = &s.fx.game;
+        *s.fx
+            .sim
+            .sys
+            .hooks
+            .drlg
+            .collision_mut(game, room, 13, 10)
+            .unwrap() |= bits::PLAYER;
+        s.fx.seed(s.owner, seed_giving(10));
+        let m = s.fire(16);
+        for _ in 0..3 {
+            s.fx.frame();
+        }
+        (size, s.alive(m), s.fx.stat(victim, st::HITPOINTS))
+    };
+    let (size, alive, hp) = probe(1, false);
+    assert_eq!(size, 2);
+    assert!(!alive);
+    assert_eq!(hp, 25600 - 2560);
+    let (_, alive, hp) = probe(2, false);
+    assert!(alive);
+    assert_eq!(hp, 25600);
+    let (_, alive, hp) = probe(0, true);
+    assert!(alive);
+    assert_eq!(hp, 25600);
+}

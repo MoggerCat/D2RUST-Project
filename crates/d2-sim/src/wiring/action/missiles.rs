@@ -276,22 +276,62 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The units on (x, y), searched in `room` and its adjacency array.
-    ///
-    /// TODO(missiles.md §R4 step 9): the search order of `0x00641CB0` is
-    /// not specified; rooms in adjacency order (the room first), units in
-    /// room-list order.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId> {
-        let adjacent = game
-            .lists
-            .room(room)
-            .map(|r| r.adjacent.clone())
-            .unwrap_or_default();
-        std::iter::once(room)
-            .chain(adjacent.into_iter().filter(|&r| r != room))
-            .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.path_position(u) == (x, y))
-            .collect()
+    /// The candidates of `0x00641CB0` (`path-placement.md` §4 rule 6)
+    /// with query size `r`, through [`crate::path::collision::unit_at_point`]
+    /// on the DRLG's rooms (every candidate offered to an accept that
+    /// collects it and declines).
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
+        let search = UnitSearch { v: self, game };
+        let mut out = Vec::new();
+        crate::path::collision::unit_at_point(&search, Some(room), x, y, r, |u| {
+            out.push(u);
+            false
+        });
+        out
+    }
+}
+
+/// The unit search's view (`path-placement.md` §4 rule 6): the DRLG's
+/// active rooms and the game's room unit lists.
+struct UnitSearch<'a, 'v, X> {
+    v: &'a View<'v, X>,
+    game: &'a Game,
+}
+
+impl<X: Pending> crate::path::collision::CollisionRooms for UnitSearch<'_, '_, X> {
+    fn subtile_rect(&self, room: RoomId) -> Option<crate::drlg::TileRect> {
+        self.v.h.drlg.subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        self.v.h.drlg.adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        self.v.h.drlg.adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&crate::drlg::collision::CollisionGrid> {
+        self.v.h.drlg.grid(room)
+    }
+    fn grid_mut(&mut self, _: RoomId) -> Option<&mut crate::drlg::collision::CollisionGrid> {
+        None
+    }
+}
+
+impl<X: Pending> crate::path::collision::UnitsAtPoint for UnitSearch<'_, '_, X> {
+    type Unit = UnitId;
+    fn room_units(&self, room: RoomId) -> Option<Vec<UnitId>> {
+        Some(self.game.lists.room_units(room))
+    }
+    fn unit_type(&self, unit: UnitId) -> UnitType {
+        self.game.lists.unit(unit).map_or(UnitType::Tile, |e| e.ty)
+    }
+    fn unit_mode(&self, unit: UnitId) -> u32 {
+        self.v.units.get(unit).map_or(0, |r| r.mode)
+    }
+    fn unit_size(&self, unit: UnitId) -> i32 {
+        self.v.path_size(unit)
+    }
+    fn unit_point(&self, unit: UnitId) -> (i32, i32) {
+        self.v.h.path_position(unit)
     }
 }
 
