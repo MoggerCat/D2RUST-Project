@@ -344,6 +344,9 @@ fn npc_dialog(cursor_item: bool) -> NpcDialog {
         interact: true,
         f4b1a10: None,
         cursor_item,
+        level: 1,
+        unidentified: 0,
+        expansion: false,
         npc_monsters: vec![UnitKey::new(1, 6)],
     }
 }
