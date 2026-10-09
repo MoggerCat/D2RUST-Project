@@ -194,28 +194,11 @@ impl ReferenceSlots {
 
     /// The 1.14d reference table (`0x00744CA8`): [`REFERENCE_TYPES`]
     /// under the game's itemtypes is-a matrix `m` (§1 r2 step 4). On the
-    /// 1.14d tables it equals [`ReferenceSlots::v1_14d`].
+    /// 1.14d tables it gives the slot classes the Constants summarise
+    /// (checked on the user's install: `d2-server` `character_save`
+    /// `the_image_reference_table_on_the_users_install`).
     pub fn game(m: &IsA) -> Self {
         Self::from_types(&reference_types(), m)
-    }
-
-    /// The 1.14d table (§Constants, read from the image): under the 1.14d
-    /// is-a relation its types reserve slots 43–116, 130–133 and 135–234
-    /// as `weap` and 4–42, 118–121, 124–129, 134 and 235–255 as `armo`;
-    /// 0–3, 117, 122 and 123 are neither.
-    pub fn v1_14d() -> Self {
-        let mut s = Self::none();
-        for r in [43..=116, 130..=133, 135..=234] {
-            for slot in &mut s.0[r] {
-                slot.weap = true;
-            }
-        }
-        for r in [4..=42, 118..=121, 124..=129, 134..=134, 235..=255] {
-            for slot in &mut s.0[r] {
-                slot.armo = true;
-            }
-        }
-        s
     }
 
     fn get(&self, i: usize) -> RefSlot {
