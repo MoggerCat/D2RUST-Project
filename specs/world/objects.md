@@ -58,8 +58,8 @@
 | Randomness | 930–976 |
 | Edge cases & original bugs | 977–1043 |
 | Test vectors | 1044–1082 |
-| Provenance | 1083–1146 |
-| Open questions | 1147–1196 |
+| Provenance | 1083–1149 |
+| Open questions | 1150–1199 |
 <!-- /index -->
 
 ## Summary
@@ -1082,6 +1082,9 @@ lists of §2 from the live `shrines.txt`.
 
 ## Provenance
 
+- §7.4 call forms (2026-10-09): `0x0054AA90`, `0x00548B00`,
+  `0x00584540`, `0x00584420` in `all.asm`, at the instruction addresses
+  cited in the table.
 - 1.14d `Game.exe`, read with `tools/ghidra/disasm.py` and the Ghidra
   export: init dispatch `0x0054F5D0`, control `0x00546C60`/`0x00546FA0`/
   `0x00546FB0`, inits `0x0054F9D0`, `0x0054F770`, `0x0054FBB0`,

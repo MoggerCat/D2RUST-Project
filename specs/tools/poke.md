@@ -55,15 +55,15 @@
 |   1. Directives | 100–137 |
 |   2. Poke files | 138–160 |
 |   3. In scenarios | 161–175 |
-|   4. The 1.14d side (`poke.py`) | 176–232 |
-|   5. The d2rs side (`d2-sim::poke`) | 233–265 |
-|   6. `goto`: walking to a target | 266–340 |
-| Constants & data dependencies | 341–354 |
-| Randomness | 355–361 |
-| Edge cases & original bugs | 362–382 |
-| Test vectors | 383–403 |
-| Provenance | 404–409 |
-| Open questions | 410–417 |
+|   4. The 1.14d side (`poke.py`) | 176–312 |
+|   5. The d2rs side (`d2-sim::poke`) | 313–345 |
+|   6. `goto`: walking to a target | 346–420 |
+| Constants & data dependencies | 421–434 |
+| Randomness | 435–441 |
+| Edge cases & original bugs | 442–462 |
+| Test vectors | 463–483 |
+| Provenance | 484–494 |
+| Open questions | 495–502 |
 <!-- /index -->
 
 ## Summary
@@ -229,6 +229,86 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    GUID at unit +0x0C, positions the player's path x / y ± N. The
    result is `ok`: whether the sender's duplicate filter dropped the
    message is not visible here (Edge cases 4).
+10. **Interaction calls** (2026-10-09, static asm; for operate / NPC
+    directives, not yet in §1). Synchronous alternatives to `msg` for
+    C→S 0x13 / 0x2F / 0x30 / 0x38: called at the hook, they act in the
+    same stop and return the handler's code. Conventions and proofs
+    live in the owning specs (`world/objects.md` §7.4,
+    `world/npc.md` §2–§4 "Call forms"); this is the poke-side digest.
+    The message bytes are built exactly as `msg` builds them (rule 9,
+    scratch +0x300), size = `transport_size`; the player is P (§4
+    rule 5); the NPC's interaction block is the u32 at
+    (u32 at NPC +0x14) + 0x30.
+
+    | Use | Function | Registers | Stack from [ESP+4] | `ret` | EAX | Preconditions |
+    |---|---|---|---|---|---|---|
+    | any C→S message, with the alive gate | dispatcher `0x0054D750` (`sim/intents-events.md` §2.3) | ECX game, EDX player | message, size | 8 | handler code 0 done, 1 refused, 2 invalid, 3 malformed; 0 also when the gate refuses | P alive and not uninterruptable (gate) |
+    | 0x13 interact (type 1 NPC, 2 object, 4 item, 5 tile, 0 player) | handler `0x0054AA90` | ECX game, EDX player | message `13 <type u32> <GUID u32>`, 9 | 8 | code | type 1: unit distance P → NPC ≤ 6 starts the talk (7–8: walk then talk on arrival; 9–50: nothing; > 50: 1), P free (no interact unit, no cursor item, player data +0x4C = 0), NPC mode ∉ {0, 12} with monstats `interact`; type 2: object mode < 8, distance ≤ 50, in the interact box and line test clear, else a walk (result 0 either way) |
+    | the same, without the size / type parse | `0x00548B00` | ECX player, EDX type | GUID, flag 0, game | 0xC | code | as the row above |
+    | operate an object at once (no range, no walk) | `0x00584420` | ECX game, EDX player | type 2, GUID, pointer to a u32 out | 0xC | 0 refused / no operate function, else the operate function's result (not a status; check the object's mode) | object exists; P's interact info inactive, +0x4C = 0, no cursor item unless stash 267; P's path not stopped (0x13 stops it first) |
+    | start talking without range (no NPC stop) | `0x00573020` | ECX game, EDX player | NPC unit, block, 0 | 0xC | not set | block non-null; P free; NPC alive with `interact`; P not already in its list. The NPC's AI is not paused (0x13 rule 2 is skipped) |
+    | 0x2F open chat (node 0 → 1, heal) | handler `0x0054B930` | ECX game, EDX player | message `2F 00000000 <NPC GUID>`, 9 | 8 | code (1 when \|dx\| or \|dy\| > 10) | node from 0x13 in state 0; same act; within 10 per axis |
+    | the same, inner | `0x00572E60` | ECX game, EDX player | NPC unit, block | 8 | not set | node in state 0 (else nothing) |
+    | 0x38 menu action (1 trade, 2 gamble, 3 hire list, services) | handler `0x0054BCA0` | ECX game, EDX player | message `38 <action> <NPC GUID> <item GUID>`, 13 | 8 | code: 1 missing / > 50 per axis, 2 other act, 3 service item check | NPC with `interact` and a block; for actions 1 / 2 a node in state 1 (0x2F first) as the client does it |
+    | the same, inner | `0x00579D60` | ECX game, EDX player | action, NPC GUID, item GUID | 0xC | 0, or 3 | as above, no act / range test |
+    | 0x30 end chat (unlink node, reset interact unit) | handler `0x0054B9F0` | ECX game, EDX player | message `30 00000000 <NPC GUID>`, 9 | 8 | code | same act; no range test |
+    | the same, inner | `0x00572F20` | ECX game, EDX player | NPC unit, block | 8 | not set | block non-null |
+
+    The order the client produces is 0x13 (type 1) → 0x2F → 0x38 → 0x30;
+    calling the handlers in that order (one stop or several) leaves the
+    NPC state as play does, the NPC paused by 0x13 rule 2. The game
+    message entry `0x0053F3D0` (ECX = buffer with the client id first,
+    EDX = size) is not proposed: it takes the game's lock itself and
+    drops the handler's code (`sim/intents-events.md` §2.2).
+    PROVISIONAL: a handler called at the tick-return stop has the same
+    effect as the same message drained by the server at the start of
+    the next frame (`msg`), apart from the frame number its events are
+    scheduled from (game +0xA8 at the stop); settled by REC-1150.
+
+    Proposed `CALL_FORMS` entries (same `Fn` / `Form` shapes as the
+    table in `poke.py`; `code` is a proposed fourth `RESULTS` kind:
+    EAX 0 → `ok`, else `failed` with the code in the record's `eax`),
+    plus `FIELDS["mon_interact"] = 0x30` (monster data +0x30, the
+    interaction block pointer):
+
+    ```
+    "dispatch":      Fn(0x0054D750, ("game", "player", "message", "size"), "code",
+                        "sim/intents-events.md §2.3", None,
+                        Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
+    "h_interact":    Fn(0x0054AA90, ("game", "player", "message", "size"), "code",
+                        "world/npc.md §2; world/objects.md §7.4", None,
+                        Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
+    "interact":      Fn(0x00548B00, ("player", "type", "guid", "flag", "game"), "code",
+                        "world/npc.md §2 call forms; world/objects.md §7.4", None,
+                        Form({"ecx": "player", "edx": "type"}, ["guid", "flag", "game"], 0xC)),
+    "operate":       Fn(0x00584420, ("game", "player", "type", "guid", "out"), "none",
+                        "world/objects.md §7.2, §7.4", None,
+                        Form({"ecx": "game", "edx": "player"}, ["type", "guid", "out"], 0xC)),
+    "npc_start":     Fn(0x00573020, ("game", "player", "npc", "block"), "none",
+                        "world/npc.md §2 call forms", None,
+                        Form({"ecx": "game", "edx": "player"}, ["npc", "block", 0], 0xC)),
+    "h_chat_open":   Fn(0x0054B930, ("game", "player", "message", "size"), "code",
+                        "world/npc.md §3", None,
+                        Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
+    "chat_open":     Fn(0x00572E60, ("game", "player", "npc", "block"), "none",
+                        "world/npc.md §3 call forms", None,
+                        Form({"ecx": "game", "edx": "player"}, ["npc", "block"], 8)),
+    "h_npc_action":  Fn(0x0054BCA0, ("game", "player", "message", "size"), "code",
+                        "world/npc.md §4", None,
+                        Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
+    "npc_action":    Fn(0x00579D60, ("game", "player", "action", "npc_guid", "item_guid"), "code",
+                        "world/npc.md §4 call forms", None,
+                        Form({"ecx": "game", "edx": "player"}, ["action", "npc_guid", "item_guid"], 0xC)),
+    "h_chat_close":  Fn(0x0054B9F0, ("game", "player", "message", "size"), "code",
+                        "world/npc.md §3", None,
+                        Form({"ecx": "game", "edx": "player"}, ["message", "size"], 8)),
+    "chat_close":    Fn(0x00572F20, ("game", "player", "npc", "block"), "none",
+                        "world/npc.md §3 call forms", None,
+                        Form({"ecx": "game", "edx": "player"}, ["npc", "block"], 8)),
+    ```
+
+    `out` is a scratch u32 (e.g. scratch +0x2F0). Every form keeps
+    `ret` = 4 × stack length (rule 8).
 
 ### 5. The d2rs side (`d2-sim::poke`)
 
@@ -406,6 +486,11 @@ same on both sides.
 - d2rs-own format (§2–§3).
 - 1.14d column: every address and argument form is quoted from the spec
   named in its row; none is new here.
+- §4 rule 10 (2026-10-09): quoted from `world/objects.md` §7.4 and the
+  "Call forms" paragraphs of `world/npc.md` §2–§4 (read from `all.asm`
+  there), and the dispatcher form of `sim/intents-events.md` §2.3
+  (`0x0054D750`: `0x0054D75C` ESI := EDX, `0x0054D75E` EDI := ECX,
+  `ret 8` at `0x0054D785`, `0x0054D81E`).
 
 ## Open questions
 
