@@ -12,10 +12,21 @@ Saving is `q-fix-flow-save`'s; message bytes `q-proto-audit`'s.
 | # | Findings | Change | Play-path test |
 |---|---|---|---|
 | 1 | T4 | Stat messages: the per-client update's changed-stat array flush (`0x006258D0`, `stat-lists.md` §11 r2) in `ActionSim::client_update_messages`, between the unit updates and the room switch; the flush-time cache diff is gone (the vitals sync, `vitals.md` §5.1, stays at the flush: the spec puts it there). Flag-ex bit 21 (set by the join's item messages, §8.2 r3.5) sends the inventory refresh's 0x48. | `app_single_player::the_first_tick_sends_the_stats_in_the_client_pass_before_0x04` (recorded frame 2: stats, 0x48, 0x04) |
-| 2 | T2, T3, A5 | `d2_sim::tick` split at step 4 / step 5 (`tick_through_timers`, `tick_from_client_pass`); the host's unit work (approach and item arrivals, death starts, corpse items, pet deaths, approaches, hireling calls with NPC act changes, pet follows, hireling drive) runs at the end of step 4, before the client pass; the NPC handler's own work runs when the handler returns (drain). A corpse announced by the death pass is marked announced. | `app_play_npc_approach::the_approach_arrival_talks_in_the_tick_the_run_stops`, `app_single_player::a_death_reaches_the_client_pass_of_its_tick` |
+| 2 | T2, T3, A5 | `d2_sim::tick` split at step 4 / step 5 (`tick_through_timers`, `tick_from_client_pass`); the host's unit work (approach and item arrivals, death starts, corpse items, pet deaths, approaches, hireling calls with NPC act changes, pet follows, hireling drive) runs at the end of step 4, before the client pass; the NPC handler's own work runs when the handler returns (drain). A corpse announced by the death pass is marked announced. | `app_single_player::a_death_reaches_the_client_pass_of_its_tick`; the arrival test `app_play_npc_approach::the_approach_arrival_talks_in_the_tick_the_run_stops` went with that file when q-fixture-migrate removed the synthetic world (see below) |
 | 3 | T5, T6, J3 | State-3 / 5 inventory refresh (0x48 after 0x04); the join sequence (q-fix-proto's 0x5B, 0x65, 0x5A plus the spec's 0x8D, merged); quest event 3 CHANGEDLEVEL in the per-client level change on the lent quest control (`QuestObjectHost::changed_level`), the after-tick level detection removed. | the session test's tail `04 48 5B 65 8D 5A` (the recorded frame-2 order); `rooms::quest_event_3_runs_in_the_level_change` |
 | 4 | A1–A4 | `act_change::run` in `waypoints.md` §11 order: state 5, spawn + free point (0x1C89, 5), leave O, enter R, switch to none, 0x05, unit act, 0x03, 0x53, switch to R, 0x15 via flag-ex 0x10000 and room-change messages, pets follow; no direct 0x04, no 0x59 / part B / 0x0B re-add. | `app_single_player::an_act_change_goes_through_state_5_and_the_client_pass_sends_0x04` |
 | 5 | C2, C4 | Paused pass: `Bridge::set_paused` (set each frame by `pause_frame` from UI state 9 / 11): no pump, no receive, only the skill fallback; not while the local player has no room or after Save and Exit (`save-exit.md` §1 r3). `PreviewOrder` pins `deliver_outputs` → `preview_walk_frame` → `monster_walk_frame` between `bridge_frame` and `mirror_units`. | `smoke_frontend::the_esc_menu_pauses_the_single_player_game`; `bridge::tests::a_paused_frame_runs_no_pump_and_only_the_skill_fallback`, `present::order_tests::*` |
+
+After q-fixture-migrate (staging `b463cda4`) the play path runs only on
+the real install: this branch's `app_single_player` play-path tests and
+`smoke_frontend::the_esc_menu_pauses_the_single_player_game` carry the
+real-data ignore mark (`tools/realdata-gate.sh`; results below). The
+removed files `app_play_npc_approach.rs` (with the arrival test of item
+2) and `smoke_town.rs` (with this branch's rig fix: a ground click must
+pick no unit) are in `q-fixture-migrate-removed.tsv` for rewrite on the
+install; the arrival test belongs in that rewrite (an NPC 7–8 sub-tiles
+from the player, C→S 0x13, the talk starts in the tick the server's run
+stops).
 
 PROVISIONAL: REC-291 (the per-client inventory refresh sends its 0x48
 without the pass's item steps 1–7), REC-292 (the join's 0x8D party word).

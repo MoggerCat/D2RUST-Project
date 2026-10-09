@@ -53,14 +53,67 @@ where
     server.lock().unwrap().with(f).unwrap()
 }
 
-/// The synthetic client's `skills` table: one row (skill 0). The
-/// synthetic game has no `skills` rows, but the join of a new character
-/// sends two 0x23 with skill 0 (`intents-events.md` §8.2 rules 3.7, 7),
-/// and the client asserts a selected skill is inside its table
-/// (`client/msg-skills.md` §2 rule 3); every install has row 0.
-pub fn synthetic_skill_rows(app: &mut bevy::prelude::App) {
-    app.world_mut()
-        .resource_mut::<d2_client::bridge::BridgeResource>()
-        .0
-        .set_skill_rows(vec![d2_client::bridge::world::SkillRow::default()]);
+/// The reason every test on the user's files carries: the real-data
+/// gate (`tools/realdata-gate.sh`, `--run-ignored only`) runs it; CI has
+/// no game files and skips it.
+pub const REAL_DATA: &str = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)";
+
+/// The user's 1.14d install (`$D2_GAME_DIR`), loaded as `d2-client play`
+/// loads it (`GameData::select`), once per test binary. No directory is a
+/// failure, never a fallback (M23): the tests that call this are
+/// `#[ignore = REAL_DATA]`.
+pub fn game_data() -> single_player::GameData {
+    static DATA: std::sync::OnceLock<single_player::GameData> = std::sync::OnceLock::new();
+    DATA.get_or_init(|| {
+        let dir = std::env::var_os("D2_GAME_DIR")
+            .map(std::path::PathBuf::from)
+            .expect("D2_GAME_DIR: this test runs on the user's 1.14d install");
+        single_player::GameData::select(Some(&dir)).expect("the install loads")
+    })
+    .clone()
+}
+
+/// The user's live data (`GameData::Live`).
+pub fn live() -> Arc<single_player::LiveData> {
+    let single_player::GameData::Live(d) = game_data();
+    d
+}
+
+/// The client tables `play::add_live_client` gives the bridge on the
+/// user's files: skills, class skills, skill tables, unit rows, item
+/// tables, object rows (for tests that wire the app by hand).
+pub fn live_tables(app: &mut bevy::prelude::App) {
+    let mut b = app
+        .world_mut()
+        .resource_mut::<d2_client::bridge::BridgeResource>();
+    live_bridge_tables(&mut b.0);
+}
+
+/// [`live_tables`] on a bridge without an app.
+pub fn live_bridge_tables<L: ServerLink>(b: &mut d2_client::bridge::Bridge<L>) {
+    let d = live();
+    let data = single_player::GameData::Live(d.clone());
+    let a = d.archives.as_ref();
+    b.set_skill_rows(single_player::client_skill_rows(a).unwrap());
+    b.set_class_skills(single_player::client_class_skills(a).unwrap());
+    b.set_skill_tables(Arc::new(single_player::client_skill_tables(a).unwrap()));
+    b.set_unit_rows(single_player::client_unit_rows(a).unwrap());
+    b.set_item_tables(Arc::new(d2_client::app::items::TableDecoder(Arc::new(
+        d.tables.item_tables().unwrap(),
+    ))));
+    b.set_object_rows(single_player::client_object_rows(&data));
+}
+
+/// The `lvlwarp` id (the warp tile unit's class, `levels.md` §10.4) of
+/// the warp from level `from` to level `to`: the install's `levels` row
+/// of `from`, the `Warp` of the `Vis` slot that names `to`.
+pub fn warp_id(from: u32, to: u32) -> u32 {
+    let d = live();
+    let l = &d.levels.drlg.levels[from as usize];
+    let slot = l
+        .vis
+        .iter()
+        .position(|&v| v == to)
+        .unwrap_or_else(|| panic!("level {from} has no way to level {to}"));
+    u32::try_from(l.warp[slot]).expect("a warp id")
 }

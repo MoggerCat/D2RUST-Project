@@ -13,8 +13,8 @@
 //! Preview fills (d2rs-own, unverified, REC-267): the animation starts at
 //! the transmute button release (the spec gives the start routine
 //! `0x0048A540` but not its caller), the client frame counts 40 ms (the
-//! 25 Hz client, as `game_messages`) for the 70 ms wall-clock step, and the
-//! draw mode 3 of the cel is the sink's. The cube-gone close runs once per
+//! 25 Hz client, as `game_messages`) for the 70 ms wall-clock step. The
+//! cel draws in mode 3 (additive, [`HORADRIC_LOOK`]). The cube-gone close runs once per
 //! pass ([`OriginalUi::cube_poll`]).
 
 use super::{OriginalUi, OriginalUiError, SharedRef};
@@ -40,6 +40,12 @@ const TIP_FONT: u16 = 1;
 
 /// `menu\horadric` (31 frames), registered with the panel files.
 const HORADRIC_FILE: &str = "menu\\horadric";
+/// §12.4: the animation cel draws in mode 3 (additive), light 0xFF, no
+/// remap.
+pub const HORADRIC_LOOK: crate::ui::CelLook = crate::ui::CelLook {
+    mode: 3,
+    remap: crate::ui::Remap::None,
+};
 /// Milliseconds per client frame (d2rs-own, unverified; see the module).
 const FRAME_MS: u64 = 40;
 
@@ -92,7 +98,7 @@ impl Panel for CubeUi {
                 image: ImageRef { file, frame: n },
                 at: Point::new(x, y),
                 clip: Rect::new(0, 0, s.w as u16, s.h as u16),
-                look: crate::ui::CelLook::PLAIN,
+                look: HORADRIC_LOOK,
             }));
         }
         if anim.grid_visible() {

@@ -83,7 +83,12 @@ impl Clock for StepClock {
 
 /// The app's game on clock `ms` (no client until its C→S 0x67).
 fn game(ms: &Arc<AtomicU32>) -> (ThreadLink<Link<StepClock>>, Started) {
-    single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap()
+    single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap()
 }
 
 fn bridge(app: &App) -> &BridgeResource {
@@ -99,21 +104,18 @@ fn stats(app: &App) -> FrameStats {
 
 // Covers: specs/client/bridge.md §8 r1, §8 r2, §8 r3; specs/sim/intents-events.md §8.1, §8.2; specs/client/model.md §7 r3
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     let ms = Arc::new(AtomicU32::new(1000));
-    let (link, started) = game(&ms);
+    let (link, _started) = game(&ms);
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     // Akara's monster row, so her 0xAC creates the unit.
-    app.world_mut()
-        .resource_mut::<BridgeResource>()
-        .0
-        .set_unit_rows(single_player::synthetic_unit_rows());
     // No original UI here: the open mode it would hand over with every
     // panel closed (`ui/panels.md` §4.2), so the world view can place.
     app.world_mut()
@@ -169,7 +171,24 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // 0x15). The 0x0D is a unit-handler message (`client/msg-units.md`
     // §4) for the local player, known from 0x59. The world view composes
     // the model of tick 3 on the CPU (no render world).
-    let wp = started.waypoint_guid;
+    // The town's waypoint: the install's preset (`objects` operate
+    // function 23, `waypoints.md` §5.1), placed by the room population.
+    let rows = app_support::live().waypoints.objects.clone();
+    let wp = app_support::with(&server, move |l| {
+        let g = &mut l.host_mut().game;
+        g.game
+            .lists
+            .units_of_type(d2_sim::units::UnitType::Object)
+            .into_iter()
+            .find(|&u| {
+                g.events.action.sys.units.get(u).is_some_and(|r| {
+                    rows.get(r.class as usize)
+                        .is_some_and(|o| o.operatefn == 23)
+                })
+            })
+            .and_then(|u| g.game.lists.unit(u).map(|e| e.guid))
+            .expect("the town's waypoint")
+    });
     app_support::with(&server, move |l| {
         l.host_mut()
             .game
@@ -372,6 +391,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
 // amplitude once per drawn frame on the tick time base.
 // Covers: specs/render/camera.md §3, §9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frame_loop_draws_each_tick_through_the_original_view() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
@@ -452,6 +472,7 @@ fn frame_loop_draws_each_tick_through_the_original_view() {
 
 // Covers: specs/render/camera.md §8, §9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frame_loop_shakes_on_the_tick_time_base() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
@@ -1060,6 +1081,7 @@ fn audio() -> GameAudio {
 }
 
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn frame_loop_uses_the_frame_store_text_layout_and_sound_pool() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, _) = game(&ms);
@@ -1203,7 +1225,7 @@ fn placeholder_hooks_refuse_text_and_sounds() {
 #[ignore = "needs the game files in D2_GAME_DIR"]
 fn frame_loop_runs_on_the_users_levels() {
     let dir = std::env::var("D2_GAME_DIR").expect("D2_GAME_DIR");
-    let data = GameData::select(Some(dir.as_ref()), false).unwrap();
+    let data = GameData::select(Some(dir.as_ref())).unwrap();
     assert!(matches!(data, GameData::Live(_)));
     let ms = Arc::new(AtomicU32::new(1000));
     let (link, started) = single_player::start(data, DEFAULT_SEED, StepClock(ms.clone())).unwrap();

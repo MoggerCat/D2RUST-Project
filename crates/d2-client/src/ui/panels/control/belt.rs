@@ -33,6 +33,10 @@ pub const LABEL_MAX_W: i32 = 28;
 pub const FONT_AFTER_BELT: u16 = 1;
 /// Hover name cut (§5 r8).
 pub const HOVER_NAME_MAX: usize = 128;
+/// Hover stat lines cut (§5 r8: `0x004E6410(buffer, item, 0x100, …)`).
+pub const HOVER_STATS_MAX: usize = 0x100;
+/// The hover text buffer before the price (§5 r8: 384 units).
+pub const HOVER_TEXT_MAX: usize = 384;
 
 /// What body location 8 holds (§5 r1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -579,12 +583,13 @@ fn strip(w: i32, h: i32, x: i32, y: i32) -> bool {
 
 /// §5 r8, the item hover text (`0x00497A40`): with the belt hovered, a
 /// hovered item, no cursor item and (box ≤ 3 or popped or
-/// `[0x007BEF9C]`), the item's name (128 units) and, unless its quality is
-/// 3, its stat lines, colored with `Prefix(…, 3)` / `Prefix(…, 0)`; the
-/// shop sell price appended after a space; queued at (`[0x00722360]`,
-/// `[0x00722364]`), color 0, centred (positions must be ≥ 0). PROVISIONAL
-/// (specs/ui/control-panel.md §5 r8; REC-ui-belt-hover): name and stat
-/// lines are joined by an LF.
+/// `[0x007BEF9C]`), T = `Prefix(S, 3)` then `Prefix(N, 0)`: the stat
+/// lines S (256 units; empty for quality 3, and an empty part gets no
+/// colour code) then the name N (128 units), in a 384-unit buffer; the
+/// shop sell price, when non-empty, appended after an LF (string 3998);
+/// queued at (`[0x00722360]`, `[0x00722364]`), color 0, centred
+/// (positions must be ≥ 0). Drawn bottom-up as the r14 pop-up, so the
+/// stat lines are the lower lines, the name above them, the price on top.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HoverText {
     pub text: Vec<u16>,
@@ -609,13 +614,16 @@ pub fn hover_text(
         return None;
     }
     let name: Vec<u16> = name.iter().copied().take(HOVER_NAME_MAX).collect();
-    let mut text = prefix(&name, 3);
-    if !item.quality3 {
+    let stats: Vec<u16> = if item.quality3 {
+        Vec::new()
+    } else {
+        stat_lines.iter().copied().take(HOVER_STATS_MAX).collect()
+    };
+    let mut text = prefix(&stats, 3);
+    text.extend(prefix(&name, 0));
+    text.truncate(HOVER_TEXT_MAX);
+    if let Some(p) = price.filter(|p| !p.is_empty()) {
         text.push(0x0A);
-        text.extend(prefix(stat_lines, 0));
-    }
-    if let Some(p) = price {
-        text.push(u16::from(b' '));
         text.extend_from_slice(p);
     }
     let (x, y) = s.text_pos;
@@ -1224,21 +1232,29 @@ mod tests {
             ..Default::default()
         };
         let t = hover_text(&s, false, Some(&it), &name, &stats, None).unwrap();
-        let want: Vec<u16> = "\u{ff}c3Healing Potion\n\u{ff}c0Heals 45"
+        // The spec vector: `ÿc3` + stat lines + `ÿc0` + name, colour 0,
+        // centred at the text position.
+        let want: Vec<u16> = "\u{ff}c3Heals 45\u{ff}c0Healing Potion"
             .encode_utf16()
             .collect();
         assert_eq!(
             (t.text, t.x, t.y, t.color, t.centered),
             (want, 388, 440, 0, true)
         );
-        // Quality 3: the name only; the price appended after a space.
+        // NPC trade, price text P: as above + LF + P.
+        let price: Vec<u16> = "(10)".encode_utf16().collect();
+        let t = hover_text(&s, false, Some(&it), &name, &stats, Some(&price)).unwrap();
+        assert_eq!(
+            String::from_utf16(&t.text).unwrap(),
+            "\u{ff}c3Heals 45\u{ff}c0Healing Potion\n(10)"
+        );
+        // Quality 3: no stat lines and no colour code for them.
         let mut q3 = it;
         q3.quality3 = true;
-        let price: Vec<u16> = "(10)".encode_utf16().collect();
         let t = hover_text(&s, false, Some(&q3), &name, &stats, Some(&price)).unwrap();
         assert_eq!(
             String::from_utf16(&t.text).unwrap(),
-            "\u{ff}c3Healing Potion (10)"
+            "\u{ff}c0Healing Potion\n(10)"
         );
         // Not with a cursor item, without a hover, or for box > 3 unless
         // popped or [7BEF9C].

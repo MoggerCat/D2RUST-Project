@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use d2_client::app::config::{ConfigRes, Settings};
 use d2_client::app::play::{add_client_data, add_game, send_create_game};
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio};
 use d2_client::assets::path::MemorySource;
 use d2_client::audio::driver::SoundRequest;
@@ -99,15 +99,19 @@ fn sounds(t: &SoundTableData) -> MemorySource {
 /// The play app over the synthetic game with the original audio parts,
 /// run until the local player joined; its key.
 fn play_app(ms: &Arc<AtomicU32>) -> (App, UnitKey) {
-    let (link, _) =
-        single_player::start(GameData::Synthetic, DEFAULT_SEED, StepClock(ms.clone())).unwrap();
+    let (link, _) = single_player::start(
+        app_support::game_data(),
+        DEFAULT_SEED,
+        StepClock(ms.clone()),
+    )
+    .unwrap();
     let server = Arc::new(Mutex::new(link));
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, AssetPlugin::default()))
         .init_asset::<Image>()
         .init_resource::<ButtonInput<MouseButton>>();
     add_game(&mut app, Box::new(SharedLink(server.clone())), true).unwrap();
-    app_support::synthetic_skill_rows(&mut app);
+    app_support::live_tables(&mut app);
     app.world_mut()
         .resource_mut::<WorldViewState>()
         .feed
@@ -120,8 +124,8 @@ fn play_app(ms: &Arc<AtomicU32>) -> (App, UnitKey) {
     send_create_game(&mut app).unwrap();
     add_client_data(
         &mut app,
-        single_player::client_drlg_source(&GameData::Synthetic),
-        single_player::client_level_rows(&GameData::Synthetic),
+        single_player::client_drlg_source(&app_support::game_data()),
+        single_player::client_level_rows(&app_support::game_data()),
     );
     for _ in 0..40 {
         ms.fetch_add(40, Ordering::SeqCst);
@@ -148,6 +152,7 @@ fn frames(app: &mut App, ms: &Arc<AtomicU32>, n: usize) {
 
 // Covers: specs/audio/sound-table.md §6.4 r2, §4 r5, §4 r6; specs/seams/bridge-app.md §2.9
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn a_pending_sound_input_does_not_stop_play() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut app, p) = play_app(&ms);
@@ -189,6 +194,7 @@ fn plays(app: &mut App, ms: &Arc<AtomicU32>, id: i32) -> bool {
 
 // Covers: specs/audio/sound-table.md §9; specs/audio/sound-table-2.md §15 r6
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_options_master_volume_reaches_the_sound_layer() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut app, _) = play_app(&ms);
@@ -212,6 +218,7 @@ fn the_options_master_volume_reaches_the_sound_layer() {
 
 // Covers: specs/audio/environment.md §1 r1, §1 r2, §2 r1, §2 r3, §2 r6; specs/audio/sound-table.md §6.1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_town_levels_song_starts_on_the_play_path() {
     let ms = Arc::new(AtomicU32::new(1000));
     let (mut app, _) = play_app(&ms);

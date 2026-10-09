@@ -25,7 +25,7 @@ use bevy::time::TimeUpdateStrategy;
 use d2_client::app::front_host::{add_front_end, write_stub, FrontArt, FrontHost};
 use d2_client::app::front_start::{front_host, Entry, StartChoice, StartHandles};
 use d2_client::app::play_start::{self, CliStart};
-use d2_client::app::single_player::{self, GameData, DEFAULT_SEED};
+use d2_client::app::single_player::{self, DEFAULT_SEED};
 use d2_client::assets::path::FileSource;
 use d2_client::ui::front_end::screens::create::{Class, NewCharacter, EXPANSION};
 use d2_client::ui::front_end::*;
@@ -289,7 +289,7 @@ fn resolve(dir: &Path, g: GameLoad, c: &StartChoice) -> anyhow::Result<play_star
             save_dir: Some(dir.to_path_buf()),
             ..CliStart::default()
         },
-        &GameData::Synthetic,
+        &app_support::game_data(),
         None,
         g.difficulty,
         Some(c),
@@ -318,7 +318,7 @@ impl Game {
         let ms = Arc::new(AtomicU32::new(1000));
         let request = start.character.clone();
         let (link, _) = single_player::start_with(
-            GameData::Synthetic,
+            app_support::game_data(),
             DEFAULT_SEED,
             start.character,
             StepClock(ms.clone()),
@@ -337,12 +337,12 @@ impl Game {
             .unwrap();
         d2_client::app::play::send_create_game_flags(&mut app, &request, start.start_flags)
             .unwrap();
-        app_support::synthetic_skill_rows(&mut app);
+        app_support::live_tables(&mut app);
         // The client's own level data, as `play::run` adds it.
         d2_client::app::play::add_client_data(
             &mut app,
-            single_player::client_drlg_source(&GameData::Synthetic),
-            single_player::client_level_rows(&GameData::Synthetic),
+            single_player::client_drlg_source(&app_support::game_data()),
+            single_player::client_level_rows(&app_support::game_data()),
         );
         // The act palettes with their text colours (`formats/palette.md`).
         d2_client::app::palette::add_act_palettes(
@@ -466,6 +466,7 @@ const NAMES: [&str; 7] = ["Barb", "Sorc", "Pala", "Necro", "Assa", "Amaz", "Drui
 /// hero, name, OK → stub written → game started with that name and class
 /// at Normal.
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn each_class_is_created_and_starts_the_game() {
     for (i, &(class, _, _)) in EXPANSION.iter().enumerate() {
         let name = NAMES[i];
@@ -500,6 +501,7 @@ fn each_class_is_created_and_starts_the_game() {
 /// listed; select, OK → the same character in game.
 // Covers: specs/ui/frontend-options.md §o3-save-and-exit-game-0x0047f2d0 r1, §o9-configure-controls-ui-11-ui-config r1
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn esc_options_save_and_exit_then_reload_the_character() {
     let dir = temp_dir("esc");
     let cfg = dir.join("cfg");
@@ -621,6 +623,7 @@ fn esc_options_save_and_exit_then_reload_the_character() {
 /// A character with Nightmare open: OK → the difficulty popup →
 /// Nightmare → the game runs on Nightmare; Esc on the popup goes back.
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn difficulty_popup_starts_the_game_on_nightmare() {
     let dir = temp_dir("diff");
     // Expansion, progression 5: Normal and Nightmare open.
@@ -727,6 +730,7 @@ fn delete_a_character() {
 /// class and name; a name already saved, a save inside the install and a
 /// save on synthetic data stop before the window with an error.
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn play_cli_new_and_save_paths() {
     let dir = temp_dir("cli");
     let cli = CliStart {
@@ -735,7 +739,7 @@ fn play_cli_new_and_save_paths() {
         difficulty: 2,
         ..CliStart::default()
     };
-    let start = play_start::resolve(&cli, &GameData::Synthetic, None, None, None).unwrap();
+    let start = play_start::resolve(&cli, &app_support::game_data(), None, None, None).unwrap();
     assert_eq!(start.save_path, Some(dir.join("Cli.d2s")));
     assert_eq!((start.difficulty, start.start_flags), (2, None));
     let game = Game::start(start);
@@ -749,20 +753,27 @@ fn play_cli_new_and_save_paths() {
     );
     // The name is taken once the file exists.
     std::fs::write(dir.join("Cli.d2s"), b"x").unwrap();
-    let err = play_start::resolve(&cli, &GameData::Synthetic, None, None, None).unwrap_err();
+    let err = play_start::resolve(&cli, &app_support::game_data(), None, None, None).unwrap_err();
     assert!(err.to_string().contains("already exists"), "{err}");
     // --save: synthetic data cannot read a save; inside the install refused.
     let save = CliStart {
         save: Some(dir.join("Cli.d2s")),
         ..CliStart::default()
     };
-    let err = play_start::resolve(&save, &GameData::Synthetic, None, None, None).unwrap_err();
+    let err = play_start::resolve(&save, &app_support::game_data(), None, None, None).unwrap_err();
     assert!(err.to_string().contains("D2_GAME_DIR"), "{err}");
-    let err = play_start::resolve(&save, &GameData::Synthetic, Some(&dir), None, None).unwrap_err();
+    let err =
+        play_start::resolve(&save, &app_support::game_data(), Some(&dir), None, None).unwrap_err();
     assert!(err.to_string().contains("inside the game install"), "{err}");
     // Neither flag: the default character, not saved.
-    let start =
-        play_start::resolve(&CliStart::default(), &GameData::Synthetic, None, None, None).unwrap();
+    let start = play_start::resolve(
+        &CliStart::default(),
+        &app_support::game_data(),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!(start.save_path, None);
 }
 
@@ -802,6 +813,7 @@ fn controls_table_bindings_keep_esc_on_the_game_menu() {
 /// still; closed again, it ticks on.
 // Covers: specs/flows/client-frame.md §1 r2; specs/client/bridge.md §8 r5
 #[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_esc_menu_pauses_the_single_player_game() {
     let dir = temp_dir("pause");
     let cfg = dir.join("cfg");
