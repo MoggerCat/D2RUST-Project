@@ -16,7 +16,7 @@ plains, De Seis early, l77, l110), so later runs only rebuild d2rs.
 | # | Check | First divergence (state + rng) | Root | Outcome |
 |---|---|---|---|---|
 | 1 | `ass-lightning-sentry-hit` | none: state equal 160/160 frames | — | **equal** on this branch (integ-r7 + q-fix-ass-traps); the survivor Fallen 1:9 walks to (5143,4270) and dies as in 1.14d. No change needed |
-| 2 | `a4-deseis-seal-early` | f36, Oblivion Knight 1:52 (class 312): 1.14d mode 8, d2rs mode 2 | same draw values (86, 35, 79); 1.14d takes `ai-bodies-4.md` §11 step 3 (secondary target S found, Skill1 at S), d2rs finds no S (`0x005DDC30` has candidates only for player-side units) and circles | **handed to q-fix-a3a5-hosts**, which implements `0x005DDC30` for monsters in d2-sim; the De Seis hp difference is downstream |
+| 2 | `a4-deseis-seal-early` | f36, Oblivion Knight 1:52 (class 312): 1.14d mode 8, d2rs mode 2 | same draw values (86, 35, 79); 1.14d takes `ai-bodies-4.md` §11 step 3 (secondary target S found, Skill1 at S), d2rs finds no S (`0x005DDC30` has candidates only for player-side units) and circles | **moved f36 → f46** with q-fix-a3a5-hosts' `0x005DDC30` merged here (2b: 1:52 now equal). New first monster divergence f46: the pack spawned at f44 (1:88–1:93) never takes the player as T in d2rs (T = 1 and the mask-4 line blocked; 1.14d targets at once): PC 1 item on the room LOS-draw test `0x0061AA40`. (The `q` field differs from f2: player quest field, not AI.) |
 | 3a | `a3-warp-l77-jungle-2-ama` | none: state equal 160/160 frames | — | **equal** (the `fr` 5120 vs 0 of q-chk-levels is gone; the sequence drawn frame of q-fix-ass-traps) |
 | 3b | `a5-warp-l110-siege-1-ama` | was f23: Death Maulers 1:16–1:18 never targeted the Barbarians (no think draw) | the target-node lists held players only: `0x005B1990` was a no-op, so slot 8 (NpcBarb) was empty | **fixed** (below): the maulers now match at f23; first divergence is now the Barbarian 1:15's own pick (scan 5, PC 1 item) |
 | 4 | `combat-pop-stony-field` | f5 game seed; monsters 1:20+ get shifted seeds, packs differ | 1.14d creates object class 144 at (5121,5148) and its two items (class 523, game draws 729–732) right before the class-20 pack; d2rs creates neither. Every game-seed value is identical, d2rs just allocates fewer units | **not monster AI**: objects / population (sent to the coordinator) |
@@ -38,6 +38,7 @@ plains, De Seis early, l77, l110), so later runs only rebuild d2rs.
 
 ## Open
 
+0. **`0x0061AA40` room LOS-draw test** (`ai.md` §5.2 step 2): unspecified, false in every host; De Seis f46 (above). PC 1 item queued.
 1. **Scan 5 callback `0x005DCA70`** (the not-evil main search): no spec;
    d2rs uses the client preview `nearest_foe`. PC 1 item
    "[q-fix-monster-ai-2] Scan 5 callback" in `pc1-data.md` Step 4 has the
