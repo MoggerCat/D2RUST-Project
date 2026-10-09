@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.2.0; command: py tools/trace-recorder/facts_render.py game/captures/day/manual/scene5.jsonl --scene a1-blood-moor-automap --frame 120 --out facts/render; game: 1.14d
+key	value
+seq	120
+tick	1128
+w	800
+h	600
+act	0
+level	2
+player_x	10778
+player_y	75629
+tile_origin_x	10378
+tile_origin_y	75349
+unit_origin_x	10378
+unit_origin_y	75345
+open_mode	0
+shift_x	0
+light_quality	0
+rain	1
+snow	0
+draws	1350
+index_sha256	f5d63abda29eccefd1d3ffe42f50e64bed569c068a488407e92c003840aea38d
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

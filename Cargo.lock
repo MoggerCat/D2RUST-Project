@@ -2564,6 +2564,8 @@ dependencies = [
  "d2-data",
  "d2-formats",
  "d2-proto",
+ "serde_json",
+ "sha2",
  "test-fixtures",
 ]
 

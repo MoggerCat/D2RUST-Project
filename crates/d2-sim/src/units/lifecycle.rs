@@ -11,7 +11,7 @@ use crate::stats::ValueCallback;
 
 use super::hooks::{Sim, UnitHooks};
 use super::modes::{self, UnitError};
-use super::record::{flags, flags2, UnitRecord};
+use super::record::{flags, flags2, UnitRecord, Units};
 use super::{ListError, RoomId, UnitId, UnitType};
 
 /// Player classes (`0x00555230` step 1: class < 7).
@@ -139,6 +139,24 @@ pub fn allocate<H: LifecycleHooks>(
     Ok(Some(unit))
 }
 
+/// `SUNIT_InitSeed` `0x00552DF0` (`rng.md` §5.3) with the game seed as
+/// parent: one game-seed step `lo'`; the unit seed is `init_low(lo')`
+/// and `dwInitSeed` (+0x28) is `lo'`. Returns both.
+pub fn draw_unit_seed(game_seed: &mut Seed) -> (Seed, u32) {
+    let lo = game_seed.step();
+    (Seed::init_low(lo), lo)
+}
+
+/// The player's unit seed (§3.1 r4.1): `0x00552DF0` run on an allocated
+/// player by its load, on the game seed. Unknown unit: no draw.
+pub fn init_player_seed(units: &mut Units, unit: UnitId, game_seed: &mut Seed) -> bool {
+    let Some(rec) = units.get_mut(unit) else {
+        return false;
+    };
+    (rec.seed, rec.init_seed) = draw_unit_seed(game_seed);
+    true
+}
+
 /// Step 8's list part: `SUNIT_Add` `0x00554850` (`unit-order.md` §3.1)
 /// of a unit [`allocate_unlinked`] returned, in the allocation's room.
 /// The path settings of step 8 are the path provider's.
@@ -198,8 +216,7 @@ pub fn allocate_unlinked<H: LifecycleHooks>(
     let mut init_seed = 0;
     let mut item_seed = None;
     if req.ty != UnitType::Player {
-        init_seed = game_seed.step();
-        seed = Seed::init_low(init_seed);
+        (seed, init_seed) = draw_unit_seed(game_seed);
     }
     if req.ty == UnitType::Item {
         let start = game_seed.step();

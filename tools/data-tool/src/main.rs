@@ -9,6 +9,8 @@
 //!   data-tool dump-compare <dump_dir> [game_dir]
 //!   data-tool excel-dir <out_dir> [game_dir]
 //!   data-tool patch (check | render | diff) ...
+//!   data-tool variant build <traces/variants/<name>/<name>.d2stack> [--game DIR] [--out DIR]
+//!   data-tool variant check <out_dir> [--game DIR]
 //!
 //! `tables` loads and validates every live `.bin` (73 record tables, 4 code
 //! buffers, `hitclass`), compiles every table's highest-priority `.txt` in
@@ -42,8 +44,16 @@
 //!
 //! `patch` checks a mod stack, renders patched tables or diffs an edited
 //! table into a layer (`specs/data/patch-layers.md` §10).
+//!
+//! `variant build` applies a test-variant stack (`traces/variants/`) to
+//! the install's tables, compiles them and writes a variant install (the
+//! install's files hard-linked, `patch_d2.mpq` rewritten with the patched
+//! `.bin` files appended) to `$D2_GAME_DIR/../variants/<name>/` or
+//! `--out`, never inside the repository; `variant check` re-checks one
+//! (`specs/tools/test-variants.md`; details in `src/variant.rs`).
 
 mod patch;
+mod variant;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -75,10 +85,11 @@ fn main() -> Result<()> {
             excel_dir(Path::new(&args[1]), &game_dir(args.get(2))?)
         }
         Some("patch") => std::process::exit(patch::main(&args[1..])),
+        Some("variant") => std::process::exit(variant::main(&args[1..])),
         _ => bail!(
             "usage: data-tool tables|links [game_dir] | data-tool gen-tables | data-tool gen-proto | \
              data-tool dump-compare <dump_dir> [game_dir] | data-tool excel-dir <out_dir> [game_dir] | \
-             data-tool patch ..."
+             data-tool patch ... | data-tool variant (build | check) ..."
         ),
     }
 }

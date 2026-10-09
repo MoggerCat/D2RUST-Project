@@ -55,6 +55,8 @@ struct Wire {
     refused: Vec<(u8, Handled)>,
     /// The ids of every S→C message received.
     received: Vec<u8>,
+    /// The same chunks, whole (a chunk holds several messages).
+    chunks: Vec<Vec<u8>>,
     /// Every drained C→S message's id and fate.
     drained: Vec<(u8, Handled)>,
 }
@@ -93,6 +95,7 @@ impl ServerLink for Probe {
     fn receive(&mut self) -> Vec<Vec<u8>> {
         let got = SharedLink(self.server.clone()).receive();
         let mut w = self.wire.lock().unwrap();
+        w.chunks.extend(got.iter().cloned());
         for c in &got {
             // Chunk ids only (the bridge splits them); enough for a trace.
             if let Some(&id) = c.first() {
@@ -1739,18 +1742,15 @@ fn the_play_path_steps_and_speaks() {
     run.check("spoke");
 }
 
-/// Known bug (q-fix-seam-store-grid; not run by the real-data gate):
-/// the shop draws and hits each store item at the cells the server put
+/// The shop draws and hits each store item at the cells the server put
 /// it in (`seams/item-grids.md` §2.9), so every cell of an item's
-/// footprint finds its GUID and no two items share a cell. On the
-/// install every store item comes at cell (0, 0): the play host's NPC
-/// grid placement `0x00560200` (`vendors.md` §3.1 r4) is a stub
-/// (`AppRest::place_in_store`), and the store fill (`store::open` in
-/// the interaction wiring) does not reach the inventory model whose x /
-/// y the 0x9C stream carries.
+/// footprint finds its GUID and no two items share a cell. The server
+/// places the store on the NPC's inventory (`vendors.md` §3.1 r4,
+/// `0x00560200`: `InvDesk::store_place`), so the 0x9C stream carries the
+/// find-free cells (q-fix-server-store-fill).
 // Covers: specs/seams/item-grids.md §2.9
 #[test]
-#[ignore = "known bug: store items placed at cell 0, 0 (no NPC grid placement on the server)"]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn the_shop_finds_each_store_item_at_its_server_cells() {
     let mut run = Run::start();
     run.open_menu(u32::from(d2_sim::world::npc::class::AKARA));
@@ -1784,4 +1784,143 @@ fn the_shop_finds_each_store_item_at_its_server_cells() {
             }
         }
     }
+}
+
+impl Run {
+    /// Opens Akara's trade window (the shop, ui 0x0C).
+    fn open_akara_shop(&mut self) -> UnitKey {
+        let akara = self.open_menu(u32::from(d2_sim::world::npc::class::AKARA));
+        let rows: Vec<Option<OptionKind>> = self
+            .with_ui(|u| u.npc_menu())
+            .unwrap()
+            .rows
+            .iter()
+            .map(|r| r.kind)
+            .collect();
+        let p =
+            app_support::npc_menu_row(&self.app, menu_row_index(&rows, Some(OptionKind::Trade)));
+        self.click(p);
+        self.step(10);
+        assert!(self.ui_open(0x0C));
+        akara
+    }
+
+    /// Ctrl held: the host's per-frame read of the keys needs the primary
+    /// window, which the headless run lacks, so the flag is set directly.
+    fn hold_ctrl(&mut self, down: bool) {
+        self.app
+            .world_mut()
+            .non_send_mut::<WorldViewUi>()
+            .original
+            .as_mut()
+            .unwrap()
+            .set_ctrl(down);
+    }
+}
+
+/// Ctrl-click on a backpack item with the shop open sells it (0x33 to the
+/// open store's NPC, `ui/inventory.md` §10 r3.3): the install's server
+/// answers, the item leaves the player's backpack and the gold rises.
+// Covers: specs/ui/inventory.md §10 r3; specs/world/vendors.md §7.2
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn ctrl_click_sells_a_backpack_item_to_the_open_store() {
+    let mut run = Run::start();
+    let akara = run.open_akara_shop();
+    let w = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .clone();
+    let mine = d2_client::bridge::items::local_items(&w);
+    eprintln!(
+        "backpack: {:?}",
+        mine.iter()
+            .map(|i| (i.key.guid, i.code, i.mode, i.page))
+            .collect::<Vec<_>>()
+    );
+    let it = mine
+        .iter()
+        .find(|i| i.mode == d2_client::bridge::items::mode::STORED && i.page == 0)
+        .expect("a backpack item")
+        .clone();
+    let gold = run.player_stat(14);
+    let at = run.with_ui(|u| u.inv_item_point(&w, it.key.guid)).unwrap();
+    run.hold_ctrl(true);
+    run.click(at);
+    run.step(10);
+    run.hold_ctrl(false);
+    let sell = run.sent_any(|m| {
+        m.len() == 17
+            && m[0] == 0x33
+            && m[1..5] == akara.guid.to_le_bytes()
+            && m[5..9] == it.key.guid.to_le_bytes()
+    });
+    assert!(sell, "C→S 0x33 for the clicked item");
+    assert!(!run.sent_any(|m| m[0] == 0x19), "Ctrl-click never lifts");
+    run.until("the sold item leaves the backpack", 200, |r| {
+        !r.local_items()
+            .iter()
+            .any(|i| i.key.guid == it.key.guid && i.mode == d2_client::bridge::items::mode::STORED)
+    });
+    assert!(run.player_stat(14) > gold, "the sale paid gold");
+    run.check("sold");
+    // No `no_findings`: the run leg's drawn / server offset (q-fix-real-client-path)
+    // is the walk's, not this click's.
+}
+
+/// A Town Portal scroll used in the Rogue Encampment is refused and costs
+/// nothing (`items/use.md` §4; Wine recording `facts/items/
+/// a1-town-portal-cold-plains.tsv` frame 362): the server answers 0x3F and
+/// 0x7C only, no portal object (0x51) and no skill count (0x22), and the
+/// scroll stays in the backpack.
+// Covers: specs/items/use.md §4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_town_portal_scroll_used_in_town_is_refused_without_cost() {
+    let mut run = Run::start();
+    let scroll = run
+        .local_items()
+        .into_iter()
+        .find(|i| i.code == Some(*b"tsc ") && i.mode == d2_client::bridge::items::mode::STORED)
+        .expect("a Town Portal scroll in the backpack")
+        .key
+        .guid;
+    let before = run.wire.lock().unwrap().chunks.len();
+    let (px, py) = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .local()
+        .and_then(|p| p.position)
+        .expect("the player's position");
+    run.bridge()
+        .send(&d2_client::bridge::items::use_grid(
+            scroll,
+            u32::from(px),
+            u32::from(py),
+        ))
+        .unwrap();
+    run.step(10);
+    let got: Vec<u8> = run.wire.lock().unwrap().chunks[before..].concat();
+    let has = |needle: &[u8]| got.windows(needle.len()).any(|w| w == needle);
+    let g = scroll.to_le_bytes();
+    // `3F FF <item> FF FF` (the failure reset) and `7C 04 <item>`.
+    assert!(
+        has(&[0x3F, 0xFF, g[0], g[1], g[2], g[3], 0xFF, 0xFF]),
+        "{got:02X?}"
+    );
+    assert!(has(&[0x7C, 0x04, g[0], g[1], g[2], g[3]]), "{got:02X?}");
+    // No skill count (0x22) for the scroll and no portal object appears.
+    assert!(!has(&[0x22, 0x04]), "{got:02X?}");
+    assert!(
+        run.local_items()
+            .iter()
+            .any(|i| i.key.guid == scroll && i.mode == d2_client::bridge::items::mode::STORED),
+        "the scroll stays"
+    );
 }

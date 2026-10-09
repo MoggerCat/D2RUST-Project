@@ -26,25 +26,25 @@
 | Outputs / state changes | 76–85 |
 | Rules | 86–87 |
 |   1. Entry points | 88–101 |
-|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–140 |
-|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 141–196 |
-|   4. Recipe scroll text (0x26 type 7) | 197–212 |
-|   5. Overhead text | 213–277 |
-|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 278–336 |
-|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 337–451 |
-|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 452–464 |
-|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 465–481 |
-|   10. Other 0x50 codes (UI effects) | 482–516 |
-|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 517–586 |
-|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 587–593 |
-|   13. NPC intro table `0x00726850` (0x91) | 594–622 |
-|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 623–639 |
-| Constants & data dependencies | 640–657 |
-| Randomness | 658–662 |
-| Edge cases & original bugs | 663–683 |
-| Test vectors | 684–706 |
-| Provenance | 707–737 |
-| Open questions | 738–763 |
+|   2. Screen message list (`0x0049E3A0(text, color)`) | 102–145 |
+|   3. Chat line formats (0x26, `client/msg-ui.md` §4 r3) | 146–201 |
+|   4. Recipe scroll text (0x26 type 7) | 202–226 |
+|   5. Overhead text | 227–295 |
+|   6. NPC text list `[0x007BF250]` (0x27 type 1) | 296–361 |
+|   7. Dialog panel (`0x004A1320`, `0x004A10E0`) | 362–501 |
+|   8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3) | 502–514 |
+|   9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2) | 515–531 |
+|   10. Other 0x50 codes (UI effects) | 532–567 |
+|   11. Item-socket dialog (UI state 0x0E, 0x58 codes) | 568–649 |
+|   12. NPC alert (0x8A, `client/msg-ui.md` §9 r3) | 650–656 |
+|   13. NPC intro table `0x00726850` (0x91) | 657–694 |
+|   14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part) | 695–711 |
+| Constants & data dependencies | 712–729 |
+| Randomness | 730–734 |
+| Edge cases & original bugs | 735–755 |
+| Test vectors | 756–778 |
+| Provenance | 779–809 |
+| Open questions | 810–835 |
 <!-- /index -->
 
 ## Summary
@@ -115,6 +115,11 @@ intro table `0x00726850`; `SetUIState` calls (0x0E, 0x23, 0x24, 0x25,
    the color is 4 and the record has exactly one line, the line is
    converted to 8-bit (`0x005263E0`, 256 bytes) and passed to the text
    filter object's method +0x18 (`0x00611560`; `client/msg-ui.md` OQ9).
+   The conversion is UTF-8 (`0x00526190`, table `0x007309B8`: < 0x80 →
+   1 byte, < 0x800 → 2, else 3 for a u16 unit): units are encoded in
+   order while fewer than 255 bytes are written, then a NUL (a unit
+   that starts at byte 253 or 254 may run past 255; not reachable with
+   one wrapped line of ≤ W − 70 px).
 3. If the list now holds more than 18 lines in total, the head record
    (oldest) is removed (`0x0049D490`), once per add. UI sound 6
    (`cursor_switch`) is requested with no unit. If the message log
@@ -196,12 +201,21 @@ stops at a `ÿc` that ends the string.
 
 ### 4. Recipe scroll text (0x26 type 7)
 
-1. `0x0048BBE0(text, lang, c8)`: the text, converted with
-   `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, …, 256)` (no language
+1. `0x0048BBE0(text, lang, c8)`: the text, converted in the 0x26
+   handler (`0x0049F490` at `0x0049F83E`) with
+   `MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, src, 256, dst, 256)`
+   into a zeroed 256-unit buffer (exactly 256 source bytes; the copy
+   below stops at the first NUL) (no language
    check: the language loop at `0x0049F87F` computes a length it never
-   uses), is copied to `[0x007BCEA8]`, `[0x007BCEA4]` := c8, then
+   uses), is copied (`0x005267E0`, unbounded wide copy) to
+   `[0x007BCEA8]`, `[0x007BCEA4]` := c8, then
    `SetUIState(0x25, on, 0)` (state 0x25 changes only in an expansion
-   game, `ui/panels.md` §2 r3).
+   game, `ui/panels.md` §2 r3). Bytes < 0x80 convert 1:1 under any
+   ANSI code page. PROVISIONAL (REC-644): bytes ≥ 0x80 depend on the
+   machine's ACP; the reference PC reports ACP 65001 (UTF-8, registry
+   `Nls\CodePage\ACP`), under which `MB_PRECOMPOSED` may make the call
+   fail (documented ERROR_INVALID_FLAGS for UTF-8) and leave the text
+   empty; settle with a recorded 0x26 type 7 carrying a byte ≥ 0x80.
 2. Draw `0x0048BC10` (UI pass `[0x25]`, `ui/panels.md` §5 step 4), only
    while the game is an expansion game (`[0x007A04F4]`, `0x0044DCC0`)
    and state 0x25 is open: `menu\recipescroll` (`0x004520C0`, cached in
@@ -263,8 +277,12 @@ stops at a `ÿc` that ends the string.
    candidate is (x + m·dx, y + m·dy) with size **400 × 280** (not the
    bubble's); it must satisfy x' ≥ 0, x' + 400 ≤ W, y' ≥ 0, y' + 280 ≤
    H and intersect none of slots 0…n − 1; the first such candidate is
-   stored in slot n and becomes the bubble's rectangle (accept). None →
-   refuse. (The table looks like four (x, y) pairs but each entry is
+   stored in slot n and becomes the bubble's rectangle (accept); the
+   caller (`0x004A0A00` → `0x0049D9A0`) reads only its left / top, so
+   the bubble is drawn at the candidate's origin with its own size
+   while the slot keeps the 400 × 280 rectangle. n > 15 → refuse
+   without a test. None → refuse. (The table looks like four (x, y)
+   pairs but each entry is
    used for both axes, so only (+, +) and (−, −) moves are tried, each
    twice: reproduce.)
 6. **Bubble draw** (`0x0049D9A0` → `0x0049D8E0(box, x, y)`): open mode
@@ -302,7 +320,8 @@ stops at a `ÿc` that ends the string.
      caption id u16) of the 527-entry table `0x00722678` whose text id
      equals id, searching entries 0–99 when id < entry 100's text id
      (164), else entries 100–526; not found → 3724 "Invalid Quest
-     Value";
+     Value". The 527 pairs: `facts/ui/npc-talk-pairs.tsv` (made by
+     `py tools/facts/npc_talk.py` from the 1.14d image);
    - NPC 201 (Jerhyn): "about the merchants" (3392, `0x004B1B80`);
    - NPC 244, 245, 246, 265, 520 (Cain) with the Horadric Cube (`box `)
      in the local player's inventory: 2231 "Horadric Cube"
@@ -328,11 +347,17 @@ stops at a `ÿc` that ends the string.
    modulo; count 0 → index 0); each draw is stored in +0x0D. A draw i
    is kept when i ≥ 2, the text record (15 bytes at +5 + 15 i) has the
    player's class at +0x0B (or 7 = any), and either its byte +2 is 0 or
-   `0x0065C310([0x007C0D43], u32 +7, 0)` equals u32 +3; a kept draw on
-   the list `0x00725CB0` with text id 0xFF is replaced by 2 when game
-   quest 12 bit 13 is set (`0x0065C310([0x007C0D47], 12, 13)` = 1).
-   After 10 rejected draws, +0x0D := 2. Other text record fields: §Open
-   questions 4.
+   `0x0065C310([0x007C0D43], u32 +7, 0)` equals u32 +3. `0x00725CB0`
+   is not a list but a text-record array: the records of intro entry 15
+   (class 201, act index 1, 10 records; read from the 1.14d image). Only
+   on the quest path (byte +2 ≠ 0 and the test passed), when the entry's
+   records pointer is `0x00725CB0` and the kept record's u16 +0 = 0xFF
+   (in stock data only record 2, text 255) and game quest 12 bit 13 is
+   set (`0x0065C310([0x007C0D47], 12, 13)` = 1): +0x0D := 2 — the same
+   value it already holds, so the rule has no visible effect with stock
+   data; the function's return value is unused by both callers
+   (`0x004B17A0`, `0x004B3E10`). After 10 rejected draws, +0x0D := 2.
+   Other text record fields: §Open questions 4.
 
 ### 7. Dialog panel (`0x004A1320`, `0x004A10E0`)
 
@@ -374,6 +399,26 @@ stops at a `ÿc` that ends the string.
    next line). The first line is the scroll speed: when all its units
    are < 0x80, speed := `atol` of it, else speed := 8; it is never
    shown. An empty text gives no lines. Line width ≥ 308 only logs.
+   Chunk reader in detail (authored):
+
+   ```
+   while *t != 0:                       # checked only between chunks
+       n := 0
+       while n < 100 and *t != LF: line[n++] := *t++   # no NUL test
+       if n < 100 and *t == LF: t++     # LF after exactly 100 units stays
+       first chunk only: speed from it, then read one more chunk the same way
+       append line (as a NUL-terminated string)
+   ```
+
+   So a text ending in LF has no trailing empty line; a line of exactly
+   100 units followed by LF is followed by one empty line (the LF starts
+   the next chunk); the speed is not written for an empty text (the
+   panel's speed field keeps the pool memory's value, `0x004A05E0`
+   does not set it). PROVISIONAL (REC-643): a text whose last line has
+   no LF, or that is only the speed line, makes the reader copy past the
+   terminating NUL until an LF or 100 units (the copy has no NUL test);
+   what the stock strings end with is unchecked (needs a string-table
+   scan of the dialog ids).
 3. **Scroll** (`0x0049D5A0`, per draw, font 8). Panel fields: lines +0,
    count +4, position p +8 (1/1024 pixel), speed +0x0C, t_last +0x1A,
    t_start +0x1E, step +0x22, acc +0x26, same u16 +0x2A. With t =
@@ -424,10 +469,15 @@ stops at a `ÿc` that ends the string.
      `[0x007BF1C4]` := 0 if it was 1, else a unit dialog runs
      `0x004B3D10(GUID)`; `0x00453AE0`; `[0x007BF20A]` := 0; mouse
      window off; handlers unregistered; R = 0.
-   - In the same pass: a dead or absent local player (`0x00463DF0`), or
-     a unit dialog whose unit is present in mode 12, sends C→S 0x30
-     [1][GUID] (unit dialog only, then `0x004B3830`) and runs
-     `0x004A0880`.
+   - Then, still inside the same guarded block and after the step above
+     (`0x004A0E70`, so it sees `[0x007BF20A]` as the step left it): a
+     dead or absent local player (`0x00463DF0`), or `[0x007BF20A]` ≠ 0
+     and the unit `0x00463990([0x007BF202])` is present in mode 12 →
+     with `[0x007BF20A]` ≠ 0: C→S 0x30 (`0x004786A0(GUID)`) and
+     `0x004B3830`; then `0x004A0880` (unit dialog: `0x004B3D10`, else
+     `0x0049F960`; `0x00453AE0`; `[0x007BF20A]` := 0); then the skip
+     handlers are unregistered if registered (`[0x007BF27C]` = 1 → 0,
+     `0x004F59A0(7)` / `0x00451E10`). R keeps the step's value.
    Then a drawn timed box adds 1 to R (§8 r2). If R = 0 and
    `[0x007BF1C0]` = 1: `[0x007BF1FA]` := `[0x007BF20A]` := 0,
    `[0x007BF1BC]` := 1, `[0x007BF1C0]` := 0, handlers unregistered if
@@ -500,11 +550,12 @@ stops at a `ÿc` that ends the string.
 2. `0x0049FBA0(a)` first draws the plain scroll (`0x0049FA10`) and
    loads `UI\menu\scroin2` / `UI\menu\scroin3` once (`[0x007BF270]`,
    `[0x007BF26C]`); with a = 0 nothing more. Stones (a = 1, font 5
-   during the call): an animation counter `[0x007BF247]` steps once per
-   > 50 ms of `GetTickCount` (`[0x007BF243]`; reset to 0 when that time
-   is 0); stone i (0–4) with symbol s = u16 `[0x007BF098 + 2i]` (s ≥ 6 →
-   skipped, s = 5 fatal 0x1673) starts when the counter passes
-   `0x00722F08`[i] = (0, 12, 24, 36, 48): f = counter − start; draw mode
+   during the call): an animation counter `[0x007BF247]` with time
+   `[0x007BF243]`: time = 0 → time := now, counter := 0; else now >
+   time + 50 (unsigned compare) → time := now, counter += 1; stone i
+   (0–4) with symbol s = u16 `[0x007BF098 + 2i]` (s ≥ 6 → skipped, s =
+   5 fatal 0x1673) is drawn when `0x00722F08`[i] < counter (strict; so
+   f ≥ 1), `0x00722F08` = (0, 12, 24, 36, 48): f = counter − start; draw mode
    m = 0 for f < 5, 1 for f < 10, 2 for f < 15, else 5 (f = 1 also
    requests UI sound 2671 `shrine_portal`; blend modes:
    `render/blend-modes.md` §1):
@@ -561,14 +612,26 @@ stops at a `ÿc` that ends the string.
    w/2, y = 106 + (h < 112 ? (114 − h) / 2 : 0), (w, h) = its cel size
    (`0x004DBEA0`), drawn with `0x0046EE80`.
 5. **Place / take**: left button down (`0x004BFC50`) is ignored within
-   400 ms of the last accepted click; then (step 1 or 2) the inventory
-   handler gets it first; the button press `0x004BFBC0` (sound 1); with
-   a cursor item inside x 123–211, y 106–220 of an item type that
+   400 ms of the last click; every click not ignored sets last click
+   `[0x007C5488]` := now first (accepted or not). Then step 1: the
+   inventory handler `0x004922A0` gets it first; step 2: only
+   `0x00489190` (the inventory close-button rectangle x W − 302 … W − 270,
+   y H − 96 … H − 64 → `[0x007BCE90]` := 1, consumed) — the inventory
+   grid is not live while an item is placed; if either consumed it:
+   done. Steps 1 and 2 only: the button press `0x004BFBC0` (sound 1);
+   steps 0 and 3 skip both. Then (any step) with the player's cursor
+   item (`0x0063C1E0(inventory)`, the model's cursor item, not the
+   cursor graphic) inside x 123–211, y 106–220 of an item type that
    passes `0x006280A0(item, 0x10)`: mode 1 → NPC 154 `0x0062C590`, 511
    `0x0062C770`, 512 `0x0062C6A0` must accept it; mode 0 → its code must
-   be `hst ` (the Horadric staff); accepted → `0x004BFA70`: step 1 → 2,
-   cursor emptied, placed := its GUID, its drop sound; step 2 → 1,
-   placed := 0, the item back on the cursor, sound 1. Refused → sound 3.
+   be `hst ` (the Horadric staff); accepted → `0x004BFA70(ESI = item)`:
+   step 1 → 2, cursor graphic cleared (`0x00468070(0)`), placed := its
+   GUID, its drop sound (`0x004C1D60` → `0x004B9A00`); step 2 → 1,
+   placed := 0, cursor graphic := the item (`0x00468070(item)`), sound
+   1; step 3: nothing. Refused → sound 3. Placing never removes the item
+   from the model's cursor slot (only the graphic), so in step 2 the
+   cursor item is the placed item and a click in the area takes it back;
+   with no cursor item a click in the area does nothing.
 6. **Buttons** (left button up `0x004C04E0` → `0x004C0450`; Esc / Space
    `0x004C0150`; mouse move `0x004BFA30`; WM_CHAR consumed):
    - a release inside an armed button's hit rectangle plays sound 1
@@ -598,18 +661,27 @@ overlay rules of `render/unit-composite.md`. The sounds are
    u32 +0x09, gossip index u32 +0x0D, gossip heard u8 +0x11, **return
    greeting due u8 +0x12**, u8 +0x13, no-introduction u8 +0x14, greeting
    due u8 +0x15. Static values: +0x15 = 1 in all; +0x14 = 1 for 146,
-   175, 176, 210, 244, 265; +0x13 = 1 for 155, 210, 367, 521.
+   175, 176, 244, 265 (not 210, corrected 2026-10-09 from the image; no
+   writer of +0x14, its one reader is `0x004B594B`); +0x13 = 1 for 155,
+   210, 367, 521. All 46 entries: `facts/ui/npc-talk-intros.tsv`; their
+   15-byte text records (text id u16 +0, flag u8 +2, u32 +3, u32 +7,
+   player class u32 +0x0B; 418 in all): `facts/ui/npc-talk-gossip.tsv`
+   (both by `py tools/facts/npc_talk.py`, which checks these values).
 2. Writers of +0x12: 0x91 (`0x004B3510`) := 1; game start / exit reset
    (`0x004B32F0`, from `0x00453DE0`) clears +0x11 and +0x12 of all; the
    NPC menu open (r3) clears it.
 3. **Menu open** (`0x004B66B0(arg 0)`, first open of a talk, after the
-   menu is built): the first entry whose class = the NPC's class (none →
-   no greeting): if +0x12 = 1: +0x12 := 0 and the greeting mode := 2
-   ("return"); then only if +0x15 = 1: +0x15 := 0, the greeting
-   (`0x004E0590(NPC, mode)`, `audio/triggers.md` §10 r1) is requested
-   (skill voices detached first), handle `[0x007C0DB8]`; with mode 2,
-   C→S **0x4D** [class u16] (`0x004785B0`, `sim/client-messages.tsv`:
-   clears the player's intro bit) and `[0x007C0DB4]` := 1. With +0x12
+   menu is built): mode := 0 (the plain greeting); the first entry
+   whose class = the NPC's class: if +0x12 = 1: +0x12 := 0 and mode :=
+   2 ("return"); then +0x15 ≠ 1 → done; else +0x15 := 0. No entry for
+   the class → straight on with mode 0 (no +0x15 gate; `0x004B68EE`).
+   Then the greeting `0x004E0590(NPC, mode)` (`audio/triggers.md` §10
+   r1); if it gives a sound: skill voices detached (`0x004CB190`), it
+   plays on the local player (`0x004B9A00`), handle `[0x007C0DB8]`;
+   mode 2 → C→S **0x4D** [class u16] (`0x004785B0`,
+   `sim/client-messages.tsv`: clears the player's intro bit) and
+   `[0x007C0DB4]` := 1; mode 0 → `[0x007C0DB8]` := 0 again (the plain
+   greeting's handle is not kept). No sound → nothing sent. With +0x12
    set but +0x15 clear, the flag is cleared and nothing plays or is
    sent.
 4. +0x15 is re-armed for all entries when the local player leaves town

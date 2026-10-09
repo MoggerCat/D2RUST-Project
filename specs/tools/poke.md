@@ -4,8 +4,15 @@
   every 1.14d address and argument form below is cited from the owning
   spec; directives whose 1.14d call form no spec states are gaps on the
   original side (§4, Open questions) and are queued for PC 1
-  (`docs/handoff/pc1-data.md` Step 4). No directive has been run on
-  1.14d yet (REC-590).
+  (`docs/handoff/pc1-data.md` Step 4). Run on 1.14d under Wine
+  (2026-10-09, `poke.py` 0.1.0, `--auto ScnAma --seed 1234`, F0 = 2):
+  `spawn` normal (GUID 8), `seed-unit`, `object` (GUID 18), `time`,
+  `seed-game`, `superunique` (GUID 8), `missile` (GUID 1) all returned
+  `ok` with no fault (`traces/pokes/spawn-town.poke`,
+  `missile-superunique.poke`). The comparison with d2rs is REC-590. The d2rs side (§3, §5) is implemented
+  (`d2-sim::poke`, scenario `poke` steps, `scenario-run`, `d2-client
+  play --poke`): every directive runs on the synthetic install; `warp`
+  to another act and `item` without item tables are d2rs gaps.
 - **Target version:** 1.14d (the original side); the format is d2rs-own.
 - **Crate/module:** `d2-sim::poke` (directives, parser, d2rs apply);
   `conformance::scenario` (`poke` steps); `tools/scenario-run`;
@@ -24,21 +31,21 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 44–56 |
-| Inputs | 57–63 |
-| Outputs / state changes | 64–72 |
-| Rules | 73–74 |
-|   1. Directives | 75–109 |
-|   2. Poke files | 110–132 |
-|   3. In scenarios | 133–147 |
-|   4. The 1.14d side (`poke.py`) | 148–171 |
-|   5. The d2rs side (`d2-sim::poke`) | 172–183 |
-| Constants & data dependencies | 184–196 |
-| Randomness | 197–203 |
-| Edge cases & original bugs | 204–213 |
-| Test vectors | 214–222 |
-| Provenance | 223–228 |
-| Open questions | 229–249 |
+| Summary | 51–63 |
+| Inputs | 64–70 |
+| Outputs / state changes | 71–79 |
+| Rules | 80–81 |
+|   1. Directives | 82–116 |
+|   2. Poke files | 117–139 |
+|   3. In scenarios | 140–154 |
+|   4. The 1.14d side (`poke.py`) | 155–178 |
+|   5. The d2rs side (`d2-sim::poke`) | 179–193 |
+| Constants & data dependencies | 194–206 |
+| Randomness | 207–213 |
+| Edge cases & original bugs | 214–223 |
+| Test vectors | 224–234 |
+| Provenance | 235–240 |
+| Open questions | 241–261 |
 <!-- /index -->
 
 ## Summary
@@ -176,9 +183,12 @@ cannot run the directive, §4). Results are written as `poke` records
    debug and test entry point: nothing in normal play calls it, it has
    no I/O, and it keeps `d2-sim`'s determinism rules (`CLAUDE.md` rule
    6): it draws only what the creation path it calls draws.
-2. Callers: `scenario-run` (scenario `poke` steps, §3) and `d2-client
+2. Callers: `scenario-run` (scenario `poke` steps, §3), `d2-client
    play --poke <file>` (applied on the server thread between ticks, at
-   §2 rule 4's point). Both resolve references on the state after tick
+   §2 rule 4's point) and `d2-client state-dump --poke "<f> ..."` (§2
+   rule 6, through the bridge after the snapshot of frame f − 1; its
+   1.14d counterpart is `record_state.py --poke`, whose pokes run after
+   that stop's snapshot; `tools/scenario-diff.md` §3 rule 5). Both resolve references on the state after tick
    t − 1 (`scenario.md` §3 rule 3).
 
 ## Constants & data dependencies
@@ -218,7 +228,9 @@ same on both sides.
 | each malformed line (unknown directive, missing / extra argument, value out of range, tick out of order, wrong version) | an error naming the line | synthetic (`d2-sim::poke` tests) |
 | every directive parsed and written | the canonical text; parsing it again gives the same directive | synthetic |
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
-| same scenario, 1.14d against d2rs | `poke`, `spawn` records and the spawned monster's first 50 ticks of `unit` records equal | REC-590 (not run yet) |
+| `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
+| same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |
+| `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (Open question 2) |
 
 ## Provenance
 

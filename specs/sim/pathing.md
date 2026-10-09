@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 359–426 |
 |   6. Straight (type 7, `0x00679ED0`) | 427–436 |
 |   7. A* (type 1, `0x0067B850`) | 437–474 |
-|   8. Velocity, direction vector, facing | 475–568 |
-|   9. Per-tick movement | 569–752 |
-|   10. Messages | 753–815 |
-|   11. Missile paths (`0x00649760`) | 816–868 |
-|   12. Other path types (1.14d-read 2026-10-08) | 869–1082 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1083–1232 |
-| Constants & data dependencies | 1233–1269 |
-| Randomness | 1270–1280 |
-| Edge cases & original bugs | 1281–1328 |
-| Test vectors | 1329–1366 |
-| Provenance | 1367–1422 |
-| Open questions | 1423–1496 |
+|   8. Velocity, direction vector, facing | 475–571 |
+|   9. Per-tick movement | 572–755 |
+|   10. Messages | 756–818 |
+|   11. Missile paths (`0x00649760`) | 819–871 |
+|   12. Other path types (1.14d-read 2026-10-08) | 872–1085 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1086–1235 |
+| Constants & data dependencies | 1236–1272 |
+| Randomness | 1273–1283 |
+| Edge cases & original bugs | 1284–1331 |
+| Test vectors | 1332–1369 |
+| Provenance | 1370–1425 |
+| Open questions | 1426–1499 |
 <!-- /index -->
 
 ## Summary
@@ -512,12 +512,15 @@ flag 4, freed at the next mode set) with stat 67 = 100 · `RunVelocity`
 / `WalkVelocity` − 100 (truncated; 1.14d live: 100·9/6 − 100 = 50); the
 list is skipped when `WalkVelocity` is 0. Rule 8.1.2 then reads it.
 
-PROVISIONAL: a run start without a mode change (a new 0x03 while in
-mode 3: the mode set frees no TEMPONLY list, `sim/units.md` §4.1) keeps
-one run list and rewrites its stat 67, rather than attaching a second
-(because §1.5 rule 6 places the attach in the animation setup, which
-only a new mode runs); settled by a recording of two 0x03 in a row
-(velocity after the second).
+A run start without a mode change (a new 0x03 while in mode 3) keeps
+the one run list: the mode set `0x00624690(unit, mode)` with mode =
+the current mode only queues the unit and sets unit flag 0x1 (not for
+a monster in mode 1) and returns 0; the temporary-list free
+(`0x006272E0`) and the animation setup `0x00624390` (whose modes 3 /
+19 call the attach `0x00620E80`, at `0x00624421`) run only for a new
+mode (read 2026-10-09). Each attach allocates a new list (flag 4,
+`0x006251F0`), so only a mode change can add one; the velocity stays
+0x900.
 
 #### 8.3 Direction vector (`0x0064FC60`)
 
@@ -1450,7 +1453,7 @@ Real (recordings; message side):
 8. *Answered:* `0x00649120` / `0x00649140` read and adjust the monster
    re-path budget at path +0x94 (not the distance budget +0x90); set to
    20 by `0x005A7C20` (§9.10).
-9. PROVISIONAL: §11.3 runs in 53-bit x87 precision (because `Game.exe` sets 53-bit once at start-up and never changes it); settled by REC-21. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
+9. Settled for Game.exe (2026-10-09, CRT start-up read, `items/treasure.md` OQ5): §11.3 runs in 53-bit x87 precision; PROVISIONAL (REC-610) only for a video runtime DLL changing it. x87 precision control during §11.3 (53-bit or 24-bit: a 24-bit mode
    rounds cos · r to float32 before the truncation). Settle: a recording
    of a Blessed Hammer missile's per-tick positions, or a debugger read
    of the FPU control word in `0x0067A140`.

@@ -257,7 +257,7 @@ impl fmt::Display for Report {
 fn stream_of(kind: &str) -> &str {
     match kind {
         "draw" => "rng-draws",
-        "spawn" => "c2s",
+        "spawn" | "poke" => "c2s",
         "unit" => "units",
         k => k,
     }
@@ -371,6 +371,26 @@ fn diff(
                 Err(u) => format!("unresolved {u}"),
             };
             field("spawned", show(x), show(y))
+        }
+        (
+            Record::Poke {
+                d: da,
+                r: ra,
+                guid: ga,
+                ..
+            },
+            Record::Poke {
+                d: db,
+                r: rb,
+                guid: gb,
+                ..
+            },
+        ) => {
+            // Field by field in the FORMAT.md order: d, r, guid.
+            let g = |g: &Option<u32>| g.map_or_else(|| "none".to_owned(), |g| g.to_string());
+            field("d", da.clone(), db.clone())
+                .or_else(|| field("r", ra.clone(), rb.clone()))
+                .or_else(|| field("guid", g(ga), g(gb)))
         }
         (
             Record::S2c {
@@ -1026,6 +1046,55 @@ mod tests {
                 (0, "spawn", 0, "spawned")
             );
         }
+    }
+
+    // Covers: specs/tools/poke.md §3 r3
+    #[test]
+    fn poke_records_compare_field_by_field_after_spawns() {
+        let with = |d: &str, r: &str, guid| {
+            let mut v = base();
+            v.insert(
+                1,
+                Record::Spawn {
+                    t: 0,
+                    i: 1,
+                    guid: Ok(Some(5)),
+                },
+            );
+            v.insert(
+                2,
+                Record::Poke {
+                    t: 0,
+                    i: 2,
+                    d: d.into(),
+                    r: r.into(),
+                    guid,
+                },
+            );
+            v
+        };
+        let a = trace("original", with("object", "ok", Some(7)));
+        assert!(compare(&a, &trace("d2rs", with("object", "ok", Some(7))))
+            .unwrap()
+            .first
+            .is_none());
+        for (other, at) in [
+            (with("superunique", "ok", Some(7)), "d"),
+            (with("object", "failed", None), "r"),
+            (with("object", "ok", Some(8)), "guid"),
+            (with("object", "ok", None), "guid"),
+        ] {
+            let d = compare(&a, &trace("d2rs", other)).unwrap().first.unwrap();
+            assert_eq!(
+                (d.tick, d.stream.as_str(), d.index, d.at.as_str()),
+                (0, "poke", 0, at)
+            );
+        }
+        // A poke missing on our side.
+        let mut b = with("object", "ok", Some(7));
+        b.remove(2);
+        let d = compare(&a, &trace("d2rs", b)).unwrap().first.unwrap();
+        assert_eq!((d.stream.as_str(), d.at.as_str()), ("poke", "record"));
     }
 
     // Covers: specs/tools/scenario.md §5 r1, §5 r2

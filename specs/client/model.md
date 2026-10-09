@@ -29,30 +29,30 @@
 | Outputs / state changes | 86–92 |
 | Rules | 93–94 |
 |   1. Model contents | 95–138 |
-|   2. Unit table | 139–184 |
-|   3. Local player | 185–207 |
-|   4. Receive and the unit message queue | 208–245 |
-|   5. Client update pass | 246–294 |
-|   6. Position check (`0x004804E0`) | 295–335 |
-|   7. Session messages | 336–507 |
-|   8. Mode requests | 508–593 |
-|   9. Room-in-sight messages | 594–628 |
-|   10. Bit reader | 629–643 |
-|   11. Current act and level (join and later) | 644–689 |
-|   12. Client DRLG and the room of a point | 690–731 |
-|   13. Visibility predicate (`0x004DBF20`) | 732–783 |
-|   14. Pet list and the hireling GUID | 784–837 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 838–927 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 928–962 |
-|   17. Model writes made by 1.14d UI code | 963–1109 |
-|   18. Audio driver inputs and the client object functions | 1110–1140 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1141–1361 |
-| Constants & data dependencies | 1362–1374 |
-| Randomness | 1375–1390 |
-| Edge cases & original bugs | 1391–1415 |
-| Test vectors | 1416–1473 |
-| Provenance | 1474–1577 |
-| Open questions | 1578–1726 |
+|   2. Unit table | 139–188 |
+|   3. Local player | 189–211 |
+|   4. Receive and the unit message queue | 212–249 |
+|   5. Client update pass | 250–298 |
+|   6. Position check (`0x004804E0`) | 299–342 |
+|   7. Session messages | 343–518 |
+|   8. Mode requests | 519–604 |
+|   9. Room-in-sight messages | 605–639 |
+|   10. Bit reader | 640–654 |
+|   11. Current act and level (join and later) | 655–700 |
+|   12. Client DRLG and the room of a point | 701–742 |
+|   13. Visibility predicate (`0x004DBF20`) | 743–794 |
+|   14. Pet list and the hireling GUID | 795–848 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 849–938 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 939–973 |
+|   17. Model writes made by 1.14d UI code | 974–1120 |
+|   18. Audio driver inputs and the client object functions | 1121–1151 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1152–1372 |
+| Constants & data dependencies | 1373–1385 |
+| Randomness | 1386–1401 |
+| Edge cases & original bugs | 1402–1426 |
+| Test vectors | 1427–1484 |
+| Provenance | 1485–1588 |
+| Open questions | 1589–1757 |
 <!-- /index -->
 
 ## Summary
@@ -160,8 +160,12 @@ position check of the local player.
    stats and local-player status.
 5. **Remove** (`0x00465EE0(GUID, type)` → `0x00465E80`): unlink from S
    (a key not in S: nothing). An item also runs `0x004879D0`. Then free
-   (`0x00465870`): hover text, light, gfx, per-kind data, the message
-   queue (`0x0045F9F0`; queued messages are dropped unapplied); if the
+   (`0x00465870`): first the unit's light (unit `+0x64` ≠ 0 →
+   `0x004743D0`, then `+0x64` := 0; the same body as `0x00464930`,
+   `0x00465870`–`0x0046587F`), then the cast light held in the stat
+   list (`0x00643A00(U, 0)` detaches it; non-zero → `0x004743D0`),
+   so no light of the unit outlives it; then hover text, gfx, per-kind
+   data, the message queue (`0x0045F9F0`; queued messages are dropped unapplied); if the
    unit is the local player, `0x00453DE0` runs and `local_player` :=
    none.
 6. **Creation fields common to every kind** (`0x00466200` players,
@@ -313,7 +317,10 @@ position check of the local player.
 5. far := |x − cx| > T. If far or |y − cy| > T: if kind = 0 and tx > 0
    (signed): d1 := (cx − x)² + (cy − y)² (`0x006492A0`); d1 ≥ 100 →
    rule 8; d2 := (cx − tx)² + (cy − ty)²; d2 ≥ d1 → rule 8; else
-   (the unit is already closer to the target than to the stated point)
+   (the unit is closer to (tx, ty) than to the stated point; for 0x18 /
+   0x95 / 0x96 (tx, ty) is the server's path target reflected through
+   (x, y), `msg-units.md` §5 r3, so this accepts a unit that lags behind
+   the server and corrects one ahead of it)
    far := false and continue with rule 6. Kind ≠ 0 or tx ≤ 0 → rule 8.
 6. (Within tolerance, or accepted by rule 5.) If x = cx or y = cy: go
    to rule 7 as visible. Else (a, b) := U's client pixel point
@@ -453,7 +460,11 @@ position check of the local player.
    the menus, and u32@0x27 is: classic softcore 0x00000004, classic
    hardcore 0x00000804, expansion softcore 0x00100004, expansion
    hardcore 0x00100804 (d2s status bits 0x04 / 0x20,
-   `formats/d2s.md`). REC-46 still confirms on live bytes. Bytes after a
+   `formats/d2s.md`). Recorded (REC-46, 2026-10-09, Wine): a classic
+   softcore character made in the create screen sends 0x00000004, an
+   expansion one 0x00100004; S→C 0x01 u32@2 = 0x4 and u8@6 = 0 for the
+   classic game (`facts/join/a1-new-classic-ama.tsv`,
+   `a1-new-ama.tsv`). Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
@@ -1637,6 +1648,26 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    unit's footprint (because the 1.14d client runs the same path code
    over the same rooms, so its walk stops where the server's does);
    settled by REC-277 (d) with REC-51.
+   *Answered, stamina* (2026-10-09, static read): the 1.14d client never
+   drains stamina. The run drain `0x0057F240` has one caller, the server
+   path event `0x00580C20`; in client code stat 10 is written only by
+   the 0x18 / 0x95 / 0x96 handlers (`0x0045DA03`, `0x0045DB73`,
+   `0x0045DC79`: stat 10 := wire stamina << 8, wire = server total >> 8,
+   `combat/vitals.md` §5.2), so the model holds the server's stamina with
+   its low 8 bits cleared. The client tests it twice, both as "stat 10 =
+   0" on the model value (server raw < 256): the click dispatcher's run
+   flag 0x40 (`0x00462DBF`, `ui/controls.md` §6 r2) and the player
+   update `0x00463390`: local player in mode 3 (run) → `0x00463260`
+   (`0x004636ED`), which on stat 10 = 0 ends the client's run locally
+   (mode machine code 6, `0x00461250`, when `0x00648BF0(path)` is set;
+   else re-path to the path target +0x10 / +0x12 and leave the run
+   through `0x004804A0` / `0x00480E70` or `0x00460830(1)`), with no C→S
+   message. So for server raw stamina 1..255 the 1.14d client already
+   walks while the server still runs (`sim/pathing.md` §9.9 r3:
+   exhausted at raw ≤ 0) until the server's own drain ends the run; §6
+   corrects the gap. PROVISIONAL: the branch detail of `0x00463260`
+   beyond "ends the run" (which branch a town or no-target path takes)
+   (because only the static read was made); settled by REC-602.
 3. ~~`[0x007A04A4]`~~: answered in §6 rule 4 and §7 rule 11
    (2026-10-08 correction: the ping round trip written by 0x8F, not
    only zeroed); the single-player value is open question 18.

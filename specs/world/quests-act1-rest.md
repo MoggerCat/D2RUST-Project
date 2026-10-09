@@ -27,17 +27,17 @@
 |   2. Cairn stones (object classes 17–21) | 148–195 |
 |   3. Town-Cain marker (object class 385, `InitFn` 54) | 196–222 |
 |   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 223–261 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–310 |
-|   6. Party list as read by the quest code | 311–336 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 337–346 |
-|   8. Act I clarifications (implementation questions, 2026-10-06) | 347–417 |
-|   9. Implementation and wiring questions (2026-10-07) | 418–577 |
-| Constants & data dependencies | 578–593 |
-| Randomness | 594–600 |
-| Edge cases & original bugs | 601–624 |
-| Test vectors | 625–656 |
-| Provenance | 657–690 |
-| Open questions | 691–727 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–326 |
+|   6. Party list as read by the quest code | 327–352 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 353–362 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 363–433 |
+|   9. Implementation and wiring questions (2026-10-07) | 434–593 |
+| Constants & data dependencies | 594–609 |
+| Randomness | 610–616 |
+| Edge cases & original bugs | 617–640 |
+| Test vectors | 641–672 |
+| Provenance | 673–706 |
+| Open questions | 707–743 |
 <!-- /index -->
 
 ## Summary
@@ -265,6 +265,22 @@ Called by the A1Q6 credit (`quests-act1.md` §10.8, `0x00596210`: client of P
 via `0x005531C0`, step 1, game difficulty +0x6D) and by six Act II–V
 sites (`0x0058DCE2`, `0x0058DD65`, `0x0058E4F1`, `0x0059C848`,
 `0x005B4D77`, `0x005BC182`).
+
+Call sites read 2026-10-09 (`all.asm`; each passes `mov edx, step`, the
+client from `0x005531C0` in ecx and game +0x6D pushed before the
+`0x005531C0` call, which leaves it on the stack for the `ret 4`):
+
+| Site | Function (source file string) | Quest event | step |
+|---|---|---|---|
+| `0x0059C848` | `0x0059C810` (`a2q6.cpp`, chain 13), called by `0x0059C860` (level-73 players) and `0x0059C920` (their party members) | event 11, Tyrael msg 302 (`quests-act2.md` §8.11; `quests-act2-2.md` §1 item 17) | 2 |
+| `0x0058DD65` | `0x0058DD30` (`a5q6.cpp`, chain 36), the per-player loop of `0x0058DEA0` | event 8, Baal's death, players in level 132 (`quests-act5-2.md` §8.5 r1) | 5 |
+| `0x0058DCE2` | `0x0058DC60` (`a5q6.cpp`), party-member callback of `0x0058DD90` | event 8, members in Act V lacking 40.0, 40.1 (§8.5 r1) | 5 |
+| `0x0058E4F1` | `0x0058E430` (`a5q6.cpp`) | event 13, game join with 40.0 or 40.15 (`quests-act5-2.md` §8.7) | 5 |
+
+So the queue's "Act II ×3, Act III" labels were wrong: three sites are
+Act V (Eve of Destruction) and one is Act II (Seven Tombs). Act V's step
+5 with m = 5 makes n = 5·(difficulty + 1), the next difficulty's
+unlock.
 
 Client +0x0A is a u16 of save flags: bit 5 = expansion character, bits
 8–12 = progression p.

@@ -561,8 +561,10 @@ impl<X: Pending> TickHooks for ActionSim<X> {
     /// 2 order "0x5B, 0x65, 0x8D, 0x5A"). PROVISIONAL (`intents-events.md`
     /// §8.3; REC-401): with more than one client, which 0x5B / 0x65 the
     /// others get is not written; d2rs sends the joiner's to each.
-    /// PROVISIONAL (REC-406): the 0x8D's party word (no spec gives
-    /// `0x0055B620`'s arguments) is the 0x5B's, no party.
+    /// The 0x8D (`0x0055B620`, `intents-events.md` §8.3): single player
+    /// sends its own GUID and party 0xFFFF (none), as recorded; settled
+    /// for one client (REC-406). The multi-client 0x8D (one per player
+    /// unit, party = `0x00554630(Q)`) is q-fix-join-multiclient.
     fn join_sequence(&mut self, game: &mut Game, client: ClientId) {
         use crate::units::messages as m;
         let Some(p) = game.lists.client(client).and_then(|e| e.player) else {

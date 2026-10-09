@@ -10,6 +10,7 @@
 //! of these are enforced by `clippy.toml` and `[lints]` in this crate.
 
 pub mod combat;
+pub mod debug;
 pub mod drlg;
 pub mod game;
 pub mod items;
@@ -17,6 +18,7 @@ pub mod missiles;
 pub mod monsters;
 pub mod path;
 pub mod player;
+pub mod poke;
 pub mod rng;
 pub mod skills;
 pub mod stats;

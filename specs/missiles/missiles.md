@@ -29,22 +29,22 @@
 | Outputs / state changes | 80–93 |
 | Rules | 94–95 |
 |   R1. Data the server keeps per missile | 96–140 |
-|   R2. Creation | 141–331 |
-|   R3. Per-tick dispatch | 332–361 |
-|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 362–492 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 493–545 |
-|   R6. Damage stage (missile-owned part) | 546–666 |
-|   R7. Lifetime and expiry | 667–720 |
-|   R8. Pierce | 721–747 |
-|   R9. Server-do and server-hit catalogues | 748–978 |
-|   R10. Behaviour of the recorded missiles | 979–1013 |
-|   R11. `missiles.txt` columns and their server use | 1014–1061 |
-| Constants & data dependencies | 1062–1088 |
-| Randomness | 1089–1121 |
-| Edge cases & original bugs | 1122–1148 |
-| Test vectors | 1149–1231 |
-| Provenance | 1232–1284 |
-| Open questions | 1285–1366 |
+|   R2. Creation | 141–358 |
+|   R3. Per-tick dispatch | 359–388 |
+|   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 389–519 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–572 |
+|   R6. Damage stage (missile-owned part) | 573–693 |
+|   R7. Lifetime and expiry | 694–747 |
+|   R8. Pierce | 748–774 |
+|   R9. Server-do and server-hit catalogues | 775–1005 |
+|   R10. Behaviour of the recorded missiles | 1006–1040 |
+|   R11. `missiles.txt` columns and their server use | 1041–1088 |
+| Constants & data dependencies | 1089–1115 |
+| Randomness | 1116–1148 |
+| Edge cases & original bugs | 1149–1175 |
+| Test vectors | 1176–1258 |
+| Provenance | 1259–1311 |
+| Open questions | 1312–1393 |
 <!-- /index -->
 
 ## Summary
@@ -273,7 +273,9 @@ question 6).
     flags 0x60000 (`sim/pathing.md` §2; `pathtype_flags` row 4 =
     393216): that is where path flag 0x40000 comes from, so
     `0x00649970` takes its first branch to the missile path compute
-    (§R4.3), never the walking path functions.
+    (§R4.3), never the walking path functions. That branch
+    (`0x006499AE`–`0x006499C2`: `0x00649760` with EAX = path, then
+    return) never reads the town-access argument (read 2026-10-09).
 17. Last-collided unit := owner (`0x0064A400`; only when `LastCollide`,
     §R5.1). With `LastCollide` the missile never hits its owner first.
 18. Path acceleration = `Accel` (signed); maximum velocity =
@@ -288,8 +290,8 @@ question 6).
     §5.28 owns it), `0x005D40F0`,
     `0x005D4680`; they belong to the skills spec.
 22. Skill (clamped ≥ 0), level.
-23. Damage setup `0x0059F900` (owner, origin, missile, level): the skills
-    spec computes the damage data (`0x0064B860`, which may draw up to
+23. Damage setup `0x0059F900` (owner, origin, missile, level),
+    `missiles/damage.md`: computes the damage data (`0x0064B860`, which may draw up to
     three `lo' % 100` checks on the owner's or origin's unit seed in
     `0x0064A850`, D2MOO `MISSILE_HasBonusStats`) and writes it as missile
     stats (`0x0064AC60`). The missile only stores the result: stats 21/22
@@ -320,14 +322,39 @@ code `0x00571F90`. No other missile-creation message is sent by
 `0x0059FA30`; the client builds its own missiles from skill and attack
 messages (`intents-events.md`; open question 5).
 
+Field sources (2026-10-09, REC-414 settled; `0x0059FEE0(client, game,
+M, f)` with f = `0x006486C0(path)` = path +0x7C, the velocity, passed by
+`0x00571F90` at `0x005721B6`; 32 bytes zeroed first, sent by
+`0x0053DA10`):
+
+1. Gates: M is a missile (type 3); its owner U (`0x00552FD0`: missile
+   flag-ex +0xC8 bit 0x400 and the stored owner +0x98 found,
+   `0x00552F60`) exists; the class's `missiles.txt` row has `ClientSend`
+   (row +0x04 & `[0x006CE27C]`). Any gate fails → nothing. The velocity
+   is **not** a gate.
+2. Bytes 1–4 are never written (0).
+3. class u16@5 = M +0x04 (`0x0064A3E0`).
+4. u32@7, u32@0xB = the path's **cell** x, y: path +0x02 and +0x06, the
+   integer halves of the 16.16 position (`0x0045ADF0` → `0x006488C0`,
+   `0x0045AE20` → `0x00648900`, zero-extended words; a missing path → 0).
+5. u32@0xF, u32@0x13 = the path's **target point** +0x10, +0x12
+   (`0x00648A00`, `0x00648A10`, zero-extended) when f ≠ 0, else 0.
+6. u16@0x17 = current frame, missile data +0x10 (`0x0064A380`).
+7. owner type u8@0x19 = U +0x00, owner GUID u32@0x1A = U +0x0C.
+8. level u8@0x1E = missile data +0x0C cut to a byte (`0x0064A210`).
+9. pierce u8@0x1F = total(M, 328, 0) (`0x00625480`) cut to a byte.
+
+```
+client_missile(M, f): U := owner(M); if !U or !row(M).clientsend: return
+  send 0x73 { class, x>>16, y>>16, f ? (target_x, target_y) : (0, 0),
+              frame, U.type, U.guid, level as u8, total(328) as u8 }
+```
+
 d2rs: `units::messages::client_missile` (the field roles are the client
 reader's, `client/msg-units.md` §7 r6) from `View::missile_add` when a
 missile is added to a room's client (`intents-events.md` §7.2 part A).
-PROVISIONAL: the two u32 positions are the path's 16.16 position, the
-optional first point is `points[0]` (cell) when the path has points and a
-non-zero velocity (`0x006486C0`), the frame is the missile data's current
-frame, the level its level cut to a byte, the pierce index stat 328;
-settled by REC-414.
+d2rs differs on three points (q-fix `qfix-a4a-0x73-fields`): it skips the
+message on velocity 0, sends the 16.16 position and sends `points[0]`.
 
 ### R3. Per-tick dispatch
 

@@ -25,14 +25,14 @@
 | Rules | 64–65 |
 |   1. The list of a client unit | 66–101 |
 |   2. Items | 102–265 |
-|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–574 |
-|   4. Skills | 575–606 |
-| Constants & data dependencies | 607–617 |
-| Randomness | 618–622 |
-| Edge cases & original bugs | 623–645 |
-| Test vectors | 646–662 |
-| Provenance | 663–682 |
-| Open questions | 683–736 |
+|   3. States (S→C 0xA7, 0xA8, 0xA9) | 266–579 |
+|   4. Skills | 580–611 |
+| Constants & data dependencies | 612–622 |
+| Randomness | 623–627 |
+| Edge cases & original bugs | 628–650 |
+| Test vectors | 651–667 |
+| Provenance | 668–687 |
+| Open questions | 688–741 |
 <!-- /index -->
 
 ## Summary
@@ -272,7 +272,12 @@ by `total(unit, stat, layer)` and `base(unit, stat, layer)`.
    repeat: stat id := 9 bits; 0x1FF ends; a stat outside the
    itemstatcost table or with `Send Bits` (+0x08) = 0 ends; param := the
    next `Send Param Bits` (+0x09) bits read signed (`client/model.md`
-   §10 rule 3) when that is > 0, else 0; value := the next `Send Bits`
+   §10 rule 3: `0x00411030` sign-extends from the top sent bit) and kept
+   as its low 16 bits (`movzx` at `0x0045EEDD`; 0xAA the same at
+   `0x0045F083`), when that is > 0, else 0, so a sent param with its top
+   bit set keys the entry at 0x10000 − 2^n + low bits (1.14d-confirmed;
+   the server writes the low n bits, the sign of its own param does not
+   matter); value := the next `Send Bits`
    bits, read signed when `Send Bits` < 32 and the stat's flags (+0x04)
    have bit `[0x006CE26C]` (= 2, `signed`; open question 5), else unsigned; add the stat to the state's list (rule 2). After the
    stream: `0x004D9E60(unit, state)` (state on hooks, rule 6.2).

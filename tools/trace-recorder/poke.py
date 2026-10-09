@@ -633,9 +633,12 @@ class PokeLayer:
                           for s in self.abs + self.rel]}
 
     # --- attaching to a TickRecorder-based recorder --------------------
-    def attach(self, rec):
+    def attach(self, rec, before=True):
         """Arm 0x0052FD1E on `rec` (unless armed) and route its stops to
-        on_tick_return. Call after the recorder's module-level EXPECT is set."""
+        on_tick_return. Call after the recorder's module-level EXPECT is set.
+        `before`: the pokes run before the recorder's own handler of that stop
+        (default); False: after it (record_state.py: the snapshot of frame
+        f - 1 is taken first, then the pokes of frame f run, as on d2rs)."""
         rt = sys.modules.get("record_tick")
         if rt is None:
             import record_tick as rt
@@ -652,13 +655,20 @@ class PokeLayer:
             rec.poke_tid = tid
             return orig_bp(tid, addr)
 
-        def handle(addr, ctx):
+        def pokes(addr, ctx):
             if addr == TICK_RET:
                 game = ctx.Esi
                 if getattr(rec, "game", None) in (None, game):
                     frame = struct.unpack("<i", rec.read(game + G_FRAME, 4))[0]
                     layer.on_tick_return(rec, game, frame, rec.poke_tid, ctx)
-            return orig_handle(addr, ctx)
+
+        def handle(addr, ctx):
+            if before:
+                pokes(addr, ctx)
+                return orig_handle(addr, ctx)
+            r = orig_handle(addr, ctx)
+            pokes(addr, ctx)
+            return r
 
         rec.on_breakpoint, rec.handle = on_breakpoint, handle
 
@@ -1242,6 +1252,47 @@ def selftest(repo):
     assert rec.read(0x200400 + U_SEED, 8) == struct.pack("<II", 3, 4)
     assert not lay.pending() and [x["k"] for x in rec.out][0] == "poke_f0"
     n += 1
+
+    # 8. attach: the stop's handler order (before / after the recorder's own)
+    class FakeRt:
+        EXPECT = {}
+    saved_rt = sys.modules.get("record_tick")
+    sys.modules["record_tick"] = FakeRt
+    try:
+        for before in (True, False):
+            order = []
+
+            class Ctx:
+                Esi = game
+
+            class AttRec(Rec):
+                game = None
+                poke_tid = None
+
+                def on_breakpoint(self, tid, addr):
+                    return None
+
+                def handle(self, addr, ctx):
+                    order.append("own")
+
+            ar = AttRec()
+            ar.m = dict(rec.m)
+            ar.w32(game + G_FRAME, 19)
+            al = PokeLayer(absolute=[parse_poke_option("20 seed-game 7 8")])
+            al.run_steps = lambda r, g, f, tid, steps: [order.append("poke") or al.done.add(id(s))
+                                                        for s in steps]
+            al.attach(ar, before=before)
+            assert FakeRt.EXPECT[TICK_RET] == TICK_RET_BYTES
+            ar.on_breakpoint(7, TICK_RET)
+            ar.handle(TICK_RET, Ctx)
+            assert ar.poke_tid == 7
+            assert order == (["poke", "own"] if before else ["own", "poke"]), (before, order)
+            n += 1
+    finally:
+        if saved_rt is None:
+            sys.modules.pop("record_tick", None)
+        else:
+            sys.modules["record_tick"] = saved_rt
     print(f"selftest ok: {len(files)} poke file(s), {n} checks (malformed lines, references, "
           "--poke lines, missile record bytes, call layouts with perturbation, fake-game "
           "resolution and scheduling)")

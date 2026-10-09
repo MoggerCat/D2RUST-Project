@@ -190,17 +190,6 @@ pub trait Pending {
     /// Stops the unit's path (`0x00648730`, `pathing.md` §13.1 rule 3)
     /// without the path provider. Default: nothing.
     fn stop_path(&mut self, unit: UnitId) {}
-    /// `0x005DE6D0` → `0x005DE4E0` walk in radius; false = failed.
-    fn walk_in_radius(
-        &mut self,
-        game: &mut Game,
-        unit: UnitId,
-        target: UnitId,
-        a: i32,
-        b: i32,
-    ) -> bool {
-        false
-    }
 
     // ---- unit queries without a spec rule ------------------------------
 
