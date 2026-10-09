@@ -421,7 +421,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
 51. **[q-scenes-compare] Client footprints of walking monsters (REC-706)** answered → see `docs/handoff/pc1-day4.md`. The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
-58. **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
+58. **[q-scenes-compare] Hover state after a use press (REC-707)** answered → see `docs/handoff/pc1-day4.md`. `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
 - [prov-data] **Hratli's unit seed two steps at creation** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
   `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
@@ -517,7 +517,7 @@ rather than a hand-run recipe.
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
-28. **Interact range test `0x00623660(P, O)`** (REC-94): its formula
+28. **Interact range test `0x00623660(P, O)`** answered → see `docs/handoff/pc1-day4.md`. (REC-94): its formula
     (object size, which positions). Measured under Wine
     (`facts/objects/objanim-a1-town.tsv` run r3): returns 1 for the
     waypoint 119 with the player 4 sub-tiles off in x and 3 in y, 0 at 5;
