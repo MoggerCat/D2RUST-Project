@@ -35,17 +35,17 @@
 |   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–390 |
 |   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 391–497 |
 |   6. A3Q4 The Golden Bird (chain 18, slot 20) | 498–586 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–683 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 684–781 |
-|   9. Act III gossip and intro records | 782–843 |
-|   10. Hooks called from other systems | 844–864 |
-|   11. Clarifications (QC-1 … QC-7) | 865–871 |
-| Constants & data dependencies | 872–888 |
-| Randomness | 889–902 |
-| Edge cases & original bugs | 903–950 |
-| Test vectors | 951–968 |
-| Provenance | 969–995 |
-| Open questions | 996–1023 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–692 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 693–790 |
+|   9. Act III gossip and intro records | 791–852 |
+|   10. Hooks called from other systems | 853–873 |
+|   11. Clarifications (QC-1 … QC-7) | 874–880 |
+| Constants & data dependencies | 881–897 |
+| Randomness | 898–911 |
+| Edge cases & original bugs | 912–959 |
+| Test vectors | 960–977 |
+| Provenance | 978–1004 |
+| Open questions | 1005–1032 |
 <!-- /index -->
 
 ## Summary
@@ -665,8 +665,17 @@ Other victims:
 #### 7.7 The Compelling Orb (object 404)
 
 - Init 60 (`0x005BBBA0`): orb smashed → mode 2. +0x28 = 0 → spawn
-  monster 366 `compellingorb` at the object (`0x005B3090`, mode 1);
-  created → unit flags |= 0x20000, +0x2C := GUID, +0x28 := 1.
+  monster 366 `compellingorb` at the object: `0x005B3090(game, init
+  room +0x08, init x +0x14, init y +0x18, class 366, mode 1, flags 0)`,
+  which is `monsters/population.md` §9 with no cl, r = −1 (one test at
+  exactly the orb's point, no ring, no retry), GUID 0 and flags 0. So
+  the bounds are the room box, the collision test uses class 366's
+  spawnCol mask and SizeX, a blocked point means no monster, party
+  minions §10 run, the monster counts in its region's spawned count
+  (§13), and its vision record is the room's record at the point
+  (§9.6). Created → unit flags |= 0x20000, +0x2C := GUID, +0x28 := 1.
+  1.14d-confirmed (`0x005BBBCA`–`0x005BBBF9`, `0x005B3090`–`0x005B30CF`,
+  read 2026-10-09, PC 1 late).
 - Operate 53 (`0x005BB980`): object mode 0. The player's weapon
   (`0x0063BEF0` on the inventory) must be `qf2 `, else sound 19. +0x38
   += 1; below 2 → return 0 (the first valid hit does nothing). Then:
