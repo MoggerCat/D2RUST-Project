@@ -178,9 +178,7 @@ pub fn skill_button_state(
     at: (i32, i32),
 ) -> u8 {
     let f = tables.flags.get(&skill).copied();
-    let base = if !tables.flags.is_empty() && !f.is_some_and(|f| f.in_game) {
-        1
-    } else if level <= 0 {
+    let base = if (!tables.flags.is_empty() && !f.is_some_and(|f| f.in_game)) || level <= 0 {
         1
     } else if f.is_some_and(|f| f.aura) {
         4
