@@ -87,6 +87,20 @@ impl<X: Pending> View<'_, X> {
         self.h.x.may_attack(s, c)
     }
 
+    /// `MeleeRng` (monstats2 +0x0E) of the scanner's class row, 255 read
+    /// as 0; 0 without a row (REC-1270).
+    fn scanner_reach(&self, unit: UnitId) -> i32 {
+        let t = &self.h.tables.combat;
+        self.units
+            .get(unit)
+            .and_then(|r| t.monstats.get(r.class as usize))
+            .and_then(|m| t.monstats2.get(usize::from(m.monstatsex)))
+            .map_or(0, |m2| match m2.meleerng {
+                255 => 0,
+                r => i32::from(r),
+            })
+    }
+
     /// Room scan 6 with callback `0x005DCBD0` (§5.3): the nearest main
     /// (threat ≥ 2) and alternative (threat < 2) candidates closer than
     /// 49 by the full-size distance; ties keep the earlier unit.
@@ -105,6 +119,16 @@ impl<X: Pending> View<'_, X> {
             // 2.
             let d = crate::monsters::ai::distance_full_size(at, size, self.h.path_position(c));
             if d >= SCAN6_RANGE {
+                continue;
+            }
+            // PROVISIONAL (ai.md §5.3 rule 1; q-fix-ass-traps, REC-1270): a
+            // monster candidate in the scanner's melee range (`0x00622C40`
+            // step 3: d ≤ 0, or d ≤ `MeleeRng` + 1; the line is not tested)
+            // is skipped, whatever its states; 1.14d: a Lightning Sentry
+            // (MeleeRng 0) never picks a Fallen at distance 1
+            // (`ass-lightning-sentry-hit`).
+            let monster = self.units.get(c).is_some_and(|r| r.ty == UnitType::Monster);
+            if monster && (d <= 0 || d <= self.scanner_reach(unit) + 1) {
                 continue;
             }
             // 3.

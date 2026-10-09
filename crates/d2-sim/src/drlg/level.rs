@@ -779,6 +779,17 @@ impl Drlg {
             .count() as u32)
     }
 
+    /// [`Self::populated_room_count`] without allocating: an absent level
+    /// has no rooms (§4.3: allocation generates none), so it counts 0.
+    pub fn populated_room_count_if_present(&self, level_id: u32) -> u32 {
+        self.find_level(level_id).map_or(0, |l| {
+            self.level_rooms(l)
+                .into_iter()
+                .filter(|&r| self.room(r).flags & room_flags::NO_POPULATION == 0)
+                .count() as u32
+        })
+    }
+
     /// `0x00642380` (§11.5 item 3): the warp-room centres (§5.4) of the
     /// room's own level, sub-tiles.
     pub fn warp_points(&self, id: DrlgRoomId) -> &[(i32, i32)] {

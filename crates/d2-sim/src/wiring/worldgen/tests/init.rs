@@ -247,3 +247,61 @@ fn a_lent_world_spawns_like_population() {
     assert!(direct.2, "type init ran");
     assert_eq!(run(true), direct);
 }
+
+// Covers: specs/monsters/population.md §13 r3
+#[test]
+fn death_counts_in_the_region_unless_flag_2_or_aligned() {
+    use crate::wiring::action::MonsterWorld;
+    let mut fx = Fx::new(isle_ds1s());
+    let (a, _) = isle(&mut fx);
+    fx.sim.create_regions();
+    fx.sim
+        .population(&mut fx.game, |cx| preset::place_presets(cx, a));
+    let u = monsters(&fx)[0];
+    let killed = |fx: &Fx| {
+        fx.sim
+            .world
+            .pop
+            .regions
+            .get(ISLE as i32)
+            .unwrap()
+            .evil_killed
+    };
+    assert_eq!(killed(&fx), 0);
+    // An aligned (non-evil) monster does not count.
+    MonsterWorld::<TestPending>::count_death(&mut fx.sim.world, u, 1);
+    assert_eq!(killed(&fx), 0);
+    MonsterWorld::<TestPending>::count_death(&mut fx.sim.world, u, 0);
+    assert_eq!(killed(&fx), 1);
+    // Flag 2 (not counted) does not count.
+    fx.sim.world.monsters.entry(u).not_counted = true;
+    MonsterWorld::<TestPending>::count_death(&mut fx.sim.world, u, 0);
+    assert_eq!(killed(&fx), 1);
+}
+
+// Covers: specs/world/quests.md §4.6
+#[test]
+fn creation_links_the_level_quest_chain() {
+    let chains = |quest: u8| {
+        let mut fx = Fx::with_tables(isle_ds1s(), |t| {
+            t.pop.levels[ISLE as usize].quest = quest;
+        });
+        let (a, _) = isle(&mut fx);
+        fx.sim.create_regions();
+        fx.sim
+            .population(&mut fx.game, |cx| preset::place_presets(cx, a));
+        let u = monsters(&fx)[0];
+        let want = format!("chain {} 1", u.0);
+        fx.sim
+            .action
+            .sys
+            .hooks
+            .x
+            .log
+            .iter()
+            .filter(|l| **l == want)
+            .count()
+    };
+    assert_eq!(chains(1), 1);
+    assert_eq!(chains(0), 0);
+}

@@ -13,11 +13,12 @@ fn set_threat(fx: &mut Fx, threat: u8) {
     fx.sim.hooks().tables = Arc::new(t);
 }
 
-/// A scanner monster at (10, 10), a monster at (12, 10) and a player at
-/// (20, 10), each with unit flag 0x4.
+/// A scanner monster at (10, 10), a monster at (14, 10) (outside the
+/// scanner's melee range, REC-1270) and a player at (20, 10), each with
+/// unit flag 0x4.
 fn three(fx: &mut Fx) -> (UnitId, UnitId, UnitId) {
     let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
-    let c = fx.spawn(UnitType::Monster, 0, fx.a, 12, 10);
+    let c = fx.spawn(UnitType::Monster, 0, fx.a, 14, 10);
     let p = fx.spawn(UnitType::Player, 1, fx.a, 20, 10);
     for u in [m, c, p] {
         fx.sim.sys.units.get_mut(u).unwrap().flags |= UNIT_FLAG_4;
@@ -38,7 +39,7 @@ fn secondary(fx: &mut Fx, m: UnitId) -> (Option<UnitId>, i32, bool) {
 fn threat_below_2_is_the_alternative_and_the_main_target_stays() {
     // Rule 3: a monster of threat 0 competes for the alternative; the
     // player (threat 14) for the main slot. Full-size distances (size 1):
-    // 2 − 1 = 1 and 10 − 1 = 9. The alternative is within 5 but the
+    // 4 − 1 = 3 and 10 − 1 = 9. The alternative is within 5 but the
     // trial path keeps the main target (the host's `choose_alternative`,
     // false here).
     let mut fx = Fx::new();
@@ -48,7 +49,7 @@ fn threat_below_2_is_the_alternative_and_the_main_target_stays() {
         scan(&mut fx, m),
         Scan6 {
             main: Some((p, 9)),
-            alt: Some((c, 1)),
+            alt: Some((c, 3)),
         }
     );
     assert_eq!(secondary(&mut fx, m), (Some(p), 9, false));
@@ -63,7 +64,7 @@ fn nearer_threatening_monster_takes_the_main_slot() {
     assert_eq!(
         scan(&mut fx, m),
         Scan6 {
-            main: Some((c, 1)),
+            main: Some((c, 3)),
             alt: None,
         }
     );
@@ -81,6 +82,23 @@ fn filter_skips_without_flag_4_and_when_not_hostile() {
     fx.sim.sys.units.get_mut(c).unwrap().flags |= UNIT_FLAG_4;
     fx.sim.hooks().x.peaceful.push(c);
     assert_eq!(scan(&mut fx, m).main, Some((p, 9)));
+}
+
+#[test]
+fn monster_in_melee_reach_is_skipped() {
+    // REC-1270: a monster at full-size distance ≤ MeleeRng + 1 (0 + 1).
+    let mut fx = Fx::new();
+    set_threat(&mut fx, 5);
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
+    let c = fx.spawn(UnitType::Monster, 0, fx.a, 12, 10);
+    fx.sim.sys.units.get_mut(c).unwrap().flags |= UNIT_FLAG_4;
+    assert_eq!(
+        scan(&mut fx, m),
+        Scan6 {
+            main: None,
+            alt: None
+        }
+    );
 }
 
 #[test]

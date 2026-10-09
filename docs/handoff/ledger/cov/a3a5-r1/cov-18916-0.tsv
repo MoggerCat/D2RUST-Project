@@ -1,0 +1,14 @@
+coverage-map 1
+monster	511	0	1
+monster	513	0	1
+monster	567	0	2
+monster	568	0	1
+monster	569	0	2
+monster-ai	5967056	567	2
+monster-ai	5967056	568	1
+monster-ai	5967056	569	2
+monster-ai	6189360	511	1
+monster-ai	6189360	513	1
+quest	18	15	1
+quest	22	13	1
+state	105	0	8
