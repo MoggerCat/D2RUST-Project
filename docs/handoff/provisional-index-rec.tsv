@@ -315,7 +315,7 @@ REC-727	6515		NPC "introduction" topic text (PROVISIONAL, `d2-client` `ui/npc_ta
 REC-728	6517		NPC menu-open greeting sound (PROVISIONAL, `d2-client` `ui/npc_box.rs` `open_npc_menu_with	recording	no		1	
 REC-730	6518		Belt / grid potion use and the cursor drop (PROVISIONAL, `d2-sim` `wiring/inventory/potion	recording	no		1	
 REC-731	6519		Remove callback `0x0056E900` "state off" queues the unit, and the regen tick runs it (PROV	unstated	no		1	
-REC-732	6520		Player alignment at the join (PROVISIONAL, `d2-sim` `wiring/action/units.rs` `View::set_al	recording	no		2	
+REC-732	6520		Player alignment at the join (PROVISIONAL, `d2-sim` `wiring/action/units.rs` `View::set_al	recording	no		1	
 REC-740	6540		Item tip anchor (PROVISIONAL, `ui/item_tip.rs` `TipAnchor::at_point`, `draw_tip`; q-fix-ui	unstated	no		1	
 REC-745	6521		Grid drop cell `0x00486BD0` (PROVISIONAL, `d2-client` `ui/panels/inv_items.rs` `grid_drop_	recording	no		1	
 REC-790	6708		Act V removals on the wired host (PROVISIONAL, `d2-sim` `wiring/economy/quest_host.rs`, M2	data	yes		6	
