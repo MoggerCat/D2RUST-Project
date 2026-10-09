@@ -43,9 +43,9 @@
 | Constants & data dependencies | 194–206 |
 | Randomness | 207–213 |
 | Edge cases & original bugs | 214–223 |
-| Test vectors | 224–234 |
-| Provenance | 235–240 |
-| Open questions | 241–261 |
+| Test vectors | 224–235 |
+| Provenance | 236–241 |
+| Open questions | 242–262 |
 <!-- /index -->
 
 ## Summary
@@ -230,6 +230,7 @@ same on both sides.
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |
+| `traces/checks/poke-fallen-town-unpinned.check` (no seed pins), after the join seed fix (staging 9aa0b329) | every unit and the game seed equal for 54 frames | REC-590, 2026-10-09: equal except `sp` of one town monster (class 154) from frame 24 (1.14d 192, d2rs 256), a finding outside this spec |
 | `traces/checks/poke-firebolt.check`: as above, then before frame 8 `missile 58 @x @y @x+3 @y+3 skill 36 1` (Fire Bolt, owner the player) | missile created on both sides, game seed after it equal, the target's hp equal | REC-590, 2026-10-09: missile `ok` (GUID 1) on both, game seed equal every frame after it, leader hp 1024 on both (no damage in town on either side); missiles are not in `state-snapshot.md` records. Damage outside town needs `warp` on 1.14d (Open question 2) |
 
 ## Provenance
