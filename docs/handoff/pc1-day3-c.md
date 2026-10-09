@@ -76,3 +76,19 @@ side needs a release `d2-client` build, which was not run on PC 1):
 `milestone-act5-entry.check`, `milestone-baal-chamber.check`. Each one
 warps from the previous act's town before frame 4 and records 40 frames
 of state.
+
+The same targets are in the harness format as
+`traces/playthrough/milestones-a3-baal.play`: four milestones, `need`
+on player lv / act / x / y (and m 5), plus exactly one Baal (ut 1, cl 544)
+in level 132. It parses, and the harness selftest passes. It has not been
+run on d2rs here (it needs the release `d2-client`). A failing milestone
+there is a d2rs finding for the cloud: queue a q-fix with the
+harness's evidence. Baal on 1.14d: monster level 60, hp 6779904 (1/256
+points), path target = its position.
+
+## Pending / not done
+
+- No q-fix rows: the d2rs side of the four checks was not run on PC 1, so
+  there is no d2rs difference to row yet.
+- No `[play-act3]` / `[play-act5]` / `[prov-*]` / `[store-fill]` items had
+  arrived by the last staging pull.
