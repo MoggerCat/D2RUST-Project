@@ -250,6 +250,13 @@ rather than a hand-run recipe.
     screenshot (Wine screenshots are blank). Commands in "Set up any
     state for a check" below.
 
+24. **Client missile motion and body gaps** (`q-fix-client-missiles-rest`,
+    REC-540–549): `missiles/client.md` Open questions 9 onward: the
+    timed arc `0x004DA5B0` (flag store vs set, the vz division), the
+    motion getters `0x004DA110`–`0x004DA150` (shifted or stored) and the
+    other points that session lists there. Answer into
+    `render/unit-composite.md` §8 and the client missile specs.
+
 ## Step 5 — spec gaps (107 provisional points no spec states)
 
 `docs/handoff/provisional-index.tsv` rows with `settle_kind` = `unstated`
