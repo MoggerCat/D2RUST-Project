@@ -303,7 +303,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     code 8 copies and whether that monster's target was cleared (an AI
     request) before its death; answer into §7.4 rule 7. d2rs tests
     `monster_death.rs` / `e2e_night_world.rs` now expect the spawn point.
-- **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
+57. **[q-fix-real-item-replay-belt-use] Potion use: what entry 3 does to the state (`items/use.md` §3, `0x005BE3F0`)**
     The spec is silent (open question 1); d2rs now does what the
     recording shows (`facts/items/a1-town-potions-low.tsv` n 9–31,
     `a1-town-item-moves.tsv` n 40–51): a potion used from the grid (0x20)
@@ -317,7 +317,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     and whether the unit is queued for update by the toggle
     (`0x00639DB0`) or by the entry itself. d2rs: PROVISIONAL REC-730 in
     `d2-sim/src/wiring/inventory/potion.rs`.
-- **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend**
+47. **[q-fix-pc1-day3-a-r2] Who gives a player its alignment (state 105, stat 172 = 2), and the frame-2 resend** answered → see `docs/handoff/pc1-day4.md`.
     The Wine join of a new sorceress (`facts/join/a1-new-sor.tsv`) shows
     the player already carrying state 105 with stat 172 = 2 in the
     loader's 0xAA (n 8, `aa00010000000c6959f9ff1f`), then at frame 2 a
@@ -352,7 +352,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     `orig.packets.jsonl` (once it takes `frame` input) the join's S->C
     0x9C action 0x0E for the two hp1 (d2rs sends none: its load leaves
     belt items in mode 4) and a C->S `26 02000000 00000000 00000000`.
-- **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)**
+48. **[q-fix-pc1-proto-items] Where the join sets the player's alignment (state 105, stat 172 = 2)** answered → see `docs/handoff/pc1-day4.md`.
     `combat/hit.md` §7.1 says players carry it, and the recording shows
     it in the player's first 0xAA (`packets-town-arrival-ama.check` seq
     39) with a 0xA8 of state 105 one frame later, but no spec names the
@@ -363,7 +363,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     unit in mode 17) gets it too. Answer into `combat/hit.md` §7.1.
     d2rs: PROVISIONAL REC-732, set right after the unit seed
     (`d2-client` `app/single_player.rs` loader, `View::set_alignment`).
-- **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case**
+49. **[q-fix-pc1-proto-items] `0x0059F570` (ACT2Q4 "Jerhyn palace activated") and the Jerhyn AI case** answered → see `docs/handoff/pc1-day4.md`.
     `monsters/ai-bodies.md` §9.9 step 2 row 201 calls `0x0059F570`; no
     spec gives its body. Recorded (`act-travel-lut-ama.check`,
     `join-act2-quests-ama.check`): start Jerhyn's first think (frame 24)
@@ -371,7 +371,7 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
     "= 0 → idle 40" branch is not what runs for a fresh or act-1-done
     character. Read `0x0059F570` (and confirm `0x0059F580`'s outputs a,
     b for these states) into `world/quests-act2.md` §10. d2rs: REC-734.
-- **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array**
+50. **[q-fix-pc1-proto-items] `0x00625870`: the mod-array test and a key absent from the base array** answered → see `docs/handoff/pc1-day4.md`.
     `sim/stat-lists.md` §11 rule 4 was corrected from the recording
     (`packets-town-arrival-ama.check` frame 2: the player update sends
     12, 0, 2, keys in the mod array, and not 67 / 68, base 100 outside
@@ -420,8 +420,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 42. **Control-panel help button `0x004A64C0`** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Step 8 of the UI pass (`ui/panels.md` §5) calls it before the new-stats button; `a4-town-pandemonium-fortress` rows 258–267 draw the text "Help (H)" (CelDrawColor at (714, 403)), `Panel\Levelsocket` frame 0 at (725, 440) and `Panel\Level` frame 0 at (728, 436). Specify when it draws (character level? first game?), its positions and its press / release, for `ui/control-panel.md`.
 43. **Mini panel open at game start (REC-519)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) Every recorded scene has state 0x15 open with no input; name the call that opens it at game entry (and whether a saved setting decides it), for `ui/control-panel.md` §9.
 44. **Shadow pre-test arguments `0x00471620` (REC-511, REC-518)** answered → see `docs/handoff/pc1-day3-c.md`. (q-scenes-compare) The measured shadows fit the §4 box test on the sheared shadow box, and objects need their mode's `BlocksLight`; read the arguments `0x00471620` passes to `0x004709A0` and the object branch, for `render/blend-modes.md` §5 r3.
-- **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
-- **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
+51. **[q-scenes-compare] Client footprints of walking monsters (REC-706)** The 1.14d client stamps mask 0x100 for each living monster (`client/msg-units.md` §3 r2); d2rs re-stamps it at the model position before each client path step. Record the client collision grid (mask 0x100 cells) around Warriv in the Rogue Encampment for 30 ticks while he walks, with the unit's client path position each tick, for `client/model.md` open question 2.
+58. **[q-scenes-compare] Hover state after a use press (REC-707)** `a1-panel-cube` (right click on the cube, no move after) draws the cube with tint 2 and no tip, so `0x007BCBF4` / `0x007BCBE4` are 0 after the press. Name the callers of the hover handler `0x00487000` (move, press, release?) and which code clears the two globals after a right-click use (C→S 0x20), for `ui/inventory.md` §5 r4.
 
 - [prov-data] **Hratli's unit seed two steps at creation** answered → see `docs/handoff/pc1-day3-c.md`. (q-prov-data,
   `world/quests-act3-2.md` §3.3, `monsters/init.md` §4): in the Act III
@@ -639,7 +639,7 @@ lines into the `q-fix-*` row.
   it schedules instead. The same think with a client in the level
   matches (`a4-fortress-arrival-ama`). Evidence: `traces/checks/a4-warp-plains-ama.check`.
 
-- **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes**
+52. **[q-fix-real-unit-seed-order] Client NPC stops a walk the server makes** answered in part (REC-1110 open) → see `docs/handoff/pc1-day4.md`.
   (`client/model.md` §19 r4 "NPC busy", monster data +0x28 bit 0):
   scenes-compare's panel run (SceSor, `-seed 1234`, inventory open at
   tick 22, an item taken to the cursor at 52, put down at 62): the 1.14d
@@ -650,6 +650,11 @@ lines into the `q-fix-*` row.
   its clear, §17 r1.7, is specified) or what else makes the client's
   walk dispatch fall back to neutral here. Blocks a1-panel-character /
   skilltree / automap / esc-menu-wine (Warriv NU frame) in d2rs.
+
+53. **[q-diff-combat-a1] preparation probe at the start (REC-753)** answered → see `docs/handoff/pc1-day4.md` (`sim/pathing.md` §4 r3).
+54. **[q-diff-combat-a1] town NPC thinks while the player runs (REC-754)** answered → see `docs/handoff/pc1-day4.md` (same mechanism as `q-fix-p3-room-empty-think`).
+55. **[pc1-day4] Local player attack / cast mode end and the next click (coordinator blocker 1)** answered → see `docs/handoff/pc1-day4.md` (`client/model.md` §20).
+56. **[pc1-day4] Andariel never dies, Radament stays at 256 hp (playthrough act1 #14, act2 #6)** → see `docs/handoff/pc1-day4.md`.
 
 ## Step 5 — spec gaps (107 provisional points no spec states)
 

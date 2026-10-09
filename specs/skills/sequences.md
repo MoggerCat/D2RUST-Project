@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–289 |
-|   4. The table (`sequences.tsv`) | 290–321 |
-|   5. Users in 1.14d | 322–338 |
-| Constants & data dependencies | 339–347 |
-| Randomness | 348–351 |
-| Edge cases & original bugs | 352–371 |
-| Test vectors | 372–386 |
-| Provenance | 387–401 |
-| Open questions | 402–407 |
+|   3. Frame queries | 112–290 |
+|   4. The table (`sequences.tsv`) | 291–322 |
+|   5. Users in 1.14d | 323–339 |
+| Constants & data dependencies | 340–348 |
+| Randomness | 349–352 |
+| Edge cases & original bugs | 353–372 |
+| Test vectors | 373–387 |
+| Provenance | 388–402 |
+| Open questions | 403–408 |
 <!-- /index -->
 
 ## Summary
@@ -149,7 +149,8 @@ client update:
 3. Advance: animation not complete (`0x006217C0`: +0x48 < 1) → frame
    advance `0x00623E00` (above).
 4. Mode 18 with flag 0x4000 → graphics refresh `0x00470610`.
-5. End: `0x006217C0` true → the neutral end (mode set by `0x004611F0`).
+5. End: `0x006217C0` true → the mode end of `client/model.md` §20 r3
+   (skill end `0x004611F0`, used skill := none, mode set NU / TN).
 
 Request timing: the 0x4C / 0x4D mode request (codes 0x16 / 0x15,
 `client/model.md` §8 rule 4 and rule 7) is a unit-queued message,
