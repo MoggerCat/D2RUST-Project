@@ -170,10 +170,23 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
         "{got:02X?}"
     );
     // A new character has its player record (§8.2 rule 7): 0x5F after
-    // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
-    // no load 0x23).
+    // 0x0B and the two 0x23, plus the loader's one when the class's
+    // `charstats` `StartSkill` is a skill of the install
+    // (`flows/game-join.md` §3 r2).
     assert!(got.windows(2).any(|w| w == [0x0B, 0x5F]), "{got:02X?}");
-    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 2, "{got:02X?}");
+    let start_skill = link
+        .with(|l| {
+            let h = l.host_mut().game.events.action.hooks();
+            let cs =
+                &h.vitals.as_ref().expect("vitals").charstats[single_player::PLAYER_CLASS as usize];
+            usize::from(cs.startskill) < h.tables.skills.skills.len()
+        })
+        .unwrap();
+    assert_eq!(
+        got.iter().filter(|&&i| i == 0x23).count(),
+        2 + usize::from(start_skill),
+        "{got:02X?}"
+    );
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;

@@ -327,13 +327,16 @@ fn play(run: &mut Run, seed: i32) -> Played {
                 (4, 5),
                 (5, 2),
                 // Life, mana and stamina at their maxima: the regeneration
-                // of the ticks between two reads changes nothing.
-                (6, 150 << 8),
+                // of the ticks between two reads changes nothing. The
+                // maximum first: a changed maximum rescales the current
+                // value (`vitals.md` §7.2), so the current value set
+                // before it would not stay at the maximum.
                 (7, 150 << 8),
-                (8, 60 << 8),
+                (6, 150 << 8),
                 (9, 60 << 8),
-                (10, 90 << 8),
+                (8, 60 << 8),
                 (11, 90 << 8),
+                (10, 90 << 8),
                 (12, level),
                 (13, 20_000 + seed),
                 (14, gold),
@@ -365,29 +368,37 @@ fn play(run: &mut Run, seed: i32) -> Played {
             q.flags[d].set(2, 12);
         }
         // (5, 0): the new character's start cube (REC-244) holds (0, 0).
-        give(s, p, 2, page::INVENTORY, (5, 0));
-        give(s, p, 30, page::INVENTORY, (3, 1));
-        give(s, p, 0, page::STASH, (0, 0));
-        give(s, p, 31, page::STASH, (4, 2));
-        give(s, p, 1, page::CUBE, (1, 1));
-        // The hammer in the right hand (body location 4).
-        equip(s, p, 0, 4);
+        give(s, p, *b"hp1 ", page::INVENTORY, (5, 0));
+        give(s, p, *b"mp1 ", page::INVENTORY, (3, 1));
+        give(s, p, *b"rin ", page::STASH, (0, 0));
+        give(s, p, *b"amu ", page::STASH, (4, 2));
+        give(s, p, *b"tsc ", page::CUBE, (1, 1));
+        // A ring on the right ring finger (body location 6): no start kit wears one.
+        equip(s, p, *b"rin ", 6);
     });
     run.step(4);
     played
 }
 
-/// Makes the synthetic item of `record` on the cursor of `owner` (an
+/// Makes the install's item of `code` on the cursor of `owner` (an
 /// inventory made for it when it has none, as the load does) and runs
 /// `put` on the inventory desk with the item (a macro: the desk's hook
 /// type is the host's own).
 macro_rules! make_then {
-    ($s:expr, $owner:expr, $record:expr, |$d:ident, $item:ident| $put:expr) => {{
-        let (s, owner, record): (&mut Sim, UnitId, i32) = ($s, $owner, $record);
+    ($s:expr, $owner:expr, $code:expr, |$d:ident, $item:ident| $put:expr) => {{
+        let (s, owner, code): (&mut Sim, UnitId, [u8; 4]) = ($s, $owner, $code);
         s.world
             .with_economy(&mut s.game, &mut s.events, |econ, parts| {
+                // The install's items row of the code (the item index
+                // runs weapons, armor, misc).
+                let record = econ
+                    .tables
+                    .items
+                    .iter()
+                    .position(|r| r.code == code)
+                    .expect("an items row of the code");
                 let mut rq = ItemRequest {
-                    item: record,
+                    item: record as i32,
                     ilvl: 1,
                     quality: 2,
                     format: 1,
@@ -424,29 +435,29 @@ macro_rules! make_then {
     }};
 }
 
-/// Makes the synthetic item of `record` and stores it at `at` on `pg` of
+/// Makes the install's item of `code` and stores it at `at` on `pg` of
 /// `p`'s inventory (as the item moves leave a stored item).
-fn give(s: &mut Sim, p: UnitId, record: i32, pg: u8, at: (i32, i32)) {
-    let placed = make_then!(s, p, record, |d, item| {
+fn give(s: &mut Sim, p: UnitId, code: [u8; 4], pg: u8, at: (i32, i32)) {
+    let placed = make_then!(s, p, code, |d, item| {
         if let Some(i) = d.state.items.get_mut(&item) {
             i.page = pg;
         }
         d.sync_out();
         d.place(p, item, at, false, true)
     });
-    assert!(placed, "item {record} stored on page {pg} at {at:?}");
+    assert!(placed, "item {code:?} stored on page {pg} at {at:?}");
 }
 
-/// Makes the synthetic item of `record` and equips it on `owner` at body
+/// Makes the install's item of `code` and equips it on `owner` at body
 /// location `loc` from the cursor (the item moves' equip, `inventory.md`).
-fn equip(s: &mut Sim, owner: UnitId, record: i32, loc: u8) {
-    let worn = make_then!(s, owner, record, |d, item| {
+fn equip(s: &mut Sim, owner: UnitId, code: [u8; 4], loc: u8) {
+    let worn = make_then!(s, owner, code, |d, item| {
         match (d.owner_of(owner), d.guid_of(item)) {
             (Some(o), g) => d.equip_from_cursor(o, g, loc, true).0,
             _ => false,
         }
     });
-    assert!(worn, "item {record} worn at body location {loc}");
+    assert!(worn, "item {code:?} worn at body location {loc}");
 }
 
 fn temp(name: &str) -> std::path::PathBuf {
@@ -521,12 +532,19 @@ fn round_trip(class: &str, name: &str, difficulty: u8, seed: i32) {
         .unwrap()
         .with_difficulty(difficulty);
     let mut run = Run::start(&character, &file);
+    // The new character's start items (the install's charstats kit and
+    // the start cube, REC-244) are what the join leaves.
+    let kit = run.live().extra.items.as_ref().map_or(0, Vec::len);
     let played = play(&mut run, seed);
     let before = run.live();
     assert!(
-        // The six of `play` and the start cube (REC-244).
-        before.extra.items.as_ref().is_some_and(|i| i.len() == 7),
-        "{name}: seven items before the save: {:?}",
+        // The six of `play` on top of the kit.
+        before
+            .extra
+            .items
+            .as_ref()
+            .is_some_and(|i| i.len() == kit + 6),
+        "{name}: {kit} + 6 items before the save: {:?}",
         before.extra.items
     );
     run.save_and_exit();
@@ -630,7 +648,7 @@ fn a_mercenary_with_gear_round_trips() {
     });
     let merc = merc.expect("the save's hireling was restored at the join");
     play(&mut run, 1);
-    run.with(move |s| equip(s, merc, 0, 4));
+    run.with(move |s| equip(s, merc, *b"cap ", 1));
     run.step(2);
     let before = run.live();
     assert_eq!(
@@ -757,9 +775,9 @@ fn each_save_keeps_the_previous_file_as_bak() {
     assert_eq!(std::fs::read(&bak).unwrap(), second);
 }
 
-/// Softcore death: the corpse takes the worn hammer, Esc respawns the
+/// Softcore death: the corpse takes the worn items, Esc respawns the
 /// player, Save and Exit writes the corpse section; the reload makes the
-/// corpse again with the hammer in it (`d2s.md` §8.3 rule 4), so the
+/// corpse again with the items in it (`d2s.md` §8.3 rule 4), so the
 /// next save keeps it.
 // Covers: specs/formats/d2s.md §8.3 r4, §2.3
 #[test]
@@ -770,6 +788,18 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     let character = single_player::new_character("sorceress", "Corpse").unwrap();
     let mut run = Run::start(&character, &file);
     play(&mut run, 0);
+    // What the corpse takes: every worn item (the start kit's and the
+    // ring `play` wears); the item's parent field (bits 58-60 of the
+    // entry, `d2s.md` §8) is 1 for a worn one.
+    let worn = run
+        .live()
+        .extra
+        .items
+        .unwrap()
+        .iter()
+        .filter(|e| (e.bytes[7] >> 2) & 7 == 1)
+        .count();
+    assert!(worn >= 2, "the kit's weapon and the ring are worn: {worn}");
     run.with(|s| {
         let (p, _) = single_player::local_player(s).unwrap();
         s.events.action.start_death(&mut s.game, p);
@@ -800,7 +830,11 @@ fn a_corpse_with_its_items_survives_save_and_reload() {
     let before = run.live();
     let corpses = before.extra.corpses.clone().unwrap();
     assert_eq!(corpses.len(), 1, "one corpse with items");
-    assert_eq!(corpses[0].items.len(), 1, "the hammer is on the corpse");
+    assert_eq!(
+        corpses[0].items.len(),
+        worn,
+        "the worn items are on the corpse"
+    );
     assert_eq!(before.status_set, 0x08, "the death starts set the dead bit");
     run.save_and_exit();
     let first = read(&file, 0).unwrap();

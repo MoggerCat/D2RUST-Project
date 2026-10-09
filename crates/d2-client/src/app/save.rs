@@ -380,6 +380,11 @@ pub fn write_file(path: &Path, save: &D2s, tables: &dyn SaveTables) -> Result<()
 pub struct SharedLink<C: d2_server::seams::Clock + Send + 'static>(Arc<Mutex<ThreadLink<Link<C>>>>);
 
 impl<C: d2_server::seams::Clock + Send + 'static> SharedLink<C> {
+    /// Shares `link` with no save handle (a game that is not saved).
+    pub fn new(link: ThreadLink<Link<C>>) -> Self {
+        Self(Arc::new(Mutex::new(link)))
+    }
+
     fn lock(&self) -> std::sync::MutexGuard<'_, ThreadLink<Link<C>>> {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }

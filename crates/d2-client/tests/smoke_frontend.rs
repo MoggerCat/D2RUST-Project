@@ -17,7 +17,7 @@ mod app_support;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bevy::prelude::*;
@@ -31,8 +31,6 @@ use d2_client::ui::front_end::screens::create::{Class, NewCharacter, EXPANSION};
 use d2_client::ui::front_end::*;
 use d2_client::ui::geom::Point;
 use d2_server::seams::Clock;
-
-use app_support::SharedLink;
 
 // ---------------------------------------------------------------- art
 
@@ -309,7 +307,7 @@ struct Joined {
 /// on synthetic panel files.
 struct Game {
     app: App,
-    server: app_support::Server<StepClock>,
+    server: d2_client::app::save::SharedLink<StepClock>,
     ms: Arc<AtomicU32>,
 }
 
@@ -324,8 +322,31 @@ impl Game {
             StepClock(ms.clone()),
         )
         .unwrap();
-        let server = Arc::new(Mutex::new(link));
+        // `play::run`'s save wiring: the server's storage writes the
+        // character's file, the Esc menu's Save and Exit asks for it.
+        let live = app_support::live();
+        let base = d2_client::app::save::base_save(&request);
+        let (server, saver) = match start.save_path.clone() {
+            Some(path) => {
+                let appearance = Some(Arc::new(
+                    d2_client::app::save::appearance_tables(&live.tables.fixed).unwrap(),
+                ));
+                let (shared, handle) = d2_client::app::save::share(
+                    link,
+                    base,
+                    Arc::new(live.save.clone()),
+                    appearance,
+                    path,
+                )
+                .unwrap();
+                (shared, Some(handle))
+            }
+            None => (d2_client::app::save::SharedLink::new(link), None),
+        };
         let mut app = App::new();
+        if let Some(h) = &saver {
+            app.insert_resource(h.clone());
+        }
         app.insert_resource(d2_client::bridge::mirror::ScriptedClock(ms.clone()));
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Image>()
@@ -334,8 +355,7 @@ impl Game {
         // The input system reads the primary window (no OS window here).
         app.world_mut()
             .spawn((Window::default(), bevy::window::PrimaryWindow));
-        d2_client::app::play::add_game(&mut app, Box::new(SharedLink(server.clone())), true)
-            .unwrap();
+        d2_client::app::play::add_game(&mut app, Box::new(server.clone()), true).unwrap();
         d2_client::app::play::send_create_game_flags(&mut app, &request, start.start_flags)
             .unwrap();
         app_support::live_tables(&mut app);
@@ -402,8 +422,10 @@ impl Game {
     }
 
     fn joined(&self) -> Option<Joined> {
-        app_support::local_player(&self.server)?;
-        Some(app_support::with(&self.server, |l| {
+        self.server
+            .with(|l| single_player::local_player(&l.host().game))
+            .unwrap()?;
+        let joined = self.server.with(|l| {
             let sim = &l.host().game;
             let (p, _) = single_player::local_player(sim).expect("joined");
             Joined {
@@ -411,7 +433,8 @@ impl Game {
                 name: sim.world.rest.names.get(&p).cloned().unwrap_or_default(),
                 difficulty: l.host_mut().game.events.action.hooks().ai_info.difficulty,
             }
-        }))
+        });
+        joined.ok()
     }
 
     /// One key press, then its release on the next frame.
@@ -442,20 +465,28 @@ impl Game {
     }
 }
 
-/// A save header with progression `status` (expansion bit, difficulties
-/// open) the select screen reads (`frontend-menus.md` §F2.3).
-fn save_with_status(dir: &Path, name: &str, class: u8, status: u16) {
-    let c = NewCharacter {
-        name: name.into(),
-        class: Class::Amazon,
-        hardcore: false,
-        expansion: true,
+/// A character save on the install with progression `status` (expansion
+/// bit, difficulties open) the select screen reads
+/// (`frontend-menus.md` §F2.3): a new `class` character played to the
+/// Esc menu's Save and Exit, so the file is a whole save the load reads
+/// (a header-only stub has no body), then the header edited and stored
+/// with its checksum (`d2s.md` §3 r1).
+fn save_with_status(dir: &Path, name: &str, class: &str, status: u16) {
+    let cli = CliStart {
+        new: Some((class.into(), name.into())),
+        save_dir: Some(dir.to_path_buf()),
+        ..CliStart::default()
     };
-    let path = write_stub(dir, &c, 1).unwrap();
+    let start = play_start::resolve(&cli, &app_support::game_data(), None, None, None).unwrap();
+    let path = start.save_path.clone().unwrap();
+    let mut game = Game::start(start);
+    game.press(KeyCode::Escape);
+    game.press(KeyCode::ArrowUp);
+    game.press(KeyCode::Enter);
+    assert!(game.exited(), "Save and Exit did not end the game");
     let mut b = std::fs::read(&path).unwrap();
     b[0x24..0x26].copy_from_slice(&status.to_le_bytes());
-    b[0x28] = class;
-    // The header checksum is not checked by the select scan.
+    d2_formats::d2s::finish(&mut b);
     std::fs::write(&path, b).unwrap();
 }
 
@@ -628,7 +659,7 @@ fn esc_options_save_and_exit_then_reload_the_character() {
 fn difficulty_popup_starts_the_game_on_nightmare() {
     let dir = temp_dir("diff");
     // Expansion, progression 5: Normal and Nightmare open.
-    save_with_status(&dir, "Zed", 4, 0x0520);
+    save_with_status(&dir, "Zed", "barbarian", 0x0520);
     let mut f = Front::open(&dir, Entry::MainMenu);
     assert_eq!(f.current(), MAIN_MENU);
     f.click_trigger(Trigger::SinglePlayer);
@@ -729,7 +760,7 @@ fn delete_a_character() {
 /// `play --new CLASS NAME [--save-dir]` and `play --save FILE` still
 /// resolve as before the front end: the new character joins with its
 /// class and name; a name already saved, a save inside the install and a
-/// save on synthetic data stop before the window with an error.
+/// file that is no character save stop before the window with an error.
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn play_cli_new_and_save_paths() {
@@ -756,13 +787,14 @@ fn play_cli_new_and_save_paths() {
     std::fs::write(dir.join("Cli.d2s"), b"x").unwrap();
     let err = play_start::resolve(&cli, &app_support::game_data(), None, None, None).unwrap_err();
     assert!(err.to_string().contains("already exists"), "{err}");
-    // --save: synthetic data cannot read a save; inside the install refused.
+    // --save on the install reads the file: a file that is no character
+    // save stops before the window with the reader's error.
     let save = CliStart {
         save: Some(dir.join("Cli.d2s")),
         ..CliStart::default()
     };
     let err = play_start::resolve(&save, &app_support::game_data(), None, None, None).unwrap_err();
-    assert!(err.to_string().contains("D2_GAME_DIR"), "{err}");
+    assert!(err.to_string().contains("not a character save"), "{err}");
     let err =
         play_start::resolve(&save, &app_support::game_data(), Some(&dir), None, None).unwrap_err();
     assert!(err.to_string().contains("inside the game install"), "{err}");
@@ -825,7 +857,7 @@ fn the_esc_menu_pauses_the_single_player_game() {
     create(&mut f, Class::Sorceress, "Pauser");
     let (g, c) = f.choice();
     let mut game = Game::start(resolve(&dir, g, &c).unwrap());
-    let frame = |game: &Game| app_support::with(&game.server, |l| l.host().game.game.frame);
+    let frame = |game: &Game| game.server.with(|l| l.host().game.game.frame).unwrap();
     let start = frame(&game);
     for _ in 0..5 {
         game.frame();

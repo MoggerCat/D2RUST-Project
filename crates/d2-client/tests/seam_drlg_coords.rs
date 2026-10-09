@@ -247,44 +247,59 @@ fn client_rooms_equal_the_servers_after_the_join() {
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn client_rooms_follow_the_server_across_the_level_border() {
     let (mut bridge, ms) = start();
-    let start_pos = server_player(&mut bridge).expect("placed").0;
-    // The synthetic town room spans sub-tiles x 80..120, the Blood Moor
-    // room 120..160 (`app_level_border.rs`). Stage the charstats
-    // velocities and velocity percent of a 1.14d install, as there.
-    bridge
-        .link_mut()
-        .with(|l: &mut Link| {
-            let g = &mut l.host_mut().game;
-            let (p, _) = single_player::local_player(g).unwrap();
-            let hooks = g.events.action.hooks();
-            let mut t = (*hooks.tables).clone();
-            use d2_data::tables::{Charstats, Record};
-            let mut row = Charstats::decode(&[0u8; Charstats::SIZE]);
-            row.walkvelocity = 6;
-            row.runvelocity = 9;
-            t.combat.charstats = vec![row; 7];
-            hooks.tables = Arc::new(t);
-            let game = &mut g.game;
-            g.events.action.with(game, |_, v| v.set_base(p, 67, 100));
-        })
-        .unwrap();
-    let target = (140u16, start_pos.1 as u16);
-    bridge
-        .send(&d2_proto::client::Walk {
-            x: target.0,
-            y: target.1,
-        })
-        .unwrap();
+    server_player(&mut bridge).expect("placed");
+    // The route out of the town over the server's collision
+    // (`test_fixtures::host::route`, move mask 0x1C09), each leg a walk
+    // intent; the rooms are compared every frame of the way.
     let mut levels = Vec::new();
-    for i in 0..400 {
-        ms.fetch_add(40, Ordering::SeqCst);
-        bridge.frame().unwrap();
-        check_rooms(&mut bridge, &format!("frame {i}"));
-        let (pos, room) = server_player(&mut bridge).expect("placed");
-        if levels.last() != Some(&room.level) {
-            levels.push(room.level);
+    for _ in 0..12 {
+        let legs = bridge
+            .link_mut()
+            .with(|l: &mut Link| {
+                let g = &mut l.host_mut().game;
+                let (p, _) = single_player::local_player(g).unwrap();
+                let h = g.events.action.hooks();
+                let from = h.path_position(p);
+                let d = h.drlg.dungeon.acts[0].as_ref().expect("Act I");
+                let rect = |id| {
+                    d.find_level(id)
+                        .map(|l| d.level(l).rect)
+                        .expect("level allocated")
+                };
+                test_fixtures::host::route(
+                    d,
+                    from,
+                    rect(single_player::ACT1_TOWN),
+                    rect(single_player::BLOOD_MOOR),
+                    12,
+                )
+            })
+            .unwrap();
+        for (x, y) in legs {
+            bridge
+                .send(&d2_proto::client::Walk {
+                    x: x as u16,
+                    y: y as u16,
+                })
+                .unwrap();
+            let mut still = 0;
+            let mut last = None;
+            for i in 0..400 {
+                ms.fetch_add(40, Ordering::SeqCst);
+                bridge.frame().unwrap();
+                check_rooms(&mut bridge, &format!("frame {i}"));
+                let (pos, room) = server_player(&mut bridge).expect("placed");
+                if levels.last() != Some(&room.level) {
+                    levels.push(room.level);
+                }
+                still = if last == Some(pos) { still + 1 } else { 0 };
+                last = Some(pos);
+                if still >= 4 && i > 2 {
+                    break;
+                }
+            }
         }
-        if pos.0 == i32::from(target.0) {
+        if levels.last() == Some(&single_player::BLOOD_MOOR) {
             break;
         }
     }

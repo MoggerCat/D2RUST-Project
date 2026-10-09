@@ -170,10 +170,10 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     let b = &app.world().resource::<BridgeResource>().0;
     let w = b.world();
     assert!(b.log().rejected.is_empty(), "{:?}", b.log().rejected);
-    // 0x03: act 0, the synthetic act's init seed (1), its town level 1,
-    // game +0x80 = 0 (the app game has no object control).
+    // 0x03: act 0, the game seed as the act's init seed (the recorded
+    // join of `-seed 1234`, REC-530: "act init seed 1234").
     let act = w.act.expect("0x03 received");
-    assert_eq!((act.act, act.init_seed), (0, 1));
+    assert_eq!((act.act, act.init_seed), (0, single_player::DEFAULT_SEED));
     let d = w.drlg.as_ref().expect("client DRLG built");
     assert_eq!((d.drlg.act, d.drlg.init_seed), (act.act, act.init_seed));
     assert!(d.drlg.on_client);
@@ -188,30 +188,38 @@ fn the_join_builds_the_client_drlg_in_the_app() {
     let pos = w.units[&me].position.expect("placed by 0x15");
     assert_eq!((i32::from(pos.0), i32::from(pos.1)), server_pos);
     // Game entry's 0x07 for the spawn room, then the room switch's for
-    // each room of its adjacency array (the synthetic town is one room).
+    // each room of its adjacency array: the recorded join's ten 0x07
+    // (REC-530, `traces/sim/join/sim-0530.json`), in the recorded order.
     let shown: Vec<_> = w
         .rooms_in_sight
         .iter()
         .map(|r| (r.show, r.level, r.x, r.y))
         .collect();
-    // The synthetic town room is at tile (16, 0); the Blood Moor room
-    // east of it (tile (24, 0), level 2) is in the town room's adjacency
-    // across the level border (`drlg/rooms.md` §3.3).
+    let recorded: Vec<_> = app_support::recorded_rooms()
+        .into_iter()
+        .map(|(show, level, x, y)| (show, u32::from(level), u32::from(x), u32::from(y)))
+        .collect();
     assert_eq!(
-        shown,
-        vec![(true, 1, 16, 0), (true, 1, 16, 0), (true, 2, 24, 0)]
+        shown
+            .iter()
+            .map(|&(s, l, x, y)| (s, l as u32, x as u32, y as u32))
+            .collect::<Vec<_>>(),
+        recorded
     );
+    let mut distinct = recorded.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
     assert_eq!(
         w.active_rooms.as_ref().map(|r| r.len()),
-        Some(2),
-        "the one room of the town and the bordering Blood Moor room"
+        Some(distinct.len()),
+        "the rooms of the recorded 0x07s"
     );
     // Tick 2 populated the town room, so the client's room was ready and
     // the client pass sent 0x04 (`tick.md` §6 rule 6): the
     // client is in game.
     assert!(w.in_game);
     // The feed answers BlankScreen from the player's level's row (the
-    // synthetic rows have BlankScreen 0).
+    // Rogue Encampment's `BlankScreen` is 0).
     let state = app.world().resource::<WorldViewState>();
     assert!(!state.feed.blank_screen(w).unwrap());
 }

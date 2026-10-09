@@ -90,6 +90,18 @@ fn clicking_the_cave_entrance_takes_the_player_to_the_den_of_evil() {
             .player_level()
     };
     assert_eq!(level(&app), Some(single_player::ACT1_TOWN as u16));
+    // The Den's cave entrance lies in the Blood Moor: the player walks
+    // out of the town by the route over the server's collision.
+    app_support::walk_into(
+        &mut app,
+        &server,
+        &ms,
+        single_player::ACT1_TOWN,
+        single_player::BLOOD_MOOR,
+    );
+    for _ in 0..30 {
+        step(&mut app);
+    }
     // The cave entrance is a tile unit of the client's model.
     let tile = |app: &App| {
         app.world()

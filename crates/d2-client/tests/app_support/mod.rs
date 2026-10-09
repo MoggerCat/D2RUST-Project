@@ -471,3 +471,63 @@ pub fn operate_town_waypoint<C: Clock + Send + 'static>(
     }
     key
 }
+
+/// One server→client message of the recorded join (`traces/sim/join/
+/// sim-0530.json`, REC-530: an expansion sorceress joining a game of the
+/// original 1.14d, `docs/handoff/q-fixture-migrate-2.md`).
+#[derive(Debug, Clone)]
+pub struct RecMsg {
+    /// The server frame (0: before the first tick).
+    pub tick: u32,
+    pub id: u8,
+    pub size: usize,
+    /// The bytes, kept for the position and seed messages (0x03, 0x07,
+    /// 0x0B, 0x15).
+    pub bytes: Option<Vec<u8>>,
+}
+
+/// The recorded join, in the order the original sent it.
+pub fn recorded_join() -> Vec<RecMsg> {
+    const TRACE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../traces/sim/join/sim-0530.json"
+    ));
+    let v: serde_json::Value = serde_json::from_str(TRACE).expect("the join trace is JSON");
+    v["expected"]
+        .as_array()
+        .expect("expected[]")
+        .iter()
+        .map(|e| {
+            let d = &e["data"];
+            RecMsg {
+                tick: e["tick"].as_u64().unwrap() as u32,
+                id: d["id"].as_u64().unwrap() as u8,
+                size: d["size"].as_u64().unwrap() as usize,
+                bytes: d["bytes"].as_str().map(|h| {
+                    (0..h.len())
+                        .step_by(2)
+                        .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+                        .collect()
+                }),
+            }
+        })
+        .collect()
+}
+
+/// The recorded join's 0x07 room messages (S→C RoomShow: x u16, y u16,
+/// level u8 after the id) as `(show, level, x, y)`, in order.
+pub fn recorded_rooms() -> Vec<(bool, u8, u16, u16)> {
+    recorded_join()
+        .into_iter()
+        .filter(|m| m.id == 0x07)
+        .map(|m| {
+            let b = m.bytes.expect("0x07 bytes");
+            (
+                true,
+                b[5],
+                u16::from_le_bytes([b[1], b[2]]),
+                u16::from_le_bytes([b[3], b[4]]),
+            )
+        })
+        .collect()
+}
