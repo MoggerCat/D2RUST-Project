@@ -19,6 +19,27 @@
   (frames, tick entry), `tools/state-snapshot.md` §2 (unit offsets),
   `tools/scenario-diff.md` (one-command run).
 
+<!-- index -->
+| Section | Lines |
+|---|---|
+| Summary | 43–52 |
+| Inputs | 53–59 |
+| Outputs / state changes | 60–64 |
+| Rules | 65–66 |
+|   1. Format `rng-raw-1` with frames and owners | 67–89 |
+|   2. Owners | 90–119 |
+|   3. The d2rs log | 120–139 |
+|   4. The 1.14d recorder (`record_rng.py --frames`) | 140–158 |
+|   5. Comparison (`rng_diff.py`) | 159–182 |
+|   6. The `rng` channel of `scenario-diff` | 183–198 |
+| Constants & data dependencies | 199–202 |
+| Randomness | 203–206 |
+| Edge cases & original bugs | 207–216 |
+| Test vectors | 217–224 |
+| Provenance | 225–229 |
+| Open questions | 230–249 |
+<!-- /index -->
+
 ## Summary
 
 Both games log every seeded draw: op and arguments, the seed before and
