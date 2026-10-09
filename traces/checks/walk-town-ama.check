@@ -1,0 +1,18 @@
+check 1
+# A walk in the Rogue Encampment from one shared input script: ScnAma,
+# -seed 1234; before frame 10's drain a left click at (600, 300) (client
+# pixels, 800 x 600), on 1.14d posted to the window at the tick-return stop
+# of frame 9, on d2rs sent through the bridge's world-click dispatcher
+# after the snapshot of frame 9. Compare the player's mode, path target and
+# position frame by frame. Spec: specs/tools/scenario-diff.md §2 rule 4.
+name walk-town-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 80
+seconds 240
+channels state
+input frame 10; click 600 300
+# known differences unrelated to the walk: the game seed order from frame 2
+# (seed, s, and the monsters' seed-driven tx/ty/hp), the player's fc / sp
+# not written by d2rs. The walk itself: state_diff.py ... --types 0.
+ignore seed s fc sp

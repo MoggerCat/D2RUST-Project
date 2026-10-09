@@ -327,13 +327,17 @@ pub fn placement_tint(fits: bool, under: Option<Under>) -> Placement {
     }
 }
 
-/// An equipment box rectangle (§6 r1): left, top, slot width and height.
+/// An equipment box rectangle (§6 r1): left, top, slot width and height
+/// (the draw point), and the table's right and bottom edges, which the
+/// press test reads with both ends inclusive (`panels-3.md` §29 r1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EquipBox {
     pub left: i32,
     pub top: i32,
     pub w: i32,
     pub h: i32,
+    pub right: i32,
+    pub bottom: i32,
 }
 
 /// Where an item of `iw × ih` cells in body location `loc` is drawn (§6
@@ -1155,6 +1159,8 @@ mod tests {
             top: 200,
             w: 58,
             h: 87,
+            right: 157,
+            bottom: 286,
         };
         let at = |loc, w, h| equip_draw_point(loc, b, (29, 29), (w, h), false);
         // 2 × 3 item fills the slot exactly: no centring offset
@@ -1181,7 +1187,9 @@ mod tests {
                     left: 0,
                     top: 0,
                     w: 28,
-                    h: 28
+                    h: 28,
+                    right: 27,
+                    bottom: 27,
                 },
                 (29, 29),
                 (1, 1),
