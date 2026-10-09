@@ -1,0 +1,13 @@
+check 1
+# Level generation of the Crystalized Cavern Level 1 (level 113): ScnAm5 starts in
+# Harrogath (act 5 open), -seed 1234, idle until frame 20, then the level
+# warp (poke `warp 113`, tile 0) on both sides. Compare the dungeon's rooms,
+# presets and populated units, and the draws (record_rng.py with the
+# poke). Area C (level generation). Spec: specs/tools/scenario-diff.md.
+name a5-warp-crystalized-ama
+save ScnAm5 --class ama --expansion --act 4 --quests acts=4
+seed 1234
+ticks 160
+seconds 900
+channels state rng
+at 20 poke warp 113

@@ -33,6 +33,10 @@ pub const HOST_MONSTER_PRESET: u32 = 6;
 /// object state's `create_object` (allocation and the §3 init).
 pub const HOST_OBJECT_PRESET: u32 = 7;
 
+/// Unit flags `0x005557D0` sets on every unit it creates
+/// (`monsters/population.md` §11.1).
+const PRESET_UNIT_FLAGS: u32 = 0x300_0000;
+
 /// The unit type of an object preset (DS1 object entries).
 pub const OBJECT_PRESET: u32 = 2;
 
@@ -90,7 +94,24 @@ impl<X: Pending> View<'_, X> {
             mode: 0,
             allied: false,
         };
-        self.allocate(game, &req, x, y).is_some()
+        let made = self.allocate(game, &req, x, y);
+        self.mark_preset_unit(made)
+    }
+
+    /// `0x005557D0` sets unit flags 0x3000000 on every unit it creates
+    /// (`monsters/population.md` §11.1, `drlg/rooms.md` §8 rule 6): flag
+    /// 0x2000000 makes the unit `S` of the compress (`sim/units.md` §3.3),
+    /// so a preset object of a level without `SaveMonsters` (the towns)
+    /// is stored when its room is freed and restored by the room's next
+    /// population. True when `made`.
+    fn mark_preset_unit(&mut self, made: Option<UnitId>) -> bool {
+        let Some(u) = made else {
+            return false;
+        };
+        if let Some(r) = self.units.get_mut(u) {
+            r.flags |= PRESET_UNIT_FLAGS;
+        }
+        true
     }
 
     /// One type-2 preset: an object at (x, y) through the object state's
@@ -108,7 +129,11 @@ impl<X: Pending> View<'_, X> {
                 && self.units.get(u).is_some_and(|r| r.class == class)
                 && self.h.path_position(u) == (x, y)
         });
-        !exists && self.create_object(game, room, class, x, y, 0).is_some()
+        if exists {
+            return false;
+        }
+        let made = self.create_object(game, room, class, x, y, 0);
+        self.mark_preset_unit(made)
     }
 
     /// The first walk of `0x005559A0` (`drlg/rooms.md` §6 "First spawn",

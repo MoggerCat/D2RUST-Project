@@ -23,7 +23,7 @@ use std::any::Any;
 
 use crate::monsters::init::MonsterData;
 use crate::units::hooks::Sim;
-use crate::units::UnitId;
+use crate::units::{RoomId, UnitId};
 
 use super::{ActionHooks, Pending, WiringError};
 
@@ -103,6 +103,27 @@ pub trait MonsterWorld<X> {
     fn component_counts(&self, _class: u32) -> Option<[u8; 16]> {
         None
     }
+    /// The creation `0x005B2F20(room, x, y, class, mode, spread, flags)`
+    /// (`monsters/population.md` §9: placement on the room seed, the
+    /// allocation with its type init, alignment, normal and boss mods,
+    /// party) on the lent world. `None`: the world cannot run it (the
+    /// caller allocates plainly); `Some(None)`: nothing placed.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_at(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        x: i32,
+        y: i32,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, x, y, class, mode, spread, flags);
+        None
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
@@ -127,6 +148,18 @@ impl<X> ActionHooks<X> {
         self.monster_world_out = false;
         self.monster_world = Some(w);
         Some(r)
+    }
+
+    /// Runs `f` while a monster route holds the world and runs a call
+    /// that is itself a world call with the world in hand (population's
+    /// creation inside [`MonsterWorld::spawn_at`]): its allocations take
+    /// their type init from that call, as population's own do, so the
+    /// hooks read as "no world lent" rather than "out".
+    pub fn as_world_holder<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let out = std::mem::replace(&mut self.monster_world_out, false);
+        let r = f(self);
+        self.monster_world_out = out;
+        r
     }
 
     /// Lends `w` to the hooks from inside a monster route (a umod

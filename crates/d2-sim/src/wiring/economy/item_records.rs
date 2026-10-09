@@ -109,6 +109,10 @@ impl<H: LifecycleHooks> Economy<'_, H> {
         let v = if it.compact || it.alt { 0 } else { it.unit28 };
         r.init_seed = v;
         r.seed = Seed::init_low(v);
+        if let Some((s, start)) = r.item_seed {
+            item.item_seed = s;
+            item.start_seed = start;
+        }
         let frame = self.game.frame as u32;
         let event3_at = {
             let ctx = RefCell::new(StatCtx::new(self.stats, self.hooks));

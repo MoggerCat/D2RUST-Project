@@ -244,6 +244,8 @@ impl Pending for TestPending {
 /// Rooms per level id; floor grids, with a missile-barrier tile column.
 struct Types {
     rooms: BTreeMap<u32, Vec<TileRect>>,
+    /// Preset units by the room's tile origin (`rooms.md` §8 rule 6).
+    presets: BTreeMap<(i32, i32), Vec<crate::drlg::seams::PresetUnit>>,
 }
 
 impl LevelTypes for Types {
@@ -260,6 +262,11 @@ impl LevelTypes for Types {
             drlg.link_room(r, LinkAt::Tail);
         }
         Ok(())
+    }
+
+    fn preset_units(&self, drlg: &Drlg, room: DrlgRoomId) -> Vec<crate::drlg::seams::PresetUnit> {
+        let r = drlg.room(room).rect;
+        self.presets.get(&(r.x, r.y)).cloned().unwrap_or_default()
     }
 
     /// One floor pass: every cell a floor, edges linked; room-local tile
@@ -436,12 +443,23 @@ impl Fx {
 
     /// The rooms of `rooms` (level id, rect) streamed in order.
     pub fn with_rooms(rooms: &[(u32, TileRect)]) -> Self {
+        Self::with_presets(rooms, BTreeMap::new())
+    }
+
+    /// [`Self::with_rooms`], the rooms' preset units by tile origin.
+    pub fn with_presets(
+        rooms: &[(u32, TileRect)],
+        presets: BTreeMap<(i32, i32), Vec<crate::drlg::seams::PresetUnit>>,
+    ) -> Self {
         let data = drlg_data();
         let mut by_level: BTreeMap<u32, Vec<TileRect>> = BTreeMap::new();
         for &(l, r) in rooms {
             by_level.entry(l).or_default().push(r);
         }
-        let mut types = Types { rooms: by_level };
+        let mut types = Types {
+            rooms: by_level,
+            presets,
+        };
         let drlg = Drlg::create(0, INIT, 0, 0, false, &data, &mut types).expect("drlg");
         let mut dungeon = crate::drlg::Dungeon::default();
         dungeon.acts[0] = Some(drlg);
