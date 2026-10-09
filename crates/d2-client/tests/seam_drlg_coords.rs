@@ -196,7 +196,9 @@ fn start() -> (Bridge<Thread>, Arc<AtomicU32>) {
     // predicate (`model.md` §13 r6) needs the view's camera and art, which
     // this headless bridge has none of, so every unit reads as visible
     // (without it a diagonal 0x96 is refused, OQ7).
-    bridge.set_visibility(Some(d2_client::bridge::world::VisibleFn::new(|_, _, _| true)));
+    bridge.set_visibility(Some(d2_client::bridge::world::VisibleFn::new(|_, _, _| {
+        true
+    })));
     bridge.set_drlg_source(Some(single_player::client_drlg_source(&data)));
     bridge.set_tables(ClientTables {
         levels: single_player::client_level_rows(&data),

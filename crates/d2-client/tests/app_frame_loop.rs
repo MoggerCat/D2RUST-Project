@@ -36,14 +36,13 @@ use bevy::render::gpu_readback::{Readback, ReadbackComplete};
 use bevy::window::ExitCondition;
 use d2_client::app::play::{add_game, send_create_game};
 use d2_client::app::server_thread::ThreadLink;
-use d2_client::app::single_player::{self, GameData, Link, Started, COLD_PLAINS, DEFAULT_SEED};
+use d2_client::app::single_player::{self, GameData, Link, Started, DEFAULT_SEED};
 use d2_client::app::sound::{AudioParts, GameAudio, SoundTable};
 use d2_client::assets::path::{CanonicalPath, MemorySource};
 use d2_client::audio::{
     Cue, CueSource, Sound, SoundId, Trigger, TriggerQueue, TriggerSource, VoiceKind, VoiceParams,
     WavDecoder,
 };
-use d2_client::bridge::link::Sent;
 use d2_client::bridge::world::ClientWorld;
 use d2_client::bridge::{BridgeResource, ClientUnit};
 use d2_client::composite::{ComponentFrame, ComponentRequest, CompositeError, UnitParams};
@@ -65,7 +64,6 @@ use d2_client::world_view::{
 };
 use d2_formats::font::{FontTable, Glyph};
 use d2_formats::palette::{Palette, Rgb};
-use d2_proto::client::TakeOrCloseWp;
 use d2_server::seams::Clock;
 use d2_sim::rng::Seed;
 
@@ -156,7 +154,7 @@ fn frame_loop_ticks_the_server_and_feeds_the_world_view() {
     // 0x04 (`tick.md` §6 rule 6).
     ms.fetch_add(40, Ordering::SeqCst);
     app.update();
-    let (player, player_guid) = app_support::local_player(&server).expect("joined");
+    let (_player, player_guid) = app_support::local_player(&server).expect("joined");
     let b = &bridge(&app).0;
     assert_eq!((b.world().frames, b.world().server_ticks), (3, 2));
     assert!(b.world().in_game, "0x04 received");
