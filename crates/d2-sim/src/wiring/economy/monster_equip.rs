@@ -32,6 +32,7 @@ const MODE_EQUIPPED: u32 = 1;
 /// item level `ilvl`; the item, or none (unknown code, the creation was
 /// refused). Draws on the game seed and the item's own seeds
 /// ([`Economy::create_item`]).
+#[allow(clippy::too_many_arguments)]
 pub fn create_monster_equip<X: Pending>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -92,8 +93,10 @@ pub fn create_monster_equip<X: Pending>(
                 Some(item)
             }
             Err(e) => {
-                if !matches!(e, crate::wiring::economy::EconomyError::Create(CreateError::BadIndex))
-                {
+                if !matches!(
+                    e,
+                    crate::wiring::economy::EconomyError::Create(CreateError::BadIndex)
+                ) {
                     d.failures.push(e);
                 }
                 None
@@ -196,7 +199,15 @@ pub fn summon_equipment<X: Pending>(
         d,
         store: crate::monsters::init::MonsterStore::default(),
     };
-    crate::monsters::init::monequip_rows(&tables.monequip, &mut host, m, Some(owner), cutoff, ilvl, false);
+    crate::monsters::init::monequip_rows(
+        &tables.monequip,
+        &mut host,
+        m,
+        Some(owner),
+        cutoff,
+        ilvl,
+        false,
+    );
 }
 
 /// [`crate::monsters::init::InitHost`] for [`summon_equipment`]: only
@@ -229,7 +240,14 @@ impl<X: Pending> crate::monsters::init::InitHost for SummonEquip<'_, '_, X> {
     fn has_item_at(&mut self, unit: UnitId, loc: u8) -> bool {
         item_at(&*self.h, &*self.sim, unit, loc).is_some()
     }
-    fn create_equip_item(&mut self, unit: UnitId, code: [u8; 4], loc: u8, modifier: u8, level: i32) {
+    fn create_equip_item(
+        &mut self,
+        unit: UnitId,
+        code: [u8; 4],
+        loc: u8,
+        modifier: u8,
+        level: i32,
+    ) {
         create_monster_equip(
             &mut *self.h,
             &mut *self.sim,

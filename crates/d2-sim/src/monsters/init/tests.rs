@@ -956,6 +956,33 @@ fn monequip_rule() {
     assert!(!f.log.iter().any(|l| l.starts_with("item")));
 }
 
+// Covers: specs/skills/bodies.md §6.5 text
+#[test]
+fn summon_equipment_rows() {
+    let mut t = Tables::new(vec![mon(1, 1, 1, 1), mon(5, 1, 1, 1)]);
+    t.monequip = vec![
+        equip(0, 0, 0, &[(b"axe ", 4)]),
+        equip(1, 9, 0, &[(b"hi  ", 4)]),
+        equip(1, 3, 0, &[(b"lo  ", 5)]),
+        equip(1, 0, 0, &[(b"    ", 7)]),
+    ];
+    let rows = t.monequip.clone();
+    let mut f = fake_with(t);
+    f.inventory = true;
+    // oninit 0 rows are used (no test), rows above L are skipped, the
+    // item level is the given one.
+    let u = f.monster(1, 1);
+    f.log.clear();
+    monequip_rows(&rows, &mut f, u, None, 4, 12, false);
+    let items: Vec<&String> = f.log.iter().filter(|l| l.starts_with("item")).collect();
+    // lo at 5 (mod1 9 → 0), and the four-space row with no owner item: none.
+    assert_eq!(items, ["item lo   5 0 12"]);
+    // With the oninit test the same rows give nothing.
+    f.log.clear();
+    monequip_rows(&rows, &mut f, u, None, 4, 12, true);
+    assert!(!f.log.iter().any(|l| l.starts_with("item")));
+}
+
 // ---- §4, §14 ----
 
 // Covers: specs/monsters/init.md §4 text, §4 r1, §4 r2, §4 r3, §4 r4, §4 r5, §4 r6, §14.1, §2, §3, §15

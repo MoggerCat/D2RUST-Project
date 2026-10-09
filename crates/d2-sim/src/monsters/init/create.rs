@@ -322,6 +322,10 @@ pub fn monprop<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, d: u
 
 /// monequip `0x005D6B60(game, 0, unit, −1, level, level, 1)` (§12).
 pub fn monequip<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId, level: i32) {
+    // Only for units with an inventory (unit +0x60).
+    if !h.has_inventory(unit) {
+        return;
+    }
     monequip_rows(cx.tables.monequip, h, unit, None, level, level, true);
 }
 
