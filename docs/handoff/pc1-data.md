@@ -188,6 +188,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 (prose / authored pseudocode, addresses); a code disagreement becomes a
 `q-fix-*` row.
 
+- [q-fix-act4-play] De Seis seal on a WingN1 game: open the Chaos Sanctuary's seal 394 (object 394, De Seis) on a game whose arm file is WingN1 (seal at DS1 x 33; boss spot (-39,+33) lies 6 sub-tiles outside the DS1). Does De Seis spawn, and where? d2rs ends `free_spot` on a spot with no room and leaves the seal shut (`docs/handoff/q-fix-act4-play.md` Open 1).
+
 1. **Vitals dx/dy sign (top suspect for the remaining rubber-banding).**
    S→C 0x18 / 0x95 / 0x96: the server side `0x00548760` vs the client
    side `0x0045DC50` / `0x0045DB20`. `combat/vitals.md` §5.2/§5.4 and
