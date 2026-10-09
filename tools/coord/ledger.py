@@ -70,7 +70,8 @@ class Repo:
             # specs/tools/ describe our own measuring tools, not 1.14d behaviour
             and not os.path.relpath(p, root).replace(os.sep, "/").startswith("specs/tools/"))
         self.checks = sorted(os.path.basename(p)[:-6] for p in
-                             glob.glob(os.path.join(root, "traces", "checks", "*.check")))
+                             glob.glob(os.path.join(root, "traces", "checks", "*.check"))
+                             + glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
         # generated checks (tools/check-gen) may be named in `checks`; they are not
         # part of the completeness rule above
         self.gen_checks = sorted(os.path.basename(p)[:-6] for p in
