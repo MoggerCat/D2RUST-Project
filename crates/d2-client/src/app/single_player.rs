@@ -1688,6 +1688,24 @@ pub fn client_skill_rows(archives: &dyn TableFiles) -> Result<Vec<SkillRow>, Bui
     Ok(rows.iter().map(super::skill_rest::skill_row).collect())
 }
 
+/// The client player update's animation lookup
+/// ([`super::anim_names::ClientPlayerAnims`]): the user's `AnimData.d2`,
+/// the art's token tables and the items tables.
+pub fn client_player_anims(
+    data: &GameData,
+) -> Result<super::anim_names::ClientPlayerAnims, BuildError> {
+    let GameData::Live(d) = data;
+    let looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+        .map_err(BuildError::Tables)?;
+    let inv = InvTables::from_fixed(&d.tables.fixed)
+        .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?;
+    Ok(super::anim_names::ClientPlayerAnims::new(
+        Arc::new(looks),
+        Arc::new(d.tables.anim.clone()),
+        &inv,
+    ))
+}
+
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
 /// §2 rule 8), one entry per `charstats` row, from the user's table.
 pub fn client_class_skills(archives: &dyn TableFiles) -> Result<Vec<[u16; 10]>, BuildError> {
