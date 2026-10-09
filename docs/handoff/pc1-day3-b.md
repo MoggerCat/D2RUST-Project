@@ -270,7 +270,7 @@ spawn.
 - **combat-potion-midfight** (CmbPot, hp1 in belt slots 0 and 4):
   - The player's life is poked to 2560 (10 points) at f60, and `key 1`
     is posted at frame 70.
-  - From f70 life rises 80 per frame (hp1: 30·256·1 / 96 frames ≈ 80,
+  - From f70 life rises 80 per frame (hp1: 30·256 × 2 for the Barbarian / len 192 = 80,
     `items/use.md` §3.1).
   - A Fallen hit lands at f77 (3120 + 80 − 479 = 2721); the regen goes on
     (4801 at f103, …).
