@@ -50,7 +50,7 @@ use d2_data::tables::{Missiles as MissileTable, Overlay, Skills, States};
 
 use crate::assets::path::{CanonicalPath, FileSource};
 use crate::bridge::predict::{cell_centre, facing};
-use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MONSTER};
+use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MISSILE, MONSTER};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::blend::{cel_ops, missile_mode, overlay_mode, MODE_OPAQUE};
 use crate::rules::camera::{moving_to_client, Camera, ClientPos, FrameSize, UnitPosition};
@@ -208,6 +208,9 @@ struct Fx {
     explosion: u16,
     owner: UnitKey,
     id: u32,
+    /// The `missiles` row of a missile effect (a flight or its
+    /// explosion); `None` for a cast overlay.
+    missile: Option<u16>,
 }
 
 /// A file made resident: its archive path, directions and frames.
@@ -416,6 +419,7 @@ impl Missiles {
                     explosion: 0,
                     owner: key,
                     id,
+                    missile: None,
                 });
             }
         }
@@ -468,6 +472,7 @@ impl Missiles {
             explosion,
             owner: key,
             id,
+            missile: Some(missile),
         });
     }
 
@@ -527,6 +532,7 @@ impl Missiles {
                     explosion: 0,
                     owner,
                     id: fid,
+                    missile: Some(id),
                 });
             }
         }
@@ -613,16 +619,22 @@ impl Missiles {
 
     /// The draws of the live effects and the state overlays whose art is
     /// resident, under `camera`, in creation order; a unit's overlays at
-    /// `at(unit)`, the 16.16 position the unit is drawn at.
+    /// `at(unit)`, the 16.16 position the unit is drawn at. A missile
+    /// for which `hidden(missile row, 16.16 position)` is true is not
+    /// drawn (the sight test, `draw-order.md` §5 r3).
     pub fn draws(
         &self,
         world: &ClientWorld,
         camera: &Camera,
         assets: &ViewAssets,
         at: &dyn Fn(&ClientUnit) -> Option<(u32, u32)>,
+        hidden: &dyn Fn(u16, (u32, u32)) -> bool,
     ) -> Vec<MissileDraw> {
         let mut found: Vec<(u32, DrawItem, Join)> = Vec::new();
         for fx in &self.live {
+            if fx.missile.is_some_and(|m| hidden(m, fx.at)) {
+                continue;
+            }
             let at = fx
                 .follow
                 .and_then(|k| world.units.get(&k))
@@ -786,7 +798,8 @@ impl Missiles {
             }
             _ => return log,
         };
-        self.last = self.draws(world, &camera, assets, &at);
+        let hidden = |missile: u16, pos: (u32, u32)| missile_hidden(world, feed, missile, pos);
+        self.last = self.draws(world, &camera, assets, &at, &hidden);
         let Some(slots) = &frame.slots else {
             // No draw order (no map feed): after every other unit.
             if !self.last.is_empty() {
@@ -825,6 +838,31 @@ fn unit_at<F: ViewFeed + ?Sized>(feed: &F, unit: &ClientUnit) -> Option<(u32, u3
         Ok(UnitPosition::Moving { x16, y16 }) => Some((x16, y16)),
         _ => unit.position.map(cell_centre),
     }
+}
+
+/// The sight test of a missile (`draw-order.md` §5 r3: missiles are
+/// tested; `draw-order-2.md` §15): the feed's answer for a missile unit
+/// of row `missile` on the sub-tile of its 16.16 position (the dynamic
+/// path's current sub-tile, §15.1 r2; size `missiles` `Size`,
+/// `path-placement.md` §3). Hidden only on a `Some(true)` answer; a feed
+/// that cannot run the test draws it.
+///
+/// `d2rs-own, unverified`: the effect layer's missiles are not model
+/// units (no client missile creation), so the probe unit stands for one.
+pub(crate) fn missile_hidden<F: ViewFeed + ?Sized>(
+    world: &ClientWorld,
+    feed: &F,
+    missile: u16,
+    pos: (u32, u32),
+) -> bool {
+    let (Ok(x), Ok(y)) = (u16::try_from(pos.0 >> 16), u16::try_from(pos.1 >> 16)) else {
+        return false;
+    };
+    let mut probe = ClientUnit::new(UnitKey::new(MISSILE, u32::MAX));
+    probe.class = u32::from(missile);
+    probe.position = Some((x, y));
+    feed.unit_facts(world, &probe)
+        .is_ok_and(|f| f.sight_hidden == Some(true))
 }
 
 /// Whether the flight at `fx.at` is within one subtile of a living

@@ -896,6 +896,10 @@ fn world_view_frame(
                 game_menu_open: ui.original.as_ref().is_some_and(|o| o.is_open(9)),
                 // d2rs-own, unverified (D1): the preview's hover pick.
                 pick: state.preview,
+                // `seams/world-screen.md` §2.6: the pick inverts the
+                // frame's shaken camera (the anchor decided on a drawn
+                // tick).
+                shake: anchor.map_or((0, 0), |a| a.shake),
             };
             // d2rs-own, unverified (D2): the run lock (command 35) is the
             // toggle action no panel took; the click reads the predicted

@@ -744,6 +744,42 @@ fn the_preview_runs_the_sight_test_over_the_client_drlg() {
     assert_eq!(hidden(&mut feed, &m.w), Some(false));
 }
 
+// Covers: specs/render/draw-order.md §5 r3
+#[test]
+fn missiles_take_the_sight_test() {
+    use crate::world_view::missiles::missile_hidden;
+    use crate::world_view::model_feed::ModelFeed;
+    use crate::world_view::preview::Preview;
+    use crate::world_view::unit_facts::UnitFactTables;
+    use crate::world_view::ViewFeed;
+    use d2_sim::drlg::collision::bits;
+    let mut m = model();
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    let mut feed = ModelFeed::new(ZeroFacts)
+        .with_map()
+        .with_preview(Preview::default());
+    feed.levels = Some(vec![LevelRow::default(); 4]);
+    let mut los_draw = vec![false; 4];
+    los_draw[2] = true;
+    // Missile row 0 has `Size` 1 (`path-placement.md` §3).
+    feed.set_unit_fact_tables(UnitFactTables {
+        missile_size: vec![1],
+        los_draw,
+        ..UnitFactTables::default()
+    });
+    // A missile on sub-tile (46, 20), 0.5 into it.
+    let at = ((46 << 16) + 0x8000, (20 << 16) + 0x8000);
+    assert!(!missile_hidden(&m.w, &feed, 0, at), "open line: drawn");
+    let drlg = &mut m.w.drlg.as_mut().unwrap().drlg;
+    *drlg.collision_at_mut(46, 14).unwrap() |= bits::VISIBLE;
+    assert!(missile_hidden(&m.w, &feed, 0, at), "behind a wall: hidden");
+    // `LOSDraw` 0: every missile passes.
+    feed.unit_tables.as_mut().unwrap().los_draw[2] = false;
+    assert!(!missile_hidden(&m.w, &feed, 0, at));
+}
+
 // Covers: specs/seams/bridge-app.md §2.10
 #[test]
 fn a_new_client_drlg_drops_the_tile_draw_state() {
