@@ -232,3 +232,17 @@ or waypoints, as of the last pull (2026-10-09). Staging is polled every
   1.14d shows. Written into `specs/sim/intents-events.md` §7.8 rule 3.2.
   d2rs's `wiring/action/switch.rs` leaves the cancel out (its doc lists
   it as unspecified). Row `q-fix-p3-leave-cancels-thinks`.
+- **Live runs, done** (Windows, release build of staging at 17:38, the
+  recorders' own lock):
+  - `packets-town-arrival-ama.check`: the c2s stream is now equal (28
+    masked bytes of C→S 0x67 skipped), so `q-fix-tool-c2s-masks` works.
+    New first divergence: frame 2, s2c #66, 1.14d 0xA8 (state 105
+    `alignment`, player 1) where d2rs sends the next 0xAC. Read from the
+    asm: the setter `0x005543B0(P, 2, 1)` runs in the player-unit init
+    `0x005348C0` at the allocation, and its resend marks state 105
+    changed until frame 2's sends. That settles REC-732 (call site and
+    v = 2) in `combat/hit.md` §7.1. d2rs doesn't send it: row
+    `q-fix-p5-alignment-resend`.
+  - `a1-town-arrival-ama.check` (state, 40 frames): no difference in
+    any compared field. PARTIAL only for d2rs's known gaps (`own`, `q`).
+    Warriv still matches after `q-fix-p3-npc-interact-gate`.
