@@ -1,0 +1,2 @@
+soak-log 1 seed=1 save=target/soak/saves/Soaktown5.d2s difficulty=0 kit=1
+241 click R 391 488
