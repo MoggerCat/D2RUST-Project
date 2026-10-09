@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–687 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 688–729 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 730–755 |
-| Constants & data dependencies | 756–762 |
-| Randomness | 763–766 |
-| Edge cases & original bugs | 767–779 |
-| Test vectors | 780–807 |
-| Provenance | 808–826 |
-| Open questions | 827–874 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–684 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 685–726 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 727–752 |
+| Constants & data dependencies | 753–759 |
+| Randomness | 760–763 |
+| Edge cases & original bugs | 764–776 |
+| Test vectors | 777–804 |
+| Provenance | 805–823 |
+| Open questions | 824–871 |
 <!-- /index -->
 
 ## Summary
@@ -344,14 +344,11 @@ check reads it.
    click record `C`: +0 flags, +4 P, +8 the hovered unit `U`
    (`0x00467A10`, `client/model.md` hover), +0xC / +0x10 the click's
    world position (`0x0045AFF0` maps the screen x, y in place,
-   `render/camera.md`; measured 2026-10-09, q-scenes-compare: client
-   (sx + cx_u − shiftX, sy + cy_u − 4), subtile ((px + 2·py) / 32,
-   (2·py − px) / 32) floored, i.e. the unit draw's inverse four rows
-   down: `a1-walk-n` walks to 1.14d's subtile; PROVISIONAL (REC-514):
-   four rows, not eight (the rounding to the nearest subtile; both fit
-   the walk scenes, four keeps a unit's feet picking its own subtile,
-   `seams/world-screen.md` §2.1; settled by a click whose subtile
-   fraction lies in 0.25–0.5, or `0x0045AFF0` itself, PC 1)),
+   `render/camera.md` §4 "Screen → world" owns the mapping: client
+   (sx + cx_u − shiftX, sy + cy_u), no row constant; the 2026-10-09
+   q-scenes-compare measurement of the walk scenes fits it as well as
+   the "− 4" it was first read as, and the re-read of `0x0045AFF0` and
+   its callers settles REC-514 for "no constant"),
    replaced by `U`'s position (`0x0045ADF0`,
    `0x0045AE20`) when `U` is an object (type 2) or an item (type 4),
    +0x14 / +0x18 the walk codes (r4), +0x1C the skill. Flags: kind 0, 1,

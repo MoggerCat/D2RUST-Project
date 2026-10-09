@@ -38,7 +38,7 @@
 | Edge cases & original bugs | 597–632 |
 | Test vectors | 633–647 |
 | Provenance | 648–670 |
-| Open questions | 671–750 |
+| Open questions | 671–751 |
 <!-- /index -->
 
 ## Summary
@@ -696,10 +696,11 @@ Spawned Ancients, Tyrael and the missiles draw from their own code
    mask table entry `0x006CE280` (= 0x40, read from the image).
 4a. Wired host (`d2-sim` `wiring/economy/quest_host.rs`): PROVISIONAL:
    the Ancients' removal `0x0058BEC0` (§7.6) clears state 54 and removes
-   the unit at once (mode 12 not modelled; REC-790); Baal's gold pile
-   `0x0055B030` (§8.7) is `0x0055A090` with max 1 on the host's
-   inventory model, as the gold pickup's rest pile (REC-793). Settled by
-   R-PQ-13 (`docs/handoff/pc2-rec-pc2-quests.md`).
+   the unit at once (mode 12 not modelled; REC-790). Settled by
+   R-PQ-13 (`docs/handoff/pc2-rec-pc2-quests.md`). Baal's gold pile
+   `0x0055B030` (§8.7) is `0x0055A090` with max 32, i.e. one pile for
+   any amount below 2·10⁹ (`items/inventory-moves.md` §10.2; settles
+   REC-793: the host's max-1 call gives the same pile).
 5. ~~The Baal throne AI condition that calls `0x0058E600` and the callers
    of `0x0058E920`: AI / monster specs.~~ **Answered** (2026-10-07): the
    caller of `0x0058E600` is BaalToStairs (AI 138, `0x005EF620`), not the

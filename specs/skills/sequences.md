@@ -22,15 +22,15 @@
 | Rules | 62–63 |
 |   1. Lookup `0x00663310` | 64–90 |
 |   2. Load `0x00621260` | 91–111 |
-|   3. Frame queries | 112–305 |
-|   4. The table (`sequences.tsv`) | 306–337 |
-|   5. Users in 1.14d | 338–354 |
-| Constants & data dependencies | 355–363 |
-| Randomness | 364–367 |
-| Edge cases & original bugs | 368–387 |
-| Test vectors | 388–402 |
-| Provenance | 403–417 |
-| Open questions | 418–423 |
+|   3. Frame queries | 112–323 |
+|   4. The table (`sequences.tsv`) | 324–355 |
+|   5. Users in 1.14d | 356–372 |
+| Constants & data dependencies | 373–381 |
+| Randomness | 382–385 |
+| Edge cases & original bugs | 386–405 |
+| Test vectors | 406–420 |
+| Provenance | 421–435 |
+| Open questions | 436–441 |
 <!-- /index -->
 
 ## Summary
@@ -149,7 +149,8 @@ client update:
 3. Advance: animation not complete (`0x006217C0`: +0x48 < 1) → frame
    advance `0x00623E00` (above).
 4. Mode 18 with flag 0x4000 → graphics refresh `0x00470610`.
-5. End: `0x006217C0` true → the neutral end (mode set by `0x004611F0`).
+5. End: `0x006217C0` true → the mode end of `client/model.md` §20 r3
+   (skill end `0x004611F0`, used skill := none, mode set NU / TN).
 
 Request timing: the 0x4C / 0x4D mode request (codes 0x16 / 0x15,
 `client/model.md` §8 rule 4 and rule 7) is a unit-queued message,
@@ -267,6 +268,23 @@ Whirlwind (`cltstfunc` 31 `0x004C9120`, `cltdofunc` 45 `0x004C9320`):
    open: whether the start runs later than the click for this request
    (e.g. `0x004C52E0` / `0x004648F0` target not ready) or the
    recorder's `px` is not path +0x00. N below uses the measured a.
+   *Recorded (2026-10-09, PC 1, Windows; `record_anim.py` with extra
+   entry hooks on `0x004C6F40`, `0x004C6140`, `0x00649970`,
+   `0x00650840`, `0x004804E0`, RecWw `-seed 1234`, two runs):* the
+   recorder's `px` **is** path +0x00 (unit +0x2C → path → +0x00 /
+   +0x04), and the start is **not** late: the click's `0x004C6F40` →
+   `0x004C6140` → path compute (count 0 → 1) all run in update 0
+   (C = 247 / 262), and the client path **does** step in update 0
+   (5168.500 → 5168.667, 4658.500 → 4658.164). Before the step of
+   update 1 and of update 2 the position reads the start again
+   (5168.500, 4658.500) and steps to the same first point; from update
+   3 it advances (5168.833 …). So the first point is reached three
+   times; something resets the client path position to the start twice
+   between client updates (during the server-tick part of the loop:
+   it is read back at the first `0x00650840` call of the next pass). It
+   is not the position check `0x004804E0` (no call on the player in
+   updates 0–5). The writer is still open (a hardware write watch on
+   path +0x00 would name it); the measured a stays right either way.
 2. Do while moving (flags & 3 = 1): +0x38 := 3·256, +0x48 := 0x500
    (loop A1 3–6). Rate 256: +0x48 runs 2048 − 256·i to 256 at update 7,
    then 1024, 768, 512, 256 per loop; it is 256 after the advance of
