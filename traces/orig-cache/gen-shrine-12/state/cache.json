@@ -1,6 +1,6 @@
 {
  "channel": "state",
- "check": "gen-shrine-11",
+ "check": "gen-shrine-12",
  "command": [
   "tools/trace-recorder/record_state.py",
   "--game",
@@ -12,7 +12,7 @@
   "--auto",
   "ScnAm2",
   "--seed",
-  "49",
+  "5",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -24,13 +24,13 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "af5ec942cd9d0b0205e728a44ec33c81981ec909f07db996437bd74fb26c7274",
-   "size": 276337
+   "sha256": "74d82d7167c7ce952aa878d084d68376be600a813b67cffa3ecc00238e34c28d",
+   "size": 276341
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "1c7918fe1dba0ebc4cb89948d0ddabb80086f0452e95edc84328dc0afeb0e32c",
+  "check": "157590d70376b2b2b04e0e711ec78f03b7569c02b618815ebfdb74047a6a4e49",
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
