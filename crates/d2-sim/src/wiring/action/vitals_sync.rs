@@ -161,7 +161,7 @@ pub fn mod_stat_messages(values: &[(i32, i32)]) -> Vec<Vec<u8>> {
 
 /// `0x0053BE40(client, s, v)`: 0x1D below 0xFF, 0x1E below 0xFFFF, else
 /// 0x1F (`None` for s > 0xFE).
-fn stat_message(stat: u16, value: i32) -> Option<Vec<u8>> {
+pub(crate) fn stat_message(stat: u16, value: i32) -> Option<Vec<u8>> {
     let s = u8::try_from(stat).ok().filter(|&s| s <= 0xFE)?;
     let v = value as u32;
     Some(if v < 0xFF {

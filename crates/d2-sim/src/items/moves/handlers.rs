@@ -514,6 +514,38 @@ pub fn remove_body_item<W: MoveWorld>(w: &mut W, p: Owner, loc: u16) -> Result<u
     Ok(res::OK)
 }
 
+/// `0x00560CD0(game, player, loc, 1)` (`formats/d2s-load.md` §6 rule 1.2,
+/// `world/quests.md` §9.2 mode 1): [`remove_body_item`]'s take-off with
+/// the fourth argument set: the item is not made the cursor item but gets
+/// item flag 0x20; mode 4, command flag 0x10, update entry, stats refresh,
+/// weapon bookkeeping and inventory pass. End state: detached, not freed.
+/// Nothing changes unless the cursor is empty and the body slot check
+/// gives 3 or 4. Returns whether the item was taken off.
+pub fn unequip_detached<W: MoveWorld>(w: &mut W, p: Owner, loc: u8) -> Result<bool, MoveFatal> {
+    if !valid_loc(u32::from(loc)) || w.cursor(p).is_some() {
+        return Ok(false);
+    }
+    let r = w.equip_check(p, loc, None, false);
+    if r != 3 && r != 4 {
+        return Ok(false);
+    }
+    let Some(it) = w.item_to_remove(p, loc) else {
+        return Ok(false);
+    };
+    remove_from_body(w, p, it)?;
+    w.stat_refresh(p);
+    add_iflags(w, it, iflag::COPIED);
+    clear_uflags(w, it, uflag::TARGETABLE);
+    w.set_mode(it, mode::CURSOR);
+    add_cmd(w, it, cmd::UNEQUIP);
+    clear_iflags(w, it, iflag::NOEQUIP);
+    w.update_list_add(p, it);
+    owner_refresh(w, p);
+    w.weapon_bookkeeping(p);
+    w.inventory_pass(p);
+    Ok(true)
+}
+
 // ------------------------------------------------------------------ 0x1D
 
 /// 0x1D SwapCursorWithBody `0x0054AF50` → `0x00560F00` (§7.8).
@@ -983,10 +1015,10 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
         }
         add_iflags(w, dst, iflag::STACK_FULL);
     } else {
-        // PROVISIONAL (§7.12, REC-289): `0x00629930(src)` ("has
-        // durability") read as gating only the stat-72 step, as §8.1's
-        // auto-stack states it; the whole merge under it would keep
-        // quivers and keys from ever merging.
+        // §7.12: `0x00629930(src)` ("has durability") gates only the
+        // stat-72 step, as §8.1's auto-stack states it: keys (3 + 4) and
+        // arrow quivers (30 + 40) merge in 1.14d (recorded, REC-289:
+        // `facts/items/a1-town-item-moves.tsv`).
         if w.merge_allowed(src) {
             let ds = w.stat(s, stat::DURABILITY);
             if ds < w.stat(d, stat::DURABILITY) {
@@ -1001,7 +1033,11 @@ pub fn stack_items<W: MoveWorld>(w: &mut W, p: Owner, src: Guid, dst: Guid) -> u
             w.book_count_changed(p, dst, qs);
         }
         w.set_cursor(p, None);
-        w.send(p, layouts::clear_cursor(Owner::ITEM, src));
+        // S→C 0x42 names the player whose cursor clears (recorded:
+        // `facts/items/a1-town-item-moves.tsv`, `42 00 <player GUID>`;
+        // `client/msg-stats-items.md` §3 rule 1 acts only on the local
+        // player).
+        w.send(p, layouts::clear_cursor(p.ty, p.guid));
         w.free_item(src);
     }
     mark(w, p, dst, cmd::ADD_QUANTITY);
@@ -1404,6 +1440,12 @@ pub fn scroll_into_book<W: MoveWorld>(
         w.remove_from_room(scroll);
         w.free_item(scroll);
         w.set_cursor(p, None);
+        if sm == mode::CURSOR {
+            // Recorded (`facts/items/a1-town-item-moves.tsv`): a cursor
+            // scroll put into its tome clears the player's cursor with
+            // S→C 0x42 before the tome's 0x3E.
+            w.send(p, layouts::clear_cursor(p.ty, p.guid));
+        }
     }
     w.set_stat(b, stat::QUANTITY, q.wrapping_add(1));
     w.send_item_stat(p, book, stat::QUANTITY);

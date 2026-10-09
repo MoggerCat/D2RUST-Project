@@ -28,13 +28,13 @@
 |   C7 Palette | 274–280 |
 |   C8 Cinematics menu (`0x00431600`) | 281–320 |
 |   C9 Sounds (deferred; owner `client/audio.md`) | 321–327 |
-|   C10 640 × 480 | 328–334 |
-| Constants & data dependencies | 335–352 |
-| Randomness | 353–356 |
-| Edge cases & original bugs | 357–374 |
-| Test vectors | 375–394 |
-| Provenance | 395–417 |
-| Open questions | 418–433 |
+|   C10 640 × 480 | 328–336 |
+| Constants & data dependencies | 337–354 |
+| Randomness | 355–358 |
+| Edge cases & original bugs | 359–376 |
+| Test vectors | 377–396 |
+| Provenance | 397–419 |
+| Open questions | 420–435 |
 <!-- /index -->
 
 ## Summary
@@ -328,9 +328,11 @@ The credits screen starts no sound.
 ### C10 640 × 480
 
 The descriptors of C3 and C8 are fixed 800 × 600 coordinates; no 640 × 480 variant exists for these
-screens. PROVISIONAL: with the 640 × 480 game resolution the front end, credits and cinematics menu still
-draw in the 800 × 600 frame with the same positions (because no front-end path reads the resolution
-option and the backgrounds are 800 × 600 art); settled by REC-226.
+screens. With the 640 × 480 game resolution the front end, credits and cinematics menu still
+draw in the 800 × 600 frame with the same positions. Recorded 2026-10-09 (REC-226, Wine: registry
+`Resolution` = 0, `run.sh` X screenshots): the window stays 800 × 600, Credits and Cinematics open
+in it, and the main menu's Single Player, Battle.net and lower button areas are pixel-equal (ImageMagick
+`compare -metric AE` = 0) to a run without the value.
 
 ## Constants & data dependencies
 

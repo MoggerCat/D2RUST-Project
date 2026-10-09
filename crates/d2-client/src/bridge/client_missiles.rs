@@ -25,8 +25,12 @@
 //! collide tests of §C8 and end the missile on the unit (§C9 r2, r4–r8);
 //! the client hit functions are in `hits` (§B6–§B7, §B12).
 //!
-//! Not modelled (each named where it would run): the init callback (§C4
-//! r27), sounds (r28, §C9 r4.4, r6: audio), the umod callback (r29), the
+//! Sounds (§C4 r28, §C9 r4.4, r6) are [`MissileSound`] calls handed to
+//! the audio layer; the owner's umod callbacks run at the create (§C4
+//! r29, umod 29's hook).
+//!
+//! Not modelled (each named where it would run): the init callbacks of
+//! the callers outside the model (§C4 r27; function 8's is run), the
 //! client event hooks (§C9 r4.2), the second pass (§C7 r13), the hit
 //! functions not in `hits` (read as returning non-zero, PROVISIONAL
 //! REC-452), and the client functions not listed in [`update_with`]'s
@@ -121,6 +125,15 @@ pub struct ClientMissileRow {
     /// functions' H1–H4 and c1–c3 (`client-bodies.md` §B1).
     pub clt_hit_sub: [i16; 4],
     pub c_hit_par: [i32; 3],
+    /// The server column `HitSubMissile1` (i16; hit 26 gates on it,
+    /// `client-bodies-2.md` Edge case 3).
+    pub hit_sub1_server: i16,
+    /// `TravelSound`, `HitSound` (i16; §C4 r28, §C9 r4.4, r6).
+    pub travel_sound: i16,
+    pub hit_sound: i16,
+    /// `NoMultiShot` (flags bit 12; the umod 29 hook,
+    /// `monsters/umod-callbacks.md` §28.2).
+    pub no_multishot: bool,
 }
 
 /// The create record (`missiles.md` §R2.1, 0x5C bytes) as the client
@@ -293,6 +306,25 @@ fn straight_path(pos: (u32, u32), target: (i32, i32)) -> Option<((i32, i32), u8)
         (centre(target.0), centre(target.1)),
     ))
 }
+
+/// A client missile's sound call (`audio/triggers.md` §8 r3), handed
+/// to the audio layer as [`super::output::Output::MissileSound`] in
+/// update order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MissileSound {
+    /// A request of `id` on the missile (`0x004B9A00`): `TravelSound` at
+    /// the create (§C4 r28), `HitSound` at the end (§C9 r4.4).
+    Request { id: i32, missile: UnitKey },
+    /// The create's `0x004CA900(owner, 314)` → `0x004BA840`: the owner's
+    /// first request in sound 314's group is stopped (§C4 r28).
+    StopOwnerGroup { owner: UnitKey, id: i32 },
+    /// The end's `0x004CA900(m, TravelSound)` → `0x004BA790`: m's first
+    /// request in the travel sound's group is detached from m (§C9 r6).
+    DetachTravel { missile: UnitKey, id: i32 },
+}
+
+/// The sound 314 whose group the create stops on the owner (§C4 r28).
+const OWNER_STOP_SOUND: i32 = 314;
 
 /// The client missiles of set C, by key.
 pub type ClientMissiles = BTreeMap<UnitKey, ClientMissile>;
@@ -536,7 +568,111 @@ pub fn create(
     w.objclient.missiles.insert(key, m);
     // r26: the light (`render/lighting.md` §8 missile row).
     missile_light(w, key, &row, rec, lights);
+    // r27: the init callback is the caller's (function 8's draws).
+    // r28: `TravelSound` ≠ 0 → a request on m; with an owner, its first
+    // request in sound 314's group stops.
+    if row.travel_sound != 0 {
+        w.objclient.missile_sounds.push(MissileSound::Request {
+            id: i32::from(row.travel_sound),
+            missile: key,
+        });
+    }
+    if let Some(owner) = rec.owner {
+        w.objclient
+            .missile_sounds
+            .push(MissileSound::StopOwnerGroup {
+                owner,
+                id: OWNER_STOP_SOUND,
+            });
+    }
+    // r29: the owner's umod callbacks of phase 4 (`0x004ADE80`).
+    if let Some(owner) = rec.owner {
+        umod_missile(w, rows, owner, key, lights)?;
+    }
     Ok(Some(key))
+}
+
+/// Umod 29 `multishot`'s client hook.
+const UMOD_MULTISHOT: u8 = 29;
+
+/// The umod dispatcher's phase 4 `0x004ADE80(owner, missile)`
+/// (`monsters/umod-callbacks.md` §28.1 r2–r3): an owner of type 1 with
+/// monster data runs, for each of its 9 umod bytes in order (bytes after
+/// a 0 included), the byte's phase-4 hook; only umod 29 has one
+/// (`0x004AD970`, §28.2): unique (type flag 8); m = the missile's class,
+/// in the table and without `NoMultiShot`; O = its owner without the
+/// guard flag (+0x16 0x80); target (tx, ty) = O's target unit's position,
+/// else the missile's path target point; (sx, sy) = the signs of O − (tx,
+/// ty) (0 for m in 63 … 66); with the guard set, two client missiles of
+/// m (`0x004CDBA0`: flags 0x20, owner and origin O) at (tx − sy, ty + sx)
+/// and (tx + sy, ty − sx), the missile's skill and level.
+///
+/// PROVISIONAL (REC-549): the model holds no monster target unit
+/// (`0x004648F0`), so the path target point is used.
+fn umod_missile(
+    w: &mut ClientWorld,
+    rows: &[ClientMissileRow],
+    owner: UnitKey,
+    key: UnitKey,
+    lights: bool,
+) -> Result<(), HandlerError> {
+    if owner.unit_type != MONSTER {
+        return Ok(());
+    }
+    let Some(data) = w.units.get(&owner).and_then(|u| match &u.kind {
+        super::world::KindData::Monster(d) => Some((d.umods, d.flags)),
+        _ => None,
+    }) else {
+        return Ok(());
+    };
+    let (umods, flags) = data;
+    for umod in umods {
+        if umod != UMOD_MULTISHOT || flags & 8 == 0 {
+            continue;
+        }
+        let Some(class) = w.objclient.set_c.get(&key).map(|u| u.class) else {
+            return Ok(());
+        };
+        if rows.get(class as usize).is_none_or(|r| r.no_multishot) {
+            continue;
+        }
+        if w.objclient.multishot_guard.contains(&owner) {
+            continue;
+        }
+        let Some(m) = w.objclient.missiles.get(&key).copied() else {
+            return Ok(());
+        };
+        let Some((ox, oy)) = w.units.get(&owner).map(|u| u.cell()) else {
+            continue;
+        };
+        let (tx, ty) = m.target_point;
+        let (mut sx, mut sy) = ((i32::from(ox) - tx).signum(), (i32::from(oy) - ty).signum());
+        if (63..=66).contains(&class) {
+            (sx, sy) = (0, 0);
+        }
+        w.objclient.multishot_guard.insert(owner);
+        for (cx, cy) in [(tx - sy, ty + sx), (tx + sy, ty - sx)] {
+            let rec = CreateRecord {
+                flags: flag::TARGET_ABSOLUTE,
+                owner: Some(owner),
+                origin: Some(owner),
+                class,
+                tx: cx,
+                ty: cy,
+                skill: m.skill,
+                level: m.level,
+                owner_dir64: Some(m.direction),
+                ..CreateRecord::default()
+            };
+            let made = create(w, rows, &rec, lights);
+            if made.is_err() {
+                w.objclient.multishot_guard.remove(&owner);
+            }
+            made?;
+        }
+        w.objclient.multishot_guard.remove(&owner);
+    }
+    Ok(())
 }
 
 /// A create made by the client missile `parent` (its bodies, §C9 r4.5):
@@ -845,10 +981,10 @@ pub fn update_with(w: &mut ClientWorld, env: &Env, key: UnitKey) -> Result<(), H
         FN_TIGER_FURY => bodies::tiger_fury(w, env, key, &row),
         FN_CHAOS_ICE => bodies::chaos_ice(w, env, key, &row),
         FN_SUC_FIREBALL => bodies::suc_fireball(w, env, key, &row),
-        // §C13 37: frames left 150 → the shake (`render/camera.md` §8,
-        // row `q-fix-shake-starts`), 50 → sound 4,638 (audio); both not
-        // modelled; every branch steps.
-        FN_DIABLO_APPEARS => default_step(w, env, key, &row),
+        // The shake starts of `render/camera.md` §8, then the step.
+        12 | 29 | 31 | 36 | FN_DIABLO_APPEARS | 38 | 54 => bodies::shaker(w, env, key, &row),
+        // Rule W.
+        66 => bodies::worldstone_shake(w, key),
         // f ≤ 0: never stepped (§C6 r5); other functions: not modelled.
         _ => Ok(()),
     }
@@ -1331,7 +1467,12 @@ fn default_step(
 /// The client act's active rooms as read-only [`CollisionRooms`]
 /// (`sim/path-placement.md` §4): a missile's footprint mask is 0
 /// (§3 table), so its moves stamp nothing and `grid_mut` answers none.
-struct MissileRooms<'a>(&'a d2_sim::drlg::Drlg);
+/// A room's grid is its copy with the unit footprints
+/// ([`stamp_unit_footprints`]) when it has one.
+struct MissileRooms<'a>(
+    &'a d2_sim::drlg::Drlg,
+    &'a BTreeMap<RoomId, d2_sim::drlg::CollisionGrid>,
+);
 
 impl CollisionRooms for MissileRooms<'_> {
     fn subtile_rect(&self, room: RoomId) -> Option<d2_sim::drlg::TileRect> {
@@ -1350,12 +1491,103 @@ impl CollisionRooms for MissileRooms<'_> {
         self.0.active_room(n).map(|a| a.id)
     }
     fn grid(&self, room: RoomId) -> Option<&d2_sim::drlg::CollisionGrid> {
+        if let Some(g) = self.1.get(&room) {
+            return Some(g);
+        }
         let r = self.0.drlg_room_of(room)?;
         self.0.active_room(r).map(|a| &a.collision)
     }
     fn grid_mut(&mut self, _: RoomId) -> Option<&mut d2_sim::drlg::CollisionGrid> {
         None
     }
+}
+
+/// [`CollisionRooms`] writing into copies of the client act's grids.
+struct FootRooms<'a> {
+    drlg: &'a d2_sim::drlg::Drlg,
+    grids: BTreeMap<RoomId, d2_sim::drlg::CollisionGrid>,
+}
+
+impl CollisionRooms for FootRooms<'_> {
+    fn subtile_rect(&self, room: RoomId) -> Option<d2_sim::drlg::TileRect> {
+        MissileRooms(self.drlg, &self.grids).subtile_rect(room)
+    }
+    fn adjacent_count(&self, room: RoomId) -> usize {
+        MissileRooms(self.drlg, &self.grids).adjacent_count(room)
+    }
+    fn adjacent(&self, room: RoomId, i: usize) -> Option<RoomId> {
+        MissileRooms(self.drlg, &self.grids).adjacent(room, i)
+    }
+    fn grid(&self, room: RoomId) -> Option<&d2_sim::drlg::CollisionGrid> {
+        if let Some(g) = self.grids.get(&room) {
+            return Some(g);
+        }
+        let r = self.drlg.drlg_room_of(room)?;
+        self.drlg.active_room(r).map(|a| &a.collision)
+    }
+    fn grid_mut(&mut self, room: RoomId) -> Option<&mut d2_sim::drlg::CollisionGrid> {
+        if !self.grids.contains_key(&room) {
+            let r = self.drlg.drlg_room_of(room)?;
+            let g = self.drlg.active_room(r)?.collision.clone();
+            self.grids.insert(room, g);
+        }
+        self.grids.get_mut(&room)
+    }
+}
+
+/// The unit footprints of the client grids as the client missiles read
+/// them, rebuilt once per client update before the set-C missile walk:
+/// every living player and monster of the model at its sub-tile, with
+/// its pattern (`sim/path-placement.md` §3: size 0 → 0, 1 and 2 → 1, 3 →
+/// 2, others → 1; a monster that can be in town (`npc` or `inTown`)
+/// without `interact` 1 → 3, 2 → 4; players size 2, monsters `monstats2`
+/// `SizeX`) and footprint mask (player 0x80, monster 0x100; a dying or
+/// dead monster none, `client/msg-units.md` §3 r2), stamped
+/// (`0x0064EA90`, §5.1) on copies of the rooms' grids.
+///
+/// PROVISIONAL (REC-546): the 1.14d client stamps these on its grids as
+/// its units move (`sim/pathing.md` §13.3 r5); the model's grids carry
+/// none (the local player's walk prediction reads them without other
+/// units, `client/model.md` REC-277 (d)), so the missiles read a copy
+/// stamped at the units' model positions once per update.
+pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::world::MonsterClass>]) {
+    let Some(d) = w.drlg.as_ref() else {
+        w.objclient.unit_grids.clear();
+        return;
+    };
+    let mut rooms = FootRooms {
+        drlg: &d.drlg,
+        grids: BTreeMap::new(),
+    };
+    for (k, u) in &w.units {
+        if u.is_dead() {
+            continue;
+        }
+        let (size, town_npc, mask) = match k.unit_type {
+            PLAYER => (2, false, 0x80),
+            MONSTER => {
+                let c = monsters.get(u.class as usize).and_then(|c| c.as_ref());
+                let size = c.map_or(0, |c| i32::from(c.size_x));
+                let town = c.is_some_and(|c| (c.npc || c.in_town) && !c.interact);
+                (size, town, 0x100)
+            }
+            _ => continue,
+        };
+        let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) else {
+            continue;
+        };
+        let pattern = match (size, town_npc) {
+            (0, _) => 0,
+            (3, false) => 2,
+            (3, true) => 4,
+            (_, true) => 3,
+            _ => 1,
+        };
+        let room = drlg_room_at(&d.drlg, x, y);
+        d2_sim::path::footprint::stamp_pattern(&mut rooms, room, x, y, pattern, mask);
+    }
+    let grids = rooms.grids;
+    w.objclient.unit_grids = grids;
 }
 
 /// The active room of the client act whose sub-tile rect holds (x, y)
@@ -1410,6 +1642,7 @@ fn path_step(w: &mut ClientWorld, env: &Env, key: UnitKey) {
         .and_then(|u| env.rows.get(u.class as usize))
         .map_or(0, |r| move_mask(r.collide_type));
     let drlg = w.drlg.as_ref().map(|d| &d.drlg);
+    let unit_grids = &w.objclient.unit_grids;
     let Some(m) = w.objclient.missiles.get_mut(&key) else {
         return;
     };
@@ -1453,7 +1686,7 @@ fn path_step(w: &mut ClientWorld, env: &Env, key: UnitKey) {
         m.new_step = end_cell != old;
         return;
     };
-    let mut rooms = MissileRooms(drlg);
+    let mut rooms = MissileRooms(drlg, unit_grids);
     // 4.
     let mut q = end;
     if end_cell != old {
@@ -1522,7 +1755,7 @@ fn move_mask(collide_type: u8) -> u16 {
 fn point_value_from(w: &ClientWorld, room: Option<RoomId>, x: i32, y: i32, mask: u16) -> u32 {
     w.drlg.as_ref().map_or(0, |d| {
         u32::from(d2_sim::path::collision::point_value(
-            &MissileRooms(&d.drlg),
+            &MissileRooms(&d.drlg, &w.objclient.unit_grids),
             room,
             x,
             y,
@@ -1551,7 +1784,7 @@ fn collision_under(w: &ClientWorld, env: &Env, key: UnitKey) -> u32 {
         .map_or(0, |r| i32::from(r.size));
     let (x, y) = cell_of(m);
     u32::from(size_value(
-        &MissileRooms(&d.drlg),
+        &MissileRooms(&d.drlg, &w.objclient.unit_grids),
         m.room,
         x,
         y,
@@ -1638,10 +1871,28 @@ pub fn end_with(
         // r4.2: U's client event hooks of kind 0 (`0x004DC210`): not
         // modelled (no client event hook list in the model).
         // r4.3: the client hit function; 0 → the missile stays.
-        if !hits::call(w, env, key, unit, row.clt_hit_func)? {
-            return Ok(None);
+        match hits::call(w, env, key, unit, row.clt_hit_func) {
+            Ok(true) => {}
+            Ok(false) => return Ok(None),
+            Err(e) => {
+                // A body the model cannot run: the error is reported and
+                // the end goes on as for a non-zero result without the
+                // explosion (r7–r8), so the missile does not stay to
+                // fail again on every update (PROVISIONAL REC-547).
+                if let Some(id) = light_of(w, key) {
+                    let _ = w.lights.die(id);
+                }
+                super::objects::remove_client_unit(w, key);
+                return Err(e);
+            }
         }
-        // r4.4: `HitSound` (audio, not modelled).
+        // r4.4: `HitSound` ≥ 0 → a request on m.
+        if row.hit_sound >= 0 {
+            w.objclient.missile_sounds.push(MissileSound::Request {
+                id: i32::from(row.hit_sound),
+                missile: key,
+            });
+        }
         // r4.5: `0x004CDBA0(m, E, 0, 0, skill, level)`: flags 0x20, the
         // owner m's owner (none → none), origin m.
         if row.explosion_missile >= 0 {
@@ -1689,7 +1940,13 @@ pub fn end_with(
     if unit.is_some() && !row.collide_kill {
         return Ok(x);
     }
-    // r6: `TravelSound` stop (audio, not modelled).
+    // r6: `TravelSound` ≥ 0 → its request on m detached.
+    if row.travel_sound >= 0 {
+        w.objclient.missile_sounds.push(MissileSound::DetachTravel {
+            missile: key,
+            id: i32::from(row.travel_sound),
+        });
+    }
     // r7: m's light dies (`0x00474470`, `render/lighting.md` §6.2 r6).
     if let Some(id) = light_of(w, key) {
         let _ = w.lights.die(id);

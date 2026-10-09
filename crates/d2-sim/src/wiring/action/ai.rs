@@ -131,8 +131,14 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn busy(&self, unit: UnitId) -> bool {
         self.units.get(unit).is_some_and(|r| r.interact.active) || self.h.x.busy(unit)
     }
+    /// Monster data +0x30: every monster gets its block at init
+    /// (`0x00572BA0`, `world/npc.md` §2 r2, `monsters/init.md` §5), so any
+    /// monster has one; other units ask [`Pending`].
     fn has_interaction_block(&self, unit: UnitId) -> bool {
-        self.h.x.has_interaction_block(unit)
+        self.units
+            .get(unit)
+            .is_some_and(|r| r.ty == crate::units::UnitType::Monster)
+            || self.h.x.has_interaction_block(unit)
     }
     fn in_interaction_list(&self, npc: UnitId, player: UnitId) -> bool {
         self.h.x.in_interaction_list(npc, player)
@@ -225,10 +231,19 @@ impl<X: Pending> AiModes for View<'_, X> {
             None => self.change_mode(game, unit, mode, target),
         }
     }
-    /// The anim mode (unit +0x10) without a mode change.
-    fn set_anim_mode(&mut self, unit: UnitId, mode: u8) {
-        if let Some(r) = self.units.get_mut(unit) {
-            r.mode = u32::from(mode);
+    /// `0x00624690(unit, mode)` (`units.md` §4.1): no mode start.
+    fn set_anim_mode(&mut self, game: &mut Game, unit: UnitId, mode: u8) {
+        let r = {
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: self.units,
+                stats: self.stats,
+                data: self.data,
+            };
+            crate::units::modes::write_mode(&mut sim, &mut *self.h, unit, u32::from(mode))
+        };
+        if let Err(e) = r {
+            self.unit_error(e);
         }
     }
     /// The path step count: the stop distance `0x00649070` (`ai.md`
@@ -271,6 +286,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn knockback_to_gethit(&mut self, game: &mut Game, unit: UnitId) {
         self.monster_set_mode(game, unit, MODE_GETHIT);
     }
+    /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
+    /// with path step count 1, as the walks to coordinates (`ai.md` §7.2);
+    /// no point → no request, false.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -278,8 +296,15 @@ impl<X: Pending> AiModes for View<'_, X> {
         target: UnitId,
         a: i32,
         b: i32,
+        velocity: &mut crate::monsters::ai::VelocityRequest,
     ) -> bool {
-        self.h.x.walk_in_radius(game, unit, target, a, b)
+        let at = self.h.path_position(unit);
+        let to = self.h.path_position(target);
+        let Some((x, y)) = crate::monsters::ai::radius_point(at, to, a, b) else {
+            return false;
+        };
+        AiModes::set_path_steps(self, unit, 1);
+        self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
     /// The operate entry `0x00584540` (`objects.md` §7.1) with the monster
     /// as operator on the object state ([`super::objects`]); a quest,
@@ -391,8 +416,45 @@ impl<X: Pending> AiTargets for View<'_, X> {
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
         self.h.x.secondary_target(game, unit)
     }
+    /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
+    /// players of the unit's room's near-room list, own room included, in
+    /// list order) keeping the nearest within 15; "close" when it is
+    /// nearer than 4; the unit itself when none.
+    /// PROVISIONAL (`ai.md` §5.3, REC-500): the callback's distance is
+    /// read as the no-size distance `0x005DC530` between the two
+    /// positions, "within 15" as ≤ 15 and a tie keeps the first found;
+    /// settled by a recording of an NPC with a player at 15 / 16 and two
+    /// players at equal distance.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
-        self.h.x.nearest_player(game, unit)
+        use crate::path::collision::CollisionRooms;
+        let Some(room) = game.lists.unit(unit).and_then(|e| e.room()) else {
+            return (unit, false);
+        };
+        let d = &self.h.drlg;
+        let mut rooms: Vec<RoomId> = (0..d.adjacent_count(room))
+            .filter_map(|i| d.adjacent(room, i))
+            .collect();
+        if !rooms.contains(&room) {
+            rooms.insert(0, room);
+        }
+        let players = super::dying::client_players(game);
+        let at = self.h.path_position(unit);
+        let mut best: Option<(UnitId, i32)> = None;
+        for r in rooms {
+            for p in game.lists.room_units(r) {
+                if !players.contains(&p) {
+                    continue;
+                }
+                let dist = crate::monsters::ai::distance_no_size(at, self.h.path_position(p));
+                if dist <= 15 && best.is_none_or(|(_, b)| dist < b) {
+                    best = Some((p, dist));
+                }
+            }
+        }
+        match best {
+            Some((p, dist)) => (p, dist < 4),
+            None => (unit, false),
+        }
     }
     fn find_door(&mut self, game: &mut Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.find_door(game, unit)

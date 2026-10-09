@@ -706,6 +706,64 @@ fn per_kind_init_runs_before_the_unit_is_linked() {
     assert_eq!(sys.hooks.inits.len(), 2);
 }
 
+// Covers: specs/sim/units.md §3.1 r4; specs/sim/rng.md §5.2
+#[test]
+fn the_player_load_draws_the_recorded_unit_seed_before_the_town() {
+    // 1.14d under Wine, `-seed 1234` (game seed {1234, 666} unstepped),
+    // q-fix-real-unit-seed-order: the four creation steps, then the
+    // player's unit seed (seq 2349), then the town's first object.
+    let mut game = Game::new();
+    let mut sys = system();
+    let mut seed = Seed::init_low(1234);
+    let creation: Vec<u32> = (0..4).map(|_| seed.step()).collect();
+    assert_eq!(creation, [2972047412, 1542758918, 1961566614, 2016663226]);
+    let mut req = AllocRequest {
+        ty: UnitType::Player,
+        class: 0,
+        room: None,
+        add: true,
+        fixed_guid: None,
+        mode: 1,
+        allied: true,
+    };
+    let p = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    // The allocation itself draws nothing for a player (r4) …
+    assert_eq!(sys.units.get(p).unwrap().init_seed, 0);
+    // … the load does (r4.1).
+    assert!(super::lifecycle::init_player_seed(
+        &mut sys.units,
+        p,
+        &mut seed
+    ));
+    let rec = sys.units.get(p).unwrap();
+    assert_eq!(
+        (rec.init_seed, rec.seed),
+        (4048349444, Seed::init_low(4048349444))
+    );
+    req.ty = UnitType::Monster;
+    let m = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(sys.units.get(m).unwrap().init_seed, 108806926);
+    // An unknown unit: no draw.
+    let before = seed;
+    sys.units.remove(m);
+    assert!(!super::lifecycle::init_player_seed(
+        &mut sys.units,
+        m,
+        &mut seed
+    ));
+    assert_eq!(seed, before);
+}
+
 // Covers: specs/sim/units.md §3.1 r1, §3.1 r4, §3.1 r6, §3.1 r9
 #[test]
 fn allocation_seeds_and_rejections() {
@@ -1421,4 +1479,49 @@ fn the_sequence_advance_counts_down_and_reads_the_crossed_event_bytes() {
     a.action_frame = 7;
     assert!(!advance_sequence(&mut a));
     assert_eq!(a.action_frame, 7);
+}
+
+// Covers: specs/sim/units.md §4.1
+#[test]
+fn the_inner_mode_write_queues_and_flags_the_unit() {
+    // `0x00624690`, run alone by the inline think of a walk end
+    // (`monsters/ai.md` §1.4): the client hears of it through flag 0x1
+    // (the Rogue Encampment arrival's 0x6D for Warriv at tick 67).
+    let mut game = Game::new();
+    let mut sys = system();
+    let mut seed = Seed::init();
+    let req = AllocRequest {
+        ty: UnitType::Monster,
+        class: 0,
+        room: None,
+        add: false,
+        fixed_guid: None,
+        mode: 1,
+        allied: false,
+    };
+    let m = sys
+        .with(&mut game, |sim, hooks| {
+            allocate(sim, hooks, &mut seed, &req)
+        })
+        .unwrap()
+        .unwrap();
+    sys.units.get_mut(m).unwrap().mode = 2;
+    sys.units.get_mut(m).unwrap().flags &= !super::record::flags::CHANGED;
+    sys.with(&mut game, |sim, hooks| {
+        super::modes::write_mode(sim, hooks, m, 1)
+    })
+    .unwrap();
+    let r = sys.units.get(m).unwrap();
+    assert_eq!(r.mode, 1);
+    assert_ne!(r.flags & super::record::flags::CHANGED, 0);
+    // A monster staying in mode 1: nothing.
+    sys.units.get_mut(m).unwrap().flags &= !super::record::flags::CHANGED;
+    sys.with(&mut game, |sim, hooks| {
+        super::modes::write_mode(sim, hooks, m, 1)
+    })
+    .unwrap();
+    assert_eq!(
+        sys.units.get(m).unwrap().flags & super::record::flags::CHANGED,
+        0
+    );
 }

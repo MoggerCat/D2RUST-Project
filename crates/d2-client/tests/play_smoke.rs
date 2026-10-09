@@ -55,6 +55,8 @@ struct Wire {
     refused: Vec<(u8, Handled)>,
     /// The ids of every S→C message received.
     received: Vec<u8>,
+    /// The same chunks, whole (a chunk holds several messages).
+    chunks: Vec<Vec<u8>>,
     /// Every drained C→S message's id and fate.
     drained: Vec<(u8, Handled)>,
 }
@@ -93,6 +95,7 @@ impl ServerLink for Probe {
     fn receive(&mut self) -> Vec<Vec<u8>> {
         let got = SharedLink(self.server.clone()).receive();
         let mut w = self.wire.lock().unwrap();
+        w.chunks.extend(got.iter().cloned());
         for c in &got {
             // Chunk ids only (the bridge splits them); enough for a trace.
             if let Some(&id) = c.first() {
@@ -1866,4 +1869,58 @@ fn ctrl_click_sells_a_backpack_item_to_the_open_store() {
     run.check("sold");
     // No `no_findings`: the run leg's drawn / server offset (q-fix-real-client-path)
     // is the walk's, not this click's.
+}
+
+/// A Town Portal scroll used in the Rogue Encampment is refused and costs
+/// nothing (`items/use.md` §4; Wine recording `facts/items/
+/// a1-town-portal-cold-plains.tsv` frame 362): the server answers 0x3F and
+/// 0x7C only, no portal object (0x51) and no skill count (0x22), and the
+/// scroll stays in the backpack.
+// Covers: specs/items/use.md §4
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_town_portal_scroll_used_in_town_is_refused_without_cost() {
+    let mut run = Run::start();
+    let scroll = run
+        .local_items()
+        .into_iter()
+        .find(|i| i.code == Some(*b"tsc ") && i.mode == d2_client::bridge::items::mode::STORED)
+        .expect("a Town Portal scroll in the backpack")
+        .key
+        .guid;
+    let before = run.wire.lock().unwrap().chunks.len();
+    let (px, py) = run
+        .app
+        .world()
+        .resource::<BridgeResource>()
+        .0
+        .world()
+        .local()
+        .and_then(|p| p.position)
+        .expect("the player's position");
+    run.bridge()
+        .send(&d2_client::bridge::items::use_grid(
+            scroll,
+            u32::from(px),
+            u32::from(py),
+        ))
+        .unwrap();
+    run.step(10);
+    let got: Vec<u8> = run.wire.lock().unwrap().chunks[before..].concat();
+    let has = |needle: &[u8]| got.windows(needle.len()).any(|w| w == needle);
+    let g = scroll.to_le_bytes();
+    // `3F FF <item> FF FF` (the failure reset) and `7C 04 <item>`.
+    assert!(
+        has(&[0x3F, 0xFF, g[0], g[1], g[2], g[3], 0xFF, 0xFF]),
+        "{got:02X?}"
+    );
+    assert!(has(&[0x7C, 0x04, g[0], g[1], g[2], g[3]]), "{got:02X?}");
+    // No skill count (0x22) for the scroll and no portal object appears.
+    assert!(!has(&[0x22, 0x04]), "{got:02X?}");
+    assert!(
+        run.local_items()
+            .iter()
+            .any(|i| i.key.guid == scroll && i.mode == d2_client::bridge::items::mode::STORED),
+        "the scroll stays"
+    );
 }

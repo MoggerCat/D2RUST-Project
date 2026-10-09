@@ -51,7 +51,7 @@
 | Edge cases & original bugs | 602–621 |
 | Test vectors | 622–637 |
 | Provenance | 638–654 |
-| Open questions | 655–711 |
+| Open questions | 655–715 |
 <!-- /index -->
 
 ## Summary
@@ -700,11 +700,15 @@ the owners named there. §C14 r9: the body reads listed in
     reader of function 59 (`client-bodies.md` §B5 r6). PROVISIONAL: the
     stored values are copied as they are and function 59 reads the
     stored z (because no shift is stated); settled by REC-541 (PC 1 Step
-    4 item 21).
+    4 item 24).
 11. §C9 r4.1: the state list of state 86 is made by `0x006251F0(0, 2,
     NextDelay, U type, U GUID)`; is `NextDelay` the list's expire frame
     (+0x18, `sim/stat-lists.md` §10.4) as an absolute client frame, or
     a count from now, and which client pass removes it? PROVISIONAL: a
     count of client updates, removed before the set-C missile walk
     (because the column is a delay); settled by REC-545 (PC 1 Step 4
-    item 21).
+    item 24).
+12. §C9 r6 detaches the travel sound with `0x004BA790(h, U, force)`:
+    which force? PROVISIONAL: 0 (because a looping travel sound then
+    stops with its last unit, as the unit free does); settled by REC-548
+    (PC 1 Step 4 item 24).

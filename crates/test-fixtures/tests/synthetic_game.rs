@@ -1062,6 +1062,48 @@ fn leave_needs_state_4() {
     assert_eq!(faults(&host), []);
 }
 
+// Covers: specs/sim/intents-events.md §8.2 r3, §8.2 r3
+#[test]
+fn loader_item_skill_messages_follow_the_add_messages() {
+    use d2_sim::units::messages as m;
+    // The loader's item calls queued three messages (0x22 twice, 0x21):
+    // they go after 0x76 and before the 0x0B and the 0x23 (rule 3.1 (c));
+    // the other item messages stay with rule 3.5.
+    let mut g = 0;
+    let j = join_with(|s, player| {
+        g = s.game.lists.unit(player).unwrap().guid;
+        let skills = s.events.action.hooks().tables.skills.skills.len();
+        let a = &mut s.events.action;
+        a.sys.hooks.session.join_items.insert(
+            player,
+            vec![
+                m::update_item_skill(0, g, 219, 2, false).to_vec(),
+                m::update_item_skill(0, g, 217, 1, false).to_vec(),
+                m::update_oskill(0, false, g, 36, 0, 1).to_vec(),
+            ],
+        );
+        assert_eq!(enter_game(s, CLIENT, &entry(skills)), Ok(player));
+    });
+    let ids: Vec<u8> = j.received.iter().map(|b| b[0]).collect();
+    let at = |pred: &dyn Fn(&Vec<u8>) -> bool| {
+        j.received
+            .iter()
+            .position(pred)
+            .unwrap_or_else(|| panic!("message ids {ids:02x?}"))
+    };
+    let id = |b: &Vec<u8>, i: u8| b[0] == i;
+    let (p76, p0b) = (at(&|b| id(b, 0x76)), at(&|b| id(b, 0x0B)));
+    let p22: Vec<usize> = (0..j.received.len())
+        .filter(|&i| j.received[i][0] == 0x22)
+        .collect();
+    let p21 = at(&|b| id(b, 0x21));
+    let p23 = at(&|b| id(b, 0x23));
+    assert_eq!(p22.len(), 2);
+    assert!(p76 < p22[0] && p22[0] < p22[1] && p22[1] < p21 && p21 < p0b);
+    assert!(p21 < p23);
+    assert_eq!(j.received[p21][7..11], [36, 0, 0, 1]);
+}
+
 // Covers: specs/sim/intents-events.md §2.5 r3, §2.5 r5, §2.5 r6
 #[test]
 fn game_list_and_the_no_effect_ids() {
@@ -1074,6 +1116,8 @@ fn game_list_and_the_no_effect_ids() {
     game[0] = 0xB2;
     game[1..5].copy_from_slice(b"game");
     game[0x31] = 1;
+    // The first game of the process has id 1 (`intents-events.md` §2.5 r3).
+    game[0x33] = 1;
     let mut end = [0u8; 53];
     end[0] = 0xB2;
     end[0x33..0x35].copy_from_slice(&[0xFF, 0xFF]);
@@ -1372,10 +1416,9 @@ fn a_stub_starts_a_new_character_before_the_join_sequence() {
         .collect();
     let n = stats.len();
     assert!(stats.contains(&&vec![0x1D, 0, cs.str]), "{stats:02X?}");
-    // PROVISIONAL (`d2s-load.md` §8 r3, REC-02): d2rs sends item −1, not
-    // the static reading's 0.
-    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0xFF; 4]));
-    assert_eq!(j.received[10 + n], hand(0, k, [0xFF; 4]));
+    // `d2s-load.md` §8 r3 (REC-02, `facts/join/a1-new-ama.tsv`): item 0.
+    assert_eq!(j.received[9 + n], hand(1, [0, 0], [0; 4]));
+    assert_eq!(j.received[10 + n], hand(0, k, [0; 4]));
     let again: Vec<&Vec<u8>> = j.received[11 + n..11 + 2 * n].iter().collect();
     assert_eq!(again, stats);
     // The server player init's native skills (`msg-skills.md` §2 rule 8):

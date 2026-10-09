@@ -261,7 +261,10 @@ pub struct Predict {
     dir: Option<u8>,
     /// The local player's stamina (stat 10) is zero: the server walks
     /// instead of running (`pathing.md` §9.9, `units.md` §4.5), so the
-    /// prediction does too. d2rs-own, unverified (client prediction).
+    /// prediction does too. The 1.14d client ends its run on model stat
+    /// 10 = 0, i.e. server raw stamina < 256 (`client/model.md` OQ2,
+    /// `seams/movement-prediction.md` §2.5 r3); the server runs while raw
+    /// is 1..255, a gap the position check corrects.
     exhausted: bool,
     /// The local player's level at the last observation.
     level: Option<u16>,
@@ -273,6 +276,10 @@ pub struct Predict {
     /// A server walk (S→C 0x0D code 1) whose target is not yet in the
     /// player's client room ([`Self::server_walk`]).
     held: Option<(u16, u16)>,
+    /// The server tick the walk under way started on (kept while a new
+    /// click re-targets it; cleared when it ends): the walk animation's
+    /// start ([`Self::walk_since`]).
+    since: Option<u64>,
     /// The player's own path over the client DRLG ([`ClientPath`]): the
     /// step of a walk when the client has a DRLG.
     path: ClientPath,
@@ -344,6 +351,7 @@ impl Predict {
                 act: world.act.as_ref().map(|a| a.act),
                 requests: p.mode_requests,
                 held: None,
+                since: None,
                 path: ClientPath::default(),
                 path_for: None,
             };
@@ -551,13 +559,40 @@ impl Predict {
     ) {
         self.observe(world);
         self.server_walk(world);
+        let mut new_walk = false;
         for w in walks {
             self.walk(w);
+            new_walk = true;
         }
-        self.face(world);
+        // A walk to a point faces its target from where it started and
+        // keeps that facing (`a1-walk-n`: 1.14d dir 32, the start subtile
+        // (4873, 4228) to the clicked (4867, 4222); PROVISIONAL REC-517);
+        // a walk to a unit follows the unit.
+        if new_walk
+            || matches!(
+                self.walk,
+                Some(Walk {
+                    to: WalkTo::Unit(_),
+                    ..
+                })
+            )
+        {
+            self.face(world);
+        }
         if ticked {
             self.tick(world, speeds);
         }
+        self.since = match (self.walk, self.since) {
+            (None, _) => None,
+            (Some(_), None) => Some(world.server_ticks),
+            (Some(_), since) => since,
+        };
+    }
+
+    /// The server tick the walk under way started on (`sim/units.md`
+    /// §4.7 step 7 revision: the walk frame counts from there).
+    pub fn walk_since(&self) -> Option<u64> {
+        self.since
     }
 
     /// The predicted precise position (16.16 sub-tiles, the form
@@ -592,8 +627,14 @@ impl Predict {
     /// The player mode the view shows while the prediction moves: 2
     /// (walk) or 3 (run); `None`: the model's mode.
     pub fn mode(&self) -> Option<u32> {
-        self.walk
-            .map(|w| if w.run && !self.exhausted { 3 } else { 2 })
+        // A walk in a town room is the town walk 6 (`pathing.md` §1.5
+        // r2), as the client path's mode request sets it.
+        let town = self.path.mode() == 6;
+        self.walk.map(|w| match (w.run && !self.exhausted, town) {
+            (true, _) => 3,
+            (false, true) => 6,
+            (false, false) => 2,
+        })
     }
 }
 
@@ -698,6 +739,53 @@ impl<L: super::state::StateSource> super::state::StateSource for PredictLink<L> 
 mod tests {
     use super::*;
     use crate::bridge::world::ClientUnit;
+
+    // Covers: specs/render/unit-composite.md §3 r1
+    /// A walk to a point faces the clicked subtile from the walk's start
+    /// (`Predict::frame` aims it only when the walk arrives).
+    #[test]
+    fn a_point_walk_faces_the_click_from_its_start() {
+        let mut p = Predict {
+            at: Some(((4873 << 16) + 0x8000, (4228 << 16) + 0x8000)),
+            ..Predict::default()
+        };
+        let w = ClientWorld {
+            server_ticks: 22,
+            ..ClientWorld::default()
+        };
+        let walk = Walk {
+            to: WalkTo::Point(4867, 4222),
+            run: false,
+        };
+        p.walk = Some(walk);
+        p.face(&w);
+        // `a1-walk-n`: 1.14d draws dir64 32 (start (4873, 4228) to the
+        // clicked (4867, 4222)).
+        assert_eq!(p.facing(), Some(32));
+    }
+
+    // Covers: specs/sim/pathing.md §1.5 r2
+    /// The drawn mode of a predicted walk: the town walk 6 when the client
+    /// path's mode request made it one (`a1-walk-n`: 1.14d draws
+    /// `soshlittwhth`, d2rs drew mode 2 `wl`); a run stays 3 in town
+    /// (`q-facts-scenes.md` finding 3).
+    #[test]
+    fn a_walk_in_town_is_drawn_in_the_town_walk_mode() {
+        let to = WalkTo::Point(1, 2);
+        let mode = |run, path| {
+            Predict {
+                walk: Some(Walk { to, run }),
+                path: ClientPath::with_mode(path),
+                ..Predict::default()
+            }
+            .mode()
+        };
+        assert_eq!(mode(false, 6), Some(6));
+        assert_eq!(mode(false, 2), Some(2));
+        assert_eq!(mode(true, 3), Some(3));
+        assert_eq!(mode(true, 6), Some(3));
+        assert_eq!(Predict::default().mode(), None);
+    }
 
     // Synthetic fixture: charstats-shaped speeds (walk 6, run 9; the
     // values of `sim/pathing.md` case V1 / §8.2).
@@ -1111,6 +1199,22 @@ mod tests {
         assert_eq!(p.mode(), Some(2));
         let walked = p.position().unwrap().0 - run_at;
         assert_eq!(walked, 6 * 0x1000);
+    }
+
+    // Covers: specs/seams/movement-prediction.md §2.5 r3; specs/client/model.md §6
+    #[test]
+    fn a_raw_stamina_below_256_walks_on_the_client() {
+        // Server raw stamina 100 reaches the model as 0x96 stamina
+        // 100 >> 8 = 0: the client walks while the server (raw > 0)
+        // still runs. The gap is 1.14d's own.
+        let raw: i32 = 100;
+        let (mut w, key) = world_at(100, 100);
+        w.units.get_mut(&key).unwrap().stats.insert(10, raw >> 8);
+        let mut p = Predict::new();
+        p.observe(&w);
+        p.walk(walk_point(110, 100, true));
+        p.tick(&w, SPEEDS);
+        assert_eq!(p.mode(), Some(2));
     }
 
     fn walk_point(x: u16, y: u16, run: bool) -> Walk {

@@ -58,6 +58,9 @@ d2-data.workspace = true
 # The play-on-native test (tests/play_native.rs) converts a synthetic
 # install with d2-convert and loads it on both sources.
 d2-convert = { path = "../../tools/d2-convert" }
+# The far-act join test (tests/app_single_player.rs) makes its saves with
+# d2s-tool on the user's tables.
+d2s-tool = { path = "../../tools/d2s-tool" }
 test-fixtures.workspace = true
 
 [lints]

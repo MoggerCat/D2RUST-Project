@@ -15,7 +15,7 @@ use crate::rules::camera::{Camera, CELL_HALF_WIDTH};
 use crate::rules::draw_order::weather::SkyDraw;
 use crate::rules::placement;
 use crate::scene::order::pass;
-use crate::scene::{BlendOp, DrawItem, FrameCycle, ItemTag};
+use crate::scene::{BlendOp, DrawItem, DrawKey, FrameCycle, ItemTag, MapId};
 use crate::world_view::weather_view::is_sky_call_path;
 use crate::world_view::UnitCall;
 
@@ -32,11 +32,19 @@ pub struct ExportContext<'a> {
     pub sky: &'a [SkyDraw],
     /// Each drawn unit's cel context direction by GUID
     /// (`WorldFrame::unit_dirs`, §5 r14).
-    pub unit_dirs: &'a BTreeMap<u32, u8>,
+    pub unit_dirs: &'a BTreeMap<u64, u8>,
     /// Cel calls without pixels (`WorldFrame::unit_calls`), sorted by key;
     /// one row each, merged with the items by key (§5 r15).
     pub unit_calls: &'a [UnitCall],
+    /// The first of the 256 colour rows of the UI rectangles
+    /// (`ViewAssets::color_rows`): a rectangle's colour is its shade map
+    /// minus this (§5 r16).
+    pub color_rows: Option<MapId>,
 }
+
+/// The frame-set path prefix of the UI rectangles
+/// (`world_view::ui_bind::rect_key`).
+const UI_RECT_PREFIX: &str = "d2rs/ui/rect/";
 
 /// `draws.tsv` and `sprites.tsv` rows (without the header and column row).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -95,7 +103,8 @@ fn tile_xy(f: &IndexFrame, item: &DrawItem, view_left: Option<i32>) -> Option<(i
 
 /// §5 r10: one row per pass-9 call. `DrawLine` (x0, y0, x1, y1, color,
 /// alpha) and the flash's `DrawBox` (x0, y0, x1, y1, color, mode),
-/// `blend-modes.md` §8 r1–r2: `x`, `y` = x0, y0, `mode` = the color.
+/// `blend-modes.md` §8 r1–r2: `x`, `y` = x0, y0, `mode` = the color,
+/// `at` = [`PASS9_TAG`](super::compare::PASS9_TAG) (§6 r5).
 fn sky_rows(sky: &[SkyDraw]) -> Vec<Vec<String>> {
     sky.iter()
         .map(|d| {
@@ -108,6 +117,7 @@ fn sky_rows(sky: &[SkyDraw]) -> Vec<Vec<String>> {
             row[6] = x.to_string();
             row[7] = y.to_string();
             row[12] = color.to_string();
+            row[16] = super::compare::PASS9_TAG.into();
             row
         })
         .collect()
@@ -158,9 +168,13 @@ fn call_rows(
     draws: &mut Vec<Vec<String>>,
 ) {
     unit_row(c.tag, c.shadow, cx, last_run, draws);
+    // §5 r17: the unit draw alone (the body failed the pre-test).
+    let Some(path) = &c.path else {
+        return;
+    };
     let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
     row[1] = if c.shadow { "CelDrawShadow" } else { "CelDraw" }.into();
-    row[2] = c.path.as_str().to_owned();
+    row[2] = path.as_str().to_owned();
     row[3] = c.dir64.to_string();
     row[4] = c.frame.to_string();
     for cell in &mut row[6..15] {
@@ -174,7 +188,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut draws: Vec<Vec<String>> = Vec::new();
     let mut sprites = BTreeMap::new();
     let mut last: Option<&DrawItem> = None;
-    let mut last_tile: Option<(ItemTag, Vec<String>)> = None;
+    let mut last_tile: Option<(ItemTag, DrawKey, Vec<String>)> = None;
     let mut sky = Some(sky_rows(cx.sky));
     // The last unit-pass entry (item or call): its tag and whether it
     // was a shadow (§5 r1 unit rows).
@@ -200,9 +214,14 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         if call_item {
             continue;
         }
-        // §5 r1: the per-block draws of one tile are one row.
+        // §5 r1: the per-block draws of one tile are one row; two tile
+        // records (two draw keys) are two calls.
         if last.is_some_and(|l| {
-            l.tag == item.tag && l.frame == item.frame && l.x == item.x && l.y == item.y
+            l.tag == item.tag
+                && l.frame == item.frame
+                && l.x == item.x
+                && l.y == item.y
+                && l.key == item.key
         }) {
             continue;
         }
@@ -226,6 +245,22 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
             .frame(item.frame)
             .ok_or_else(|| FactsError::Export(format!("frame {:?} not resident", item.frame)))?;
         let mut row = vec![NA.to_owned(); DRAW_COLUMNS.len()];
+        // §5 r16: a UI rectangle (`0x0046EFD0` → `DrawRectangle`) is the
+        // call's `DrawBox` row: its left, top and colour.
+        if key.path().starts_with(UI_RECT_PREFIX) {
+            row[1] = "DrawBox".into();
+            row[6] = item.x.to_string();
+            row[7] = item.y.to_string();
+            row[12] = match (cx.color_rows, item.shade.maps().first()) {
+                (Some(base), Some(m)) if m.0 >= base.0 && m.0 - base.0 < 256 => {
+                    (m.0 - base.0).to_string()
+                }
+                _ => UNKNOWN.into(),
+            };
+            last_tile = None;
+            draws.push(row);
+            continue;
+        }
         row[2] = key.path().to_owned();
         match key.part() {
             FramePart::Tile(t) => {
@@ -247,7 +282,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 // §5 r14: a unit cel's `dir` is the context's `dir64`, not
                 // the file direction the frame set is keyed by.
                 let d = match item.tag {
-                    ItemTag::Unit(guid) => cx.unit_dirs.get(&guid).copied().unwrap_or(d),
+                    ItemTag::Unit(_) => cx.unit_dirs.get(&item.key.slot()).copied().unwrap_or(d),
                     _ => d,
                 };
                 row[3] = d.to_string();
@@ -294,11 +329,11 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         if tile_row
             && last_tile
                 .as_ref()
-                .is_some_and(|(tag, r)| *tag == item.tag && *r == row)
+                .is_some_and(|(tag, key, r)| *tag == item.tag && *key == item.key && *r == row)
         {
             continue;
         }
-        last_tile = tile_row.then(|| (item.tag, row.clone()));
+        last_tile = tile_row.then(|| (item.tag, item.key, row.clone()));
         draws.push(row);
     }
     for c in calls {
@@ -450,6 +485,7 @@ pub fn dump(req: &DumpRequest, d: &DumpFrame<'_>) -> Result<(), FactsError> {
         sky: &d.frame.sky,
         unit_dirs: &d.frame.unit_dirs,
         unit_calls: &d.frame.unit_calls,
+        color_rows: d.assets.color_rows,
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();

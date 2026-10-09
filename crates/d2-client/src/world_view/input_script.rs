@@ -18,6 +18,8 @@ use crate::bridge::predict::{Predict, Speeds, WalkTap};
 use crate::bridge::world::ClientWorld;
 use crate::bridge::{Bridge, BridgeError};
 use crate::controls::click::ClickState;
+use crate::controls::keymap::vk_to_key;
+use crate::controls::Key;
 use crate::rules::camera::FrameSize;
 use crate::ui::{FramePos, Point, PointerButton, UiEvent};
 
@@ -39,7 +41,9 @@ pub enum Step {
     /// `hold X Y N` (after a `frame` step): left press at (X, Y), its
     /// release N frames later (before frame F + N's drain).
     Hold(Point, u32),
-    /// `key K`: a key down and up (Windows virtual-key code).
+    /// `key K`: a key down and up (Windows virtual-key code). `play`
+    /// delivers it as the window's key press ([`play_key`]: its bound
+    /// world action and its typed character); headless refuses it.
     Key(u32),
 }
 
@@ -75,10 +79,18 @@ pub fn vk_code(k: &str) -> Option<u32> {
     }
 }
 
+/// The window key of a `key` step's virtual-key code (`play`), through
+/// the controls key table ([`vk_to_key`]); `None` for a code the table
+/// cannot hold (the parser rejects those).
+pub fn play_key(vk: u32) -> Option<Key> {
+    u16::try_from(vk).ok().and_then(vk_to_key)
+}
+
 /// Parses `wait N; move X Y; click X Y; rclick X Y; frame F; hold X Y N;
 /// key K` (steps separated by `;`, blank steps ignored). Coordinates are
 /// 800 × 600 frame pixels. `frame` numbers are ≥ 1 and never go back;
-/// `hold` needs a `frame` step before it (its N counts frames).
+/// `hold` needs a `frame` step before it (its N counts frames); a `key`
+/// is one the controls key table holds ([`play_key`]).
 pub fn parse(text: &str) -> Result<Vec<Step>, String> {
     let mut steps = Vec::new();
     let mut last_frame: Option<u32> = None;
@@ -147,7 +159,9 @@ pub fn parse(text: &str) -> Result<Vec<Step>, String> {
             }
             "key" => match args {
                 [k] => Step::Key(
-                    vk_code(k).ok_or_else(|| format!("`{}`: unknown key `{k}`", raw.trim()))?,
+                    vk_code(k)
+                        .filter(|&vk| play_key(vk).is_some())
+                        .ok_or_else(|| format!("`{}`: unknown key `{k}`", raw.trim()))?,
                 ),
                 _ => return Err(format!("`{}`: needs K", raw.trim())),
             },
@@ -166,6 +180,7 @@ pub struct InputScript {
     release: Option<(PointerButton, Point)>,
     release_at: u64,
     cursor: Option<Point>,
+    keys: Vec<Key>,
 }
 
 impl InputScript {
@@ -177,12 +192,19 @@ impl InputScript {
             release: None,
             release_at: 0,
             cursor: None,
+            keys: Vec::new(),
         }
     }
 
     /// Where the script put the cursor last.
     pub fn cursor(&self) -> Option<FramePos> {
         self.cursor.map(FramePos::Inside)
+    }
+
+    /// The keys of the `key` steps run since the last call, in order
+    /// (the caller turns them into the window's key events).
+    pub fn take_keys(&mut self) -> Vec<Key> {
+        std::mem::take(&mut self.keys)
     }
 
     /// Whether every step has run.
@@ -196,7 +218,8 @@ impl InputScript {
     /// for tick F − 1 (PROVISIONAL: `play` counts the bridge's server
     /// ticks, which equal the server frame from frame 1; the events reach
     /// the UI on the next loop pass, not exactly at the poke point). Key
-    /// steps are skipped: `play` has no scripted keyboard yet.
+    /// steps run without using the tick up; [`InputScript::take_keys`]
+    /// hands them to the window's key path.
     pub fn events(&mut self, tick: u64) -> Vec<UiEvent> {
         let mut out = Vec::new();
         if let Some((button, at)) = self.release {
@@ -219,11 +242,12 @@ impl InputScript {
                     self.resume_at = tick + n;
                     break;
                 }
-                Step::Frame(_) | Step::Key(_) => {}
+                Step::Frame(_) => {}
                 Step::Move(p) => {
                     out.push(UiEvent::CursorMoved(p));
                     self.cursor = Some(p);
                 }
+                Step::Key(vk) => self.keys.extend(play_key(vk)),
                 Step::Click(button, at) => {
                     out.push(UiEvent::CursorMoved(at));
                     out.push(UiEvent::Press { button, at });
@@ -466,10 +490,47 @@ mod tests {
             "wait -3",
             "wait",
             "click a b",
+            "key",
+            "key F1X",
+            "key 0xZZ",
+            "key I J",
         ] {
             assert!(parse(bad).is_err(), "{bad}");
         }
         assert_eq!(parse(" ; ").unwrap(), []);
+        assert_eq!(
+            parse("key I; key esc; key TAB; key 0xC0; key 7").unwrap(),
+            [
+                Step::Key(0x49),
+                Step::Key(0x1B),
+                Step::Key(0x09),
+                Step::Key(0xC0),
+                Step::Key(0x37),
+            ]
+        );
+        assert_eq!(
+            [0x49, 0x1B, 0x09, 0xC0, 0x37].map(play_key),
+            [
+                Some(Key::I),
+                Some(Key::Escape),
+                Some(Key::Tab),
+                Some(Key::Grave),
+                Some(Key::Digit7),
+            ]
+        );
+    }
+
+    #[test]
+    fn keys_run_on_their_tick_without_using_it_up() {
+        let mut s = InputScript::new(parse("wait 2; key I; move 1 2; wait 1; key C").unwrap());
+        assert_eq!(s.events(1), []);
+        assert_eq!(s.take_keys(), []);
+        assert_eq!(s.events(3), [UiEvent::CursorMoved(p(1, 2))]);
+        assert_eq!(s.take_keys(), [Key::I]);
+        assert_eq!(s.take_keys(), []);
+        assert_eq!(s.events(4), []);
+        assert_eq!(s.take_keys(), [Key::C]);
+        assert!(s.done());
     }
 
     // Covers: specs/tools/scenario-diff.md §2 r4

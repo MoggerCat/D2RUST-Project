@@ -237,6 +237,9 @@ pub enum Output {
     /// §28 r3; graphics refresh and loads, overlays, lights, the client
     /// skill start), in update order.
     ObjectFx(ObjFx),
+    /// The client missiles' sound calls (`missiles/client.md` §C4 r28,
+    /// §C9 r4.4, r6; `audio/triggers.md` §8 r3), in update order.
+    MissileSound(super::client_missiles::MissileSound),
 }
 
 /// The phase of a `StateFx` (`client/stat-lists.md` §3 r6.1–r6.3).
@@ -353,7 +356,7 @@ use Consumer::{Audio, Effects, Ui};
 
 /// The variants in code, in the §10 table's order (checked against the
 /// table, §10 rule 8).
-pub const ROWS: [Row; 44] = [
+pub const ROWS: [Row; 45] = [
     row("ServerSound", 0x2C, Audio),
     row("QuestUi", 0x5D, Ui),
     row("WaypointMenu", 0x63, Ui),
@@ -398,6 +401,7 @@ pub const ROWS: [Row; 44] = [
     update_row("ObjectSound", Audio),
     update_row("ObjectFx", Effects),
     row("HoradricItem", 0x9C, Ui),
+    update_row("MissileSound", Audio),
 ];
 
 impl Output {
@@ -448,6 +452,7 @@ impl Output {
             Output::ObjectSound(_) => 41,
             Output::ObjectFx(_) => 42,
             Output::HoradricItem { .. } => 43,
+            Output::MissileSound(_) => 44,
         };
         &ROWS[i]
     }
@@ -875,16 +880,20 @@ mod tests {
             Output::ObjectSound(ObjSound::Request { id: 0, unit: obj }),
             Output::ObjectFx(ObjFx::GfxLoad { class: 0, flag: 0 }),
             Output::HoradricItem { code: *b"hst " },
+            Output::MissileSound(crate::bridge::client_missiles::MissileSound::Request {
+                id: 0,
+                missile: k,
+            }),
         ]
     }
 
-    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42, §10 row43, §10 row44
+    // Covers: specs/client/bridge.md §10 r1, §10 row1, §10 row2, §10 row3, §10 row4, §10 row5, §10 row6, §10 row7, §10 row8, §10 row9, §10 row10, §10 row11, §10 row12, §10 row13, §10 row14, §10 row15, §10 row16, §10 row17, §10 row18, §10 row19, §10 row20, §10 row21, §10 row22, §10 row23, §10 row24, §10 row25, §10 row26, §10 row27, §10 row28, §10 row29, §10 row30, §10 row31, §10 row32, §10 row33, §10 row34, §10 row35, §10 row36, §10 row37, §10 row38, §10 row39, §10 row40, §10 row41, §10 row42, §10 row43, §10 row44, §10 row45
     #[test]
     fn each_table_row_is_one_variant_with_its_producer_and_consumer() {
         let table = parse_table(SPEC).unwrap();
         let all = every_variant();
-        assert_eq!(all.len(), 44);
-        assert_eq!(table.len(), 44);
+        assert_eq!(all.len(), 45);
+        assert_eq!(table.len(), 45);
         for (i, (o, t)) in all.iter().zip(&table).enumerate() {
             // The variant's Debug name is the table's variant name.
             let dbg = format!("{o:?}");

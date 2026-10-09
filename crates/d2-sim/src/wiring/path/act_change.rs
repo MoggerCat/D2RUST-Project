@@ -62,6 +62,48 @@ fn leave_room<X: Pending>(c: &mut PathCtx<'_, X>, player: UnitId) {
     }
 }
 
+/// Step 3: act `act`'s DRLG, created by `0x0053AC70` when missing
+/// (`drlg/levels.md` §2) on the game's init seed (game +0x7C) and
+/// difficulty (+0x6D), read from an act already built (its copies,
+/// `levels.md` §3 step 1). `false`: no act is built, or the creation
+/// failed (logged).
+// TODO(levels.md §2 rule 2): an arena game passes its arena level as the
+// town; d2rs keeps no arena flag, so the act's own town is used.
+fn build_act<X: Pending>(c: &mut PathCtx<'_, X>, act: u8) -> bool {
+    let drlg = &mut c.v.h.drlg;
+    if drlg
+        .dungeon
+        .acts
+        .get(usize::from(act))
+        .is_some_and(Option::is_some)
+    {
+        return true;
+    }
+    let Some((init_seed, difficulty)) = drlg
+        .dungeon
+        .acts
+        .iter()
+        .flatten()
+        .next()
+        .map(|d| (d.init_seed, d.difficulty))
+    else {
+        return false;
+    };
+    let data = drlg.data.clone();
+    let r =
+        drlg.dungeon
+            .get_or_create(act, init_seed, difficulty, None, &data, drlg.types.as_mut());
+    match r {
+        Ok(_) => true,
+        Err(e) => {
+            c.v.h
+                .errors
+                .push(crate::wiring::action::WiringError::Drlg(e));
+            false
+        }
+    }
+}
+
 /// The act change `0x0053ACC0` (`waypoints.md` §11 steps 1–19) of
 /// `player` to `level` with `tile_index`: `true` when the player was moved.
 /// The client goes to state 5 (step 4); 0x04 is not sent here: the next
@@ -81,8 +123,13 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
     if old_act == Some(act) {
         return false;
     }
-    // Step 3: d2rs builds every act's DRLG with the dungeon; an act
-    // without one cannot be entered (nothing changes, nothing is sent).
+    // Step 3: act A not built → build it (`0x0053AC70`, `levels.md` §2:
+    // the game's init seed and difficulty, which every built act holds a
+    // copy of). A game with no act built, or a failed build: nothing
+    // changes, nothing is sent.
+    if !build_act(&mut c, act) {
+        return false;
+    }
     let Some(init_seed) =
         c.v.h
             .drlg

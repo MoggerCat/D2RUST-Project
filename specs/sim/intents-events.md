@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 636–667 |
 |   5. Machine-readable tables | 668–704 |
 |   6. Exact-match comparison | 705–813 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1289 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1290–1553 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1554–1726 |
-| Constants & data dependencies | 1727–1745 |
-| Randomness | 1746–1751 |
-| Edge cases & original bugs | 1752–1797 |
-| Test vectors | 1798–1884 |
-| Provenance | 1885–2011 |
-| Open questions | 2012–2164 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 814–1293 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1294–1559 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1560–1732 |
+| Constants & data dependencies | 1733–1751 |
+| Randomness | 1752–1757 |
+| Edge cases & original bugs | 1758–1803 |
+| Test vectors | 1804–1890 |
+| Provenance | 1891–2017 |
+| Open questions | 2018–2170 |
 <!-- /index -->
 
 ## Summary
@@ -1004,8 +1004,12 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    u16@8, d u8@10, e u8@11).
 7. **Death**: the kill sets mode 0 (flag 0x1), so the next client pass
    sends 0x69 code 8 with (a, b) = the path target (mode 0 has "target
-   from path"; (0, 0) when the path never had a target, recorded `69
-   1b000000 08 0000 0000 38 06` at frame 2882) and d, e (mode 0 has no
+   from path": a monster's creation writes its spawn point as the
+   target, `monsters/init.md` §4.1 step 1.1, read so by 1.14d state
+   snapshots of idle spawned monsters; the recorded `69 1b000000 08 0000
+   0000 38 06` at frame 2882 shows (0, 0), a target cleared later.
+   PROVISIONAL: spawn point until cleared (because the snapshots and
+   init.md agree); settled by REC-594) and d, e (mode 0 has no
    target); when mode 12 is set (§7.7 rule 3) 0x69 code 9 at the unit's
    cell with e = 0 follows. Recorded: `69 13000000 08 9512 5515 38 06`
    (frame 2724) and `69 13000000 09 9412 5515 38 00` (frame 2748) in
@@ -1343,6 +1347,8 @@ rule 3), drained in a later frame (recorded: after tick 1).
    0x4, 0x8, 0x20: results 0x13, 0x14, 0x15, 0x17, 0x18). A non-zero
    result → **S→C 0xB4** (direct, `0x0053B260`, §3.3 rule 5) with the
    code, the client is removed (`0x00539DA0`), stop.
+   The load draws the player's unit seed (`sim/units.md` §3.1 r4.1)
+   before any item it makes; it is the join's first game-seed step.
 3. Messages of a successful load, in order:
    1. From the loader (the player is allocated nowhere, position
       (0, 0)): the player's own add messages `0x00571F90(game, P,

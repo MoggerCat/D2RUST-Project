@@ -34,25 +34,25 @@
 |   4. Receive and the unit message queue | 212–249 |
 |   5. Client update pass | 250–298 |
 |   6. Position check (`0x004804E0`) | 299–342 |
-|   7. Session messages | 343–514 |
-|   8. Mode requests | 515–600 |
-|   9. Room-in-sight messages | 601–635 |
-|   10. Bit reader | 636–650 |
-|   11. Current act and level (join and later) | 651–696 |
-|   12. Client DRLG and the room of a point | 697–738 |
-|   13. Visibility predicate (`0x004DBF20`) | 739–790 |
-|   14. Pet list and the hireling GUID | 791–844 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 845–934 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 935–969 |
-|   17. Model writes made by 1.14d UI code | 970–1116 |
-|   18. Audio driver inputs and the client object functions | 1117–1147 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1148–1368 |
-| Constants & data dependencies | 1369–1381 |
-| Randomness | 1382–1397 |
-| Edge cases & original bugs | 1398–1422 |
-| Test vectors | 1423–1480 |
-| Provenance | 1481–1584 |
-| Open questions | 1585–1743 |
+|   7. Session messages | 343–518 |
+|   8. Mode requests | 519–604 |
+|   9. Room-in-sight messages | 605–639 |
+|   10. Bit reader | 640–654 |
+|   11. Current act and level (join and later) | 655–700 |
+|   12. Client DRLG and the room of a point | 701–742 |
+|   13. Visibility predicate (`0x004DBF20`) | 743–794 |
+|   14. Pet list and the hireling GUID | 795–848 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 849–938 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 939–973 |
+|   17. Model writes made by 1.14d UI code | 974–1120 |
+|   18. Audio driver inputs and the client object functions | 1121–1151 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1152–1380 |
+| Constants & data dependencies | 1381–1393 |
+| Randomness | 1394–1409 |
+| Edge cases & original bugs | 1410–1434 |
+| Test vectors | 1435–1492 |
+| Provenance | 1493–1596 |
+| Open questions | 1597–1755 |
 <!-- /index -->
 
 ## Summary
@@ -460,7 +460,11 @@ position check of the local player.
    the menus, and u32@0x27 is: classic softcore 0x00000004, classic
    hardcore 0x00000804, expansion softcore 0x00100004, expansion
    hardcore 0x00100804 (d2s status bits 0x04 / 0x20,
-   `formats/d2s.md`). REC-46 still confirms on live bytes. Bytes after a
+   `formats/d2s.md`). Recorded (REC-46, 2026-10-09, Wine): a classic
+   softcore character made in the create screen sends 0x00000004, an
+   expansion one 0x00100004; S→C 0x01 u32@2 = 0x4 and u8@6 = 0 for the
+   classic game (`facts/join/a1-new-classic-ama.tsv`,
+   `a1-new-ama.tsv`). Bytes after a
    name's NUL: zero (the original's stack contents are not
    reproducible and no reader uses them).
 10. **0xAF** ConnectionInfo and **0xB0** ConnectionTerminated (system
@@ -1350,6 +1354,14 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
       1 → flags bit 1 cleared, client-only object 478 at U
       (`0x00466730(478, x, y, 2, 0)`); sounds `0x004C72F0` (state group
       `0x0063A340`), `0x004CB460`, `0x004CAF60` (`audio/`).
+   PROVISIONAL: d2rs runs only the animation part of rule 8 for a
+   monster: anim kind 0 for every mode (step 5's advance, frame += speed,
+   wrapping at the count; kinds 1–3, the end tests and the mode end are
+   not run), and its rate (rule 6, `sim/units.md` §4.7) reads no used
+   skill (the V-skill and A-skill columns never apply) (because the town
+   arrival's NU and WL are kind 0 and no client monster casts there; the
+   recorded Kashya WL and NU frames match);
+   settled by REC-503 (kinds, end tests) and REC-502 (skill columns).
 9. **Seed draws** in rules 1–8 (all on client seeds; their values are
    capture-only, open question 9 and REC-51): blood spray (codes 0x06,
    0x13, `client/stat-lists.md` §3 r6.10, U's seed); attack pick (rule

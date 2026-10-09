@@ -169,11 +169,15 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
         [0x04, 0x48, 0x5B, 0x65, 0x8D, 0x5A],
         "{got:02X?}"
     );
-    // A new character has its player record (§8.2 rule 7): 0x5F after
-    // 0x0B and the two 0x23 (no `StartSkill` without the vitals tables, so
-    // no load 0x23).
+    // A new sorceress has its player record (§8.2 rule 7): 0x5F after
+    // 0x0B and three 0x23, as the Wine recording of a character made in
+    // the create screen (`facts/join/a1-new-sor.tsv`): the load's own
+    // `StartSkill` select before 0x0B (the install has the vitals tables),
+    // then the two hands after 0x5F.
     assert!(got.windows(2).any(|w| w == [0x0B, 0x5F]), "{got:02X?}");
-    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 2, "{got:02X?}");
+    assert_eq!(got.iter().filter(|&&i| i == 0x23).count(), 3, "{got:02X?}");
+    let pos = |id: u8| got.iter().position(|&i| i == id).unwrap();
+    assert!(pos(0x23) < pos(0x0B), "the select's 0x23 comes first");
     let (class, fields, knows, faults, log) = link
         .with(|l| {
             let sim = &mut l.host_mut().game;
@@ -211,11 +215,13 @@ fn the_session_flow_creates_the_game_then_loads_the_character_at_the_join() {
     assert_eq!(
         steps,
         [
-            // No `skills` rows: `client/msg-skills.md` §2 r8 selects skill
-            // 0 outside the table. (The synthetic vitals tables, q-smoke-town,
-            // give the start stats, items and skill their provider.)
-            "player skills",
+            // On the install the `skills` rows exist, so the player
+            // skills are applied; `StartSkill` comes with the start items'
+            // stat 107, which has no provider ("has skill", as
+            // `synthetic_game.rs`). The one-rows 0x23 reading is the
+            // recorded join's (above).
             "new character set-up",
+            "has skill",
             "mouse skills",
             "quest entry"
         ]
@@ -460,7 +466,7 @@ fn a_save_from_the_command_line_joins() {
 
 /// The app's C→S 0x67 bytes (`client/model.md` §7 rule 9): the recorded
 /// single-player layout for an expansion character; a classic save sends
-/// bit 2 alone (PROVISIONAL there, REC-46).
+/// bit 2 alone (recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 // Covers: specs/client/model.md §7 r9
 #[test]
 fn the_create_request_has_the_builder_layout() {
@@ -734,4 +740,80 @@ fn the_join_sends_the_quest_entry_messages_before_the_player_record() {
     let q28 = chunks.iter().find(|c| c[0] == 0x28).unwrap();
     assert_eq!((q28[1], &q28[2..6]), (6, &[0u8, 0, 0, 0][..]));
     assert_eq!(q28.len(), 103);
+}
+
+/// A save standing in the town of Act III, IV or V joins: the server
+/// builds the act's slot at the join (`intents-events.md` §8.2 step 4:
+/// only acts I and II exist from the game's creation), so the join runs
+/// on to the player's placement instead of stopping after S→C 0x03
+/// (the `a3`..`a5-town-*` scenes drew no world before).
+// Covers: specs/sim/intents-events.md §8.2
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_save_in_act_three_to_five_is_placed_at_the_join() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    for act in 2u8..=4 {
+        // The save of `prepare_scene_chars.sh`'s SceAct3..5: the §8.1 act
+        // transitions done, standing in the act's town.
+        let dir = std::env::temp_dir().join(format!("d2rs-far-act-{}-{act}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Far.d2s");
+        let args: Vec<String> = [
+            "new",
+            "--name",
+            "Far",
+            "--class",
+            "sor",
+            "--expansion",
+            "--map-seed",
+            "1",
+            "--time",
+            "1700000000",
+            "--waypoints",
+            "all",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .chain([
+            "--quests".into(),
+            format!("acts={act}"),
+            "--act".into(),
+            act.to_string(),
+            "-o".into(),
+            path.display().to_string(),
+        ])
+        .collect();
+        assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
+        let data = app_support::game_data();
+        let character = single_player::load_character(&data, &path, 0).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let ms = std::sync::Arc::new(AtomicU32::new(1000));
+        let (mut link, _) =
+            single_player::start_with(data, DEFAULT_SEED, character.clone(), StepClock(ms.clone()))
+                .unwrap();
+        let req = single_player::create_request_for(&character);
+        link.send(SendQueue::System, &req.encode()).unwrap();
+        link.pump().unwrap();
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        link.receive();
+        link.send(SendQueue::System, &[0x6B]).unwrap();
+        ms.fetch_add(40, Ordering::SeqCst);
+        assert!(link.pump().unwrap().ticked);
+        let chunks = link.receive();
+        let load = chunks
+            .iter()
+            .find(|c| c[0] == LoadAct::ID)
+            .map(|c| LoadAct::decode(c).unwrap())
+            .expect("0x03 at the join");
+        assert_eq!(load.act, act, "act {act}");
+        let ids: Vec<u8> = chunks.iter().map(|c| c[0]).collect();
+        assert!(ids.contains(&0x04), "act {act}: {ids:02X?}");
+        let placed = link
+            .with(|l| single_player::local_player(&l.host().game).is_some())
+            .unwrap();
+        assert!(placed, "act {act}: no player after the join");
+    }
 }

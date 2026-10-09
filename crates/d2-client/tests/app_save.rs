@@ -34,8 +34,8 @@ impl d2s::SaveTables for Tables {
             signed: true,
         })
     }
-    /// A new character carries its start cube (REC-244): the entries
-    /// are read with the synthetic item tables.
+    /// A new character carries its charstats start items: the entries
+    /// are read with the user's item tables.
     fn item_entry_len(&self, buf: &[u8]) -> Result<usize, String> {
         let items = app_support::live().tables.item_tables().unwrap();
         d2_sim::items::bitstream::read::read_save_entry(buf, &items)

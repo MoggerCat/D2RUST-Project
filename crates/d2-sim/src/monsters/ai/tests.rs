@@ -302,7 +302,7 @@ impl AiModes for Fake {
         self.anim.insert(unit, m);
         true
     }
-    fn set_anim_mode(&mut self, unit: UnitId, m: u8) {
+    fn set_anim_mode(&mut self, _: &mut Game, unit: UnitId, m: u8) {
         self.anim.insert(unit, m);
     }
     fn set_path_steps(&mut self, _: UnitId, steps: i32) {
@@ -333,7 +333,15 @@ impl AiModes for Fake {
     fn knockback_to_gethit(&mut self, _: &mut Game, _: UnitId) {
         self.log.push("gethit".into());
     }
-    fn walk_in_radius(&mut self, _: &mut Game, _: UnitId, _: UnitId, a: i32, b: i32) -> bool {
+    fn walk_in_radius(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        _: UnitId,
+        a: i32,
+        b: i32,
+        _: &mut VelocityRequest,
+    ) -> bool {
         self.log.push(format!("radius {a} {b}"));
         true
     }
@@ -1851,3 +1859,17 @@ mod npc;
 mod rules;
 mod scans;
 mod skill_check;
+
+// Covers: specs/monsters/ai.md §7.2
+#[test]
+fn walk_in_radius_points_follow_the_recorded_walks() {
+    // Warriv's three walks at the Rogue Encampment arrival (1.14d under
+    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
+    let p = (4873, 4228);
+    assert_eq!(radius_point((4866, 4235), p, 3, 2), Some((4868, 4233)));
+    assert_eq!(radius_point((4868, 4233), p, 2, 2), Some((4869, 4232)));
+    assert_eq!(radius_point((4869, 4232), p, 1, 2), Some((4870, 4231)));
+    // Already within b, or on the target: no point.
+    assert_eq!(radius_point((4872, 4229), p, 3, 2), None);
+    assert_eq!(radius_point(p, p, 3, 0), None);
+}

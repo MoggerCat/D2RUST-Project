@@ -81,6 +81,7 @@ impl ItemsUi {
         world: &ClientWorld,
         files: &UiFiles,
         g: &GridRecord,
+        mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
         let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
@@ -91,6 +92,11 @@ impl ItemsUi {
             let Some(a) = self.art(files, &it, cell) else {
                 continue;
             };
+            // `inventory.md` §3 r2–r3: the footprint's tints, then the item
+            // (`a1-panel-cube` rows 5–9).
+            for d in self.grid_item_tints(world, g, mouse, &it) {
+                out.push(d);
+            }
             let (x, y, _, _) = g.cell(i32::from(it.x), i32::from(it.y));
             out.push(self.item_cel(world, &it, a.file, x, y + a.gh));
         }

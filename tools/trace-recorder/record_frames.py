@@ -107,6 +107,18 @@ CUR_LAST_STEP, CUR_IDLE_SINCE = 0x7A6AEC, 0x7A6AE8
 LIGHT_QUALITY, DRAW_RATE, LIGHT_OPT_A, LIGHT_OPT_B, RENDER_KIND = (0x7B567C, 0x7A04A8, 0x72DA50,
                                                                   0x72A348, 0x712CCC)
 RAIN_ON, SNOW_ON, LIGHTNING, FLASH, WEATHER_UPDATE = 0x7A8A44, 0x7A8A40, 0x7A89E8, 0x7BB390, 0x7A8A0C
+# capture.md §2a (--front-end): launcher mode, 4 = menu, 1 = client (tools/original-hooks.md §5.4,
+# autostart.py GAME_MODE)
+LAUNCHER_MODE = 0x74C704
+# capture.md §3.6 (--front-end): D2Win_LoadCelFile 0x4FA9B0 (ui/text.md §3: the D2Win cel loader;
+# its arguments are not in a spec: the path argument is found per call, the first one pointing
+# at a path, and logged; the cel file is EAX at the return address)
+D2WIN_LOAD = 0x4FA9B0
+D2WIN_LOAD_BYTES = b"\x55\x8B\xEC\x81\xEC\x08\x01\x00"   # measured 2026-10-09 (capture.md §2a)
+# tools/cloud-game/xinput.sh: the game window's client origin on the Xvfb screen (no window manager)
+X_ORIGIN = (112, 98)
+X_KEYS = {0x1B: "Escape", 0x09: "Tab", 0x0D: "Return", 0x20: "space", 0x10: "Shift_L",
+          0x11: "Control_L", 0x12: "Alt_L", **{0x6F + i: f"F{i}" for i in range(1, 13)}}
 
 
 def png_bytes(width, height, pixels, palette_rgb):
@@ -315,12 +327,201 @@ STATE_KEY = ("player", "tile_origin", "unit_origin", "shake", "open_mode", "pale
              "cursor_key", "light_key", "level")
 
 
+# --- front end (--front-end, capture.md §2a) -----------------------------------
+
+FE_FORBIDDEN = ("waitlevel", "goto", "dumpdrlg")   # need a level (autostart.py --menu rule)
+
+
+def scene_name(s):
+    if not s or not all(c.islower() or c.isdigit() or c == "-" for c in s):
+        raise ValueError(f"front-end script: scene name {s!r} must be lowercase letters, digits and '-'")
+    return s
+
+
+def parse_front_end(text):
+    """--front-end-script: autostart.py's input-script commands (not waitlevel, goto, dumpdrlg)
+    with `shot NAME [change|0xRET]` instead of its screenshot: capture the next presented frame
+    with its draw log as scene NAME; `change`: the next frame presented by another EndScene
+    caller than the frame the shot was armed at (e.g. the loading screen after OK); 0xRET: the
+    next frame whose EndScene return address is RET (the frame records' `ret`)."""
+    out = []
+    for raw in (text or "").split(";"):
+        w = raw.split()
+        if not w:
+            continue
+        if w[0].lower() == "shot":
+            if not 2 <= len(w) <= 3:
+                raise ValueError(f"front-end script: shot takes NAME [change|0xRET]: {raw.strip()!r}")
+            cond = None
+            if len(w) == 3:
+                cond = "change" if w[2].lower() == "change" else int(w[2], 16)
+            out.append(("shot", [scene_name(w[1]), cond]))
+            continue
+        for op, a in autostart.parse_script(raw):
+            if op in FE_FORBIDDEN:
+                raise ValueError(f"front-end script: {op} needs a level")
+            out.append((op, a))
+    return out
+
+
+def x_keysym(vk):
+    """An autostart key code as an xdotool key name."""
+    if vk in X_KEYS:
+        return X_KEYS[vk]
+    if 0x30 <= vk <= 0x39 or 0x41 <= vk <= 0x5A:
+        return chr(vk).lower()
+    raise ValueError(f"no X key name for key code {vk:#x}")
+
+
+def x_command(op, a, display=":99"):
+    """One input command as an xdotool command chain (the steps of tools/cloud-game/xinput.sh:
+    focus the game window, absolute screen point = client point + X_ORIGIN)."""
+    cmd = ["/usr/bin/env", f"DISPLAY={display}", "xdotool", "search", "--name", "Diablo II",
+           "windowfocus"]
+    if op in ("move", "click", "rclick", "hold"):
+        cmd += ["mousemove", str(int(a[0]) + X_ORIGIN[0]), str(int(a[1]) + X_ORIGIN[1])]
+    if op in ("click", "rclick"):
+        b = "3" if op == "rclick" else "1"
+        cmd += ["sleep", "0.1", "mousedown", b, "sleep", "0.08", "mouseup", b]
+    elif op == "hold":
+        cmd += ["sleep", "0.1", "mousedown", "1", "sleep", str(a[2]), "mouseup", "1"]
+    elif op == "key":
+        k = x_keysym(a[0])
+        cmd += (["keydown", k, "sleep", str(a[1]), "keyup", k] if len(a) > 1 else ["key", k])
+    elif op == "text":
+        cmd += ["type", "--delay", "80", a[0]]
+    elif op != "move":
+        raise ValueError(f"no X input for {op}")
+    return cmd
+
+
+def x_duration(op, a):
+    """Seconds an X command chain takes (its sleeps and typing) plus a margin."""
+    if op == "hold":
+        return a[2] + 0.4
+    if op == "key":
+        return (a[1] if len(a) > 1 else 0) + 0.3
+    if op == "text":
+        return 0.08 * len(a[0]) + 0.3
+    return 0.4 if op in ("click", "rclick") else 0.2
+
+
+def under_wine():
+    try:
+        import ctypes
+        return hasattr(ctypes.WinDLL("ntdll"), "wine_get_version")
+    except (OSError, AttributeError):
+        return False
+
+
+def x_send(cmd):
+    """Run a Unix command from Windows Python under Wine (`start /unix`; the call returns at once)."""
+    import subprocess
+    line = " ".join(f'"{c}"' if (" " in c or not c) else c for c in cmd)
+    subprocess.run("start /unix " + line, shell=True)
+
+
+class ShotQueue:
+    """Front-end shots. A presented frame is everything drawn between two EndScene calls, so a
+    shot's draw log starts at the EndScene before its frame; `present` is called at every
+    EndScene entry with its return address."""
+
+    def __init__(self, every=0):
+        self.pending = []        # [name, cond] not yet armed
+        self.logging = None      # (name, cond, ret of the frame it was armed at)
+        self.presents = 0        # EndScene calls since launch: the front-end frame index
+        self.every = every       # also capture every N-th present (no draw log); 0 = shots only
+        self.callers = {}        # EndScene return address -> presents
+        self.done = []           # (name, present index)
+
+    def request(self, name, cond=None):
+        self.pending.append([name, cond])
+
+    def busy(self):
+        return bool(self.pending or self.logging)
+
+    def present(self, ret):
+        """-> (scene or None, capture, log the next frame's draws)."""
+        self.presents += 1
+        self.callers[ret] = self.callers.get(ret, 0) + 1
+        scene = None
+        if self.logging is not None:
+            name, cond, base = self.logging
+            if cond is None or (cond == "change" and ret != base) or cond == ret:
+                scene, self.logging = name, None
+                self.done.append((name, self.presents))
+        if self.logging is None and self.pending:
+            name, cond = self.pending.pop(0)
+            self.logging = (name, cond, ret)
+        capture = scene is not None or bool(self.every and (self.presents - 1) % self.every == 0)
+        return scene, capture, self.logging is not None
+
+
+def make_front_end(script, x_input, shot_dir=None):
+    """The front-end scene driver: an autostart.AutoStart that never leaves the menu by force,
+    plays `script` from launch, turns `shot` into a ShotQueue request of the recorder it is
+    polled with, and with `x_input` sends mouse and keys as X input (Wine: the 1.14d front end
+    ignores PostMessage there, docs/handoff/q-prov-recording.md) instead of PostMessage."""
+    class FrontEnd(autostart.AutoStart):
+        def __init__(self):
+            super().__init__(None, "", shot_dir)
+            self.fe_script = script
+            self.x_input = x_input
+            self.display = os.environ.get("DISPLAY") or ":99"
+
+        def poll(self, mem):
+            if self.sink is None and isinstance(getattr(mem, "notes", None), list):
+                self.sink = mem.notes
+            now = self.clock()
+            if now < self.next_poll or self.done:
+                return self.done
+            self.next_poll = now + 0.05
+            if self.runner is None:
+                self.log("front end: scene script started")
+                self.runner = self.run(mem, self.fe_script)
+                self.wake = now
+            while not self.done and now >= self.wake:
+                try:
+                    self.wake = now + next(self.runner)
+                except StopIteration:
+                    self.runner = iter(())
+                    self.wake = float("inf")
+            return self.done
+
+        def run(self, mem, script=None):
+            for op, a in (self.script if script is None else script):
+                el = round(self.clock() - self.t0, 2)
+                if op == "shot":
+                    self.played.append((el, op, a))
+                    mem.fe.request(a[0], a[1])
+                    self.log(f"front end: shot {a[0]} requested at {el}s")
+                    continue
+                if self.x_input and op in ("move", "click", "rclick", "hold", "key", "text"):
+                    self.played.append((el, op, a))
+                    x_send(x_command(op, a, self.display))
+                    yield x_duration(op, a)
+                    continue
+                if op == "end":
+                    limit = self.clock() + 30
+                    while mem.fe.busy() and self.clock() < limit:
+                        yield 0.1
+                    if mem.fe.busy():
+                        self.log("front end: shots still pending at end: "
+                                 + ", ".join(p[0] for p in mem.fe.pending + ([list(mem.fe.logging)]
+                                                                             if mem.fe.logging else [])))
+                yield from super().run(mem, [(op, a)])
+
+    return FrontEnd()
+
+
 def make_recorder(rt):
     """The recorder class, built on record_tick.TickRecorder (Windows only)."""
     class Recorder(rt.TickRecorder):
         def __init__(self, exe, args, out_path, seconds, max_ticks, img_dir, every, max_frames,
-                     allow_size, draws_every, light_full):
+                     allow_size, draws_every, light_full, front_end=None):
             super().__init__(exe, args, out_path, seconds, 0, max_ticks)
+            self.fe = front_end    # ShotQueue in --front-end mode (capture.md §2a), else None
+            self.d2win_wait = {}   # return address -> (path, argument) of a D2Win cel load
             self.img_dir, self.every, self.max_frames = img_dir, every, max_frames
             self.allow_size, self.draws_every, self.light_full = allow_size, draws_every, light_full
             self.frames = 0
@@ -333,7 +534,8 @@ def make_recorder(rt):
             self.raster_other = 0  # rasterizer calls not matched to the last cel op
             self.armed = set()
             self.meta = {"k": "capture", "images": os.path.basename(img_dir) if img_dir else None,
-                         "every": every, "draws_every": draws_every, "state_key": list(STATE_KEY)}
+                         "every": every, "draws_every": draws_every, "state_key": list(STATE_KEY),
+                         "front_end": front_end is not None}
 
         # breakpoints: draw hooks are verified at start but armed per selected frame
         def arm(self, addr):
@@ -359,6 +561,8 @@ def make_recorder(rt):
                 self.write(addr, rt.rr.INT3)
 
         def frame_start(self, ctx):
+            if self.fe is not None:   # front-end mode: draw logs are armed at EndScene (§2a)
+                return
             unit = self.u32(PLAYER)
             self.start = {"seed": read_seed(self, unit), "cursor": read_cursor(self)}
             want = self.draws_every and self.seen % self.draws_every == 0
@@ -398,7 +602,11 @@ def make_recorder(rt):
                 self.raster_other += 1
 
         def capture(self, ctx):
-            if self.u32(ctx.Esp) != IN_GAME_RET:
+            ret = self.u32(ctx.Esp)
+            if self.fe is not None:
+                self.capture_front_end(ret)
+                return
+            if ret != IN_GAME_RET:
                 return
             draws, self.draws = self.draws, None
             raster_other, self.raster_other = self.raster_other, 0
@@ -407,27 +615,84 @@ def make_recorder(rt):
             if (self.seen - 1) % self.every:
                 return
             self.seq += 1
+            rec = {"k": "frame", "seq": self.seq, "f": self.frame}
+            if self.grab(rec):
+                rec.update(self.state())
+                self.finish(rec, draws, raster_other)
+
+        def capture_front_end(self, ret):
+            """capture.md §2a: every EndScene call is a presented frame (menu, loading screen,
+            in game); captured when a shot or --every asks for it."""
+            draws, self.draws = self.draws, None
+            raster_other, self.raster_other = self.raster_other, 0
+            if ret not in self.fe.callers:
+                self.notes.append(f"EndScene caller {ret:#x} first at present {self.fe.presents + 1}")
+            scene, capture, log_next = self.fe.present(ret)
+            if capture:
+                self.seq += 1
+                rec = {"k": "frame", "seq": self.seq, "f": self.frame, "present": self.fe.presents,
+                       "ret": f"{ret:#x}", "in_game": ret == IN_GAME_RET,
+                       "launcher_mode": self.u32(LAUNCHER_MODE)}
+                if scene:
+                    rec["scene"] = scene
+                if self.grab(rec):
+                    if rec["in_game"]:
+                        rec.update(self.state())
+                    self.finish(rec, draws if scene else None, raster_other)
+            if log_next:
+                self.draws, self.raster_other = [], 0
+            self.set_draw_hooks(log_next)
+
+        def d2win_entry(self, ctx):
+            """D2Win_LoadCelFile entry: the path (first of ECX, EDX, [ESP+4], [ESP+8] that points
+            at path text) and a one-shot breakpoint at the return address for the cel file."""
+            path, arg = None, None
+            for name, v in (("ecx", ctx.Ecx), ("edx", ctx.Edx), ("esp+4", self.u32(ctx.Esp + 4)),
+                            ("esp+8", self.u32(ctx.Esp + 8))):
+                if v < 0x10000:
+                    continue
+                try:
+                    raw = self.read(v, 260).split(b"\0")[0]
+                except OSError:
+                    continue
+                if len(raw) >= 4 and b"\\" in raw and all(32 <= c < 127 for c in raw):
+                    path, arg = raw.decode("latin-1"), name
+                    break
+            ret = self.u32(ctx.Esp)
+            if path is None or ret in self.d2win_wait:
+                self.emit({"k": "celload", "path": path, "ret": f"{ret:#x}", "note": "not followed"})
+                return
+            if ret not in self.bp_orig:
+                self.bp_orig[ret] = self.read(ret, 1)[0]
+            self.write(ret, rt.rr.INT3)
+            self.d2win_wait[ret] = (path, arg)
+
+        def grab(self, rec):
+            """Frame and palette into `rec` (capture.md §3.1); False when refused (§1)."""
             vt, w, h, base = (self.u32(VIDEO_TYPE), self.i32(FB_W), self.i32(FB_H), self.u32(FB_PTR))
-            rec = {"k": "frame", "seq": self.seq, "f": self.frame, "video_type": vt, "w": w, "h": h}
+            rec.update(video_type=vt, w=w, h=h)
             if vt != GDI or not base or (not self.allow_size and (w, h) != (800, 600)):
                 rec["refused"] = "needs GDI (-w) at 800x600 (capture.md §1)"
                 self.emit(rec)
-                return
-            pixels = self.read(base, w * h)
+                return False
+            self.pixels = self.read(base, w * h)
             ct = self.read(COLOR_TABLE, 1024)
-            pal = b"".join(bytes((ct[4 * i + 2], ct[4 * i + 1], ct[4 * i])) for i in range(256))
-            rec["index_sha256"] = hashlib.sha256(pixels).hexdigest()
-            rec["palette_sha256"] = hashlib.sha256(pal).hexdigest()
-            rec.update(self.state())
+            self.pal = b"".join(bytes((ct[4 * i + 2], ct[4 * i + 1], ct[4 * i])) for i in range(256))
+            rec["index_sha256"] = hashlib.sha256(self.pixels).hexdigest()
+            rec["palette_sha256"] = hashlib.sha256(self.pal).hexdigest()
+            return True
+
+        def finish(self, rec, draws, raster_other):
             if self.img_dir:
                 name = f"frame-{self.seq:07d}.png"
                 with open(os.path.join(self.img_dir, name), "wb") as f:
-                    f.write(png_bytes(w, h, pixels, pal))
+                    f.write(png_bytes(rec["w"], rec["h"], self.pixels, self.pal))
                 rec["image"] = name
             if draws is not None:
                 rec["draws"] = draws
                 rec["raster_other"] = raster_other
-            self.keys.append({k: rec.get(k) for k in STATE_KEY + ("index_sha256",)})
+            if self.fe is None or rec.get("in_game"):   # §7: menu frames have no state key
+                self.keys.append({k: rec.get(k) for k in STATE_KEY + ("index_sha256",)})
             self.emit(rec)
             self.frames += 1
             if self.max_frames and self.frames >= self.max_frames:
@@ -477,6 +742,12 @@ def make_recorder(rt):
             elif addr == CEL_LOADED:
                 path = self.read(ctx.Ebp - 0x108, 0x104).split(b"\0")[0].decode("latin-1")
                 self.emit({"k": "celfile", "ptr": f"{self.u32(ctx.Ebp - 4):#x}", "path": path})
+            elif addr == D2WIN_LOAD and self.fe is not None:
+                self.d2win_entry(ctx)
+            elif addr in self.d2win_wait:
+                path, arg = self.d2win_wait.pop(addr)
+                self.emit({"k": "celfile", "ptr": f"{ctx.Eax:#x}", "path": path, "via": "0x4fa9b0",
+                           "arg": arg})
             elif addr in (COMP_PATH_DCC, COMP_PATH_DC6):
                 name = self.read(self.u32(ctx.Ebp + 8), 64).split(b"\0")[0].decode("latin-1")
                 path = self.read(ctx.Ebx, 260).split(b"\0")[0].decode("latin-1")
@@ -616,10 +887,47 @@ def selftest():
     recs[3]["index_sha256"] = "x"
     assert stability(recs) == (2, 4, 1, "FAIL"), stability(recs)
     assert stability(recs[:2] + recs[4:])[3] == "NOT ENOUGH"
+
+    # front end (capture.md §2a): script parsing, X input, the shot queue's frame numbering
+    sc = parse_front_end("wait 3; shot main-menu; click 400 307; key ENTER; shot loading change; "
+                         "shot x 0x44cb4f; text abc; end")
+    assert sc == [("wait", [3]), ("shot", ["main-menu", None]), ("click", [400, 307]), ("key", [0x0D]),
+                  ("shot", ["loading", "change"]), ("shot", ["x", IN_GAME_RET]), ("text", ["abc"]),
+                  ("end", [])], sc
+    for bad in ("shot", "shot Main", "shot a b c d", "waitlevel 1", "goto 1 2", "shot a 0xzz"):
+        try:
+            parse_front_end(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {bad!r}")
+    assert x_command("click", [400, 307])[-11:] == ["mousemove", "512", "405", "sleep", "0.1",
+                                                    "mousedown", "1", "sleep", "0.08", "mouseup", "1"]
+    assert x_command("key", [0x0D])[-2:] == ["key", "Return"] and x_command("key", [0x41])[-1] == "a"
+    assert x_command("rclick", [0, 0])[-1] == "3" and x_command("text", ["ab c"])[-1] == "ab c"
+    menu, other = 0x4F9999, 0x456999          # two EndScene callers (return addresses), made up
+    q = ShotQueue()
+    assert q.present(menu) == (None, False, False) and not q.busy()     # no shot: nothing captured
+    q.request("main-menu")
+    assert q.present(menu) == (None, False, True)      # armed: the next frame's draws are logged
+    assert q.present(menu) == ("main-menu", True, False) and q.done == [("main-menu", 3)]
+    q.request("loading", "change")
+    q.request("after")
+    assert q.present(menu) == (None, False, True)      # armed at a menu frame
+    assert q.present(menu) == (None, False, True)      # same caller: keep logging, frame dropped
+    assert q.present(other) == ("loading", True, True)  # caller changed: captured; next shot armed
+    assert q.present(other) == ("after", True, False) and not q.busy()
+    assert q.done[-2:] == [("loading", 6), ("after", 7)] and q.presents == 7
+    assert q.callers == {menu: 5, other: 2}
+    q2 = ShotQueue(every=3)                            # --every 3: presents 1, 4, 7 without draws
+    assert [q2.present(menu)[1] for _ in range(7)] == [True, False, False, True, False, False, True]
+    q2.request("s", IN_GAME_RET)
+    assert q2.present(menu)[2] and q2.present(menu) == (None, False, True)
+    assert q2.present(IN_GAME_RET) == ("s", True, False)
     print("selftest ok: PNG keeps indices and palette; a 1-byte change changes the hash; "
           "raw-3 cel header, DT1 list and tile lookup; "
           f"{len(cases)} state fields each follow exactly their source bytes; stability counts "
-          "only repeated keys and reports exactly the changed key")
+          "only repeated keys and reports exactly the changed key; front end: script and X input, "
+          "shot queue numbers presents, arms one frame early, `change` / caller shots, --every")
 
 
 def main():
@@ -629,7 +937,9 @@ def main():
     ap.add_argument("--game", default=os.path.join(repo, "game", "Game.exe"))
     ap.add_argument("--seconds", type=float, default=120.0, help="kill the game after N s (default 120)")
     ap.add_argument("--ticks", type=int, default=0, help="stop after N server ticks (default: no limit)")
-    ap.add_argument("--every", type=int, default=1, help="capture every N-th in-game frame (default 1)")
+    ap.add_argument("--every", type=int, default=None,
+                    help="capture every N-th in-game frame (default 1; --front-end: every N-th presented "
+                         "frame besides the shots, default 0 = shots only)")
     ap.add_argument("--max-frames", type=int, default=0, help="stop after N captures (default: no limit)")
     ap.add_argument("--draws-every", type=int, default=0,
                     help="log every draw call of every N-th in-game frame (default 0: none; slow)")
@@ -640,13 +950,37 @@ def main():
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-frames.jsonl)")
     ap.add_argument("--selftest", action="store_true", help="check the PNG writer and the readers, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
+    g = ap.add_argument_group("front end (capture.md §2a)")
+    g.add_argument("--front-end", action="store_true",
+                   help="capture at the front end: no game start, every EndScene call is a frame "
+                        "(numbered by `present`, no server tick), scenes by --front-end-script")
+    g.add_argument("--front-end-script", default="", metavar="SCRIPT",
+                   help="with --front-end: autostart.py input commands from launch, `shot NAME "
+                        "[change|0xRET]` = capture the next presented frame with its draw log as NAME")
+    g.add_argument("--x-input", choices=("auto", "on", "off"), default="auto",
+                   help="with --front-end: send mouse and keys as X input via xdotool (Wine; the "
+                        "front end ignores PostMessage there); auto = on under Wine")
     autostart.add_options(ap)
     poke.add_options(ap)
     a = ap.parse_args()
-    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
     if a.selftest:
         selftest()
         return
+    fe = None
+    if a.front_end:
+        if a.auto or a.menu or a.input:
+            raise SystemExit("--front-end excludes --auto, --menu and --input")
+        try:
+            script = parse_front_end(a.front_end_script)
+        except ValueError as e:
+            raise SystemExit(str(e))
+        fe = ShotQueue(max(0, a.every or 0))
+    elif a.front_end_script:
+        raise SystemExit("--front-end-script needs --front-end")
+    gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
+    if fe is not None:
+        x_on = a.x_input == "on" or (a.x_input == "auto" and under_wine())
+        auto = make_front_end(script, x_on, a.shots)
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = a.out or os.path.join(repo, "traces", "raw", stamp + "-frames.jsonl")
@@ -658,10 +992,12 @@ def main():
                  FRAME_START: FRAME_START_BYTES, CEL_LOADED: CEL_LOADED_BYTES,
                  UNIT_DRAW: UNIT_DRAW_BYTES, RASTER: RASTER_BYTES, COMP_PATH_DCC: COMP_PATH_DCC_BYTES,
                  COMP_PATH_DC6: COMP_PATH_DC6_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
+    if fe is not None:
+        rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds,
-                          a.ticks, img_dir, max(1, a.every), a.max_frames, a.allow_any_size,
-                          max(0, a.draws_every), a.draws_light)
+                          a.ticks, img_dir, max(1, a.every or 1), a.max_frames, a.allow_any_size,
+                          max(0, a.draws_every), a.draws_light, fe)
     r.auto = auto
     if auto and auto.has_frames():
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1
@@ -676,6 +1012,13 @@ def main():
         print("note:", n)
     keys, frames, bad, verdict = stability(r.keys)
     print(f"wrote {out}: {r.frames} frames, {r.ticks} ticks; images: {img_dir or 'none'}")
+    if fe is not None:
+        print(f"front end: {fe.presents} presents; EndScene callers "
+              + ", ".join(f"{k:#x}: {v}" for k, v in sorted(fe.callers.items()))
+              + "; shots " + (", ".join(f"{n} (present {i})" for n, i in fe.done) or "none")
+              + (("; NOT captured: " + ", ".join(p[0] for p in fe.pending
+                                                 + ([list(fe.logging)] if fe.logging else [])))
+                 if fe.busy() else ""))
     print(f"stability: {keys} state keys seen twice or more ({frames} frames), "
           f"{bad} with differing frames: {verdict}")
 

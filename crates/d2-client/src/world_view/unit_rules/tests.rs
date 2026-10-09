@@ -315,7 +315,13 @@ fn missing_files_are_skipped_with_one_log_line() {
     let calls: Vec<(u8, &str, bool)> = built
         .unit_calls
         .iter()
-        .map(|c| (c.key.sub(), c.path.as_str(), c.shadow))
+        .map(|c| {
+            (
+                c.key.sub(),
+                c.path.as_ref().map_or("", |p| p.as_str()),
+                c.shadow,
+            )
+        })
         .collect();
     assert_eq!(
         calls,
@@ -425,4 +431,44 @@ fn a_spinning_unit_loops_its_frames_from_frame_three() {
         world.server_ticks = t;
         assert!(frame(&world) >= 3, "tick {t} frame {}", frame(&world));
     }
+}
+
+// Covers: specs/render/unit-composite.md §3 r2
+/// The measured phase: the draw of tick T has had T − 1 advances
+/// (`facts/render/scenes`: rate 80, 16 frames: tick 42 → 12, 52 → 15,
+/// 128 → 7, 174 → 6, 224 → 5, 43 → 13).
+#[test]
+fn tick_frame_has_one_advance_less_than_the_tick() {
+    for (tick, frame) in [
+        (42, 12),
+        (43, 13),
+        (52, 15),
+        (128, 7),
+        (174, 6),
+        (224, 5),
+        (274, 5),
+        (354, 14),
+    ] {
+        assert_eq!(super::tick_frame(tick, 16, 80), frame, "tick {tick}");
+    }
+    // M08: the old phase (T advances) gives 13 at tick 42.
+    assert_eq!((42 * 80) >> 8, 13, "the old phase");
+    assert_ne!(super::tick_frame(42, 16, 80), 13);
+    assert_eq!(super::tick_frame(0, 16, 80), 0);
+    assert_eq!(super::tick_frame(1, 16, 256), 0);
+    assert_eq!(super::tick_frame(2, 16, 256), 1);
+}
+
+// Covers: specs/sim/units.md §4.7
+/// The town walk's frame counts from the walk request at speed 213
+/// (`a1-walk-*`: started at tick 22, 1.14d frames 0, 3, 7, 3, 6, 2 at
+/// ticks 32, 46, 60, 74, 88, 102).
+#[test]
+fn the_walk_frame_counts_from_the_walk_start() {
+    for (tick, frame) in [(32, 0), (46, 3), (60, 7), (74, 3), (88, 6), (102, 2)] {
+        assert_eq!(super::walk_frame(tick, 22, 8), frame, "tick {tick}");
+    }
+    // M08: the server-tick clock (rate 256) gives other frames.
+    assert_ne!(super::tick_frame(46, 8, 256), 3);
+    assert_eq!(super::walk_frame(22, 22, 8), 0);
 }

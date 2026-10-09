@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–136 |
-|   3. Lifecycle | 137–384 |
-|   4. Modes and mode schedules | 385–810 |
-|   5. Event dispatch | 811–825 |
-|   6. Events per kind | 826–948 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 949–970 |
-|   8. Collision line between two units | 971–975 |
-| Constants & data dependencies | 976–992 |
-| Randomness | 993–1000 |
-| Edge cases & original bugs | 1001–1021 |
-| Test vectors | 1022–1081 |
-| Provenance | 1082–1156 |
-| Open questions | 1157–1236 |
+|   3. Lifecycle | 137–401 |
+|   4. Modes and mode schedules | 402–858 |
+|   5. Event dispatch | 859–873 |
+|   6. Events per kind | 874–996 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 997–1018 |
+|   8. Collision line between two units | 1019–1023 |
+| Constants & data dependencies | 1024–1040 |
+| Randomness | 1041–1048 |
+| Edge cases & original bugs | 1049–1069 |
+| Test vectors | 1070–1129 |
+| Provenance | 1130–1216 |
+| Open questions | 1217–1296 |
 <!-- /index -->
 
 ## Summary
@@ -150,6 +150,23 @@ fixed GUID):
    into +0x1C; quest chain := 0.
 4. Not a player: unit seed (`0x00552DF0`); item: `0x00627C90`, item seed
    (`0x00552E90`) (`rng.md` §5.3).
+   4.1. A player draws no seed here; its load does (recorded 2026-10-09,
+      q-fix-real-unit-seed-order). The character load of the join
+      (`intents-events.md` §8.2 rule 2, full save and stub alike) runs
+      `0x00552DF0` on the player it allocated: one game-seed step `lo'`,
+      unit seed `init_low(lo')`, `dwInitSeed` `lo'`. Nothing draws between
+      the allocation and this step: it is the first game-seed step after
+      the four of game creation (`rng.md` §5.2), before every item the
+      load makes (a save's items, a stub's start items) and before the
+      act's DRLG (§8.2 rule 4). Recorded under Wine, `-seed 1234`: the
+      step at seq 2349 (`0x00552E31`, unit record +0x20 at 0x2EF2520,
+      outside the town units' block) gives 4048349444; with `ScnAma` (full
+      save, no items) the town's first object takes the next step
+      (108806926, seq 7270), with `StubAma` (stub) the first of the eight
+      start items does (unit 108806926, item 4040195123, seq 2352–2355).
+      The call site inside the load is not identified; the order is.
+      The death corpse draws its seed the same way after its allocation
+      (`combat/vitals.md` §4.7 r1.4).
 5. Flags |= 0x10; node index := 11.
 6. GUID: a monster with flags bit 2 takes the fixed GUID; every other
    unit draws one (`0x00552EE0`, `unit-order.md` §1.3).
@@ -401,6 +418,19 @@ rate `0x00623F50` when the unit has a path, else only the AnimData
 lookup `0x00620F00`; frame count := AnimData frames · 256), cancel
 `0x00553990` (the unit's events of type 0, then type 1, any argument),
 then §4.2. Movement starts set the mode, cancel and schedule §4.4.
+
+PROVISIONAL: the re-init `0x00624390` of a player or monster sets
+action frame := 0, frame := frame bonus · 256, the AnimData record of
+the new mode, frame count +0x48 := its frames · 256 and, for a unit
+with a path, speed +0x4C := the rate `0x00623F50` (§4.7), as the prepare
+step does for a plain animation; the velocity half and the sequence
+loads are left to the mode starts (because no spec writes its player /
+monster branch, and a 1.14d Amazon standing in town after the join
+reads +0x48 = 4096, +0x4C = 80, the AMTNHTH record, with no animated
+start run: REC-590 `poke-fallen-town` state diff); settled by REC-592
+(record_state.py `fr`, `fc`, `sp` across a mode change without an
+animated start: join in town, walk start, a monster's NU after a
+think).
 
 #### 4.2 Animation schedule (events 0 and 1)
 
@@ -767,6 +797,24 @@ Steps, first match wins:
 10. Otherwise: speed := D(s, clamp(total(69 `other_animrate`), 15,
     175)).
 
+PROVISIONAL: d2rs computes the monster w of steps 6–7 (monstats +0x36 /
++0x38, `data/fixups.md` §8) at the rate call from AnimData with the
+host's COF composer for (class b, mode 2 / 15), not the fixup's monster
+composer (because the typed monstats rows carry no +0x36 / +0x38);
+settled by REC-593 (a walking town NPC's `sp`, e.g. Charsi 192 in
+`poke-fallen-town-unpinned`, and a run of a monster with `BaseId` ≠ its
+row, in `record_state.py` against `d2-client state-dump`).
+
+Measured (revision 2026-10-09, q-scenes-compare): the local player's
+town walk (mode 6, w = 213, p = 100) is drawn at server tick T with frame
+`((T − c) · 213 >> 8) mod 8`, c = the tick of the walk request that
+started the walk; a new click while still walking keeps c (`a1-walk-n`
+… `-w`, 1.14d frames 0, 3, 7, 3, 6, 2 at ticks 32 … 102, c = 22).
+PROVISIONAL (REC-516): the run (mode 3, w = 101) does not fit c = the
+run click (`a1-run-n` frame 5 at tick 150, run click 140); the d2rs
+client applies the rule to walks only (settled by a run recording from
+a standing start).
+
 Steps 7 and 8 assert (fatal) for types 2 and 3; no 1.14d caller passes
 an object or missile (objects take `0x00624390`'s own branch,
 `world/objects.md`). The rate draws nothing.
@@ -1081,6 +1129,18 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §3.1 r4.1 (2026-10-09, revision, q-fix-real-unit-seed-order): added
+  from two Wine recordings of 1.14d (`tools/cloud-game/run.sh --python
+  -- tools/trace-recorder/record_rng.py --auto ScnAma --seed 1234
+  --input "wait 3; end"`, and the same with `--auto StubAma`). Before
+  this revision the spec named no player seed, d2rs drew none, and every
+  later unit of the game took the step 1.14d gives the next one (town
+  objects one step early: the 2026-10-09 report's "from object guid 7 on
+  no d2rs unit seed appears in 1.14d's draws"). The handoff's reading
+  that the start items took the in-between steps was a misreading: the
+  `ScnAma` save has no items. Checked by
+  `d2-client/tests/app_unit_seed_order.rs` (real data) and
+  `units::tests::the_player_load_draws_the_recorded_unit_seed_before_the_town`.
 - §3.1 steps 7.1–7.5 (2026-10-07): `all.asm` `0x00555230` jump-table
   cases (argument registers at `0x00555393`, `0x005553ED`), `0x00574250`,
   `0x0054F5D0`, `0x00554850`, `0x00620290`, `0x00623520`, `0x00620AE0`,

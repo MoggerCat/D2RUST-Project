@@ -244,8 +244,8 @@ pub const CREATE_FLAGS_EXPANSION: u32 = create_flags::EXPANSION | 0x4;
 
 /// The 0x67 u32@0x27 of a classic character.
 ///
-/// PROVISIONAL (client/model.md §7 r9; REC-46): bit 2 alone, without the
-/// expansion bit 20.
+/// Bit 2 alone, without the expansion bit 20 (`client/model.md` §7 r9;
+/// recorded, REC-46: `facts/join/a1-new-classic-ama.tsv`).
 pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
@@ -1598,6 +1598,8 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             let m2 = monstats2.record(link as usize);
             let mut c = MonsterClass::from_record(m2, m.npc, m.interact)?;
             c.setup = Some(monster_setup(m, monstats_table.record(i), m2));
+            c.no_aura = m.noaura;
+            c.in_town = m.intown;
             if let Some(x) = monstats2_rows.get(link as usize) {
                 c.light = x.light;
                 c.light_rgb = (x.light_r, x.light_g, x.light_b);
@@ -1707,6 +1709,10 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
                 m.clthitsubmissile4 as i16,
             ],
             c_hit_par: [m.chitpar1 as i32, m.chitpar2 as i32, m.chitpar3 as i32],
+            hit_sub1_server: m.hitsubmissile1 as i16,
+            travel_sound: m.travelsound as i16,
+            hit_sound: m.hitsound as i16,
+            no_multishot: m.nomultishot,
         })
         .collect();
     let states: Vec<d2_data::tables::States> = decode_all(table("states")?).map_err(err)?;
@@ -1729,6 +1735,58 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
         states,
         missiles,
     })
+}
+
+/// The animation columns of the client monster rows
+/// ([`MonsterClass::anims`], `walk_speed`, `run_speed`): `AnimData.d2`
+/// by the class's composite name per mode (the art's name rules,
+/// [`super::anim_names::anim_key`]) and the fixed-up `monstats` speeds
+/// (`data/fixups.md` §8), from the user's files.
+pub fn client_monster_anims(
+    archives: &crate::assets::game_files::GameFiles,
+    rows: &mut UnitRows,
+) -> Result<(), BuildError> {
+    let anim = match archives.read_native(
+        &CanonicalPath::new(d2_formats::animdata::PATH)
+            .map_err(|e| BuildError::Tables(format!("{}: {e}", d2_formats::animdata::PATH)))?,
+    ) {
+        Some(Ok(NativeAsset::AnimData(a))) => a,
+        Some(Ok(_)) => return Err(BuildError::Tables("AnimData.d2: wrong kind".into())),
+        Some(Err(e)) => return Err(BuildError::Tables(format!("AnimData.d2: {e}"))),
+        None => return Err(BuildError::Tables("AnimData.d2: in no archive".into())),
+    };
+    let bins = d2_data::bin::load_from(archives, d2_data::bin::DEFAULT_LANGUAGE)
+        .map_err(|e| BuildError::Tables(e.to_string()))?;
+    let tables = GameTables::from_loaded(bins, anim.clone())?;
+    let monstats = tables
+        .fixed
+        .table("monstats")
+        .ok_or_else(|| BuildError::Tables("monstats not loaded".into()))?;
+    let looks =
+        crate::world_view::unit_assets::UnitLooks::live(archives).map_err(BuildError::Tables)?;
+    for (class, row) in rows.monsters.iter_mut().enumerate() {
+        let Some(c) = row.as_mut() else {
+            continue;
+        };
+        if class < monstats.count {
+            let r = monstats.record(class);
+            c.walk_speed = u16::from_le_bytes([r[0x36], r[0x37]]);
+            c.run_speed = u16::from_le_bytes([r[0x38], r[0x39]]);
+        }
+        for (mode, a) in c.anims.iter_mut().enumerate() {
+            let key = super::anim_names::anim_key(
+                &looks,
+                d2_sim::units::UnitType::Monster,
+                class as u32,
+                mode as u32,
+            );
+            *a = match key {
+                Some(k) => anim.record(&k).ok().map(|rec| (rec.frames, rec.speed)),
+                None => None,
+            };
+        }
+    }
+    Ok(())
 }
 
 /// A built game and the units the app and tests address. The player
@@ -1996,10 +2054,9 @@ pub fn build_with(
     world.inventory = parts.inventory.map(preview_inv_parts);
     // The cube (d2rs-own, unverified, REC-119): the user's `cubemain`.
     world.cube = parts.cube.map(preview_cube_parts);
-    // A new character carries the Horadric Cube (d2rs-own, unverified,
-    // REC-244): charstats gives none, and the preview has no Act II quest
-    // reward path yet.
-    world.start_extra = vec![*b"box "];
+    // No extra start items: a new character gets the charstats slots only
+    // (REC-244 settled: 1.14d gives an Amazon stub 8 start items, Wine
+    // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
     s.set_host_sync(sync_seams);
@@ -2034,11 +2091,14 @@ fn loader(
             mode: 1,
             allied: true,
         };
-        let Some(player) = s
-            .events
-            .action
-            .with(&mut s.game, |g, v| v.allocate(g, &req, 0, 0))
-        else {
+        let Some(player) = s.events.action.with(&mut s.game, |g, v| {
+            // `units.md` §3.1 r4.1: the load draws the player's unit
+            // seed (`0x00552DF0`) right after the allocation, before
+            // the save's or the start items and the act's DRLG.
+            let p = v.allocate(g, &req, 0, 0)?;
+            v.init_player_seed(p);
+            Some(p)
+        }) else {
             s.events
                 .action
                 .hooks()

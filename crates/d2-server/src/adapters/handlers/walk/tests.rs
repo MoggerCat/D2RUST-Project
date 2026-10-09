@@ -545,11 +545,11 @@ fn walk_to_point_moves_the_player_and_tells_the_other_client() {
         y: 10,
     };
     assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())]);
-    for t in &ticks[1..] {
-        assert!(t.3.is_empty(), "{:?}", t.3);
-    }
-    // The stop's mode set (neutral) queues it again: mode 1 has no walk
-    // row, nothing is sent.
+    // The stop's mode set (neutral, row NU 7, `pathing.md` §10 r2) tells
+    // client 1 only: 0x0D code 7 at the stop cell; the own client nothing.
+    let stop = d2_sim::path::walk::messages::player_stop(0, guid, 7, 31, 10, 0, 0);
+    let rest: Vec<_> = ticks[1..].iter().flat_map(|t| t.3.clone()).collect();
+    assert_eq!(rest, vec![(1, stop.to_vec())]);
     assert!(fx.tick().is_empty());
     assert_eq!(fx.path(p).cell(), d2_sim::path::Point::new(31, 10));
     fx.assert_clean();
@@ -622,7 +622,14 @@ fn walk_and_run_to_a_unit_send_0x10() {
             y: 10,
         };
         assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())], "{id:#04x}");
-        assert!(ticks[1..].iter().all(|t| t.3.is_empty()));
+        // The stop's neutral mode (row NU) tells client 1 with 0x0D code 7.
+        let rest: Vec<_> = ticks[1..].iter().flat_map(|t| t.3.clone()).collect();
+        assert!(
+            rest.iter()
+                .all(|(to, m)| *to == 1 && m[0] == 0x0D && m[6] == 7),
+            "{rest:?}"
+        );
+        assert!(rest.len() <= 1, "{rest:?}");
         fx.assert_clean();
     }
 }
@@ -974,7 +981,14 @@ fn town_walk_sends_the_walk_code() {
     // The stop sets town neutral (5).
     assert_eq!(ticks.last().unwrap().2, 5);
     assert_eq!(ticks[0].3, vec![(1, want.encode().to_vec())]);
-    assert!(ticks[1..].iter().all(|t| t.3.is_empty()));
+    // The town neutral (TN 5) tells client 1 with 0x0D code 7.
+    let rest: Vec<_> = ticks[1..].iter().flat_map(|t| t.3.clone()).collect();
+    assert!(
+        rest.iter()
+            .all(|(to, m)| *to == 1 && m[0] == 0x0D && m[6] == 7),
+        "{rest:?}"
+    );
+    assert_eq!(rest.len(), 1, "{rest:?}");
     fx.assert_clean();
 }
 

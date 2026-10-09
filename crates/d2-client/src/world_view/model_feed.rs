@@ -281,7 +281,16 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         self.preview.is_some()
     }
 
+    /// The model's running shake (`render/camera.md` §8, started by the
+    /// model rules: S→C 0x5A code 0x12, client missile functions), else
+    /// the inner feed's.
     fn shake(&self, world: &ClientWorld) -> Result<Option<RunningShake>, ViewError> {
+        if let Some(s) = world.shake {
+            return Ok(Some(RunningShake {
+                shake: s.shake,
+                start_tick: s.start_tick,
+            }));
+        }
         self.inner.shake(world)
     }
 
@@ -544,6 +553,24 @@ mod tests {
         );
         // Open mode without the UI: 0 (ui/panels-2.md §22 r5).
         assert_eq!(feed.open_mode(&w).unwrap(), OpenMode::NONE);
+    }
+
+    // Covers: specs/render/camera.md §8
+    #[test]
+    fn the_shake_is_the_models() {
+        let feed = ModelFeed::<NoFeed>::default();
+        let mut w = ClientWorld::default();
+        assert_eq!(feed.shake(&w).unwrap(), None);
+        w.server_ticks = 3;
+        w.start_shake(6, 4000, 10000, 4000);
+        // t2 = 0 starts nothing: the running one stays.
+        w.server_ticks = 4;
+        w.start_shake(9, 1, 0, 1);
+        let r = feed.shake(&w).unwrap().unwrap();
+        assert_eq!(
+            (r.shake, r.start_tick),
+            (crate::rules::Shake::start(6, 4000, 10000, 4000).unwrap(), 3)
+        );
     }
 
     // Covers: specs/ui/panels.md §4 r2

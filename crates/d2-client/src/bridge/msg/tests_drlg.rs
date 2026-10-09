@@ -1415,3 +1415,341 @@ fn piercing_and_next_hit_on_a_client_missile() {
     end_with(&mut m.w, &env, k, Some(mon), false).unwrap();
     assert!(!m.w.objclient.set_c.contains_key(&k));
 }
+
+/// [`hit_model`] with monsters 5 at (48, 12) and 9 at (46, 14), a hit
+/// row (class 1) of function `h` with c1 `c1`, its missile owned by the
+/// local player at (46, 12), and skills tables with one blank skill.
+fn search_model(
+    h: i16,
+    c1: i32,
+) -> (
+    Model,
+    crate::bridge::world::UnitKey,
+    Vec<crate::bridge::client_missiles::ClientMissileRow>,
+    d2_sim::skills::SkillTables,
+) {
+    use crate::bridge::client_missiles::{create, flag, ClientMissileRow, CreateRecord};
+    use d2_data::tables::{Missiles, Record, Skilldesc, Skills};
+    fn blank<T: Record>() -> T {
+        T::decode(&vec![0u8; T::SIZE])
+    }
+    let mut m = hit_model();
+    m.recv(&assign_monster(5, 48, 12))
+        .recv(&assign_monster(9, 46, 14));
+    let base = ClientMissileRow {
+        range: 40,
+        clt_do_func: 1,
+        explosion_missile: -1,
+        ..ClientMissileRow::default()
+    };
+    let mut rows = vec![base; 3];
+    (rows[1].clt_hit_func, rows[1].clt_hit_sub, rows[1].c_hit_par) =
+        (h, [2, -1, -1, -1], [c1, 0, 0]);
+    let p = m.w.local_player.unwrap();
+    let rec = CreateRecord {
+        flags: flag::POSITION,
+        owner: Some(p),
+        class: 1,
+        x: 46,
+        y: 12,
+        level: 1,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().unwrap();
+    let t = d2_sim::skills::SkillTables {
+        skills: vec![blank::<Skills>()],
+        skilldesc: vec![blank::<Skilldesc>()],
+        missiles: vec![blank::<Missiles>()],
+        skills_code: Vec::new(),
+        miss_code: Vec::new(),
+        level_cap: 99,
+        stat_count: 359,
+    };
+    (m, k, rows, t)
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b9-client-unit-search
+// Covers: specs/missiles/client-bodies-2.md §b12-hit-bodies
+#[test]
+fn hit_16_chains_to_the_next_guid_in_range() {
+    use crate::bridge::client_missiles::{end_with, Env};
+    use crate::bridge::world::UnitKey;
+    let (mut m, k, rows, t) = search_model(16, 10);
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    m.w.objclient.missiles.get_mut(&k).unwrap().d28 = 3;
+    let (m7, m9, m5) = (UnitKey::new(1, 7), UnitKey::new(1, 9), UnitKey::new(1, 5));
+    end_with(&mut m.w, &env, k, Some(m7), false).unwrap();
+    // GUIDs in range {5, 7, 9}, g = 7 → 9: m's class toward it, d28 2,
+    // last-collided 7.
+    let next: Vec<_> =
+        m.w.objclient
+            .missiles
+            .iter()
+            .filter(|(c, _)| **c != k)
+            .map(|(_, c)| (c.target_unit, c.d28, c.last_collided, c.target_point))
+            .collect();
+    assert_eq!(next, vec![(Some(m9), 2, Some(m7), (46, 14))]);
+    // From 9 (g = 9): no larger GUID → the smallest, 5.
+    let c = *m.w.objclient.missiles.keys().find(|c| **c != k).unwrap();
+    m.w.objclient.missiles.get_mut(&c).unwrap().d28 = 2;
+    end_with(&mut m.w, &env, c, Some(m9), false).unwrap();
+    assert!(m
+        .w
+        .objclient
+        .missiles
+        .values()
+        .any(|x| x.target_unit == Some(m5) && x.d28 == 1));
+    // d28 ≤ 1: no hop.
+    let before = m.w.objclient.missiles.len();
+    let last =
+        *m.w.objclient
+            .missiles
+            .iter()
+            .find(|(_, x)| x.d28 == 1)
+            .unwrap()
+            .0;
+    end_with(&mut m.w, &env, last, Some(m5), false).unwrap();
+    assert!(m.w.objclient.missiles.len() < before + 1);
+    assert!(!m
+        .w
+        .objclient
+        .missiles
+        .values()
+        .any(|x| x.d28 == 0 && x.target_unit.is_some()));
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b9-client-unit-search
+// Covers: specs/missiles/client-bodies-2.md §b12-hit-bodies
+#[test]
+fn hits_25_and_26_bolt_the_units_in_range() {
+    use crate::bridge::client_missiles::{end_with, Env};
+    // 26: V = (d28, d2C) = monster 7; mask 0 → 0x583 (no hostility,
+    // line or state test): a bolt of H1 at each unit in r = 10 but O.
+    let (mut m, k, mut rows, t) = search_model(26, 10);
+    rows[1].hit_sub1_server = 0;
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    let mm = m.w.objclient.missiles.get_mut(&k).unwrap();
+    (mm.d28, mm.d2c) = (1, 7);
+    end_with(&mut m.w, &env, k, None, true).unwrap();
+    let mut bolts: Vec<_> =
+        m.w.objclient
+            .set_c
+            .iter()
+            .filter(|(_, u)| u.class == 2)
+            .map(|(c, _)| m.w.objclient.missiles[c].target_point)
+            .collect();
+    bolts.sort();
+    assert_eq!(bolts, vec![(46, 12), (46, 14), (48, 12)]);
+    // No V: 0, the missile stays.
+    let (mut m, k, mut rows, t) = search_model(26, 10);
+    rows[1].hit_sub1_server = 0;
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    m.w.objclient.missiles.get_mut(&k).unwrap().d28 = 1;
+    m.w.objclient.missiles.get_mut(&k).unwrap().d2c = 99;
+    end_with(&mut m.w, &env, k, None, true).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    // 25 searches with the skip flag (monstats `noaura` skipped) and mask
+    // 0xA783 (hostile, line of sight, not in state 86); max := c2, here
+    // 2: the first two in search order.
+    let (mut m, k, mut rows, t) = search_model(25, 10);
+    rows[1].c_hit_par[1] = 2;
+    let mut monsters = monsters;
+    monsters[0] = monsters[0].map(|c| crate::bridge::world::MonsterClass {
+        no_aura: false,
+        ..c
+    });
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    end_with(&mut m.w, &env, k, None, true).unwrap();
+    let bolts =
+        m.w.objclient
+            .set_c
+            .values()
+            .filter(|u| u.class == 2)
+            .count();
+    assert_eq!(bolts, 2);
+    // All `noaura`: none.
+    let (mut m, k, mut rows, t) = search_model(25, 10);
+    rows[1].c_hit_par[1] = 2;
+    monsters[0] = monsters[0].map(|c| crate::bridge::world::MonsterClass { no_aura: true, ..c });
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    end_with(&mut m.w, &env, k, None, true).unwrap();
+    assert_eq!(
+        m.w.objclient
+            .set_c
+            .values()
+            .filter(|u| u.class == 2)
+            .count(),
+        0
+    );
+}
+
+// Covers: specs/missiles/client-bodies-2.md §b10-shared-helpers-part-2
+// Covers: specs/missiles/client-bodies-2.md §b12-hit-bodies
+#[test]
+fn hit_13_retargets_the_lowest_guid() {
+    use crate::bridge::client_missiles::{end_with, Env};
+    use crate::bridge::world::UnitKey;
+    let (mut m, k, mut rows, t) = search_model(13, 0);
+    (rows[1].param, rows[1].lev_range, rows[1].collide_kill) = ([0, 20], 2, true);
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    // d28 2, frames left 0: the retarget picks GUID 5 (the lowest in
+    // `Param2` 20), frames := `Range` + `LevRange` × (level − 1) = 40,
+    // d28 := 5; the hit returns 0: m stays.
+    let mm = m.w.objclient.missiles.get_mut(&k).unwrap();
+    (mm.d28, mm.current) = (2, 0);
+    end_with(&mut m.w, &env, k, None, true).unwrap();
+    let mm = m.w.objclient.missiles[&k];
+    assert_eq!(
+        (mm.target_unit, mm.d28, mm.total, mm.current),
+        (Some(UnitKey::new(1, 5)), 5, 40, 40)
+    );
+    // d28 1 (locked): a hit on another unit than its target → 0; on its
+    // target → 1 (ended).
+    let mm = m.w.objclient.missiles.get_mut(&k).unwrap();
+    mm.d28 = 1;
+    end_with(&mut m.w, &env, k, Some(UnitKey::new(1, 7)), false).unwrap();
+    assert!(m.w.objclient.set_c.contains_key(&k));
+    end_with(&mut m.w, &env, k, Some(UnitKey::new(1, 5)), false).unwrap();
+    assert!(!m.w.objclient.set_c.contains_key(&k));
+}
+
+// Covers: specs/sim/path-placement.md §5.1
+// Covers: specs/missiles/client.md §c7-default-step-0x004d30c0-function-1
+#[test]
+fn client_missiles_see_the_units_footprints() {
+    use crate::bridge::client_missiles::{
+        create, flag, stamp_unit_footprints, update_with, ClientMissileRow, CreateRecord, Env,
+    };
+    use crate::bridge::world::UnitKey;
+    let mut m = model();
+    m.inputs.tables.monsters[0] = Some(MonsterClass {
+        size_x: 2,
+        ..MonsterClass::default()
+    });
+    m.hex("03 00 c4 88 38 10 01 00 61 d1 e0 9f");
+    m.recv(&sight(true, 8, 0)).recv(&sight(true, 16, 0));
+    m.recv(&assign_player(46, 6)).hex("0b 00 01 00 00 00");
+    m.recv(&assign_monster(7, 46, 12));
+    let monsters = m.inputs.tables.monsters.clone();
+    stamp_unit_footprints(&mut m.w, &monsters);
+    // The monster (size 2: pattern 1, the plus) stamps 0x100 on its plus,
+    // with the NO_PATH marker on its cell; the local player 0x80. The
+    // model's own grid is untouched.
+    let stamped = |m: &Model, x: i32, y: i32| {
+        let d = &m.w.drlg.as_ref().unwrap().drlg;
+        let r = d
+            .active_rooms()
+            .into_iter()
+            .find(|&(_, r)| d.active_room(r).is_some_and(|a| a.subtiles.contains(x, y)))
+            .unwrap()
+            .0;
+        m.w.objclient.unit_grids[&r].get(x, y).unwrap()
+    };
+    assert_eq!(stamped(&m, 46, 11) & 0x100, 0x100);
+    assert_eq!(stamped(&m, 46, 12) & 0x1100, 0x1100);
+    assert_eq!(stamped(&m, 46, 6) & 0x80, 0x80);
+    assert_eq!(
+        m.w.drlg
+            .as_ref()
+            .unwrap()
+            .drlg
+            .collision_at(46, 11)
+            .unwrap()
+            & 0x100,
+        0
+    );
+    // A missile flying south ends on the monster when its walk enters the
+    // plus, at (46, 11).
+    let p = m.w.local_player.unwrap();
+    let rows = vec![ClientMissileRow {
+        vel: 16,
+        range: 40,
+        collide_type: 3,
+        client_col: true,
+        collide_kill: true,
+        size: 1,
+        clt_do_func: 1,
+        ..ClientMissileRow::default()
+    }];
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: None,
+        monsters: &monsters,
+    };
+    let rec = CreateRecord {
+        flags: flag::POSITION | flag::TARGET_RELATIVE,
+        owner: Some(p),
+        x: 46,
+        y: 8,
+        ty: 10,
+        ..CreateRecord::default()
+    };
+    let k = create(&mut m.w, &rows, &rec, true).unwrap().unwrap();
+    let mut last = None;
+    while m.w.objclient.set_c.contains_key(&k) {
+        last = m.w.objclient.set_c[&k].position;
+        update_with(&mut m.w, &env, k).unwrap();
+    }
+    assert_eq!(last, Some((46, 10)));
+    // A dead monster stamps nothing.
+    m.w.units.get_mut(&UnitKey::new(1, 7)).unwrap().mode = 12;
+    stamp_unit_footprints(&mut m.w, &monsters);
+    assert_eq!(stamped(&m, 46, 11) & 0x100, 0);
+}
+
+// Covers: specs/missiles/client.md §c9-end-0x004d2d70-m-u-forced
+#[test]
+fn a_hit_body_the_model_cannot_run_still_ends_the_missile() {
+    use crate::bridge::client_missiles::{end_with, ClientMissileRow, Env};
+    use crate::bridge::world::UnitKey;
+    let (mut m, k, mut rows, t) = search_model(52, 0);
+    rows[1] = ClientMissileRow {
+        light: 3,
+        ..rows[1]
+    };
+    let monsters = m.inputs.tables.monsters.clone();
+    let env = Env {
+        rows: &rows,
+        lights: true,
+        skills: Some(&t),
+        monsters: &monsters,
+    };
+    // Hit 52 on a monster reads a monstats2 flag the model lacks: the
+    // error is reported and the missile is gone (no update loop on it).
+    assert!(end_with(&mut m.w, &env, k, Some(UnitKey::new(1, 7)), false).is_err());
+    assert!(!m.w.objclient.set_c.contains_key(&k));
+}

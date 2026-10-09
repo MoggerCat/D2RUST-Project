@@ -289,11 +289,11 @@ values, for both load paths:
    owner item +0x34 when not −1, `0x00643B00`; −1 for a class skill), so
    a fresh Sorceress or Necromancer gets three 0x23 in its join. Static
    reading; no new-character join is recorded yet (Open question 4).
-   PROVISIONAL: d2rs sends hand 1 and hand 0 with item −1, not 0
-   (because the recorded fresh saves carry `ffffffff` there, and with
-   item 0 the client's select, `client/msg-skills.md` §2 r3, finds no
-   (skill, 0) entry, so a new character has no left skill and no click
-   walks; 2026-10-08 preview); settled by REC-02.
+   Confirmed by the Wine recording of characters made in the 1.14d
+   create screen (`facts/join/a1-new-ama.tsv`, `a1-new-sor.tsv`; REC-02):
+   both items are 0. The client's select (`client/msg-skills.md` §2 r3)
+   then finds no (skill, 0) entry and leaves the hand as the player init
+   set it.
 4. d2rs: `d2-server::adapters::session::PlayerRecord` = {+0x2C,
    hands} from r1–r3; `Entry::record` is always known once the save
    (or stub) is parsed.
