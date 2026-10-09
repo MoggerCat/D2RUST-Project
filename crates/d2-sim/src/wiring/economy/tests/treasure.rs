@@ -290,3 +290,45 @@ fn walk_is_deterministic() {
     assert_eq!(a.len(), 2);
     assert_eq!(a, run());
 }
+
+/// `treasure.md` §7 step 4: the request's +0x00 is the dropper U, so a
+/// `body` item (type 40) gets U's class as its file index
+/// (`generation.md` §6.1); without a dropper, the request's index.
+// Covers: specs/items/treasure.md §7 r4
+#[test]
+fn a_body_drop_takes_the_droppers_class() {
+    let mut w = World::new();
+    let body = w.tables.items.len();
+    w.tables.items.push(ItemRec {
+        code: *b"bod ",
+        type_: ty::BODY as i16,
+        level: 1,
+        ..ItemRec::default()
+    });
+    let monster = w.spawn(UnitType::Monster, MONSTER_CLASS);
+    let req = |index| crate::treasure::DropRequest {
+        id: body as u16,
+        quality: q::NORMAL,
+        index,
+        item_level: 1,
+        spot: DropSpot {
+            room: None,
+            x: 0,
+            y: 0,
+        },
+        spawn_type: 3,
+        init_flags: 1,
+        item_format: 101,
+        drop_flags: 0,
+    };
+    let (with, without) = {
+        let mut e = w.econ();
+        let mut sink = ItemDrops::new(&mut e, Here).with_unit(monster);
+        let with = sink.create(req(0)).expect("created");
+        let mut sink = ItemDrops::new(&mut e, Here);
+        let without = sink.create(req(5)).expect("created");
+        (with, without)
+    };
+    assert_eq!(w.items.get(with).unwrap().file_index, MONSTER_CLASS as i32);
+    assert_eq!(w.items.get(without).unwrap().file_index, 5);
+}

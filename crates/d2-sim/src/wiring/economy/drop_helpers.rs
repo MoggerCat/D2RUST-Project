@@ -87,7 +87,8 @@ fn create_at<X: Pending, F: FreeSpot>(
     let (x, y) = pos;
     // The start offset when a room exists there (`path-placement.md` §9
     // rule 1; the floor drop does it itself with the provider).
-    let start = match room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3)) {
+    let start_room = room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3));
+    let start = match start_room {
         Some(_) => (x + 2, y + 3),
         None => (x, y),
     };
@@ -113,6 +114,7 @@ fn create_at<X: Pending, F: FreeSpot>(
         let mut placer = Spots {
             inner: spots,
             room,
+            start_room,
             start,
         };
         match placer.place(&mut econ, x, y) {

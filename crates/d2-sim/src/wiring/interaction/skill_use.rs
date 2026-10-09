@@ -1085,6 +1085,30 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
+        // Find Item `0x005A8000` (`treasure.md` §3.6) on the game's drop
+        // state ([`super::super::action::ActionHooks::object_drops`]); a
+        // game without it drops nothing. The quality value is ignored.
+        if let bodies::BodyEffect::TreasureDrop { corpse, killer, .. } = e {
+            let cv = &mut self.cv;
+            if let Some(mut d) = cv.v.h.object_drops.take() {
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                crate::wiring::economy::find_item_drop(
+                    &mut *cv.v.h,
+                    &mut sim,
+                    &mut d,
+                    &mut crate::wiring::economy::StartSpot,
+                    corpse,
+                    killer,
+                );
+                cv.v.h.object_drops = Some(d);
+            }
+            return;
+        }
         if let Some(e) = self.pet_effect(e) {
             self.xm().body_effect(e);
         }
