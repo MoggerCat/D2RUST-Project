@@ -1742,3 +1742,183 @@ mod waypoint_play {
         assert_eq!(rects(&u), vec![(367, 447, 0, 2)]);
     }
 }
+
+/// The control panel's small items on the play path (`control-panel.md`
+/// §3–§9).
+mod hud_small {
+    use super::*;
+    use crate::controls::{Action as Act, Bindings, Key};
+    use crate::ui::StringLookup;
+
+    /// The mini panel open at 800 × 600, single player: layout 2 buttons
+    /// at x 326 + 21 i, y H − 50 (§9 r4); function f = i, + 1 from i = 3.
+    fn mini_open(u: &mut Ui) {
+        u.ui.set_ui(0x15, 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+    }
+
+    /// The press point of mini-panel button i (inside x_i < x < x_i + 20,
+    /// H − 69 < y < H − 47).
+    fn button(i: i32) -> Point {
+        Point::new(326 + 21 * i + 10, 540)
+    }
+
+    struct Strs(Vec<(u16, Vec<u16>)>);
+    impl Strs {
+        fn new(v: &[(u16, &str)]) -> Self {
+            Strs(
+                v.iter()
+                    .map(|(k, t)| (*k, t.encode_utf16().collect()))
+                    .collect(),
+            )
+        }
+    }
+    impl StringLookup for Strs {
+        fn get(&self, _: &str) -> Option<&[u16]> {
+            None
+        }
+        fn get_id(&self, id: u16) -> Option<&[u16]> {
+            self.0
+                .iter()
+                .find(|(k, _)| *k == id)
+                .map(|(_, t)| t.as_slice())
+        }
+    }
+
+    fn texts(u: &Ui, w: &ClientWorld, strings: &dyn StringLookup) -> Vec<String> {
+        let ctx = UiCtx {
+            tick: 0,
+            world: w,
+            strings,
+        };
+        let mut out: Vec<UiDraw> = Vec::new();
+        u.root.draw(&ctx, &mut out);
+        out.iter()
+            .filter_map(|d| match d {
+                UiDraw::Text(t) => Some(String::from_utf16_lossy(&t.text)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    // The Quest Log button (f 6, i 5) runs `0x004A3FE0(0)`: the quest log
+    // opens and asks for the quest data, as the Q key does.
+    // Covers: specs/ui/control-panel.md §9 r5, §9 r8
+    #[test]
+    fn the_quest_log_button_opens_the_quest_log() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        mini_open(&mut u);
+        u.click(&w, button(5));
+        assert!(u.ui.is_open(0x0F));
+        assert_eq!(
+            u.root.take_intents(),
+            vec![quest_log_ui::request_quest_data()]
+        );
+    }
+
+    // The Automap button (f 4, i 3) toggles UI state 0x0A, the state the
+    // shown automap follows (`ui/automap.md` §8 r2).
+    // Covers: specs/ui/control-panel.md §9 r5
+    #[test]
+    fn the_automap_button_toggles_state_0x0a() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        mini_open(&mut u);
+        u.click(&w, button(3));
+        assert!(u.ui.is_open(0x0A));
+    }
+
+    // Hovering a button shows its string and ` (%s)` with its binding's
+    // key (§9 r6); the run button's tip adds the Run key (§6 r1).
+    // Covers: specs/ui/control-panel.md §9 r6, §6 r1
+    #[test]
+    fn the_mini_panel_and_run_tips_name_their_keys() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        let mut b = Bindings::empty();
+        b.set(Act::ToggleQuests, &[Key::Q]);
+        b.set(Act::ToggleRun, &[Key::R]);
+        u.ui.set_belt_keys(&b);
+        mini_open(&mut u);
+        let s = Strs::new(&[(4175, "Quest Log"), (4178, " (%s)"), (4179, "Run")]);
+        u.send(&w, UiEvent::CursorMoved(button(5)));
+        let want = format!("Quest Log ({})", Key::Q.name());
+        assert!(texts(&u, &w, &s).contains(&want), "{:?}", texts(&u, &w, &s));
+        // §6 r1: the run rectangle x W/2 − 145…W/2 − 128, y H − 28…H − 8.
+        u.send(&w, UiEvent::CursorMoved(Point::new(262, 580)));
+        let want = format!("Run ({})", Key::R.name());
+        assert!(texts(&u, &w, &s).contains(&want), "{:?}", texts(&u, &w, &s));
+    }
+
+    // A belt with extra rows and more than one row blocks the right side
+    // (§9 r2): layout 1, the art at (W/2 − 205, H − 47); the buttons
+    // move to x0 = W/2 − 202 (§9 r4, r7: offset −118).
+    // Covers: specs/ui/control-panel.md §9 r2, §9 r3, §9 r7
+    #[test]
+    fn a_belt_with_extra_rows_moves_the_mini_panel_left() {
+        use crate::bridge::items::mode;
+        use crate::ui::panels::inv_items::tests::world as item_world;
+        // A worn belt of `belts` type 0 (3 rows, §5 r7) whose extra rows
+        // were shown (`[0x007BEFA0]` = 1, §5 r3).
+        let mut w = item_world(&[(7, mode::BODY, (8, 0, 0, 0), b"lbl ")], None);
+        let me = w.local_player.unwrap();
+        w.units.get_mut(&me).unwrap().mode = 1;
+        let mut u = ui(Some(areas()), true);
+        u.ui.set_belt_parts(hud_belt::BeltParts {
+            records: Vec::new(),
+            types: BTreeMap::from([(*b"lbl ", 0)]),
+        });
+        u.ui.shared.borrow_mut().hud.belt.state.extra_boxes = true;
+        mini_open(&mut u);
+        let art: Vec<(i32, i32)> = panel_images(&u.images(&w), "panel\\minipanel_s")
+            .into_iter()
+            .map(|(_, x, y)| (x, y))
+            .collect();
+        assert_eq!(art, vec![(195, 553)]);
+        // Button 5 (Quest Log) at x0 = 198: x 303 … 323.
+        u.click(&w, Point::new(198 + 105 + 10, 540));
+        assert!(u.ui.is_open(0x0F));
+    }
+
+    // A state with flag bit 24 (`stambarblue`) draws the stamina bar blue
+    // (§4 r2: fill frame 2).
+    // Covers: specs/ui/control-panel.md §4 r2
+    #[test]
+    fn a_stambarblue_state_draws_the_stamina_bar_blue() {
+        let mut w = world(AMAZON, 1, true);
+        let key = w.local_player.unwrap();
+        let unit = w.units.get_mut(&key).unwrap();
+        unit.stats.insert(10, 40 << 8);
+        unit.stats.insert(11, 80 << 8);
+        let mut u = ui(Some(areas()), true);
+        let frames = |u: &Ui, w: &ClientWorld| -> Vec<u32> {
+            panel_images(&u.images(w), hud::FILL_FILE)
+                .into_iter()
+                .map(|(f, ..)| f)
+                .collect()
+        };
+        assert!(!frames(&u, &w).contains(&2));
+        u.ui.set_hud_tables(hud::HudTables {
+            stambarblue: vec![0x3A],
+            ..Default::default()
+        });
+        w.units.get_mut(&key).unwrap().states.insert(0x3A);
+        assert!(frames(&u, &w).contains(&2), "{:?}", frames(&u, &w));
+    }
+
+    // The life text toggle is stored at once (§3 r5) and read at start.
+    // Covers: specs/ui/control-panel.md §3 r5
+    #[test]
+    fn the_globe_text_toggles_are_stored_and_read_back() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.click(&w, Point::new(50, 560));
+        let s = u.ui.take_settings_change().expect("stored at once");
+        assert_eq!((s.show_hp_text, s.show_mp_text), (1, 0));
+        let mut v = ui(Some(areas()), true);
+        v.ui.set_settings(s);
+        assert!(v.ui.shared.borrow().hud.input.show_hp);
+        assert!(!v.ui.shared.borrow().hud.input.show_mp);
+    }
+}

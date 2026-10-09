@@ -620,8 +620,11 @@ impl OriginalUi {
     }
 
     /// The belt key labels follow the play bindings (`hud_belt`, REC-264).
+    /// The run and mini-panel tips' key names too (`hud::key_names`).
     pub fn set_belt_keys(&mut self, b: &crate::controls::Bindings) {
-        self.shared.borrow_mut().hud.belt.set_keys(b);
+        let mut sh = self.shared.borrow_mut();
+        sh.hud.belt.set_keys(b);
+        sh.hud.bindings = Some(b.clone());
     }
 
     /// The item tool tips' tables and strings (`item_tip`).
@@ -968,8 +971,13 @@ impl OriginalUi {
     }
 
     /// The settings the Esc menu's Options page shows (`app::config`).
+    /// The control panel's text toggles are read from them at start
+    /// (`control-panel.md` §3 r5, `0x004967F0`).
     pub fn set_settings(&mut self, s: crate::app::config::Settings) {
-        self.shared.borrow_mut().esc.menu.set_settings(s);
+        let mut sh = self.shared.borrow_mut();
+        sh.esc.menu.set_settings(s);
+        sh.hud.input.show_hp = s.show_hp_text != 0;
+        sh.hud.input.show_mp = s.show_mp_text != 0;
     }
 
     /// The settings after a change on the Options page, once per change.

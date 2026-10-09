@@ -1,7 +1,8 @@
-// Spec: specs/ui/control-panel.md (§4 r1, §7 r2)
+// Spec: specs/ui/control-panel.md (§4 r1, §4 r2, §7 r2)
 //! The tables the play HUD reads ([`HudTables`]): each skill's
-//! `charclass` and skilldesc `IconCel` (§7 r2) and the `experience` rows
-//! (§4 r1), from the user's `.bin` set.
+//! `charclass` and skilldesc `IconCel` (§7 r2), the `experience` rows
+//! (§4 r1) and the `stambarblue` states (§4 r2), from the user's `.bin`
+//! set.
 
 use bevy::prelude::*;
 use d2_data::bin::TableFiles;
@@ -18,7 +19,17 @@ pub fn hud_tables(archives: &dyn TableFiles) -> Result<HudTables, String> {
     let skills: Vec<Skills> = decode_all(table("skills")?).map_err(|e| e.to_string())?;
     let descs: Vec<Skilldesc> = decode_all(table("skilldesc")?).map_err(|e| e.to_string())?;
     let exp: Vec<Experience> = decode_all(table("experience")?).map_err(|e| e.to_string())?;
-    let mut tables = HudTables::default();
+    let states: Vec<States> = decode_all(table("states")?).map_err(|e| e.to_string())?;
+    let mut tables = HudTables {
+        // §4 r2: the states with flag bit 24 (`stambarblue`).
+        stambarblue: states
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.stambarblue)
+            .filter_map(|(id, _)| u8::try_from(id).ok())
+            .collect(),
+        ..HudTables::default()
+    };
     for (id, s) in skills.iter().enumerate() {
         // d2rs-own, unverified: the `skilldesc` link is read as the
         // skilldesc row index.

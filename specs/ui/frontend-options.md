@@ -28,15 +28,15 @@
 |   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 212–302 |
 |   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 303–347 |
 |   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 348–392 |
-|   O7. Settings storage and the d2rs config mapping | 393–424 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 425–449 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 450–543 |
-| Constants & data dependencies | 544–563 |
-| Randomness | 564–567 |
-| Edge cases & original bugs | 568–592 |
-| Test vectors | 593–623 |
-| Provenance | 624–663 |
-| Open questions | 664–671 |
+|   O7. Settings storage and the d2rs config mapping | 393–426 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 427–451 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 452–545 |
+| Constants & data dependencies | 546–565 |
+| Randomness | 566–569 |
+| Edge cases & original bugs | 570–594 |
+| Test vectors | 595–625 |
+| Provenance | 626–665 |
+| Open questions | 666–673 |
 <!-- /index -->
 
 ## Summary
@@ -417,6 +417,8 @@ cel runs); the cel draw `0x00502680` passes the row mode to the renderer unchang
 | Automap Center | `AutoMap Centers` | 0–1, 1 | `[automap] centers` |
 | Automap Party | `AutoMap Party` | 0–1, 1 | `[automap] party` |
 | Automap Party Names | `AutoMap Party Names` | 0–1, 1 | `[automap] party_names` |
+| (no row: control panel life text toggle, `ui/control-panel.md` §3 r5) | `Show HP Text` | 0–1, 0 | `[hud] show_hp_text` |
+| (no row: control panel mana text toggle, §3 r5) | `Show MP Text` | 0–1, 0 | `[hud] show_mp_text` |
 | Configure Controls | `<save>\<char>.key`, `<save>\default.key` | — | `controls.toml` (`client/ui.md` §A6) |
 
 3. Writes happen at the same moments as the original's registry writes (each apply; Gamma /

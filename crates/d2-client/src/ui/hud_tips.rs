@@ -1,11 +1,12 @@
-// Spec: specs/ui/control-panel.md (§4 r1, §6 r1/r4, §8 r1)
+// Spec: specs/ui/control-panel.md (§4 r1, §6 r1/r4, §8 r1, §9 r6)
 //! The control panel tool tips (`Tip` of `ui::panels::control`) bound to
-//! the string tables: the run, menu, new-stats / new-skills and
-//! experience hovers resolve their string ids through [`StringLookup`]
-//! and leave as centred text draws.
+//! the string tables: the run, menu, new-stats / new-skills, experience
+//! and mini-panel hovers resolve their string ids through
+//! [`StringLookup`] and leave as centred text draws.
 // d2rs-own, unverified: the tip font (1, the font of the globe numbers)
 // is not named by the spec. Without the font measure the globe numbers
-// are centred on width 0.
+// are centred on width 0. The run and mini-panel key names are the play
+// bindings' names ([`TipIn::keys`]), not the key name strings of §5 r13.
 
 use crate::ui::draw::{RectRequest, TextRequest, TextStyle, UiDraw, UiDrawSink};
 use crate::ui::geom::Point;
@@ -14,6 +15,7 @@ use crate::ui::panels::control::buttons::{menu_tip, run_tip, tip_800, BtnEnv, Ne
 use crate::ui::panels::control::globes::{
     exp_tip, globe_numbers, stamina_tip, ExpIn, NumbersIn, StaminaIn, Tip,
 };
+use crate::ui::panels::control::minipanel::{Layout, MiniPanel, FUNCTION_BINDINGS};
 use crate::ui::text::TextOpts;
 use crate::ui::FRAME;
 
@@ -35,10 +37,19 @@ pub struct TipIn<'a> {
     /// The tip font's measure (the pop-up placement, `control-panel.md`
     /// §5 r14); `None`: the tips are drawn at their call point.
     pub fonts: Option<&'a super::FontMeasure>,
+    /// The primary and secondary key name of a command (`ui/controls.md`
+    /// §3 numbering).
+    pub keys: &'a dyn Fn(i32) -> [Option<Vec<u16>>; 2],
+    /// The drawn mini panel and its layout (§9 r3), while state 0x15 is
+    /// open and a side is free.
+    pub mini: Option<(Layout, &'a MiniPanel)>,
 }
 
+/// The run / walk command (`ui/controls.md` §3 cmd 0x23).
+const CMD_RUN: i32 = 0x23;
+
 /// The tips under the mouse, in the order run, menu, new stats, new
-/// skills, experience.
+/// skills, experience, mini panel.
 pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
     let s = |id: u16| {
         i.strings
@@ -53,7 +64,7 @@ pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
         open_mode: 0,
     };
     [
-        run_tip(i.w, i.h, i.mouse, [None, None], &s),
+        run_tip(i.w, i.h, i.mouse, (i.keys)(CMD_RUN), &s),
         menu_tip(i.w, i.h, i.mini_open, i.mouse, &s),
         // §8 r1: the tool tips are 800 × 600 only.
         i.res2
@@ -63,6 +74,14 @@ pub fn hud_tips(i: &TipIn<'_>) -> Vec<Tip> {
             .then(|| tip_800(&env, NewBtn::Skills, i.mouse, i.state9_open, &s))
             .flatten(),
         exp_tip(&i.exp, i.w, i.h, i.mouse, &s),
+        // §9 r6: the button's string and its binding's keys.
+        i.mini.and_then(|(l, m)| {
+            let keys = |f: usize| match FUNCTION_BINDINGS[f] {
+                Some(cmd) => (i.keys)(i32::from(cmd)),
+                None => [None, None],
+            };
+            m.tip(l, i.w, i.h, i.mouse, &keys, &s)
+        }),
     ]
     .into_iter()
     .flatten()
@@ -233,6 +252,8 @@ mod tests {
             exp: ExpIn::default(),
             strings,
             fonts: None,
+            keys: &|_| [None, None],
+            mini: None,
         })
         .iter()
         .map(|t| String::from_utf16_lossy(&t.text))
@@ -250,6 +271,8 @@ mod tests {
             exp: ExpIn::default(),
             strings,
             fonts: None,
+            keys: &|_| [None, None],
+            mini: None,
         })
         .iter()
         .map(|t| String::from_utf16_lossy(&t.text))
@@ -290,6 +313,8 @@ mod tests {
                 exp: ExpIn::default(),
                 strings: &s,
                 fonts: None,
+                keys: &|_| [None, None],
+                mini: None,
             },
             &mut out,
         );
