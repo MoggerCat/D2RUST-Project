@@ -438,15 +438,13 @@ impl OriginalUi {
         // r2.3: the act index of the local player's room's level
         // (`0x006427F0`); none → tab 0. `0x0049C760(a)`: a ≥ 5 → 0;
         // tab 0 has no gate; the others read the client quest flags.
+        let quest = self.more.client_quest;
+        let gate = |record: u32| crate::bridge::objects::quest_bit(&quest, record as u8, 0);
         let tab = match world.player_level() {
-            None => Some(0),
+            None => 0,
             Some(level) => match act_index(u32::from(level)) {
-                a if a >= WAYPOINT_TABS => Some(0),
-                0 => Some(0),
-                _ => {
-                    self.skip(skip::WAYPOINT_TAB_GATE);
-                    None
-                }
+                a if a >= WAYPOINT_TABS => 0,
+                a => crate::ui::panels::waypoint::set_tab(a as u8, &gate),
             },
         };
         // r2.4–r2.6: the row rebuild before and after the store.
@@ -455,7 +453,7 @@ impl OriginalUi {
         self.msg.waypoint = Some(WaypointMenuState {
             guid,
             record,
-            tab,
+            tab: Some(tab),
             close_latch: false,
         });
         // The installed menu's rows (`waypoint_ui`).
@@ -466,6 +464,7 @@ impl OriginalUi {
             record,
             current: world.player_level().map_or(0, u32::from),
             seq,
+            tab,
         });
         Ok(())
     }

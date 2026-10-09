@@ -418,6 +418,7 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     let drlg_source = single_player::client_drlg_source(&data);
     let level_rows = single_player::client_level_rows(&data);
     let waypoint_map = single_player::client_waypoint_map(&data);
+    let level_names = single_player::client_level_names(&data);
     let object_rows = single_player::client_object_rows(&data);
     let object_names = single_player::client_object_names(&data);
     let automap_source = super::automap::live_source(&d.tables).map_err(anyhow::Error::msg)?;
@@ -504,6 +505,7 @@ pub fn add_live_client(app: &mut App, link: DynLink, c: LiveClient) -> anyhow::R
     super::hud::install_char_tables(app, archives.as_ref()).map_err(anyhow::Error::msg)?;
     super::hud::install_skill_tree_tables(app, archives.as_ref()).map_err(anyhow::Error::msg)?;
     ui::set_waypoint_map(app, waypoint_map);
+    ui::set_level_names(app, level_names);
     ui::set_shop_prices(app, c.prices);
     super::hire_stats::install_hire_stats(app, hire_rows, true);
     let table = sound::sound_table_live(archives.as_ref()).map_err(anyhow::Error::msg)?;

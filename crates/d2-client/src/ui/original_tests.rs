@@ -60,13 +60,21 @@ fn inv_area_rect_has_an_inclusive_bottom() {
 
 // An expansion game's waypoint tabs step by 64 over five tabs: a press
 // at (300, 80) at 800 × 600 (x' = 220, y' = 20) selects tab 3 (`menus.md`
-// test vector), drawn as `expwaygatetabs` frame 2t = 6.
+// test vector), drawn as `expwaygatetabs` frame 2t = 6. The click walks
+// down the setter's quest records (§1.4), so the client holds records 7,
+// 15, 23, 26 and 28 bit 0 (S→C 0x29).
 // Covers: specs/ui/menus.md §1 r3
 // Covers: specs/ui/panels.md §13 r3
 #[test]
 fn expansion_waypoint_tab_click_uses_five_tabs() {
     let mut u = ui(Some(areas()), true);
     let w = world(AMAZON, 1, true);
+    let mut quest = [0u8; 96];
+    for q in [7usize, 15, 23, 26, 28] {
+        quest[2 * q] |= 1;
+    }
+    u.ui.apply_output(&Output::QuestFlags { record: quest }, &w)
+        .unwrap();
     let record = [2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     u.ui.apply_output(&Output::WaypointMenu { guid: 0x0A, record }, &w)
         .unwrap();
@@ -1472,6 +1480,7 @@ mod close_hooks {
             record: Default::default(),
             current: 1,
             seq: 1,
+            tab: 0,
         };
         let w = alive();
         let mut u = ui(Some(areas()), true);
@@ -1607,4 +1616,129 @@ fn the_inventory_close_button_closes_the_cube() {
         1,
         "{sent:?}"
     );
+}
+
+/// The waypoint menu on the play path (`menus.md` §1, `panels.md` §13).
+mod waypoint_play {
+    use super::*;
+
+    /// Client quest flags (S→C 0x29) with bit 0 of each record set.
+    fn quest(records: &[usize]) -> Output {
+        let mut record = [0u8; 96];
+        for &q in records {
+            record[2 * q] |= 1;
+        }
+        Output::QuestFlags { record }
+    }
+
+    fn open(u: &mut Ui, tab: u8) {
+        u.ui.shared.borrow_mut().waypoint_open = Some(WaypointOpen {
+            guid: 0x0A,
+            record: Default::default(),
+            current: 1,
+            seq: 1,
+            tab,
+        });
+        u.ui.set_ui(0x14, 0, false).unwrap();
+        u.ui.sync_root(&mut u.root);
+    }
+
+    fn tabs(u: &Ui, w: &ClientWorld) -> Vec<u32> {
+        panel_images(&u.images(w), "menu\\expwaygatetabs")
+            .into_iter()
+            .map(|(f, ..)| f)
+            .collect()
+    }
+
+    // The open's tab (§2 r2.3 of msg-ui) is the menu's current tab:
+    // frame 2t; the drawn tabs test records 7 / 15 / 23 / 26 (§13.3), so
+    // with only record 7 tab 1 draws its frame 3 and tabs 3, 4 none.
+    // Covers: specs/ui/panels.md §13 r3
+    #[test]
+    fn the_menu_opens_on_the_open_tab_and_draws_the_gated_tabs() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.ui.apply_output(&quest(&[7, 15]), &w).unwrap();
+        open(&mut u, 2);
+        let t = tabs(&u, &w);
+        assert!(t.contains(&4), "{t:?}");
+        assert!(t.contains(&1) && t.contains(&3), "{t:?}");
+        assert!(!t.contains(&7) && !t.contains(&9), "{t:?}");
+    }
+
+    // A tab click past the quest gate walks down to the last reachable
+    // tab (§1.4): with record 7 only, tab 3 opens as tab 1.
+    // Covers: specs/ui/menus.md §1 r4
+    #[test]
+    fn a_gated_tab_click_walks_down_the_quest_records() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.ui.apply_output(&quest(&[7]), &w).unwrap();
+        open(&mut u, 0);
+        u.send(
+            &w,
+            UiEvent::Press {
+                button: PointerButton::Left,
+                at: Point::new(300, 80),
+            },
+        );
+        let t = tabs(&u, &w);
+        assert!(t.contains(&2), "{t:?}");
+        assert!(!t.contains(&6), "{t:?}");
+    }
+
+    // A press outside the left half closes the menu with one latched
+    // C→S 0x49 level 0 (§1.2, §1.5); the press reaches the menu, not the
+    // world.
+    // Covers: specs/ui/menus.md §1 r2, §1 r5
+    #[test]
+    fn a_press_outside_the_left_half_closes_with_one_0x49() {
+        let mut w = world(AMAZON, 1, true);
+        let p = w.local_player.unwrap();
+        w.units.get_mut(&p).unwrap().position = Some((100, 100));
+        let mut u = ui(Some(areas()), true);
+        open(&mut u, 0);
+        let r = u.send(
+            &w,
+            UiEvent::Press {
+                button: PointerButton::Left,
+                at: Point::new(600, 200),
+            },
+        );
+        assert_eq!(r, Routed::Panel(PanelId(0x14)));
+        let want =
+            ClientIntent::from_message(&d2_proto::client::TakeOrCloseWp { wp: 0x0A, level: 0 });
+        assert_eq!(u.root.take_intents(), vec![want]);
+        assert!(!u.ui.is_open(0x14));
+    }
+
+    // The close button's hover draws the filled rectangle (colour 0,
+    // mode 2) around the "Cancel" tip (§13.4): at 800 × 600 the area is
+    // (353, 447) 36 × 34.
+    // Covers: specs/ui/panels.md §13 r4
+    #[test]
+    fn the_close_hover_draws_the_filled_rectangle() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        open(&mut u, 0);
+        let rects = |u: &Ui| -> Vec<(i32, i32, u8, u8)> {
+            let ctx = UiCtx {
+                tick: 0,
+                world: &w,
+                strings: &NoStrings,
+            };
+            let mut out: Vec<UiDraw> = Vec::new();
+            u.root.draw(&ctx, &mut out);
+            out.iter()
+                .filter_map(|d| match d {
+                    UiDraw::Rect(r) if r.y0 == 430 => Some((r.x0, r.y1, r.color, r.mode)),
+                    _ => None,
+                })
+                .collect()
+        };
+        assert!(rects(&u).is_empty());
+        u.send(&w, UiEvent::CursorMoved(Point::new(370, 460)));
+        // No font bound: the tip's half width is 0.
+        assert_eq!(rects(&u), vec![(367, 447, 0, 2)]);
+    }
 }

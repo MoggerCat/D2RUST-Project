@@ -276,6 +276,12 @@ struct Shared {
     /// [`TopUi`], and the local copy of the client seed its step draws on.
     cursor: RefCell<super::cursor::Cursor>,
     cursor_seed: std::cell::Cell<Option<u64>>,
+    /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
+    /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
+    client_quest: [u8; 96],
+    /// `levels` `LevelName` keys by level id (the waypoint rows' text,
+    /// `waypoint_ui`).
+    level_names: Vec<String>,
 }
 
 impl Shared {
@@ -428,6 +434,8 @@ impl OriginalUi {
                 0,
             )),
             cursor_seed: std::cell::Cell::new(None),
+            client_quest: [0; 96],
+            level_names: Vec::new(),
         };
         Ok(Self {
             shared: Rc::new(RefCell::new(shared)),
