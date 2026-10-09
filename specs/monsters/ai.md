@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–245 |
-|   2. Think dispatch `0x005B1740` | 246–382 |
-|   3. AI control and AI tables | 383–554 |
-|   4. AI parameters | 555–573 |
-|   5. Target selection | 574–732 |
-|   6. Distances and line tests | 733–747 |
-|   7. Tactics helpers | 748–972 |
-|   8. AI commands and minions | 973–997 |
-|   10. The catalogue `ai-functions.tsv` | 998–1018 |
-| Constants & data dependencies | 1019–1042 |
-| Randomness | 1043–1064 |
-| Edge cases & original bugs | 1065–1106 |
-| Test vectors | 1107–1195 |
-| Provenance | 1196–1252 |
-| Open questions | 1253–1356 |
+|   1. Think scheduling | 97–282 |
+|   2. Think dispatch `0x005B1740` | 283–422 |
+|   3. AI control and AI tables | 423–594 |
+|   4. AI parameters | 595–613 |
+|   5. Target selection | 614–772 |
+|   6. Distances and line tests | 773–787 |
+|   7. Tactics helpers | 788–1022 |
+|   8. AI commands and minions | 1023–1049 |
+|   10. The catalogue `ai-functions.tsv` | 1050–1070 |
+| Constants & data dependencies | 1071–1094 |
+| Randomness | 1095–1116 |
+| Edge cases & original bugs | 1117–1158 |
+| Test vectors | 1159–1247 |
+| Provenance | 1248–1308 |
+| Open questions | 1309–1412 |
 <!-- /index -->
 
 ## Summary
@@ -103,7 +103,9 @@ args 0, 0, default handler. The monster class handler `0x005A7F80`
 dispatches it to `0x005B1740` through table `0x006E2490` entry 2, but
 drops it without running when the monster has state 1 (D2MOO
 `STATE_FREEZE`) and is not dead (`0x005541B0`); `tick.md` §5.6. A dropped
-think is not rescheduled by the dispatcher. The freeze itself schedules
+think is not rescheduled by the dispatcher. A dead monster's think is **not** dropped here; it has none
+because the death clean-up cancels its type-2 events (`sim/units.md`
+§4.6 "What keeps a dead monster dead"). The freeze itself schedules
 the next think twice:
 
 1. Freeze apply `0x0057B230` (combat spec owns the length): delete the
@@ -219,6 +221,41 @@ So a monster that walks or runs re-thinks the frame its path ends.
    `0x0053A8E0`), every monster in that room's unit list gets
    `0x00573780` (+2 if neutral). Recorded: all 61 "step clients"
    schedules are +2.
+3. **Last client leaves a room: the think is cancelled.** The room
+   leave `0x0053A9B0` (`sim/intents-events.md` §7.8 rule 3) removes the
+   client (`0x0061A700`), then tests the room's client count
+   (`cmp [room + 0x78], 0` at `0x0053AA0A`); when it is 0, every unit of
+   the room's unit list (room +0x74, next +0xE8) of type 1 gets
+   `0x005738D0(game, unit)` (call at `0x0053AA2A`): delete the unit's
+   type-2 events (AI think) and then its type-3 events (stat
+   regeneration), any argument (`0x00540E60(2, 0)`, `0x00540E60(3, 0)`).
+   Nothing is scheduled in their place, and nothing is drawn. The
+   monster has no pending think until a client enters its room again
+   (rule 2: +2 if neutral). The same "no client, no think" holds at
+   creation (`init.md` §4.1, gate `0x00553160`: `room.clients ≠ 0`, else
+   clean-up and no think), so a monster in a room no client sees never
+   thinks from a timer.
+   - The test is in the room leave only. The think path has none: the
+     class handler `0x005A7F80` (freeze gate only, §1.1), the runner
+     `0x00541060` (`sim/tick.md` §5.5), the dispatch `0x005B1740` (§2)
+     and the Npc AI `0x005E7130` (`ai-bodies.md` §9.9) never read room
+     +0x78. A think that is still pending runs normally.
+   - Only types 2 and 3 are cancelled. Mode events (types 0 and 1) stay,
+     so a monster that is mid-mode when the last client leaves still
+     reaches its mode end, and the mode end can schedule or run a think
+     (§1.3, §1.4). This is a static reading; no recording has it. An
+     idle monster has no mode end to wait for, so it stops thinking.
+   - Recorded (`traces/checks/a4-warp-plains-ama.check`, ScnAm4,
+     `-seed 1234`): the warp at frame 6 takes the client out of every
+     Pandemonium Fortress room. The Fortress NPCs (classes 405, 257,
+     246) had think +20 pending from their frame-4 home think
+     (`ai-bodies.md` §9.9 step 1). That think is cancelled, so there is
+     no frame-24 think and no map-AI draw. Their unit seeds do not
+     change from frame 6 to frame 80. With a client in the level, the
+     same think runs (`a4-fortress-arrival-ama` matches).
+   Provenance: 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`,
+   `0x005738D0`, `0x00540E60`, `0x0053A8E0`, `0x005A7F80`,
+   `0x00541060`, `0x005B1740`, `0x005E7130`; q-prov-data).
 
 #### 1.6 AI reset (event type 10)
 
@@ -271,7 +308,10 @@ If either record is missing nothing runs. Otherwise:
    unit, record). A bad code pointer is a fatal assert.
 
 1.14d-confirmed (`0x005B1740`). The 1.14d handler does not test state
-54 (D2MOO only warns).
+54 (D2MOO only warns). It does not test the room's client count either
+(room +0x78). A monster in a room with no client has no think to
+dispatch, because the room leave cancelled it (§1.5 rule 3); 2026-10-09
+(pc1-day3-c, read in `0x005B1740`).
 
 #### 2.2 Precheck A `0x005B10E0`: stun, doors, leash
 
@@ -969,6 +1009,16 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
    ```
    point == U.cell: type 13 -> 0 pts -> type 15 -> 0 pts; WL start 0 -> NU; think f + aidel; 0x67 code 7
    ```
+9. **Mode damage** (1.14d-read 2026-10-09, `0x005A7D34`–`0x005A7D39`):
+   after rule 4 (`0x005A63F0` returns at `0x005A7D34`), still inside
+   the m ≠ 3 branch, `0x005A4F50(U, m)` with m = the requested mode
+   (record +0x00, kept at [ebp − 4]) rewrites U's base `tohit`,
+   `mindamage`, `maxdamage` and element stats for m
+   (`skills/bodies-2.md` §2.1), then umod mode 0 (`0x005A4350` at
+   `0x005A7D42`) and the start function. Every non-GH request (also
+   one whose start then fails, and the creation mode) runs it; a
+   monster's melee to-hit and damage are those of its last such
+   request (`combat/damage.md` §10, checked by a 1.14d recording).
 
 ### 8. AI commands and minions
 
@@ -986,7 +1036,9 @@ last). Param 0 is the command type.
 | `0x0058EEF0(type, set)` | `GetAiCommandFromParam` | no current (ring empty) → 0. Else the first command of that type in the order current's next, its next, …, current (current is tested last; a one-node ring tests only it); set ≠ 0 makes it current; 0 if none |
 | `0x0058EFA0` | `SetCurrentAiCommand(type, set)` | find by type (`0x0058EEF0`), create it with params (type, 0, 0, 0, 0) if absent (it becomes current), then return `0x0058EEF0(type, set)` |
 | `0x0058F730` | `AllocCommandsForMinions` | copy the command to every minion of this unit's minion owner (control +0x2C/+0x30), in minion-list order |
-| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0 |
+| `0x0058F0D0` | `GetMinionOwner` | minion owner unit, or 0: 0 when control +0x28 is 0; else the unit of type +0x30, GUID +0x2C (`0x00552F60`) |
+| `0x0058F030(game, unit, GUID, type, a, b)` | — (set owner data) | monsters only: b ≠ 0 → `0x005DD230(control, 2, 1)`; a ≠ 0 → `0x005DD230(control, 1, 1)`; then control +0x2C := GUID, +0x30 := type, +0x28 := game (this is what makes `0x0058F0D0` answer). Party leaders get their own GUID (`population.md` §10.2.1), so `0x0058F0D0(leader)` = leader (`ai-bodies.md` §9.4 rule 6) |
+| `0x0058F100(game, leader, minion)` | — (add minion) | new 8-byte node {minion GUID (+0x0C, −1 for none), next}, pushed at the **head** of control +0x34, so the list runs newest first |
 
 Command types used by Act 1 AIs: 1 = "attack now" (Fallen, FallenShaman
 minions), 10 = home position (NPCs, BloodRaven: params 1, 2 = x, y), 4
@@ -1249,6 +1301,10 @@ Other recorded checks:
 - Recordings: `traces/raw/20261006-015554-tick.jsonl`,
   `-021854-tick.jsonl`, `-022304-tick.jsonl` (`tick-raw-1`); counts by
   a script over `hin`, `set`, `ex`, `cancel` records (Test vectors).
+- 2026-10-09 (pc1-day3-c, read in `0x0053A9B0`, `0x005738D0`,
+  `0x00540E60`, `0x005B1740`, `0x005E7130`): §1.5 rule 3. When the last
+  client leaves a room, the think is cancelled. Evidence:
+  `traces/checks/a4-warp-plains-ama.check`.
 
 ## Open questions
 

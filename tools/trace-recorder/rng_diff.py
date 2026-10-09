@@ -88,6 +88,16 @@ def prepare(header, recs):
     return out, info
 
 
+def only_drlg(ranges):
+    """True when every skipped [lo, hi) lies inside the DRLG code ranges whose
+    inline draws are always `other:drlg` (rng-trace.md §2 r5, §5 r5)."""
+    for lo, hi in ranges:
+        lo, hi = int(lo, 16), int(hi, 16)
+        if not any(a <= lo and hi <= b for a, b in rng_owners.DRLG_SITES):
+            return False
+    return True
+
+
 def is_compared(owner):
     return owner == "game" or owner.startswith("unit ")
 
@@ -265,8 +275,14 @@ def report(r, ha, hb, nxt=20, out=sys.stdout):
     p(f"not compared: other seeds orig {ia['other']}, d2rs {ib['other']}; no-step draws orig "
       f"{ia['nostep']}, d2rs {ib['nostep']}; unresolved inline orig {ia['unresolved']}")
     gaps = []
-    if ha.get("skip_inline"):
-        gaps.append(f"orig inline sites skipped in {ha['skip_inline']}")
+    skipped = ha.get("skip_inline") or []
+    if skipped and only_drlg(skipped):
+        # rng_owners rule 5: every inline draw there is other:drlg and takes
+        # no part in the owner chains, so the comparison misses nothing
+        p(f"note: orig inline sites skipped in {skipped}: DRLG code only (owner other:drlg, "
+          f"never compared)")
+    elif skipped:
+        gaps.append(f"orig inline sites skipped in {skipped}")
     if ia["unresolved"]:
         gaps.append(f"{ia['unresolved']} orig inline draws without a state")
     for g in gaps:
@@ -379,7 +395,7 @@ def run(orig, d2rs, **kw):
     return compare(split(copy.deepcopy(orig)), split(copy.deepcopy(d2rs)), **kw)
 
 
-# Covers: specs/tools/rng-trace.md §1 r2, §5 r1, §5 r2, §5 r3, §5 r4, §5 r5
+# Covers: specs/tools/rng-trace.md §1 r2, §5 r1, §5 r2, §5 r3, §5 r4, §5 r5, §4 r6
 def selftest():
     ok = 0
     orig, d2rs = synthetic()
@@ -463,6 +479,12 @@ def selftest():
     # a 1.14d file with skipped inline ranges is at best partial
     a = copy.deepcopy(orig)
     a[0]["skip_inline"] = [["0x642000", "0x682000"]]
+    assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 2
+    ok += 1
+    # ... unless the skipped ranges are DRLG code only (other:drlg, never compared)
+    a[0]["skip_inline"] = [[f"{x:#x}", f"{y:#x}"] for x, y in rng_owners.DRLG_SITES]
+    assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 0
+    a[0]["skip_inline"] = [["0x66b000", "0x683000"]]  # one page past the DRLG code
     assert report(run(a, d2rs), a[0], d2rs[0], out=sink) == 2
     ok += 1
     # a file without frames is an error

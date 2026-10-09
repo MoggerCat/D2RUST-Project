@@ -21,6 +21,36 @@ use crate::world::waypoints::{ObjectFacts, PlayerFacts, RoomRect, WaypointRecord
 
 use super::{Pending, View, WiringError};
 
+/// `0x0053AEC0(game, player, level, tile_code)` (`waypoints.md` §7 rule
+/// 5): with the path provider, the same-act warp is the spawn point and
+/// placement of `path-placement.md` §11
+/// ([`crate::wiring::path::place::level_warp`]), an act change is
+/// [`crate::wiring::path::act_change::run`]; a warp without the provider
+/// (or without the destination act) goes to [`Pending::warp`]. The one
+/// level warp of the action wiring (waypoints, quests).
+pub fn level_warp<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    level: u32,
+    tile_code: u8,
+) {
+    if v.h.paths.is_some() {
+        let c = crate::wiring::path::PathCtx::of(v, game);
+        if crate::wiring::path::place::level_warp(c, player, level, u32::from(tile_code)).is_some()
+        {
+            return;
+        }
+        // Another act: the act change (d2rs-own wiring, unverified;
+        // `wiring::path::act_change`).
+        let c = crate::wiring::path::PathCtx::of(v, game);
+        if crate::wiring::path::act_change::run(c, player, level, u32::from(tile_code)) {
+            return;
+        }
+    }
+    v.h.x.warp(game, player, level, tile_code);
+}
+
 /// The waypoint code's view of a game.
 pub struct WaypointView<'a, X> {
     pub game: &'a mut Game,
@@ -157,21 +187,7 @@ impl<X: Pending> WaypointWorld for WaypointView<'_, X> {
     /// [`crate::wiring::path::act_change::run`]; a warp without the
     /// provider (or without the destination act) goes to [`Pending::warp`].
     fn warp(&mut self, player: UnitId, level: u32, tile_code: u8) {
-        if self.v.h.paths.is_some() {
-            let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
-            if crate::wiring::path::place::level_warp(c, player, level, u32::from(tile_code))
-                .is_some()
-            {
-                return;
-            }
-            // Another act: the act change (d2rs-own wiring, unverified;
-            // `wiring::path::act_change`).
-            let c = crate::wiring::path::PathCtx::of(&mut self.v, self.game);
-            if crate::wiring::path::act_change::run(c, player, level, u32::from(tile_code)) {
-                return;
-            }
-        }
-        self.v.h.x.warp(self.game, player, level, tile_code);
+        level_warp(&mut self.v, self.game, player, level, tile_code);
     }
     /// `0x00619E50(act of level, level, tile code)`: the room the spawn
     /// search `0x0066B2B0` (`levels.md` §10) chooses, as an active room.

@@ -1,0 +1,42 @@
+# format anim-facts-1
+# tool trace-recorder anim_facts 0.2.0
+# recorder trace-recorder record_anim 0.2.0 (anim-raw-1), Game.exe sha256 631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf, args -w -ns -nosave -name ScnAma -seed 1234
+# command: python3 tools/trace-recorder/anim_facts.py <raw> --weather --out facts/client/weather/a1-town-rain-start.tsv --note recorded under Wine: record_anim.py --seconds 120 --auto ScnAma --seed 1234 --types 9 --weather --input 'wait 15; end' (rain on in the Rogue Encampment from the first update; draw-order-2.md §11.2 r3 / §11.9 r3)
+# note: recorded under Wine: record_anim.py --seconds 120 --auto ScnAma --seed 1234 --types 9 --weather --input 'wait 15; end' (rain on in the Rogue Encampment from the first update; draw-order-2.md §11.2 r3 / §11.9 r3)
+k	C	mark	F	live	rain	target
+wu	1	0	0	0	0	0
+wu	2	1	0	0	1	0
+wu	3	2	0	1	1	1
+wm	3	3	0	1	1	1
+wu	4	3	1	1	1	1
+wm	4	4	1	1	1	1
+wu	5	4	2	2	1	2
+wm	5	5	2	2	1	2
+wu	6	5	3	2	1	2
+wm	6	6	3	2	1	2
+wu	7	6	4	3	1	3
+wm	7	7	4	3	1	3
+wu	8	7	5	3	1	3
+wm	8	8	5	3	1	3
+wu	9	8	6	4	1	4
+wm	9	9	6	4	1	4
+wu	10	9	7	4	1	4
+wm	10	10	7	4	1	4
+wu	11	10	8	5	1	5
+wm	11	11	8	5	1	5
+wu	12	11	9	5	1	5
+wm	12	12	9	5	1	5
+wu	13	12	10	6	1	6
+wm	13	13	10	6	1	6
+wu	14	13	11	6	1	6
+wm	14	14	11	6	1	6
+wu	15	14	12	7	1	7
+wm	15	15	12	7	1	7
+wu	16	15	13	7	1	7
+wm	16	16	13	7	1	7
+wu	18	16	14	8	1	8
+wm	18	18	14	8	1	8
+wu	20	18	15	8	1	8
+wm	20	20	15	8	1	8
+wu	22	20	16	9	1	9
+wm	22	22	16	9	1	9

@@ -1,0 +1,164 @@
+{
+ "area": "frontend",
+ "behavior": "frontend-menus",
+ "compare": {
+  "ignore": [],
+  "mode": "exact"
+ },
+ "expected": [
+  {
+   "data": {
+    "label": "empty",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "dash_first",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "under_first",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "mixed",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "ab-cd"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "cleared",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "home_dash",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "ab"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "mid_under",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "a_b"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "second_sep",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "a_xb"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "cleared2",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "codes",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "a-b"
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "cleared3",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": ""
+   },
+   "kind": "wstr",
+   "tick": 0
+  },
+  {
+   "data": {
+    "label": "sixteen",
+    "off": "0x5c",
+    "ptr": "0x77934c",
+    "text": "QRSTUVWXYZabcde"
+   },
+   "kind": "wstr",
+   "tick": 0
+  }
+ ],
+ "format_version": 1,
+ "game_version": "1.14d",
+ "id": "frontend-0001",
+ "inputs": [
+  {
+   "data": {
+    "text": "wait 7; click 400 300; wait 3; click 400 307; wait 4; click 117 500; wait 4; click 440 250; wait 0.1; click 520 280; wait 3; shot walk; wstr 0x77934C 0x5C empty;text -; wstr 0x77934C 0x5C dash_first; text _; wstr 0x77934C 0x5C under_first;text a1 #b-c_d; wstr 0x77934C 0x5C mixed;key 0x23; key 0x08; key 0x08; key 0x08; key 0x08; key 0x08; key 0x08; key 0x08; wstr 0x77934C 0x5C cleared;text ab; key 0x24; text -; wstr 0x77934C 0x5C home_dash; key 0x25; key 0x27; text _; wstr 0x77934C 0x5C mid_under; text x-; wstr 0x77934C 0x5C second_sep;key 0x23; key 0x08; key 0x08; key 0x08; key 0x08; key 0x08; key 0x08; wstr 0x77934C 0x5C cleared2;text a; char 0xE9; char 0xC0; char 0xFF; char 0x20; char 0x30; char 0x39; char 0x2E; char 0x27; char 0x2D; char 0x5F; text b; wstr 0x77934C 0x5C codes;key 0x23; key 0x08; key 0x08; key 0x08; key 0x08; wstr 0x77934C 0x5C cleared3;text QRSTUVWXYZabcdefg; wstr 0x77934C 0x5C sixteen; wait 1; end"
+   },
+   "kind": "script",
+   "tick": 0
+  }
+ ],
+ "notes": "REC-181 / REC-209: the create screen's name box (descriptor 204, edit control [0x77934C], text at +0x5C per ui/text.md 15 r5) read after each typed step. Separators are refused at caret 0 even with text present (home_dash), accepted inside (mid_under), a second separator refused (second_sep); digits, space, accented letters (0xE9, 0xC0, 0xFF), '.', apostrophe refused (codes); 15 characters at most (sixteen). Also: a click on the Paladin 0.1 s after the Barbarian click (Barbarian walking) is ignored: frontend-0002 band shot walk_* has diff_px 0 against the Barbarian hover text.",
+ "recorded": {
+  "by": "claude (cloud, Wine)",
+  "command": "tools/cloud-game/run.sh --python --seconds 150 --out RUN -- tools/trace-recorder/autostart.py --menu --game $D2_GAME_DIR/Game.exe --seconds 120 --input \"$(cat SCRIPT)\"; python3 tools/trace-recorder/menu_trace.py --log RUN/stdout.clean.txt --script SCRIPT ...",
+  "date": "2026-10-09",
+  "method": "memory-read",
+  "tool": "trace-recorder menu_trace 0.1.0 / autostart 0.2.0"
+ },
+ "setup": {
+  "band": null,
+  "band_ref": null,
+  "game_args": [
+   "-w",
+   "-ns"
+  ],
+  "menu_mode": true,
+  "size": [
+   800,
+   600
+  ]
+ },
+ "spec": "specs/ui/frontend-menus.md"
+}

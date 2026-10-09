@@ -39,7 +39,7 @@ use d2_data::tables::{Itemratio, Itemstatcost, Itemtypes, Record};
 
 use super::{InvDesk, InvRest, InvState};
 use crate::game::Game;
-use crate::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec};
+use crate::items::inventory::tables::{GridRec, InvItemRec, InvTypeRec, ItemUseTables};
 use crate::items::inventory::{InvTables, UnitKind};
 use crate::items::moves::{self, Guid, MovePending, Owner, Spot};
 use crate::items::tables::ItemRec;
@@ -156,7 +156,7 @@ fn equiv() -> EquivMatrix {
 /// (code, type, invwidth, invheight, reqstr, autobelt, useable, stackable,
 /// maxstack, durability) per record.
 type Row = ([u8; 4], u16, u8, u8, u16, u8, u8, u8, u32, u8);
-const ROWS: [Row; 16] = [
+const ROWS: [Row; 17] = [
     (*b"cap ", T_HELM, 2, 2, 0, 0, 0, 0, 0, 12),
     (*b"gld ", T_GOLD, 1, 1, 0, 0, 0, 0, 0, 0),
     (*b"ssd ", T_SWOR, 1, 3, 0, 0, 0, 0, 0, 24),
@@ -173,7 +173,32 @@ const ROWS: [Row; 16] = [
     (*b"box ", T_MISC, 2, 2, 0, 0, 1, 0, 0, 0),
     (*b"gsw ", T_GEM, 1, 1, 0, 0, 0, 0, 0, 0),
     (*b"cm1 ", T_CHARM, 1, 1, 0, 0, 0, 0, 0, 0),
+    (*b"mp1 ", T_HPOT, 1, 1, 0, 1, 1, 0, 0, 0),
 ];
+pub const MP1: usize = 16;
+
+/// The items code of the potion calcs (`data/calc-expressions.md` §2:
+/// PUSH8 / PUSH16, END): `30` at 0 and `192` at 3 (`hp1` `calc1` /
+/// `len`), `20` at 7 and `128` at 10 (`mp1`), the live 1.14d values
+/// (`items/use.md` §3.1).
+pub const ITEMS_CODE: [u8; 14] = [
+    0x07, 30, 0x00, 0x08, 192, 0, 0x00, 0x07, 20, 0x00, 0x08, 128, 0, 0x00,
+];
+
+/// The `misc.txt` use fields of a potion record (`items/use.md` §3.1):
+/// state, stat1, `calc1` and `len` offsets into [`ITEMS_CODE`]. `hp2`
+/// reuses `hp1`'s (fixture).
+fn potion_use(rec: &mut InvItemRec) {
+    let (state, stat, calc, len) = match &rec.code {
+        b"hp1 " | b"hp2 " => (100, 74, 0, 3),
+        b"mp1 " => (106, 26, 7, 10),
+        _ => return,
+    };
+    rec.use_state = state;
+    rec.use_stat = [stat, -1, -1];
+    rec.use_calc = [calc, u32::MAX, u32::MAX];
+    rec.use_len = len;
+}
 pub const GEM: usize = 14;
 pub const CHARM: usize = 15;
 pub const TSC: usize = 11;
@@ -265,27 +290,49 @@ pub fn inv_tables() -> InvTables {
                 pspell: match &r.0 {
                     b"tsc " | b"tbk " => 2,
                     b"isc " => 1,
-                    b"hp1 " | b"hp2 " => 3,
+                    b"hp1 " | b"hp2 " | b"mp1 " => 3,
                     _ => 0,
                 },
                 ..InvItemRec::default()
+            })
+            .map(|mut r| {
+                potion_use(&mut r);
+                r
             })
             .collect(),
         itemtypes,
         equiv: equiv(),
         books: Vec::new(),
+        item_use: ItemUseTables {
+            code: ITEMS_CODE.to_vec(),
+            maxstat: Vec::new(),
+        },
     }
 }
 
 #[derive(Default)]
 pub struct Hooks {
+    /// The remove callbacks of detached lists (`stat-lists.md` §8.2
+    /// rule 6): (unit, state, callback).
+    pub removed: Vec<(UnitId, u32, u32)>,
     /// The corpse pickups `0x0057FB70` the desk handed over (player,
     /// corpse).
     pub corpse_pickups: Vec<(UnitId, UnitId)>,
     /// The answer of the corpse pickup's steps 1–2 (§12.1).
     pub corpse_allowed: bool,
 }
-impl StatHost for Hooks {}
+impl StatHost for Hooks {
+    fn list_removed(
+        &mut self,
+        _: &mut StatLists,
+        unit: UnitId,
+        state: u32,
+        _: crate::stats::lists::ListId,
+        callback: crate::stats::lists::RemoveCallback,
+    ) {
+        self.removed.push((unit, state, callback.0));
+    }
+}
 impl UnitHooks for Hooks {
     fn player_corpse_pickup(
         &mut self,
@@ -594,6 +641,18 @@ impl World {
         };
         let mut d = InvDesk::new(&mut econ, &self.inv, &mut self.state, &mut self.rest);
         f(&mut d)
+    }
+
+    /// One player regeneration tick `0x00580810` (`stat-lists.md` §10.1).
+    pub fn regen_tick(&mut self) {
+        let p = self.player;
+        let mut sim = Sim {
+            game: &mut self.game,
+            units: &mut self.units,
+            stats: &mut self.stats,
+            data: &self.data,
+        };
+        crate::units::dispatch::player_regen(&mut sim, &mut self.hooks, p, 0, 0).expect("regen");
     }
 
     pub fn set_stat(&mut self, unit: UnitId, stat: u16, value: i32) {

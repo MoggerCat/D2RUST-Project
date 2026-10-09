@@ -1,0 +1,25 @@
+check 1
+# Placement target for the playthrough harness (pc1-day3-c round 2, 2026-10-09):
+# Izual (monster 256) in the Plains of Despair (level 105), DS1 preset Mid08X08Izual.ds1.
+# The player warps there before frame 4, then is moved along a path with
+# pos pokes every 3 frames, 10 sub-tiles apart, until the target's room is active.
+# 1.14d (PC 1, Windows, -seed 1234): ut 1 cl 256: GUID 91 at (5578, 4818), mode 1; created when its room
+# is populated (the player's room becomes adjacent), not at level load.
+# Table: docs/handoff/pc1-day3-c.md "Round 2 — placement". Spec: specs/tools/scenario-diff.md.
+name milestone-izual
+save MilA5 --class sor --expansion --act 2
+seed 1234
+ticks 72
+seconds 240
+channels state
+at 4 poke warp 105
+at 12 poke pos @player 5467 4739
+at 15 poke pos @player 5477 4747
+at 18 poke pos @player 5488 4756
+at 21 poke pos @player 5499 4764
+at 24 poke pos @player 5509 4772
+at 27 poke pos @player 5520 4780
+at 30 poke pos @player 5530 4785
+at 33 poke pos @player 5540 4790
+at 36 poke pos @player 5550 4795
+at 39 poke pos @player 5560 4800

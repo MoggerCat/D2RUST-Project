@@ -161,3 +161,34 @@ fn state_lists_expire_through_the_type_12_event() {
     });
     fx.assert_clean();
 }
+
+// Covers: specs/combat/hit.md §7.1; specs/sim/intents-events.md §7.9 r1
+#[test]
+fn a_set_alignment_makes_the_state_105_list() {
+    // `0x005543B0`: stat 172 in the state-105 list, the state on and its
+    // changed bit set (a 0xA8 on the next update); the player's first
+    // 0xAA then carries the recorded `-022633` seq 103 bytes.
+    let mut fx = Fx::new();
+    let p = fx.spawn(UnitType::Player, 0, fx.a, 10, 10);
+    fx.sim.with(&mut fx.game, |g, v| {
+        assert_eq!(v.state_list(p, 105), None);
+        v.set_alignment(g, p, 2);
+        let l = v.state_list(p, 105).expect("the list is made");
+        assert_eq!(v.stats.base_entries(l).len(), 1);
+        assert_eq!(v.state_stat(p, 105, 172), Some(2));
+        assert!(v.stats.has_state(p, 105));
+        let (_, changed) = v.stats.state_bits(p).expect("state bits");
+        assert_ne!(changed[105 / 32] & (1 << (105 % 32)), 0);
+        // A second set reuses the list; 0 empties it (the list stays).
+        v.set_alignment(g, p, 0);
+        assert_eq!(v.state_list(p, 105), Some(l));
+        assert!(v.stats.base_entries(l).is_empty());
+        // M08: 3 is the original's assertion; nothing changes.
+        v.set_alignment(g, p, 3);
+        assert!(v.stats.base_entries(l).is_empty());
+        v.set_alignment(g, p, 2);
+        assert_eq!(v.state_stat(p, 105, 172), Some(2));
+        assert!(g.lists.unit(p).is_some_and(|e| e.allied));
+    });
+    fx.assert_clean();
+}

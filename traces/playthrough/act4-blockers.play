@@ -39,3 +39,23 @@ milestone seals
   sweep 20 2 400 40
   need ever player lv == 108
   need unit ut 2 cl 393,394,395,396,397 lv 108 seen
+
+milestone fallen-fire-bolt-105
+  use a4
+  deadline 120
+  poke 5 warp 105
+  poke 30 spawn 19 @x+3 @y normal
+  poke 32 stat @1:19 6 0 1
+  poke 40 missile 58 @x @y @x+3 @y skill 36 1
+  need ever unit ut 1 cl 19 dead
+
+milestone izual-fire-bolt-near
+  use a4
+  deadline 1400
+  poke 5 warp 105
+  sweep 20 2 400 40
+  find ut 1 cl 256
+  poke +2 pos @1:256 @x+3 @y
+  poke +2 stat @1:256 6 0 1
+  poke +10 missile 58 @x @y @x+3 @y skill 36 20
+  need ever unit ut 1 cl 256 dead

@@ -34,17 +34,17 @@
 | Inputs | 62–73 |
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
-|   25. Client object function dispatch | 84–235 |
-|   26. The client object functions | 236–434 |
-|   27. Client latches of the zoo and the preloads | 435–445 |
-|   28. What d2rs must model for §25–§27 | 446–458 |
-|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 459–537 |
-| Constants & data dependencies | 538–559 |
-| Randomness | 560–573 |
-| Edge cases & original bugs | 574–591 |
-| Test vectors | 592–626 |
-| Provenance | 627–660 |
-| Open questions | 661–676 |
+|   25. Client object function dispatch | 84–239 |
+|   26. The client object functions | 240–438 |
+|   27. Client latches of the zoo and the preloads | 439–449 |
+|   28. What d2rs must model for §25–§27 | 450–462 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 463–541 |
+| Constants & data dependencies | 542–563 |
+| Randomness | 564–577 |
+| Edge cases & original bugs | 578–595 |
+| Test vectors | 596–630 |
+| Provenance | 631–664 |
+| Open questions | 665–680 |
 <!-- /index -->
 
 ## Summary
@@ -170,7 +170,7 @@ server state changes; no S→C message is read here.
    a later S→C 0x0E code 3 (`world/objects-2.md` §23) overwrites the
    client mode. After a 0x0E mode change the mode sound call runs inside
    it (`audio/triggers-2.md` §20 r3).
-8. **Animation set-up of an S object (PROVISIONAL, REC-440).** The
+8. **Animation set-up of an S object (measured, REC-440).** The
    client runs the object branch of `world/objects.md` §4 (r1–r4) on U's
    client seed: at S→C 0x51 (`client/msg-units.md` §1.3) in the mode
    byte, and at every 0x0E code 3 mode change (`client/model.md` §8 r5)
@@ -178,15 +178,19 @@ server state changes; no S→C message is read here.
    speed (+0x4C) := `FrameDelta[m]` when `Sync` ≠ 0, else
    `roll(d >> 3)` + d − (d >> 4), 0 when ≤ 0, at most 0x7FFF; the
    generic step `0x004BCBB0` adds this speed per client update.
-   Measured, not traced (`facts/render/scenes/a1-town-arrival-ama`, the
-   Wine recording's object cels at f 3–113): N2 (36) speed 125 and RB
-   (39) 124 are the first draw of their seeds; the three torches (37,
-   init 8 sets mode 2, so the server sends a 0x0E) are 191, 188, 199,
-   the second draw, and count their frames from one tick later. With
-   this rule every object frame of ticks 13, 73 and 113 matches. Not
-   measured: whether `reinit(U)` and `set_mode(U, m)` of §26 also draw a
-   speed; d2rs draws nothing there and steps by `FrameDelta[m]` until
-   the next set-up.
+   Traced (`facts/objects/objanim-a1-town.tsv`, `record_objanim.py` on
+   the Rogue Encampment arrival, Wine): the 0x51 init `0x004BC720` calls
+   `0x00624390` itself (return `0x004BC7E6`); the 0x0E code 3 handler
+   `0x004BCF60` first calls `set_mode` (return `0x004BCF8F`), which in
+   the same mode runs no re-init, then calls `0x00624390` itself (return
+   `0x004BD06D`), which draws again. All 45 recorded torch draws (class
+   37, client and server) equal `roll(25)` + 188 on the unit's seed
+   before; classes 35, 36, 39 fit d = 128. `0x00624390` draws for client
+   and server objects alike whoever calls it, so `reinit(U)` and a
+   `set_mode(U, m)` that changes the mode draw a new speed as well (the
+   server's own `set_mode` 0 → 2 of each torch drew). Not recorded: a
+   0x0E code 3 into a different mode (whether its `set_mode` and the
+   direct call then draw twice).
 9. **Generic step** `0x004BCBB0` (EAX = U; 2026-10-09 read, b2a;
    call site A, r2). m = U's mode, C = `FrameCnt[m]` (objects +0xD8 +
    4m, already × 256), f = frame U+0x44, s = speed U+0x4C (i16), row

@@ -74,7 +74,11 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.v.h.x.set_coord_record(unit, rect, room, x, y);
     }
 
+    /// `0x005543B0`: the unit's state-105 list
+    /// ([`crate::wiring::action::View::set_alignment`]),
+    /// then the host's copy.
     fn set_alignment(&mut self, unit: UnitId, align: u8) {
+        self.v.set_alignment(self.game, unit, align);
         self.v.h.x.set_alignment(unit, align);
     }
 
@@ -144,13 +148,39 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         self.init(|cx, h| init::xfer_umods(cx, h, boss, minion));
     }
 
+    /// `0x0058F030(game, unit, GUID, type a, f1 b, f2 c)`: the AI control
+    /// record's minion owner (+0x2C GUID, +0x30 type;
+    /// `umod-callbacks.md` §1 rule 5), read back by `0x0058F0D0` (the pack
+    /// leader test of the Fallen body, `ai-bodies.md` §9.4 step 5.2).
+    /// Both keys name the unit's GUID (`0x00451F50`: unit +0x0C,
+    /// `population.md` §10.2 step 3).
+    ///
+    /// PROVISIONAL (umod-callbacks.md §1 r5, REC-892): what the restart
+    /// `0x005DD230` does for f1 / f2 ≠ 0 is not stated; nothing is done
+    /// for them here.
     fn set_owner_data(&mut self, unit: UnitId, owner: OwnerKey, a: i32, b: i32, c: i32) {
+        let (OwnerKey::Guid(o) | OwnerKey::DataOf(o)) = owner;
+        let guid = self.game.lists.unit(o).map(|e| e.guid);
+        let ty = u8::try_from(a)
+            .ok()
+            .and_then(|t| UnitType::ALL.get(usize::from(t)).copied());
+        if let (Some(guid), Some(ty)) = (guid, ty) {
+            if let Some(ctl) = self.v.h.ai.as_mut().and_then(|s| s.control_mut(unit)) {
+                ctl.minion_owner = Some(crate::monsters::ai::UnitRef { ty, guid });
+            }
+        }
         self.v.h.x.set_owner_data(unit, owner, a, b, c);
     }
 
-    /// `0x0058F100`.
+    /// `0x0058F100`: also the leader's AI control minion list (+0x34,
+    /// GUIDs), which the command copy `0x0058F730` walks (`ai.md` §8).
     fn add_minion(&mut self, leader: UnitId, minion: UnitId) {
         self.w.minions.entry(leader).or_default().push(minion);
+        if let Some(guid) = self.game.lists.unit(minion).map(|e| e.guid) {
+            if let Some(ctl) = self.v.h.ai.as_mut().and_then(|s| s.control_mut(leader)) {
+                ctl.minions.push(guid);
+            }
+        }
     }
 
     /// `0x005DD330`.

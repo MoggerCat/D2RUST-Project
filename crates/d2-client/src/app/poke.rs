@@ -147,7 +147,7 @@ impl Schedule {
 }
 
 /// The `objects` rows with operate function 23 (`@wp`, `world/waypoints.md` §5).
-fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
+pub(crate) fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
     s.world
         .action
         .waypoints
@@ -171,12 +171,19 @@ pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
         return poke::PokeResult::Unresolved("@player".into());
     };
     let waypoints = waypoint_classes(s);
+    // A copy: the loan below takes the world's tables for its call.
+    let tables = s.world.tables.clone();
     let env = poke::Env {
         player,
         waypoint_classes: &waypoints,
-        items: Some(&s.world.tables),
+        items: Some(&tables),
     };
-    poke::apply_op(&mut s.game, &mut s.events, &env, op)
+    // The quest parts are lent as in the tick and the 0x13 / waypoint
+    // handlers, so a quest object a directive creates (a `warp` that
+    // builds an act) runs its init (`quests-act2-2.md` §2 item 1).
+    let game = &mut s.game;
+    s.world
+        .lend_quests(&mut s.events, |_, ev| poke::apply_op(game, ev, &env, op))
 }
 
 /// The keyword a `poke` record names (`d`): the directive's, or `spawn`.

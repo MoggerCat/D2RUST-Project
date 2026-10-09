@@ -424,6 +424,7 @@ fn init<W: QuestWorld>(
         x: c.x,
         y: c.y,
     });
+    w.set_init_point(c.room.map(|room| (object, c.x, c.y, room)));
     match n {
         4 => act1::q5::object_init(ctl, w, object),
         23 => act3::tome_init(ctl, w, object),
@@ -468,8 +469,16 @@ fn init<W: QuestWorld>(
         7 => act1::q4::gibbet_init(ctl, w, object),
         9 => act1::q4::tree_init(ctl, w, object),
         15 => act1::malus_init(ctl, w, object),
-        18 => act2::q4::start_jerhyn_init(ctl, w, object),
-        19 => act2::q4::palace_jerhyn_init(ctl, w, object),
+        18 => {
+            if let Some(at) = at {
+                act2::q4::start_jerhyn_init(ctl, w, at);
+            }
+        }
+        19 => {
+            if let Some(at) = at {
+                act2::q4::palace_jerhyn_init(ctl, w, object, at);
+            }
+        }
         20 => act2::q3::altar_init(ctl, w, object),
         21 => act2::q6::orifice_init(ctl, w, object),
         29 => act2::q4::portal_init(ctl, w, object),
@@ -498,6 +507,7 @@ fn init<W: QuestWorld>(
         // 31–33 and 70: `ret`.
         _ => {}
     }
+    w.set_init_point(None);
     QuestObjectRun::Ran
 }
 

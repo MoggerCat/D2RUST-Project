@@ -41,17 +41,17 @@
 |   3. Game entry: picking the quest set | 405–452 |
 |   4. Events and dispatch | 453–537 |
 |   5. Quest updater and timers (tick step 8) | 538–559 |
-|   6. Status reporting | 560–739 |
-|   7. NPC dialog hooks | 740–772 |
-|   8. Act transitions, warps and portals | 773–860 |
-|   9. Quest items, rewards and helpers | 861–1053 |
-|   11. Acts II–V | 1054–1070 |
-| Constants & data dependencies | 1071–1085 |
-| Randomness | 1086–1113 |
-| Edge cases & original bugs | 1114–1132 |
-| Test vectors | 1133–1164 |
-| Provenance | 1165–1193 |
-| Open questions | 1194–1266 |
+|   6. Status reporting | 560–741 |
+|   7. NPC dialog hooks | 742–774 |
+|   8. Act transitions, warps and portals | 775–862 |
+|   9. Quest items, rewards and helpers | 863–1055 |
+|   11. Acts II–V | 1056–1072 |
+| Constants & data dependencies | 1073–1087 |
+| Randomness | 1088–1115 |
+| Edge cases & original bugs | 1116–1134 |
+| Test vectors | 1135–1166 |
+| Provenance | 1167–1195 |
+| Open questions | 1196–1268 |
 <!-- /index -->
 
 ## Summary
@@ -694,7 +694,9 @@ quest control (`QuestObjectHost::npc_wants_interact`, `QuestLoan`);
 `nearest_player` (`wiring/action/ai.rs`) runs the gate above. Step 4
 takes the act from `unit_act(player)`: the sim has no client act
 (PROVISIONAL, REC-860). Edge (c) (no room → 0) is not modelled: d2rs
-returns the NPC itself.
+returns the NPC itself. The 0x8A send is checked against 1.14d:
+`traces/checks/packets-town-arrival-ama.check` (`8a 01 07000000` at
+frame 24, every S→C message of 40 frames equal).
 
 #### 6.5 S→C 0x89 UniqueEvent
 

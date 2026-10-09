@@ -1,0 +1,26 @@
+check 1
+# A missile kill: the Amazon's Fire Arrow on a Quill Rat in the Blood Moor
+# (warp 2 at frame 4; town allows no combat). The Quill Rat (monstats 63,
+# normal) is poked at @x+4 @y+4 at frame 30 and stays there (recorded
+# 1.14d position = player + (4, 4) through frame 62, combat-arrow-quillrat).
+# Fire Arrows (missiles row 12, skill 7 level 20, owner the player) aimed
+# at that cell every 8 frames from frame 34. ScnAma has no bow: a plain
+# arrow's damage comes from the owner's weapon (missiles/damage.md §1,
+# SrcDamage) and did 0 on both sides; Fire Arrow's fire damage comes from
+# the skill (EMin/EMax by level). Compare the rat's life and death and the
+# player's.
+name combat-arrow-kill
+save ScnAma --class ama --expansion
+seed 1234
+ticks 110
+seconds 300
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+4 @y+4 normal
+at 34 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 42 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 50 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 58 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 66 poke missile 12 @x @y @x+4 @y+4 skill 7 20

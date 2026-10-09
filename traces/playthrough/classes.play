@@ -1,0 +1,151 @@
+# Class and difficulty milestones for tools/playthrough/playthrough.py
+# (spec: specs/tools/playthrough.md §4). Each class fights with its main
+# skill and uses the skill that defines it: summons (and their follow
+# through a waypoint warp), auras, war cries, shapeshift, traps and
+# teleport. Run it as a matrix:
+#   playthrough.py traces/playthrough/classes.play --class all --difficulty all
+# Without --class each milestone runs for its save's own class (every
+# skill at 20); with --class each save becomes the class profile's.
+#
+# {role} placeholders resolve to the class profile in playthrough.py
+# (PROFILES; ids read from the 1.14d skills.txt / monstats.txt, spec §4
+# Provenance): {main} {summon} {aura} {buff} {shift} {trap} {move} are
+# skill ids, {pet} / {trapunit} the monstats class the summon / trap
+# creates. A milestone with a role only some classes have says so with
+# `only class`.
+#
+# Screen: the player is at (400, 300) on the 800x600 view; sub-tile
+# (x+3, y) is at (448, 324) (iso: 16 px per x step right, 8 down).
+# Ids (1.14d tables): Blood Moor 2, Cold Plains 3, Stony Field 4 (both
+# with a waypoint); Zombie 5 (zombie1), Quill Rat 63 (quillrat1). The
+# kill targets are Quill Rats: no resistance >= 100 on any difficulty
+# (monstats Res*: Hell ResDm 50, ResCo 50), where a Hell Zombie is cold
+# immune (ResCo(H) 120) and Frost Nova could never kill it.
+playthrough 1
+act 1
+
+save main --name PtClsMain --class sor --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --waypoints all --right-skill {main}
+save summon --name PtClsSummon --class nec --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --waypoints all --right-skill {summon}
+save aura --name PtClsAura --class pal --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {aura}
+save buff --name PtClsBuff --class bar --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {buff}
+save shift --name PtClsShift --class dru --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {shift}
+save trap --name PtClsTrap --class ass --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {trap}
+save move --name PtClsMove --class sor --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {move}
+
+milestone main-skill-kill
+  use main
+  deadline 300
+  poke 5 warp 2
+  poke 30 spawn 63 @x+3 @y normal
+  poke 31 stat @p1 6 0 256
+  input frame 40; rclick 448 324; frame 70; rclick 448 324; frame 100; rclick 448 324; frame 130; rclick 448 324; frame 160; rclick 448 324
+  note the class's main skill (right) at the Quill Rat, five casts 30 frames apart; the Quill Rat is set to 1 hp so one hit kills on every difficulty (Hell monsters have thousands of hp)
+  need unit ut 1 g @p1 dead
+
+milestone cast-then-walk
+  use main
+  deadline 160
+  poke 5 warp 2
+  input frame 40; rclick 448 324; frame 100; click 300 300
+  note one cast of the main skill, then a walk click 60 frames later (the cast is over by then)
+  need player moved >= 3 since 99
+
+milestone summon-cast
+  only class ama,nec,dru,ass
+  use summon
+  deadline 120
+  poke 5 warp 3
+  input frame 40; rclick 448 324
+  need player lv == 3
+  need unit ut 1 cl {pet} lv 3 present
+
+milestone summon-follows-wp
+  only class ama,nec,dru,ass
+  use summon
+  deadline 200
+  poke 5 warp 3
+  input frame 40; rclick 448 324
+  poke 100 warp 4
+  note the waypoint warp 0x0053AEC0 moves pets whose pettype has warp (world/hirelings.md §6 r1, world/waypoints.md §11 step 19)
+  need ever unit ut 1 cl {pet} lv 3 present
+  need player lv == 4
+  need unit ut 1 cl {pet} lv 4 present
+
+milestone aura-applies
+  only class pal
+  use aura
+  deadline 300
+  poke 5 warp 2
+  poke 30 spawn 63 @x+2 @y normal
+  poke 31 stat @p1 6 0 256
+  input frame 40; rclick 448 324
+  note a right-hand aura is active once selected; Holy Fire's periodic damage kills the Quill Rat set to 1 hp
+  need unit ut 1 g @p1 dead
+
+milestone buff-applies
+  only class bar
+  use buff
+  deadline 120
+  poke 5 warp 2
+  input frame 40; rclick 448 324
+  note Battle Orders: item_maxhp_percent on the caster (skills.txt aurastat2)
+  need ever player hpx delta > 0 since 39
+
+milestone shapeshift
+  only class dru
+  use shift
+  deadline 120
+  poke 5 warp 2
+  input frame 40; rclick 448 324
+  note Werewolf: item_maxhp_percent (skills.txt aurastat4)
+  need ever player hpx delta > 0 since 39
+
+milestone trap-kills
+  only class ass
+  use trap
+  deadline 300
+  poke 5 warp 2
+  poke 30 spawn 63 @x+4 @y normal
+  poke 31 stat @p1 6 0 256
+  input frame 40; rclick 448 324
+  note Lightning Sentry at (x+3, y) next to the Quill Rat (set to 1 hp)
+  need ever unit ut 1 cl {trapunit} present
+  need unit ut 1 g @p1 dead
+
+milestone teleport
+  only class sor
+  use move
+  deadline 50
+  poke 5 warp 2
+  input frame 40; rclick 560 380
+  note Teleport 10 sub-tiles away (x+10, y) in one cast; walking covers about 1 in 6 frames
+  need player lv == 2
+  need player moved >= 8 since 39
+
+# Monster level per difficulty (monsters/init.md §7): Normal monstats
+# Level of zombie1 = 1; Nightmare / Hell in an expansion game the area
+# level, levels.txt row 2 MonLvl2Ex = 36, MonLvl3Ex = 67 (1.14d tables,
+# data-tool excel-dir view). The Zombie is spawned out of reach.
+milestone mlvl-normal
+  only difficulty normal
+  use main
+  deadline 40
+  poke 5 warp 2
+  poke 20 spawn 5 @x+12 @y normal
+  need unit ut 1 g @p1 lvl 1 present
+
+milestone mlvl-nightmare
+  only difficulty nightmare
+  use main
+  deadline 40
+  poke 5 warp 2
+  poke 20 spawn 5 @x+12 @y normal
+  need unit ut 1 g @p1 lvl 36 present
+
+milestone mlvl-hell
+  only difficulty hell
+  use main
+  deadline 40
+  poke 5 warp 2
+  poke 20 spawn 5 @x+12 @y normal
+  need unit ut 1 g @p1 lvl 67 present
