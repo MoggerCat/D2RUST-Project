@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
 |   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–983 |
-| Constants & data dependencies | 984–1019 |
-| Randomness | 1020–1036 |
-| Edge cases & original bugs | 1037–1076 |
-| Test vectors | 1077–1091 |
-| Provenance | 1092–1114 |
-| Open questions | 1115–1144 |
+|   5. Bodies used by one monster skill | 545–989 |
+| Constants & data dependencies | 990–1025 |
+| Randomness | 1026–1042 |
+| Edge cases & original bugs | 1043–1082 |
+| Test vectors | 1083–1097 |
+| Provenance | 1098–1120 |
+| Open questions | 1121–1150 |
 <!-- /index -->
 
 ## Summary
@@ -762,6 +762,12 @@ The Ghidra function ends at `0x005CBFC7`; the body runs to `0x005CC04D`.
    raw current frame +0x44 and speed +0x4C; else the monstats column for
    the mode by table `0x006EA938` (A1 `MissA1` +0x3A, A2 +0x3C, SC `MissC`
    +0x46, S1–S4 +0x3E–+0x44, SQ +0x48; other modes −1).
+   `0x0063E6B0(unit, f)`: the frame tests above run only for f ≠ 0
+   (test at `0x0063E6B0` entry); f = 0 skips them and returns the
+   column for the mode directly (table entry 0 for mode → −1; row by
+   monstats index unit +0x04, stride 0x1A8). Callers passing 0 (e.g.
+   `0x005A6D50` with moving flag 0, `skills/use.md` §5.2) get the
+   column with no action-frame gate.
 4. m < 0 or ≥ missiles count → 0.
 5. Straight `skill_missile(game, m, unit, skill, L, 0, 0, 0, 0, quant
    1)`. Return 1.

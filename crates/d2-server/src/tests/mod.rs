@@ -7,4 +7,5 @@ mod fakes;
 mod gaps;
 mod host;
 mod messages;
+mod packets;
 mod tests_c2sima;
