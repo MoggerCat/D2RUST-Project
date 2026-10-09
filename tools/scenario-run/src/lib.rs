@@ -33,7 +33,9 @@ use conformance::scenario::trace::{Header, Record, TraceFile};
 use conformance::scenario::Scenario;
 use d2_data::tables::Objects;
 use d2_formats::mpq::ArchiveSet;
-use d2_server::adapters::handlers::world::{ActionEvents, ActionWorld, Outbox};
+use d2_server::adapters::handlers::world::{
+    preview_inv_parts, ActionEvents, ActionWorld, Outbox, WiredWorld,
+};
 use d2_server::adapters::{PlayerData, PlayerFields, ProtoSizes, SimGame, UnitFacts};
 use d2_server::seams::{ClientId, MessageSink, PlayerGate, Pos, SessionHandler};
 use d2_server::transport::{Classified, Queue, ServerQueues};
@@ -55,6 +57,9 @@ use d2_sim::wiring::interaction::{VitalsRest, VitalsView};
 use d2_sim::wiring::worldgen::dispatch::WorldSim;
 use d2_sim::wiring::worldgen::{WorldPending, WorldState};
 use test_fixtures::game::{ActCreation, GameData};
+
+pub mod rest;
+pub use rest::ScenarioRest;
 
 /// The trace header's `tool`.
 pub const TOOL: &str = concat!("scenario-run ", env!("CARGO_PKG_VERSION"));
@@ -165,7 +170,7 @@ impl Outbox for ScenarioSeams {
 }
 
 /// The server game of a run.
-pub type Sim = SimGame<WorldSim<ScenarioSeams>, ActionWorld>;
+pub type Sim = SimGame<WorldSim<ScenarioSeams>, WiredWorld<ScenarioRest>>;
 
 /// No session code (system messages are not scripted by the starters).
 pub struct NoSession;
@@ -536,10 +541,38 @@ fn build(s: &Scenario, data: &Data) -> Result<Built, RunError> {
     // The server game: the waypoint world, the client joined in game
     // with no room (the first tick's client update runs the room switch,
     // `rooms.md` §4.1), the player's gate fields, the objects' facts.
-    let world = ActionWorld {
+    // The wired host (inventory model, item loads, quest records) with the
+    // scenario's no-op rest (`rest.rs`). Its quest and NPC controls draw on
+    // a scratch copy of the game seed, so the game seed's draws stay as
+    // they were before the host had them (TODO(spec: the controls'
+    // creation draws in game-creation order)).
+    let action = ActionWorld {
         waypoints: Some(waypoint_data),
         ..ActionWorld::default()
     };
+    let mut scratch = sim.action.sys.hooks.game_seed;
+    let quest_tables = d2_sim::world::quests::QuestTables::load()
+        .map_err(|e| build_err(format!("quest tables: {e:?}")))?;
+    let quests = d2_sim::world::quests::QuestControl::new(&quest_tables, &mut scratch)
+        .map_err(|e| build_err(format!("quest control: {e:?}")))?;
+    let npc = d2_sim::world::npc::NpcControl::new(&[], Vec::new(), s.expansion, 0, &mut scratch)
+        .map_err(|e| build_err(format!("npc control: {e:?}")))?;
+    let items = ItemTables::from_fixed(&d.fixed).map_err(|e| build_err(e.to_string()))?;
+    let inv = d2_sim::items::inventory::InvTables::from_fixed(&d.fixed)
+        .map_err(|e| build_err(e.to_string()))?;
+    let mut world = WiredWorld::new(
+        action,
+        items,
+        quests,
+        npc,
+        d2_sim::world::vendors::VendorTables::default(),
+        ScenarioRest {
+            expansion: s.expansion,
+            ..ScenarioRest::default()
+        },
+        0,
+    );
+    world.inventory = Some(preview_inv_parts(inv));
     let mut g: Sim = SimGame::with_world(game, sim, world);
     g.join(CLIENT, Some(player), None, client_state::IN_GAME)
         .map_err(|e| build_err(format!("join: {e}")))?;
@@ -619,11 +652,45 @@ fn load_char_save(
     };
     let (_, report) = d2_server::adapters::session::load_save(g, player, &save, &ctx)
         .map_err(|e| bad(format!("load: {e:?}")))?;
+    // The save's items on the wired host (`d2s.md` §8.2), as the play
+    // app's join does (`WiredWorld::load_items`).
+    let items_ok = match &save.body {
+        Some(body) if !body.items.is_empty() => {
+            let loaded = g
+                .world
+                .load_items(&mut g.game, &mut g.events, player, &body.items);
+            for f in &loaded.faults {
+                gaps.push(format!("char save: item load: {f}"));
+            }
+            loaded.faults.is_empty()
+        }
+        _ => true,
+    };
+    // Load §2 quests (`world/quests.md` §1.6) into the player's quest
+    // record, and `d2s.md` §6 rule 1's NPC fields.
+    let mut quests = d2_sim::world::quests::PlayerQuests::default();
+    if let Some(body) = &save.body {
+        for (d, rec) in body.quests.records.iter().enumerate() {
+            match d2_sim::world::quests::QuestFlags::copy_in(rec, true) {
+                Ok(f) => quests.flags[d] = f,
+                Err(e) => gaps.push(format!("char save: quests {d}: {e}")),
+            }
+        }
+        quests.first_talk = body.npcs.a;
+        for (d, &b) in body.npcs.b.iter().enumerate() {
+            quests.set_intro_bits(d, b);
+        }
+    }
+    g.world.rest.quests.insert(player, quests);
     for u in report.unapplied {
-        gaps.push(format!(
-            "char save: load step {:?} not applied (no provider in the scenario host)",
-            u.step
-        ));
+        let applied =
+            (items_ok && u.step == "items") || u.step == "quests" || u.step == "npc fields";
+        if !applied {
+            gaps.push(format!(
+                "char save: load step {:?} not applied (no provider in the scenario host)",
+                u.step
+            ));
+        }
     }
     Ok(())
 }
@@ -914,7 +981,7 @@ pub fn run(s: &Scenario, data: &Data) -> Result<RunOutput, RunError> {
             .tick_faults
             .iter()
             .map(|f| format!("{f:?}"))
-            .chain(g.world.faults.iter().map(|f| format!("{f:?}")))
+            .chain(g.world.action.faults.iter().map(|f| format!("{f:?}")))
             .chain(g.events.errors())
             .collect();
         for f in faults {
