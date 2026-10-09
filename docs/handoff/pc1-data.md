@@ -359,6 +359,7 @@ rather than a hand-run recipe.
     `CALL_FORMS`.
 
 23. **Poke runs on Windows** (REC-590) — answered → see `docs/handoff/pc1-day3-a.md`. The cloud ran every runnable
+23. **Poke runs on Windows** (REC-590; answered → see `docs/handoff/pc1-day3-c.md`): the cloud ran every runnable
     directive on 1.14d under Wine (`specs/tools/poke.md` Status) and
     settled the variant load (REC-591, `tools/test-variants.md` Status).
     Left: run `traces/pokes/spawn-town.poke` once on PC 1 with a
