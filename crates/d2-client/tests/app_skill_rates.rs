@@ -122,8 +122,8 @@ fn at(rates: &[(u32, String)], f: u32) -> &str {
 }
 
 // Covers: specs/sim/units.md §4.7 text
-// Covers: specs/render/unit-composite.md §1.1 text
-// Covers: specs/skills/bodies.md §2.6 text
+// Covers: specs/render/unit-composite.md §1.1
+// Covers: specs/skills/bodies.md §2.6
 #[test]
 #[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
 fn werewolf_re_rates_the_cast_and_draws_the_druid_as_the_wolf() {
