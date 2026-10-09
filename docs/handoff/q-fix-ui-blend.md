@@ -28,3 +28,14 @@ D2_GAME_DIR=/root/game cargo nextest run -p d2-client --run-ignored only \
   -E 'binary(/^(smoke_frontend|app_input_pass|app_play_640|app_play_e2e|app_play_visibility|app_hud_e2e|app_levelup_ui|app_frame_loop)$/)'
 python3 tools/coord/realdata.py
 ```
+
+## Real-data run (d2-client only; `realdata.py`'s release build ran out of disk)
+`cargo nextest run -p d2-client --run-ignored only`: 263 run, 240 pass, 23 fail
+(was: the 15 UI-blend tests failing). Remaining failures: the 2 above;
+7 GPU tests (no GPU in the cloud container); the baseline's other
+families (app_cain_quest, app_play_act3 x3, play_act5 x4, play_smoke x3,
+seam_drlg_coords); and not in the baseline note: app_single_player
+`a_save_from_the_command_line_joins`, app_cast
+`a_right_skill_at_a_point_costs_mana_and_creates_the_missile`,
+save_roundtrip `random_play_round_trips` (not examined; may be env or new).
+Full-workspace `realdata.py` count not re-measured (needs ~15 GB free).
