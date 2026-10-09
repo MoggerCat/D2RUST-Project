@@ -123,3 +123,36 @@ spawn.
   compared → tool row `q-fix-b-headless-unit-click-keys`.
 - The 1.14d and d2rs state files are in `traces/raw/check-*/`
   (gitignored) on PC 1.
+
+## Round 3
+
+### Item 2: Fallen leader A2 vs S2 at f41 (answered)
+- The Fallen body matches. The leader is its own minion owner
+  (`0x005B28E9` SetBoss → `0x0058F030` owner data), so step 5.2 makes
+  the aip1 draw (`0x005F047F`–`0x005F04A8`: D < 15, then
+  `0x0058F0D0(unit)` == unit, then roll(100) < aip1).
+- 1.14d: 3 draws at f30 (idle 10), then S2 at f41.
+- d2rs never sets the owner (`set_owner_data` / `unique_minion_owner_data`
+  are empty trait defaults), so it skips that draw and picks A2.
+- Both sides' seeds reproduce exactly with `d2rng.py`.
+- Spec: `monsters/ai-bodies.md` §9.4 r6–r7, `monsters/ai.md` §8.
+- Row: `q-fix-c2-fallen-s2-choice`.
+
+### Item 3: Quill Rat shoot or walk (answered)
+- The QuillRat body (`0x005F1140`) matches. The order is:
+  1. command → A2;
+  2. C → A1;
+  3. AI state 3 / 19 → A2 with no draw;
+  4. D ≥ 10 → wander;
+  5. P(35) → A2;
+  6. escape 2;
+  7. D > 3 → wander, else A2.
+
+  The next think comes at mode end + aidel 15.
+- d2rs never stores the monster AI state (data +0x54):
+  `Pending::ai_state` returns 0 and the setter does nothing. So the hit
+  that sets 19 (→ 3 on mode change, `0x005A68E0`) is lost, and at f59 d2rs
+  draws (89 ≥ 35) and escapes instead of firing again with no draw.
+- Spec: `monsters/ai-bodies.md` §9.7 r8–r9. Row: `q-fix-c3-quillrat-choice`.
+- PROVISIONAL REC-826: the 1.14d rat-seed step at f46 when its quill
+  reaches the player without damage.
