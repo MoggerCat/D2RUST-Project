@@ -106,6 +106,28 @@ impl<R, S> WiredWorld<R, S> {
         self.load_list(game, events, corpse, entries, true)
     }
 
+    /// Adds `player`'s inventory to the model when it has none.
+    fn ensure_player_inventory<D: ActionEvents>(
+        &mut self,
+        game: &mut Game,
+        events: &mut D,
+        player: UnitId,
+    ) {
+        let Some(mut inv) = self.inventory.take() else {
+            return;
+        };
+        self.with_economy(game, events, |econ, _| {
+            let Some((class, guid)) = econ.units.get(player).map(|u| (u.class, u.guid)) else {
+                return;
+            };
+            if !inv.state.inventories.contains_key(&player) {
+                inv.state
+                    .add_inventory(player, UnitKind::Player { class: class as u8 }, guid);
+            }
+        });
+        self.inventory = Some(inv);
+    }
+
     fn load_list<D: ActionEvents>(
         &mut self,
         game: &mut Game,
@@ -116,6 +138,12 @@ impl<R, S> WiredWorld<R, S> {
     ) -> LoadedItems {
         let mut r = LoadedItems::default();
         if entries.is_empty() {
+            // A player's inventory exists from the unit's allocation
+            // (`0x0063ABD0`), items or not: without it a pick-up finds no
+            // inventory (`items-pickup-ama`, REC-1402).
+            if !corpse {
+                self.ensure_player_inventory(game, events, player);
+            }
             return r;
         }
         let Some(mut inv) = self.inventory.take() else {

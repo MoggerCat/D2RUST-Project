@@ -23,6 +23,15 @@ use crate::units::UnitId;
 /// Stat 152 `item_indesctructible` (`generation.md` §1.3).
 const STAT_INDESTRUCTIBLE: u16 = 152;
 
+impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
+    /// The item unit is still in a room's unit list.
+    fn in_room(&self, item: Guid) -> bool {
+        self.item_unit(item)
+            .and_then(|u| self.econ.game.lists.unit(u))
+            .is_some_and(|e| e.room().is_some())
+    }
+}
+
 impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, R> {
     /// Room list removal `0x0064C370` (a unit in no room is left as is).
     fn remove_from_room(&mut self, item: Guid) {
@@ -337,11 +346,18 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
         room.is_some_and(|r| self.econ.hooks.town_room(self.econ.game, r))
             || self.rest.in_town(player)
     }
+    /// Idempotent (`ground::leave_room`): an item that already left its
+    /// room (the grid / belt placement did) is not announced again
+    /// (REC-1403: one S→C 0x0A per pick-up, `items-pickup-ama`).
     fn room_delete_notice(&mut self, item: Guid) {
-        self.rest.room_delete_notice(item)
+        if self.in_room(item) {
+            self.rest.room_delete_notice(item)
+        }
     }
     fn free_collision(&mut self, item: Guid) {
-        self.rest.free_collision(item)
+        if self.in_room(item) {
+            self.rest.free_collision(item)
+        }
     }
     fn room_change_notice(&mut self, item: Guid, x: i32, y: i32) {
         self.rest.room_change_notice(item, x, y)
@@ -434,7 +450,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn sound(&mut self, u: Owner, id: u32) {
         self.rest.sound(u, id)
     }
+    /// The sound event on the player (`0x00553380`, `inventory-moves.md`
+    /// §8.1 step 3): queued in the player's sound slot, sent as S→C 0x2C in
+    /// the tick's client pass. PROVISIONAL (REC-1404): event 1, the value of
+    /// the one recording (`items-pickup-ama`, a healing potion); what picks
+    /// the event is not written.
     fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        if let Some(u) = self.unit_of(player) {
+            if let Err(e) = crate::units::sound::queue_sound(self.econ.game, u, 1, None) {
+                self.note_list(Err(e));
+            }
+        }
         self.rest.pickup_sound(player, item)
     }
     fn requirement_sound(&mut self, player: Owner) {
