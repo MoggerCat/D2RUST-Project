@@ -297,7 +297,7 @@ fn the_cursor_cell_centres_an_even_item() {
     );
 }
 
-// Covers: specs/ui/inventory.md §10 r4.2 (drop cell 0x00486BD0)
+// Covers: specs/ui/inventory.md §10 r4
 #[test]
 fn an_overflowing_drop_cell_sends_nothing_after_a_valid_move() {
     let (u, files) = ui();

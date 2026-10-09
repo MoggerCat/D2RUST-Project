@@ -473,7 +473,7 @@ mod tests {
         s
     }
 
-    // Covers: specs/skills/use.md §2 (use_state table, tests 1–4)
+    // Covers: specs/skills/use.md §2
     #[test]
     fn use_state_order() {
         let mut s = seams();

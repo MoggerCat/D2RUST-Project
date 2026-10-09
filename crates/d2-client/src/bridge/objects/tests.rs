@@ -707,7 +707,7 @@ fn generic_step_clamps_a_non_cycling_mode() {
     assert_eq!(obj(&w).frame, 388);
 }
 
-// Covers: specs/world/objects-client.md §25 r9.1, §25 r9.2.1
+// Covers: specs/world/objects-client.md §25 r9
 #[test]
 fn generic_step_one_frame_and_door() {
     let mut w = world((0, 0));
@@ -731,7 +731,7 @@ fn generic_step_one_frame_and_door() {
     assert_eq!(obj(&w).frame, 0);
 }
 
-// Covers: specs/world/objects-client.md §25 r9.2.2
+// Covers: specs/world/objects-client.md §25 r9
 #[test]
 fn generic_step_mode_1_turns_into_mode_2_after_the_clamp() {
     let mut w = world((0, 0));
@@ -776,7 +776,7 @@ fn generic_step_mode_1_turns_into_mode_2_after_the_clamp() {
     assert!(out.contains(&Output::ObjectFx(ObjFx::Collision { unit })));
 }
 
-// Covers: specs/world/objects-client.md §25 r9.2.2, §25 r9.3
+// Covers: specs/world/objects-client.md §25 r9, §25 r9
 #[test]
 fn generic_step_class_12_runs_backwards_and_189_chains() {
     let mut w = world((0, 0));

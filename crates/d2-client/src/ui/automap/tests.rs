@@ -1730,7 +1730,7 @@ fn dead_gate_and_mini_down_follow_their_answers() {
     assert!(mini_down(0) && mini_down(1) && !mini_down(2));
 }
 
-// Covers: specs/ui/automap.md §7 r2, §7 r3 (the link is the first u32)
+// Covers: specs/ui/automap.md §7 r2, §7 r3
 #[test]
 fn two_records_of_layer_2_link_from_the_first_u32() {
     let mut f = MaFile::default();

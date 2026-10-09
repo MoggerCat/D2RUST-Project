@@ -166,7 +166,7 @@ fn only_level_120_draws_and_never_while_exiting() {
     assert!(frame.items.is_empty() && log.len() == 1, "{log:?}");
 }
 
-// Covers: specs/render/draw-order-2.md §12 l120 r1, §12 l74 r1
+// Covers: specs/render/draw-order-2.md §12
 #[test]
 fn seeds_mix_the_clock_and_the_shake_start() {
     use super::{stars_seed_at, summit_seed_at};
@@ -186,7 +186,7 @@ fn seeds_mix_the_clock_and_the_shake_start() {
     );
 }
 
-// Covers: specs/render/draw-order-2.md §12 l74 r3
+// Covers: specs/render/draw-order-2.md §12
 #[test]
 fn level_74_initialises_the_stars_once_with_last_zero() {
     let mut a = assets();

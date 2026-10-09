@@ -77,7 +77,7 @@ mod tests {
         String::from_utf8(k.iter().copied().take_while(|&b| b != 0).collect()).unwrap()
     }
 
-    // Covers: specs/render/unit-composite.md §2 r1–r3, §2.1
+    // Covers: specs/render/unit-composite.md §2 r1, §2 r2, §2 r3, §2.1
     #[test]
     fn the_key_uses_the_equipped_weapon_class() {
         // 1hs = class 2: A1 → `AMA11HS`; no item (0): `hth`.

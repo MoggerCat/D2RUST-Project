@@ -1394,7 +1394,7 @@ mod grid_hover {
     // overflow return, fails the placement test and sends nothing
     // (changed 2026-10-09, q-fix-ui-drop-cell: it used to place at the
     // kept cell with 0x18). A press inside the grid places.
-    // Covers: specs/ui/inventory.md §5 r3, §10 r4.2
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
     #[test]
     fn an_inventory_press_over_the_last_column_keeps_the_last_cell() {
         let mut u = grid_ui(&[crate::ui::states::id::INVENTORY]);
@@ -1414,7 +1414,7 @@ mod grid_hover {
     // the drop cell fails the placement test (changed 2026-10-09,
     // q-fix-ui-drop-cell: it used to place at the kept cell (4, 2)); the
     // kept cell's own press still places on page 4.
-    // Covers: specs/ui/inventory.md §5 r3, §10 r4.2
+    // Covers: specs/ui/inventory.md §5 r3, §10 r4
     #[test]
     fn a_stash_press_over_the_last_column_places_at_the_kept_cell() {
         use crate::ui::states::id;

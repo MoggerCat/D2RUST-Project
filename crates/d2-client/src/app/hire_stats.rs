@@ -79,7 +79,7 @@ mod tests {
         }
     }
 
-    // Covers: specs/ui/menus.md §3.3 r5; specs/world/hirelings.md §1.2 r3, §2
+    // Covers: specs/ui/menus.md §3 r5; specs/world/hirelings.md §1.2 r3, §2
     #[test]
     fn a_nightmare_act_2_offer_shows_the_servers_words() {
         let rows = HirelingRows::new(vec![

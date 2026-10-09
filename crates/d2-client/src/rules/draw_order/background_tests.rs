@@ -338,7 +338,7 @@ fn pass1_only_in_levels_74_and_120_with_recorded_seeds() {
     assert_eq!(b.pass1(&f).unwrap().len(), STARS);
 }
 
-// Covers: specs/render/draw-order-2.md §12 l74 r3
+// Covers: specs/render/draw-order-2.md §12
 #[test]
 fn star_tick_starts_at_zero_and_the_first_call_moves_the_stars() {
     let p = gray_palette();

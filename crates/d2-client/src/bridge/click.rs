@@ -677,7 +677,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/render/camera.md §4 (Screen → world)
+    // Covers: specs/render/camera.md §4
     #[test]
     fn screen_to_world_has_no_minus_8() {
         let cam = |x, y| {
@@ -708,7 +708,7 @@ mod tests {
         );
     }
 
-    // Covers: specs/ui/controls.md §6 r4 (0x004645B0)
+    // Covers: specs/ui/controls.md §6 r4
     #[test]
     fn sequence_mode_gates_on_the_frame_event_index() {
         let act = |used, ev| can_act(true, false, 18, 0, used, ev);

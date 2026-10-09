@@ -547,7 +547,7 @@ mod tests {
         s.encode_utf16().collect()
     }
 
-    // Covers: specs/ui/control-panel.md §3 r1.4, OQ1 (binary64 ramp)
+    // Covers: specs/ui/control-panel.md §3 r1
     #[test]
     fn smoothing_ramp_is_binary64() {
         let m = 25_600;
