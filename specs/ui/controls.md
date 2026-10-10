@@ -534,9 +534,16 @@ check reads it.
       (:= 0, `client/stat-lists.md` §3 r6.5–r6.6, r6.8). So the client's
       own lock lasts at most 12 client updates and covers the gap until
       the server's state 121 arrives; from then on test 10 refuses.
+      REC-2900 (1.14d recording `gen-skill-ama-7`, Fire Arrow with no
+      bow worn: 1.14d sends no C→S 0x0C at the click, d2rs did): d2rs
+      (`bridge::use_state::item_type_test`) now runs the item type test
+      `0x00643F80` of test 5 (rules 1–4 of `skills/use.md` §2 "Item type
+      test", items at body locations 4 and 5, type equivalence through
+      the item tables) → state 2. PROVISIONAL: the matched-item rules
+      (item flags, `shoots` ammo) and the weapon in use of skills 4 / 5.
       PROVISIONAL (REC-2417): d2rs (`bridge::use_state::use_state`) runs
-      tests 1–4, 6 (mana, `skills/levels.md` §4) and 7 (shape) on the
-      model and reads tests 5, 8–10 and the lock as passing (because
+      tests 1–4, 5 (type part), 6 (mana, `skills/levels.md` §4) and 7
+      (shape) on the model and reads the rest of test 5, tests 8–10 and the lock as passing (because
       the model's click path holds no lock counter and does not yet
       read the item, start-stat and charge facts for it); settled by
       build-queue proposal `q-fix-pc1today-use-state-tests` and a 1.14d
