@@ -5,10 +5,10 @@
 //! `eval(passivecalc_i, skill, L)`, plus the markers 350 (skill) and
 //! 351 (level).
 //!
-//! Layered stats (`passiveitype` > 0, the weapon masteries) are set on
-//! the layer `passiveitype` (the itemtypes row), as `0x00646D60` passes
-//! it to `0x00627150` (1.14d `gen-skill-bar-126`: the 0xA8 mastery lists
-//! carry the item type as the stat's param).
+//! Each stat goes on the layer `passiveitype` when it is > 0 (the weapon
+//! masteries: the item type the bonus applies to), else on layer 0; the
+//! two markers are on layer 0 (`0x00646D60`, read; the layer is the
+//! 0xA8 entry's param, 1.14d `gen-skill-ass-*` frame 2).
 
 use super::helpers::{eval, rec, s16, stat_ok, state_ok};
 use super::BodyWorld;
@@ -56,8 +56,6 @@ pub fn refresh<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32)
     if w.list_get(l, PASSIVE_LEVEL) == level {
         return;
     }
-    // The layer is `passiveitype` when it is > 0, else 0.
-    let layer = u16::try_from(s16(r.passiveitype)).unwrap_or(0);
     let pairs = [
         (r.passivestat1, r.passivecalc1),
         (r.passivestat2, r.passivecalc2),
@@ -65,6 +63,10 @@ pub fn refresh<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32)
         (r.passivestat4, r.passivecalc4),
         (r.passivestat5, r.passivecalc5),
     ];
+    let layer = match s16(r.passiveitype) {
+        k @ 1.. => k as u16,
+        _ => 0,
+    };
     for (stat, calc) in pairs {
         let s = s16(stat);
         if !stat_ok(t, s) {

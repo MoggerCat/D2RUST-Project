@@ -7,7 +7,7 @@ save ScnBuy --class ama --expansion --gold 5000
 seed 1234
 ticks 140
 seconds 400
-channels items
+channels items packets
 at 4 poke warp 75
 at 12 poke goto unit 255
 at 62 send InteractWithEntity type=1 id=@1:255

@@ -31,18 +31,18 @@
 |   2. Game unit hash lists | 100–138 |
 |   3. Unit placement and removal (list bookkeeping) | 139–150 |
 |   4. Act room lists (active rooms) | 151–161 |
-|   5. Room unit lists | 162–219 |
-|   6. Room update queues | 220–239 |
-|   7. Client list | 240–248 |
-|   8. Unit timer lists | 249–256 |
-|   9. Adjacent-room arrays (dependency) | 257–265 |
-|   10. Iteration and modification | 266–282 |
-| Constants & data dependencies | 283–293 |
-| Randomness | 294–300 |
-| Edge cases & original bugs | 301–311 |
-| Test vectors | 312–345 |
-| Provenance | 346–363 |
-| Open questions | 364–408 |
+|   5. Room unit lists | 162–225 |
+|   6. Room update queues | 226–245 |
+|   7. Client list | 246–254 |
+|   8. Unit timer lists | 255–262 |
+|   9. Adjacent-room arrays (dependency) | 263–271 |
+|   10. Iteration and modification | 272–288 |
+| Constants & data dependencies | 289–299 |
+| Randomness | 300–306 |
+| Edge cases & original bugs | 307–317 |
+| Test vectors | 318–351 |
+| Provenance | 352–369 |
+| Open questions | 370–414 |
 <!-- /index -->
 
 ## Summary
@@ -194,6 +194,12 @@ table `0x006E10E0`:
    | unit free `0x00465870` (`client/model.md` §2 rule 5) | remove, while the client act exists: per-kind frees `0x00460D50`, `0x004AED30`, `0x004BCA50`, `0x004CD170`; items `0x004C1A70` only when the unit is in the room's list (`0x0064C260`); tiles at `0x00465968` |
    | client room free `0x0061A840` (`drlg/rooms.md` §8.2 rule 4) | each unit leaves the room (`0x0064C450`) |
 
+   The recache runs on every path step that changes the unit's cell, the
+   client's walking server monsters included: a town NPC that walks
+   across a room edge is in the new room's list (capture `gen-ui-hud`
+   2026-10-10: Gheed 1:4 at sub-tile x 4841, tile 968, is drawn from
+   the room of tiles 968–975; the room of tiles 960–967 fails the room
+   test of `render/draw-order.md` §3 r1 and is not walked).
    A unit created at (0, 0) has no room and is in no list. 0x59 / 0xAC /
    0x51 create in the room of their point (`client/model.md` §2 rule 7),
    so a new unit is at the head of its room's list.

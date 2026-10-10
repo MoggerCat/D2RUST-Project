@@ -205,6 +205,9 @@ pub fn prepare_ui(app: &App, original: &mut OriginalUi) {
 pub struct TableDecoder(pub Arc<d2_sim::items::ItemTables>);
 
 impl crate::bridge::item_lists::StreamProps for TableDecoder {
+    fn item_is_type(&self, code: [u8; 4], t: i16) -> bool {
+        self.0.find_code(code).is_some_and(|i| self.0.is_type(i, t))
+    }
     fn props(&self, stream: &[u8]) -> (Vec<crate::bridge::item_lists::ItemProp>, bool) {
         use d2_proto::item_bits::{decode, ItemLookup};
         let t = &*self.0;

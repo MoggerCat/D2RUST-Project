@@ -436,6 +436,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         // dead-body footprint `0x00649F70(P, 1)` replaces the player's
         // 0x80 footprint, so missiles no longer see the body.
         View::of(sim.units, sim.stats, sim.data, self).dead_body_footprint(unit);
+        self.death_notice(sim, unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
     /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
@@ -1141,11 +1142,6 @@ impl<X: Pending> View<'_, X> {
     /// Set a stat of a list (`0x006270B0`, layer 0).
     pub fn set_list_stat(&mut self, l: ListId, s: u16, value: i32) {
         self.stats.set(&mut *self.h, l, s, value, 0, None);
-    }
-
-    /// Set a stat of a list on `layer` (`0x00627150(list, s, v, layer)`).
-    pub fn set_list_stat_layer(&mut self, l: ListId, s: u16, value: i32, layer: u16) {
-        self.stats.set(&mut *self.h, l, s, value, layer, None);
     }
 
     /// State toggle `0x00625A70` (`stat-lists.md` §9.2) with the disguise
