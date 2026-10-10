@@ -1,0 +1,23 @@
+RULES-99 (owner decisions 2026-10-10 16:40Z; read after RULES-template.txt; these override its push/merge lines):
+
+GOAL: 99% of applicable ledger rows EQUAL and 99% checked (NOT-APPLICABLE rows are outside the count). Speed matters: one cause, fix, merge, next.
+
+CLAIM before you start a cause (stops duplicate fixes):
+1. git fetch origin claude/integ-r23; read docs/handoff/claims.tsv there (`git show origin/claude/integ-r23:docs/handoff/claims.tsv | grep -i KEY`).
+   KEY = the causes-99 id and its first-divergence signature (e.g. "0x9C byte 37", "vendor recharge", check names).
+2. If an open claim (no `done`) by another session matches, pick another cause.
+3. Else append `<cause_id>\t<NAME>\t<UTC hh:mm>\t<signature>\topen` to docs/handoff/claims.tsv on a fresh checkout of integ-r23 and push it to claude/integ-r23 directly (one-line commit "claim: ..."; on reject: fetch, re-append, retry).
+4. When the cause is merged, change your line's `open` to `done <EQUAL delta>` in your merge commit.
+
+SELF-MERGE (replaces "push to claude/NAME only"; the coordinator no longer merges for you):
+1. Pass the push checks of RULES-template (fmt, clippy --all-targets on the crates you touched, nextest on them, coverage, spec_index, ledger --check).
+2. git fetch origin claude/integ-r23 && git merge --no-edit origin/claude/integ-r23
+   - checks-status.md conflict: `python3 tools/coord/coordinator/statusres.py && git add docs/handoff/checks-status.md`
+   - fidelity-ledger.md/.tsv conflict: `git checkout --theirs` both, then `python3 tools/coord/ledger.py`
+   - code/spec conflict: keep BOTH sides' behaviour; if the other side already fixed your cause, keep theirs and drop yours.
+3. Re-run fmt --check, clippy and nextest on the crates you touched, `python3 tools/coord/ledger.py --check` (0 errors) and `cargo test -q -p d2-sim --lib`.
+4. git push origin HEAD:claude/integ-r23 (never force). Rejected (someone merged first): back to 2, at most 5 tries.
+5. Also push claude/NAME. Then send "done NAME <cause>: EQUAL a -> b (merged <sha>)".
+A full test gate runs on integ-r23 about every 45 min; if it names your commit, fix it first, before anything else.
+
+NEVER: edit another session's ledger part (only docs/handoff/ledger/NAME.tsv); add `ignore` lines, skip/exclude directives or comparator exceptions (rule 10: replay recorded host inputs instead, e.g. clock, frame schedule, -ns, registry); mark a row EQUAL that a fresh run doesn't prove under REC-2055/2056; force-push.
