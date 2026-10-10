@@ -116,3 +116,19 @@ Rows so far: 23 `q-fix-pc1today-*`.
   `ui/frontend-credits`, 11 rows, is left: Credits / Cinematics do not take
   posted clicks on Windows).
 Rows so far: 25 `q-fix-pc1today-*`.
+
+## Push 5 (15:02) — credits, more world scenes
+
+- **frontend-credits**: the Credits button does open (wait 14 s for the menu,
+  then one plain click); scene `facts/render/scenes/frontend-credits` recorded
+  twice (122 UI rows, 0 differing). 8 rows → needs_pc1 n. The **Cinematics
+  button and Delete Character** still do not open by posted clicks in this
+  windowed game: 3 cinematics rows stay needs_pc1 y.
+- **Six more world draw-list checks** (`draws-a2-town`, `-a3-town`, `-a4-town`,
+  `-a5-town`, `-blood-moor`, `-cave`), both sides plus pixels: 97.3–98.5 %
+  equal, all DIVERGED; row `world-draws` (after a warp d2rs draws the player
+  in town-neutral mode; mini-panel button frame 0 vs 2).
+- Private repo f47bdb6f: `recordings/pc1-2026-10-10/pixel-compare` (the 32
+  1.14d / d2rs frame pairs), credits frame.
+- needs_pc1 = y and not EQUAL: 171. Of the audit's 217 rows, 3 are left.
+Rows so far: 26 `q-fix-pc1today-*`.
