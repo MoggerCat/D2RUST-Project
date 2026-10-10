@@ -122,12 +122,12 @@ impl PathWorld for Ctx<'_> {
         if unit != ME {
             return false;
         }
-        let fp = self.foot.clone();
+        let fp = self.foot;
         remove_footprint(&mut self.rooms, &fp, RemoveRule::Other, force)
     }
     fn add_footprint(&mut self, unit: UnitId) {
         if unit == ME {
-            let fp = self.foot.clone();
+            let fp = self.foot;
             add_footprint(&mut self.rooms, &fp);
         }
     }
@@ -181,7 +181,12 @@ fn footprint_of(p: &DynamicPath) -> Footprint {
 }
 
 fn row(inputs: &ModelInputs, class: u32) -> Option<MonsterClass> {
-    inputs.tables.monsters.get(class as usize).copied().flatten()
+    inputs
+        .tables
+        .monsters
+        .get(class as usize)
+        .copied()
+        .flatten()
 }
 
 /// Runs `f` on the path of `key` in its context. `None`: no client DRLG,
@@ -229,7 +234,14 @@ fn with_ctx<R>(
 /// first frame from the unit seed (r6.5), the flags (r6.6), the initial
 /// direction (r6.9) and the creator's stop distance (`monstats2` +0x0E,
 /// `0x00649070`).
-pub fn setup(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, room: RoomId, x: i32, y: i32) {
+pub fn setup(
+    w: &mut ClientWorld,
+    inputs: &ModelInputs,
+    key: UnitKey,
+    room: RoomId,
+    x: i32,
+    y: i32,
+) {
     let Some(r) = w
         .objclient
         .set_c
@@ -306,7 +318,11 @@ pub fn setup(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, room: Room
     if let Some(p) = w.objclient.c_paths.get_mut(&key) {
         snap(p, dir);
         // `0x00649070(path, n)`: n − 1 for n in 1…19, else 0.
-        p.stop_distance = if (1..=19).contains(&stop) { stop - 1 } else { 0 };
+        p.stop_distance = if (1..=19).contains(&stop) {
+            stop - 1
+        } else {
+            0
+        };
     }
 }
 

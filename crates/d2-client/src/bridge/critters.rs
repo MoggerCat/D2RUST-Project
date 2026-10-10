@@ -21,8 +21,6 @@ use super::world::{
 
 /// The size-query mask of the critter placement (§11.7 r3).
 const PLACE_MASK: u16 = 0x3F11;
-/// The footprint mask of a monster (`sim/path-placement.md` §3).
-const MONSTER_FOOTPRINT: u16 = 0x100;
 
 /// The room pass `0x0044C750` (`model.md` §5 r6). No client DRLG:
 /// nothing.
@@ -330,7 +328,17 @@ fn chicken_ai(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
         // Free: to U + 4s; else step(4, 0x0C, 120).
         if free {
             let (x, y) = (ux + 4 * s.0, uy + 4 * s.1);
-            request(w, inputs, key, Request::To { code: 0x0C, x, y, r4: 120 });
+            request(
+                w,
+                inputs,
+                key,
+                Request::To {
+                    code: 0x0C,
+                    x,
+                    y,
+                    r4: 120,
+                },
+            );
         } else {
             step(w, inputs, key, 4, 0x0C, 120);
         }
