@@ -745,8 +745,28 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         v.stats.free_state_list(&mut *v.h, u, u32::from(state));
         v.set_state(u, state, false);
     }
+    /// The non-`immediate` branch of the right-skill aura start
+    /// (`0x0056FF10`, `skills/use.md` §7): the aura's state on (`0x00639DB0`,
+    /// which queues the unit); its list, made when the unit has none (flags
+    /// 0, expire 0, the unit as owner), gets the state, the skill and the
+    /// level (`0x006252D0`, `0x006260D0`, `0x006260F0`), is attached
+    /// (`0x00626E10`, reset 1) and keeps base stats 350 = skill and
+    /// 351 = level (the type-8 handler reads them back).
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32) {
-        self.xm().set_aura_state(u, state, skill, lvl);
+        self.cv.v.set_state(u, state, true);
+        let l = match self.cv.v.state_list(u, state) {
+            Some(l) => Some(l),
+            None => BodyWorld::alloc_list(self, 0, 0, Some(u)),
+        };
+        let Some(l) = l else {
+            return;
+        };
+        let v = &mut self.cv.v;
+        v.stats.set_state(l, u32::from(state));
+        v.stats.set_skill(l, skill as u32, lvl as u32);
+        v.stats.attach(&mut *v.h, u, l, true);
+        v.set_list_stat(l, 350, skill);
+        v.set_list_stat(l, 351, lvl);
     }
 }
 
