@@ -175,3 +175,14 @@ lines).
   (left: playing a cinematic); 26 `q-fix-pc1today-*` rows; 36 new checks
   (`ui-draws-*` 25, `draws-*` 11); facts scenes: 5 option menus, trademark,
   credits, cinematics; 17 client-state recordings.
+
+## Push 9 (16:08)
+
+- **Delete Character prompt** captured twice (`frontend-character-delete`,
+  442 UI rows, 0 differing; answered NO, no save deleted). The earlier misses
+  were timing: character select needs about 8 s here before a click lands.
+- Front-end capture recipe on Windows (`record_frames.py --front-end`):
+  `wait 14` before the first click on the main menu; plain `click X Y`;
+  sound on (`-- -w`) for the Cinematics menu; `wait 9` after opening character
+  select.
+- Every `ui-draws-*` check is stable on the 1.14d side now (cursor pinned).
