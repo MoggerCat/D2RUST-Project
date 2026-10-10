@@ -410,6 +410,20 @@ impl<X: Pending> ActionHooks<X> {
             None => self.x.used_skill(unit),
         }
     }
+
+    /// The E-flags word (`0x006446A0`, entry +0x0C) of entry `e`: the
+    /// unit's skill list owns it when it has one (a skill start's
+    /// `0x00644660` writes there), else the host seam.
+    pub fn entry_flags_of(&self, unit: UnitId, e: &crate::skills::SkillEntry) -> u32 {
+        match self
+            .skill_lists
+            .get(&unit)
+            .and_then(|l| l.find(e.skill, e.owner_guid).and_then(|i| l.entries.get(i)))
+        {
+            Some(le) => le.flags,
+            None => self.x.entry_flags(unit, e),
+        }
+    }
 }
 
 impl<X> ActionHooks<X> {

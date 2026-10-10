@@ -1479,7 +1479,7 @@ impl<X: Pending> ActionHooks<X> {
                     .is_some_and(|m| m.npc),
             used_flags: self
                 .used_skill_of(unit)
-                .map(|e| self.x.entry_flags(unit, &e)),
+                .map(|e| self.entry_flags_of(unit, &e)),
             // The item/skill getter `0x00625500` is the unit total
             // (`sim/stats.md`): Burst of Speed's state list counts.
             item_fastermove: sim.stats.unit_total(unit, scale_stat as u16, 0),
