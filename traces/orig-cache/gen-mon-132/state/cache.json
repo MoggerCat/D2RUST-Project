@@ -1,0 +1,46 @@
+{
+ "channel": "state",
+ "check": "gen-mon-132",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "360",
+  "--ticks",
+  "150",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "30 seed-game 0x00001234 666",
+  "--poke",
+  "30 seed-unit @player 0x00000055 666",
+  "--poke",
+  "30 spawn 132 @x+5 @y-4 normal"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "2e04fcb4bd4ceed62a1965ef162f618f3e0248dad14af53a11203d1ced789981",
+   "size": 691521
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "ba2bf45a3b7e1233edeca9de1ada191c70dd79b716e1aaa5e3aacd2471fa2b97",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
