@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–346 |
-|   5. The d2rs side (`d2-sim::poke`) | 347–404 |
-|   6. `goto`: walking to a target | 405–484 |
-| Constants & data dependencies | 485–500 |
-| Randomness | 501–507 |
-| Edge cases & original bugs | 508–535 |
-| Test vectors | 536–563 |
-| Provenance | 564–574 |
-| Open questions | 575–582 |
+|   5. The d2rs side (`d2-sim::poke`) | 347–410 |
+|   6. `goto`: walking to a target | 411–490 |
+| Constants & data dependencies | 491–506 |
+| Randomness | 507–513 |
+| Edge cases & original bugs | 514–541 |
+| Test vectors | 542–569 |
+| Provenance | 570–580 |
+| Open questions | 581–588 |
 <!-- /index -->
 
 ## Summary
@@ -391,16 +391,22 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    leave in the same frame's buffer (first run: `interact-talk-akara`,
    0x27 / 0x29 / 0x28 flushed in frame 15 on 1.14d, 16 on d2rs between
    frames). `state-dump` therefore runs every poke of a frame that
-   holds an `operate` or `talk` at the same point: a tick-end hook of
-   the link (`Host::frame_with`, after the tick, before the flush), in
-   file order, after taking that frame's snapshot there (as
-   `record_state.py` snapshots before its pokes, §5 rule 2). A `goto`
-   in such a frame is an error (its walk runs between frames). Other
-   frames keep the between-frames point; a directive there whose path
-   queues an S→C message at once would show the same one-frame shift in
-   the packets channel. `play --poke` runs every poke
-   between frames: its `operate` / `talk` replies reach the client one
-   frame later than on 1.14d (a play aid, not a comparison).
+   holds an `operate`, a `talk` or a `goto` at the same point: a
+   tick-end hook of the link (`Host::frame_with`, after the tick, before
+   the flush), in file order, after taking that frame's snapshot there
+   (as `record_state.py` snapshots before its pokes, §5 rule 2). A
+   `goto`'s later steps (§6) run there too, one per frame, before the
+   pokes due in that frame. What the directives send through the sim
+   (a placement's 0x07, `path-placement.md` §10 rule 6) is queued into
+   the client's buffer right after them (`Host::queue_now`), so it
+   leaves in that frame's flush, as on 1.14d (first run:
+   `a2-npc-atma-talk`, the walk's 0x07 in frames 3–12 on 1.14d, one
+   frame later on d2rs before; rc-net-s2c). Other frames keep the
+   between-frames point; a directive there whose path queues an S→C
+   message at once would show the same one-frame shift in the packets
+   channel. `play --poke` runs every poke between frames: its
+   `operate` / `talk` replies reach the client one frame later than on
+   1.14d (a play aid, not a comparison).
 
 ### 6. `goto`: walking to a target
 

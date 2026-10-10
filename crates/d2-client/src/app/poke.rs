@@ -98,34 +98,26 @@ pub fn due_after(when: When, anchor: Option<i32>) -> Option<i32> {
     }
 }
 
-/// Splits `state-dump`'s `--poke` entries (`poke.md` §5 rule 4): every
-/// entry of a frame that holds an `operate` or `talk` runs at the tick
-/// end (first), in order; the others (second) between frames. A `goto` in
-/// such a frame is an error (its walk runs between frames).
-pub fn split_tick_end(entries: Vec<Entry>) -> Result<(Vec<Entry>, Vec<Entry>), String> {
-    let interact = |e: &Entry| {
+/// Splits `state-dump`'s `--poke` entries (`poke.md` §5 rule 5): every
+/// entry of a frame that holds an `operate`, a `talk` or a `goto` runs at
+/// the tick end (first), in order; the others (second) between frames.
+/// A `goto`'s later steps also run at the tick end (the 1.14d hook's
+/// point), so a step's immediate 0x07 leaves in that frame's flush.
+pub fn split_tick_end(entries: Vec<Entry>) -> (Vec<Entry>, Vec<Entry>) {
+    let at_tick_end = |e: &Entry| {
         matches!(
             e.op,
-            PokeOp::Directive(Directive::Operate { .. } | Directive::Talk { .. })
+            PokeOp::Directive(
+                Directive::Operate { .. } | Directive::Talk { .. } | Directive::Goto(_)
+            )
         )
     };
     let frames: BTreeSet<When> = entries
         .iter()
-        .filter(|e| interact(e))
+        .filter(|e| at_tick_end(e))
         .map(|e| e.when)
         .collect();
-    let (at_end, rest): (Vec<Entry>, Vec<Entry>) =
-        entries.into_iter().partition(|e| frames.contains(&e.when));
-    if let Some(g) = at_end
-        .iter()
-        .find(|e| matches!(e.op, PokeOp::Directive(Directive::Goto(_))))
-    {
-        return Err(format!(
-            "--poke {:?} {}: a goto cannot share its frame with operate / talk",
-            g.when, g.op
-        ));
-    }
-    Ok((at_end, rest))
+    entries.into_iter().partition(|e| frames.contains(&e.when))
 }
 
 /// The pending pokes of a game.
@@ -287,6 +279,23 @@ pub type ServerHost<C> = d2_server::host::Host<
     crate::bridge::local::PendingSession,
     C,
 >;
+
+/// Queues what the sim sent during a poke run at the tick end
+/// (`poke.md` §5 rule 5) into the clients' buffers now, so it leaves in
+/// this frame's flush as on 1.14d (a `goto` step's 0x07); left in the
+/// sim, the next tick would queue it. A queueing failure is printed.
+pub fn queue_sent_now<C: d2_server::seams::Clock>(h: &mut ServerHost<C>) {
+    use d2_server::adapters::handlers::world::WorldHost;
+    let sent = h.game.world.take_sent(&mut h.game.events);
+    for (unit, bytes) in sent {
+        // A player without a client receives nothing.
+        if let Some(c) = h.game.client_of(unit) {
+            if let Err(e) = h.queue_now(c, &bytes) {
+                eprintln!("poke: queueing a message at the tick end: {e}");
+            }
+        }
+    }
+}
 
 /// [`apply_on_link`] on the link's host: the form a tick-end hook
 /// (`LocalLink::set_tick_end`, `poke.md` §5 rule 4) calls.
@@ -652,26 +661,31 @@ mod tests {
         );
     }
 
-    // Covers: specs/tools/poke.md §5 r4
+    // Covers: specs/tools/poke.md §5 r5
     #[test]
-    fn frames_with_operate_or_talk_run_at_the_tick_end() {
+    fn frames_with_operate_talk_or_goto_run_at_the_tick_end() {
         let e = |s: &str| parse_poke_arg(s).unwrap();
         let (end, rest) = split_tick_end(vec![
             e("4 pos @player 1 2"),
+            e("5 goto unit 148"),
+            e("5 talk @1:148"),
             e("7 pos @player 3 4"),
             e("7 talk @1:148"),
             e("9 operate @2:267"),
             e("12 time 2 0"),
-        ])
-        .unwrap();
+        ]);
         let text = |v: &[Entry]| v.iter().map(|e| e.op.to_string()).collect::<Vec<_>>();
         assert_eq!(
             text(&end),
-            ["pos @player 3 4", "talk @1:148", "operate @2:267"]
+            [
+                "goto unit 148",
+                "talk @1:148",
+                "pos @player 3 4",
+                "talk @1:148",
+                "operate @2:267"
+            ]
         );
         assert_eq!(text(&rest), ["pos @player 1 2", "time 2 0"]);
-        let err = split_tick_end(vec![e("5 goto unit 148"), e("5 talk @1:148")]).unwrap_err();
-        assert!(err.contains("goto"), "{err}");
     }
 
     // Covers: specs/tools/poke.md §1 r2, §5 r4
