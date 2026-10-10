@@ -182,6 +182,22 @@ first drawn frame in `traces/orig-cache/draws-town-arrival-ama`
 carries over (§11.1), so the first update draws only when the old
 countdown is 0.
 
+**Repeatability** (recorded on Windows 2026-10-10, REC-2445; settles
+REC-510). The rain lines of a run are a pure function of the client seed
+stream, and every step of it inside a frame comes from the drawn frame:
+26 runs (`traces/pc1/rain-lines-a1-town.tsv`, `-a1-town-pin.tsv`,
+`-a3-town.tsv`; seed before and after each of 70 drawn frames, every
+pass-9 line) differ only by two inputs. (1) The update count at the
+first drawn frame is 1 or 2, by load time. It moves only what is keyed
+on the update count: the splash arming of §11.5 puts a splash spawn
+(3 steps, `0x00472E3B`–`0x00472E71`) into drawn frame 11 of the Kurast
+Docks when the first frame is update 2, and into a later frame when it
+is 1; the Rogue Encampment (no water floor) is equal in both. (2) The
+cursor: 5,000 ms by the wall clock after the last pointer move its state
+goes 1 → 2 and each frame takes one step fewer from then on. With the
+pointer moved every 18 frames, ten runs of each town are equal, frame
+by frame, within one first-update value.
+
 #### 11.4 Particles: top-up, wind, lightning timer (`0x004737B0`)
 
 1. While the live particle count < target: spawn one (`0x00473090`, r5).

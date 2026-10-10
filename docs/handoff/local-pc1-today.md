@@ -196,3 +196,42 @@ character selected), `frontend-create-name` (name typed, check boxes),
 Multiplayer and the Convert prompt (their buttons did not react to posted or
 held clicks in three tries). Test saves left in the save folder: `Doll*`,
 `FeClassic`.
+
+## Push 11 (17:05) — new goal (99 %); rain lines
+
+Merged `claude/integ-r23` 174dbce3d (ledger: EQUAL 2866 of 4479, check 0
+errors). `pc1-data.md` Step 4: no new open item at this merge. REC used:
+2445.
+
+**Rain (item f): 1.14d rain is reproducible.** 26 runs on Windows, 70 drawn
+frames each: `traces/pc1/rain-lines-a1-town.tsv` (cursor never moved),
+`rain-lines-a1-town-pin.tsv` (cursor moved), `rain-lines-a3-town.tsv`; tool
+`tools/trace-recorder/rain_lines.py`. Each file gives, per drawn frame, the
+client seed before and after, the steps, and every pass-9 line; the header
+names the groups of equal runs.
+
+- The lines depend only on the client seed stream, and the stream is
+  stepped per **drawn frame** (key the comparison by frames-raw `seq`, not
+  by tick or client update).
+- Exactly two things vary between runs:
+  1. the client update count at the first drawn frame (1 or 2, load time).
+     Rogue Encampment: no effect. Kurast Docks: the splash arming of
+     `draw-order-2.md` §11.5 is keyed on the update count, so a 3-step
+     splash spawn lands in drawn frame 11 (first frame = update 2) or
+     later (update 1); two groups, each exactly repeatable.
+  2. the cursor's idle change after 5,000 ms of wall-clock time (state
+     1 → 2, one seed step fewer per frame afterwards): frame 40 or 41
+     with no pointer move. This is what made REC-510 look random.
+- With the pointer moved every 18 frames: ten of ten runs equal in each
+  town (within one first-update value).
+- New check `draws-town-rain-ama` (no weather skip, cursor moved every 18
+  frames), both sides run here: DIVERGED. d2rs draws 36 rain lines against
+  35, five start points equal, no colour equal (another colour table), and
+  the list first differs at row 191 (a `unit` row for object 2:5 that d2rs
+  lacks; `draws-town-arrival-ama` shows the same on this build).
+- Rows: `q-fix-pc1today-rain-phase`, `-rain-colors`, `-cursor-idle-checks`
+  (the last one matters to every draws check: a check pinned once at frame
+  38 can idle at frame 74 here, earlier on a slower host).
+
+Open: re-run of the 35 scenes and the draws checks on this merge (next
+round); music-stream pairing; the 117 rows still marked needs_pc1.
