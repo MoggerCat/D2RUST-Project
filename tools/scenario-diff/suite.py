@@ -253,6 +253,14 @@ def run_check(job, k, opts, game_sha, log):
            "work": os.path.relpath(work, REPO), "channels": {}, "error": None,
            "reused_orig": False, "worker": k}
     t0 = time.time()
+    unknown = [ch for ch in c["channels"] if ch not in ORIG_OUTPUTS]
+    if unknown:  # e.g. save: no 1.14d output the suite can reuse or clear; an error, never a MATCH
+        rec["error"] = "channel without ORIG_OUTPUTS entry: " + ", ".join(unknown)
+        for ch in c["channels"]:
+            rec["channels"][ch] = {"code": 3, "verdict": "ERROR", "summary": None}
+        rec["seconds"] = 0.0
+        rec["orig_seconds"] = 0.0
+        return rec
     env = dict(os.environ, WINEPREFIX=os.path.join(opts.prefix_root, f".wine-d2-suite-{k}"),
                D2_DISPLAY=f":{90 + k}", D2_DRAWS_DISPLAY=f":{100 + k}",
                D2_AUTO_AFTER=opts.auto_after)
@@ -314,7 +322,7 @@ def run_check(job, k, opts, game_sha, log):
                 os.path.exists(os.path.join(work, ORIG_OUTPUTS[ch][0])) for ch in c["channels"] if ch in ORIG_OUTPUTS):
             with open(os.path.join(work, "suite.key"), "w", encoding="utf-8") as f:
                 json.dump(key, f, indent=1)
-    except (SuiteError, OSError, subprocess.TimeoutExpired, sd.CheckError) as e:
+    except (SuiteError, OSError, KeyError, subprocess.TimeoutExpired, sd.CheckError) as e:
         rec["error"] = str(e)
     for ch in c["channels"]:
         rec["channels"].setdefault(ch, {"code": 3, "verdict": "ERROR", "summary": None})

@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1356 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1357–1701 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1702–1874 |
-| Constants & data dependencies | 1875–1893 |
-| Randomness | 1894–1899 |
-| Edge cases & original bugs | 1900–1945 |
-| Test vectors | 1946–2032 |
-| Provenance | 2033–2159 |
-| Open questions | 2160–2312 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1376 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1377–1721 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1722–1894 |
+| Constants & data dependencies | 1895–1913 |
+| Randomness | 1914–1919 |
+| Edge cases & original bugs | 1920–1965 |
+| Test vectors | 1966–2052 |
+| Provenance | 2053–2179 |
+| Open questions | 2180–2332 |
 <!-- /index -->
 
 ## Summary
@@ -1070,7 +1070,15 @@ that drops gold:
 4. Monster and item are in the same room's update queue: whichever was
    queued last goes first (`sim/unit-order.md` §6 rule 5); the item is
    queued at its creation after the kill set the monster's mode, so the
-   item's 0x9C precedes the monster's 0x69 in that room. Confirmed
+   item's 0x9C precedes the monster's 0x69 in that room. The player's
+   corpse (REC-2812, recorded `items-drops-cha-00` frame 96): the DD start
+   `0x0057F700` broadcasts 0x8E (`0x0053DF80`: flag 1, owner GUID, corpse
+   GUID); the corpse then arrives in the client pass as a new player unit:
+   0x59 (name of the owner) + 0x75, five 0x20, 0x74 (flag 1, owner, corpse),
+   0xAA (states 7 and 105), 0x0D (the mode function `0x005484B0`, code 9),
+   0x76, then the update pass's 0x0D, 0xA7, 0xA8. 0x59 is always followed
+   by 0x75 (`0x0053E8F0` → `0x0053DA90`: party 0xFFFF, level, 0, 0). The
+   corpse fill sends nothing to the player. Confirmed
    2026-10-10 (`items-drops-cha-00` frame 37, REC-2810): three 0x9C, then
    the dead champion's 0x69 code 8 (a = b = 0, the path end of rule 7.7),
    then 0x65. d2rs announces the ground item at its queue position: the
@@ -1106,6 +1114,18 @@ that drops gold:
    `MonsterKill` 1: the recorded counts 1, then 2. The join's 0x65
    (`0x0053FC70`, §8.3) is the other path; `0x00538860`, its second
    caller, has no reference in `Game.exe` (dead code).
+   Recorded again 2026-10-10 (REC-2821, `combat-melee-fallen`): the
+   killing blow's tick sends `69 15000000 08 …` (the monster update) and
+   then `65 01000000 0100` (GUID 1, count 1), both in frame 46's tick
+   phase, in that order.
+
+**Player update order** (REC-2822, `combat-potion-midfight` frame 70,
+2026-10-10): within one player update the item messages of step 2 (the
+0x9D list pass, 0x47, 0x48) precede the step 5 state messages (0xA8) and
+the step 7 stat sends; a unit still new to the client keeps the join
+order. d2rs runs the item pass after the tick, so the action wiring holds
+a player's step 5 / 7 sends (`ActionHooks::player_tail`) until the host's
+item pass has run.
 
 #### 7.7 Monster messages 0x67–0x6D (senders, triggers, layouts)
 

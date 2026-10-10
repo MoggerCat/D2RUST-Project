@@ -33,13 +33,14 @@ fn player_part_b_sends_the_five_0x20_stats_to_others_only() {
     fx.stats(p1, &[(67, 0), (68, 0), (12, 5), (0, 20), (2, 25)]);
     let g1 = fx.game.lists.unit(p1).unwrap().guid;
     let got = add(&mut fx, p0, p1);
-    // Message 0 is the 0x59 assign; part B follows.
+    // Message 0 is the 0x59 assign, 1 its 0x75 party info; part B follows.
     let want: Vec<Vec<u8>> = [(67u8, 0u32), (68, 0), (12, 5), (0, 20), (2, 25)]
         .iter()
         .map(|&(s, v)| crate::units::messages::stat_update(g1, s, v).to_vec())
         .collect();
     assert_eq!(got[0][0], 0x59);
-    assert_eq!(&got[1..6], &want[..]);
+    assert_eq!(got[1][0], 0x75);
+    assert_eq!(&got[2..7], &want[..]);
     // The receiver's own part B: no 0x20.
     let own = add(&mut fx, p0, p0);
     assert!(own.iter().all(|m| m[0] != 0x20));
