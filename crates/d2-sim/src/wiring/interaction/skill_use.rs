@@ -718,7 +718,8 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.cv.v.state_list(u, state).is_some()
     }
     /// `use.md` §6: a list with flags 2, expire `e`, the unit as owner,
-    /// state 121, remove callback `0x0056E900`; attached; state 121 on.
+    /// state 121, remove callback `0x0056E900`; attached; state 121 on
+    /// (`0x0056EF90`).
     ///
     /// TODO(use.md §6, stat-lists.md §8.1): the attach `reset` argument is
     /// not stated; reset = 1 as the action wiring's state lists.
@@ -734,7 +735,11 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         v.stats.set_state(l, u32::from(STATE_SKILL_DELAY));
         v.stats.set_remove_callback(l, Some(DELAY_REMOVE_CALLBACK));
         v.stats.attach(&mut *v.h, u, l, true);
+        // `0x00639DB0(unit, 121, 1)`: the toggle, then the unit queued for
+        // update (always, `sim/stat-lists.md` §9.2), so the next update
+        // sends 0xA7 for state 121 (1.14d `gen-skill-sor-51` frame 26).
         v.set_state(u, STATE_SKILL_DELAY, true);
+        BodyWorld::queue_update(self, u);
     }
     fn set_state_list_expiry(&mut self, u: UnitId, state: u16, expire: i32) {
         if let Some(l) = self.cv.v.state_list(u, state) {
