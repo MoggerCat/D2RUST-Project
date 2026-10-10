@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+client.s-monsters.path-stop	system	world	server-monster neutral fallback path stop 0x00480490 -> 0x00650590 (precise position to cell centre), Warriv draw	specs/client/model.md	draft	draws-town-arrival-ama	DIVERGED@73	yes	0	n	claude/rc-warriv-draw	DIVERGED	M	row 172 (Warriv CelDraw 304/292) now EQUAL; next first difference row 173 (CelDraw vs unit row, 1.14d 261 rows vs d2rs 267)

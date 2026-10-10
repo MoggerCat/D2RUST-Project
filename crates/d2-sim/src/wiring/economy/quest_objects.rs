@@ -33,7 +33,7 @@ use crate::wiring::action::ActionHooks;
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::act2::q4::{self, JerhynStep};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
-use crate::world::quests::{self, act1, act2, act4, act5, QuestControl, QuestWorld};
+use crate::world::quests::{self, act1, act2, act4, act5, placeholders, QuestControl, QuestWorld};
 
 /// What running one queued route did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +127,16 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
             interact,
         };
         self.on_world(game, v, call) == LoanOut::Active(true)
+    }
+
+    fn object_link(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        object: UnitId,
+        chain: u8,
+    ) -> bool {
+        self.on_world(game, v, LoanCall::ObjectLink { object, chain }) == LoanOut::Active(true)
     }
 
     fn jerhyn_palace_active(&mut self) -> bool {
@@ -240,6 +250,8 @@ enum LoanCall<'c> {
     },
     /// Jerhyn's palace NPC state `0x0059F580` (`world/quests-act2.md` §10).
     JerhynState { at: (i32, i32) },
+    /// Object init 13: `0x005436B0` for `chain` (`world/quests.md` §4.6).
+    ObjectLink { object: UnitId, chain: u8 },
 }
 
 /// What a [`LoanCall`] gave back.
@@ -300,6 +312,13 @@ fn on_host<'e, X: Pending, R: QuestRest>(
             quests.npc_wants_interact(&mut w, player, npc, class, interact) == Ok(true),
         ),
         LoanCall::JerhynState { at } => LoanOut::Jerhyn(q4::jerhyn_npc_state(quests, &mut w, at)),
+        // `0x00543640` finds the record; the link itself may already
+        // exist. Chain 4 on a class-61 object runs `0x00592F80` first.
+        LoanCall::ObjectLink { object, chain } => {
+            let special = (chain == 4).then_some(0x0059_2F80);
+            quests.add_link(&mut w, object, chain, special);
+            LoanOut::Active(quests.find(chain).is_some())
+        }
     }
 }
 
@@ -348,6 +367,8 @@ pub fn init_fn(n: u8) -> Option<u32> {
     Some(match n {
         // TowerTome (`quests-act1.md` §10.7).
         4 => 0x0059_5A00,
+        // InvisibleObject: the chain 4 link or mode 2 (`objects-2.md` §17).
+        13 => 0x0059_4020,
         // CairnStone, objects 17–21 (`quests-act1-rest.md` §2.2).
         6 => 0x0059_35E0,
         // CainGibbet → `0x00594060` (`quests-act1-rest.md` §9 item 8).
@@ -394,6 +415,8 @@ pub fn init_fn(n: u8) -> Option<u32> {
         54 => 0x0059_40E0,
         // CainPortal (`quests-act1-rest.md` §9 item 10).
         61 => 0x0059_4290,
+        // TrappedSoulPlaceHolder (`objects-2.md` §17).
+        46 => 0x0055_06D0,
         // Act IV objects (`quests-act4.md` §1.4, q-a4-endgame).
         48 => 0x005B_5A20,
         55 => 0x005B_5590,
@@ -501,6 +524,14 @@ fn init<W: QuestWorld>(
     w.set_init_point(c.room.map(|room| (object, c.x, c.y, room)));
     match n {
         4 => act1::q5::object_init(ctl, w, object),
+        // `0x00594020`: chain 4's record exists → link the object to it
+        // (`0x005436B0`, special case `0x00592F80`); else mode 2 unless
+        // it is already in mode 2.
+        13 => {
+            if !ctl.add_link(w, object, 4, Some(0x0059_2F80)) && w.object_mode(object) != 2 {
+                w.set_object_mode(object, 2);
+            }
+        }
         23 => act3::tome_init(ctl, w, object),
         25 => {
             if let Some(at) = at {
@@ -562,6 +593,7 @@ fn init<W: QuestWorld>(
         // The init args' room and position; a null room spawns nothing
         // (`quests-act1-rest.md` §9 item 2).
         54 => act1::q4::marker_init(ctl, w, object, c.room, c.x, c.y),
+        46 => placeholders::trapped_soul_init(w, object, at),
         61 => act1::q4::cain_portal_init(w, object),
         62 => act5::q2::cage_init(ctl, w, object),
         // The statue's class (474–476) picks its slot (part 2 §7.8).

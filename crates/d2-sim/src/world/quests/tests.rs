@@ -218,6 +218,8 @@ pub(super) struct Player {
 
 #[derive(Default)]
 pub(super) struct Fake {
+    /// The object control's seed (`object_seed`; absent: none).
+    pub(super) object_seed: Option<Seed>,
     pub(super) frame: i32,
     pub(super) difficulty: u8,
     pub(super) expansion: bool,
@@ -1076,6 +1078,9 @@ impl QuestWorld for Fake {
     // -- end Act V part 2 seam fakes.
 
     // -- Helper seam fakes (`quests-helpers.md`).
+    fn object_seed(&mut self) -> Option<&mut Seed> {
+        self.object_seed.as_mut()
+    }
     fn room_box(&mut self, room: RoomId) -> Option<crate::drlg::TileRect> {
         self.rooms
             .get(&room)

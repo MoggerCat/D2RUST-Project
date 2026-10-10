@@ -99,25 +99,15 @@ pub fn due_after(when: When, anchor: Option<i32>) -> Option<i32> {
 }
 
 /// Splits `state-dump`'s `--poke` entries (`poke.md` §5 rule 5): every
-/// entry of a frame that holds an `operate`, a `talk` or a `goto` runs at
-/// the tick end (first), in order; the others (second) between frames.
-/// A `goto`'s later steps also run at the tick end (the 1.14d hook's
-/// point), so a step's immediate 0x07 leaves in that frame's flush.
+/// entry due after a tick (absolute frame 2 or later) runs at the tick end
+/// (first), the 1.14d hook's point, so what a directive sends at once (a
+/// warp's or a `goto` step's 0x07) leaves in that frame's flush; the
+/// others (second: due before the first tick) between frames. A `goto`'s
+/// later steps also run at the tick end.
 pub fn split_tick_end(entries: Vec<Entry>) -> (Vec<Entry>, Vec<Entry>) {
-    let at_tick_end = |e: &Entry| {
-        matches!(
-            e.op,
-            PokeOp::Directive(
-                Directive::Operate { .. } | Directive::Talk { .. } | Directive::Goto(_)
-            )
-        )
-    };
-    let frames: BTreeSet<When> = entries
-        .iter()
-        .filter(|e| at_tick_end(e))
-        .map(|e| e.when)
-        .collect();
-    entries.into_iter().partition(|e| frames.contains(&e.when))
+    entries
+        .into_iter()
+        .partition(|e| matches!(e.when, When::Frame(f) if f >= 2))
 }
 
 /// The pending pokes of a game.
@@ -663,14 +653,14 @@ mod tests {
 
     // Covers: specs/tools/poke.md §5 r5
     #[test]
-    fn frames_with_operate_talk_or_goto_run_at_the_tick_end() {
+    fn pokes_due_after_a_tick_run_at_the_tick_end() {
         let e = |s: &str| parse_poke_arg(s).unwrap();
         let (end, rest) = split_tick_end(vec![
+            e("1 pos @player 5 6"),
             e("4 pos @player 1 2"),
+            e("4 warp 2"),
             e("5 goto unit 148"),
             e("5 talk @1:148"),
-            e("7 pos @player 3 4"),
-            e("7 talk @1:148"),
             e("9 operate @2:267"),
             e("12 time 2 0"),
         ]);
@@ -678,14 +668,15 @@ mod tests {
         assert_eq!(
             text(&end),
             [
+                "pos @player 1 2",
+                "warp 2",
                 "goto unit 1:148",
                 "talk @1:148",
-                "pos @player 3 4",
-                "talk @1:148",
-                "operate @2:267"
+                "operate @2:267",
+                "time 2 0"
             ]
         );
-        assert_eq!(text(&rest), ["pos @player 1 2", "time 2 0"]);
+        assert_eq!(text(&rest), ["pos @player 5 6"]);
     }
 
     // Covers: specs/tools/poke.md §1 r2, §5 r4

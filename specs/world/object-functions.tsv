@@ -84,7 +84,7 @@ init	9	0x00593FC0	InifussTree	1	world/quests.md
 init	10	0x0054F860	Unused10	0	§17
 init	11	0x00550140	Portal	1	§5.5
 init	12	0x0054FE70	PermanentPortal	1	§5.5
-init	13	0x00594020	InvisibleObject	1	§17
+init	13	0x00594020	InvisibleObject	1	world/quests.md
 init	14	0x005500D0	Brazier	1	§17
 init	15	0x00544950	MalusStand	1	world/quests.md
 init	16	0x00552B30	Well	17	§5.3

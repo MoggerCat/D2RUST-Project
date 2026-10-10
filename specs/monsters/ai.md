@@ -34,15 +34,15 @@
 |   4. AI parameters | 641–659 |
 |   5. Target selection | 660–996 |
 |   6. Distances and line tests | 997–1012 |
-|   7. Tactics helpers | 1013–1266 |
-|   8. AI commands and minions | 1267–1293 |
-|   10. The catalogue `ai-functions.tsv` | 1294–1314 |
-| Constants & data dependencies | 1315–1338 |
-| Randomness | 1339–1368 |
-| Edge cases & original bugs | 1369–1410 |
-| Test vectors | 1411–1499 |
-| Provenance | 1500–1561 |
-| Open questions | 1562–1668 |
+|   7. Tactics helpers | 1013–1269 |
+|   8. AI commands and minions | 1270–1296 |
+|   10. The catalogue `ai-functions.tsv` | 1297–1317 |
+| Constants & data dependencies | 1318–1341 |
+| Randomness | 1342–1371 |
+| Edge cases & original bugs | 1372–1413 |
+| Test vectors | 1414–1502 |
+| Provenance | 1503–1564 |
+| Open questions | 1565–1671 |
 <!-- /index -->
 
 ## Summary
@@ -1017,6 +1017,9 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | 1.14d | D2MOO | Effect |
 |---|---|---|
 | `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit; request flag 1; the path step count is not set; no skill is set, so the builder's clear leaves the used skill entry (`0x00620250`) **none** for the whole mode (a plain A1 / A2 has no skill entry: every reader of the used entry takes its "none" branch, e.g. `skills/bodies.md` §-rules "no used skill entry → 0", `sim/units.md` attack weapon → D; Attack (skill 0) is **not** substituted; 2026-10-09 read of `0x005DDF90` → `0x005A7E60` → `0x00620210(U, 0)` → `0x00643990`: list +0x10 := 0) |
+
+Recorded 2026-10-10 (`gen-mon-469` f122, 1.14d `0x005A7670` read): after a skill mode (a curse, S2) the next plain A1 through `0x005DDF90` must find **no** used skill, else event 0 takes its used-skill branch (refresh, no strike) and the melee to-hit draw `0x0057D9B0` (site `0x57DB38`) never happens. d2rs clears the monster's current skill in `mode_at` (REC-2325).
+
 | `0x005DDFC0(mode, x, y)` | `…ChangeModeAndTargetCoordinates` | mode change at coordinates; request flag 1; the path step count is not set (like `0x005DE490`) |
 | `0x005DE000(skill, target, x, y)` | `AITACTICS_UseSequenceSkill` | skill id in range: mode 14 (sequence), current skill := skill, path step 1, no fallback |
 | `0x005DEAD0(mode, skill, target, x, y)` | `AITACTICS_UseSkill` | mode < 16: current skill := the unit's skill entry with that id and owner −1 (`0x006439B0`, 0 when none; `0x00620210`), unit flag 0x40, path step 1; request with target unit, point (x, y) and flag 0; returns 1 when the mode change succeeds; else idle 10 and returns 0. Mode ≥ 16: nothing, returns 0 |

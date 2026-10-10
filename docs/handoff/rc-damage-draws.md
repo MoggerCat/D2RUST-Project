@@ -3,10 +3,7 @@
 Branch `claude/rc-damage-draws` (from specs-staging-7 + integ-r19). REC-2355..2358.
 
 ## Checks (gen-mon, the 51 DIVERGED rows of `rc-gen-mon-triage.tsv`)
-EQUAL (state + rng, harness-ignored fields as before): 0 -> 23 of 51.
-Also equal now (were not in the DIVERGED list at r19): gen-mon-190, 475, 618.
-Ledger: `docs/handoff/ledger/rc-damage-draws.tsv` (23 rows EQUAL).
-
+EQUAL (state + rng, harness-ignored fields as before): 0 -> 23 of 51. Ledger: `ledger/rc-damage-draws.tsv`.
 ## What changed (one commit per cause)
 1. **Used skill cleared by the mode request builder** (REC-2355, `0x005A7E60`
    `0x00620210(unit,0)`; skill requests set the skill after it:
@@ -26,11 +23,9 @@ Ledger: `docs/handoff/ledger/rc-damage-draws.tsv` (23 rows EQUAL).
    `MeleeRng`+extra+1, unit distance, line 0x804) for every monster attacker
    (595: Charge hit one frame early). Charge's `mode_damage` mode keys on the
    class (`0x00463900`), not `BaseId` (`0x005CFCA2`); spec `skills/bodies-2.md` §5.4.
-
 ## Not touched / open
-- "d2rs game-seed draw at unit removal (`lifecycle.rs:180`, 7)" and
-  "1.14d game-seed draw at `0x552e31`" (6): no longer in the 51 after the
-  above (475, 190 equal); not separately fixed. Cause list not re-triaged.
+- Unit-removal and `0x552e31` game-seed draws (7 + 6): 475, 190 equal after
+  the above; not fixed separately, cause list not re-triaged.
 - 28 of the 51 still diverge, other causes (counts by first difference):
   - monster-fired missile hits the player: d2rs rolls the missile damage
     (`missiles/hit.rs:140`) but does not apply it, 1.14d continues with
@@ -39,6 +34,7 @@ Ledger: `docs/handoff/ledger/rc-damage-draws.tsv` (23 rows EQUAL).
     687, 712 (9). Missile area.
   - player `sp` 128 vs 64 (anim speed) 295, 576, 578, 624, 629, 630, 652 (7).
   - monster x 5151 vs 5147 at frame 85: 69-71 (3).
-- Not run: clippy on `d2-client` (3 lines in `single_player.rs`; disk 3.8 GB
-  left; the release build of d2-client compiles). `cargo nextest -p d2-sim`:
-  4770 passed. Full gen-mon (335) not re-run (too slow); the 51 above were.
+- Not run: clippy on `d2-client` (3 lines; disk 3.8 GB; release build ok).
+  d2-sim nextest passed. Full gen-mon (335) not re-run; the 51 above were.
+- Merge note: specs-staging-7 meanwhile added `clear_current_skill` and the
+  clear in `tactics::change_mode`; both clears stay (idempotent).

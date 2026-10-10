@@ -555,7 +555,7 @@ def fam_missile(ctx):
             f"gen-missile-{mid}", "missile", f"missiles.txt Id {mid}",
             f"missile {name} ({mid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
             70, 300, "state rng packets",
-            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+6 @y normal",
+            BM + ["at 8 poke spawn 179 @x+6 @y normal",
                   f"at 12 poke missile {mid} @x @y @x+6 @y{tail}"],
             variant="blood-moor-empty",
             comment=[f"Missiles.txt row {mid} ({name}) created by the poke at frame 12 at the "
@@ -564,8 +564,7 @@ def fam_missile(ctx):
                      + (f"; skill {skill} at level {lvl}, as the row's maker (PROVISIONAL "
                         "REC-1730)." if skill is not None else "; no skill (no skill makes it).")
                      + " Compares the missile unit (class, mode, path, frames), what it hits, "
-                     "the seeds and the packets. `ignore q`: the quest-flag field is not written by d2rs yet "
-                     "(REC-1625) and would hide every other first difference."])
+                     "the seeds and the packets."])
         c.extra = {"missile": mid, "name": name, "area": area}
         out.append(c)
     return out
@@ -586,15 +585,13 @@ def fam_state(ctx):
             f"gen-state-{sid}", "state", f"states.txt id {sid}",
             f"state {name} ({sid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
             40, 300, "state packets",
-            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+4 @y normal",
+            BM + ["at 8 poke spawn 179 @x+4 @y normal",
                   f"at 12 poke state @player {sid} on", f"at 12 poke state @1:179 {sid} on",
                   f"at 24 poke state @player {sid} off", f"at 24 poke state @1:179 {sid} off"],
             variant="blood-moor-empty",
             comment=[f"States.txt row {sid} ({name}) set on the player and on a cow (class 179, "
                      "Blood Moor, variant blood-moor-empty) at frame 12 and cleared at frame 24. "
-                     "Compares the set and end state messages and the stats the toggle moves. `ignore q`: "
-                     "the quest-flag field is not written by d2rs yet (REC-1625) and would hide "
-                     "every other first difference."])
+                     "Compares the set and end state messages and the stats the toggle moves."])
         c.extra = {"state": sid, "name": name}
         out.append(c)
     return out

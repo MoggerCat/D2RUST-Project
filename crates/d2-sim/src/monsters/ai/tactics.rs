@@ -82,6 +82,9 @@ pub fn mode_at<W: AiHost + ?Sized>(
         // mode request record).
         None => ModeTarget::Point(0, 0),
     };
+    // The builder `0x005A7E60` clears the used skill: a plain A1 / A2 has
+    // none, whatever the last skill mode left (gen-mon-469 frame 122).
+    cx.world.clear_current_skill(unit);
     request_mode(game, cx, unit, m, t)
 }
 

@@ -28,14 +28,14 @@
 |   1. Conventions | 66–93 |
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
-|   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–999 |
-| Constants & data dependencies | 1000–1035 |
-| Randomness | 1036–1052 |
-| Edge cases & original bugs | 1053–1092 |
-| Test vectors | 1093–1107 |
-| Provenance | 1108–1130 |
-| Open questions | 1131–1160 |
+|   4. Bodies used by several monster skills | 356–551 |
+|   5. Bodies used by one monster skill | 552–1010 |
+| Constants & data dependencies | 1011–1046 |
+| Randomness | 1047–1063 |
+| Edge cases & original bugs | 1064–1103 |
+| Test vectors | 1104–1118 |
+| Provenance | 1119–1141 |
+| Open questions | 1142–1177 |
 <!-- /index -->
 
 ## Summary
@@ -495,6 +495,13 @@ Each member of a monster family (`NextInClass` chain) fires the next
 missile row: fallenshaman1 `srvmissilea`, fallenshaman2 the row after,
 and so on.
 
+Recorded (items-drops-nor-04, 1.14d): fallenshaman5 (class 62, position
+4) fires missile class 26 (shafire5); firing class 22 (position read as 0)
+changed the missile's start offset and the hit frame, which moved the
+dropper's death and the unit seed. The production position is the fixups.md
+§8 pass-A value computed from the loaded monstats rows
+(`population::data::chain_position`), not a default.
+
 #### 4.10 srvdo 96 ZakarumHeal, Bestow `0x005CC840`
 
 1. R invalid → 0. T none → 0.
@@ -647,6 +654,10 @@ The heal is p % of the **current** life.
    (dx[e], dy[e]): k 0 (−2, −2), 1 (0, −2), 2 (2, −2), 3 (2, 0), 4 (2,
    2), 5 (0, 2), 6 (−2, 2), 7 (−2, 0).
 5. Unit action frame (+0x4E) := 0.
+   (rc-sandmaggot: `dir64` here is the real direction vector of
+   `0x00621DC0` -> `0x0064FDC0` -> `0x0064FC60` from the unit to T; the
+   host default 0 put every egg at k = 0, 4 sub-tiles off in x in
+   `gen-mon-72`/`679`/`716`.)
 6. m = `0x005B2F20(game, the unit's room, x, y, c, mode, spread −1,
    flags 0)`; none → 0. m flags |= 0x4000000. Return 1.
 
@@ -1157,3 +1168,9 @@ steps call them (`bodies.md` Randomness).
    the casting unit's room. "E flags bit 2" in §5.16 / §5.30 is mask 2,
    the move-ended flag owned by `use.md` §5.2 rule 2 (`test al, 2` at
    `0x005CBCC8`, `0x005CD3D2`).
+
+Note (rc-extra-missile): the Frames helper's "total frames := n, frames
+left := n" must reach the missile in the server's missile store, or the
+missile lives its full `Range` (fetishinferno1: 30 frames instead of
+`Param2` + L − 1 = 14 at skill level 8). Checked by gen-mon-279 and ten
+sibling Fetish Shaman / Megademon / fallen shaman checks (state 150/150).
