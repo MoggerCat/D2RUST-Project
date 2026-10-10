@@ -540,7 +540,8 @@ pub fn deliver_outputs(
     if let (Some(ui), Some(mut s)) = (original, state) {
         let calls = ui.take_overlay_calls();
         if !calls.is_empty() {
-            s.missiles.overlay_calls(calls);
+            let tick = bridge.0.world().server_ticks;
+            s.missiles.overlay_calls(tick, calls);
         }
     }
     if let Some(mut s) = sounds {
