@@ -32,18 +32,18 @@
 |   2. Pipeline | 142–156 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 157–302 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 303–404 |
-|   5. Application | 405–605 |
-|   6. Hit class and hit recovery | 606–636 |
-|   7. Reaction and death trigger | 637–742 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 743–806 |
-|   9. Durability `0x0057D3D0` | 807–834 |
-|   10. Monster melee on a player, end to end | 835–927 |
-| Constants & data dependencies | 928–949 |
-| Randomness | 950–982 |
-| Edge cases & original bugs | 983–1017 |
-| Test vectors | 1018–1100 |
-| Provenance | 1101–1126 |
-| Open questions | 1127–1176 |
+|   5. Application | 405–610 |
+|   6. Hit class and hit recovery | 611–641 |
+|   7. Reaction and death trigger | 642–747 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 748–811 |
+|   9. Durability `0x0057D3D0` | 812–839 |
+|   10. Monster melee on a player, end to end | 840–932 |
+| Constants & data dependencies | 933–954 |
+| Randomness | 955–987 |
+| Edge cases & original bugs | 988–1022 |
+| Test vectors | 1023–1105 |
+| Provenance | 1106–1131 |
+| Open questions | 1132–1181 |
 <!-- /index -->
 
 ## Summary
@@ -568,6 +568,11 @@ Length `n` = stun length; `n ≤ 0` → nothing.
    67 `velocitypercent`, 68 `attackrate`, 69 `other_animrate` = effect,
    refresh animation rate (`0x00623F50`). Existing list: if its expiry
    < `e`, set it to `e` and schedule timer 12 at `e`.
+5b. The cold list's remove callback is its own, `0x0057AD80` (read
+   2026-10-10), not the default `0x0056E900`: the same life/stay-on-death
+   test, state 11 off, then (unit alive) state 107 off, then the anim
+   refresh `0x00623F50`. So when the cold ends the unit's speed returns
+   (gen-mon-295 frame 71: player sp 64 → 128).
 6. Shatter: draw (defender seed, inline `lo′ mod 100`). `r < 20` and the
    defender is a monster without `monstats2.deadCol` → state 107
    (`shatter`) on; otherwise off.

@@ -513,6 +513,22 @@ pub fn request_mode_byte<W: AiHost + ?Sized>(
     target: ModeTarget,
     path_byte: Option<u8>,
 ) -> bool {
+    // The builder `0x005A7E60` clears the current skill (§7.1).
+    cx.world.clear_current_skill(unit);
+    request_mode_keep_skill(game, cx, unit, m, target, path_byte)
+}
+
+/// [`request_mode_byte`] for a caller that has set the current skill
+/// after the builder's clear (`0x005DEAD0`, `0x005DE000`): the skill set
+/// before this call is the one the mode start sees.
+pub fn request_mode_keep_skill<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    m: u8,
+    target: ModeTarget,
+    path_byte: Option<u8>,
+) -> bool {
     let mut v = cx.store.get(unit).map(|e| e.velocity).unwrap_or_default();
     let ok = cx
         .world
@@ -717,7 +733,7 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
     // the unit itself counting as none), point (0, 0); so without a
     // target unit the path target point becomes (0, 0) (`0x00648AD0`,
     // §7.5 rule 2). Its builder also clears the used skill entry
-    // `0x00620210(unit, 0)`; the host seam has no "none" yet.
+    // `0x00620210(unit, 0)` ([`request_mode_byte`]).
     if cx.world.has_state(unit, state::UNINTERRUPTABLE) {
         cx.world.clear_uninterruptable(game, unit);
         delete_thinks(game, unit);

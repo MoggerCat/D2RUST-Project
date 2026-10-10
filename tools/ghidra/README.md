@@ -75,3 +75,21 @@ the private repo's `re/exports-typed/` was made this way). Add struct
 fields to `d2_114d_types.h` as specs measure them: every field carries
 its `// +0xNN` offset and every struct its `// size`, and ApplyTypes
 rejects a header whose layout disagrees.
+
+## Finding a function fast (cloud sessions)
+
+Read-only helpers over the private repo's `re/` (`$D2_RE`, else
+`../d2rust-private-repo/re`; typed export preferred, `exports/names.tsv`
+overrides names). They print addresses and names only; each has
+`--selftest` (no private files needed). Nothing is written into the repo.
+
+```
+python3 tools/ghidra/site2fn.py 0x5a55ba      # rng draw site / first-diff address ->
+                                              # function, callers (depth 2), citing specs
+python3 tools/ghidra/lookup.py FireClaws      # name part -> functions
+python3 tools/ghidra/lookup.py 0x5a55ba       # containing function + callers + callees
+python3 tools/ghidra/lookup.py --callers <name|addr>   # also --callees
+python3 tools/ghidra/lookup.py --str "text"   # strings and the functions using them
+sh tools/ghidra/decomp1.sh 0x5a5560           # decompile one function to a temp
+                                              # dir (needs cloud_setup.sh install+project)
+```
