@@ -30,6 +30,9 @@ use super::world::{ClientUnit, ClientWorld, KindData, ModelInputs, MonsterData, 
 pub const CLIENT_FNS: u8 = 19;
 /// The fatal assert of a `ClientFn` ≥ 19 (`0x004BDEF6`).
 pub const FATAL_CLIENT_FN: u32 = 0x546;
+/// The fatal assert of an object refresh in a mode without graphics
+/// (`0x0046E980`: `Mode<m>` ≠ 1).
+pub const FATAL_GFX_MODE: u32 = 0x4DC;
 /// The client quest record's size (96 bytes, `world/quests-status.md`).
 pub const QUEST_RECORD: usize = 0x60;
 
@@ -82,6 +85,8 @@ pub struct ObjClientRow {
     pub overlay: u8,
     /// `HasCollision0`–`7`.
     pub has_collision: [u8; 8],
+    /// `Mode0`–`7` (+0x13F..): the modes the client has graphics for.
+    pub mode_ok: [u8; 8],
     /// The footprint inputs of `sim/path-placement.md` §3 (`SizeX` ×
     /// `SizeY`, the mask from `IsDoor`, `BlocksVis`, `BlockMissile`,
     /// `SubClass`; `HasCollision0..7`), as the server reads them.
@@ -156,6 +161,9 @@ impl ObjClientRow {
                 o.hascollision5,
                 o.hascollision6,
                 o.hascollision7,
+            ],
+            mode_ok: [
+                o.mode0, o.mode1, o.mode2, o.mode3, o.mode4, o.mode5, o.mode6, o.mode7,
             ],
             shape: d2_sim::wiring::action::objects::object_shape(o),
         }
@@ -417,9 +425,15 @@ impl Cx<'_> {
         anim_setup(u, &row, m)
     }
 
-    /// `refresh(U)` (`0x00470610(U, 0)`): an effect call.
+    /// `refresh(U)` (`0x00470610(U, 0)`): an effect call. An object in a
+    /// mode whose `Mode<m>` flag (+0x13F + m) is not 1 is fatal 0x4DC
+    /// (`0x0046E980`, `Gfx.cpp`; the game ends with exit code 0xFFFFFFFF,
+    /// `tools/scenario-diff.md` §3 rule 17).
     pub fn refresh(&mut self) -> Result<(), HandlerError> {
         let mode = self.u()?.mode;
+        if self.row.mode_ok.get(mode as usize) != Some(&1) {
+            return Err(HandlerError::Fatal(FATAL_GFX_MODE));
+        }
         self.fx(ObjFx::GfxRefresh {
             unit: self.unit,
             mode,

@@ -151,7 +151,17 @@ server state changes; no S→C message is read here.
    flag 1 set, temporary stat lists dropped, then the animation re-init
    `0x00624390` — frame event +0x4E := 0, frame := frame bonus × 256,
    which is 0 for objects; the same mode only sets flag 1).
-   `refresh(U)` = the graphics refresh `0x00470610(U, 0)`. `reinit(U)` =
+   `refresh(U)` = the graphics refresh `0x00470610(U, 0)`, which for an
+   object (unit type 2) runs `0x0046E980` in U's mode m: the class's
+   `Mode<m>` flag (objects.txt `Mode0`–`Mode7`, row +0x13F + m) must be
+   1, else fatal 0x4DC (`Gfx.cpp`, the game ends with exit code
+   0xFFFFFFFF through `0x00681E09`; REC-3160). With the flag set and
+   the graphics for (token, mode) not loadable it is fatal 0x4D4 (the
+   file lookup `0x0046E740` returns 0). Reached in the checks
+   `gen-obj-374`, `-385`, `-400`, `-403`, `-450` (`Mode1` = 0; the
+   operate sets mode 1 and the next generic step refreshes) and
+   `gen-obj-375` (0x4D4 at the creation, call chain `0x00466300` →
+   `0x00470610`, mode 0). `reinit(U)` =
    `0x00624390(U)` alone. "write mode m" = U+0x10 := m without
    `set_mode`. `End(m)` = `FrameCnt[m]` (already × 256 in the binary
    row, `data/fixups.md` §13) − 256, the last frame. `sound(U)` = the

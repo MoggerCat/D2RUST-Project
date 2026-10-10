@@ -547,6 +547,24 @@ state first. It is the default way to compare a behaviour with 1.14d.
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
 
+17. **1.14d fatal exit** (REC-3160): a check can drive 1.14d into a state
+    its own code treats as fatal: it shows its error dialog and calls
+    `0x00681E09(-1)`, the process ends with exit code `0xFFFFFFFF`, and
+    the recorders end the recording there with the footer note `game
+    exited, code 0xffffffff` (measured 2026-10-10, `gen-obj-374`:
+    snapshot 20 written, the client's refresh of the operated object in
+    mode 1 dies, `world/objects-client.md` §25 rule 5). The recording
+    is complete up to that point; a d2rs run that goes on is a
+    difference, not a longer run. The d2rs hosts therefore end the run at
+    the same place when the client model (or the server) raises a
+    1.14d fatal assert (`HandlerError::Fatal` / `Crash`): after the
+    snapshot of the tick in which the client update raised it (a fatal in
+    the server's tick or poke call ends the run before that tick's
+    snapshot), with the footer note `1.14d fatal exit after N ticks: <what>
+    (exit code 0xffffffff)`. All channels of one run end at that frame
+    (the rng and packets dumps share the loop), so the comparison covers
+    the same frames on both sides.
+
 ### 4. Suite
 
 `tools/scenario-diff/suite.py`: every check (or `--filter GLOB` on the
