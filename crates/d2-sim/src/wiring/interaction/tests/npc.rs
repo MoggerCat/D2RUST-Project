@@ -104,14 +104,13 @@ fn chat_open_heals_on_real_stats_and_state_lists() {
     assert!(!has_list(&w, player, S_CURABLE));
     assert!(has_list(&w, player, S_PLAIN));
     // The life and mana sets went out as SetStat; stamina was full.
-    let log: Vec<&str> = w.rest.log.iter().map(String::as_str).collect();
-    assert!(log.contains(&"setstat 6 25600"));
-    assert!(log.contains(&"setstat 8 5120"));
-    assert!(!log.iter().any(|l| l.starts_with("setstat 10")));
-    assert_eq!(
-        log.last().copied(),
-        Some(format!("sound {} {SOUND_HEAL}", npc.0).as_str())
-    );
+    let sent: Vec<&[u8]> = w.rest.sent.iter().map(|(_, m)| m.as_slice()).collect();
+    assert!(sent.contains(&&[0x1E, 6, 0x00, 0x64][..]));
+    assert!(sent.contains(&&[0x1E, 8, 0x00, 0x14][..]));
+    assert!(!sent.iter().any(|m| m[0] >= 0x1D && m[1] == 10));
+    // The heal sound is queued on the NPC for every client (target 0).
+    let slot = w.game.sounds.get(npc).expect("the heal sound is queued");
+    assert_eq!((slot.event, slot.target), (SOUND_HEAL, None));
     w.assert_clean();
 }
 

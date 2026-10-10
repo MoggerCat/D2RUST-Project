@@ -962,6 +962,20 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         self.with_monster_world(|w, h| w.assign_umod(sim, h, unit, umod));
     }
 
+    fn set_alignment(&mut self, sim: &mut Sim<'_>, unit: UnitId, value: u8) {
+        View::of(sim.units, sim.stats, sim.data, self).set_alignment(sim.game, unit, value);
+    }
+
+    fn clear_hireling_components(&mut self, unit: UnitId) {
+        self.with_monster_world(|w, _| {
+            if let Some(m) = w.monster_mut(unit) {
+                for i in [0, 1, 5, 6, 7] {
+                    m.components[i] = 0;
+                }
+            }
+        });
+    }
+
     /// `0x00574CC0` (`hirelings.md` §6 rule 5): the pet placed at the
     /// player's room and point (`0x00650BE0`, the path provider's
     /// teleport, which also leaves the old room's list), queued for

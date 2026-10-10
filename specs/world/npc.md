@@ -353,7 +353,7 @@ nothing unless the player's interact unit is that NPC. Then, in order:
    max life `0x00625D10` (a **signed** compare, unlike the player's),
    then base stat 6 := max (`0x00627260`) and "changed"; each of the
    other three counts as a change when it removes something.
-6. If anything changed: sound 10 attached to the NPC (`0x00553380`,
+6. If anything changed: sound 10 attached to the NPC (`0x00553380(npc, 10, 0)`: target none, every client; asm `0x00578E4F`,
    delivered by the unit spec).
 
 Heal is free and happens on every 0x2F that moves the node from state 0

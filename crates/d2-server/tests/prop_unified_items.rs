@@ -662,7 +662,6 @@ impl NpcRest for Rest {
     fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
     fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
     fn npc_ai_param(&mut self, _: UnitId, _: u32) {}
-    fn stat_sent(&mut self, _: UnitId, _: u16, _: u32) {}
     fn respec_sound(&mut self, _: UnitId) {}
     fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
         [0; 34]
@@ -702,7 +701,6 @@ impl NpcRest for Rest {
 
 impl HirelingRest for Rest {
     fn set_mode(&mut self, _: UnitId, _: u8) {}
-    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
     fn skill_count(&self) -> u32 {
         0
     }
@@ -714,8 +712,6 @@ impl HirelingRest for Rest {
     fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
         None
     }
-    fn join_team(&mut self, _: UnitId, _: UnitId) {}
-    fn hireling_ai(&mut self, _: UnitId) {}
     fn free_unit(&mut self, _: UnitId) {}
     fn queue_room_removal(&mut self, _: UnitId) {}
     fn death_event(&mut self, _: UnitId) {}
@@ -867,7 +863,6 @@ impl QuestRest for Rest {
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
     }
-    fn attach_sound(&mut self, _: UnitId, _: u16) {}
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
