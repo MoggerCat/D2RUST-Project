@@ -34,17 +34,17 @@
 |   3. A2Q1 Radament's Lair (chain 8, slot 9) | 216–299 |
 |   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 300–405 |
 |   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–657 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 658–693 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–967 |
-|   9. Act II gossip and intro records | 968–976 |
-|   10. Hooks called from other systems | 977–994 |
-| Constants & data dependencies | 995–1008 |
-| Randomness | 1009–1023 |
-| Edge cases & original bugs | 1024–1057 |
-| Test vectors | 1058–1080 |
-| Provenance | 1081–1112 |
-| Open questions | 1113–1200 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–662 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 663–698 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 699–972 |
+|   9. Act II gossip and intro records | 973–981 |
+|   10. Hooks called from other systems | 982–999 |
+| Constants & data dependencies | 1000–1013 |
+| Randomness | 1014–1028 |
+| Edge cases & original bugs | 1029–1062 |
+| Test vectors | 1063–1085 |
+| Provenance | 1086–1117 |
+| Open questions | 1118–1205 |
 <!-- /index -->
 
 ## Summary
@@ -634,6 +634,11 @@ C→S 0x31 (§6.5) to open the portal.
 - Operate 34 (`0x005846B0`, object spec) calls `0x0059BAF0(level)`:
   level 74 with +0x44 = 0 → +0x44 := 1, +0x42 := 2; level 54 with +0x42
   = 0 → +0x42 := 1, +0x44 := 2.
+  That call is made only when the portal is already open (mode ≠ 0), and
+  only on the level-74 / level-54 branches (re-read 2026-10, rc-object-operate,
+  1.14d `0x005846B0`). A closed portal (mode 0) does nothing else than
+  mode 1 and an event 1 queued at the current frame + (`FrameCnt1` >> 8) +
+  1; no quest call, no draw beyond the mode change's own. Check: gen-obj-298.
 
 #### 6.10 Jerhyn and the palace guard (spawn side; AI behaviour: AI spec)
 
