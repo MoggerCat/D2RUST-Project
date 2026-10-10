@@ -2016,9 +2016,9 @@ fn run_with(game_seed: u32) -> Transcript {
     };
     // The kill's mode set (DT, unit flag 0x1) goes out in the client
     // pass of the hit's tick (`intents-events.md` §7.3 rule 2 step 2,
-    // §7.4 rule 7): S→C 0x69 code 8 at the path target (the spawn
-    // point the creation's mode request wrote, `monsters/init.md` §4.1
-    // step 1.1; PROVISIONAL, REC-594), d = the path direction, e =
+    // §7.4 rule 7): S→C 0x69 code 8 at the path END (`0x00648A40/60`:
+    // the last computed point, (0, 0) for none; REC-594, recorded
+    // `items-drops-cha-00` frame 37; rc-census-missing), d = the path direction, e =
     // unit +0xB0, the killing hit's class (`damage.md` §7.1 step 2: the
     // missile record has no class, so §6.1 gives 13 `over`). No other S→C so far
     // but the join's 0x07s (frame 2): the unit-add / ground messages of
@@ -2030,13 +2030,11 @@ fn run_with(game_seed: u32) -> Transcript {
     let mut code8 = vec![0x69];
     code8.extend(mguid.to_le_bytes());
     code8.push(8);
-    code8.extend(md.target_x.to_le_bytes());
-    code8.extend(md.target_y.to_le_bytes());
+    // No computed point: the path end is (0, 0).
+    assert_eq!(md.point_count, 0);
+    code8.extend([0, 0, 0, 0]);
     code8.extend([md.direction, 13]);
-    let (sx, sy) = (mpos.0 as u16, mpos.1 as u16);
-    let [sx0, sx1] = sx.to_le_bytes();
-    let [sy0, sy1] = sy.to_le_bytes();
-    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 13]);
+    assert_eq!(&code8[5..], [8, 0, 0, 0, 0, md.direction, 13]);
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
