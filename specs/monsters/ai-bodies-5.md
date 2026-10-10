@@ -30,32 +30,32 @@
 |   1. Scope and order | 103–139 |
 |   2. Minion (116) `0x005E1B60` | 140–156 |
 |   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–189 |
-|   4. Succubus (118) `0x005E1E00` | 190–209 |
-|   5. BloodLord (125) `0x005E36F0` | 210–220 |
-|   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
-|   7. Overseer (120) `0x005E27A0` | 246–281 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 282–299 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 300–317 |
-|   10. DeathMauler (130) `0x005EE260` | 318–328 |
-|   11. PutridDefiler (137) `0x005EFA90` | 329–353 |
-|   12. Ancient (133) `0x005EF1A0` | 354–408 |
-|   13. AncientStatue (132) `0x005EEAA0` | 409–416 |
-|   14. FrozenHorror (124) `0x005E3530` | 417–431 |
-|   15. SiegeBeast (115) `0x005E1900` | 432–459 |
-|   16. SuicideMinion (117) `0x005E1D30` | 460–471 |
-|   17. BaalMinion (141) `0x005EF910` | 472–483 |
-|   18. BaalTaunt (136) `0x005EF710` | 484–500 |
-|   19. BaalToStairs (138) `0x005EF620` | 501–516 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 517–561 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 562–673 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–684 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 685–722 |
-| Constants & data dependencies | 723–741 |
-| Randomness | 742–750 |
-| Edge cases & original bugs | 751–765 |
-| Test vectors | 766–780 |
-| Provenance | 781–806 |
-| Open questions | 807–845 |
+|   4. Succubus (118) `0x005E1E00` | 190–217 |
+|   5. BloodLord (125) `0x005E36F0` | 218–228 |
+|   6. SuccubusWitch (119) `0x005E2120` | 229–253 |
+|   7. Overseer (120) `0x005E27A0` | 254–289 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 290–307 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 308–325 |
+|   10. DeathMauler (130) `0x005EE260` | 326–336 |
+|   11. PutridDefiler (137) `0x005EFA90` | 337–361 |
+|   12. Ancient (133) `0x005EF1A0` | 362–416 |
+|   13. AncientStatue (132) `0x005EEAA0` | 417–424 |
+|   14. FrozenHorror (124) `0x005E3530` | 425–439 |
+|   15. SiegeBeast (115) `0x005E1900` | 440–467 |
+|   16. SuicideMinion (117) `0x005E1D30` | 468–479 |
+|   17. BaalMinion (141) `0x005EF910` | 480–491 |
+|   18. BaalTaunt (136) `0x005EF710` | 492–508 |
+|   19. BaalToStairs (138) `0x005EF620` | 509–524 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 525–569 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 570–681 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 682–692 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 693–730 |
+| Constants & data dependencies | 731–749 |
+| Randomness | 750–758 |
+| Edge cases & original bugs | 759–773 |
+| Test vectors | 774–788 |
+| Provenance | 789–814 |
+| Open questions | 815–853 |
 <!-- /index -->
 
 ## Summary
