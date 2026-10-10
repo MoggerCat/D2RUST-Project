@@ -25,6 +25,11 @@ Open:
 - Hydra fire bolt damage (missile 247 `hydra`, fired by a monster-owned
   hydra, skill lvl 3): at frame 70 1.14d takes 2593 (10.1 life) per hit,
   d2rs kills the 50-life player (hp 0, mode 0 vs 1.14d mode 4).
+  d2rs builds the hit record with level 3, skill row 62 (Hydra), fire
+  min/max 6400/8320 (25-32.5 life, 3 hydra missiles in one frame); 1.14d's
+  per-hit loss is 2593 (10.1 life). Read first: which level the monster's
+  Hydra uses in 1.14d (SetSkill level 1 vs skill_stats L=3) and the
+  monster-side skill damage path.
   Rows: gen-su-26,27,28,30,31 (monster.superunique council, size S-M).
 - gen-su-34 taintbreeder frame 73 monster m 2 vs 1 (not looked at).
 - Player-mode m rows gen-su-12/18, gen-boss-250/544, gen-umod-30,
