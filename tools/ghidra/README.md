@@ -1,8 +1,9 @@
-# Ghidra tooling (spec-writing sessions only)
+# Ghidra tooling
 
 Our own scripts for analyzing the 1.14d `Game.exe`. Everything they produce
-goes under `re/` (gitignored). Implementation sessions don't use any of
-this (see `docs/CLEAN_ROOM.md`).
+goes under `re/` (gitignored); `re/exports/` is also pushed, read-only, to
+the private repo's `re/exports/` so cloud sessions can read it (CLAUDE.md
+rule 3). Never into the public repo.
 
 - Ghidra 12.1.4 in `%LOCALAPPDATA%\Programs\ghidra_12.1.4_PUBLIC`
 - JDK: Temurin 21, pinned through `JAVA_HOME_OVERRIDE` in Ghidra's
