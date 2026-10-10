@@ -397,6 +397,7 @@ impl SkillTreePanel {
     /// [`Self::draw`] with the free-points number (`panels-2.md` §19 r3,
     /// r6: after the background, before the icons) when `uninterruptable`
     /// is given (the player's state 54).
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_with_points(
         &self,
         t: &PanelTables,
