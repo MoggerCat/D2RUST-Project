@@ -1278,20 +1278,8 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn is_trading(&mut self, player: UnitId) -> bool {
         self.inner.is_trading(player)
     }
-    /// `0x0052E050` (`quests-act2-2.md` §5.3) with the removals into the
-    /// sim's own outbox, so they keep their send order with the tick's
-    /// other messages (recorded `a2-quest-tombs` frame 32: Jerhyn's 0x0A
-    /// leaves before the room switch's 0x07s; the rest buffer's messages
-    /// leave after the outbox).
     fn remove_unit(&mut self, unit: UnitId) {
-        let Some((ty, guid, to)) = self.inner.removal_plan(unit) else {
-            return;
-        };
-        let msg = crate::units::messages::remove_unit(ty as u8, guid);
-        for p in to {
-            self.inner.econ.hooks.x.send(p, &msg);
-        }
-        self.inner.free_unit(unit);
+        self.inner.remove_unit(unit)
     }
     fn npc_hold_chat(&mut self, npc: UnitId) -> bool {
         self.inner.npc_hold_chat(npc)

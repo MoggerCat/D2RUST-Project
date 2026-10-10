@@ -109,6 +109,12 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         to: u32,
     ) {
         self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
+        // The event's messages (0x5D, a quest unit's 0x0A) leave at once,
+        // before the room switch's (`0x00543B90` runs before `0x00537B50`;
+        // recorded `a2-wp-46`, `a2-quest-tombs` frame 4 and 32).
+        for (unit, bytes) in self.rest.drain_sent() {
+            v.h.x.send(unit, &bytes);
+        }
     }
 
     fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
