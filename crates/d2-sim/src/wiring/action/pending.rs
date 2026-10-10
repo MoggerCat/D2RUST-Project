@@ -1587,6 +1587,36 @@ pub trait Pending {
         Vec::new()
     }
 
+    /// The ally test `0x00554DE0(game, a, b)` for the missile bodies
+    /// (`missiles/bodies.md` §13 step 2), on the skill use view
+    /// (`BodyWorld::allied`); routed to
+    /// [`crate::wiring::interaction::skill_events::missile_ally_test`] by a
+    /// [`crate::wiring::interaction::UseRest`] value. Default: false.
+    fn missile_ally_test(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, a: UnitId, b: UnitId) -> bool
+    where
+        Self: Sized,
+    {
+        false
+    }
+
+    /// `shout_state(game, unit, owner, skill, level)` (`0x005D8290`,
+    /// `skills/bodies.md` §6.8) for the shout missile hit (`missiles/bodies.md`
+    /// §13). Runs on the skill use view, so a [`crate::wiring::interaction::UseRest`]
+    /// value routes it to
+    /// [`crate::wiring::interaction::skill_events::missile_shout_state`].
+    /// Default: nothing.
+    fn missile_shout_state(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
+
     // ---- skill timer events (`stat-lists.md` §10.2, §10.3; `use.md` §7) --
 
     /// Routes timer events 5, 8 and 9 to the skill use pipeline. The

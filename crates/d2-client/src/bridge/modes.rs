@@ -296,6 +296,14 @@ fn object(
             let u = w.units.get_mut(&key).expect("checked by the caller");
             u.mode = mode;
             let class = u.class;
+            // The graphics refresh `0x00470610` (after `set_mode`, not for
+            // a door): the new mode needs its `Mode<m>` flag, else fatal
+            // 0x4DC (`world/objects-client.md` §25 r5, REC-3160).
+            if let Some(row) = inputs.objclient.rows.get(class as usize) {
+                if row.is_door == 0 && row.mode_ok.get(mode as usize) != Some(&1) {
+                    return Err(HandlerError::Fatal(super::objects::FATAL_GFX_MODE));
+                }
+            }
             // The animation set-up of the new mode (`world/objects-client.md`
             // §25 r8; measured REC-440: 1.14d's `0x004BCF60` runs
             // `0x00624390` itself after its `set_mode`, drawing again even

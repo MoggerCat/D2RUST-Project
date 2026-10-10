@@ -1,0 +1,46 @@
+{
+ "channel": "packets",
+ "check": "gen-qflow-a1q3-tools",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "60",
+  "--auto",
+  "PtQA1Q3",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 goto unit 1:154",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:154",
+  "--send",
+  "16 InitEntityChat id=@1:154",
+  "--send",
+  "18 QuestMessage npc=@1:154 msg=163",
+  "--send",
+  "20 TerminateEntityChat id=@1:154"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "2b49f0b707360882c1c9a361f52bbf1d938f9a4de116d1a9a9b7f074026b4f2e",
+   "size": 64511
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "38aac471bb30697f3545c172c6d1531753c3eea9910d2847f1a91538b2749f40",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
+  "save": "c036679d43433de08554b0f396cba4dbfabc0fcd8a544e8d87eae4500d724b23"
+ }
+}

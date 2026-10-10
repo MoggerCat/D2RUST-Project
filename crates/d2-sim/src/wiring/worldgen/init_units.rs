@@ -299,6 +299,13 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.set_state(unit, state, true);
     }
 
+    /// §14.3 bloodraven: state 118 corpse_noselect on
+    /// (`0x00639DB0(unit, 118, 1)`; recorded in the 0xAA of
+    /// `items-drops-hel-10`).
+    fn set_corpse_noselect(&mut self, unit: UnitId) {
+        self.v.set_state(unit, 118, true);
+    }
+
     // ---- umod callbacks (`umod-callbacks.md`; bodies in `umod_host.rs`)
 
     fn stat_total(&self, unit: UnitId, stat: u16) -> i32 {

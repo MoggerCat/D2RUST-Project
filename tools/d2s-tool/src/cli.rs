@@ -36,6 +36,8 @@ edit flags:
   --quests none|all|LIST       LIST: comma-separated [diff:]acts=N or [diff:]SLOT.BIT ('all' is Pending)
   --waypoints none|all|LIST    LIST: comma-separated [diff:]INDEX or [diff:]lv=LEVEL
   --difficulty-unlocked normal|nightmare|hell   progression bits (d2s.md §2.2 rule 5.4)
+  --allow-locked               with --act/--difficulty: write the town of a difficulty not unlocked
+                               (a file 1.14d refuses to load, d2s.md §10)
   --act A --difficulty D       town byte: act 0..4 of difficulty D (default 0, normal)
   --item CODE[#Q][@X,Y][:PAGE] a normal identified item (page 0 inventory, 3 cube, 4 stash;
                                #Q: quantity Q); repeatable. Options after '/':
@@ -140,6 +142,7 @@ fn parse(rest: Vec<String>) -> Result<(Edits, Common)> {
                     num(p[3], "--merc exp")?,
                 ));
             }
+            "--allow-locked" => e.allow_locked = true,
             "--seed" => e.seed = Some(num(&a.value(&f)?, "--seed")?),
             "--map-seed" => e.map_seed = Some(num(&a.value(&f)?, "--map-seed")?),
             "--time" => e.time = Some(num(&a.value(&f)?, "--time")?),

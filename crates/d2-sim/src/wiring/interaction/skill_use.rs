@@ -718,7 +718,8 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.cv.v.state_list(u, state).is_some()
     }
     /// `use.md` §6: a list with flags 2, expire `e`, the unit as owner,
-    /// state 121, remove callback `0x0056E900`; attached; state 121 on.
+    /// state 121, remove callback `0x0056E900`; attached; state 121 on
+    /// (`0x0056EF90`).
     ///
     /// TODO(use.md §6, stat-lists.md §8.1): the attach `reset` argument is
     /// not stated; reset = 1 as the action wiring's state lists.
@@ -734,7 +735,11 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         v.stats.set_state(l, u32::from(STATE_SKILL_DELAY));
         v.stats.set_remove_callback(l, Some(DELAY_REMOVE_CALLBACK));
         v.stats.attach(&mut *v.h, u, l, true);
+        // `0x00639DB0(unit, 121, 1)`: the toggle, then the unit queued for
+        // update (always, `sim/stat-lists.md` §9.2), so the next update
+        // sends 0xA7 for state 121 (1.14d `gen-skill-sor-51` frame 26).
         v.set_state(u, STATE_SKILL_DELAY, true);
+        BodyWorld::queue_update(self, u);
     }
     fn set_state_list_expiry(&mut self, u: UnitId, state: u16, expire: i32) {
         if let Some(l) = self.cv.v.state_list(u, state) {
@@ -1392,6 +1397,59 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             crate::wiring::action::reaction::kill_by(&mut self.cv, u, killer);
             return;
         }
+        // `0x00571AA0` as the bodies call it (`bodies-2.md` §2.21): the
+        // 0xA3 record {v, skill, lvl, unit, T, x, y}, the unit queued.
+        if let bodies::BodyEffect::MsgA3 {
+            u,
+            target,
+            skill,
+            lvl,
+            x,
+            y,
+            v,
+        } = e
+        {
+            use crate::wiring::action::event_records::EventRecord;
+            let units = &self.cv.v.units;
+            let of = |id: Option<UnitId>| {
+                id.and_then(|id| units.get(id))
+                    .map_or((0, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+            };
+            let r = EventRecord::Progressive {
+                charges: v as u8,
+                skill: skill as u16,
+                level: lvl as u16,
+                unit: of(Some(u)),
+                target: of(target),
+                x: x as u32,
+                y: y as u32,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
+            return;
+        }
+        // `0x0053CDF0(client, m)` (`bodies.md` §8.9 step 7): 0x7F about
+        // the pet m, sent at once to the caster's client.
+        if let bodies::BodyEffect::AllyInfo { u, m } = e {
+            let life = bodies::b4_helpers::life_percent(self, m).clamp(0, 0xFFFF) as u16;
+            let game = &*self.cv.game;
+            let level = game
+                .lists
+                .unit(m)
+                .and_then(|e| e.room())
+                .and_then(|r| self.cv.v.h.drlg.level_id(game, r))
+                .unwrap_or(0) as u16;
+            if let Some(r) = self.cv.v.units.get(m) {
+                let mut msg = [0u8; 10];
+                msg[0] = 0x7F;
+                msg[1] = u8::from(r.ty == UnitType::Player);
+                msg[2..4].copy_from_slice(&life.to_le_bytes());
+                msg[4..8].copy_from_slice(&r.guid.to_le_bytes());
+                msg[8..10].copy_from_slice(&level.to_le_bytes());
+                Pending::send(self.xm(), u, &msg);
+            }
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {
@@ -1435,6 +1493,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                     .x
                     .player_mode_request(&mut *cv.game, u, Some(skill as u16), mode as u32, wt);
             }
+            // `0x0057FE90` / `0x0057FEF0` (`sim/units.md` §4.2 "does not
+            // survive a player's attack start"): the re-entry request
+            // calls the start `0x0056FAF0` of the used skill (Attack)
+            // after the mode's schedule, which writes +0x44 := frame
+            // bonus · 256 (`0x0056CA40`).
+            let tables = self.cv.v.h.tables.clone();
+            crate::skills::use_::start(self, &tables.skills, u);
+            let cv = &mut self.cv;
             let t = ModeTarget::Unit(target);
             crate::wiring::interaction::body_path::point_target(&mut cv.v, u, t);
             self.xm().keep_target(u, t);
