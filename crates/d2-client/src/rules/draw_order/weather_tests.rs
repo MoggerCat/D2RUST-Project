@@ -1326,7 +1326,7 @@ fn thunder_requests_202_with_the_delay_and_places_it_y_first() {
     assert_eq!(seed, e);
 }
 
-// Covers: specs/render/draw-order-2.md §11.8 (one-time `0x00472610`)
+// Covers: specs/render/draw-order-2.md §11.8 r1
 #[test]
 fn first_act_load_adds_the_one_time_wind_init() {
     let lv = level(2, 0, true, false);
