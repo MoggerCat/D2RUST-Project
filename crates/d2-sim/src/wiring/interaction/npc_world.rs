@@ -345,6 +345,10 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         quests::send_player_flags(&mut w, player, unit_type, guid);
     }
     fn quest_chat_end(&mut self, player: UnitId, npc: UnitId) {
+        if self.state.defer_chat_end {
+            self.state.chat_ends.push((player, npc));
+            return;
+        }
         let (ctl, mut w) = self.quest_world();
         ctl.npc_deactivate(&mut w, player, npc);
     }

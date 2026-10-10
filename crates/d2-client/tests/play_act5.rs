@@ -190,11 +190,16 @@ impl Act5 {
 
     /// Moves the player next to `(x, y)` in hops of at most 16 sub-tiles
     /// (staging: the rooms on the way come into play as on foot).
-    fn stand_by(&mut self, (x, y): (i32, i32)) {
+    fn stand_by(&mut self, at: (i32, i32)) {
+        self.stand_within(at, 3);
+    }
+
+    /// Like [`Self::stand_by`] with the given slack (sub-tiles) around the spot.
+    fn stand_within(&mut self, (x, y): (i32, i32), slack: i32) {
         for _ in 0..200 {
             let (px, py) = self.rig.pos();
             let (dx, dy) = (x + 2 - px, y + 2 - py);
-            if dx.abs() <= 3 && dy.abs() <= 3 {
+            if dx.abs() <= slack && dy.abs() <= slack {
                 return;
             }
             let (sx, sy) = (dx.clamp(-16, 16), dy.clamp(-16, 16));
@@ -266,7 +271,9 @@ impl Act5 {
             let at = self
                 .rig
                 .with(move |sim, _| sim.events.action.sys.hooks.path_position(m));
-            self.stand_by(at);
+            // The preview's swing reach is 4 sub-tiles (single_player.rs
+            // `in_melee_range`): stand within it, not at the room-scale slack.
+            self.stand_within(at, 1);
             self.strengthen();
             let mut msg = vec![0x06];
             msg.extend(1u32.to_le_bytes());
