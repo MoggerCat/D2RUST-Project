@@ -38,6 +38,14 @@ impl TipUnit for WorldUnit<'_> {
     fn stat(&self, id: u16, layer: u16) -> i32 {
         self.world.total(self.key, id, layer)
     }
+    fn attack_anim(&self, weapon_class: [u8; 4]) -> Option<(i32, i32)> {
+        let class = self.world.units.get(&self.key)?.class;
+        self.world
+            .tip_anims
+            .0
+            .as_ref()?
+            .attack1(class, weapon_class)
+    }
     fn has_state(&self, state: u8) -> bool {
         self.world
             .units

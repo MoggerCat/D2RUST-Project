@@ -199,7 +199,22 @@ impl<X: WorldPending> WorldHost<'_, X> {
         let Some(owner) = owner.and_then(|o| self.game.lists.find_unit(o.ty, o.guid)) else {
             return;
         };
+        // The hit's damage apply runs the owner's mode-3 umods
+        // (`0x005A4390`, `umod-callbacks.md` §2 item 4): the world goes
+        // back to the hooks for the nested dispatch, as for a mode set.
+        let placeholder = self.w.placeholder();
+        let real = std::mem::replace(&mut *self.w, placeholder);
+        let lent = self.v.h.relend_monster_world(Box::new(real));
         self.v.missile_record_hit(self.game, owner, src, unit, *rec);
+        match self.v.h.take_relent_monster_world(lent) {
+            Some(w) => *self.w = w,
+            None => self
+                .w
+                .errors
+                .push(WorldgenError::Wiring(WiringError::Reentrant(
+                    "umod missile hit",
+                ))),
+        }
     }
 
     /// The aura columns of a skills row (§5).

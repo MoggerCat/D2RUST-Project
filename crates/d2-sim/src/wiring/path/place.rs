@@ -390,7 +390,7 @@ pub fn level_spawn<X: Pending>(
 /// `None`: the destination is in another act: the caller runs the act
 /// change `0x0053ACC0` ([`super::act_change::run`], `waypoints.md` §11).
 pub fn level_warp<X: Pending>(
-    c: PathCtx<'_, X>,
+    mut c: PathCtx<'_, X>,
     player: UnitId,
     level: u32,
     tile_index: u32,
@@ -409,6 +409,13 @@ pub fn level_warp<X: Pending>(
         // lists ([`super::super::action::ActionHooks::hireling_calls`]).
         if let Some(q) = c.v.h.hireling_calls.as_mut() {
             q.push(HirelingCall::ActChange(player));
+        }
+        // The town-leave refresh `0x00537340` runs first (its quest part,
+        // `world/quests.md` §6.7: the act's NPC intro list and, for Lut
+        // Gholein, the Cain act change `0x00597310`).
+        if let Some(mut host) = c.v.h.quest_host.take() {
+            host.town_leave(c.game, &mut c.v, player, level);
+            c.v.h.quest_host = Some(host);
         }
         return None;
     }

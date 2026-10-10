@@ -31,37 +31,37 @@
 |   3. Placement | 165–173 |
 |   4. Creation sequence after placement (`0x005B2A00`) | 174–329 |
 |   5. Monster type init (`0x00574250`) | 330–347 |
-|   6. Stats and skills (`0x00573CB0`) | 348–411 |
-|   7. Monster level | 412–427 |
-|   8. Base values from monlvl | 428–462 |
-|   9. Player-count bonus (`0x00573930`) | 463–474 |
-|   10. Components (`0x005739D0`) | 475–485 |
-|   11. monprop (`monprop.txt`) | 486–494 |
-|   12. monequip (`0x005D6B60`) | 495–511 |
-|   13. Classic scaling (`0x0063EEF0`) | 512–519 |
-|   14. Normal mods and boss mods | 520–621 |
-|   15. Party minions | 622–626 |
-|   16. Boss spawns | 627–662 |
-|   17. Choosing umods (`0x005A0760`) | 663–706 |
-|   18. Boss minions and umod init (`0x005A2120`) | 707–724 |
-|   19. Umod init functions | 725–817 |
-|   20. Superuniques (`0x005A49B0`) | 818–866 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 867–881 |
-|   22. Umod callbacks and the type-7 event | 882–933 |
-|   23. Unique names (client) | 934–943 |
-|   24. Monster assign message | 944–995 |
-|   25. Calling the spawn functions outside population (tools) | 996–1086 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1087–1146 |
-|   27. Class reinit (`0x00574370`) | 1147–1192 |
-| Constants & data dependencies | 1193–1214 |
-| Randomness | 1215–1259 |
-| Edge cases & original bugs | 1260–1291 |
-| Test vectors | 1292–1293 |
-|   Synthetic (CI-safe) | 1294–1316 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1317–1347 |
-|   Recorded checks (monster assign 0xAC) | 1348–1360 |
-| Provenance | 1361–1450 |
-| Open questions | 1451–1531 |
+|   6. Stats and skills (`0x00573CB0`) | 348–414 |
+|   7. Monster level | 415–430 |
+|   8. Base values from monlvl | 431–465 |
+|   9. Player-count bonus (`0x00573930`) | 466–477 |
+|   10. Components (`0x005739D0`) | 478–488 |
+|   11. monprop (`monprop.txt`) | 489–497 |
+|   12. monequip (`0x005D6B60`) | 498–514 |
+|   13. Classic scaling (`0x0063EEF0`) | 515–522 |
+|   14. Normal mods and boss mods | 523–624 |
+|   15. Party minions | 625–629 |
+|   16. Boss spawns | 630–665 |
+|   17. Choosing umods (`0x005A0760`) | 666–709 |
+|   18. Boss minions and umod init (`0x005A2120`) | 710–727 |
+|   19. Umod init functions | 728–820 |
+|   20. Superuniques (`0x005A49B0`) | 821–869 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 870–884 |
+|   22. Umod callbacks and the type-7 event | 885–936 |
+|   23. Unique names (client) | 937–946 |
+|   24. Monster assign message | 947–1003 |
+|   25. Calling the spawn functions outside population (tools) | 1004–1094 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1095–1154 |
+|   27. Class reinit (`0x00574370`) | 1155–1200 |
+| Constants & data dependencies | 1201–1222 |
+| Randomness | 1223–1267 |
+| Edge cases & original bugs | 1268–1299 |
+| Test vectors | 1300–1301 |
+|   Synthetic (CI-safe) | 1302–1324 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1325–1355 |
+|   Recorded checks (monster assign 0xAC) | 1356–1368 |
+| Provenance | 1369–1458 |
+| Open questions | 1459–1539 |
 <!-- /index -->
 
 ## Summary
@@ -397,6 +397,9 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     (`0x006439B0` + `0x006442A0`, owner −1 adds no bonus on a monster):
     `ActionHooks::natural_skills` keeps skill → level per unit, Megademon's
     range (`Skill1` level) needs it. A monster without an entry reads 1.
+    The entry lookup `0x006439F0` finds these entries too (rc-c011-gameseed:
+    Armageddon's state function, `skills/bodies-4.md` §4.9, reads the
+    entry's param 1 every period; Diablo clone 333 fires it).
     The used skill entry (`0x00620250`, list +0x10) is one of these
     entries, so a skill the monster casts runs at this level, and so does
     the missile it creates (stat 12, `missiles/damage.md` §4): vampire2
@@ -980,6 +983,11 @@ caller `0x005720D8`; the client reader is `client/msg-units.md` §1.2):
    bit: the minion owner (`0x0058F0D0`) is a player and its pet type of
    U's GUID (`sim/pets.md` §9) is 7 (hireable) → 1 and the owner's GUID
    in 32 bits; else 0.
+   Implemented (rc-pkt-handwritten, REC-3370): the hireling bit and its
+   owner GUID are sent for the units `set_ai_owner` linked to a player
+   (`ActionHooks::hireling_units`; the hireling init is its only caller).
+   Evidence: the 1.14d 0xAC of every hire-* check is 4 bytes longer than
+   before (bit 1 + the owner GUID, `traces/checks/hire-kashya.check`).
 5. Source link: 1 bit = flag-ex +0xC8 bit 0x400 and owner type +0x94 =
    0; set → 31 bits of +0x98 & 0x8FFFFFFF.
 6. Stats: L = U's child list with state 0 and flag 0x40 (`0x006257D0(U,

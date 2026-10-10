@@ -508,7 +508,7 @@ fn a_ui_overlay_call_creates_advances_draws_on_its_host_and_removes() {
         id: 1,
         on: true,
     };
-    r.m.overlay_calls([on]);
+    r.m.overlay_calls(2, [on]);
     // Created before the update's walk: advanced once in the same update.
     assert_eq!(r.frame(&mut w, 2).len(), 1);
     let rec = r.m.unit_overlays(k)[0];
@@ -532,12 +532,43 @@ fn a_ui_overlay_call_creates_advances_draws_on_its_host_and_removes() {
     r.frame(&mut w, 6);
     assert_eq!(r.m.unit_overlays(k)[0].frame, 5 * 144 - 512);
     // A second create of the same id replaces the record (§2 r5).
-    r.m.overlay_calls([on]);
+    r.m.overlay_calls(7, [on]);
     r.frame(&mut w, 7);
     assert_eq!(r.m.unit_overlays(k).len(), 1);
     assert_eq!(r.m.unit_overlays(k)[0].frame, 144);
     // Remove by id; then nothing draws.
-    r.m.overlay_calls([OverlayCall { on: false, ..on }]);
+    r.m.overlay_calls(8, [OverlayCall { on: false, ..on }]);
     assert!(r.frame(&mut w, 8).is_empty());
     assert!(r.m.unit_overlays(k).is_empty());
+}
+
+// Covers: specs/render/overlay.md §3 r2
+#[test]
+fn a_call_delivered_on_a_skipped_tick_runs_just_before_that_ticks_step() {
+    let mut w = world();
+    let mut r = Run::new();
+    r.m.rows.overlay_rules = vec![
+        OverlayRules::default(),
+        OverlayRules {
+            anim_rate: 9,
+            ..OverlayRules::default()
+        },
+    ];
+    let k = UnitKey::new(MONSTER, 7);
+    let mut npc = ClientUnit::new(k);
+    npc.position = Some((102, 100));
+    w.units.insert(k, npc);
+    r.frame(&mut w, 1);
+    // Tick 2 draws no frame; the call delivered at tick 3 waits for the
+    // frame of tick 3, which catches up ticks 2 and 3: one advance.
+    r.m.overlay_calls(
+        3,
+        [OverlayCall {
+            unit: k,
+            id: 1,
+            on: true,
+        }],
+    );
+    r.frame(&mut w, 3);
+    assert_eq!(r.m.unit_overlays(k)[0].frame, 144);
 }
