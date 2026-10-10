@@ -48,14 +48,14 @@
 |   19. BaalToStairs (138) `0x005EF620` | 501–516 |
 |   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 517–561 |
 |   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 562–673 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–684 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 685–722 |
-| Constants & data dependencies | 723–741 |
-| Randomness | 742–750 |
-| Edge cases & original bugs | 751–765 |
-| Test vectors | 766–780 |
-| Provenance | 781–806 |
-| Open questions | 807–845 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–690 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 691–728 |
+| Constants & data dependencies | 729–747 |
+| Randomness | 748–756 |
+| Edge cases & original bugs | 757–771 |
+| Test vectors | 772–786 |
+| Provenance | 787–812 |
+| Open questions | 813–851 |
 <!-- /index -->
 
 ## Summary
@@ -681,6 +681,12 @@ unit's max life / 3, stat 6 (`hitpoints`) := its life / 3, stat 74
 4. X → execute k (§21.3), wait 25. No X → idle 15.
 
 1.14d-confirmed (§21, §22); same as D2MOO (1.10f cull 55).
+
+rc-boss-570 (REC-2250, 1.14d-confirmed by check `gen-boss-570`): a clone
+spawned with no owner takes step 2 on its first think and is killed with
+`0x0057CCB0(game, unit, 0, 1)` (`combat/damage.md` §7.2): it is in death
+mode (0) on that frame. The kill seam must run the real kill, not answer
+"nothing".
 
 ### 23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280`
 
