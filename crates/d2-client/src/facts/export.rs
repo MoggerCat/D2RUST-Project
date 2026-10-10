@@ -132,17 +132,20 @@ fn num(v: Option<i32>) -> String {
 /// §5 r1: the unit draw `0x00471EC0` starts a unit's run outside the
 /// shadow pass; 1.14d's shadow pass calls `CelDrawShadow` with no unit
 /// draw (`a1-town-arrival-ama` rows 97–115). A run after the unit's own
-/// shadow still starts with it. `last_run` is the previous entry's (tag,
-/// shadow) of any kind.
+/// shadow still starts with it. One unit draw is one draw-order slot: a new
+/// slot starts a run even under the same tag (a GUID two unit types share,
+/// `gen-ui-hud` monster 1:3 then object 2:3). `last_run` is the previous
+/// entry's (tag, shadow, slot) of any kind.
 fn unit_row(
     tag: ItemTag,
     shadow: bool,
+    slot: u64,
     cx: &ExportContext<'_>,
-    last_run: &mut Option<(ItemTag, bool)>,
+    last_run: &mut Option<(ItemTag, bool, u64)>,
     draws: &mut Vec<Vec<String>>,
 ) {
     if let (ItemTag::Unit(guid), false) = (tag, shadow) {
-        if *last_run != Some((tag, false)) {
+        if *last_run != Some((tag, false, slot)) {
             let unit = match (cx.unit_type)(guid) {
                 Some(t) => format!("{t}:{guid}"),
                 None => UNKNOWN.to_owned(),
@@ -156,7 +159,7 @@ fn unit_row(
             draws.push(row);
         }
     }
-    *last_run = Some((tag, shadow));
+    *last_run = Some((tag, shadow, slot));
 }
 
 /// §5 r15: a cel call without pixels (a component file in no archive):
@@ -166,10 +169,10 @@ fn unit_row(
 fn call_rows(
     c: &UnitCall,
     cx: &ExportContext<'_>,
-    last_run: &mut Option<(ItemTag, bool)>,
+    last_run: &mut Option<(ItemTag, bool, u64)>,
     draws: &mut Vec<Vec<String>>,
 ) {
-    unit_row(c.tag, c.shadow, cx, last_run, draws);
+    unit_row(c.tag, c.shadow, c.key.slot(), cx, last_run, draws);
     // §5 r17: the unit draw alone (the body failed the pre-test).
     let Some(path) = &c.path else {
         return;
@@ -194,7 +197,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
     let mut sky = Some(sky_rows(cx.sky));
     // The last unit-pass entry (item or call): its tag and whether it
     // was a shadow (§5 r1 unit rows).
-    let mut last_run: Option<(ItemTag, bool)> = None;
+    let mut last_run: Option<(ItemTag, bool, u64)> = None;
     let mut calls = cx.unit_calls.iter().peekable();
     for item in items {
         // §5 r15: the calls without pixels before this item's key.
@@ -233,6 +236,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
         unit_row(
             item.tag,
             item.key.pass() == pass::SHADOWS,
+            item.key.slot(),
             cx,
             &mut last_run,
             &mut draws,
