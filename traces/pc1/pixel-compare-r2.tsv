@@ -1,0 +1,38 @@
+# pc1-pixel-compare 1
+# tool: d2rs-probes/pixel_check.py (as traces/pc1/pixel-compare.tsv); real Windows 10, Intel HD Graphics 630 (Vulkan), d2rs at claude/local-pc1-today 9e221a193 (origin/claude/integ-r23 174dbce3d merged), 2026-10-10 round 2; prev_percent = the first round
+check	tick	orig_frame_f	equal_pixels	total_pixels	percent	diff_bbox	prev_percent
+draws-town-arrival-ama	73	73	469350	480000	97.78	0 0 799 582	97.56
+ui-draws-automap-ama	73	73	449221	480000	93.59	0 0 800 582	93.37
+ui-draws-belt-ama	73	73	471809	480000	98.29	0 0 800 582	98.01
+ui-draws-char-skill-ama	73	73	475268	480000	99.01	12 8 800 582	98.87
+ui-draws-character-ama	73	73	472497	480000	98.44	12 1 800 582	97.88
+ui-draws-help-ama	73	72	58259	480000	12.14	0 0 800 586	12.20
+ui-draws-hover-life-ama	73	72	469337	480000	97.78	0 0 799 582	97.68
+ui-draws-hover-mana-ama	73	72	468826	480000	97.67	0 0 799 582	98.13
+ui-draws-hover-npc-ama	73	73	471519	480000	98.23	0 0 771 582	98.13
+ui-draws-hover-stamina-ama	73	73	471789	480000	98.29	0 0 799 600	98.20
+ui-draws-hover-xp-ama	73	73	471925	480000	98.32	0 0 794 583	98.13
+ui-draws-inv-char-ama	73	72	478826	480000	99.76	12 6 800 582	99.69
+ui-draws-inv-char-l5-ama	73	73	478889	480000	99.77	17 6 800 582	99.70
+ui-draws-inv-char-tip-ama	73	73	465896	480000	97.06	12 252 588 582	97.06
+ui-draws-inventory-ama	73	73	473362	480000	98.62	0 0 800 582	98.14
+ui-draws-item-tip-ama	73	73	460428	480000	95.92	0 1 588 582	95.80
+ui-draws-left-skill-pick-ama	73	73	451276	480000	94.02	0 0 799 595	93.35
+ui-draws-minipanel-ama	73	73	471713	480000	98.27	0 0 794 600	97.61
+ui-draws-msglog-ama	73	73	119330	480000	24.86	0 0 800 582	24.92
+ui-draws-party-ama	73	73	471736	480000	98.28	0 0 800 582	97.44
+ui-draws-quest-inv-ama	73	73	479344	480000	99.86	12 9 800 582	99.71
+ui-draws-quest-skill-ama	73	72	475398	480000	99.04	12 9 800 582	98.89
+ui-draws-questlog-ama	73	72	471480	480000	98.22	12 1 800 582	97.90
+ui-draws-right-skill-pick-ama	73	73	449408	480000	93.63	0 0 799 595	93.50
+ui-draws-skillbar-ama	73	73	464928	480000	96.86	0 0 800 582	96.03
+ui-draws-skilltree-ama	73	73	469456	480000	97.80	0 1 800 582	97.38
+draws-a2-town-ama	73	73	469676	480000	97.85	12 0 800 582	97.30
+draws-a3-town-ama	73	72	468439	480000	97.59	4 8 800 582	97.43
+draws-a4-town-ama	73	72	469457	480000	97.80	0 0 800 582	98.46
+draws-a5-town-ama	73	72	471863	480000	98.30	0 9 800 582	98.22
+draws-blood-moor-ama	73	72	471357	480000	98.20	5 0 800 582	98.18
+draws-cave-ama	73	73	472150	480000	98.36	12 9 800 582	98.28
+draws-melee-bar	46	46	406337	480000	84.65	10 0 787 582	84.65
+draws-frost-nova-sor	27	27	404983	480000	84.37	17 48 770 582	84.37
+draws-fire-bolt-sor	30	30	405138	480000	84.40	17 28 797 582	84.41
