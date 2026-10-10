@@ -144,9 +144,12 @@ pub mod callback {
     pub const MIND_BLAST: u32 = 0x005D_7310;
     /// Pregnant `0x005D21B0` (`bodies-4.md` §3.16).
     pub const PREGNANT: u32 = 0x005D_21B0;
+    /// Just-hit list `0x005ADAF0` (`missiles.md` §R5 step 6.1): state off.
+    pub const JUSTHIT: u32 = 0x005A_DAF0;
     /// Every callback id the bodies specify.
-    pub const ALL: [u32; 15] = [
+    pub const ALL: [u32; 16] = [
         DEFAULT,
+        JUSTHIT,
         SELF_AURA,
         BUFF,
         AI_CURSE,
@@ -1172,7 +1175,7 @@ pub fn remove_callback<W: BodyWorld>(
         callback::SELF_AURA => remove_self_aura(w, t, u, state),
         callback::BUFF => remove_buff(w, u, state),
         callback::AI_CURSE => remove_ai_curse(w, u, state),
-        callback::CHARGE => w.state_on(u, state, false),
+        callback::CHARGE | callback::JUSTHIT => w.state_on(u, state, false),
         callback::INFERNO | callback::BLADE_FURY => {
             w.state_on(u, state, false);
             flags_or(w, u, FLAG_40);

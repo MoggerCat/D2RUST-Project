@@ -131,7 +131,14 @@ impl<X: Pending> MissileUnits for View<'_, X> {
     fn apply_justhit(&mut self, game: &mut Game, unit: UnitId, expire: i32) {
         // TODO(missiles.md §R5 step 6.1): the list's owner is not stated;
         // the hit unit's own type and GUID are used.
-        self.create_state_list(unit, STATE_JUSTHIT, None, expire);
+        if let Some(l) = self.create_state_list(unit, STATE_JUSTHIT, None, expire) {
+            self.stats.set_remove_callback(
+                l,
+                Some(crate::stats::lists::RemoveCallback(
+                    crate::skills::use_::bodies::callback::JUSTHIT,
+                )),
+            );
+        }
         self.set_state(unit, STATE_JUSTHIT, true);
         if let Err(e) =
             game.schedule_event(unit, u32::from(event::REMOVE_STATE), expire, None, 0, 0)

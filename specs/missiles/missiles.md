@@ -32,19 +32,19 @@
 |   R2. Creation | 141–358 |
 |   R3. Per-tick dispatch | 359–388 |
 |   R4. Default flight (server-do 1, `0x005B0BC0` → `0x005AE1F0`) | 389–519 |
-|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–577 |
-|   R6. Damage stage (missile-owned part) | 578–722 |
-|   R7. Lifetime and expiry | 723–776 |
-|   R8. Pierce | 777–803 |
-|   R9. Server-do and server-hit catalogues | 804–1040 |
-|   R10. Behaviour of the recorded missiles | 1041–1075 |
-|   R11. `missiles.txt` columns and their server use | 1076–1123 |
-| Constants & data dependencies | 1124–1150 |
-| Randomness | 1151–1189 |
-| Edge cases & original bugs | 1190–1216 |
-| Test vectors | 1217–1299 |
-| Provenance | 1300–1352 |
-| Open questions | 1353–1443 |
+|   R5. Hit handler (`0x005ADF10`, D2MOO `MISSMODE_SrvDmgHitHandler`) | 520–583 |
+|   R6. Damage stage (missile-owned part) | 584–728 |
+|   R7. Lifetime and expiry | 729–782 |
+|   R8. Pierce | 783–809 |
+|   R9. Server-do and server-hit catalogues | 810–1046 |
+|   R10. Behaviour of the recorded missiles | 1047–1081 |
+|   R11. `missiles.txt` columns and their server use | 1082–1129 |
+| Constants & data dependencies | 1130–1156 |
+| Randomness | 1157–1195 |
+| Edge cases & original bugs | 1196–1222 |
+| Test vectors | 1223–1305 |
+| Provenance | 1306–1358 |
+| Open questions | 1359–1449 |
 <!-- /index -->
 
 ## Summary
@@ -561,6 +561,12 @@ order:
       unit, state 86 is turned on, and a type-12 (remove state) timed
       event is scheduled on the unit for that frame (`0x005417D0`,
       `tick.md` §5.2).
+      The list's owner is the hit unit itself (its type and GUID) and its
+      remove callback is its own, `0x005ADAF0` (read 2026-10-10): state 86
+      off (the toggle with the update-queue insert `0x00639DB0`) and
+      nothing else. Without it the state never left the unit and a
+      `NextHit` missile's later contacts were refused for good (gen-mon-533
+      frame 113, gen-boss-544 frame 80: the explosion's damage came late).
    2. Unit event 0 (hit by missile, events.txt row 0; `0x005C0C30`,
       called also when the unit is none).
    3. `pSrvHitFunc` in 1…70 (count `0x0073C83C`): `c` = its result
