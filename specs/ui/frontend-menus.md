@@ -33,21 +33,21 @@
 |   F2.7 Other buttons | 472–496 |
 |   F2.8 Difficulty box (`0x00439780`) | 497–516 |
 |   F2.9 Control records and art | 517–553 |
-|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–668 |
-|   F3.1 Character-create screen build (`0x00435580`) | 669–704 |
-|   F3.2 Class line-up (positions, creation order) | 705–720 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 721–781 |
-|   F3.4 Name entry (edit box, descriptor 204) | 782–796 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 797–820 |
-|   F3.6 OK / Cancel behaviour and the new save | 821–855 |
-|   F3.7 Sounds (deferred) | 856–860 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 861–891 |
-| Constants & data dependencies | 892–928 |
-| Randomness | 929–932 |
-| Edge cases & original bugs | 933–964 |
-| Test vectors | 965–998 |
-| Provenance | 999–1044 |
-| Open questions | 1045–1089 |
+|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–681 |
+|   F3.1 Character-create screen build (`0x00435580`) | 682–717 |
+|   F3.2 Class line-up (positions, creation order) | 718–733 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 734–794 |
+|   F3.4 Name entry (edit box, descriptor 204) | 795–809 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 810–833 |
+|   F3.6 OK / Cancel behaviour and the new save | 834–868 |
+|   F3.7 Sounds (deferred) | 869–873 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 874–904 |
+| Constants & data dependencies | 905–941 |
+| Randomness | 942–945 |
+| Edge cases & original bugs | 946–977 |
+| Test vectors | 978–1011 |
+| Provenance | 1012–1057 |
+| Open questions | 1058–1102 |
 <!-- /index -->
 
 ## Summary
@@ -665,6 +665,19 @@ list is scanned. It is not a unit: no inventory, no light, no direction other th
    Compare per figure the `CelDraw` list from `0x00503DC7`: the five name tokens (weapon class `bow`, `1ss`,
    `1hs`; armour tokens), the mode argument (1 for (e)), the palette argument (non-zero for (d)) and, for
    (e), the `DATA\GLOBAL\MONSTERS\RH\…` paths in the `compfile` records; then the pixels against d2rs.
+   *Recorded (2026-10-10, PC 1 today, Windows; `traces/pc1/charselect-dolls.tsv`: the five saves'
+   appearance bytes as 1.14d wrote them, and every component file the screen loaded):* (a) bow Amazon:
+   component bytes `ff ff ff ff ff ff 29 ff …` (LH = 0x29) and the screen loads `CHARS/AM/LH/AMLHSBWTNBOW`;
+   (b) two short swords, Barbarian: bytes 5, 6 = 0x11, 0x11 → `BA/RH/BARHSSDTN1HS`, `BA/LH/BALHSSDTN1SS`,
+   `BA/RA/BARALITTN1HS`, `BA/LA/BALALITTN1SS`, the other layers `…TNHTH`; (c) sword + buckler, Paladin:
+   bytes 5, 7 = 0x11, 0x4F → `PA/RH/PARHSSDTN1HS`, `PA/SH/PASHBUCTN1HS`, every other layer `…TN1HS`; (d)
+   unique quilted armour + unique cap, Sorceress: bytes `39 01 01 01 01 ff ff ff 02 02`, colours `53 e2 e2
+   e2 e2 ff ff ff e2 e2` → `SO/HD/SOHDCAPTNHTH`, `SO/S1/SOS1MEDTNHTH`, `SO/S2/SOS2MEDTNHTH`; (e) dead
+   hardcore Necromancer → `MONSTERS/RH/TR/RHTRLITTNHTH` only (red name). So r1–r3's names (token, layer,
+   armour, mode `TN`, per-layer weapon class) hold on 1.14d-written saves. A save built by d2s-tool alone
+   has all-0xFF appearance bytes and shows the class default figure: the header is written by 1.14d's own
+   save. Still PROVISIONAL (REC-2181): the palette argument of (d) and the pixels against d2rs (the saves
+   and the capture frames are in the private repo, `recordings/pc1-2026-10-10/dolls/`).
 
 ### F3.1 Character-create screen build (`0x00435580`)
 

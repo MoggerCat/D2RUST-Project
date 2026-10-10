@@ -49,11 +49,11 @@
 |   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1587–1849 |
 |   20. Player mode steps (`0x00463390`) and the local player's next action | 1850–2010 |
 | Constants & data dependencies | 2011–2023 |
-| Randomness | 2024–2039 |
-| Edge cases & original bugs | 2040–2064 |
-| Test vectors | 2065–2122 |
-| Provenance | 2123–2229 |
-| Open questions | 2230–2444 |
+| Randomness | 2024–2092 |
+| Edge cases & original bugs | 2093–2117 |
+| Test vectors | 2118–2175 |
+| Provenance | 2176–2283 |
+| Open questions | 2284–2500 |
 <!-- /index -->
 
 ## Summary
@@ -2082,7 +2082,9 @@ skill modes itself.
    PROVISIONAL (REC-2439): the per-site seed values of this table are
    derived from the code and two recordings that bracket them (frame
    start / end); settled by a hook recording of each site
-   (`audio/sound-table-2.md` §14.5). PROVISIONAL (REC-2440): d2rs steps
+   (`audio/sound-table-2.md` §14.5; the sound-tick row is recorded:
+   `S[16]` = {0xE4CA4C4E, 0x3A4FDE2B} at the first tick, PC 1
+   2026-10-10). PROVISIONAL (REC-2440): d2rs steps
    the cursor once per drawn frame for the first 5,000 ms of cursor
    idle time (because the original's 16 ms and 5,000 ms tests are on
    wall-clock time and a 25 Hz frame always passes the first); settled
@@ -2276,6 +2278,7 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `20261006-022633-packets.jsonl`.
 - 2026-10-09 (pc1-day3-c, REC-10 / REC-576 (4)): a scripted Kashya hire recorded with `record_packets.py` on Windows; §14 rule 3.
 - 2026-10-09 (pc1-day4, static asm): §20 from `0x00463390`–`0x0046370C` (mode record table `0x00711E00`, 20 × 12 bytes, read from the image with `re/scripts/rd.py`), `0x004611F0`, `0x006217C0`, `0x00623E00`, `0x004807C0`, `0x00460DE0`, `0x00460F10`, `0x00463260` (entries only); next action `0x00464600`, `0x004645B0`, `0x00480BA0`, `0x00481030`, loop `0x0044EFA0` (`0x0044F039`–`0x0044F167`); pending `0x00481600`, `0x00481400`, `0x004814A0`, `0x004815A0`, `0x004812E0`, `0x00480C80`, `0x0045C470`, `0x00460780`. §17 r7: `0x00461DC0` (`0x004620BE`–`0x00462118`), the +0x28 writers `0x004AE0A0` (callers `0x004664B0`, `0x004AEB71`, `0x004AF047`), `0x004B3CEB`, `0x00460730` (no reference: byte search of the image).
+- 2026-10-10 (PC 1 today, static asm / exports; REC-2439, REC-2440): Randomness rule 4 from `0x00460BF0` (`0x00460D12`–`0x00460D3E`), `0x0045D160`, `0x004654C0` (`0x0046569C`), `0x00472C20`, `0x004726F0`, `0x00472610`, `0x00472890`, `0x004547B0`, `0x0044C990` (`0x0044C999`), `0x0044EFA0` (`0x0044F280`–`0x0044F2B5`), `0x00473F50`, `0x00473E50`, `0x00473D00`, `0x004681C0`; values checked against the frame seeds of `traces/orig-cache/draws-town-arrival-ama` (ScnAma `-seed 1234`: 4 steps before the first frame, 12 in it) and the packets of `traces/orig-cache/packets-town-arrival-ama` (0x59 at (0, 0), 0x0B, 0x15 `15 00 01 00 00 00 09 13 84 10 01`).
 - 2026-10-10 (PC 1 today, static asm / exports): §5 r3 tail and r7 from `0x00465AA0` (`0x00465B0A`–`0x00465BE0`), `0x00465070` (jump table `0x004653D0`, byte map `0x004653E4`), `0x00534650`, `0x00650C20` → `0x00650AA0`, `0x006491B0`, `0x00648770`, `0x00648750`; the writers of a path's position found by xref of `0x0064FB90` (callers `0x00650590`, `0x006505E0`, `0x006507B0`, `0x00650840`, `0x00650910`, `0x00650AA0`, `0x00650CA0`) and the raw copy at `0x00465125` (REC-1385). §8 r4 walking note from `0x00461250` (jump table `0x004616A4`, byte map `0x004616E4`), `0x00648DC0`, `0x00648CF0` (REC-1250). §8 r7 bodies `0x004F2010`, `0x004F3870`, `0x004F39A0`, `0x004F3EB0`, `0x004F3F50`, `0x004F4000` with `0x00645510`, `0x00645680`, `0x004B11F0`, `0x004C52E0` (table dwords read from the image; REC-1641).
 
 ## Open questions

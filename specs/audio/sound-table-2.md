@@ -25,12 +25,12 @@
 |---|---|
 | Summary | 36–46 |
 | Rules | 47–48 |
-|   14. Other users of the local player's client unit seed | 49–146 |
-|   15. Options-menu sliders (`audio/sound-table.md` open question 9) | 147–209 |
-|   16. Sample cache, exact (refines `audio/sound-table.md` §10 r2–r6) | 210–260 |
-|   17. Start failures on a channel (refines `audio/sound-table.md` §7) | 261–280 |
-| Test vectors | 281–302 |
-| Provenance | 303–326 |
+|   14. Other users of the local player's client unit seed | 49–195 |
+|   15. Options-menu sliders (`audio/sound-table.md` open question 9) | 196–258 |
+|   16. Sample cache, exact (refines `audio/sound-table.md` §10 r2–r6) | 259–309 |
+|   17. Start failures on a channel (refines `audio/sound-table.md` §7) | 310–329 |
+| Test vectors | 330–352 |
+| Provenance | 353–385 |
 <!-- /index -->
 
 ## Summary
@@ -173,7 +173,7 @@ return `[0x007A6A70]`) and step its +0x20 (inline, or through
    |---|---|---|
    | `0x00460D12` (player init, before the step) | ESI = new unit, EBX = local player; seed of ESI | {1, 666}; after the step (`0x00460D3E`) `S[1]` |
    | `0x0045D160` entry and `0x0045D19E` (S→C 0x15) | ECX = message at entry, byte [ECX + 0xA] | flag 1; `S[1]` → `S[4]` |
-   | `0x00472610` entry | return address [ESP] | 4 calls before T 0: from `0x0047278A` (0x15), `0x0047278A` (act load), `0x004728AC`, `0x0047278A` (phase 1), at `S[1]`, `S[4]`, `S[7]`, `S[11]` |
+   | `0x00472610` entry | return address [ESP] | 4 calls before T 0, return addresses `0x0047277F` (0x15), `0x0047277F` (act load), `0x004728B1` (once per process), `0x0047277F` (phase 1), at `S[1]`, `S[4]`, `S[7]`, `S[11]` |
    | `0x0044C990` entry (frame) | `[0x007A2888]` (loading cel ≠ 0 = act load pending) | first frame: C 1, `S[4]` |
    | `0x00473E50` entry and its `ret` | phase `[0x007A8A24]`, countdown `[0x007A8A3C]`, length `[0x007A8A38]`, peak `[0x007A89C0]`, target `[0x007A89E0]` | first: 0, 0 at `S[10]`; at return phase 1, length 498, countdown 497, peak 255, `S[15]` |
    | `0x00473090` entry (particle spawn) | EAX = seed pointer | first at C 2 |
@@ -184,6 +184,14 @@ return `[0x007A6A70]`) and step its +0x20 (inline, or through
    The seed at each sound-tick entry and before each `roll` is the
    input a d2rs conformance run needs when frames are dropped or the
    cursor's wall-clock tests differ (§14.4).
+
+   *Recorded (2026-10-10, PC 1 today, Windows, sound on; the last row
+   only: a breakpoint at `0x00482C20`, `traces/pc1/client-seed-town-ama.tsv`):*
+   the seed at the first sound tick is {0xE4CA4C4E, 0x3A4FDE2B} =
+   `S[16]`, as derived; the next entries read {0xE55EB81F, 0x16F60A97}
+   (ticks 1–2), {0x740F9FB2, 0x35B12C70} (3–4), {0x8DF2DB76, 0x625E0E95}
+   (5): the seed moves only with drawn frames, not with every sound
+   tick. The other rows of the table stay PROVISIONAL (REC-2439).
 
 ### 15. Options-menu sliders (`audio/sound-table.md` open question 9)
 
@@ -324,6 +332,7 @@ owns how the three audio sliders turn into the §9 settings of
 | Input | Expected | Source |
 |---|---|---|
 | sound tick with no starts, ambience off, `soundchaosdebug` off | seed unchanged across `0x00482C20` | §14.1 r1 |
+| first sound tick (T 0) of the first game of a process, start in the Rogue Encampment, any game seed | seed {0xE4CA4C4E, 0x3A4FDE2B} (16 steps from {1, 666}); no draw in that tick | §14.5 r2 |
 | local player casts a skill with `cltdofunc` 34 | the sound seed steps during the receive of the S→C 0xA3 that starts it | §14.3 r2 |
 | item with overlay of type 6, a = 8 created on the client | 2 steps of the sound seed (`roll(frames)`, `roll(2048)`) | §14.3 table |
 | menu opened with Music Volume 50 / 100 / 0 / 37 / 4 | slider position 10 / 20 / 0 / 7 / 1 | §15 r2 |
@@ -351,6 +360,15 @@ read by hand in `tools/ghidra/disasm.py`); function-pointer tables read
 from the image with `pefile` (`0x00727BA8`, 130 entries). Client loop
 order `0x0044EFA0` (`0x0044F167`, `0x0044F19A`, `0x0044F28B`,
 `0x0044F2B5`). D2MOO not used.
+§14.3 placement and act-load rows, §14.5 (2026-10-10, PC 1 today, static
+asm / exports): `0x004654C0` (`0x0046569C` flag → `0x00472C20`), its
+callers `0x0045D199`, `0x00460FD8`, `0x004C8C4B`; `0x004726F0`,
+`0x00472610`, `0x00472890`, `0x004547B0`, `0x0044C990`, `0x00473F50`,
+`0x00473E50`, `0x00473D00`, `0x004681C0`, `0x004E40A0`, `0x00460D12`;
+recordings `traces/orig-cache/draws-town-arrival-ama` (frame seeds),
+`traces/orig-cache/packets-town-arrival-ama` (0x59 at (0, 0), 0x0B,
+0x15 flag 1), `traces/audio/win/audio-town-ambience-ama.orig-win.jsonl`
+(requests by T); `soundenviron`, `sounds` rows from patch_d2.
 §15: option records `0x00716218`, `0x00716768`, `0x00717758` and the
 handler table `0x006D6034`–`0x006D6090` read from the image with
 `pefile`; `tools/ghidra/disasm.py` of `0x0047CC90`, `0x0047CD00`,

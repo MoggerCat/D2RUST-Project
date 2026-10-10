@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–362 |
-|   12. Level backgrounds (pass 1) | 363–416 |
-|   13. Pass 8 (`0x00475B20`) | 417–425 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 426–451 |
-|   15. Sight test (`draw-order.md` §5 r3) | 452–498 |
-|   16. Line test (`0x0064E260`) | 499–528 |
-| Constants & data dependencies | 529–539 |
-| Randomness | 540–551 |
-| Edge cases & original bugs | 552–568 |
-| Test vectors | 569–590 |
-| Provenance | 591–623 |
-| Open questions | 624–699 |
+|   11. Weather (passes 4 and 9; water floors) | 68–391 |
+|   12. Level backgrounds (pass 1) | 392–445 |
+|   13. Pass 8 (`0x00475B20`) | 446–454 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 455–480 |
+|   15. Sight test (`draw-order.md` §5 r3) | 481–527 |
+|   16. Line test (`0x0064E260`) | 528–557 |
+| Constants & data dependencies | 558–568 |
+| Randomness | 569–580 |
+| Edge cases & original bugs | 581–597 |
+| Test vectors | 598–619 |
+| Provenance | 620–653 |
+| Open questions | 654–729 |
 <!-- /index -->
 
 ## Summary
@@ -649,6 +649,7 @@ header. Level lists from
 `patch_d2` `levels.txt`. Rain seen in run 2 (`20261006-141725`, Rogue
 Encampment): splash ripples on the river, drop lines.
 - 2026-10-09 (pc1-day3-c, REC-576 (6)): `[0x007BB390]` polled with no breakpoints on Windows (scratch probe on `autostart.py`'s hook-free debugger), §11.7 r2.
+- 2026-10-10 (PC 1 today, static asm / exports): §11.3 "Seed and the first cycle" from `0x00473F50` (seed argument unit + 0x20), `0x00473E50`, `0x00473D00`, `0x004726F0`, `0x00472610`, `0x00472890`, `0x004547B0`; values from the stream of `client/model.md` Randomness rule 4, checked against `traces/orig-cache/draws-town-arrival-ama` (frame seeds), `facts/client/weather/a1-town-rain-start.tsv` and the 1.14d request log of `traces/audio/win/` (rain request T 3).
 
 ## Open questions
 
