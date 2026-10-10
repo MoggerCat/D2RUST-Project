@@ -1,0 +1,10 @@
+cause	count	examples	likely_crate_spec	size
+draws: tick # draw row # (CelDraw) column op: ORIG CelDraw vs D#RS unit	19	ui-draws-automap-ama, ui-draws-belt-ama, ui-draws-character-ama	d2-client render/draws	M
+suite.py crashes on channel save (no ORIG_OUTPUTS entry)	5	save-corpse-ama, save-fresh-ama, save-items-ama	tools/scenario-diff/suite.py	S
+state: frame # monster #:# class #, field m: ORIG # vs D#RS #	2	sys-difficulty-hell, sys-difficulty-nightmare	d2-sim/d2-server	M
+items: item ## (hp#) frame: ORIG # vs D#RS #	1	items-drops-uni-02	d2-sim items	M
+items: item ## (mp#) frame: ORIG # vs D#RS #	1	items-drops-uni-03	d2-sim items	M
+items: item ## (gld) frame: ORIG # vs D#RS #	1	items-drops-uni-05	d2-sim items	M
+packets: frame # stream s#c ## id: ORIG # vs D#RS #e (id #x#)	1	rng-town-idle-sor	d2-server/d2-proto	M
+draws: tick # draw row # (CelDrawColor) column frame: ORIG # vs D#RS #	1	ui-draws-inv-char-ama	d2-client render/draws	M
+packets: frame # stream c#s ## bytes[#]: ORIG # vs D#RS # (id #x#)	1	walk-click-walk-town-ama	d2-server/d2-proto	M
