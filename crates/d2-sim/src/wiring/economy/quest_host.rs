@@ -660,8 +660,15 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>> {
         self.inner.party_members(player)
     }
+    /// Into the sim's own outbox, in send order with the tick's other
+    /// messages (the rest buffer leaves after it); a send deferred behind
+    /// an item reward keeps its queue.
     fn send(&mut self, player: UnitId, msg: &[u8]) {
-        self.inner.send(player, msg)
+        if self.inner.behind_reward().is_some() {
+            self.inner.send(player, msg)
+        } else {
+            self.inner.econ.hooks.x.send(player, msg)
+        }
     }
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]) {
         self.inner.send_text_list(player, npc, list)
