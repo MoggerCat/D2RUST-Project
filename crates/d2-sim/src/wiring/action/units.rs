@@ -367,9 +367,9 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     // maximum (the shrine set stamina to 2v on the list); the skill one's
     // skill refresh has nothing to refresh here (levels read the stat).
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, INFERNO};
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
         use crate::skills::use_::bodies::helpers::FLAG_40;
-        use crate::world::objects::shrines::STAMINA_REMOVE;
+        use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
             // PROVISIONAL (REC-731): "state off" read as the toggle with
@@ -390,6 +390,17 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 } else {
                     r.flags2 &= !flags2::DISGUISE;
                 }
+            }
+            // The default callback's anim refresh `0x00623F50`
+            // (`skills/bodies.md` §2.8; `0x0056E900`, 1.14d-read): the
+            // rate stats of the freed list (cold: 67-69) leave the
+            // unit's speed and velocity (gen-mon-295 frame 71).
+            if matches!(cb, DEFAULT | SKILL_REMOVE | STAMINA_REMOVE) {
+                let speed = self.rate_refresh(sim, u);
+                if let (Some(s), Some(r)) = (speed, sim.units.get_mut(u)) {
+                    r.anim.speed = s;
+                }
+                self.monster_mode_velocity(sim, u);
             }
             if cb == STAMINA_REMOVE {
                 sim.stats.clamp_to_max(self, u);
