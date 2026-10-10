@@ -739,7 +739,11 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.h.x.ai_set_target_override(unit, kind, guid);
     }
     fn chain_index(&self, class: i32) -> i32 {
-        self.h.x.ai_chain_index(class)
+        let monstats = &self.h.tables.combat.monstats;
+        if monstats.is_empty() {
+            return self.h.x.ai_chain_index(class);
+        }
+        crate::monsters::population::data::chain_position(monstats, class)
     }
     fn class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
         self.h.x.ai_class_for_level(game, room, class)

@@ -495,6 +495,13 @@ Each member of a monster family (`NextInClass` chain) fires the next
 missile row: fallenshaman1 `srvmissilea`, fallenshaman2 the row after,
 and so on.
 
+Recorded (items-drops-nor-04, 1.14d): fallenshaman5 (class 62, position
+4) fires missile class 26 (shafire5); firing class 22 (position read as 0)
+changed the missile's start offset and the hit frame, which moved the
+dropper's death and the unit seed. The production position is the fixups.md
+§8 pass-A value computed from the loaded monstats rows
+(`population::data::chain_position`), not a default.
+
 #### 4.10 srvdo 96 ZakarumHeal, Bestow `0x005CC840`
 
 1. R invalid → 0. T none → 0.

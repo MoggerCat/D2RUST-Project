@@ -1773,7 +1773,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     /// [`Pending::ai_chain_index`] (`0x006510C0`).
     fn chain_position(&self, class: i32) -> i32 {
-        self.x().ai_chain_index(class)
+        let monstats = &self.cv.v.h.tables.combat.monstats;
+        if monstats.is_empty() {
+            return self.x().ai_chain_index(class);
+        }
+        crate::monsters::population::data::chain_position(monstats, class)
     }
     /// [`Pending::ai_class_for_level`] (`0x0063EC70`).
     fn class_for_level(&self, room: Option<RoomId>, class: i32) -> i32 {

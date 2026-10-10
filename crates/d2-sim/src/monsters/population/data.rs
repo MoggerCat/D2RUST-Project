@@ -295,6 +295,33 @@ pub fn chain_lengths(t: &BinTable) -> Vec<u8> {
         .collect()
 }
 
+/// The chain position byte (+0x4B) of a class (`0x006510C0`; pass A of
+/// `data/fixups.md` §8, own implementation): the number of `NextInClass`
+/// steps from the row's `BaseId` to the row itself; 0 for an invalid class
+/// or a row missing from its own chain.
+pub fn chain_position(monstats: &[Monstats], class: i32) -> i32 {
+    let Ok(row) = usize::try_from(class) else {
+        return 0;
+    };
+    if row >= monstats.len() {
+        return 0;
+    }
+    let link = |v: u16| i32::from(v as i16);
+    let (mut cur, mut steps, mut pos) = (link(monstats[row].baseid), 0i32, 0i32);
+    while let Some(m) = usize::try_from(cur).ok().and_then(|c| monstats.get(c)) {
+        if cur == class {
+            pos = steps & 0xFF;
+        }
+        let next = link(m.nextinclass);
+        steps += 1;
+        if cur == next || steps > 255 || next < 0 {
+            break;
+        }
+        cur = next;
+    }
+    pos
+}
+
 /// The composit counts (+0x15…+0x24) and total (+0x25) of every
 /// `monstats2.bin` record.
 pub fn composits(t: &BinTable) -> Vec<([u8; 16], u8)> {
@@ -307,4 +334,35 @@ pub fn composits(t: &BinTable) -> Vec<([u8; 16], u8)> {
             (c, r.get(0x25).copied().unwrap_or(0))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod chain_position_tests {
+    use super::*;
+    use d2_data::tables::Record;
+
+    fn row(base: i16, next: i16) -> Monstats {
+        let mut r = vec![0u8; Monstats::SIZE];
+        r[2..4].copy_from_slice(&base.to_le_bytes());
+        r[4..6].copy_from_slice(&next.to_le_bytes());
+        Monstats::decode(&r)
+    }
+
+    /// `data/fixups.md` §8 test vectors: 3 rows, BaseId 0, Next 0→1, 1→2,
+    /// 2→−1 give +0x4B = 0, 1, 2; an invalid class gives 0.
+    #[test]
+    fn chain_position_counts_steps_from_base() {
+        let t = [row(0, 1), row(0, 2), row(0, -1)];
+        assert_eq!([0, 1, 2].map(|c| chain_position(&t, c)), [0, 1, 2]);
+        assert_eq!(chain_position(&t, 3), 0);
+        assert_eq!(chain_position(&t, -1), 0);
+    }
+
+    /// 2 rows, BaseId 0, Next 0→1, 1→0: the cycle runs 255 steps more
+    /// (+0x4B = 254, 255).
+    #[test]
+    fn chain_position_cycle_wraps() {
+        let t = [row(0, 1), row(0, 0)];
+        assert_eq!([0, 1].map(|c| chain_position(&t, c)), [254, 255]);
+    }
 }
