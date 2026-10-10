@@ -285,12 +285,20 @@ fn level_changes() {
     assert_eq!((r.state, r.status), (3, 0));
     assert!(r.guids.0.is_empty() && f.flags(P1).get(SLOT, 3));
     assert!(f.sent.is_empty());
-    // Old level 109, killed < 5, status 0: status 1 to all.
+    // Old level 109 at state 0: the tail needs state 2, nothing is sent.
     let (mut ctl, _) = control();
     let mut f = fake();
     lvl(&mut ctl, &mut f, 109, 110);
     let r = ctl.record(CHAIN).unwrap();
-    assert_eq!((r.state, r.status), (0, 1));
+    assert_eq!((r.state, r.status), (0, 0));
+    assert!(f.sent.is_empty());
+    // At state 2, killed < 5, status 0: status 1 to all, callback 2 gone.
+    let (mut ctl, _) = control();
+    let mut f = fake();
+    ctl.record_mut(CHAIN).unwrap().state = 2;
+    lvl(&mut ctl, &mut f, 109, 110);
+    let r = ctl.record(CHAIN).unwrap();
+    assert_eq!((r.state, r.status), (3, 1));
     assert!(!r.has_callback(event::NPC_DEACTIVATE));
 }
 
