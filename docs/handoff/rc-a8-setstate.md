@@ -1,5 +1,4 @@
 # rc-a8-setstate hand-back
-
 Cause 1 (0xA8 byte 9): EQUAL 2759 -> 2801 on its base. Cause 2 (right aura at join): EQUAL 3195 -> 3213 on integ-r23.
 gen-skill packets MATCH 91 -> 137 -> 178 of 210 (no regressions; gen-state-1? and gen-state-2? samples clean).
 
