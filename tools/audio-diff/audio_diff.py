@@ -426,8 +426,15 @@ def run_check(a):
                 str(c["seed"])] + r.poke_args() + r.send_args()
         if r.orig_input():
             args += ["--input", r.orig_input()]
-        r.sh([os.path.join(HERE, "capture.sh"), cap, str(c["seconds"]), "--"] + args,
-             timeout=c["seconds"] + 240, check=False)
+        if os.name == "nt":
+            # real Windows (PC 1): no Wine wrapper; the recorder runs the game itself, sound on
+            os.makedirs(cap, exist_ok=True)
+            r.sh([sys.executable, os.path.join(HERE, "record_audio.py"), "--seconds",
+                  str(c["seconds"]), "--out", os.path.join(cap, "audio.jsonl"), "--blob-dir",
+                  os.path.join(cap, "blobs")] + args, timeout=c["seconds"] + 240, check=False)
+        else:
+            r.sh([os.path.join(HERE, "capture.sh"), cap, str(c["seconds"]), "--"] + args,
+                 timeout=c["seconds"] + 240, check=False)
     dump = r.path("d2rs.audio.jsonl")
     if "d2rs" in sides and not (a.reuse and os.path.exists(dump)):
         exe = r.d2_client_bin()

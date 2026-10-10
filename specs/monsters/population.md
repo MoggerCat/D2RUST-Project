@@ -46,9 +46,9 @@
 | Constants & data dependencies | 1038–1108 |
 | Randomness | 1109–1152 |
 | Edge cases & original bugs | 1153–1193 |
-| Test vectors | 1194–1265 |
-| Provenance | 1266–1294 |
-| Open questions | 1295–1353 |
+| Test vectors | 1194–1266 |
+| Provenance | 1267–1295 |
+| Open questions | 1296–1354 |
 <!-- /index -->
 
 ## Summary
@@ -1197,6 +1197,7 @@ Synthetic (CI-safe, from the rules and `rng.md` §2–§3):
 
 | Input | Expected | Rule |
 |---|---|---|
+| level 106 (City of the Damned) entered by `warp 106` at frame 20, seed 1234 (`gen-lvl-106`) | frame 21: 8 rooms populated in this order (room x, y; counted records; tries): (5480, 4520; 1; 169), (5440, 4520; 5; 145), (5480, 4480; 1; 169), (5400, 4520; 1; 169), (5480, 4440; 5; 153), (5440, 4440; 3; 169), (5400, 4480; 11; 146), (5400, 4440; 13; 140); 48 coordinate records visited (each list ends with an all-zero record, skipped by index 0), 1260 tries = 1260 game-seed density draws at `0x0054ED96` | recorded 1.14d, PC 1 2026-10-10 (`traces/pc1/gen-lvl-106-coordlists.tsv`: every record's box, clipped rect, node flag, index) |
 | game seed {1, 666}, MonDen 520, 6 tries | lo' = 1791398751, 791599131, 671516612, 3064641593, 3217527747, 716489901; mod 100000 = 98751, 99131, 16612, 41593, 27747, 89901: no spawn | §3.2.3.1 |
 | game seed {12345, 666}, 6 tries | mod 100000 = 52887, 85264, 82871, 88125, 94168, 24880: no spawn | §3.2.3.1 |
 | game seed {429, 666}, 1 try | lo' = 4005600443, mod 100000 = 443 ≤ 520: hit | §3.2.3.1 |

@@ -1,0 +1,41 @@
+{
+ "channel": "rng",
+ "check": "a3-warp-l78-jungle-3-ama",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "160",
+  "--auto",
+  "ScnAm3",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "20 warp 78"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "db11a36a7f4fe5401d66aa467fad9ce6eb915681476252f835bd0292fdd51b2d",
+   "size": 3186617
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "0d66a4482e8196d87e04e38c7f7feaec5e5cdc665597ba39255f70c237afe781",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "7a4b4198964a2bc05e0a5e49a81080707335f061078dcfdfdcfb0acdac698f1a",
+  "save": "162feeda99dba3863626f49614928844687e4b2eb2618576ec9ea3f4e1addba6"
+ }
+}

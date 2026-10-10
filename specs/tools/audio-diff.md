@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 252–263 |
 | Test vectors | 264–272 |
 | Provenance | 273–281 |
-| Open questions | 282–306 |
+| Open questions | 282–320 |
 <!-- /index -->
 
 ## Summary
@@ -300,6 +300,20 @@ for this spec.
    compare` of this file against the cloud's `orig.voices.jsonl` of the
    same check (not in the repo) to list every difference; until then
    treat stream-voice start ticks as implementation-dependent.
+   Second Windows result (2026-10-10, PC 1 today; `audio_diff.py run`
+   now runs `record_audio.py` directly on Windows, summaries in
+   `traces/audio/win/*.summary-win.json`): all four `traces/audio`
+   checks ran against d2rs. Sound effects pair by samples on Windows as
+   under Wine (frost nova: 10 of 10 1.14d voices paired, `coldcast.wav`
+   T 18 / 58, `novaice.wav` T 25 / 65). The **music streams do not
+   pair**: d2rs's `town1.wav` (T 0) and `wild.wav` (T 77) find no 1.14d
+   voice with those samples in any of the four checks, where the Wine
+   capture held `town1.wav` byte for byte. So the music voice's captured
+   bytes or its start differ between Windows DirectSound and Wine
+   (REC-1363 stays open for music; settled for effects). Verdicts: all
+   four DIVERGED (town ambience and walk: footstep variant, tick,
+   volume and pan differences from T 27–41 on; monster hit: variant
+   picks from T 75).
 2. Stream voices (music) start on the stream thread: their `Play` `T` may
    lag the main thread's by one; the start tick uses the main-thread
    `SetCurrentPosition` (REC-1360).

@@ -40,16 +40,16 @@
 |   7. Nearest free point (`0x0064DEA0`) | 433–497 |
 |   8. Coarse free-box search (`0x0064E840`) | 498–530 |
 |   9. Floor drop placement (`0x00555DA0`) | 531–553 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 554–620 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 621–669 |
-|   12. Warp tiles and warp arrival | 670–730 |
-|   13. Where a joining character stands at tick 0 | 731–792 |
-| Constants & data dependencies | 793–811 |
-| Randomness | 812–821 |
-| Edge cases & original bugs | 822–857 |
-| Test vectors | 858–895 |
-| Provenance | 896–936 |
-| Open questions | 937–1020 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 554–632 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 633–681 |
+|   12. Warp tiles and warp arrival | 682–742 |
+|   13. Where a joining character stands at tick 0 | 743–804 |
+| Constants & data dependencies | 805–823 |
+| Randomness | 824–833 |
+| Edge cases & original bugs | 834–869 |
+| Test vectors | 870–907 |
+| Provenance | 908–948 |
+| Open questions | 949–1032 |
 <!-- /index -->
 
 ## Summary
@@ -589,6 +589,18 @@ alt; `ret 0x14`; EAX 1 / 0.
    (rule 7); timer event 14 at frame + 50 with callback
    `0x00554570` (`sim/units.md` §6); pets follow (`0x005754B0`, the
    pet/mercenary spec); result 1.
+   The callback `0x00554570(game, unit)` (1.14d-confirmed, asm
+   `0x00554570`–`0x005545BA`, read 2026-10-10, PC 1 today): unit a
+   player with player data → player data +0x148 := 0, +0x14C := 0, then
+   every pending type-14 event of the unit with this callback is
+   cancelled (`0x00540EA0(game, unit, 14, 0x00554570)`), result 1; else
+   0. So the "last placed point" is (x, y) for 50 frames after a
+   placement (a later placement inside the window writes a new point
+   and adds its own event; the first event to fire clears the point and
+   drops the others) and (0, 0) after it. Its reader is pet follow step 4 (`monsters/ai-bodies-6.md`
+   §2, `0x005E47C8`): a pet keeps close (k 4) only inside that window.
+   Recorded: `gen-skill-dru-222`, warp at frame 4, the vine's frame-67
+   think sees (0, 0) (`monsters/ai-bodies-7.md` §20).
 7. Position history (player data +0xA0 next index u8, +0xA4 time of the
    last write (`GetTickCount`), +0xA8 + 8·i: 20 × {u32 x, u32 y}, a
    ring; `0x006221A0` gives the player data):

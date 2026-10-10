@@ -64,6 +64,8 @@ pub struct TableReport {
     pub explained: BTreeMap<&'static str, (usize, usize)>,
     /// Unexplained differences by field label.
     pub mismatches: BTreeMap<String, FieldDiff>,
+    /// Every differing record with its field labels (`~` prefix: explained).
+    pub record_diffs: BTreeMap<usize, Vec<String>>,
 }
 
 impl TableReport {
@@ -175,6 +177,7 @@ pub fn compare_sets(
             note: None,
             explained: BTreeMap::new(),
             mismatches: BTreeMap::new(),
+            record_diffs: BTreeMap::new(),
         };
         let bin = match bin {
             Some(b) => Some(b),
@@ -273,6 +276,11 @@ fn compare_records(def: &TableDef, compiled: &Compiled, bin: &BinTable, report: 
                     None
                 };
             if let Some(reason) = explained {
+                report
+                    .record_diffs
+                    .entry(r)
+                    .or_default()
+                    .push(format!("~{reason}"));
                 let e = report.explained.entry(reason).or_default();
                 e.0 += 1;
                 if !seen_explained.contains(&reason) {
@@ -292,6 +300,10 @@ fn compare_records(def: &TableDef, compiled: &Compiled, bin: &BinTable, report: 
                     def.fields[fields[0]].footprint(),
                 ),
             };
+            let rd = report.record_diffs.entry(r).or_default();
+            if !rd.contains(&label) {
+                rd.push(label.clone());
+            }
             let d = report.mismatches.entry(label.clone()).or_default();
             d.bytes += 1;
             if !seen_fields.contains(&label) {

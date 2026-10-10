@@ -3,6 +3,7 @@
 //!
 //! Usage (run with --release):
 //!   data-tool tables [game_dir]
+//!   data-tool cov-records [game_dir]
 //!   data-tool gen-tables
 //!   data-tool gen-proto
 //!   data-tool links [game_dir]
@@ -75,6 +76,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("tables") if args.len() <= 2 => tables(&game_dir(args.get(1))?),
+        Some("cov-records") if args.len() <= 2 => cov_records(&game_dir(args.get(1))?),
         Some("gen-tables") if args.len() == 1 => gen_tables(),
         Some("gen-proto") if args.len() == 1 => gen_proto(),
         Some("links") if args.len() <= 2 => links(&game_dir(args.get(1))?),
@@ -136,6 +138,27 @@ fn excel_dir(out: &Path, game: &Path) -> Result<()> {
         names.len(),
         out.display()
     );
+    Ok(())
+}
+
+/// `cov-records`: one line per runtime or by-product table: `<table>\t<records>\t<n differing>` and
+/// one `diff\t<table>\t<record>\t<field labels, '|'-joined; '~' = explained>` line per
+/// differing record (compiled text vs shipped `.bin`; `tools/coord/cov_tables.py`).
+fn cov_records(dir: &Path) -> Result<()> {
+    let set = ArchiveSet::open_dir(dir).with_context(|| format!("opening {}", dir.display()))?;
+    let report = crosscheck::run(&set).context("cross-check")?;
+    for t in report.tables.iter().filter(|t| t.role != Role::ClientOnly) {
+        println!(
+            "table\t{}\t{}\t{}\t{}",
+            t.name,
+            t.records_txt,
+            t.records_bin.map_or(-1, |n| n as i64),
+            t.record_diffs.len()
+        );
+        for (r, f) in &t.record_diffs {
+            println!("diff\t{}\t{}\t{}", t.name, r, f.join("|"));
+        }
+    }
     Ok(())
 }
 

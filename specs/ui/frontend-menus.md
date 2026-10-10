@@ -33,21 +33,21 @@
 |   F2.7 Other buttons | 472–496 |
 |   F2.8 Difficulty box (`0x00439780`) | 497–516 |
 |   F2.9 Control records and art | 517–553 |
-|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–594 |
-|   F3.1 Character-create screen build (`0x00435580`) | 595–630 |
-|   F3.2 Class line-up (positions, creation order) | 631–646 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 647–707 |
-|   F3.4 Name entry (edit box, descriptor 204) | 708–722 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 723–746 |
-|   F3.6 OK / Cancel behaviour and the new save | 747–781 |
-|   F3.7 Sounds (deferred) | 782–786 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 787–817 |
-| Constants & data dependencies | 818–854 |
-| Randomness | 855–858 |
-| Edge cases & original bugs | 859–890 |
-| Test vectors | 891–924 |
-| Provenance | 925–970 |
-| Open questions | 971–1015 |
+|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–681 |
+|   F3.1 Character-create screen build (`0x00435580`) | 682–717 |
+|   F3.2 Class line-up (positions, creation order) | 718–733 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 734–794 |
+|   F3.4 Name entry (edit box, descriptor 204) | 795–809 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 810–833 |
+|   F3.6 OK / Cancel behaviour and the new save | 834–868 |
+|   F3.7 Sounds (deferred) | 869–873 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 874–904 |
+| Constants & data dependencies | 905–941 |
+| Randomness | 942–945 |
+| Edge cases & original bugs | 946–977 |
+| Test vectors | 978–1011 |
+| Provenance | 1012–1057 |
+| Open questions | 1058–1102 |
 <!-- /index -->
 
 ## Summary
@@ -560,23 +560,53 @@ list is scanned. It is not a unit: no inventory, no light, no direction other th
    weapon class from `0x00504AF0`, 0 = build fails (caller retries class' 7 / mode 5, §F2.2 r6). Class' ≥ 25,
    mode ≥ 20 or weapon class ≥ 15 → (7, 5, 1) (`0x00504040`); a COF that does not load → (7, 5, 1) again.
    Stored colour per component = save colour − 1, 0xFF stays (a save colour of 0 therefore draws no map).
-   Component byte 0, 0xFF or ≥ 0xFF → armour class `lit`; else the token table's code (`d2s-appearance.md`
-   §1: the front end rebuilds the same table in `0x00506000`; slot placement taken as equal, PROVISIONAL
-   REC-2181). The slot fix-ups of `0x00504D60` (armour of the wrong type in a body slot) are not implemented:
-   PROVISIONAL REC-2181 (saves with equipped items: unverified; the capture saves are all unequipped).
-2. Weapon class (`0x00504AF0`): from the right (5) and left (6) hand tokens: a hit class per hand (item `wclass`
-   column; the `2handedwclass` column when both hands hold items, or when the shield hand (7) is empty and the
-   column differs); `ht1` / `ht2` (13 / 14) only for class' 6; an armour-type item gives the static 1.00 table's
-   class (taken as none, PROVISIONAL REC-2181). Pair rule: none/none → `hth`; right none → left; bow/bow and
-   xbow/xbow keep; staff (8) as right keeps 8; left none → right; `1hs`+`1hs` → `1ss`… (full table in
-   `ui::front_end::doll::combine`). Numbers index `hth 1ht 2ht 1hs 2hs bow xbw stf 1js 1jt 1ss 1st ht1 ht2`.
-3. Files (`0x00503740`): COF `data\global\chars\<T>\cof\<T><M><W>.cof` (T = class token `AM SO NE PA BA DZ AI RO RH RH`,
-   M = mode token, W = weapon class name). Direction 0 → file direction `file_direction(cof directions, 0)`.
-   Per COF slot (`cof.component_at(0, frame, slot)`): component DCC
-   `data\global\chars\<T>\<C>\<T><C><armour><M><layer W>.dcc` (W from the COF layer record of that component;
-   the doll's own class when the layer is missing). Cel = frame `frame` of that direction, placed as any DCC cel
-   (`render/sprite-placement.md` §8) at the anchor. Draw mode 5; mode 1 (alpha) for a dead hardcore character
-   (`0x00503BA0`: draw flags 0x20 and 0x10). Colour maps: stored colour c → file by `c >> 5` (0 and 8:
+   Order inside the build: weapon class first (r2, from the bytes as saved), then per component byte b
+   (slot s = 0…15): b = 0, b ≥ 255 (the table count `[0x0087D834]`) or 0xFF → token 0 (armour class `lit`),
+   type 1; else the slot fix-up (r7) rewrites b **in the entry** and the token is entry b's code of the front
+   end's token table. That table (`0x00506000`, built once, flag `[0x0087E85C]`; 255 × 12 bytes at
+   `0x0087D838`: code, weapon class number, item type; two-handed class numbers at `0x0087E430`) is filled by
+   the rule of `d2s-appearance.md` §1 with the reference table `0x0072E1E0` (r7) in place of `0x00744CA8`;
+   the two reference tables hold the same (code, type) in all 283 entries (`facts/ui/doll-static-tokens.tsv`,
+   tool check), so the slot placement equals the in-game one (1.14d-confirmed, read 2026-10-10, PC 1 today;
+   settles that part of REC-2181). An entry's class numbers come from the record that placed it: `wclass`
+   (+0xC0) and `2handedwclass` (+0xC4) looked up in the 13 name → id pairs at `0x0072EF68`, id → number by
+   `0x0072EF30` (`facts/ui/doll-names.tsv`); no name → 1 (`hth`). PROVISIONAL REC-2181 (what is left): no
+   capture of a save with equipped items; settled by the capture of §F2.10 r8.
+2. Weapon class (`0x00504AF0(class')`, components in EBX): r = byte 5 (RH), l = byte 6 (LH); `both` = neither
+   is 0xFF. Right number R: 0 when r = 0xFF; else the two-handed number when `both`, or when l and byte 7 (SH)
+   are 0xFF and the two numbers of entry r differ; else the one-handed number. Left number L: 0 when l = 0xFF,
+   else two-handed when `both`, else one-handed. For either hand: when the number is 13 / 14 (`ht1` / `ht2`)
+   and class' ≠ 6, or the entry's type is-a `armo` (50, `0x00504A20` over the itemtypes `equiv1` / `equiv2`),
+   the number is replaced by the hit class of the **reference** table's entry of the same index (r7, +4;
+   that table is in 1.00 numbering, so the value is unrelated to the item); a 13 / 14 that is still there with
+   class' ≠ 6 becomes 0. A 1.14d-written save never takes the replacement (hands hold weapon tokens, the
+   shield is byte 7, claws are Assassin-only: `d2s-appearance.md` §4). Pair rule, first match:
+   R = 0 → L, or 1 (`hth`) when L = 0 too; R = L ∈ {6 `bow`, 7 `xbw`} → R; R = 8 (`stf`) → 8; L = 0 → R;
+   (4, 4) → 11 `1ss`; (4, 2) → 9 `1js`; (2, 4) → 12 `1st`; (2, 2) → 10 `1jt`; (4, 5), (5, 4), (5, 5), (2, 5),
+   (5, 2) → 11; (13, 13) and (14, 14) → 13 `ht1`; (1, 1) → 1; anything else → 0 (the build fails, r1).
+   Numbers index `hth 1ht 2ht 1hs 2hs bow xbw stf 1js 1jt 1ss 1st ht1 ht2` from 1 (`0x0072E15C`).
+3. Files. COF (`0x005034B0`): `<root>\<T>\COF\<T><M><W>.COF`, root `DATA\GLOBAL\CHARS` for class' ≤ 6 and
+   `DATA\GLOBAL\MONSTERS` for class' ≥ 7 (the fallback figure `RO` and the dead figures `RH`); T = class token
+   (`0x0072E050`: `AM SO NE PA BA DZ AI RO RH RH`…, 25), M = mode token (`0x0072E0B8`, 20), W = weapon class
+   name. The object keeps the COF's frame count (byte +1), direction count (byte +2) and rate (+0x18)
+   (`0x005042F0`). Per draw, for each component c of the COF's order row of (direction 0, frame)
+   (`0x005032B0`), the cel context (`0x00503740`) is: unit type 0 (class' ≤ 6) or 1 (≥ 7), class', mode,
+   class token, component token (`0x0072E108`), armour token (r1; `lit` when 0), mode token, weapon class
+   name = the 3 characters of the COF layer record of c (+5 from its component byte; `0x005031D0`), flag 2.
+   D2CMP (`0x005FE610`) makes the name `<T><C><armour><M><W>` and the path `<root>\<T>\<C>\<name>.dcc`, root
+   `DATA\GLOBAL\CHARS` for unit type 0, `DATA\GLOBAL\MONSTERS` for type 1. A component whose file does not
+   exist draws nothing. Direction: the object's direction byte (+4, always 0) through the table `0x006DCA60`
+   (row = lowest set bit of the COF direction count + 1, entry d = d × 64 / count) = 64-direction 0, then the
+   file direction as for a unit (`render/unit-composite.md` §6). Recorded (1.14d native, `record_frames`
+   front-end capture `game/captures/day4/fe3.jsonl`, 5 sorceress saves, read 2026-10-10): every figure draws,
+   at one anchor, `SORAlitTNhth`, `SOLGlitTNhth`, `SOLAlitTNhth`, `SOTRlitTNhth`, `SOHDlitTNhth`,
+   `SOS1litTNhth`, `SOS2litTNhth`, then `SOSHlitTNhth` (no such file: no cel) through `CelDraw` from
+   `0x00503DC7`, light −1, mode 5, palette 0. Cel = frame `frame` of that direction, placed as any DCC cel
+   (`render/sprite-placement.md` §8) at the anchor. Draw mode 5; mode 1 (alpha) when the object's flags hold
+   both 0x10 and 0x20, or 0x2000 (`0x00503BA0`). The list layout (`0x004380F0`, classic `0x00438560`)
+   **replaces** the flags on every layout pass: 1, + 0x10 when status & 8 (dead), + 0x20 when status & 4
+   (hardcore); 0 (not drawn) for an entry outside the 8 visible slots; so mode 1 is the dead hardcore figure.
+   Colour maps (`0x005038D0`, none when the stored colour is 0xFF): stored colour c → file by `c >> 5` (0 and 8:
    `invgreybrown`, 1 `grey`, 2 `grey2`, 3 and 4: no map, 5 `greybrown`, 6 `invgrey`, 7 `invgrey2`; > 8: none),
    map `c & 0x1F` (< 21) of `Data\Global\Items\Palette\<name>.dat` (`0x00505470`, `shading.md` §6 r4).
 4. Animation: frame f = phase >> 8, phase starts at 0 when the screen is built; each draw adds the COF rate
@@ -585,12 +615,69 @@ list is scanned. It is not a unit: no inventory, no light, no direction other th
    frame): TN sorceress 16 frames, rate 0x50 → 3 frames per 0.4 s = one add per 40 ms tick. Check
    `ui-charselect-dolls` (scenario-diff.md §3 r16): all 12 timed shots match a d2rs frame, so the rate and the loop
    are settled (REC-2182 settled for them); only the build instant relative to the capture stays PROVISIONAL
-   REC-2182 (not tick-anchored, input is wall-clock).
-5. Placement: anchor (column x + 30, row bottom − 13) (§F2.4 r3). The 1.14d capture draws every figure one row
-   above `anchor.y + y_min` (best match of offsets −4…4, all three slots): settled REC-2183 (check `ui-charselect-dolls`: offset 0 differs 0 px, ±1 row 430+ px, ±2 650+, all slots), d2rs applies
-   −1 in the doll draw (`DOLL_DY`); cause not read.
-6. Shadows: `0x00503A50` calls the D2GFX shadow vtable entry (+0x90) for each slot before the cels; d2rs draws
-   none (REC-2184 settled by the capture: the feet band is not darker than the rest, 1.14d minus d2rs +0.4..+1.3 on a channel sum against -0.1..+0.2 elsewhere, so the 1.14d background shows no shadow either).
+   REC-2182 (not tick-anchored, input is wall-clock). The add is one per call of `0x00503BA0`, i.e. one per
+   front-end frame (the sprite-object pass `0x004F9870`: all shadow passes, then all figures, then the text /
+   hover passes `0x00505810`, `0x00505A80`). The two overlay cels of `0x00503BA0` (flag 0x400: cel
+   `[0x0087E850]` at (x + 5, y − 5) before the figure; flag 0x200: cel `[0x0087E844]` at (x, y + 10) after
+   it; both mode 3, frames stepped by a 66 ms `GetTickCount` timer) and the badge cel (object +0xBC, at
+   (x − 20, y − 60)) are never set by the single-player list (flags as r3).
+5. Placement: anchor (column x + 30, row bottom − 13) (§F2.4 r3; `0x004380F0` stores `[0x007799FC]` − 13 and
+   x + 30 in the object, +0x18 / +0x14), passed unchanged to `CelDraw` (`0x00503DB5`); the cel's offsets are
+   the DCC frame's (`render/sprite-placement.md` §3), so the figure covers rows `anchor.y + y_min …
+   anchor.y + y_max`: **no row shift**. 1.14d-confirmed (`0x00503BA0`, `0x006C84B0`, `0x006014C0`, read
+   2026-10-10, PC 1 today) and recorded on native 1.14d (`game/captures/day4/fe3` and `fe4`, the exact index
+   frame: `CelDraw` at (67, 165), (339, 165), (67, 258), (339, 258), (67, 351); the pixels common to the five
+   figures span rows anchor.y − 65 … anchor.y + 2 and end at column anchor.x + 12, exactly the `HD` cel's top
+   (yoff −44, h 22), the `LG` cel's bottom (yoff 2) and the `LA` cel's right edge (xoff 4, w 9)). REC-2183
+   settled: the one-row shift measured under Wine belongs to the X capture of `tools/frontend-sbs` (crop
+   origin (112, 98)), not to the game; d2rs's `DOLL_DY` = −1 is wrong. PROVISIONAL REC-2432: the X capture is
+   one row low (crop origin y 97) (because the native frame has the figure at dy 0 and row 0 black, the
+   backdrop on rows 1–599); settled by one 1.14d X shot of character select: crop row 0 black and row 599
+   lit → origin right and the shift is Wine's; row 0 lit → origin 97.
+6. Shadows: `0x00503A50` runs only when the object's flags hold 1 and 4. The build sets 1, 2 and 4, but the
+   list layout replaces the flags before the first draw (r3: 1, 0x10, 0x20 only), so the character-select
+   figures have **no shadow pass** (1.14d-confirmed `0x00503A50`, `0x004380F0`, `0x00505360`, read 2026-10-10,
+   PC 1 today; recorded: the `fe3` / `fe4` frames hold no `CelDrawShadow` call; REC-2184 settled, d2rs equal).
+   For a sprite object that keeps flag 4 the pass is: at least one component of the frame must have a cel
+   (`0x00503970`); then for each component of the order row, the same cel context as r3 goes to
+   `CelDrawShadow` (`0x004F6540` → driver slot +0x90, GDI `0x006C87E0`, DirectDraw `0x005122E0`) at
+   (x − 2, y): the unit shadow draw of `render/blend-modes.md` §5.
+7. Reference table and slot fix-up. `0x0072E1E0`: 283 entries (`[0x0072EF24]`) of 12 bytes: code, hit class
+   (a weapon class number, 0 for armour), item type; the 1.00 item order (`lit med hvy` at 1–3, helms from 4,
+   body armour from 11, shields from 27, gloves / boots / belts 31–39, weapons from 43, expansion codes to
+   282). Dump: `facts/ui/doll-static-tokens.tsv` (`py tools/facts/doll_tables.py`). Uses: `0x00506000` reads
+   the type (+8) for the slot search (r1); `0x00504AF0` reads the hit class (+4) (r2); `0x00504D60` reads code
+   and type. Fix-up `0x00504D60` (slot s in EBX, byte pointer in ESI), with ref = reference entry of the
+   current b, `find(code)` = the lowest token-table index 0…254 holding that code:
+   - s ∈ {1, 2, 3, 4} (TR, LG, RA, LA) and b > 3: three passes in order, for `tors` (3), `glov` (16), `boot`
+     (15): when ref's type is-a it, b := `find(ref code)`, or b mod 3 + 1 when not found. Then: ref's type
+     is-a `shld` (51) and `find` succeeds → b := that index; **otherwise b := b mod 3 + 1**. So a body-slot
+     byte above 3 ends as 1…3 (`lit med hvy`) unless it leads to a shield code.
+   - s = 0 (HD) and the token-table entry b's type is not is-a `helm` (37): ref's type is-a `helm` and `find`
+     succeeds → b := that index; else b := 1.
+   - other slots: unchanged.
+   A 1.14d-written save holds 1…3 or 0xFF in bytes 1–4 and a helm's index in byte 0
+   (`d2s-appearance.md` §4, §5), so the fix-up changes nothing there; it only remaps bytes written in the
+   1.00 numbering. 1.14d-confirmed (`0x00504D60`, `0x005066C0`, read 2026-10-10, PC 1 today).
+8. Capture that confirms r1–r3 on equipped saves (REC-2181): saves wearing (a) a bow, (b) two one-handed
+   swords (Barbarian), (c) sword + shield, (d) a coloured (magic / set) body armour and helm, (e) a dead
+   hardcore character; `record_frames` front-end capture of character select (as `game/captures/day4/fe3`).
+   Compare per figure the `CelDraw` list from `0x00503DC7`: the five name tokens (weapon class `bow`, `1ss`,
+   `1hs`; armour tokens), the mode argument (1 for (e)), the palette argument (non-zero for (d)) and, for
+   (e), the `DATA\GLOBAL\MONSTERS\RH\…` paths in the `compfile` records; then the pixels against d2rs.
+   *Recorded (2026-10-10, PC 1 today, Windows; `traces/pc1/charselect-dolls.tsv`: the five saves'
+   appearance bytes as 1.14d wrote them, and every component file the screen loaded):* (a) bow Amazon:
+   component bytes `ff ff ff ff ff ff 29 ff …` (LH = 0x29) and the screen loads `CHARS/AM/LH/AMLHSBWTNBOW`;
+   (b) two short swords, Barbarian: bytes 5, 6 = 0x11, 0x11 → `BA/RH/BARHSSDTN1HS`, `BA/LH/BALHSSDTN1SS`,
+   `BA/RA/BARALITTN1HS`, `BA/LA/BALALITTN1SS`, the other layers `…TNHTH`; (c) sword + buckler, Paladin:
+   bytes 5, 7 = 0x11, 0x4F → `PA/RH/PARHSSDTN1HS`, `PA/SH/PASHBUCTN1HS`, every other layer `…TN1HS`; (d)
+   unique quilted armour + unique cap, Sorceress: bytes `39 01 01 01 01 ff ff ff 02 02`, colours `53 e2 e2
+   e2 e2 ff ff ff e2 e2` → `SO/HD/SOHDCAPTNHTH`, `SO/S1/SOS1MEDTNHTH`, `SO/S2/SOS2MEDTNHTH`; (e) dead
+   hardcore Necromancer → `MONSTERS/RH/TR/RHTRLITTNHTH` only (red name). So r1–r3's names (token, layer,
+   armour, mode `TN`, per-layer weapon class) hold on 1.14d-written saves. A save built by d2s-tool alone
+   has all-0xFF appearance bytes and shows the class default figure: the header is written by 1.14d's own
+   save. Still PROVISIONAL (REC-2181): the palette argument of (d) and the pixels against d2rs (the saves
+   and the capture frames are in the private repo, `recordings/pc1-2026-10-10/dolls/`).
 
 ### F3.1 Character-create screen build (`0x00435580`)
 

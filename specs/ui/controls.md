@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–693 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 694–735 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 736–761 |
-| Constants & data dependencies | 762–768 |
-| Randomness | 769–772 |
-| Edge cases & original bugs | 773–785 |
-| Test vectors | 786–813 |
-| Provenance | 814–832 |
-| Open questions | 833–880 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–720 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 721–762 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 763–788 |
+| Constants & data dependencies | 789–795 |
+| Randomness | 796–799 |
+| Edge cases & original bugs | 800–812 |
+| Test vectors | 813–840 |
+| Provenance | 841–859 |
+| Open questions | 860–907 |
 <!-- /index -->
 
 ## Summary
@@ -510,12 +510,39 @@ check reads it.
       Measured (q-fix-skills-4cls, 1.14d under Wine 2026-10-09,
       `nec-bloodgolem.check` / `nec-firegolem.check`): a level-20 Blood
       Golem (cost (25 + 4·19) << 8 = 25856) or Fire Golem with 21248
-      mana sends nothing at the click. PROVISIONAL: d2rs runs tests 1–4,
-      6 (mana, `skills/levels.md` §4) and 7 (shape, `skills/use.md` §2)
-      of the use state on the model and reads tests 5, 8–10 and the code 8 delay as passing
-      (because the model holds no client cooldown or item-skill facts
-      yet); settled by REC-1640 (a 1.14d check casting a skill on
-      cooldown and one without its item).
+      mana sends nothing at the click.
+      1.14d-confirmed (`0x004D9FC0`–`0x004D9FF1`, `0x00647960`,
+      `0x0044CE40` / `0x0044CE50` and their callers, read 2026-10-10,
+      PC 1 today; settles REC-1640): `0x004D9FC0` (ECX unit, EDX
+      entry) calls the shared `0x00647960` itself, so the client runs
+      the same ten tests in the same order as the server
+      (`skills/use.md` §2 table: 5 the skill item test `0x00647640`
+      then the item type `0x00643F80` → 2; 8 the start stat
+      `0x006440F0`: a player whose mana (stat 8) is below `startmana`
+      (row +0x184) << 8 and who lacks state 12 → 1; 9 charges
+      `0x00647840` → 2; 10 the cooldown `0x006478F0`: a player with
+      state 121 and a `delay` calc (row +0x190) > 0 at the entry's
+      level → 8), all on the client unit's own stats, states,
+      inventory and skill entry. Only a result of 0 goes on: the unit
+      is the local player (`0x00463DE0`) and the client update counter
+      C (`0x0044DA90`, `[0x007A0498]`) is below the lock (`0x0044CE50`,
+      `[0x007A04FC]`, unsigned) → 8. The lock has three writers and no
+      other reference: the game start block `0x0044E322` (:= 0); the
+      client do tail `0x004C68DA` (`client/msg-skills.md` §11 r5: the
+      local player's skill with a `delay` calc d > 0 → C + min(d, 12),
+      through `0x0044CE40`); and setfunc 19 / remfunc 12 `0x004D97E0`
+      (:= 0, `client/stat-lists.md` §3 r6.5–r6.6, r6.8). So the client's
+      own lock lasts at most 12 client updates and covers the gap until
+      the server's state 121 arrives; from then on test 10 refuses.
+      PROVISIONAL (REC-2417): d2rs (`bridge::use_state::use_state`) runs
+      tests 1–4, 6 (mana, `skills/levels.md` §4) and 7 (shape) on the
+      model and reads tests 5, 8–10 and the lock as passing (because
+      the model's click path holds no lock counter and does not yet
+      read the item, start-stat and charge facts for it); settled by
+      build-queue proposal `q-fix-pc1today-use-state-tests` and a 1.14d
+      check that clicks a `delay` skill twice within 12 updates and
+      one without its item (no second C→S, refusal sound of state 8 /
+      2).
    2. **Interact** `0x00461DC0(T, g)`, by U's type (jump table
       `0x004621AC`: 0 → `0x00461F61`, 1 → `0x00462030`, 2 →
       `0x00461DF2`, 3 → `0x00462057`, 4 → `0x00461EE5`, 5 →
