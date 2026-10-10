@@ -330,7 +330,16 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     }
     fn create_state_list(&mut self, u: UnitId, state: u16, owner: UnitId, expiry: i32) {
         let owner = self.game.lists.unit(owner).map(|e| (e.ty, e.guid));
-        self.v.create_state_list(u, state, owner, expiry);
+        let l = self.v.create_state_list(u, state, owner, expiry);
+        // Cold's own remove callback (`0x0057AD80`, damage.md §5.6).
+        if let (Some(l), 11) = (l, state) {
+            self.v.stats.set_remove_callback(
+                l,
+                Some(crate::stats::lists::RemoveCallback(
+                    crate::skills::use_::bodies::callback::COLD,
+                )),
+            );
+        }
     }
     fn set_state_list_stat(&mut self, u: UnitId, state: u16, stat: u16, value: i32) {
         if let Some(l) = self.v.state_list(u, state) {
