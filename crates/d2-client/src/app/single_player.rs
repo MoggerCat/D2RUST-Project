@@ -279,6 +279,11 @@ pub fn create_request_for(character: &Character) -> CreateGame {
             save.header.name_bytes(),
             save.header.status & d2_formats::d2s::status::EXPANSION != 0,
         ),
+        Character::Refused(r) => (
+            0,
+            &r.name[..r.name.iter().position(|&b| b == 0).unwrap_or(16)],
+            r.expansion,
+        ),
     };
     let mut char_name = [0u8; 16];
     char_name[..name.len()].copy_from_slice(name);
@@ -322,6 +327,34 @@ pub enum Character {
     /// (`d2_server::adapters::session::load_save`); `d2-client play
     /// --save` reads one with [`LiveData::read_save`].
     Save(Box<D2s>, LoadContext),
+    /// A save the load refuses (`formats/d2s.md` §10): the join reports
+    /// the result in S→C 0xB4 and the client is removed (`intents-events.md`
+    /// §8.2 rule 2). Only the request's name and flags are kept.
+    Refused(RefusedLoad),
+}
+
+/// A refused load: the result code the join reports and what the 0x67
+/// request carries (`formats/d2s-load.md` §5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefusedLoad {
+    /// The load result of `formats/d2s.md` §10 rule 1 (the 0xB4 payload).
+    pub result: u32,
+    /// The save's character name (+0x14), NUL-padded.
+    pub name: [u8; 16],
+    /// The save's expansion bit (status bit 5), for the request's flags.
+    pub expansion: bool,
+    /// The game's difficulty.
+    pub difficulty: u8,
+    /// The save's class (+0x28), the player unit's class when the load
+    /// fails after the unit exists.
+    pub class: u8,
+    /// The failure is in a section reader (internal codes 15–23): the
+    /// player unit exists and its add messages were queued.
+    pub after_player: bool,
+    /// The skill levels (§7.2) the load had applied: set when a section
+    /// after the skills failed (internal codes 20–23), so the join sends S→C
+    /// 0x94 before the 0xB4.
+    pub skills: Option<Vec<u8>>,
 }
 
 impl Character {
@@ -332,6 +365,7 @@ impl Character {
             Character::New => GAME_SETUP.difficulty,
             Character::Named(c) => c.difficulty,
             Character::Save(_, ctx) => ctx.difficulty,
+            Character::Refused(r) => r.difficulty,
         }
     }
 
@@ -354,6 +388,7 @@ impl Character {
                 ctx.difficulty = d;
                 Character::Save(s, ctx)
             }
+            Character::Refused(r) => Character::Refused(RefusedLoad { difficulty: d, ..r }),
         }
     }
 }
@@ -1670,6 +1705,33 @@ pub fn load_character(
     ))
 }
 
+/// The refused character of the save at `path`, when 1.14d's load of it fails
+/// with a result (`formats/d2s.md` §10); `None` when it loads or cannot be read.
+pub fn refused_load(data: &GameData, path: &std::path::Path, difficulty: u8) -> Option<Character> {
+    let GameData::Live(d) = data;
+    let bytes = std::fs::read(path).ok()?;
+    let err = d.read_save(&bytes, difficulty).err()?;
+    let result = err.result()?;
+    let after_player = err.internal().is_some_and(|c| (15..=23).contains(&c));
+    let skills = err
+        .internal()
+        .filter(|c| (20..=23).contains(c))
+        .and_then(|_| d2_formats::d2s::skills_before_failure(&bytes, &d.save));
+    let mut name = [0u8; 16];
+    let n = save_name(&bytes);
+    name[..n.len()].copy_from_slice(n);
+    let status = bytes.get(0x24).copied().unwrap_or(0);
+    Some(Character::Refused(RefusedLoad {
+        result: u32::from(result),
+        name,
+        expansion: status & d2_formats::d2s::status::EXPANSION as u8 != 0,
+        difficulty,
+        class: bytes.get(0x28).copied().unwrap_or(0),
+        after_player,
+        skills,
+    }))
+}
+
 /// Where the game's tables and levels come from.
 #[derive(Debug, Clone)]
 pub enum GameData {
@@ -1946,6 +2008,7 @@ pub fn walk_speeds(
         Character::New => PLAYER_CLASS as u8,
         Character::Named(c) => c.class,
         Character::Save(save, _) => save.header.class,
+        Character::Refused(_) => 0,
     };
     let rows: Vec<d2_data::tables::Charstats> = d
         .tables
@@ -2587,11 +2650,19 @@ fn loader(
     character: Character,
     cold_plains_wp: Option<u8>,
 ) -> CharacterLoader<WorldSim<LocalSeams>, World> {
-    Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
+    Box::new(move |s: &mut Sim, client: ClientId, r: &CreateGame| {
+        // A refused load gives the result before any player exists
+        // (`session_flow.rs` join: 0xB4 and the client removed).
+        if let Character::Refused(refused) = &character {
+            if !refused.after_player {
+                return Err(refused.result);
+            }
+        }
         // A save's own class allocates the player: the request's class
         // byte is 0 for an existing character (REC-1130, `create_request_for`).
         let class = match &character {
             Character::Save(save, _) => save.header.class,
+            Character::Refused(r) => r.class,
             _ => r.class,
         };
         let req = AllocRequest {
@@ -2698,6 +2769,27 @@ fn loader(
                     );
                 }
                 (entry, PlayerQuests::default())
+            }
+            // A section reader failed with the player allocated: the join
+            // announces the player, then refuses (`LOAD_AFTER_PLAYER`).
+            Character::Refused(r) => {
+                if let Some(skills) = &r.skills {
+                    d2_server::adapters::session::apply_skills_before_failure(s, player, skills);
+                }
+                // The client record holds the player for the announcement.
+                if let Some(id) = s.sim_client(client) {
+                    if let Some(e) = s.game.lists.client_mut(id) {
+                        e.player = Some(player);
+                    }
+                }
+                let skills = if r.skills.is_some() {
+                    d2_server::adapters::session_flow::LOAD_AFTER_SKILLS
+                } else {
+                    0
+                };
+                return Err(r.result
+                    | d2_server::adapters::session_flow::LOAD_AFTER_PLAYER
+                    | skills);
             }
             Character::Save(save, ctx) => match load_save(s, player, save, ctx) {
                 Ok((mut entry, report)) => {

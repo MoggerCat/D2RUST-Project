@@ -234,6 +234,9 @@ impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R
         v.h.items = items;
         v.h.game_seed = fields.seed;
         v.h.uniques = fields.uniques;
+        for (player, msg) in self.rest.drain_sent() {
+            v.h.x.send(player, &msg);
+        }
         out
     }
 }

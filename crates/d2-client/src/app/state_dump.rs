@@ -275,9 +275,19 @@ impl DumpGame {
     /// (`main::play_once`): the character of `--save` (or the default),
     /// the difficulty, the seed, the hardcore bit of the save.
     pub fn resolve(args: &DumpArgs, data: GameData, game_dir: Option<&Path>) -> Result<Self> {
-        let start = play_start::resolve(
+        // A save the load refuses plays the join as 1.14d does: the 0x67
+        // request, then S→C 0xB4 (`formats/d2s-load.md` §5 r2a).
+        let refused = args
+            .save
+            .as_deref()
+            .and_then(|p| single_player::refused_load(&data, p, args.difficulty));
+        let mut start = play_start::resolve(
             &CliStart {
-                save: args.save.clone(),
+                save: if refused.is_some() {
+                    None
+                } else {
+                    args.save.clone()
+                },
                 new: None,
                 save_dir: None,
                 difficulty: args.difficulty,
@@ -288,6 +298,9 @@ impl DumpGame {
             None,
             None,
         )?;
+        if let Some(c) = refused {
+            start.character = c;
+        }
         let seed = single_player::game_seed(&start.character, args.seed);
         // `play::run`: a loaded save's own status bit makes it hardcore.
         let hardcore = start.hardcore
@@ -341,6 +354,9 @@ pub const RUN_GAPS: [&str; 1] = [
      where the 1.14d client sends anything else differs from the first such tick",
 ];
 
+/// The server ticks a refused load runs.
+const REFUSED_TICKS: u32 = 2;
+
 /// Runs `game` for `ticks` server ticks and writes the `state-1` lines to
 /// `out` (one snapshot per tick whose frame is a multiple of `every`).
 pub fn dump<W: Write>(
@@ -351,6 +367,14 @@ pub fn dump<W: Write>(
     out: &mut W,
 ) -> Result<DumpReport> {
     let every = every.max(1);
+    // A refused load ends the game at the second tick: 0xB4 goes out in
+    // the first tick's input phase and the client is removed (recorded:
+    // `formats/d2s-load.md` §5 r2a).
+    let ticks = if matches!(game.character, single_player::Character::Refused(_)) {
+        ticks.min(REFUSED_TICKS)
+    } else {
+        ticks
+    };
     let ms = Arc::new(AtomicU32::new(START_MS));
     let client_data = ClientData::of(&game.data)?;
     let speeds = single_player::walk_speeds(&game.data, &game.character)?;

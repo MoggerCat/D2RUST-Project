@@ -37,15 +37,15 @@
 | Rules | 86–87 |
 |   1. Conventions | 88–170 |
 |   2. Act V records | 171–198 |
-|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–321 |
-|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 322–446 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 447–681 |
-| Constants & data dependencies | 682–699 |
-| Randomness | 700–709 |
-| Edge cases & original bugs | 710–744 |
-| Test vectors | 745–759 |
-| Provenance | 760–784 |
-| Open questions | 785–852 |
+|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–325 |
+|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 326–451 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 452–687 |
+| Constants & data dependencies | 688–705 |
+| Randomness | 706–715 |
+| Edge cases & original bugs | 716–750 |
+| Test vectors | 751–765 |
+| Provenance | 766–790 |
+| Open questions | 791–858 |
 <!-- /index -->
 
 ## Summary
@@ -233,8 +233,12 @@ all, +0x08 := 0; +0x16 = 1 → status 4 to all, +0x16 := 0.
 
 New level 110–112 (Bloody Foothills, Frigid Highlands, Arreat Plateau),
 not-intro and state 1 or 2 → state := 3, flag iterate for all. Otherwise,
-old level 109: quick remove; state 2 and the player lacks 35.0 and 35.1 →
-state := 3; status 0 → status 1 to all; flag iterate for all.
+old level 109: quick remove; then only if state is 2 and the player lacks
+35.0 and 35.1: state := 3; status 0 → status 1 to all; flag iterate for
+all. With any other state nothing is sent (a5-wp-34: no chain-31 0x5D).
+The nesting is read from `0x00588200` / `0x00589D80`; `0x005873E0` itself
+is not in the export, so the chain-31 nesting is PROVISIONAL REC-3100,
+settled by the recording above.
 
 #### 3.6 Shenk's death (event 8, `0x00587330`)
 
@@ -365,9 +369,10 @@ status 1 to all, +0x84 := 0, callback 2 := null.
 New level 111 or 112 (Frigid Highlands, Arreat Plateau), not-intro and
 killed < 5: state 1 or 2 → state := 3 (b); status 0 → status 1 to all and
 callback 2 := null, then flag iterate; status ≠ 0 → flag iterate only
-when b. Otherwise, old level 109: quick remove; state 2 and the player
-lacks 36.0 and 36.1 → state := 3, flag iterate; then status 0, not-intro
-and killed < 5 → status 1 to all, callback 2 := null.
+when b. Otherwise, old level 109: quick remove; then only if state is 2 and the
+player lacks 36.0 and 36.1: state := 3, flag iterate; then status 0,
+not-intro and killed < 5 → status 1 to all, callback 2 := null (the
+whole tail is inside the state 2 test, `0x00588200`).
 
 #### 4.6 Kills (event 8, `0x00588040`)
 
@@ -507,8 +512,9 @@ Chat end (`0x00588F80`, never cleared): malah: +0xAC → status 1 to all,
    Frozen River) with not-intro: state ≤ 2 → state := 3 (b); status 0 →
    status 1 to all, flag iterate; status ≠ 0 → flag iterate when b; then
    town cleanup.
-2. Old level 109: quick remove; state 2 and the player lacks 37.0 and
-   37.1 → state := 3; status 0 → status 1 to all; flag iterate.
+2. Old level 109: quick remove; then only if state is 2 and the player
+   lacks 37.0 and 37.1: state := 3; status 0 → status 1 to all; flag
+   iterate (all inside the state 2 test, `0x00589D80`).
 3. New level 121–124 (Nihlathak's Temple to Halls of Vaught), not-intro
    and state < 5: completion flag `0x00589AA0` from the event's unit
    (lacking 37.0, 37.1, 37.13); state := 6 (direct write); +0x84 := 2;

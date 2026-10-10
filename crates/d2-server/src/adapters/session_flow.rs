@@ -49,8 +49,8 @@ use d2_sim::units::messages as msg;
 use d2_sim::units::UnitId;
 
 use super::handlers::player::HotKey;
-use super::handlers::world::ActionEvents;
-use super::session::{enter_game, Entry, GameSetup, JoinError};
+use super::handlers::world::{ActionEvents, Outbox};
+use super::session::{announce_player, enter_game, Entry, GameSetup, JoinError};
 use super::storage::SaveFault;
 use super::SimGame;
 use crate::buffers::QueueError;
@@ -70,6 +70,13 @@ pub mod create_flags {
 
 /// Load result of an expansion class in a classic game (§8.2 rule 2).
 pub const LOAD_CLASSIC_EXPANSION_CLASS: u32 = 0x18;
+/// Set on a loader's refusal code (a load result is below 0x20) when the
+/// player unit already exists at the failure: the join sends the player's
+/// add messages before the 0xB4 (`formats/d2s-load.md` §5 r2b).
+pub const LOAD_AFTER_PLAYER: u32 = 0x0100_0000;
+/// With [`LOAD_AFTER_PLAYER`]: the skills section was read too, so S→C 0x94
+/// is sent before the 0xB4.
+pub const LOAD_AFTER_SKILLS: u32 = 0x0200_0000;
 /// The first expansion class (client +8 ≥ 5, §8.2 rule 2).
 const FIRST_EXPANSION_CLASS: u8 = 5;
 /// Class u8@0x12 must be below this (§2.5).
@@ -320,7 +327,10 @@ pub fn game_list_entry(name: &[u8; 16], players: u16, id: u16) -> [u8; 53] {
     m
 }
 
-impl<D: ActionEvents, W> SessionFlow<D, W> {
+impl<D: ActionEvents, W> SessionFlow<D, W>
+where
+    D::X: Outbox,
+{
     /// One queue-0 message; false for the ids the flow does not run.
     pub fn message(
         &mut self,
@@ -575,6 +585,15 @@ impl<D: ActionEvents, W> SessionFlow<D, W> {
             Err(code) => {
                 // §8.2 rule 2: S→C 0xB4 (direct, `0x0053B260`) with the
                 // code, then the client is removed (`0x00539DA0`).
+                let flags = LOAD_AFTER_PLAYER | LOAD_AFTER_SKILLS;
+                let announce = code < 4 * LOAD_AFTER_PLAYER && code & LOAD_AFTER_PLAYER != 0;
+                let skills = announce && code & LOAD_AFTER_SKILLS != 0;
+                let code = if announce { code & !flags } else { code };
+                if announce {
+                    if let Err(e) = announce_player(s, client, &r.char_name, skills, out) {
+                        self.faults.push((client, SessionFault::Join(e)));
+                    }
+                }
                 let mut b = vec![0xB4];
                 b.extend_from_slice(&code.to_le_bytes());
                 if let Err(e) = out.send_direct(client, &b) {
@@ -628,7 +647,10 @@ pub trait SessionRunner<D, W> {
     fn flow(&self) -> &SessionFlow<D, W>;
 }
 
-impl<D: ActionEvents, W> SessionRunner<D, W> for SessionFlow<D, W> {
+impl<D: ActionEvents, W> SessionRunner<D, W> for SessionFlow<D, W>
+where
+    D::X: Outbox,
+{
     fn run(
         &mut self,
         s: &mut SimGame<D, W>,

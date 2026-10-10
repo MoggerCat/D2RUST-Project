@@ -1036,6 +1036,25 @@ FMT_ROWS = {
     "gen-fmt-anim-walk": ["animdata.4-", "animdata.5-", "animdata.6-"],
 }
 
+# Refused loads (formats/d2s.md section 10, d2s-load.md section 5): (id, d2s-tool save args,
+# game difficulty, internal code, load result). The packets channel compares the join's S->C
+# stream up to the S->C 0xB4 whose payload is the result.
+REFUSE_CASES = [
+    ("checksum", "--break checksum", None, 6, 14), ("size", "--break size", None, 5, 14),
+    ("version", "--break version", None, 7, 1), ("magic", "--break magic", None, 4, 9),
+    ("quests", "--break quests", None, 15, 2), ("waypoints", "--break waypoints", None, 16, 3),
+    ("npcs", "--break npcs", None, 17, 11), ("stats", "--break stats", None, 18, 4),
+    ("skills", "--break skills", None, 19, 5), ("items", "--break items", None, 20, 7),
+    ("corpse", "--break corpse", None, 21, 8), ("hireling", "--break hireling", None, 22, 10),
+    ("golem", "--break golem", None, 23, 10),
+    ("class", "--break class", None, 4, 9), ("newflag", "--break newflag", None, 2, 9),
+    ("dead", "--break dead", None, 10, 21), ("short", "--break short", None, 4, 9),
+    ("nightmare", "", "nightmare", 13, 17),
+    ("hell", "--difficulty-unlocked nightmare", "hell", 14, 18),
+]
+for _id, *_ in REFUSE_CASES:
+    FMT_ROWS["gen-fmt-refuse-" + _id] = ["d2s.10-", "d2s-load.5-"]
+
 
 def fam_fmt(ctx):
     town = Check(
@@ -1062,6 +1081,14 @@ def fam_fmt(ctx):
         comment=["Frame counts and speed of the walk/run modes come from the animation data "
                  "(specs/formats/animdata.md sections 4-6); the player's position per tick shows them."])
     out = [town, load, anim]
+    for rid, args, diff, code, result in REFUSE_CASES:
+        out.append(Check(
+            "gen-fmt-refuse-" + rid, "fmt", f"formats: refused load, internal code {code}",
+            f"a save the load refuses with internal code {code} (result {result}): the join's S->C stream and 0xB4",
+            ("ScnAma --class ama --expansion " + args).strip(), 20, 300, "packets",
+            ([f"difficulty {diff}"] if diff else []),
+            comment=[f"formats/d2s.md section 10: internal code {code} gives load result {result}; "
+                     "S->C 0xB4 carries it (d2s-load.md section 5 r2a, r2b)."]))
     for c in out:
         c.extra = {"fmt": True}
     return out
