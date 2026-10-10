@@ -404,7 +404,7 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.x.remove_pet(owner, pet);
     }
     fn is_undead(&self, unit: UnitId) -> bool {
-        self.v.h.is_undead(unit)
+        self.v.h.x.umod_is_undead(unit)
     }
     fn missile_range(&self, class: i32) -> Option<i32> {
         self.v.h.x.umod_missile_range(class)

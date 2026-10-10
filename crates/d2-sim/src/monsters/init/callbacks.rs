@@ -332,16 +332,20 @@ pub fn purge<H: InitHost + ?Sized>(
     for m in found {
         if type_of(h, m) != Some(UnitType::Monster)
             || h.alignment(m) != 0
-            || (undead && !h.is_undead(m))
+            || (undead && !is_undead_class(cx, class_of(h, m)))
             || class_of(h, m) == 333
         {
             continue;
         }
-        eprintln!("DBG purge pass {:?}", m);
         let roll = seed(h, b).map_or(0, |s| s.roll(max.wrapping_sub(min)));
         event7(h, m, min.wrapping_add(roll as i32));
         super::create::assign_umod(cx, h, m, 21, false);
     }
+}
+
+/// `0x0063E990` on a class: monstats `lUndead` or `hUndead`.
+fn is_undead_class(cx: &Ctx<'_>, class: u32) -> bool {
+    cx.monstats(class).is_some_and(|m| m.lundead || m.hundead)
 }
 
 /// The skill-calc fields of skill 66 the curse evaluates (§5).
@@ -1150,8 +1154,6 @@ fn hireable_missile<H: InitHost + ?Sized>(h: &mut H, m: UnitId) {
 
 /// §14 umod 21, mode 2.
 fn kill_self<H: InitHost + ?Sized>(h: &mut H, u: UnitId) {
-    let (d, f, st, ow) = (h.units().is_dead(u), h.game().frame, h.has_state(u, state::UNINTERRUPTABLE), h.minion_owner(u));
-    eprintln!("DBG kill_self {:?} dead={} f={} st={} owner={:?}", u, d, f, st, ow);
     if h.units().is_dead(u) {
         return;
     }
