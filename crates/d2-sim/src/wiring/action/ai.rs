@@ -803,7 +803,19 @@ impl<X: Pending> AiActs for View<'_, X> {
             Some(m) => m.get(&skill).copied(),
             None => match self.h.natural_skills.get(&unit) {
                 Some(m) => m.get(&skill).copied(),
-                None => self.h.x.ai_skill_level(unit, skill, highest),
+                None => match self.h.skill_lists.get(&unit) {
+                    // A player's list (`skill_lists`): the entry's base
+                    // level plus bonus; the highest of the unit's entries
+                    // of the skill (`0x006439F0`) when `highest`, else the
+                    // native one (`0x006439B0`, owner −1).
+                    Some(l) => l
+                        .view()
+                        .iter()
+                        .filter(|e| e.skill == skill && (highest || e.owner_guid == -1))
+                        .map(|e| e.base + e.level_bonus)
+                        .max(),
+                    None => self.h.x.ai_skill_level(unit, skill, highest),
+                },
             },
         }
     }
@@ -1200,6 +1212,13 @@ impl<X: Pending> AiSummons for View<'_, X> {
     }
     /// `0x006442A0`: the base level of a monster's entry.
     fn skill_base_level(&self, unit: UnitId, skill: i32) -> Option<i32> {
+        if let Some(l) = self.h.skill_lists.get(&unit) {
+            return l
+                .view()
+                .iter()
+                .find(|e| e.skill == skill && e.owner_guid == -1)
+                .map(|e| e.base);
+        }
         self.unit_skills(unit)
             .iter()
             .find(|&&(s, _)| s == skill)
