@@ -12,9 +12,13 @@ Base: specs-staging-7 + integ-r23. 22 draws checks (21 gen + `draws-town-arrival
 
 - Rain (pass 9): the cursor steps the shared client seed after the weather update; the rain colors use the environment record's day period. `play --frame-schedule` (written by `scenario_diff.py` from the capture) replays 1.14d's drawn ticks and host clock (`tools/scenario-diff.md` §3 r7 step 5; settles REC-510 and REC-2440 for checks). Overlay calls are stamped with their delivery tick for the catch-up. On `draws-town-arrival-ama` the seed equals the capture's through tick 25, and the rain lines are equal on ticks 4-24.
 
+- Round 4: cursor jump (`ui/panels.md` §4 r3: move at (x', y − 3), mouse starts at (320, 240); REC-3470 provisional), `play --no-sound` from the capture's `-ns`, host pointer ignored in check runs (`tools/scenario-diff.md` §3 r7 step 6). The ama client seed equals the capture's through tick 73, and the rain rows match.
+
 ## Next causes (by ledger rows)
 
-- 139 rows (13 town checks, rows 195-198, rain `DrawLine`): an extra footstep variant roll on the client seed (sound 2768 starts at T 22 in d2rs, T 27 in 1.14d). Routed by the coordinator to rc-audio-fmt-div.
-- 14 blood-moor, 12 firebolt (row 98 player shadow file), 11 frozen (row 108 shadow dir), 3 den, 3 wp, 2 kurast, 1 stash: rc-sysrender-div.
+- 26 rows: draw rows all equal, frame `index_sha256` differs (pixels: rc-sysrender-div).
+- Town/ui checks at rows ~244-284 (DrawBox / CelDrawColor / menubutton): the mini panel starts open in d2rs (no registry) and closed in 1.14d (`Diablo II\Mini Panel` on the recording host, `ui/control-panel.md` §9 r9). Needs a decision: the host registry as a check input.
+- 5 ui-draws checks with scripted input still differ at the rain rows (left/right-skill-pick, minipanel, cube, inv-item): not traced yet.
+- 14 blood-moor, 12 firebolt, 11 frozen, 3 den, 3 wp, 2 kurast, 1 stash: rc-sysrender-div. Item-tip scout: rc-c011-gameseed.
 
-Tests: `cargo nextest run -p d2-client --lib` 2329/2329; clippy clean. Integration test binaries were not built (disk).
+Tests: `cargo nextest run -p d2-client --lib` 2330/2330; clippy clean. Integration test binaries were not built (disk).
