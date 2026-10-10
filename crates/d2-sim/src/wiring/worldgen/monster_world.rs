@@ -18,7 +18,7 @@ use std::any::Any;
 
 use crate::game::Game;
 use crate::monsters::init::{self, MonsterData};
-use crate::monsters::population::{placement, preset};
+use crate::monsters::population::{placement, preset, spawn};
 use crate::units::hooks::Sim;
 use crate::units::UnitId;
 
@@ -141,6 +141,25 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
             })
         });
         Some(placed.unit())
+    }
+
+    /// `0x005A43E0` through population's random boss
+    /// ([`spawn::random_boss`], champion allowed, warp check).
+    fn spawn_random_boss(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: crate::units::RoomId,
+        class: i32,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let made = h.as_world_holder(|h| {
+            let mut wh = host(sim, h, self);
+            wh.population(|cx| spawn::random_boss(cx, room, None, class, true, 0, 0, true))
+        });
+        Some(made)
     }
 
     /// `0x0054E600` through population's preset spawn

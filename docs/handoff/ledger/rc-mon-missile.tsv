@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+missile.willowisplightningbolt	entity	coverage	missiles.txt willowisplightningbolt (320)	specs/sim/pathing.md,specs/missiles/missiles.md	draft	diff-a4-nm-unique,diff-a4-hell-unique	DIVERGED@61	?	0	n	claude/rc-mon-missile	DIVERGED	S	rc-mon-missile: the Gloam bolt matches 1.14d frames 36-60 (position, xf/yf, removal) after the type-4 no-snap fix; the later divergence (frame 61, player fc after the Fire Bolt volley) is not the missile

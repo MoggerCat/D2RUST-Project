@@ -1,0 +1,6 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+ui.frontend.main	ui	systems	Main menu (expansion), 800x600, X screenshot	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	gateway label now drawn (GATEWAY: EUROPE, PROVISIONAL tz bias 0, REC-1905); mean colour equal; remaining diff is snow/fire animation (wall-clock input, scenario-diff r4)
+ui.frontend.charselect	ui	systems	Character select with 3 saves	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	paper dolls still missing (REC-1907, not read: 0x005066C0 sprite object); text/frames equal by eye; snow animation differs
+ui.frontend.charselect-return	ui	systems	Character select after Esc from create	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	sky palette restored on re-entry (0x0043AE30 loads it, REC-1906); no blue cast; snow animation differs
+ui.frontend.create	ui	systems	Character create, 7 expansion classes	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	EXPANSION CHARACTER label drawn at the 1.14d position; fechar confirmed from 0x00435580 (REC-1908); snow/fire animation differs

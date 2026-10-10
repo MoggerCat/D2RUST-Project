@@ -116,6 +116,43 @@ pub fn monster_skill_start<X: Pending + UseRest>(
     start(&mut w, &t.skills, unit)
 }
 
+/// The right skill's aura part of the save load's assign (`0x005701B0`,
+/// `use.md` §7 "0x3C SelectSkill"): the loaded right skill is an `aura`
+/// skill → `immediate` (Might, Resist Fire, ...) runs the do core once,
+/// else its aura state is switched on (stats 350 / 351); then the aura
+/// form of `schedule_periodic` (q-fix-pt-right-aura). The load selects
+/// the hand before the unit has a room, so the first periodic do runs on
+/// the first tick after game entry.
+pub fn assign_right_aura<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let Some(e) = w.right_skill(unit) else {
+        return;
+    };
+    let Some(r) = t.skills.skill(e.skill).filter(|r| r.aura) else {
+        return;
+    };
+    let l = skill_level(&w, &t.skills, Some(unit), Some(&e), true);
+    if l == 0 {
+        return;
+    }
+    if r.immediate {
+        crate::skills::use_::do_core(&mut w, &t.skills, unit, e.skill, l, true, false, false);
+    } else {
+        w.set_aura_state(unit, r.aurastate, e.skill, l);
+    }
+    crate::skills::use_::schedule_periodic(&mut w, &t.skills, unit, e.skill, l, true);
+}
+
 /// The skill part of the monster sequence event 0 `0x005A8670`
 /// (`units.md` §4.6 rule 13) on the skill use pipeline: E := the used
 /// skill, f := its E flags (`0x006446A0`; 0 without a used skill), "do
@@ -340,4 +377,132 @@ pub fn passive_refresh_all<X: Pending + UseRest>(
             crate::skills::use_::bodies::BodyWorld::passive_state_apply(&mut w, unit, &e);
         }
     }
+}
+
+/// The save load's right-skill selection (`formats/d2s.md` §2.4 rule
+/// 6.3, `0x005701B0` hand 0): the selected right skill's aura start
+/// ([`crate::skills::use_::right_aura_start`]), so an aura saved on the
+/// right button is on from the join (1.14d `pal-vigor` / `pal-fanaticism`
+/// checks: the aura's stats at frame 2).
+pub fn right_aura_select<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    player: UnitId,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let Some(e) = UseWorld::right_skill(&w, player) else {
+        return;
+    };
+    let l = skill_level(&w, &t.skills, Some(player), Some(&e), true);
+    crate::skills::use_::right_aura_start(&mut w, &t.skills, player, &e, l);
+}
+
+/// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33 step
+/// 4): `0x0056E620` for `owner` on the skill pipeline.
+pub fn missile_summon_class<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    owner: UnitId,
+    skill: i32,
+    _level: i32,
+) -> (i32, i32) {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    crate::skills::use_::bodies::summon_class(&w, &t.skills, &ct, owner, skill)
+}
+
+/// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`
+/// (`skills/bodies.md` §6.2) with flags 0xD, AI special state 0, pet max 0.
+#[allow(clippy::too_many_arguments)]
+pub fn missile_summon_spawn<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    owner: UnitId,
+    class: i32,
+    mode: i32,
+    at: (i32, i32),
+    pet_type: i32,
+) -> Option<UnitId> {
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    crate::skills::use_::bodies::spawn(
+        &mut w,
+        crate::skills::use_::bodies::Summon {
+            flags: 0xD,
+            owner,
+            class,
+            ai: 0,
+            mode,
+            x: at.0,
+            y: at.1,
+            pet_type,
+            pet_max: 0,
+        },
+    )
+}
+
+/// The Bone Wall maker's piece binding (§33 step 8), in order: owner
+/// data (anchor, 0, 0), the anchor's minion list, umod 15, `skill_stats`
+/// (ilvl 0), the source-unit link to `owner`, target-node slot 9.
+#[allow(clippy::too_many_arguments)]
+pub fn missile_bone_wall_piece<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    owner: UnitId,
+    anchor: UnitId,
+    piece: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    use crate::skills::use_::bodies::{self as b, BodyEffect};
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    BodyWorld::effect(
+        &mut w,
+        BodyEffect::OwnerData {
+            m: piece,
+            owner: Some(anchor),
+            a: 0,
+            b: 0,
+        },
+    );
+    BodyWorld::effect(
+        &mut w,
+        BodyEffect::AddMinion {
+            leader: anchor,
+            m: piece,
+        },
+    );
+    BodyWorld::effect(
+        &mut w,
+        BodyEffect::Umod {
+            m: piece,
+            umod: 15,
+            arg: 0,
+        },
+    );
+    b::skill_stats(&mut w, &t.skills, owner, piece, skill, level, 0);
+    b::link_source(&mut w, piece, Some(owner));
+    b::node_prepend(&mut w, piece, 9);
 }

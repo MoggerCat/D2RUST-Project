@@ -134,6 +134,9 @@ impl Pending for Open {
     fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
         crate::wiring::interaction::skill_events::route(h, sim, ev);
     }
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
+        crate::wiring::interaction::skill_events::assign_right_aura(h, sim, unit);
+    }
     fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
         crate::wiring::interaction::skill_events::monster_attack_skill(h, sim, unit);
     }
@@ -463,6 +466,7 @@ impl Fx {
                 enabled: true,
                 aidel: [15, 15, 15],
                 moves: 1 << 4,
+                mode_chart: false,
             }],
             ..UnitData::default()
         };
@@ -718,6 +722,34 @@ fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
     fx.assert_clean();
 }
 
+// Covers: specs/skills/bodies-4.md §4.9 r8
+#[test]
+fn use_point_collides_reads_the_rooms_once_paths_are_on() {
+    use crate::skills::use_::bodies::BodyWorld;
+    // `0x0064CB30(room, x, y, 1)` of Armageddon's tries (§4.9 step 8):
+    // without the provider the seam's default (collides); with it the
+    // cell's value under the mask.
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let _player = fx.spawn(UnitType::Player, 10, 10);
+    let room = fx.room;
+    let at = |fx: &mut Fx, m| {
+        fx.sim.skill_use(&mut fx.game, |w| {
+            BodyWorld::point_collides(w, room, (13, 10), m)
+        })
+    };
+    assert!(!at(&mut fx, 1), "an open cell");
+    *fx.sim
+        .sys
+        .hooks
+        .drlg
+        .collision_mut(&fx.game, room, 13, 10)
+        .expect("in a grid") |= bits::WALL;
+    assert!(at(&mut fx, 1), "a wall under mask 1");
+    assert!(!at(&mut fx, 0), "nothing under mask 0");
+    fx.assert_clean();
+}
+
 // Covers: specs/skills/bodies-2b.md §7.18 r6; specs/missiles/bodies.md §2 r4
 #[test]
 fn missile_data_words_reach_the_missile_store() {
@@ -741,5 +773,71 @@ fn missile_data_words_reach_the_missile_store() {
     let m = m.expect("created");
     let data = fx.sim.hooks().missile_store().get(m).unwrap().clone();
     assert_eq!(data.target, (174, -3));
+    fx.assert_clean();
+}
+
+// Covers: specs/skills/bodies.md §2.12
+#[test]
+fn use_allied_resolves_a_monster_to_its_minion_owner() {
+    use crate::monsters::ai::{AiControl, AiStore, UnitRef};
+    use crate::skills::use_::bodies::BodyWorld;
+    // Filter 0x10000's `0x00554DE0`: a monster stands for its minion
+    // owner (`0x0058F0D0`); the same unit after that → allies. An Oak
+    // Sage's aura (filter 0x10103) reaches its druid this way.
+    let mut fx = Fx::new();
+    let p = fx.spawn(UnitType::Player, 10, 10);
+    let pet = fx.spawn(UnitType::Monster, 11, 10);
+    let wild = fx.spawn(UnitType::Monster, 12, 10);
+    let guid = fx.sim.sys.units.get(p).unwrap().guid;
+    let mut ai = AiStore::new();
+    ai.entry(pet).control = Some(AiControl {
+        minion_owner: Some(UnitRef {
+            ty: UnitType::Player,
+            guid,
+        }),
+        ..AiControl::default()
+    });
+    ai.entry(wild).control = Some(AiControl::default());
+    fx.sim.sys.hooks.ai = Some(ai);
+    let (a, b, c, d) = fx.sim.skill_use(&mut fx.game, |w| {
+        (
+            BodyWorld::allied(w, pet, p),
+            BodyWorld::allied(w, p, pet),
+            BodyWorld::allied(w, wild, p),
+            BodyWorld::allied(w, wild, wild),
+        )
+    });
+    assert!(a && b, "the pet and its owner");
+    assert!(!c, "a monster without the link");
+    assert!(d, "the same unit");
+    fx.assert_clean();
+}
+
+// Covers: specs/sim/pathing.md §8.1 r2
+#[test]
+fn a_monster_drawn_as_a_player_takes_the_charstats_walk_velocity() {
+    // `0x00621360` on the draw identity: the Shadow Warrior (monstats
+    // `Velocity` 0) under a gfx state with `gfxtype` 2 and `gfxclass` 6
+    // walks on the assassin's `WalkVelocity` (6); without the disguise
+    // flag, its own monstats.
+    use crate::units::record::flags2;
+    const SHADOW: u32 = 119;
+    let mut data = (*super::stat_data()).clone();
+    data.states.set_gfx(vec![(SHADOW, 2, 6)]);
+    let mut fx = Fx::with(Arc::new(data), skills());
+    {
+        let t = Arc::make_mut(&mut fx.sim.sys.hooks.tables);
+        t.combat.monstats[0].velocity = 0;
+        let mut ass = blank::<d2_data::tables::Charstats>();
+        ass.walkvelocity = 6;
+        t.combat.charstats.resize(7, ass.clone());
+        t.combat.charstats[6] = ass;
+    }
+    let m = fx.spawn(UnitType::Monster, 12, 10);
+    let v = |fx: &mut Fx| fx.sim.with(&mut fx.game, |_, v| v.velocity_base(m));
+    assert_eq!(v(&mut fx), 0, "its own monstats");
+    fx.sim.sys.stats.toggle_state(m, SHADOW, true);
+    fx.sim.sys.units.get_mut(m).unwrap().flags2 |= flags2::DISGUISE;
+    assert_eq!(v(&mut fx), 6, "the shown class's charstats");
     fx.assert_clean();
 }

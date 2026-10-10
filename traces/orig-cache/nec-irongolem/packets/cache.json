@@ -1,0 +1,40 @@
+{
+ "channel": "packets",
+ "check": "nec-irongolem",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnNec",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "78efef3ed25b3459ef4240fd8612d3e0c6403f70fe1aedca17f350e6ac09cc08",
+   "size": 124188
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "e3519d116b876ba11973727233f2c0803acbde1c887855082c0e0061c65455cd",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cdb34be43fbbad3d6b4dde997201cf9ac810447ec77c1b633ddcd85d46e51a47",
+  "save": "7d3f585e50247137786625c6dbe393a86afce0ce99c3606c75d0cb1a01407bfe"
+ }
+}

@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–269 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 270–279 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 280–322 |
-|   4. Queued movement and action messages | 323–410 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 411–441 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 442–472 |
-|   7. Other unit messages (general handlers, act at receive) | 473–608 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 609–759 |
-| Constants & data dependencies | 760–771 |
-| Randomness | 772–779 |
-| Edge cases & original bugs | 780–802 |
-| Test vectors | 803–853 |
-| Provenance | 854–905 |
-| Open questions | 906–951 |
+|   1. Unit add | 77–272 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 273–282 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 283–325 |
+|   4. Queued movement and action messages | 326–413 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 414–444 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 445–475 |
+|   7. Other unit messages (general handlers, act at receive) | 476–611 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 612–762 |
+| Constants & data dependencies | 763–774 |
+| Randomness | 775–782 |
+| Edge cases & original bugs | 783–805 |
+| Test vectors | 806–856 |
+| Provenance | 857–908 |
+| Open questions | 909–954 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -234,7 +234,19 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    kind's init (player `0x00460BF0`, missile `0x004CD0A0`, item
    `0x004C1910`, tile: unit flags |= 0x22, static path; jump table
    `0x004661A0` read from the file). Add; an object
-   then gets `0x004BC8D0`.
+   then gets `0x004BC8D0`. The object init sets the static path
+   (`0x00620AE0(unit, room, x, y)`) and then, when the objects byte
+   +0x120 + mode (`HasCollision[mode]`) ≠ 0, stamps the footprint on the
+   client grid with the server's stamp `0x00620A70(unit, room, x, y)`
+   (box and mask of `sim/path-placement.md` §3; read 2026-10-10,
+   `0x004BC720`; settles REC-1251 and REC-1565). It is stamped once, in
+   the 0x51 mode: a later mode change does not re-test `HasCollision`.
+   The client frees it only through `0x00623830` (`world/objects-client.md`
+   §25 r9: the generic step's mode 1 → 2 turn when `HasCollision2` = 0
+   and `HasCollision1` ≠ 0, and the door finish without a test). The
+   client path (`client/model.md` open question 2) walks around it.
+   Model: kind data {footprint} := `HasCollision[mode]` ≠ 0 at 0x51,
+   cleared by those frees.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`:
    object data +8 := the shrines record of index interact (`0x006414B0`:
    table `[0x0096D468]`, 0xB8-byte rows, count `[0x0096D46C]`; out of
@@ -250,15 +262,6 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    function is set.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
    {interact}.
-   PROVISIONAL: the object init `0x004BC720` stamps the object's
-   footprint on the client grid as the server's add does
-   (`sim/path-placement.md` §2.5: when `HasCollision[mode]` ≠ 0, box
-   `SizeX` × `SizeY`, §3 mask), and the client's own frees
-   (`world/objects-client.md` §25 r9, `0x00623830`) keep it exactly while
-   `HasCollision[mode]` ≠ 0; d2rs stamps it on the client path's grids
-   (because the client frees object footprints, so it holds them, and
-   the server player stops at a colliding object a footprint-less
-   client path walks through); settled by REC-1251.
 5. **Types 0, 3, 4, 5 are never sent.** The only 1.14d builder of 0x51,
    `0x0053BD10`, has one caller (`0x00572067` in the add messages,
    `sim/intents-events.md` §7.2), which passes type 2; all 206 recorded

@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+system.sim.units.4-1-setting-a-mode	system	systems	specs/sim/units.md §4.1 Setting a mode	specs/sim/units.md	draft	gen-boss-708	DIVERGED@101	yes	1	y	-	DIVERGED	M	rc-player-fc: player corpse fc/sp now equal (was fc 256 vs 0 at frame 83); next divergence frame 101 monster seed (monster AI)

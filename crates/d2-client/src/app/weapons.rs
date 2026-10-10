@@ -69,6 +69,8 @@ pub struct ItemFacts {
     pub wclass: [u8; 4],
     pub wclass2: [u8; 4],
     pub weap: bool,
+    /// `rangeadder`: the player's melee reach (`combat/hit.md` §7.3).
+    pub range_adder: i32,
 }
 
 /// A player's hands.
@@ -115,6 +117,14 @@ impl Weapons {
         self.weapon(u)
             .and_then(|w| self.items.get(&w))
             .map_or(class::HAND_TO_HAND, |f| f.class)
+    }
+
+    /// The `rangeadder` of the weapon in use (0 without one): a player's
+    /// melee reach (`0x00622870`, `combat/hit.md` §7.3 step 1).
+    pub fn range_adder(&self, u: UnitId) -> i32 {
+        self.weapon(u)
+            .and_then(|w| self.items.get(&w))
+            .map_or(0, |f| f.range_adder)
     }
 
     /// The shield in the left hand (`0x0063C8F0`).
@@ -204,6 +214,7 @@ pub(crate) fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         wclass: t.item(record).map_or([0; 4], |r| r.wclass),
         wclass2: t.item(record).map_or([0; 4], |r| r.wclass2),
         weap: is_any(t, record, &weap),
+        range_adder: t.item(record).map_or(0, |r| i32::from(r.rangeadder)),
     }
 }
 

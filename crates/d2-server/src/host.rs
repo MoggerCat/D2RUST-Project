@@ -287,6 +287,16 @@ where
         Some(code)
     }
 
+    /// Queues `msg` for `client` now, outside the tick (a poke at the
+    /// tick-end point, `tools/poke.md` §5 rule 5): the bytes join the
+    /// client's buffer before this frame's flush, as a 1.14d send from the
+    /// poked function does.
+    pub fn queue_now(&mut self, client: ClientId, msg: &[u8]) -> Result<(), QueueError> {
+        let r = self.buffers.queue(client, msg);
+        self.note_tap();
+        r
+    }
+
     /// System-message senders (§2.1 rule 2): no filter.
     pub fn send_system(&mut self, client: ClientId, msg: &[u8]) -> Result<Classified, SendError> {
         self.note(PacketEvent::ClientOut { client, msg });
@@ -311,7 +321,7 @@ where
     /// [`Self::frame`] with `at_tick_end` run after the tick and before
     /// its flush, when a tick ran: the point of the 1.14d tick-return
     /// hook `0x0052FD1E` where pokes run (`tools/poke.md` §4 rules 1–2,
-    /// §5 rule 4). Not run in a frame without a tick.
+    /// §5 rules 4–5). Not run in a frame without a tick.
     pub fn frame_with(
         &mut self,
         at_tick_end: impl FnOnce(&mut Self),

@@ -487,37 +487,32 @@ pub fn walk_in_radius<W: AiHost + ?Sized>(
     ok
 }
 
-/// The point `0x005DE4E0` walks to (1.14d, read 2026-10-10): d = the
-/// full-size distance `0x005DC380` from the unit (its size `size`) to
-/// `t`; k = min(a, |d − b|); the sign is −1 (away from `t`) when d < b,
-/// else +1. With Δ = |t − u| per axis and s = max(Δx + Δy, k): the step
-/// is (Δx·k / s, Δy·k / s) by truncating division, and while its sum is
-/// below k both parts grow by 1. The point is u + sign(t − u)·step·sign
-/// per axis (an equal coordinate adds 0). k ≤ 0 or t on the unit give the
-/// unit's own point.
-/// Recorded (REC-501, 1.14d under Wine, `-seed 1234`, player at
-/// (4873, 4228)): Warriv's walks from (4866, 4235) with (a, b) = (3, 2)
-/// to (4868, 4233), from (4868, 4233) with (2, 2) to (4869, 4232), from
-/// (4869, 4232) with (1, 2) to (4870, 4231).
+/// The point `0x005DE4E0` walks to (`ai.md` §7.2, 1.14d-confirmed, settles
+/// REC-501): d := full-size distance from the unit (size `size`) to `t`;
+/// s := −1 when d < b, else +1; k := min(|d − b|, a); with ax, ay the
+/// absolute axis distances and n := max(ax + ay, k), n > 0: kx := ax·k / n,
+/// ky := ay·k / n (truncated), then while kx + ky < k both grow by 1. The
+/// point is the unit's position plus sign(Δ)·kx·s and sign(Δ)·ky·s per
+/// axis. No early exit: k = 0, or `t` on the unit, gives its own position.
+/// Checked against Warriv's three recorded arrival walks (`-seed 1234`,
+/// player at (4873, 4228)) and Jerhyn's (`gen-shrine-*`, frame 50).
 pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> (i32, i32) {
     let d = distance_full_size(u, size, t);
-    let sign = if d < b { -1 } else { 1 };
-    let k = a.min((d - b).abs());
-    let dx = t.0.wrapping_sub(u.0).wrapping_abs();
-    let dy = t.1.wrapping_sub(u.1).wrapping_abs();
-    let s = (dx + dy).max(k);
-    let (mut xc, mut yc) = (0, 0);
-    if s > 0 {
-        xc = dx * k / s;
-        yc = dy * k / s;
-        while xc + yc < k {
-            xc += 1;
-            yc += 1;
-        }
+    let s = if d < b { -1 } else { 1 };
+    let k = (d - b).abs().min(a);
+    let (ax, ay) = ((t.0 - u.0).abs(), (t.1 - u.1).abs());
+    let n = (ax + ay).max(k);
+    if n <= 0 {
+        return u;
+    }
+    let (mut kx, mut ky) = (ax * k / n, ay * k / n);
+    while kx + ky < k {
+        kx += 1;
+        ky += 1;
     }
     (
-        u.0 + (t.0 - u.0).signum() * xc * sign,
-        u.1 + (t.1 - u.1).signum() * yc * sign,
+        u.0 + (t.0 - u.0).signum() * kx * s,
+        u.1 + (t.1 - u.1).signum() * ky * s,
     )
 }
 

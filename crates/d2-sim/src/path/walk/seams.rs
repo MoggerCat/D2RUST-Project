@@ -204,6 +204,16 @@ pub trait WalkUnits {
     fn monstats_velocity(&self, unit: UnitId) -> (i32, bool) {
         (0, false)
     }
+    /// The velocity base `0x00621360(type, class)` of §8.1 rule 2 (× 256
+    /// applied by the caller): charstats `WalkVelocity` for a player,
+    /// monstats `Velocity` for a monster, of the unit's **draw identity**
+    /// (`0x00645270`). Default: the unit's own type and class.
+    fn velocity_base(&self, unit: UnitId) -> i32 {
+        match self.unit_type(unit) {
+            UnitType::Player => self.charstats_velocity(unit).0,
+            _ => self.monstats_velocity(unit).0,
+        }
+    }
     /// armor `speed` of the torso item (body location 3); `None` = none.
     fn torso_speed(&self, unit: UnitId) -> Option<i32> {
         None
