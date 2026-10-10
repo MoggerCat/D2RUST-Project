@@ -25,3 +25,10 @@ NOT-IMPLEMENTED by feature). No code changed, no ledger rows changed.
   client gap / no item on either side, with packets MATCH or no input/send. Settle in a ledger part.
 - PARTIAL reasons now come from the comparator (state_diff one-sided fields and gaps, items_diff).
 - Ledger after merging integ-r23: 838 DIVERGED, 500 NO-CHECK, 46 NOT-IMPLEMENTED.
+
+## v3
+- Hand checks re-ran too (319 cached checks: MATCH 86, DIVERGED 195, PARTIAL 235 channel results).
+  511 checks have fresh results. Uncached gen (196) and hand (70) checks, plus 20 checks new in
+  the ledger, are recording 1.14d now (`--fill-cache`; the cache files are not committed here).
+- Ledger after merging integ-r23: 824 DIVERGED, 414 NO-CHECK, 46 NOT-IMPLEMENTED.
+- C003 (71 rows) is free: the re-run is EQUAL under REC-2055/2056, so a ledger part settles it.
