@@ -21,6 +21,8 @@ Families (one check per table row, written under traces/checks/gen/):
   itemq the same items at each quality (low .. crafted) over three game seeds
   aud   one audio-diff scenario per reachable system.audio ledger row group (channel
         audio; written to traces/audio/gen/, outside the scenario-diff suite)
+  npc   one talk scenario per town NPC the ledger has no check for (interact, chat open,
+        chat close; state + packets channels)
   item  a census of ITEM_CHUNK base items per check, each created on the ground by
         the game's own creation path (poke `item`), compared by the items channel
 
@@ -43,7 +45,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -523,6 +525,56 @@ QSEEDS = [(0x1234, 666), (0x2222, 77), (0x5A5A, 4242)]
 QEXTRA = ["rin", "amu", "cm1", "jew"]
 
 
+# town NPCs without a hand-written talk check: (ledger name, monstats class, act 1..5,
+# quest rows the first talk can touch).  Source: the vendors.tsv rows of the ledger.
+NPC_ROWS = [
+    ("warriv1", 155, 1, ["quest.a1q0-warriv-gossip"]), ("charsi", 154, 1, []),
+    ("gheed", 147, 1, []), ("cain1", 146, 1, []), ("navi", 266, 1, []),
+    ("geglash", 200, 2, []), ("act2guard2", 331, 2, []), ("act2guard4", 377, 2, []),
+    ("act2guard5", 378, 2, []),
+    ("alkor", 254, 3, []), ("hratli", 253, 3, ["quest.a3q0-hratli-gossip"]),
+    ("ormus", 255, 3, []), ("natalya", 297, 3, []), ("meshif2", 264, 3, []),
+    ("cain3", 245, 3, []), ("tyrael1", 251, 3, []),
+    ("halbu", 257, 4, []), ("jamella", 405, 4, []), ("izualghost", 406, 4, []),
+    ("malachai", 408, 4, []), ("tyrael2", 367, 4, ["quest.a4q0-tyrael-gossip"]),
+    ("cain4", 246, 4, []),
+    ("drehya", 512, 5, []), ("tyrael3", 521, 5, []),
+]
+
+# ledger rows the item-quality census reaches: item creation at a forced quality runs the
+# affix pick / unique pick / socket / ethereal rolls of that quality and the items channel
+# compares the whole 0x9C stream (the rolls are not forced one by one).
+ITEMQ_AREAS = {
+    "all": ["item.gen.create-wrapper", "item.gen.sockets", "item.gen.ethereal",
+            "item.affix.ids-slots", "item.affix.fit-tests", "item.affix.alvl"],
+    "low": ["item.quality.low", "item.quality.dispatch"],
+    "normal": ["item.quality.dispatch"],
+    "superior": ["item.quality.superior", "item.quality.dispatch"],
+    "magic": ["item.affix.magic", "item.affix.magic-roller", "item.quality.dispatch"],
+    "set": ["item.quality.set", "item.set-item", "item.quality.dispatch"],
+    "rare": ["item.affix.rare", "item.affix.rare-name", "item.quality.dispatch"],
+    "unique": ["item.quality.unique", "item.unique", "item.quality.dispatch"],
+    "crafted": ["item.affix.crafted", "item.props.craft", "item.quality.dispatch"],
+}
+
+
+def fam_npc(ctx):
+    out = []
+    for name, cls, act, quests in NPC_ROWS:
+        lines = [f"at 4 poke goto unit 1:{cls}",
+                 f"at 14 send InteractWithEntity type=1 id=@1:{cls}",
+                 f"at 16 send InitEntityChat id=@1:{cls}",
+                 f"at 18 send TerminateEntityChat id=@1:{cls}"]
+        c = Check(f"gen-npc-{name}", "npc", f"npc {name} ({cls})",
+                  f"talk to {name} (monstats {cls}, act {act})",
+                  ACT_SAVE[act - 1], 50, 300, "state packets", lines,
+                  comment=["NPC talk (world/npc.md): goto the NPC, interact (0x13), open the "
+                           "chat (0x2F), close it (0x30); state + packets channels."])
+        c.extra = {"areas": [f"npc.{name}"] + quests}
+        out.append(c)
+    return out
+
+
 def fam_itemq(ctx):
     rows = item_rows(ctx)
     wa = [r for r in rows if r[0] < 100000 and r[1] not in QEXTRA and not r[1].startswith(("hp", "mp", "rv"))]
@@ -959,8 +1011,99 @@ def fam_render(ctx):
     return out
 
 
+def fam_monskill(ctx):
+    """One check per monster skill row (skills.txt, charclass blank) that has a ledger row
+    `skill.monster.<slug>`: a monster class that lists the skill in monstats Skill1..8 (first
+    enabled non-boss class, else the lowest enabled) is spawned next to the player in the Blood
+    Moor; its AI picks and casts the skill on its own (specs/skills/monster-skills.md)."""
+    sk = excel(ctx.excel, "skills.txt", ["skill", "Id", "charclass"])
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx", "enabled", "boss"] +
+               [f"Skill{k}" for k in range(1, 9)])
+    wanted = {a[len("skill.monster."):] for a, _ in load_ledger(ctx.ledger)
+              if a.startswith("skill.monster.") and a != "skill.monster.table"}
+    users = {}
+    for r in ms.rows:
+        hc = ms.get(r, "hcIdx")
+        if not hc.isdigit():
+            continue
+        key = (ms.get(r, "enabled") != "1", ms.get(r, "boss") == "1", int(hc))
+        for k in range(1, 9):
+            n = ms.get(r, f"Skill{k}")
+            if n:
+                users.setdefault(n, []).append((key, int(hc), ms.get(r, "Id"), k))
+    out = []
+    for r in sk.rows:
+        name = sk.get(r, "skill")
+        if sk.get(r, "charclass") or not name or slug(name) not in wanted:
+            continue
+        sid = int(sk.get(r, "Id"))
+        if name not in users:
+            raise GenError(f"monster skill {name} ({sid}) is used by no monstats row")
+        _, hc, ident, slot = min(users[name])
+        c = spawn_check(f"gen-monskill-{sid}", "monskill", f"skills.txt Id {sid}",
+                        f"monster skill {name} ({sid}), class {hc} {ident}",
+                        f"spawn {hc} @x+3 @y-2 normal",
+                        [f"Monster skill {name} (skill {sid}): class {hc} ({ident}, monstats "
+                         f"Skill{slot}) spawned normal next to the player; its AI casts the "
+                         "skill on its own (the cast is compared, not forced)."], ticks=500)
+        c.save = "ScnAma --class ama --expansion --level 70"
+        c.comment.append("Expansion character, level 70: it outlives the first seconds, so the AI "
+                         "gets many think frames to pick the skill.")
+        c.extra = {"skill": sid, "slug": slug(name), "class": hc}
+        out.append(c)
+    return out
+
+
+# Quest monsters (ledger monster.quest.*): kind of monster by spawn directive.
+# (area suffix, [(spawn directive kind, row or class)])
+QKILL = [("ancients", [("su", 44), ("su", 45), ("su", 46)]), ("baal", [("boss", 544)]),
+         ("blood-raven", [("boss", 267)]), ("cain-rescue-guard", [("su", 3), ("su", 4)]),
+         ("countess", [("su", 6)]), ("cow-king", [("su", 39)]),
+         ("griswold", [("boss", 365)]), ("hellforge-hephasto", [("su", 41)]),
+         ("izual", [("boss", 256)]), ("nihlathak", [("boss", 526)]),
+         ("radament", [("boss", 229)]), ("summoner", [("boss", 250)])]
+
+
+def fam_qkill(ctx):
+    """Quest monster kill: the monster (or superunique) spawned in the empty Blood Moor, its
+    life set to 1, killed by a missile; the state channel compares the death, corpse and
+    drops frame by frame."""
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx"])
+    cls = {ms.get(r, "Id"): ms.get(r, "hcIdx") for r in ms.rows if ms.get(r, "hcIdx").isdigit()}
+    su = excel(ctx.excel, "superuniques.txt", ["Superunique", "Class", "hcIdx"])
+    out = []
+    for slug_, parts in QKILL:
+        # a table without the superunique row (the selftest's synthetic view) skips that quest
+        if any(k == "su" and (n >= len(su.rows) or su.get(su.rows[n], "Class") not in cls)
+               for k, n in parts):
+            continue
+        lines, refs = [], []
+        for i, (kind, n) in enumerate(parts):
+            dx = 4 + 3 * i
+            if kind == "su":
+                refs.append(cls[su.get(su.rows[n], "Class")])
+                lines.append(f"at 30 poke superunique {n} @x+{dx} @y+4")
+            else:
+                refs.append(str(n))
+                lines.append(f"at 30 poke spawn {n} @x+{dx} @y+4 normal")
+        for r in dict.fromkeys(refs):
+            lines.append(f"at 50 poke stat @1:{r} 6 0 256")
+        for i in range(len(parts)):
+            lines.append(f"at 54 poke missile 58 @x @y @x+{4 + 3 * i} @y+4 skill 36 30")
+        c = Check(f"gen-qkill-{slug_}", "qkill", "quest monster " + slug_,
+                  f"quest monster {slug_} spawned and killed", "ScnAma --class ama --expansion",
+                  180, 360, "state", BM + SEEDS + lines, variant="blood-moor-empty",
+                  comment=[f"Quest monster {slug_} ({', '.join(f'{k} {n}' for k, n in parts)}) "
+                           "spawned next to the player in the empty Blood Moor, life set to 1 "
+                           "at frame 50, hit by missile 58 with skill 36 level 30 (the combat-kill-fallen form) at frame 54; the state channel compares "
+                           "death, corpse, drops and quest-record effects frame by frame."])
+        c.extra = {"area": f"monster.quest.{slug_}"}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1022,13 +1165,20 @@ def resolve_area(c, areas):
     elif f == "mon":
         pick = [a for a, s in areas if a.startswith("monster.")
                 and s.endswith(f"(hcIdx {x['class']})")]
+    elif f == "monskill":
+        pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
+    elif f == "qkill":
+        pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":
         c.area = ",".join(x["rows"]) if x["rows"] else "-"
         return
-    elif f == "aud":
+    elif f in ("aud", "npc"):
         c.area = ",".join(x["areas"])
+        return
+    elif f == "itemq":
+        c.area = ",".join(ITEMQ_AREAS["all"] + ITEMQ_AREAS[x["quality"]])
         return
     elif f == "fmt":
         pre = FMT_ROWS[c.name]

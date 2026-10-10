@@ -31,9 +31,10 @@ def synthetic(d):
     table(os.path.join(d, "levels.txt"), ["Name", "Id", "Act", "DrlgType"],
           [["Null", 0, 0, 0], ["Act 1 - Town", 1, 0, 2], ["Act 1 - Cave 1", 8, 0, 1],
            ["Act 2 - Town", 40, 1, 2], ["Act 5 - Siege 1", 110, 4, 3], ["Expansion", "", "", ""]])
-    table(os.path.join(d, "monstats.txt"), ["Id", "hcIdx", "AI", "enabled", "boss"],
-          [["skeleton1", 0, "Skeleton", 1, 0], ["skeleton2", 1, "Skeleton", 1, 0],
-           ["fallen1", 19, "Fallen", 1, 0], ["andariel", 156, "Andariel", 1, 1]])
+    table(os.path.join(d, "monstats.txt"), ["Id", "hcIdx", "AI", "enabled", "boss"] + [f"Skill{k}" for k in range(1, 9)],
+          [["skeleton1", 0, "Skeleton", 1, 0, "Attack"] + [""] * 7,
+           ["skeleton2", 1, "Skeleton", 1, 0] + [""] * 8,
+           ["fallen1", 19, "Fallen", 1, 0] + [""] * 8, ["andariel", 156, "Andariel", 1, 1] + [""] * 8])
     table(os.path.join(d, "superuniques.txt"), ["Superunique", "Name", "Class", "hcIdx"],
           [["Bishibosh", "Bishibosh", "fallenshaman1", 0], ["", "", "", ""],
            ["Rakanishu", "Rakanishu", "fallen2", 3]])
@@ -155,6 +156,11 @@ def run():
         t.ok(len(by["aud"]) == len(cg.AUD_SCEN) and by["aud"][0] == "gen-aud-town-idle", by["aud"])
         t.ok(next(c for c in checks if c.name == "gen-aud-ui-panels").area.startswith("system.audio."),
              "aud ledger area")
+        # every family is generated here or skipped with a reason
+        skipped = {"mon": "needs real monstats rows with ledger monster.* areas",
+                   "monskill": "needs a ledger skill.monster.* row"}
+        for fam in cg.FAMILIES:
+            t.ok(by.get(fam) or fam in skipped, f"family {fam} generated nothing and is not skipped")
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")
@@ -168,6 +174,7 @@ def run():
         args = ["--excel", ex, "--waypoints", wp, "--out", out,
                 "--audio-out", os.path.join(tmp, "audio-out"),
                 "--waypoint-towns", os.path.join(HERE, "waypoint-towns.tsv"),
+                "--client-messages", ctx.client_messages, "--census", ctx.census,
                 "--shrine-seeds", os.path.join(tmp, "seeds.tsv")]
         with open(os.path.join(tmp, "seeds.tsv"), "w") as f:
             f.write("shrine\tseed\tobject_class\tverified\n1\t1234\t2\td2rs\n")
@@ -225,3 +232,7 @@ def run():
         print("selftest: D2_GAME_DIR excel view not found: real-table pass skipped")
     print(f"selftest: {t.n} checks passed")
     return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run())

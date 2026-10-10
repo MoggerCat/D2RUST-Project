@@ -722,27 +722,24 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
 2. Velocity vector 0 → count := index := 0; Q := the current cell
    centre; done. (Dead in 1.14d: the only caller, §9.4 rule 2.2, resets
    before calling with a (0, 0) vector.)
-3. Δ := velocity vector. Not a missile: R := point[index] centre −
-   position; if |R.x| ≤ M and |R.y| ≤ M with M = max(|Δx|, |Δy|): Δ := R
-   and "reaches the point". PROVISIONAL: missiles snap too (because the
-   1.14d recording `dru-tornado` shows the tornado, path type 10 with
-   point 0 = its start cell, keep its exact position on its first tick
-   while its facing turns to point 1, then fly straight to point 1:
-   frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
-   2.5 aim give); settled by a read of `0x00650660` (REC-1391).
-   Not for path type 4 (a missile aimed at a point, `missiles/missiles.md`
-   §R4.3 step 5): the Gloam's bolt (class 320, `diff-a4-nm-unique`,
-   1.14d frames 36–41) flies on past the aim point with x/y fraction
-   still advancing by one step per frame; a snap there would end the path
-   (index = count) and remove the missile a frame early. Recorded
-   2026-10-10 (rc-mon-missile); the rule's exact 1.14d condition for
-   types 10 and 14 stays REC-1391.
-   2.5 aim give; also the charged bolt and blessed hammer of
-   `sor-charged-bolt.check` frame 27 / `pal-blessed-hammer.check` frame
-   31 land exactly on point centres, q-fix-skills-4cls REC-1643), except
-   on the straight missile path (type 4: an Inferno flame flies on past
-   its target point in `sor-inferno.check` frame 45, which a snap would
-   end); settled by a read of `0x00650660` (REC-1391).
+3. Δ := velocity vector (path +0x72, +0x76). Snap (`0x00650090`,
+   called once at `0x006506D7`): unless the path type (+0x3C) is 4,
+   R := point[index] centre − position (point words at path +0x9C +
+   4·index, centre = cell · 65536 + 0x8000); if |R.x| ≤ M and |R.y| ≤ M
+   with M = max(|Δx|, |Δy|): Δ := R and "reaches the point". The path
+   type is the only test: no unit type, no flag, no index < count
+   bound (1.14d-confirmed `0x00650660`, `0x00650090`, read 2026-10-10,
+   PC 1 today; settles REC-1391 and REC-1643). So missiles snap like
+   players and monsters on every type but 4 (recorded: `dru-tornado`
+   frames 30–31, type 10 with point 0 = its start cell: Δ = (0, 0),
+   index 1, then the §9.4 rule 2.5 aim; `sor-charged-bolt.check` frame
+   27 and `pal-blessed-hammer.check` frame 31 land on point centres),
+   and a type-4 path, of any unit type, never snaps and never reaches a
+   point here: its index is not advanced by this function, so it flies
+   on past its aim point (`diff-a4-nm-unique` frames 36–41, class 320;
+   `sor-inferno.check` frame 45) until something else ends it. A type-4
+   missile that stops at its target cell (`ass-fire-blast` frame 41)
+   is not stopped by this rule; its owner is `missiles/missiles.md`.
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path
@@ -764,7 +761,10 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    mask; collided mask |= result; refused iff the mask has 0x1 or 0x4.
    Others → try move (§6 rule 1) with the move mask (0x3401 replaced by
    0x3C01); collided mask |= result; refused iff the mask ≠ 0.
-7. Reaching the point (rule 3) and not blocked: index += 1.
+7. Reaching the point (rule 3) and not blocked: index += 1. The
+   function's own result (ignored, rule 4): 1 here, 0 without a snap
+   or on rule 2; blocked: 0 on the index := count branch, else 1 iff
+   the re-path returned 0 (`0x00650745`–`0x00650799`).
 8. Set position (`0x0064FB90(Q, hint)`): missile path whose new cell has
    no room → count := 0, position unchanged. Else precise := Q, client
    coordinates (`sim/path-placement.md` §1); if flag 0x1: room recache
