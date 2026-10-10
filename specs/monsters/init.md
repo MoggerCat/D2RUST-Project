@@ -49,19 +49,19 @@
 |   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 867–881 |
 |   22. Umod callbacks and the type-7 event | 882–933 |
 |   23. Unique names (client) | 934–943 |
-|   24. Monster assign message | 944–995 |
-|   25. Calling the spawn functions outside population (tools) | 996–1086 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1087–1146 |
-|   27. Class reinit (`0x00574370`) | 1147–1192 |
-| Constants & data dependencies | 1193–1214 |
-| Randomness | 1215–1259 |
-| Edge cases & original bugs | 1260–1291 |
-| Test vectors | 1292–1293 |
-|   Synthetic (CI-safe) | 1294–1316 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1317–1347 |
-|   Recorded checks (monster assign 0xAC) | 1348–1360 |
-| Provenance | 1361–1450 |
-| Open questions | 1451–1531 |
+|   24. Monster assign message | 944–1000 |
+|   25. Calling the spawn functions outside population (tools) | 1001–1091 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1092–1151 |
+|   27. Class reinit (`0x00574370`) | 1152–1197 |
+| Constants & data dependencies | 1198–1219 |
+| Randomness | 1220–1264 |
+| Edge cases & original bugs | 1265–1296 |
+| Test vectors | 1297–1298 |
+|   Synthetic (CI-safe) | 1299–1321 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1322–1352 |
+|   Recorded checks (monster assign 0xAC) | 1353–1365 |
+| Provenance | 1366–1455 |
+| Open questions | 1456–1536 |
 <!-- /index -->
 
 ## Summary

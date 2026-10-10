@@ -44,14 +44,14 @@
 |   10. Restoring from a save | 684–729 |
 |   11. Items (expansion) | 730–799 |
 |   12. Services (links) | 800–803 |
-|   13. Messages | 804–870 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 871–877 |
-| Constants & data dependencies | 878–901 |
-| Randomness | 902–912 |
-| Edge cases & original bugs | 913–964 |
-| Test vectors | 965–1027 |
-| Provenance | 1028–1084 |
-| Open questions | 1085–1177 |
+|   13. Messages | 804–875 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 876–882 |
+| Constants & data dependencies | 883–906 |
+| Randomness | 907–917 |
+| Edge cases & original bugs | 918–969 |
+| Test vectors | 970–1032 |
+| Provenance | 1033–1089 |
+| Open questions | 1090–1182 |
 <!-- /index -->
 
 ## Summary
