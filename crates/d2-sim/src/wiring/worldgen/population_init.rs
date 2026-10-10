@@ -148,7 +148,7 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
             UMOD_CHAMPION => h.init(|cx, h| init::champion_pack_member(cx, h, unit, m)),
             UMOD_QUEST => {
                 if let Some((row, aura)) = h.w.superunique_tail.remove(&unit) {
-                    h.init(|cx, h| init::superunique_finish(cx, h, unit, row, aura));
+                    h.init(|cx, h| init::superunique_finish_with(cx, h, unit, row, aura, false));
                 }
                 h.init(|cx, h| init::assign_umod(cx, h, unit, m, true));
             }

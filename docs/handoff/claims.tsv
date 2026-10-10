@@ -17,5 +17,7 @@ C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed dr
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	done 8 rows EQUAL (act-travel/a2-warp/join/milestone/npc-talk: 18 checks state 100%); packets part stays rc-net-div
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	done 7 rows EQUAL (gen-su-26/28/29/30/63, gen-boss-544, gen-ai-highpriest); deathmauler1-5 rows blocked by "ignore q seed" in gen-mon-529..533
 C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
+C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open
+C018	rc-c018-monstate	17:43	su hcIdx extra-spawn double roll(5) (a2-quest-radament s)	done gen-su radament,ismail,geleb,toorc,wyand,bremm,maffer,baal2 EQUAL
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	released: footstep-variant client seed (rc-audio-fmt-div, Windows)
 C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	open
