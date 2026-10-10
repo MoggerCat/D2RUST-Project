@@ -458,6 +458,13 @@ impl<X: Pending> View<'_, X> {
         let Some(u) = self.allocate(game, &req, rec.x, rec.y) else {
             return;
         };
+        // PROVISIONAL (REC-1560): the quest links of the boss mods
+        // (`0x005B1CF0` `Chain` steps, `init.md` §14.3: the barbarian
+        // cages' prison door 434 -> chain 32) come back with the unit; the
+        // anew-created restore otherwise leaves a restored door unlinked
+        // and its death never reaches the rescue quest. d2rs-own,
+        // unverified: the original's restore path was not read for them.
+        self.relink_boss_chains(u);
         if kind == SpawnKind::Plain {
             return;
         }
@@ -483,6 +490,26 @@ impl<X: Pending> View<'_, X> {
             }
             SpawnKind::Minion => m.type_flags |= tf::MINION,
             SpawnKind::Plain => {}
+        }
+    }
+
+    /// The `Chain` steps of the unit's boss mods (REC-1560).
+    fn relink_boss_chains(&mut self, u: UnitId) {
+        use crate::monsters::init::{boss_mods_for, BossStep};
+        let Some(class) = self.units.get(u).map(|r| r.class) else {
+            return;
+        };
+        let base = self
+            .h
+            .tables
+            .combat
+            .monstats
+            .get(class as usize)
+            .map_or(class as i32, |m| i32::from(m.baseid));
+        for &step in boss_mods_for(base, class) {
+            if let BossStep::Chain(n) = step {
+                self.h.x.monster_quest_chain(u, n);
+            }
         }
     }
 

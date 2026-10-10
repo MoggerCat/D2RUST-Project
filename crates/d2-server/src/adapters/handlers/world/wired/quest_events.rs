@@ -84,6 +84,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         let mut act3_npcs = None;
         let mut lair = None;
         let mut summit = None;
+        let mut armed = false;
         let mut not_intro = Vec::new();
         let mut rescue = Vec::new();
         self.desk(game, events, |desk, ctl, inv| {
@@ -195,6 +196,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 // only once the altar was used; the preview has no fight to
                 // open them with, so a fresh game stays passable.
                 summit = Some(act5::q5::summit_warp_open(q) || !act5::q5::altar_used(q));
+                armed = act5::q5::armed(q);
                 not_intro = q.records.iter().map(|r| (r.chain, r.not_intro)).collect();
                 rescue = act5::q2::barbarian_states(q);
             });
@@ -213,6 +215,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         if let Some(open) = durance {
             events.action().sys.hooks.x.set_durance_open(open);
         }
+        events.action().sys.hooks.x.set_ancients_armed(armed);
         if let Some(open) = summit {
             events.action().sys.hooks.x.set_summit_open(open);
         }
