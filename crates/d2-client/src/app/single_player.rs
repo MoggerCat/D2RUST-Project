@@ -1049,6 +1049,16 @@ impl Pending for LocalSeams {
     ) -> (i32, i32) {
         skill_events::missile_summon_class(h, sim, owner, skill, level)
     }
+    fn missile_area_units(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
+        skill_events::missile_area_units(h, sim, owner, at, r, f)
+    }
     fn missile_summon_spawn(
         h: &mut ActionHooks<Self>,
         sim: &mut USim<'_>,
