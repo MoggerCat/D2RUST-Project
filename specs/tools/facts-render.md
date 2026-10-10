@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–351 |
-|   6. Comparison | 352–408 |
-|   7. Requests | 409–420 |
-| Constants & data dependencies | 421–424 |
-| Randomness | 425–428 |
-| Edge cases & original bugs | 429–436 |
-| Test vectors | 437–445 |
-| Provenance | 446–450 |
-| Open questions | 451–465 |
+|   5. d2rs export | 190–355 |
+|   6. Comparison | 356–412 |
+|   7. Requests | 413–424 |
+| Constants & data dependencies | 425–428 |
+| Randomness | 429–432 |
+| Edge cases & original bugs | 433–440 |
+| Test vectors | 441–449 |
+| Provenance | 450–454 |
+| Open questions | 455–469 |
 <!-- /index -->
 
 ## Summary
@@ -199,7 +199,11 @@ composition, through `d2-client` only (game logic untouched).
    cell (two draw keys) stay two rows, as 1.14d calls the drawer per
    record (revision 2026-10-09: `a4-town-pandemonium-fortress` rows
    12–13). Before the first item of
-   each run of items tagged with the same unit, one `unit` row.
+   each run of items tagged with the same unit, one `unit` row. A run
+   is one unit draw, i.e. one draw-order slot: a new slot starts a new
+   run under the same tag (the tag is the GUID alone, and a GUID repeats
+   across unit types: monster 1:3 then object 2:3, `gen-ui-hud`
+   2026-10-10 rows 174–178).
 2. A frame of a DT1 part is a tile op; of a direction part a cel op;
    `file` / `dir` / `frame` come from the frame store's owner of the
    item's frame id.
