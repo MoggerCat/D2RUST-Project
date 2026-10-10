@@ -101,7 +101,7 @@ pub const FRAME_RECT_PAD: i32 = 16;
 /// The screen rectangle `(left, top, right, bottom)` of each unit's drawn
 /// cels (shadows left out) of one built frame, by unit: an item belongs to
 /// the unit whose draw-order slot (`slots`) it carries.
-// Spec: specs/tools/scenario-diff.md §3 r8.2 (hover = drawn frame rectangle)
+// Spec: specs/tools/scenario-diff.md §3 (hover = drawn frame rectangle)
 pub fn unit_rects(
     items: &[crate::scene::DrawItem],
     frames: &crate::frames::FrameStore,
@@ -240,7 +240,7 @@ mod rect_tests {
         (w, key)
     }
 
-    // Covers: specs/tools/scenario-diff.md §3 r8.2
+    // Covers: specs/tools/scenario-diff.md §3
     #[test]
     fn the_cursor_hits_a_drawn_frame_rectangle_widened_by_16() {
         let (w, key) = world_with_monster();
@@ -252,7 +252,7 @@ mod rect_tests {
         assert_eq!(pick_rects(&w, &rects, (120, 196)), None);
     }
 
-    // Covers: specs/tools/scenario-diff.md §3 r8.2
+    // Covers: specs/tools/scenario-diff.md §3
     #[test]
     fn a_unit_without_a_drawn_rectangle_is_not_hovered() {
         let (w, _) = world_with_monster();

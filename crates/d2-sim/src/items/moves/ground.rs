@@ -185,7 +185,9 @@ pub fn corpse_fill<W: MoveWorld>(w: &mut W, p: Owner, c: Owner) -> Result<bool, 
         return Ok(false);
     }
     let mut all = true;
+    let mut moved = false;
     if let Some(x) = w.cursor(p) {
+        moved = true;
         // Detaches the cursor item from P (`inventory.md` §1.4 rule 3).
         w.set_cursor(p, None);
         match w.find_free(c, x, page::INVENTORY) {
@@ -202,6 +204,7 @@ pub fn corpse_fill<W: MoveWorld>(w: &mut W, p: Owner, c: Owner) -> Result<bool, 
         let Some(x) = w.body_item(p, loc) else {
             continue;
         };
+        moved = true;
         super::handlers::remove_from_body(w, p, x)?;
         if w.place_body(c, x, loc) {
             w.set_body_loc(x, loc);
@@ -212,9 +215,15 @@ pub fn corpse_fill<W: MoveWorld>(w: &mut W, p: Owner, c: Owner) -> Result<bool, 
             all = false;
         }
     }
-    w.stat_refresh(p);
-    owner_refresh(w, p);
-    w.inventory_pass(p);
+    // The original's `0x0057F700` calls no refresh for P; with nothing
+    // moved P's client hears nothing (recorded `items-drops-cha-00`
+    // frame 96: no 0x47 / 0x48). PROVISIONAL (REC-2812): with items moved
+    // the refresh stays d2rs-own.
+    if moved {
+        w.stat_refresh(p);
+        owner_refresh(w, p);
+        w.inventory_pass(p);
+    }
     Ok(all)
 }
 
