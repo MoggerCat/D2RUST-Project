@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–478 |
-|   5. Client vitals sync (`0x00548760`) | 479–617 |
-| Constants & data dependencies | 618–634 |
-| Randomness | 635–638 |
-| Edge cases & original bugs | 639–650 |
-| Test vectors | 651–671 |
-| Provenance | 672–707 |
-| Open questions | 708–744 |
+|   4. Experience | 179–485 |
+|   5. Client vitals sync (`0x00548760`) | 486–624 |
+| Constants & data dependencies | 625–641 |
+| Randomness | 642–645 |
+| Edge cases & original bugs | 646–657 |
+| Test vectors | 658–678 |
+| Provenance | 679–714 |
+| Open questions | 715–751 |
 <!-- /index -->
 
 ## Summary
@@ -451,6 +451,13 @@ target unit K (resolved by `0x00580A70`).
       &= ~0x2 (`0x00538260(client, 0)`); dead-body footprint
       `0x00649F70(P, 1)`; cancel event types 8, 9 (`0x00540E60`); cancel
       0/1 (`0x00553990`).
+      The footprint call is unconditional for a player (no `deadCol`
+      gate): the 0x80 player footprint becomes a 3 × 3 box of 0x8000, so
+      a missile's collide-mask test (`missiles/missiles.md` §R4 step 9)
+      no longer finds the body. Measured 2026-10-10,
+      `items-drops-nor-04`: with the player dead at f39 the 1.14d bolt
+      passes the monster beside the body; with the 0x80 footprint kept
+      d2rs hit it.
    6. Cancel 0/1 again (`0x00553990`), animation schedule `0x005539B0`
       (`sim/units.md` §4.2).
    7. P lacks state 7 (`playerbody`) → P flags (+0xC4) &= ~0x2.

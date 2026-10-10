@@ -462,6 +462,13 @@ impl<X: Pending> View<'_, X> {
         if dead_col {
             return;
         }
+        self.dead_body_footprint(unit);
+    }
+
+    /// `0x00649F70(U, 1)` (`skills/bodies-3.md` §3.9) without the class
+    /// gate: the player's dead clean-up `0x0057F330` calls it directly
+    /// (`combat/vitals.md` §4.6 rule 1.5).
+    pub fn dead_body_footprint(&mut self, unit: UnitId) {
         let Some((room, x, y)) = self
             .h
             .paths
