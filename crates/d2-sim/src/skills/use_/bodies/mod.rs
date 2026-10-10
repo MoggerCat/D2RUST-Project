@@ -111,6 +111,9 @@ pub fn start(index: u16) -> Option<i32> {
 
 /// The remove callbacks of §2.8 (list +0x38 ids; the 1.14d addresses).
 pub mod callback {
+    /// Missile just-hit list `0x005ADAF0` (`missiles.md` §R5 step 6.1):
+    /// state off and the update queue only.
+    pub const JUSTHIT: u32 = 0x005A_DAF0;
     /// Default `0x0056E900`.
     pub const DEFAULT: u32 = 0x0056_E900;
     /// Cold `0x0057AD80` (`combat/damage.md` §5.6): state off; a living

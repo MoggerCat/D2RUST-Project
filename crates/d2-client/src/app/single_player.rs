@@ -1265,7 +1265,9 @@ impl Pending for LocalSeams {
                 (u, d2_sim::monsters::ai::distance_full_size(p, size, at))
             })
             .filter(|&(_, d)| d <= GOOD_SEARCH_RANGE)
-            .min_by_key(|&(u, d)| (d, u))
+            // A tie keeps the earlier candidate of the walk: a room's unit
+            // list is newest first (`ai.md` §5.4 rule 3), so the newest id.
+            .min_by_key(|&(u, d)| (d, std::cmp::Reverse(u)))
     }
     /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
     /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag

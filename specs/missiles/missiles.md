@@ -560,7 +560,11 @@ order:
       expiring at frame + `NextDelay` with state 86 is attached to the
       unit, state 86 is turned on, and a type-12 (remove state) timed
       event is scheduled on the unit for that frame (`0x005417D0`,
-      `tick.md` §5.2).
+      `tick.md` §5.2). The list's remove callback is `0x005ADAF0`
+      (`push 0; call 0x00639DB0(unit, state, 0)`, 1.14d bytes): state off
+      and the update-queue insert, nothing else. Without it the unit
+      stays "just hit" for good and later missiles never hit it
+      (`a5-su-ancient1` frame 37, Death Mauler 3:3 on act5barb1).
    2. Unit event 0 (hit by missile, events.txt row 0; `0x005C0C30`,
       called also when the unit is none).
    3. `pSrvHitFunc` in 1…70 (count `0x0073C83C`): `c` = its result
