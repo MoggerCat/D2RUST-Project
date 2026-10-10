@@ -659,12 +659,37 @@ fn search(
     b: (i32, i32, i32, i32),
     step: usize,
 ) -> Vec<(i32, i32)> {
+    // A player's move is tested with a plus around the cell (`pathing.md`
+    // §7 pattern query, pattern 1), so a cell next to a wall is not walkable: route
+    // with one cell of clearance, and without it only when that reaches
+    // nothing.
+    let (path, reached) = search_clear(drlg, start, areas, b, step, 1);
+    if reached {
+        return path;
+    }
+    search_clear(drlg, start, areas, b, step, 0).0
+}
+
+/// [`search`] with `clear` cells of free space around every cell of the
+/// route; whether the route ends inside `b`.
+fn search_clear(
+    drlg: &Drlg,
+    start: (i32, i32),
+    areas: &[(i32, i32, i32, i32)],
+    b: (i32, i32, i32, i32),
+    step: usize,
+    clear: i32,
+) -> (Vec<(i32, i32)>, bool) {
     use std::collections::{BTreeMap, VecDeque};
     let inside =
         |(x, y): (i32, i32), r: (i32, i32, i32, i32)| x >= r.0 && y >= r.1 && x < r.2 && y < r.3;
     let free = |c: (i32, i32)| {
-        drlg.collision_at(c.0, c.1)
-            .is_some_and(|m| m & MOVE_MASK == 0)
+        let open = |x: i32, y: i32| drlg.collision_at(x, y).is_some_and(|m| m & MOVE_MASK == 0);
+        open(c.0, c.1)
+            && (clear == 0
+                || [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .all(|&(dx, dy)| open(c.0 + dx, c.1 + dy)))
     };
     let dist = |c: (i32, i32)| {
         let dx = (b.0 - c.0).max(c.0 - (b.2 - 1)).max(0);
@@ -714,7 +739,7 @@ fn search(
     if out.last() != path.last() {
         out.extend(path.last());
     }
-    out
+    (out, best.0 == 0)
 }
 
 /// Goal points two tiles inside `to`, along the edge it shares with

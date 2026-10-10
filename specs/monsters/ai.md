@@ -421,6 +421,13 @@ Only when a target was found:
    target distance is < 20, the target is a player, and control flag 0x10
    is clear: play sound 16, set flag 0x10, idle 20, stop. Once per
    monster.
+   Recorded (rc-drop-content, `items-drops-nor-11` with the rng channel,
+   2026-10-10): Griswold (class 365, monstats `boss`) spawned at frame 30
+   with a player < 20 away makes its first think at frame 31 and idles
+   20 (no draw); its Griswold body (`0x005E5AC0`) first draws at frame 51,
+   then 61 and 66. The boss, demon, undead and prime-evil tests read the
+   monstats flags of the unit's class (monster units only); d2rs answered
+   false for all four until the action hooks read the row.
 2. **Teleport** (`0x005B11F0`, monsters given control flag 0x20 by a
    monumod; `monsters/init.md`). Not if dead or flag 0x20 clear. Draws:
    1. `lo' % 100` ≥ 40 → continue with 3.
@@ -1106,6 +1113,12 @@ the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
 9. Any other skill → 1.
 
 1.14d-confirmed (`0x005FD470`, register use in the disassembly).
+Implemented (rc-mon-frame31, REC-1996): `View::skill_check` runs the rules
+above on the DRLG rooms once the path provider is on (rule 5, DiabPrison,
+stays false). Before this the host stub answered 0, so a ClawViper never
+cast SerpentCharge (srvdofunc 67, rule 7). gen-mon-77: first divergence
+31 → 34 (the Charge hit).
+
 
 #### 7.5 Path target and re-path budget on a mode request
 

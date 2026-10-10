@@ -264,8 +264,8 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
 
     /// `0x00619660`: the room's floor records (`rooms.md` §10.2 lists it
     /// as the floor list), positions in level tiles.
-    // A record is water when its DT1 tile's material flags (header +0x06,
-    // accessor `0x00604BC0`, `rooms.md` §9.3) have bit 0x2 (`0x005B2789`).
+    /// A record is water when its tile's DT1 material flags (`0x00604BC0`
+    /// returns the u16 at tile +0x06) have bit 0x2 (`population.md` §9.2).
     fn tile_records(&self, room: RoomId) -> Vec<TileRec> {
         let Some((act, r)) = self.drlg_room(room) else {
             return Vec::new();
@@ -278,7 +278,7 @@ impl<X: WorldPending> PopWorld for WorldHost<'_, X> {
             t.floors
                 .iter()
                 .map(|rec| TileRec {
-                    water: d.tile_info(rec.tile).material & 0x2 != 0,
+                    water: d.tile_info(rec.tile).material & 2 != 0,
                     x: rec.x + dr.rect.x,
                     y: rec.y + dr.rect.y,
                 })
