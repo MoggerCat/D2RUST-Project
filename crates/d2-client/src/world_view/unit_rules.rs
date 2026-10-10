@@ -69,7 +69,8 @@ impl<R> UnitRules<R> {
         // (`player_anim::mode_set`, e.g. the 0x15 placement out of town):
         // the model's own looping frame.
         if unit.key.unit_type == PLAYER
-            && matches!(unit.mode, 1 | 5)
+            && (matches!(unit.mode, 1 | 5)
+                || crate::bridge::player_anim::ENDING_MODES.contains(&unit.mode))
             && unit.speed.is_some()
             && unit.frame_count > 0
         {
