@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
 |   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–989 |
-| Constants & data dependencies | 990–1025 |
-| Randomness | 1026–1042 |
-| Edge cases & original bugs | 1043–1082 |
-| Test vectors | 1083–1097 |
-| Provenance | 1098–1120 |
-| Open questions | 1121–1150 |
+|   5. Bodies used by one monster skill | 545–999 |
+| Constants & data dependencies | 1000–1035 |
+| Randomness | 1036–1052 |
+| Edge cases & original bugs | 1053–1092 |
+| Test vectors | 1093–1107 |
+| Provenance | 1108–1130 |
+| Open questions | 1131–1160 |
 <!-- /index -->
 
 ## Summary
@@ -603,6 +603,16 @@ dead-body footprint (§3.9). Return 1. Skill and L are not read.
       1; tries += 1.
 6. Kill the unit: `0x0057CCB0(game, unit, unit, 1)` (`combat/damage.md`
    §7.2). Return 1.
+
+rc-maggot-seed (1.14d-measured, gen-mon-190..194, 681): the spawns of step
+5 go through the full creation (`monsters/population.md` §9 placement on
+the room seed around the egg, then allocation and init draws), in order:
+placement, allocation, init of the first baby, then the same for each
+extra. The egg gave up its footprint at its start (§5.6, §3.9), so the
+first ring-0 test at the egg's own position passes. The level L is the
+monster's `Sk1lvl` plus the difficulty's `MonsterSkillBonus`
+(`monsters/init.md` §6 step 14), so maggotegg1 at level 2 hatches
+`calc1` = 2 babies (the second in mode 8, spread 1).
 
 #### 5.8 srvst 44 MagottUp `0x005CB170`
 

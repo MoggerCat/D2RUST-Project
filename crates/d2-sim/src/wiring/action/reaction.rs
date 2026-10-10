@@ -556,8 +556,11 @@ impl<X: Pending> VitalsUnits for CombatView<'_, X> {
     fn max_stamina(&self, u: UnitId) -> i32 {
         VitalsUnits::max_stamina(&self.v, u)
     }
+    /// `0x0064C040`: the unit joins its room's update queue, so its
+    /// player update sends the changed stats (`stat-lists.md` §11 rule 4).
     fn refresh(&mut self, u: UnitId) {
         VitalsUnits::refresh(&mut self.v, u);
+        let _ = self.game.lists.queue_update(u);
     }
     fn level_up_notify(&mut self, u: UnitId) {
         self.v.level_up_notify(u);

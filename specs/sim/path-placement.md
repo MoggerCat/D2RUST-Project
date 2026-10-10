@@ -35,21 +35,21 @@
 |   2. Path records | 101–208 |
 |   3. Size, collision pattern, footprint mask | 209–249 |
 |   4. Collision queries | 250–330 |
-|   5. Footprints | 331–383 |
-|   6. Moving a footprint | 384–422 |
-|   7. Nearest free point (`0x0064DEA0`) | 423–487 |
-|   8. Coarse free-box search (`0x0064E840`) | 488–520 |
-|   9. Floor drop placement (`0x00555DA0`) | 521–543 |
-|   10. Placing a unit at a point (`0x00554EA0`) | 544–610 |
-|   11. Level spawn point (`0x0061B060`) and game entry | 611–659 |
-|   12. Warp tiles and warp arrival | 660–720 |
-|   13. Where a joining character stands at tick 0 | 721–782 |
-| Constants & data dependencies | 783–801 |
-| Randomness | 802–811 |
-| Edge cases & original bugs | 812–847 |
-| Test vectors | 848–885 |
-| Provenance | 886–926 |
-| Open questions | 927–1010 |
+|   5. Footprints | 331–393 |
+|   6. Moving a footprint | 394–432 |
+|   7. Nearest free point (`0x0064DEA0`) | 433–497 |
+|   8. Coarse free-box search (`0x0064E840`) | 498–530 |
+|   9. Floor drop placement (`0x00555DA0`) | 531–553 |
+|   10. Placing a unit at a point (`0x00554EA0`) | 554–620 |
+|   11. Level spawn point (`0x0061B060`) and game entry | 621–669 |
+|   12. Warp tiles and warp arrival | 670–730 |
+|   13. Where a joining character stands at tick 0 | 731–792 |
+| Constants & data dependencies | 793–811 |
+| Randomness | 812–821 |
+| Edge cases & original bugs | 822–857 |
+| Test vectors | 858–895 |
+| Provenance | 896–936 |
+| Open questions | 937–1020 |
 <!-- /index -->
 
 ## Summary
@@ -380,6 +380,16 @@ Remove (`0x00649560(unit, force)`), returns whether it cleared:
    0x8000 (rule 1 restamps the plus with 0x8000; pattern 5 adds no
    marker).
 4. Unit removal clears with force (`0x00649F50`).
+5. Path reset (`0x00649CA0(unit)`): with a dynamic path, the pattern
+   := §3 pattern of the **stored** size (`0x00648580(unit, path
+   +0x08)`); when the unit has a room (`0x00620BB0`) the old footprint
+   is removed first (force, `0x00649560(unit, 1)`) and the new one
+   stamped (`0x00649400`). It undoes a wraith's pattern 5 (§2.4): the
+   alignment setter's tail `0x00554340` (`combat/hit.md`) runs it on a
+   monster's first alignment set, so every placed wraith ends with the
+   size pattern and its 0x1000 marker (1.14d: `gen-lvl-31` frame 21,
+   wraith2 1:32 placed at y 8159, three cells past the candidate whose
+   plus held the previous wraith's centre).
 
 ### 6. Moving a footprint
 
