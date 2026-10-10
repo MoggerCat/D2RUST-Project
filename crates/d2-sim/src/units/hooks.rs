@@ -26,6 +26,9 @@ pub struct MonsterInfo {
     /// The monstats2 move bits (+0x104, bit = mode) of the class's
     /// `MonStatsEx` row.
     pub moves: u32,
+    /// `SplGetModeChart` (+0x1A5): the class may use the per-class mode
+    /// records of `0x005A78A0` (`sim/units.md` §4.6).
+    pub mode_chart: bool,
 }
 
 /// Tables and game settings the unit code reads.
@@ -66,6 +69,7 @@ impl UnitData {
                     enabled: m.enabled,
                     aidel: [m.aidel, m.aidel_n, m.aidel_h],
                     moves,
+                    mode_chart: m.splgetmodechart != 0,
                 }
             })
             .collect();

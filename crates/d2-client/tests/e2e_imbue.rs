@@ -234,6 +234,7 @@ impl Fx {
                     enabled: true,
                     aidel: [15; 3],
                     moves: 0,
+                    mode_chart: false,
                 };
                 N_MONSTATS
             ],

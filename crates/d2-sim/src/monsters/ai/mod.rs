@@ -711,7 +711,24 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    // The generic end `0x005A8030`: a unit with state 54 first runs
+    // `0x005544B0(unit, 0)` and a dead one stops there; the neutral
+    // request (its builder clears the used skill entry `0x00620210(unit,
+    // 0)`; the host seam has no "none" yet, `set_current_skill(0)` would
+    // pick skill 0) targets the unit's path target unit (`0x00553540`: none when it is
+    // the unit itself), else the point (0, 0) (§7.5 rule 6).
+    if cx.world.has_state(unit, state::UNINTERRUPTABLE) {
+        cx.world.clear_uninterruptable(game, unit);
+        delete_thinks(game, unit);
+        if cx.world.is_dead(unit) {
+            return;
+        }
+    }
+    let target = match cx.world.path_target(unit).filter(|&t| t != unit) {
+        Some(t) => ModeTarget::Unit(t),
+        None => ModeTarget::Point(0, 0),
+    };
+    request_mode(game, cx, unit, mode::NEUTRAL, target);
 }
 
 /// Installing an AI `0x005B0E00` (§3.3).

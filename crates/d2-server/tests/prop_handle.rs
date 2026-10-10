@@ -637,6 +637,7 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
             enabled: true,
             aidel: [15; 3],
             moves: 0,
+            mode_chart: false,
         }],
         ..UnitData::default()
     };
@@ -1554,6 +1555,7 @@ mod trade {
                     enabled: true,
                     aidel: [15; 3],
                     moves: 0,
+                    mode_chart: false,
                 };
                 N_MONSTATS
             ],

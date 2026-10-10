@@ -1203,6 +1203,7 @@ impl Fx {
                     enabled: true,
                     aidel: [15; 3],
                     moves: if c == 0 { 1 << 4 } else { 0 },
+                    mode_chart: false,
                 })
                 .collect(),
             ..UnitData::default()

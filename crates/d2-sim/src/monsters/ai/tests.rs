@@ -1434,11 +1434,12 @@ fn mode_end_inline_think() {
     w.fake.states.insert((mon, state::FREEZE));
     w.with(|g, cx| mode_end(g, cx, mon, mode::RUN));
     assert!(w.thinks().is_empty());
-    // An attack end requests neutral.
+    // An attack end requests neutral at the point (0, 0) when the path
+    // target is none or the unit itself (`0x005A8030`, `ai.md` §1.4).
     let mut w = World::new(monstats(1, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
-    assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
 }
 
 // Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1
@@ -1701,7 +1702,7 @@ fn special_states_10_to_12_need_switchai() {
 #[test]
 fn stub_ai_logged() {
     // Every AI table think has a body now; a special-state think without
-    // one (state 6 `0x005E7C10`) is a logged stub.
+    // one (an address outside the table) is a logged stub.
     let mut w = World::new(monstats(41, [0; 5], 15));
     let mon = w.mon;
     let p = TickParam {
@@ -1711,11 +1712,11 @@ fn stub_ai_logged() {
         class: 0,
         class2: 0,
     };
-    w.with(|g, cx| run_function(g, cx, 0x005E_7C10, mon, &p));
+    w.with(|g, cx| run_function(g, cx, 0x005E_7C11, mon, &p));
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7C10,
+            addr: 0x005E_7C11,
             unit: mon
         }]
     );

@@ -162,7 +162,7 @@ fn think_rhythm_table() {
     assert_eq!(last_mode(&w), at_unit(mode::ATTACK2, w.player));
     assert!(w.thinks().is_empty());
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK2));
-    assert_eq!(last_mode(&w), at_unit(mode::NEUTRAL, mon));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
     w.with(|g, cx| neutral_mode_start(g, cx, mon));
     assert_eq!(w.thinks(), [115]);
     // A walk end thinks inline (Idle: +200 from this frame); AI Idle →

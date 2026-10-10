@@ -1560,6 +1560,7 @@ fn merc_give_swaps_onto_the_hosts_hireling() {
         enabled: true,
         aidel: [15; 3],
         moves: 0,
+        mode_chart: false,
     }];
     let merc = sim
         .events

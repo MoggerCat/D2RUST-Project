@@ -616,7 +616,7 @@ impl<X: Pending> ActionHooks<X> {
     /// animation refresh, animation complete → KB event 1.
     fn monster_kb_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let _ = self.monster_step(sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        self.refresh_unit_animation(sim, unit);
         if self.monster_anim_complete(sim, unit) {
             self.monster_kb_event1(sim, unit);
         }
@@ -647,13 +647,7 @@ impl<X: Pending> ActionHooks<X> {
             return;
         }
         X::monster_sequence_frame(self, sim, unit);
-        let advanced = sim
-            .units
-            .get_mut(unit)
-            .is_some_and(|r| crate::units::anim::advance_sequence(&mut r.anim));
-        if !advanced {
-            self.x.refresh_animation(sim.game, unit);
-        }
+        self.refresh_unit_animation(sim, unit);
     }
 
     /// Attack-family event 0 `0x005A7670` (modes 4, 5, 7, 8, 9;
@@ -668,7 +662,7 @@ impl<X: Pending> ActionHooks<X> {
     fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         if self.used_skill_of(unit).is_some() {
             X::monster_attack_skill(self, sim, unit);
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_unit_animation(sim, unit);
             return;
         }
         let Some(mode) = sim.units.get(unit).map(|r| r.mode) else {
@@ -677,7 +671,7 @@ impl<X: Pending> ActionHooks<X> {
         let moving = monster_moves(sim, unit, mode);
         if moving {
             let _ = self.monster_step(sim, unit);
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_unit_animation(sim, unit);
             if self.monster_anim_complete(sim, unit) {
                 return;
             }
@@ -692,7 +686,7 @@ impl<X: Pending> ActionHooks<X> {
     /// animation refresh, animation complete → set mode 11.
     fn monster_s3_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let _ = self.monster_step(sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        self.refresh_unit_animation(sim, unit);
         if self.monster_anim_complete(sim, unit) {
             self.plain_mode(sim, unit, MODE_S4);
         }
@@ -704,7 +698,7 @@ impl<X: Pending> ActionHooks<X> {
     }
 
     /// Runs `f` on the AI store and the wired AI world.
-    fn with_ai(
+    pub(crate) fn with_ai(
         &mut self,
         sim: &mut Sim<'_>,
         f: impl FnOnce(&mut crate::game::Game, &mut ai::Ctx<'_, View<'_, X>>),

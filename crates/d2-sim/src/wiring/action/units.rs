@@ -583,6 +583,37 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         X::action_frame(self, sim, unit, a1, a2)
     }
 
+    /// The per-class mode records of `0x005A78A0` (`units.md` §4.6): a
+    /// class with `SplGetModeChart` set takes the attack-family record
+    /// `{0x005A75C0, 0x005A7670, 0x005A8030, schedules}` for S3 (mode 10)
+    /// when it is 543, 544, 570 or 709, for S3 and S4 (modes 10, 11) when
+    /// it is 243, 333 or 705, and for S4 when it is 417 or 418. Class
+    /// 403's records (modes 4, 5, 8, 9; event-1 functions `0x005A8330`,
+    /// `0x005A83E0`) are not specified and keep the table's.
+    fn monster_class_record(
+        &mut self,
+        sim: &Sim<'_>,
+        unit: UnitId,
+        mode: u32,
+    ) -> Option<crate::units::modes::MonsterModeRecord> {
+        let class = sim.units.get(unit)?.class;
+        if !sim.data.monster(class).is_some_and(|m| m.mode_chart) {
+            return None;
+        }
+        let hit = match class {
+            543 | 544 | 570 | 709 => mode == 10,
+            243 | 333 | 705 => mode == 10 || mode == 11,
+            417 | 418 => mode == 11,
+            _ => false,
+        };
+        hit.then_some(crate::units::modes::MonsterModeRecord {
+            start: MONSTER_MODES[4].start,
+            event0: MONSTER_MODES[4].event0,
+            event1: MONSTER_MODES[4].event1,
+            schedules: true,
+        })
+    }
+
     /// Monster mode functions (`units.md` §4.6): the start and event
     /// functions of rules 5–14 ([`crate::wiring::path::monsters`]); the
     /// death start `0x005A6FF0` goes to [`Pending::monster_death_start`]

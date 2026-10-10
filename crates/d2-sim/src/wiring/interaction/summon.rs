@@ -245,6 +245,38 @@ impl<X: Pending + UseRest> UseView<'_, X> {
             }
             return Some(e);
         }
+        if let BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30`: +0x94 / +0x98 := the owner's type and GUID
+            // (0 / 0 for none).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                r.source = link.unwrap_or((0, 0));
+            }
+            return None;
+        }
+        if let BodyEffect::WaitThink { m, frames } = e {
+            // "wait N" `0x005DE0F0(game, m, N)` (`ai.md` §1.2 table):
+            // delete the thinks and schedule one at frame + N, the mode
+            // unchanged; without the AI store the seam's.
+            if self.cv.v.h.ai.is_none() {
+                return Some(e);
+            }
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.cv.game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            v.h.with_ai(&mut sim, |g, cx| {
+                crate::monsters::ai::idle_keep_mode(g, cx, m, frames)
+            });
+            return None;
+        }
         if let BodyEffect::OwnerData { m, owner, a, b } = e {
             self.owner_data(m, owner);
             // f1 / f2 ≠ 0 also restart the AI (`0x005DD230`): the seam's.

@@ -171,6 +171,10 @@ pub struct UnitRecord {
     pub flags: u32,
     /// +0xC8.
     pub flags2: u32,
+    /// +0x94 / +0x98: the source-unit link's owner type and GUID, valid
+    /// while +0xC8 bit 0x400 is set (`0x00621CE0`, `0x00552FD0`;
+    /// `sim/units.md` §2 "Owner links").
+    pub source: (u32, u32),
     /// +0xD0.
     pub node_index: u32,
     /// +0x64 / +0x68 / +0x6C ([`InteractInfo`]).
@@ -194,6 +198,7 @@ impl UnitRecord {
             hover: None,
             flags: 0,
             flags2: 0,
+            source: (0, 0),
             node_index: INITIAL_NODE_INDEX,
             // sim/units.md §2: the zeroed allocation (`0x00620290`) leaves
             // GUID 0, type 0, inactive; nothing in `0x00555230` writes them.

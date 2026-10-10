@@ -658,7 +658,18 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         self.h.x.ai_hostile(game, a, b)
     }
+    /// `0x00552FD0`: the source-unit link (+0xC8 bit 0x400: the unit of
+    /// type +0x94 and GUID +0x98), else the host's.
     fn owner(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        if let Some((ty, guid)) = self
+            .units
+            .get(unit)
+            .filter(|r| r.flags2 & 0x400 != 0)
+            .map(|r| r.source)
+        {
+            let ty = *crate::units::UnitType::ALL.get(ty as usize)?;
+            return game.lists.find_unit(ty, guid);
+        }
         self.h.x.ai_owner(game, unit)
     }
     fn owner_record(&self, unit: UnitId) -> Option<(i32, u32)> {

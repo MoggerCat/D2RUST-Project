@@ -96,6 +96,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
                 enabled: true,
                 aidel: [15, 15, 15],
                 moves: 0,
+                mode_chart: false,
             };
             ANDARIEL as usize + 1
         ],

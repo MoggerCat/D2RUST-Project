@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–282 |
-|   2. Think dispatch `0x005B1740` | 283–422 |
-|   3. AI control and AI tables | 423–594 |
-|   4. AI parameters | 595–613 |
-|   5. Target selection | 614–925 |
-|   6. Distances and line tests | 926–940 |
-|   7. Tactics helpers | 941–1180 |
-|   8. AI commands and minions | 1181–1207 |
-|   10. The catalogue `ai-functions.tsv` | 1208–1228 |
-| Constants & data dependencies | 1229–1252 |
-| Randomness | 1253–1282 |
-| Edge cases & original bugs | 1283–1324 |
-| Test vectors | 1325–1413 |
-| Provenance | 1414–1474 |
-| Open questions | 1475–1581 |
+|   1. Think scheduling | 97–289 |
+|   2. Think dispatch `0x005B1740` | 290–429 |
+|   3. AI control and AI tables | 430–601 |
+|   4. AI parameters | 602–620 |
+|   5. Target selection | 621–932 |
+|   6. Distances and line tests | 933–947 |
+|   7. Tactics helpers | 948–1187 |
+|   8. AI commands and minions | 1188–1214 |
+|   10. The catalogue `ai-functions.tsv` | 1215–1235 |
+| Constants & data dependencies | 1236–1259 |
+| Randomness | 1260–1289 |
+| Edge cases & original bugs | 1290–1331 |
+| Test vectors | 1332–1420 |
+| Provenance | 1421–1481 |
+| Open questions | 1482–1588 |
 <!-- /index -->
 
 ## Summary
@@ -202,8 +202,15 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   set the anim mode (only the table-1 branch calls `0x00624690(unit,
   1)`); same freeze gate, then the think (`0x005A80C5`–`0x005A80F5`); a
   matching class whose mode does not match falls to the table test;
-- every other case requests a mode change to neutral (which schedules
-  through §1.3).
+- every other case (`0x005A8030` at `0x005A80E0`–`0x005A8150`, read
+  2026-10-10) first, for a unit with state 54, runs `0x005544B0(unit, 0)`
+  and stops when the unit is dead (`0x005541B0`); then clears the current
+  skill (`0x00620210(unit, 0)`) and requests a mode change to neutral
+  whose target unit is the unit's path target unit (`0x00553540`; none
+  when that is the unit itself) and whose point is (0, 0) (§7.5 rule 6),
+  so a monster with no target unit gets path target (0, 0) (recorded:
+  Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107). The
+  request schedules through §1.3.
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
@@ -502,7 +509,7 @@ name):
 | 3 | SpecialState03 | 1 | `0x005E5730` | `0x005E5870` | – |
 | 4 | Hireable | 0 | – | `0x005E52D0` | `0x005E5280` |
 | 5 | GoodNpcRanged | 0 | – | `0x005E7AC0` | – |
-| 6 | SpecialState06 | 0 | – | `0x005E7C10` | – |
+| 6 | SpecialState06 | 0 | – | `0x005E7C10` (`ai-bodies.md` §9.33) | – |
 | 7 | NecroPet | 0 | – | `0x005E4CF0` | – |
 | 8 | TownRogue | 1 | – | `0x005E7DC0` | – |
 | 9 | SpecialState09 | 1 | – | `0x005E7F80` | – |

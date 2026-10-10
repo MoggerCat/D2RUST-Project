@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1004 |
-|   5. Event dispatch | 1005–1019 |
-|   6. Events per kind | 1020–1142 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1143–1164 |
-|   8. Collision line between two units | 1165–1169 |
-| Constants & data dependencies | 1170–1186 |
-| Randomness | 1187–1194 |
-| Edge cases & original bugs | 1195–1215 |
-| Test vectors | 1216–1275 |
-| Provenance | 1276–1362 |
-| Open questions | 1363–1442 |
+|   4. Modes and mode schedules | 454–1032 |
+|   5. Event dispatch | 1033–1047 |
+|   6. Events per kind | 1048–1170 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1171–1192 |
+|   8. Collision line between two units | 1193–1197 |
+| Constants & data dependencies | 1198–1214 |
+| Randomness | 1215–1222 |
+| Edge cases & original bugs | 1223–1243 |
+| Test vectors | 1244–1303 |
+| Provenance | 1304–1390 |
+| Open questions | 1391–1470 |
 <!-- /index -->
 
 ## Summary
@@ -538,6 +538,12 @@ and nothing on the timer run writes +0x4E. Rule:
 
 `0x006218D0(U, i)` (set +0x4E from E[i] when 1–4) has no callers.
 
+d2rs runs this advance for every monster event 0 that the specs
+above send to `0x00623E00` (`ActionHooks::refresh_unit_animation`). With a
+frame count of zero or less the wrap loop does not run (the original's
+would not end). Measured: Baal 1:8 (`gen-lvl-132` frame 97): +0x44
+18688 → 1184 (+160 per advance, wrapped at the frame count 5888).
+
 Speed 0 gives event 1 at f + 1 in all forms. Callers: `0x00553B10` from
 `0x0056E210`; `0x00553C70` from skills `0x005C8CA0`, `0x005C8E30`,
 `0x005D68A0`, `0x005D69D0`; `0x00553DC0` from skills `0x005CF900` (3),
@@ -612,6 +618,28 @@ event-1 function, schedule flag} at `0x006E2260` + 16·mode; classes
 243–418, 543 and 544–709 with a set byte +0x1A5 in their monstats row
 use per-class records (`0x006E22D0`–`0x006E23A0`; monster spec). Null
 record or function: fallback `0x005A7B30`.
+
+**Per-class records** (`0x005A78A0`, read 2026-10-10). A class whose
+monstats `SplGetModeChart` (+0x1A5) is nonzero takes, for the listed
+(class, mode) pairs, a record other than the table's; every other pair
+takes `0x006E2260 + 16·mode`. All of these are the attack-family record
+{`0x005A75C0`, `0x005A7670`, `0x005A8030`, schedules = 1} (the same
+addresses as modes 4, 5, 7, 8, 9 above):
+
+| Classes | Modes |
+|---|---|
+| 543 (`0x21F`), 544 (`0x220`, Baal), 570 (`0x23A`), 709 (`0x2C5`) | 10 (S3) |
+| 243 (`0xF3`), 333 (`0x14D`), 705 (`0x2C1`) | 10 (S3), 11 (S4) |
+| 417, 418 (`0x1A1`, `0x1A2`) | 11 (S4) |
+| 403 (`0x193`) | 4, 5: `0x006E2380` and 8, 9: `0x006E2390`, event 1 `0x005A8330` / `0x005A83E0` (not read here) |
+
+So Baal's S3 (mode 10, the second step of its tentacle cast) schedules
+its animation: +0x44 := frame·256 at the mode start and the action events
+of its AnimData, with the attack-family event 0 (the frame advance runs
+only with a used skill or a moving mode, §4.2). Recorded: Baal 1:8 in
+`gen-lvl-132` enters S3 at frame 98 with +0x44 = 25088 = 98·256 and
+leaves it at frame 111 (event 0 of the 13th frame). d2rs implements the
+rows without class 403.
 
 | Mode | Start | Event 0 | Event 1 | Schedules | Moves (`0x006E23D0`) |
 |---|---|---|---|---|---|

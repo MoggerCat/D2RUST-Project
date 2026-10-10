@@ -1650,7 +1650,45 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
         self.x().body_point_collides(room, at, mask)
     }
+    /// `0x005B2F20` for the room-and-point form through population's
+    /// placement and creation on the lent monster world
+    /// (`monsters/population.md` §9: the placement draws, then the
+    /// allocation); the host's answer for the other forms.
     fn spawn_monster(&mut self, q: bodies::MonsterSpawn<UnitId, RoomId>) -> Option<UnitId> {
+        if let bodies::MonsterSpawn::At {
+            room,
+            x,
+            y,
+            class,
+            mode,
+            spread,
+            flags,
+        } = q
+        {
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *self.cv.game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let placed = v.h.with_monster_world(|w, h| {
+                w.spawn_at(
+                    &mut sim,
+                    h,
+                    room,
+                    x,
+                    y,
+                    class,
+                    u8::try_from(mode).unwrap_or(0),
+                    spread,
+                    flags as u16,
+                )
+            });
+            if let Some(Some(m)) = placed {
+                return m;
+            }
+        }
         self.xm().body_spawn_monster(q)
     }
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
