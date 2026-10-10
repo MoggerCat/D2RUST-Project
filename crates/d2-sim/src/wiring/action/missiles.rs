@@ -580,6 +580,14 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan has no provider here ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
+    /// Max life `0x00625D10` (the heal of server-hit 31 reads it).
+    fn max_life(&self, unit: UnitId) -> i32 {
+        self.stats.max_life(unit)
+    }
+    /// Max mana `0x00625D60`.
+    fn max_mana(&self, unit: UnitId) -> i32 {
+        self.stats.max_mana(unit)
+    }
     /// The `pettype.txt` row count (data tables +0xBF0).
     fn pet_type_count(&self) -> i32 {
         self.h.bodies.as_ref().map_or(0, |b| b.pettype_count)
