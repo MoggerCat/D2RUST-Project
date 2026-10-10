@@ -2636,3 +2636,67 @@ object.preset.579.presetshrine	objects.txt preset fn 579 @0x0054F0D0 (- rows)
 object.preset.580.specialchest	objects.txt preset fn 580 @0x0054F370 (- rows)
 object.preset.581.presetchest	objects.txt preset fn 581 @0x0054F180 (- rows)
 object.preset.582.arcanesymbol	objects.txt preset fn 582 @0x0054F430 (- rows)
+skill.monster.baal-taunt	skills.txt Baal Taunt (284) monster
+skill.monster.bestow	skills.txt Bestow (182) monster
+skill.monster.blood-mana	skills.txt Blood Mana (310) monster
+skill.monster.bloodlordfrenzy	skills.txt BloodLordFrenzy (328) monster
+skill.monster.countessfirewall	skills.txt CountessFirewall (321) monster
+skill.monster.cry-help	skills.txt Cry Help (290) monster
+skill.monster.deathmaul	skills.txt DeathMaul (308) monster
+skill.monster.defense-curse	skills.txt Defense Curse (309) monster
+skill.monster.doomknightmissile	skills.txt DoomKnightMissile (335) monster
+skill.monster.emerge	skills.txt Emerge (180) monster
+skill.monster.fetishaura	skills.txt FetishAura (177) monster
+skill.monster.fetishinferno	skills.txt FetishInferno (178) monster
+skill.monster.fingermagespider	skills.txt FingerMageSpider (196) monster
+skill.monster.fire-hit	skills.txt Fire Hit (156) monster
+skill.monster.healing-vortex	skills.txt Healing Vortex (291) monster
+skill.monster.horror-arctic-blast	skills.txt Horror Arctic Blast (323) monster
+skill.monster.imp-fire-missile	skills.txt Imp Fire Missile (299) monster
+skill.monster.imp-fire-missile-ex	skills.txt Imp Fire Missile Ex (356) monster
+skill.monster.imp-fireball	skills.txt Imp Fireball (283) monster
+skill.monster.imp-inferno	skills.txt Imp Inferno (282) monster
+skill.monster.imp-teleport	skills.txt Imp Teleport (330) monster
+skill.monster.impbolt	skills.txt ImpBolt (322) monster
+skill.monster.impregnate	skills.txt Impregnate (300) monster
+skill.monster.maggotegg	skills.txt MaggotEgg (159) monster
+skill.monster.magottdown	skills.txt MagottDown (162) monster
+skill.monster.magottlay	skills.txt MagottLay (163) monster
+skill.monster.magottup	skills.txt MagottUp (161) monster
+skill.monster.megademoninferno	skills.txt MegademonInferno (319) monster
+skill.monster.monblizzard	skills.txt MonBlizzard (205) monster
+skill.monster.monbonearmor	skills.txt MonBoneArmor (210) monster
+skill.monster.monbonespirit	skills.txt MonBoneSpirit (211) monster
+skill.monster.monbow	skills.txt MonBow (339) monster
+skill.monster.moncoldarrow	skills.txt MonColdArrow (341) monster
+skill.monster.moncursecast	skills.txt MonCurseCast (212) monster
+skill.monster.monexplodingarrow	skills.txt MonExplodingArrow (342) monster
+skill.monster.monfirearrow	skills.txt MonFireArrow (340) monster
+skill.monster.monfreezingarrow	skills.txt MonFreezingArrow (343) monster
+skill.monster.monfrenzy	skills.txt MonFrenzy (215) monster
+skill.monster.monicespear	skills.txt MonIceSpear (347) monster
+skill.monster.monpowerstrike	skills.txt MonPowerStrike (344) monster
+skill.monster.monteleport	skills.txt MonTeleport (184) monster
+skill.monster.mosquito	skills.txt Mosquito (206) monster
+skill.monster.nest	skills.txt Nest (167) monster
+skill.monster.overseer-whip	skills.txt Overseer Whip (295) monster
+skill.monster.regurgitatoreat	skills.txt RegurgitatorEat (214) monster
+skill.monster.resurrect	skills.txt Resurrect (181) monster
+skill.monster.resurrect2	skills.txt Resurrect2 (327) monster
+skill.monster.self-resurrect	skills.txt Self-resurrect (293) monster
+skill.monster.serpentcharge	skills.txt SerpentCharge (352) monster
+skill.monster.shamanfireex	skills.txt ShamanFireEx (355) monster
+skill.monster.shamanice	skills.txt ShamanIce (348) monster
+skill.monster.siege-beast-stomp	skills.txt Siege Beast Stomp (301) monster
+skill.monster.skeletonraise	skills.txt SkeletonRaise (158) monster
+skill.monster.spiderlay	skills.txt SpiderLay (173) monster
+skill.monster.submerge	skills.txt Submerge (176) monster
+skill.monster.succubusbolt	skills.txt SuccubusBolt (345) monster
+skill.monster.swarm-move	skills.txt Swarm Move (166) monster
+skill.monster.unholybolt	skills.txt UnHolyBolt (157) monster
+skill.monster.unholyboltex	skills.txt UnHolyBoltEx (354) monster
+skill.monster.vampirefireball	skills.txt VampireFireball (169) monster
+skill.monster.vampiremeteor	skills.txt VampireMeteor (171) monster
+skill.monster.vampiremissile	skills.txt VampireMissile (333) monster
+skill.monster.zakarumheal	skills.txt ZakarumHeal (179) monster
+skill.monster.zakarumlightning	skills.txt ZakarumLightning (332) monster
