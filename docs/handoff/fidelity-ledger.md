@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6151
+- Duplicate areas between parts: 6153
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2216,6 +2216,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.clawviper7`: rc-damage-draws.tsv:14 kept, rc-player-mode.tsv:11 dropped
   - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-player-mode.tsv:12 dropped
   - `monster.clawviper10`: rc-damage-draws.tsv:16 kept, rc-player-mode.tsv:13 dropped
+  - `monster.boss.baalcrab`: rc-mon-fr.tsv:9 kept, rc-player-mode.tsv:14 dropped
+  - `monster.deathmauler5`: rc-gen-mon-triage.tsv:138 kept, rc-player-mode.tsv:15 dropped
   - `render.effect.fx-frost-nova-cast`: rc-client-skill-do.tsv:5 kept, rc-render-effect.tsv:15 dropped
   - `render.effect.fx-frost-nova-flight`: rc-client-skill-do.tsv:6 kept, rc-render-effect.tsv:16 dropped
   - `render.effect.fx-fire-ball-cast`: rc-render-effect.tsv:11 kept, rc-render-wp-click.tsv:3 dropped
