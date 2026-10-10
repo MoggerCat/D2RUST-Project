@@ -16,7 +16,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | coverage | 171 | 29 | 0 | 61 | 0 | 81 | 60 | 30 | 0 | 90–360 | 0 | 152 / 11 / 8 |
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
-| items | 721 | 43 | 0 | 46 | 0 | 632 | 25 | 64 | 0 | 140.5–562 | 65 | 652 / 0 / 69 |
+| items | 721 | 43 | 0 | 45 | 0 | 633 | 24 | 64 | 0 | 140–560 | 65 | 653 / 0 / 68 |
 | monsters | 660 | 152 | 0 | 10 | 0 | 498 | 15 | 147 | 0 | 301.5–1206 | 5 | 400 / 240 / 20 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | q-chk-render-ui | 12 | 10 | 0 | 2 | 0 | 0 | 5 | 5 | 2 | 28.5–50+ | 0 | 10 / 0 / 2 |
@@ -32,8 +32,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 130 | 0 | 28 | 0 | 497 | 66 | 92 | 0 | 217–868 | 6 | 545 / 99 / 11 |
 | systems | 918 | 381 | 46 | 251 | 0 | 240 | 250 | 426 | 2 | 993–3908+ | 39 | 554 / 0 / 364 |
-| world | 826 | 41 | 0 | 77 | 0 | 708 | 10 | 103 | 5 | 251–844+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 901 | 46 | 500 | 0 | 3032 | 523 | 912 | 12 | 2181.5–8342+ | 286 | 3522 / 382 / 575 |
+| world | 826 | 50 | 0 | 68 | 0 | 708 | 10 | 103 | 5 | 251–844+ | 171 | 731 / 21 / 74 |
+| **all** | 4479 | 910 | 46 | 490 | 0 | 3033 | 522 | 912 | 12 | 2181–8340+ | 286 | 3523 / 382 / 574 |
 
 ## By family
 
@@ -53,7 +53,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `data` | 3 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 |
 | `difficulty` | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
 | `drlg` | 8 | 1 | 0 | 3 | 0 | 4 | 0 | 0 | 4 | 0 | 2 | 0 |
-| `drop` | 12 | 5 | 0 | 6 | 0 | 1 | 1 | 3 | 8 | 0 | 4 | 0 |
+| `drop` | 12 | 5 | 0 | 5 | 0 | 2 | 0 | 2 | 8 | 0 | 4 | 0 |
 | `format` | 4 | 0 | 0 | 2 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 |
 | `hireling` | 8 | 1 | 0 | 2 | 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 |
 | `hirelings` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
@@ -666,7 +666,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `quest` | 53 | 12 | 0 | 32 | 0 | 9 | 0 | 4 | 35 | 5 | 27 | 14 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
-| `shrine` | 24 | 0 | 0 | 19 | 0 | 5 | 15 | 0 | 19 | 0 | 5 | 0 |
+| `shrine` | 24 | 2 | 0 | 17 | 0 | 5 | 13 | 0 | 19 | 0 | 5 | 0 |
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 16 | 0 | 0 | 0 | 14 | 0 | 0 | 16 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 20 | 0 | 10 | 0 | 0 | 10 | 18 | 12 | 0 | 0 | 23 |
@@ -701,7 +701,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `tools` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `ui` | 21 | 16 | 0 | 4 | 0 | 1 | 0 | 11 | 7 | 2 | 0 | 0 |
 | `vendor` | 25 | 7 | 0 | 6 | 0 | 12 | 0 | 3 | 10 | 0 | 3 | 0 |
-| `waypoint` | 39 | 10 | 0 | 7 | 0 | 22 | 7 | 0 | 17 | 0 | 26 | 0 |
+| `waypoint` | 39 | 17 | 0 | 0 | 0 | 22 | 0 | 0 | 17 | 0 | 26 | 0 |
 | `world` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 |
 
 ## Not covered by any row
@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2739
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 5987
+- Duplicate areas between parts: 6017
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1754,6 +1754,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `object.549-eweaponrackl`: rc-link-checks.tsv:489 kept, rc-object-operate.tsv:20 dropped
   - `object.550-earmorstandr`: rc-link-checks.tsv:491 kept, rc-object-operate.tsv:21 dropped
   - `object.551-earmorstandl`: rc-link-checks.tsv:492 kept, rc-object-operate.tsv:22 dropped
+  - `skill.nec.golem-mastery`: rc-link-2.tsv:131 kept, rc-packets-chan.tsv:107 dropped
+  - `skill.nec.skeleton-mastery`: rc-link-2.tsv:132 kept, rc-packets-chan.tsv:118 dropped
+  - `skill.nec.summon-resist`: rc-link-2.tsv:133 kept, rc-packets-chan.tsv:119 dropped
+  - `skill.sor.cold-mastery`: rc-link-2.tsv:134 kept, rc-packets-chan.tsv:155 dropped
+  - `skill.sor.fire-mastery`: rc-link-2.tsv:135 kept, rc-packets-chan.tsv:160 dropped
+  - `skill.sor.lightning-mastery`: rc-link-2.tsv:136 kept, rc-packets-chan.tsv:171 dropped
+  - `skill.sor.warmth`: rc-link-2.tsv:137 kept, rc-packets-chan.tsv:179 dropped
   - `system.seams.messages.1-contract-table-per-message-family`: rc-intents-moves.tsv:3 kept, rc-packets-s2c.tsv:3 dropped
   - `system.sim.intents-events.1-loop-order-single-player`: rc-intents-moves.tsv:4 kept, rc-packets-s2c.tsv:4 dropped
   - `system.sim.intents-events.2-client-server`: rc-intents-moves.tsv:5 kept, rc-packets-s2c.tsv:5 dropped
@@ -2007,6 +2014,21 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.124.act-5-temple-boss`: rc-gen-misc.tsv:25 kept, rc-pc1-audit.tsv:78 dropped
   - `level.a5.131.act-5-throne-room`: rc-gen-misc.tsv:26 kept, rc-pc1-audit.tsv:80 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-pc1-audit.tsv:81 dropped
+  - `shrine.1.refill`: rc-link-2.tsv:138 kept, rc-pc1-audit.tsv:111 dropped
+  - `shrine.10.resist-lightning-boost`: rc-link-2.tsv:139 kept, rc-pc1-audit.tsv:112 dropped
+  - `shrine.11.resist-poison-boost`: rc-link-2.tsv:140 kept, rc-pc1-audit.tsv:113 dropped
+  - `shrine.12.skill-boost`: rc-link-2.tsv:141 kept, rc-pc1-audit.tsv:114 dropped
+  - `shrine.13.recharge-boost`: rc-link-2.tsv:142 kept, rc-pc1-audit.tsv:115 dropped
+  - `shrine.14.stamina-boost`: rc-link-2.tsv:143 kept, rc-pc1-audit.tsv:116 dropped
+  - `shrine.15.experience-boost`: rc-link-2.tsv:144 kept, rc-pc1-audit.tsv:117 dropped
+  - `shrine.17.portal-to-unknown`: rc-link-2.tsv:145 kept, rc-pc1-audit.tsv:118 dropped
+  - `shrine.2.health-boost`: rc-link-2.tsv:146 kept, rc-pc1-audit.tsv:119 dropped
+  - `shrine.20.warping-shrine`: rc-link-2.tsv:147 kept, rc-pc1-audit.tsv:120 dropped
+  - `shrine.3.mana-boost`: rc-link-2.tsv:148 kept, rc-pc1-audit.tsv:121 dropped
+  - `shrine.6.armor-boost`: rc-link-2.tsv:149 kept, rc-pc1-audit.tsv:122 dropped
+  - `shrine.7.combat-boost`: rc-link-2.tsv:150 kept, rc-pc1-audit.tsv:123 dropped
+  - `shrine.8.resist-fire-boost`: rc-link-2.tsv:151 kept, rc-pc1-audit.tsv:124 dropped
+  - `shrine.9.resist-cold-boost`: rc-link-2.tsv:152 kept, rc-pc1-audit.tsv:125 dropped
   - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-pc1-audit.tsv:126 dropped
   - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-pc1-audit.tsv:127 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-pc1-audit.tsv:128 dropped
@@ -2018,7 +2040,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-pc1-audit.tsv:134 dropped
   - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-pc1-audit.tsv:135 dropped
   - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-pc1-audit.tsv:139 dropped
+  - `waypoint.31.rigid-highlands`: rc-link-2.tsv:153 kept, rc-pc1-audit.tsv:140 dropped
+  - `waypoint.32.arreat-plateau`: rc-link-2.tsv:154 kept, rc-pc1-audit.tsv:141 dropped
+  - `waypoint.33.crystalized-cavern-level-1`: rc-link-2.tsv:155 kept, rc-pc1-audit.tsv:142 dropped
+  - `waypoint.34.crystalized-cavern-level-2`: rc-link-2.tsv:156 kept, rc-pc1-audit.tsv:143 dropped
+  - `waypoint.35.halls-of-death-s-calling`: rc-link-2.tsv:157 kept, rc-pc1-audit.tsv:144 dropped
+  - `waypoint.36.tundra-wastelands`: rc-link-2.tsv:158 kept, rc-pc1-audit.tsv:145 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-pc1-audit.tsv:146 dropped
+  - `waypoint.38.the-worldstone-keep-level-2`: rc-link-2.tsv:159 kept, rc-pc1-audit.tsv:147 dropped
   - `system.sim.pets.1-data`: rc-packets-chan.tsv:181 kept, rc-pets.tsv:11 dropped
   - `system.sim.pets.10-creation-free-and-maximum-resync`: rc-packets-chan.tsv:182 kept, rc-pets.tsv:12 dropped
   - `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max`: rc-packets-chan.tsv:183 kept, rc-pets.tsv:13 dropped
@@ -2187,6 +2216,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.35.halls-of-death-s-calling`: rc-promote.tsv:157 kept, rc-run-1.tsv:287 dropped
   - `waypoint.36.tundra-wastelands`: rc-promote.tsv:158 kept, rc-run-1.tsv:288 dropped
   - `waypoint.38.the-worldstone-keep-level-2`: rc-promote.tsv:159 kept, rc-run-1.tsv:289 dropped
+  - `drop.gold`: rc-link-2.tsv:120 kept, rc-run-2.tsv:55 dropped
   - `vendor.drehya`: rc-packets-chan.tsv:3 kept, rc-run-2.tsv:65 dropped
   - `monster.ai.abyssknight`: rc-run-1.tsv:78 kept, rc-run-2.tsv:68 dropped
   - `monster.ai.corruptarcher`: rc-promote.tsv:55 kept, rc-run-2.tsv:69 dropped
@@ -7437,7 +7467,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cube.recipe.crafting` | content | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-d7d8-items-net | specs/world/cube.md | [traces/checks-gen/cube, items channel, 1.14d vs d2rs] 38/40 recipes MATCH (output 0x9C adds byte-equal); PARTIAL (recordings end at different frames) rows 083,084; ingredient removal 0x9D, state and the join-stream divergence not compared here [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `cube.recipe.socket` | content | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-d7d8-items-net | specs/world/cube.md | [traces/checks-gen/cube, items channel, 1.14d vs d2rs] 2/3 recipes MATCH (output 0x9C adds byte-equal); no verdict rows 017: d2s-tool cannot place the inputs in the 4x3 cube page (generator tools/checks/gen_cube.py); ingredient removal 0x9D, state and the join-stream divergence not compared here [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `drop.chest` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/treasure.md | needs interact pokes (poke msg 0x13) on chests; not authored |
-| `drop.gold` | system | NO-CHECK | S | MATCH | ? | 0 | y | claude/q-fix-server-store-fill | specs/items/treasure.md | rc-run-2: fresh verdict MATCH on the checks run (earlier divergence no longer reproduces; not all checks of the row ran); items channel: two poked gold piles have the 1.14d gold amount and position bit for bit, but item flag 0x10 (identified) is unset on d2rs; TC-rolled gold not yet compared (d2rs drops vps where 1.14d drops gold) |
 | `drop.quality` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/treasure.md | needs per-quality mass runs (poke kill N seeds); no seed sweep yet |
 | `drop.quest-helper` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/treasure.md | quest drops (Radament book, Horadric items) need quest flow; not authored |
 | `drop.tc.runtime` | system | NO-CHECK | M | - | ? | 0 | y | claude/q-fix-server-store-fill | specs/items/treasure.md | TC runtime form; rebuilt from live memory per spec; unit tier; size M: needs a recording of the original plus a compare check |
@@ -7486,6 +7515,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cube.recipe.reroll` | content | EQUAL | - | MATCH | yes | 0 | n | - | specs/world/cube.md | [traces/checks-gen/cube, items channel, 1.14d vs d2rs] 2/2 recipes MATCH (output 0x9C adds byte-equal); ingredient removal 0x9D, state and the join-stream divergence not compared here |
 | `cube.recipe.rune-upgrades` | content | EQUAL | - | MATCH | yes | 0 | n | - | specs/world/cube.md | [traces/checks-gen/cube, items channel, 1.14d vs d2rs] 32/32 recipes MATCH (output 0x9C adds byte-equal); ingredient removal 0x9D, state and the join-stream divergence not compared here |
 | `cube.recipe.upgrade-gems` | content | EQUAL | - | MATCH | yes | 0 | n | - | specs/world/cube.md | [traces/checks-gen/cube, items channel, 1.14d vs d2rs] 28/28 recipes MATCH (output 0x9C adds byte-equal); ingredient removal 0x9D, state and the join-stream divergence not compared here |
+| `drop.gold` | system | EQUAL | - | MATCH | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/treasure.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `drop.monster` | system | EQUAL | - | MATCH | ? | 0 | y | claude/q-fix-server-store-fill | specs/items/treasure.md | rc-run-2: items-drop-monster-kill |
 | `item.0-hax` | entity | EQUAL | - | MATCH | yes | 0 | n | - | - | [gen-item-00] 0x9C bit stream byte-equal (poke item, normal quality, seed-game 0x1234/666) |
 | `item.100-9bt` | entity | EQUAL | - | MATCH | yes | 0 | n | - | - | [gen-item-05] 0x9C bit stream byte-equal (poke item, normal quality, seed-game 0x1234/666) |
@@ -10575,6 +10605,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a4q2-terror-s-end` | entity | DIVERGED | M | DIVERGED@28 | yes | 36 | n | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-izual=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a4q3-hell-s-forge` | entity | DIVERGED | M | PARTIAL | no | 37 | n | claude/q-fix-d3-player-mode | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-hephasto=PARTIAL,milestone-hellforge=DIVERGED \| player mode fixed (REC-1385, was DIVERGED@61 m 5 vs 1); first difference now monster 1:20 class 311 field fr (1.14d 150 vs d2rs 16384, frame 83) in the River of Flame: monster animation owner; the quest state machine itself is still unchecked |
 | `quest.a5q1-siege-on-harrogath` | entity | DIVERGED | M | DIVERGED@30 | no | 36 | n | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-nihlathak=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `shrine.17.portal-to-unknown` | entity | DIVERGED | M | DIVERGED@40 | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-17: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `shrine.7.combat-boost` | entity | DIVERGED | M | DIVERGED@40 | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-7: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
 | `system.act.travel` | system | DIVERGED | M | DIVERGED@10 | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/1 of its a* checks diverge) |
 | `waypoint.18.kurast-docktown` | entity | DIVERGED | M | DIVERGED@434 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-18 state: frame 434: monster 1:10 class 254, field tx: 1.14d 0 vs d2rs 5085 (was DIVERGED@37, class 359 seed; SpecialState06 `0x005E7C10` implemented, ai-bodies.md section 9.33) |
 | `waypoint.19.spider-forest` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-19 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
@@ -10586,6 +10618,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `waypoint.25.travincal` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-25 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
 | `waypoint.26.durance-of-hate-level-2` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-26 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
 | `waypoint.28.city-of-the-damned` | entity | DIVERGED | M | DIVERGED | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/monsters/population.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: gen-wp-28=DIVERGED \| frame 401 monster 1:29 class 403 vs 308: 1.14d takes 2 more game-seed density steps (0x54ed96) in the last populated room (same cause as gen-lvl-106 frame 21) |
+| `waypoint.31.rigid-highlands` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-31-lv111: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.32.arreat-plateau` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-32-lv112: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.33.crystalized-cavern-level-1` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-33-lv113: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.34.crystalized-cavern-level-2` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-34-lv115: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.35.halls-of-death-s-calling` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-35-lv123: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.36.tundra-wastelands` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-36-lv117: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
+| `waypoint.38.the-worldstone-keep-level-2` | entity | DIVERGED | M | DIVERGED@4 | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-38-lv129: check has input/send and packets is not a channel [ledger.py: NO-CHECK -> DIVERGED from its checks] |
 | `drlg.preset.lvlprest` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/preset.md,specs/drlg/preset-tables.tsv | all preset levels share one code path; DS1 pick and preset-unit lists not compared per level; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `drlg.wall-remap` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/wall-remap.md | wall remap table; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `hirelings.quest-merc-init.team-ai-alignment` | system | NO-CHECK | S | - | yes | 0 | n | claude/rc-blade-hostcalls | specs/world/hirelings.md | merc init providers read from the 1.14d asm and wired in d2-sim (join team, alignment state list, umod 19 + monster data components 0,1,5,6,7 := 0); only the self-play app_play_act3 blade test runs them, no 1.14d recording of a hire/quest merc |
@@ -10644,25 +10683,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `shrine.14.stamina-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-14: check has input/send and packets is not a channel |
 | `shrine.15.experience-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-15: check has input/send and packets is not a channel |
 | `shrine.16.shrine-of-enirhs` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
-| `shrine.17.portal-to-unknown` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-17: check has input/send and packets is not a channel |
 | `shrine.2.health-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-2: check has input/send and packets is not a channel |
 | `shrine.20.warping-shrine` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-20: check has input/send and packets is not a channel |
 | `shrine.3.mana-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-3: check has input/send and packets is not a channel |
 | `shrine.4.health-exchange` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
 | `shrine.5.mana-exchange` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
 | `shrine.6.armor-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-6: check has input/send and packets is not a channel |
-| `shrine.7.combat-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-7: check has input/send and packets is not a channel |
 | `shrine.8.resist-fire-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-8: check has input/send and packets is not a channel |
 | `shrine.9.resist-cold-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-9: check has input/send and packets is not a channel |
 | `system.difficulty.progression` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/save-exit.md,specs/world/quests-act5.md | difficulty unlock after Baal and monster scaling not compared; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `system.townportal` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md,specs/world/objects.md | portal object operate (object.operate); no check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `waypoint.31.rigid-highlands` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-31-lv111: check has input/send and packets is not a channel |
-| `waypoint.32.arreat-plateau` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-32-lv112: check has input/send and packets is not a channel |
-| `waypoint.33.crystalized-cavern-level-1` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-33-lv113: check has input/send and packets is not a channel |
-| `waypoint.34.crystalized-cavern-level-2` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-34-lv115: check has input/send and packets is not a channel |
-| `waypoint.35.halls-of-death-s-calling` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-35-lv123: check has input/send and packets is not a channel |
-| `waypoint.36.tundra-wastelands` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-36-lv117: check has input/send and packets is not a channel |
-| `waypoint.38.the-worldstone-keep-level-2` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-38-lv129: check has input/send and packets is not a channel |
 | `drlg.maze.lvlmaze` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/maze.md,specs/drlg/maze-specials.tsv | a1-warp-tower-cellar-ama,a2-warp-maggot-lair-ama,a2-warp-sewers-ama,a2-warp-tal-rasha-tomb-ama,a3-warp-kurast-sewers-ama,a3-warp-durance-ama,a5-warp-halls-anguish-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `drlg.outdoor.tilesub` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/outdoor.md,specs/drlg/outdoor-tilesub.md,specs/drlg/outdoor-act3-act5.md | warp-cold-plains-ama,combat-pop-blood-moor,a4-warp-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `drlg.warps.vis-lvlwarp` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/levels.md | a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a2-warp-sewers-ama,a3-warp-flayer-dungeon-ama,a4-warp-river-ama,a5-warp-crystalized-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
