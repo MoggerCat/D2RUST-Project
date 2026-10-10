@@ -353,3 +353,36 @@ fn missile_unit_search_uses_the_shapes_and_skips_the_dead() {
     assert!(alive);
     assert_eq!(hp, 25600);
 }
+
+// `missiles/bodies.md` §12 step 6 / §30: the state-list seams of the
+// server-hit bodies on the real stat lists (a fresh list: flags 2, the
+// owner's GUID, state on; its expiry read and moved).
+#[test]
+fn missile_state_list_seams_use_the_real_stat_lists() {
+    use crate::missiles::MissileBodies;
+    let mut s = shot();
+    let (owner, target) = (s.owner, s.target);
+    let state = 1;
+    let r = s
+        .fx
+        .sim
+        .missiles(&mut s.fx.game, |g, cx| {
+            let w = &mut *cx.world;
+            assert!(w.states_count() > state);
+            assert_eq!(w.state_list_expiry(target, state), None);
+            assert!(w.new_state_list(g, target, state, 40, owner));
+            let e = w.state_list_expiry(target, state);
+            w.set_state_list_expiry(target, state, 55);
+            w.mark_state_changed(target, state);
+            (e, w.state_list_expiry(target, state))
+        })
+        .unwrap();
+    assert_eq!(r, (Some(40), Some(55)));
+    let v = &s.fx.sim.sys.stats;
+    assert!(v.has_state(target, state as u32));
+    let l = v
+        .unit_list(target)
+        .and_then(|r| v.list_of_state(r, state as u32))
+        .expect("list");
+    assert_eq!(v.flags(l) & 2, 2);
+}
