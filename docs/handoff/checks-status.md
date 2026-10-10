@@ -389,7 +389,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-wp-36-lv117 | state | PARTIAL | 540/540 | - | - |
 | a5-wp-37-lv118 | state | PARTIAL | 540/540 | - | - |
 | a5-wp-38-lv129 | state | PARTIAL | 540/540 | - | - |
-| act-travel-lut-ama | state | DIVERGED | 9/80 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| act-travel-lut-ama | state | PARTIAL | 80/80 | - | - |
 | ama-charged-strike | state | PARTIAL | 70/70 | - | - |
 | ama-cold-arrow | state | PARTIAL | 70/70 | - | - |
 | ama-dopplezon | state | PARTIAL | 70/70 | - | - |
