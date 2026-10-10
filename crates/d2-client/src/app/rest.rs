@@ -387,6 +387,9 @@ impl VendorRest for AppRest {
 }
 
 impl QuestRest for AppRest {
+    fn drain_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
     fn client_save_flags(&self, p: UnitId) -> Option<u16> {
         self.save_flags.get(&p).copied()
     }

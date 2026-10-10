@@ -19,6 +19,14 @@ use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 /// The quest calls no written spec provides yet, each with its expected
 /// provider (`docs/handoff/impl-world.md` "Seams").
 pub trait QuestRest {
+    /// The messages the quest calls sent through this rest since the last
+    /// drain, in send order. A host whose rest keeps its own outbox
+    /// hands them back here so a quest call made mid-tick forwards them
+    /// to the action wiring's stream at the point of the call (1.14d
+    /// queues each send to the client buffer at once). Default: none.
+    fn drain_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
     /// Game +0xC0 (DRLG).
     fn has_act2(&self) -> bool;
     /// Players in `unit-order.md` §7 order (units / clients).
