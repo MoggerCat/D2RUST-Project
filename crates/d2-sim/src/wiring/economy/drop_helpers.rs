@@ -331,3 +331,31 @@ pub fn code_drop<X: Pending, F: FreeSpot>(
     };
     create_at(h, sim, d, spots, room, pos, Some(u), rq)
 }
+
+/// `0x00582AC0` and the inline potion drop of the exploding and poison
+/// shrines (`objects.md` §9.3): the floor search from P's position and
+/// P's level, but a request that names no source unit (its record's unit
+/// fields stay zero, so the item seed comes from the game's draw, not P's).
+/// An unknown code gives none.
+// PROVISIONAL (REC-2095): the request's other fields are the zeroed record's.
+#[allow(clippy::too_many_arguments)]
+pub fn near_player_drop<X: Pending, F: FreeSpot>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    d: &mut DeathDrops,
+    levels: &[Levels],
+    spots: &mut F,
+    p: UnitId,
+    code: u32,
+) -> Option<UnitId> {
+    let id = d.picks.find_code(code.to_le_bytes())? as i32;
+    let room = sim.game.lists.unit(p).and_then(|e| e.room());
+    let pos = h.path_position(p);
+    let rq = ItemRequest {
+        ilvl: source_level(h, sim, levels, p),
+        item: id,
+        quality: 2,
+        ..ItemRequest::default()
+    };
+    create_at(h, sim, d, spots, room, pos, None, rq)
+}
