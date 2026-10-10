@@ -17,11 +17,11 @@
 | Rules | 34–35 |
 |   6. Deferred item messages | 36–135 |
 |   7. Intents | 136–705 |
-|   8. Pickup from the ground | 706–887 |
-|   9. Drop to the ground | 888–935 |
-|   10. Gold | 936–983 |
-|   11. Message layouts | 984–1013 |
-|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1014–1141 |
+|   8. Pickup from the ground | 706–889 |
+|   9. Drop to the ground | 890–937 |
+|   10. Gold | 938–985 |
+|   11. Message layouts | 986–1015 |
+|   12. Corpse take-back (`0x0057FB70` → `0x00562F30`) | 1016–1143 |
 <!-- /index -->
 
 ## Summary
@@ -706,6 +706,8 @@ queued; result 0.
 ### 8. Pickup from the ground
 
 #### 8.1 Auto (`0x00563560`, cursor flag 0)
+
+C→S 0x13 with unit type 4 reaches the same code: `0x00548B00` case 4 is the type-4 case of §7.1 with cursor flag 0 (item in mode 3, distance < 0x33, then auto pickup when the distance is < 5 and the collision test `0x00622B50` (mask 0x804) is clear, else the walk). A gold pile picked up in the handler is announced by the tick: S→C 0x0A, 0x2C and 0x19 all arrive in the next tick, none in the handler (recorded: `net-s2c-gold-pickup`). Open (REC-3861): a non-gold item picked up in the handler still gets its 0x0A at handler time here.
 
 1. Cursor item or busy → 0. Item missing → out 1; mode ≠ 3 → out 1.
 2. Targeting reset. Can-pick (§8.4) fails → refused pickup (§8.3, sound

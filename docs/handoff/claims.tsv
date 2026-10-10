@@ -5,8 +5,8 @@ C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal s
 C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
 C-skilldelay-a7	rc-skill-div-b	16:59	s2c 0xa7 state 121 missing in d2rs at cast (gen-skill-sor-51/56/59/62/64, dru-225/229/234)	open
 C-summon-0xac	rc-skill-div-b	16:59	0xAC AssignMonster of skill summons shorter than 1.14d (gen-skill-ama-28, dru-221, nec-78)	open
-C-0x5D-p2	rc-promote	16:59	0x5D chains 31-33 on same-act warp from Harrogath (a5-wp-31..38, drehya/nihlathak stock): event-3 old-level 109 branch	open
-C-ui-draws-q	rc-ui-div	16:59	ui-draws-* unmeasured ? cells (mode/light/pal/file/w/h of CelDrawColor/Ex/Clipped, glyph files)	open
+C-0x5D-p2	rc-promote	16:59	0x5D chains 31-33 on same-act warp from Harrogath (a5-wp-31..38, drehya/nihlathak stock): event-3 old-level 109 branch	done part 1 (town-leave quest msgs queued at once; mark fixes); part 2 open: a5 same-act warp from Harrogath, d2rs sends chains 31-33 via event-3 old-level-109 branch, 1.14d none; a=0 emulation refuted (a2 checks need a=40)
+C-ui-draws-q	rc-ui-div	16:59	ui-draws-* unmeasured ? cells (mode/light/pal/file/w/h of CelDrawColor/Ex/Clipped, glyph files)	done 6 ui-draws checks draws+packets MATCH (char-skill, quest-inv, quest-skill, inv-char, inv-char-l5, inv-char-tip); 0 ledger rows flip yet (other checks per row blocked by rain C002 / unit rows)
 C024	rc-promote	16:59	skill.ass 6 + shrine.17/.7: packets C->S/S->C divergence after packets channel added (ass sentry 0xA7/0xAC/0x21, shrine 0xA8/0x2C)	open
 C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	done EQUAL +31, checked +50
 fatal-exit	rc-run-3b	16:59	1.14d fatal exit(-1): gen-obj-374/385/400/403/450 (A client Mode<m>=0, done), 375 (B gfx file), 59/60/377 (C portal partner level)	open
@@ -25,5 +25,11 @@ C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
-C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open
+C068	rc-ctail-packets	18:55	s2c 0x0a missing gold pickup via 0x13	done net-s2c-gold-pickup packets MATCH
 C024	rc-net-div	18:37	a2-super-fangskin frame 5 s2c 0x53 Darkness missing (act-load quest hook 0x0059AC40 never called: Tainted Sun at Act II first build)	open
+C067	rc-drops-order	17:39	items-drops-nor-09 category ass 16 vs 5; nor-10 gld missing (drop pick)	done EQUAL 3456 -> 3457 (nor-09/-12 order, hel-04/-05 MATCH; nor-10 is a separate cause: 3 monsters never die in d2rs, not drop picking)
+C010q	rc-drops-order	18:27	items-drops-nor-07 Andariel quest TC (TreasureClass4/TCQuestId, quest_tc_open never implemented)	open
+C012	rc-c012-a8bytes	19:06	packets s2c 0xa8 bytes[] (bar-battle-command, bar-shout, gen-missile-149)	done EQUAL +3 rows (skill.bar.battle-command, skill.bar.shout, missile.shout); stat 83/126/127/188 refresh-all + passive changed bit
+C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops the player light); ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	open
+C-mon-inv-9d	rc-skill-promote-9d	19:03	0x9D monster inventory (0x00534F80) for ass shadow-warrior/master	open
+C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	done ass-shadow-master state 61->70/70 (player skill levels for the pet); 20 checks improved, 0 worse

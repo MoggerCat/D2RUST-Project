@@ -461,6 +461,9 @@ pub fn effect<W: ObjectHost>(
     Ok(())
 }
 
+/// Sound event of a refused portal creation in town (`0x0056D130`).
+const PORTAL_REFUSED_SOUND: u8 = 0x18;
+
 /// Code 17 `0x00582A30`.
 fn portal_shrine<W: ObjectHost>(t: &ObjectTables, w: &mut W, p: UnitId) {
     // §9.2 code 17: no free spot → nothing; the portal is created in P's
@@ -468,6 +471,14 @@ fn portal_shrine<W: ObjectHost>(t: &ObjectTables, w: &mut W, p: UnitId) {
     let Some((x, y)) = w.free_spot(p, PORTAL_SPOT_SIZE, PORTAL_SPOT_MASK) else {
         return;
     };
+    // `0x0056D130` (Wine 1.14d, gen-shrine-17): P's room in a town
+    // (`0x0061AB00`) and the class not one of the quest portals → no
+    // portal; sound event 0x18 on P, targeted at P (`0x00553380`), result
+    // 0.
+    if w.level(p).is_some_and(crate::world::waypoints::is_town) {
+        w.sound(p, PORTAL_REFUSED_SOUND, Some(p), false);
+        return;
+    }
     let Some(act) = w.level(p).and_then(|l| t.level(l)).map(|l| l.act) else {
         return;
     };

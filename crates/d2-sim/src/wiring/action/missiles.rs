@@ -973,7 +973,7 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
 
 /// Runs `f` on the hooks and a [`crate::units::hooks::Sim`] over the
 /// view's parts and `game`.
-fn with_sim<X: Pending, R>(
+pub(super) fn with_sim<X: Pending, R>(
     v: &mut View<'_, X>,
     game: &mut Game,
     f: impl FnOnce(&mut super::ActionHooks<X>, &mut crate::units::hooks::Sim<'_>) -> R,
