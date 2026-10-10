@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+render.scene.a5-outdoor-frigid-highlands	content	render-world	sidebyside scene (tools/cloud-game/scene_defs.py group act5out), scene tick 262, run 2026-10-09 at the head of claude/q-chk-render-world	specs/tools/facts-render.md,specs/render/draw-order.md	draft	-	-	yes	0	n	claude/q-scenes-compare	DIVERGED	M	78.49%; REC-1850 fixed the pose mode (WL -> NU); first diff now row 121 the player's dir/frame (d2rs dir 3 frame 2, 1.14d dir 0 frame 0: neutral pose restarts at arrival); quest-log hint and banner rows still open

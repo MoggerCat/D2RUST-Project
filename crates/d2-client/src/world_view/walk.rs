@@ -95,10 +95,13 @@ pub fn preview_walk_frame(
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());
-        art.pose_mode = walk
-            .predict
-            .player()
-            .and_then(|k| Some((k, walk.predict.mode()?)));
+        art.pose_mode = walk.predict.player().and_then(|k| {
+            let mode = walk
+                .predict
+                .mode()
+                .or_else(|| walk.predict.stood_mode(bridge.0.world()))?;
+            Some((k, mode))
+        });
         art.pose_dir = walk
             .predict
             .player()

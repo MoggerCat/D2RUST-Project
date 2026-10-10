@@ -1145,7 +1145,8 @@ fn start_line_of_sight() {
     let at = (37, 41);
     assert_eq!(go(&mut fx, Some(at), Some((at, 0x804))), (mode::SC, 1));
     assert_eq!(go(&mut fx, None, Some((at, 0x804))), (mode::SC, 1));
-    assert_eq!(go(&mut fx, Some(at), Some((at, 0x805))), (mode::TN, 0));
+    // A failed start outside town: NU (REC-1644).
+    assert_eq!(go(&mut fx, Some(at), Some((at, 0x805))), (mode::NU, 0));
 }
 
 /// Step 6.2 and `levels.md` §4: the mana check and the charge at start.
@@ -1160,7 +1161,7 @@ fn start_mana() {
     fx.with_skill(WERE);
     fx.set_stats(p, &[(8, 0)]);
     fx.handle(&point(0x0C, 110, 90));
-    assert_eq!((fx.mode(), fx.log().len()), (mode::TN, 0), "no mana");
+    assert_eq!((fx.mode(), fx.log().len()), (mode::NU, 0), "no mana");
     fx.book().shapeshifted = true;
     fx.set_mode(p, mode::NU);
     fx.handle(&point(0x0C, 110, 90));
