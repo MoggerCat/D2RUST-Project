@@ -36,17 +36,17 @@
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
 |   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–795 |
-|   10. Messages | 796–858 |
-|   11. Missile paths (`0x00649760`) | 859–911 |
-|   12. Other path types (1.14d-read 2026-10-08) | 912–1125 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1126–1275 |
-| Constants & data dependencies | 1276–1312 |
-| Randomness | 1313–1323 |
-| Edge cases & original bugs | 1324–1371 |
-| Test vectors | 1372–1410 |
-| Provenance | 1411–1466 |
-| Open questions | 1467–1540 |
+|   9. Per-tick movement | 607–802 |
+|   10. Messages | 803–865 |
+|   11. Missile paths (`0x00649760`) | 866–918 |
+|   12. Other path types (1.14d-read 2026-10-08) | 919–1132 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1133–1282 |
+| Constants & data dependencies | 1283–1319 |
+| Randomness | 1320–1330 |
+| Edge cases & original bugs | 1331–1378 |
+| Test vectors | 1379–1417 |
+| Provenance | 1418–1473 |
+| Open questions | 1474–1547 |
 <!-- /index -->
 
 ## Summary
@@ -713,6 +713,13 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    while its facing turns to point 1, then fly straight to point 1:
    frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
    2.5 aim give); settled by a read of `0x00650660` (REC-1391).
+   Not for path type 4 (a missile aimed at a point, `missiles/missiles.md`
+   §R4.3 step 5): the Gloam's bolt (class 320, `diff-a4-nm-unique`,
+   1.14d frames 36–41) flies on past the aim point with x/y fraction
+   still advancing by one step per frame; a snap there would end the path
+   (index = count) and remove the missile a frame early. Recorded
+   2026-10-10 (rc-mon-missile); the rule's exact 1.14d condition for
+   types 10 and 14 stays REC-1391.
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path

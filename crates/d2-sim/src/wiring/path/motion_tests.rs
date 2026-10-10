@@ -551,6 +551,27 @@ fn a_charged_bolt_path_snaps_to_its_start_point_on_the_first_step() {
     fx.assert_clean();
 }
 
+// Covers: specs/sim/pathing.md §9.6 r3
+#[test]
+fn a_straight_missile_keeps_its_direction_past_the_aim_point() {
+    // Path type 4 never snaps onto its point: the Gloam's bolt (class 320)
+    // in `diff-a4-nm-unique` flies on past the aim point for several frames.
+    let mut fx = fx();
+    let a = fx.a;
+    let owner = fx.spawn(UnitType::Monster, 0, a, 41, 30);
+    let m = fire(&mut fx, owner, 42, 30);
+    let mut far = 0u32;
+    for _ in 0..40 {
+        fx.tick();
+        let live = fx.sim.hooks().paths.as_ref().unwrap().dynamic(m);
+        match live {
+            Some(d) => far = far.max(d.precise_x),
+            None => break,
+        }
+    }
+    assert!(i64::from(far) > 43 * 0x10000, "it must pass the aim point");
+}
+
 // Covers: specs/sim/path-placement.md §6 r4; specs/missiles/bodies-2.md §46 r2
 #[test]
 fn missile_body_teleport_moves_the_path_and_clears_the_points() {
