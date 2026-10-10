@@ -62,6 +62,10 @@ pub struct InvItemRec {
     /// `rangeadder` (weapons +0x104): the melee reach `0x00622870` adds
     /// for a player (`combat/hit.md` §7.3).
     pub rangeadder: u8,
+    /// `hit class` (item row +0x13C, `hitclass.txt` index): the hit class
+    /// `0x0062A180` returns for a wielded weapon (`combat/damage.md` §5.1
+    /// step 4.4).
+    pub hit_class: u8,
     /// `StrBonus` / `DexBonus` (+0x106 / +0x108 of the weapon row's
     /// layout): the percent of the wielder's stat added to the weapon's
     /// damage (`combat/damage.md` §3.2).
@@ -108,6 +112,7 @@ macro_rules! inv_item_rec {
                     wclass: r.wclass,
                     wclass2: r.f_2handedwclass,
                     rangeadder: r.rangeadder,
+                    hit_class: r.hit_class,
                     strbonus: r.strbonus,
                     dexbonus: r.dexbonus,
                     durability: r.durability,
