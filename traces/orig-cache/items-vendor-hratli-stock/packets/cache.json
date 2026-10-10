@@ -13,6 +13,8 @@
   "ScnBuy",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.packets.jsonl",
   "--poke",
@@ -28,8 +30,8 @@
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "6dd4e68376f8236e75bad4906d521617ff755ec720908ba59d6fb29a033afacb",
-   "size": 185555
+   "sha256": "f540cc9f648ffcff078295d457b1321aecb8cf1698a26dd209b6d231ba4e34eb",
+   "size": 102355
   }
  },
  "format": "orig-cache-1",
@@ -38,7 +40,7 @@
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "recorder": "890e1d10983891572c923cd4a25dd5dbaeb22e6940d455ea36c91b02eafaacd6",
   "save": "07bef22def593cb31d444f383466ce2c28ba60d6024a315bca7735b30e2c1716"
  }
 }
