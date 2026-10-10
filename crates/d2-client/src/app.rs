@@ -13,6 +13,7 @@ pub mod anim_names;
 pub mod audio_dump;
 pub mod automap;
 pub mod autoplay_host;
+pub mod client_state;
 pub mod config;
 pub mod death;
 pub mod front_host;
