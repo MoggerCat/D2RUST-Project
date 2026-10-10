@@ -590,39 +590,39 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | draws-town-arrival-ama | draws | DIVERGED | 0/1 | tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit | coord-resume-3 |
 | dru-arctic-blast | packets | MATCH | 70/70 | - | - |
 | dru-arctic-blast | state | PARTIAL | 70/70 | - | - |
-| dru-armageddon | packets | DIVERGED | 62/70 | frame 37 stream s2c #0 missing in d2rs (id 0xa3) | q-fix-join-items |
+| dru-armageddon | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-armageddon | state | PARTIAL | 70/70 | - | - |
-| dru-cycle-of-life | packets | DIVERGED | 68/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
+| dru-cycle-of-life | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | rc-c028-skillmsgs |
 | dru-cycle-of-life | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
-| dru-firestorm | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | q-fix-join-items |
+| dru-firestorm | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-firestorm | state | PARTIAL | 70/70 | - | - |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
 | dru-fissure | packets | MATCH | 70/70 | - | - |
 | dru-grizzly | state | PARTIAL | 70/70 | - | - |
-| dru-heart-of-wolverine | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | q-fix-join-items |
+| dru-heart-of-wolverine | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-heart-of-wolverine | state | PARTIAL | 70/70 | - | - |
 | dru-hurricane | state | PARTIAL | 70/70 | - | - |
-| dru-oak-sage | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | q-fix-join-items |
+| dru-oak-sage | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-oak-sage | state | PARTIAL | 70/70 | - | - |
-| dru-plague-poppy | packets | DIVERGED | 68/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
+| dru-plague-poppy | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | rc-c028-skillmsgs |
 | dru-plague-poppy | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
-| dru-raven | packets | DIVERGED | 69/70 | frame 29 stream s2c #1 size: 1.14d 15 vs d2rs 14 (id 0xac) | q-fix-join-items |
+| dru-raven | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-raven | state | PARTIAL | 70/70 | - | - |
 | dru-shock-wave | packets | MATCH | 70/70 | - | - |
 | dru-shock-wave | state | PARTIAL | 70/70 | - | - |
-| dru-spirit-of-barbs | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | q-fix-join-items |
+| dru-spirit-of-barbs | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-spirit-of-barbs | state | PARTIAL | 70/70 | - | - |
-| dru-summon-fenris | packets | DIVERGED | 69/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
+| dru-summon-fenris | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-summon-fenris | state | PARTIAL | 70/70 | - | - |
-| dru-summon-spirit-wolf | packets | DIVERGED | 69/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
+| dru-summon-spirit-wolf | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-summon-spirit-wolf | state | PARTIAL | 70/70 | - | - |
 | dru-tornado | packets | MATCH | 70/70 | - | - |
 | dru-tornado | state | PARTIAL | 70/70 | - | - |
 | dru-twister | packets | MATCH | 70/70 | - | - |
 | dru-twister | state | PARTIAL | 70/70 | - | - |
-| dru-vines | packets | DIVERGED | 68/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
+| dru-vines | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | rc-c028-skillmsgs |
 | dru-vines | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
-| dru-volcano | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa3) | q-fix-join-items |
+| dru-volcano | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | dru-volcano | state | PARTIAL | 70/70 | - | - |
 | dru-werewolf | state | PARTIAL | 70/70 | - | - |
 | gen-boss-708 | state | PARTIAL | 150/150 | - | - |
@@ -1493,7 +1493,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | interact-talk-akara | state | PARTIAL | 30/30 | - | - |
 | items-vendor-drehya-stock | packets | DIVERGED | 138/140 | frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) | unrouted |
 | nec-bone-wall | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
-| nec-clay-golem | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | unrouted |
+| nec-clay-golem | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | save-fresh-ama | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | save-merc-bar | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | ui-draws-char-skill-ama | draws | DIVERGED | 0/1 | tick 72 draw row 9 (CelDrawColor) column op: 1.14d CelDrawColor vs d2rs CelDraw | unrouted |
@@ -1782,7 +1782,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-pal-105 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-105 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-107 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-pal-107 | packets | DIVERGED | 69/70 | frame 22 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
+| gen-skill-pal-107 | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | gen-skill-pal-108 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-108 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-109 | state | PARTIAL | 70/70 | - | - |
