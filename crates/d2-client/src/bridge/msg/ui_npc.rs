@@ -33,6 +33,7 @@ pub fn quest_info(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerE
     q.copy_from_slice(b.slice(7, 96)?);
     // Rule 2.
     if t == 6 {
+        w.quest_player = Some(q);
         msg.out.push(Output::QuestFlags { record: q });
         return Ok(());
     }

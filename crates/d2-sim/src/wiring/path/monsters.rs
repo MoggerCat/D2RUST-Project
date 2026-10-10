@@ -22,7 +22,9 @@ use crate::path::walk::Step;
 use crate::path::DynamicPath;
 use crate::tick::events::event;
 use crate::units::hooks::Sim;
-use crate::units::modes::{monster_mode, monster_moves, MONSTER_MODES};
+use crate::units::modes::{
+    monster_mode, monster_moves, MONSTER_MODES, TRAPPED_SOUL_END_A, TRAPPED_SOUL_END_S,
+};
 use crate::units::record::flags as unit_flags;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::action::unit_update::anim_complete;
@@ -308,9 +310,10 @@ impl<X: Pending> ActionHooks<X> {
     }
 
     /// The velocity half of `0x00623F50` (`pathing.md` §8.1) for a
-    /// monster in its current mode, run by the animation prepare of every
-    /// monster mode set: a mode with the velocity modifier (or knockback)
-    /// sets the path velocity, any other mode leaves it.
+    /// monster or player in its current mode, run by the animation
+    /// prepare of every mode set and by the rate refresh: a mode with the
+    /// velocity modifier (or knockback) sets the path velocity, any other
+    /// mode leaves it.
     pub(crate) fn monster_mode_velocity(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let Some(p) = self.paths.as_ref() else {
             return;
@@ -318,7 +321,7 @@ impl<X: Pending> ActionHooks<X> {
         let Some(r) = sim.units.get(unit) else {
             return;
         };
-        if r.ty != UnitType::Monster {
+        if !matches!(r.ty, UnitType::Monster | UnitType::Player) {
             return;
         }
         let mode = r.mode;
@@ -386,6 +389,10 @@ impl<X: Pending> ActionHooks<X> {
                 true
             }
             S3_EVENT1 => true,
+            TRAPPED_SOUL_END_A | TRAPPED_SOUL_END_S => {
+                self.with_ai(sim, |g, cx| ai::trapped_soul_end(g, cx, unit));
+                true
+            }
             _ => return None,
         };
         Some(started)
@@ -616,7 +623,7 @@ impl<X: Pending> ActionHooks<X> {
     /// animation refresh, animation complete → KB event 1.
     fn monster_kb_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let _ = self.monster_step(sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        self.refresh_unit_animation(sim, unit);
         if self.monster_anim_complete(sim, unit) {
             self.monster_kb_event1(sim, unit);
         }
@@ -647,13 +654,7 @@ impl<X: Pending> ActionHooks<X> {
             return;
         }
         X::monster_sequence_frame(self, sim, unit);
-        let advanced = sim
-            .units
-            .get_mut(unit)
-            .is_some_and(|r| crate::units::anim::advance_sequence(&mut r.anim));
-        if !advanced {
-            self.x.refresh_animation(sim.game, unit);
-        }
+        self.refresh_unit_animation(sim, unit);
     }
 
     /// Attack-family event 0 `0x005A7670` (modes 4, 5, 7, 8, 9;
@@ -668,7 +669,7 @@ impl<X: Pending> ActionHooks<X> {
     fn monster_attack_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         if self.used_skill_of(unit).is_some() {
             X::monster_attack_skill(self, sim, unit);
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_unit_animation(sim, unit);
             return;
         }
         let Some(mode) = sim.units.get(unit).map(|r| r.mode) else {
@@ -677,7 +678,7 @@ impl<X: Pending> ActionHooks<X> {
         let moving = monster_moves(sim, unit, mode);
         if moving {
             let _ = self.monster_step(sim, unit);
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_unit_animation(sim, unit);
             if self.monster_anim_complete(sim, unit) {
                 return;
             }
@@ -692,7 +693,7 @@ impl<X: Pending> ActionHooks<X> {
     /// animation refresh, animation complete → set mode 11.
     fn monster_s3_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let _ = self.monster_step(sim, unit);
-        self.x.refresh_animation(sim.game, unit);
+        self.refresh_unit_animation(sim, unit);
         if self.monster_anim_complete(sim, unit) {
             self.plain_mode(sim, unit, MODE_S4);
         }
@@ -762,9 +763,18 @@ pub(crate) fn stage_velocity<X: Pending>(
     }
 }
 
-/// `0x00553540`: the path target unit; `None` without one.
+/// `0x00553540`: the path target unit; `None` without one. A target that
+/// is the unit itself counts as none (the original returns 0 when the
+/// looked-up unit equals the caller), so a town NPC's mode end after a
+/// self-targeted S1 requests neutral toward point (0, 0)
+/// (`ai.md` §1.4; `gen-wp-30` frame 430, Malah).
 pub(crate) fn path_target<X: Pending>(h: &ActionHooks<X>, unit: UnitId) -> Option<UnitId> {
-    h.paths.as_ref()?.dynamic(unit)?.target_unit.map(|t| t.unit)
+    h.paths
+        .as_ref()?
+        .dynamic(unit)?
+        .target_unit
+        .map(|t| t.unit)
+        .filter(|&t| t != unit)
 }
 
 /// Path flag 0x800 (`ai.md` §2.2 rule 2: a blocked step).

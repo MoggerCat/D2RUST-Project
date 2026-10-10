@@ -434,6 +434,13 @@ impl Fx {
         // cleared unit flag 0x10, `intents-events.md` §7.1 rule 2.1).
         s.events.action.sys.units.get_mut(u).unwrap().flags &=
             !d2_sim::units::record::flags::SEED_SET;
+        // The 0x13 object case walks the player when the object is out of
+        // its interact range (`objects.md` §7.3 rule 4); these flows test
+        // the operate, so the player stands beside the object.
+        let (player, room) = (self.player, self.room);
+        s.events.action.with(&mut s.game, |g, v| {
+            d2_sim::wiring::path::PathCtx::of(v, g).teleport(player, Some(room), at.0 - 2, at.1)
+        });
         self.stage(u);
         u
     }

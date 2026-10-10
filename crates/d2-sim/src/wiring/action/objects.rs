@@ -38,6 +38,7 @@ use crate::world::objects::{
     ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, StateList, StateRequest,
     UpdateMessage,
 };
+use crate::world::quests::act2::q4::JerhynStep;
 
 use super::{Pending, View, WiringError};
 use crate::path::record::ObjectShape;
@@ -130,6 +131,38 @@ pub trait QuestObjectHost<X> {
         let _ = (game, v, player, npc, class, interact);
         false
     }
+    /// The Jerhyn AI hooks of `ai-bodies.md` §9.9 step 2
+    /// (`world/quests-act2.md` §10): `0x0059F570` (palace active),
+    /// `0x0059F580` (palace NPC state, the AI unit at its path position
+    /// `at`), `0x0059B6E0` (guard moving) and the success of
+    /// [`JerhynStep::PlaceAt`]. Defaults: no quest state (active, (1, 0),
+    /// not moving).
+    fn jerhyn_palace_active(&mut self) -> bool {
+        true
+    }
+    fn jerhyn_npc_state(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        at: (i32, i32),
+    ) -> JerhynStep {
+        let _ = (game, v, at);
+        JerhynStep::Out(1, 0)
+    }
+    fn guard_moving(&mut self) -> bool {
+        false
+    }
+    fn jerhyn_placed(&mut self) {}
+    /// The palace guard AI hooks of `ai-bodies-7.md` §7
+    /// (`world/quests-act2.md` §10): `0x0059B8B0` (the guard at its end
+    /// position, the door open) and `0x0059AEC0` (the blocker open).
+    /// Defaults: false.
+    fn palace_door_open(&mut self) -> bool {
+        false
+    }
+    fn palace_guard_aside(&mut self) -> bool {
+        false
+    }
     /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8), called from
     /// the preset object placement after the object of `class` (459, 461
     /// or 543) is created with the preset's path: (action, x, y) points.
@@ -189,6 +222,10 @@ pub enum ObjectCase {
     /// Operate 23: the caller runs `waypoints.md` §5.2 (the waypoint
     /// tables live with the host); then result 0.
     Waypoint(Operate),
+    /// Not in interact range or the line blocked (`objects.md` §7.3 rule
+    /// 4): the caller runs the player to this object (`0x00548A50`) and
+    /// repeats the case on arrival; result 0.
+    Walk(UnitId),
 }
 
 /// The object code's view of a game.
@@ -615,6 +652,58 @@ impl<X: Pending> View<'_, X> {
         log(self, r)
     }
 
+    /// The reach steps of the C→S 0x13 object case (`objects.md` §7.3
+    /// rules 3–4, `0x00548B00` case 2): the unit distance
+    /// (`0x00641530`) > 50 → too far; the interact range
+    /// ([`View::object_in_reach`], `0x00623660`) false or the line test
+    /// `0x00622B50(P, O, 0x804)` blocked → walk; else operate. `None`
+    /// without the path provider (the host's seams decide).
+    fn object_reach(&self, game: &Game, player: UnitId, object: UnitId) -> Option<ObjectReach> {
+        let paths = self.h.paths.as_ref()?;
+        let pt = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::Point { x, y }
+        };
+        let dist = crate::path::walk::geom::unit_distance(
+            &paths.tables,
+            pt(player),
+            self.path_size(player),
+            pt(object),
+            self.path_size(object),
+        );
+        if dist > 50 {
+            return Some(ObjectReach::TooFar);
+        }
+        if !self.object_in_reach(player, object, dist) {
+            return Some(ObjectReach::Walk);
+        }
+        let blocked = self.units_line_blocked(game, player, object, 0x804)?;
+        Some(if blocked {
+            ObjectReach::Walk
+        } else {
+            ObjectReach::Operate
+        })
+    }
+
+    /// `0x00623660(P, O)` (`objects.md` §7.3 rule 4): `dist` is the unit
+    /// distance. Distance 0 → in range. Else P's position against O's
+    /// box, the position minus half the sizes (`SizeX` × `SizeY`, integer
+    /// halves): an empty box (a size < 1) takes ±1 around the point; else
+    /// the box plus 2 on every side, with the four corner cells of that
+    /// ring cut off (P's size is then 2, never above it).
+    fn object_in_reach(&self, player: UnitId, object: UnitId, dist: i32) -> bool {
+        if dist == 0 {
+            return true;
+        }
+        let (px, py) = self.h.path_position(player);
+        let (ox, oy) = self.h.path_position(object);
+        let (w, h) = match self.path_shape(object) {
+            Some(crate::path::record::UnitShape::Object(o)) => (o.size_x as i32, o.size_y as i32),
+            _ => (0, 0),
+        };
+        in_reach_box((px, py), (ox, oy), (w, h), self.path_size(player))
+    }
+
     /// The C→S 0x13 object case `0x00548B00` (`waypoints.md` §5.2) for
     /// `player` and the object with `guid`: object missing → 1; mode ≥ 8
     /// → 3; [`Pending::object_approach`] (distance > 50 → 1; walk); in
@@ -637,27 +726,30 @@ impl<X: Pending> View<'_, X> {
         if self.units.get(object).map_or(0, |r| r.mode) >= u32::from(objects::MODE_BOUND) {
             return Some(ObjectCase::Code(3));
         }
-        let reach = match self.h.x.object_preview_range() {
-            Some(r) => {
-                // d2rs-own, unverified: the preview's reach test.
-                let d = {
-                    let (px, py) = self.h.path_position(player);
-                    let (ox, oy) = self.h.path_position(object);
-                    (px - ox).abs().max((py - oy).abs())
-                };
-                if d > 50 {
-                    ObjectReach::TooFar
-                } else if d > r {
-                    ObjectReach::Walk
-                } else {
-                    ObjectReach::Operate
+        let reach = match self.object_reach(game, player, object) {
+            Some(r) => r,
+            None => match self.h.x.object_preview_range() {
+                Some(r) => {
+                    // d2rs-own, unverified: the preview's reach test.
+                    let d = {
+                        let (px, py) = self.h.path_position(player);
+                        let (ox, oy) = self.h.path_position(object);
+                        (px - ox).abs().max((py - oy).abs())
+                    };
+                    if d > 50 {
+                        ObjectReach::TooFar
+                    } else if d > r {
+                        ObjectReach::Walk
+                    } else {
+                        ObjectReach::Operate
+                    }
                 }
-            }
-            None => self.h.x.object_approach(game, player, object),
+                None => self.h.x.object_approach(game, player, object),
+            },
         };
         match reach {
             ObjectReach::TooFar => return Some(ObjectCase::Code(1)),
-            ObjectReach::Walk => return Some(ObjectCase::Code(0)),
+            ObjectReach::Walk => return Some(ObjectCase::Walk(object)),
             ObjectReach::Operate => {}
         }
         let (result, d) = self.operate_object(game, Some(player), guid)?;
@@ -675,6 +767,45 @@ impl<X: Pending> View<'_, X> {
             }
             Some(Dispatch::Done(_)) | None => ObjectCase::Code(0),
         })
+    }
+
+    /// Unit distance `0x00641530` on the path records (`pathing.md` §9.5).
+    fn object_unit_distance(&self, a: UnitId, b: UnitId) -> i32 {
+        let Some(paths) = self.h.paths.as_ref() else {
+            return i32::MAX;
+        };
+        let pt = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::Point { x, y }
+        };
+        crate::path::walk::geom::unit_distance(
+            &paths.tables,
+            pt(a),
+            self.path_size(a),
+            pt(b),
+            self.path_size(b),
+        )
+    }
+
+    /// Interact range `0x00623660` (§7.1, [`objects::interact_range`]) on
+    /// the path positions, the operator's size and the object's
+    /// `objects.txt` `SizeX` / `SizeY`. `None` without the path provider
+    /// or an object row.
+    pub fn object_range(&self, operator: UnitId, object: UnitId) -> Option<bool> {
+        self.h.paths.as_ref()?;
+        let class = self
+            .units
+            .get(object)
+            .filter(|r| r.ty == UnitType::Object)?
+            .class;
+        let row = self.h.objects.as_ref()?.tables.object(class as u16).ok()?;
+        Some(objects::interact_range(
+            self.h.path_position(operator),
+            self.path_size(operator),
+            self.h.path_position(object),
+            (row.sizex as i32, row.sizey as i32),
+            self.object_unit_distance(operator, object),
+        ))
     }
 
     /// The object update pass `0x00581AD0` (§14) for one queued object and
@@ -724,6 +855,33 @@ impl<X: Pending> View<'_, X> {
         let st = self.h.objects.as_ref()?;
         let class = st.control.data.get(&door)?.class;
         st.tables.object(class).ok().map(|o| o.monsterok != 0)
+    }
+}
+
+/// The box test of `0x00623660` (`objects.md` §7.3 rule 4) for a player at
+/// `p` (size `psize`) and an object at `o` of size `w` × `h`, the unit
+/// distance being nonzero. The box corner is `o` minus half the size
+/// (integer halves). An empty box (w or h < 1) takes ±1 around the corner
+/// point; else the box plus 2 on every side, and a player of size ≤ 2
+/// loses the four corner cells of that ring (the rows above and below the
+/// box keep x within ±1 of it).
+pub fn in_reach_box(p: (i32, i32), o: (i32, i32), size: (i32, i32), psize: i32) -> bool {
+    let (w, h) = size;
+    let (ox, oy) = (o.0 - w / 2, o.1 - h / 2);
+    let (px, py) = p;
+    if w < 1 || h < 1 {
+        return px >= ox - 1 && px <= ox + 1 && py >= oy - 1 && py <= oy + 1;
+    }
+    if px < ox - 2 || px > ox + w + 2 || py < oy - 2 || py > oy + h + 2 {
+        return false;
+    }
+    if psize > 2 {
+        return true;
+    }
+    if py < oy - 1 || py > oy + h + 1 {
+        px >= ox - 1 && px <= ox + w + 1
+    } else {
+        true
     }
 }
 
@@ -967,7 +1125,10 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
         match self.v.h.x.object_preview_range() {
             Some(r) => preview_distance(&self.v, operator, object) <= r,
-            None => self.v.h.x.object_in_range(self.game, operator, object),
+            None => self
+                .v
+                .object_range(operator, object)
+                .unwrap_or_else(|| self.v.h.x.object_in_range(self.game, operator, object)),
         }
     }
     /// `0x00554100`: the interact info on the player's unit record.
@@ -1424,7 +1585,44 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     fn player_level(&self, player: UnitId) -> i32 {
         self.v.stat(player, STAT_LEVEL)
     }
+    fn drop_near_player(&mut self, player: UnitId, code: [u8; 4]) {
+        self.shrine_item_near(player, code);
+    }
+    fn drop_potion_near_player(&mut self, player: UnitId, code: [u8; 4], _quantity: i32) {
+        self.shrine_item_near(player, code);
+    }
 }
+
+impl<X: Pending> ObjectView<'_, X> {
+    /// `0x00582AC0` and the inline potion drop of `0x005830E0` /
+    /// `0x00583410` (`objects.md` §9.3): the floor search from P's
+    /// position, an item of `code` at P's level, then quantity (stat 70)
+    /// := 1.
+    // PROVISIONAL (REC-2095; objects.md §9.3): the item flag bit 0 at
+    // record +0xC4 and the client item message of `0x00582AC0` are not
+    // wired; the creation and its draws are the code drop's.
+    fn shrine_item_near(&mut self, player: UnitId, code: [u8; 4]) {
+        let made = self
+            .with_drops(|h, sim, d, levels, spots| {
+                drop_helpers::near_player_drop(
+                    h,
+                    sim,
+                    d,
+                    levels,
+                    spots,
+                    player,
+                    u32::from_le_bytes(code),
+                )
+            })
+            .flatten();
+        if let Some(item) = made {
+            self.v.set_base(item, STAT_QUANTITY, 1);
+        }
+    }
+}
+
+/// Stat 70 `quantity` (`sim/stats.md`).
+const STAT_QUANTITY: u16 = 70;
 
 /// Stat 12 `level` (`sim/stats.md`).
 const STAT_LEVEL: u16 = 12;

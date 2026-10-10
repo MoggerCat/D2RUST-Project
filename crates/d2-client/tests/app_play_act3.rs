@@ -307,22 +307,16 @@ impl Play {
         Some((key.guid, Point::new(x, y - 20)))
     }
 
-    /// Walks to the town NPC of `class`, clicks it and waits for its menu
-    /// (S→C 0x28 and the menu box), then leaves the menu by its last row.
-    /// The quest messages (C→S 0x31) the talk sent.
+    /// Talks to the Kurast Docks NPC of `class`: the `goto preset 75
+    /// <class>` poke places the player next to it (the walk-room-by-room
+    /// approach stops short on the docks: the server's walk finds no
+    /// path past y 5085 from (5139, 5087)), then the click and menu
+    /// half. The quest messages (C→S 0x31) the talk sent.
     fn talk(&mut self, class: u16) -> Vec<u32> {
-        app_support::approach(
-            &mut self.app,
-            &self.server,
-            &self.ms,
-            1,
-            &[u32::from(class)],
-        );
-        self.talk_here(class)
+        self.talk_goto(75, class)
     }
 
-    /// [`Self::talk`] for an NPC the walk-room-by-room approach does not
-    /// reach: the `goto preset <level> <class>` poke places the player
+    /// [`Self::talk`] for any town NPC: the `goto preset <level> <class>` poke places the player
     /// next to the level's preset NPC (`tools/poke.md` §6).
     fn talk_goto(&mut self, level: u32, class: u16) -> Vec<u32> {
         let toks = ["goto", "preset", &level.to_string(), &class.to_string()].map(String::from);
@@ -528,6 +522,15 @@ impl Play {
         })
     }
 
+    /// Stages the sorceress' life and mana: a boss pack beside a level 25
+    /// character would kill her before the quest steps run (the tests are
+    /// about the quest).
+    fn stage_life(&mut self) {
+        for stat in [7, 6, 9, 8] {
+            self.poke(&format!("stat @player {stat} 0 {}", 5000 * 256));
+        }
+    }
+
     /// Kills monster `guid`: its life set to 1 by a poke, the player
     /// placed beside it, then right-skill casts (C→S 0x0D) on it until
     /// it dies.
@@ -656,10 +659,31 @@ impl Play {
     /// player (the level's rooms toured until one exists): its GUID.
     fn find_object(&mut self, class: u32) -> u32 {
         let found = |p: &Play| app_support::server_unit(&p.server, 2, &[class]);
-        assert!(
-            self.tour(|p| found(p).is_some()),
-            "object {class} in the level"
-        );
+        if !self.tour(|p| found(p).is_some()) {
+            // The level's preset list names the unit: the poke walks the
+            // player next to it (`tools/poke.md` §6).
+            let level = self.level().expect("joined");
+            let line = format!("goto preset {level} 2:{class}");
+            let toks: Vec<&str> = line.split(' ').collect();
+            let t = match d2_sim::poke::parse_op(&toks) {
+                Ok(d2_sim::poke::PokeOp::Directive(d2_sim::poke::Directive::Goto(t))) => t,
+                other => panic!("goto parses: {other:?}"),
+            };
+            let mut walk = d2_sim::poke::GotoWalk::default();
+            for _ in 0..600 {
+                let (r, w) = app_support::with(&self.server, move |l| {
+                    d2_client::app::poke::goto_now(&mut l.host_mut().game, t, walk)
+                });
+                walk = w;
+                match r {
+                    d2_sim::poke::PokeResult::Pending => self.step(1),
+                    d2_sim::poke::PokeResult::Ok(_) => break,
+                    other => panic!("{line}: {other:?}"),
+                }
+            }
+            self.step(30);
+        }
+        assert!(found(self).is_some(), "object {class} in the level");
         found(self).unwrap().0
     }
 
@@ -759,6 +783,14 @@ fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
     assert_eq!(p.chain(18).map(|c| c.0), Some(1), "the figurine dropped");
     p.pick_up(b"j34 ");
     p.warp(75);
+
+    // The first talk with each NPC is its Act III introduction (chain 39,
+    // `quests-act3.md` §9.3): the client replays the first text of the
+    // NPC's list, so the quest text comes with the second talk.
+    for class in [npc::CAIN3, npc::MESHIF2, npc::ALKOR] {
+        let intro = p.talk(class);
+        assert!(!intro.is_empty(), "NPC {class} introduces itself");
+    }
     let cain = p.talk(npc::CAIN3);
     assert!(cain.contains(&527), "Cain on the figurine: {cain:?}");
     assert!(p.bit(20, 2));
@@ -787,9 +819,11 @@ fn the_golden_bird_from_the_jungle_boss_to_the_potion_of_life() {
     let before = maxhp(&p);
     let potion = p.item_guid(b"xyz ").unwrap();
     let mut m = vec![0x20];
+    // x, y: the player's own point (within 50 sub-tiles, §7.11).
+    let me = app_support::server_pos(&p.server);
     m.extend_from_slice(&potion.to_le_bytes());
-    m.extend_from_slice(&0u32.to_le_bytes());
-    m.extend_from_slice(&0u32.to_le_bytes());
+    m.extend_from_slice(&(me.0 as u32).to_le_bytes());
+    m.extend_from_slice(&(me.1 as u32).to_le_bytes());
     p.send(&m);
     p.step(20);
     assert_eq!(maxhp(&p), before + 20 * 256, "the potion adds 20 life");
@@ -807,13 +841,21 @@ const GIDBINN_DECOY: u32 = 252;
 fn the_blade_of_the_old_religion_from_hratli_to_ormus_and_asheara() {
     // The Golden Bird done: the sequence starts the Blade (§1.3).
     let mut p = Play::start("0:20.0");
+    // Hratli's first talk is his gossip (16.0, `quests-act3.md` §9.1; the
+    // client replays the first text of the list), the second the Blade.
+    let gossip = p.talk(npc::HRATLI);
+    assert!(gossip.contains(&466), "Hratli's gossip: {gossip:?}");
     let hratli = p.talk(npc::HRATLI);
     assert!(hratli.contains(&571), "Hratli starts the Blade: {hratli:?}");
     p.step(10);
     assert_eq!(p.chain(17).map(|c| c.1), Some(2), "status 2 after the chat");
     p.warp(78);
+    p.stage_life();
     let decoy = p.find_object(GIDBINN_DECOY);
     p.operate(decoy);
+    // The boss timer (period 7) runs when the quest updater does, every
+    // 20th frame (`quests.md` §5): 140 frames after the operate.
+    p.step(160);
     let boss = app_support::with(&p.server, |l| {
         let r = l.host().game.world.quests.record(17)?;
         let e = &r.extra.act3.q3;
@@ -825,6 +867,8 @@ fn the_blade_of_the_old_religion_from_hratli_to_ormus_and_asheara() {
     p.pick_up(b"g33 ");
     assert!(p.bit(19, 5), "19.5: holds the Gidbinn");
     p.warp(75);
+    let intro = p.talk(npc::ORMUS);
+    assert!(!intro.is_empty(), "Ormus introduces himself");
     let ormus = p.talk(npc::ORMUS);
     assert!(ormus.contains(&587), "Ormus takes the Gidbinn: {ormus:?}");
     assert!(p.bit(19, 6));
@@ -834,6 +878,8 @@ fn the_blade_of_the_old_religion_from_hratli_to_ormus_and_asheara() {
     assert!(ormus.contains(&593), "Ormus' ring: {ormus:?}");
     p.step(10);
     assert!(p.holds(b"rin "), "the ring");
+    let intro = p.talk(npc::ASHEARA);
+    assert!(!intro.is_empty(), "Asheara introduces herself");
     let asheara = p.talk(npc::ASHEARA);
     assert!(asheara.contains(&589), "Asheara's mercenary: {asheara:?}");
     assert!(p.bit(19, 0), "the quest done");
@@ -913,4 +959,19 @@ fn esc_opens_the_game_menu_only_when_nothing_is_closable() {
         p.open_states(),
         before.into_iter().filter(|&u| u != 34).collect::<Vec<_>>()
     );
+}
+
+// Covers: specs/sim/pathing.md §6
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_walk_from_the_docks_arrival_reaches_cain() {
+    let mut p = Play::start("");
+    let guid = app_support::approach(&mut p.app, &p.server, &p.ms, 1, &[u32::from(npc::CAIN3)]);
+    let at = app_support::server_pos(&p.server);
+    eprintln!("Cain {guid} reached at {at:?}");
+    assert!(
+        at.1 < 5080,
+        "the player walked north past the Docks wall: {at:?}"
+    );
+    p.assert_clean("walk to Cain");
 }

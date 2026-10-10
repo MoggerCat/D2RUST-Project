@@ -99,7 +99,9 @@ use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
-use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
+use d2_server::world_data::tables::{
+    class_picks, drop_tables, hireling_tables, LevelTables, SaveData,
+};
 use d2_server::world_data::{self, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::drlg::maze::Maze;
@@ -549,6 +551,9 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The Ancients' fight is armed (`Pending::set_ancients_armed`); the
+    /// Ancients' AI gate `0x0058CF90` answers "not activatable" while not.
+    pub ancients_armed: bool,
     /// The quest records' not-intro bytes by chain, published by the quest
     /// control once per tick (`Pending::publish_not_intro`): the not-intro
     /// test `0x005444B0` of population and the missile bodies.
@@ -571,6 +576,16 @@ pub struct LocalSeams {
 }
 
 impl LocalSeams {
+    /// The melee reach `0x00622870` (`combat/hit.md` §7.3): a player's is
+    /// the weapon in use's `rangeadder` (0 without one; q-fix-pt-whirlwind);
+    /// every other unit keeps the preview reach.
+    fn reach(&self, u: UnitId) -> i32 {
+        match self.sides.get(&u) {
+            Some(&(UnitType::Player, ..)) => self.weapons.range_adder(u),
+            _ => PREVIEW_MELEE_RANGE,
+        }
+    }
+
     /// Player side: a player or an allied (good-aligned) monster.
     fn player_side(&self, unit: UnitId) -> Option<bool> {
         self.sides
@@ -587,11 +602,16 @@ impl LocalSeams {
     ///
     /// PROVISIONAL (REC-279 part 2; d2rs-own, unverified): the ranges are
     /// settled (`ai.md` §5.2 step 4: 35; §5.3 scan 6: full-size < 49), but
-    /// the scan 6 filter `0x005DC970`, the `nThreat` main / alternative
-    /// classes, the line test (mask 4) and `0x005DD510` are not applied
-    /// here, nor the scan 5 callback `0x005DCA70`.
+    /// of the scan 6 filter `0x005DC970` only the dead test and unit flag
+    /// 0x4 are applied, and the `nThreat` main / alternative classes, the
+    /// line test (mask 4) and `0x005DD510` are not, nor the rest of the
+    /// scan 5 callback `0x005DCA70`. PROVISIONAL (REC-1642): scan 5 skips
+    /// a monster without unit flag 0x4 like scan 6 (1.14d, q-fix-skills-4cls
+    /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
+    /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
+    /// scan 5 callback's reading.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |_| true)
+        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
     }
 
     /// [`Self::nearest_foe`] among the candidates `keep` accepts.
@@ -791,10 +811,13 @@ impl Pending for LocalSeams {
             QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
             QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
             QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
-            QuestCall::AncientsNotActivatable => {
-                self.quest_events.push(QuestEvent::AncientsDisarm);
-                return false;
-            }
+            // PROVISIONAL (REC-1561, d2rs-own, unverified): the gate
+            // `0x0058CF90` answers "not armed" and changes nothing (its
+            // name, the AI's use as an idle test and the kill rule that
+            // needs the armed byte all agree; `quests-act5-2.md` §7.9
+            // reads it as "armed := 0", under which no Ancient death
+            // counts). PC 1: confirm the instruction.
+            QuestCall::AncientsNotActivatable => return !self.ancients_armed,
             _ => return false,
         }
         true
@@ -830,6 +853,9 @@ impl Pending for LocalSeams {
                 // for the Compelling Orb, except from Durance 2.
                 || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
+    }
+    fn set_ancients_armed(&mut self, armed: bool) {
+        self.ancients_armed = armed;
     }
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
@@ -967,6 +993,15 @@ impl Pending for LocalSeams {
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::monster_right_aura(h, sim, unit, skill, level);
+    }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
@@ -987,8 +1022,48 @@ impl Pending for LocalSeams {
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
+    }
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
+        skill_events::right_aura_select(h, sim, player);
+    }
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);
+    }
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::assign_right_aura(h, sim, unit);
+    }
+    fn summon_follow(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        d2_sim::wiring::interaction::summon::summon_follow(h, sim, unit);
     }
     // d2rs-own, unverified (q-amazon, REC-150): the hand class, the item
     // shoots / stack facts of the skill bodies ([`super::weapons`]).
@@ -1151,8 +1226,8 @@ impl Pending for LocalSeams {
         )
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
-    fn melee_range(&self, _: UnitId) -> i32 {
-        PREVIEW_MELEE_RANGE
+    fn melee_range(&self, u: UnitId) -> i32 {
+        self.reach(u)
     }
     /// d2rs-own, unverified (preview, D1; `combat/range.md` §7.2 step 3
     /// with the preview reach and no line test): the larger axis
@@ -1162,6 +1237,25 @@ impl Pending for LocalSeams {
         else {
             return false;
         };
+        if matches!(self.sides.get(&a), Some(&(UnitType::Player, ..))) {
+            // `combat/range.md` §7.2 step 3 for a player attacker (no line
+            // test): the unit distance `0x00641530` against reach + extra
+            // + 1, so a Fallen 3 sub-tiles away (both sizes 2: distance
+            // 0) is in an axe's reach (q-fix-pt-whirlwind).
+            static TABLES: std::sync::OnceLock<Option<d2_sim::path::tables::PathTables>> =
+                std::sync::OnceLock::new();
+            if let Some(t) = TABLES.get_or_init(|| d2_sim::path::tables::PathTables::spec().ok()) {
+                let size = |u| self.sizes.get(&u).copied().unwrap_or(2);
+                let d = d2_sim::path::walk::geom::unit_distance(
+                    t,
+                    d2_sim::path::Point::new(pa.0, pa.1),
+                    size(a),
+                    d2_sim::path::Point::new(pd.0, pd.1),
+                    size(d),
+                );
+                return d <= 0 || self.reach(a).wrapping_add(extra).wrapping_add(1) >= d;
+            }
+        }
         let dist = (pa.0 - pd.0).abs().max((pa.1 - pd.1).abs());
         dist <= PREVIEW_MELEE_RANGE + extra + 1
     }
@@ -1206,10 +1300,9 @@ impl Pending for LocalSeams {
     fn object_quest_record(&self, _: UnitId) -> bool {
         true
     }
-    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
-    fn object_preview_range(&self) -> Option<i32> {
-        Some(crate::world_view::object_click::INTERACT_RANGE)
-    }
+    // No preview reach: the 0x13 object case takes the interact range
+    // `0x00623660` and the server's walk on the path provider
+    // (`objects.md` §7.3; `interact-operate-stash`).
 }
 
 impl WorldPending for LocalSeams {
@@ -1361,6 +1454,8 @@ pub struct LiveData {
     pub tables: GameTables,
     /// The chest drop's tables (`ActionHooks::object_drops`).
     pub drops: Arc<DropTables>,
+    /// The item class picks of the drop helpers (`DeathDrops::with_picks`).
+    pub picks: Arc<d2_sim::treasure::class_pick::ClassPicks>,
     /// `InteractionState::hireling_tables`.
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
@@ -1398,6 +1493,7 @@ impl LiveData {
             levels,
             files,
             drops: Arc::new(drop_tables(&tables.fixed)?),
+            picks: Arc::new(class_picks(&tables.fixed)?),
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
@@ -1593,6 +1689,26 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
             ))
         }),
     }
+}
+
+/// The `objects.txt` records after their load fix-up (`data/fixups.md`
+/// §13 r2: `FrameCnt0`–`7` in 1/256 frames), for the sim tables that read
+/// them as `>> 8` (waypoint init 17, `waypoints.md` §5.1: ENDANIM at
+/// frame + `FrameCnt1`). Without the fixed table: the raw rows, shifted.
+// Spec: specs/world/waypoints.md §5.1
+fn fixed_objects(d: &LiveData) -> Vec<Objects> {
+    let fixed: Option<Vec<Objects>> = d
+        .tables
+        .fixed
+        .table("objects")
+        .and_then(|t| decode_all(t).ok());
+    fixed.unwrap_or_else(|| {
+        let mut rows = d.waypoints.objects.clone();
+        for o in &mut rows {
+            o.framecnt1 = o.framecnt1.wrapping_shl(8);
+        }
+        rows
+    })
 }
 
 /// The `objects.txt` rows of the client object update
@@ -2080,6 +2196,8 @@ struct GameParts {
     bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
+    /// The drop helpers' class picks (`DeathDrops::with_picks`).
+    picks: Option<Arc<d2_sim::treasure::class_pick::ClassPicks>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
     /// The inventory tables of the wired host's inventory model (the new
@@ -2111,6 +2229,7 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
+            picks: Some(d.picks.clone()),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
@@ -2184,10 +2303,8 @@ pub fn build_with(
         .map(Arc::new);
     // Init function 17 of the waypoint objects (`waypoints.md` §5.1) on
     // the game's tables.
-    hooks.waypoint_init = Some(Arc::new(WaypointData::new(
-        &wp_tables.levels,
-        &wp_tables.objects,
-    )));
+    let wp_objects = fixed_objects(d);
+    hooks.waypoint_init = Some(Arc::new(WaypointData::new(&wp_tables.levels, &wp_objects)));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
     // The hireling calls (save restore, join follow, act change;
@@ -2248,11 +2365,13 @@ pub fn build_with(
     })?;
     // The chest drop's state (`treasure.md` §4): its seed, creation
     // fields and unique bits are the action wiring's.
+    let picks = parts.picks;
     sim.action.hooks().object_drops = parts.drops.map(|t| {
-        Box::new(DeathDrops::new(
-            t,
-            GameFields::new(Seed::init_low(0), false),
-        ))
+        let d = DeathDrops::new(t, GameFields::new(Seed::init_low(0), false));
+        Box::new(match picks {
+            Some(p) => d.with_picks(p),
+            None => d,
+        })
     });
     let mut game = Game::new();
     let start_levels = [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
@@ -2300,7 +2419,7 @@ pub fn build_with(
         .collect();
     // The wired host on the created controls.
     let action = ActionWorld {
-        waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
+        waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_objects)),
         // The skill handlers (C→S 0x05–0x11, 0x3A–0x3C) on the action
         // wiring, their open seams on `LocalSeams` (`super::skill_rest`).
         skills: WiredSkills::default(),
@@ -2490,6 +2609,9 @@ fn loader(
                     let (game, world) = (&mut s.game, &mut s.world);
                     s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
+                    // `use.md` §7 "0x3C SelectSkill": the selected right skill, an aura,
+                    // starts (q-fix-pt-right-aura).
+                    s.events.action.assign_right_aura(&mut s.game, player);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
                     entry.hotkeys = super::save_gaps::loaded_hotkeys(
@@ -2829,5 +2951,58 @@ mod target_search_tests {
             seams(135, 0).good_target_search(&mut g, UnitId(1), false),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod player_melee_range_tests {
+    use super::*;
+    use crate::app::weapons::{Hands, ItemFacts};
+
+    /// A player at (100, 100) with a weapon of `rangeadder` `adder` and a
+    /// hostile monster at (x, 100); both size 2 (the default).
+    fn seams(x: i32, adder: i32) -> LocalSeams {
+        let mut s = LocalSeams::default();
+        s.sides
+            .insert(UnitId(1), (UnitType::Player, true, (100, 100)));
+        s.sides
+            .insert(UnitId(2), (UnitType::Monster, false, (x, 100)));
+        let item = UnitId(9);
+        s.weapons.items.insert(
+            item,
+            ItemFacts {
+                class: 2,
+                range_adder: adder,
+                ..ItemFacts::default()
+            },
+        );
+        s.weapons.hands.insert(
+            UnitId(1),
+            Hands {
+                right: Some(item),
+                weapon: Some(item),
+                ..Hands::default()
+            },
+        );
+        s
+    }
+
+    // Covers: specs/combat/hit.md §7.2
+    // (§7.2 step 3, §7.3 step 1: a player's reach is the weapon's rangeadder;
+    // the size-adjusted unit distance `0x00641530`: 3 sub-tiles between two
+    // size-2 units is distance 0)
+    #[test]
+    fn a_player_reaches_by_unit_distance_and_rangeadder() {
+        // An axe (adder 0): 3 sub-tiles apart is distance 0, in reach.
+        assert!(seams(103, 0).in_melee_range(UnitId(1), UnitId(2), 0));
+        // 4 sub-tiles is distance 2: out of reach for adder 0, in for 1.
+        assert!(!seams(104, 0).in_melee_range(UnitId(1), UnitId(2), 0));
+        assert!(seams(104, 1).in_melee_range(UnitId(1), UnitId(2), 0));
+        // Far away is out whatever the adder.
+        assert!(!seams(120, 1).in_melee_range(UnitId(1), UnitId(2), 0));
+        // No weapon: adder 0.
+        let mut s = seams(104, 1);
+        s.weapons = Default::default();
+        assert!(!s.in_melee_range(UnitId(1), UnitId(2), 0));
     }
 }

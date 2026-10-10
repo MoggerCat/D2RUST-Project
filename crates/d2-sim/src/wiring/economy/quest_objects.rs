@@ -31,6 +31,7 @@ use super::quest_reward::QuestInventory;
 use super::{Economy, EconomyQuests, GameFields, HostQuests, QuestRest};
 use crate::wiring::action::ActionHooks;
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
+use crate::world::quests::act2::q4::{self, JerhynStep};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
 use crate::world::quests::{self, act1, act2, act4, act5, QuestControl, QuestWorld};
 
@@ -128,6 +129,38 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         self.on_world(game, v, call) == LoanOut::Active(true)
     }
 
+    fn jerhyn_palace_active(&mut self) -> bool {
+        q4::jerhyn_palace_active(&self.quests)
+    }
+
+    fn jerhyn_npc_state(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        at: (i32, i32),
+    ) -> JerhynStep {
+        match self.on_world(game, v, LoanCall::JerhynState { at }) {
+            LoanOut::Jerhyn(s) => s,
+            _ => JerhynStep::Out(1, 0),
+        }
+    }
+
+    fn guard_moving(&mut self) -> bool {
+        q4::guard_moved(&mut self.quests)
+    }
+
+    fn jerhyn_placed(&mut self) {
+        q4::jerhyn_placed(&mut self.quests);
+    }
+
+    fn palace_door_open(&mut self) -> bool {
+        q4::guard_at_end(&self.quests)
+    }
+
+    fn palace_guard_aside(&mut self) -> bool {
+        q4::blocker_open(&self.quests)
+    }
+
     fn map_ai_store(
         &mut self,
         game: &mut Game,
@@ -205,6 +238,8 @@ enum LoanCall<'c> {
         class: u16,
         interact: bool,
     },
+    /// Jerhyn's palace NPC state `0x0059F580` (`world/quests-act2.md` §10).
+    JerhynState { at: (i32, i32) },
 }
 
 /// What a [`LoanCall`] gave back.
@@ -213,6 +248,8 @@ enum LoanOut {
     Run(QuestObjectRun),
     /// The active test's answer.
     Active(bool),
+    /// `0x0059F580`'s outputs.
+    Jerhyn(JerhynStep),
 }
 
 /// `call` on [`HostQuests`] over `econ` and `rest`, with the host's
@@ -262,6 +299,7 @@ fn on_host<'e, X: Pending, R: QuestRest>(
         } => LoanOut::Active(
             quests.npc_wants_interact(&mut w, player, npc, class, interact) == Ok(true),
         ),
+        LoanCall::JerhynState { at } => LoanOut::Jerhyn(q4::jerhyn_npc_state(quests, &mut w, at)),
     }
 }
 
@@ -585,6 +623,15 @@ fn operate<W: QuestWorld>(
         }
         // Only the `0x0059BAF0(level)` call is stated; the rest of the
         // operate (the object spec's) is handed back.
+        // Mode 0 (`0x005846B0`): mode 1 and the open event one frame
+        // after the animation (no quest call); an open portal runs the
+        // level-dependent call below.
+        34 if w.object_mode(o) == 0 => {
+            w.set_object_mode(o, 1);
+            let at = w.frame() + (w.object_anim_length(o) >> 8) + 1;
+            w.schedule_object_event(o, 1, at);
+            return QuestObjectRun::Ran;
+        }
         34 => {
             if let Some(level) = w.unit_level(o) {
                 act2::q4::portal_operate(ctl, w, level);

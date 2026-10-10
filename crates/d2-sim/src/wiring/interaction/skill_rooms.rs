@@ -45,6 +45,24 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         )
     }
 
+    /// `0x0064CB30(room, x, y, mask)` ≠ 0 (`path-placement.md` §4 rule
+    /// 2): the masked cell value looked up from `room`; `None` without
+    /// the provider.
+    pub(super) fn rooms_point_collides(
+        &self,
+        room: RoomId,
+        (x, y): (i32, i32),
+        mask: u32,
+    ) -> Option<bool> {
+        if !self.on_rooms() {
+            return None;
+        }
+        Some(
+            crate::path::collision::point_value(&self.cv.v.h.drlg, Some(room), x, y, mask as u16)
+                != 0,
+        )
+    }
+
     /// The `Teleport` column of the room's level (`levels.txt`); `None`
     /// without the provider, a level or a row.
     pub(super) fn level_teleport(&self, r: RoomId) -> Option<i32> {
@@ -150,11 +168,23 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         r: Option<RoomId>,
         at: (i32, i32),
     ) -> Option<bool> {
+        self.rooms_place_unit_exact(u, r, at, false)
+    }
+
+    /// `0x00554EA0(game, unit, room, x, y, exact, 0)`: `exact` skips the
+    /// free-point search (`path-placement.md` §10 rule 3).
+    pub(super) fn rooms_place_unit_exact(
+        &mut self,
+        u: UnitId,
+        r: Option<RoomId>,
+        at: (i32, i32),
+        exact: bool,
+    ) -> Option<bool> {
         if !self.on_rooms() {
             return None;
         }
         let c = PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
-        Some(place_unit(c, u, r, at.0, at.1, false, false))
+        Some(place_unit(c, u, r, at.0, at.1, exact, false))
     }
 }
 

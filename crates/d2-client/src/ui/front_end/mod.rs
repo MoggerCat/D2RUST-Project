@@ -45,12 +45,9 @@ pub fn logo_frame(now_ms: u64, created_ms: u64) -> u32 {
     (now_ms.saturating_sub(created_ms) / 40 % 29) as u32
 }
 
-/// The palette of the character-create screen (`fechar`, "front end
-/// character"). PROVISIONAL (§F1.6 r1 names `fechar` only as compared
-/// against by `0x0042F2E0`; the builder `0x00435580` loads no palette in
-/// the trace): chosen because the 1.14d screenshot of the create screen
-/// matches the `charactercreationscreenEXP` art drawn with `fechar` (mean
-/// RGB error 13 against 25 and more for every other palette of d2data).
+/// The palette of the character-create screen (`fechar`): the builder
+/// `0x00435580` passes the strings at `0x006D39E8` / `0x006D39D0`
+/// (`palette\fechar\pal.dat` / `.pl2`) to the loader `0x0042F2E0`.
 pub const FECHAR_PALETTE: [&str; 2] = [
     r"data\global\palette\fechar\pal.dat",
     r"data\global\palette\fechar\pal.pl2",
@@ -563,7 +560,8 @@ impl FrontEnd {
                     if c.string_id != 0 {
                         out.push(DrawItem::Text {
                             string_id: c.string_id,
-                            text: String::new(),
+                            // Only the gateway label carries an argument.
+                            text: c.text.clone().unwrap_or_default(),
                             font: control::label_font(c.h),
                             at,
                             label: Some(Label {

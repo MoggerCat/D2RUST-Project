@@ -54,8 +54,6 @@ pub trait NpcRest: super::HirelingRest {
     fn npc_ai_param(&mut self, npc: UnitId, param: u32);
     // ---- messages and sounds (transport; `send` and `attach_sound` are
     // the quests' [`QuestRest`] ones)
-    /// The SetStat message part of `0x00548520` (after the stat is set).
-    fn stat_sent(&mut self, player: UnitId, stat: u16, value: u32);
     fn respec_sound(&mut self, player: UnitId);
     /// `0x00661480` (not specified).
     fn encode_text_list(&self, list: &TextList) -> [u8; 34];
@@ -263,10 +261,16 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .stats
             .unit_set(&mut *self.econ.hooks, unit, stat, value as i32, 0);
     }
-    /// `0x00548520`: the stat set, then its message.
+    /// `0x00548520`: the stat set, then its message to the player's
+    /// client at once (`0x0053BE40`: SetStat 0x1D / 0x1E / 0x1F by the
+    /// value's size; `intents-events.md` §3.5 rule 7). Recorded:
+    /// `a2-npc-fara-heal` frame 14, `1e 06 00 32` inside the 0x2F
+    /// handling, before the client's 0x31.
     fn set_stat_send(&mut self, player: UnitId, stat: u16, value: u32) {
         NpcWorld::set_stat(self, player, stat, value);
-        self.rest.stat_sent(player, stat, value);
+        if let Some(m) = crate::wiring::action::vitals_sync::stat_message(stat, value as i32) {
+            QuestRest::send(&mut *self.rest, player, &m);
+        }
     }
     fn max_life(&self, unit: UnitId) -> u32 {
         self.econ.stats.max_life(unit) as u32
@@ -303,8 +307,13 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .stats
             .free_state_list(&mut *self.econ.hooks, unit, u32::from(state));
     }
+    /// `0x00553380(unit, sound)`: the unit's sound event, sent as S→C
+    /// 0x2C by the client pass of the tick (`units::sound`). Recorded:
+    /// `a2-npc-fara-heal` frame 15, `2c 01 0a000000 0a00` (§5 step 6).
     fn attach_sound(&mut self, unit: UnitId, sound: u16) {
-        QuestRest::attach_sound(&mut *self.rest, unit, sound);
+        // `0x00553380(npc, 10, 0)` (asm `0x00578E4F`–`0x00578E59`): no
+        // target, every client.
+        let _ = crate::units::sound::queue_sound(&mut *self.econ.game, unit, sound, None);
     }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {
@@ -322,7 +331,14 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     }
     fn quest_text_list(&mut self, player: UnitId, npc: UnitId) -> TextList {
         let mut list = TextList::new();
+        // The chat's held-item tests read the host's inventory model
+        // (REC-1555); the rest has no item list.
+        let held = self
+            .inv
+            .as_deref()
+            .map(|i| (i.cursor_item(player), i.items_of(player)));
         let (ctl, mut w) = self.quest_world();
+        w.held = held;
         ctl.npc_activate(&mut w, player, npc, &mut list);
         list
     }
@@ -338,6 +354,10 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         quests::send_player_flags(&mut w, player, unit_type, guid);
     }
     fn quest_chat_end(&mut self, player: UnitId, npc: UnitId) {
+        if self.state.defer_chat_end {
+            self.state.chat_ends.push((player, npc));
+            return;
+        }
         let (ctl, mut w) = self.quest_world();
         ctl.npc_deactivate(&mut w, player, npc);
     }

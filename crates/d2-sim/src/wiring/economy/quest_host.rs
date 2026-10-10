@@ -1062,8 +1062,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn end_tainted_sun(&mut self) {
         self.inner.end_tainted_sun()
     }
-    fn quest_chest_gate(&mut self, object: UnitId, player: UnitId) -> bool {
-        self.inner.quest_chest_gate(object, player)
+    /// `0x00545850` over this host's own object view: the gate reads
+    /// `Mode1` and the animation length of objects with object data,
+    /// which the inner economy world cannot see.
+    fn quest_chest_gate(&mut self, object: UnitId, _player: UnitId) -> bool {
+        crate::world::quests::helpers::quest_chest_gate(self, object)
     }
     fn quest_drop(
         &mut self,
@@ -1564,6 +1567,53 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     /// `0x00619790`: the units of every room of the DRLG room's adjacency
     /// array (the room itself included, `rooms.md` §6), in array order,
     /// each room's unit list in order.
+    /// `0x005A0180(victim, 12)` (champion or unique) or `0x0063E9F0(0,
+    /// victim)` (boss), as the combat wiring reads them.
+    fn special_monster(&mut self, victim: UnitId) -> bool {
+        let h = &*self.inner.econ.hooks;
+        h.monster_flag(victim, 12) || h.x.is_boss(victim)
+    }
+    fn has_act3(&mut self) -> bool {
+        self.inner.econ.hooks.drlg.dungeon.acts[2].is_some()
+    }
+    /// `0x00619DA0`: the Act III active room whose sub-tile rectangle
+    /// holds (x, y).
+    fn room_covering(&mut self, x: i32, y: i32) -> Option<RoomId> {
+        let e = &*self.inner.econ;
+        e.game.lists.active_rooms(2).into_iter().find(|&r| {
+            e.hooks
+                .drlg
+                .subtiles(e.game, r)
+                .is_some_and(|s| x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h)
+        })
+    }
+    /// A player in `room` or a room of its adjacency array
+    /// ([`Self::adjacent_units`]).
+    fn player_in_rooms(&mut self, room: RoomId) -> bool {
+        self.adjacent_units(room).into_iter().any(|u| {
+            self.inner
+                .econ
+                .game
+                .lists
+                .unit(u)
+                .is_some_and(|e| e.ty == UnitType::Player)
+        })
+    }
+    /// `0x005A43E0(game, room, 0, class, 1, 0, 0, 1)` through the lent
+    /// monster world.
+    fn spawn_monster_in_room(&mut self, room: RoomId, class: u16) -> Option<UnitId> {
+        self.view(|g, v| {
+            let mut sim = crate::units::hooks::Sim {
+                game: g,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            v.h.with_monster_world(|w, h| w.spawn_random_boss(&mut sim, h, room, i32::from(class)))
+        })
+        .flatten()
+        .flatten()
+    }
     fn adjacent_units(&mut self, room: RoomId) -> Vec<UnitId> {
         use crate::path::collision::CollisionRooms;
         if !self.drlg_room(room) {

@@ -20,7 +20,10 @@
 //! | stats | the unit's list in [`crate::stats::StatLists`] (unit +0x5C): full array (6–11), base array (0–3, 12) |
 //! | `seed` | [`ActionHooks::game_seed`] (game +0xD0) |
 //!
-//! `own` is left out (spec §2: no 1.14d source; [`D2RS_GAPS`]).
+//! `own` (spec §2, `sim/units.md` §2 "Owner links"): a monster's AI
+//! control minion owner, a missile's stored owner ([`owner`]); an item's
+//! holder is the inventory model's, which the host overlays (the export
+//! in `d2-client` `state-dump`). The player and object types have none.
 //!
 //! `q` (the player's quest flag record, [`HOST_FIELDS`]) is not in the
 //! wired game: the host keeps the players' records (`PlayerQuests`) and
@@ -59,12 +62,7 @@ pub const HOST_FIELDS: [&str; 1] = ["q"];
 pub const PATH_FIELDS: [&str; 8] = ["x", "y", "xf", "yf", "tx", "ty", "d", "lv"];
 
 /// The keys d2rs never fills, with why (header `gaps`, one line each).
-pub const D2RS_GAPS: [(&str, &str); 1] = [(
-    "own",
-    "own: not written; the spec gives it no 1.14d source (state-snapshot.md §2, open \
-     question 1) and d2rs keeps owners per system (missile store, pet lists, item store), \
-     with no single unit-owner field to map",
-)];
+pub const D2RS_GAPS: [(&str, &str); 0] = [];
 
 /// One unit of a snapshot (§2). `None`: the key is absent from the line.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -442,6 +440,7 @@ fn unit_state<X>(
             .room()
             .and_then(|room| sys.hooks.drlg.level_id(game, room));
     }
+    u.own = owner(sys, id, ty);
     if let Some(l) = sys.stats.unit_list(id).filter(|&l| sys.stats.is_live(l)) {
         stats(&mut u, &sys.stats, l);
     }
@@ -474,6 +473,31 @@ fn unit_state<X>(
         }
     }
     u
+}
+
+/// `own` of a monster or a missile (§2): the AI control's minion owner
+/// (`0x0058F0D0`; a released pack, GUID −1, is none) or the missile's
+/// source-unit link (`0x00552FD0`). Types 0, 2, 5 have none; an item's
+/// holder lives in the inventory model (overlaid by the host). 0 is
+/// absent as on the 1.14d side.
+fn owner<X>(sys: &UnitSystem<ActionHooks<X>>, id: UnitId, ty: UnitType) -> Option<u32> {
+    let guid = match ty {
+        UnitType::Monster => sys.hooks.ai.as_ref()?.control(id)?.minion_owner?.guid,
+        UnitType::Missile => sys.hooks.missiles.as_ref()?.get(id)?.owner?.guid,
+        // A monster's equipment: the monster has no inventory model, its
+        // holdings are the host's (PROVISIONAL, REC-1030); the holder is
+        // the monster the item is held for.
+        UnitType::Item => {
+            let (&holder, _) = sys
+                .hooks
+                .monster_equip
+                .iter()
+                .find(|(_, held)| held.values().any(|&i| i == id))?;
+            sys.units.get(holder)?.guid
+        }
+        _ => return None,
+    };
+    (guid != 0 && guid != u32::MAX).then_some(guid)
 }
 
 /// Types 0, 1, 3 (§2): u16 sub-tile words, the fractions, the target and

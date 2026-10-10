@@ -39,16 +39,16 @@
 |   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 469–504 |
 |   9. Placement search and creation call (`0x005B2A00`) | 505–633 |
 |   10. Party minions (monstats minion columns, `0x005B2830`) | 634–685 |
-|   11. Preset monsters (DS1 presets) | 686–945 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 946–970 |
-|   13. Region bookkeeping | 971–1003 |
-|   14. Other table-driven and AI spawns | 1004–1028 |
-| Constants & data dependencies | 1029–1099 |
-| Randomness | 1100–1143 |
-| Edge cases & original bugs | 1144–1184 |
-| Test vectors | 1185–1256 |
-| Provenance | 1257–1285 |
-| Open questions | 1286–1344 |
+|   11. Preset monsters (DS1 presets) | 686–954 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 955–979 |
+|   13. Region bookkeeping | 980–1012 |
+|   14. Other table-driven and AI spawns | 1013–1037 |
+| Constants & data dependencies | 1038–1108 |
+| Randomness | 1109–1152 |
+| Edge cases & original bugs | 1153–1193 |
+| Test vectors | 1194–1265 |
+| Provenance | 1266–1294 |
+| Open questions | 1295–1353 |
 <!-- /index -->
 
 ## Summary
@@ -539,7 +539,7 @@ the ring search is skipped.
 (room seed); s = 0 → s = 1. Then visit indices s, s+1, … mod n until
 back at s − 1 (never visiting s − 1 itself). For a tile record with tile
 data (+0x18) whose material flags (`0x00604BC0`, DT1 header +0x06,
-`drlg/rooms.md` §9.3) have bit 0x2: the point is
+`drlg/rooms.md` §9.3) have bit 0x2 (d2rs reads the material of the record's chosen DT1 tile; `gen-wp-21` frame 401, the Slime Prince pack, class 249): the point is
 x = (rec+8 + room tile x) × 5 + 3, y = (rec+0xC + room tile y) × 5 + 3.
 The point must pass `0x0064CB30(room, x, y, 0x100)` = 0, and at least one
 of (x, y) + (0,−3), (3,0), (0,3), (−3,0) (table `0x006E2D50`) must be
@@ -688,8 +688,17 @@ count, set = ¬(flags >> 2) & 1, flags 0x40)` runs:
 #### 11.1 Order (`0x005559A0`, monster part only)
 
 The room's preset list (`0x00619FD0`) is walked twice. The first pass
-places every non-monster preset (objects, etc.; objects spec). Level 136
-(0x88) has its own special cases. The second pass places the monster
+places every non-monster preset (objects, etc.; objects spec) whose
+"done" bit is clear, except per level (`0x0061A1B0`; read from the 1.14d
+function):
+
+- Levels 133 and 135 (0x85, 0x87): object (type 2) 397 is never placed.
+- Level 134 (0x86): object 402 (waypoint) is never placed; every other
+  object preset adds 1 to a game counter (game +0x1DE4, zeroed at game
+  creation `0x00530930`, never reset), and the object whose increment
+  makes it equal to game +0x7C (init seed) mod 3 + 3 is not placed.
+  Non-object presets are placed.
+- Level 136 (0x88): objects 26, 268 and 269 are never placed. The second pass places the monster
 presets (type 1) whose "done" bit (+0x1C bit 0) is clear, in list order.
 Level 136 skips the second pass. Each preset goes through `0x00555910`:
 class = preset +0x04, x = preset +0x08 + room subtile x (`0x00619730`), y = preset

@@ -110,6 +110,8 @@ pub struct WorldViewState {
     /// in draw order: what the frame shows, for logs and tests.
     pub last_tags: Vec<crate::scene::ItemTag>,
     pub last_ui: Vec<crate::ui::UiDraw>,
+    /// The hover target the previous pass left (`ClickView::prev_hover`).
+    pub prev_hover: Option<crate::bridge::world::UnitKey>,
     /// The preview's pending interaction (`super::interact`).
     pub interact: super::interact::PreviewInteract,
     /// Ground items (`super::ground_items`): the app hands in the item art
@@ -164,6 +166,7 @@ impl WorldViewState {
             preview_error: None,
             last_tags: Vec::new(),
             last_ui: Vec::new(),
+            prev_hover: None,
             interact: Default::default(),
             ground_items: Default::default(),
             corpse_clicks: Default::default(),
@@ -486,6 +489,19 @@ pub fn deliver_with<L: ServerLink>(
                 Some(ui) => {
                     ui.apply_output(o, bridge.borrow().world())?;
                     requests.borrow_mut().extend(ui.take_sounds());
+                    // S→C 0x5A: the codes whose line goes to the screen
+                    // message list `0x0049E3A0`, which requests UI sound 6
+                    // (`ui/messages.md` §2 r3) even for the empty line of
+                    // the local player's own join (code 2, `client/msg-ui.md`
+                    // §19 r3). The original UI does not build these lines
+                    // yet, so the sound is requested here. PROVISIONAL
+                    // (REC-1681): codes other than 0–5 and 0xD are taken
+                    // as lines too.
+                    if let Output::EventText { bytes, .. } = o {
+                        if event_text_adds_line(bytes[1]) {
+                            requests.borrow_mut().push(SoundRequest::Ui(6));
+                        }
+                    }
                     for s in ui.take_skipped() {
                         debug!("ui output {o:?}: skipped {s}");
                     }
@@ -596,6 +612,13 @@ pub fn audio_request(o: &Output) -> Option<SoundRequest> {
         }
         _ => return None,
     })
+}
+
+/// Whether a 0x5A code ends in a screen message (`client/msg-ui.md` §19
+/// r3: 0–5 and 0xD build a line, 6, 8–11, 0xF–0x11 other forms; 7, 0xC,
+/// 0xE and above 0x12 add none).
+pub(crate) fn event_text_adds_line(code: u8) -> bool {
+    matches!(code, 0..=6 | 8..=11 | 0xD | 0xF..=0x11)
 }
 
 /// The player event sounds of a world click's results (`ClickOut::Sound`,
@@ -1020,6 +1043,8 @@ fn world_view_frame(
                 // frame's shaken camera (the anchor decided on a drawn
                 // tick).
                 shake: anchor.map_or((0, 0), |a| a.shake),
+                // 1.14d's press sees the hover the previous pass drew.
+                prev_hover: state.preview.then_some(state.prev_hover),
             };
             // d2rs-own, unverified (D2): the run lock (command 35) is the
             // toggle action no panel took; the click reads the predicted
@@ -1053,6 +1078,7 @@ fn world_view_frame(
                 .filter(|_| over && state.preview)
                 .and_then(|c| crate::bridge::hover::pick(bridge.0.world(), c, mouse));
             state.feed.set_hover(hover);
+            state.prev_hover = hover;
             // d2rs-own, unverified (REC-239): the hovered object's name.
             if let Some(label) = cam.as_ref().and_then(|c| {
                 state
@@ -1205,6 +1231,13 @@ fn world_view_frame(
         None => None,
     };
     if !draw {
+        // A new tick whose draw waits for the GPU still is a client
+        // update: the weather steps (REC-1900).
+        if !state.last.is_some_and(|l| l.server_tick == tick) {
+            state
+                .feed
+                .weather_update(bridge.0.world(), &mut state.assets);
+        }
         return Ok(());
     }
     if let Some(d) = drawn.as_deref_mut() {

@@ -93,6 +93,11 @@ impl MonsterAi {
         true
     }
 
+    /// The unit's used skill := none (`0x00620250` reads none after).
+    pub fn clear_current(&mut self, unit: UnitId) {
+        self.current.remove(&unit);
+    }
+
     /// The used skill (`0x00620250`) of a unit: the one the request set
     /// ([`Self::set_current`], `0x005DEAD0` / `0x005DE000`), else none. A
     /// mode from the plain request `0x005DDF90` has **no** used skill

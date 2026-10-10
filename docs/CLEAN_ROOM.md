@@ -15,13 +15,17 @@ defensible as our own work. (This is a process document, not legal advice.)
   Write it the way you'd explain it to another programmer.
 
 **Implementer (Rust role)**
-- Reads `specs/` only. Does not open `re/` or `../refs/`.
-- If a spec is ambiguous, file a question in the spec's "Open questions"
-  section and hand it back to the RE role. Don't go peek.
+- Reads `specs/` first, and may read the Ghidra exports (`re/exports/`, or
+  the private repo's `re/exports/` in the cloud) read-only to settle exact
+  behaviour (decision 2026-10-09, project owner).
+- Writes the Rust in its own words and structure; never pastes or
+  line-translates decompiler output. When a fix rests on a function, the
+  behaviour and the address go into the spec, so the written record stays
+  complete.
 
-With one person (plus Claude), enforce the split through **separate sessions**:
-one Claude Code session for spec writing, a fresh one for implementation that
-is told to read only `specs/`. A one-person clean room is weaker than a
+Until 2026-10-09 the split was enforced through separate sessions (an
+implementer that read only `specs/`). The project owner lifted that: the
+measure-and-guess loop it forced cost far more than it protected. A one-person clean room is weaker than a
 two-team one; the written record of specs is what demonstrates the process.
 
 ## What a good spec contains

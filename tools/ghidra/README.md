@@ -1,8 +1,9 @@
-# Ghidra tooling (spec-writing sessions only)
+# Ghidra tooling
 
 Our own scripts for analyzing the 1.14d `Game.exe`. Everything they produce
-goes under `re/` (gitignored). Implementation sessions don't use any of
-this (see `docs/CLEAN_ROOM.md`).
+goes under `re/` (gitignored); `re/exports/` is also pushed, read-only, to
+the private repo's `re/exports/` so cloud sessions can read it (CLAUDE.md
+rule 3). Never into the public repo.
 
 - Ghidra 12.1.4 in `%LOCALAPPDATA%\Programs\ghidra_12.1.4_PUBLIC`
 - JDK: Temurin 21, pinned through `JAVA_HOME_OVERRIDE` in Ghidra's
@@ -57,3 +58,20 @@ case targets per site), `labels.tsv`, `strings.tsv` and `data.tsv`
 Ghidra.
 
 `switches.tsv` `case_index` is the order of the computed-jump references on the instruction, not the case value: read the jump table itself (or `disasm.py`) for the case number (a close-hook table was found one case off this way).
+
+## Cloud sessions (Linux, headless)
+
+`sh tools/ghidra/cloud_setup.sh install` puts Ghidra 12.1.4 in
+`$HOME/ghidra` (the GitHub release is out of the session's GitHub scope;
+it takes the official distribution from the Docker Hub image
+`blacktop/ghidra:12.1.4` through the registry API). `project` imports the
+private repo's `install/Game.exe`, auto-analyzes (~10 min) and runs
+`types`: ImportCommunityLabels, ApplyNames (`re/exports/functions.tsv`,
+then names harvested from specs/ by `spec_harvest.py`) and ApplyTypes
+(`d2_114d_types.h`, our structs written from specs/, plus argument types
+from the specs' call shapes). Then `decompile 0xADDR` prints one function
+with current names and types; `export DIR` re-exports everything (~3 min;
+the private repo's `re/exports-typed/` was made this way). Add struct
+fields to `d2_114d_types.h` as specs measure them: every field carries
+its `// +0xNN` offset and every struct its `// size`, and ApplyTypes
+rejects a header whose layout disagrees.

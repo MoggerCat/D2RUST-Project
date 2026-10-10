@@ -216,7 +216,8 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         self.cv.v.allocate(game, &req, at.0, at.1)
     }
 
-    /// [`BodyEffect::PetAdd`] on the lists, [`BodyEffect::OwnerData`] on
+    /// [`BodyEffect::PetAdd`] on the lists, [`BodyEffect::OwnerData`] and
+    /// [`BodyEffect::AiParams`] on
     /// the AI control and [`BodyEffect::SetSkill`] on
     /// [`crate::wiring::action::ActionHooks::monster_skills`]; every other
     /// effect (and the seam parts of these two) comes back for
@@ -245,6 +246,46 @@ impl<X: Pending + UseRest> UseView<'_, X> {
             }
             return Some(e);
         }
+        if let BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30`: +0x94 / +0x98 := the owner's type and GUID
+            // (0 / 0 for none).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                r.source = link.unwrap_or((0, 0));
+            }
+            return None;
+        }
+        if let BodyEffect::SelectSkill {
+            u: m,
+            side: 0,
+            skill,
+            owner: -1,
+        } = e
+        {
+            if self.monster_aura_select(m, skill) {
+                return None;
+            }
+            return Some(e);
+        }
+        // `0x005B0D70(control, p0, p1, p2)`: each param other than −666
+        // written into the AI control (`skills/bodies.md` §6.15 step 4:
+        // −666 = unchanged), e.g. the Hydra's expiry frame (param 0,
+        // `bodies-2b.md` §8.5 step 4) its AI reads (`ai-bodies-6.md` §19).
+        if let BodyEffect::AiParams { m, p0, p1, p2 } = e {
+            if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+                for (slot, v) in c.params.iter_mut().zip([p0, p1, p2]) {
+                    if v != -666 {
+                        *slot = v;
+                    }
+                }
+                return None;
+            }
+            return Some(e);
+        }
         if let BodyEffect::OwnerData { m, owner, a, b } = e {
             self.owner_data(m, owner);
             // f1 / f2 ≠ 0 also restart the AI (`0x005DD230`): the seam's.
@@ -265,6 +306,53 @@ impl<X: Pending + UseRest> UseView<'_, X> {
 }
 
 impl<X: Pending + UseRest> UseView<'_, X> {
+    /// `0x005701B0(m, 0, k, −1)` of `bodies.md` §6.5 step 6 on a summoned
+    /// monster whose `sumskill` k is an `aura` skill (Oak Sage, Heart of
+    /// Wolverine, Spirit of Barbs): the monster gets a skill list (unit
+    /// +0xA8) of its summon skills (the base levels `0x0056DEB0` gave,
+    /// [`crate::wiring::action::ActionHooks::monster_skills`]) and the
+    /// assignment of `use.md` §7 runs on it: right skill := k, its aura
+    /// state on (stats 350/351), the type-8 aura timer. False (nothing
+    /// done) for a unit that is not a monster or a skill that is not an
+    /// aura; the seam takes those. 1.14d: dru-oak-sage's druid has the
+    /// aura's life the frame after the summon.
+    pub(super) fn monster_aura_select(&mut self, m: UnitId, skill: i32) -> bool {
+        use crate::skills::list::ListOwner;
+        let Some(r) = self.cv.v.units.get(m) else {
+            return false;
+        };
+        if r.ty != UnitType::Monster {
+            return false;
+        }
+        let class = r.class as i32;
+        let t = self.cv.v.h.tables.clone();
+        if !t.skills.skill(skill).is_some_and(|x| x.aura) {
+            return false;
+        }
+        let skills: Vec<(i32, i32)> = self
+            .cv
+            .v
+            .h
+            .monster_skills
+            .get(&m)
+            .map(|s| s.iter().map(|(&k, &v)| (k, v)).collect())
+            .unwrap_or_default();
+        let owner = ListOwner {
+            monster: true,
+            class,
+        };
+        let list = self.cv.v.h.skill_lists.entry(m).or_default();
+        for (k, v) in skills {
+            list.set_base(&t.skills.skills, owner, k, v.clamp(0, 255) as u8);
+        }
+        let mut msg = [0u8; 9];
+        msg[0] = 0x3C;
+        msg[1..5].copy_from_slice(&(skill as u32 & 0x7FFF_FFFF).to_le_bytes());
+        msg[5..9].copy_from_slice(&(-1i32).to_le_bytes());
+        crate::skills::use_::select_skill(self, &t.skills, m, &msg);
+        true
+    }
+
     /// Owner data `0x0058F030(game, m, owner GUID, owner type, …)`
     /// (`monsters/umod-callbacks.md` §1 rule 5): the minion owner link
     /// of m's AI control record (+0x2C GUID, +0x30 type), looked up by
@@ -318,5 +406,31 @@ impl<X: Pending> View<'_, X> {
                 }
             }
         }
+    }
+}
+
+/// Pet follow `0x005754B0` for the summoned pet types
+/// (`world/hirelings.md` §6 rule 1; [`ActionHooks::summon_follow`]): the
+/// `warp` types moved to `player`, the `range` types beyond 1600 removed
+/// with kill (`sim/pets.md` §6). Called from the host's pet follows
+/// ([`crate::wiring::action::Pending::summon_follow`]).
+pub fn summon_follow<X: Pending + UseRest>(
+    h: &mut crate::wiring::action::ActionHooks<X>,
+    sim: &mut crate::units::hooks::Sim<'_>,
+    player: UnitId,
+) {
+    let far = h.summon_follow(sim, player);
+    if far.is_empty() {
+        return;
+    }
+    let mut w = UseView {
+        cv: crate::wiring::action::combat::CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let mut pv = PetView { u: &mut w };
+    for guid in far {
+        let _ = pets::remove(&mut pv, player, guid, true);
     }
 }

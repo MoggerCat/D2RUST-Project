@@ -246,7 +246,9 @@ impl<X: Pending> View<'_, X> {
             },
             UnitType::Item => UnitShape::Item,
             UnitType::Tile => UnitShape::Tile,
-            UnitType::Object => return None,
+            UnitType::Object => {
+                UnitShape::Object(self.h.object_footprint_shape(Some(r.ty), r.class)?)
+            }
         })
     }
 
@@ -275,6 +277,16 @@ impl<X: Pending> View<'_, X> {
     pub fn path_size(&self, unit: UnitId) -> i32 {
         if self.h.paths.is_none() {
             return self.h.x.size(unit);
+        }
+        // An object's size is its `objects.txt` `SizeX` (`path-placement.md`
+        // §3 table; `pathing.md` §3 step 6 lifts a sized target's footprint:
+        // `interact-operate-stash` frame 4, the run aims at the stash's own
+        // cell).
+        if let Some(r) = self.units.get(unit).filter(|r| r.ty == UnitType::Object) {
+            return self
+                .h
+                .object_footprint_shape(Some(r.ty), r.class)
+                .map_or(0, |s| s.size_x as i32);
         }
         self.path_shape(unit).map_or(0, |s| s.size())
     }
@@ -460,6 +472,13 @@ impl<X: Pending> View<'_, X> {
         if dead_col {
             return;
         }
+        self.dead_body_footprint(unit);
+    }
+
+    /// `0x00649F70(U, 1)` (`skills/bodies-3.md` §3.9) without the class
+    /// gate: the player's dead clean-up `0x0057F330` calls it directly
+    /// (`combat/vitals.md` §4.6 rule 1.5).
+    pub fn dead_body_footprint(&mut self, unit: UnitId) {
         let Some((room, x, y)) = self
             .h
             .paths
@@ -483,6 +502,46 @@ impl<X: Pending> View<'_, X> {
             .get(unit)
             .and_then(|r| self.h.tables.combat.monstats.get(r.class as usize))
             .map_or((0, false), |m| (i32::from(m.velocity), m.npc))
+    }
+
+    /// The velocity base `0x00621360(type, class)` (`pathing.md` §8.1
+    /// rule 2) of the unit's draw identity `0x00645270` (`units.md` §4.7):
+    /// with flag-ex disguise and a gfx state on, that state's `gfxtype`
+    /// (1: a monster, 2: a player) and `gfxclass`; else the unit's own
+    /// type and class. A player identity reads charstats `WalkVelocity`,
+    /// a monster one monstats `Velocity` (1.14d: the Shadow Warrior,
+    /// monstats `Velocity` 0, walks on the assassin's 6; a shapeshifted
+    /// Druid on its wolf or bear row).
+    pub fn velocity_base(&self, unit: UnitId) -> i32 {
+        let Some(r) = self.units.get(unit) else {
+            return 0;
+        };
+        let (mut player, mut class) = (r.ty == UnitType::Player, r.class as usize);
+        if r.flags2 & crate::units::record::flags2::DISGUISE != 0 {
+            let states = &self.stats.data().states;
+            let shown = states
+                .gfx_states()
+                .iter()
+                .find(|&&(s, ..)| self.stats.has_state(unit, s))
+                .copied();
+            match shown {
+                Some((_, 1, c)) => (player, class) = (false, usize::from(c)),
+                Some((_, 2, c)) => (player, class) = (true, usize::from(c)),
+                _ => {}
+            }
+        }
+        let combat = &self.h.tables.combat;
+        if player {
+            combat
+                .charstats
+                .get(class)
+                .map_or(0, |c| i32::from(c.walkvelocity))
+        } else {
+            combat
+                .monstats
+                .get(class)
+                .map_or(0, |m| i32::from(m.velocity))
+        }
     }
 
     /// charstats `WalkVelocity`, `RunVelocity`, `RunDrain` of a player.

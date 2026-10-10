@@ -113,6 +113,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
             anim: 7,
             range: 1,
             flags: skill_flag::IN_TOWN,
+            ingame: true,
             ..SkillRow::default()
         }]);
         b.0.set_unit_rows(UnitRows {
@@ -206,6 +207,7 @@ fn a_monster_walks_and_a_left_click_on_it_attacks() {
         game_menu_open: false,
         pick: false,
         shake: (0, 0),
+        prev_hover: None,
     };
     sent.lock().unwrap().clear();
     let mut st = ClickState::default();

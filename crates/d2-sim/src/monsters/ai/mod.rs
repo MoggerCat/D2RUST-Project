@@ -711,7 +711,35 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    // The generic end `0x005A8030`: a unit with state 54 first runs
+    // `0x005544B0(unit, 0)` and a dead one stops there. The request
+    // record (§1.4): target unit := the path target unit (`0x00553540`,
+    // the unit itself counting as none), point (0, 0); so without a
+    // target unit the path target point becomes (0, 0) (`0x00648AD0`,
+    // §7.5 rule 2). Its builder also clears the used skill entry
+    // `0x00620210(unit, 0)`; the host seam has no "none" yet.
+    if cx.world.has_state(unit, state::UNINTERRUPTABLE) {
+        cx.world.clear_uninterruptable(game, unit);
+        delete_thinks(game, unit);
+        if cx.world.is_dead(unit) {
+            return;
+        }
+    }
+    let target = match cx.world.path_target(unit) {
+        Some(t) => ModeTarget::Unit(t),
+        None => ModeTarget::Point(0, 0),
+    };
+    request_mode(game, cx, unit, mode::NEUTRAL, target);
+}
+
+/// `0x005A8330` / `0x005A83E0`, the trapped soul's A1/A2 and S1/S2 ends
+/// (per-class records, `units.md` §4.6): a mode request to S1 targeting
+/// itself, then the think unless frozen.
+pub fn trapped_soul_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId) {
+    request_mode(game, cx, unit, mode::SKILL1, ModeTarget::Unit(unit));
+    if !frozen(cx, unit) {
+        think(game, cx, unit);
+    }
 }
 
 /// Installing an AI `0x005B0E00` (§3.3).

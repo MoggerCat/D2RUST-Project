@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–524 |
-|   4. Suite | 525–640 |
-| Constants & data dependencies | 641–644 |
-| Randomness | 645–648 |
-| Edge cases & original bugs | 649–672 |
-| Test vectors | 673–695 |
-| Provenance | 696–699 |
-| Open questions | 700–748 |
+|   3. Run | 145–531 |
+|   4. Suite | 532–647 |
+| Constants & data dependencies | 648–651 |
+| Randomness | 652–655 |
+| Edge cases & original bugs | 656–679 |
+| Test vectors | 680–702 |
+| Provenance | 703–706 |
+| Open questions | 707–755 |
 <!-- /index -->
 
 ## Summary
@@ -239,7 +239,12 @@ state first. It is the default way to compare a behaviour with 1.14d.
       pokes, the due steps' pointer events go through the bridge's
       world-click dispatcher (`world_view::ui_bind::world_clicks`, the
       call the window path makes after the UI): no panel, no shake; the
-      hover target is `play`'s preview pick (`bridge::hover::pick`, the
+      hover target is `play`'s preview pick (`bridge::hover::pick`, taken
+      at the end of the previous pass from the cursor then, as 1.14d
+      hovers while it draws: a press posted in the pass of its `move` is a
+      point click; objects pick inside ±48 px of their feet, units ±24,
+      PROVISIONAL REC-2116: 1.14d hit-tests the sprite; the Act I waypoint
+      click path of the effect scenes is the case that needs it; the
       `ClickView::pick` the window sets: the unit — monster, NPC,
       object or ground item, never a player — whose feet are nearest
       the click inside a box standing on them; d2rs-own, unverified,
@@ -381,7 +386,9 @@ state first. It is the default way to compare a behaviour with 1.14d.
        1.14d after the 0x13 (`world/npc.md` §2 rule 2 clears her path)
        and her position on d2rs; frame 16, S→C 0x27's text entries in
        another order; frame 17, the 1.14d client itself answers the 0x27
-       with C→S 0x31 (the bridge does not); frame 20, store items have
+       with C→S 0x31 (the bridge did not; since q-fix-npc-interact the
+       headless state-dump answers 0x28's dialog branch as the UI does,
+       `client/msg-ui.md` §16 r4.3); frame 20, store items have
        no `x` / `y` / `d` in d2rs' snapshot; frame 24 (the 0x32): 1.14d
        answers 0x2A kind 4, code 0, GUID 42, gold 3744 (the copy, which
        appears in the inventory; store item 1 is removed), d2rs 0x2A

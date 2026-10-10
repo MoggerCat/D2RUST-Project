@@ -5,7 +5,8 @@
   hand-played recording `traces/raw/20261006-015956-packets.jsonl`
   (Charsi, Akara, Warriv, Flavie; Test vectors); a hire at Kashya is
   recorded (`traces-raw-buddy/merc1-spawn-packets.jsonl`, Test vectors);
-  resurrect, heal and the service actions have no recording yet.
+  a heal at Fara is recorded (`a2-npc-fara-heal`, §5); resurrect and
+  the service actions have no recording yet.
 - **Target version:** 1.14d
 - **Crate/module:** `d2-sim::world::npc`
 - **Related specs:** `world/vendors.md` (store inventories, gamble lists,
@@ -27,26 +28,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–65 |
-| Inputs | 66–76 |
-| Outputs / state changes | 77–84 |
-| Rules | 85–86 |
-|   1. NPC control and records | 87–141 |
-|   2. Starting an interaction (C→S 0x13) | 142–235 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 236–274 |
-|   4. Menu actions (C→S 0x38) | 275–333 |
-|   5. Healing on chat open | 334–361 |
-|   6. Cain identify (C→S 0x34) | 362–390 |
-|   7. Mercenaries | 391–514 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 515–594 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 595–628 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 629–640 |
-| Constants & data dependencies | 641–653 |
-| Randomness | 654–666 |
-| Edge cases & original bugs | 667–742 |
-| Test vectors | 743–766 |
-| Provenance | 767–817 |
-| Open questions | 818–876 |
+| Summary | 53–66 |
+| Inputs | 67–77 |
+| Outputs / state changes | 78–85 |
+| Rules | 86–87 |
+|   1. NPC control and records | 88–142 |
+|   2. Starting an interaction (C→S 0x13) | 143–245 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 246–284 |
+|   4. Menu actions (C→S 0x38) | 285–343 |
+|   5. Healing on chat open | 344–379 |
+|   6. Cain identify (C→S 0x34) | 380–408 |
+|   7. Mercenaries | 409–532 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 533–612 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 613–646 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 647–658 |
+| Constants & data dependencies | 659–671 |
+| Randomness | 672–684 |
+| Edge cases & original bugs | 685–760 |
+| Test vectors | 761–784 |
+| Provenance | 785–835 |
+| Open questions | 836–894 |
 <!-- /index -->
 
 ## Summary
@@ -214,6 +215,15 @@ the results 1 below are internal only):
 Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
 1720, 1751, 3570).
 
+Entry order of the 0x27 list (recorded 2026-10-09,
+`items-vendor-akara-buy` frame 15, Akara): `(0, 64), (0, 11)` where the
+quest dispatch adds 11, then 64, i.e. newest first. d2rs reads the add
+`0x006612F0` as a prepend (as the client's build `0x00661510`,
+`client/msg-ui.md` §16 r9) and the writer `0x00661480` as a walk from
+the head. PROVISIONAL (REC-1401): one recording with two entries from
+two records; a list with two entries of one table would tell a prepend
+from a reversed dispatch.
+
 **Call forms** (2026-10-09, static asm; used by `tools/poke.md` §4
 rule 10). All run on the game thread and return with the stack popped
 by the callee.
@@ -353,11 +363,19 @@ nothing unless the player's interact unit is that NPC. Then, in order:
    max life `0x00625D10` (a **signed** compare, unlike the player's),
    then base stat 6 := max (`0x00627260`) and "changed"; each of the
    other three counts as a change when it removes something.
-6. If anything changed: sound 10 attached to the NPC (`0x00553380`,
+6. If anything changed: sound 10 attached to the NPC (`0x00553380(npc, 10, 0)`: target none, every client; asm `0x00578E4F`,
    delivered by the unit spec).
 
 Heal is free and happens on every 0x2F that moves the node from state 0
 to 1, i.e. once per interaction.
+
+Recorded (2026-10-09, `a2-npc-fara-heal`, 1.14d under Wine, life poked
+to 20 of 50): the 0x2F's handling sends `1e 06 00 32` (step 1, SetStat
+0x1E, stat 6 := 12800) at once, before the client's C→S 0x31 of the
+same drain; the next tick's client pass sends the sound `2c 01 0a000000
+0a00` (step 6, sound 10 on Fara, type 1 GUID 10); the 0x95 of the
+vitals sync follows in that tick's flush (`combat/vitals.md` §5.1).
+d2rs equal on every byte and phase (q-fix-npc-interact).
 
 ### 6. Cain identify (C→S 0x34)
 

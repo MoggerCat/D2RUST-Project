@@ -447,6 +447,17 @@ impl Cx<'_> {
     pub fn fx(&mut self, fx: ObjFx) {
         self.out.push(Output::ObjectFx(fx));
     }
+
+    /// The collision call `0x00623830(U)` (§25 r9): frees U's footprint
+    /// on the client grid ([`super::world::ObjectData::footprint`]).
+    pub fn free_footprint(&mut self) -> Result<(), HandlerError> {
+        let unit = self.unit;
+        if let KindData::Object(d) = &mut self.u()?.kind {
+            d.footprint = false;
+        }
+        self.fx(ObjFx::Collision { unit });
+        Ok(())
+    }
 }
 
 /// `FrameCnt[m]`; a mode past 7 reads beyond the eight columns.
@@ -640,12 +651,11 @@ fn door_step(cx: &mut Cx<'_>, cnt: i32) -> Result<(), HandlerError> {
         }
     }
     // Finish `0x004BCA90`: no sound, light, OrderFlag2, Parm7 or overlay.
-    let unit = cx.unit;
     if m == 3 {
         cx.u()?.mode = 0;
         cx.u()?.frame = i32::from(cx.row.start[0]);
     } else {
-        cx.fx(ObjFx::Collision { unit });
+        cx.free_footprint()?;
         cx.u()?.mode = 2;
         cx.u()?.frame = i32::from(cx.row.start[2]);
     }
@@ -686,7 +696,7 @@ fn end_of_mode_1(cx: &mut Cx<'_>, class: u32) -> Result<(), HandlerError> {
     let (lit, rgb) = (cx.row.lit[2], cx.row.rgb);
     cx.fx(ObjFx::Light { unit, lit, rgb });
     if cx.row.has_collision[2] == 0 && cx.row.has_collision[1] != 0 {
-        cx.fx(ObjFx::Collision { unit });
+        cx.free_footprint()?;
     }
     Ok(())
 }
@@ -828,6 +838,7 @@ pub fn create_client_unit(
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
     let u = w.objclient.set_c.remove(&key)?;
     w.objclient.missiles.remove(&key);
+    w.room_units.leave(super::world::view_key(key));
     w.freed.push((key, true));
     Some(u)
 }

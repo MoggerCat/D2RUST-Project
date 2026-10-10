@@ -1200,6 +1200,7 @@ impl Fx {
             // enabled and stand.
             monsters: (0..N_MONSTATS)
                 .map(|c| MonsterInfo {
+                    mode_chart: false,
                     enabled: true,
                     aidel: [15; 3],
                     moves: if c == 0 { 1 << 4 } else { 0 },
@@ -2017,7 +2018,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // §7.4 rule 7): S→C 0x69 code 8 at the path target (the spawn
     // point the creation's mode request wrote, `monsters/init.md` §4.1
     // step 1.1; PROVISIONAL, REC-594), d = the path direction, e =
-    // unit +0xB0 (`Pending::unit_b0`'s default 0). No other S→C so far
+    // unit +0xB0, the killing hit's class (`damage.md` §7.1 step 2: the
+    // missile record has no class, so §6.1 gives 13 `over`). No other S→C so far
     // but the join's 0x07s (frame 2): the unit-add / ground messages of
     // the missile and the drop belong to the per-unit update
     // `0x0053A500`, which the tick wiring does not run for them yet
@@ -2029,11 +2031,11 @@ fn run_with(game_seed: u32) -> Transcript {
     code8.push(8);
     code8.extend(md.target_x.to_le_bytes());
     code8.extend(md.target_y.to_le_bytes());
-    code8.extend([md.direction, 0]);
+    code8.extend([md.direction, 13]);
     let (sx, sy) = (mpos.0 as u16, mpos.1 as u16);
     let [sx0, sx1] = sx.to_le_bytes();
     let [sy0, sy1] = sy.to_le_bytes();
-    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 0]);
+    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 13]);
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
@@ -2271,11 +2273,10 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 9. Run to Akara (C→S 0x04, unit form, type 1): the path targets
     // her unit. The player's stop distance (path +0x93) has no written
-    // setter (0: `pathing.md` §9.5 rule 3 never stops early) and the
-    // player's move mask 0x1C09 (`path-placement.md` §2.4) does not hold
-    // the monster footprint bit 0x100, so the run ends on Akara's own
-    // sub-tile (`pathing.md` §9.5 rule 3: no player walk / run path sets
-    // the stop distance, so it stays 0).
+    // setter (0: `pathing.md` §9.5 rule 3), so the run stops at the first
+    // step where the unit distance is 0: a negative `dist8_unit` entry
+    // (§9.5) one diagonal cell short of her sub-tile (`npc.md` §2 rule
+    // 3.3: short of the NPC's own sub-tile for any NPC size ≥ 2).
     let ng = fx.guid(npc);
     let w = walk(
         &mut fx,
@@ -2285,8 +2286,11 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let n = w.len();
     assert!(w[..n - 1].iter().all(|f| f.2 == 3));
-    assert_eq!(w[n - 1], (centre(NPC_AT.0), centre(NPC_AT.1), 1));
-    assert_eq!(fx.pos(player), NPC_AT);
+    // The run now stops at distance 0 beside her (Δ=(1,1)), not on her
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
+    let stop = (NPC_AT.0 + 1, NPC_AT.1 + 1);
+    assert_eq!(w[n - 1], (centre(stop.0), centre(stop.1), 1));
+    assert_eq!(fx.pos(player), stop);
     walks.push(w);
 
     // 10. Talk (C→S 0x13, `npc.md` §2): S→C 0x27, 0x29, 0x28 in order
@@ -2350,10 +2354,13 @@ fn run_with(game_seed: u32) -> Transcript {
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
-    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    // One 0x9C action 11 per store item, in store order (§4 step 3). The
+    // frame also carries the 0x2F's heal SetStat (Akara heals,
+    // `npc.md` §5 step 1).
     let shown: Vec<(u8, u8, u32)> = frames[trade_frame]
         .2
         .iter()
+        .filter(|m| m[0] == 0x9C)
         .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
         .collect();
     let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
@@ -2418,9 +2425,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap, bought]);
 
-    // 14. Walk to the waypoint object (C→S 0x02, type 2): objects have
-    // no footprint here (`wiring::path::units` TODO: no objects.txt), so
-    // the walk ends on the object's sub-tile.
+    // 14. Walk to the waypoint object (C→S 0x02, type 2): the walk ends
+    // beside the object at distance 0 (Δ=(0,1) here), not on its
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
     let og = fx.guid(fx.wp_unit);
     let w = walk(
         &mut fx,
@@ -2430,7 +2437,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let n = w.len();
     assert!(w[..n - 1].iter().all(|f| f.2 == 2));
-    assert_eq!(w[n - 1], (centre(WP_AT.0), centre(WP_AT.1), 1));
+    assert_eq!(w[n - 1], (centre(WP_AT.0), centre(WP_AT.1 + 1), 1));
     walks.push(w);
 
     // 15. Waypoint travel to the GATE level (C→S 0x49, `waypoints.md`
@@ -2582,12 +2589,16 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
     // + the picked gold pile's removal 0x0A (REC-281).
+    // + the 0x2F's heal at Akara (`npc.md` §5): its sound 0x2C.
     // + the two pick-up sounds 0x2C (gold, cap; REC-1402..1404).
-    assert_eq!(log.handled, 28 + store.len() as u64);
+    assert_eq!(log.handled, 29 + store.len() as u64);
     assert_eq!(
         log.dropped,
-        // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
-        BTreeMap::from([(0x0D, 1), (0x4D, 1), (0x69, 2), (0x6D, 1)])
+        // The player's own 0x4D echo (REC-95) is gone: the caster's own
+        // client gets the skill-mode message only for a used skill with
+        // E flag 0x4 (`sim/pathing.md` §10 rule 2, `skills/sequences.md`
+        // local player rule 3; rc-cast-mode).
+        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
     );
     assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");
@@ -2598,6 +2609,10 @@ fn run_with(game_seed: u32) -> Transcript {
         .collect();
     let mut want = vec![(0x07, "fatal assert 0x58A".to_owned()); 11];
     want.extend(vec![(0x08, "fatal assert 0x59E".to_owned()); 4]);
+    // The heal's SetStat 0x1E at Akara (`npc.md` §5 step 1), after the
+    // join's four 0x07: no local player in this staged game
+    // (`msg-stats-items.md` §1 rule 1, fatal 0x9AA).
+    want.insert(4, (0x1E, "fatal assert 0x9AA".to_owned()));
     assert_eq!(rejected, want);
     assert!(log.discarded.is_empty());
     // No local player: the world view has no camera (`model.md` §3 rule 3).
@@ -2654,12 +2669,14 @@ fn run_with(game_seed: u32) -> Transcript {
 #[test]
 fn full_single_player_loop() {
     let t = run();
-    // Frames per walk / run: 20, 33 and 16 (the runs move at the run
-    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 8; 98
-    // recorded frames, one tick each.
+    // Frames per walk / run: 20, 33 and 14 (the runs move at the run
+    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 6; the
+    // run to Akara and the walk to the waypoint each stop 2 frames short
+    // of the target's sub-tile (rc-object-approach); 94 recorded frames,
+    // one tick each.
     let lens: Vec<usize> = t.walks.iter().map(Vec::len).collect();
-    assert_eq!(lens, [20, 33, 16, 8]);
-    assert_eq!(t.frames.len(), 98);
+    assert_eq!(lens, [20, 33, 14, 6]);
+    assert_eq!(t.frames.len(), 94);
     assert_eq!(t.frames.len() as i32, t.game_frame);
     // The kill: 100 experience, one drop (the gold, picked up).
     assert_eq!((t.player_exp, t.drops.len()), (100, 1));

@@ -419,8 +419,11 @@ impl Fx {
     }
 
     /// One game tick; what was queued during it.
+    /// One tick and the host's flush after it (the vitals sync runs in
+    /// the flush, `Tick::flush_sync`).
     fn tick(&mut self) -> Vec<(ClientId, Vec<u8>)> {
         self.sim.tick(&mut self.out);
+        self.sim.flush_sync(&mut self.out);
         std::mem::take(&mut self.out.0)
     }
 
@@ -607,11 +610,21 @@ fn walk_and_run_to_a_unit_send_0x10() {
         let t = fx.path(p).target_unit.expect("target unit");
         assert_eq!((t.unit, t.ty, t.guid), (o, UnitType::Object, og));
         let ticks = fx.run(p, mode, 20);
-        if mode == 3 {
-            assert_m2(&ticks, mode);
+        // The run to a unit ends where the unit distance reaches 0 (the
+        // object at (31, 10) has size 0: Δ = (2, 0) gives 0 at once,
+        // `pathing.md` §9.5), at the centre of cell 29.
+        let (first, step, moving) = if mode == 3 {
+            (0x1B1000, 0x9000, 5)
         } else {
-            assert_m1(&ticks, mode);
+            (0x1AE000, 0x6000, 7)
+        };
+        assert_eq!(ticks.len(), moving + 1);
+        for (k, t) in ticks.iter().take(moving).enumerate() {
+            assert_eq!(t.0, first + k as u32 * step, "tick {}", k + 1);
+            assert_eq!((t.1, t.2), (centre(10), mode), "tick {}", k + 1);
         }
+        let last = &ticks[moving];
+        assert_eq!((last.0, last.1, last.2), (centre(29), centre(10), 1));
         let want = PlayerToTarget {
             type_: 0,
             guid,

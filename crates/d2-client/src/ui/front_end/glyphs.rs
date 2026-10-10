@@ -51,7 +51,17 @@ pub fn text_quads(
     else {
         return Vec::new();
     };
-    let units: Vec<u16> = if !text.is_empty() {
+    let units: Vec<u16> = if label.is_some() && *string_id != 0 && !text.is_empty() {
+        // A label formatted from a string: its "%s" takes `text`.
+        let arg: Vec<u16> = text.encode_utf16().collect();
+        let fmt = resolve(*string_id);
+        match fmt.iter().position(|&u| u == u16::from(b'%')) {
+            Some(i) if fmt.get(i + 1) == Some(&u16::from(b's')) => {
+                [&fmt[..i], &arg[..], &fmt[i + 2..]].concat()
+            }
+            _ => fmt,
+        }
+    } else if !text.is_empty() {
         text.encode_utf16().collect()
     } else if *string_id != 0 {
         resolve(*string_id)

@@ -6,9 +6,17 @@
 //! lines and the lightning flash — turned into scene [`DrawItem`]s.
 //!
 //! Fills, each `d2rs-own, unverified` (the model does not hold the input):
-//! - the weather seed is `Seed::init_low(local player guid)` (the client's
-//!   seed is read-only in the model, `camera.md` open question 6);
-//! - the client update count is the server tick;
+//! - the weather seed is the local player's client seed, shared with the
+//!   sound draws (`sound-table-2.md` §14.3; the model's steps replayed
+//!   first, REC-1845); `Seed::init_low(local player guid)` only while the
+//!   model holds none (PROVISIONAL, REC-1846);
+//! - the client update count is the server tick; a tick whose draw was
+//!   skipped is replayed so that every update steps the weather once
+//!   (the original draws every loop pass; PROVISIONAL, REC-1900);
+//! - the local player's 0x15 placements (`ClientWorld::local_places`) run
+//!   their level entry `0x004726F0(flag)` before the frame's act load
+//!   (`draw-order-2.md` §11.8; PROVISIONAL, REC-1901: the draws sit in the
+//!   receive of the original, here at the next weather step);
 //! - the camera delta is the change of the camera's unit origin between
 //!   frames; the day period is 1 and the video mode 1 (colors of the
 //!   rain / snow tables); the frame rate is 25 (≥ 10: the flash draws);
@@ -20,9 +28,11 @@
 //! the line color, `blend-modes.md` §8 r1); the flash is a rectangle
 //! frame of the clipped size, mode 5 (opaque).
 
-use crate::audio::driver::{SoundLink, WeatherSound};
+use crate::audio::driver::{ClientSeed, SoundLink, WeatherSound};
+use crate::rules::draw_order::source::SeedCommit;
 use crate::rules::draw_order::weather::ThunderSound;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use d2_formats::dc6::Dc6;
 use d2_sim::rng::Seed;
@@ -109,8 +119,14 @@ pub struct WeatherView {
     floors: FloorContext,
     seed: Seed,
     seeded: bool,
+    /// The local player's client seed, shared with the sound draws
+    /// (`sound-table-2.md` §14.3); `seed` is the working copy for a frame
+    /// and the fallback while the model holds none.
+    shared: Arc<Mutex<ClientSeed>>,
     level: Option<LevelWeather>,
     update_count: u32,
+    /// How many of `ClientWorld::local_places` were replayed.
+    places_seen: usize,
     origin: Option<(i32, i32)>,
     color_maps: Option<Vec<MapId>>,
     /// Why the weather is off (logged once by the caller).
@@ -138,8 +154,10 @@ impl WeatherView {
             floors: FloorContext::default(),
             seed: Seed::init(),
             seeded: false,
+            shared: Arc::default(),
             level: None,
             update_count: 0,
+            places_seen: 0,
             origin: None,
             color_maps: None,
             failure: None,
@@ -149,6 +167,7 @@ impl WeatherView {
 
     /// The sound layer for the thunder step's request of sound 202.
     pub fn with_sound(mut self, link: SoundLink) -> Self {
+        self.shared = link.client_seed();
         self.thunder = Some(link);
         self
     }
@@ -175,6 +194,10 @@ impl WeatherView {
     /// (`None` before the first level or after a failure).
     pub fn frame(&mut self) -> Option<WeatherFrame<'_>> {
         let level = self.level?;
+        let shared = self.shared.clone();
+        if let Some(s) = shared.lock().unwrap_or_else(|e| e.into_inner()).seed() {
+            self.seed = *s;
+        }
         Some(WeatherFrame {
             weather: &mut self.weather,
             floors: &mut self.floors,
@@ -193,12 +216,42 @@ impl WeatherView {
                 .thunder
                 .as_mut()
                 .map(|t| t as &mut (dyn ThunderSound + Send + Sync)),
+            commit: Some(SeedCommit(Box::new(move |s| {
+                if let Some(m) = shared.lock().unwrap_or_else(|e| e.into_inner()).seed() {
+                    *m = *s;
+                }
+            }))),
         })
     }
 
     /// Before the frame's build: the level, the act load, the update step
     /// (§11.2) and the art the frame's draws need resident.
     pub fn prepare(
+        &mut self,
+        world: &ClientWorld,
+        levels: Option<&[LevelRow]>,
+        local_at: Option<(u32, u32)>,
+        mode: OpenMode,
+        assets: &mut ViewAssets,
+    ) {
+        // The update's draws step the shared client seed, after the
+        // model's steps of the receive and the client update.
+        let shared = self.shared.clone();
+        let mut held = shared.lock().unwrap_or_else(|e| e.into_inner());
+        held.sync(world);
+        if let Some(s) = held.seed() {
+            self.seed = *s;
+            self.seeded = true;
+        }
+        drop(held);
+        self.prepare_draws(world, levels, local_at, mode, assets);
+        let mut held = shared.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(m) = held.seed() {
+            *m = self.seed;
+        }
+    }
+
+    fn prepare_draws(
         &mut self,
         world: &ClientWorld,
         levels: Option<&[LevelRow]>,
@@ -238,27 +291,51 @@ impl WeatherView {
             self.seed = Seed::init_low(local.key.guid);
             self.seeded = true;
         }
+        // The local player's placements (`0x00472C20(flag)`, received
+        // before this frame's draw): the level entry of a non-zero flag.
+        while let Some(&flag) = world.local_places.get(self.places_seen) {
+            self.places_seen += 1;
+            if flag != 0 {
+                if let Err(e) = self
+                    .weather
+                    .level_entry(u32::from(flag), &mut self.seed, &level)
+                {
+                    return self.fail(e.to_string());
+                }
+            }
+        }
         let previous = self.level;
         let r = self.enter(previous, level, assets);
         if let Err(m) = r {
             return self.fail(m);
         }
         self.level = Some(level);
-        self.update_count = world.server_ticks as u32;
+        // 1.14d updates the weather once per client update, in the draw of
+        // its loop pass; a pass whose draw was skipped here (the GPU still
+        // busy) is replayed so that every client update steps it once
+        // (REC-1900, PROVISIONAL: the original draws every pass).
+        let now = world.server_ticks as u32;
+        let first = match previous {
+            Some(_) if self.update_count < now => self.update_count + 1,
+            _ => now,
+        };
+        self.update_count = now;
         let delta = self.camera_delta(local_at, mode);
-        let input = UpdateInput {
-            update_count: self.update_count,
-            frame: FrameSize::play(),
-            camera_delta: delta,
-            day_period: DAY_PERIOD,
-            video_mode: VIDEO_MODE,
-        };
-        let player = LocalPlayer {
-            seed: &mut self.seed,
-            level,
-        };
-        if let Err(e) = self.weather.update(Some(player), &input) {
-            return self.fail(e.to_string());
+        for c in first..=now {
+            let input = UpdateInput {
+                update_count: c,
+                frame: FrameSize::play(),
+                camera_delta: if c == now { delta } else { (0, 0) },
+                day_period: DAY_PERIOD,
+                video_mode: VIDEO_MODE,
+            };
+            let player = LocalPlayer {
+                seed: &mut self.seed,
+                level,
+            };
+            if let Err(e) = self.weather.update(Some(player), &input) {
+                return self.fail(e.to_string());
+            }
         }
         if let Some(l) = &self.thunder {
             let active = !self.weather.snow_mode && level.rain;
@@ -624,6 +701,7 @@ mod tests {
             prepared(&mut view, &mut w, &levels, &mut a, tick);
             let mut frame = view.frame().expect("a level with weather");
             let sky = frame.sky_passes().unwrap();
+            drop(frame);
             let items = view
                 .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
                 .unwrap();
@@ -662,6 +740,7 @@ mod tests {
         let mut frame = view.frame().unwrap();
         let sky = frame.sky_passes().unwrap();
         assert_eq!(sky.sky.len(), 1);
+        drop(frame);
         let items = view
             .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
             .unwrap();
@@ -700,6 +779,7 @@ mod tests {
         let mut frame = view.frame().unwrap();
         let sky = frame.sky_passes().unwrap();
         assert_eq!(sky.pools.len(), 2);
+        drop(frame);
         let items = view
             .items(&sky, OpenMode::NONE, a.shades.as_ref(), &a)
             .unwrap();

@@ -121,6 +121,12 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         seqinput: s.seqinput,
         range: s.range,
         flags: crate::bridge::combat::skill_flags(s),
+        ingame: s.ingame,
+        aura: s.aura,
+        mana: s.mana,
+        lvlmana: s.lvlmana,
+        manashift: s.manashift,
+        cltstfunc: s.cltstfunc,
     }
 }
 
@@ -258,7 +264,18 @@ impl UseRest for LocalSeams {
     fn owns_skill(&self, _: UnitId, _: i32) -> bool {
         false
     }
-    fn set_used_skill(&mut self, _: UnitId, _: Option<SkillEntry>) {}
+    /// A monster has no skill list: its used skill is the request's
+    /// current skill (`monsters::used_skill`); a clear (Charge's melee
+    /// swing, `skills/bodies-2.md` §5.3) leaves none, so the mode start
+    /// it requests does not start the skill again.
+    fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
+        match e {
+            None => self.monsters.clear_current(u),
+            Some(e) => {
+                self.monsters.set_current(u, e.skill);
+            }
+        }
+    }
     fn used_skill_flags(&self, u: UnitId) -> u32 {
         self.skills.unit(u).map_or(0, |s| s.used_flags)
     }

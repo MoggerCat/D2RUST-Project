@@ -40,7 +40,6 @@ pub trait QuestRest {
     /// The party list at game +0x1D2C (no party spec; `quests.md` open
     /// question 7).
     fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
-    fn attach_sound(&mut self, player: UnitId, sound: u16);
     fn send(&mut self, player: UnitId, msg: &[u8]);
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
     /// The player's inventory items in list order (inventory spec;
@@ -198,6 +197,9 @@ pub struct EconomyQuests<'e, 'a, H, R> {
     /// sends that follow a reward in the call; `None`:
     /// [`QuestRest::mercenary_reward`].
     pub deferred: Option<&'e mut Vec<QuestDeferred>>,
+    /// The cursor item and item list of the host's inventory model, for
+    /// the held-item tests ([`Self::find_item`]); `None`: the rest's.
+    pub held: Option<(Option<UnitId>, Vec<UnitId>)>,
 }
 
 /// A quest-call effect the caller runs after the call, in list order
@@ -255,6 +257,7 @@ impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
             econ,
             rest,
             deferred: None,
+            held: None,
         }
     }
 
@@ -287,6 +290,9 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
     /// `questdiffcheck` is 0, or its stat 356 (`questitemdifficulty`,
     /// total value) ≥ the game difficulty.
     pub fn find_item(&self, player: UnitId, code: [u8; 4]) -> Option<UnitId> {
+        if let Some((cursor, list)) = &self.held {
+            return self.find_item_in(*cursor, list.clone(), code);
+        }
         self.find_item_in(
             self.rest.quest_cursor_item(player),
             self.rest.inventory(player),
@@ -438,8 +444,13 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         let e = &mut *self.econ;
         e.stats.unit_add(e.hooks, unit, stat, delta, 0);
     }
+    /// `0x00553380(player, sound, player)` (`quests-act3.md` §1: "sound
+    /// n" on the player; `triggers-2.md` §14): the event queued on the
+    /// player's unit, delivered to that player. The target is the player
+    /// as in the original's quest callbacks (asm `0x005B95A9`–`0x005B95BA`).
     fn attach_sound(&mut self, player: UnitId, sound: u16) {
-        self.rest.attach_sound(player, sound)
+        // A player not in the lists keeps the slot; nothing to deliver.
+        let _ = crate::units::sound::queue_sound(&mut *self.econ.game, player, sound, Some(player));
     }
     fn player_byte_4c(&self, player: UnitId) -> u8 {
         self.rest.player_byte_4c(player)

@@ -35,17 +35,17 @@
 |   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–390 |
 |   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 391–497 |
 |   6. A3Q4 The Golden Bird (chain 18, slot 20) | 498–586 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–692 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 693–790 |
-|   9. Act III gossip and intro records | 791–852 |
-|   10. Hooks called from other systems | 853–873 |
-|   11. Clarifications (QC-1 … QC-7) | 874–880 |
-| Constants & data dependencies | 881–897 |
-| Randomness | 898–911 |
-| Edge cases & original bugs | 912–959 |
-| Test vectors | 960–977 |
-| Provenance | 978–1004 |
-| Open questions | 1005–1032 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–700 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 701–798 |
+|   9. Act III gossip and intro records | 799–860 |
+|   10. Hooks called from other systems | 861–881 |
+|   11. Clarifications (QC-1 … QC-7) | 882–888 |
+| Constants & data dependencies | 889–905 |
+| Randomness | 906–919 |
+| Edge cases & original bugs | 920–967 |
+| Test vectors | 968–985 |
+| Provenance | 986–1012 |
+| Open questions | 1013–1040 |
 <!-- /index -->
 
 ## Summary
@@ -105,7 +105,7 @@ record (set `0x00544720`, test `0x00544760`, slot in EDX, bit pushed);
 list (record +0x1C; `0x00545200` / `0x005452C0`); event 10 removes the
 player from it (`0x00545530`); "quick remove" = `0x00545310` (leaving
 Kurast Docks, level 75); "FX b" = `quests.md` §6.5 (`0x00545760`);
-"sound n" = `0x00553380` on the player; "completion flag" = for each
+"sound n" = `0x00553380(player, n, target = player)` (asm `0x005B95A9`–`0x005B95BA`; flushed as S→C 0x2C to that player); "completion flag" = for each
 player lacking the listed bits: set s.14 and `0x00545920(player, chain,
 0)` (`5D <chain> 00 0C 0000`, `quests.md` §6.3). "Holds `code`" =
 `0x00558110` finds the item on the player. "Lam Esen done" = game 17.13.
@@ -665,6 +665,14 @@ Other victims:
 #### 7.7 The Compelling Orb (object 404)
 
 - Init 60 (`0x005BBBA0`): orb smashed → mode 2. +0x28 = 0 → spawn
+  monster 366 `compellingorb` at the object (`0x005B3090`, mode 1);
+  created → unit flags |= 0x20000, +0x2C := GUID, +0x28 := 1.
+  `0x005B3090(game, room, x, y, class, mode, flags)` is `0x005B2F20`
+  with spread −1 (`monsters/init.md` §1) at the object's room and
+  position. PROVISIONAL (REC-1696): flags 0, as the palace Kaelan call
+  of the same wrapper (`quests-act2-2.md` init 19). Settled by: PC 1
+  item "[q-fix-seed-game] The Compelling Orb's monster spawn" and
+  `a3-warp-durance-ama` frame 21 (monster 366 at the orb).
   monster 366 `compellingorb` at the object: `0x005B3090(game, init
   room +0x08, init x +0x14, init y +0x18, class 366, mode 1, flags 0)`,
   which is `monsters/population.md` §9 with no cl, r = −1 (one test at

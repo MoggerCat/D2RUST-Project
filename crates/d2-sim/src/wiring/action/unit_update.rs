@@ -71,6 +71,13 @@ pub enum ModeMessageError {
 }
 
 impl<X: Pending> View<'_, X> {
+    /// Unit +0xB0 (`combat/damage.md` §7.1 step 2), as the messages send
+    /// it (u8): e of a monster mode-0 / mode-3 message, f of a mode-13
+    /// one (§7.4 rule 5), b of 0x0C / 0x0D.
+    pub fn unit_b0(&self, unit: UnitId) -> u8 {
+        self.units.get(unit).map_or(0, |r| r.hit_class as u8)
+    }
+
     /// The monster update `0x00598220` (§7.3 rule 2) for the client
     /// `client`, its messages sent to the client's player
     /// ([`Pending::send`]); a client without a player gets nothing. Needs
@@ -245,7 +252,7 @@ impl<X: Pending> View<'_, X> {
             path_90: path.dist_budget,
             max_distance: path.max_distance,
             stop_distance: path.stop_distance,
-            unit_b0: self.h.x.unit_b0(unit),
+            unit_b0: self.unit_b0(unit),
             life: life as u8,
             flag_100: self.h.x.monster_flag_100(unit),
             velocity: self.stats.unit_total(unit, STAT_VELOCITY, 0),
@@ -374,6 +381,18 @@ pub fn anim_complete(a: &Anim) -> bool {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// The frame advance `0x00623E00` (`sim/units.md` §4.2): the
+    /// sequence branch when the unit has a sequence, else the frame
+    /// advance with the frame bonus `0x00623B10`.
+    pub fn refresh_unit_animation(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
+        if let Some(r) = sim.units.get_mut(unit) {
+            if !crate::units::anim::advance_sequence(&mut r.anim) {
+                crate::units::anim::advance_frame(&mut r.anim, bonus);
+            }
+        }
+    }
+
     /// Mode DT's event-0 function `0x005A7350` (§7.7 rule 3): a monster
     /// of `monstats` base id 78 takes a path step (`0x00554CA0`),
     /// refreshes its animation (`0x00623E00`, [`Pending::refresh_animation`])
@@ -397,7 +416,7 @@ impl<X: Pending> ActionHooks<X> {
                     v.h.x.step(sim.game, unit);
                 }
             }
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_unit_animation(sim, unit);
             if !sim.units.get(unit).is_some_and(|r| anim_complete(&r.anim)) {
                 return;
             }

@@ -189,6 +189,8 @@ fn client_world_holds_only_stated_fields() {
         session_total,
         session_log,
         server_ticks,
+        // `msg-units.md` §3 rule 4.6 (REC-1901): 0x15 flags of the local player.
+        local_places: _,
         units,
         local_player,
         difficulty,
@@ -233,6 +235,12 @@ fn client_world_holds_only_stated_fields() {
         // `client/msg-stats-items.md` §5 r6–r7.
         overrides,
         quest_availability,
+        // `world/quests-status.md` §12: the records the sound layer's
+        // level-entry check reads.
+        quest_player,
+        quest_game,
+        quest_status,
+        quest_counters,
         rooms_loaded,
         roster,
         roster_inactive,
@@ -258,6 +266,8 @@ fn client_world_holds_only_stated_fields() {
     assert_eq!(objclient, Default::default());
     assert!(overrides == Default::default() && roster.is_empty() && roster_inactive.is_empty());
     assert!(quest_availability.is_none() && rooms_loaded.is_empty());
+    assert!(quest_player.is_none() && quest_game.is_none() && quest_status.is_none());
+    assert_eq!(quest_counters, [0; 3]);
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);

@@ -113,6 +113,8 @@ impl Act5 {
             self.rig.step(1);
         }
         assert_eq!(self.rig.level(), Some(level), "warped into {level}");
+        // Staging: the new level must not catch a weak player.
+        self.strengthen();
         self.rig.step(20);
     }
 
@@ -163,6 +165,9 @@ impl Act5 {
     /// `(x, y)` (poke `pos`, which reaches the player's room and its
     /// neighbours). False: none.
     fn hop(&mut self, x: i32, y: i32) -> bool {
+        // Staging: the walk through a hostile level must not kill the
+        // player (a dead player, mode 17, never attacks again).
+        self.strengthen();
         for r in [0, 2, 4, 7] {
             for (dx, dy) in [
                 (r, r),
@@ -185,11 +190,16 @@ impl Act5 {
 
     /// Moves the player next to `(x, y)` in hops of at most 16 sub-tiles
     /// (staging: the rooms on the way come into play as on foot).
-    fn stand_by(&mut self, (x, y): (i32, i32)) {
+    fn stand_by(&mut self, at: (i32, i32)) {
+        self.stand_within(at, 3);
+    }
+
+    /// Like [`Self::stand_by`] with the given slack (sub-tiles) around the spot.
+    fn stand_within(&mut self, (x, y): (i32, i32), slack: i32) {
         for _ in 0..200 {
             let (px, py) = self.rig.pos();
             let (dx, dy) = (x + 2 - px, y + 2 - py);
-            if dx.abs() <= 3 && dy.abs() <= 3 {
+            if dx.abs() <= slack && dy.abs() <= slack {
                 return;
             }
             let (sx, sy) = (dx.clamp(-16, 16), dy.clamp(-16, 16));
@@ -255,13 +265,15 @@ impl Act5 {
             });
         });
         for _ in 0..40 {
-            if self.dead(m) {
+            if self.dead(m, guid) {
                 break;
             }
             let at = self
                 .rig
                 .with(move |sim, _| sim.events.action.sys.hooks.path_position(m));
-            self.stand_by(at);
+            // The preview's swing reach is 4 sub-tiles (single_player.rs
+            // `in_melee_range`): stand within it, not at the room-scale slack.
+            self.stand_within(at, 1);
             self.strengthen();
             let mut msg = vec![0x06];
             msg.extend(1u32.to_le_bytes());
@@ -284,17 +296,21 @@ impl Act5 {
                 );
             }
         }
-        assert!(self.dead(m), "monster {guid} killed");
+        assert!(self.dead(m, guid), "monster {guid} killed");
     }
 
-    fn dead(&mut self, m: UnitId) -> bool {
+    fn dead(&mut self, m: UnitId, guid: u32) -> bool {
         self.rig.with(move |sim, _| {
             sim.events
                 .action
                 .sys
                 .units
                 .get(m)
-                .is_none_or(|u| u.mode == 0 || u.mode == 12)
+                // A dead monster's slot can be reused (a drop): same unit
+                // means same type and GUID.
+                .is_none_or(|u| {
+                    u.ty != UnitType::Monster || u.guid != guid || u.mode == 0 || u.mode == 12
+                })
                 || sim.game.lists.unit(m).is_none()
         })
     }
@@ -648,7 +664,7 @@ fn the_ancients_fall_on_arreat_summit() {
     let mut killed = 0;
     for _ in 0..30 {
         let ancients = a.units(UnitType::Monster, &[540, 541, 542]);
-        let alive: Vec<_> = ancients.into_iter().filter(|e| !a.dead(e.0)).collect();
+        let alive: Vec<_> = ancients.into_iter().filter(|e| !a.dead(e.0, e.1)).collect();
         if alive.is_empty() && killed >= 3 {
             break;
         }
@@ -685,6 +701,9 @@ fn baal_falls_and_the_game_is_finished() {
     for _ in 0..80 {
         a.strengthen();
         a.clear_around(throne, 70, &[543, 559]);
+        // Baal's room must stay active (the player walked off to the
+        // monsters it killed; a stored Baal does not think).
+        a.stand_by(throne);
         a.rig.step(50);
         let baal = a.units(UnitType::Monster, &[543, 559]);
         if baal.is_empty() {

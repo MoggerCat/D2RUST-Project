@@ -435,10 +435,18 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             Some(m) => preview::entries(m, &counts),
             None => Vec::new(),
         };
-        let local_at = self.local_at;
-        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
         let preview = self.preview.as_mut().expect("checked above");
         let r = preview.prepare(world, &entries, assets);
+        self.weather_update(world, assets);
+        r
+    }
+
+    fn weather_update(&mut self, world: &ClientWorld, assets: &mut ViewAssets) {
+        let local_at = self.local_at;
+        let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
+        let Some(preview) = self.preview.as_mut() else {
+            return self.inner.weather_update(world, assets);
+        };
         if let Some(w) = self.weather.as_mut() {
             w.prepare(
                 world,
@@ -451,7 +459,6 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
                 preview.log_once(format!("weather: {m}"));
             }
         }
-        r
     }
 
     /// Preview: the frame's light map from the kept list

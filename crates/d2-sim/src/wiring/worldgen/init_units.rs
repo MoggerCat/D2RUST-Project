@@ -503,6 +503,21 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         }
         self.v.h.object_drops = Some(d);
     }
+    /// `init.md` §14.3 ([`crate::wiring::economy::tier_code`]); without
+    /// the drop state the code stays.
+    fn item_tier_code(&mut self, code: [u8; 4], difficulty: u8) -> [u8; 4] {
+        match self.v.h.object_drops.as_ref() {
+            Some(d) => {
+                crate::wiring::economy::tier_code(&d.tables.treasure_items, code, difficulty)
+            }
+            None => code,
+        }
+    }
+    /// `init.md` §14.3: `0x00573B20(game, unit, &entry, level, 4)`, the
+    /// monequip helper with quality 4 (magic).
+    fn create_boss_item(&mut self, unit: UnitId, code: [u8; 4], loc: u8, level: i32) {
+        self.create_equip_item(unit, code, loc, 4, level);
+    }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);
     }
@@ -514,6 +529,16 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     }
     /// `0x005DD250(unit, 1)`: AI control flags |= `flag` (`umod-init-bodies.md`
     /// §4 r4); a unit without an AI control writes nothing.
+    /// §19.5: give and assign the aura skill (`0x0056DEB0`, `0x005701B0`).
+    fn give_aura(&mut self, unit: UnitId, skill: u16, level: i32) {
+        let mut sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
+        };
+        X::monster_right_aura(&mut *self.v.h, &mut sim, unit, i32::from(skill), level);
+    }
     fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {
         if let Some(c) = self.v.h.ai.as_mut().and_then(|ai| ai.control_mut(unit)) {
             c.flags |= flag;
@@ -530,6 +555,14 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     }
     fn ai_use_skill(&mut self, unit: UnitId, mode: u32, skill: u16) {
         self.v.h.x.ai_use_skill(unit, mode, skill);
+    }
+    fn give_skill(&mut self, unit: UnitId, skill: u16, level: i32, _mode: Option<u8>) {
+        self.v
+            .h
+            .natural_skills
+            .entry(unit)
+            .or_default()
+            .insert(i32::from(skill), level);
     }
     fn skill_level(&mut self, unit: UnitId, skill: u16) -> Option<i32> {
         self.v.h.x.skill_level(unit, skill)

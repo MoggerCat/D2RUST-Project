@@ -64,12 +64,20 @@ pub fn path_distance(t: &PathTables, a: Point, b: Point) -> i32 {
     }
 }
 
-/// Unit distance (`0x00641530`, §9.5) between positions with sizes.
+/// Unit distance (`0x00641530`, §9.5) between positions with sizes: a
+/// negative `dist8_unit` entry returns 0 at once, with no size
+/// adjustment (`0x00641634`).
 pub fn unit_distance(t: &PathTables, a: Point, size_a: i32, b: Point, size_b: i32) -> i32 {
     let dx = (a.x - b.x).abs();
     let dy = (a.y - b.y).abs();
     if dx < 8 && dy < 8 && size_a < 4 && size_b < 4 {
-        let mut d = t.dist8_unit[(dx + 8 * dy) as usize].max(0);
+        let mut d = t.dist8_unit[(dx + 8 * dy) as usize];
+        // A negative entry returns 0 at once, with no size adjustment
+        // (`0x00641634`; recorded: the stash, SizeX 1, stops the run 2
+        // sub-tiles away).
+        if d < 0 {
+            return 0;
+        }
         if size_a == 3 || size_b == 3 {
             d = (d - 1).max(0);
         }

@@ -199,19 +199,19 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
         self.v.h.monster_flag(u, mask)
     }
     fn is_boss(&self, u: UnitId) -> bool {
-        self.v.h.x.is_boss(u)
+        self.v.h.is_boss(u)
     }
     fn is_hireling(&self, u: UnitId) -> bool {
         self.v.is_hireling(self.game, u)
     }
     fn is_demon(&self, u: UnitId) -> bool {
-        self.v.h.x.is_demon(u)
+        self.v.h.is_demon(u)
     }
     fn is_undead(&self, u: UnitId) -> bool {
-        self.v.h.x.is_undead(u)
+        self.v.h.is_undead(u)
     }
     fn is_prime_evil(&self, u: UnitId) -> bool {
-        self.v.h.x.is_prime_evil(u)
+        self.v.h.is_prime_evil(u)
     }
     fn is_revived(&self, u: UnitId) -> bool {
         self.v.h.x.is_revived(u)
@@ -237,7 +237,21 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn weapon_class(&self, u: UnitId) -> i32 {
         self.v.h.x.weapon_class(u)
     }
+    /// `0x00623C20` (`damage.md` §5.1 step 4.4): a monster's is its
+    /// monstats2 `HitClass` (+0x14, through monstats `MonStatsEx`; no
+    /// row → 0); a player's (its weapon's item hit class, 1 without one)
+    /// and other types: [`Pending::weapon_hit_class`].
     fn weapon_hit_class(&self, u: UnitId) -> u32 {
+        if self.ty(u) == UnitType::Monster {
+            let t = &self.v.h.tables.combat;
+            return self
+                .v
+                .units
+                .get(u)
+                .and_then(|r| t.monstats.get(r.class as usize))
+                .and_then(|m| t.monstats2.get(usize::from(m.monstatsex)))
+                .map_or(0, |m2| u32::from(m2.hitclass));
+        }
         self.v.h.x.weapon_hit_class(u)
     }
     fn montype_matches(&self, layer: u16, montype: i32) -> bool {
@@ -338,18 +352,18 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     /// ([`ActionHooks::rate_refresh`]: a shape state changes the draw
     /// identity, a stat fill the rate stats), then the host's hook.
     fn refresh_anim_rate(&mut self, u: UnitId) {
-        let speed = {
-            let sim = Sim {
-                game: &mut *self.game,
-                units: &mut *self.v.units,
-                stats: &mut *self.v.stats,
-                data: self.v.data,
-            };
-            self.v.h.rate_refresh(&sim, u)
+        let mut sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
         };
-        if let (Some(s), Some(r)) = (speed, self.v.units.get_mut(u)) {
+        let speed = self.v.h.rate_refresh(&sim, u);
+        if let (Some(s), Some(r)) = (speed, sim.units.get_mut(u)) {
             r.anim.speed = s;
         }
+        // The velocity half of the same routine (`pathing.md` §8.1).
+        self.v.h.monster_mode_velocity(&mut sim, u);
         self.v.h.x.refresh_anim_rate(u);
     }
     fn set_last_attacker(&mut self, d: UnitId, a: UnitId) {

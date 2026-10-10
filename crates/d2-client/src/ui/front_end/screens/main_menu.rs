@@ -33,6 +33,34 @@ pub const STR_OTHER_MULTIPLAYER: u32 = 5108;
 pub const STR_EXIT: u32 = 5109;
 pub const STR_CREDITS: u32 = 5110;
 pub const STR_CINEMATICS: u32 = 5111;
+/// "GATEWAY: %s" (`0x00431AF0` passes index 0x2B29).
+pub const STR_GATEWAY: u32 = 11049;
+
+/// The default gateway list (`DATA\GLOBAL\gateways.txt`, version 1002):
+/// zone (hours from GMT, as the file writes it) and name, in list order.
+const GATEWAYS: [(i32, &str); 4] = [
+    (8, "U.S. West"),
+    (6, "U.S. East"),
+    (-9, "Asia"),
+    (-1, "Europe"),
+];
+
+/// The gateway picked when no choice is stored (`BNGatewayAccess::Load`
+/// `0x005186D0` → `PickClosestZone` `0x00518580`): the first zone whose
+/// distance to the system time-zone bias (minutes) is smallest.
+/// PROVISIONAL (REC-1905): the bias is 0 (UTC; the 1.14d recording runs
+/// with it), the host's time zone is not read.
+pub fn gateway_name() -> &'static str {
+    let bias = 0;
+    let mut best = (0x564, GATEWAYS[0].1);
+    for (zone, name) in GATEWAYS {
+        let d = (zone * 60 - bias).abs();
+        if d < best.0 {
+            best = (d, name);
+        }
+    }
+    best.1
+}
 
 struct MainMenu;
 
@@ -86,8 +114,10 @@ impl Screen for MainMenu {
                 Action::Trigger(Trigger::SinglePlayer),
             ),
             button(WIDE2, 264, 366 - up, 272, 35, STR_BATTLE_NET, Action::None),
-            // The gateway label is set at run time (0x00431AF0): none here.
-            button(NARROW, 264, 391 - up, 272, 25, 0, Action::None),
+            // The gateway label is set at run time (0x00431AF0): "GATEWAY: %s"
+            // (string 11049) with the current gateway's name.
+            button(NARROW, 264, 391 - up, 272, 25, STR_GATEWAY, Action::None)
+                .with_text(gateway_name(), 0),
             button(
                 WIDE,
                 264,

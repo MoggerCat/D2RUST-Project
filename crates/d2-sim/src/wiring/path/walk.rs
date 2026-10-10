@@ -27,6 +27,7 @@ use crate::path::walk::{Step, Walk, WalkError};
 use crate::path::{CollisionRooms, DynamicPath, PathTables, UnitPath};
 use crate::rng::Seed;
 use crate::units::{ClientId, RoomId, UnitId, UnitType};
+use crate::wiring::action::reaction::UNIT_FLAG_SOFT_HIT;
 use crate::wiring::action::{Pending, View, WiringError};
 
 /// The walk context ([module doc](self)).
@@ -301,6 +302,28 @@ pub fn player_request<X: Pending>(
     }
 }
 
+/// Player mode request, unit form `0x00580A70` with re-entry 1
+/// (`pathing.md` §1.2, rule 3 skipped): the Swing of the skill bodies
+/// (`bodies-2.md` §2.15). `None`: a fatal path (logged).
+pub fn player_request_reentry<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    skill: Option<u16>,
+    mode: u32,
+    target: WalkTarget,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match request(&t, &mut c, player, skill, mode, target, true) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
 /// Player event 0 of modes 2, 3, 6, 19: `0x00580C20` (`pathing.md`
 /// §9.2); the action result for `units.md` §4.5 (2 = stopped).
 pub fn player_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) -> u32 {
@@ -385,14 +408,13 @@ pub fn update_messages<X: Pending>(
             v.h.x.send(receiver, &msg);
         } else if let Some(row) = stop_row(mode) {
             stop_row_messages(v, receiver, unit, (ty, guid), &path, row, own);
-        } else if player_skill_mode(mode) {
+        } else if player_skill_mode(mode) && (!own || own_skill_message(v, unit)) {
             // PROVISIONAL (sim/pathing.md §10 rule 2): the skill rows of
             // `0x007319E8` read as `0x00548090` (the skill message with
-            // the path's target unit, else its target point). d2rs-own,
-            // unverified: sent to the own client too (the click's mode
-            // request is not applied, `ui/controls.md` §6 r7, so the
-            // client sets the attack mode from this echo); settled by
-            // REC-95.
+            // the path's target unit, else its target point); settled by
+            // REC-95. The own client gets it only with E flags bit 0x4
+            // (`skills/sequences.md` local player rule 3: the client
+            // starts its own cast at the click).
             let target = path
                 .target_unit
                 .filter(|t| game.lists.find_unit(t.ty, t.guid) == Some(t.unit))
@@ -407,6 +429,14 @@ pub fn update_messages<X: Pending>(
             );
         }
     }
+}
+
+/// `0x00548090` for the unit's own client (`sim/pathing.md` §10 rule 2):
+/// sent only when the used skill's E flags (`0x006446A0`, entry +0x0C)
+/// have bit 0x4 (the dodge / avoid reaction). No used skill → false.
+fn own_skill_message<X: Pending>(v: &View<'_, X>, unit: UnitId) -> bool {
+    v.h.used_skill_of(unit)
+        .is_some_and(|e| v.h.x.entry_flags(unit, &e) & 0x4 != 0)
 }
 
 /// The non-walk, non-skill rows of the player mode-update table
@@ -449,6 +479,46 @@ fn life_percent<X: Pending>(v: &View<'_, X>, unit: UnitId) -> u8 {
     ((v.stats.unit_total(unit, 6, 0) >> 8).wrapping_mul(100) / m) as u8
 }
 
+/// `intents-events.md` §7.3 rule 1 step 4: unit flag 0x8000 (the soft
+/// hit, `combat/damage.md` §7.1) → `0x00547F70` → S→C 0x0D (`0x0053B4B0`):
+/// type, GUID, 0x13, the path cell, unit +0xB0, life percent
+/// (`damage.md` §10 rule 8).
+pub fn soft_hit_message<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &Game,
+    client: ClientId,
+    unit: UnitId,
+) {
+    let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
+        return;
+    };
+    let Some(r) = v.units.get(unit) else {
+        return;
+    };
+    if r.ty != UnitType::Player || r.flags & UNIT_FLAG_SOFT_HIT == 0 {
+        return;
+    }
+    let (ty, guid) = (r.ty as u8, r.guid);
+    let Some(pos) =
+        v.h.paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .map(|p| p.cell())
+    else {
+        return;
+    };
+    let m = crate::path::walk::messages::player_stop(
+        ty,
+        guid,
+        0x13,
+        pos.x as u16,
+        pos.y as u16,
+        v.unit_b0(unit),
+        life_percent(v, unit),
+    );
+    v.h.x.send(receiver, &m);
+}
+
 /// One client's message of a [`StopRow`] (§10 rule 2).
 fn stop_row_messages<X: Pending>(
     v: &mut View<'_, X>,
@@ -462,7 +532,7 @@ fn stop_row_messages<X: Pending>(
     use crate::path::walk::messages::{player_move, player_stop};
     let pos = path.cell();
     let (x, y) = (pos.x as u16, pos.y as u16);
-    let b0 = v.h.x.unit_b0(unit);
+    let b0 = v.unit_b0(unit);
     let life = life_percent(v, unit);
     let (code, b) = match row {
         StopRow::Neutral if own => return,
@@ -640,7 +710,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
             seq_input: i32::from(row.seqinput),
             srvdofunc: i32::from(row.srvdofunc),
             interrupt: row.interrupt,
-            skill_flags: self.v.h.x.entry_flags(unit, &e),
+            skill_flags: self.v.h.entry_flags_of(unit, &e),
         })
     }
     /// Mode set `0x00553570` (`units.md` §4.1) through the unit system.
@@ -741,6 +811,9 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     fn monstats_velocity(&self, unit: UnitId) -> (i32, bool) {
         self.v.monster_velocity(unit)
     }
+    fn velocity_base(&self, unit: UnitId) -> i32 {
+        self.v.velocity_base(unit)
+    }
     /// `0x0063E860` (`path-placement.md` §3).
     fn monster_can_be_in_town(&self, unit: UnitId) -> bool {
         self.v
@@ -755,6 +828,23 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// The player of a client record (`unit-order.md` §7).
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.game.lists.client(client)?.player
+    }
+    /// §9.8: S→C 0x0A (`0x00571600`) to the client's player.
+    fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {
+        let (Some(receiver), Some(e)) = (self.client_player(client), self.game.lists.unit(unit))
+        else {
+            return;
+        };
+        let m = crate::units::messages::remove_unit(e.ty as u8, e.guid);
+        self.v.h.x.send(receiver, &m);
+    }
+    /// §9.8: the add messages `0x00571F90` (`intents-events.md` §7.2) to
+    /// the client's player.
+    fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
+        let Some(receiver) = self.client_player(client) else {
+            return;
+        };
+        self.v.add_messages(self.game, receiver, unit);
     }
     /// [`crate::wiring::path::PathState::history`] (players only).
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {
