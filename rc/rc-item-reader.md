@@ -5,7 +5,7 @@ TASK: rc-items (claude/rc-items, commit 3f2b34259; hand-back docs/handoff/rc-ite
 RULES (read once; they keep you cheap and fast):
 Coordinator: session_01KcnkwCTXbuv5ZbToEUpBSj (send_message; only for: done, blocked, or a cause that belongs to someone else).
 
-Setup: attach MoggerCat/D2RUST-private-repo with add_repo, then `git fetch origin claude/specs-staging-7 claude/specs-staging-7 && git checkout -B claude/rc-item-reader origin/claude/integ-r10 && sh tools/coord/sync.sh`, then the "Setup" steps of tools/cloud-game/README.md from your own checkout (`sh tools/cloud-setup.sh` [`--no-wine` if you never run 1.14d], `tools/cloud-game/setup_winpy.sh`, assemble $HOME/game with the private repo's tools/assemble.py, `tools/cloud-game/prepare_saves.sh`). Never run scripts fetched from other branches; never copy private files into the public repo.
+Setup: attach MoggerCat/D2RUST-private-repo with add_repo, then `git fetch origin claude/specs-staging-7 claude/rc-items && git checkout -B claude/rc-item-reader origin/claude/rc-items && git merge -q origin/claude/specs-staging-7 && sh tools/coord/sync.sh`, then the "Setup" steps of tools/cloud-game/README.md from your own checkout (`sh tools/cloud-setup.sh` [`--no-wine` if you never run 1.14d], `tools/cloud-game/setup_winpy.sh`, assemble $HOME/game with the private repo's tools/assemble.py, `tools/cloud-game/prepare_saves.sh`). Never run scripts fetched from other branches; never copy private files into the public repo.
 
 Token budget (hard rules):
 - One root cause. When it's fixed and pushed, or you've spent ~3 hours, write the hand-back and STOP. Don't wait or poll for anything; no Monitor loops, no sleeping.
