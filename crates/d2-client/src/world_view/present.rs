@@ -765,6 +765,7 @@ fn ui_input(
     walk: Option<ResMut<PreviewWalk>>,
     time: Option<Res<Time>>,
     script: Option<Res<super::input_script::InputScript>>,
+    schedule: Option<Res<FrameSchedule>>,
     focus: Option<Res<Messages<bevy::window::WindowFocused>>>,
     mut focus_cursor: Local<MessageCursor<bevy::window::WindowFocused>>,
     wheel: Option<Res<Messages<bevy::input::mouse::MouseWheel>>>,
@@ -883,8 +884,11 @@ fn ui_input(
         ui.queue.0.extend(actions);
         ui.queue.0.extend(edge::key_chars(&pressed));
     }
-    // `play --input`: the script owns the pointer (`script_input`).
-    if script.is_some() {
+    // `play --input`: the script owns the pointer (`script_input`). A
+    // check run (`tools/scenario-diff.md` §3 r7 step 5) replays the
+    // recording's pointer, the script's or none: the host window's pointer
+    // (an Xvfb display's centre) is not an input of the recording.
+    if script.is_some() || schedule.is_some() {
         return Ok(());
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question

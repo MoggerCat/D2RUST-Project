@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–580 |
-|   4. Suite | 581–708 |
-| Constants & data dependencies | 709–712 |
-| Randomness | 713–716 |
-| Edge cases & original bugs | 717–752 |
-| Test vectors | 753–775 |
-| Provenance | 776–779 |
-| Open questions | 780–842 |
+|   3. Run | 145–595 |
+|   4. Suite | 596–723 |
+| Constants & data dependencies | 724–727 |
+| Randomness | 728–731 |
+| Edge cases & original bugs | 732–767 |
+| Test vectors | 768–790 |
+| Provenance | 791–794 |
+| Open questions | 795–857 |
 <!-- /index -->
 
 ## Summary
@@ -231,6 +231,21 @@ state first. It is the default way to compare a behaviour with 1.14d.
       on every tick 4–24; tick 25 on differs by one extra footstep
       variant roll in d2rs (sound 2768 at T 22, 1.14d T 27: the audio
       owner's cause).
+   6. **The recording's sound switch and pointer** (2026-10-10,
+      rc-draw-row173). The recorders start Game.exe with `-w -ns`
+      (`render/capture.md` §2): with `-ns` no sound device exists, so the
+      sound init `0x00482260` never runs (it needs `[0x00881768]`), the
+      request `0x004B9A00` returns at its first test (`[0x007C545C]` = 0,
+      set only by that init's `0x004B9D00`), and no sound draw ever
+      steps the client seed (measured: `draws-town-arrival-ama`, 76
+      frames, every frame's seed steps are 5 per rain spawn plus the
+      cursor's). `play --no-sound` is that switch (no sound driver);
+      `scenario_diff.py` passes it when the capture header's `args` hold
+      `-ns` (no header: the check fails). The pointer of a check run is
+      the recording's: the input script's, or none; the host window's
+      (an Xvfb display's centre) is ignored. With steps 5 and 6 the client
+      seed of `draws-town-arrival-ama` equals the capture's at every frame
+      through tick 73 and the rain rows are equal.
 9. **packets** (`tools/packets-trace.md`; work dir files in brackets):
    1.14d `record_packets.py` with the rule 2 start
    [`orig.packets.jsonl`]; d2rs `d2-client state-dump --save --seed

@@ -6,7 +6,7 @@
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
-//!   d2-client play       ... --dump-draws DIR [--at-tick N[,M...]] [--dump-image] [--input SCRIPT] [--frame-schedule FILE]
+//!   d2-client play       ... --dump-draws DIR [--at-tick N[,M...]] [--dump-image] [--input SCRIPT] [--frame-schedule FILE] [--no-sound]
 //!   d2-client play       ... [--poke "F DIRECTIVE ARGS"]... [--poke-file FILE]
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
@@ -126,6 +126,9 @@ struct Options {
     /// `play --frame-schedule FILE`: a check run's recorded frame schedule
     /// and host clock (`specs/tools/scenario-diff.md` §3 r7.5).
     frame_schedule: Option<PathBuf>,
+    /// `play --no-sound`: Game.exe `-ns` (`specs/tools/scenario-diff.md`
+    /// §3 r7 step 6).
+    no_sound: bool,
     /// `play --audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md` §3).
     audio_dump: Option<PathBuf>,
     audio_ticks: Option<u64>,
@@ -201,6 +204,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         dump_image: false,
         sound_log: None,
         frame_schedule: None,
+        no_sound: false,
         audio_dump: None,
         audio_ticks: None,
         input: None,
@@ -232,6 +236,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--dump-image" => o.dump_image = true,
             "--sound-log" => o.sound_log = Some(PathBuf::from(value()?)),
             "--frame-schedule" => o.frame_schedule = Some(PathBuf::from(value()?)),
+            "--no-sound" => o.no_sound = true,
             "--audio-dump" => o.audio_dump = Some(PathBuf::from(value()?)),
             "--audio-ticks" => o.audio_ticks = Some(value()?.parse().context("--audio-ticks")?),
             "--input" => {
@@ -793,6 +798,7 @@ fn play_once(
         pokes: o.pokes.clone(),
         sends: o.sends.clone(),
         sound_log: o.sound_log.clone(),
+        no_sound: o.no_sound,
         frame_schedule: match &o.frame_schedule {
             Some(p) => Some(
                 d2_client::world_view::present::FrameSchedule::parse(
@@ -1034,6 +1040,9 @@ mod tests {
         assert!(parse_options(&args(&["--dump-draws", "d", "--at-tick", "40,"])).is_err());
         let o = parse_options(&args(&["--sound-log", "s.tsv"])).unwrap();
         assert_eq!(o.sound_log, Some(PathBuf::from("s.tsv")));
+        let o = parse_options(&args(&["--dump-draws", "d", "--no-sound"])).unwrap();
+        assert!(o.no_sound);
+        assert!(parse_options(&args(&["--frame-schedule", "f.tsv"])).is_err());
     }
 
     #[test]

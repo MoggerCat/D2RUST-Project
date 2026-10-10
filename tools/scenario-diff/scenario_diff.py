@@ -462,6 +462,9 @@ class Runner:
                     sched = self.path("frame-schedule.tsv")
                     write_frame_schedule(raw, sched)
                     args += ["--frame-schedule", sched]
+                    # rule 7.6: the recording's -ns (no sound device)
+                    if capture_no_sound(raw):
+                        args += ["--no-sound"]
                 if self.d2rs_input():
                     args += ["--input", self.d2rs_input()]
                 with self.display() as env:
@@ -632,6 +635,22 @@ def draws_summary(orig_tsv, d2rs_tsv, code, tick):
     out.update(rows_compared=max(len(ra), len(rb)), rows_equal=equal, first=first,
                rows=(len(ra), len(rb)))
     return out
+
+
+def capture_no_sound(raw):
+    """Rule 7.6: whether the capture's Game.exe ran with `-ns` (its header
+    `args`); a capture without a header fails the check."""
+    import json
+    with open(raw, encoding="utf-8") as f:
+        for line in f:
+            r = json.loads(line)
+            if r.get("k") == "header":
+                args = r.get("args")
+                if args is None:
+                    raise CheckError(f"{raw}: header has no game args (-ns unknown)")
+                return "-ns" in args or "-nosound" in args
+            break
+    raise CheckError(f"{raw}: no capture header (-ns unknown)")
 
 
 def write_frame_schedule(raw, out):
