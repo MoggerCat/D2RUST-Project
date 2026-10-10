@@ -16,3 +16,4 @@ C056	rc-c022-playerstate	17:05	gen-su-12 frame 54 player m 19 vs 5 (knockback/hi
 C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed draws)	open
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	done 8 rows EQUAL (act-travel/a2-warp/join/milestone/npc-talk: 18 checks state 100%); packets part stays rc-net-div
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
+C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
