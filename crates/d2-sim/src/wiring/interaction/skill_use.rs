@@ -1299,6 +1299,12 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
             return;
         }
+        // Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9): the
+        // egg's start gives up its monster footprint (§5.6).
+        if let bodies::BodyEffect::DeadFootprint(u) = e {
+            self.cv.v.dead_body_footprint(u);
+            return;
+        }
         // Kill `0x0057CCB0(game, u, killer, 1)` (`combat/damage.md` §7.2):
         // the egg hatch's last step (`bodies-3.md` §5.7 step 6).
         if let bodies::BodyEffect::KillBy { u, killer, .. } = e {
