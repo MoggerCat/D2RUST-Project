@@ -258,6 +258,7 @@ pub fn run_function<W: AiHost + ?Sized>(
         0x005E_7E20 => navi(game, cx, u, p),
         0x005E_7D60 => town_rogue(game, cx, u),
         0x005E_7AC0 => super::npc::good_npc_ranged(game, cx, u, p),
+        0x005E_5C50 => bodies4::special_state_13(game, cx, u, p),
         0x005E_7C10 => super::npc::special_state_06(game, cx, u),
         0x005E_7880 => super::npc::npc_out_of_town(game, cx, u, p),
         0x005E_7130 => super::npc::npc(game, cx, u, p),

@@ -49,13 +49,13 @@
 |   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 532–576 |
 |   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 577–688 |
 |   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 689–705 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 706–743 |
-| Constants & data dependencies | 744–762 |
-| Randomness | 763–771 |
-| Edge cases & original bugs | 772–786 |
-| Test vectors | 787–801 |
-| Provenance | 802–827 |
-| Open questions | 828–866 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 706–749 |
+| Constants & data dependencies | 750–768 |
+| Randomness | 769–777 |
+| Edge cases & original bugs | 778–792 |
+| Test vectors | 793–807 |
+| Provenance | 808–833 |
+| Open questions | 834–872 |
 <!-- /index -->
 
 ## Summary
@@ -736,6 +736,12 @@ nothing.
    (`population.md` §11.6), `Skill5` at T, end. Else wander 6. End.
 9. `Skill4` > 0, its entry exists and D ≤ 13 → `Skill4` at T. End.
 10. Draw < 60 → walk to T; then idle 5 (both).
+
+The "its entry exists" tests of steps 6–9 (`0x006439F0(unit, skill)`)
+find the monster's init skill entries (`Skill1..8` of monstats, `init.md`
+§14), not only summoned ones: Nihlathak has entries for Skill1..5, so
+steps 6 and 7 draw (`gen-su-60`, unit seed draws at `0x005EE82B`,
+`0x005EE8A0`; REC-3801).
 
 **Alternate** `0x005E5280` (also the Hireable alternate, `ai.md` §3.2):
 state 12 off; re-install the control's current state; idle 1. No

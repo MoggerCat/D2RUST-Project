@@ -816,7 +816,16 @@ impl<X: Pending> AiActs for View<'_, X> {
                 let mode = self.h.tables.skills.skill(skill)?.monanim;
                 Some((skill, mode))
             }
-            None => self.h.x.ai_skill_entry(unit, skill),
+            // The monster's init entries (`monsters/init.md` §14, the
+            // `Skill1..8` of monstats): `0x006439F0` finds them as well
+            // (REC-3801, gen-su-60 draws of Nihlathak's steps 6 and 7).
+            None => match self.h.natural_skills.get(&unit) {
+                Some(m) if m.contains_key(&skill) => {
+                    let mode = self.h.tables.skills.skill(skill)?.monanim;
+                    Some((skill, mode))
+                }
+                _ => self.h.x.ai_skill_entry(unit, skill),
+            },
         }
     }
     /// A monster with a skill list (an assigned aura,
