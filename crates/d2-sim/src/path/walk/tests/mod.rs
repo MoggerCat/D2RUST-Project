@@ -200,8 +200,10 @@ fn w5_preparation_reaches_start() {
     assert_eq!((p.cur_point, p.point_count), (0, 0));
     assert_eq!(p.flags & flags::ACTIVE, 0);
     // §4 r3 (REC-753): the probe found the start, so the target keeps
-    // the requested point.
+    // the requested point; the compute record's target, written before
+    // the start test, is the start, and the final target takes it.
     assert_eq!(p.target(), Point::new(15, 10));
+    assert_eq!(p.final_target(), Point::new(13, 10));
     // Through the request: count 0 → neutral start.
     let o = request(
         &t,

@@ -305,9 +305,11 @@ pub fn generate<W: VendorWorld>(
 
 /// Clearing a record's data `0x00536580` (§6 rule 4).
 pub fn clear_record<W: VendorWorld>(rec: &mut VendorRecord, w: &mut W) {
+    // Every gamble list: items removed and destroyed, as §5.4.
     for g in std::mem::take(&mut rec.gamble_lists) {
         for item in g.items {
             w.remove_gamble_item(rec.class, g.player, item);
+            w.destroy_item(item);
         }
     }
     for item in std::mem::take(&mut rec.store) {
