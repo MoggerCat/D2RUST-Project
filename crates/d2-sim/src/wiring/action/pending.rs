@@ -1840,6 +1840,10 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The Ancients' gate `0x0058CF90` (`quests-act5-2.md` §7.9) answer
+    /// source: the fight's armed byte (+0x11), published by the quest
+    /// control once per tick. Default: nothing.
+    fn set_ancients_armed(&mut self, armed: bool) {}
     /// The not-intro test `0x005444B0(game, chain)` (`quests.md` §2.3:
     /// no record with the chain → true, else its not-intro byte +0x09):
     /// the quest control publishes its records' answers once per tick.
