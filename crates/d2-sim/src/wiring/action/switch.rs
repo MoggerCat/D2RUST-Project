@@ -265,9 +265,10 @@ impl<X: Pending> View<'_, X> {
                 self.h.x.send(receiver, &m);
                 // `0x0053E8F0` ends with the party info `0x0053DA90`.
                 let level = self.stats.unit_total(unit, 12, 0) as u16;
-                self.h
-                    .x
-                    .send(receiver, &messages::player_party_info(guid, level));
+                self.h.x.send(
+                    receiver,
+                    &messages::player_party_info(guid, level, receiver == unit),
+                );
                 self.player_part_b(game, receiver, unit);
             }
             UnitType::Object => {
