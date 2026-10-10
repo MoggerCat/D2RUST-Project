@@ -41,7 +41,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj", "aud"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj", "aud", "fmt"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -729,8 +729,54 @@ def fam_aud(ctx):
     return out
 
 
+# File-format rows (ledger area system.formats.*): a scenario reaches a
+# format only through what the game does with the file, so each check runs a
+# fixed scene in which the formats' output shows: the draw list of the town
+# arrival (every DCC/DC6/DT1 file drawn, palette, COF layer order, animation
+# frame data), the load of a saved character (the .d2s sections), a
+# walk/run (animation frame counts drive the movement ticks). The rows each
+# check stands for are listed in FMT_ROWS (area prefix -> check).
+FMT_ROWS = {
+    "gen-fmt-draws-town": ["dcc.", "cof.", "dt1.", "palette.", "dc6.", "animdata.1-", "animdata.2-",
+                           "animdata.3-", "d2s-appearance.1-", "d2s-appearance.2-",
+                           "d2s-appearance.3-", "d2s-appearance.6-"],
+    "gen-fmt-load-ama": ["d2s.1-", "d2s.9-", "d2s-load.1-", "d2s-load.2-", "d2s-load.7-", "d2s-load.8-"],
+    "gen-fmt-anim-walk": ["animdata.4-", "animdata.5-", "animdata.6-"],
+}
+
+
+def fam_fmt(ctx):
+    town = Check(
+        "gen-fmt-draws-town", "fmt", "formats: town arrival draw list",
+        "draw list of the Rogue Encampment arrival (DCC/DC6/DT1/COF/palette/animdata)",
+        "ScnAma --class ama --expansion", 76, 600, "draws", ["draws-at 73"],
+        comment=["Every file the town arrival draws goes through the format readers: the draw "
+                 "rows name the DCC, DC6 and DT1 files, the palette shift and the COF layer "
+                 "order. Same scene as draws-town-arrival-ama (server tick 73)."])
+    load = Check(
+        "gen-fmt-load-ama", "fmt", "formats: load of a saved character",
+        "load of a saved expansion Amazon, 20 idle ticks: state and packets",
+        "ScnAma --class ama --expansion", 20, 300, "state packets", [],
+        comment=["The .d2s sections (header, quests, waypoints, stats, skills, items) "
+                 "become the player's state; the join packets carry the loaded values "
+                 "(specs/formats/d2s-load.md sections 1, 2, 7, 8)."])
+    anim = Check(
+        "gen-fmt-anim-walk", "fmt", "formats: animation data in movement",
+        "Walk and Run in the Rogue Encampment: movement ticks come from AnimData",
+        "ScnAma --class ama --expansion --level 12", 80, 300, "state packets",
+        ["ignore q",
+         "at 6 send Walk x=@x+6 y=@y",
+         "at 36 send Run x=@x y=@y+5"],
+        comment=["Frame counts and speed of the walk/run modes come from the animation data "
+                 "(specs/formats/animdata.md sections 4-6); the player's position per tick shows them."])
+    out = [town, load, anim]
+    for c in out:
+        c.extra = {"fmt": True}
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt}
 
 
 # ----------------------------------------------------------- ledger join
@@ -792,6 +838,12 @@ def resolve_area(c, areas):
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "aud":
         c.area = ",".join(x["areas"])
+        return
+    elif f == "fmt":
+        pre = FMT_ROWS[c.name]
+        c.area = ",".join(a for a, _ in areas if a.startswith("system.formats.")
+                          and any(a[len("system.formats."):].split(".", 1)[-1].startswith(p)
+                                  or a[len("system.formats."):].startswith(p) for p in pre)) or "-"
         return
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
