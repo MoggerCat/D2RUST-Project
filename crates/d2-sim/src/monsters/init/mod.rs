@@ -52,8 +52,8 @@ pub use umods::{
     aura_choice, boss_minions_and_init, callback, champion_pack_member, choose_umods, dispatch,
     eligible, handle_event7, make_unique, mark_boss, mark_unique, nearest_eligible, pick_champion,
     pick_unique, random_boss, restore_boss, restore_minion, run_umod_init, superunique_finish,
-    superunique_init, superunique_mods, warp_eligible, xfer_umods, Gate, Saved, UmodRow,
-    WarpCandidate, AURAS, UMODS, UMODS_TSV,
+    superunique_finish_with, superunique_init, superunique_mods, warp_eligible, xfer_umods, Gate,
+    Saved, UmodRow, WarpCandidate, AURAS, UMODS, UMODS_TSV,
 };
 
 /// Stat ids (`itemstatcost.txt` rows) init reads or writes.

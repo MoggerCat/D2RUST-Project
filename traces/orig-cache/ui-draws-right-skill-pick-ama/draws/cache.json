@@ -23,20 +23,20 @@
   "1",
   "--no-save",
   "--input",
-  "frame 40; click 660 570"
+  "frame 40; hold 660 570 2"
  ],
  "files": {
   "orig.frames.jsonl": {
-   "sha256": "bb64d5c8ed8910c6e27e729280cc94a72300e60e579e18acc203fb6faf75749b",
-   "size": 4837597
+   "sha256": "bf17f5bcbdb7f1f085e4d4038157b7bc10eba4050dd04453254344de4a0cdc28",
+   "size": 2815480
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "6b7abd0c3ccabbff6da2627766dfa8e6d18208ac80d7e9f383faa637aa71fa24",
+  "check": "fa743fa39724f6827483eb239e98bb800a64377ac47dd469f851a9209a1039c1",
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
-  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
   "recorder": "6acab5c77636638a790840c542c51dd7472887044888df9f164764661dcb9c53",
   "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
  }

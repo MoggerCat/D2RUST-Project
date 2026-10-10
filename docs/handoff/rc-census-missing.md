@@ -34,3 +34,10 @@ First divergence frame 37 -> 73 (then 73: killer GUID, 1.14d 10 vs d2rs 26, an A
 - The play host sets `UnitData.difficulty` and `aidel_by_difficulty` (game type 3, `ai.md` §1.3): the neutral AI delay used the base column in every difficulty (the "0x67 MonsterMove missing" group, 2-frame late first think in Hell).
 - Result over the 60 `items-drops-*` packets checks: 16 MATCH (0 at the start of the session), 44 DIVERGED.
 - Open (first divergence, 44 checks): `a9 EndState vs a8 SetState / 65` (6), `6d MonsterStop vs 0d` (6), `75 PartyInfo vs 67/69/6c` (4), AddUnit state 118 on Blood Raven in Hell/Nightmare/Normal (`knock` monprop, 4), `69 vs 4d` (3), and scattered "missing in d2rs" 0x67/0x6D (monster AI timing, ~15).
+
+## Round 4–5 (REC-2813, REC-2814)
+- Player dead clean-up `0x0057F330` (stat 6 := 0, death sweep, states but `plrstaydeath` cleared; 0xA9 on a poisoned player); the player's DT/DD 0x0D goes out in the queue walk (a hosts without the path provider keeps the old announce); the player is queued after its corpse.
+- Level-up (`vitals.md` §3 step 7): 0x75 to every client, level-up sound, +0xC8 bit 0; the rest of the client update (stat flush, 0x65) waits behind the item pass (`send_after_items`, the existing `defer_player_tail`).
+- Blood Raven's corpse_noselect state at creation (`init.md` §14.3) wired to the host (the seam was a no-op).
+- items-drops-* packets: 26 of 60 MATCH (0 at the start of the session).
+- Open (first divergences): ±1 frame in missile-hit timing on moving bosses (`nor-10`: hits at poke+14 vs +15), monster AI timing "0x67/0x6D missing" (~10), `4d/69` skill vs mode message order (3), `a8` player SetState vs 0x0D (2), 0x9C item shapes (`nor-12`, `rbo-04`: 34 vs 35 bytes), `nor-09/nor-13` 0x28/0x5D vs 0x9C.

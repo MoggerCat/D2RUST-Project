@@ -14,7 +14,7 @@ main 26500 -> 918, cinematics 49732 -> 372, credits 46388 -> 374, charselect 336
 - Fix 1 (`front_end/mod.rs image_tiles`): last tile row of a multi-row image ends on the control's bottom row
   (y = 599), not 600. Rows 512..599 of every 800x600 background were one row low. PROVISIONAL other sizes.
 - Fix 2 (`screens/cinematics.rs`): heading centred (flag 2) and colour 4 (0x004FD060).
-- Spec: frontend-menus.md §F2.11, scenario-diff.md §3 rule 17. Ledger part `ledger/rc-c009-scenes.tsv`.
+- Spec: frontend-menus.md §F2.11, scenario-diff.md §3 rule 18. Ledger part `ledger/rc-c009-scenes.tsv`.
 
 ## Open (first divergences after this, by size)
 1. Mouse cursor: 1.14d draws it into the frame on every front-end screen, d2rs does not (372 px of the
