@@ -5280,7 +5280,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ass.weapon-block`: rc-a8-setstate.tsv:28 kept, rc-skill-div-a.tsv:32 dropped
   - `skill.bar.axe-mastery`: rc-a8-setstate.tsv:29 kept, rc-skill-div-a.tsv:33 dropped
   - `skill.bar.bash`: rc-a8-setstate.tsv:30 kept, rc-skill-div-a.tsv:34 dropped
-  - `skill.bar.battle-command`: rc-skill-div-a.tsv:35 kept, rc-c012-a8bytes.tsv:3 dropped
+  - `skill.bar.battle-command`: rc-c012-a8bytes.tsv:3 kept, rc-skill-div-a.tsv:35 dropped
   - `skill.bar.battle-cry`: rc-a8-setstate.tsv:31 kept, rc-skill-div-a.tsv:36 dropped
   - `skill.bar.battle-orders`: rc-a8-setstate.tsv:32 kept, rc-skill-div-a.tsv:37 dropped
   - `skill.bar.berserk`: rc-a8-setstate.tsv:33 kept, rc-skill-div-a.tsv:38 dropped
@@ -5578,7 +5578,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.bar.berserk`: rc-a8-setstate.tsv:33 kept, skills.tsv:149 dropped
   - `skill.bar.natural-resistance`: rc-a8-setstate.tsv:48 kept, skills.tsv:150 dropped
   - `skill.bar.war-cry`: rc-a8-setstate.tsv:56 kept, skills.tsv:151 dropped
-  - `skill.bar.battle-command`: rc-skill-div-a.tsv:35 kept, skills.tsv:152 dropped
+  - `skill.bar.battle-command`: rc-c012-a8bytes.tsv:3 kept, skills.tsv:152 dropped
   - `skill.dru.raven`: rc-c028-skillmsgs.tsv:10 kept, skills.tsv:153 dropped
   - `skill.dru.plague-poppy`: q-chk-skills-bda.tsv:34 kept, skills.tsv:154 dropped
   - `skill.dru.wearwolf`: rc-packets-chan.tsv:93 kept, skills.tsv:155 dropped
@@ -9561,7 +9561,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ass.shadow-warrior` | entity | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: 0xAC (umod 42 unique + source link), 0xA7 state 121, 0xAA all equal; missing the monster inventory messages 0x00534F80: two S2C 0x9D action 6 (Equip, 0x0053D090) for the shadow equipment items (monster_equip holdings have no item stream sender); shared with any summon with equipment |
 | `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/rc-c012-a8bytes | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c012-a8bytes REC-2055: state PARTIAL 70/70, packets MATCH 70/70 in bar-battle-command (0x00646D60 marks changed; stat 127 refresh all) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.bar.leap` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap packets: frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.leap-attack` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap-attack packets: frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.shout` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
