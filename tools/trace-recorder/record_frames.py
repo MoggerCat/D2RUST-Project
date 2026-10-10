@@ -256,6 +256,28 @@ def read_cel_header(mem, cel):
     return {"flip": flip, "w": w, "h": h, "xoff": xoff, "yoff": yoff}
 
 
+def cel_header_from_file(mem, c):
+    """The frame header of a cel op that never reaches the rasterizer (`CelDrawEx`, whose context
+    +0x3C is still null): the frame pointer table of the loaded DC6 (dirs +0x10, frames per dir
+    +0x14, pointers from +0x18; absolute after the load), then `read_cel_header`. None when the
+    context holds no plausible file or frame."""
+    try:
+        f = int(c.get("file") or "0x0", 16)
+        if f < 0x10000:
+            return None
+        dirs, fpd = struct.unpack("<II", mem.read(f + 0x10, 8))
+        d, fr = c.get("dir") or 0, c.get("frame") or 0
+        if not (0 <= d < dirs <= 64 and 0 <= fr < fpd <= 4096):
+            return None
+        ptr = struct.unpack("<I", mem.read(f + 0x18 + 4 * (d * fpd + fr), 4))[0]
+        if ptr < 0x10000:
+            return None
+        h = read_cel_header(mem, ptr)
+        return h if 0 < h["w"] <= 4096 and 0 < h["h"] <= 4096 else None
+    except (OSError, struct.error):
+        return None
+
+
 def read_dt1_list(mem, limit=4096):
     """capture.md §3.5: every loaded DT1 as (tile array, count, path)."""
     out, rec, seen = [], u32(mem, DT1_LIST), set()
@@ -279,10 +301,21 @@ def dt1_lookup(libs, tile):
 
 def read_cel_context(mem, ctx):
     raw = mem.read(ctx, CEL_CONTEXT_SIZE)
-    return {"raw": raw.hex(), "ctx": f"{ctx:#x}", "frame": struct.unpack_from("<i", raw, 0)[0],
-            "dir": struct.unpack_from("<i", raw, 0x40)[0],
-            "file": f"{struct.unpack_from('<I', raw, 0x34)[0]:#x}",
-            "tokens": [text4(raw[o:o + 4]) for o in (0x18, 0x1C, 0x20, 0x24, 0x28)]}
+    rec = {"raw": raw.hex(), "ctx": f"{ctx:#x}", "frame": struct.unpack_from("<i", raw, 0)[0],
+           "dir": struct.unpack_from("<i", raw, 0x40)[0],
+           "file": f"{struct.unpack_from('<I', raw, 0x34)[0]:#x}",
+           "tokens": [text4(raw[o:o + 4]) for o in (0x18, 0x1C, 0x20, 0x24, 0x28)]}
+    # An item graphic (unit type 4 at +0x08, 0x004DABC0): +0x2C points at the inventory file name
+    # and 0x005FE610 builds `DATA\GLOBAL\items\<name>.dc6` (`ui/inventory.md` §8 r2); no +0x34 file.
+    ptr = struct.unpack_from("<I", raw, 0x2C)[0]
+    if ptr >= 0x10000 and rec["file"] == "0x0" and struct.unpack_from("<I", raw, 8)[0] == 4:
+        try:
+            t = mem.read(ptr, 64).split(b"\0")[0]
+            if t and all(32 < c < 127 for c in t):
+                rec["cache_path"] = "DATA\\GLOBAL\\items\\" + t.decode("latin-1") + ".dc6"
+        except OSError:
+            pass
+    return rec
 
 
 def read_draw(mem, name, args, light_full=False, libs=None):
@@ -589,6 +622,11 @@ def make_recorder(rt):
                     self.libs = read_dt1_list(self)
                 rec = read_draw(self, name, args, self.light_full, self.libs)
                 rec["at"] = f"{ret - 5:#x}"
+                c = rec.get("cel")
+                if name == "CelDrawEx" and c and "hdr" not in c:
+                    hdr = cel_header_from_file(self, c)
+                    if hdr:
+                        c["hdr"] = hdr
             self.draws.append(rec)
 
         def raster(self, ctx):
@@ -755,7 +793,7 @@ def make_recorder(rt):
             elif addr == CEL_LOADED:
                 path = self.read(ctx.Ebp - 0x108, 0x104).split(b"\0")[0].decode("latin-1")
                 self.emit({"k": "celfile", "ptr": f"{self.u32(ctx.Ebp - 4):#x}", "path": path})
-            elif addr == D2WIN_LOAD and self.fe is not None:
+            elif addr == D2WIN_LOAD:
                 self.d2win_entry(ctx)
             elif addr in self.d2win_wait:
                 path, arg = self.d2win_wait.pop(addr)
@@ -1010,8 +1048,7 @@ def main():
                  FRAME_START: FRAME_START_BYTES, CEL_LOADED: CEL_LOADED_BYTES,
                  UNIT_DRAW: UNIT_DRAW_BYTES, RASTER: RASTER_BYTES, COMP_PATH_DCC: COMP_PATH_DCC_BYTES,
                  COMP_PATH_DC6: COMP_PATH_DC6_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
-    if fe is not None:
-        rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES
+    rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES  # fonts and UI art load in game too (glyph cel files)
     if a.sounds:
         rt.EXPECT[SOUND_REQUEST] = SOUND_REQUEST_BYTES
     rt.FORMAT, rt.TOOL = FORMAT, TOOL

@@ -33,7 +33,6 @@ use super::output::{Output, Outputs};
 use super::world::{
     ClientWorld, ModeRequest, ModelInputs, UnitKey, ITEM, MISSILE, MONSTER, OBJECT, PLAYER,
 };
-use crate::rules::lighting::records::Owner;
 
 /// Player modes the table names (`sim/units.md` player modes).
 pub mod player_mode {
@@ -113,21 +112,12 @@ pub fn neutral_walk(w: &ClientWorld, key: UnitKey) -> (u32, u32) {
     }
 }
 
-/// `0x00643A00(U, 0)` then `0x004743D0`: the unit's light (a cast light
-/// of the client skill start, `render/lighting.md` §8 r3) is detached
-/// and removed; a unit without one: nothing.
+/// `0x00643A00(U, 0)` then `0x004743D0`: the unit's cast light (held in
+/// its stat list, `render/lighting.md` §8 r3) is detached and removed; a
+/// unit without one: nothing. The unit's own light (`+0x64`, the player
+/// light) stays (`client/model.md` §8 rule 4).
 pub(super) fn remove_unit_light(w: &mut ClientWorld, key: UnitKey) {
-    let owner = Owner {
-        unit_type: u32::from(key.unit_type),
-        guid: key.guid,
-        client_only: false,
-    };
-    let id = w
-        .lights
-        .iter()
-        .find(|(_, r)| r.owner() == Some(owner))
-        .map(|(id, _)| id);
-    if let Some(id) = id {
+    if let Some(id) = w.cast_lights.remove(&key) {
         let _ = w.lights.remove(id);
     }
 }

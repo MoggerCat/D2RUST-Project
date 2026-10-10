@@ -42,25 +42,25 @@
 |   12. DarkWanderer (91) `0x005EA130` | 281–297 |
 |   13. ArcaneTower (93) `0x005E0F60` | 298–313 |
 |   14. Spirit (97) `0x005E3840` | 314–323 |
-|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 324–353 |
-|   16. InvisoPet (103) `0x005EA7A0` | 354–368 |
-|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 369–391 |
-|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 392–469 |
-|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 470–508 |
-|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 509–579 |
-|   21. DruidBear (112) `0x005ED730` | 580–606 |
-|   22. SiegeTower (113) `0x005E1860` | 607–621 |
-|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 622–650 |
-|   24. Wussie (131) `0x005EE3C0` | 651–678 |
-|   25. UberIzual (144) `0x005F8C80` | 679–694 |
-|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 695–747 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 748–929 |
-| Constants & data dependencies | 930–952 |
-| Randomness | 953–960 |
-| Edge cases & original bugs | 961–977 |
-| Test vectors | 978–998 |
-| Provenance | 999–1030 |
-| Open questions | 1031–1042 |
+|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 324–360 |
+|   16. InvisoPet (103) `0x005EA7A0` | 361–375 |
+|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 376–398 |
+|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 399–476 |
+|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 477–515 |
+|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 516–586 |
+|   21. DruidBear (112) `0x005ED730` | 587–613 |
+|   22. SiegeTower (113) `0x005E1860` | 614–628 |
+|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 629–657 |
+|   24. Wussie (131) `0x005EE3C0` | 658–685 |
+|   25. UberIzual (144) `0x005F8C80` | 686–701 |
+|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 702–754 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 755–936 |
+| Constants & data dependencies | 937–959 |
+| Randomness | 960–967 |
+| Edge cases & original bugs | 968–984 |
+| Test vectors | 985–1005 |
+| Provenance | 1006–1037 |
+| Open questions | 1038–1049 |
 <!-- /index -->
 
 ## Summary
@@ -347,6 +347,13 @@ Sentinel. Init: param 0 := −1 (expiry), param 1 := 1 (leg), param 2
    0: walk-del to (params 3, 4) started → end; param 1 := 0; walk-del to
    (params 1, 2). Neither started → wander near the minion owner 5
    (`0x005DF530`); not started → idle 5.
+
+d2rs (rc-skill-div-a, 1.14d `ass-blade-sentinel`): `0x0056EDE0` (step 4) and
+`0x00621CE0(M, unit)` run on the real missile store (the missile's owner
+field becomes the creeper); the skill's AI command (`0x0058EF40`, `bodies-2.md`
+§4.11 step 7) is inserted before the current one. The first walk's path
+point then differs from 1.14d's by 2 sub-tiles (open: the creeper's walk
+around the cow standing on its line; the stop distance is 0 on both sides).
 
 The creeper shuttles between the two points of its command (set by the
 skill, `skills/bodies.md`). No draws (the wander's). 1.14d-confirmed.

@@ -39,13 +39,13 @@
 |   10. Scripted ambient overrides (`0x0046BDD0`) | 592–667 |
 |   11. Light values handed to the draws | 668–707 |
 |   12. Captures (answers `capture.md` Open question 5) | 708–745 |
-|   13. d2rs answers | 746–761 |
-| Constants & data dependencies | 762–773 |
-| Randomness | 774–780 |
-| Edge cases & original bugs | 781–797 |
-| Test vectors | 798–831 |
-| Provenance | 832–891 |
-| Open questions | 892–1000 |
+|   13. d2rs answers | 746–762 |
+| Constants & data dependencies | 763–774 |
+| Randomness | 775–781 |
+| Edge cases & original bugs | 782–798 |
+| Test vectors | 799–832 |
+| Provenance | 833–892 |
+| Open questions | 893–1001 |
 <!-- /index -->
 
 ## Summary
@@ -749,8 +749,9 @@ sub-tile) clamps the cell to 0…47 on each axis.
 |---|---|
 | `LightMap` | §1–§4, §7, rebuilt per presented frame in the client, from client state only |
 | `LightSources` | §6 records created by the client's unit mirror (§8) |
+| unit light slots | two per unit, as in 1.14d: the unit's own light (`+0x64`: player, monster, umod 3, object lights) and the cast light held in its stat list (`0x00643A00`, §8 r3; `ClientWorld::cast_lights`); a mode request (`client/model.md` §8 r4) and the client skill end remove only the cast light, the unit free both (2026-10-10: removing any light of the unit dropped the player light on the first mode request, so towns were drawn without it) |
 | `Environment` | §9, advanced per client update, set by S→C 0x53 |
-| `q` | §5; in verify cases taken from the recording, never measured |
+| `q` | §5; in verify cases and check runs taken from the recording (check runs: the frame schedule's `quality` column, `tools/scenario-diff.md` §3 r7 step 5), never measured; live play without a schedule: 2 (the high option at a draw rate ≥ 16; the draw-rate meter is not wired yet) |
 | light value per draw | §11; `ShadeChain` from `render/shading.md` |
 | floating point | §9.3, §9.4, §10 use doubles and `sin`; client-only (not `d2-sim`) |
 | blocks-light source | the client's active-room collision grids (§4 r3); a cell in no room or a room without a grid → flag 1 (§4 r2) |

@@ -248,6 +248,7 @@ pub fn push_text_colors(
         }
     };
     state.assets.shades = Some(shades);
+    state.assets.text_colors = Some(colors);
     *maps.shared.write().unwrap_or_else(|e| e.into_inner()) = Some(colors);
     maps.shown = Some(act);
     Ok(())

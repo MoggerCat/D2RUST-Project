@@ -398,7 +398,7 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
             stats: &mut *self.v.stats,
             data: self.v.data,
         };
-        if !self.v.h.run_umods(&mut sim, a, None, umod_mode::HIT) {
+        if !self.v.h.run_umods(&mut sim, a, None, umod_mode::HIT) && !self.v.h.defer_umod_hit(a) {
             self.v.h.x.monster_hit_hook(a);
         }
     }
