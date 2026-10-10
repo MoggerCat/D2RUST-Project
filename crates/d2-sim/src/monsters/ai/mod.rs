@@ -711,17 +711,13 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    // PROVISIONAL (REC-1651): §1.4 does not give the request's target.
-    // With a path target unit (`0x00553540`) d2rs keeps the unit itself
-    // (the target point is not written); without one the record's point
-    // (0, 0) is the path target (`0x00648AD0`, §7.5 rule 2). Measured
-    // 1.14d: summons ending their summon mode S1 at the animation end
-    // (raven, plague poppy, vines, cycle of life) have path target (0, 0)
-    // after it; a Grizzly whose think idles it first keeps its target.
-    let target = if cx.world.path_target(unit).is_some() {
-        ModeTarget::Unit(unit)
-    } else {
-        ModeTarget::Point(0, 0)
+    // The request record of `0x005A8030` (§1.4): target unit := the path
+    // target unit (`0x00553540`, the unit itself counting as none), point
+    // (0, 0); so without a target unit the path target point becomes
+    // (0, 0) (`0x00648AD0`, §7.5 rule 2).
+    let target = match cx.world.path_target(unit) {
+        Some(t) => ModeTarget::Unit(t),
+        None => ModeTarget::Point(0, 0),
     };
     request_mode(game, cx, unit, mode::NEUTRAL, target);
 }

@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 385–452 |
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
-|   8. Velocity, direction vector, facing | 501–613 |
-|   9. Per-tick movement | 614–807 |
-|   10. Messages | 808–870 |
-|   11. Missile paths (`0x00649760`) | 871–923 |
-|   12. Other path types (1.14d-read 2026-10-08) | 924–1137 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1138–1287 |
-| Constants & data dependencies | 1288–1324 |
-| Randomness | 1325–1335 |
-| Edge cases & original bugs | 1336–1383 |
-| Test vectors | 1384–1422 |
-| Provenance | 1423–1478 |
-| Open questions | 1479–1552 |
+|   8. Velocity, direction vector, facing | 501–614 |
+|   9. Per-tick movement | 615–808 |
+|   10. Messages | 809–871 |
+|   11. Missile paths (`0x00649760`) | 872–924 |
+|   12. Other path types (1.14d-read 2026-10-08) | 925–1138 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1139–1288 |
+| Constants & data dependencies | 1289–1325 |
+| Randomness | 1326–1336 |
+| Edge cases & original bugs | 1337–1384 |
+| Test vectors | 1385–1423 |
+| Provenance | 1424–1479 |
+| Open questions | 1480–1553 |
 <!-- /index -->
 
 ## Summary
@@ -525,13 +525,14 @@ animation-speed half of it belongs to the future animation-rate spec,
    (truncated), base = charstats `WalkVelocity` × 256 for players,
    monstats `Velocity` × 256 for monsters (`0x00621360`; the mode does
    not change the base).
-   PROVISIONAL: a monster drawn as a player (flag-ex disguise, first
-   gfx state with `gfxtype` 2: the draw identity `0x00645270`,
-   `units.md` §4.7) takes the charstats `WalkVelocity` of the shown class
-   (`gfxclass`) as its base (because 1.14d's Shadow Warrior, monstats
-   `Velocity` 0, walks 0x4800 a frame = 6 × 256 × 75 % in the
-   ass-shadow-warrior check); settled by the PC 1 read of `0x00621360`
-   (REC-1652).
+   `0x00623F50` passes `0x00621360` the type (ECX) and class (EAX) of
+   the unit's **draw identity** (`0x00645270`, `units.md` §4.7; read
+   2026-10-09): type 0 reads charstats `WalkVelocity` (+0x40), type 1
+   monstats `Velocity` (+0x32). So a monster drawn as a player (the
+   Shadow Warrior, monstats `Velocity` 0, gfx state with `gfxtype` 2,
+   `gfxclass` 6) walks on the assassin's 6 (1.14d ass-shadow-warrior:
+   0x4800 a frame = 6 × 256 × 75 %), and a player drawn as a monster on
+   that monster's row (REC-1652, settled by this read).
 3. Velocity write (`0x00648690`): +0x38 := 15 only when the new value
    differs from the current velocity; velocity and max velocity (+0x84)
    := the new value always.

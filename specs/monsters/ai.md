@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–291 |
-|   2. Think dispatch `0x005B1740` | 292–431 |
-|   3. AI control and AI tables | 432–603 |
-|   4. AI parameters | 604–622 |
-|   5. Target selection | 623–830 |
-|   6. Distances and line tests | 831–845 |
-|   7. Tactics helpers | 846–1085 |
-|   8. AI commands and minions | 1086–1112 |
-|   10. The catalogue `ai-functions.tsv` | 1113–1133 |
-| Constants & data dependencies | 1134–1157 |
-| Randomness | 1158–1179 |
-| Edge cases & original bugs | 1180–1221 |
-| Test vectors | 1222–1310 |
-| Provenance | 1311–1371 |
-| Open questions | 1372–1475 |
+|   1. Think scheduling | 97–293 |
+|   2. Think dispatch `0x005B1740` | 294–433 |
+|   3. AI control and AI tables | 434–605 |
+|   4. AI parameters | 606–624 |
+|   5. Target selection | 625–832 |
+|   6. Distances and line tests | 833–847 |
+|   7. Tactics helpers | 848–1087 |
+|   8. AI commands and minions | 1088–1114 |
+|   10. The catalogue `ai-functions.tsv` | 1115–1135 |
+| Constants & data dependencies | 1136–1159 |
+| Randomness | 1160–1181 |
+| Edge cases & original bugs | 1182–1223 |
+| Test vectors | 1224–1312 |
+| Provenance | 1313–1373 |
+| Open questions | 1374–1477 |
 <!-- /index -->
 
 ## Summary
@@ -208,14 +208,16 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
 
-PROVISIONAL: the neutral request of the last case carries no target unit
-and the point (0, 0) when the unit has no path target unit (`0x00553540`),
-so the path target point becomes (0, 0) (`0x00648AD0`, §7.5 rule 2); with
-a path target unit d2rs keeps targeting the monster itself (the point is
-not written) (because 1.14d's summons ending S1 at the animation end, the
-raven, plague poppy, vines and cycle of life checks, show path target
-(0, 0) after it, while attack ends with a target unit keep the point);
-settled by the PC 1 read of `0x005A8030`'s request record (REC-1651).
+The neutral request of the last case (`0x005A8030`, read 2026-10-09)
+first, when the unit has state 54, runs `0x005544B0` and stops if the
+unit is then dead (`0x005541B0`); it clears the used skill (`0x00620210(unit, 0)`), then builds the
+mode-change record {unit, target unit := the path target unit
+(`0x00553540`: none when there is none or it is the unit itself), point
+(0, 0), mode 1} and calls `0x005A7C20(game, record, 1)`. So a monster
+without a path target unit ends with path target point (0, 0) (§7.5
+rule 2): the summons that end S1 at the animation end (raven, plague
+poppy, vines, cycle of life) show it in 1.14d (REC-1651, settled by this
+read).
 
 #### 1.5 First think and player arrival
 

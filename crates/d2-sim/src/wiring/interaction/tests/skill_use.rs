@@ -812,9 +812,10 @@ fn use_allied_resolves_a_monster_to_its_minion_owner() {
 // Covers: specs/sim/pathing.md §8.1 r2
 #[test]
 fn a_monster_drawn_as_a_player_takes_the_charstats_walk_velocity() {
-    // REC-1652: the Shadow Warrior (monstats `Velocity` 0) under a gfx
-    // state with `gfxtype` 2 and `gfxclass` 6 walks on the assassin's
-    // `WalkVelocity` (6); without the disguise flag, its own monstats.
+    // `0x00621360` on the draw identity: the Shadow Warrior (monstats
+    // `Velocity` 0) under a gfx state with `gfxtype` 2 and `gfxclass` 6
+    // walks on the assassin's `WalkVelocity` (6); without the disguise
+    // flag, its own monstats.
     use crate::units::record::flags2;
     const SHADOW: u32 = 119;
     let mut data = (*super::stat_data()).clone();
@@ -829,10 +830,10 @@ fn a_monster_drawn_as_a_player_takes_the_charstats_walk_velocity() {
         t.combat.charstats[6] = ass;
     }
     let m = fx.spawn(UnitType::Monster, 12, 10);
-    let v = |fx: &mut Fx| fx.sim.with(&mut fx.game, |_, v| v.monster_velocity(m));
-    assert_eq!(v(&mut fx), (0, false), "its own monstats");
+    let v = |fx: &mut Fx| fx.sim.with(&mut fx.game, |_, v| v.velocity_base(m));
+    assert_eq!(v(&mut fx), 0, "its own monstats");
     fx.sim.sys.stats.toggle_state(m, SHADOW, true);
     fx.sim.sys.units.get_mut(m).unwrap().flags2 |= flags2::DISGUISE;
-    assert_eq!(v(&mut fx), (6, false), "the shown class's charstats");
+    assert_eq!(v(&mut fx), 6, "the shown class's charstats");
     fx.assert_clean();
 }

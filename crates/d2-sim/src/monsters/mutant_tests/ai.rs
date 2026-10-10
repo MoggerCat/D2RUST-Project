@@ -157,7 +157,7 @@ fn spl_end_generic_cases() {
         assert_eq!(w.thinks(), want, "{case}");
         // Every case that is not inline requests neutral, except the
         // frozen inline case, which does neither. No path target unit
-        // here: the request targets the point (0, 0) (REC-1651).
+        // here: the request targets the point (0, 0) (`0x005A8030`).
         let neutral = w.logged(&format!("mode {} Point(0, 0)", mode::NEUTRAL));
         assert_eq!(neutral, !inline && !frozen, "{case}");
     }
