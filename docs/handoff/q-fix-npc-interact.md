@@ -58,3 +58,31 @@ sh tools/coord/session-setup.sh && export D2_GAME_DIR=$HOME/game CARGO_INCREMENT
 python3 tools/scenario-diff/suite.py --filter 'a2-npc-*' --no-playthrough --workers 4 --orig-cache
 python3 tools/trace-recorder/packets_diff.py traces/raw/suite/<check>/orig.packets.jsonl traces/raw/suite/<check>/d2rs.packets.jsonl --from 13
 ```
+
+## Round 2 (coordinator follow-ups, 2026-10-10)
+
+Base: merged `claude/integ-r7` (its REC-1401 is the same 0x27 order fix:
+kept theirs, REC-1634 retired) and `claude/q-tool-interact-pokes`.
+
+| Item | Cause | Fix | Result |
+|---|---|---|---|
+| Gheed / other gamble lists (q-chk-items-vendors, q-chk-items-drops) | the gamble node inventory of round 1 | none needed | `items-vendor-gheed-gamble` items MATCH |
+| interact-talk-akara f15 | the trade open's 0x9C action 11 went out inside the 0x38; 1.14d sends them in the next tick's client pass, after the NPC's 0x8A / 0x6D | `WorldHost::take_client_pass_sent`, queued by `SimGame::tick` before the item update pass | next difference f16 is a 0x9C item byte (q-fix-d7d8-items-net, note sent) |
+| interact-operate-stash f4 | the 0x13 object case never walked (a d2rs-own preview reach) | `objects.md` §7.3 rules 3–5 on the path provider: unit distance, `interact_range` (`0x00623660`, §7.1), line test 0x804, `ObjectCase::Walk` → the run `0x00548A50` and the case again on arrival (`object_approach.rs`); the single-player host's preview reach removed | state and packets equal to 1.14d |
+| (unmasked by the walk) | `pathing.md` §4 r3 (REC-753 settled): target preparation wrote the path's +0x10; §9.5: a negative `dist8_unit` entry is distance 0; `path-placement.md` §3: an object's size is `SizeX` (d2rs had 0, so §3 step 6 never lifted a target object's footprint) | the three fixed in `path/walk/find.rs`, `geom.rs`, `wiring/path/units.rs` | the run aims at the stash's own cell as 1.14d |
+
+Regression (108 cached checks, this branch vs a baseline build of
+`claude/integ-r7`, same check files): no check got worse. Improved:
+`a2-npc-elzix-gamble`, `-jerhyn-talk`, `-meshif-talk`, `-warriv-talk`,
+`act-travel-lut-ama`, `join-act2-quests-ama` and `a5-warp-wsk-ama`
+(state channel) now have no state difference; `a2-quest-radament` first
+differs at f61 (was f2), `a2-quest-tombs` at f51 (was f14). (`ass-fade` /
+`ass-burst-of-speed` read differently in the parallel run but are
+PARTIAL on both binaries run alone; the rng channel of `a5-warp-wsk-ama`
+needs a `d2-client-rng` build on both sides.)
+
+Not done: the coordinator's Warriv wander (`town-ama-10k` f287, ty 4228
+vs 4229) is not re-run (a 10k-frame replay); the walk-target fix above is
+the likely cause, to confirm. Reading the private repo's `re/` exports
+(new CLAUDE.md rule 3) was refused by this session's permission check, so
+REC-1631..1633 stay PC 1 questions.
