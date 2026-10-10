@@ -275,21 +275,50 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The units on (x, y), searched in `room` and its adjacency array.
+    /// The units whose shape the query shape of size `r` at (x, y)
+    /// overlaps (`path-placement.md` §4 rule 6, `0x00641CB0`), searched in
+    /// `room` and its adjacency array: players in mode 0 / 17, monsters in
+    /// mode 0 / 12 and every non-unit type are skipped, missiles are
+    /// candidates; a unit of size ≤ 0 is skipped, a size above 3 is 3;
+    /// `r` outside 1..=3 finds none. The accept test is the caller's.
     ///
-    /// TODO(missiles.md §R4 step 9): the search order of `0x00641CB0` is
-    /// not specified; rooms in adjacency order (the room first), units in
-    /// room-list order.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId> {
+    /// TODO(missiles.md §R4 step 9): rooms in adjacency order (the room
+    /// first), units in room-list order; the near-rect test of
+    /// `0x00641930` never rejects a room, so none is applied.
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
+        if !(1..=3).contains(&r) {
+            return Vec::new();
+        }
         let adjacent = game
             .lists
             .room(room)
             .map(|r| r.adjacent.clone())
             .unwrap_or_default();
         std::iter::once(room)
-            .chain(adjacent.into_iter().filter(|&r| r != room))
-            .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.path_position(u) == (x, y))
+            .chain(adjacent.into_iter().filter(|&q| q != room))
+            .flat_map(|q| game.lists.room_units(q))
+            .filter(|&u| {
+                let Some(rec) = self.units.get(u) else {
+                    return false;
+                };
+                match rec.ty {
+                    UnitType::Player if rec.mode == 0 || rec.mode == 17 => return false,
+                    UnitType::Monster if rec.mode == 0 || rec.mode == 12 => return false,
+                    UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                    _ => return false,
+                }
+                let s = self.path_size(u);
+                if s <= 0 {
+                    return false;
+                }
+                let (ux, uy) = self.h.path_position(u);
+                crate::path::collision::shapes_overlap(
+                    r,
+                    s.min(3),
+                    (x - ux).abs(),
+                    (y - uy).abs(),
+                )
+            })
             .collect()
     }
 }

@@ -112,7 +112,7 @@ pub trait MissileRooms {
     /// The units on subtile (x, y) in the search order of `0x00641CB0`
     /// (D2MOO `D2Common_10407`); the missile code applies the collide
     /// callback to each.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId>;
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId>;
 }
 
 /// Damage and skill code. Provider: the combat/skills session.
