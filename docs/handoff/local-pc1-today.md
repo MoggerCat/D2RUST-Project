@@ -144,3 +144,18 @@ Rows so far: 23 `q-fix-pc1today-*`.
 - With the pin, the belt key and the party key add no UI row on 1.14d (empty
   belt; single player).
 - `pc1-data.md` Step 4: the audit item is marked (214 of 217).
+
+## Push 7 (15:47) — cinematics, camera while moving
+
+- **Cinematics menu**: opens with sound on (`-w`); with `-ns` (the recorders'
+  default) the click enters `0x00431600` but the menu does not stay
+  (`ui/frontend-credits.md` §C8 recorded, REC-2444). Scene
+  `frontend-cinematics`, two runs, stable. Left needing PC 1 of the audit's
+  217: one row (playing a cinematic: full-screen, owner's OK).
+- **Camera rows (10) now have a verdict**: camera values of both sides over
+  34 draws checks (`traces/pc1/camera-compare.tsv`): equal standing, DIVERGED
+  while walking / running (new checks `draws-walk-ama`, `draws-run-ama`); row
+  `camera-moving`.
+- Row `frontend-draw-dump`: d2rs needs a draw-list dump for front-end screens
+  and paused menus before the 13 front-end / menu scenes can be compared.
+Rows so far: 25 `q-fix-pc1today-*`.
