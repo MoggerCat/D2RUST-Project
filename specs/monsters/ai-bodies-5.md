@@ -193,6 +193,14 @@ Brackets: succubus1 [90, 50, 50, 15, 15, 15, 3, 0]; `Skill1` Defense
 Curse, `Skill2` Blood Mana, `Skill3` SuccubusBolt. Skill tests here are
 **> 0**. "Cursed" = T has an active stat list with list flag 0x20
 (`0x00625760(T, 0x20)`, `sim/stat-lists.md` §9; D2MOO `STATLIST_CURSE`).
+`0x00625760(unit, f)` answers 0 unless the unit's own list is extended
+(bit 0x80000000); then `0x006256E0` returns the first list of the active
+chain whose flags share a bit with f. The skill-3 test reads max life
+(`0x00625D10`, stat 7) and max mana (`0x00625D60`, stat 9) of T: cast when
+max mana < max life, T is absent or T is not a player. Both reads are
+real stat reads in the wiring (a stub of 0 / false made a monster cast a
+curse again on an already cursed player; gen-su-54, first difference
+frame 41 -> 68).
 
 1. T not cursed, D < aip4 [15] and P(aip3) [50]:
    1. `Skill1` > 0 and T's life percent ≥ aip7 [3] → `Skill1` at T. End.
