@@ -719,7 +719,12 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
-    let levels = hooks.monster_skills.clone();
+    // The used skill's base level: a summoned monster's entry, else the
+    // level monster init step 14 gave (`monsters/init.md` §6).
+    let mut levels = hooks.natural_skills.clone();
+    for (u, m) in &hooks.monster_skills {
+        levels.entry(*u).or_default().extend(m);
+    }
     hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
