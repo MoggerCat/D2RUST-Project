@@ -11,14 +11,14 @@ layered pair in 448 checks (gen-missile 264, gen-state 184):
 Behind those: gen-missile-149 (0xA8 missing, frame 12), gen-netc2s-60
 (0x23 vs 0x47, frame 20). gen-missile-101 errored on the first run (variant
 build race between parallel workers), ran clean on the second.
-
 ## Change
 `d2-client state-dump` runs every poke due after a tick (frame >= 2) at the
 tick-end hook (`Host::frame_with`, before the flush), the 1.14d point
 (`specs/tools/poke.md` §4 r2, §5 r5); only pokes before the first tick stay
 between frames (`app/poke.rs` `split_tick_end`, `app/state_dump.rs`).
 A narrower try (warp only) left the `stat` poke's update one frame late
-(a2-npc-fara-heal frame 7, combat-potion-midfight frame 59), so all pokes move.
+(a2-npc-fara-heal frame 7, combat-potion-midfight frame 59), so all pokes move;
+this supersedes staging's warp-only REC-2290 (`8edad33b1`, merged, spec kept).
 
 ## Checks before -> after (orig-cache, same 1.14d recordings)
 - gen packets checks: packets MATCH 74 -> 74 (the join burst still comes
