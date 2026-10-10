@@ -21,6 +21,8 @@ Families (one check per table row, written under traces/checks/gen/):
   itemq the same items at each quality (low .. crafted) over three game seeds
   aud   one audio-diff scenario per reachable system.audio ledger row group (channel
         audio; written to traces/audio/gen/, outside the scenario-diff suite)
+  npc   one talk scenario per town NPC the ledger has no check for (interact, chat open,
+        chat close; state + packets channels)
   item  a census of ITEM_CHUNK base items per check, each created on the ground by
         the game's own creation path (poke `item`), compared by the items channel
 
@@ -43,7 +45,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "npc"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -521,6 +523,56 @@ QUALITIES = {1: "low", 2: "normal", 3: "superior", 4: "magic", 5: "set", 6: "rar
              7: "unique", 8: "crafted"}
 QSEEDS = [(0x1234, 666), (0x2222, 77), (0x5A5A, 4242)]
 QEXTRA = ["rin", "amu", "cm1", "jew"]
+
+
+# town NPCs without a hand-written talk check: (ledger name, monstats class, act 1..5,
+# quest rows the first talk can touch).  Source: the vendors.tsv rows of the ledger.
+NPC_ROWS = [
+    ("warriv1", 155, 1, ["quest.a1q0-warriv-gossip"]), ("charsi", 154, 1, []),
+    ("gheed", 147, 1, []), ("cain1", 146, 1, []), ("navi", 266, 1, []),
+    ("geglash", 200, 2, []), ("act2guard2", 331, 2, []), ("act2guard4", 377, 2, []),
+    ("act2guard5", 378, 2, []),
+    ("alkor", 254, 3, []), ("hratli", 253, 3, ["quest.a3q0-hratli-gossip"]),
+    ("ormus", 255, 3, []), ("natalya", 297, 3, []), ("meshif2", 264, 3, []),
+    ("cain3", 245, 3, []), ("tyrael1", 251, 3, []),
+    ("halbu", 257, 4, []), ("jamella", 405, 4, []), ("izualghost", 406, 4, []),
+    ("malachai", 408, 4, []), ("tyrael2", 367, 4, ["quest.a4q0-tyrael-gossip"]),
+    ("cain4", 246, 4, []),
+    ("drehya", 512, 5, []), ("tyrael3", 521, 5, []),
+]
+
+# ledger rows the item-quality census reaches: item creation at a forced quality runs the
+# affix pick / unique pick / socket / ethereal rolls of that quality and the items channel
+# compares the whole 0x9C stream (the rolls are not forced one by one).
+ITEMQ_AREAS = {
+    "all": ["item.gen.create-wrapper", "item.gen.sockets", "item.gen.ethereal",
+            "item.affix.ids-slots", "item.affix.fit-tests", "item.affix.alvl"],
+    "low": ["item.quality.low", "item.quality.dispatch"],
+    "normal": ["item.quality.dispatch"],
+    "superior": ["item.quality.superior", "item.quality.dispatch"],
+    "magic": ["item.affix.magic", "item.affix.magic-roller", "item.quality.dispatch"],
+    "set": ["item.quality.set", "item.set-item", "item.quality.dispatch"],
+    "rare": ["item.affix.rare", "item.affix.rare-name", "item.quality.dispatch"],
+    "unique": ["item.quality.unique", "item.unique", "item.quality.dispatch"],
+    "crafted": ["item.affix.crafted", "item.props.craft", "item.quality.dispatch"],
+}
+
+
+def fam_npc(ctx):
+    out = []
+    for name, cls, act, quests in NPC_ROWS:
+        lines = [f"at 4 poke goto unit 1:{cls}",
+                 f"at 14 send InteractWithEntity type=1 id=@1:{cls}",
+                 f"at 16 send InitEntityChat id=@1:{cls}",
+                 f"at 18 send TerminateEntityChat id=@1:{cls}"]
+        c = Check(f"gen-npc-{name}", "npc", f"npc {name} ({cls})",
+                  f"talk to {name} (monstats {cls}, act {act})",
+                  ACT_SAVE[act - 1], 50, 300, "state packets", lines,
+                  comment=["NPC talk (world/npc.md): goto the NPC, interact (0x13), open the "
+                           "chat (0x2F), close it (0x30); state + packets channels."])
+        c.extra = {"areas": [f"npc.{name}"] + quests}
+        out.append(c)
+    return out
 
 
 def fam_itemq(ctx):
@@ -1003,7 +1055,7 @@ def fam_monskill(ctx):
 
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "npc": fam_npc}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1072,8 +1124,11 @@ def resolve_area(c, areas):
     elif f == "ui":
         c.area = ",".join(x["rows"]) if x["rows"] else "-"
         return
-    elif f == "aud":
+    elif f in ("aud", "npc"):
         c.area = ",".join(x["areas"])
+        return
+    elif f == "itemq":
+        c.area = ",".join(ITEMQ_AREAS["all"] + ITEMQ_AREAS[x["quality"]])
         return
     elif f == "fmt":
         pre = FMT_ROWS[c.name]
