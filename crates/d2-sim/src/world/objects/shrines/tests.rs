@@ -130,7 +130,7 @@ impl ShrineWorld for Fake {
             format!("potion {} {} {quantity}", player.0, code_str(code)),
         );
     }
-    fn units_in_range(&self, center: UnitId, _range: i32) -> Vec<UnitId> {
+    fn units_in_range(&mut self, center: UnitId, _range: i32) -> Vec<UnitId> {
         let mut out = Vec::new();
         let mut i = 0;
         while let Some(&u) = self.stats.get(&(center, K_RANGE + i)) {

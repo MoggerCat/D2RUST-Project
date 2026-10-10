@@ -1738,7 +1738,12 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     // ---- batch 4
 
     fn dir64(&self, u: UnitId, at: (i32, i32)) -> i32 {
-        self.x().body_dir64(u, at)
+        // `0x00621DC0` through the path provider; the host's answer
+        // only without one (MagottLay egg side, `gen-mon-72`).
+        self.cv
+            .v
+            .path_dir64(u, at)
+            .unwrap_or_else(|| self.x().body_dir64(u, at))
     }
     /// Unit +0x4E.
     fn action_frame(&self, u: UnitId) -> i32 {
@@ -1781,7 +1786,13 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn missile_frames(&self, m: UnitId) -> i32 {
         self.x().body_missile_frames(m)
     }
+    /// Total frames and frames left of a missile in the store
+    /// (`0x0064A2B0`, `0x0064A330`; `specs/skills/bodies-3.md` §3.2).
     fn set_missile_frames(&mut self, m: UnitId, total: i32, left: i32) {
+        if let Some(d) = self.cv.v.h.missiles.as_mut().and_then(|s| s.get_mut(m)) {
+            d.total = missiles::clamp_frame(total);
+            d.current = missiles::clamp_frame(left);
+        }
         self.xm().body_set_missile_frames(m, total, left);
     }
     /// Unit +0x30 → +0x34.

@@ -397,10 +397,20 @@ pub fn monster_table_mode(code: u8) -> Option<u32> {
 }
 
 /// The neutral fallback "F" `0x004AE1D0` (§19 r4): a monster in mode
-/// 1…15 other than 12 is set to mode 1; any other mode: nothing.
+/// 1…15 other than 12 gets the path stop (precise position to its cell's
+/// centre) and is set to mode 1; any other mode: nothing.
 fn neutral_fallback(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
     let mode = w.units.get(&key).expect("checked by the caller").mode;
     if (1..=15).contains(&mode) && mode != monster_mode::DEAD {
+        // The path stop `0x00480490` -> `0x00650590`: the path's precise
+        // position becomes the centre of the cell it is in (`(p &
+        // 0xFFFF0000) + 0x8000` per axis), so a walker that ended short
+        // of its goal's centre is drawn at the centre from here on.
+        if let Some(u) = w.units.get_mut(&key) {
+            if let Some((px, py)) = u.precise {
+                u.precise = Some(((px & 0xFFFF_0000) | 0x8000, (py & 0xFFFF_0000) | 0x8000));
+            }
+        }
         super::monster_anim::mode_set(w, inputs, key, monster_mode::NEUTRAL);
     }
 }

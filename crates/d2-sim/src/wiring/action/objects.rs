@@ -1624,14 +1624,52 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
         }
         self.v.h.missiles = Some(store);
     }
+    /// Storm's finder call (objects.md §9.3): the shrine's room, centre and
+    /// `range`, with the filter `0x00582710` (a player not in mode 0 or 17;
+    /// a monster not in mode 0 or 12; any other type refused; no distance
+    /// test), then the `0x005541B0` dead test.
+    fn units_in_range(&mut self, center: UnitId, range: i32) -> Vec<UnitId> {
+        use crate::missiles::{self, bodies_ext2::unit_find_by};
+        use crate::units::UnitType;
+        let room = self.room(center);
+        let at = self.v.h.path_position(center);
+        let Some(mut store) = self.v.h.missiles.take() else {
+            self.v.h.errors.push(WiringError::Reentrant("missiles"));
+            return Vec::new();
+        };
+        let t = self.v.h.tables.clone();
+        let found = {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut self.v,
+            };
+            unit_find_by(self.game, &mut cx, room, at, range, 0, |g, cx, u| {
+                let Some(ty) = g.lists.unit(u).map(|e| e.ty) else {
+                    return false;
+                };
+                let mode = cx.world.units.get(u).map_or(0, |r| r.mode as i32);
+                match ty {
+                    UnitType::Player => mode != 0 && mode != 17,
+                    UnitType::Monster => mode != 0 && mode != 12,
+                    _ => false,
+                }
+            })
+        };
+        self.v.h.missiles = Some(store);
+        found
+            .into_iter()
+            .filter(|&u| !self.v.units.is_dead(u))
+            .collect()
+    }
     fn player_level(&self, player: UnitId) -> i32 {
         self.v.stat(player, STAT_LEVEL)
     }
     fn drop_near_player(&mut self, player: UnitId, code: [u8; 4]) {
-        self.shrine_item_near(player, code);
+        self.shrine_item_near(player, code, 2);
     }
     fn drop_potion_near_player(&mut self, player: UnitId, code: [u8; 4], _quantity: i32) {
-        self.shrine_item_near(player, code);
+        self.shrine_item_near(player, code, 0);
     }
 }
 
@@ -1643,7 +1681,7 @@ impl<X: Pending> ObjectView<'_, X> {
     // PROVISIONAL (REC-2095; objects.md §9.3): the item flag bit 0 at
     // record +0xC4 and the client item message of `0x00582AC0` are not
     // wired; the creation and its draws are the code drop's.
-    fn shrine_item_near(&mut self, player: UnitId, code: [u8; 4]) {
+    fn shrine_item_near(&mut self, player: UnitId, code: [u8; 4], quality: u8) {
         let made = self
             .with_drops(|h, sim, d, levels, spots| {
                 drop_helpers::near_player_drop(
@@ -1654,6 +1692,7 @@ impl<X: Pending> ObjectView<'_, X> {
                     spots,
                     player,
                     u32::from_le_bytes(code),
+                    quality,
                 )
             })
             .flatten();
