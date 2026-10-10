@@ -26,13 +26,13 @@
 |   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–301 |
 |   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 302–347 |
 |   4. `quests.tsv` addresses not named in part 1 | 348–364 |
-|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 365–457 |
-| Constants & data dependencies | 458–467 |
-| Randomness | 468–472 |
-| Edge cases & original bugs | 473–491 |
-| Test vectors | 492–510 |
-| Provenance | 511–523 |
-| Open questions | 524–533 |
+|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 365–458 |
+| Constants & data dependencies | 459–468 |
+| Randomness | 469–473 |
+| Edge cases & original bugs | 474–492 |
+| Test vectors | 493–511 |
+| Provenance | 512–524 |
+| Open questions | 525–534 |
 <!-- /index -->
 
 ## Summary
@@ -439,13 +439,14 @@ two functions draw nothing.
 
 Used by chain 7's event 3 (§2 item 3.1).
 
-Send order (recorded `a2-quest-tombs` frame 32; 1.14d
-sender `0x0053BDC2`): the event runs in the client's level-change step
-(`sim/tick.md` §6 rule 5, before the room switch `0x00537B50`), so
-Jerhyn's 0x0A (type 1, GUID 1) leaves before the switch's 0x07 joins.
-d2rs queues it into the sim's own outbox (`HostQuests::remove_unit`),
-which keeps the order; the quest world's rest buffer is collected after
-the outbox.
+Send order (recorded `a2-quest-tombs` frame 32, `a2-wp-46` frame 4;
+1.14d sender `0x0053BDC2`): the event runs in the client's level-change
+step (`sim/tick.md` §6 rule 5, before the room switch `0x00537B50`), so
+its messages (0x5D, Jerhyn's 0x0A) leave in the event's own order and
+before the switch's 0x07 joins. d2rs: the quest world's rest buffer is
+drained into the sim's outbox right after the event
+(`QuestLoan::changed_level`, as `town_leave`), the rest buffer being
+collected after the outbox otherwise.
 
 #### 5.4 Scroll text (`0x005456A0(player, object, string)`)
 

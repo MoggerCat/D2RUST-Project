@@ -131,29 +131,29 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-npc-meshif-talk | state | PARTIAL | 50/50 | - | - |
 | a2-npc-warriv-talk | packets | MATCH | 50/50 | - | - |
 | a2-npc-warriv-talk | state | PARTIAL | 50/50 | - | - |
-| a2-quest-arcane | packets | DIVERGED | 110/114 | frame 84 stream s2c #0 bytes[6]: 1.14d 103 vs d2rs 114 (id 0x67) | q-fix-join-items |
+| a2-quest-arcane | packets | DIVERGED | 113/114 | frame 110 stream c2s #0 missing in d2rs (id 0x30) | q-fix-join-items |
 | a2-quest-arcane | state | PARTIAL | 114/114 | - | - |
-| a2-quest-radament | packets | DIVERGED | 130/138 | frame 61 stream s2c #36 id: 1.14d 9c vs d2rs 51 (id 0x9c) | q-fix-join-items |
-| a2-quest-radament | state | DIVERGED | 83/138 | frame 84 monster 1:106 class 229, field s: 1.14d [1664319924, 1195937719] vs d2rs [1880661819, 694175140] | q-fix-seed-order |
+| a2-quest-radament | packets | DIVERGED | 135/138 | frame 131 stream c2s #0 missing in d2rs (id 0x30) | q-fix-join-items |
+| a2-quest-radament | state | DIVERGED | 135/138 | frame 136 monster 1:4 class 175, field x: 1.14d 5149 vs d2rs 5146 | q-fix-seed-order |
 | a2-quest-staff | packets | MATCH | 44/44 | - | - |
 | a2-quest-staff | state | PARTIAL | 44/44 | - | - |
 | a2-quest-summoner | packets | DIVERGED | 61/76 | frame 20 stream s2c #30 bytes[2]: 1.14d 57 vs d2rs 51 (id 0x51) | unrouted |
 | a2-quest-summoner | state | DIVERGED | 19/76 | frame 20 game, field seed: 1.14d [1037325479, 564040154] vs d2rs [123760680, 1255268544] | unrouted |
-| a2-quest-taintedsun | packets | DIVERGED | 73/82 | frame 52 stream s2c #19 id: 1.14d 9c vs d2rs 07 (id 0x9c) | unrouted |
-| a2-quest-taintedsun | state | DIVERGED | 76/82 | frame 77 monster 1:162 class 9, field m: 1.14d 15 vs d2rs 1 | unrouted |
-| a2-quest-tombs | packets | DIVERGED | 132/150 | frame 32 stream s2c #1 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-quest-taintedsun | packets | DIVERGED | 77/82 | frame 52 stream s2c #19 id: 1.14d 9c vs d2rs 07 (id 0x9c) | unrouted |
+| a2-quest-taintedsun | state | PARTIAL | 82/82 | - | unrouted |
+| a2-quest-tombs | packets | DIVERGED | 133/150 | frame 35 stream s2c #0 id: 1.14d 68 vs d2rs a8 (id 0x68) | q-fix-join-items |
 | a2-quest-tombs | state | PARTIAL | 150/150 | - | - |
-| a2-super-beetleburst | packets | DIVERGED | 113/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-beetleburst | packets | MATCH | 120/120 | - | - |
 | a2-super-beetleburst | state | PARTIAL | 120/120 | - | - |
-| a2-super-coldworm | packets | DIVERGED | 91/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-coldworm | packets | MATCH | 120/120 | - | - |
 | a2-super-coldworm | state | PARTIAL | 120/120 | - | - |
-| a2-super-darkelder | packets | DIVERGED | 118/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-darkelder | packets | MATCH | 120/120 | - | - |
 | a2-super-darkelder | state | PARTIAL | 120/120 | - | - |
-| a2-super-fangskin | packets | DIVERGED | 107/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | unrouted |
+| a2-super-fangskin | packets | DIVERGED | 108/120 | frame 5 stream s2c #1 id: 1.14d 53 vs d2rs 51 (id 0x53) | unrouted |
 | a2-super-fangskin | state | DIVERGED | 80/120 | frame 81 item 4:1 class 523, field x: 1.14d 15066 vs d2rs 15065 | unrouted |
-| a2-super-fireeye | packets | DIVERGED | 119/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-fireeye | packets | MATCH | 120/120 | - | - |
 | a2-super-fireeye | state | PARTIAL | 120/120 | - | - |
-| a2-super-leatherarm | packets | DIVERGED | 119/120 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
+| a2-super-leatherarm | packets | MATCH | 120/120 | - | - |
 | a2-super-leatherarm | state | DIVERGED | 69/120 | frame 70 item 4:1 class 523, field fr: 1.14d 4096 vs d2rs 0 | unrouted |
 | a2-warp-arcane-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-arcane-ama | state | PARTIAL | 160/160 | - | - |
@@ -183,7 +183,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l53-basement-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l54-basement-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l54-basement-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | q-fix-seed-order |
+| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/… | q-fix-seed-order |
 | a2-warp-l55-tomb-1-a-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | q-fix-seed-order |
 | a2-warp-l56-tomb-2-a-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l56-tomb-2-a-ama | state | PARTIAL | 160/160 | - | - |
@@ -207,7 +207,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l67-tomb-tal-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | q-fix-seed-order |
+| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim… | q-fix-seed-order |
 | a2-warp-l69-tomb-tal-4-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | q-fix-seed-order |
 | a2-warp-l70-tomb-tal-5-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l70-tomb-tal-5-ama | state | PARTIAL | 160/160 | - | - |
@@ -225,21 +225,21 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-tal-rasha-tomb-ama | state | PARTIAL | 160/160 | - | - |
 | a2-wp-40 | packets | MATCH | 50/50 | - | - |
 | a2-wp-40 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-42 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | unrouted |
+| a2-wp-42 | packets | MATCH | 50/50 | - | - |
 | a2-wp-42 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-43 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-43 | packets | MATCH | 50/50 | - | - |
 | a2-wp-43 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-44 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-44 | packets | MATCH | 50/50 | - | - |
 | a2-wp-44 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-46 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-wp-46 | packets | MATCH | 50/50 | - | - |
 | a2-wp-46 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-48 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-48 | packets | MATCH | 50/50 | - | - |
 | a2-wp-48 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-52 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-52 | packets | MATCH | 50/50 | - | - |
 | a2-wp-52 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-57 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-57 | packets | MATCH | 50/50 | - | - |
 | a2-wp-57 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-74 | packets | DIVERGED | 11/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-wp-74 | packets | DIVERGED | 13/50 | frame 14 stream s2c #30 bytes[2]: 1.14d 57 vs d2rs 51 (id 0x51) | q-fix-join-items |
 | a2-wp-74 | state | DIVERGED | 13/50 | frame 14 game, field seed: 1.14d [3301680733, 432660541] vs d2rs [2249109384, 51619635] | q-fix-seed-order |
 | a3-start-noquest-sor | state | PARTIAL | 30/30 | - | - |
 | a3-warp-durance-ama | rng | MATCH | 133/133 | - | - |
