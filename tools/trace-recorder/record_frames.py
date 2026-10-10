@@ -755,7 +755,7 @@ def make_recorder(rt):
             elif addr == CEL_LOADED:
                 path = self.read(ctx.Ebp - 0x108, 0x104).split(b"\0")[0].decode("latin-1")
                 self.emit({"k": "celfile", "ptr": f"{self.u32(ctx.Ebp - 4):#x}", "path": path})
-            elif addr == D2WIN_LOAD and self.fe is not None:
+            elif addr == D2WIN_LOAD:
                 self.d2win_entry(ctx)
             elif addr in self.d2win_wait:
                 path, arg = self.d2win_wait.pop(addr)
@@ -1010,8 +1010,7 @@ def main():
                  FRAME_START: FRAME_START_BYTES, CEL_LOADED: CEL_LOADED_BYTES,
                  UNIT_DRAW: UNIT_DRAW_BYTES, RASTER: RASTER_BYTES, COMP_PATH_DCC: COMP_PATH_DCC_BYTES,
                  COMP_PATH_DC6: COMP_PATH_DC6_BYTES, **{d: b"\x55\x8B\xEC" for d in DRAWS}}
-    if fe is not None:
-        rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES
+    rt.EXPECT[D2WIN_LOAD] = D2WIN_LOAD_BYTES  # fonts and UI art load in game too (glyph cel files)
     if a.sounds:
         rt.EXPECT[SOUND_REQUEST] = SOUND_REQUEST_BYTES
     rt.FORMAT, rt.TOOL = FORMAT, TOOL

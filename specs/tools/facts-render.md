@@ -110,8 +110,21 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    mode, palette; the cursor vector of `capture.md` §Test vectors)
    `mode` = the draw-mode argument (`blend-modes.md`), `light` = the
    light argument as hex, `pal` = `0` when the palette argument is null,
-   else `?` (a pointer; which table it is: Open question 2). The other cel
-   wrappers' argument positions are not specified: `mode light pal` = `?`.
+   else `?` (a pointer; which table it is: Open question 2). `CelDrawColor`
+   has the arguments (context, X, Y, light, mode, colour index k)
+   (`ui/text.md` §4 r1; the recorded k values are 0, 1, 4, 5): `mode`,
+   `light` as for `CelDraw`, `pal` = k in decimal. `CelDrawEx` (context,
+   X, Y, rows skipped, rows drawn, mode: `ui/control-panel.md` §3) and
+   `CelDrawClipped` (context, X, Y, clip, mode) have a mode and no light
+   or palette argument: `mode` = it, `light` and `pal` = `-`. The other
+   cel wrappers' argument positions are not specified: `mode light pal` =
+   `?`. `w h xoff yoff` come from the header in the context's memory when
+   the file is not named (a font glyph: the recorder also follows the
+   `D2Win_LoadCelFile` `0x004FA9B0` loads in game, so the font files are
+   named). d2rs writes the same cells for its UI cels (`CelDraw`,
+   `CelDrawColor`: draw mode, light `0xffffffff`, null palette `0` or the
+   colour index of the glyph's text-colour map) (revision 2026-10-10,
+   REC-3650).
 4. Tile ops: `file` = the DT1 path and `frame` = the tile's index in it
    (`capture.md` §3.5 lookup; `?` until the recorder resolves it, Open
    question 3), `dir` = `-`, `tile` = `orientation.main.sub.rarity` of
