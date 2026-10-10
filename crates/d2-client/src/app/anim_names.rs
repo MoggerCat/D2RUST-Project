@@ -106,6 +106,7 @@ impl PlayerAnims for ClientPlayerAnims {
             frames: r.frames,
             speed: i32::from(r.speed as i16),
             weapon,
+            events: Some(r.events),
         })
     }
 }
