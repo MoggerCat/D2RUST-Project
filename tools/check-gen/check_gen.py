@@ -745,7 +745,15 @@ UI_ITEM = ["at 4 poke seed-game 0x00001234 666",
            "at 4 poke item hp1 @x+1 @y",
            "at 8 send PickItem type=4 id=@4 cursor=0",
            "at 12 send InsertItemInBuffer item=@4 x=0 y=0 page=0"]
+UI_SET = ["at 4 poke seed-game 0x00001234 666",
+          "at 4 poke item hgl @x+1 @y quality set ilvl 30",
+          "at 8 send PickItem type=4 id=@4 cursor=0",
+          "at 12 send InsertItemInBuffer item=@4 x=0 y=0 page=0"]
 UI_SCENARIOS = [
+    ("conflict", "inventory (I), skill tree (T), character (C): the conflict gate and the pass order of the open panels",
+     "frame 20; key I; frame 30; key T; frame 40; key C", 80, 78, [], [r"panels\.(2|3|5)-"]),
+    ("setitem", "set item (heavy gloves, quality set) in the inventory, cursor over it (set tip)",
+     "frame 30; key I; frame 40; move 432 330", 70, 68, UI_SET, [r"item-tips\.9-"]),
     ("inv", "inventory panel (key I) open, empty", "frame 20; key I", 60, 58, [],
      [r"inventory\.(1|6|7|b5)-", r"panels\.(1|4|7|9)-", r"panels-2\.18-", r"controls\.(1|3|4|b4)-",
       r"text\.(1|2|3|4|5|6|7|11)-"]),
@@ -781,6 +789,8 @@ UI_SCENARIOS = [
 
 
 UI_CHANNELS = {"beltuse": "packets", "walkclick": "packets"}
+# system.render rows a UI scenario carries (GDI lines: the automap)
+UI_RENDER_ROWS = {"automap": ["blend-modes.8-"]}
 UI_SAVE = {}
 
 
@@ -794,6 +804,8 @@ def ui_rows(ledger):
         for name, _, _, _, _, _, pats in UI_SCENARIOS:
             if any(re.match(p, tail) for p in pats):
                 rows.setdefault(name, []).append(a)
+    for name, pre in UI_RENDER_ROWS.items():
+        rows.setdefault(name, []).extend(render_areas(pre))
     return rows
 
 
@@ -811,7 +823,7 @@ def fam_ui(ctx):
                   (["draws-at %d" % at] if chans == "draws" else []) + lines,
                   comment=[f"UI scenario {name}: {title}; input `{inp or '(none)'}`. Compared: the "
                            "channel(s) named above (draws: the draw list of the last drawn tick <= draws-at). Ledger rows exercised: "
-                           + (", ".join(a[len("system.ui."):] for a in rows.get(name, [])) or "(none)") + "."])
+                           + (", ".join(a.split(".", 1)[1] for a in rows.get(name, [])) or "(none)") + "."])
         c.extra = {"scenario": name, "rows": rows.get(name, [])}
         out.append(c)
     return out
@@ -1004,9 +1016,9 @@ def fam_fmt(ctx):
 # (frame, text), ledger area prefixes of system.render.* the scene reaches).
 RENDER_SCENES = [
     ("town-dawn", "Rogue Encampment at dawn", None, [(4, "time 0 600")],
-     ["lighting.1-", "lighting.2-", "lighting.3-", "lighting.9-", "lighting.11-", "shading.1-", "shading.2-", "shading.3-", "shading.9-", "composition.3-", "composition.4-", "composition.5-"]),
+     ["lighting.1-", "lighting.2-", "lighting.3-", "lighting.9-", "lighting.11-", "shading.1-", "shading.2-", "shading.3-", "shading.9-", "composition.1-", "composition.2-", "composition.3-", "composition.4-", "composition.5-", "composition.6-", "lighting.13-"]),
     ("town-night", "Rogue Encampment at night", None, [(4, "time 3 600")],
-     ["lighting.5-", "lighting.6-", "lighting.7-", "lighting.10-", "shading.4-"]),
+     ["lighting.5-", "lighting.6-", "lighting.7-", "lighting.10-", "lighting.12-", "shading.4-", "shading.10-"]),
     ("blood-moor", "Blood Moor by day (tiles, walls, view culling)", 2, [],
      ["camera.1-", "camera.2-", "camera.3-", "camera.4-", "camera.5-", "camera.6-", "camera.7-", "camera.9-",
       "sprite-placement.1-", "sprite-placement.2-", "sprite-placement.3-", "sprite-placement.5-", "sprite-placement.6-", "sprite-placement.7-"]),
