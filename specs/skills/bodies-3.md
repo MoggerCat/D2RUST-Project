@@ -28,14 +28,14 @@
 |   1. Conventions | 66–93 |
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
-|   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–989 |
-| Constants & data dependencies | 990–1025 |
-| Randomness | 1026–1042 |
-| Edge cases & original bugs | 1043–1082 |
-| Test vectors | 1083–1097 |
-| Provenance | 1098–1120 |
-| Open questions | 1121–1150 |
+|   4. Bodies used by several monster skills | 356–551 |
+|   5. Bodies used by one monster skill | 552–996 |
+| Constants & data dependencies | 997–1032 |
+| Randomness | 1033–1049 |
+| Edge cases & original bugs | 1050–1089 |
+| Test vectors | 1090–1104 |
+| Provenance | 1105–1127 |
+| Open questions | 1128–1157 |
 <!-- /index -->
 
 ## Summary
