@@ -157,6 +157,9 @@ pub struct ItemGfx {
     pub transform: u8,
     pub gemoffset: i32,
     pub wclass: [u8; 4],
+    /// `2handedwclass` (+0xC4); the front-end paper doll's second hit
+    /// class (`specs/ui/frontend-menus.md` §F2.10).
+    pub wclass2: [u8; 4],
 }
 
 /// One slot of the 1.00 reference table (`0x00744CA8`): whether its type

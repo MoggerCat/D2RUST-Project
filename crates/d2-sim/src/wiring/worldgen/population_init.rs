@@ -200,9 +200,19 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         }
     }
 
-    /// `0x005DD330`.
+    /// `0x005DD330`: also the minion's AI control leash owner (+0x0C GUID,
+    /// +0x10 type), which precheck A (`ai.md` §2.2 rule 3) reads.
     fn set_owner(&mut self, minion: UnitId, owner: UnitId) {
         self.w.owners.insert(minion, owner);
+        if let Some(e) = self.game.lists.unit(owner) {
+            let leash = crate::monsters::ai::UnitRef {
+                ty: e.ty,
+                guid: e.guid,
+            };
+            if let Some(ctl) = self.v.h.ai.as_mut().and_then(|s| s.control_mut(minion)) {
+                ctl.owner = Some(leash);
+            }
+        }
     }
 
     fn boss_quest_hook(&mut self, boss: UnitId) {

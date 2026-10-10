@@ -23,7 +23,9 @@ use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use d2_formats::cof::Cof;
 use d2_formats::dc6::{Dc6, Dc6Frame};
+use d2_formats::dcc::Dcc;
 use d2_formats::font::FontTable;
 use d2_formats::palette::{Palette, Pl2};
 
@@ -69,6 +71,15 @@ pub struct FrontArt {
     fonts: HashMap<u16, Option<(FontTable, Dc6)>>,
     /// UTF-16 text of a string id (button labels); `None`: labels blank.
     strings: Option<Box<dyn Fn(u32) -> Vec<u16>>>,
+    /// The paper dolls' tables (`DrawItem::Doll`); `None`: no dolls.
+    dolls: Option<crate::ui::front_end::doll::DollTables>,
+    cofs: HashMap<String, Option<Cof>>,
+    dccs: HashMap<String, Option<Dcc>>,
+    /// Item colour maps by file name (`0x00505470`, 21 maps of 256).
+    colour_files: HashMap<&'static str, Option<Vec<u8>>>,
+    /// Per doll key: draws so far and the 8.8 frame phase (`0x00503BA0`).
+    doll_phase: HashMap<u32, (u32, u32)>,
+    doll_epoch: u64,
 }
 
 fn read_palette(source: &dyn FileSource, files: [&str; 2]) -> (Option<Palette>, Option<Pl2>) {
@@ -90,7 +101,50 @@ impl FrontArt {
             cache: HashMap::new(),
             fonts: HashMap::new(),
             strings: None,
+            dolls: None,
+            cofs: HashMap::new(),
+            dccs: HashMap::new(),
+            colour_files: HashMap::new(),
+            doll_phase: HashMap::new(),
+            doll_epoch: u64::MAX,
         }
+    }
+
+    /// The tables the character-select paper dolls are built from.
+    pub fn with_dolls(mut self, t: crate::ui::front_end::doll::DollTables) -> Self {
+        self.dolls = Some(t);
+        self
+    }
+
+    fn cof(&mut self, path: &str) -> Option<&Cof> {
+        let source = &self.source;
+        self.cofs
+            .entry(path.to_owned())
+            .or_insert_with(|| Cof::parse(&source.read_file(path)?.ok()?).ok())
+            .as_ref()
+    }
+
+    fn dcc(&mut self, path: &str) -> Option<&Dcc> {
+        let source = &self.source;
+        self.dccs
+            .entry(path.to_owned())
+            .or_insert_with(|| Dcc::parse(&source.read_file(path)?.ok()?).ok())
+            .as_ref()
+    }
+
+    /// The 256-byte map `i` of item colour file `name`.
+    fn colour_map(&mut self, name: &'static str, i: usize) -> Option<[u8; 256]> {
+        let source = &self.source;
+        let bytes = self
+            .colour_files
+            .entry(name)
+            .or_insert_with(|| {
+                source
+                    .read_file(&format!(r"data\global\items\palette\{name}.dat"))?
+                    .ok()
+            })
+            .as_ref()?;
+        bytes.get(i * 256..i * 256 + 256)?.try_into().ok()
     }
 
     /// Switches to the palette `files` the current screen loaded
@@ -204,6 +258,33 @@ impl IndexFrame {
     }
 }
 
+impl IndexFrame {
+    /// Draws a DCC frame's indices (0 transparent) with its top-left at
+    /// (`x`, `y`), each through `map` first.
+    #[allow(clippy::too_many_arguments)]
+    fn indices(
+        &mut self,
+        px: &[u8],
+        w: u32,
+        x: i32,
+        y: i32,
+        mode: u8,
+        map: Option<&[u8; 256]>,
+        pl2: Option<&Pl2>,
+    ) {
+        if w == 0 {
+            return;
+        }
+        for (i, &idx) in px.iter().enumerate() {
+            if idx != 0 {
+                let s = map.map_or(idx, |m| m[usize::from(idx)]);
+                let (c, r) = ((i as u32 % w) as i32, (i as u32 / w) as i32);
+                self.put(x + c, y + r, s, mode, pl2);
+            }
+        }
+    }
+}
+
 /// The palette index nearest to `rgb` (the d2rs-own boxes).
 fn nearest(pal: &Palette, rgb: [u8; 3]) -> u8 {
     let dist = |i: u8| {
@@ -259,6 +340,24 @@ fn draw_item(frame: &mut IndexFrame, a: &mut FrontArt, pl2: Option<&Pl2>, it: &D
             }
         }
         // d2rs-own, unverified (REC-231): a dark box and a 1 px outline.
+        DrawItem::Doll {
+            class,
+            mode,
+            components,
+            colours,
+            at,
+            draw_mode,
+            key,
+            epoch,
+            ticks,
+        } => draw_doll(
+            frame,
+            a,
+            pl2,
+            (*class, *mode, components, colours),
+            (*at, *draw_mode),
+            (*key, *epoch, *ticks),
+        ),
         DrawItem::Rect { at, w, h } => {
             let c = nearest(&pal, [8, 8, 12]);
             for y in at.y..at.y + h {
@@ -319,6 +418,92 @@ fn draw_item(frame: &mut IndexFrame, a: &mut FrontArt, pl2: Option<&Pl2>, it: &D
                 }
             }
         }
+    }
+}
+
+/// PROVISIONAL (REC-2183): the 1.14d capture draws every doll one row above
+/// `at.y + y_min` (all three visible slots, best pixel match at dy = -1 of
+/// -4..4); the cause (cel placement of `D2GFX_DrawCelContext`) is not read.
+const DOLL_DY: i32 = -1;
+
+/// One paper doll (`0x00503BA0`): the COF's slot order for direction 0 at
+/// the animation frame, each component's DCC cel at the anchor, through
+/// the colour map of its stored colour.
+fn draw_doll(
+    frame: &mut IndexFrame,
+    a: &mut FrontArt,
+    pl2: Option<&Pl2>,
+    (class, mode, comp, col): (u8, u8, &[u8; 16], &[u8; 16]),
+    (at, draw_mode): (Point, u8),
+    (key, epoch, ticks): (u32, u64, u32),
+) {
+    use crate::ui::front_end::doll::{colour_map, Doll};
+    let Some(tables) = a.dolls.as_ref() else {
+        return;
+    };
+    // `0x005066C0`, then the retry of `0x00504040`: no class → class 7,
+    // mode 5, `hth`, then no figure.
+    let built = tables.build(class, mode, comp, col);
+    let mut doll = built.unwrap_or_else(Doll::fallback);
+    if a.cof(&doll.cof_path()).is_none() {
+        doll = Doll::fallback();
+    }
+    let Some(cof) = a.cof(&doll.cof_path()).cloned() else {
+        return;
+    };
+    if a.doll_epoch != epoch {
+        a.doll_epoch = epoch;
+        a.doll_phase.clear();
+    }
+    let (frames, step) = (u32::from(cof.frames), cof.animation_rate);
+    let st = a.doll_phase.entry(key).or_insert((0, 0));
+    if ticks < st.0 {
+        *st = (0, 0);
+    }
+    while st.0 < ticks {
+        st.1 = crate::ui::front_end::doll::advance(st.1, frames, step);
+        st.0 += 1;
+    }
+    let f = (st.1 >> 8) as usize;
+    let Ok(dir) = crate::rules::unit_composite::file_direction(cof.directions, 0) else {
+        return;
+    };
+    for slot in 0..usize::from(cof.layers_count) {
+        let Some(c) = cof.component_at(0, f, slot) else {
+            continue;
+        };
+        let c = usize::from(c);
+        let wc = cof
+            .layers
+            .iter()
+            .find(|l| usize::from(l.component) == c)
+            .map(|l| {
+                String::from_utf8_lossy(&l.weapon_class)
+                    .trim_end_matches(['\0', ' '])
+                    .to_owned()
+            })
+            .unwrap_or_else(|| doll.weapon_class_name().to_owned());
+        let path = doll.dcc_path(c, &wc);
+        let map = colour_map(doll.colours[c]).and_then(|(n, i)| a.colour_map(n, i));
+        let Some(dcc) = a.dcc(&path) else {
+            continue;
+        };
+        let Some(fr) = dcc
+            .directions
+            .get(usize::from(dir))
+            .and_then(|d| d.frames.get(f))
+        else {
+            continue;
+        };
+        frame.indices(
+            &fr.pixels,
+            fr.width,
+            at.x + fr.x_min,
+            at.y + fr.y_min + DOLL_DY,
+            draw_mode,
+            map.as_ref(),
+            pl2,
+        );
     }
 }
 
