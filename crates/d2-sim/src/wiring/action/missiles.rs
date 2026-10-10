@@ -631,6 +631,24 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
             X::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
         })
     }
+    /// `0x00554DE0` ([`Pending::missile_ally_test`]).
+    fn ally_test(&mut self, game: &mut Game, a: UnitId, b: UnitId) -> bool {
+        with_sim(self, game, |h, sim| X::missile_ally_test(h, sim, a, b))
+    }
+    /// `shout_state` (`0x005D8290`) on the skill use view
+    /// ([`Pending::missile_shout_state`]).
+    fn shout_state(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        with_sim(self, game, |h, sim| {
+            X::missile_shout_state(h, sim, unit, owner, skill, level)
+        });
+    }
     /// `missiles/bodies-2.md` §33 step 8 ([`Pending::missile_bone_wall_piece`]).
     fn bind_bone_wall_piece(
         &mut self,
