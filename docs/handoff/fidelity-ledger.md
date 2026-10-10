@@ -31,9 +31,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
-| systems | 918 | 342 | 46 | 251 | 0 | 279 | 250 | 387 | 2 | 915–3596+ | 39 | 571 / 0 / 347 |
+| systems | 918 | 332 | 46 | 251 | 0 | 289 | 240 | 387 | 2 | 910–3576+ | 39 | 571 / 0 / 347 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 840 | 46 | 458 | 0 | 3135 | 474 | 858 | 12 | 2049–7812+ | 286 | 3540 / 382 / 557 |
+| **all** | 4479 | 830 | 46 | 458 | 0 | 3145 | 464 | 858 | 12 | 2044–7792+ | 286 | 3540 / 382 / 557 |
 
 ## By family
 
@@ -694,7 +694,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `system.render` | 105 | 78 | 0 | 27 | 0 | 0 | 0 | 0 | 105 | 0 | 0 | 0 |
 | `system.replay` | 3 | 2 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 2 | 0 | 0 |
 | `system.seams` | 11 | 3 | 0 | 0 | 0 | 8 | 0 | 1 | 2 | 0 | 2 | 0 |
-| `system.sim` | 103 | 10 | 0 | 0 | 0 | 93 | 0 | 10 | 0 | 0 | 22 | 0 |
+| `system.sim` | 103 | 0 | 0 | 0 | 0 | 103 | 0 | 0 | 0 | 0 | 22 | 0 |
 | `system.skills` | 4 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 4 | 0 |
 | `system.townportal` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.ui` | 174 | 107 | 0 | 65 | 0 | 2 | 0 | 77 | 95 | 0 | 3 | 0 |
@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2661
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6201
+- Duplicate areas between parts: 6144
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2183,19 +2183,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.36.tundra-wastelands`: rc-link-2.tsv:158 kept, rc-pc1-audit.tsv:145 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-pc1-audit.tsv:146 dropped
   - `waypoint.38.the-worldstone-keep-level-2`: rc-link-2.tsv:159 kept, rc-pc1-audit.tsv:147 dropped
-  - `system.sim.pets.1-data`: rc-packets-chan.tsv:181 kept, rc-pets.tsv:11 dropped
-  - `system.sim.pets.10-creation-free-and-maximum-resync`: rc-packets-chan.tsv:182 kept, rc-pets.tsv:12 dropped
-  - `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max`: rc-packets-chan.tsv:183 kept, rc-pets.tsv:13 dropped
-  - `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi`: rc-packets-chan.tsv:184 kept, rc-pets.tsv:14 dropped
-  - `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max`: rc-packets-chan.tsv:185 kept, rc-pets.tsv:15 dropped
-  - `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e`: rc-packets-chan.tsv:186 kept, rc-pets.tsv:16 dropped
-  - `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un`: rc-packets-chan.tsv:187 kept, rc-pets.tsv:17 dropped
-  - `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi`: rc-packets-chan.tsv:188 kept, rc-pets.tsv:18 dropped
-  - `system.sim.pets.8-broadcast-and-message-0x7a`: rc-packets-chan.tsv:189 kept, rc-pets.tsv:19 dropped
-  - `system.sim.pets.9-lookup-0x00574a20-player-guid`: rc-packets-chan.tsv:190 kept, rc-pets.tsv:20 dropped
-  - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, rc-pkt-handwritten.tsv:29 dropped
-  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-pkt-handwritten.tsv:31 dropped
-  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-pkt-handwritten.tsv:32 dropped
+  - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, rc-pkt-handwritten.tsv:9 dropped
+  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-pkt-handwritten.tsv:11 dropped
+  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-pkt-handwritten.tsv:12 dropped
   - `skill.ama.cold-arrow`: rc-a8-setstate.tsv:4 kept, rc-pkt-misc.tsv:3 dropped
   - `skill.ama.exploding-arrow`: rc-a8-setstate.tsv:9 kept, rc-pkt-misc.tsv:4 dropped
   - `skill.ama.fire-arrow`: rc-a8-setstate.tsv:10 kept, rc-pkt-misc.tsv:5 dropped
@@ -2440,33 +2430,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, rc-run-2.tsv:150 dropped
   - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:11 kept, rc-run-2.tsv:151 dropped
   - `client.s-monsters.path-stop`: rc-draw-row173.tsv:189 kept, rc-run-2.tsv:152 dropped
-  - `system.sim.rng.1-seed-state`: rc-combat-seed-2.tsv:3 kept, rc-run-2.tsv:155 dropped
-  - `system.sim.rng.2-step`: rc-combat-seed-2.tsv:4 kept, rc-run-2.tsv:156 dropped
-  - `system.sim.rng.3-draw-helpers`: rc-combat-seed-2.tsv:5 kept, rc-run-2.tsv:157 dropped
-  - `system.sim.rng.4-setting-and-reading-seeds`: rc-combat-seed-2.tsv:6 kept, rc-run-2.tsv:158 dropped
-  - `system.sim.rng.5-where-seeds-come-from`: rc-combat-seed-2.tsv:7 kept, rc-run-2.tsv:159 dropped
-  - `system.sim.rng.6-inlined-draws`: rc-combat-seed-2.tsv:8 kept, rc-run-2.tsv:160 dropped
-  - `system.sim.rng.7-which-systems-draw-from-which-seed`: rc-combat-seed-2.tsv:9 kept, rc-run-2.tsv:161 dropped
-  - `system.sim.unit-order.1-unit-identity-and-guids`: rc-combat-seed-2.tsv:10 kept, rc-run-2.tsv:162 dropped
-  - `system.sim.unit-order.2-game-unit-hash-lists`: rc-combat-seed-2.tsv:12 kept, rc-run-2.tsv:163 dropped
-  - `system.sim.unit-order.3-unit-placement-and-removal-list-bookkeeping`: rc-combat-seed-2.tsv:13 kept, rc-run-2.tsv:164 dropped
-  - `system.sim.unit-order.4-act-room-lists-active-rooms`: rc-combat-seed-2.tsv:14 kept, rc-run-2.tsv:165 dropped
-  - `system.sim.unit-order.5-room-unit-lists`: rc-combat-seed-2.tsv:15 kept, rc-run-2.tsv:166 dropped
-  - `system.sim.unit-order.6-room-update-queues`: rc-combat-seed-2.tsv:16 kept, rc-run-2.tsv:167 dropped
-  - `system.sim.unit-order.7-client-list`: rc-combat-seed-2.tsv:17 kept, rc-run-2.tsv:168 dropped
-  - `system.sim.unit-order.8-unit-timer-lists`: rc-combat-seed-2.tsv:18 kept, rc-run-2.tsv:169 dropped
-  - `system.sim.unit-order.9-adjacent-room-arrays-dependency`: rc-combat-seed-2.tsv:19 kept, rc-run-2.tsv:170 dropped
-  - `system.sim.unit-order.10-iteration-and-modification`: rc-combat-seed-2.tsv:11 kept, rc-run-2.tsv:171 dropped
-  - `system.render.draw-order.1-frame-passes`: rc-draw-row173.tsv:59 kept, rc-run-2.tsv:172 dropped
-  - `system.render.draw-order.2-the-draw-cell-grid-0x004dce60-0x004ddb70`: rc-draw-row173.tsv:61 kept, rc-run-2.tsv:173 dropped
-  - `system.render.draw-order.3-filling-the-grid-0x004dd7c0-per-room`: rc-draw-row173.tsv:62 kept, rc-run-2.tsv:174 dropped
-  - `system.render.draw-order.4-list-insertion`: rc-draw-row173.tsv:63 kept, rc-run-2.tsv:175 dropped
-  - `system.render.draw-order.5-which-units-draw`: rc-draw-row173.tsv:64 kept, rc-run-2.tsv:176 dropped
-  - `system.render.draw-order.6-the-passes`: rc-draw-row173.tsv:65 kept, rc-run-2.tsv:177 dropped
-  - `system.render.draw-order.7-tile-records-that-never-draw`: rc-draw-row173.tsv:66 kept, rc-run-2.tsv:178 dropped
-  - `system.render.draw-order.8-wall-fade-targets-0x004dd180-0x004dd060`: rc-draw-row173.tsv:67 kept, rc-run-2.tsv:179 dropped
-  - `system.render.draw-order.9-map-tile-feed`: rc-draw-row173.tsv:68 kept, rc-run-2.tsv:180 dropped
-  - `system.render.draw-order.10-d2rs-mapping`: rc-draw-row173.tsv:60 kept, rc-run-2.tsv:181 dropped
+  - `system.render.draw-order.1-frame-passes`: rc-draw-row173.tsv:59 kept, rc-run-2.tsv:155 dropped
+  - `system.render.draw-order.2-the-draw-cell-grid-0x004dce60-0x004ddb70`: rc-draw-row173.tsv:61 kept, rc-run-2.tsv:156 dropped
+  - `system.render.draw-order.3-filling-the-grid-0x004dd7c0-per-room`: rc-draw-row173.tsv:62 kept, rc-run-2.tsv:157 dropped
+  - `system.render.draw-order.4-list-insertion`: rc-draw-row173.tsv:63 kept, rc-run-2.tsv:158 dropped
+  - `system.render.draw-order.5-which-units-draw`: rc-draw-row173.tsv:64 kept, rc-run-2.tsv:159 dropped
+  - `system.render.draw-order.6-the-passes`: rc-draw-row173.tsv:65 kept, rc-run-2.tsv:160 dropped
+  - `system.render.draw-order.7-tile-records-that-never-draw`: rc-draw-row173.tsv:66 kept, rc-run-2.tsv:161 dropped
+  - `system.render.draw-order.8-wall-fade-targets-0x004dd180-0x004dd060`: rc-draw-row173.tsv:67 kept, rc-run-2.tsv:162 dropped
+  - `system.render.draw-order.9-map-tile-feed`: rc-draw-row173.tsv:68 kept, rc-run-2.tsv:163 dropped
+  - `system.render.draw-order.10-d2rs-mapping`: rc-draw-row173.tsv:60 kept, rc-run-2.tsv:164 dropped
   - `drop.monster`: rc-run-2.tsv:54 kept, rc-run-2b.tsv:48 dropped
   - `drop.placement`: rc-pc1-audit.tsv:3 kept, rc-run-2b.tsv:49 dropped
   - `item.gen.base-stats`: rc-pc1-audit.tsv:5 kept, rc-run-2b.tsv:51 dropped
@@ -2628,72 +2601,45 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.pathing.7-a-type-1-0x0067b850`: rc-partial-promote.tsv:251 kept, rc-run-2b.tsv:235 dropped
   - `system.sim.pathing.8-velocity-direction-vector-facing`: rc-partial-promote.tsv:252 kept, rc-run-2b.tsv:236 dropped
   - `system.sim.pathing.9-per-tick-movement`: rc-partial-promote.tsv:253 kept, rc-run-2b.tsv:237 dropped
-  - `system.sim.pets.1-data`: rc-packets-chan.tsv:181 kept, rc-run-2b.tsv:238 dropped
-  - `system.sim.pets.10-creation-free-and-maximum-resync`: rc-packets-chan.tsv:182 kept, rc-run-2b.tsv:239 dropped
-  - `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max`: rc-packets-chan.tsv:183 kept, rc-run-2b.tsv:240 dropped
-  - `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi`: rc-packets-chan.tsv:184 kept, rc-run-2b.tsv:241 dropped
-  - `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max`: rc-packets-chan.tsv:185 kept, rc-run-2b.tsv:242 dropped
-  - `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e`: rc-packets-chan.tsv:186 kept, rc-run-2b.tsv:243 dropped
-  - `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un`: rc-packets-chan.tsv:187 kept, rc-run-2b.tsv:244 dropped
-  - `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi`: rc-packets-chan.tsv:188 kept, rc-run-2b.tsv:245 dropped
-  - `system.sim.pets.8-broadcast-and-message-0x7a`: rc-packets-chan.tsv:189 kept, rc-run-2b.tsv:246 dropped
-  - `system.sim.pets.9-lookup-0x00574a20-player-guid`: rc-packets-chan.tsv:190 kept, rc-run-2b.tsv:247 dropped
-  - `system.sim.rng.1-seed-state`: rc-combat-seed-2.tsv:3 kept, rc-run-2b.tsv:248 dropped
-  - `system.sim.rng.2-step`: rc-combat-seed-2.tsv:4 kept, rc-run-2b.tsv:249 dropped
-  - `system.sim.rng.3-draw-helpers`: rc-combat-seed-2.tsv:5 kept, rc-run-2b.tsv:250 dropped
-  - `system.sim.rng.4-setting-and-reading-seeds`: rc-combat-seed-2.tsv:6 kept, rc-run-2b.tsv:251 dropped
-  - `system.sim.rng.5-where-seeds-come-from`: rc-combat-seed-2.tsv:7 kept, rc-run-2b.tsv:252 dropped
-  - `system.sim.rng.6-inlined-draws`: rc-combat-seed-2.tsv:8 kept, rc-run-2b.tsv:253 dropped
-  - `system.sim.rng.7-which-systems-draw-from-which-seed`: rc-combat-seed-2.tsv:9 kept, rc-run-2b.tsv:254 dropped
-  - `system.sim.stat-lists.1-records`: rc-gen-misc.tsv:39 kept, rc-run-2b.tsv:255 dropped
-  - `system.sim.stat-lists.10-timer-event-handlers`: rc-gen-misc.tsv:40 kept, rc-run-2b.tsv:256 dropped
-  - `system.sim.stat-lists.11-mod-array-and-stat-messages`: rc-gen-misc.tsv:41 kept, rc-run-2b.tsv:257 dropped
-  - `system.sim.stat-lists.2-flags-0x10`: rc-gen-misc.tsv:42 kept, rc-run-2b.tsv:258 dropped
-  - `system.sim.stat-lists.3-stat-arrays`: rc-gen-misc.tsv:43 kept, rc-run-2b.tsv:259 dropped
-  - `system.sim.stat-lists.4-allocation-and-ownership`: rc-gen-misc.tsv:44 kept, rc-run-2b.tsv:260 dropped
-  - `system.sim.stat-lists.5-base-writes`: rc-gen-misc.tsv:45 kept, rc-run-2b.tsv:261 dropped
-  - `system.sim.stat-lists.6-full-values`: rc-gen-misc.tsv:46 kept, rc-run-2b.tsv:262 dropped
-  - `system.sim.stat-lists.7-value-change-notification`: rc-gen-misc.tsv:47 kept, rc-run-2b.tsv:263 dropped
-  - `system.sim.stat-lists.8-chain-operations`: rc-gen-misc.tsv:48 kept, rc-run-2b.tsv:264 dropped
-  - `system.sim.stat-lists.9-states`: rc-gen-misc.tsv:49 kept, rc-run-2b.tsv:265 dropped
-  - `system.sim.stats.1-identity`: rc-gen-misc.tsv:50 kept, rc-run-2b.tsv:266 dropped
-  - `system.sim.stats.2-values`: rc-gen-misc.tsv:51 kept, rc-run-2b.tsv:267 dropped
-  - `system.sim.stats.3-itemstatcost-columns-read-by-the-simulation`: rc-gen-misc.tsv:52 kept, rc-run-2b.tsv:268 dropped
-  - `system.sim.stats.4-reading-a-stat`: rc-gen-misc.tsv:53 kept, rc-run-2b.tsv:269 dropped
-  - `system.sim.stats.5-muldiv-0x00483360`: rc-gen-misc.tsv:54 kept, rc-run-2b.tsv:270 dropped
-  - `system.sim.stats.6-evaluation-the-value-a-full-entry-is-set-to`: rc-gen-misc.tsv:55 kept, rc-run-2b.tsv:271 dropped
-  - `system.sim.stats.7-where-evaluation-happens`: rc-gen-misc.tsv:56 kept, rc-run-2b.tsv:272 dropped
-  - `system.sim.stats.8-by-time-adjustment-0x0065ca30`: rc-gen-misc.tsv:57 kept, rc-run-2b.tsv:273 dropped
-  - `system.sim.stats.9-derived-stats-and-clamps`: rc-gen-misc.tsv:58 kept, rc-run-2b.tsv:274 dropped
-  - `system.sim.unit-order.1-unit-identity-and-guids`: rc-combat-seed-2.tsv:10 kept, rc-run-2b.tsv:275 dropped
-  - `system.sim.unit-order.10-iteration-and-modification`: rc-combat-seed-2.tsv:11 kept, rc-run-2b.tsv:276 dropped
-  - `system.sim.unit-order.2-game-unit-hash-lists`: rc-combat-seed-2.tsv:12 kept, rc-run-2b.tsv:277 dropped
-  - `system.sim.unit-order.3-unit-placement-and-removal-list-bookkeeping`: rc-combat-seed-2.tsv:13 kept, rc-run-2b.tsv:278 dropped
-  - `system.sim.unit-order.4-act-room-lists-active-rooms`: rc-combat-seed-2.tsv:14 kept, rc-run-2b.tsv:279 dropped
-  - `system.sim.unit-order.5-room-unit-lists`: rc-combat-seed-2.tsv:15 kept, rc-run-2b.tsv:280 dropped
-  - `system.sim.unit-order.6-room-update-queues`: rc-combat-seed-2.tsv:16 kept, rc-run-2b.tsv:281 dropped
-  - `system.sim.unit-order.7-client-list`: rc-combat-seed-2.tsv:17 kept, rc-run-2b.tsv:282 dropped
-  - `system.sim.unit-order.8-unit-timer-lists`: rc-combat-seed-2.tsv:18 kept, rc-run-2b.tsv:283 dropped
-  - `system.sim.unit-order.9-adjacent-room-arrays-dependency`: rc-combat-seed-2.tsv:19 kept, rc-run-2b.tsv:284 dropped
-  - `ui.frontend.charselect.dolls`: rc-dolls-check.tsv:3 kept, rc-run-2b.tsv:285 dropped
-  - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, rc-run-2b.tsv:286 dropped
-  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, rc-run-2b.tsv:287 dropped
-  - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:288 dropped
-  - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, rc-run-2b.tsv:289 dropped
-  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2b.tsv:291 dropped
-  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, rc-run-2b.tsv:292 dropped
-  - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-2b.tsv:293 dropped
-  - `level.a3.75.act-3-town`: rc-promote.tsv:19 kept, rc-run-2b.tsv:294 dropped
-  - `level.a4.103.act-4-town`: rc-promote.tsv:23 kept, rc-run-2b.tsv:295 dropped
-  - `level.a5.109.act-5-town`: rc-promote.tsv:24 kept, rc-run-2b.tsv:296 dropped
-  - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:297 dropped
-  - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:298 dropped
-  - `quest.a4q3-hell-s-forge`: rc-pc1-audit.tsv:107 kept, rc-run-2b.tsv:299 dropped
-  - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:300 dropped
-  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, rc-run-2b.tsv:301 dropped
-  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:46 kept, rc-run-2b.tsv:302 dropped
-  - `system.act.travel`: rc-run-1.tsv:282 kept, rc-run-2b.tsv:303 dropped
-  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2b.tsv:304 dropped
+  - `system.sim.stat-lists.1-records`: rc-gen-misc.tsv:39 kept, rc-run-2b.tsv:238 dropped
+  - `system.sim.stat-lists.10-timer-event-handlers`: rc-gen-misc.tsv:40 kept, rc-run-2b.tsv:239 dropped
+  - `system.sim.stat-lists.11-mod-array-and-stat-messages`: rc-gen-misc.tsv:41 kept, rc-run-2b.tsv:240 dropped
+  - `system.sim.stat-lists.2-flags-0x10`: rc-gen-misc.tsv:42 kept, rc-run-2b.tsv:241 dropped
+  - `system.sim.stat-lists.3-stat-arrays`: rc-gen-misc.tsv:43 kept, rc-run-2b.tsv:242 dropped
+  - `system.sim.stat-lists.4-allocation-and-ownership`: rc-gen-misc.tsv:44 kept, rc-run-2b.tsv:243 dropped
+  - `system.sim.stat-lists.5-base-writes`: rc-gen-misc.tsv:45 kept, rc-run-2b.tsv:244 dropped
+  - `system.sim.stat-lists.6-full-values`: rc-gen-misc.tsv:46 kept, rc-run-2b.tsv:245 dropped
+  - `system.sim.stat-lists.7-value-change-notification`: rc-gen-misc.tsv:47 kept, rc-run-2b.tsv:246 dropped
+  - `system.sim.stat-lists.8-chain-operations`: rc-gen-misc.tsv:48 kept, rc-run-2b.tsv:247 dropped
+  - `system.sim.stat-lists.9-states`: rc-gen-misc.tsv:49 kept, rc-run-2b.tsv:248 dropped
+  - `system.sim.stats.1-identity`: rc-gen-misc.tsv:50 kept, rc-run-2b.tsv:249 dropped
+  - `system.sim.stats.2-values`: rc-gen-misc.tsv:51 kept, rc-run-2b.tsv:250 dropped
+  - `system.sim.stats.3-itemstatcost-columns-read-by-the-simulation`: rc-gen-misc.tsv:52 kept, rc-run-2b.tsv:251 dropped
+  - `system.sim.stats.4-reading-a-stat`: rc-gen-misc.tsv:53 kept, rc-run-2b.tsv:252 dropped
+  - `system.sim.stats.5-muldiv-0x00483360`: rc-gen-misc.tsv:54 kept, rc-run-2b.tsv:253 dropped
+  - `system.sim.stats.6-evaluation-the-value-a-full-entry-is-set-to`: rc-gen-misc.tsv:55 kept, rc-run-2b.tsv:254 dropped
+  - `system.sim.stats.7-where-evaluation-happens`: rc-gen-misc.tsv:56 kept, rc-run-2b.tsv:255 dropped
+  - `system.sim.stats.8-by-time-adjustment-0x0065ca30`: rc-gen-misc.tsv:57 kept, rc-run-2b.tsv:256 dropped
+  - `system.sim.stats.9-derived-stats-and-clamps`: rc-gen-misc.tsv:58 kept, rc-run-2b.tsv:257 dropped
+  - `ui.frontend.charselect.dolls`: rc-dolls-check.tsv:3 kept, rc-run-2b.tsv:258 dropped
+  - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, rc-run-2b.tsv:259 dropped
+  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, rc-run-2b.tsv:260 dropped
+  - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:261 dropped
+  - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, rc-run-2b.tsv:262 dropped
+  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2b.tsv:264 dropped
+  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, rc-run-2b.tsv:265 dropped
+  - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-2b.tsv:266 dropped
+  - `level.a3.75.act-3-town`: rc-promote.tsv:19 kept, rc-run-2b.tsv:267 dropped
+  - `level.a4.103.act-4-town`: rc-promote.tsv:23 kept, rc-run-2b.tsv:268 dropped
+  - `level.a5.109.act-5-town`: rc-promote.tsv:24 kept, rc-run-2b.tsv:269 dropped
+  - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:270 dropped
+  - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:271 dropped
+  - `quest.a4q3-hell-s-forge`: rc-pc1-audit.tsv:107 kept, rc-run-2b.tsv:272 dropped
+  - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:273 dropped
+  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, rc-run-2b.tsv:274 dropped
+  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:46 kept, rc-run-2b.tsv:275 dropped
+  - `system.act.travel`: rc-run-1.tsv:282 kept, rc-run-2b.tsv:276 dropped
+  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2b.tsv:277 dropped
   - `object.1-casket`: rc-partial-promote.tsv:254 kept, rc-run-3.tsv:3 dropped
   - `object.100-duriel-s-lair`: rc-link-checks.tsv:363 kept, rc-run-3.tsv:4 dropped
   - `object.101-dummy`: rc-partial-promote.tsv:255 kept, rc-run-3.tsv:5 dropped
@@ -4902,26 +4848,23 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.slinger7`: rc-gen-mon-triage.tsv:171 kept, rc-siegebeast.tsv:6 dropped
   - `monster.slinger8`: rc-gen-mon-triage.tsv:172 kept, rc-siegebeast.tsv:7 dropped
   - `monster.slinger9`: rc-gen-mon-triage.tsv:173 kept, rc-siegebeast.tsv:8 dropped
-  - `system.flows.server-tick.1-server-frame-host-side`: rc-pkt-handwritten.tsv:8 kept, rc-sim-combat-div.tsv:3 dropped
-  - `system.flows.server-tick.2-tick-steps-in-order`: rc-pkt-handwritten.tsv:9 kept, rc-sim-combat-div.tsv:4 dropped
-  - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-pkt-handwritten.tsv:10 kept, rc-sim-combat-div.tsv:5 dropped
-  - `system.flows.server-tick.4-client-pass-within-step-5`: rc-pkt-handwritten.tsv:11 kept, rc-sim-combat-div.tsv:6 dropped
-  - `system.sim.tick.1-tick-rate-and-host-schedule`: rc-pkt-handwritten.tsv:12 kept, rc-sim-combat-div.tsv:7 dropped
-  - `system.sim.tick.2-frame-counter`: rc-pkt-handwritten.tsv:13 kept, rc-sim-combat-div.tsv:8 dropped
-  - `system.sim.tick.3-tick-steps-in-order`: rc-pkt-handwritten.tsv:14 kept, rc-sim-combat-div.tsv:9 dropped
-  - `system.sim.tick.4-room-pass-step-3`: rc-pkt-handwritten.tsv:15 kept, rc-sim-combat-div.tsv:10 dropped
-  - `system.sim.tick.5-timer-events-step-4`: rc-pkt-handwritten.tsv:16 kept, rc-sim-combat-div.tsv:11 dropped
-  - `system.sim.tick.6-client-pass-step-5`: rc-pkt-handwritten.tsv:17 kept, rc-sim-combat-div.tsv:12 dropped
-  - `system.sim.tick.7-periodic-steps-summary`: rc-pkt-handwritten.tsv:18 kept, rc-sim-combat-div.tsv:13 dropped
-  - `system.sim.tick.8-wall-clock-and-host-only-parts`: rc-pkt-handwritten.tsv:19 kept, rc-sim-combat-div.tsv:14 dropped
-  - `system.sim.units.1-unit-kinds`: rc-pkt-handwritten.tsv:20 kept, rc-sim-combat-div.tsv:15 dropped
-  - `system.sim.units.2-unit-record`: rc-pkt-handwritten.tsv:21 kept, rc-sim-combat-div.tsv:16 dropped
-  - `system.sim.units.3-lifecycle`: rc-pkt-handwritten.tsv:22 kept, rc-sim-combat-div.tsv:17 dropped
-  - `system.sim.units.4-modes-and-mode-schedules`: rc-pkt-handwritten.tsv:23 kept, rc-sim-combat-div.tsv:18 dropped
-  - `system.sim.units.5-event-dispatch`: rc-pkt-handwritten.tsv:24 kept, rc-sim-combat-div.tsv:19 dropped
-  - `system.sim.units.6-events-per-kind`: rc-pkt-handwritten.tsv:25 kept, rc-sim-combat-div.tsv:20 dropped
-  - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-pkt-handwritten.tsv:26 kept, rc-sim-combat-div.tsv:21 dropped
-  - `system.sim.units.8-collision-line-between-two-units`: rc-pkt-handwritten.tsv:27 kept, rc-sim-combat-div.tsv:22 dropped
+  - `system.sim.rng.1-seed-state`: rc-combat-seed-2.tsv:3 kept, rc-sim-combat-div.tsv:33 dropped
+  - `system.sim.rng.2-step`: rc-combat-seed-2.tsv:4 kept, rc-sim-combat-div.tsv:34 dropped
+  - `system.sim.rng.3-draw-helpers`: rc-combat-seed-2.tsv:5 kept, rc-sim-combat-div.tsv:35 dropped
+  - `system.sim.rng.4-setting-and-reading-seeds`: rc-combat-seed-2.tsv:6 kept, rc-sim-combat-div.tsv:36 dropped
+  - `system.sim.rng.5-where-seeds-come-from`: rc-combat-seed-2.tsv:7 kept, rc-sim-combat-div.tsv:37 dropped
+  - `system.sim.rng.6-inlined-draws`: rc-combat-seed-2.tsv:8 kept, rc-sim-combat-div.tsv:38 dropped
+  - `system.sim.rng.7-which-systems-draw-from-which-seed`: rc-combat-seed-2.tsv:9 kept, rc-sim-combat-div.tsv:39 dropped
+  - `system.sim.unit-order.1-unit-identity-and-guids`: rc-combat-seed-2.tsv:10 kept, rc-sim-combat-div.tsv:40 dropped
+  - `system.sim.unit-order.10-iteration-and-modification`: rc-combat-seed-2.tsv:11 kept, rc-sim-combat-div.tsv:41 dropped
+  - `system.sim.unit-order.2-game-unit-hash-lists`: rc-combat-seed-2.tsv:12 kept, rc-sim-combat-div.tsv:42 dropped
+  - `system.sim.unit-order.3-unit-placement-and-removal-list-bookkeeping`: rc-combat-seed-2.tsv:13 kept, rc-sim-combat-div.tsv:43 dropped
+  - `system.sim.unit-order.4-act-room-lists-active-rooms`: rc-combat-seed-2.tsv:14 kept, rc-sim-combat-div.tsv:44 dropped
+  - `system.sim.unit-order.5-room-unit-lists`: rc-combat-seed-2.tsv:15 kept, rc-sim-combat-div.tsv:45 dropped
+  - `system.sim.unit-order.6-room-update-queues`: rc-combat-seed-2.tsv:16 kept, rc-sim-combat-div.tsv:46 dropped
+  - `system.sim.unit-order.7-client-list`: rc-combat-seed-2.tsv:17 kept, rc-sim-combat-div.tsv:47 dropped
+  - `system.sim.unit-order.8-unit-timer-lists`: rc-combat-seed-2.tsv:18 kept, rc-sim-combat-div.tsv:48 dropped
+  - `system.sim.unit-order.9-adjacent-room-arrays-dependency`: rc-combat-seed-2.tsv:19 kept, rc-sim-combat-div.tsv:49 dropped
   - `skill.ass.blade-shield`: rc-a8-setstate.tsv:25 kept, rc-skill-div-a.tsv:3 dropped
   - `skill.ass.blades-of-ice`: rc-a8-setstate.tsv:26 kept, rc-skill-div-a.tsv:4 dropped
   - `skill.ass.claw-mastery`: rc-a8-setstate.tsv:27 kept, rc-skill-div-a.tsv:5 dropped
@@ -5021,26 +4964,26 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.succubus-634`: rc-run-4.tsv:306 kept, rc-succubus-m.tsv:8 dropped
   - `monster.succubus-635`: rc-run-4.tsv:307 kept, rc-succubus-m.tsv:9 dropped
   - `monster.succubus-719`: rc-run-4.tsv:308 kept, rc-succubus-m.tsv:10 dropped
-  - `system.flows.server-tick.1-server-frame-host-side`: rc-pkt-handwritten.tsv:8 kept, rc-tick-idle.tsv:3 dropped
-  - `system.flows.server-tick.2-tick-steps-in-order`: rc-pkt-handwritten.tsv:9 kept, rc-tick-idle.tsv:4 dropped
-  - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-pkt-handwritten.tsv:10 kept, rc-tick-idle.tsv:5 dropped
-  - `system.flows.server-tick.4-client-pass-within-step-5`: rc-pkt-handwritten.tsv:11 kept, rc-tick-idle.tsv:6 dropped
-  - `system.sim.tick.1-tick-rate-and-host-schedule`: rc-pkt-handwritten.tsv:12 kept, rc-tick-idle.tsv:7 dropped
-  - `system.sim.tick.2-frame-counter`: rc-pkt-handwritten.tsv:13 kept, rc-tick-idle.tsv:8 dropped
-  - `system.sim.tick.3-tick-steps-in-order`: rc-pkt-handwritten.tsv:14 kept, rc-tick-idle.tsv:9 dropped
-  - `system.sim.tick.4-room-pass-step-3`: rc-pkt-handwritten.tsv:15 kept, rc-tick-idle.tsv:10 dropped
-  - `system.sim.tick.5-timer-events-step-4`: rc-pkt-handwritten.tsv:16 kept, rc-tick-idle.tsv:11 dropped
-  - `system.sim.tick.6-client-pass-step-5`: rc-pkt-handwritten.tsv:17 kept, rc-tick-idle.tsv:12 dropped
-  - `system.sim.tick.7-periodic-steps-summary`: rc-pkt-handwritten.tsv:18 kept, rc-tick-idle.tsv:13 dropped
-  - `system.sim.tick.8-wall-clock-and-host-only-parts`: rc-pkt-handwritten.tsv:19 kept, rc-tick-idle.tsv:14 dropped
-  - `system.sim.units.1-unit-kinds`: rc-pkt-handwritten.tsv:20 kept, rc-tick-idle.tsv:15 dropped
-  - `system.sim.units.2-unit-record`: rc-pkt-handwritten.tsv:21 kept, rc-tick-idle.tsv:16 dropped
-  - `system.sim.units.3-lifecycle`: rc-pkt-handwritten.tsv:22 kept, rc-tick-idle.tsv:17 dropped
-  - `system.sim.units.4-modes-and-mode-schedules`: rc-pkt-handwritten.tsv:23 kept, rc-tick-idle.tsv:18 dropped
-  - `system.sim.units.5-event-dispatch`: rc-pkt-handwritten.tsv:24 kept, rc-tick-idle.tsv:19 dropped
-  - `system.sim.units.6-events-per-kind`: rc-pkt-handwritten.tsv:25 kept, rc-tick-idle.tsv:20 dropped
-  - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-pkt-handwritten.tsv:26 kept, rc-tick-idle.tsv:21 dropped
-  - `system.sim.units.8-collision-line-between-two-units`: rc-pkt-handwritten.tsv:27 kept, rc-tick-idle.tsv:22 dropped
+  - `system.flows.server-tick.1-server-frame-host-side`: rc-sim-combat-div.tsv:3 kept, rc-tick-idle.tsv:3 dropped
+  - `system.flows.server-tick.2-tick-steps-in-order`: rc-sim-combat-div.tsv:4 kept, rc-tick-idle.tsv:4 dropped
+  - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-sim-combat-div.tsv:5 kept, rc-tick-idle.tsv:5 dropped
+  - `system.flows.server-tick.4-client-pass-within-step-5`: rc-sim-combat-div.tsv:6 kept, rc-tick-idle.tsv:6 dropped
+  - `system.sim.tick.1-tick-rate-and-host-schedule`: rc-sim-combat-div.tsv:7 kept, rc-tick-idle.tsv:7 dropped
+  - `system.sim.tick.2-frame-counter`: rc-sim-combat-div.tsv:8 kept, rc-tick-idle.tsv:8 dropped
+  - `system.sim.tick.3-tick-steps-in-order`: rc-sim-combat-div.tsv:9 kept, rc-tick-idle.tsv:9 dropped
+  - `system.sim.tick.4-room-pass-step-3`: rc-sim-combat-div.tsv:10 kept, rc-tick-idle.tsv:10 dropped
+  - `system.sim.tick.5-timer-events-step-4`: rc-sim-combat-div.tsv:11 kept, rc-tick-idle.tsv:11 dropped
+  - `system.sim.tick.6-client-pass-step-5`: rc-sim-combat-div.tsv:12 kept, rc-tick-idle.tsv:12 dropped
+  - `system.sim.tick.7-periodic-steps-summary`: rc-sim-combat-div.tsv:13 kept, rc-tick-idle.tsv:13 dropped
+  - `system.sim.tick.8-wall-clock-and-host-only-parts`: rc-sim-combat-div.tsv:14 kept, rc-tick-idle.tsv:14 dropped
+  - `system.sim.units.1-unit-kinds`: rc-sim-combat-div.tsv:15 kept, rc-tick-idle.tsv:15 dropped
+  - `system.sim.units.2-unit-record`: rc-sim-combat-div.tsv:16 kept, rc-tick-idle.tsv:16 dropped
+  - `system.sim.units.3-lifecycle`: rc-sim-combat-div.tsv:17 kept, rc-tick-idle.tsv:17 dropped
+  - `system.sim.units.4-modes-and-mode-schedules`: rc-sim-combat-div.tsv:18 kept, rc-tick-idle.tsv:18 dropped
+  - `system.sim.units.5-event-dispatch`: rc-sim-combat-div.tsv:19 kept, rc-tick-idle.tsv:19 dropped
+  - `system.sim.units.6-events-per-kind`: rc-sim-combat-div.tsv:20 kept, rc-tick-idle.tsv:20 dropped
+  - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-sim-combat-div.tsv:21 kept, rc-tick-idle.tsv:21 dropped
+  - `system.sim.units.8-collision-line-between-two-units`: rc-sim-combat-div.tsv:22 kept, rc-tick-idle.tsv:22 dropped
   - `client.c-monsters.draw`: rc-draw-row173.tsv:188 kept, rc-town-arrival.tsv:3 dropped
   - `system.ui.item-tips.1-entry-and-dispatch-0x0048dd90`: rc-draw-row173.tsv:145 kept, rc-ui-div.tsv:3 dropped
   - `system.ui.panels.10-skill-tree-ui-4-right-0x004ac690`: rc-draw-row173.tsv:168 kept, rc-ui-div.tsv:4 dropped
@@ -5712,7 +5655,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x33`: rc-run-6.tsv:15 kept, systems.tsv:54 dropped
   - `net.c2s.0x34`: rc-run-6.tsv:213 kept, systems.tsv:55 dropped
   - `net.c2s.0x35`: rc-run-6.tsv:16 kept, systems.tsv:56 dropped
-  - `net.c2s.0x36`: rc-pkt-handwritten.tsv:30 kept, systems.tsv:57 dropped
+  - `net.c2s.0x36`: rc-pkt-handwritten.tsv:10 kept, systems.tsv:57 dropped
   - `net.c2s.0x37`: rc-run-6.tsv:17 kept, systems.tsv:58 dropped
   - `net.c2s.0x38`: rc-run-1.tsv:185 kept, systems.tsv:59 dropped
   - `net.c2s.0x39`: rc-run-6.tsv:214 kept, systems.tsv:60 dropped
@@ -5987,16 +5930,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.pathing.11-missile-paths-0x00649760`: rc-partial-promote.tsv:243 kept, systems.tsv:329 dropped
   - `system.sim.pathing.12-other-path-types-1-14d-read-2026-10-08`: rc-partial-promote.tsv:244 kept, systems.tsv:330 dropped
   - `system.sim.pathing.13-path-accessors-and-the-cell-line-test-1-14d-r`: rc-partial-promote.tsv:245 kept, systems.tsv:331 dropped
-  - `system.sim.pets.1-data`: rc-packets-chan.tsv:181 kept, systems.tsv:332 dropped
-  - `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max`: rc-packets-chan.tsv:183 kept, systems.tsv:333 dropped
-  - `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi`: rc-packets-chan.tsv:184 kept, systems.tsv:334 dropped
-  - `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max`: rc-packets-chan.tsv:185 kept, systems.tsv:335 dropped
-  - `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e`: rc-packets-chan.tsv:186 kept, systems.tsv:336 dropped
-  - `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un`: rc-packets-chan.tsv:187 kept, systems.tsv:337 dropped
-  - `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi`: rc-packets-chan.tsv:188 kept, systems.tsv:338 dropped
-  - `system.sim.pets.8-broadcast-and-message-0x7a`: rc-packets-chan.tsv:189 kept, systems.tsv:339 dropped
-  - `system.sim.pets.9-lookup-0x00574a20-player-guid`: rc-packets-chan.tsv:190 kept, systems.tsv:340 dropped
-  - `system.sim.pets.10-creation-free-and-maximum-resync`: rc-packets-chan.tsv:182 kept, systems.tsv:341 dropped
+  - `system.sim.pets.1-data`: rc-sim-combat-div.tsv:23 kept, systems.tsv:332 dropped
+  - `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max`: rc-sim-combat-div.tsv:25 kept, systems.tsv:333 dropped
+  - `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi`: rc-sim-combat-div.tsv:26 kept, systems.tsv:334 dropped
+  - `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max`: rc-sim-combat-div.tsv:27 kept, systems.tsv:335 dropped
+  - `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e`: rc-sim-combat-div.tsv:28 kept, systems.tsv:336 dropped
+  - `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un`: rc-sim-combat-div.tsv:29 kept, systems.tsv:337 dropped
+  - `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi`: rc-sim-combat-div.tsv:30 kept, systems.tsv:338 dropped
+  - `system.sim.pets.8-broadcast-and-message-0x7a`: rc-sim-combat-div.tsv:31 kept, systems.tsv:339 dropped
+  - `system.sim.pets.9-lookup-0x00574a20-player-guid`: rc-sim-combat-div.tsv:32 kept, systems.tsv:340 dropped
+  - `system.sim.pets.10-creation-free-and-maximum-resync`: rc-sim-combat-div.tsv:24 kept, systems.tsv:341 dropped
   - `system.sim.rng.1-seed-state`: rc-combat-seed-2.tsv:3 kept, systems.tsv:342 dropped
   - `system.sim.rng.2-step`: rc-combat-seed-2.tsv:4 kept, systems.tsv:343 dropped
   - `system.sim.rng.3-draw-helpers`: rc-combat-seed-2.tsv:5 kept, systems.tsv:344 dropped
@@ -6024,14 +5967,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.stats.7-where-evaluation-happens`: rc-gen-misc.tsv:56 kept, systems.tsv:366 dropped
   - `system.sim.stats.8-by-time-adjustment-0x0065ca30`: rc-gen-misc.tsv:57 kept, systems.tsv:367 dropped
   - `system.sim.stats.9-derived-stats-and-clamps`: rc-gen-misc.tsv:58 kept, systems.tsv:368 dropped
-  - `system.sim.tick.1-tick-rate-and-host-schedule`: rc-pkt-handwritten.tsv:12 kept, systems.tsv:369 dropped
-  - `system.sim.tick.2-frame-counter`: rc-pkt-handwritten.tsv:13 kept, systems.tsv:370 dropped
-  - `system.sim.tick.3-tick-steps-in-order`: rc-pkt-handwritten.tsv:14 kept, systems.tsv:371 dropped
-  - `system.sim.tick.4-room-pass-step-3`: rc-pkt-handwritten.tsv:15 kept, systems.tsv:372 dropped
-  - `system.sim.tick.5-timer-events-step-4`: rc-pkt-handwritten.tsv:16 kept, systems.tsv:373 dropped
-  - `system.sim.tick.6-client-pass-step-5`: rc-pkt-handwritten.tsv:17 kept, systems.tsv:374 dropped
-  - `system.sim.tick.7-periodic-steps-summary`: rc-pkt-handwritten.tsv:18 kept, systems.tsv:375 dropped
-  - `system.sim.tick.8-wall-clock-and-host-only-parts`: rc-pkt-handwritten.tsv:19 kept, systems.tsv:376 dropped
+  - `system.sim.tick.1-tick-rate-and-host-schedule`: rc-sim-combat-div.tsv:7 kept, systems.tsv:369 dropped
+  - `system.sim.tick.2-frame-counter`: rc-sim-combat-div.tsv:8 kept, systems.tsv:370 dropped
+  - `system.sim.tick.3-tick-steps-in-order`: rc-sim-combat-div.tsv:9 kept, systems.tsv:371 dropped
+  - `system.sim.tick.4-room-pass-step-3`: rc-sim-combat-div.tsv:10 kept, systems.tsv:372 dropped
+  - `system.sim.tick.5-timer-events-step-4`: rc-sim-combat-div.tsv:11 kept, systems.tsv:373 dropped
+  - `system.sim.tick.6-client-pass-step-5`: rc-sim-combat-div.tsv:12 kept, systems.tsv:374 dropped
+  - `system.sim.tick.7-periodic-steps-summary`: rc-sim-combat-div.tsv:13 kept, systems.tsv:375 dropped
+  - `system.sim.tick.8-wall-clock-and-host-only-parts`: rc-sim-combat-div.tsv:14 kept, systems.tsv:376 dropped
   - `system.sim.unit-order.1-unit-identity-and-guids`: rc-combat-seed-2.tsv:10 kept, systems.tsv:377 dropped
   - `system.sim.unit-order.2-game-unit-hash-lists`: rc-combat-seed-2.tsv:12 kept, systems.tsv:378 dropped
   - `system.sim.unit-order.3-unit-placement-and-removal-list-bookkeeping`: rc-combat-seed-2.tsv:13 kept, systems.tsv:379 dropped
@@ -6042,14 +5985,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.unit-order.8-unit-timer-lists`: rc-combat-seed-2.tsv:18 kept, systems.tsv:384 dropped
   - `system.sim.unit-order.9-adjacent-room-arrays-dependency`: rc-combat-seed-2.tsv:19 kept, systems.tsv:385 dropped
   - `system.sim.unit-order.10-iteration-and-modification`: rc-combat-seed-2.tsv:11 kept, systems.tsv:386 dropped
-  - `system.sim.units.1-unit-kinds`: rc-pkt-handwritten.tsv:20 kept, systems.tsv:387 dropped
-  - `system.sim.units.2-unit-record`: rc-pkt-handwritten.tsv:21 kept, systems.tsv:388 dropped
-  - `system.sim.units.3-lifecycle`: rc-pkt-handwritten.tsv:22 kept, systems.tsv:389 dropped
-  - `system.sim.units.4-modes-and-mode-schedules`: rc-pkt-handwritten.tsv:23 kept, systems.tsv:390 dropped
-  - `system.sim.units.5-event-dispatch`: rc-pkt-handwritten.tsv:24 kept, systems.tsv:391 dropped
-  - `system.sim.units.6-events-per-kind`: rc-pkt-handwritten.tsv:25 kept, systems.tsv:392 dropped
-  - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-pkt-handwritten.tsv:26 kept, systems.tsv:393 dropped
-  - `system.sim.units.8-collision-line-between-two-units`: rc-pkt-handwritten.tsv:27 kept, systems.tsv:394 dropped
+  - `system.sim.units.1-unit-kinds`: rc-sim-combat-div.tsv:15 kept, systems.tsv:387 dropped
+  - `system.sim.units.2-unit-record`: rc-sim-combat-div.tsv:16 kept, systems.tsv:388 dropped
+  - `system.sim.units.3-lifecycle`: rc-sim-combat-div.tsv:17 kept, systems.tsv:389 dropped
+  - `system.sim.units.4-modes-and-mode-schedules`: rc-sim-combat-div.tsv:18 kept, systems.tsv:390 dropped
+  - `system.sim.units.5-event-dispatch`: rc-sim-combat-div.tsv:19 kept, systems.tsv:391 dropped
+  - `system.sim.units.6-events-per-kind`: rc-sim-combat-div.tsv:20 kept, systems.tsv:392 dropped
+  - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-sim-combat-div.tsv:21 kept, systems.tsv:393 dropped
+  - `system.sim.units.8-collision-line-between-two-units`: rc-sim-combat-div.tsv:22 kept, systems.tsv:394 dropped
   - `system.combat.damage.0-shared-integer-helpers`: rc-combat-seed.tsv:3 kept, systems.tsv:395 dropped
   - `system.combat.damage.1-damage-record`: rc-combat-seed.tsv:4 kept, systems.tsv:396 dropped
   - `system.combat.damage.2-pipeline`: rc-combat-seed.tsv:6 kept, systems.tsv:397 dropped
@@ -6087,10 +6030,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.flows.save-exit.3-server-periodic-save`: rc-run-2b.tsv:197 kept, systems.tsv:433 dropped
   - `system.flows.save-exit.4-client-end-of-game`: rc-run-2b.tsv:198 kept, systems.tsv:434 dropped
   - `system.flows.save-exit.5-load`: rc-link-2.tsv:76 kept, systems.tsv:435 dropped
-  - `system.flows.server-tick.1-server-frame-host-side`: rc-pkt-handwritten.tsv:8 kept, systems.tsv:436 dropped
-  - `system.flows.server-tick.2-tick-steps-in-order`: rc-pkt-handwritten.tsv:9 kept, systems.tsv:437 dropped
-  - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-pkt-handwritten.tsv:10 kept, systems.tsv:438 dropped
-  - `system.flows.server-tick.4-client-pass-within-step-5`: rc-pkt-handwritten.tsv:11 kept, systems.tsv:439 dropped
+  - `system.flows.server-tick.1-server-frame-host-side`: rc-sim-combat-div.tsv:3 kept, systems.tsv:436 dropped
+  - `system.flows.server-tick.2-tick-steps-in-order`: rc-sim-combat-div.tsv:4 kept, systems.tsv:437 dropped
+  - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-sim-combat-div.tsv:5 kept, systems.tsv:438 dropped
+  - `system.flows.server-tick.4-client-pass-within-step-5`: rc-sim-combat-div.tsv:6 kept, systems.tsv:439 dropped
   - `system.seams.bridge-app.1-frame-order-one-bevy-frame`: rc-link-2.tsv:86 kept, systems.tsv:440 dropped
   - `system.seams.bridge-app.2-contract`: rc-link-2.tsv:87 kept, systems.tsv:441 dropped
   - `system.seams.drlg-coords.1-coordinate-spaces`: rc-link-2.tsv:88 kept, systems.tsv:442 dropped
@@ -6913,13 +6856,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, world.tsv:372 dropped
   - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:46 kept, world.tsv:374 dropped
   - `system.act.travel`: rc-run-1.tsv:282 kept, world.tsv:379 dropped
-  - `system.death.corpse`: rc-run-2.tsv:182 kept, world.tsv:381 dropped
+  - `system.death.corpse`: rc-run-2.tsv:165 kept, world.tsv:381 dropped
   - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, world.tsv:383 dropped
   - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, world.tsv:384 dropped
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
-  - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:290 kept, world.tsv:386 dropped
+  - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1893
+- Rows whose state disagrees with their checks: 1903
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6980,7 +6923,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1833 more (rerun with the tsv to list them)
+  - … and 1843 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -10055,16 +9998,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.seams.messages.warp-0x07-frame` | system | DIVERGED | S | DIVERGED@46 | yes | 0 | n | claude/rc-map-reveal | specs/tools/poke.md | rc-map-reveal: 0x07 now frame 3 (packets 147->149/150); first divergence now frame 46 MonsterState 0x69 |
 | `system.seams.world-screen.1-units-and-spaces` | system | DIVERGED | M | DIVERGED@72 | yes | 1 | y | rc-gen-client | specs/seams/world-screen.md | scenario draw; draws DIVERGED; first: tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit |
 | `system.seams.world-screen.2-contract` | system | DIVERGED | M | DIVERGED@73 | yes | 1 | y | rc-gen-client | specs/seams/world-screen.md | scenario draw; draws DIVERGED; first: tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit |
-| `system.sim.pets.1-data` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.10-creation-free-and-maximum-resync` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.8-broadcast-and-message-0x7a` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
-| `system.sim.pets.9-lookup-0x00574a20-player-guid` | system | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-pets | specs/sim/pets.md | sys-pets-skeletons state: PARTIAL |
 | `system.ui.automap.1-cell-store` | ui | DIVERGED | S | DIVERGED@58 | yes | 0 | n | claude/rc-draw-row173 | specs/ui/automap.md | rc-draw-row173 rain: gen-ui-automap DIVERGED: tick 58 draw row 198 (DrawLine) column x: 1.14d 538 vs d2rs 505 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.ui.automap.10-cell-draw-pass` | ui | DIVERGED | S | DIVERGED@58 | yes | 0 | n | claude/rc-draw-row173 | specs/ui/automap.md | rc-draw-row173 rain: gen-ui-automap DIVERGED: tick 58 draw row 198 (DrawLine) column x: 1.14d 538 vs d2rs 505 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.ui.automap.11-unit-markers-0x0045ac90-0x0045a860` | ui | DIVERGED | S | DIVERGED@58 | yes | 0 | n | claude/rc-draw-row173 | specs/ui/automap.md | rc-draw-row173 rain: gen-ui-automap DIVERGED: tick 58 draw row 198 (DrawLine) column x: 1.14d 538 vs d2rs 505 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
@@ -10636,10 +10569,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.flows.client-frame.1-loop-pass-order-1-14d` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.flows.client-frame.2-prediction-correction-interpolation` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.flows.save-exit.5-load` | system | EQUAL | - | MATCH | yes | 0 | n | rc-gen-client | specs/flows/save-exit.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
-| `system.flows.server-tick.1-server-frame-host-side` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.flows.server-tick.2-tick-steps-in-order` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.flows.server-tick.3-timer-queue-within-step-4` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.flows.server-tick.4-client-pass-within-step-5` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
+| `system.flows.server-tick.1-server-frame-host-side` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.flows.server-tick.2-tick-steps-in-order` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.flows.server-tick.3-timer-queue-within-step-4` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.flows.server-tick.4-client-pass-within-step-5` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
 | `system.formats.animdata.4-name-lookup-0x0066a8f0` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/animdata.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.formats.animdata.5-record-by-unit-class-and-mode-0x0066a9b0` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/animdata.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.formats.animdata.6-info-query-0x0066aa80` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/animdata.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
@@ -10696,6 +10629,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.sim.pathing.9-8-room-change-messages` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/sim/pathing.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.sim.pathing.9-per-tick-movement` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.click-walk-player-y` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-walk-y1 | specs/sim/pathing.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `system.sim.pets.1-data` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.10-creation-free-and-maximum-resync` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.2-add-0x00575d90-game-player-pet-t-max` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.8-broadcast-and-message-0x7a` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.sim.pets.9-lookup-0x00574a20-player-guid` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/pets.md | rc-sim-combat-div: load selection 0x23 sent only for an existing (skill, owner -1) entry (d2s.md 2.4 r6.3) and SetSkill hand/type args fixed; sys-pets-skeletons rng MATCH, packets MATCH, state only the client-gap PARTIAL (REC-2055/2056) |
 | `system.sim.rng.1-seed-state` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/rng.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.rng.2-step` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/rng.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.rng.3-draw-helpers` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/rng.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
@@ -10723,14 +10666,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.sim.stats.7-where-evaluation-happens` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/sim/stats.md | sys-stats-base 80/80, sys-stats-clamp 80/80, sys-states 100/100 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
 | `system.sim.stats.8-by-time-adjustment-0x0065ca30` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/sim/stats.md | sys-stats-base 80/80, sys-stats-clamp 80/80, sys-states 100/100 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
 | `system.sim.stats.9-derived-stats-and-clamps` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/sim/stats.md | sys-stats-base 80/80, sys-stats-clamp 80/80, sys-states 100/100 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
-| `system.sim.tick.1-tick-rate-and-host-schedule` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.2-frame-counter` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.3-tick-steps-in-order` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.4-room-pass-step-3` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.5-timer-events-step-4` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.6-client-pass-step-5` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.7-periodic-steps-summary` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
-| `system.sim.tick.8-wall-clock-and-host-only-parts` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
+| `system.sim.tick.1-tick-rate-and-host-schedule` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.2-frame-counter` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.3-tick-steps-in-order` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.4-room-pass-step-3` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.5-timer-events-step-4` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.6-client-pass-step-5` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.7-periodic-steps-summary` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.tick.8-wall-clock-and-host-only-parts` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/tick.md | rc-sim-combat-div: ignore q dropped from the check; sys-tick-idle-a2,sys-tick-idle-a5 state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
 | `system.sim.unit-order.1-unit-identity-and-guids` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.unit-order.10-iteration-and-modification` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.unit-order.2-game-unit-hash-lists` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
@@ -10741,15 +10684,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.sim.unit-order.7-client-list` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.unit-order.8-unit-timer-lists` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
 | `system.sim.unit-order.9-adjacent-room-arrays-dependency` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/unit-order.md | rc-combat-seed (2026-10-10, REC-3390, causes-99 C016): rng-town-idle-sor packets MATCH 120/120 (was DIVERGED@2: the join's SetSkill 0x23 had unit type and hand swapped), rng MATCH 41/41; rng-town-arrival-ama rng MATCH 33/33 |
-| `system.sim.units.1-unit-kinds` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.2-unit-record` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.3-lifecycle` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
+| `system.sim.units.1-unit-kinds` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.2-unit-record` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.3-lifecycle` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
 | `system.sim.units.4-1-setting-a-mode` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/sim/units.md | gen-boss-708 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.sim.units.4-modes-and-mode-schedules` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.5-event-dispatch` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.6-events-per-kind` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.7-scheduler-inventory-unit-events-tsv` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
-| `system.sim.units.8-collision-line-between-two-units` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-units-census) |
+| `system.sim.units.4-modes-and-mode-schedules` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.5-event-dispatch` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.6-events-per-kind` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.7-scheduler-inventory-unit-events-tsv` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
+| `system.sim.units.8-collision-line-between-two-units` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/units.md | rc-sim-combat-div: ignore q dropped from the check; sys-units-census state every field compared, 0 differences, only the d2rs client-gap PARTIAL; rng MATCH (REC-2055/2056) |
 | `system.ui.controls.6-world-clicks-left-right-button-answers-oq-2-in` | ui | EQUAL | - | MATCH | yes | 3 | y | claude/rc-draw-row173 | specs/ui/controls.md | rc-draw-row173 rain: gen-ui-walkclick MATCH |
 | `system.ui.controls.7-gates-and-belt-use-answers-oq-3-oq-4-oq-5` | ui | EQUAL | - | MATCH | yes | 3 | y | claude/rc-draw-row173 | specs/ui/controls.md | rc-draw-row173 rain: gen-ui-beltuse MATCH |
 | `tools.poke.tick-end` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-packets-join-order | specs/tools/poke.md | gen-missile-10,gen-state-1,a2-npc-fara-heal (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |

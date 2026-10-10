@@ -1177,7 +1177,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
 | poke-firebolt | state | PARTIAL | 60/60 | - | - |
 | rng-town-arrival-ama | rng | MATCH | 33/33 | - | - |
-| rng-town-idle-sor | packets | DIVERGED | 119/120 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
+| rng-town-idle-sor | packets | MATCH | 120/120 | - | - |
 | rng-town-idle-sor | rng | MATCH | 41/41 | - | - |
 | save-corpse-ama | save | MATCH | 1/1 | - | - |
 | save-items-ama | save | DIVERGED | 0/1 | byte 0x0321 (stats +0x24): 1.14d 0e 0a 00 00 vs d2rs ff 01 69 66; 34 of 866 bytes differ; sizes 866 vs 848 | unrouted |
@@ -1224,7 +1224,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | sys-intents-moves | state | PARTIAL | 140/140 | - | - |
 | sys-levelup-state | rng | MATCH | 66/66 | - | - |
 | sys-levelup-state | state | PARTIAL | 110/110 | - | - |
-| sys-pets-skeletons | packets | DIVERGED | 219/220 | frame 2 stream s2c #4 id: 1.14d 5e vs d2rs 23 (id 0x5e) | q-fix-join-items |
+| sys-pets-skeletons | packets | MATCH | 220/220 | - | - |
 | sys-pets-skeletons | rng | MATCH | 133/133 | - | - |
 | sys-pets-skeletons | state | PARTIAL | 220/220 | - | - |
 | sys-states | rng | MATCH | 33/33 | - | - |
