@@ -356,6 +356,12 @@ struct Track {
     /// `ClientUnit::mode_requests` at the last pass (REC-1683; also the
     /// explicit 0x13 sound, REC-1835).
     mode_requests: u32,
+    /// The local player's click start, held one sound tick: the click runs
+    /// in the loop pass after that pass's sound tick (`skills/sequences.md`
+    /// local player rule 4), so 1.14d's `0x004C6514` request is served by
+    /// the next tick (`audio-cast-frost-nova-sor`: request at f 19, voice
+    /// at f 20).
+    held_start: Option<u16>,
 }
 
 /// One unit of a frame with the inputs the rules read.
@@ -541,7 +547,13 @@ impl UnitFeed {
                 local_dist,
                 record: None,
                 item: None,
-                skill_request: skill_start_request(t.mode_requests, u),
+                skill_request: None,
+            };
+            let fresh = skill_start_request(t.mode_requests, u);
+            p.skill_request = if is_local {
+                std::mem::replace(&mut t.held_start, fresh)
+            } else {
+                fresh
             };
             match key.unit_type {
                 MONSTER => {
