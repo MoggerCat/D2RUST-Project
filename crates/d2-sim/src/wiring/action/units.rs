@@ -1429,6 +1429,58 @@ const SPEED_MAX: u32 = 0x7FFF;
 const RUN_BASE_ROWS: usize = 410;
 
 impl<X: Pending> ActionHooks<X> {
+    /// Pet follow `0x005754B0(game, player, x, y)` (`hirelings.md` §6,
+    /// rule one) for the summoned pet types of [`ActionHooks::pet_lists`]
+    /// (types one up to count − 1 but 7, the hireling's, which has its own
+    /// list): by the `pettype` flag byte, `warp` (bit 0) → every living pet is
+    /// moved to the player ([`LifecycleHooks::warp_pet`]); else `range`
+    /// (bit 1) → the GUIDs of the living pets farther than 1600 (squared
+    /// distance, `0x006492A0`) are returned for the caller's remove with
+    /// kill. TODO(hirelings.md §6 r1): a type with neither flag frees its
+    /// nodes (`0x00574C60`); 1.14d has no such summon row.
+    pub(crate) fn summon_follow(&mut self, sim: &mut Sim<'_>, player: UnitId) -> Vec<i32> {
+        use crate::units::modes::monster_mode;
+        const HIRELING_TYPE: usize = 7;
+        const RANGE_LIMIT: i32 = 1600;
+        let Some(b) = self.bodies.clone() else {
+            return Vec::new();
+        };
+        let Some(lists) = self.pet_lists.get(&player).cloned() else {
+            return Vec::new();
+        };
+        let (px, py) = self.path_position(player);
+        let mut far = Vec::new();
+        for (t, e) in lists.entries.iter().enumerate().skip(1) {
+            if t == HIRELING_TYPE {
+                continue;
+            }
+            let flags = b.pettype_flags.get(t).copied().unwrap_or(0);
+            for n in &e.nodes {
+                let Some(unit) = sim.game.lists.find_unit(UnitType::Monster, n.guid as u32) else {
+                    continue;
+                };
+                let alive = sim
+                    .units
+                    .get(unit)
+                    .is_some_and(|r| r.mode != monster_mode::DT && r.mode != monster_mode::DD);
+                if !alive {
+                    continue;
+                }
+                if flags & 1 != 0 {
+                    self.warp_pet(sim, unit, player);
+                } else if flags & 2 != 0 {
+                    let (x, y) = self.path_position(unit);
+                    let (dx, dy) = (x.wrapping_sub(px), y.wrapping_sub(py));
+                    let d = dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy));
+                    if d > RANGE_LIMIT {
+                        far.push(n.guid);
+                    }
+                }
+            }
+        }
+        far
+    }
+
     /// `0x00623F50` steps 6 and 7 (`units.md` §4.7): knockback (player
     /// mode 19, monster mode 13) → w clamped to 0..0x7FFF; a mode with the
     /// velocity modifier (`pathing.md` §8.1 rule 2) → w · p / 100 (i32,
