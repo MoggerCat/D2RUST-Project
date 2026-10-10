@@ -23,10 +23,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-effects | 80 | 80 | 0 | 0 | 0 | 0 | 80 | 0 | 0 | 40–160 | 0 | 80 / 0 / 0 |
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 7 | 1 | 0 | 0 | 0 | 6 | 0 | 1 | 0 | 2–8 | 0 | 7 / 0 / 0 |
-| skills | 589 | 54 | 0 | 534 | 0 | 0 | 436 | 153 | 0 | 524–2096 | 6 | 493 / 84 / 12 |
+| skills | 589 | 55 | 0 | 534 | 0 | 0 | 436 | 153 | 0 | 524–2096 | 6 | 493 / 84 / 12 |
 | systems | 913 | 209 | 46 | 579 | 0 | 79 | 205 | 626 | 3 | 1378.5–5418+ | 293 | 263 / 0 / 650 |
 | world | 824 | 207 | 0 | 584 | 0 | 33 | 530 | 256 | 5 | 817–3108+ | 299 | 699 / 46 / 79 |
-| **all** | 4444 | 1055 | 46 | 2183 | 269 | 890 | 1501 | 2040 | 13 | 4934.5–19322+ | 691 | 3057 / 457 / 930 |
+| **all** | 4444 | 1056 | 46 | 2183 | 269 | 890 | 1501 | 2040 | 13 | 4934.5–19322+ | 691 | 3057 / 457 / 930 |
 
 ## By family
 
@@ -662,7 +662,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `sim` | 2 | 0 | 0 | 2 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 6 | 0 | 24 | 0 | 0 | 24 | 6 | 24 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 12 | 0 | 18 | 0 | 0 | 18 | 18 | 12 | 0 | 0 | 23 |
-| `skill.bar` | 30 | 1 | 0 | 28 | 0 | 0 | 28 | 29 | 1 | 0 | 0 | 26 |
+| `skill.bar` | 30 | 2 | 0 | 28 | 0 | 0 | 28 | 29 | 1 | 0 | 0 | 26 |
 | `skill.dru` | 30 | 16 | 0 | 14 | 0 | 0 | 14 | 14 | 16 | 0 | 0 | 22 |
 | `skill.generic` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
@@ -4826,6 +4826,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ass.shock-field` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | ass-shock-field: state channel first divergence: frame 28 game, field seed: 1.14d [204979522, 1679869131] vs d2rs [3798855888, 1490448036] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | DIVERGED@52 | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | ass-wake-of-fire-sentry: state channel first divergence: frame 52 monster 1:9 class 410, field m: 1.14d 1 vs d2rs 9 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | bar-battle-command: state channel first divergence: frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 (q-chk-skills-bda, Wine run 2026-10-09); |
+| `skill.bar.whirlwind` | entity | DIVERGED | S | DIVERGED@20 | yes | 0 | n | claude/rc-whirlwind | specs/skills/bodies-2.md | bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players) |
 | `skill.dru.arctic-blast` | entity | DIVERGED | M | DIVERGED@39 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | dru-arctic-blast: state channel first divergence: frame 39 game, field seed: 1.14d [402943041, 1392284648] vs d2rs [4019089901, 168064467] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.armageddon` | entity | DIVERGED | M | DIVERGED@37 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-armageddon: state channel first divergence: frame 37 game, field seed: 1.14d [3385903807, 408973908] vs d2rs [980535581, 1085454190] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@31 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-cycle-of-life: state channel first divergence: frame 31 monster 1:8 class 426, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
@@ -5388,7 +5389,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.skills.levels` | system | NO-CHECK | M | - | ? | 21 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/levels.md | stat_cb not wired into the server stat callback; provisional = provisional-index.tsv rows whose location names skill; M: wiring + a recording-backed check |
 | `system.skills.sequences` | system | NO-CHECK | M | - | ? | 21 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/sequences.md | sequence table; no check; provisional = provisional-index.tsv rows whose location names skill; M: wiring + a recording-backed check |
 | `system.skills.use-path` | system | NO-CHECK | M | - | ? | 21 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/use.md | start->do chain; wired in d2-server but several seams Pending (attack_cleanup, skill_resync); provisional = provisional-index.tsv rows whose location names skill; M: wiring + a recording-backed check |
-| `skill.bar.whirlwind` | entity | PARTIAL | S | DIVERGED@20 | yes | 0 | n | claude/rc-whirlwind | specs/skills/bodies-2.md | bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players) |
 
 ## systems
 
