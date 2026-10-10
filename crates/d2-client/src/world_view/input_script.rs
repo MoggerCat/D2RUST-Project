@@ -207,6 +207,10 @@ pub fn headless_key_action(bindings: &Bindings, vk: u32) -> Result<Action, Strin
     }
 }
 
+/// The UI between a pass's events and the world handlers ([`Headless::apply_with`]).
+pub type UiRoute<'a, L> =
+    dyn FnMut(&mut Bridge<L>, Vec<UiEvent>) -> Result<Vec<UiEvent>, BridgeError> + 'a;
+
 /// One step of a script.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -855,7 +859,7 @@ impl Headless {
         &mut self,
         bridge: &mut Bridge<L>,
         last: i32,
-        ui: &mut dyn FnMut(&mut Bridge<L>, Vec<UiEvent>) -> Result<Vec<UiEvent>, BridgeError>,
+        ui: &mut UiRoute<'_, L>,
     ) -> Result<Vec<String>, BridgeError> {
         let local_at = self.walk.as_ref().and_then(|(p, _, _)| p.position());
         let cam = script_camera(bridge.world(), local_at);
