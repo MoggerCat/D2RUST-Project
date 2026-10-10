@@ -1423,3 +1423,40 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-shadow-warrior | packets | DIVERGED | 69/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
 | ass-shock-field | packets | DIVERGED | 69/70 | frame 27 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | ass-wake-of-fire-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| bar-double-throw | packets | MATCH | 70/70 | - | - |
+| bar-double-throw | state | PARTIAL | 70/70 | - | - |
+| bar-leap | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| bar-leap | state | PARTIAL | 70/70 | - | - |
+| bar-leap-attack | packets | DIVERGED | 69/70 | frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| bar-shout | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | unrouted |
+| bar-shout | state | PARTIAL | 70/70 | - | - |
+| cube-007-1-ring-1-perfect-ruby-1-explod | items | MATCH | 5/5 | - | - |
+| cube-007-1-ring-1-perfect-ruby-1-explod | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
+| cube-007-1-ring-1-perfect-ruby-1-explod | state | PARTIAL | 24/24 | - | - |
+| draws-a2-town-ama | draws | DIVERGED | 0/1 | tick 73 draw row 115 (CelDrawShadow) column file: 1.14d data/global/monsters/bg/tr/bgtrlitnuhth.dcc vs d2rs data/global/monsters/bg/tr/bgtrlits1hth.dcc | unrouted |
+| draws-a3-town-ama | draws | DIVERGED | 0/1 | tick 72 draw row 97 (CelDraw) column frame: 1.14d 2 vs d2rs 8 | unrouted |
+| draws-a4-town-ama | draws | DIVERGED | 0/1 | tick 73 draw row 278 (CelDraw) column file: 1.14d data/global/ui/cursor/ohand.dc6 vs d2rs data/global/ui/cursor/protate.dc6 | unrouted |
+| draws-a5-town-ama | draws | DIVERGED | 0/1 | tick 72 draw row 76 (CelDrawShadow) column frame: 1.14d 1 vs d2rs 2 | unrouted |
+| draws-blood-moor-ama | draws | DIVERGED | 0/1 | tick 73 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
+| draws-cave-ama | draws | DIVERGED | 0/1 | tick 73 draw row 65 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
+| draws-fire-bolt-sor | draws | DIVERGED | 0/1 | tick 29 draw row 98 (CelDrawShadow) column dir: 1.14d 54 vs d2rs 57 | unrouted |
+| draws-frost-nova-sor | draws | DIVERGED | 0/1 | tick 26 draw row 98 (CelDrawShadow) column dir: 1.14d 54 vs d2rs 57 | unrouted |
+| draws-melee-bar | draws | DIVERGED | 0/1 | tick 45 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/ba/ra/baralita11hs.dcc vs d2rs data/global/chars/ba/sh/bashlita1hth.dcc | unrouted |
+| draws-run-ama | draws | DIVERGED | 0/1 | tick 59 draw row 1 (FloorTileDraw) column x: 1.14d -31 vs d2rs -24 | unrouted |
+| draws-walk-ama | draws | DIVERGED | 0/1 | tick 59 draw row 1 (FloorTileDraw) column y: 1.14d -62 vs d2rs -55 | unrouted |
+| dru-fissure | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| dru-grizzly | packets | MATCH | 70/70 | - | - |
+| dru-hurricane | packets | MATCH | 70/70 | - | - |
+| dru-molten-boulder | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| dru-molten-boulder | state | PARTIAL | 70/70 | - | - |
+| dru-werewolf | packets | MATCH | 70/70 | - | - |
+| interact-talk-akara | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | unrouted |
+| interact-talk-akara | state | PARTIAL | 30/30 | - | - |
+| items-vendor-drehya-stock | packets | DIVERGED | 138/140 | frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) | unrouted |
+| nec-bone-wall | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| nec-clay-golem | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | unrouted |
+| pal-blessed-aim | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 21 (id 0xaa) | unrouted |
+| pal-charge | packets | DIVERGED | 69/70 | frame 25 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| pal-cleansing | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-concentration | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 24 (id 0xaa) | unrouted |
+| pal-conviction | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
