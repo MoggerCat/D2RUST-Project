@@ -41,7 +41,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj", "aud", "fmt", "render"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -475,6 +475,46 @@ def fam_netc2s(ctx):
     return out
 
 
+# One scenario per group of S->C / C->S message ids a scenario can reach by a
+# poke or a send; each id is a ledger row (net.s2c.0xNN / net.c2s.0xNN).
+# Every other NO-CHECK id stays so with its reason in the ledger part
+# (id unused in 1.14d, multiplayer-only, sender needs a state no poke makes).
+NETS2C_GROUPS = [
+    ("arrival", "s2c", [0x5B, 0x65, 0x8D], 30, [],
+     "town arrival only: the three messages every 1.14d join queues"),
+    ("warp", "s2c", [0x04, 0x05], 80, ["at 10 poke warp 2"],
+     "warp to the Blood Moor: UnloadComplete and LoadComplete of the level change"),
+    ("ping", "s2c", [0x8F], 30, ["at 10 send hex 6d 01 00 00 00 00 00 00 00 00 00 00 00"],
+     "one Ping (0x6D): the server answers Pong"),
+    ("leave", "s2c", [0x06], 30, ["at 10 send hex 69"],
+     "LeaveGame (0x69): GameExit to the leaving client"),
+    ("hotkey", "s2c", [0x7B], 30,
+     ["at 10 send BindHotkey skill=0 left=1 slot=0 item=4294967295"],
+     "bind the Attack skill to hotkey slot 0: AssignHotkey"),
+    ("stat", "s2c", [0x20], 30, ["at 10 poke stat @player 0 0 40"],
+     "base Strength changed by a poke: the stat update queue"),
+    ("trade", "s2c", [0x58], 110,
+     ["at 4 poke goto unit 2:267", "at 70 poke operate @2:267"],
+     "operate the Rogue Encampment stash: OpenUi"),
+    ("overhead", "c2s", [0x14], 30, ["at 10 send hex 14 00 00 68 69 00 00"],
+     "one overhead chat text (0x14) with an empty name"),
+]
+
+
+def fam_nets2c(ctx):
+    out = []
+    for gname, side, ids, ticks, lines, what in NETS2C_GROUPS:
+        c = Check(f"gen-nets2c-{gname}", "nets2c", f"net.{side} " + " ".join(f"0x{i:02x}" for i in ids),
+                  f"{side.upper()} " + " ".join(f"0x{i:02X}" for i in ids), "ScnAma --class ama --expansion",
+                  ticks, 300, "packets", lines,
+                  comment=[f"{what}. The packets channel compares every message of the window on both "
+                           "sides (PROVISIONAL REC-2580: the trigger is a poke or a send, not the "
+                           "original's own cause)."])
+        c.extra = {"areas": [f"net.{side}.0x{i:02x}" for i in ids]}
+        out.append(c)
+    return out
+
+
 QUALITIES = {1: "low", 2: "normal", 3: "superior", 4: "magic", 5: "set", 6: "rare",
              7: "unique", 8: "crafted"}
 QSEEDS = [(0x1234, 666), (0x2222, 77), (0x5A5A, 4242)]
@@ -835,7 +875,7 @@ def fam_render(ctx):
     return out
 
 
-FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s,
+FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
              "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render}
 
 
@@ -887,6 +927,10 @@ def resolve_area(c, areas):
 
     elif f == "netc2s":
         pick = [a for a, _ in areas if a == f"net.c2s.0x{x['msg']:02x}"]
+    elif f == "nets2c":
+        have = {a for a, _ in areas}
+        c.area = ",".join(a for a in x["areas"] if a in have) or "-"
+        return
     elif f == "missile":
         pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
     elif f == "state":
