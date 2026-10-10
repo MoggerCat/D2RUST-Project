@@ -309,6 +309,19 @@ on the player's seed:
    (`0x00472590`: lightning off; the particle pool is cleared when the
    mode changes or `arg` ≠ 0).
 
+Act load also runs a **one-time** `0x00472610` after `0x004726F0(1)`
+(`0x00472890`: flag `[0x007A8A30]` = 0 → three raw steps on the player's
+seed, then the flag is set; `.bss`, never cleared, so only the first act
+load of the client process does it). `0x004726F0` returns at once, with no
+step, while the local player has no room. A placement of the local player
+(`0x004654C0`, S→C 0x15 at the join) ends in `0x00472C20(flag)`, which
+clears two grids and, for flag ≠ 0, runs `0x004726F0(flag)` (outside act V:
+snow off and `0x00472610`, three steps); the join's 0x15 carries flag 1, so
+the player's seed takes 3 (0x15) + 3 (act load) + 3 (one-time) raw steps
+before the first rain update (verified: the rain ramp of
+`facts/client/weather/a1-town-rain-start.tsv`, target 1 at C 3, 2 at C 5,
+3 at C 7, follows from these draws; d2rs: REC-1900, REC-1901).
+
 `0x00472400` (phase 2, per level): 109–112 snow goal (42, 170), peak :=
 `roll_range(32, 56)`; 117 goal (170, 56), peak := `roll_range(40, 112)`;
 120, 121 goal (28, 28), wind and goal 28, peak := 256; other levels keep

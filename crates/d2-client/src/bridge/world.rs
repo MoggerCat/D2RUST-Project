@@ -651,6 +651,10 @@ pub struct ClientWorld {
     pub store_serial: u32,
     /// Bridge frames whose pump ran a server tick (`bridge.md` §5 rule 3).
     pub server_ticks: u64,
+    /// The flag byte of every 0x15 that placed the local player, in order
+    /// (`msg-units.md` §3 rule 4.6: each runs `0x00472C20(flag)`, whose
+    /// weather side the weather view replays on the shared client seed).
+    pub local_places: Vec<u8>,
     /// Set S: the units the server announced, in key order (§2 rule 8).
     pub units: BTreeMap<UnitKey, ClientUnit>,
     /// `[0x007A6A70]` (§3).

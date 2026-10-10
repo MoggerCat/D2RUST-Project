@@ -1325,3 +1325,30 @@ fn thunder_requests_202_with_the_delay_and_places_it_y_first() {
     assert_eq!(out.thunder.unwrap().position, None);
     assert_eq!(seed, e);
 }
+
+// Covers: specs/render/draw-order-2.md §11.8 (one-time `0x00472610`)
+#[test]
+fn first_act_load_adds_the_one_time_wind_init() {
+    let lv = level(2, 0, true, false);
+    let steps = |w: &mut Weather| {
+        let mut s = Seed::new(7, 0);
+        w.act_load(
+            LocalPlayer {
+                seed: &mut s,
+                level: lv,
+            },
+            resources(),
+        )
+        .unwrap();
+        let mut t = Seed::new(7, 0);
+        (0..32).find(|_| {
+            t.step();
+            t == s
+        })
+    };
+    let mut w = Weather::new();
+    // 0x004726F0(1) outside act V: three steps; the one-time init: three more.
+    assert_eq!(steps(&mut w), Some(5));
+    // Later act loads of the same client run only the level entry.
+    assert_eq!(steps(&mut w), Some(2));
+}
