@@ -1401,6 +1401,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                     .x
                     .player_mode_request(&mut *cv.game, u, Some(skill as u16), mode as u32, wt);
             }
+            // `0x0057FE90` / `0x0057FEF0` (`sim/units.md` §4.2 "does not
+            // survive a player's attack start"): the re-entry request
+            // calls the start `0x0056FAF0` of the used skill (Attack)
+            // after the mode's schedule, which writes +0x44 := frame
+            // bonus · 256 (`0x0056CA40`).
+            let tables = self.cv.v.h.tables.clone();
+            crate::skills::use_::start(self, &tables.skills, u);
+            let cv = &mut self.cv;
             let t = ModeTarget::Unit(target);
             crate::wiring::interaction::body_path::point_target(&mut cv.v, u, t);
             self.xm().keep_target(u, t);
