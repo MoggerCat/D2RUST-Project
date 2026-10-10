@@ -20,9 +20,10 @@ C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 2
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open
 C018	rc-c018-monstate	17:43	su hcIdx extra-spawn double roll(5) (a2-quest-radament s)	done gen-su radament,ismail,geleb,toorc,wyand,bremm,maffer,baal2 EQUAL
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	released: footstep-variant client seed (rc-audio-fmt-div, Windows)
-C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	open
+C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	done packets MATCH a2-super-leatherarm, a2-wp-46; a2-wp-74 4->14
 C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35 C008 checks state 100% (11 rows EQUAL)
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
+C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open
 C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops the player light); ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	open
