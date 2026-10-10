@@ -168,11 +168,23 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         r: Option<RoomId>,
         at: (i32, i32),
     ) -> Option<bool> {
+        self.rooms_place_unit_exact(u, r, at, false)
+    }
+
+    /// `0x00554EA0(game, unit, room, x, y, exact, 0)`: `exact` skips the
+    /// free-point search (`path-placement.md` §10 rule 3).
+    pub(super) fn rooms_place_unit_exact(
+        &mut self,
+        u: UnitId,
+        r: Option<RoomId>,
+        at: (i32, i32),
+        exact: bool,
+    ) -> Option<bool> {
         if !self.on_rooms() {
             return None;
         }
         let c = PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
-        Some(place_unit(c, u, r, at.0, at.1, false, false))
+        Some(place_unit(c, u, r, at.0, at.1, exact, false))
     }
 }
 
@@ -183,8 +195,21 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     // does not walk, so the path record holds no target; the point kept
     // at the mode start (`UseRest::target_position`) stands in when
     // [`Pending::path_target_point`] has none (0, 0). Settled by REC-154.
+    // The path provider's record is read first (u16 +0x10, +0x12 of the
+    // unit's path, `pathing.md` §2.3): a monster's mode request writes the
+    // point there (Imp Teleport's `0x005D1AB0` "no O, no T" branch reads it
+    // at the action frame, `0x0056D2C0`), and the host seam only answers for
+    // hosts without the provider.
     pub(super) fn cast_target_point(&self, u: UnitId) -> (i32, i32) {
-        match self.x().path_target_point(u) {
+        let path = self
+            .cv
+            .v
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(u))
+            .map(|d| (i32::from(d.target_x), i32::from(d.target_y)));
+        match path.unwrap_or_else(|| self.x().path_target_point(u)) {
             (0, 0) => self.x().target_position(u).unwrap_or((0, 0)),
             p => p,
         }

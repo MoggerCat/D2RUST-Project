@@ -137,6 +137,15 @@ impl Pending for Open {
     fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
         crate::wiring::interaction::skill_events::assign_right_aura(h, sim, unit);
     }
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        crate::wiring::interaction::skill_events::monster_right_aura(h, sim, unit, skill, level);
+    }
     fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
         crate::wiring::interaction::skill_events::monster_attack_skill(h, sim, unit);
     }

@@ -21,11 +21,12 @@ traces/orig-cache` (no 1.14d timeouts); no check went EQUAL -> DIVERGED.
   init step 14 entry. d2rs: the client's monster seam (`MonsterAi`)
   mirrored only summon entries and fell back to 1. `sync_seams` now
   mirrors `natural_skills` too (summons override, as `ai.rs`
-  `skill_level`). `crates/d2-client/src/app/{single_player,monster_ai}.rs`,
-  unit test, `specs/monsters/init.md` §6 step 14 note.
+  `skill_level`). The same fix reached staging meanwhile (46add4d6, per-skill
+  merge); the sync kept staging's code, so this branch adds the
+  `specs/monsters/init.md` §6 step 14 note only.
 - 613–616, 722, 723 EQUAL; the other 13 diverge later (causes file).
 - `docs/handoff/rc-gen-mon-causes.tsv`: the 100 remaining first
-  differences in 20 clusters (cause, count, example, suspected 1.14d fn). Ledger part `docs/handoff/ledger/rc-gen-mon-triage.tsv`: all 335 rows re-settled on r16 (overrides older rc-* gen-mon rows by name order).
+  differences in 20 clusters (cause, count, example, suspected 1.14d fn). Ledger part `docs/handoff/ledger/rc-gen-mon-triage.tsv`: 265 rows re-settled on r16 (rows rc-maggot-seed / rc-mon-fr / rc-mon-tx / rc-pets hold left to them).
 
 ## Open (sizes)
 
@@ -35,6 +36,5 @@ traces/orig-cache` (no 1.14d timeouts); no check went EQUAL -> DIVERGED.
   at unit removal `lifecycle.rs:180`: 7 (S); monster dies early: 7 (M);
   player sp 64 vs 128: 7 (S); the rest ≤ 6 each (causes file).
 - `fr` (3) belongs to rc-mon-fr; monster item `own` (3) to rc-seed-order.
-- Pre-existing on r16, not mine: `tools/coverage.py --check` flags
-  `crates/d2-sim/src/debug/state/tests.rs:409` (malformed rule `§2 \`own\``); `d2-client --test e2e_full_loop`
+- Pre-existing on r16, not mine: `d2-client --test e2e_full_loop`
   (3) panics at `e2e_full_loop.rs:2362` (0x9C slice of 4) with or without this fix.

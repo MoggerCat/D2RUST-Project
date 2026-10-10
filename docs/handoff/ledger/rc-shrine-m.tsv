@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+shrine.18.gem-upgrade	entity	world	shrines.txt row 18 Gem Upgrade (Magic)	specs/world/objects.md	draft	gen-shrine-18	PARTIAL	?	15	y	claude/rc-shrine-m	EQUAL	-	gen-shrine-18 state: all 120 ticks equal

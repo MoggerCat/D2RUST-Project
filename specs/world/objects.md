@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–503 |
-|   8. Chests and breakables | 504–639 |
-|   9. Shrines | 640–755 |
-|   10. Doors, operate 8 (`0x00581D40`) | 756–779 |
-|   11. Wells, operate 22 (`0x005858A0`) | 780–811 |
-|   12. Portals, operate 15 (`0x00584870`) | 812–882 |
-|   13. Torch, operate 11 (`0x005843D0`) | 883–887 |
-|   14. Client messages | 888–915 |
-|   15. Not covered yet | 916–930 |
-|   16.–18. Moved | 931–937 |
-| Constants & data dependencies | 938–984 |
-| Randomness | 985–1031 |
-| Edge cases & original bugs | 1032–1098 |
-| Test vectors | 1099–1137 |
-| Provenance | 1138–1204 |
-| Open questions | 1205–1258 |
+|   7. Operate dispatch | 324–511 |
+|   8. Chests and breakables | 512–647 |
+|   9. Shrines | 648–769 |
+|   10. Doors, operate 8 (`0x00581D40`) | 770–793 |
+|   11. Wells, operate 22 (`0x005858A0`) | 794–825 |
+|   12. Portals, operate 15 (`0x00584870`) | 826–896 |
+|   13. Torch, operate 11 (`0x005843D0`) | 897–901 |
+|   14. Client messages | 902–929 |
+|   15. Not covered yet | 930–944 |
+|   16.–18. Moved | 945–951 |
+| Constants & data dependencies | 952–998 |
+| Randomness | 999–1045 |
+| Edge cases & original bugs | 1046–1112 |
+| Test vectors | 1113–1151 |
+| Provenance | 1152–1218 |
+| Open questions | 1219–1283 |
 <!-- /index -->
 
 ## Summary
@@ -501,6 +501,14 @@ waypoint's operate sets the operator's interact info,
 So an operate or a walk gives 0; the operate function's own result
 never reaches this value.
 
+Recorded (2026-10-09, `interact-operate-stash`: the player 7 sub-tiles
+from stash 267, `poke operate`): the 0x13 starts a run (mode 3) at
+frame 4 whose path target is the stash's own cell (4866, 4229) (the run
+lifts the stash's footprint, `sim/pathing.md` §3 step 6, size `SizeX`
+1), the player stops at (4868, 4229) at frame 13 (unit distance 0) and
+the operate runs on arrival: S→C 0x77 0x10 (stash open) in that frame.
+d2rs equal on every state field and packet (q-fix-npc-interact).
+
 ### 8. Chests and breakables
 
 Common pieces:
@@ -746,6 +754,12 @@ stat 162 is "other" → a · stat162(P) / 100.
   := the shrine's position, target offset (+5i if i odd else −5i, +5j if
   j odd else −5j), skill level := clamp(stat 12 of P / 5 (signed), 1,
   8); created by `0x0059FA30`.
+- **Item drop near P** (`0x00582AC0`, gem 18 and the potions): the request
+  names no source unit (its unit fields stay zero), item level from P's
+  level, quality 2, spot from the floor search at P (`0x00555DA0`: start
+  (x+2, y+3) when a room exists there). The item takes its seeds from the
+  game seed (derive, then one step) and its own seed stays `{start, 666}`
+  with no draw; quantity (stat 70) := 1. Verified: `gen-shrine-18`.
 - **Potion drop** (21, 22; inline in `0x005830E0` / `0x00583410`): code
   index `0x00633680('opm ' / 'gpm ')` (−1 → fatal); per potion a free
   item spot next to P (`0x00555DA0`); none → that potion is skipped but
@@ -1255,3 +1269,14 @@ lists of §2 from the live `shrines.txt`.
 16. `0x0061B060(…, 3)` (portal arrival point without a partner, §12
     rule 8): the DRLG spec owns which point kind 3 is. **Answered**:
     3 is the free-point size (§12 rule 8, `0x00584A59`).
+
+#### 9.3a Shrine missile creation (`0x0059FA30`)
+
+The storm and potion shrines call the missile creator with the parameter
+record of `missiles/missiles.md` §R2.1. Storm: flags 3, start = the shrine's
+path position, target = offset (relative). Potions (`0x005830E0`,
+`0x00583410`): flags 0x520 (absolute target 0x20, frames-from-distance
+0x400); start = the shrine's position, target = shrine position + offset.
+Owner P, class 62 / 45 / 48, skill level clamp(P level / 5, 1, 8); the
+gfx word (+0x24) is 1 and unread. Wired in `ObjectView::create_missile`
+(rc-shrine-missile).

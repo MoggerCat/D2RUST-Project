@@ -58,6 +58,12 @@ pub struct Extra {
     pub guard_moved2: bool,
     /// +0x11 the harem blocker exists.
     pub blocker_made: bool,
+    /// +0x12 Jerhyn's palace walk armed (`0x0059F580`, §10).
+    pub palace_walk: bool,
+    /// +0x13 Jerhyn's walk to the blocker started (§10).
+    pub palace_walked: bool,
+    /// +0x14 Jerhyn placed beside the blocker (§10).
+    pub palace_placed: bool,
     /// +0x15 Jerhyn's position stored.
     pub jerhyn_pos_stored: bool,
     /// +0x16 the portal to the Canyon is open.
@@ -765,6 +771,109 @@ fn path_distance(at: (i32, i32), x: i32, y: i32) -> u32 {
     let dx = at.0.abs_diff(x);
     let dy = at.1.abs_diff(y);
     (2 * dx.max(dy) + dx.min(dy)) / 2
+}
+
+/// `0x0059DFB0` (§10): chain 13 not-intro with state < 4 → false, else
+/// true (a missing record answers true).
+fn tombs_past_open(ctl: &QuestControl) -> bool {
+    !ctl.record(13).is_some_and(|r| r.not_intro && r.state < 4)
+}
+
+/// Jerhyn AI hook `0x0059F570` → `0x0059F510` (from `0x005E7130`, §10):
+/// false ("Jerhyn held at the palace") only when chain 11 exists with
+/// +0x0D set, chain 8 exists not-intro with state ≠ 5, `0x0059DFB0` is
+/// false, and chain 11 is not-intro with state < 2. No draw.
+pub fn jerhyn_palace_active(ctl: &QuestControl) -> bool {
+    let held = ctl.record(CHAIN).is_some_and(|r11| {
+        r11.extra.a2.q4.jerhyn_palace
+            && ctl
+                .record(8)
+                .is_some_and(|r8| r8.not_intro && r8.state != 5)
+            && !tombs_past_open(ctl)
+            && r11.not_intro
+            && r11.state < 2
+    });
+    !held
+}
+
+/// What the Jerhyn AI does after `0x0059F580` (§10): the outputs (a, b)
+/// and the action the hook takes on the AI unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JerhynStep {
+    /// Nothing to do on the unit.
+    Out(i32, i32),
+    /// Walk to (x, y) (`0x005DED90`), then (a, b) = (0, 0).
+    Walk(i32, i32),
+    /// Place the unit at (x, y) = the blocker's position with x + 4, in
+    /// the blocker's room (free test sizes 1, 2, 3, then `0x00554EA0`);
+    /// on success [`jerhyn_placed`]. (a, b) = (0, 1) either way.
+    PlaceAt(i32, i32, RoomId),
+}
+
+/// Jerhyn / palace NPC logic `0x0059F580(game, unit, &a, &b)` (§10). The
+/// walk and placement are the AI's ([`JerhynStep`]); the record writes
+/// before them are made here. `at` is the unit's path position.
+pub fn jerhyn_npc_state<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    at: (i32, i32),
+) -> JerhynStep {
+    let Some(i) = ctl.find(CHAIN) else {
+        return JerhynStep::Out(1, 0);
+    };
+    if !ctl.records[i].not_intro || !ctl.records[i].extra.a2.q4.jerhyn_palace {
+        return JerhynStep::Out(1, 0);
+    }
+    // `0x0059D7C0`: chain 13 not-intro with state < 2 → 0, else 1.
+    if ctl.game.get(12, 13) || ctl.game.get(14, 13) || !tombs_not_started(ctl) {
+        return JerhynStep::Out(1, 0);
+    }
+    if ctl.records[i].extra.a2.q4.palace_placed {
+        return JerhynStep::Out(1, 0);
+    }
+    // `0x0059D7E0`: "not-intro with state 1". PROVISIONAL (REC-1631):
+    // read as chain 13's record, as its neighbour `0x0059D7C0`.
+    if ctl.record(13).is_some_and(|r| r.not_intro && r.state == 1) {
+        x4(ctl, i).palace_walk = true;
+    }
+    if !ctl.records[i].extra.a2.q4.palace_walk {
+        return JerhynStep::Out(1, 0);
+    }
+    let x = &ctl.records[i].extra.a2.q4;
+    if !x.palace_walked || x.guard_moved {
+        jerhyn_near_blocker(ctl, w);
+        let x = x4(ctl, i);
+        if x.near_blocker {
+            x.palace_walked = true;
+            x.palace_walk = false;
+            return JerhynStep::Walk(x.blocker_x, x.blocker_y);
+        }
+        return JerhynStep::Out(0, 1);
+    }
+    if !x.blocker_made {
+        return JerhynStep::Out(0, 1);
+    }
+    let (bx, by, guid) = (x.blocker_x, x.blocker_y, x.blocker_guid);
+    if path_distance(at, bx, by) > 2 {
+        let x = x4(ctl, i);
+        x.guard_pos2 = true;
+        x.guard_pos = false;
+        return JerhynStep::Walk(bx, by);
+    }
+    let found = w.object_by_guid(guid).and_then(|(b, _)| w.unit_position(b));
+    match found {
+        Some((ox, oy, room)) => JerhynStep::PlaceAt(ox + 4, oy, room),
+        None => JerhynStep::Out(0, 1),
+    }
+}
+
+/// [`JerhynStep::PlaceAtBlocker`] succeeded: +0x0F := 1, +0x14 := 1.
+pub fn jerhyn_placed(ctl: &mut QuestControl) {
+    if let Some(i) = ctl.find(CHAIN) {
+        let x = x4(ctl, i);
+        x.guard_moved = true;
+        x.palace_placed = true;
+    }
 }
 
 /// Monster class hook `0x0059B6C0` (jerhyn, from `0x005447A0`): a bare

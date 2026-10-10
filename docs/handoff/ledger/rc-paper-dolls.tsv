@@ -1,0 +1,4 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+ui.frontend.charselect	ui	systems	Character select with 3 saves	specs/ui/frontend-menus.md	draft	-	-	yes	4	n	claude/rc-paper-dolls	DIVERGED	S	paper dolls drawn (REC-1907, F2.10); remaining: snow/background noise, selection-box rows
+ui.frontend.charselect.dolls	ui	systems	Character-select paper dolls (3 unequipped saves, 12 X captures)	specs/ui/frontend-menus.md	draft	-	-	yes	4	n	claude/rc-paper-dolls	NO-CHECK	S	figure pixels 100% equal to 1.14d at the matching animation frame (frame advance 1 per 40 ms tick, REC-2182); dy -1 (REC-2183), equipped saves and slot fix-ups (REC-2181), shadows (REC-2184) unverified; no scenario check yet

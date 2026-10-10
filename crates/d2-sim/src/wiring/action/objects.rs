@@ -33,11 +33,13 @@ use crate::game::Game;
 use crate::rng::Seed;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId, UnitType};
+use crate::world::objects::shrines::MissileRequest;
 use crate::world::objects::{
     self, ChestWorld, Created, Dispatch, EventRun, MiscWorld, ObjectControl, ObjectError,
     ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, StateList, StateRequest,
     UpdateMessage,
 };
+use crate::world::quests::act2::q4::JerhynStep;
 
 use super::{Pending, View, WiringError};
 use crate::path::record::ObjectShape;
@@ -128,6 +130,38 @@ pub trait QuestObjectHost<X> {
         interact: bool,
     ) -> bool {
         let _ = (game, v, player, npc, class, interact);
+        false
+    }
+    /// The Jerhyn AI hooks of `ai-bodies.md` §9.9 step 2
+    /// (`world/quests-act2.md` §10): `0x0059F570` (palace active),
+    /// `0x0059F580` (palace NPC state, the AI unit at its path position
+    /// `at`), `0x0059B6E0` (guard moving) and the success of
+    /// [`JerhynStep::PlaceAt`]. Defaults: no quest state (active, (1, 0),
+    /// not moving).
+    fn jerhyn_palace_active(&mut self) -> bool {
+        true
+    }
+    fn jerhyn_npc_state(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        at: (i32, i32),
+    ) -> JerhynStep {
+        let _ = (game, v, at);
+        JerhynStep::Out(1, 0)
+    }
+    fn guard_moving(&mut self) -> bool {
+        false
+    }
+    fn jerhyn_placed(&mut self) {}
+    /// The palace guard AI hooks of `ai-bodies-7.md` §7
+    /// (`world/quests-act2.md` §10): `0x0059B8B0` (the guard at its end
+    /// position, the door open) and `0x0059AEC0` (the blocker open).
+    /// Defaults: false.
+    fn palace_door_open(&mut self) -> bool {
+        false
+    }
+    fn palace_guard_aside(&mut self) -> bool {
         false
     }
     /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8), called from
@@ -736,6 +770,45 @@ impl<X: Pending> View<'_, X> {
         })
     }
 
+    /// Unit distance `0x00641530` on the path records (`pathing.md` §9.5).
+    fn object_unit_distance(&self, a: UnitId, b: UnitId) -> i32 {
+        let Some(paths) = self.h.paths.as_ref() else {
+            return i32::MAX;
+        };
+        let pt = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::Point { x, y }
+        };
+        crate::path::walk::geom::unit_distance(
+            &paths.tables,
+            pt(a),
+            self.path_size(a),
+            pt(b),
+            self.path_size(b),
+        )
+    }
+
+    /// Interact range `0x00623660` (§7.1, [`objects::interact_range`]) on
+    /// the path positions, the operator's size and the object's
+    /// `objects.txt` `SizeX` / `SizeY`. `None` without the path provider
+    /// or an object row.
+    pub fn object_range(&self, operator: UnitId, object: UnitId) -> Option<bool> {
+        self.h.paths.as_ref()?;
+        let class = self
+            .units
+            .get(object)
+            .filter(|r| r.ty == UnitType::Object)?
+            .class;
+        let row = self.h.objects.as_ref()?.tables.object(class as u16).ok()?;
+        Some(objects::interact_range(
+            self.h.path_position(operator),
+            self.path_size(operator),
+            self.h.path_position(object),
+            (row.sizex as i32, row.sizey as i32),
+            self.object_unit_distance(operator, object),
+        ))
+    }
+
     /// The object update pass `0x00581AD0` (§14) for one queued object and
     /// the client of `receiver`: S→C 0x0E / 0x4D sent to `receiver`
     /// ([`Pending::send`]), 0x60 likewise,
@@ -1053,7 +1126,10 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     fn in_interact_range(&self, operator: UnitId, object: UnitId) -> bool {
         match self.v.h.x.object_preview_range() {
             Some(r) => preview_distance(&self.v, operator, object) <= r,
-            None => self.v.h.x.object_in_range(self.game, operator, object),
+            None => self
+                .v
+                .object_range(operator, object)
+                .unwrap_or_else(|| self.v.h.x.object_in_range(self.game, operator, object)),
         }
     }
     /// `0x00554100`: the interact info on the player's unit record.
@@ -1507,10 +1583,88 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     fn max_stamina(&self, unit: UnitId) -> i32 {
         self.v.stats.max_stamina(unit)
     }
+    /// Missile creation `0x0059FA30` on the missile store, with the
+    /// parameter record the storm (`0x00582DA0`) and potion
+    /// (`0x005830E0`, `0x00583410`) shrines build (`objects.md` §9.3,
+    /// `missiles.md` §R2.1): the start is the shrine's path position, the
+    /// target is that position plus the offset when the absolute-target
+    /// flag (0x20) is set, else the offset itself (relative, flag 2).
+    fn create_missile(&mut self, m: MissileRequest) {
+        use crate::missiles::{self, param_flags, MissileParams};
+        let (x, y) = self.v.h.path_position(m.from);
+        let (target_x, target_y) = if m.flags & param_flags::TARGET_ABSOLUTE != 0 {
+            (x.wrapping_add(m.offset.0), y.wrapping_add(m.offset.1))
+        } else {
+            m.offset
+        };
+        let p = MissileParams {
+            flags: m.flags,
+            owner: Some(m.owner),
+            origin: Some(m.from),
+            class: i32::from(m.class),
+            x,
+            y,
+            target_x,
+            target_y,
+            level: m.skill_level,
+            ..MissileParams::default()
+        };
+        let Some(mut store) = self.v.h.missiles.take() else {
+            self.v.h.errors.push(WiringError::Reentrant("missiles"));
+            return;
+        };
+        let t = self.v.h.tables.clone();
+        {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut self.v,
+            };
+            let _ = missiles::create_missile(self.game, &mut cx, &p);
+        }
+        self.v.h.missiles = Some(store);
+    }
     fn player_level(&self, player: UnitId) -> i32 {
         self.v.stat(player, STAT_LEVEL)
     }
+    fn drop_near_player(&mut self, player: UnitId, code: [u8; 4]) {
+        self.shrine_item_near(player, code);
+    }
+    fn drop_potion_near_player(&mut self, player: UnitId, code: [u8; 4], _quantity: i32) {
+        self.shrine_item_near(player, code);
+    }
 }
+
+impl<X: Pending> ObjectView<'_, X> {
+    /// `0x00582AC0` and the inline potion drop of `0x005830E0` /
+    /// `0x00583410` (`objects.md` §9.3): the floor search from P's
+    /// position, an item of `code` at P's level, then quantity (stat 70)
+    /// := 1.
+    // PROVISIONAL (REC-2095; objects.md §9.3): the item flag bit 0 at
+    // record +0xC4 and the client item message of `0x00582AC0` are not
+    // wired; the creation and its draws are the code drop's.
+    fn shrine_item_near(&mut self, player: UnitId, code: [u8; 4]) {
+        let made = self
+            .with_drops(|h, sim, d, levels, spots| {
+                drop_helpers::near_player_drop(
+                    h,
+                    sim,
+                    d,
+                    levels,
+                    spots,
+                    player,
+                    u32::from_le_bytes(code),
+                )
+            })
+            .flatten();
+        if let Some(item) = made {
+            self.v.set_base(item, STAT_QUANTITY, 1);
+        }
+    }
+}
+
+/// Stat 70 `quantity` (`sim/stats.md`).
+const STAT_QUANTITY: u16 = 70;
 
 /// Stat 12 `level` (`sim/stats.md`).
 const STAT_LEVEL: u16 = 12;

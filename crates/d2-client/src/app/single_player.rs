@@ -520,6 +520,9 @@ pub struct LocalSeams {
     /// The unit size (`0x00620510`, the path record's) of the units of
     /// [`Self::sides`], for the full-size distance of the target search.
     pub sizes: BTreeMap<UnitId, i32>,
+    /// The monsters carrying a usable shield (`0x006225F0`; the `SH`
+    /// component choice), set by [`super::weapons::sync`].
+    pub shielded: std::collections::BTreeSet<UnitId>,
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
@@ -719,8 +722,12 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
-    let levels =
-        super::monster_ai::MonsterAi::merged_levels(&hooks.natural_skills, &hooks.monster_skills);
+    // The init-given skill levels (`monsters/init.md` §6 step 14) under the
+    // summons' entries: the used skill's base level (the egg hatch's count).
+    let mut levels = hooks.natural_skills.clone();
+    for (u, m) in &hooks.monster_skills {
+        levels.entry(*u).or_default().extend(m);
+    }
     hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
@@ -759,6 +766,14 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// The monster AI's sound request, `0x00553380(unit, event, target)`
+    /// (Spec: specs/audio/triggers-2.md §14 rule 1; NPC greeting, event 18,
+    /// `0x005E73A0`): the unit's sound slot, then queued for update so the
+    /// monster update's S→C 0x2C (`0x00571740`) goes out.
+    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        let _ = d2_sim::units::sound::queue_sound(game, unit, sound as u16, to);
+    }
+
     fn frame_event_index(&self, unit: UnitId) -> i32 {
         LocalSeams::frame_event_index(self, unit)
     }
@@ -994,6 +1009,15 @@ impl Pending for LocalSeams {
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::monster_right_aura(h, sim, unit, skill, level);
+    }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
@@ -1102,6 +1126,20 @@ impl Pending for LocalSeams {
     }
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
+    }
+    // Spec: specs/combat/hit.md §5 (monster block chance, `0x006225F0`).
+    fn composit_shield(&self, unit: UnitId) -> bool {
+        self.shielded.contains(&unit)
+    }
+    // Spec: specs/combat/damage.md §3.2 (StrBonus / DexBonus), §9.
+    fn str_dex_bonus(&self, item: UnitId) -> (i32, i32) {
+        let f = self.weapons.facts(item);
+        (f.str_bonus, f.dex_bonus)
+    }
+    // PROVISIONAL (REC-2140): the row test of `0x00629930` only; the max
+    // durability and indestructible stats are not read.
+    fn item_has_durability(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).breakable
     }
     fn item_type_class(&self, item: UnitId) -> u32 {
         self.weapons.type_class(item)
@@ -1292,10 +1330,9 @@ impl Pending for LocalSeams {
     fn object_quest_record(&self, _: UnitId) -> bool {
         true
     }
-    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
-    fn object_preview_range(&self) -> Option<i32> {
-        Some(crate::world_view::object_click::INTERACT_RANGE)
-    }
+    // No preview reach: the 0x13 object case takes the interact range
+    // `0x00623660` and the server's walk on the path provider
+    // (`objects.md` §7.3; `interact-operate-stash`).
 }
 
 impl WorldPending for LocalSeams {

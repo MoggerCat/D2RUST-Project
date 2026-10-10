@@ -436,7 +436,7 @@ gets its party (§10).
    For each minion created: transfer the boss's modifiers that have
    `xfer` (`0x005A0930`, `monsters/init.md`), set owner data
    (`0x0058F030`), add the minion to the boss's minion list
-   (`0x0058F100`), set the owner GUID and type (`0x005DD330`), and set
+   (`0x0058F100`), set the owner GUID and type (`0x005DD330`: writes the minion's AI control +0x0C := owner GUID, +0x10 := owner type, the leash owner of `ai.md` §2.2 rule 3; 1.14d-confirmed, `sys-units-census` frame 91: a pack member over 20 away wanders near its boss 19), and set
    type flag 0x10.
 
 ### 7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX)
@@ -539,7 +539,7 @@ the ring search is skipped.
 (room seed); s = 0 → s = 1. Then visit indices s, s+1, … mod n until
 back at s − 1 (never visiting s − 1 itself). For a tile record with tile
 data (+0x18) whose material flags (`0x00604BC0`, DT1 header +0x06,
-`drlg/rooms.md` §9.3) have bit 0x2: the point is
+`drlg/rooms.md` §9.3) have bit 0x2 (d2rs reads the material of the record's chosen DT1 tile; `gen-wp-21` frame 401, the Slime Prince pack, class 249): the point is
 x = (rec+8 + room tile x) × 5 + 3, y = (rec+0xC + room tile y) × 5 + 3.
 The point must pass `0x0064CB30(room, x, y, 0x100)` = 0, and at least one
 of (x, y) + (0,−3), (3,0), (0,3), (−3,0) (table `0x006E2D50`) must be

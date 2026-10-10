@@ -291,6 +291,16 @@ fn attack_event0_of_a_moving_mode_strikes_only_at_its_trigger_frame() {
         let r = fx.sim.sys.units.get_mut(m).unwrap();
         r.mode = u32::from(mode::ATTACK1);
         r.anim.frame_count = 1 << 16;
+        // The frame advance `0x00623E00` writes +0x4E from the record's
+        // event bytes (units.md §4.2): frames 1, 2, 3 carry 2, 1, 3.
+        r.anim.speed = 256;
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        events[1..4].copy_from_slice(&[2, 1, 3]);
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 256,
+            byte_0f: 0,
+            events,
+        });
     }
     let x0 = fx.sim.sys.hooks.x.position(m).0;
     frame_events(&mut fx, m, &[2, 1, 3]);
@@ -464,6 +474,33 @@ fn natural_skill_level_is_read_by_the_ai() {
             crate::monsters::ai::AiActs::skill_level(&*v, m, 352, false),
             Some(9)
         );
+    });
+    fx.assert_clean();
+}
+
+#[test]
+fn used_skill_takes_the_monster_entry_level() {
+    // A monster without a skill list casts with its init entry's base
+    // level (doomknight2 DoomKnightMissile at `Sk1lvl` 3: the missile's
+    // level in `milestone-hellforge`), a summon's entry winning; a skill
+    // with no entry keeps the seam's answer.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let entry = |skill| crate::skills::SkillEntry {
+        skill,
+        base: 1,
+        owner_guid: -1,
+        ..Default::default()
+    };
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.h.x.used.insert(m, entry(335));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
+        v.h.natural_skills.entry(m).or_default().insert(335, 3);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(3));
+        v.h.monster_skills.entry(m).or_default().insert(335, 7);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(7));
+        v.h.x.used.insert(m, entry(300));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
     });
     fx.assert_clean();
 }

@@ -922,8 +922,12 @@ pub trait Pending {
     fn overlay(&mut self, unit: UnitId, id: i32) {}
     /// `0x00623F50` animation rate refresh.
     fn refresh_anim_rate(&mut self, unit: UnitId) {}
-    /// Monster sound.
-    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {}
+    /// Monster sound: `0x00553380(unit, event, target)` queues the unit's
+    /// sound slot (flag 0x400); the unit update sends it as S→C 0x2C
+    /// (`audio/triggers-2.md` §14; the NPC greeting is event 18).
+    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        let _ = crate::units::sound::queue_sound(game, unit, sound as u16, to);
+    }
     /// Operate a door (`0x00584540`, objects spec) in a game without an
     /// object state (with one: [`super::objects`]).
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {}
@@ -1636,6 +1640,21 @@ pub trait Pending {
         Self: Sized,
     {
         false
+    }
+    /// A monster's aura as its right skill: `0x0056DEB0(m, skill, level)`
+    /// then `0x005701B0(m, 0, skill, −1)` (`monsters/init.md` §19.5 umod
+    /// 30 `0x005A1650`; `monsters/ai-bodies-2.md` §14 Duriel). Routed to
+    /// [`crate::wiring::interaction::skill_events::monster_right_aura`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
     }
     /// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33
     /// step 4, `0x0056E620`): routed to

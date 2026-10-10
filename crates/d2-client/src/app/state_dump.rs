@@ -326,7 +326,7 @@ pub struct RunInfo {
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
     "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
-     the model's own answers (0x6B, 0x5F, 0x28's 0x2F and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
+     the model's own answers (0x6B, 0x5F, 0x28's 0x2F / 0x30 and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
      with the play preview's hover pick, the local player at the play preview's walk \
      prediction, held repeat once per server frame; keys: belt 1-4, run lock, weapon swap, \
      speech only), so a run \
@@ -700,7 +700,12 @@ fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
     let mut s = state::snapshot_world(&sim.game, &sim.events);
     if let Some(inv) = sim.world.inventory.as_ref() {
         overlay_item_places(&mut s, &inv.state);
-        overlay_item_owners(&mut s, &inv.state, &sim.game.lists);
+        overlay_item_owners(
+            &mut s,
+            &inv.state,
+            &sim.game.lists,
+            &sim.events.action.sys.units,
+        );
     }
     let d = usize::from(state::difficulty_world(&sim.events)).min(2);
     for (id, q) in &sim.world.rest.quests {
@@ -758,20 +763,37 @@ fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::in
 /// the item is linked into (item data +0x5C -> inventory +0x08 owner
 /// unit); absent on the ground (no inventory) or with a 0 GUID. d2rs
 /// keeps the link in the inventory model.
+///
+/// A store item (vendor flag, unit +0xC8 bit 2: `world/vendors.md` §3.1
+/// step 5) reads absent: recorded `items-vendor-akara-buy`, the 41 store
+/// items of Akara at frames 20-40 have no `own` on 1.14d while the
+/// bought copy in the player's inventory has the player's GUID. The
+/// store's inventory has no owner unit (`vendors.md` §4 rule 3, "new NPC
+/// inventory").
 fn overlay_item_owners(
     snap: &mut state::StateSnapshot,
     inv: &d2_sim::wiring::inventory::InvState,
     lists: &d2_sim::units::UnitLists,
+    units: &d2_sim::units::record::Units,
 ) {
     for u in snap.units.iter_mut().filter(|u| u.ut == 4) {
-        let holder = inv
-            .items
-            .values()
-            .find(|d| d.guid == u.g)
-            .and_then(|d| d.inv)
+        let found = inv.items.iter().find(|(_, d)| d.guid == u.g);
+        let vendor = found.is_some_and(|(id, _)| {
+            units
+                .get(*id)
+                .is_some_and(|r| r.flags2 & d2_sim::items::moves::deferred::VENDOR_ITEM != 0)
+        });
+        let holder = found
+            .and_then(|(_, d)| d.inv)
             .and_then(|o| lists.unit(o))
             .map(|e| e.guid);
-        u.own = holder.filter(|&g| g != 0);
+        // A monster's equipment has no inventory model: the snapshot's
+        // own holder (sim `owner`) stays.
+        if vendor {
+            u.own = None;
+        } else if holder.is_some() {
+            u.own = holder.filter(|&g| g != 0);
+        }
     }
 }
 

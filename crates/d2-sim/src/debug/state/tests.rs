@@ -406,7 +406,7 @@ fn a_walking_monster_snapshots_the_velocity_mode_speed() {
     assert_eq!(sp, 256);
 }
 
-// Covers: specs/tools/state-snapshot.md §2 `own`; specs/sim/units.md §2 "Owner links"
+// Covers: specs/tools/state-snapshot.md §2; specs/sim/units.md §2
 #[test]
 fn a_monsters_own_is_its_control_minion_owner() {
     use crate::monsters::ai::{AiControl, AiStore, UnitRef};
