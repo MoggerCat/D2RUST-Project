@@ -202,6 +202,38 @@ pub enum WalkTo {
     Point(u16, u16),
     /// 0x02 / 0x04: a unit (its position each tick).
     Unit(UnitKey),
+    /// C→S 0x06 / 0x0D: a skill on a unit. Only [`WalkTap::record`] makes
+    /// it; [`Predict::frame`] turns it into a run to the unit when the
+    /// target is out of the preview melee reach (the server's
+    /// `use_on_unit` runs there, `skills/use.md` §3 r6) and drops it
+    /// otherwise. Never the target of a stored walk.
+    Attack(UnitKey),
+}
+
+/// The target of a C→S skill-on-unit message (0x06 left, 0x0D right:
+/// {id, type u32, guid u32}); any other message → `None`.
+pub fn attack_of(msg: &[u8]) -> Option<UnitKey> {
+    let (&id, rest) = msg.split_first()?;
+    if !matches!(id, 6 | 0x0D) || rest.len() != 8 {
+        return None;
+    }
+    let t = u32::from_le_bytes([rest[0], rest[1], rest[2], rest[3]]);
+    let guid = u32::from_le_bytes([rest[4], rest[5], rest[6], rest[7]]);
+    Some(UnitKey::new(u8::try_from(t).ok()?, guid))
+}
+
+/// d2rs-own, unverified (preview, D1; PROVISIONAL REC-2015): whether a
+/// skill on `target` is in melee reach of the player at `from`. The same
+/// rule as the local server host's `in_melee_range` (reach 2, extra 2,
+/// plus 1, larger axis distance of the path positions, no line test), so
+/// the client runs exactly when the server does. In 1.14d the click
+/// itself decides with `0x00622C40` and walks (C→S 0x01-0x04) before it
+/// sends the skill (`ui/controls.md` §6 r9.3).
+pub fn in_preview_reach(from: (u16, u16), target: (u16, u16)) -> bool {
+    let d = (i32::from(from.0) - i32::from(target.0))
+        .abs()
+        .max((i32::from(from.1) - i32::from(target.1)).abs());
+    d <= 5
 }
 
 /// One walk or run intent the client sent.
@@ -496,7 +528,7 @@ impl Predict {
         };
         let target = match walk.to {
             WalkTo::Point(tx, ty) => Some((tx, ty)),
-            WalkTo::Unit(k) => world.units.get(&k).and_then(|u| u.position),
+            WalkTo::Unit(k) | WalkTo::Attack(k) => world.units.get(&k).and_then(|u| u.position),
         };
         let Some(target) = target else {
             self.walk = None;
@@ -548,6 +580,7 @@ impl Predict {
         };
         let to = match walk.to {
             WalkTo::Point(x, y) => PathTo::Point(x, y),
+            WalkTo::Attack(_) => return false,
             WalkTo::Unit(k) => {
                 let Some(&ty) = d2_sim::units::UnitType::ALL.get(usize::from(k.unit_type)) else {
                     return false;
@@ -606,7 +639,7 @@ impl Predict {
         };
         let target = match walk.to {
             WalkTo::Point(tx, ty) => Some((tx, ty)),
-            WalkTo::Unit(k) => world.units.get(&k).and_then(|u| u.position),
+            WalkTo::Unit(k) | WalkTo::Attack(k) => world.units.get(&k).and_then(|u| u.position),
         };
         if let Some(d) = target.and_then(|t| facing((x as u32, y as u32), cell_centre(t))) {
             self.dir = Some(d);
@@ -627,6 +660,24 @@ impl Predict {
         self.server_walk(world);
         let mut new_walk = false;
         for w in walks {
+            let w = match w.to {
+                WalkTo::Attack(k) => {
+                    let (Some(from), Some(at)) = (
+                        self.cell(),
+                        world.units.get(&k).and_then(|u| u.position),
+                    ) else {
+                        continue;
+                    };
+                    if in_preview_reach(from, at) {
+                        continue;
+                    }
+                    Walk {
+                        to: WalkTo::Unit(k),
+                        run: true,
+                    }
+                }
+                _ => w,
+            };
             self.walk(w);
             new_walk = true;
         }
@@ -769,6 +820,12 @@ impl WalkTap {
     pub fn record(&self, msg: &[u8]) {
         if let Some(w) = walk_of(msg) {
             self.push(w);
+        }
+        if let Some(k) = attack_of(msg) {
+            self.push(Walk {
+                to: WalkTo::Attack(k),
+                run: true,
+            });
         }
         if msg.first() == Some(&C2S_WAYPOINT) {
             self.1.store(true, std::sync::atomic::Ordering::Relaxed);
