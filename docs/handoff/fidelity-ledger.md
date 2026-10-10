@@ -17,7 +17,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
 | items | 721 | 43 | 0 | 46 | 0 | 632 | 25 | 64 | 0 | 140.5–562 | 65 | 652 / 0 / 69 |
-| monsters | 660 | 152 | 0 | 10 | 0 | 498 | 15 | 147 | 0 | 301.5–1206 | 5 | 400 / 240 / 20 |
+| monsters | 660 | 151 | 0 | 10 | 0 | 499 | 15 | 146 | 0 | 299.5–1198 | 5 | 400 / 240 / 20 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | q-chk-render-ui | 12 | 10 | 0 | 2 | 0 | 0 | 5 | 5 | 2 | 28.5–50+ | 0 | 10 / 0 / 2 |
 | rc-client-seed-2 | 2 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 2.5–10 | 0 | 2 / 0 / 0 |
@@ -33,7 +33,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
 | systems | 918 | 359 | 46 | 251 | 0 | 262 | 250 | 404 | 2 | 949–3732+ | 39 | 554 / 0 / 364 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 858 | 46 | 459 | 0 | 3116 | 475 | 876 | 12 | 2085.5–7958+ | 286 | 3522 / 382 / 575 |
+| **all** | 4479 | 857 | 46 | 459 | 0 | 3117 | 475 | 875 | 12 | 2083.5–7950+ | 286 | 3522 / 382 / 575 |
 
 ## By family
 
@@ -43,7 +43,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 
 | Family | Rows | DIVERGED | NOT-IMPLEMENTED | NO-CHECK | UNKNOWN | EQUAL | of which partly compared | S | M | L | Needs PC 1 | Exercised no |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `ai` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `ai` | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `audio` | 6 | 3 | 0 | 2 | 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 |
 | `check` | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `client` | 7 | 4 | 0 | 3 | 0 | 0 | 0 | 3 | 3 | 1 | 0 | 1 |
@@ -6884,7 +6884,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:290 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1875
+- Rows whose state disagrees with their checks: 1876
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6945,7 +6945,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1815 more (rerun with the tsv to list them)
+  - … and 1816 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -8293,7 +8293,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `ai.scan5.good-target` | system | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/rc-ancient-tx | specs/monsters/ai.md | rc-ancient-tx: barbarian 1:15 target now 1:19 (candidate-size full-size distance, d<=35); tx 4324 matches at frame 7, first state difference moved frame 7 -> 36 (Mauler 1:18 hp, barb melee hit applied by d2rs not 1.14d); 6 checks now differ at frame 16 game seed; threat class split and tie order still open |
 | `mon.missile.hit-footprint-by-mode` | system | DIVERGED | M | DIVERGED | yes | 0 | y | claude/rc-drop-nor-timing | specs/missiles/missiles.md | bolt 4 hits fallenshaman5 (1:19, in hit mode, x 5147) at 5146 in 1.14d (kill frame 54), d2rs at 5147 (55); bolt 3 on the same monster idle hit at 5147 in both; finder and size read equal, so the footprint stamped under the monster by mode is the suspect (needs a 1.14d collision-grid probe at frame 53) |
 | `mon.skill.chain-position` | system | DIVERGED | M | DIVERGED | yes | 0 | n | claude/rc-drop-nor-timing | specs/skills/bodies-3.md | fallenshaman5 (class 62) fired shafire1 (class 22) because the production chain position was a stub 0; 1.14d fires shafire5 (26). state channel of nor-04: first divergence (missile 3:5 class 26 vs 22, frame 44) gone [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.abyssknight` | system | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
@@ -8456,6 +8455,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.population.presets` | system | NO-CHECK | M | - | ? | 2 | y | claude/q-fix-real-unit-seed-order | specs/monsters/preset-monsters.tsv,specs/monsters/population.md | preset monster units from DS1 objects; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.umod.0-none` | content | NO-CHECK | M | - | ? | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | one row per unique mod; callbacks by mode; ported, nothing compares; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `ai.precheck-c.boss-sound` | system | EQUAL | - | MATCH | yes | 0 | n | claude/rc-drop-content | specs/monsters/ai.md | boss/demon/undead/primeevil monstats flags were Pending defaults (false) in production, so Griswold's first think ran 20 frames early and its seed drew before the bolt; now read from the monstats row of the monster's class; rng draws of unit 1:20 in nor-11 matched in value, only the frames differed (31/41/46 vs 51/61/66) |
+| `ai.scan5.good-target` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-ancient-tx | specs/monsters/ai.md | rc-ancient-tx: target scan 5 (candidate-size distance, newest-first tie) + missile justhit remove callback 0x005ADAF0: 14 a5-su-* checks state 90/90 0 differences, a5-warp-l110-siege-1-ama state 160/160 and rng 158/158 MATCH; 6 checks still differ at frame 16 (game seed) |
 | `monster.ai.7tillusion` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-7tillusion: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.ancient` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-ancient: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.ancientstatue` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-ancientstatue: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
