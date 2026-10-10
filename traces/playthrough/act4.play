@@ -315,6 +315,11 @@ milestone diablo-killed
   poke 2945 missile 59 @x @y @x-2 @y-2 skill 39 1
   need ever unit ut 1 cl 243 killed
 
+# Seed 5 boss GUIDs (Infector 150, De Seis 160, Vizier 166) are 4 higher
+# since rc-mon-frame31: every Venom Lord casts Inferno from its init skill
+# level (1.14d 0x005E0C80), the missile's game-seed step changes the f61
+# room's density roll and adds one pack (docs/handoff/rc-a4-wingn2.md).
+# `@1:<class>` would name a minion or a room monster of the same class.
 milestone diablo-present-wingn2
   use sor
   seed 5
@@ -327,24 +332,24 @@ milestone diablo-present-wingn2
   poke 420 msg 0x13 2 122
   poke 440 pos @player 7925 5296
   poke 455 pos @player 7931 5278
-  poke 475 pos 1/146 @x+3 @y
-  poke 475 stat 1/146 6 0 256
+  poke 475 pos 1/150 @x+3 @y
+  poke 475 stat 1/150 6 0 256
   poke 475 missile 59 @x @y @x+3 @y skill 39 1
-  poke 483 pos 1/146 @x-3 @y
-  poke 483 stat 1/146 6 0 256
+  poke 483 pos 1/150 @x-3 @y
+  poke 483 stat 1/150 6 0 256
   poke 483 missile 59 @x @y @x-3 @y skill 39 1
-  poke 491 pos 1/146 @x @y+3
-  poke 491 stat 1/146 6 0 256
+  poke 491 pos 1/150 @x @y+3
+  poke 491 stat 1/150 6 0 256
   poke 491 missile 59 @x @y @x @y+3 skill 39 1
-  poke 499 pos 1/146 @x @y-3
-  poke 499 stat 1/146 6 0 256
+  poke 499 pos 1/150 @x @y-3
+  poke 499 stat 1/150 6 0 256
   poke 499 missile 59 @x @y @x @y-3 skill 39 1
   goto 500 preset 108 2:393
-  poke 507 pos 1/146 @x+2 @y+2
-  poke 507 stat 1/146 6 0 256
+  poke 507 pos 1/150 @x+2 @y+2
+  poke 507 stat 1/150 6 0 256
   poke 507 missile 59 @x @y @x+2 @y+2 skill 39 1
-  poke 515 pos 1/146 @x-2 @y-2
-  poke 515 stat 1/146 6 0 256
+  poke 515 pos 1/150 @x-2 @y-2
+  poke 515 stat 1/150 6 0 256
   poke 515 missile 59 @x @y @x-2 @y-2 skill 39 1
   poke 890 pos @player 7915 5275
   poke 900 msg 0x13 2 127
@@ -357,23 +362,23 @@ milestone diablo-present-wingn2
   poke 1400 msg 0x13 2 150
   poke 1420 pos @player 7796 5170
   poke 1435 pos @player 7773 5186
-  poke 1455 pos 1/156 @x+3 @y
-  poke 1455 stat 1/156 6 0 256
+  poke 1455 pos 1/160 @x+3 @y
+  poke 1455 stat 1/160 6 0 256
   poke 1455 missile 59 @x @y @x+3 @y skill 39 1
-  poke 1463 pos 1/156 @x-3 @y
-  poke 1463 stat 1/156 6 0 256
+  poke 1463 pos 1/160 @x-3 @y
+  poke 1463 stat 1/160 6 0 256
   poke 1463 missile 59 @x @y @x-3 @y skill 39 1
-  poke 1471 pos 1/156 @x @y+3
-  poke 1471 stat 1/156 6 0 256
+  poke 1471 pos 1/160 @x @y+3
+  poke 1471 stat 1/160 6 0 256
   poke 1471 missile 59 @x @y @x @y+3 skill 39 1
-  poke 1479 pos 1/156 @x @y-3
-  poke 1479 stat 1/156 6 0 256
+  poke 1479 pos 1/160 @x @y-3
+  poke 1479 stat 1/160 6 0 256
   poke 1479 missile 59 @x @y @x @y-3 skill 39 1
-  poke 1487 pos 1/156 @x+2 @y+2
-  poke 1487 stat 1/156 6 0 256
+  poke 1487 pos 1/160 @x+2 @y+2
+  poke 1487 stat 1/160 6 0 256
   poke 1487 missile 59 @x @y @x+2 @y+2 skill 39 1
-  poke 1495 pos 1/156 @x-2 @y-2
-  poke 1495 stat 1/156 6 0 256
+  poke 1495 pos 1/160 @x-2 @y-2
+  poke 1495 stat 1/160 6 0 256
   poke 1495 missile 59 @x @y @x-2 @y-2 skill 39 1
   goto 1500 preset 108 2:395
   poke 1890 pos @player 7655 5275
@@ -383,23 +388,23 @@ milestone diablo-present-wingn2
   poke 2400 msg 0x13 2 207
   poke 2420 pos @player 7671 5318
   poke 2435 pos @player 7684 5321
-  poke 2455 pos 1/162 @x+3 @y
-  poke 2455 stat 1/162 6 0 256
+  poke 2455 pos 1/166 @x+3 @y
+  poke 2455 stat 1/166 6 0 256
   poke 2455 missile 59 @x @y @x+3 @y skill 39 1
-  poke 2463 pos 1/162 @x-3 @y
-  poke 2463 stat 1/162 6 0 256
+  poke 2463 pos 1/166 @x-3 @y
+  poke 2463 stat 1/166 6 0 256
   poke 2463 missile 59 @x @y @x-3 @y skill 39 1
-  poke 2471 pos 1/162 @x @y+3
-  poke 2471 stat 1/162 6 0 256
+  poke 2471 pos 1/166 @x @y+3
+  poke 2471 stat 1/166 6 0 256
   poke 2471 missile 59 @x @y @x @y+3 skill 39 1
-  poke 2479 pos 1/162 @x @y-3
-  poke 2479 stat 1/162 6 0 256
+  poke 2479 pos 1/166 @x @y-3
+  poke 2479 stat 1/166 6 0 256
   poke 2479 missile 59 @x @y @x @y-3 skill 39 1
-  poke 2487 pos 1/162 @x+2 @y+2
-  poke 2487 stat 1/162 6 0 256
+  poke 2487 pos 1/166 @x+2 @y+2
+  poke 2487 stat 1/166 6 0 256
   poke 2487 missile 59 @x @y @x+2 @y+2 skill 39 1
-  poke 2495 pos 1/162 @x-2 @y-2
-  poke 2495 stat 1/162 6 0 256
+  poke 2495 pos 1/166 @x-2 @y-2
+  poke 2495 stat 1/166 6 0 256
   poke 2495 missile 59 @x @y @x-2 @y-2 skill 39 1
   goto 2600 preset 108 2:255
   need player lv == 108
