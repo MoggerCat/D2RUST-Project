@@ -9,6 +9,6 @@ save ScnAma --class ama --expansion --item ssd@0,0 --item hp1@2,0
 seed 1234
 ticks 76
 seconds 600
-channels draws
+channels draws packets
 draws-at 73
 input frame 40; key I; frame 44; key A; frame 48; move 430 330
