@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+system.sim.monster.warp-placement-y	system	systems	monster y after level warp (frame 21)	specs/sim/pathing.md	draft	a1-warp-l31-jail-3-ama,a1-warp-l33-cathedral-ama	PARTIAL	yes	0	n	claude/rc-mon-y-warp	EQUAL	-	r19 re-measure: state 160/160 equal on both, rng 133/133 MATCH; y divergence fixed upstream (staging-7 + integ-r19), no code change
