@@ -4,7 +4,7 @@ Branch claude/rc-run-5. Command: suite.py --checks-dir traces/checks/gen
 --filter 'gen-missile-*,gen-item-*,gen-itemq-*,gen-wp-*,gen-shrine-*'
 --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough.
 Whole filter ran (380 checks); per coordinator split, this part reports the
-FIRST half by sorted name (190 checks, gen-item-* .. gen-missile-419).
+
 The second half is rc-run-5b's.
 
 - First half: 176 EQUAL (REC-2055/2056 rules: state PARTIAL with 0 differences

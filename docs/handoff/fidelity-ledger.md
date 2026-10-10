@@ -28,11 +28,11 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-effects | 77 | 77 | 0 | 0 | 0 | 0 | 77 | 0 | 0 | 38.5–154 | 0 | 77 / 0 / 0 |
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 7 | 1 | 0 | 0 | 0 | 6 | 0 | 1 | 0 | 2–8 | 0 | 7 / 0 / 0 |
-| shrine | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
+| shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 69 | 0 | 176 | 0 | 410 | 85 | 160 | 0 | 362.5–1450 | 6 | 544 / 99 / 12 |
-| systems | 918 | 351 | 46 | 321 | 0 | 200 | 257 | 458 | 3 | 1068.5–4178+ | 46 | 510 / 0 / 408 |
+| systems | 918 | 348 | 46 | 321 | 0 | 203 | 254 | 458 | 3 | 1067–4172+ | 46 | 510 / 0 / 408 |
 | world | 825 | 105 | 0 | 95 | 0 | 625 | 31 | 164 | 5 | 383.5–1374+ | 171 | 732 / 21 / 72 |
-| **all** | 4477 | 917 | 46 | 825 | 0 | 2689 | 656 | 1118 | 14 | 2676–10256+ | 290 | 3465 / 386 / 626 |
+| **all** | 4477 | 913 | 46 | 825 | 0 | 2693 | 652 | 1118 | 14 | 2674–10248+ | 290 | 3465 / 386 / 626 |
 
 ## By family
 
@@ -658,14 +658,14 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `missile` | 299 | 5 | 0 | 121 | 0 | 173 | 2 | 120 | 6 | 0 | 0 | 2 |
 | `mon` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `monster` | 669 | 164 | 0 | 18 | 0 | 487 | 2 | 16 | 165 | 1 | 4 | 241 |
-| `net.c2s` | 113 | 11 | 9 | 14 | 0 | 79 | 0 | 28 | 6 | 0 | 26 | 0 |
-| `net.s2c` | 183 | 33 | 21 | 79 | 0 | 50 | 5 | 130 | 3 | 0 | 1 | 0 |
+| `net.c2s` | 113 | 10 | 9 | 14 | 0 | 80 | 0 | 27 | 6 | 0 | 26 | 0 |
+| `net.s2c` | 183 | 31 | 21 | 79 | 0 | 52 | 5 | 128 | 3 | 0 | 1 | 0 |
 | `npc` | 48 | 22 | 0 | 26 | 0 | 0 | 20 | 9 | 39 | 0 | 1 | 10 |
 | `object` | 523 | 3 | 0 | 32 | 0 | 488 | 21 | 23 | 12 | 0 | 10 | 0 |
 | `quest` | 53 | 14 | 0 | 39 | 0 | 0 | 3 | 8 | 40 | 5 | 27 | 18 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
-| `shrine` | 24 | 16 | 0 | 4 | 0 | 4 | 0 | 1 | 19 | 0 | 5 | 0 |
+| `shrine` | 24 | 15 | 0 | 4 | 0 | 5 | 0 | 0 | 19 | 0 | 5 | 0 |
 | `sim` | 3 | 0 | 0 | 3 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 6 | 0 | 24 | 0 | 0 | 24 | 6 | 24 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 12 | 0 | 18 | 0 | 0 | 18 | 18 | 12 | 0 | 0 | 23 |
@@ -716,7 +716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2631
 - Rows set exercised = yes from the coverage reports' seen lists: 20
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 4081
+- Duplicate areas between parts: 4799
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2456,113 +2456,809 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.zombie5`: rc-gen-mon-triage.tsv:262 kept, rc-run-4.tsv:478 dropped
   - `sim.monster-mode-records`: rc-mon-modes.tsv:4 kept, rc-run-4.tsv:479 dropped
   - `system.sim.units.4-1-setting-a-mode`: rc-pc1-audit.tsv:48 kept, rc-run-4.tsv:481 dropped
-  - `missile.amplify-damage`: rc-link-checks.tsv:3 kept, rc-run-5.tsv:3 dropped
-  - `missile.andrialspray`: rc-link-checks.tsv:5 kept, rc-run-5.tsv:4 dropped
-  - `missile.andypoisonbolt`: rc-link-checks.tsv:6 kept, rc-run-5.tsv:5 dropped
-  - `missile.attract`: rc-link-checks.tsv:10 kept, rc-run-5.tsv:6 dropped
-  - `missile.battle-command`: rc-link-checks.tsv:17 kept, rc-run-5.tsv:7 dropped
-  - `missile.battle-cry`: rc-link-checks.tsv:18 kept, rc-run-5.tsv:8 dropped
-  - `missile.battle-orders`: rc-link-checks.tsv:19 kept, rc-run-5.tsv:9 dropped
-  - `missile.blade-sentinel`: rc-link-checks.tsv:28 kept, rc-run-5.tsv:10 dropped
-  - `missile.blaze`: rc-link-checks.tsv:31 kept, rc-run-5.tsv:11 dropped
-  - `missile.blizzard`: rc-link-checks.tsv:33 kept, rc-run-5.tsv:12 dropped
-  - `missile.blood-mana`: rc-link-checks.tsv:34 kept, rc-run-5.tsv:13 dropped
-  - `missile.bone-spear`: rc-link-checks.tsv:38 kept, rc-run-5.tsv:14 dropped
-  - `missile.bone-spirit`: rc-link-checks.tsv:39 kept, rc-run-5.tsv:15 dropped
-  - `missile.bone-wall`: rc-link-checks.tsv:40 kept, rc-run-5.tsv:16 dropped
-  - `missile.catapultblizzard`: rc-link-checks.tsv:41 kept, rc-run-5.tsv:19 dropped
-  - `missile.catapultplague`: rc-link-checks.tsv:43 kept, rc-run-5.tsv:20 dropped
-  - `missile.charged-strike`: rc-link-checks.tsv:46 kept, rc-run-5.tsv:21 dropped
-  - `missile.chilling-armor`: rc-link-checks.tsv:47 kept, rc-run-5.tsv:22 dropped
-  - `missile.cold-arrow`: rc-link-checks.tsv:49 kept, rc-run-5.tsv:23 dropped
-  - `missile.confuse`: rc-link-checks.tsv:50 kept, rc-run-5.tsv:24 dropped
-  - `missile.corpse-explosion`: rc-link-checks.tsv:51 kept, rc-run-5.tsv:25 dropped
-  - `missile.countessfirewall`: rc-link-checks.tsv:53 kept, rc-run-5.tsv:26 dropped
-  - `missile.cursedballtrapleft`: rc-link-checks.tsv:60 kept, rc-run-5.tsv:27 dropped
-  - `missile.cursedballtrapright`: rc-link-checks.tsv:61 kept, rc-run-5.tsv:28 dropped
-  - `missile.decrepify`: rc-link-checks.tsv:65 kept, rc-run-5.tsv:29 dropped
-  - `missile.defense-curse`: rc-link-checks.tsv:66 kept, rc-run-5.tsv:30 dropped
-  - `missile.desertturret`: rc-link-checks.tsv:67 kept, rc-run-5.tsv:31 dropped
-  - `missile.diabfire`: rc-link-checks.tsv:68 kept, rc-run-5.tsv:32 dropped
-  - `missile.diablight`: rc-missile-missing.tsv:3 kept, rc-run-5.tsv:33 dropped
-  - `missile.diabwall`: rc-link-checks.tsv:70 kept, rc-run-5.tsv:34 dropped
-  - `missile.dim-vision`: rc-link-checks.tsv:71 kept, rc-run-5.tsv:35 dropped
-  - `missile.doomknightmissile`: rc-link-checks.tsv:72 kept, rc-run-5.tsv:36 dropped
-  - `missile.exploding-arrow`: rc-link-checks.tsv:76 kept, rc-run-5.tsv:37 dropped
-  - `missile.fenris-rage`: rc-link-checks.tsv:77 kept, rc-run-5.tsv:38 dropped
-  - `missile.fetishaura`: rc-link-checks.tsv:78 kept, rc-run-5.tsv:39 dropped
-  - `missile.fetishinferno`: rc-link-checks.tsv:79 kept, rc-run-5.tsv:40 dropped
-  - `missile.fingermagespider`: rc-link-checks.tsv:80 kept, rc-run-5.tsv:41 dropped
-  - `missile.fire-arrow`: rc-link-checks.tsv:81 kept, rc-run-5.tsv:42 dropped
-  - `missile.fire-trauma`: rc-link-checks.tsv:84 kept, rc-run-5.tsv:43 dropped
-  - `missile.fist-of-the-heavens`: rc-link-checks.tsv:88 kept, rc-run-5.tsv:44 dropped
-  - `missile.frost-nova`: rc-link-checks.tsv:93 kept, rc-run-5.tsv:45 dropped
-  - `missile.frozen-orb`: rc-link-checks.tsv:94 kept, rc-run-5.tsv:46 dropped
-  - `missile.gargoyletrap`: rc-link-checks.tsv:96 kept, rc-run-5.tsv:47 dropped
-  - `missile.grim-ward`: rc-link-checks.tsv:104 kept, rc-run-5.tsv:48 dropped
-  - `missile.hellmeteor`: rc-link-checks.tsv:107 kept, rc-run-5.tsv:49 dropped
-  - `missile.howl`: rc-link-checks.tsv:110 kept, rc-run-5.tsv:50 dropped
-  - `missile.hydramissile`: rc-link-checks.tsv:112 kept, rc-run-5.tsv:51 dropped
-  - `missile.ice-arrow`: rc-link-checks.tsv:113 kept, rc-run-5.tsv:52 dropped
-  - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, rc-run-5.tsv:53 dropped
-  - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, rc-run-5.tsv:54 dropped
-  - `missile.iron-maiden`: rc-link-checks.tsv:130 kept, rc-run-5.tsv:55 dropped
-  - `missile.leap`: rc-link-checks.tsv:131 kept, rc-run-5.tsv:56 dropped
-  - `missile.life-tap`: rc-link-checks.tsv:132 kept, rc-run-5.tsv:57 dropped
-  - `missile.lightning-bolt`: rc-link-checks.tsv:134 kept, rc-run-5.tsv:58 dropped
-  - `missile.lightning-fury`: rc-link-checks.tsv:135 kept, rc-run-5.tsv:59 dropped
-  - `missile.lightning-strike`: rc-link-checks.tsv:136 kept, rc-run-5.tsv:60 dropped
-  - `missile.lower-resist`: rc-link-checks.tsv:137 kept, rc-run-5.tsv:61 dropped
-  - `missile.magic-arrow`: rc-link-checks.tsv:138 kept, rc-run-5.tsv:62 dropped
-  - `missile.magottup`: rc-link-checks.tsv:139 kept, rc-run-5.tsv:63 dropped
-  - `missile.mephfrostnova`: rc-link-checks.tsv:140 kept, rc-run-5.tsv:64 dropped
-  - `missile.mephistomissile`: rc-link-checks.tsv:141 kept, rc-run-5.tsv:65 dropped
-  - `missile.meteor`: rc-link-checks.tsv:142 kept, rc-run-5.tsv:66 dropped
-  - `missile.mon-death-sentry`: rc-link-checks.tsv:145 kept, rc-run-5.tsv:67 dropped
-  - `missile.monblizzard`: rc-link-checks.tsv:148 kept, rc-run-5.tsv:68 dropped
-  - `missile.monbonespirit`: rc-link-checks.tsv:149 kept, rc-run-5.tsv:69 dropped
-  - `missile.moncoldarrow`: rc-link-checks.tsv:151 kept, rc-run-5.tsv:70 dropped
-  - `missile.moncursecast`: rc-link-checks.tsv:152 kept, rc-run-5.tsv:71 dropped
-  - `missile.monexplodingarrow`: rc-link-checks.tsv:153 kept, rc-run-5.tsv:72 dropped
-  - `missile.monfirearrow`: rc-link-checks.tsv:154 kept, rc-run-5.tsv:73 dropped
-  - `missile.multiple-shot`: rc-link-checks.tsv:157 kept, rc-run-5.tsv:74 dropped
-  - `missile.necromagemissile`: rc-link-checks.tsv:163 kept, rc-run-5.tsv:75 dropped
-  - `missile.nihlathakcorpseexplosion`: rc-link-checks.tsv:164 kept, rc-run-5.tsv:76 dropped
-  - `missile.poison-explosion`: rc-link-checks.tsv:173 kept, rc-run-5.tsv:77 dropped
-  - `missile.poison-javelin`: rc-link-checks.tsv:174 kept, rc-run-5.tsv:78 dropped
-  - `missile.poison-nova`: rc-link-checks.tsv:175 kept, rc-run-5.tsv:79 dropped
-  - `missile.poisonballtrap`: rc-link-checks.tsv:176 kept, rc-run-5.tsv:80 dropped
-  - `missile.primebolt`: rc-link-checks.tsv:178 kept, rc-run-5.tsv:81 dropped
-  - `missile.primefirewall`: rc-link-checks.tsv:179 kept, rc-run-5.tsv:82 dropped
-  - `missile.primeicenova`: rc-link-checks.tsv:180 kept, rc-run-5.tsv:83 dropped
-  - `missile.primelightning`: rc-link-checks.tsv:181 kept, rc-run-5.tsv:84 dropped
-  - `missile.primepoisonball`: rc-link-checks.tsv:182 kept, rc-run-5.tsv:85 dropped
-  - `missile.primepoisonnova`: rc-link-checks.tsv:183 kept, rc-run-5.tsv:86 dropped
-  - `missile.primespike`: rc-link-checks.tsv:184 kept, rc-run-5.tsv:87 dropped
-  - `missile.quick-strike`: rc-link-checks.tsv:185 kept, rc-run-5.tsv:88 dropped
-  - `missile.raise-skeletal-mage`: rc-link-checks.tsv:187 kept, rc-run-5.tsv:89 dropped
-  - `missile.raise-skeleton`: rc-link-checks.tsv:188 kept, rc-run-5.tsv:90 dropped
-  - `missile.redemption`: rc-link-checks.tsv:189 kept, rc-run-5.tsv:91 dropped
-  - `missile.regurgitatoreat`: rc-link-checks.tsv:191 kept, rc-run-5.tsv:92 dropped
-  - `missile.revive`: rc-link-checks.tsv:192 kept, rc-run-5.tsv:93 dropped
-  - `missile.roguemissile`: rc-link-checks.tsv:193 kept, rc-run-5.tsv:94 dropped
-  - `missile.sacrifice`: rc-link-checks.tsv:195 kept, rc-run-5.tsv:95 dropped
-  - `missile.shamanfire`: rc-link-checks.tsv:198 kept, rc-run-5.tsv:96 dropped
-  - `missile.shamanfireex`: rc-link-checks.tsv:199 kept, rc-run-5.tsv:97 dropped
-  - `missile.shiver-armor`: rc-link-checks.tsv:201 kept, rc-run-5.tsv:98 dropped
-  - `missile.shock-field`: rc-link-checks.tsv:202 kept, rc-run-5.tsv:99 dropped
-  - `missile.strafe`: rc-link-checks.tsv:224 kept, rc-run-5.tsv:101 dropped
-  - `missile.teeth`: rc-link-checks.tsv:226 kept, rc-run-5.tsv:102 dropped
-  - `missile.terror`: rc-link-checks.tsv:227 kept, rc-run-5.tsv:103 dropped
-  - `missile.thunder-storm`: rc-link-checks.tsv:228 kept, rc-run-5.tsv:104 dropped
-  - `missile.vampirefireball`: rc-link-checks.tsv:233 kept, rc-run-5.tsv:105 dropped
-  - `missile.vampirefirewall`: rc-link-checks.tsv:234 kept, rc-run-5.tsv:106 dropped
-  - `missile.vampiremeteor`: rc-link-checks.tsv:235 kept, rc-run-5.tsv:107 dropped
-  - `missile.vampiremissile`: rc-link-checks.tsv:236 kept, rc-run-5.tsv:108 dropped
-  - `missile.war-cry`: rc-link-checks.tsv:244 kept, rc-run-5.tsv:109 dropped
-  - `missile.weaken`: rc-link-checks.tsv:245 kept, rc-run-5.tsv:110 dropped
-  - `missile.zakarumlightning`: rc-link-checks.tsv:248 kept, rc-run-5.tsv:111 dropped
-  - `tools.poke.tick-end`: rc-packets-join-order.tsv:3 kept, rc-run-5.tsv:112 dropped
+  - `item.0-hax`: rc-items.tsv:3 kept, rc-run-5.tsv:3 dropped
+  - `item.100-9bt`: rc-items.tsv:91 kept, rc-run-5.tsv:4 dropped
+  - `item.101-9ga`: rc-items.tsv:92 kept, rc-run-5.tsv:5 dropped
+  - `item.102-9gi`: rc-items.tsv:93 kept, rc-run-5.tsv:6 dropped
+  - `item.103-9wn`: rc-items.tsv:94 kept, rc-run-5.tsv:7 dropped
+  - `item.104-9yw`: rc-items.tsv:95 kept, rc-run-5.tsv:8 dropped
+  - `item.105-9bw`: rc-items.tsv:96 kept, rc-run-5.tsv:9 dropped
+  - `item.106-9gw`: rc-items.tsv:97 kept, rc-run-5.tsv:10 dropped
+  - `item.107-9cl`: rc-items.tsv:98 kept, rc-run-5.tsv:11 dropped
+  - `item.108-9sc`: rc-items.tsv:99 kept, rc-run-5.tsv:12 dropped
+  - `item.109-9qs`: rc-items.tsv:100 kept, rc-run-5.tsv:13 dropped
+  - `item.11-ywn`: rc-items.tsv:10 kept, rc-run-5.tsv:14 dropped
+  - `item.110-9ws`: rc-items.tsv:101 kept, rc-run-5.tsv:15 dropped
+  - `item.111-9sp`: rc-items.tsv:102 kept, rc-run-5.tsv:16 dropped
+  - `item.112-9ma`: rc-items.tsv:103 kept, rc-run-5.tsv:17 dropped
+  - `item.113-9mt`: rc-items.tsv:104 kept, rc-run-5.tsv:18 dropped
+  - `item.114-9fl`: rc-items.tsv:105 kept, rc-run-5.tsv:19 dropped
+  - `item.115-9wh`: rc-items.tsv:106 kept, rc-run-5.tsv:20 dropped
+  - `item.116-9m9`: rc-items.tsv:107 kept, rc-run-5.tsv:21 dropped
+  - `item.117-9gm`: rc-items.tsv:108 kept, rc-run-5.tsv:22 dropped
+  - `item.118-9ss`: rc-items.tsv:109 kept, rc-run-5.tsv:23 dropped
+  - `item.119-9sm`: rc-items.tsv:110 kept, rc-run-5.tsv:24 dropped
+  - `item.12-bwn`: rc-items.tsv:11 kept, rc-run-5.tsv:25 dropped
+  - `item.120-9sb`: rc-items.tsv:111 kept, rc-run-5.tsv:26 dropped
+  - `item.121-9fc`: rc-items.tsv:112 kept, rc-run-5.tsv:27 dropped
+  - `item.122-9cr`: rc-items.tsv:113 kept, rc-run-5.tsv:28 dropped
+  - `item.123-9bs`: rc-items.tsv:114 kept, rc-run-5.tsv:29 dropped
+  - `item.124-9ls`: rc-items.tsv:115 kept, rc-run-5.tsv:30 dropped
+  - `item.125-9wd`: rc-items.tsv:116 kept, rc-run-5.tsv:31 dropped
+  - `item.126-92h`: rc-items.tsv:117 kept, rc-run-5.tsv:32 dropped
+  - `item.127-9cm`: rc-items.tsv:118 kept, rc-run-5.tsv:33 dropped
+  - `item.128-9gs`: rc-items.tsv:119 kept, rc-run-5.tsv:34 dropped
+  - `item.129-9b9`: rc-items.tsv:120 kept, rc-run-5.tsv:35 dropped
+  - `item.13-gwn`: rc-items.tsv:12 kept, rc-run-5.tsv:36 dropped
+  - `item.130-9fb`: rc-items.tsv:121 kept, rc-run-5.tsv:37 dropped
+  - `item.131-9gd`: rc-items.tsv:122 kept, rc-run-5.tsv:38 dropped
+  - `item.132-9dg`: rc-items.tsv:123 kept, rc-run-5.tsv:39 dropped
+  - `item.133-9di`: rc-items.tsv:124 kept, rc-run-5.tsv:40 dropped
+  - `item.134-9kr`: rc-items.tsv:125 kept, rc-run-5.tsv:41 dropped
+  - `item.135-9bl`: rc-items.tsv:126 kept, rc-run-5.tsv:42 dropped
+  - `item.136-9tk`: rc-items.tsv:127 kept, rc-run-5.tsv:43 dropped
+  - `item.137-9ta`: rc-items.tsv:128 kept, rc-run-5.tsv:44 dropped
+  - `item.138-9bk`: rc-items.tsv:129 kept, rc-run-5.tsv:45 dropped
+  - `item.139-9b8`: rc-items.tsv:130 kept, rc-run-5.tsv:46 dropped
+  - `item.140-9ja`: rc-items.tsv:131 kept, rc-run-5.tsv:47 dropped
+  - `item.141-9pi`: rc-items.tsv:132 kept, rc-run-5.tsv:48 dropped
+  - `item.142-9s9`: rc-items.tsv:133 kept, rc-run-5.tsv:49 dropped
+  - `item.143-9gl`: rc-items.tsv:134 kept, rc-run-5.tsv:50 dropped
+  - `item.144-9ts`: rc-items.tsv:135 kept, rc-run-5.tsv:51 dropped
+  - `item.145-9sr`: rc-items.tsv:136 kept, rc-run-5.tsv:52 dropped
+  - `item.146-9tr`: rc-items.tsv:137 kept, rc-run-5.tsv:53 dropped
+  - `item.147-9br`: rc-items.tsv:138 kept, rc-run-5.tsv:54 dropped
+  - `item.148-9st`: rc-items.tsv:139 kept, rc-run-5.tsv:55 dropped
+  - `item.149-9p9`: rc-items.tsv:140 kept, rc-run-5.tsv:56 dropped
+  - `item.150-9b7`: rc-items.tsv:141 kept, rc-run-5.tsv:57 dropped
+  - `item.151-9vo`: rc-items.tsv:142 kept, rc-run-5.tsv:58 dropped
+  - `item.152-9s8`: rc-items.tsv:143 kept, rc-run-5.tsv:59 dropped
+  - `item.153-9pa`: rc-items.tsv:144 kept, rc-run-5.tsv:60 dropped
+  - `item.154-9h9`: rc-items.tsv:145 kept, rc-run-5.tsv:61 dropped
+  - `item.155-9wc`: rc-items.tsv:146 kept, rc-run-5.tsv:62 dropped
+  - `item.156-8ss`: rc-items.tsv:147 kept, rc-run-5.tsv:63 dropped
+  - `item.157-8ls`: rc-items.tsv:148 kept, rc-run-5.tsv:64 dropped
+  - `item.158-8cs`: rc-items.tsv:149 kept, rc-run-5.tsv:65 dropped
+  - `item.159-8bs`: rc-items.tsv:150 kept, rc-run-5.tsv:66 dropped
+  - `item.16-gsc`: rc-items.tsv:13 kept, rc-run-5.tsv:67 dropped
+  - `item.160-8ws`: rc-items.tsv:151 kept, rc-run-5.tsv:68 dropped
+  - `item.161-8sb`: rc-items.tsv:152 kept, rc-run-5.tsv:69 dropped
+  - `item.162-8hb`: rc-items.tsv:153 kept, rc-run-5.tsv:70 dropped
+  - `item.163-8lb`: rc-items.tsv:154 kept, rc-run-5.tsv:71 dropped
+  - `item.164-8cb`: rc-items.tsv:155 kept, rc-run-5.tsv:72 dropped
+  - `item.165-8s8`: rc-items.tsv:156 kept, rc-run-5.tsv:73 dropped
+  - `item.166-8l8`: rc-items.tsv:157 kept, rc-run-5.tsv:74 dropped
+  - `item.167-8sw`: rc-items.tsv:158 kept, rc-run-5.tsv:75 dropped
+  - `item.168-8lw`: rc-items.tsv:159 kept, rc-run-5.tsv:76 dropped
+  - `item.169-8lx`: rc-items.tsv:160 kept, rc-run-5.tsv:77 dropped
+  - `item.17-wsp`: rc-items.tsv:14 kept, rc-run-5.tsv:78 dropped
+  - `item.170-8mx`: rc-items.tsv:161 kept, rc-run-5.tsv:79 dropped
+  - `item.171-8hx`: rc-items.tsv:162 kept, rc-run-5.tsv:80 dropped
+  - `item.172-8rx`: rc-items.tsv:163 kept, rc-run-5.tsv:81 dropped
+  - `item.173-qf1`: rc-items.tsv:164 kept, rc-run-5.tsv:82 dropped
+  - `item.174-qf2`: rc-items.tsv:165 kept, rc-run-5.tsv:83 dropped
+  - `item.176-wrb`: rc-items.tsv:166 kept, rc-run-5.tsv:84 dropped
+  - `item.177-axf`: rc-items.tsv:167 kept, rc-run-5.tsv:85 dropped
+  - `item.178-ces`: rc-items.tsv:168 kept, rc-run-5.tsv:86 dropped
+  - `item.179-clw`: rc-items.tsv:169 kept, rc-run-5.tsv:87 dropped
+  - `item.18-spc`: rc-items.tsv:15 kept, rc-run-5.tsv:88 dropped
+  - `item.180-btl`: rc-items.tsv:170 kept, rc-run-5.tsv:89 dropped
+  - `item.181-skr`: rc-items.tsv:171 kept, rc-run-5.tsv:90 dropped
+  - `item.182-9ar`: rc-items.tsv:172 kept, rc-run-5.tsv:91 dropped
+  - `item.183-9wb`: rc-items.tsv:173 kept, rc-run-5.tsv:92 dropped
+  - `item.184-9xf`: rc-items.tsv:174 kept, rc-run-5.tsv:93 dropped
+  - `item.185-9cs`: rc-items.tsv:175 kept, rc-run-5.tsv:94 dropped
+  - `item.186-9lw`: rc-items.tsv:176 kept, rc-run-5.tsv:95 dropped
+  - `item.187-9tw`: rc-items.tsv:177 kept, rc-run-5.tsv:96 dropped
+  - `item.188-9qr`: rc-items.tsv:178 kept, rc-run-5.tsv:97 dropped
+  - `item.189-7ar`: rc-items.tsv:179 kept, rc-run-5.tsv:98 dropped
+  - `item.190-7wb`: rc-items.tsv:180 kept, rc-run-5.tsv:99 dropped
+  - `item.191-7xf`: rc-items.tsv:181 kept, rc-run-5.tsv:100 dropped
+  - `item.192-7cs`: rc-items.tsv:182 kept, rc-run-5.tsv:101 dropped
+  - `item.193-7lw`: rc-items.tsv:183 kept, rc-run-5.tsv:102 dropped
+  - `item.194-7tw`: rc-items.tsv:184 kept, rc-run-5.tsv:103 dropped
+  - `item.195-7qr`: rc-items.tsv:185 kept, rc-run-5.tsv:104 dropped
+  - `item.196-7ha`: rc-items.tsv:186 kept, rc-run-5.tsv:105 dropped
+  - `item.197-7ax`: rc-items.tsv:187 kept, rc-run-5.tsv:106 dropped
+  - `item.198-72a`: rc-items.tsv:188 kept, rc-run-5.tsv:107 dropped
+  - `item.199-7mp`: rc-items.tsv:189 kept, rc-run-5.tsv:108 dropped
+  - `item.2-2ax`: rc-items.tsv:4 kept, rc-run-5.tsv:109 dropped
+  - `item.20-mst`: rc-items.tsv:16 kept, rc-run-5.tsv:110 dropped
+  - `item.200-7wa`: rc-items.tsv:190 kept, rc-run-5.tsv:111 dropped
+  - `item.201-7la`: rc-items.tsv:191 kept, rc-run-5.tsv:112 dropped
+  - `item.202-7ba`: rc-items.tsv:192 kept, rc-run-5.tsv:113 dropped
+  - `item.203-7bt`: rc-items.tsv:193 kept, rc-run-5.tsv:114 dropped
+  - `item.204-7ga`: rc-items.tsv:194 kept, rc-run-5.tsv:115 dropped
+  - `item.205-7gi`: rc-items.tsv:195 kept, rc-run-5.tsv:116 dropped
+  - `item.206-7wn`: rc-items.tsv:196 kept, rc-run-5.tsv:117 dropped
+  - `item.207-7yw`: rc-items.tsv:197 kept, rc-run-5.tsv:118 dropped
+  - `item.208-7bw`: rc-items.tsv:198 kept, rc-run-5.tsv:119 dropped
+  - `item.209-7gw`: rc-items.tsv:199 kept, rc-run-5.tsv:120 dropped
+  - `item.21-fla`: rc-items.tsv:17 kept, rc-run-5.tsv:121 dropped
+  - `item.210-7cl`: rc-items.tsv:200 kept, rc-run-5.tsv:122 dropped
+  - `item.211-7sc`: rc-items.tsv:201 kept, rc-run-5.tsv:123 dropped
+  - `item.212-7qs`: rc-items.tsv:202 kept, rc-run-5.tsv:124 dropped
+  - `item.213-7ws`: rc-items.tsv:203 kept, rc-run-5.tsv:125 dropped
+  - `item.214-7sp`: rc-items.tsv:204 kept, rc-run-5.tsv:126 dropped
+  - `item.215-7ma`: rc-items.tsv:205 kept, rc-run-5.tsv:127 dropped
+  - `item.216-7mt`: rc-items.tsv:206 kept, rc-run-5.tsv:128 dropped
+  - `item.217-7fl`: rc-items.tsv:207 kept, rc-run-5.tsv:129 dropped
+  - `item.218-7wh`: rc-items.tsv:208 kept, rc-run-5.tsv:130 dropped
+  - `item.219-7m7`: rc-items.tsv:209 kept, rc-run-5.tsv:131 dropped
+  - `item.22-whm`: rc-items.tsv:18 kept, rc-run-5.tsv:132 dropped
+  - `item.220-7gm`: rc-items.tsv:210 kept, rc-run-5.tsv:133 dropped
+  - `item.221-7ss`: rc-items.tsv:211 kept, rc-run-5.tsv:134 dropped
+  - `item.222-7sm`: rc-items.tsv:212 kept, rc-run-5.tsv:135 dropped
+  - `item.223-7sb`: rc-items.tsv:213 kept, rc-run-5.tsv:136 dropped
+  - `item.224-7fc`: rc-items.tsv:214 kept, rc-run-5.tsv:137 dropped
+  - `item.225-7cr`: rc-items.tsv:215 kept, rc-run-5.tsv:138 dropped
+  - `item.226-7bs`: rc-items.tsv:216 kept, rc-run-5.tsv:139 dropped
+  - `item.227-7ls`: rc-items.tsv:217 kept, rc-run-5.tsv:140 dropped
+  - `item.228-7wd`: rc-items.tsv:218 kept, rc-run-5.tsv:141 dropped
+  - `item.229-72h`: rc-items.tsv:219 kept, rc-run-5.tsv:142 dropped
+  - `item.23-mau`: rc-items.tsv:19 kept, rc-run-5.tsv:143 dropped
+  - `item.230-7cm`: rc-items.tsv:220 kept, rc-run-5.tsv:144 dropped
+  - `item.231-7gs`: rc-items.tsv:221 kept, rc-run-5.tsv:145 dropped
+  - `item.232-7b7`: rc-items.tsv:222 kept, rc-run-5.tsv:146 dropped
+  - `item.233-7fb`: rc-items.tsv:223 kept, rc-run-5.tsv:147 dropped
+  - `item.234-7gd`: rc-items.tsv:224 kept, rc-run-5.tsv:148 dropped
+  - `item.235-7dg`: rc-items.tsv:225 kept, rc-run-5.tsv:149 dropped
+  - `item.236-7di`: rc-items.tsv:226 kept, rc-run-5.tsv:150 dropped
+  - `item.237-7kr`: rc-items.tsv:227 kept, rc-run-5.tsv:151 dropped
+  - `item.238-7bl`: rc-items.tsv:228 kept, rc-run-5.tsv:152 dropped
+  - `item.239-7tk`: rc-items.tsv:229 kept, rc-run-5.tsv:153 dropped
+  - `item.24-gma`: rc-items.tsv:20 kept, rc-run-5.tsv:154 dropped
+  - `item.240-7ta`: rc-items.tsv:230 kept, rc-run-5.tsv:155 dropped
+  - `item.241-7bk`: rc-items.tsv:231 kept, rc-run-5.tsv:156 dropped
+  - `item.242-7b8`: rc-items.tsv:232 kept, rc-run-5.tsv:157 dropped
+  - `item.243-7ja`: rc-items.tsv:233 kept, rc-run-5.tsv:158 dropped
+  - `item.244-7pi`: rc-items.tsv:234 kept, rc-run-5.tsv:159 dropped
+  - `item.245-7s7`: rc-items.tsv:235 kept, rc-run-5.tsv:160 dropped
+  - `item.246-7gl`: rc-items.tsv:236 kept, rc-run-5.tsv:161 dropped
+  - `item.247-7ts`: rc-items.tsv:237 kept, rc-run-5.tsv:162 dropped
+  - `item.248-7sr`: rc-items.tsv:238 kept, rc-run-5.tsv:163 dropped
+  - `item.249-7tr`: rc-items.tsv:239 kept, rc-run-5.tsv:164 dropped
+  - `item.25-ssd`: rc-items.tsv:21 kept, rc-run-5.tsv:165 dropped
+  - `item.250-7br`: rc-items.tsv:240 kept, rc-run-5.tsv:166 dropped
+  - `item.251-7st`: rc-items.tsv:241 kept, rc-run-5.tsv:167 dropped
+  - `item.252-7p7`: rc-items.tsv:242 kept, rc-run-5.tsv:168 dropped
+  - `item.253-7o7`: rc-items.tsv:243 kept, rc-run-5.tsv:169 dropped
+  - `item.254-7vo`: rc-items.tsv:244 kept, rc-run-5.tsv:170 dropped
+  - `item.255-7s8`: rc-items.tsv:245 kept, rc-run-5.tsv:171 dropped
+  - `item.256-7pa`: rc-items.tsv:246 kept, rc-run-5.tsv:172 dropped
+  - `item.257-7h7`: rc-items.tsv:247 kept, rc-run-5.tsv:173 dropped
+  - `item.258-7wc`: rc-items.tsv:248 kept, rc-run-5.tsv:174 dropped
+  - `item.259-6ss`: rc-items.tsv:249 kept, rc-run-5.tsv:175 dropped
+  - `item.26-scm`: rc-items.tsv:22 kept, rc-run-5.tsv:176 dropped
+  - `item.260-6ls`: rc-items.tsv:250 kept, rc-run-5.tsv:177 dropped
+  - `item.261-6cs`: rc-items.tsv:251 kept, rc-run-5.tsv:178 dropped
+  - `item.262-6bs`: rc-items.tsv:252 kept, rc-run-5.tsv:179 dropped
+  - `item.263-6ws`: rc-items.tsv:253 kept, rc-run-5.tsv:180 dropped
+  - `item.264-6sb`: rc-items.tsv:254 kept, rc-run-5.tsv:181 dropped
+  - `item.265-6hb`: rc-items.tsv:255 kept, rc-run-5.tsv:182 dropped
+  - `item.266-6lb`: rc-items.tsv:256 kept, rc-run-5.tsv:183 dropped
+  - `item.267-6cb`: rc-items.tsv:257 kept, rc-run-5.tsv:184 dropped
+  - `item.268-6s7`: rc-items.tsv:258 kept, rc-run-5.tsv:185 dropped
+  - `item.269-6l7`: rc-items.tsv:259 kept, rc-run-5.tsv:186 dropped
+  - `item.270-6sw`: rc-items.tsv:260 kept, rc-run-5.tsv:187 dropped
+  - `item.271-6lw`: rc-items.tsv:261 kept, rc-run-5.tsv:188 dropped
+  - `item.272-6lx`: rc-items.tsv:262 kept, rc-run-5.tsv:189 dropped
+  - `item.273-6mx`: rc-items.tsv:263 kept, rc-run-5.tsv:190 dropped
+  - `item.274-6hx`: rc-items.tsv:264 kept, rc-run-5.tsv:191 dropped
+  - `item.275-6rx`: rc-items.tsv:265 kept, rc-run-5.tsv:192 dropped
+  - `item.276-ob1`: rc-items.tsv:266 kept, rc-run-5.tsv:193 dropped
+  - `item.277-ob2`: rc-items.tsv:267 kept, rc-run-5.tsv:194 dropped
+  - `item.278-ob3`: rc-items.tsv:268 kept, rc-run-5.tsv:195 dropped
+  - `item.279-ob4`: rc-items.tsv:269 kept, rc-run-5.tsv:196 dropped
+  - `item.28-flc`: rc-items.tsv:23 kept, rc-run-5.tsv:197 dropped
+  - `item.280-ob5`: rc-items.tsv:270 kept, rc-run-5.tsv:198 dropped
+  - `item.281-am1`: rc-items.tsv:271 kept, rc-run-5.tsv:199 dropped
+  - `item.282-am2`: rc-items.tsv:272 kept, rc-run-5.tsv:200 dropped
+  - `item.283-am3`: rc-items.tsv:273 kept, rc-run-5.tsv:201 dropped
+  - `item.284-am4`: rc-items.tsv:274 kept, rc-run-5.tsv:202 dropped
+  - `item.285-am5`: rc-items.tsv:275 kept, rc-run-5.tsv:203 dropped
+  - `item.286-ob6`: rc-items.tsv:276 kept, rc-run-5.tsv:204 dropped
+  - `item.287-ob7`: rc-items.tsv:277 kept, rc-run-5.tsv:205 dropped
+  - `item.288-ob8`: rc-items.tsv:278 kept, rc-run-5.tsv:206 dropped
+  - `item.289-ob9`: rc-items.tsv:279 kept, rc-run-5.tsv:207 dropped
+  - `item.29-crs`: rc-items.tsv:24 kept, rc-run-5.tsv:208 dropped
+  - `item.290-oba`: rc-items.tsv:280 kept, rc-run-5.tsv:209 dropped
+  - `item.291-am6`: rc-items.tsv:281 kept, rc-run-5.tsv:210 dropped
+  - `item.292-am7`: rc-items.tsv:282 kept, rc-run-5.tsv:211 dropped
+  - `item.293-am8`: rc-items.tsv:283 kept, rc-run-5.tsv:212 dropped
+  - `item.294-am9`: rc-items.tsv:284 kept, rc-run-5.tsv:213 dropped
+  - `item.295-ama`: rc-items.tsv:285 kept, rc-run-5.tsv:214 dropped
+  - `item.296-obb`: rc-items.tsv:286 kept, rc-run-5.tsv:215 dropped
+  - `item.297-obc`: rc-items.tsv:287 kept, rc-run-5.tsv:216 dropped
+  - `item.298-obd`: rc-items.tsv:288 kept, rc-run-5.tsv:217 dropped
+  - `item.299-obe`: rc-items.tsv:289 kept, rc-run-5.tsv:218 dropped
+  - `item.30-bsd`: rc-items.tsv:25 kept, rc-run-5.tsv:219 dropped
+  - `item.300-obf`: rc-items.tsv:290 kept, rc-run-5.tsv:220 dropped
+  - `item.301-amb`: rc-items.tsv:291 kept, rc-run-5.tsv:221 dropped
+  - `item.302-amc`: rc-items.tsv:292 kept, rc-run-5.tsv:222 dropped
+  - `item.303-amd`: rc-items.tsv:293 kept, rc-run-5.tsv:223 dropped
+  - `item.304-ame`: rc-items.tsv:294 kept, rc-run-5.tsv:224 dropped
+  - `item.305-amf`: rc-items.tsv:295 kept, rc-run-5.tsv:225 dropped
+  - `item.306-cap`: rc-items.tsv:296 kept, rc-run-5.tsv:226 dropped
+  - `item.307-skp`: rc-items.tsv:297 kept, rc-run-5.tsv:227 dropped
+  - `item.308-hlm`: rc-items.tsv:298 kept, rc-run-5.tsv:228 dropped
+  - `item.309-fhl`: rc-items.tsv:299 kept, rc-run-5.tsv:229 dropped
+  - `item.31-lsd`: rc-items.tsv:26 kept, rc-run-5.tsv:230 dropped
+  - `item.310-ghm`: rc-items.tsv:300 kept, rc-run-5.tsv:231 dropped
+  - `item.311-crn`: rc-items.tsv:301 kept, rc-run-5.tsv:232 dropped
+  - `item.312-msk`: rc-items.tsv:302 kept, rc-run-5.tsv:233 dropped
+  - `item.314-lea`: rc-items.tsv:303 kept, rc-run-5.tsv:234 dropped
+  - `item.315-hla`: rc-items.tsv:304 kept, rc-run-5.tsv:235 dropped
+  - `item.316-stu`: rc-items.tsv:305 kept, rc-run-5.tsv:236 dropped
+  - `item.317-rng`: rc-items.tsv:306 kept, rc-run-5.tsv:237 dropped
+  - `item.318-scl`: rc-items.tsv:307 kept, rc-run-5.tsv:238 dropped
+  - `item.32-wsd`: rc-items.tsv:27 kept, rc-run-5.tsv:239 dropped
+  - `item.320-brs`: rc-items.tsv:308 kept, rc-run-5.tsv:240 dropped
+  - `item.321-spl`: rc-items.tsv:309 kept, rc-run-5.tsv:241 dropped
+  - `item.322-plt`: rc-items.tsv:310 kept, rc-run-5.tsv:242 dropped
+  - `item.323-fld`: rc-items.tsv:311 kept, rc-run-5.tsv:243 dropped
+  - `item.324-gth`: rc-items.tsv:312 kept, rc-run-5.tsv:244 dropped
+  - `item.325-ful`: rc-items.tsv:313 kept, rc-run-5.tsv:245 dropped
+  - `item.326-aar`: rc-items.tsv:314 kept, rc-run-5.tsv:246 dropped
+  - `item.327-ltp`: rc-items.tsv:315 kept, rc-run-5.tsv:247 dropped
+  - `item.328-buc`: rc-items.tsv:316 kept, rc-run-5.tsv:248 dropped
+  - `item.329-sml`: rc-items.tsv:317 kept, rc-run-5.tsv:249 dropped
+  - `item.33-2hs`: rc-items.tsv:28 kept, rc-run-5.tsv:250 dropped
+  - `item.330-lrg`: rc-items.tsv:318 kept, rc-run-5.tsv:251 dropped
+  - `item.332-tow`: rc-items.tsv:319 kept, rc-run-5.tsv:252 dropped
+  - `item.333-gts`: rc-items.tsv:320 kept, rc-run-5.tsv:253 dropped
+  - `item.334-lgl`: rc-items.tsv:321 kept, rc-run-5.tsv:254 dropped
+  - `item.335-vgl`: rc-items.tsv:322 kept, rc-run-5.tsv:255 dropped
+  - `item.336-mgl`: rc-items.tsv:323 kept, rc-run-5.tsv:256 dropped
+  - `item.337-tgl`: rc-items.tsv:324 kept, rc-run-5.tsv:257 dropped
+  - `item.338-hgl`: rc-items.tsv:325 kept, rc-run-5.tsv:258 dropped
+  - `item.339-lbt`: rc-items.tsv:326 kept, rc-run-5.tsv:259 dropped
+  - `item.34-clm`: rc-items.tsv:29 kept, rc-run-5.tsv:260 dropped
+  - `item.340-vbt`: rc-items.tsv:327 kept, rc-run-5.tsv:261 dropped
+  - `item.341-mbt`: rc-items.tsv:328 kept, rc-run-5.tsv:262 dropped
+  - `item.342-tbt`: rc-items.tsv:329 kept, rc-run-5.tsv:263 dropped
+  - `item.343-hbt`: rc-items.tsv:330 kept, rc-run-5.tsv:264 dropped
+  - `item.344-lbl`: rc-items.tsv:331 kept, rc-run-5.tsv:265 dropped
+  - `item.345-vbl`: rc-items.tsv:332 kept, rc-run-5.tsv:266 dropped
+  - `item.346-mbl`: rc-items.tsv:333 kept, rc-run-5.tsv:267 dropped
+  - `item.347-tbl`: rc-items.tsv:334 kept, rc-run-5.tsv:268 dropped
+  - `item.348-hbl`: rc-items.tsv:335 kept, rc-run-5.tsv:269 dropped
+  - `item.349-bhm`: rc-items.tsv:336 kept, rc-run-5.tsv:270 dropped
+  - `item.35-gis`: rc-items.tsv:30 kept, rc-run-5.tsv:271 dropped
+  - `item.350-bsh`: rc-items.tsv:337 kept, rc-run-5.tsv:272 dropped
+  - `item.351-spk`: rc-items.tsv:338 kept, rc-run-5.tsv:273 dropped
+  - `item.352-xap`: rc-items.tsv:339 kept, rc-run-5.tsv:274 dropped
+  - `item.353-xkp`: rc-items.tsv:340 kept, rc-run-5.tsv:275 dropped
+  - `item.354-xlm`: rc-items.tsv:341 kept, rc-run-5.tsv:276 dropped
+  - `item.355-xhl`: rc-items.tsv:342 kept, rc-run-5.tsv:277 dropped
+  - `item.356-xhm`: rc-items.tsv:343 kept, rc-run-5.tsv:278 dropped
+  - `item.357-xrn`: rc-items.tsv:344 kept, rc-run-5.tsv:279 dropped
+  - `item.358-xsk`: rc-items.tsv:345 kept, rc-run-5.tsv:280 dropped
+  - `item.359-xui`: rc-items.tsv:346 kept, rc-run-5.tsv:281 dropped
+  - `item.36-bsw`: rc-items.tsv:31 kept, rc-run-5.tsv:282 dropped
+  - `item.360-xea`: rc-items.tsv:347 kept, rc-run-5.tsv:283 dropped
+  - `item.361-xla`: rc-items.tsv:348 kept, rc-run-5.tsv:284 dropped
+  - `item.362-xtu`: rc-items.tsv:349 kept, rc-run-5.tsv:285 dropped
+  - `item.363-xng`: rc-items.tsv:350 kept, rc-run-5.tsv:286 dropped
+  - `item.364-xcl`: rc-items.tsv:351 kept, rc-run-5.tsv:287 dropped
+  - `item.365-xhn`: rc-items.tsv:352 kept, rc-run-5.tsv:288 dropped
+  - `item.366-xrs`: rc-items.tsv:353 kept, rc-run-5.tsv:289 dropped
+  - `item.367-xpl`: rc-items.tsv:354 kept, rc-run-5.tsv:290 dropped
+  - `item.368-xlt`: rc-items.tsv:355 kept, rc-run-5.tsv:291 dropped
+  - `item.369-xld`: rc-items.tsv:356 kept, rc-run-5.tsv:292 dropped
+  - `item.37-flb`: rc-items.tsv:32 kept, rc-run-5.tsv:293 dropped
+  - `item.370-xth`: rc-items.tsv:357 kept, rc-run-5.tsv:294 dropped
+  - `item.371-xul`: rc-items.tsv:358 kept, rc-run-5.tsv:295 dropped
+  - `item.372-xar`: rc-items.tsv:359 kept, rc-run-5.tsv:296 dropped
+  - `item.373-xtp`: rc-items.tsv:360 kept, rc-run-5.tsv:297 dropped
+  - `item.374-xuc`: rc-items.tsv:361 kept, rc-run-5.tsv:298 dropped
+  - `item.375-xml`: rc-items.tsv:362 kept, rc-run-5.tsv:299 dropped
+  - `item.376-xrg`: rc-items.tsv:363 kept, rc-run-5.tsv:300 dropped
+  - `item.377-xit`: rc-items.tsv:364 kept, rc-run-5.tsv:301 dropped
+  - `item.378-xow`: rc-items.tsv:365 kept, rc-run-5.tsv:302 dropped
+  - `item.379-xts`: rc-items.tsv:366 kept, rc-run-5.tsv:303 dropped
+  - `item.38-gsd`: rc-items.tsv:33 kept, rc-run-5.tsv:304 dropped
+  - `item.380-xlg`: rc-items.tsv:367 kept, rc-run-5.tsv:305 dropped
+  - `item.381-xvg`: rc-items.tsv:368 kept, rc-run-5.tsv:306 dropped
+  - `item.382-xmg`: rc-items.tsv:369 kept, rc-run-5.tsv:307 dropped
+  - `item.383-xtg`: rc-items.tsv:370 kept, rc-run-5.tsv:308 dropped
+  - `item.384-xhg`: rc-items.tsv:371 kept, rc-run-5.tsv:309 dropped
+  - `item.385-xlb`: rc-items.tsv:372 kept, rc-run-5.tsv:310 dropped
+  - `item.386-xvb`: rc-items.tsv:373 kept, rc-run-5.tsv:311 dropped
+  - `item.387-xmb`: rc-items.tsv:374 kept, rc-run-5.tsv:312 dropped
+  - `item.388-xtb`: rc-items.tsv:375 kept, rc-run-5.tsv:313 dropped
+  - `item.389-xhb`: rc-items.tsv:376 kept, rc-run-5.tsv:314 dropped
+  - `item.390-zlb`: rc-items.tsv:377 kept, rc-run-5.tsv:315 dropped
+  - `item.391-zvb`: rc-items.tsv:378 kept, rc-run-5.tsv:316 dropped
+  - `item.392-zmb`: rc-items.tsv:379 kept, rc-run-5.tsv:317 dropped
+  - `item.393-ztb`: rc-items.tsv:380 kept, rc-run-5.tsv:318 dropped
+  - `item.394-zhb`: rc-items.tsv:381 kept, rc-run-5.tsv:319 dropped
+  - `item.395-xh9`: rc-items.tsv:382 kept, rc-run-5.tsv:320 dropped
+  - `item.396-xsh`: rc-items.tsv:383 kept, rc-run-5.tsv:321 dropped
+  - `item.397-xpk`: rc-items.tsv:384 kept, rc-run-5.tsv:322 dropped
+  - `item.399-dr2`: rc-items.tsv:385 kept, rc-run-5.tsv:323 dropped
+  - `item.4-wax`: rc-items.tsv:5 kept, rc-run-5.tsv:324 dropped
+  - `item.40-dir`: rc-items.tsv:34 kept, rc-run-5.tsv:325 dropped
+  - `item.400-dr3`: rc-items.tsv:386 kept, rc-run-5.tsv:326 dropped
+  - `item.401-dr4`: rc-items.tsv:387 kept, rc-run-5.tsv:327 dropped
+  - `item.402-dr5`: rc-items.tsv:388 kept, rc-run-5.tsv:328 dropped
+  - `item.404-ba2`: rc-items.tsv:389 kept, rc-run-5.tsv:329 dropped
+  - `item.405-ba3`: rc-items.tsv:390 kept, rc-run-5.tsv:330 dropped
+  - `item.406-ba4`: rc-items.tsv:391 kept, rc-run-5.tsv:331 dropped
+  - `item.407-ba5`: rc-items.tsv:392 kept, rc-run-5.tsv:332 dropped
+  - `item.408-pa1`: rc-items.tsv:393 kept, rc-run-5.tsv:333 dropped
+  - `item.409-pa2`: rc-items.tsv:394 kept, rc-run-5.tsv:334 dropped
+  - `item.41-kri`: rc-items.tsv:35 kept, rc-run-5.tsv:335 dropped
+  - `item.410-pa3`: rc-items.tsv:395 kept, rc-run-5.tsv:336 dropped
+  - `item.411-pa4`: rc-items.tsv:396 kept, rc-run-5.tsv:337 dropped
+  - `item.412-pa5`: rc-items.tsv:397 kept, rc-run-5.tsv:338 dropped
+  - `item.414-ne2`: rc-items.tsv:398 kept, rc-run-5.tsv:339 dropped
+  - `item.415-ne3`: rc-items.tsv:399 kept, rc-run-5.tsv:340 dropped
+  - `item.416-ne4`: rc-items.tsv:400 kept, rc-run-5.tsv:341 dropped
+  - `item.417-ne5`: rc-items.tsv:401 kept, rc-run-5.tsv:342 dropped
+  - `item.418-ci0`: rc-items.tsv:402 kept, rc-run-5.tsv:343 dropped
+  - `item.419-ci1`: rc-items.tsv:403 kept, rc-run-5.tsv:344 dropped
+  - `item.42-bld`: rc-items.tsv:36 kept, rc-run-5.tsv:345 dropped
+  - `item.420-ci2`: rc-items.tsv:404 kept, rc-run-5.tsv:346 dropped
+  - `item.421-ci3`: rc-items.tsv:405 kept, rc-run-5.tsv:347 dropped
+  - `item.422-uap`: rc-items.tsv:406 kept, rc-run-5.tsv:348 dropped
+  - `item.423-ukp`: rc-items.tsv:407 kept, rc-run-5.tsv:349 dropped
+  - `item.424-ulm`: rc-items.tsv:408 kept, rc-run-5.tsv:350 dropped
+  - `item.425-uhl`: rc-items.tsv:409 kept, rc-run-5.tsv:351 dropped
+  - `item.426-uhm`: rc-items.tsv:410 kept, rc-run-5.tsv:352 dropped
+  - `item.427-urn`: rc-items.tsv:411 kept, rc-run-5.tsv:353 dropped
+  - `item.428-usk`: rc-items.tsv:412 kept, rc-run-5.tsv:354 dropped
+  - `item.429-uui`: rc-items.tsv:413 kept, rc-run-5.tsv:355 dropped
+  - `item.43-tkf`: rc-items.tsv:37 kept, rc-run-5.tsv:356 dropped
+  - `item.430-uea`: rc-items.tsv:414 kept, rc-run-5.tsv:357 dropped
+  - `item.431-ula`: rc-items.tsv:415 kept, rc-run-5.tsv:358 dropped
+  - `item.432-utu`: rc-items.tsv:416 kept, rc-run-5.tsv:359 dropped
+  - `item.433-ung`: rc-items.tsv:417 kept, rc-run-5.tsv:360 dropped
+  - `item.434-ucl`: rc-items.tsv:418 kept, rc-run-5.tsv:361 dropped
+  - `item.435-uhn`: rc-items.tsv:419 kept, rc-run-5.tsv:362 dropped
+  - `item.436-urs`: rc-items.tsv:420 kept, rc-run-5.tsv:363 dropped
+  - `item.437-upl`: rc-items.tsv:421 kept, rc-run-5.tsv:364 dropped
+  - `item.438-ult`: rc-items.tsv:422 kept, rc-run-5.tsv:365 dropped
+  - `item.439-uld`: rc-items.tsv:423 kept, rc-run-5.tsv:366 dropped
+  - `item.44-tax`: rc-items.tsv:38 kept, rc-run-5.tsv:367 dropped
+  - `item.440-uth`: rc-items.tsv:424 kept, rc-run-5.tsv:368 dropped
+  - `item.441-uul`: rc-items.tsv:425 kept, rc-run-5.tsv:369 dropped
+  - `item.442-uar`: rc-items.tsv:426 kept, rc-run-5.tsv:370 dropped
+  - `item.443-utp`: rc-items.tsv:427 kept, rc-run-5.tsv:371 dropped
+  - `item.444-uuc`: rc-items.tsv:428 kept, rc-run-5.tsv:372 dropped
+  - `item.445-uml`: rc-items.tsv:429 kept, rc-run-5.tsv:373 dropped
+  - `item.446-urg`: rc-items.tsv:430 kept, rc-run-5.tsv:374 dropped
+  - `item.447-uit`: rc-items.tsv:431 kept, rc-run-5.tsv:375 dropped
+  - `item.448-uow`: rc-items.tsv:432 kept, rc-run-5.tsv:376 dropped
+  - `item.449-uts`: rc-items.tsv:433 kept, rc-run-5.tsv:377 dropped
+  - `item.45-bkf`: rc-items.tsv:39 kept, rc-run-5.tsv:378 dropped
+  - `item.450-ulg`: rc-items.tsv:434 kept, rc-run-5.tsv:379 dropped
+  - `item.451-uvg`: rc-items.tsv:435 kept, rc-run-5.tsv:380 dropped
+  - `item.452-umg`: rc-items.tsv:436 kept, rc-run-5.tsv:381 dropped
+  - `item.453-utg`: rc-items.tsv:437 kept, rc-run-5.tsv:382 dropped
+  - `item.454-uhg`: rc-items.tsv:438 kept, rc-run-5.tsv:383 dropped
+  - `item.455-ulb`: rc-items.tsv:439 kept, rc-run-5.tsv:384 dropped
+  - `item.456-uvb`: rc-items.tsv:440 kept, rc-run-5.tsv:385 dropped
+  - `item.457-umb`: rc-items.tsv:441 kept, rc-run-5.tsv:386 dropped
+  - `item.458-utb`: rc-items.tsv:442 kept, rc-run-5.tsv:387 dropped
+  - `item.459-uhb`: rc-items.tsv:443 kept, rc-run-5.tsv:388 dropped
+  - `item.46-bal`: rc-items.tsv:40 kept, rc-run-5.tsv:389 dropped
+  - `item.460-ulc`: rc-items.tsv:444 kept, rc-run-5.tsv:390 dropped
+  - `item.461-uvc`: rc-items.tsv:445 kept, rc-run-5.tsv:391 dropped
+  - `item.462-umc`: rc-items.tsv:446 kept, rc-run-5.tsv:392 dropped
+  - `item.463-utc`: rc-items.tsv:447 kept, rc-run-5.tsv:393 dropped
+  - `item.464-uhc`: rc-items.tsv:448 kept, rc-run-5.tsv:394 dropped
+  - `item.465-uh9`: rc-items.tsv:449 kept, rc-run-5.tsv:395 dropped
+  - `item.466-ush`: rc-items.tsv:450 kept, rc-run-5.tsv:396 dropped
+  - `item.467-upk`: rc-items.tsv:451 kept, rc-run-5.tsv:397 dropped
+  - `item.468-dr6`: rc-items.tsv:452 kept, rc-run-5.tsv:398 dropped
+  - `item.469-dr7`: rc-items.tsv:453 kept, rc-run-5.tsv:399 dropped
+  - `item.47-jav`: rc-items.tsv:41 kept, rc-run-5.tsv:400 dropped
+  - `item.470-dr8`: rc-items.tsv:454 kept, rc-run-5.tsv:401 dropped
+  - `item.471-dr9`: rc-items.tsv:455 kept, rc-run-5.tsv:402 dropped
+  - `item.472-dra`: rc-items.tsv:456 kept, rc-run-5.tsv:403 dropped
+  - `item.473-ba6`: rc-items.tsv:457 kept, rc-run-5.tsv:404 dropped
+  - `item.474-ba7`: rc-items.tsv:458 kept, rc-run-5.tsv:405 dropped
+  - `item.475-ba8`: rc-items.tsv:459 kept, rc-run-5.tsv:406 dropped
+  - `item.476-ba9`: rc-items.tsv:460 kept, rc-run-5.tsv:407 dropped
+  - `item.477-baa`: rc-items.tsv:461 kept, rc-run-5.tsv:408 dropped
+  - `item.478-pa6`: rc-items.tsv:462 kept, rc-run-5.tsv:409 dropped
+  - `item.479-pa7`: rc-items.tsv:463 kept, rc-run-5.tsv:410 dropped
+  - `item.48-pil`: rc-items.tsv:42 kept, rc-run-5.tsv:411 dropped
+  - `item.480-pa8`: rc-items.tsv:464 kept, rc-run-5.tsv:412 dropped
+  - `item.481-pa9`: rc-items.tsv:465 kept, rc-run-5.tsv:413 dropped
+  - `item.482-paa`: rc-items.tsv:466 kept, rc-run-5.tsv:414 dropped
+  - `item.483-ne6`: rc-items.tsv:467 kept, rc-run-5.tsv:415 dropped
+  - `item.484-ne7`: rc-items.tsv:468 kept, rc-run-5.tsv:416 dropped
+  - `item.485-ne8`: rc-items.tsv:469 kept, rc-run-5.tsv:417 dropped
+  - `item.486-ne9`: rc-items.tsv:470 kept, rc-run-5.tsv:418 dropped
+  - `item.487-nea`: rc-items.tsv:471 kept, rc-run-5.tsv:419 dropped
+  - `item.488-drb`: rc-items.tsv:472 kept, rc-run-5.tsv:420 dropped
+  - `item.489-drc`: rc-items.tsv:473 kept, rc-run-5.tsv:421 dropped
+  - `item.49-ssp`: rc-items.tsv:43 kept, rc-run-5.tsv:422 dropped
+  - `item.490-drd`: rc-items.tsv:474 kept, rc-run-5.tsv:423 dropped
+  - `item.491-dre`: rc-items.tsv:475 kept, rc-run-5.tsv:424 dropped
+  - `item.492-drf`: rc-items.tsv:476 kept, rc-run-5.tsv:425 dropped
+  - `item.493-bab`: rc-items.tsv:477 kept, rc-run-5.tsv:426 dropped
+  - `item.494-bac`: rc-items.tsv:478 kept, rc-run-5.tsv:427 dropped
+  - `item.495-bad`: rc-items.tsv:479 kept, rc-run-5.tsv:428 dropped
+  - `item.496-bae`: rc-items.tsv:480 kept, rc-run-5.tsv:429 dropped
+  - `item.497-baf`: rc-items.tsv:481 kept, rc-run-5.tsv:430 dropped
+  - `item.498-pab`: rc-items.tsv:482 kept, rc-run-5.tsv:431 dropped
+  - `item.499-pac`: rc-items.tsv:483 kept, rc-run-5.tsv:432 dropped
+  - `item.5-lax`: rc-items.tsv:6 kept, rc-run-5.tsv:433 dropped
+  - `item.50-glv`: rc-items.tsv:44 kept, rc-run-5.tsv:434 dropped
+  - `item.500-pad`: rc-items.tsv:484 kept, rc-run-5.tsv:435 dropped
+  - `item.501-pae`: rc-items.tsv:485 kept, rc-run-5.tsv:436 dropped
+  - `item.502-paf`: rc-items.tsv:486 kept, rc-run-5.tsv:437 dropped
+  - `item.503-neb`: rc-items.tsv:487 kept, rc-run-5.tsv:438 dropped
+  - `item.504-neg`: rc-items.tsv:488 kept, rc-run-5.tsv:439 dropped
+  - `item.505-ned`: rc-items.tsv:489 kept, rc-run-5.tsv:440 dropped
+  - `item.506-nee`: rc-items.tsv:490 kept, rc-run-5.tsv:441 dropped
+  - `item.507-nef`: rc-items.tsv:491 kept, rc-run-5.tsv:442 dropped
+  - `item.508-elx`: rc-items.tsv:492 kept, rc-run-5.tsv:443 dropped
+  - `item.51-tsp`: rc-items.tsv:45 kept, rc-run-5.tsv:444 dropped
+  - `item.513-vps`: rc-items.tsv:493 kept, rc-run-5.tsv:445 dropped
+  - `item.514-yps`: rc-items.tsv:494 kept, rc-run-5.tsv:446 dropped
+  - `item.517-wms`: rc-items.tsv:495 kept, rc-run-5.tsv:447 dropped
+  - `item.518-tbk`: rc-items.tsv:496 kept, rc-run-5.tsv:448 dropped
+  - `item.519-ibk`: rc-items.tsv:497 kept, rc-run-5.tsv:449 dropped
+  - `item.52-spr`: rc-items.tsv:46 kept, rc-run-5.tsv:450 dropped
+  - `item.520-amu`: rc-items.tsv:498 kept, rc-run-5.tsv:451 dropped
+  - `item.522-rin`: rc-items.tsv:499 kept, rc-run-5.tsv:452 dropped
+  - `item.53-tri`: rc-items.tsv:47 kept, rc-run-5.tsv:453 dropped
+  - `item.530-isc`: rc-items.tsv:500 kept, rc-run-5.tsv:454 dropped
+  - `item.54-brn`: rc-items.tsv:48 kept, rc-run-5.tsv:455 dropped
+  - `item.543-key`: rc-items.tsv:501 kept, rc-run-5.tsv:456 dropped
+  - `item.55-spt`: rc-items.tsv:49 kept, rc-run-5.tsv:457 dropped
+  - `item.557-gcv`: rc-items.tsv:502 kept, rc-run-5.tsv:458 dropped
+  - `item.558-gfv`: rc-items.tsv:503 kept, rc-run-5.tsv:459 dropped
+  - `item.559-gsv`: rc-items.tsv:504 kept, rc-run-5.tsv:460 dropped
+  - `item.56-pik`: rc-items.tsv:50 kept, rc-run-5.tsv:461 dropped
+  - `item.560-gzv`: rc-items.tsv:505 kept, rc-run-5.tsv:462 dropped
+  - `item.561-gpv`: rc-items.tsv:506 kept, rc-run-5.tsv:463 dropped
+  - `item.562-gcy`: rc-items.tsv:507 kept, rc-run-5.tsv:464 dropped
+  - `item.563-gfy`: rc-items.tsv:508 kept, rc-run-5.tsv:465 dropped
+  - `item.564-gsy`: rc-items.tsv:509 kept, rc-run-5.tsv:466 dropped
+  - `item.565-gly`: rc-items.tsv:510 kept, rc-run-5.tsv:467 dropped
+  - `item.566-gpy`: rc-items.tsv:511 kept, rc-run-5.tsv:468 dropped
+  - `item.567-gcb`: rc-items.tsv:512 kept, rc-run-5.tsv:469 dropped
+  - `item.568-gfb`: rc-items.tsv:513 kept, rc-run-5.tsv:470 dropped
+  - `item.569-gsb`: rc-items.tsv:514 kept, rc-run-5.tsv:471 dropped
+  - `item.57-bar`: rc-items.tsv:51 kept, rc-run-5.tsv:472 dropped
+  - `item.570-glb`: rc-items.tsv:515 kept, rc-run-5.tsv:473 dropped
+  - `item.571-gpb`: rc-items.tsv:516 kept, rc-run-5.tsv:474 dropped
+  - `item.572-gcg`: rc-items.tsv:517 kept, rc-run-5.tsv:475 dropped
+  - `item.573-gfg`: rc-items.tsv:518 kept, rc-run-5.tsv:476 dropped
+  - `item.574-gsg`: rc-items.tsv:519 kept, rc-run-5.tsv:477 dropped
+  - `item.575-glg`: rc-items.tsv:520 kept, rc-run-5.tsv:478 dropped
+  - `item.576-gpg`: rc-items.tsv:521 kept, rc-run-5.tsv:479 dropped
+  - `item.578-gfr`: rc-items.tsv:522 kept, rc-run-5.tsv:480 dropped
+  - `item.579-gsr`: rc-items.tsv:523 kept, rc-run-5.tsv:481 dropped
+  - `item.58-vou`: rc-items.tsv:52 kept, rc-run-5.tsv:482 dropped
+  - `item.580-glr`: rc-items.tsv:524 kept, rc-run-5.tsv:483 dropped
+  - `item.581-gpr`: rc-items.tsv:525 kept, rc-run-5.tsv:484 dropped
+  - `item.582-gcw`: rc-items.tsv:526 kept, rc-run-5.tsv:485 dropped
+  - `item.583-gfw`: rc-items.tsv:527 kept, rc-run-5.tsv:486 dropped
+  - `item.584-gsw`: rc-items.tsv:528 kept, rc-run-5.tsv:487 dropped
+  - `item.585-glw`: rc-items.tsv:529 kept, rc-run-5.tsv:488 dropped
+  - `item.586-gpw`: rc-items.tsv:530 kept, rc-run-5.tsv:489 dropped
+  - `item.587-hp1`: rc-items.tsv:531 kept, rc-run-5.tsv:490 dropped
+  - `item.588-hp2`: rc-items.tsv:532 kept, rc-run-5.tsv:491 dropped
+  - `item.589-hp3`: rc-items.tsv:533 kept, rc-run-5.tsv:492 dropped
+  - `item.59-scy`: rc-items.tsv:53 kept, rc-run-5.tsv:493 dropped
+  - `item.590-hp4`: rc-items.tsv:534 kept, rc-run-5.tsv:494 dropped
+  - `item.591-hp5`: rc-items.tsv:535 kept, rc-run-5.tsv:495 dropped
+  - `item.592-mp1`: rc-items.tsv:536 kept, rc-run-5.tsv:496 dropped
+  - `item.593-mp2`: rc-items.tsv:537 kept, rc-run-5.tsv:497 dropped
+  - `item.594-mp3`: rc-items.tsv:538 kept, rc-run-5.tsv:498 dropped
+  - `item.595-mp4`: rc-items.tsv:539 kept, rc-run-5.tsv:499 dropped
+  - `item.596-mp5`: rc-items.tsv:540 kept, rc-run-5.tsv:500 dropped
+  - `item.597-skc`: rc-items.tsv:541 kept, rc-run-5.tsv:501 dropped
+  - `item.598-skf`: rc-items.tsv:542 kept, rc-run-5.tsv:502 dropped
+  - `item.599-sku`: rc-items.tsv:543 kept, rc-run-5.tsv:503 dropped
+  - `item.6-bax`: rc-items.tsv:7 kept, rc-run-5.tsv:504 dropped
+  - `item.60-pax`: rc-items.tsv:54 kept, rc-run-5.tsv:505 dropped
+  - `item.600-skl`: rc-items.tsv:544 kept, rc-run-5.tsv:506 dropped
+  - `item.601-skz`: rc-items.tsv:545 kept, rc-run-5.tsv:507 dropped
+  - `item.603-cm1`: rc-items.tsv:546 kept, rc-run-5.tsv:508 dropped
+  - `item.604-cm2`: rc-items.tsv:547 kept, rc-run-5.tsv:509 dropped
+  - `item.605-cm3`: rc-items.tsv:548 kept, rc-run-5.tsv:510 dropped
+  - `item.61-hal`: rc-items.tsv:55 kept, rc-run-5.tsv:511 dropped
+  - `item.610-r01`: rc-items.tsv:549 kept, rc-run-5.tsv:512 dropped
+  - `item.611-r02`: rc-items.tsv:550 kept, rc-run-5.tsv:513 dropped
+  - `item.612-r03`: rc-items.tsv:551 kept, rc-run-5.tsv:514 dropped
+  - `item.613-r04`: rc-items.tsv:552 kept, rc-run-5.tsv:515 dropped
+  - `item.615-r06`: rc-items.tsv:553 kept, rc-run-5.tsv:516 dropped
+  - `item.616-r07`: rc-items.tsv:554 kept, rc-run-5.tsv:517 dropped
+  - `item.617-r08`: rc-items.tsv:555 kept, rc-run-5.tsv:518 dropped
+  - `item.618-r09`: rc-items.tsv:556 kept, rc-run-5.tsv:519 dropped
+  - `item.619-r10`: rc-items.tsv:557 kept, rc-run-5.tsv:520 dropped
+  - `item.62-wsc`: rc-items.tsv:56 kept, rc-run-5.tsv:521 dropped
+  - `item.620-r11`: rc-items.tsv:558 kept, rc-run-5.tsv:522 dropped
+  - `item.621-r12`: rc-items.tsv:559 kept, rc-run-5.tsv:523 dropped
+  - `item.622-r13`: rc-items.tsv:560 kept, rc-run-5.tsv:524 dropped
+  - `item.623-r14`: rc-items.tsv:561 kept, rc-run-5.tsv:525 dropped
+  - `item.624-r15`: rc-items.tsv:562 kept, rc-run-5.tsv:526 dropped
+  - `item.625-r16`: rc-items.tsv:563 kept, rc-run-5.tsv:527 dropped
+  - `item.626-r17`: rc-items.tsv:564 kept, rc-run-5.tsv:528 dropped
+  - `item.627-r18`: rc-items.tsv:565 kept, rc-run-5.tsv:529 dropped
+  - `item.628-r19`: rc-items.tsv:566 kept, rc-run-5.tsv:530 dropped
+  - `item.629-r20`: rc-items.tsv:567 kept, rc-run-5.tsv:531 dropped
+  - `item.63-sst`: rc-items.tsv:57 kept, rc-run-5.tsv:532 dropped
+  - `item.630-r21`: rc-items.tsv:568 kept, rc-run-5.tsv:533 dropped
+  - `item.631-r22`: rc-items.tsv:569 kept, rc-run-5.tsv:534 dropped
+  - `item.632-r23`: rc-items.tsv:570 kept, rc-run-5.tsv:535 dropped
+  - `item.633-r24`: rc-items.tsv:571 kept, rc-run-5.tsv:536 dropped
+  - `item.634-r25`: rc-items.tsv:572 kept, rc-run-5.tsv:537 dropped
+  - `item.635-r26`: rc-items.tsv:573 kept, rc-run-5.tsv:538 dropped
+  - `item.636-r27`: rc-items.tsv:574 kept, rc-run-5.tsv:539 dropped
+  - `item.637-r28`: rc-items.tsv:575 kept, rc-run-5.tsv:540 dropped
+  - `item.638-r29`: rc-items.tsv:576 kept, rc-run-5.tsv:541 dropped
+  - `item.639-r30`: rc-items.tsv:577 kept, rc-run-5.tsv:542 dropped
+  - `item.640-r31`: rc-items.tsv:578 kept, rc-run-5.tsv:543 dropped
+  - `item.641-r32`: rc-items.tsv:579 kept, rc-run-5.tsv:544 dropped
+  - `item.642-r33`: rc-items.tsv:580 kept, rc-run-5.tsv:545 dropped
+  - `item.643-jew`: rc-items.tsv:581 kept, rc-run-5.tsv:546 dropped
+  - `item.645-0sc`: rc-items.tsv:582 kept, rc-run-5.tsv:547 dropped
+  - `item.65-cst`: rc-items.tsv:58 kept, rc-run-5.tsv:548 dropped
+  - `item.658-std`: rc-items.tsv:583 kept, rc-run-5.tsv:549 dropped
+  - `item.66-bst`: rc-items.tsv:59 kept, rc-run-5.tsv:550 dropped
+  - `item.67-wst`: rc-items.tsv:60 kept, rc-run-5.tsv:551 dropped
+  - `item.68-sbw`: rc-items.tsv:61 kept, rc-run-5.tsv:552 dropped
+  - `item.69-hbw`: rc-items.tsv:62 kept, rc-run-5.tsv:553 dropped
+  - `item.71-cbw`: rc-items.tsv:63 kept, rc-run-5.tsv:554 dropped
+  - `item.72-sbb`: rc-items.tsv:64 kept, rc-run-5.tsv:555 dropped
+  - `item.73-lbb`: rc-items.tsv:65 kept, rc-run-5.tsv:556 dropped
+  - `item.74-swb`: rc-items.tsv:66 kept, rc-run-5.tsv:557 dropped
+  - `item.75-lwb`: rc-items.tsv:67 kept, rc-run-5.tsv:558 dropped
+  - `item.77-mxb`: rc-items.tsv:68 kept, rc-run-5.tsv:559 dropped
+  - `item.78-hxb`: rc-items.tsv:69 kept, rc-run-5.tsv:560 dropped
+  - `item.79-rxb`: rc-items.tsv:70 kept, rc-run-5.tsv:561 dropped
+  - `item.8-gax`: rc-items.tsv:8 kept, rc-run-5.tsv:562 dropped
+  - `item.80-gps`: rc-items.tsv:71 kept, rc-run-5.tsv:563 dropped
+  - `item.81-ops`: rc-items.tsv:72 kept, rc-run-5.tsv:564 dropped
+  - `item.82-gpm`: rc-items.tsv:73 kept, rc-run-5.tsv:565 dropped
+  - `item.83-opm`: rc-items.tsv:74 kept, rc-run-5.tsv:566 dropped
+  - `item.84-gpl`: rc-items.tsv:75 kept, rc-run-5.tsv:567 dropped
+  - `item.85-opl`: rc-items.tsv:76 kept, rc-run-5.tsv:568 dropped
+  - `item.86-d33`: rc-items.tsv:77 kept, rc-run-5.tsv:569 dropped
+  - `item.87-g33`: rc-items.tsv:78 kept, rc-run-5.tsv:570 dropped
+  - `item.88-leg`: rc-items.tsv:79 kept, rc-run-5.tsv:571 dropped
+  - `item.89-hdm`: rc-items.tsv:80 kept, rc-run-5.tsv:572 dropped
+  - `item.9-gix`: rc-items.tsv:9 kept, rc-run-5.tsv:573 dropped
+  - `item.90-hfh`: rc-items.tsv:81 kept, rc-run-5.tsv:574 dropped
+  - `item.91-hst`: rc-items.tsv:82 kept, rc-run-5.tsv:575 dropped
+  - `item.92-msf`: rc-items.tsv:83 kept, rc-run-5.tsv:576 dropped
+  - `item.93-9ha`: rc-items.tsv:84 kept, rc-run-5.tsv:577 dropped
+  - `item.94-9ax`: rc-items.tsv:85 kept, rc-run-5.tsv:578 dropped
+  - `item.95-92a`: rc-items.tsv:86 kept, rc-run-5.tsv:579 dropped
+  - `item.96-9mp`: rc-items.tsv:87 kept, rc-run-5.tsv:580 dropped
+  - `item.97-9wa`: rc-items.tsv:88 kept, rc-run-5.tsv:581 dropped
+  - `item.98-9la`: rc-items.tsv:89 kept, rc-run-5.tsv:582 dropped
+  - `item.99-9ba`: rc-items.tsv:90 kept, rc-run-5.tsv:583 dropped
+  - `item.affix.crafted`: rc-gen-wine168.tsv:4 kept, rc-run-5.tsv:584 dropped
+  - `item.affix.magic`: rc-gen-wine168.tsv:7 kept, rc-run-5.tsv:585 dropped
+  - `item.affix.rare`: rc-gen-wine168.tsv:9 kept, rc-run-5.tsv:586 dropped
+  - `item.gen.normal-quality`: rc-items.tsv:591 kept, rc-run-5.tsv:587 dropped
+  - `item.quality.low`: rc-gen-wine168.tsv:16 kept, rc-run-5.tsv:588 dropped
+  - `item.quality.set`: rc-gen-wine168.tsv:17 kept, rc-run-5.tsv:589 dropped
+  - `item.quality.superior`: rc-gen-wine168.tsv:18 kept, rc-run-5.tsv:590 dropped
+  - `item.quality.unique`: rc-gen-wine168.tsv:19 kept, rc-run-5.tsv:591 dropped
+  - `missile.amplify-damage`: rc-link-checks.tsv:3 kept, rc-run-5.tsv:593 dropped
+  - `missile.andrialspray`: rc-link-checks.tsv:5 kept, rc-run-5.tsv:594 dropped
+  - `missile.andypoisonbolt`: rc-link-checks.tsv:6 kept, rc-run-5.tsv:595 dropped
+  - `missile.arcanetower`: rc-link-checks.tsv:7 kept, rc-run-5.tsv:596 dropped
+  - `missile.arctic-blast`: rc-link-checks.tsv:8 kept, rc-run-5.tsv:597 dropped
+  - `missile.armageddon`: rc-link-checks.tsv:9 kept, rc-run-5.tsv:598 dropped
+  - `missile.attract`: rc-link-checks.tsv:10 kept, rc-run-5.tsv:599 dropped
+  - `missile.baal-clone-teleport`: rc-link-checks.tsv:11 kept, rc-run-5.tsv:600 dropped
+  - `missile.baal-cold-missiles`: rc-link-checks.tsv:12 kept, rc-run-5.tsv:601 dropped
+  - `missile.baal-inferno`: rc-link-checks.tsv:13 kept, rc-run-5.tsv:602 dropped
+  - `missile.baal-monster-spawn`: rc-link-checks.tsv:14 kept, rc-run-5.tsv:603 dropped
+  - `missile.baal-nova`: rc-link-checks.tsv:15 kept, rc-run-5.tsv:604 dropped
+  - `missile.baal-teleport`: rc-link-checks.tsv:16 kept, rc-run-5.tsv:606 dropped
+  - `missile.battle-command`: rc-link-checks.tsv:17 kept, rc-run-5.tsv:607 dropped
+  - `missile.battle-cry`: rc-link-checks.tsv:18 kept, rc-run-5.tsv:608 dropped
+  - `missile.battle-orders`: rc-link-checks.tsv:19 kept, rc-run-5.tsv:609 dropped
+  - `missile.blade-fury`: rc-link-checks.tsv:27 kept, rc-run-5.tsv:610 dropped
+  - `missile.blade-sentinel`: rc-link-checks.tsv:28 kept, rc-run-5.tsv:611 dropped
+  - `missile.blade-shield`: rc-link-checks.tsv:29 kept, rc-run-5.tsv:612 dropped
+  - `missile.blades-of-ice`: rc-link-checks.tsv:30 kept, rc-run-5.tsv:613 dropped
+  - `missile.blaze`: rc-link-checks.tsv:31 kept, rc-run-5.tsv:614 dropped
+  - `missile.blessed-hammer`: rc-link-checks.tsv:32 kept, rc-run-5.tsv:615 dropped
+  - `missile.blizzard`: rc-link-checks.tsv:33 kept, rc-run-5.tsv:616 dropped
+  - `missile.blood-mana`: rc-link-checks.tsv:34 kept, rc-run-5.tsv:617 dropped
+  - `missile.boltsentry`: rc-link-checks.tsv:36 kept, rc-run-5.tsv:618 dropped
+  - `missile.bone-spear`: rc-link-checks.tsv:38 kept, rc-run-5.tsv:619 dropped
+  - `missile.bone-spirit`: rc-link-checks.tsv:39 kept, rc-run-5.tsv:620 dropped
+  - `missile.bone-wall`: rc-link-checks.tsv:40 kept, rc-run-5.tsv:621 dropped
+  - `missile.catapultblizzard`: rc-link-checks.tsv:41 kept, rc-run-5.tsv:624 dropped
+  - `missile.catapultmeteor`: rc-link-checks.tsv:42 kept, rc-run-5.tsv:625 dropped
+  - `missile.catapultplague`: rc-link-checks.tsv:43 kept, rc-run-5.tsv:626 dropped
+  - `missile.chain-lightning`: rc-link-checks.tsv:44 kept, rc-run-5.tsv:627 dropped
+  - `missile.charged-bolt`: rc-link-checks.tsv:45 kept, rc-run-5.tsv:628 dropped
+  - `missile.charged-strike`: rc-link-checks.tsv:46 kept, rc-run-5.tsv:629 dropped
+  - `missile.chilling-armor`: rc-link-checks.tsv:47 kept, rc-run-5.tsv:630 dropped
+  - `missile.claws-of-thunder`: rc-link-checks.tsv:48 kept, rc-run-5.tsv:631 dropped
+  - `missile.cold-arrow`: rc-link-checks.tsv:49 kept, rc-run-5.tsv:632 dropped
+  - `missile.confuse`: rc-link-checks.tsv:50 kept, rc-run-5.tsv:633 dropped
+  - `missile.corpse-explosion`: rc-link-checks.tsv:51 kept, rc-run-5.tsv:634 dropped
+  - `missile.corpsecycler`: rc-link-checks.tsv:52 kept, rc-run-5.tsv:635 dropped
+  - `missile.countessfirewall`: rc-link-checks.tsv:53 kept, rc-run-5.tsv:636 dropped
+  - `missile.cursedballtrapleft`: rc-link-checks.tsv:60 kept, rc-run-5.tsv:637 dropped
+  - `missile.cursedballtrapright`: rc-link-checks.tsv:61 kept, rc-run-5.tsv:638 dropped
+  - `missile.death-sentry-ltng`: rc-link-checks.tsv:63 kept, rc-run-5.tsv:639 dropped
+  - `missile.deathmaul`: rc-link-checks.tsv:64 kept, rc-run-5.tsv:640 dropped
+  - `missile.decrepify`: rc-link-checks.tsv:65 kept, rc-run-5.tsv:641 dropped
+  - `missile.defense-curse`: rc-link-checks.tsv:66 kept, rc-run-5.tsv:642 dropped
+  - `missile.desertturret`: rc-link-checks.tsv:67 kept, rc-run-5.tsv:643 dropped
+  - `missile.diabfire`: rc-link-checks.tsv:68 kept, rc-run-5.tsv:644 dropped
+  - `missile.diablight`: rc-missile-missing.tsv:3 kept, rc-run-5.tsv:645 dropped
+  - `missile.diablogeddon`: rc-link-checks.tsv:69 kept, rc-run-5.tsv:646 dropped
+  - `missile.diabwall`: rc-link-checks.tsv:70 kept, rc-run-5.tsv:647 dropped
+  - `missile.dim-vision`: rc-link-checks.tsv:71 kept, rc-run-5.tsv:648 dropped
+  - `missile.doomknightmissile`: rc-link-checks.tsv:72 kept, rc-run-5.tsv:649 dropped
+  - `missile.dragon-tail`: rc-link-checks.tsv:73 kept, rc-run-5.tsv:650 dropped
+  - `missile.eruption`: rc-link-checks.tsv:75 kept, rc-run-5.tsv:651 dropped
+  - `missile.exploding-arrow`: rc-link-checks.tsv:76 kept, rc-run-5.tsv:652 dropped
+  - `missile.fenris-rage`: rc-link-checks.tsv:77 kept, rc-run-5.tsv:653 dropped
+  - `missile.fetishaura`: rc-link-checks.tsv:78 kept, rc-run-5.tsv:654 dropped
+  - `missile.fetishinferno`: rc-link-checks.tsv:79 kept, rc-run-5.tsv:655 dropped
+  - `missile.fingermagespider`: rc-link-checks.tsv:80 kept, rc-run-5.tsv:656 dropped
+  - `missile.fire-arrow`: rc-link-checks.tsv:81 kept, rc-run-5.tsv:657 dropped
+  - `missile.fire-ball`: rc-link-checks.tsv:82 kept, rc-run-5.tsv:658 dropped
+  - `missile.fire-bolt`: rc-link-checks.tsv:83 kept, rc-run-5.tsv:659 dropped
+  - `missile.fire-trauma`: rc-link-checks.tsv:84 kept, rc-run-5.tsv:660 dropped
+  - `missile.fire-wall`: rc-link-checks.tsv:85 kept, rc-run-5.tsv:661 dropped
+  - `missile.firestorm`: rc-link-checks.tsv:87 kept, rc-run-5.tsv:662 dropped
+  - `missile.fist-of-the-heavens`: rc-link-checks.tsv:88 kept, rc-run-5.tsv:663 dropped
+  - `missile.fists-of-fire`: rc-link-checks.tsv:89 kept, rc-run-5.tsv:664 dropped
+  - `missile.freezing-arrow`: rc-link-checks.tsv:90 kept, rc-run-5.tsv:665 dropped
+  - `missile.frost-nova`: rc-link-checks.tsv:93 kept, rc-run-5.tsv:666 dropped
+  - `missile.frozen-orb`: rc-link-checks.tsv:94 kept, rc-run-5.tsv:667 dropped
+  - `missile.gargoyletrap`: rc-link-checks.tsv:96 kept, rc-run-5.tsv:668 dropped
+  - `missile.glacial-spike`: rc-link-checks.tsv:97 kept, rc-run-5.tsv:669 dropped
+  - `missile.grim-ward`: rc-link-checks.tsv:104 kept, rc-run-5.tsv:670 dropped
+  - `missile.guided-arrow`: rc-link-checks.tsv:105 kept, rc-run-5.tsv:671 dropped
+  - `missile.healing-vortex`: rc-link-checks.tsv:106 kept, rc-run-5.tsv:672 dropped
+  - `missile.hellmeteor`: rc-link-checks.tsv:107 kept, rc-run-5.tsv:673 dropped
+  - `missile.holy-bolt`: rc-link-checks.tsv:108 kept, rc-run-5.tsv:674 dropped
+  - `missile.horror-arctic-blast`: rc-link-checks.tsv:109 kept, rc-run-5.tsv:675 dropped
+  - `missile.howl`: rc-link-checks.tsv:110 kept, rc-run-5.tsv:676 dropped
+  - `missile.hurricane`: rc-link-checks.tsv:111 kept, rc-run-5.tsv:677 dropped
+  - `missile.hydramissile`: rc-link-checks.tsv:112 kept, rc-run-5.tsv:678 dropped
+  - `missile.ice-arrow`: rc-link-checks.tsv:113 kept, rc-run-5.tsv:679 dropped
+  - `missile.ice-blast`: rc-link-checks.tsv:114 kept, rc-run-5.tsv:680 dropped
+  - `missile.ice-bolt`: rc-link-checks.tsv:115 kept, rc-run-5.tsv:681 dropped
+  - `missile.immolation-arrow`: rc-link-checks.tsv:116 kept, rc-run-5.tsv:682 dropped
+  - `missile.imp-fire-missile`: rc-link-checks.tsv:118 kept, rc-run-5.tsv:683 dropped
+  - `missile.imp-fire-missile-ex`: rc-link-checks.tsv:119 kept, rc-run-5.tsv:684 dropped
+  - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, rc-run-5.tsv:685 dropped
+  - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, rc-run-5.tsv:686 dropped
+  - `missile.imp-teleport`: rc-link-checks.tsv:122 kept, rc-run-5.tsv:687 dropped
+  - `missile.impbolt`: rc-link-checks.tsv:123 kept, rc-run-5.tsv:688 dropped
+  - `missile.inferno`: rc-link-checks.tsv:129 kept, rc-run-5.tsv:689 dropped
+  - `missile.iron-maiden`: rc-link-checks.tsv:130 kept, rc-run-5.tsv:690 dropped
+  - `missile.leap`: rc-link-checks.tsv:131 kept, rc-run-5.tsv:691 dropped
+  - `missile.life-tap`: rc-link-checks.tsv:132 kept, rc-run-5.tsv:692 dropped
+  - `missile.lightning`: rc-link-checks.tsv:133 kept, rc-run-5.tsv:693 dropped
+  - `missile.lightning-bolt`: rc-link-checks.tsv:134 kept, rc-run-5.tsv:694 dropped
+  - `missile.lightning-fury`: rc-link-checks.tsv:135 kept, rc-run-5.tsv:695 dropped
+  - `missile.lightning-strike`: rc-link-checks.tsv:136 kept, rc-run-5.tsv:696 dropped
+  - `missile.lower-resist`: rc-link-checks.tsv:137 kept, rc-run-5.tsv:697 dropped
+  - `missile.magic-arrow`: rc-link-checks.tsv:138 kept, rc-run-5.tsv:698 dropped
+  - `missile.magottup`: rc-link-checks.tsv:139 kept, rc-run-5.tsv:699 dropped
+  - `missile.megademoninferno`: rc-missile-missing.tsv:4 kept, rc-run-5.tsv:700 dropped
+  - `missile.mephfrostnova`: rc-link-checks.tsv:140 kept, rc-run-5.tsv:701 dropped
+  - `missile.mephistomissile`: rc-link-checks.tsv:141 kept, rc-run-5.tsv:702 dropped
+  - `missile.meteor`: rc-link-checks.tsv:142 kept, rc-run-5.tsv:703 dropped
+  - `missile.mind-blast`: rc-link-checks.tsv:143 kept, rc-run-5.tsv:704 dropped
+  - `missile.molten-boulder`: rc-link-checks.tsv:144 kept, rc-run-5.tsv:705 dropped
+  - `missile.mon-death-sentry`: rc-link-checks.tsv:145 kept, rc-run-5.tsv:706 dropped
+  - `missile.mon-inferno-sentry`: rc-link-checks.tsv:146 kept, rc-run-5.tsv:707 dropped
+  - `missile.monblizzard`: rc-link-checks.tsv:148 kept, rc-run-5.tsv:708 dropped
+  - `missile.monbonespirit`: rc-link-checks.tsv:149 kept, rc-run-5.tsv:709 dropped
+  - `missile.monbow`: rc-link-checks.tsv:150 kept, rc-run-5.tsv:710 dropped
+  - `missile.moncoldarrow`: rc-link-checks.tsv:151 kept, rc-run-5.tsv:711 dropped
+  - `missile.moncursecast`: rc-link-checks.tsv:152 kept, rc-run-5.tsv:712 dropped
+  - `missile.monexplodingarrow`: rc-link-checks.tsv:153 kept, rc-run-5.tsv:713 dropped
+  - `missile.monfirearrow`: rc-link-checks.tsv:154 kept, rc-run-5.tsv:714 dropped
+  - `missile.monfreezingarrow`: rc-link-checks.tsv:155 kept, rc-run-5.tsv:715 dropped
+  - `missile.multiple-shot`: rc-link-checks.tsv:157 kept, rc-run-5.tsv:716 dropped
+  - `missile.necromagemissile`: rc-link-checks.tsv:163 kept, rc-run-5.tsv:717 dropped
+  - `missile.nihlathakcorpseexplosion`: rc-link-checks.tsv:164 kept, rc-run-5.tsv:718 dropped
+  - `missile.nova`: rc-link-checks.tsv:165 kept, rc-run-5.tsv:719 dropped
+  - `missile.plague-javelin`: rc-link-checks.tsv:172 kept, rc-run-5.tsv:720 dropped
+  - `missile.poison-explosion`: rc-link-checks.tsv:173 kept, rc-run-5.tsv:721 dropped
+  - `missile.poison-javelin`: rc-link-checks.tsv:174 kept, rc-run-5.tsv:722 dropped
+  - `missile.poison-nova`: rc-link-checks.tsv:175 kept, rc-run-5.tsv:723 dropped
+  - `missile.poisonballtrap`: rc-link-checks.tsv:176 kept, rc-run-5.tsv:724 dropped
+  - `missile.primeblaze`: rc-link-checks.tsv:177 kept, rc-run-5.tsv:725 dropped
+  - `missile.primebolt`: rc-link-checks.tsv:178 kept, rc-run-5.tsv:726 dropped
+  - `missile.primefirewall`: rc-link-checks.tsv:179 kept, rc-run-5.tsv:727 dropped
+  - `missile.primeicenova`: rc-link-checks.tsv:180 kept, rc-run-5.tsv:728 dropped
+  - `missile.primelightning`: rc-link-checks.tsv:181 kept, rc-run-5.tsv:729 dropped
+  - `missile.primepoisonball`: rc-link-checks.tsv:182 kept, rc-run-5.tsv:730 dropped
+  - `missile.primepoisonnova`: rc-link-checks.tsv:183 kept, rc-run-5.tsv:731 dropped
+  - `missile.primespike`: rc-link-checks.tsv:184 kept, rc-run-5.tsv:732 dropped
+  - `missile.quick-strike`: rc-link-checks.tsv:185 kept, rc-run-5.tsv:733 dropped
+  - `missile.rabies`: rc-link-checks.tsv:186 kept, rc-run-5.tsv:734 dropped
+  - `missile.raise-skeletal-mage`: rc-link-checks.tsv:187 kept, rc-run-5.tsv:735 dropped
+  - `missile.raise-skeleton`: rc-link-checks.tsv:188 kept, rc-run-5.tsv:736 dropped
+  - `missile.redemption`: rc-link-checks.tsv:189 kept, rc-run-5.tsv:737 dropped
+  - `missile.regurgitatoreat`: rc-link-checks.tsv:191 kept, rc-run-5.tsv:738 dropped
+  - `missile.revive`: rc-link-checks.tsv:192 kept, rc-run-5.tsv:739 dropped
+  - `missile.roguemissile`: rc-link-checks.tsv:193 kept, rc-run-5.tsv:740 dropped
+  - `missile.royal-strike`: rc-link-checks.tsv:194 kept, rc-run-5.tsv:741 dropped
+  - `missile.sacrifice`: rc-link-checks.tsv:195 kept, rc-run-5.tsv:742 dropped
+  - `missile.sanctuary`: rc-link-checks.tsv:196 kept, rc-run-5.tsv:743 dropped
+  - `missile.sentry-lightning`: rc-link-checks.tsv:197 kept, rc-run-5.tsv:744 dropped
+  - `missile.shamanfire`: rc-link-checks.tsv:198 kept, rc-run-5.tsv:745 dropped
+  - `missile.shamanfireex`: rc-link-checks.tsv:199 kept, rc-run-5.tsv:746 dropped
+  - `missile.shamanice`: rc-link-checks.tsv:200 kept, rc-run-5.tsv:747 dropped
+  - `missile.shiver-armor`: rc-link-checks.tsv:201 kept, rc-run-5.tsv:748 dropped
+  - `missile.shock-field`: rc-link-checks.tsv:202 kept, rc-run-5.tsv:749 dropped
+  - `missile.shock-wave`: rc-link-checks.tsv:203 kept, rc-run-5.tsv:750 dropped
+  - `missile.strafe`: rc-link-checks.tsv:224 kept, rc-run-5.tsv:752 dropped
+  - `missile.succubusbolt`: rc-link-checks.tsv:225 kept, rc-run-5.tsv:753 dropped
+  - `missile.teeth`: rc-link-checks.tsv:226 kept, rc-run-5.tsv:754 dropped
+  - `missile.terror`: rc-link-checks.tsv:227 kept, rc-run-5.tsv:755 dropped
+  - `missile.thunder-storm`: rc-link-checks.tsv:228 kept, rc-run-5.tsv:756 dropped
+  - `missile.trap-nova`: rc-link-checks.tsv:229 kept, rc-run-5.tsv:757 dropped
+  - `missile.twister`: rc-link-checks.tsv:230 kept, rc-run-5.tsv:758 dropped
+  - `missile.unholybolt`: rc-link-checks.tsv:231 kept, rc-run-5.tsv:759 dropped
+  - `missile.unholyboltex`: rc-link-checks.tsv:232 kept, rc-run-5.tsv:760 dropped
+  - `missile.vampirefireball`: rc-link-checks.tsv:233 kept, rc-run-5.tsv:761 dropped
+  - `missile.vampirefirewall`: rc-link-checks.tsv:234 kept, rc-run-5.tsv:762 dropped
+  - `missile.vampiremeteor`: rc-link-checks.tsv:235 kept, rc-run-5.tsv:763 dropped
+  - `missile.vampiremissile`: rc-link-checks.tsv:236 kept, rc-run-5.tsv:764 dropped
+  - `missile.vine-attack`: rc-link-checks.tsv:237 kept, rc-run-5.tsv:765 dropped
+  - `missile.vinecycler`: rc-link-checks.tsv:238 kept, rc-run-5.tsv:766 dropped
+  - `missile.volcano`: rc-link-checks.tsv:242 kept, rc-run-5.tsv:767 dropped
+  - `missile.wake-of-destruction-sentry`: rc-link-checks.tsv:243 kept, rc-run-5.tsv:768 dropped
+  - `missile.war-cry`: rc-link-checks.tsv:244 kept, rc-run-5.tsv:769 dropped
+  - `missile.weaken`: rc-link-checks.tsv:245 kept, rc-run-5.tsv:770 dropped
+  - `missile.zakarumlightning`: rc-link-checks.tsv:248 kept, rc-run-5.tsv:771 dropped
+  - `net.s2c.0x0e`: rc-run-1.tsv:200 kept, rc-run-5.tsv:773 dropped
+  - `net.s2c.0x1c`: rc-run-1.tsv:202 kept, rc-run-5.tsv:774 dropped
+  - `net.s2c.0x47`: rc-run-1.tsv:210 kept, rc-run-5.tsv:776 dropped
+  - `net.s2c.0x4d`: rc-run-1.tsv:212 kept, rc-run-5.tsv:778 dropped
+  - `net.s2c.0x68`: rc-run-1.tsv:226 kept, rc-run-5.tsv:779 dropped
+  - `net.s2c.0x6b`: rc-run-1.tsv:228 kept, rc-run-5.tsv:780 dropped
+  - `net.s2c.0xa7`: rc-run-1.tsv:240 kept, rc-run-5.tsv:781 dropped
+  - `net.s2c.0xa8`: rc-run-1.tsv:241 kept, rc-run-5.tsv:782 dropped
+  - `tools.poke.tick-end`: rc-packets-join-order.tsv:3 kept, rc-run-5.tsv:783 dropped
+  - `shrine.1.refill`: rc-pc1-audit.tsv:111 kept, rc-run-5.tsv:784 dropped
+  - `shrine.10.resist-lightning-boost`: rc-pc1-audit.tsv:112 kept, rc-run-5.tsv:785 dropped
+  - `shrine.11.resist-poison-boost`: rc-pc1-audit.tsv:113 kept, rc-run-5.tsv:786 dropped
+  - `shrine.12.skill-boost`: rc-pc1-audit.tsv:114 kept, rc-run-5.tsv:787 dropped
+  - `shrine.13.recharge-boost`: rc-pc1-audit.tsv:115 kept, rc-run-5.tsv:788 dropped
+  - `shrine.14.stamina-boost`: rc-pc1-audit.tsv:116 kept, rc-run-5.tsv:789 dropped
+  - `shrine.15.experience-boost`: rc-pc1-audit.tsv:117 kept, rc-run-5.tsv:790 dropped
+  - `shrine.17.portal-to-unknown`: rc-pc1-audit.tsv:118 kept, rc-run-5.tsv:791 dropped
+  - `shrine.2.health-boost`: rc-pc1-audit.tsv:119 kept, rc-run-5.tsv:794 dropped
+  - `shrine.20.warping-shrine`: rc-pc1-audit.tsv:120 kept, rc-run-5.tsv:795 dropped
+  - `shrine.3.mana-boost`: rc-pc1-audit.tsv:121 kept, rc-run-5.tsv:798 dropped
+  - `shrine.6.armor-boost`: rc-pc1-audit.tsv:122 kept, rc-run-5.tsv:799 dropped
+  - `shrine.7.combat-boost`: rc-pc1-audit.tsv:123 kept, rc-run-5.tsv:800 dropped
+  - `shrine.8.resist-fire-boost`: rc-pc1-audit.tsv:124 kept, rc-run-5.tsv:801 dropped
+  - `shrine.9.resist-cold-boost`: rc-pc1-audit.tsv:125 kept, rc-run-5.tsv:802 dropped
+  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-run-5.tsv:813 dropped
+  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-run-5.tsv:814 dropped
+  - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-run-5.tsv:815 dropped
+  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, rc-run-5.tsv:816 dropped
+  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-run-5.tsv:817 dropped
+  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, rc-run-5.tsv:818 dropped
+  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, rc-run-5.tsv:819 dropped
+  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-run-5.tsv:820 dropped
+  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-run-5.tsv:821 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-run-5.tsv:822 dropped
+  - `waypoint.27.the-pandemonium-fortress`: rc-pc1-audit.tsv:136 kept, rc-run-5.tsv:823 dropped
+  - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-5.tsv:824 dropped
+  - `waypoint.29.river-of-flame`: rc-pc1-audit.tsv:138 kept, rc-run-5.tsv:825 dropped
+  - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-run-5.tsv:827 dropped
+  - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-run-5.tsv:828 dropped
   - `state.alignment`: rc-join-burst.tsv:3 kept, rc-run-6.tsv:20 dropped
   - `state.amplifydamage`: rc-join-burst.tsv:4 kept, rc-run-6.tsv:21 dropped
   - `state.antidote`: rc-join-burst.tsv:5 kept, rc-run-6.tsv:22 dropped
@@ -3020,6 +3716,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ancientbarb2`: rc-damage-draws.tsv:12 kept, rc-seed-order.tsv:4 dropped
   - `monster.ancientbarb3`: rc-damage-draws.tsv:13 kept, rc-seed-order.tsv:5 dropped
   - `monster.bighead2`: rc-gen-mon-triage.tsv:6 kept, rc-seed-order.tsv:6 dropped
+  - `shrine.18.gem-upgrade`: rc-run-5.tsv:792 kept, rc-shrine-m.tsv:3 dropped
+  - `shrine.missile-create`: rc-run-5.tsv:592 kept, rc-shrine-missile.tsv:3 dropped
+  - `shrine.19.storm-shrine`: rc-run-5.tsv:793 kept, rc-shrine-rest.tsv:3 dropped
+  - `shrine.21.exploding-shrine`: rc-run-5.tsv:796 kept, rc-shrine-rest.tsv:4 dropped
+  - `shrine.22.poison-shrine`: rc-run-5.tsv:797 kept, rc-shrine-rest.tsv:5 dropped
   - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-siegebeast.tsv:3 dropped
   - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-siegebeast.tsv:4 dropped
   - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-siegebeast.tsv:5 dropped
@@ -3040,6 +3741,23 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `client.c-monsters.draw`: rc-pc1-audit.tsv:49 kept, rc-town-arrival.tsv:3 dropped
   - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
+  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:803 kept, rc-wp-arrival-mode.tsv:3 dropped
+  - `waypoint.1.cold-plains`: rc-run-5.tsv:804 kept, rc-wp-arrival-mode.tsv:4 dropped
+  - `waypoint.3.dark-wood`: rc-run-5.tsv:826 kept, rc-wp-arrival-mode.tsv:5 dropped
+  - `waypoint.4.black-marsh`: rc-run-5.tsv:829 kept, rc-wp-arrival-mode.tsv:6 dropped
+  - `waypoint.5.outer-cloister`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:7 dropped
+  - `waypoint.6.jail-level-1`: rc-run-5.tsv:831 kept, rc-wp-arrival-mode.tsv:8 dropped
+  - `waypoint.7.inner-cloister`: rc-run-5.tsv:832 kept, rc-wp-arrival-mode.tsv:9 dropped
+  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:833 kept, rc-wp-arrival-mode.tsv:10 dropped
+  - `waypoint.9.lut-gholein`: rc-run-5.tsv:834 kept, rc-wp-arrival-mode.tsv:11 dropped
+  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:805 kept, rc-wp-arrival-mode.tsv:12 dropped
+  - `waypoint.11.dry-hills`: rc-run-5.tsv:806 kept, rc-wp-arrival-mode.tsv:13 dropped
+  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:14 dropped
+  - `waypoint.13.far-oasis`: rc-run-5.tsv:808 kept, rc-wp-arrival-mode.tsv:15 dropped
+  - `waypoint.14.lost-city`: rc-run-5.tsv:809 kept, rc-wp-arrival-mode.tsv:16 dropped
+  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:810 kept, rc-wp-arrival-mode.tsv:17 dropped
+  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:811 kept, rc-wp-arrival-mode.tsv:18 dropped
+  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:812 kept, rc-wp-arrival-mode.tsv:19 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-wp-last3.tsv:3 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-wp-last3.tsv:4 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-wp-last3.tsv:5 dropped
@@ -3506,7 +4224,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `missile.redemption`: rc-link-checks.tsv:189 kept, skills.tsv:466 dropped
   - `missile.howl`: rc-link-checks.tsv:110 kept, skills.tsv:467 dropped
   - `missile.leap`: rc-link-checks.tsv:131 kept, skills.tsv:468 dropped
-  - `missile.shout`: rc-run-5.tsv:100 kept, skills.tsv:469 dropped
+  - `missile.shout`: rc-run-5.tsv:751 kept, skills.tsv:469 dropped
   - `missile.battle-cry`: rc-link-checks.tsv:18 kept, skills.tsv:470 dropped
   - `missile.battle-orders`: rc-link-checks.tsv:19 kept, skills.tsv:471 dropped
   - `missile.grim-ward`: rc-link-checks.tsv:104 kept, skills.tsv:472 dropped
@@ -3571,10 +4289,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `missile.wake-of-destruction-sentry`: rc-link-checks.tsv:243 kept, skills.tsv:531 dropped
   - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, skills.tsv:532 dropped
   - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, skills.tsv:533 dropped
-  - `missile.baal-taunt`: q-run-missiles-states.tsv:18 kept, skills.tsv:534 dropped
+  - `missile.baal-taunt`: rc-run-5.tsv:605 kept, skills.tsv:534 dropped
   - `missile.baal-monster-spawn`: rc-link-checks.tsv:14 kept, skills.tsv:535 dropped
-  - `missile.catapult-charged-ball`: rc-run-5.tsv:17 kept, skills.tsv:536 dropped
-  - `missile.catapult-spike-ball`: rc-run-5.tsv:18 kept, skills.tsv:537 dropped
+  - `missile.catapult-charged-ball`: rc-run-5.tsv:622 kept, skills.tsv:536 dropped
+  - `missile.catapult-spike-ball`: rc-run-5.tsv:623 kept, skills.tsv:537 dropped
   - `missile.healing-vortex`: rc-link-checks.tsv:106 kept, skills.tsv:538 dropped
   - `missile.vine-attack`: rc-link-checks.tsv:237 kept, skills.tsv:539 dropped
   - `missile.imp-fire-missile`: rc-link-checks.tsv:118 kept, skills.tsv:540 dropped
@@ -3696,7 +4414,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x46`: rc-run-6.tsv:221 kept, systems.tsv:73 dropped
   - `net.c2s.0x47`: rc-run-6.tsv:222 kept, systems.tsv:74 dropped
   - `net.c2s.0x48`: rc-run-6.tsv:223 kept, systems.tsv:75 dropped
-  - `net.c2s.0x49`: q-run-net.tsv:80 kept, systems.tsv:76 dropped
+  - `net.c2s.0x49`: rc-run-5.tsv:772 kept, systems.tsv:76 dropped
   - `net.c2s.0x4a`: q-run-net.tsv:81 kept, systems.tsv:77 dropped
   - `net.c2s.0x4b`: q-run-net.tsv:82 kept, systems.tsv:78 dropped
   - `net.c2s.0x4c`: q-run-net.tsv:83 kept, systems.tsv:79 dropped
@@ -3774,7 +4492,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x23`: rc-run-1.tsv:205 kept, systems.tsv:151 dropped
   - `net.s2c.0x24`: q-run-net.tsv:152 kept, systems.tsv:152 dropped
   - `net.s2c.0x25`: q-run-net.tsv:153 kept, systems.tsv:153 dropped
-  - `net.s2c.0x26`: q-run-net.tsv:154 kept, systems.tsv:154 dropped
+  - `net.s2c.0x26`: rc-run-5.tsv:775 kept, systems.tsv:154 dropped
   - `net.s2c.0x27`: q-fix-d7d8-items-net.tsv:4 kept, systems.tsv:155 dropped
   - `net.s2c.0x28`: rc-run-1.tsv:206 kept, systems.tsv:156 dropped
   - `net.s2c.0x29`: rc-run-1.tsv:207 kept, systems.tsv:157 dropped
@@ -3812,7 +4530,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x49`: q-run-net.tsv:189 kept, systems.tsv:189 dropped
   - `net.s2c.0x4a`: q-run-net.tsv:190 kept, systems.tsv:190 dropped
   - `net.s2c.0x4b`: q-run-net.tsv:191 kept, systems.tsv:191 dropped
-  - `net.s2c.0x4c`: q-run-net.tsv:192 kept, systems.tsv:192 dropped
+  - `net.s2c.0x4c`: rc-run-5.tsv:777 kept, systems.tsv:192 dropped
   - `net.s2c.0x4d`: rc-run-1.tsv:212 kept, systems.tsv:193 dropped
   - `net.s2c.0x4e`: rc-run-1.tsv:213 kept, systems.tsv:194 dropped
   - `net.s2c.0x4f`: rc-run-1.tsv:214 kept, systems.tsv:195 dropped
@@ -4592,24 +5310,24 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `drlg.outdoor.tilesub`: rc-pc1-audit.tsv:52 kept, world.tsv:137 dropped
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, world.tsv:139 dropped
   - `drlg.warps.vis-lvlwarp`: rc-pc1-audit.tsv:53 kept, world.tsv:140 dropped
-  - `waypoint.0.rogue-encampment`: rc-wp-arrival-mode.tsv:3 kept, world.tsv:141 dropped
-  - `waypoint.1.cold-plains`: rc-wp-arrival-mode.tsv:4 kept, world.tsv:142 dropped
+  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:803 kept, world.tsv:141 dropped
+  - `waypoint.1.cold-plains`: rc-run-5.tsv:804 kept, world.tsv:142 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, world.tsv:143 dropped
-  - `waypoint.3.dark-wood`: rc-wp-arrival-mode.tsv:5 kept, world.tsv:144 dropped
-  - `waypoint.4.black-marsh`: rc-wp-arrival-mode.tsv:6 kept, world.tsv:145 dropped
-  - `waypoint.5.outer-cloister`: rc-wp-arrival-mode.tsv:7 kept, world.tsv:146 dropped
-  - `waypoint.6.jail-level-1`: rc-wp-arrival-mode.tsv:8 kept, world.tsv:147 dropped
-  - `waypoint.7.inner-cloister`: rc-wp-arrival-mode.tsv:9 kept, world.tsv:148 dropped
-  - `waypoint.8.catacombs-level-2`: rc-wp-arrival-mode.tsv:10 kept, world.tsv:149 dropped
-  - `waypoint.9.lut-gholein`: rc-wp-arrival-mode.tsv:11 kept, world.tsv:150 dropped
-  - `waypoint.10.sewers-level-2`: rc-wp-arrival-mode.tsv:12 kept, world.tsv:151 dropped
-  - `waypoint.11.dry-hills`: rc-wp-arrival-mode.tsv:13 kept, world.tsv:152 dropped
-  - `waypoint.12.halls-of-the-dead-level-2`: rc-wp-arrival-mode.tsv:14 kept, world.tsv:153 dropped
-  - `waypoint.13.far-oasis`: rc-wp-arrival-mode.tsv:15 kept, world.tsv:154 dropped
-  - `waypoint.14.lost-city`: rc-wp-arrival-mode.tsv:16 kept, world.tsv:155 dropped
-  - `waypoint.15.palace-cellar-level-1`: rc-wp-arrival-mode.tsv:17 kept, world.tsv:156 dropped
-  - `waypoint.16.arcane-sanctuary`: rc-wp-arrival-mode.tsv:18 kept, world.tsv:157 dropped
-  - `waypoint.17.canyon-of-the-magi`: rc-wp-arrival-mode.tsv:19 kept, world.tsv:158 dropped
+  - `waypoint.3.dark-wood`: rc-run-5.tsv:826 kept, world.tsv:144 dropped
+  - `waypoint.4.black-marsh`: rc-run-5.tsv:829 kept, world.tsv:145 dropped
+  - `waypoint.5.outer-cloister`: rc-run-5.tsv:830 kept, world.tsv:146 dropped
+  - `waypoint.6.jail-level-1`: rc-run-5.tsv:831 kept, world.tsv:147 dropped
+  - `waypoint.7.inner-cloister`: rc-run-5.tsv:832 kept, world.tsv:148 dropped
+  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:833 kept, world.tsv:149 dropped
+  - `waypoint.9.lut-gholein`: rc-run-5.tsv:834 kept, world.tsv:150 dropped
+  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:805 kept, world.tsv:151 dropped
+  - `waypoint.11.dry-hills`: rc-run-5.tsv:806 kept, world.tsv:152 dropped
+  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:807 kept, world.tsv:153 dropped
+  - `waypoint.13.far-oasis`: rc-run-5.tsv:808 kept, world.tsv:154 dropped
+  - `waypoint.14.lost-city`: rc-run-5.tsv:809 kept, world.tsv:155 dropped
+  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:810 kept, world.tsv:156 dropped
+  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:811 kept, world.tsv:157 dropped
+  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:812 kept, world.tsv:158 dropped
   - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, world.tsv:159 dropped
   - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, world.tsv:160 dropped
   - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, world.tsv:161 dropped
@@ -4731,11 +5449,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `shrine.15.experience-boost`: rc-pc1-audit.tsv:117 kept, world.tsv:287 dropped
   - `shrine.16.shrine-of-enirhs`: q-run-gen-wp-shrine.tsv:28 kept, world.tsv:288 dropped
   - `shrine.17.portal-to-unknown`: rc-pc1-audit.tsv:118 kept, world.tsv:289 dropped
-  - `shrine.18.gem-upgrade`: rc-shrine-m.tsv:3 kept, world.tsv:290 dropped
-  - `shrine.19.storm-shrine`: rc-shrine-rest.tsv:3 kept, world.tsv:291 dropped
+  - `shrine.18.gem-upgrade`: rc-run-5.tsv:792 kept, world.tsv:290 dropped
+  - `shrine.19.storm-shrine`: rc-run-5.tsv:793 kept, world.tsv:291 dropped
   - `shrine.20.warping-shrine`: rc-pc1-audit.tsv:120 kept, world.tsv:292 dropped
-  - `shrine.21.exploding-shrine`: rc-shrine-rest.tsv:4 kept, world.tsv:293 dropped
-  - `shrine.22.poison-shrine`: rc-shrine-rest.tsv:5 kept, world.tsv:294 dropped
+  - `shrine.21.exploding-shrine`: rc-run-5.tsv:796 kept, world.tsv:293 dropped
+  - `shrine.22.poison-shrine`: rc-run-5.tsv:797 kept, world.tsv:294 dropped
   - `npc.cain1`: rc-gen-wine168.tsv:36 kept, world.tsv:295 dropped
   - `npc.gheed`: rc-gen-wine168.tsv:42 kept, world.tsv:296 dropped
   - `npc.akara`: rc-pc1-audit.tsv:82 kept, world.tsv:297 dropped
@@ -4798,7 +5516,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: q-chk-hirelings.tsv:4 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: q-chk-hirelings.tsv:5 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: q-chk-hirelings.tsv:6 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1437
+- Rows whose state disagrees with their checks: 1441
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `net.c2s.0x26`: EQUAL but checks say PARTIAL
@@ -4859,7 +5577,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.minion`: EQUAL but checks say PARTIAL
   - `monster.ai.minionspawner`: EQUAL but checks say PARTIAL
   - `monster.ai.mosquito`: EQUAL but checks say PARTIAL
-  - … and 1377 more (rerun with the tsv to list them)
+  - … and 1381 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -7043,7 +7761,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `shrine.missile-create` | system | DIVERGED | S | DIVERGED | yes | 0 | n | rc-shrine-missile | specs/world/objects.md | game.seed gap at f40 closed; next divergence: 19 hp (units_in_range unwired), 21/22 item ik |
+| `shrine.missile-create` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-missile | specs/world/objects.md | rc-run-5: 3 checks EQUAL (gen-shrine-19..) |
 
 ## skills
 
@@ -7051,7 +7769,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 |---|---|---|---|---|---|---|---|---|---|---|
 | `hireling.skills.desert-mercenary` | entity | DIVERGED | M | DIVERGED@4 | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | merc-desert-cow PARTIAL (q-fix-d4-placement) but no hireling skill is used: the cow has no isAtt; a skill check needs an attackable target [ledger.py: NO-CHECK -> DIVERGED from its checks] |
 | `hireling.skills.rogue-scout` | entity | DIVERGED | M | DIVERGED@4 | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | merc-rogue-cow / merc-rogue-town-bar PARTIAL (q-fix-d4-placement) but no hireling skill is ever used there: the cow (class 179) has no isAtt, so scan 6 never picks it; a skill check needs an attackable target (e.g. spawn 19 fallen) [ledger.py: NO-CHECK -> DIVERGED from its checks] |
-| `missile.baal-taunt` | entity | DIVERGED | M | DIVERGED@38 | yes | 1 | n | claude/q-fix-seed-order | specs/missiles/missiles.md,specs/missiles/bodies.md,specs/missiles/bodies-2.md,specs/missiles/client.md | [gen-missile-546] rng frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None |
+| `missile.baal-taunt` | entity | DIVERGED | M | DIVERGED@38 | yes | 1 | n | claude/q-fix-seed-order | specs/missiles/missiles.md,specs/missiles/bodies.md,specs/missiles/bodies-2.md,specs/missiles/client.md | rc-run-5: gen-missile-546 rng: frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None |
 | `missile.catapult-charged-ball` | entity | DIVERGED | M | DIVERGED@36 | yes | 1 | n | claude/q-fix-seed-order | specs/missiles/missiles.md,specs/missiles/bodies.md,specs/missiles/bodies-2.md,specs/missiles/client.md | rc-run-5: gen-missile-407 rng: frame 36, unit 3:2, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/path/walk/missile.rs:122 |
 | `missile.catapult-spike-ball` | entity | DIVERGED | M | DIVERGED@36 | yes | 1 | n | claude/q-fix-seed-order | specs/missiles/missiles.md,specs/missiles/bodies.md,specs/missiles/bodies-2.md,specs/missiles/client.md | rc-run-5: gen-missile-411 rng: frame 36, unit 3:1, draw #0, field missing: 1.14d site 0x5d5c89 vs d2rs site None |
 | `missile.shout` | entity | DIVERGED | M | DIVERGED@12 | yes | 1 | n | claude/q-fix-join-items | specs/missiles/missiles.md,specs/missiles/bodies.md,specs/missiles/bodies-2.md,specs/missiles/client.md | rc-run-5: gen-missile-149 packets: frame 12 stream s2c #0 missing in d2rs (id 0xa8) |
@@ -7714,7 +8432,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x06` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/rc-unit-guid-order | specs/sim/client-messages.tsv | rc-unit-guid-order (integ-r10): the 0x06 bytes are now equal on both sides, 06 01000000 15000000 at frame 39 (target GUID 21; the old 21 vs 19 offset no longer reproduces). The check still diverges on other ids: packets frame 3 S->C 0x07 missing in d2rs, state frame 46 game seed |
 | `net.c2s.0x0c` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (3/3 of its a* checks diverge) |
 | `net.c2s.0x36` | message | DIVERGED | M | DIVERGED@14 | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | state channel only (the packets of the 0x2A answer were seen equal for the refusal case); hire result diverges: game seed + spawn tile |
-| `net.c2s.0x49` | message | DIVERGED | S | DIVERGED@400 | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: first diverged gen-wp-0@400 extra (d2rs only); 2 equal pair(s) |
 | `net.c2s.0x4b` | message | DIVERGED | S | DIVERGED@261 | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: first diverged hire-follow-waypoint-kashya@261 missing in d2rs; 1 equal pair(s) |
 | `net.c2s.0x5f` | message | DIVERGED | M | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x60` | message | DIVERGED | S | DIVERGED@20 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-60 packets DIVERGED at frame 20: first difference stream s2c #1 id: 1.14d 0x23 vs d2rs 0x47 (c2s bytes equal) |
@@ -7729,11 +8446,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x1c` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (2/3 of its a* checks diverge) |
 | `net.s2c.0x1f` | message | DIVERGED | S | DIVERGED@22 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-asheara@22 missing in d2rs; 10 equal pair(s) |
 | `net.s2c.0x22` | message | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged cube-002-1-wirt-s-leg-1-town-portal-boo@2 bytes[2] (1.14d 171 vs d2rs 0); 0 equal pair(s) |
-| `net.s2c.0x26` | message | DIVERGED | S | DIVERGED@40 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged gen-shrine-13@40 bytes[8] (1.14d 136 vs d2rs 0); 1 equal pair(s); gen checks (traces/checks/gen): gen-shrine-1,gen-shrine-10,gen-shrine-11,gen-shrine-12,gen-shrine-13,gen-shrine-14 |
 | `net.s2c.0x27` | message | DIVERGED | M | DIVERGED@16 | ? | 1 | n | claude/q-fix-d7d8-items-net | specs/sim/server-messages.tsv | D8 settled (REC-1401, provisional): entry order of the list is reversed in the encoder; the 0x27 records of the check are equal; the check still diverges later (c2s 0x31 missing at 17, s2c 0x9c byte 37 at 20) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `net.s2c.0x3f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged cube-000-staff-of-kings-viper-amulet-ho@4 id (1.14d 3f vs d2rs 47); 2 equal pair(s) |
 | `net.s2c.0x42` | message | DIVERGED | S | DIVERGED@34 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-items-kashya@34 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0x4c` | message | DIVERGED | S | DIVERGED@456 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged gen-wp-1@456 extra (d2rs only); 2 equal pair(s) |
 | `net.s2c.0x4d` | message | DIVERGED | S | DIVERGED@48 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/2 of its a* checks diverge) |
 | `net.s2c.0x5d` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
 | `net.s2c.0x6b` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-lightning-sentry: state PARTIAL, input/send without a MATCHing packets channel (1/3 of its a* checks diverge) |
@@ -8468,6 +9183,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x46` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-46 MATCH |
 | `net.c2s.0x47` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-47 MATCH |
 | `net.c2s.0x48` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-48 MATCH |
+| `net.c2s.0x49` | message | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-5: 1 checks EQUAL (gen-wp-0..) |
 | `net.c2s.0x4c` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: 1 equal pair(s), first gen-netc2s-4c@20; no diverged pair in any check; gen checks (traces/checks/gen): gen-netc2s-4c |
 | `net.c2s.0x4d` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: 1 equal pair(s), first gen-netc2s-4d@20; no diverged pair in any check; gen checks (traces/checks/gen): gen-netc2s-4d |
 | `net.c2s.0x51` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-51 MATCH |
@@ -8497,12 +9213,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x1d` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x1e` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 7 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x23` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `net.s2c.0x26` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-5: 6 checks EQUAL (gen-shrine-1..) |
 | `net.s2c.0x28` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x29` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x2a` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x2c` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x47` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x48` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `net.s2c.0x4c` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-5: 1 checks EQUAL (gen-wp-1..) |
 | `net.s2c.0x4e` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x4f` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x50` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
@@ -9433,28 +10151,28 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `object.operate.73.lastlastportal` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-obj-566: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `object.operate.8.door` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-obj-13,gen-obj-295: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `object.operate.9.monolith` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | gen-obj-17, gen-obj-18, gen-obj-19, gen-obj-20, gen-obj-21 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055); items PARTIAL only as 'no item created on either side' (0 = 0, PROVISIONAL REC-2056) |
-| `shrine.18.gem-upgrade` | entity | EQUAL | - | PARTIAL | ? | 15 | y | claude/rc-shrine-m | specs/world/objects.md | gen-shrine-18 state: all 120 ticks equal |
-| `shrine.19.storm-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | units_in_range wired: unit finder 0x0065A950/0x0065AC70 with filter 0x00582710 (mode filter, no distance test) + dead test |
-| `shrine.21.exploding-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | potion request quality word +0x30 = 0 (rolled), 5 item-seed draws |
-| `shrine.22.poison-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | potion request quality word +0x30 = 0 (rolled), 5 item-seed draws |
-| `waypoint.0.rogue-encampment` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.1.cold-plains` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.10.sewers-level-2` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.11.dry-hills` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.12.halls-of-the-dead-level-2` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.13.far-oasis` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.14.lost-city` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.15.palace-cellar-level-1` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.16.arcane-sanctuary` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.17.canyon-of-the-magi` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
+| `shrine.18.gem-upgrade` | entity | EQUAL | - | PARTIAL | ? | 15 | y | claude/rc-shrine-m | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-18..) |
+| `shrine.19.storm-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-19..) |
+| `shrine.21.exploding-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-21..) |
+| `shrine.22.poison-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-22..) |
+| `waypoint.0.rogue-encampment` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-0..) |
+| `waypoint.1.cold-plains` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-1..) |
+| `waypoint.10.sewers-level-2` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-10..) |
+| `waypoint.11.dry-hills` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-11..) |
+| `waypoint.12.halls-of-the-dead-level-2` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-12..) |
+| `waypoint.13.far-oasis` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-13..) |
+| `waypoint.14.lost-city` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-14..) |
+| `waypoint.15.palace-cellar-level-1` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-15..) |
+| `waypoint.16.arcane-sanctuary` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-16..) |
+| `waypoint.17.canyon-of-the-magi` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-17..) |
 | `waypoint.2.stony-field` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/drlg/levels.md | gen-wp-2 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): state 460/460 equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
-| `waypoint.3.dark-wood` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
+| `waypoint.3.dark-wood` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-3..) |
 | `waypoint.30.harrogath` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-wp-seed400 | specs/world/waypoints.md | gen-wp-30 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): state 460/460 equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
 | `waypoint.37.glacial-caves-level-1` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/drlg/levels.md | gen-wp-37 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): state 460/460 equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
-| `waypoint.4.black-marsh` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.5.outer-cloister` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.6.jail-level-1` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.7.inner-cloister` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.8.catacombs-level-2` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
-| `waypoint.9.lut-gholein` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
+| `waypoint.4.black-marsh` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-4..) |
+| `waypoint.5.outer-cloister` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-5..) |
+| `waypoint.6.jail-level-1` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-6..) |
+| `waypoint.7.inner-cloister` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-7..) |
+| `waypoint.8.catacombs-level-2` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-8..) |
+| `waypoint.9.lut-gholein` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-9..) |
 
