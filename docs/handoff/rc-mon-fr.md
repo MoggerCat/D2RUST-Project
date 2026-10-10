@@ -21,7 +21,7 @@ mode at fr 7936 (> count 5120), event 0 at frame 41 wraps it to 3024.
 
 ## Checks (gen checks of the `fr` cluster, 65, `--no-playthrough`)
 - first divergence on `fr`: 65 before -> 3 after (gen-mon-117 f100,
-  gen-mon-509/510 f97; later frames than before: 100 vs 100?, 51 -> 97).
+  gen-mon-509/510 f97; the latter were f51 before).
 - MATCH: 0 -> 0 (each check has a further divergence; the cluster
   moved to other fields: lvl 18, s 9, seed 4, m 4, hp 4, tx 4, sp 3).
 - d2-sim nextest 4756 pass; clippy, coverage, spec_index, ledger clean.
