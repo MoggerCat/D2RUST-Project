@@ -30,3 +30,8 @@ probably predates a later staging sync; no poke change made. The py `free_cell`/
 - Note: poke.py still calls `_settle` from `_goto` once (the duplicate is gone).
 Ledger: docs/handoff/ledger/rc-staging-regress.tsv (vendor.drognan PARTIAL).
 Disk: the container filled up during release builds; `target/` was cleaned.
+
+Sync note: `tools/coord/sync.sh` after the fix hits 10+ content conflicts (e2e_full_loop,
+e2e_walk, vendor_inv, walk/tests, world.rs, object_approach, wired.rs, geom.rs, objects.rs,
+npc_items.rs) between the npc-interact branch and newer staging: a merge task, not mine.
+The fix itself is one function in state_dump.rs; it cherry-picks cleanly.
