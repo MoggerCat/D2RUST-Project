@@ -613,11 +613,8 @@ impl LocalSeams {
     /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
     /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
     /// scan 5 callback's reading.
-    fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
-    }
-
-    /// [`Self::nearest_foe`] among the candidates `keep` accepts.
+    ///
+    /// Only the candidates `keep` accepts are considered.
     fn nearest_foe_where(
         &self,
         unit: UnitId,
@@ -1124,6 +1121,11 @@ impl Pending for LocalSeams {
     fn weapon(&self, unit: UnitId) -> Option<UnitId> {
         self.weapons.weapon(unit)
     }
+    // `0x00623C20` for a player (damage.md §5.1 step 4.4): the weapon's
+    // item hit class, 1 without one.
+    fn weapon_hit_class(&self, unit: UnitId) -> u32 {
+        self.weapons.weapon_hit_class(unit)
+    }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)
     }
@@ -1243,7 +1245,7 @@ impl Pending for LocalSeams {
     fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
         d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
-    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
+    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe_where`]
     /// within 35 (`ai.md` §5.2 step 4), no-size distance.
     fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
         // Scan 5 callback `0x005DCA70` rule 2 (`ai.md` §5.4): the full-size
@@ -1269,7 +1271,7 @@ impl Pending for LocalSeams {
             // list is newest first (`ai.md` §5.4 rule 3), so the newest id.
             .min_by_key(|&(u, d)| (d, std::cmp::Reverse(u)))
     }
-    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
+    /// `0x005DDC30`: [`LocalSeams::nearest_foe_where`] at full-size distance
     /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
     /// 0x4 (scan 6 rule 1, `0x00451F30(C, 4)`), with the preview's melee
     /// flag; none: distance 0x7FFFFFFF.
@@ -2534,6 +2536,8 @@ pub fn build_with(
     // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
+    s.events.action.hooks().item_marks = true;
+    s.events.action.hooks().arena = Some(Default::default());
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's

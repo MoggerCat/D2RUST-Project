@@ -71,6 +71,8 @@ pub struct ItemFacts {
     pub weap: bool,
     /// `rangeadder`: the player's melee reach (`combat/hit.md` §7.3).
     pub range_adder: i32,
+    /// `hit class` (`0x0062A180`): the weapon's hit class (damage.md §5.1).
+    pub hit_class: u8,
     /// `StrBonus` / `DexBonus` (`combat/damage.md` §3.2).
     pub str_bonus: i32,
     pub dex_bonus: i32,
@@ -122,6 +124,15 @@ impl Weapons {
         self.weapon(u)
             .and_then(|w| self.items.get(&w))
             .map_or(class::HAND_TO_HAND, |f| f.class)
+    }
+
+    /// A player's weapon hit class (`0x00623C20`, `combat/damage.md` §5.1
+    /// step 4.4): the weapon in use's item hit class (`0x0062A180`), 1
+    /// without a weapon.
+    pub fn weapon_hit_class(&self, u: UnitId) -> u32 {
+        self.weapon(u)
+            .and_then(|w| self.items.get(&w))
+            .map_or(1, |f| u32::from(f.hit_class))
     }
 
     /// The `rangeadder` of the weapon in use (0 without one): a player's
@@ -220,6 +231,7 @@ pub(crate) fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         wclass2: t.item(record).map_or([0; 4], |r| r.wclass2),
         weap: is_any(t, record, &weap),
         range_adder: t.item(record).map_or(0, |r| i32::from(r.rangeadder)),
+        hit_class: t.item(record).map_or(0, |r| r.hit_class),
         str_bonus: t.item(record).map_or(0, |r| i32::from(r.strbonus)),
         dex_bonus: t.item(record).map_or(0, |r| i32::from(r.dexbonus)),
         breakable: t

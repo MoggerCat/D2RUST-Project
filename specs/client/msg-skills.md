@@ -25,22 +25,22 @@
 | Outputs / state changes | 66–74 |
 | Rules | 75–76 |
 |   1. The client skill list (unit +0xA8) | 77–118 |
-|   2. Shared skill-list operations | 119–254 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 255–264 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 265–274 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 275–284 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 285–291 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 292–335 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 336–355 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 356–393 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 394–408 |
-|   11. The client do (`0x004C68F0` → `0x004C6680`) | 409–467 |
-| Constants & data dependencies | 468–479 |
-| Randomness | 480–483 |
-| Edge cases & original bugs | 484–493 |
-| Test vectors | 494–519 |
-| Provenance | 520–545 |
-| Open questions | 546–580 |
+|   2. Shared skill-list operations | 119–256 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 257–266 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 267–276 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 277–286 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 287–293 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 294–337 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 338–357 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 358–395 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 396–410 |
+|   11. The client do (`0x004C68F0` → `0x004C6680`) | 411–469 |
+| Constants & data dependencies | 470–481 |
+| Randomness | 482–485 |
+| Edge cases & original bugs | 486–495 |
+| Test vectors | 496–521 |
+| Provenance | 522–547 |
+| Open questions | 548–582 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -153,7 +153,9 @@ handlers (the server specs link here for the steps).
    §4 r3) is updated only when its stat
    351 ≠ L: for i = 1…5 while `passivestat_i` is a valid stat: set
    (`0x00627150`) stat `passivestat_i` with layer `passiveitype` (0 when
-   ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`); then stat 350
+   ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`; the layer is
+   the param S→C 0xA8 sends with the entry, `sim/intents-events.md` §3.5
+   rule 6: 1.14d `gen-skill-ass-*` frame 2, the masteries); then stat 350
    := skill, stat 351 := L (layer 0); mark state p for update
    (`0x00639E30`). Otherwise (no E, or the aura state is on) the state
    list of p, if any, is detached and freed (`0x006277E0`,

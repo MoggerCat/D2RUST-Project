@@ -488,6 +488,9 @@ pub trait BodyWorld: UseWorld + KickItems {
     fn list_get(&self, l: Self::List, s: i32) -> i32;
     /// List set `0x00627150(list, s, v, 0)` (`0x006270B0` in the fills).
     fn list_set(&mut self, l: Self::List, s: i32, v: i32);
+    /// List set on a layer: `0x00627150(list, s, v, layer)` (the passive
+    /// refresh's `passiveitype` layer, `client/msg-skills.md` §2 rule 4).
+    fn list_set_layer(&mut self, l: Self::List, s: i32, v: i32, layer: u16);
     /// `0x00626E10(unit, list, 1)`.
     fn attach(&mut self, u: Self::Unit, l: Self::List);
     /// `0x00625CE0(list, f)`.
