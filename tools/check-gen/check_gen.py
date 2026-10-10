@@ -1045,7 +1045,7 @@ def fam_render(ctx):
         save = ACT_SAVE[2] if slug_ == "kurast-rain" else ACT_SAVE[0]
         c = Check(f"gen-render-{slug_}", "render", f"scene {slug_}", title,
                   save, ticks, 600, "draws",
-                  lines + [f"draws-at {ticks - 2}", "skip-weather", f"input frame {ticks - 4}; move 790 10"],
+                  lines + [f"draws-at {ticks - 2}", "skip-weather", "skip-cursor", f"input frame {ticks - 4}; move 790 10"],
                   comment=[f"Render scene {slug_}: {title}. The draw list of tick {ticks - 2} "
                            "(files, frames, positions, draw modes, palettes) on both sides."])
         c.extra = {"areas": render_areas(prefixes), "scene": slug_}

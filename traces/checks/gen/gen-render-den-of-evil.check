@@ -12,4 +12,5 @@ channels draws
 at 4 poke warp 8
 draws-at 58
 skip-weather
+skip-cursor
 input frame 56; move 790 10

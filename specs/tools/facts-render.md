@@ -418,7 +418,9 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    next (measured 2026-10-10, `gen-render-town-dawn`: with the pointer
    pinned by `move 790 10` the position matches, the art and frame do
    not). A check that names `skip-cursor` (`scenario-diff.md` §2) leaves
-   the cursor to the UI checks that pin its input time. Exact equality of
+   the cursor to the UI checks that pin its input time. After r5 or r6 the
+   frame's `draws` count on each side is reduced by the rows dropped, so
+   the count compares the rows that are compared. Exact equality of
    the cursor's art needs a recording with a fixed clock; none exists.
 
 ### 7. Requests
