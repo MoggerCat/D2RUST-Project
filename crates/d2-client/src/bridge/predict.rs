@@ -286,6 +286,9 @@ pub struct Predict {
     /// The client sent a waypoint travel (C→S 0x49) whose arrival walk
     /// request has not come yet ([`Self::waypoint_sent`]).
     waypoint: bool,
+    /// The local player's mode request count of a waypoint arrival's
+    /// walk-out that was not walked ([`Self::stood_mode`]).
+    stood: Option<u32>,
     /// The server tick the walk under way started on (kept while a new
     /// click re-targets it; cleared when it ends): the walk animation's
     /// start ([`Self::walk_since`]).
@@ -371,6 +374,7 @@ impl Predict {
                 requests: p.mode_requests,
                 held: None,
                 waypoint: self.waypoint,
+                stood: None,
                 since: None,
                 others: std::mem::take(&mut self.others),
                 objects: std::mem::take(&mut self.objects),
@@ -432,6 +436,7 @@ impl Predict {
             // r4; measured, REC-288, `traces/client/model/client-0002.json`).
             if std::mem::take(&mut self.waypoint) {
                 self.held = None;
+                self.stood = Some(p.mode_requests);
                 return;
             }
             self.held = p
@@ -700,6 +705,23 @@ impl Predict {
     /// direction).
     pub fn facing(&self) -> Option<u8> {
         self.dir
+    }
+
+    /// The mode the view shows for a waypoint arrival's unwalked walk-out:
+    /// the model's walk mode (S→C 0x0D code 1) never ends, as the client
+    /// path has no points after the teleport (`sim/path-placement.md` §6
+    /// r4), so the player stands (neutral 1, town 5). 1.14d draws the
+    /// arrival in the neutral pose (`nuhth`, `q-chk-render-world`
+    /// a4/a5 outdoor). PROVISIONAL (REC-1850): that the model mode itself
+    /// is neutral; settled by `record_state.py` `m` across a waypoint
+    /// arrival.
+    pub fn stood_mode(&self, world: &ClientWorld) -> Option<u32> {
+        let p = world.local().filter(|p| Some(p.key) == self.player)?;
+        if self.walk.is_some() || self.stood != Some(p.mode_requests) {
+            return None;
+        }
+        let (neutral, walk) = super::modes::neutral_walk(world, p.key);
+        (p.mode == walk).then_some(neutral)
     }
 
     /// The player mode the view shows while the prediction moves: 2

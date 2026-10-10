@@ -34,17 +34,17 @@
 |   3. A2Q1 Radament's Lair (chain 8, slot 9) | 216–299 |
 |   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 300–405 |
 |   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–657 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 658–693 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 694–967 |
-|   9. Act II gossip and intro records | 968–976 |
-|   10. Hooks called from other systems | 977–994 |
-| Constants & data dependencies | 995–1008 |
-| Randomness | 1009–1023 |
-| Edge cases & original bugs | 1024–1057 |
-| Test vectors | 1058–1080 |
-| Provenance | 1081–1112 |
-| Open questions | 1113–1200 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–669 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 670–705 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 706–979 |
+|   9. Act II gossip and intro records | 980–988 |
+|   10. Hooks called from other systems | 989–1006 |
+| Constants & data dependencies | 1007–1020 |
+| Randomness | 1021–1035 |
+| Edge cases & original bugs | 1036–1069 |
+| Test vectors | 1070–1092 |
+| Provenance | 1093–1124 |
+| Open questions | 1125–1212 |
 <!-- /index -->
 
 ## Summary
@@ -586,11 +586,18 @@ callback 2; flag iterate.
 
 #### 6.6 Level changes (event 3, `0x0059F0C0`)
 
+Branch order (`0x0059F0D2`–`0x0059F17C`, read 2026-10-09, REC-1405
+settled): the new level is tested first, and the level-74 branch returns
+on every path (`0x0059F135`, or the exit at `0x0059F299`), so a move
+**into 74 never runs the old-level-40 block**, even from Lut Gholein (the
+start Jerhyn stays; recording `a2-warp-arcane-ama`: alive to frame 143).
+Level 50 falls through to the old-level test.
+
 - New level 74 (Arcane Sanctuary): state < 4 → state := 4; status < 4
   → status 4 to all, then the flag iterate; status ≥ 4 with the state
-  already ≥ 4 → nothing; otherwise the flag iterate.
-- New level 50 (Harem Level 1): set 12.8, 12.7.
-- Old level 40: the Jerhyn start / palace handling (§6.10); quick
+  already ≥ 4 → nothing; otherwise the flag iterate. Then return.
+- New level 50 (Harem Level 1): set 12.8, 12.7; continue below.
+- Old level 40 (new level ≠ 74): the Jerhyn start / palace handling (§6.10); quick
   remove; if the player lacks 12.0, 12.1 and state = 3: state := 4,
   flag iterate.
 
@@ -634,6 +641,11 @@ C→S 0x31 (§6.5) to open the portal.
 - Operate 34 (`0x005846B0`, object spec) calls `0x0059BAF0(level)`:
   level 74 with +0x44 = 0 → +0x44 := 1, +0x42 := 2; level 54 with +0x42
   = 0 → +0x42 := 1, +0x44 := 2.
+  That call is made only when the portal is already open (mode ≠ 0), and
+  only on the level-74 / level-54 branches (re-read 2026-10, rc-object-operate,
+  1.14d `0x005846B0`). A closed portal (mode 0) does nothing else than
+  mode 1 and an event 1 queued at the current frame + (`FrameCnt1` >> 8) +
+  1; no quest call, no draw beyond the mode change's own. Check: gen-obj-298.
 
 #### 6.10 Jerhyn and the palace guard (spawn side; AI behaviour: AI spec)
 

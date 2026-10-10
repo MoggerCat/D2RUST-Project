@@ -35,18 +35,18 @@
 |   5. Footsteps (`0x004CAF60(U)`) | 384–435 |
 |   6. Monster idle voices | 436–462 |
 |   7. Object mode sounds (`0x004CB460`, objects) | 463–504 |
-|   8. Skills, missiles, states | 505–542 |
-|   9. Items | 543–566 |
-|   10. NPC speech | 567–636 |
-|   11. UI sounds | 637–663 |
-|   12. Other fixed requests | 664–727 |
-| Constants & data dependencies | 728–744 |
-| Randomness | 745–768 |
-| Edge cases & original bugs | 769–785 |
-| Test vectors | 786–817 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 818–831 |
-| Provenance | 832–868 |
-| Open questions | 869–980 |
+|   8. Skills, missiles, states | 505–547 |
+|   9. Items | 548–571 |
+|   10. NPC speech | 572–641 |
+|   11. UI sounds | 642–671 |
+|   12. Other fixed requests | 672–735 |
+| Constants & data dependencies | 736–752 |
+| Randomness | 753–776 |
+| Edge cases & original bugs | 777–793 |
+| Test vectors | 794–825 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 826–839 |
+| Provenance | 840–876 |
+| Open questions | 877–988 |
 <!-- /index -->
 
 ## Summary
@@ -109,7 +109,7 @@ the sound fields of §1 r6. Each client RNG draw listed in Randomness.
    ids 52–71 except group bases a, b; `0x004BA9D0(a, b)` ids 72–201
    except group bases a, b; `0x004BAA50` ids 2,934–4,656 (speech).
 5. **Time bases.** T = sound tick `[0x007BC9BC]` (`sound-table.md`
-   §6.1). C = client update counter `[0x007A0498]`, +1 per client update
+   §6.1; the recorded offsets of the first frames: REC-1684). C = client update counter `[0x007A0498]`, +1 per client update
    `0x0044C790` (`render/capture.md` §2 table; one per server tick in
    single player, `client/model.md` §5 r1). All timers in this spec are
    in C unless they say T. Request delays are always in T.
@@ -518,6 +518,11 @@ line indices, 0 = none. Dumped from `Game.exe`.
    3. `stsoundclass` > 0, not replaced by an item cast sound, U a
       player whose class = the skill's `charclass` (+0x0C):
       request(`stsoundclass`, U, d as in r1.1).
+   d2rs (REC-1683): the start is taken from the unit's mode request,
+   code 0x15 / 0x16 (`client/model.md` §8 r4), skill = record entry 0,
+   after the mode sounds of a mode change; the start function result is
+   taken as non-zero, and the local player's request with level 0
+   (the server's first message of a cast) plays nothing.
 2. **Skill do / target** (`0x004C6680`, `0x004C6930`, `0x004C6AC0`;
    from S→C 0xA3 `0x0045D5E0` and item casts `0x004CA060`): after the
    skill's client do function returns non-zero: `dosound` > 0 →
@@ -638,7 +643,10 @@ line indices, 0 = none. Dumped from `Game.exe`.
 
 All are requests with no unit, delay 0 (call sites whose id is a
 constant in the disassembly; `client/ui.md` §B8 owns which control is
-which):
+which). Id 6 is also requested by every screen message added
+(`0x0049E3A0`, `ui/messages.md` §2 r3), recorded at T 0 for the empty
+line of the local player's own join (S→C 0x5A code 2, return
+`0x0049E58A`); d2rs requests it for the 0x5A lines (REC-1681):
 
 <!-- rows -->
 | Id | Sound | Sites |

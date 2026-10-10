@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 385–452 |
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
-|   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–795 |
-|   10. Messages | 796–858 |
-|   11. Missile paths (`0x00649760`) | 859–911 |
-|   12. Other path types (1.14d-read 2026-10-08) | 912–1125 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1126–1275 |
-| Constants & data dependencies | 1276–1312 |
-| Randomness | 1313–1323 |
-| Edge cases & original bugs | 1324–1371 |
-| Test vectors | 1372–1410 |
-| Provenance | 1411–1466 |
-| Open questions | 1467–1540 |
+|   8. Velocity, direction vector, facing | 501–614 |
+|   9. Per-tick movement | 615–816 |
+|   10. Messages | 817–879 |
+|   11. Missile paths (`0x00649760`) | 880–932 |
+|   12. Other path types (1.14d-read 2026-10-08) | 933–1146 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1147–1296 |
+| Constants & data dependencies | 1297–1333 |
+| Randomness | 1334–1344 |
+| Edge cases & original bugs | 1345–1392 |
+| Test vectors | 1393–1431 |
+| Provenance | 1432–1487 |
+| Open questions | 1488–1561 |
 <!-- /index -->
 
 ## Summary
@@ -525,6 +525,14 @@ animation-speed half of it belongs to the future animation-rate spec,
    (truncated), base = charstats `WalkVelocity` × 256 for players,
    monstats `Velocity` × 256 for monsters (`0x00621360`; the mode does
    not change the base).
+   `0x00623F50` passes `0x00621360` the type (ECX) and class (EAX) of
+   the unit's **draw identity** (`0x00645270`, `units.md` §4.7; read
+   2026-10-09): type 0 reads charstats `WalkVelocity` (+0x40), type 1
+   monstats `Velocity` (+0x32). So a monster drawn as a player (the
+   Shadow Warrior, monstats `Velocity` 0, gfx state with `gfxtype` 2,
+   `gfxclass` 6) walks on the assassin's 6 (1.14d ass-shadow-warrior:
+   0x4800 a frame = 6 × 256 × 75 %), and a player drawn as a monster on
+   that monster's row (REC-1652, settled by this read).
 3. Velocity write (`0x00648690`): +0x38 := 15 only when the new value
    differs from the current velocity; velocity and max velocity (+0x84)
    := the new value always.
@@ -713,6 +721,19 @@ axis Δ − (size1/2 + size2/2) (not below 0), then 2·max + min.
    while its facing turns to point 1, then fly straight to point 1:
    frames 30–31, which only Δ = R = (0, 0), index 1 and the §9.4 rule
    2.5 aim give); settled by a read of `0x00650660` (REC-1391).
+   Not for path type 4 (a missile aimed at a point, `missiles/missiles.md`
+   §R4.3 step 5): the Gloam's bolt (class 320, `diff-a4-nm-unique`,
+   1.14d frames 36–41) flies on past the aim point with x/y fraction
+   still advancing by one step per frame; a snap there would end the path
+   (index = count) and remove the missile a frame early. Recorded
+   2026-10-10 (rc-mon-missile); the rule's exact 1.14d condition for
+   types 10 and 14 stays REC-1391.
+   2.5 aim give; also the charged bolt and blessed hammer of
+   `sor-charged-bolt.check` frame 27 / `pal-blessed-hammer.check` frame
+   31 land exactly on point centres, q-fix-skills-4cls REC-1643), except
+   on the straight missile path (type 4: an Inferno flame flies on past
+   its target point in `sor-inferno.check` frame 45, which a snap would
+   end); settled by a read of `0x00650660` (REC-1391).
 4. If position + Δ is in another cell: distance budget (+0x90) −= 1 when
    > 0 and the type is not 8 or 11; cell walk (rule 9.6.5); blocked →
    Q := the centre of the last free cell, and: "monster re-path" → re-path

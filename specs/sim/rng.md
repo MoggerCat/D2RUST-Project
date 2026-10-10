@@ -25,15 +25,15 @@
 |   2. Step | 75–96 |
 |   3. Draw helpers | 97–126 |
 |   4. Setting and reading seeds | 127–143 |
-|   5. Where seeds come from | 144–218 |
-|   6. Inlined draws | 219–239 |
-|   7. Which systems draw from which seed | 240–270 |
-| Constants & data dependencies | 271–281 |
-| Randomness | 282–286 |
-| Edge cases & original bugs | 287–299 |
-| Test vectors | 300–348 |
-| Provenance | 349–386 |
-| Open questions | 387–422 |
+|   5. Where seeds come from | 144–271 |
+|   6. Inlined draws | 272–292 |
+|   7. Which systems draw from which seed | 293–323 |
+| Constants & data dependencies | 324–334 |
+| Randomness | 335–339 |
+| Edge cases & original bugs | 340–352 |
+| Test vectors | 353–401 |
+| Provenance | 402–445 |
+| Open questions | 446–481 |
 <!-- /index -->
 
 ## Summary
@@ -216,6 +216,59 @@ Start-up, title, main menu and character screens step no seed (recorded:
 Battle.net code use the C runtime `rand()` (separate LCG, `0x00687461`),
 which never feeds game outcomes and is out of scope.
 
+#### 5.6 Every game-seed draw (game +0xD0)
+
+Complete static list (2026-10-09, q-fix-seed-game): every instruction
+in `all.asm` that addresses game +0xD0 / +0xD4 (`lea …, [g + 0xD0]`,
+`add r, 0xD0`, inline reads) was checked; the other +0xD0 reads are
+fields of other records (objects.txt rows `0x00640E90` in
+`0x00550C20`–`0x00552B50`, item-stat rows, client copies). Only these
+step the game seed; nothing else passes its address on.
+
+<!-- rows -->
+| # | Step site (function) | Draw | Reached from / condition | (a) join, town, idle | (b) melee / missile hit on a monster |
+|---|---|---|---|---|---|
+| G1 | `0x0052C2C6` (`0x0052C280`) | step → `dwInitSeed` (§5.2) | game creation, only without `-seed` | frame 0 | no |
+| G2 | `0x00547D38` (`0x00547D20`) | step → monster-region seed | game creation `0x00530930` / `0x00530BF0` | frame 0 | no |
+| G3 | `0x00546CB9` (`0x00546C60`) | step → object-control seed | same, after G2 | frame 0 | no |
+| G4 | `0x005360D8` (`0x00536070`) | step → NPC-control seed | same, after G3 | frame 0 | no |
+| G5 | `0x00545F27` (`0x00545D80`) | step → quest seed | same, after G4 | frame 0 | no |
+| G6 | `0x00552E31` (`0x00552DF0`) | step → unit seed `{lo', 666}`, `dwInitSeed` lo' | (i) every allocation `0x00555230` of type 1–5 (`0x0055530E`; type 0 never; callers by type: `sim/units.md` §3.1 r4.2); (ii) a player after its type-0 allocation: full save `0x0056A090` → `0x00569F20` (`0x00569F53`), new character `0x00569F80` → `0x00569F20`, legacy loads `0x00532590` / `0x00532690` → `0x00532520` (`0x0053254E`); (iii) a corpse: save corpse `0x0056A830` (`0x0056A95E`), legacy corpse `0x00533850` (`0x005338D8`), death corpse `0x0057F700` (`0x0057F7E5`) | frame 1: the player (ii); its save items, corpse(s) (iii), hireling (type 1 via `0x005774F0`) and their items; frame 2 and every later room population: preset NPCs, objects, warp tiles, ambient spawns | missiles (type 3, `0x0059FA30`) made by the attack, by sub-missile / hit / umod code and by monster skills; drops (type 4, below); spawned monsters / objects (quest, umod and AI code); a player death corpse; room population when the player enters new rooms |
+| G7 | `0x00552E9F` (`0x00552E90`) | step → item start seed and item seed | type 4 only, right after G6 of the same allocation (`0x0055532A`): two steps per item | save items (`0x00558CB0`) at frame 1 | every drop item and gold pile (`0x00558D90` from the TC drop `0x0055A550`, `items/treasure.md` §7) |
+| G8 | `0x0054ED96` (`0x0054EC90`) | step, `lo' mod 100000` ≤ region MonDen | room population, per try of each coordinate rectangle (`monsters/population.md` §3.2) | none recorded in the Act I town (below) | only when the player's movement activates rooms of a populated level |
+| G9 | `0x0054EE53` (`0x0054EC90`) | step, `lo' mod 100` ≤ `sparsePopulate` | after a G8 hit, monster with `sparsePopulate` ≠ 0 | no | as G8 |
+| G10 | `0x00565996`, `0x00565A54` (`0x00565930`) | `roll(item count)` start, then `roll(candidates)` | cube item-type pick from `0x00565AB0` (`world/cube.md` §7.5); the second roll only with ≥ 1 candidate | no | no |
+
+Run order: G2–G5 (G1 first without `-seed`), then everything else is
+allocation order. The combat path itself (`combat/hit.md`,
+`combat/damage.md`, hit recovery, death, the TC walk) draws only from
+unit seeds; a hit moves the game seed only through G6–G9.
+
+Recorded (`traces/raw/check-hire-kashya/orig.rng.jsonl`, 1.14d, ScnHi1
+town Act I, `-seed 1234`, owner `game`, 40 draws in 90 ticks; a
+`poke goto` at frame 4 moves the player about 20 sub-tiles): frame 0
+G2–G5; then **only** G6 (`0x00552E31`): 1 at frame 1 (player,
+4048349444), 24 at frame 2 (seven town NPCs and 17 objects), 10 at
+frame 5 (rooms activated by the move: NPCs 152 ×3, 179, 148, five
+objects of class 37), 1 at frame 13 (the hire's hireling, class 271,
+first in the state snapshot of frame 14). No G7–G10
+in that run.
+
+Recorded (`traces/raw/check-combat-melee-fallen/orig.rng.jsonl`,
+1.14d, melee kill of a poked Fallen; rng frame = state frame − 1):
+frame 0 G2–G5; frame 1 G6 ×2 and G7 ×1 (player, starting sword); frame
+2 G6 ×24 (town); frame 4 G6 ×3; frame 5 (warp to the Blood Moor) G6 ×15
+and G8 ×1352; frame 29 G6 ×3 (the poked Fallen party). After the
+frame-30 seed poke, **no** game-seed draw through frame 150, although
+Fallen GUID 21 was hit and died at frame 46 (mode 12 at 66, no drop):
+the melee hit, hit recovery, death and corpse draw nothing from it.
+
+Conclusion: no draw site above is conditional on the hit itself. A
+game-seed difference in town or in a fight comes from how many units
+and items are allocated, in which order (G6, G7), and how many
+population tries run (G8, G9); a hit adds steps only when it creates a
+missile, a drop or a spawned unit (`combat/hit.md` Randomness).
+
 ### 6. Inlined draws
 
 The 846 inline sites compute the same step; what they do with `lo'`
@@ -383,6 +436,12 @@ and applies each `op` in order; `value` and `state` must match.
   player, steps at `0x004704DD`, `0x004705B6`, `0x004705D7`); table
   `0x00727BA8` entries read from the image with `pefile`; the rest as
   surveyed in `audio/sound-table-2.md` §14.
+- §5.6 (2026-10-09): every `+ 0xd0]` / `add r, 0xd0` in `all.asm`
+  (92 + 8 + 3 instructions) classified by hand; callers of
+  `0x00552DF0` (6), `0x00552E90` (1), `0x0054EC90` (2), `0x00565930` (2)
+  and the 69 calls of `0x00555230` with their ECX type from
+  `index/calls.tsv` and the asm; the frame counts from the recording
+  named there.
 
 ## Open questions
 
