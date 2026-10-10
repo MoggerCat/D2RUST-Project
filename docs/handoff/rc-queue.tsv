@@ -1,0 +1,19 @@
+cause	checks	examples	likely_crate_spec	size
+player/hireling y differs by 1 subpixel step at first walk step (1.14d y=N, d2rs y=N+1) after click-walk start; player movement rounding on y axis	44	a1-quest-andariel-reward a1-quest-den-reward a1-warp-l33-cathedral-ama	d2-sim movement; specs/sim/pathing.md	M
+game seed after warp/level entry (frame ~21) differs: level-enter RNG draws or order differ (rng channel shows missing 1.14d draw sites)	38	a1-warp-l13-cave-2-treasure-ama a1-warp-l14-cave-3-treasure-ama a1-warp-l25-crypt-3-e-ama	d2-sim level load / drlg; specs/drlg + specs/world/levels	L
+item drop/stream differs at first item (missing item, frame, category or stream byte; many item codes: rvs, tsc, isc, gps, rin ...)	20	items-drops-cha-00 items-drops-cha-05 items-drops-hel-00 items-drops-hel-04 item	d2-sim items/drops; specs/items/*	M
+monster mode differs (1.14d mode N vs d2rs 1/2): death/attack/neutral mode at spawn or first AI step; see examples	19	a2-super-fangskin a2-warp-l61-tomb-3-treasure-ama a4-deseis-seal-early	d2-sim monsters/ai; specs/monsters/ai.md	M
+missile present in 1.14d, missing in d2rs (arrow/cold/lightning/fire missiles live one tick longer or are created in 1.14d only)	17	a3-warp-l98-temple-5-ama combat-arrow-kill combat-champion-pack	d2-sim missiles; specs/skills/missiles	M
+potion drop frame differs	12	items-drops-cha-01 items-drops-cha-02 items-drops-cha-03	d2-sim items/drops	S
+player facing frame count (fc) differs at first action	11	combat-pop-cold-plains diff-a3-hell-champion-bm diff-a3-hell-unique-bm	d2-sim units; specs/sim/units.md	S
+monster position/target/frame/seed differs at first step after spawn	10	a2-warp-l70-tomb-tal-5-ama a2-warp-l73-duriel-s-lair-ama a3-warp-l102-mephisto-3-ama	d2-sim monsters; specs/monsters/ai.md	M
+S->C packet 0x07 (and similar) missing in d2rs: first server packet at frame 3 of quest/npc checks	5	a2-super-coldworm a2-super-darkelder a2-super-fireeye	d2-server / d2-proto; specs/net/msg-*.md	M
+gold drop amount/missing differs	5	items-drops-nig-02 items-drops-nor-08 items-drops-rbo-05	d2-sim items/drops; specs/items/drops.md	M
+vendor stock ring item stream bytes differ (mode bit)	5	items-vendor-alkor-stock items-vendor-elzix-stock items-vendor-gheed-stock-goto	d2-sim items/vendor	S
+player hp differs (regen/damage rounding)	2	a2-super-beetleburst a3-warp-l97-temple-4-ama	d2-sim; specs/sim/units.md	S
+player x/y differs after NPC walk	2	a5-npc-qual-kehk hire-resurrect-qual-kehk	d2-sim pathing	S
+item frame differs	1	a2-super-leatherarm	d2-sim items	S
+unclassified first divergence: tick N draw row N (CelDrawShadow) column file: N.Nd data/global/monsters/ck/tr/cktrlitwlhth.dcc vs d	1	draws-town-arrival-ama	?	?
+unclassified first divergence: frame N stream sNc #N id: N.Nd N vs dNrs Ne (id NxN)	1	rng-town-idle-sor	?	?
+unclassified first divergence: frame N stream sNc #N id: N.Nd Nc vs dNrs Nd (id NxNc)	1	sys-intents-moves	?	?
+unclassified first divergence: record_state.py wrote no /home/user/DNRUST-Project/traces/raw/suite/sys-tick-idle-aN/orig.state.json	1	sys-tick-idle-a5	?	?
