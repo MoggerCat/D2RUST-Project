@@ -1701,6 +1701,20 @@ pub trait Pending {
     {
         (-1, 0)
     }
+    /// The skill handlers of stats 83, 126, 127, 188 (`skills/levels.md`
+    /// §7.2, refresh all `0x0056DFA0`): routed to
+    /// [`crate::wiring::interaction::skill_events::skill_stat_refresh`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn skill_stat_refresh(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        stat: u16,
+        layer: u16,
+    ) where
+        Self: Sized,
+    {
+    }
     /// The Bone Wall maker's summon spawn (§33 step 7, flags 0xD).
     /// Default: none.
     #[allow(clippy::too_many_arguments)]

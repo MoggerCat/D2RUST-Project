@@ -197,12 +197,12 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
         "world/quests.md §1.7",
         Status::Implemented(System::Quests),
     ),
-    // §9 rule 1 names `monsters/ai.md` §9.9; the AI params are
-    // `monsters/ai-bodies.md` §9.9's, the handler's entry is not written.
+    // §9 rule 1 names `monsters/ai.md` §9.9; the entry `0x0054CA10` is
+    // `monsters/ai-bodies.md` §9.9's (`NpcControl::make_entity_move`).
     (
         0x59,
-        "monsters/ai-bodies.md §9.9 (entry not written)",
-        Status::NoOwner,
+        "monsters/ai-bodies.md §9.9",
+        Status::Implemented(System::Npc),
     ),
     (0x62, "world/npc.md §7.4", Status::Implemented(System::Npc)),
 ];
@@ -602,6 +602,7 @@ impl NpcCall for NpcRun<'_> {
         Ok(match m[0] {
             0x13 => ctl.interact(w, p, m)?,
             0x2F => Some(ctl.chat_open(w, p, m)),
+            0x59 => Some(ctl.make_entity_move(w, p, m)),
             0x30 => Some(ctl.chat_close(w, p, m)),
             0x34 => Some(ctl.identify(w, p, m)),
             0x36 => Some(ctl.hire(w, p, m)?),
@@ -1100,12 +1101,27 @@ impl MovePending for PreviewMoveRest {
         }
         self.quest_writes.push((player, quest, flag, on));
     }
-    /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
-    /// larger of the two sub-tile axis distances of the staged places,
-    /// out of range without both.
+    /// Unit distance `0x00641530` (`sim/pathing.md` §9.5) of the staged
+    /// places, out of range without both. The unit sizes are
+    /// `0x00620510`'s: a player 2, an item 1; any other unit type 2 (a
+    /// monster's `monstats2` size and an object's `SizeX` are not staged
+    /// here: d2rs-own, unverified).
     fn distance(&self, a: Owner, b: Owner) -> i32 {
+        use d2_sim::path::walk::geom::unit_distance;
+        use d2_sim::path::{PathTables, Point};
+        static TABLES: std::sync::OnceLock<Option<PathTables>> = std::sync::OnceLock::new();
+        let size = |o: Owner| if o.ty == Owner::ITEM { 1 } else { 2 };
         match (self.places.get(&a), self.places.get(&b)) {
-            (Some(a), Some(b)) => (a.pos.0 - b.pos.0).abs().max((a.pos.1 - b.pos.1).abs()),
+            (Some(pa), Some(pb)) => match TABLES.get_or_init(|| PathTables::spec().ok()) {
+                Some(t) => unit_distance(
+                    t,
+                    Point::new(pa.pos.0, pa.pos.1),
+                    size(a),
+                    Point::new(pb.pos.0, pb.pos.1),
+                    size(b),
+                ),
+                None => i32::MAX,
+            },
             _ => i32::MAX,
         }
     }

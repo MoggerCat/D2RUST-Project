@@ -158,6 +158,11 @@ impl std::fmt::Debug for WeatherView {
 }
 
 impl WeatherView {
+    /// The current level's `Rain` and `Mud` flags (`None`: no level yet).
+    pub fn level_flags(&self) -> Option<(bool, bool)> {
+        self.level.map(|l| (l.rain, l.mud))
+    }
+
     /// Weather with the overlay cels read from `source`.
     pub fn new(source: Option<Arc<dyn FileSource>>) -> Self {
         WeatherView {

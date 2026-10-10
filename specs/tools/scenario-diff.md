@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–614 |
-|   4. Suite | 615–742 |
-| Constants & data dependencies | 743–746 |
-| Randomness | 747–750 |
-| Edge cases & original bugs | 751–786 |
-| Test vectors | 787–809 |
-| Provenance | 810–813 |
-| Open questions | 814–876 |
+|   3. Run | 145–629 |
+|   4. Suite | 630–757 |
+| Constants & data dependencies | 758–761 |
+| Randomness | 762–765 |
+| Edge cases & original bugs | 766–801 |
+| Test vectors | 802–824 |
+| Provenance | 825–828 |
+| Open questions | 829–891 |
 <!-- /index -->
 
 ## Summary
@@ -86,7 +86,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend`, `cstate` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -225,6 +225,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
       clock on any frame, or a schedule in which a frame other than the
       last lacks `now`, fails the check; d2rs never falls back to a clock
       of its own in a check run. Live play keeps the host clock.
+      An optional third column `quality` (2026-10-10, rc-ui-div /
+      rc-ui-pixels; `-` when not captured) holds the frame's light
+      quality (`light.quality`, `render/lighting.md` §5), which 1.14d
+      derives from the host clock and its measured draw rate, so it is a
+      recorded input too (under the debugger the rate falls to 1 and `q`
+      drops from 2 to 0 at about tick 16). The world view lights each
+      drawn tick with its row's `quality`; without one, its own `q` (2).
       Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
       the client seed matches the capture's `seed_start` of every frame
       through tick 25 and the rain lines (endpoints and colors) are equal
@@ -611,6 +618,14 @@ state first. It is the default way to compare a behaviour with 1.14d.
     each side, compared where stable on both sides at tolerance 0, the animated pixels
     counted (specs/ui/frontend-menus.md §F2.11). d2rs starts its script 6 s after
     launch (`FE_WAIT_OURS`) so the trademark screen is still up like 1.14d's.
+
+19. **cstate** (`channels cstate`; `tools/scenario-diff/cstate_diff.py`; the
+    check file is named `<check>-cs`, its recorded 1.14d side is
+    `traces/pc1/client-state/<check>.cstate.jsonl`, else the recorder runs
+    `record_state.py --client-out`): the client's own unit sets S and C
+    (`tools/state-snapshot.md` §3 rule 5) against `d2-client state-dump
+    --client-out`. Exit codes as `state_diff.py`; a key only one side writes
+    is reported as not compared (PARTIAL at best), never ignored.
 
 ### 4. Suite
 

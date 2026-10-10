@@ -333,6 +333,10 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// Mode-3 umod dispatches (`init.md` §22) asked while the monster world
+    /// was out (a umod callback's own damage): run when the outer dispatch
+    /// ends ([`ActionHooks::run_umods`]).
+    pub(super) deferred_umod_hits: Vec<UnitId>,
     /// The quest control lent by the host that holds it
     /// ([`objects::QuestObjectHost`]): a quest init, operate or object
     /// event 7 the object module hands back runs on it at once, inside the
@@ -441,6 +445,10 @@ pub struct ActionHooks<X> {
     /// callback id), taken by [`UnitHooks::lists_expired`] after the
     /// expiry walk (`units.rs`).
     pub removed_lists: Vec<(UnitId, u32, u32)>,
+    /// Skill stat callbacks (stats 83, 126, 127, 188: unit, stat, layer)
+    /// the stat lists raised; their "refresh all" runs at the unit's next
+    /// update ([`Pending::skill_stat_refresh`]).
+    pub skill_refresh: Vec<(UnitId, u16, u16)>,
     pub errors: Vec<WiringError>,
 }
 
@@ -557,6 +565,7 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            deferred_umod_hits: Vec::new(),
             vision_seen: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
@@ -583,6 +592,7 @@ impl<X> ActionHooks<X> {
             x,
             orphan_seed: Seed::init(),
             removed_lists: Vec::new(),
+            skill_refresh: Vec::new(),
             errors: Vec::new(),
         }
     }

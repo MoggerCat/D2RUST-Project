@@ -347,6 +347,24 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
     if id == SWAP_WEAPONS && size == 1 {
         return swap_weapons(sim, client, out);
     }
+    // C→S 0x13 with unit type 4 (a ground item): `0x00548B00` case 4 is
+    // the type-4 case of 0x16 (`inventory-moves.md` §7.1 step 2) with
+    // cursor flag 0, so it runs as that message (`world/npc.md` §2).
+    let as_pick;
+    let msg = if id == 0x13 && size == 9 && msg.len() >= 9 && msg[1..5] == 4u32.to_le_bytes() {
+        let mut m = vec![0x16];
+        m.extend_from_slice(&msg[1..9]);
+        m.extend_from_slice(&[0; 4]);
+        as_pick = m;
+        &as_pick[..]
+    } else {
+        msg
+    };
+    let (id, size) = if msg.len() == 13 && id == 0x13 {
+        (0x16, 13)
+    } else {
+        (id, size)
+    };
     if !is_move_id(id) {
         return None;
     }

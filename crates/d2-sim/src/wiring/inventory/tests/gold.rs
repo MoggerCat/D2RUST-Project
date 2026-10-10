@@ -97,7 +97,8 @@ fn drop_gold_without_creation_keeps_the_gold() {
 
 /// G2 through 0x16 (auto pickup, §8.1 step 3 → §10.1): level 1 (limit
 /// 10000), gold 9500, pile 1000 → gold 10000, a new pile of the rest 500
-/// at the player (seam), the picked pile left the room and was freed.
+/// at the player (seam), the picked pile left the room and was freed
+/// (no immediate delete notice: the tick's room pass announces it).
 #[test]
 fn gold_pickup_caps_at_the_limit() {
     let mut w = World::new();
@@ -115,7 +116,6 @@ fn gold_pickup_caps_at_the_limit() {
         w.rest.log,
         [
             format!("pickup_sound {} {g}", w.pguid()),
-            format!("room_delete_notice {g}"),
             format!("free_collision {g}"),
             format!("rest_pile {} 500", w.pguid()),
         ]

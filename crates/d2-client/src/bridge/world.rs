@@ -749,6 +749,12 @@ pub struct ClientWorld {
     /// callback (`rooms.md` §5 rule 9) runs over it for every new active
     /// room.
     pub lights: LightList,
+    /// Each unit's cast light, held in its stat list (`0x00643A00`,
+    /// `render/lighting.md` §8 r3), apart from the unit's own light
+    /// (`+0x64`, e.g. the player light): the mode requests and the client
+    /// skill end detach and remove only this one (`client/model.md` §8
+    /// rule 4). No model rule creates one yet.
+    pub cast_lights: BTreeMap<UnitKey, crate::rules::lighting::records::LightId>,
     /// The unit origin of the last drawn frame (`render/camera.md` §3,
     /// §4), read by the client missile function 2
     /// (`missiles/client.md` §C13); set by the play app on each drawn
@@ -913,6 +919,7 @@ impl ClientWorld {
         for id in lit {
             let _ = self.lights.remove(id);
         }
+        self.cast_lights.remove(&key);
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {
@@ -1049,8 +1056,27 @@ impl ClientWorld {
         // `drlg/rooms.md` §8 r4: each unit of a freed room (server units:
         // no flag 0x400000) gets flags-2 0x20, then flag 0x800000, then
         // leaves the room.
-        for room in gone {
+        for &room in &gone {
             self.free_active_room(room);
+        }
+        // `model.md` §5 r5: a client-only unit (set C) left in a freed room
+        // carries flag 0x800000 and is removed by the client update that
+        // follows (`0x00465F00`). The model links set-C objects into no room
+        // list, so the room is the one whose rectangle holds the unit's cell.
+        let freed: Vec<UnitKey> = self
+            .objclient
+            .set_c
+            .values()
+            .filter(|u| {
+                u.position.is_some_and(|(x, y)| {
+                    old.iter()
+                        .any(|r| gone.contains(&r.room) && r.contains(i32::from(x), i32::from(y)))
+                })
+            })
+            .map(|u| u.key)
+            .collect();
+        for key in freed {
+            super::objects::remove_client_unit(self, key);
         }
         let created = self
             .drlg

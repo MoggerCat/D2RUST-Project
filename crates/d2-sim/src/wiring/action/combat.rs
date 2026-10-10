@@ -190,8 +190,27 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn mode(&self, u: UnitId) -> i32 {
         self.v.units.get(u).map_or(0, |r| r.mode as i32)
     }
+    /// `0x00622D00` (`combat/hit.md` §6.1 step 3): a player in mode 2, 3 or 6
+    /// (walk, run, town walk), a monster in mode 2 or 15, or one in mode 8 /
+    /// 9 whose `BaseId` is 110 (vulture). A unit with a shapeshift record
+    /// (unit +0x30, read through `0x00621190`) is not modelled: its mode is
+    /// used. Another unit type: the host's.
     fn moving_mode(&self, u: UnitId) -> bool {
-        self.v.h.x.moving_mode(u)
+        let Some(r) = self.v.units.get(u) else {
+            return self.v.h.x.moving_mode(u);
+        };
+        match r.ty {
+            UnitType::Player => matches!(r.mode, 2 | 3 | 6),
+            UnitType::Monster => match r.mode {
+                2 | 15 => true,
+                8 | 9 => usize::try_from(r.class)
+                    .ok()
+                    .and_then(|c| self.v.h.tables.combat.monstats.get(c))
+                    .is_some_and(|m| m.baseid == 110),
+                _ => false,
+            },
+            _ => false,
+        }
     }
     /// `0x005A0180`: the lent monster world's type flags
     /// ([`super::ActionHooks::monster_flag`]).
@@ -398,7 +417,7 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
             stats: &mut *self.v.stats,
             data: self.v.data,
         };
-        if !self.v.h.run_umods(&mut sim, a, None, umod_mode::HIT) {
+        if !self.v.h.run_umods(&mut sim, a, None, umod_mode::HIT) && !self.v.h.defer_umod_hit(a) {
             self.v.h.x.monster_hit_hook(a);
         }
     }
