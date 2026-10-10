@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–589 |
-|   4. Suite | 590–717 |
-| Constants & data dependencies | 718–721 |
-| Randomness | 722–725 |
-| Edge cases & original bugs | 726–761 |
-| Test vectors | 762–784 |
-| Provenance | 785–788 |
-| Open questions | 789–851 |
+|   3. Run | 145–621 |
+|   4. Suite | 622–749 |
+| Constants & data dependencies | 750–753 |
+| Randomness | 754–757 |
+| Edge cases & original bugs | 758–793 |
+| Test vectors | 794–816 |
+| Provenance | 817–820 |
+| Open questions | 821–883 |
 <!-- /index -->
 
 ## Summary
@@ -225,6 +225,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
       clock on any frame, or a schedule in which a frame other than the
       last lacks `now`, fails the check; d2rs never falls back to a clock
       of its own in a check run. Live play keeps the host clock.
+      An optional third column `quality` (2026-10-10, rc-ui-div /
+      rc-ui-pixels; `-` when not captured) holds the frame's light
+      quality (`light.quality`, `render/lighting.md` §5), which 1.14d
+      derives from the host clock and its measured draw rate, so it is a
+      recorded input too (under the debugger the rate falls to 1 and `q`
+      drops from 2 to 0 at about tick 16). The world view lights each
+      drawn tick with its row's `quality`; without one, its own `q` (2).
       Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
       the client seed matches the capture's `seed_start` of every frame
       through tick 25 and the rain lines (endpoints and colors) are equal
@@ -586,6 +593,31 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **1.14d fatal exit** (REC-3160): a check can drive 1.14d into a state
+    its own code treats as fatal: it shows its error dialog and calls
+    `0x00681E09(-1)`, the process ends with exit code `0xFFFFFFFF`, and
+    the recorders end the recording there with the footer note `game
+    exited, code 0xffffffff` (measured 2026-10-10, `gen-obj-374`:
+    snapshot 20 written, the client's refresh of the operated object in
+    mode 1 dies, `world/objects-client.md` §25 rule 5). The recording
+    is complete up to that point; a d2rs run that goes on is a
+    difference, not a longer run. The d2rs hosts therefore end the run at
+    the same place when the client model (or the server) raises a
+    1.14d fatal assert (`HandlerError::Fatal` / `Crash`): after the
+    snapshot of the tick in which the client update raised it (a fatal in
+    the server's tick or poke call ends the run before that tick's
+    snapshot), with the footer note `1.14d fatal exit after N ticks: <what>
+    (exit code 0xffffffff)`. All channels of one run end at that frame
+    (the rng and packets dumps share the loop), so the comparison covers
+    the same frames on both sides.
+
+18. **frontend screens** (REC-3760): a frontend check named `ui-frontend-screens*`
+    runs `frontend_sbs.py --script screens` and `screens_check.py` instead of the
+    paper dolls: every screen of the menu walk, per-pixel median over the shots of
+    each side, compared where stable on both sides at tolerance 0, the animated pixels
+    counted (specs/ui/frontend-menus.md §F2.11). d2rs starts its script 6 s after
+    launch (`FE_WAIT_OURS`) so the trademark screen is still up like 1.14d's.
 
 ### 4. Suite
 

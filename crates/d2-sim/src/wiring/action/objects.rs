@@ -1520,6 +1520,14 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
         self.v.replace_overhead(obj, &text, 0, end);
         true
     }
+    /// `0x0064E7B0(room, &pt, size, mask, 0)` at the unit's position, in
+    /// its room (`path-placement.md` §7; the shrine code 17 call
+    /// `0x00582A30`).
+    fn free_spot(&mut self, unit: UnitId, size: i32, mask: u32) -> Option<(i32, i32)> {
+        let room = ObjectWorld::room(self, unit)?;
+        let (x, y) = ObjectWorld::position(self, unit);
+        objects::MechWorld::free_point(self, room, x, y, size, mask).map(|(_, px, py)| (px, py))
+    }
     fn hover_expiry(&self, obj: UnitId) -> Option<i32> {
         self.v.units.get(obj)?.hover
     }

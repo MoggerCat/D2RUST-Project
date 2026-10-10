@@ -28,3 +28,19 @@ Wine 1.14d recorded, 2026-10-10.
 Nothing in this cause. Seen, not mine: gen-boss-242 f59, 267 f93, 333 f71,
 707 f51 (seed), 526 f69 (tx), gen-ai-sandmaggotqueen f43 (seed).
 Ledger: `docs/handoff/ledger/rc-player-mode.tsv` (13 rows EQUAL).
+
+## Next causes (coordinator list)
+- C028 player sp 128->64 (8), C050 sp 80->40 (3), C033 player m 4->5 (6):
+  all 17 checks (gen-mon-295/652/629/630/576/578/624, gen-umod-27,
+  gen-monskill-212/335/210/211/339-343/301) are EQUAL on integ-r23 already
+  (fixed by the two causes above); ledger part `rc-player-state.tsv`.
+- C026 player q (8 rows): all 17 checks of the 7 rows equal on integ-r23
+  (stale rc-run-1 verdict and a stale checks-status line); `rc-player-q.tsv`.
+- C057 player s (gen-boss-267, gen-monskill-348): EQUAL now. Cause: the
+  missile damage set-up found no weapon for a monster that wields one;
+  1.14d takes the base from stats 23/24 for a grip of 2 (Blood Raven's bow:
+  2..6, not 21/22 = 4..6), so the draw range and the hit differed.
+  Fix: d2-client `weapons::sync` copies monster equipment into the hands
+  (PROVISIONAL REC-3270). Spec: `specs/missiles/damage.md` §1 step 6.
+  Sample (gen-boss/mon/ai/monskill 2xx-3xx): 605/618 equal, the 13 others
+  are monster-field divergences that were not EQUAL before.

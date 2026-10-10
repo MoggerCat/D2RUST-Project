@@ -1,9 +1,9 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
 monster.megademon3	entity	monsters	monstats.txt megademon3 (hcIdx 362)	-	none	gen-mon-362	PARTIAL	yes	0	n	claude/rc-mon-frame31	DIVERGED	S	rc-mon-frame31 2026-10-10: state frame 52 monster 1:8, field fr: 1.14d 2752 vs d2rs 2560 (was frame 31, m); skill1 level read from the natural entry
-monster.megademon4	entity	monsters	monstats.txt megademon4 (hcIdx 686)	-	none	gen-mon-686	DIVERGED@49	yes	0	n	claude/rc-mon-frame31	DIVERGED	S	rc-mon-frame31 2026-10-10: state frame 49 monster 1:8, field fr: 1.14d 2816 vs d2rs 2560 (was frame 31, m)
+monster.megademon4	entity	monsters	monstats.txt megademon4 (hcIdx 686)	-	none	gen-mon-686	PARTIAL	yes	0	n	claude/rc-mon-frame31	DIVERGED	S	rc-mon-frame31 2026-10-10: state frame 49 monster 1:8, field fr: 1.14d 2816 vs d2rs 2560 (was frame 31, m)
 monster.putriddefiler1	entity	monsters	monstats.txt putriddefiler1 (hcIdx 546)	-	none	gen-mon-546	PARTIAL	yes	0	n	claude/rc-mon-frame31	EQUAL	-	rc-mon-frame31 2026-10-10: boss sound idle 20 on the first think (monstats boss bit); state PARTIAL, rng MATCH
 monster.putriddefiler2	entity	monsters	monstats.txt putriddefiler2 (hcIdx 547)	-	none	gen-mon-547	PARTIAL	yes	0	n	claude/rc-mon-frame31	EQUAL	-	rc-mon-frame31 2026-10-10: as 546
 monster.vilemother1	entity	monsters	monstats.txt vilemother1 (hcIdx 298)	-	none	gen-mon-298	PARTIAL	yes	0	n	claude/rc-mon-frame31	EQUAL	-	rc-mon-frame31 2026-10-10: birth: footprint test flag 0 and path direction; state PARTIAL, rng MATCH
 monster.vilemother2	entity	monsters	monstats.txt vilemother2 (hcIdx 299)	-	none	gen-mon-299	PARTIAL	yes	0	n	claude/rc-mon-frame31	EQUAL	-	rc-mon-frame31 2026-10-10: as 298
-monster.clawviper5	entity	monsters	monstats.txt clawviper5 (hcIdx 77)	-	none	gen-mon-77	DIVERGED@34	yes	0	n	claude/rc-mon-frame31	DIVERGED	M	rc-mon-frame31 2026-10-10: state frame 34 player 0:1, field m: 1.14d 19 vs d2rs 5 (was frame 31, m): the SerpentCharge hit
+monster.clawviper5	entity	monsters	monstats.txt clawviper5 (hcIdx 77)	-	none	gen-mon-77	PARTIAL	yes	0	n	claude/rc-mon-frame31	DIVERGED	M	rc-mon-frame31 2026-10-10: state frame 34 player 0:1, field m: 1.14d 19 vs d2rs 5 (was frame 31, m): the SerpentCharge hit

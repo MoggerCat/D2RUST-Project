@@ -203,6 +203,9 @@ impl NpcWorld for Fake {
     fn npc_ai_param(&mut self, npc: UnitId, param: u32) {
         self.log.push(format!("ai {} {param:#x}", npc.0));
     }
+    fn npc_ai_point(&mut self, npc: UnitId, x: u32, y: u32) {
+        self.log.push(format!("aipt {} {x} {y}", npc.0));
+    }
     fn reschedule_ai_think(&mut self, npc: UnitId) {
         self.log.push(format!("think {}", npc.0));
     }
@@ -1494,9 +1497,10 @@ fn resurrect_at_tyrael() {
 
 // Covers: specs/world/npc.md §7.4 r2, §edge-cases-original-bugs r11; specs/world/hirelings.md §9 r3, §edge-cases-original-bugs r5
 #[test]
-fn resurrect_refuses_a_living_hireling() {
-    // Test vector "crafted 0x62 at Kashya, hireling living": 0x2A code 9;
-    // no gold taken, no 0x9B, nothing changed (d2rs policy).
+fn resurrect_revives_a_living_hireling() {
+    // 1.14d does not test the dead bit (`traces/checks/hire-resurrect-kashya.check`:
+    // a hireling with life poked to 0 that never died is revived): the cost is
+    // paid, 0x9B and 0x2A code 5 follow, as for a dead one.
     let mut c = control(0);
     let mut w = Fake::new();
     let kashya = w.npc(class::KASHYA, 0x30);
@@ -1518,9 +1522,10 @@ fn resurrect_refuses_a_living_hireling() {
     w.sent.clear();
     w.log.clear();
     assert_eq!(c.resurrect(&mut w, PLAYER, &msg5(0x62, 0x30)), 0);
-    assert_eq!(w.sent, [transaction(0, 9, u32::MAX, 1000).to_vec()]);
-    assert_eq!(w.get(PLAYER, stat::GOLD), 1000);
-    assert!(w.log.is_empty(), "{:?}", w.log);
+    assert_eq!(w.sent[0], hex("9b ffff 00000000"));
+    // The tail reads the GUID of the record revive's rule 3 freed (−1).
+    assert_eq!(w.sent[1], transaction(0, 5, u32::MAX, 250).to_vec());
+    assert_eq!(w.get(PLAYER, stat::GOLD), 250);
 }
 
 // ------------------------------------------------------------ §7.5
@@ -1946,4 +1951,47 @@ fn live_monstats_records() {
     for s in SELLERS {
         assert!(c.seller_row(s, 1).is_some(), "Normal row of {s}");
     }
+}
+
+fn msg59(ty: u32, guid: u32, x: u32, y: u32) -> Vec<u8> {
+    let mut m = vec![0x59];
+    for v in [ty, guid, x, y] {
+        m.extend_from_slice(&v.to_le_bytes());
+    }
+    m
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.9
+#[test]
+fn make_entity_move_sets_the_npc_ai_params() {
+    let mut c = control(0);
+    let mut w = Fake::new();
+    w.npc(class::CHARSI, 6);
+    w.dist = 50;
+    assert_eq!(
+        c.make_entity_move(&mut w, PLAYER, &msg59(1, 6, 4865, 4241)),
+        0
+    );
+    assert_eq!(
+        w.log,
+        [
+            "path 1006",
+            "think 1006",
+            "ai 1006 0x28",
+            "aipt 1006 4865 4241"
+        ]
+        .map(String::from)
+    );
+    // 51 or farther, an unknown unit, a monster that is not npc + interact.
+    w.dist = 51;
+    w.log.clear();
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 6, 1, 2)), 1);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 99, 1, 2)), 1);
+    w.dist = 3;
+    w.npc(1, 30);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 30, 1, 2)), 1);
+    assert!(w.log.is_empty());
+    // Size 17 only; unit type above 5.
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &[0x59, 1]), 3);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(6, 6, 1, 2)), 2);
 }

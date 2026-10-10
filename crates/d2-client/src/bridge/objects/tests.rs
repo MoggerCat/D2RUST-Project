@@ -27,6 +27,7 @@ fn row(f: u8) -> ObjClientRow {
     ObjClientRow {
         client_fn: f,
         frame_cnt: [21 * 256; 8],
+        mode_ok: [1; 8],
         ..ObjClientRow::default()
     }
 }
@@ -1143,4 +1144,25 @@ fn the_client_guid_counter_starts_at_one_and_gives_the_value_after_the_add() {
     w.objclient.next_guid = u32::MAX;
     let c = create_client_unit(&mut w, MONSTER, CHICKEN, 0, 0).unwrap();
     assert_eq!(c.guid, 0);
+}
+
+/// `0x00470610` → `0x0046E980`: a refresh in a mode whose `Mode<m>` flag is
+/// not 1 is fatal 0x4DC (REC-3160).
+#[test]
+fn refresh_in_a_mode_without_graphics_is_fatal() {
+    let mut w = world((100, 100));
+    let mut i = inputs(0, 1000);
+    i.objclient.rows[0].mode_ok = [1, 0, 0, 0, 0, 0, 0, 0];
+    w.units.get_mut(&OBJ).unwrap().mode = 1;
+    let mut out = Vec::new();
+    let mut cx = Cx {
+        w: &mut w,
+        inputs: &i,
+        unit: S,
+        row: i.objclient.rows[0],
+        out: &mut out,
+    };
+    assert_eq!(cx.refresh(), Err(HandlerError::Fatal(FATAL_GFX_MODE)));
+    cx.u().unwrap().mode = 0;
+    assert_eq!(cx.refresh(), Ok(()));
 }

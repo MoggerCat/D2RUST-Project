@@ -1,7 +1,7 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-monster.reanimatedhorde4	entity	monsters	monstats.txt reanimatedhorde4 (hcIdx 439)	-	none	gen-mon-439	MATCH	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
-monster.reanimatedhorde5	entity	monsters	monstats.txt reanimatedhorde5 (hcIdx 440)	-	none	gen-mon-440	MATCH	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
-monster.reanimatedhorde6	entity	monsters	monstats.txt reanimatedhorde6 (hcIdx 698)	-	none	gen-mon-698	MATCH	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
-monster.slinger4	entity	monsters	monstats.txt slinger4 (hcIdx 376)	-	none	gen-mon-376	MATCH	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
-monster.slinger6	entity	monsters	monstats.txt slinger6 (hcIdx 395)	-	none	gen-mon-395	MATCH	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
+monster.reanimatedhorde4	entity	monsters	monstats.txt reanimatedhorde4 (hcIdx 439)	-	none	gen-mon-439	PARTIAL	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
+monster.reanimatedhorde5	entity	monsters	monstats.txt reanimatedhorde5 (hcIdx 440)	-	none	gen-mon-440	PARTIAL	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
+monster.reanimatedhorde6	entity	monsters	monstats.txt reanimatedhorde6 (hcIdx 698)	-	none	gen-mon-698	PARTIAL	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
+monster.slinger4	entity	monsters	monstats.txt slinger4 (hcIdx 376)	-	none	gen-mon-376	PARTIAL	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)
+monster.slinger6	entity	monsters	monstats.txt slinger6 (hcIdx 395)	-	none	gen-mon-395	PARTIAL	no	0	n	-	EQUAL	-	spawn + 150 ticks: state and rng channels equal on all frames (rc-mon-tx re-run: the tx divergence was stale)

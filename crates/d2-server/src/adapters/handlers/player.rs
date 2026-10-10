@@ -141,8 +141,7 @@ pub const PLAYER_IDS: &[(u8, &str, &str, Status)] = &[
         "sim/intents-events.md §9 r13",
         Status::Handled,
     ),
-    // `monsters/ai-bodies.md` §9.9 sets the AI params; the handler's
-    // entry (unit lookup, refusals) is not written.
+    // Routed to the NPC system (`handlers/world.rs`, `WORLD_IDS`).
     (
         0x59,
         "MakeEntityMove",

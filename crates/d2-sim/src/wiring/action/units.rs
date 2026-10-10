@@ -58,11 +58,20 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO, JUSTHIT};
+        use crate::skills::use_::bodies::callback::{
+            BLADE_FURY, CHARGE, COLD, DEFAULT, INFERNO, JUSTHIT,
+        };
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         if matches!(
             callback.0,
-            JUSTHIT | DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+            JUSTHIT
+                | CHARGE
+                | DEFAULT
+                | COLD
+                | SKILL_REMOVE
+                | STAMINA_REMOVE
+                | INFERNO
+                | BLADE_FURY
         ) {
             self.removed_lists.push((unit, state, callback.0));
         }
@@ -693,6 +702,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .is_some()
     }
 
+    /// `0x0058EC00(unit, index + 1, v)` on the unit's AI control.
+    fn set_ai_param(&mut self, unit: UnitId, index: usize, v: i32) -> bool {
+        self.ai
+            .as_mut()
+            .and_then(|a| a.control_mut(unit))
+            .and_then(|c| c.params.get_mut(index))
+            .map(|p| *p = v)
+            .is_some()
+    }
+
     /// `0x0061AB00` on the unit's room.
     fn room_flag(&mut self, sim: &Sim<'_>, unit: UnitId) -> bool {
         sim.game
@@ -994,6 +1013,10 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
                 guid: owner_guid,
             });
         }
+    }
+
+    fn queue_removal_notice(&mut self, unit_type: u8, guid: u32) {
+        self.removal_notices.push((unit_type, guid));
     }
 
     fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {

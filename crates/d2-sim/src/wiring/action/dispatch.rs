@@ -33,6 +33,21 @@ pub struct ActionSim<X> {
 }
 
 impl<X: Pending> ActionSim<X> {
+    /// Sends `m` to the player `p` after the host's item update pass when
+    /// the player has item messages pending (+0xC8 bit 0) and the host
+    /// defers ([`ActionHooks::defer_player_tail`]): in 1.14d the item
+    /// messages are part of the player's step 5 update, before the rest of
+    /// the client update (recorded `items-drops-rbo-00` frame 50).
+    fn send_after_items(&mut self, p: UnitId, m: &[u8]) {
+        let h = &mut self.sys.hooks;
+        let pending = self.sys.units.get(p).is_some_and(|r| r.flags2 & 1 != 0);
+        if h.defer_player_tail && pending {
+            h.player_tail.push((p, m.to_vec()));
+        } else {
+            h.x.send(p, m);
+        }
+    }
+
     /// Sends the player step 5 / 7 messages held by
     /// [`ActionHooks::defer_player_tail`]: the host calls it after its item
     /// update pass.
@@ -576,13 +591,20 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             return;
         };
         let (guid, refresh) = (r.guid, r.flags2 & INVENTORY_REFRESH_EX != 0);
+        // The removal notices of the units the host freed (`0x0053A770`;
+        // PROVISIONAL REC-3374: sent here, to every player, once).
+        for (ty, g) in std::mem::take(&mut self.sys.hooks.removal_notices) {
+            let m = crate::units::messages::remove_unit(ty, g);
+            for q in game.lists.units_of_type(UnitType::Player) {
+                self.sys.hooks.x.send(q, &m);
+            }
+        }
         let msgs = vitals_sync::mod_stat_messages(&self.sys.stats.mod_values(p));
-        let x = &mut self.sys.hooks.x;
         for m in &msgs {
-            x.send(p, m);
+            self.send_after_items(p, m);
         }
         if refresh {
-            x.send(
+            self.sys.hooks.x.send(
                 p,
                 &crate::items::moves::layouts::relator2(UnitType::Player as u8, 0, guid),
             );
@@ -606,7 +628,7 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             return;
         };
         let m = crate::units::messages::player_kill_count(guid, score as u16);
-        self.sys.hooks.x.send(p, &m);
+        self.send_after_items(p, &m);
     }
 
     /// Step 6, last (`0x0053FAE0`): arena flag 0x400 := 0.

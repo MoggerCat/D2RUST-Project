@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 573–624 |
 | Test vectors | 625–669 |
 | Provenance | 670–715 |
-| Open questions | 716–801 |
+| Open questions | 716–807 |
 <!-- /index -->
 
 ## Summary
@@ -731,6 +731,12 @@ Save: the test character with Cold Plains has the section `5753
    (0xAC, 0xAA, 0x6D, 0x51, 0x0E …) follow in the next frame's tick.
    Act I → II (frame 441) had one S→C 0x5D (`0x0053D72C`, bytes `5d 04
    00 0c 00 00`) before the removals; Act II → I (frame 611) had none.
+   d2rs (rc-sim-combat-div, `gen-sysc-flows-act-change-1/3`,
+   `gen-sysc-client-msg-ui-20`, packets MATCH): the quest calls of the
+   level change (the town-leave refresh's `0x00597310` and event 3) send
+   through the transport at once, as the original's quest sends reach the
+   client queue directly, so the 0x5D precedes the removals; they are not
+   held for the tick-end drain of the quest rest's outbox.
    Further recording: R-NV-11 (`docs/handoff/pc2-rec-npc-vendors.md`).
 2. First activation of a neutral waypoint: confirm no 0x63, the 0x0E/0x51
    mode messages and the ENDANIM frame. Settle: record operating a new

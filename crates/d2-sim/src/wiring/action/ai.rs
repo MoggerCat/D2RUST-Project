@@ -431,7 +431,10 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.h.drlg.in_town(game, room)
     }
     fn los_draw(&self, game: &Game, room: RoomId) -> bool {
-        self.h.x.los_draw(game, room)
+        if self.h.paths.is_none() {
+            return self.h.x.los_draw(game, room);
+        }
+        self.h.drlg.los_draw(game, room)
     }
     /// `0x0064D910`: the grid at the unit's position has a `mask` bit
     /// (with the path provider: the pattern test of
@@ -800,7 +803,19 @@ impl<X: Pending> AiActs for View<'_, X> {
             Some(m) => m.get(&skill).copied(),
             None => match self.h.natural_skills.get(&unit) {
                 Some(m) => m.get(&skill).copied(),
-                None => self.h.x.ai_skill_level(unit, skill, highest),
+                None => match self.h.skill_lists.get(&unit) {
+                    // A player's list (`skill_lists`): the entry's base
+                    // level plus bonus; the highest of the unit's entries
+                    // of the skill (`0x006439F0`) when `highest`, else the
+                    // native one (`0x006439B0`, owner −1).
+                    Some(l) => l
+                        .view()
+                        .iter()
+                        .filter(|e| e.skill == skill && (highest || e.owner_guid == -1))
+                        .map(|e| e.base + e.level_bonus)
+                        .max(),
+                    None => self.h.x.ai_skill_level(unit, skill, highest),
+                },
             },
         }
     }
@@ -844,7 +859,31 @@ impl<X: Pending> AiActs for View<'_, X> {
             self.h.x.ai_add_right_skill(game, unit, skill, level);
         }
     }
+    /// `0x00647280` on a monster (`ai-bodies-7.md` §27 init): the entry
+    /// goes next to the init entries ([`ActionHooks::natural_skills`]) in
+    /// the unit's list ([`ActionHooks::monster_skills`], which then
+    /// shadows them). PROVISIONAL (REC-3510): the list is kept in skill-id
+    /// order; 1.14d's is in insertion order (init entries, then Attack,
+    /// then the class skills in record order).
     fn assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
+        if self
+            .units
+            .get(unit)
+            .is_some_and(|r| r.ty == UnitType::Monster)
+        {
+            let natural = self
+                .h
+                .natural_skills
+                .get(&unit)
+                .cloned()
+                .unwrap_or_default();
+            self.h
+                .monster_skills
+                .entry(unit)
+                .or_insert(natural)
+                .insert(skill, level);
+            return;
+        }
         self.h.x.ai_assign_skill(game, unit, skill, level);
     }
     fn set_skill_param(&mut self, unit: UnitId, skill: i32, value: i32) -> bool {
@@ -1073,6 +1112,137 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// `0x0056EDE0(game, owner, skill, level, missile, x, y)`
+    /// (`skills/bodies.md` §6.13): both coordinates 0 take the owner's
+    /// target position; still 0, or farther than 100 (`0x006417F0`, max +
+    /// min / 2): none; else a missile at the point (record flags 1) on the
+    /// real missile store. 1.14d `ass-blade-sentinel` frame 28: the
+    /// creeper's blade missile is the unit allocation that steps the game
+    /// seed.
+    fn skill_missile(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+        missile: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        use crate::missiles::{self, MissileBodies, MissileParams};
+        let (mut tx, mut ty) = (x, y);
+        if tx == 0 && ty == 0 {
+            (tx, ty) = MissileBodies::target_position(self, game, owner).unwrap_or((0, 0));
+            if tx == 0 && ty == 0 {
+                return None;
+            }
+        }
+        let (ox, oy) = self.h.path_position(owner);
+        let (dx, dy) = (
+            ox.wrapping_sub(tx).wrapping_abs(),
+            oy.wrapping_sub(ty).wrapping_abs(),
+        );
+        if dx.max(dy).wrapping_add(dx.min(dy) / 2) as u32 > 100 {
+            return None;
+        }
+        let p = MissileParams {
+            flags: 1,
+            owner: Some(owner),
+            class: missile,
+            x: tx,
+            y: ty,
+            skill,
+            level,
+            ..MissileParams::default()
+        };
+        let mut store = self.h.missiles.take()?;
+        let t = self.h.tables.clone();
+        let made = {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut *self,
+            };
+            missiles::create_missile(game, &mut cx, &p)
+        };
+        self.h.missiles = Some(store);
+        made
+    }
+    /// `0x00621CE0(a, b)`: `a` stores `b` as its owner (type +0x94, id
+    /// +0x98, flag-ex 0x400; the source map the missile owner lookups
+    /// read).
+    fn link_owner(&mut self, game: &mut Game, a: UnitId, b: UnitId) {
+        // A missile's owner is the unit this stores (`0x00621CE0`, missile
+        // creation step 24): 1.14d `ass-blade-sentinel` gives the blade
+        // missile the creeper as owner.
+        if let Some(m) = self.h.missiles.as_mut().and_then(|s| s.get_mut(a)) {
+            m.owner = self.units.get(b).map(|r| crate::missiles::UnitRef {
+                ty: r.ty,
+                guid: r.guid,
+            });
+            return;
+        }
+        let link = self
+            .units
+            .get(b)
+            .map(|r| r.ty.index() as u32)
+            .zip(game.lists.unit(b).map(|e| e.guid));
+        if let Some(r) = self.units.get_mut(a) {
+            match link {
+                Some(l) => {
+                    r.source = l;
+                    r.flags2 |= 0x400;
+                }
+                None => {
+                    r.source = (0, 0);
+                    r.flags2 &= !0x400;
+                }
+            }
+        }
+        self.h.unit_source.insert(a, b);
+    }
+    /// `0x006439B0` entry +0x08 of a monster's entry: the skill's
+    /// `monanim` (fixed when the entry is created, `skills/use.md` §5.1).
+    fn entry_mode(&self, unit: UnitId, skill: i32) -> Option<u8> {
+        self.unit_skills(unit)
+            .iter()
+            .any(|&(s, _)| s == skill)
+            .then(|| self.h.tables.skills.skill(skill).map(|r| r.monanim))
+            .flatten()
+    }
+    /// `0x006442A0`: the base level of a monster's entry.
+    fn skill_base_level(&self, unit: UnitId, skill: i32) -> Option<i32> {
+        if let Some(l) = self.h.skill_lists.get(&unit) {
+            return l
+                .view()
+                .iter()
+                .find(|e| e.skill == skill && e.owner_guid == -1)
+                .map(|e| e.base);
+        }
+        self.unit_skills(unit)
+            .iter()
+            .find(|&&(s, _)| s == skill)
+            .map(|&(_, l)| l)
+    }
+    /// The unit's list of init and summon entries, `(id, level)`.
+    fn unit_skills(&self, unit: UnitId) -> Vec<(i32, i32)> {
+        match self
+            .h
+            .monster_skills
+            .get(&unit)
+            .or_else(|| self.h.natural_skills.get(&unit))
+        {
+            Some(m) => m.iter().map(|(&s, &l)| (s, l)).collect(),
+            None => Vec::new(),
+        }
+    }
+    /// A monster with init or summon entries has a list (unit +0xA8).
+    fn has_skill_list(&self, unit: UnitId) -> bool {
+        self.h.monster_skills.contains_key(&unit) || self.h.natural_skills.contains_key(&unit)
+    }
+    fn class_skills(&self, class: i32) -> Vec<i32> {
+        crate::skills::list::class_skills(&self.h.tables.skills.skills, class)
+    }
     /// Path +0x18 / +0x1A of the unit's dynamic path (`0x00648A20` /
     /// `0x00648A30`); no dynamic path: (0, 0).
     fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
@@ -1257,14 +1427,21 @@ impl<X: Pending> View<'_, X> {
     ) -> Option<bool> {
         let paths = self.h.paths.as_ref()?;
         let t = &self.h.tables.combat;
-        let class = self
-            .units
-            .get(a)
-            .filter(|r| r.ty == UnitType::Monster)?
-            .class;
-        let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
-        let rng = t.monstats2.get(usize::from(ex))?.meleerng;
-        let reach = if rng == 255 { 0 } else { i32::from(rng) };
+        let ar = self.units.get(a)?;
+        let reach = if ar.ty == UnitType::Player {
+            // `0x00622870` for a player: the weapon's `rangeadder`, the
+            // host's `melee_range` (0 without one).
+            self.h.x.melee_range(a)
+        } else {
+            let class = Some(ar).filter(|r| r.ty == UnitType::Monster)?.class;
+            let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
+            let rng = t.monstats2.get(usize::from(ex))?.meleerng;
+            if rng == 255 {
+                0
+            } else {
+                i32::from(rng)
+            }
+        };
         let dist = |a: UnitId, b: UnitId| {
             let pt = |u: UnitId| {
                 let (x, y) = self.h.path_position(u);

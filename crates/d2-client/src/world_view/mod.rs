@@ -193,6 +193,9 @@ pub struct ViewAssets {
     /// map `c` of file `t` is row `base + 21·(t − 1) + c`, once a UI cel
     /// with an item colour needs them ([`panel_art::PanelArtLoader`]).
     pub item_palettes: Option<MapId>,
+    /// The act's 12 text-colour maps once pushed ([`TextColors`]): the
+    /// rendering facts read a glyph's colour index from its shade map.
+    pub text_colors: Option<TextColors>,
 }
 
 impl ViewAssets {
@@ -207,6 +210,7 @@ impl ViewAssets {
             shades: None,
             color_rows: None,
             item_palettes: None,
+            text_colors: None,
         }
     }
 
@@ -551,7 +555,7 @@ pub struct WorldFrame {
     /// The 1.14d cel wrapper of each UI draw, by its index in the frame's
     /// UI list (the items' `ItemTag::Ui`): glyphs of a text are
     /// `CelDrawColor` (`tools/facts-render.md` §5 r18).
-    pub ui_calls: Vec<crate::ui::draw::CelCall>,
+    pub ui_calls: Vec<crate::ui::draw::UiCelInfo>,
     /// Each drawn unit's cel context direction ([`UnitPose::dir64`]) by
     /// its draw slot ([`DrawKey::slot`] of its pass key and of its shadow
     /// key; a GUID is unique per unit type only), for the rendering facts
@@ -768,9 +772,28 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     let ui_calls = ui
         .iter()
         .map(|d| match d {
-            crate::ui::UiDraw::Image(r) => r.call,
-            crate::ui::UiDraw::Text(_) => crate::ui::draw::CelCall::Color,
-            crate::ui::UiDraw::Rect(_) => crate::ui::draw::CelCall::Draw,
+            crate::ui::UiDraw::Image(r) => crate::ui::draw::UiCelInfo {
+                call: r.call,
+                mode: r.look.mode,
+                pal: match r.look.remap {
+                    crate::ui::Remap::None => Some(0),
+                    crate::ui::Remap::Palette(k) => Some(k),
+                    crate::ui::Remap::ItemColor { .. } => None,
+                },
+                text: false,
+            },
+            crate::ui::UiDraw::Text(t) => crate::ui::draw::UiCelInfo {
+                call: crate::ui::draw::CelCall::Color,
+                mode: t.opts.mode(),
+                pal: None,
+                text: true,
+            },
+            crate::ui::UiDraw::Rect(_) => crate::ui::draw::UiCelInfo {
+                call: crate::ui::draw::CelCall::Draw,
+                mode: 5,
+                pal: Some(0),
+                text: false,
+            },
         })
         .collect();
 

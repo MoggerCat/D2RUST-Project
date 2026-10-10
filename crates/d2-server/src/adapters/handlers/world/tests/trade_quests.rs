@@ -69,6 +69,9 @@ impl Pending for ActionRest {
     fn take_quest_events(&mut self) -> Vec<d2_sim::wiring::action::QuestEvent> {
         std::mem::take(&mut self.quest_events)
     }
+    fn queue_quest_event(&mut self, e: d2_sim::wiring::action::QuestEvent) {
+        self.quest_events.push(e);
+    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
