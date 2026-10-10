@@ -42,7 +42,7 @@ pub fn room_pass(w: &mut ClientWorld, inputs: &ModelInputs) {
             continue;
         }
         critters(w, inputs, r.room, r.level);
-        presets(w, r.room);
+        presets(w, inputs, r.room);
         if let Some(d) = w.drlg.as_mut() {
             d.set_populated(r.room);
         }
@@ -134,7 +134,7 @@ fn place_critter(w: &mut ClientWorld, inputs: &ModelInputs, room: DrlgRoomId, cl
 /// The client presets `0x00466820(room)` (`model.md` §5 r6): each
 /// preset unit of the room with flag bit 0, in list order, at its
 /// position plus the room's sub-tile origin, with its type and mode.
-fn presets(w: &mut ClientWorld, room: DrlgRoomId) {
+fn presets(w: &mut ClientWorld, inputs: &ModelInputs, room: DrlgRoomId) {
     let Some(d) = w.drlg.as_ref() else {
         return;
     };
@@ -150,6 +150,15 @@ fn presets(w: &mut ClientWorld, room: DrlgRoomId) {
         };
         if let Some(u) = w.objclient.set_c.get_mut(&key) {
             u.mode = p.mode;
+            // The object init of a client preset runs the animation
+            // set-up in its mode (`world/objects-client.md` §25 r8;
+            // 1.14d client state of the Rogue Encampment arrival: frame
+            // count and speed set on every client object).
+            if u.key.unit_type == super::world::OBJECT {
+                if let Some(row) = inputs.objclient.rows.get(u.class as usize) {
+                    let _ = super::objects::anim_setup(u, row, p.mode);
+                }
+            }
         }
     }
 }

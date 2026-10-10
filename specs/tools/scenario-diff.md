@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–589 |
-|   4. Suite | 590–717 |
-| Constants & data dependencies | 718–721 |
-| Randomness | 722–725 |
-| Edge cases & original bugs | 726–761 |
-| Test vectors | 762–784 |
-| Provenance | 785–788 |
-| Open questions | 789–851 |
+|   3. Run | 145–597 |
+|   4. Suite | 598–725 |
+| Constants & data dependencies | 726–729 |
+| Randomness | 730–733 |
+| Edge cases & original bugs | 734–769 |
+| Test vectors | 770–792 |
+| Provenance | 793–796 |
+| Open questions | 797–859 |
 <!-- /index -->
 
 ## Summary
@@ -86,7 +86,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend`, `cstate` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -586,6 +586,14 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **cstate** (`channels cstate`; `tools/scenario-diff/cstate_diff.py`; the
+    check file is named `<check>-cs`, its recorded 1.14d side is
+    `traces/pc1/client-state/<check>.cstate.jsonl`, else the recorder runs
+    `record_state.py --client-out`): the client's own unit sets S and C
+    (`tools/state-snapshot.md` §3 rule 5) against `d2-client state-dump
+    --client-out`. Exit codes as `state_diff.py`; a key only one side writes
+    is reported as not compared (PARTIAL at best), never ignored.
 
 ### 4. Suite
 

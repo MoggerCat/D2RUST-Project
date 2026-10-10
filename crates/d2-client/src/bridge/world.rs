@@ -1049,8 +1049,27 @@ impl ClientWorld {
         // `drlg/rooms.md` §8 r4: each unit of a freed room (server units:
         // no flag 0x400000) gets flags-2 0x20, then flag 0x800000, then
         // leaves the room.
-        for room in gone {
+        for &room in &gone {
             self.free_active_room(room);
+        }
+        // `model.md` §5 r5: a client-only unit (set C) left in a freed room
+        // carries flag 0x800000 and is removed by the client update that
+        // follows (`0x00465F00`). The model links set-C objects into no room
+        // list, so the room is the one whose rectangle holds the unit's cell.
+        let freed: Vec<UnitKey> = self
+            .objclient
+            .set_c
+            .values()
+            .filter(|u| {
+                u.position.is_some_and(|(x, y)| {
+                    old.iter()
+                        .any(|r| gone.contains(&r.room) && r.contains(i32::from(x), i32::from(y)))
+                })
+            })
+            .map(|u| u.key)
+            .collect();
+        for key in freed {
+            super::objects::remove_client_unit(self, key);
         }
         let created = self
             .drlg
