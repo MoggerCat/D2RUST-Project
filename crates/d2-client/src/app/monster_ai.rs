@@ -24,9 +24,10 @@ pub struct MonsterAi {
     targets: BTreeMap<UnitId, UnitId>,
     /// The current skill (`Pending::set_current_skill`).
     current: BTreeMap<UnitId, i32>,
-    /// A summoned monster's skill entries' base levels (`0x0056DEB0`,
-    /// `skills/bodies.md` §6.5 step 6), mirrored from the sim each frame
-    /// (`sync_seams`); a monster without one uses level 1.
+    /// A monster's skill entries' base levels, mirrored from the sim each
+    /// frame (`sync_seams`): init step 14's (`Sk<i>lvl` + the monster
+    /// skill bonus, `monsters/init.md` §6), or a summon's (`0x0056DEB0`,
+    /// `skills/bodies.md` §6.5 step 6); a skill without one uses level 1.
     levels: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The modes each class has (monstats2 `mDT`…`mRN`, bit = mode).
     pub modes: Vec<u16>,
@@ -55,9 +56,21 @@ impl MonsterAi {
         }
     }
 
-    /// Replace the mirrored summon skill levels.
+    /// Replace the mirrored skill levels.
     pub fn set_levels(&mut self, levels: BTreeMap<UnitId, BTreeMap<i32, i32>>) {
         self.levels = levels;
+    }
+
+    /// The levels [`Self::set_levels`] mirrors: init step 14's entries
+    /// (`natural`), a summon's (`summon`) replacing a unit's, as the
+    /// sim's AI reads them (`wiring/action/ai.rs` `skill_level`).
+    pub fn merged_levels(
+        natural: &BTreeMap<UnitId, BTreeMap<i32, i32>>,
+        summon: &BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    ) -> BTreeMap<UnitId, BTreeMap<i32, i32>> {
+        let mut levels = natural.clone();
+        levels.extend(summon.iter().map(|(u, m)| (*u, m.clone())));
+        levels
     }
 
     /// `0x0046C140(class, mode)`: the class has the mode.
@@ -142,5 +155,28 @@ mod tests {
         // A skill id below 0 sets nothing.
         assert!(!ai.set_current(UnitId(6), -1));
         assert_eq!(ai.used_skill(UnitId(6)), None);
+    }
+
+    // Covers: specs/monsters/init.md §6 text
+    #[test]
+    fn a_natural_monster_casts_at_its_monstats_level() {
+        let (vamp, summon, other) = (UnitId(8), UnitId(9), UnitId(10));
+        // vampire2: VampireMissile (skill 378) at Sk4lvl 3.
+        let natural = BTreeMap::from([
+            (vamp, BTreeMap::from([(378, 3)])),
+            (summon, BTreeMap::from([(378, 7)])),
+        ]);
+        let summoned = BTreeMap::from([(summon, BTreeMap::from([(500, 4)]))]);
+        let mut ai = MonsterAi::default();
+        ai.set_levels(MonsterAi::merged_levels(&natural, &summoned));
+        for (u, k, l) in [
+            (vamp, 378, 3),
+            (summon, 500, 4),
+            (summon, 378, 1),
+            (other, 378, 1),
+        ] {
+            assert!(ai.set_current(u, k));
+            assert_eq!(ai.used_skill(u).map(|e| e.base), Some(l), "{u:?} {k}");
+        }
     }
 }

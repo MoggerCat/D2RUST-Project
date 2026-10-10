@@ -719,7 +719,8 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
-    let levels = hooks.monster_skills.clone();
+    let levels =
+        super::monster_ai::MonsterAi::merged_levels(&hooks.natural_skills, &hooks.monster_skills);
     hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
