@@ -993,6 +993,15 @@ impl Pending for LocalSeams {
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::monster_right_aura(h, sim, unit, skill, level);
+    }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }

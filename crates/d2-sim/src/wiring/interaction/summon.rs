@@ -316,7 +316,7 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     /// done) for a unit that is not a monster or a skill that is not an
     /// aura; the seam takes those. 1.14d: dru-oak-sage's druid has the
     /// aura's life the frame after the summon.
-    fn monster_aura_select(&mut self, m: UnitId, skill: i32) -> bool {
+    pub(super) fn monster_aura_select(&mut self, m: UnitId, skill: i32) -> bool {
         use crate::skills::list::ListOwner;
         let Some(r) = self.cv.v.units.get(m) else {
             return false;

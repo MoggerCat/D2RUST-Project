@@ -797,11 +797,33 @@ impl<X: Pending> AiActs for View<'_, X> {
             None => self.h.x.ai_skill_entry(unit, skill),
         }
     }
+    /// A monster with a skill list (an assigned aura,
+    /// [`Pending::monster_right_aura`]): its hand's entry, id and base
+    /// level; else the seam.
     fn hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
-        self.h.x.ai_hand_skill(unit, right)
+        match self.h.skill_lists.get(&unit) {
+            Some(l) => {
+                let i = if right { l.right } else { l.left };
+                i.and_then(|i| l.view().get(i).map(|e| (e.skill, e.base)))
+            }
+            None => self.h.x.ai_hand_skill(unit, right),
+        }
     }
+    /// `0x0056DEB0` + `0x005701B0`: an aura goes to
+    /// [`Pending::monster_right_aura`] (`ai-bodies-2.md` §14 Duriel), any
+    /// other skill to the seam.
     fn add_right_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
-        self.h.x.ai_add_right_skill(game, unit, skill, level);
+        if self.h.tables.skills.skill(skill).is_some_and(|r| r.aura) {
+            let mut sim = Sim {
+                game,
+                units: &mut *self.units,
+                stats: &mut *self.stats,
+                data: self.data,
+            };
+            X::monster_right_aura(&mut *self.h, &mut sim, unit, skill, level);
+        } else {
+            self.h.x.ai_add_right_skill(game, unit, skill, level);
+        }
     }
     fn assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
         self.h.x.ai_assign_skill(game, unit, skill, level);
