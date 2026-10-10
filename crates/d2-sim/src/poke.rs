@@ -412,6 +412,17 @@ fn signed(t: &str) -> Result<i32, String> {
     }
 }
 
+/// d2rs-own (`hop` only): a poked position reaches the client like a placement does
+/// (queued for update with flag-ex 0x10000: the S→C 0x15 at its next update,
+/// `sim/path-placement.md` §6 rule 4), so a client model and its pick
+/// see the unit where the poke put it.
+fn mark_reassign<X: WorldPending>(game: &mut Game, sim: &mut WorldSim<X>, u: UnitId) {
+    let _ = game.lists.queue_update(u);
+    if let Some(r) = sim.action.sys.units.get_mut(u) {
+        r.flags2 |= 0x1_0000;
+    }
+}
+
 fn coord(t: &str) -> Result<Coord, String> {
     let Some(body) = t.strip_prefix('@') else {
         return signed(t).map(Coord::Num);
@@ -1545,6 +1556,9 @@ fn run<X: WorldPending>(
                     None => return Ok(PokeResult::Failed),
                 }
             }
+            // 1.14d's `pos` poke sends no S->C 0x15 (REC-2900,
+            // `gen-sysc-client-msg-ui-2`: frame 4 has none): no reassign
+            // mark here, unlike `hop`.
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
             PokeResult::Ok(None)
         }
@@ -1582,6 +1596,7 @@ fn run<X: WorldPending>(
                     })
                 });
                 if sim.action.sys.hooks.path_position(u) != from {
+                    mark_reassign(game, sim, u);
                     return Ok(PokeResult::Ok(None));
                 }
                 // a refused spot (blocked): try the next; the refusal is the probe's

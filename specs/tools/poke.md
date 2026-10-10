@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–354 |
-|   5. The d2rs side (`d2-sim::poke`) | 355–424 |
-|   6. `goto`: walking to a target | 425–504 |
-| Constants & data dependencies | 505–520 |
-| Randomness | 521–527 |
-| Edge cases & original bugs | 528–555 |
-| Test vectors | 556–583 |
-| Provenance | 584–594 |
-| Open questions | 595–602 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–425 |
+|   6. `goto`: walking to a target | 426–505 |
+| Constants & data dependencies | 506–521 |
+| Randomness | 522–528 |
+| Edge cases & original bugs | 529–556 |
+| Test vectors | 557–584 |
+| Provenance | 585–595 |
+| Open questions | 596–603 |
 <!-- /index -->
 
 ## Summary
@@ -415,9 +415,10 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    `combat-melee-fallen`, `a2-wp-42` (REC-2290); `stat`: the stat update in the
    poke's frame window, `a2-npc-fara-heal` frame 7,
    `combat-potion-midfight` frame 59; rc-packets-join-order). Only a
-   poke due before the first tick keeps the between-frames point. A `pos` poke sends no S→C 0x15: the teleport `0x00650BE0` sets no
-   update flag (the former d2rs-own reassign request is gone, rc-net-div
-   C014: `items-vendor-akara-buy` frame 4 now equal).
+   poke due before the first tick keeps the between-frames point. A `pos` poke
+   queues no S→C 0x15 (REC-2900: 1.14d sends none in the next frames,
+   `gen-sysc-client-msg-ui-2`, `interact-operate-waypoint` now MATCH on
+   packets); only the d2rs-own `hop` still marks a reassign.
    `play --poke` runs every poke between frames: its
    `operate` / `talk` replies reach the client one frame later than on
    1.14d (a play aid, not a comparison).
