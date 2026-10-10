@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–391 |
-|   12. Level backgrounds (pass 1) | 392–445 |
-|   13. Pass 8 (`0x00475B20`) | 446–454 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 455–480 |
-|   15. Sight test (`draw-order.md` §5 r3) | 481–527 |
-|   16. Line test (`0x0064E260`) | 528–557 |
-| Constants & data dependencies | 558–568 |
-| Randomness | 569–580 |
-| Edge cases & original bugs | 581–597 |
-| Test vectors | 598–619 |
-| Provenance | 620–653 |
-| Open questions | 654–729 |
+|   11. Weather (passes 4 and 9; water floors) | 68–407 |
+|   12. Level backgrounds (pass 1) | 408–461 |
+|   13. Pass 8 (`0x00475B20`) | 462–470 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 471–496 |
+|   15. Sight test (`draw-order.md` §5 r3) | 497–543 |
+|   16. Line test (`0x0064E260`) | 544–573 |
+| Constants & data dependencies | 574–584 |
+| Randomness | 585–596 |
+| Edge cases & original bugs | 597–613 |
+| Test vectors | 614–635 |
+| Provenance | 636–669 |
+| Open questions | 670–745 |
 <!-- /index -->
 
 ## Summary
