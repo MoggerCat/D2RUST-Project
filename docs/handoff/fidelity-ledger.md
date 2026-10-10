@@ -19,8 +19,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 7 | 1 | 0 | 0 | 0 | 6 | 0 | 1 | 0 | 2–8 | 0 | 7 / 0 / 0 |
 | skills | 588 | 79 | 0 | 509 | 0 | 0 | 434 | 154 | 0 | 525–2100 | 6 | 492 / 84 / 12 |
 | systems | 902 | 204 | 46 | 577 | 0 | 75 | 198 | 626 | 3 | 1375–5404+ | 292 | 251 / 0 / 651 |
-| world | 389 | 180 | 0 | 208 | 0 | 0 | 5 | 379 | 5 | 800.5–3042+ | 380 | 190 / 41 / 158 |
-| **all** | 4334 | 1008 | 46 | 2280 | 269 | 730 | 1403 | 2188 | 13 | 5181.5–20310+ | 771 | 2326 / 886 / 1122 |
+| world | 389 | 180 | 0 | 209 | 0 | 0 | 5 | 379 | 5 | 800.5–3042+ | 380 | 190 / 41 / 158 |
+| **all** | 4334 | 1008 | 46 | 2281 | 269 | 730 | 1403 | 2188 | 13 | 5181.5–20310+ | 771 | 2326 / 886 / 1122 |
 
 ## By family
 
@@ -638,7 +638,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `item.set-item` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `item.treasure-tables` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `item.unique` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
-| `level` | 136 | 120 | 0 | 15 | 0 | 0 | 0 | 0 | 136 | 0 | 136 | 0 |
+| `level` | 136 | 120 | 0 | 16 | 0 | 0 | 1 | 0 | 136 | 0 | 136 | 0 |
 | `missile` | 299 | 5 | 0 | 294 | 0 | 0 | 175 | 293 | 6 | 0 | 0 | 4 |
 | `monster` | 647 | 280 | 0 | 255 | 0 | 112 | 2 | 2 | 532 | 1 | 4 | 253 |
 | `net.c2s` | 113 | 12 | 9 | 14 | 0 | 78 | 0 | 31 | 4 | 0 | 27 | 0 |
@@ -6581,6 +6581,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a2.62.act-2-lair-1-a` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.66.act-2-tomb-tal-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.74.act-2-arcane` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `level.a3.100.act-3-mephisto-1` | entity | NO-CHECK | M | PARTIAL | yes | 13 | y | claude/rc-wp-walk-tx | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-100: rng MATCH, state PARTIAL (no difference compared); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/gen-lvl-100.check --orig-cache traces/orig-cache [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `level.a3.88.act-3-dungeon-2-a` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.105.act-4-mesa-2` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | DRLG kind outdoor; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a4.107.act-4-lava-1` | entity | NO-CHECK | M | - | yes | 13 | y | claude/q-prov-recording | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | DRLG kind maze; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -6781,5 +6782,4 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `waypoint.6.jail-level-1` | entity | NO-CHECK | M | - | ? | 3 | y | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | waypoint object + menu/travel for this level; town waypoints share code; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `waypoint.7.inner-cloister` | entity | NO-CHECK | M | - | ? | 3 | y | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | waypoint object + menu/travel for this level; town waypoints share code; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `waypoint.8.catacombs-level-2` | entity | NO-CHECK | M | - | ? | 3 | y | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | waypoint object + menu/travel for this level; town waypoints share code; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `level.a3.100.act-3-mephisto-1` | entity | PARTIAL | M | PARTIAL | yes | 13 | y | claude/rc-wp-walk-tx | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-100: rng MATCH, state PARTIAL (no difference compared); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/gen-lvl-100.check --orig-cache traces/orig-cache |
 
