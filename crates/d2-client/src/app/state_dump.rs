@@ -406,9 +406,10 @@ pub fn dump<W: Write>(
     };
     writeln!(out, "{}", header.to_json_line())?;
 
-    // `poke.md` §5 rule 5: the pokes due after a tick run at the tick end
-    // (the 1.14d hook's point), after that frame's snapshot; a `goto` steps
-    // there on every later frame until it ends.
+    // `poke.md` §5 rule 5: the frames with an `operate`, `talk`, `goto` or
+    // `warp` run at the tick end (the 1.14d hook's point), after that
+    // frame's snapshot; a `goto` steps there on every later frame until it
+    // ends.
     let (tick_end_entries, rest) = pokes::split_tick_end(game.pokes);
     let tick_end = Arc::new(Mutex::new(TickEndOut::default()));
     if !tick_end_entries.is_empty() {
@@ -621,8 +622,8 @@ pub fn dump<W: Write>(
 
 /// Runs every pending poke due after `last_frame` (absolute `f` with
 /// f − 1 ≤ `last_frame`, `poke.md` §2 r6) through the bridge, in order,
-/// writing a `poke` line each and printing it to stderr. Only the pokes
-/// due before the first tick get here; the others run at the tick end
+/// writing a `poke` line each and printing it to stderr. A `goto` or a
+/// `warp` never gets here: its frame runs at the tick end
 /// ([`pokes::split_tick_end`]).
 fn run_due_pokes<W: Write>(
     bridge: &mut Bridge<DumpLink>,
