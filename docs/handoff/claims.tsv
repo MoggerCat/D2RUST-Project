@@ -1,5 +1,5 @@
 C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	open
-C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	open
+C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	done ui.frontend rows linked to ui-frontend-screens; stable-px diff main 26500->918 (EQUAL 0->0)
 C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	open
 C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	done EQUAL +3 (superunique beetleburst, dark-elder, fire-eye); coldworm+wp-42 packets MATCH
 C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
@@ -17,6 +17,8 @@ C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed dr
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	done 8 rows EQUAL (act-travel/a2-warp/join/milestone/npc-talk: 18 checks state 100%); packets part stays rc-net-div
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	done 7 rows EQUAL (gen-su-26/28/29/30/63, gen-boss-544, gen-ai-highpriest); deathmauler1-5 rows blocked by "ignore q seed" in gen-mon-529..533
 C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
+C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open
+C018	rc-c018-monstate	17:43	su hcIdx extra-spawn double roll(5) (a2-quest-radament s)	done gen-su radament,ismail,geleb,toorc,wyand,bremm,maffer,baal2 EQUAL
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	released: footstep-variant client seed (rc-audio-fmt-div, Windows)
 C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	open
 C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35 C008 checks state 100% (11 rows EQUAL)
