@@ -26,15 +26,15 @@
 |   C5 Video hook (all videos; stub in d2rs) | 224–254 |
 |   C6 Cinematics progress byte N | 255–273 |
 |   C7 Palette | 274–280 |
-|   C8 Cinematics menu (`0x00431600`) | 281–320 |
-|   C9 Sounds (deferred; owner `client/audio.md`) | 321–327 |
-|   C10 640 × 480 | 328–336 |
-| Constants & data dependencies | 337–354 |
-| Randomness | 355–358 |
-| Edge cases & original bugs | 359–376 |
-| Test vectors | 377–396 |
-| Provenance | 397–419 |
-| Open questions | 420–435 |
+|   C8 Cinematics menu (`0x00431600`) | 281–330 |
+|   C9 Sounds (deferred; owner `client/audio.md`) | 331–337 |
+|   C10 640 × 480 | 338–346 |
+| Constants & data dependencies | 347–364 |
+| Randomness | 365–368 |
+| Edge cases & original bugs | 369–386 |
+| Test vectors | 387–406 |
+| Provenance | 407–429 |
+| Open questions | 430–445 |
 <!-- /index -->
 
 ## Summary
@@ -317,6 +317,16 @@ files). This is the front-end palette set by code (`ui/frontend-menus.md` §F1.6
 6. CANCEL / Esc (`0x004345C0`): archive restore, `0x00514D80` ≠ 0 → `0x005148F0(1)` (music, named only),
    main menu `0x004336C0`.
 7. Playing a video from this menu never changes N (only the writers of C6 r3 do).
+
+*Recorded (2026-10-10, PC 1 today, Windows, windowed; `facts/render/scenes/frontend-cinematics`, two
+runs, 122 UI rows, none differing):* with sound on (`-w` only) the Cinematics click opens the menu
+(expansion layout: descriptor 61 box, `SELECT CINEMATICS`, seven wide buttons of which the first two
+carry labels on this install, `THE SISTER'S LAMENT` and `DESERT JOURNEY`, the other five drawn blank,
+and CANCEL). With sound off (`-w -ns`, the recorders' default) the same click enters `0x00431600`
+(breakpoint hit) but the main menu is on screen 1 s and 4 s later: the menu does not stay without a
+sound device. PROVISIONAL (REC-2444): which call of step 1 (`0x00515F50(0xB4)`, `0x00514930`,
+`0x00515CE0(0xFF)`) or of the build leaves the screen when sound is off is not read; settled by a read
+of those three functions' no-device paths.
 
 ### C9 Sounds (deferred; owner `client/audio.md`)
 
