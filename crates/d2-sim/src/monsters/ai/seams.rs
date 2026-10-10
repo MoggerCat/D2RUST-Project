@@ -8,6 +8,7 @@
 use crate::game::Game;
 use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
+use crate::world::quests::act2::q4::JerhynStep;
 
 /// Where a mode request points.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,6 +50,11 @@ pub trait AiUnits {
     fn add_life(&mut self, unit: UnitId, amount: i32);
     /// Monster data `dwAiState` (read by `0x005734E0`).
     fn ai_state(&self, unit: UnitId) -> u32;
+    /// `0x00552FD0`: the unit's source unit (set by `link_source`), none
+    /// when unit +0xC8 lacks bit 0x400.
+    fn source_unit(&self, _unit: UnitId) -> Option<UnitId> {
+        None
+    }
     /// Alignment (`0x006259B0`): 0 evil, 1 neutral, 2 good.
     fn alignment(&self, unit: UnitId) -> u8;
     /// Monster type flag 8 (`0x005A0180`).
@@ -297,8 +303,13 @@ pub trait AiQuests {
 
     /// jerhyn: `0x0059F570` `ACT2Q4_IsJerhynPalaceActivated`.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool;
-    /// jerhyn: `0x0059F580` `ACT2Q4_GetAndUpdatePalaceNpcState`: (a, b).
-    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32);
+    /// jerhyn: `0x0059F580` `ACT2Q4_GetAndUpdatePalaceNpcState`: (a, b)
+    /// and the walk or placement it makes on the unit
+    /// (`world/quests-act2.md` §10).
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> JerhynStep;
+    /// jerhyn: the placement of [`JerhynStep::PlaceAt`] succeeded (+0x0F,
+    /// +0x14 := 1).
+    fn jerhyn_placed(&mut self, game: &mut Game);
     /// jerhyn: `0x0059B6E0` `ACT2Q4_IsGuardMoving`.
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool;
     /// alkor: `0x005BAD20` `ACT3Q4_GoldenBirdBroughtToAlkor`.

@@ -456,12 +456,6 @@ where
     /// timeout belongs to the session code.
     pub fn flush(&mut self, force: bool, now: u32) -> Result<(usize, usize), HostError> {
         self.note(PacketEvent::Flush);
-        if force {
-            // `0x0052FD90` with argument 1: the vitals sync runs for each
-            // client before its buffers are sent, so its messages belong
-            // to the flush phase of the frame.
-            self.game.pre_flush(&mut self.buffers);
-        }
         let r = self.flush_inner(force, now);
         self.note_tap();
         r
@@ -476,6 +470,9 @@ where
             }
         }
         self.last_flush = Some(now);
+        // The vitals sync ends the tick's batch (`combat/vitals.md` §5.1
+        // rule 1): queued inside the flush, before any buffer is sent.
+        self.game.flush_sync(&mut self.buffers);
         let (mut sent, mut discarded) = (0, 0);
         for client in self.game.clients() {
             while let Some(buf) = self.buffers.pop(client) {

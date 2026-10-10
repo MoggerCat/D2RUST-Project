@@ -638,8 +638,9 @@ pub fn ref_unit_distance(a: Point, sa: i32, b: Point, sb: i32) -> i32 {
     let dy = (a.y - b.y).abs();
     if dx < 8 && dy < 8 && sa < 4 && sb < 4 {
         let mut d = tables().dist8_unit[(dx + 8 * dy) as usize];
+        // §9.5: a negative entry returns 0 at once (no size adjustment).
         if d < 0 {
-            d = 0;
+            return 0;
         }
         if sa == 3 || sb == 3 {
             d = (d - 1).max(0);

@@ -38,30 +38,30 @@
 |   6. EvilHole (76) `0x005FB410` | 327–354 |
 |   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 355–475 |
 |   8. QuillMother (75) `0x005FB2A0` | 476–490 |
-|   9. BaalTentacle (139) `0x005EF820` | 491–504 |
-|   10. ElementalBeast (46) `0x005F6B70` | 505–523 |
-|   11. NpcStationary (54) `0x005E73A0` | 524–551 |
-|   12. MosquitoNest (83) `0x005E0260` | 552–569 |
-|   13. DesertTurret (94) `0x005E0980` | 570–610 |
-|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 611–645 |
-|   15. Catapult (123) `0x005E34C0` | 646–650 |
-|   16. CatapultSpotter (126) `0x005EE040` | 651–689 |
-|   17. Tentacle (56) `0x005F8F80` | 690–714 |
-|   18. TentacleHead (57) `0x005F9270` | 715–732 |
-|   19. Hydra (86) `0x005E9E60` | 733–743 |
-|   20. Totem (109) `0x005ED9E0` | 744–764 |
-|   21. Vendor (42) `0x005E9E00` | 765–770 |
-|   22. Trap-Missile (77) `0x005FB5B0` | 771–783 |
-|   23. TrappedSoul (99) `0x005E9F10` | 784–800 |
-|   24. DruidWolf (108) `0x005ED710` | 801–883 |
-|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 884–914 |
-|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 915–935 |
-| Constants & data dependencies | 936–960 |
-| Randomness | 961–969 |
-| Edge cases & original bugs | 970–987 |
-| Test vectors | 988–1012 |
-| Provenance | 1013–1039 |
-| Open questions | 1040–1048 |
+|   9. BaalTentacle (139) `0x005EF820` | 491–514 |
+|   10. ElementalBeast (46) `0x005F6B70` | 515–533 |
+|   11. NpcStationary (54) `0x005E73A0` | 534–561 |
+|   12. MosquitoNest (83) `0x005E0260` | 562–579 |
+|   13. DesertTurret (94) `0x005E0980` | 580–620 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 621–655 |
+|   15. Catapult (123) `0x005E34C0` | 656–660 |
+|   16. CatapultSpotter (126) `0x005EE040` | 661–699 |
+|   17. Tentacle (56) `0x005F8F80` | 700–724 |
+|   18. TentacleHead (57) `0x005F9270` | 725–742 |
+|   19. Hydra (86) `0x005E9E60` | 743–753 |
+|   20. Totem (109) `0x005ED9E0` | 754–774 |
+|   21. Vendor (42) `0x005E9E00` | 775–780 |
+|   22. Trap-Missile (77) `0x005FB5B0` | 781–793 |
+|   23. TrappedSoul (99) `0x005E9F10` | 794–810 |
+|   24. DruidWolf (108) `0x005ED710` | 811–893 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 894–924 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 925–945 |
+| Constants & data dependencies | 946–970 |
+| Randomness | 971–979 |
+| Edge cases & original bugs | 980–997 |
+| Test vectors | 998–1022 |
+| Provenance | 1023–1049 |
+| Open questions | 1050–1058 |
 <!-- /index -->
 
 ## Summary
@@ -501,6 +501,16 @@ Brackets: baaltentacle1 [70, 24, 10]. AI param 2 = expiry frame e.
 5. Idle aip2 [24].
 
 1.14d-confirmed.
+
+Recorded (`gen-lvl-132`, Baal 1:8 cast at frame 97): the tentacle skill
+(`skills/bodies-4.md` srvdo 140) makes each tentacle with `0x005B2F20`
+(mode 4, spread −1), links it to Baal through the source-unit link
+(`0x00621CE0`: +0x94 / +0x98, +0xC8 bit 0x400; the owner of step 1 is
+`0x00552FD0`) and "waits 15" (`0x005DE0F0(15)`): the first think is 15
+frames after the cast, frame 112, and draws `roll(aip3)` = `roll(10)` at
+`0x005EF875`. Without the link step 1 kills the tentacle at once. The
+tentacle's A1 ends at frame 107 (10 frames, speed 256) into the generic
+mode end (`ai.md` §1.4: path target (0, 0)).
 
 ### 10. ElementalBeast (46) `0x005F6B70`
 

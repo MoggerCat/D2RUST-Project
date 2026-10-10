@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–298 |
-|   2. Think dispatch `0x005B1740` | 299–438 |
-|   3. AI control and AI tables | 439–610 |
-|   4. AI parameters | 611–629 |
-|   5. Target selection | 630–966 |
-|   6. Distances and line tests | 967–982 |
-|   7. Tactics helpers | 983–1222 |
-|   8. AI commands and minions | 1223–1249 |
-|   10. The catalogue `ai-functions.tsv` | 1250–1270 |
-| Constants & data dependencies | 1271–1294 |
-| Randomness | 1295–1324 |
-| Edge cases & original bugs | 1325–1366 |
-| Test vectors | 1367–1455 |
-| Provenance | 1456–1517 |
-| Open questions | 1518–1624 |
+|   1. Think scheduling | 97–302 |
+|   2. Think dispatch `0x005B1740` | 303–449 |
+|   3. AI control and AI tables | 450–638 |
+|   4. AI parameters | 639–657 |
+|   5. Target selection | 658–994 |
+|   6. Distances and line tests | 995–1010 |
+|   7. Tactics helpers | 1011–1256 |
+|   8. AI commands and minions | 1257–1283 |
+|   10. The catalogue `ai-functions.tsv` | 1284–1304 |
+| Constants & data dependencies | 1305–1328 |
+| Randomness | 1329–1358 |
+| Edge cases & original bugs | 1359–1400 |
+| Test vectors | 1401–1489 |
+| Provenance | 1490–1551 |
+| Open questions | 1552–1658 |
 <!-- /index -->
 
 ## Summary
@@ -209,6 +209,10 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
   `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
   `0x005A8100`–`0x005A8140`).
+  Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
+  a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
+  also: Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107
+  (path target (0, 0)).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
@@ -415,6 +419,13 @@ Only when a target was found:
    target distance is < 20, the target is a player, and control flag 0x10
    is clear: play sound 16, set flag 0x10, idle 20, stop. Once per
    monster.
+   Recorded (rc-drop-content, `items-drops-nor-11` with the rng channel,
+   2026-10-10): Griswold (class 365, monstats `boss`) spawned at frame 30
+   with a player < 20 away makes its first think at frame 31 and idles
+   20 (no draw); its Griswold body (`0x005E5AC0`) first draws at frame 51,
+   then 61 and 66. The boss, demon, undead and prime-evil tests read the
+   monstats flags of the unit's class (monster units only); d2rs answered
+   false for all four until the action hooks read the row.
 2. **Teleport** (`0x005B11F0`, monsters given control flag 0x20 by a
    monumod; `monsters/init.md`). Not if dead or flag 0x20 clear. Draws:
    1. `lo' % 100` ≥ 40 → continue with 3.
@@ -518,7 +529,7 @@ name):
 | 3 | SpecialState03 | 1 | `0x005E5730` | `0x005E5870` | – |
 | 4 | Hireable | 0 | – | `0x005E52D0` | `0x005E5280` |
 | 5 | GoodNpcRanged | 0 | – | `0x005E7AC0` | – |
-| 6 | SpecialState06 | 0 | – | `0x005E7C10` | – |
+| 6 | SpecialState06 | 0 | – | `0x005E7C10` (`ai-bodies.md` §9.33) | – |
 | 7 | NecroPet | 0 | – | `0x005E4CF0` | – |
 | 8 | TownRogue | 1 | – | `0x005E7DC0` | – |
 | 9 | SpecialState09 | 1 | – | `0x005E7F80` | – |
@@ -573,6 +584,23 @@ think. Installers that reach a running monster: curse AI `0x005C34B0`
 own switch back to 0. Monster creation, the class reinit
 (`0x00574250`) and the inactive restore (`0x005424F0`) install on a
 fresh control (function 0), so never step 3.
+
+**Special state 16 (possessed imp), 1.14d-confirmed.** Init `0x005E2CD0`:
+one raw step of the unit seed; its low bit b picks the first slot
+index (b + 1) mod 2 of the table `0x006E34E0` (pairs {2, 0}, {4, 0}); the
+slot is the unit's monstats `Skill<slot + 1>`; the first slot whose skill
+the unit has an entry of (owner −1, `0x006439B0`) is stored: AI param 1
+:= slot, param 2 := the second dword (0); neither: both 0. Think
+`0x005E2D80` (target mode 1): no source unit (`0x00552FD0`) or no state
+143 → AI state 0, idle 1. Distance > 24, source dead, source alignment
+≠ 0 (`0x006259B0`) or param 1 = 0 → teleport in range imp1's `aip1`
+with imp1's `Skill1` / `Sk1mode` (`0x005DF850`), param 0 := −1. Else when
+distance < imp2's (monstats 493) `aip1` and `roll(100)` < imp2's `aip2`:
+param 2 ≠ 0 → two `roll(2 · imp2.aip3)`; imp1's `Skill<slot + 1>` in its
+mode at the target (`0x005DEAD0`), idle 20 when the skill is < 0.
+Otherwise `roll(100)` < 50 → mode 8 at the target (`0x005DDF90`), else
+idle 20. Imp Teleport's exact placement `0x00554EA0(…, exact 1)` skips
+the free-point search (`sim/path-placement.md` §10 rule 3).
 
 **Installed special states in 1.14d.** Literal states pushed: 0, 5, 6
 (Hireable `0x005E52D0`), 10 (`0x005D6520`), 11 (`0x005DDD00`), 13
@@ -1100,6 +1128,12 @@ the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
 9. Any other skill → 1.
 
 1.14d-confirmed (`0x005FD470`, register use in the disassembly).
+Implemented (rc-mon-frame31, REC-1996): `View::skill_check` runs the rules
+above on the DRLG rooms once the path provider is on (rule 5, DiabPrison,
+stays false). Before this the host stub answered 0, so a ClawViper never
+cast SerpentCharge (srvdofunc 67, rule 7). gen-mon-77: first divergence
+31 → 34 (the Charge hit).
+
 
 #### 7.5 Path target and re-path budget on a mode request
 

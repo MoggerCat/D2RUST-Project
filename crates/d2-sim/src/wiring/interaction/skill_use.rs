@@ -974,7 +974,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     /// The missile store's owner (`0x00552FD0`).
     fn missile_owner(&self, u: UnitId) -> Option<UnitId> {
-        let o = self.cv.v.h.missiles.as_ref()?.get(u)?.owner?;
+        let Some(m) = self.cv.v.h.missiles.as_ref().and_then(|s| s.get(u)) else {
+            return self.cv.v.h.unit_source.get(&u).copied();
+        };
+        let o = m.owner?;
         self.cv.game.lists.find_unit(o.ty, o.guid)
     }
     fn minion_owner(&self, u: UnitId) -> Option<UnitId> {
@@ -1203,6 +1206,13 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         // "wait N" `0x005DE0F0(game, m, N)` (`monsters/ai-bodies-2.md`):
         // delete the thinks and schedule one at frame + N; the mode is
         // not changed. A fresh spawn has no uninterruptable state to clear.
+        if let bodies::BodyEffect::SourceFields { m, owner } = e {
+            match owner {
+                Some(o) => self.cv.v.h.unit_source.insert(m, o),
+                None => self.cv.v.h.unit_source.remove(&m),
+            };
+            return;
+        }
         if let bodies::BodyEffect::WaitThink { m, frames } = e {
             let game = &mut *self.cv.game;
             crate::monsters::ai::delete_thinks(game, m);
@@ -1841,7 +1851,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         if a == 0 {
             BodyWorld::place_unit(self, u, r, at)
         } else {
-            self.xm().body_place_unit_flag(u, r, at, a)
+            match self.rooms_place_unit_exact(u, r, at, true) {
+                Some(placed) => placed,
+                None => self.xm().body_place_unit_flag(u, r, at, a),
+            }
         }
     }
     /// [`Pending::ai_component`].

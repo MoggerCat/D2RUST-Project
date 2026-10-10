@@ -124,6 +124,11 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// The store items a purchase took, their 0x9C action 12 sent with
     /// the next tick's unit work (`vendors.md` §7.1 rule 10: "next frame").
     pub(super) taken_sent: Vec<(UnitId, Vec<u8>)>,
+    /// The store items a trade open added to the NPC's trade inventory,
+    /// their 0x9C action 11 sent by the next tick's client pass
+    /// ([`WorldHost::take_client_pass_sent`]; recorded:
+    /// `interact-talk-akara` frame 16, after the NPC's 0x8A and 0x6D).
+    pub(super) shown_sent: Vec<(UnitId, Vec<u8>)>,
     /// The messages the systems sent so far, in production order
     /// ([`Self::collect_sent`]; `seams/sim-server.md` §2.2,
     /// `sim/intents-events.md` §1 r3).
@@ -212,6 +217,7 @@ impl<R, S> WiredWorld<R, S> {
             now,
             inv_sent: Vec::new(),
             taken_sent: Vec::new(),
+            shown_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
             object_queued: Vec::new(),
@@ -978,7 +984,7 @@ where
             }
             ((), flush_shown(desk, inv))
         });
-        self.inv_sent.extend(sent);
+        self.shown_sent.extend(sent);
         self.handler_work(game, events);
         Some(out)
     }
@@ -1374,6 +1380,10 @@ where
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
         self.collect_sent(events);
         std::mem::take(&mut self.outbox)
+    }
+
+    fn take_client_pass_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.shown_sent)
     }
 
     /// The action wiring's object host tick, and [`WiredWorld::now`] (the

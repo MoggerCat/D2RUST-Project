@@ -99,9 +99,6 @@ impl NpcRest for Probe {
     fn npc_ai_param(&mut self, npc: UnitId, p: u32) {
         self.log.push(format!("ai param {} {p:#x}", npc.0));
     }
-    fn stat_sent(&mut self, _: UnitId, stat: u16, value: u32) {
-        self.log.push(format!("setstat {stat} {value}"));
-    }
     fn respec_sound(&mut self, _: UnitId) {}
     fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
         [0; 34]
@@ -148,7 +145,6 @@ impl HirelingRest for Probe {
     fn set_mode(&mut self, u: UnitId, mode: u8) {
         self.log.push(format!("mode {} {mode}", u.0));
     }
-    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
     fn skill_count(&self) -> u32 {
         0
     }
@@ -160,8 +156,6 @@ impl HirelingRest for Probe {
     fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
         None
     }
-    fn join_team(&mut self, _: UnitId, _: UnitId) {}
-    fn hireling_ai(&mut self, _: UnitId) {}
     fn free_unit(&mut self, _: UnitId) {}
     fn queue_room_removal(&mut self, _: UnitId) {}
     fn death_event(&mut self, _: UnitId) {}
@@ -205,9 +199,6 @@ impl QuestRest for Probe {
     }
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
-    }
-    fn attach_sound(&mut self, u: UnitId, sound: u16) {
-        self.log.push(format!("sound {} {sound}", u.0));
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));

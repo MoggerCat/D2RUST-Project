@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1036 |
-|   5. Event dispatch | 1037–1051 |
-|   6. Events per kind | 1052–1174 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1175–1196 |
-|   8. Collision line between two units | 1197–1201 |
-| Constants & data dependencies | 1202–1218 |
-| Randomness | 1219–1226 |
-| Edge cases & original bugs | 1227–1247 |
-| Test vectors | 1248–1307 |
-| Provenance | 1308–1399 |
-| Open questions | 1400–1479 |
+|   4. Modes and mode schedules | 454–1042 |
+|   5. Event dispatch | 1043–1057 |
+|   6. Events per kind | 1058–1180 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1181–1202 |
+|   8. Collision line between two units | 1203–1207 |
+| Constants & data dependencies | 1208–1224 |
+| Randomness | 1225–1232 |
+| Edge cases & original bugs | 1233–1253 |
+| Test vectors | 1254–1313 |
+| Provenance | 1314–1405 |
+| Open questions | 1406–1485 |
 <!-- /index -->
 
 ## Summary
@@ -544,6 +544,12 @@ and nothing on the timer run writes +0x4E. Rule:
    event byte; mode changed → +0xC4 |= 0x4000.
 
 `0x006218D0(U, i)` (set +0x4E from E[i] when 1–4) has no callers.
+
+d2rs runs this advance for every monster event 0 that the specs
+above send to `0x00623E00` (`ActionHooks::refresh_unit_animation`). With a
+frame count of zero or less the wrap loop does not run (the original's
+would not end). Measured: Baal 1:8 (`gen-lvl-132` frame 97): +0x44
+18688 → 1184 (+160 per advance, wrapped at the frame count 5888).
 
 Speed 0 gives event 1 at f + 1 in all forms. Callers: `0x00553B10` from
 `0x0056E210`; `0x00553C70` from skills `0x005C8CA0`, `0x005C8E30`,

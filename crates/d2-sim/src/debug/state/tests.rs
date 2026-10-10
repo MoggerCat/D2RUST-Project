@@ -288,19 +288,14 @@ fn a_snapshot_maps_the_d2rs_homes() {
 fn coverage_lists_every_key_but_the_gaps() {
     let (fx, _, _) = small_game();
     let (fields, gaps) = coverage(&fx.sim.sys);
-    let want: Vec<String> = FIELDS
-        .iter()
-        .filter(|k| **k != "own")
-        .map(|k| (*k).to_owned())
-        .collect();
+    let want: Vec<String> = FIELDS.iter().map(|k| (*k).to_owned()).collect();
     assert_eq!(fields, want);
-    assert_eq!(gaps.len(), 1);
-    assert!(gaps[0].starts_with("own: "));
+    assert!(gaps.is_empty());
     // Without the path provider the path keys are gaps too.
     let bare = Fx::new();
     let (fields, gaps) = coverage(&bare.sim.sys);
     assert!(PATH_FIELDS.iter().all(|k| !fields.iter().any(|f| f == k)));
-    assert_eq!(gaps.len(), 2);
+    assert_eq!(gaps.len(), 1);
 }
 
 /// AnimData with one record per name: (name, frames, speed), no events.
@@ -409,4 +404,49 @@ fn a_walking_monster_snapshots_the_velocity_mode_speed() {
         crate::units::hooks::UnitHooks::anim_rate(hooks, sim, m)
     });
     assert_eq!(sp, 256);
+}
+
+// Covers: specs/tools/state-snapshot.md §2 `own`; specs/sim/units.md §2 "Owner links"
+#[test]
+fn a_monsters_own_is_its_control_minion_owner() {
+    use crate::monsters::ai::{AiControl, AiStore, UnitRef};
+    let (mut fx, p, m) = small_game();
+    let mut store = AiStore::new();
+    store.entry(m).control = Some(AiControl {
+        minion_owner: Some(UnitRef {
+            ty: UnitType::Player,
+            guid: 77,
+        }),
+        ..AiControl::default()
+    });
+    fx.sim.hooks().ai = Some(store);
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let unit = |t: UnitType, id| {
+        let g = fx.game.lists.unit(id).unwrap().guid;
+        s.units
+            .iter()
+            .find(|u| u.ut == t as u8 && u.g == g)
+            .unwrap()
+            .own
+    };
+    assert_eq!(unit(UnitType::Monster, m), Some(77));
+    assert_eq!(unit(UnitType::Player, p), None);
+    // A released pack (GUID -1) has none.
+    fx.sim
+        .hooks()
+        .ai
+        .as_mut()
+        .unwrap()
+        .control_mut(m)
+        .unwrap()
+        .minion_owner = Some(UnitRef {
+        ty: UnitType::Player,
+        guid: u32::MAX,
+    });
+    let s = snapshot(&fx.game, &fx.sim.sys);
+    let g = fx.game.lists.unit(m).unwrap().guid;
+    assert_eq!(
+        s.units.iter().find(|u| u.ut == 1 && u.g == g).unwrap().own,
+        None
+    );
 }

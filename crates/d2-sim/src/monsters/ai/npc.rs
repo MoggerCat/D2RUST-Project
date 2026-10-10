@@ -5,9 +5,10 @@
 
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
+use crate::world::quests::act2::q4::JerhynStep;
 
 use super::tactics::*;
-use super::{idle, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
+use super::{idle, main_search, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
 
 /// Command types of §8 used here.
 mod cmd {
@@ -85,6 +86,44 @@ pub fn good_npc_ranged<W: AiHost + ?Sized>(
                 }
             } else if cx.world.seed(u).roll(100) < 30 {
                 circle(game, cx, u, Some(s), 4, false);
+            } else {
+                idle(game, cx, u, 10);
+            }
+            return;
+        }
+    }
+    // 3.
+    if cx.chance(u, 20) {
+        wander(game, cx, u, 5);
+    } else {
+        idle(game, cx, u, 10);
+    }
+}
+
+/// §9.33 SpecialState06 `0x005E7C10` (the hirelings' state when their
+/// owner is gone, `ai-bodies-6.md` §7 step 1).
+pub fn special_state_06<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) {
+    // 1.
+    if cx.world.anim_mode(u) != mode::NEUTRAL {
+        idle(game, cx, u, 5);
+        return;
+    }
+    // 2. Out of town (a unit with no room counts as out of town): the
+    // main search; the rolls happen only when it finds a target.
+    let room = game.lists.unit(u).and_then(|e| e.room());
+    let in_town = room.is_some_and(|r| cx.world.in_town(game, r));
+    if !in_town {
+        let s = main_search(game, cx, u);
+        if let Some(t) = s.target {
+            let r = cx.world.seed(u).roll(100);
+            if !s.combat {
+                if r < 30 {
+                    walk_to(game, cx, u, Some(t), 7);
+                } else {
+                    idle(game, cx, u, 10);
+                }
+            } else if r < 80 {
+                mode_at(game, cx, u, mode::ATTACK1, Some(t));
             } else {
                 idle(game, cx, u, 10);
             }
@@ -348,7 +387,7 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
                 idle(game, cx, u, 40);
                 return;
             }
-            let (a, b) = cx.world.jerhyn_npc_state(game, u);
+            let (a, b) = jerhyn_npc_state(game, cx, u);
             if b != 0 {
                 idle(game, cx, u, 20);
             }
@@ -401,6 +440,39 @@ pub fn npc<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, 
     }
     // 6.
     idle(game, cx, u, 8);
+}
+
+/// `0x0059F580(game, unit, &a, &b)` (`world/quests-act2.md` §10): the
+/// quest hook's outputs, with the walk (`0x005DED90`) or the placement
+/// beside the harem blocker it makes on the unit. The placement's free
+/// test is `0x0064E7B0` with mask 0x3C01, sizes 1, 2, 3 in turn, the
+/// first point found placed with `0x00554EA0`. No draw. PROVISIONAL
+/// (REC-1632): "sizes 1, 2, 3 in turn" read as the first size whose
+/// search finds a point; the free test is the masked search seam.
+fn jerhyn_npc_state<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+) -> (i32, i32) {
+    match cx.world.jerhyn_npc_state(game, u) {
+        JerhynStep::Out(a, b) => (a, b),
+        JerhynStep::Walk(x, y) => {
+            walk_to_point(game, cx, u, x, y);
+            (0, 0)
+        }
+        JerhynStep::PlaceAt(x, y, room) => {
+            let point = (1..=3).find_map(|size| {
+                cx.world
+                    .free_point_masked(game, Some(room), x, y, size, 0x3C01, 1)
+            });
+            if let Some((px, py)) = point {
+                if cx.world.place_unit(game, u, Some(room), px, py) {
+                    cx.world.jerhyn_placed(game);
+                }
+            }
+            (0, 1)
+        }
+    }
 }
 
 /// §9.9 the command handler `0x005E6AE0`. True = handled.

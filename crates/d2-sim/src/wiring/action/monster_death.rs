@@ -115,7 +115,7 @@ pub fn death_cleanup<X: Pending>(h: &mut ActionHooks<X>, sim: &mut Sim<'_>, unit
     h.lists_expired(sim, unit);
     // `0x00639FB0(U, boss)`.
     let keep = match sim.units.get(unit).map(|r| r.ty) {
-        Some(UnitType::Monster) if h.x.is_boss(unit) => group::BOSS_STAY_DEATH,
+        Some(UnitType::Monster) if h.is_boss(unit) => group::BOSS_STAY_DEATH,
         Some(UnitType::Monster) => group::MON_STAY_DEATH,
         _ => group::PLR_STAY_DEATH,
     };

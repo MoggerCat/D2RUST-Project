@@ -1050,3 +1050,105 @@ pub fn taunted<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: Unit
     cx.world.set_path_target(u, pt);
     walk_to_method13(game, cx, u, Some(pt), 7);
 }
+
+// ---- special state 16 (imp possession) ----------------------------------
+
+/// The imp record (monstats 492) and the one whose AI parameters the
+/// think reads (493, `imp2`; 1.14d indexes the table at fixed offsets).
+const IMP1: i32 = 492;
+const IMP2: i32 = 493;
+/// State 143 (`attached`): the imp rides its source.
+const STATE_ATTACHED: u16 = 143;
+
+/// Whether the unit has a skill-list entry of `skill` with owner −1
+/// (`0x006439B0(unit, skill, −1)`): an added entry, else the ones monster
+/// creation gives for a `Skill<i>` ≥ 0 with `Sk<i>lvl` > 0
+/// (`monsters/init.md` §6 step 14).
+fn has_skill_entry<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, u: UnitId, skill: i32) -> bool {
+    if skill < 0 {
+        return false;
+    }
+    if cx.world.skill_level(u, skill, false).is_some() {
+        return true;
+    }
+    let Some(r) = cx.monstats(cx.world.class(u)) else {
+        return false;
+    };
+    let lvls = [
+        r.sk1lvl, r.sk2lvl, r.sk3lvl, r.sk4lvl, r.sk5lvl, r.sk6lvl, r.sk7lvl, r.sk8lvl,
+    ];
+    (1..=8).any(|n| cx.class_skill(cx.world.class(u), n).0 == skill && lvls[n - 1] > 0)
+}
+
+/// Special state 16 init `0x005E2CD0`: one raw step of the unit seed; its
+/// low bit picks the first of two skill slots (3, then 5: the table
+/// `0x006E34E0` holds slot 2 and 4, second dword 0); the first slot whose
+/// skill the unit has is stored in the control's +0x18 (slot) and +0x1C
+/// (second dword); neither → 0 and 0. `ai.md` §3.3.
+pub fn possess_init<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId) {
+    const SLOTS: [(i32, i32); 2] = [(2, 0), (4, 0)];
+    let mut idx = (cx.world.seed(u).step() & 1) as usize;
+    let class = cx.world.class(u);
+    let mut found = (0, 0);
+    for _ in 0..2 {
+        idx = (idx + 1) & 1;
+        let (slot, second) = SLOTS[idx];
+        if has_skill_entry(cx, u, cx.class_skill(class, slot as usize + 1).0) {
+            found = (slot, second);
+            break;
+        }
+    }
+    set_param(cx, u, 1, found.0);
+    set_param(cx, u, 2, found.1);
+}
+
+/// Special state 16 think `0x005E2D80` (the possessed imp, target mode 1;
+/// `skills/bodies-4.md` §2.3).
+pub fn possessed_imp<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    p: &TickParam,
+) {
+    let t = p.target;
+    let src = cx.world.source_unit(u);
+    // 1. Not riding any more: back to state 0, idle 1.
+    let Some(src) = src.filter(|_| cx.world.has_state(u, STATE_ATTACHED)) else {
+        install(game, cx, u, 0);
+        idle(game, cx, u, 1);
+        return;
+    };
+    let (slot, second) = (param(cx, u, 1), param(cx, u, 2));
+    let out =
+        p.distance > 0x18 || cx.world.is_dead(src) || cx.world.alignment(src) != 0 || slot == 0;
+    if out {
+        // 2. Out of reach: a teleport in range of imp1's first AIP, then
+        // the first parameter is reset.
+        let r = cx.class_aip(IMP1, 1);
+        let (s, m) = cx.class_skill(IMP1, 1);
+        teleport_in_range(game, cx, u, r, s, m);
+        set_param(cx, u, 0, -1);
+        return;
+    }
+    // 3. Within imp2's first AIP: act with chance imp2's second AIP.
+    if p.distance < cx.class_aip(IMP2, 1) && roll(cx, u, 100) < cx.class_aip(IMP2, 2) {
+        if second != 0 {
+            let n = cx.class_aip(IMP2, 3).wrapping_mul(2);
+            roll(cx, u, n);
+            roll(cx, u, n);
+        }
+        let (s, m) = cx.class_skill(IMP1, slot as usize + 1);
+        if s >= 0 {
+            use_skill(game, cx, u, m, s, super::bodies::at(t));
+            return;
+        }
+        idle(game, cx, u, 0x14);
+        return;
+    }
+    // 4.
+    if roll(cx, u, 100) < 50 {
+        mode_at(game, cx, u, 8, t);
+    } else {
+        idle(game, cx, u, 0x14);
+    }
+}

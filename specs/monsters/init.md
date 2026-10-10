@@ -31,37 +31,37 @@
 |   3. Placement | 165–173 |
 |   4. Creation sequence after placement (`0x005B2A00`) | 174–329 |
 |   5. Monster type init (`0x00574250`) | 330–347 |
-|   6. Stats and skills (`0x00573CB0`) | 348–400 |
-|   7. Monster level | 401–416 |
-|   8. Base values from monlvl | 417–451 |
-|   9. Player-count bonus (`0x00573930`) | 452–463 |
-|   10. Components (`0x005739D0`) | 464–474 |
-|   11. monprop (`monprop.txt`) | 475–483 |
-|   12. monequip (`0x005D6B60`) | 484–500 |
-|   13. Classic scaling (`0x0063EEF0`) | 501–508 |
-|   14. Normal mods and boss mods | 509–610 |
-|   15. Party minions | 611–615 |
-|   16. Boss spawns | 616–651 |
-|   17. Choosing umods (`0x005A0760`) | 652–695 |
-|   18. Boss minions and umod init (`0x005A2120`) | 696–713 |
-|   19. Umod init functions | 714–800 |
-|   20. Superuniques (`0x005A49B0`) | 801–849 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 850–864 |
-|   22. Umod callbacks and the type-7 event | 865–916 |
-|   23. Unique names (client) | 917–926 |
-|   24. Monster assign message | 927–978 |
-|   25. Calling the spawn functions outside population (tools) | 979–1069 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1070–1129 |
-|   27. Class reinit (`0x00574370`) | 1130–1175 |
-| Constants & data dependencies | 1176–1197 |
-| Randomness | 1198–1242 |
-| Edge cases & original bugs | 1243–1274 |
-| Test vectors | 1275–1276 |
-|   Synthetic (CI-safe) | 1277–1299 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1300–1330 |
-|   Recorded checks (monster assign 0xAC) | 1331–1343 |
-| Provenance | 1344–1433 |
-| Open questions | 1434–1514 |
+|   6. Stats and skills (`0x00573CB0`) | 348–405 |
+|   7. Monster level | 406–421 |
+|   8. Base values from monlvl | 422–456 |
+|   9. Player-count bonus (`0x00573930`) | 457–468 |
+|   10. Components (`0x005739D0`) | 469–479 |
+|   11. monprop (`monprop.txt`) | 480–488 |
+|   12. monequip (`0x005D6B60`) | 489–505 |
+|   13. Classic scaling (`0x0063EEF0`) | 506–513 |
+|   14. Normal mods and boss mods | 514–615 |
+|   15. Party minions | 616–620 |
+|   16. Boss spawns | 621–656 |
+|   17. Choosing umods (`0x005A0760`) | 657–700 |
+|   18. Boss minions and umod init (`0x005A2120`) | 701–718 |
+|   19. Umod init functions | 719–811 |
+|   20. Superuniques (`0x005A49B0`) | 812–860 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 861–875 |
+|   22. Umod callbacks and the type-7 event | 876–927 |
+|   23. Unique names (client) | 928–937 |
+|   24. Monster assign message | 938–989 |
+|   25. Calling the spawn functions outside population (tools) | 990–1080 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1081–1140 |
+|   27. Class reinit (`0x00574370`) | 1141–1186 |
+| Constants & data dependencies | 1187–1208 |
+| Randomness | 1209–1253 |
+| Edge cases & original bugs | 1254–1285 |
+| Test vectors | 1286–1287 |
+|   Synthetic (CI-safe) | 1288–1310 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1311–1341 |
+|   Recorded checks (monster assign 0xAC) | 1342–1354 |
+| Provenance | 1355–1444 |
+| Open questions | 1445–1525 |
 <!-- /index -->
 
 ## Summary
@@ -393,6 +393,11 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     and `Sk<i>lvl` > 0: give the skill at level `Sk<i>lvl` + monster
     skill bonus (§9); if `Sk<i>mode` ≥ 0 set that skill's mode.
     `0x0063EBC0` follows (an empty stub in 1.14d).
+    Implemented (rc-mon-frame31, REC-1998): the AI reads these levels
+    (`0x006439B0` + `0x006442A0`, owner −1 adds no bonus on a monster):
+    `ActionHooks::natural_skills` keeps skill → level per unit, Megademon's
+    range (`Skill1` level) needs it. A monster without an entry reads 1.
+
 15. monstats2 `isAtt` → unit flag 0x04; monstats `petIgnore` → unit flag
     0x40000000.
 16. monprop (§11). Draws.
@@ -779,7 +784,13 @@ seed 0x1506 without monster data) gives `roll(n)`; the unit seed is not
 touched. Superunique row 37 (Lord De Seis) forces index 5. Class 704
 instead gets conviction level 20. Skill level = clamp((lvl + offset) ×
 multiplier / divisor, 1, 99); the skill is given and assigned
-(`0x0056DEB0`, `0x005701B0`, skills spec).
+(`0x0056DEB0`, `0x005701B0`, skills spec). The assignment is the right-hand
+aura select of `skills/use.md` §7: the aura state or immediate do, and
+the type-8 aura timer at the next frame ≡ 1 (mod `perdelay`), whose do
+rolls the aura's damage on the monster's own seed (Holy Freeze, Holy
+Shock: `0x0056E0C0`). 1.14d: Bremm Sparkfist (gen-lvl-102) and a unique
+Frozen Horror (gen-lvl-118) draw at frames 51, 101, 151 after a warp at
+frame 20 (rc-rng-level-pop).
 
 #### 19.6 Champion types and others
 

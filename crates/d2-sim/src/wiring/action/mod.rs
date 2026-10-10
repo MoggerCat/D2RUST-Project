@@ -363,6 +363,15 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// The entries monster init step 14 gives a monster (`Skill<i>` at
+    /// `Sk<i>lvl` + the monster skill bonus, `monsters/init.md` §6):
+    /// skill id → base level. Read for the level only
+    /// ([`Pending::ai_skill_level`] is asked for a unit without one).
+    pub natural_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A unit's source unit (+0x94 / +0x98, set by `link_source`
+    /// `0x00621C30`, `skills/bodies-4.md` §1); read by `0x00552FD0` when
+    /// unit +0xC8 has bit 0x400.
+    pub unit_source: BTreeMap<UnitId, UnitId>,
     /// A monster's equipped items by body location (its inventory's
     /// body slots, `monsters/init.md` §12): d2rs-own record of the
     /// holdings `has_item_at` reads (no monster inventory model here).
@@ -408,6 +417,20 @@ impl<X: Pending> ActionHooks<X> {
         match self.skill_lists.get(&unit) {
             Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
             None => self.x.used_skill(unit),
+        }
+    }
+
+    /// The E-flags word (`0x006446A0`, entry +0x0C) of entry `e`: the
+    /// unit's skill list owns it when it has one (a skill start's
+    /// `0x00644660` writes there), else the host seam.
+    pub fn entry_flags_of(&self, unit: UnitId, e: &crate::skills::SkillEntry) -> u32 {
+        match self
+            .skill_lists
+            .get(&unit)
+            .and_then(|l| l.find(e.skill, e.owner_guid).and_then(|i| l.entries.get(i)))
+        {
+            Some(le) => le.flags,
+            None => self.x.entry_flags(unit, e),
         }
     }
 }
@@ -465,6 +488,8 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            natural_skills: BTreeMap::new(),
+            unit_source: BTreeMap::new(),
             monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),

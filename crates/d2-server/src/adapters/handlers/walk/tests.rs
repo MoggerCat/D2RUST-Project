@@ -419,9 +419,11 @@ impl Fx {
     }
 
     /// One game tick; what was queued during it.
+    /// One tick and the host's flush after it (the vitals sync runs in
+    /// the flush, `Tick::flush_sync`).
     fn tick(&mut self) -> Vec<(ClientId, Vec<u8>)> {
         self.sim.tick(&mut self.out);
-        self.sim.pre_flush(&mut self.out);
+        self.sim.flush_sync(&mut self.out);
         std::mem::take(&mut self.out.0)
     }
 

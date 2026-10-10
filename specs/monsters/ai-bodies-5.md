@@ -37,25 +37,25 @@
 |   8. ReanimatedHorde (114) `0x005E1540` | 282–299 |
 |   9. ClawViperEx (142) `0x005F1DE0` | 300–317 |
 |   10. DeathMauler (130) `0x005EE260` | 318–328 |
-|   11. PutridDefiler (137) `0x005EFA90` | 329–346 |
-|   12. Ancient (133) `0x005EF1A0` | 347–401 |
-|   13. AncientStatue (132) `0x005EEAA0` | 402–409 |
-|   14. FrozenHorror (124) `0x005E3530` | 410–424 |
-|   15. SiegeBeast (115) `0x005E1900` | 425–452 |
-|   16. SuicideMinion (117) `0x005E1D30` | 453–464 |
-|   17. BaalMinion (141) `0x005EF910` | 465–476 |
-|   18. BaalTaunt (136) `0x005EF710` | 477–493 |
-|   19. BaalToStairs (138) `0x005EF620` | 494–509 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 510–554 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 555–666 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 667–677 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 678–715 |
-| Constants & data dependencies | 716–734 |
-| Randomness | 735–743 |
-| Edge cases & original bugs | 744–758 |
-| Test vectors | 759–773 |
-| Provenance | 774–799 |
-| Open questions | 800–838 |
+|   11. PutridDefiler (137) `0x005EFA90` | 329–353 |
+|   12. Ancient (133) `0x005EF1A0` | 354–408 |
+|   13. AncientStatue (132) `0x005EEAA0` | 409–416 |
+|   14. FrozenHorror (124) `0x005E3530` | 417–431 |
+|   15. SiegeBeast (115) `0x005E1900` | 432–459 |
+|   16. SuicideMinion (117) `0x005E1D30` | 460–471 |
+|   17. BaalMinion (141) `0x005EF910` | 472–483 |
+|   18. BaalTaunt (136) `0x005EF710` | 484–500 |
+|   19. BaalToStairs (138) `0x005EF620` | 501–516 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 517–561 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 562–673 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–684 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 685–722 |
+| Constants & data dependencies | 723–741 |
+| Randomness | 742–750 |
+| Edge cases & original bugs | 751–765 |
+| Test vectors | 766–780 |
+| Provenance | 781–806 |
+| Open questions | 807–845 |
 <!-- /index -->
 
 ## Summary
@@ -343,6 +343,13 @@ Brackets: putriddefiler1 [15, 5]; skill 300 Impregnate.
    skill fixed). Else walk to H.
 
 1.14d-confirmed.
+
+Implemented (rc-mon-frame31, REC-1997): putriddefiler1 has monstats
+`boss` = 1, so the precheck C boss sound (`ai.md` §2.4 rule 1, boss test
+`0x0063E9F0` = monstats byte +0x0C & 0x40) fires on its first think (a
+player within 20): sound 16, flag 0x10, idle 20; the escape starts 20
+frames later. gen-mon-546..549: EQUAL.
+
 
 ### 12. Ancient (133) `0x005EF1A0`
 
