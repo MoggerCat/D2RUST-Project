@@ -35,15 +35,15 @@
 |   3. Start functions (srvst) | 535–625 |
 |   4. Do functions (srvdo) | 626–822 |
 |   5. `srvmissile` path | 823–838 |
-|   6. Shared helpers, batch 2 | 839–1177 |
-|   7. Start functions (srvst), batch 2 | 1178–1244 |
-|   8. Do functions (srvdo), batch 2 | 1245–1668 |
-| Constants & data dependencies | 1669–1715 |
-| Randomness | 1716–1734 |
-| Edge cases & original bugs | 1735–1784 |
-| Test vectors | 1785–1805 |
-| Provenance | 1806–1843 |
-| Open questions | 1844–1869 |
+|   6. Shared helpers, batch 2 | 839–1188 |
+|   7. Start functions (srvst), batch 2 | 1189–1255 |
+|   8. Do functions (srvdo), batch 2 | 1256–1679 |
+| Constants & data dependencies | 1680–1726 |
+| Randomness | 1727–1745 |
+| Edge cases & original bugs | 1746–1795 |
+| Test vectors | 1796–1816 |
+| Provenance | 1817–1854 |
+| Open questions | 1855–1880 |
 <!-- /index -->
 
 ## Summary
@@ -989,6 +989,17 @@ x_((i − 16) mod 64).
    passive refresh `0x0056DE40(T)`. Return 1.
 
 A recast refreshes the expiry of an existing list (unlike §4.2 step 3).
+
+Read 2026-10-10 (1.14d `bar-shout` / `bar-battle-command`, rc-skill-div-a):
+step 4's passive refresh `0x0056DE40(T)` is `0x00646F20(T)` (every passive
+skill whose state T has: `0x00646D60`, which ends with `0x00639E30(T,
+passivestate, 1)`: changed bit and update queue, so a level change sends the
+state again as 0xA8) and, for a player T, the skill resync `0x00575900`.
+`0x00639E30` always ends with the update-queue insert `0x0064C040`, so the
+step-4 changed mark also queues T. The Shout / Battle Orders / Battle
+Command missiles (srvhit 18, `missiles/bodies.md` §13) run this same
+`shout_state` on every ally they touch, the caster included: the caster's
+state goes out a second time one frame after the cast.
 
 #### 6.9 Sentry spawn `0x005D5E10`
 
