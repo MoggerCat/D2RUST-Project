@@ -396,6 +396,10 @@ pub struct ActionHooks<X> {
     /// with a player owner, called only by the hireling init): the units whose
     /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
     pub hireling_units: std::collections::BTreeSet<UnitId>,
+    /// The removal notices (type, GUID) of units freed outside the tick's
+    /// steps ([`LifecycleHooks::queue_removal_notice`]), sent by the next
+    /// per-client update.
+    pub removal_notices: Vec<(u8, u32)>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -569,6 +573,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             hireling_units: std::collections::BTreeSet::new(),
+            removal_notices: Vec::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),
