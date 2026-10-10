@@ -42,15 +42,21 @@ decompiled code.
    **produced by a tool** from the real files or a recording, never from
    memory, and carry a format version and the command that made them. The
    pre-commit hook in `tools/hooks/` enforces the forbidden half.
-2. **No decompiled code in `crates/`.** Ghidra output lives only in `re/`
-   (gitignored). Rust code implements a spec in `specs/`, and every module
-   names the spec it implements: `// Spec: specs/items/affix-rolling.md`.
-3. **Session separation.** *Implementation* tasks read `specs/`, `docs/`,
-   and `crates/` only; do not open `re/` or `../refs/`. *Spec-writing* tasks
-   may read `re/` and `../refs/`; their output is prose, tables, behavior descriptions and
-   **authored pseudocode** (our own words and structure) in `specs/`,
-   never pasted decompiler output. Implementation tasks may read the
-   private data repo and `facts/`.
+2. **No decompiled code in `crates/`.** Ghidra output lives in `re/`
+   (gitignored) and, read-only, in the private repo's `re/` folder; it never
+   goes into the public repo. Rust code is written in our own words, never
+   pasted or line-translated from decompiler output, and every module names
+   the spec it implements: `// Spec: specs/items/affix-rolling.md`; name the
+   1.14d function address it matches where there is one.
+3. **Reading the original.** Every session (implementation included) may
+   read the Ghidra exports read-only: `re/exports/` locally, the private
+   repo's `re/exports/` in the cloud (`functions.tsv`, the per-function
+   decompiled C, `index/`). Use them to get exact behaviour before
+   measuring or guessing. Specs stay the written record: when a fix rests
+   on a function, add the behaviour in our own words (and the address) to
+   the spec it implements. `../refs/` (D2MOO, Riiablo, ...) may be read too,
+   under rule 4. Implementation tasks also read the private data repo and
+   `facts/`.
 4. **License hygiene.** D2MOO (MIT) and Riiablo (Apache-2.0) may be adapted
    with notices in `THIRD_PARTY_NOTICES.md`. OpenDiablo2 / OpenD2 (GPL-3.0):
    read for understanding only, never copy code.
