@@ -86,6 +86,23 @@ impl DrlgWorld {
         Some(d.level(d.room(r).level).id)
     }
 
+    /// `0x0061AA40` (`monsters/ai.md` §5.2 "LOS-draw test"): an
+    /// outdoor-grid room (type 1) answers true; a preset room (type 2)
+    /// answers its room flag 0x80000 (set from an `Outdoors` lvlprest
+    /// row); every other type, and a room without a DRLG room, false.
+    pub fn los_draw(&self, game: &Game, room: RoomId) -> bool {
+        use crate::drlg::room::RoomKind;
+        let Some((d, r)) = self.drlg_room(game, room) else {
+            return false;
+        };
+        let dr = d.room(r);
+        match dr.kind {
+            RoomKind::Outdoor => true,
+            RoomKind::Preset => dr.flags & crate::drlg::room_flags::NO_LOS_DRAW != 0,
+            RoomKind::Other(_) => false,
+        }
+    }
+
     /// `0x0061AB00`: the room's level is a town (`0x006426A0`,
     /// `waypoints.md` §1 rule 4). A room without a DRLG room is not.
     pub fn in_town(&self, game: &Game, room: RoomId) -> bool {
