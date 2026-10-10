@@ -23,18 +23,18 @@
 | Outputs / state changes | 59–65 |
 | Rules | 66–67 |
 |   1. Files and header | 68–89 |
-|   2. `draws.tsv` | 90–136 |
-|   3. `frame.tsv` | 137–169 |
-|   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–355 |
-|   6. Comparison | 356–419 |
-|   7. Requests | 420–431 |
-| Constants & data dependencies | 432–435 |
-| Randomness | 436–439 |
-| Edge cases & original bugs | 440–447 |
-| Test vectors | 448–456 |
-| Provenance | 457–461 |
-| Open questions | 462–476 |
+|   2. `draws.tsv` | 90–151 |
+|   3. `frame.tsv` | 152–184 |
+|   4. `sprites.tsv` | 185–204 |
+|   5. d2rs export | 205–370 |
+|   6. Comparison | 371–434 |
+|   7. Requests | 435–446 |
+| Constants & data dependencies | 447–450 |
+| Randomness | 451–454 |
+| Edge cases & original bugs | 455–462 |
+| Test vectors | 463–471 |
+| Provenance | 472–476 |
+| Open questions | 477–491 |
 <!-- /index -->
 
 ## Summary
