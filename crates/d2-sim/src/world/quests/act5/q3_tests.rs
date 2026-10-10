@@ -536,12 +536,13 @@ fn level_changes() {
     let r = ctl.record(CHAIN).unwrap();
     assert_eq!((r.state, r.status), (3, 1));
     assert!(r.guids.0.is_empty() && f.flags(P1).get(SLOT, 3));
-    // r1 and r2 both: Harrogath → Arreat Plateau by waypoint at state 0.
+    // r1 and r2 both: Harrogath → Arreat Plateau by waypoint at state 0
+    // (r1 sets state 1; r2's tail needs state 2: no status).
     let (mut ctl, _) = control();
     let mut f = fake();
     lvl(&mut ctl, &mut f, 109, 112);
     let r = ctl.record(CHAIN).unwrap();
-    assert_eq!((r.state, r.status), (1, 1));
+    assert_eq!((r.state, r.status), (1, 0));
     // r3 (edge case 6): the temple before Anya is freed.
     let (mut ctl, _) = control();
     let mut f = fake();

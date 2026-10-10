@@ -349,16 +349,17 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
     if args.a == 109 {
         quick_remove(ctl, w, i, p);
         let f = flags(w, p);
+        // Status and iterate sit inside the state 2 test (`0x00589D80`).
         if ctl.records[i].state == 2
             && !f.get(SLOT, bit::REWARD_GRANTED)
             && !f.get(SLOT, bit::REWARD_PENDING)
         {
             set_state(ctl, i, 3);
+            if ctl.records[i].status == 0 {
+                status_to_all(ctl, w, i, 1);
+            }
+            flag_iterate_all(ctl, w, i);
         }
-        if ctl.records[i].status == 0 {
-            status_to_all(ctl, w, i, 1);
-        }
-        flag_iterate_all(ctl, w, i);
     }
     // Step 3 (edge case 6).
     if (121..=124).contains(&args.b) && not_intro && ctl.records[i].state < 5 {

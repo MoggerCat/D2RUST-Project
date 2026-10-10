@@ -225,19 +225,19 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-tal-rasha-tomb-ama | state | PARTIAL | 160/160 | - | - |
 | a2-wp-40 | packets | MATCH | 50/50 | - | - |
 | a2-wp-40 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-42 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | unrouted |
+| a2-wp-42 | packets | MATCH | 50/50 | - | - |
 | a2-wp-42 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-43 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-43 | packets | MATCH | 50/50 | - | - |
 | a2-wp-43 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-44 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-44 | packets | MATCH | 50/50 | - | - |
 | a2-wp-44 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-46 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-wp-46 | packets | MATCH | 50/50 | - | - |
 | a2-wp-46 | state | PARTIAL | 50/50 | - | - |
 | a2-wp-48 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
 | a2-wp-48 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-52 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-52 | packets | MATCH | 50/50 | - | - |
 | a2-wp-52 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-57 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-57 | packets | MATCH | 50/50 | - | - |
 | a2-wp-57 | state | PARTIAL | 50/50 | - | - |
 | a2-wp-74 | packets | DIVERGED | 11/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
 | a2-wp-74 | state | DIVERGED | 13/50 | frame 14 game, field seed: 1.14d [3301680733, 432660541] vs d2rs [2249109384, 51619635] | q-fix-seed-order |
@@ -1430,13 +1430,13 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-shrine-7 | packets | DIVERGED | 119/120 | frame 40 stream s2c #0 size: 1.14d 15 vs d2rs 12 (id 0xa8) | unrouted |
 | gen-shrine-8 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-9 | packets | MATCH | 120/120 | - | - |
-| a5-wp-31-lv111 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
-| a5-wp-32-lv112 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
-| a5-wp-33-lv113 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
-| a5-wp-34-lv115 | packets | DIVERGED | 539/540 | frame 4 stream s2c #35 extra (d2rs only) (id 0x5d) | unrouted |
-| a5-wp-35-lv123 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
-| a5-wp-36-lv117 | packets | DIVERGED | 539/540 | frame 4 stream s2c #42 extra (d2rs only) (id 0x5d) | unrouted |
-| a5-wp-38-lv129 | packets | DIVERGED | 539/540 | frame 4 stream s2c #34 extra (d2rs only) (id 0x5d) | unrouted |
+| a5-wp-31-lv111 | packets | MATCH | 540/540 | - | - |
+| a5-wp-32-lv112 | packets | MATCH | 540/540 | - | - |
+| a5-wp-33-lv113 | packets | MATCH | 540/540 | - | - |
+| a5-wp-34-lv115 | packets | MATCH | 540/540 | - | - |
+| a5-wp-35-lv123 | packets | MATCH | 540/540 | - | - |
+| a5-wp-36-lv117 | packets | MATCH | 540/540 | - | - |
+| a5-wp-38-lv129 | packets | MATCH | 540/540 | - | - |
 | items-drop-gold-potion | items | MATCH | 6/6 | - | - |
 | ama-cold-arrow | packets | MATCH | 70/70 | - | - |
 | ama-dopplezon | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 size: 1.14d 23 vs d2rs 14 (id 0xac) | unrouted |
@@ -3682,3 +3682,5 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | bar-taunt | state | PARTIAL | 70/70 | - | - |
 | bar-taunt | packets | MATCH | 70/70 | - | - |
 | ui-frontend-screens | frontend | DIVERGED | 0/15 | charselect: 3970 stable pixels differ, first at [37, 86] | unrouted |
+| interact-operate-waypoint | packets | MATCH | 30/30 | - | - |
+| interact-operate-waypoint | state | PARTIAL | 30/30 | - | - |
