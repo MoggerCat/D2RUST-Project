@@ -154,6 +154,15 @@ pub fn monster_right_aura<X: Pending + UseRest>(
 /// form of `schedule_periodic` (q-fix-pt-right-aura). The load selects
 /// the hand before the unit has a room, so the first periodic do runs on
 /// the first tick after game entry.
+///
+/// In 1.14d this is the join's post-load step (d), after part B's 0xAA
+/// (`formats/d2s.md` §2.4 rule 6.3): the aura's stats are in effect for
+/// the join's later messages (the first 0x95 of `gen-skill-pal-115`), but
+/// the 0xAA never lists its state, which the first update sends as 0xA8.
+// PROVISIONAL (REC-3410): d2rs sends part B at game entry, after the
+// load, so the aura state's unit bit is switched off here (its list and
+// its changed bit stay) and [`passive_states_on`] switches it back on
+// after the join messages.
 pub fn assign_right_aura<X: Pending + UseRest>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -182,6 +191,11 @@ pub fn assign_right_aura<X: Pending + UseRest>(
         w.set_aura_state(unit, r.aurastate, e.skill, l);
     }
     crate::skills::use_::schedule_periodic(&mut w, &t.skills, unit, e.skill, l, true);
+    if let Ok(s) = u16::try_from(r.aurastate as i16) {
+        if w.cv.v.state_list(unit, s).is_some() && w.cv.v.stats.has_state(unit, u32::from(s)) {
+            w.cv.v.set_state(unit, s, false);
+        }
+    }
 }
 
 /// The skill part of the monster sequence event 0 `0x005A8670`
@@ -449,6 +463,16 @@ pub fn passive_states_on<X: Pending + UseRest>(
             .map_or(-1, |r| i32::from(r.passivestate as i16));
         if let Ok(p @ 1..) = u16::try_from(p) {
             w.cv.v.set_state(unit, p, true);
+        }
+    }
+    // The right aura's state hidden by `assign_right_aura` (REC-3410).
+    let aura = UseWorld::right_skill(&w, unit)
+        .and_then(|e| t.skills.skill(e.skill))
+        .filter(|r| r.aura)
+        .and_then(|r| u16::try_from(r.aurastate as i16).ok());
+    if let Some(s) = aura {
+        if w.cv.v.state_list(unit, s).is_some() && !w.cv.v.stats.has_state(unit, u32::from(s)) {
+            w.cv.v.set_state(unit, s, true);
         }
     }
 }

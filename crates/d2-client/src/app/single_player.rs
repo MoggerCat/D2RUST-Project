@@ -2443,7 +2443,13 @@ pub fn build_with(
     // (q-fixture-migrate: a second, fresh state left every town without
     // its preset NPCs and objects on the user's files).
     let state = WorldState::new(shared_types, Arc::new(parts.world), info);
-    let mut sim = WorldSim::new(Arc::new(parts.stats), parts.units, hooks, state);
+    // The game's difficulty and the neutral delay's column
+    // (`ai.md` §1.3 rule 1: game +0x6A is 3 in single player, so the
+    // difficulty's `aidel` column; recorded Hell first think at f + 13).
+    let mut unit_data = parts.units;
+    unit_data.difficulty = character.difficulty();
+    unit_data.aidel_by_difficulty = GAME_TYPE != 0 || GAME_SETUP.ladder;
+    let mut sim = WorldSim::new(Arc::new(parts.stats), unit_data, hooks, state);
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
     let fields = GameFields {
@@ -2709,9 +2715,6 @@ fn loader(
                     let (game, world) = (&mut s.game, &mut s.world);
                     s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
-                    // `use.md` §7 "0x3C SelectSkill": the selected right skill, an aura,
-                    // starts (q-fix-pt-right-aura).
-                    s.events.action.assign_right_aura(&mut s.game, player);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
                     entry.hotkeys = super::save_gaps::loaded_hotkeys(

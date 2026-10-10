@@ -366,6 +366,8 @@ def part_rank(path):
         return 0
     if b == "rc-promote.tsv":
         return 3   # fresh-run promotion of PARTIAL rows (tools/coord/promote.py) wins over older rc-* states
+    if "-override" in b:
+        return 3        # a session's own part that must supersede other rc-* parts' rows
     return 2 if b.startswith("rc-") else 1
 
 

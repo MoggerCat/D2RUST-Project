@@ -16,7 +16,8 @@ use super::super::bits::BitReader;
 use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
-use super::super::modes::mode_request;
+use super::super::modes::{mode_request, neutral_walk, player_mode, remove_unit_light};
+use super::super::player_anim;
 use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
 use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
@@ -315,6 +316,12 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             // unit seed.
             super::super::monster_anim::mode_set(w, msg.inputs, key, mode);
             super::super::monster_anim::first_frame(w, key);
+            // Rule 6.9: the initial path direction (after the frame draw:
+            // the other order gives 40 / 29 where 1.14d draws 57 / 46,
+            // `gen-render-firebolt` / `-frozen`).
+            if let Some(row) = &class_row {
+                super::super::monster_anim::first_direction(w, key, row.npc, row.modes);
+            }
             // The monster init's light (`0x004AE210`, `render/lighting.md`
             // §8 monster row), in the monster's room.
             if let Some(row) = &class_row {
@@ -584,6 +591,7 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     // (`0x0064E7B0`), which needs the client's collision map.
     if let Some(u) = w.units.get_mut(&key) {
         u.position = Some((x, y));
+        u.placements = u.placements.wrapping_add(1);
     }
     // Rule 4.6: the local player's placement ends in `0x00472C20(flag)`.
     if w.local_player == Some(key) {
@@ -593,6 +601,19 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     // the old room's list, head of room''s.
     if w.active_rooms.is_some() {
         w.room_units.place(key, new_room.map(|r| r.room));
+    }
+    // Rule 6, the last call `0x00463B80`: a player with a room in mode 1 or
+    // 5 gets the mode request code 7 with no record (`0x00461250`), which
+    // sets the neutral mode of the room it now stands in (5 in town, else
+    // 1): a warp out of town leaves the town neutral mode at once.
+    if key.unit_type == PLAYER && w.room_units.room_of(key).is_some() {
+        let mode = w.units[&key].mode;
+        if mode == player_mode::NEUTRAL || mode == player_mode::TOWN_NEUTRAL {
+            remove_unit_light(w, key);
+            let (neutral, _) = neutral_walk(w, key);
+            w.units.get_mut(&key).expect("checked above").flag_2 = Some(true);
+            player_anim::mode_set(w, msg.inputs, key, neutral);
+        }
     }
     Ok(())
 }
