@@ -25,8 +25,7 @@ took staging's version where it overlapped.
 - Source-unit link +0x94/+0x98 stored; owner `0x00552FD0` reads it (without
   it the tentacle AI killed the unit at once).
 - Mode end `0x005A8030`: state-54 / dead guard (`ai.md` §1.4).
-- Tests: SpecialState06 x3, frame advance x3. fmt, clippy, d2-sim + d2-server
-  (5158 tests), coverage / spec_index / ledger checks pass.
+- Tests: SpecialState06 x3, frame advance x3; all gates pass (5158 tests).
 
 ## Open
 
@@ -39,4 +38,4 @@ took staging's version where it overlapped.
 - `prop_walk_motion::chase_a_moving_target` is flaky on staging (~1 in 3,
   `(0,0)` vs `(1,1)`, line 352); path code, not touched here (S).
 - `re/exports/names.tsv` is absent in the private repo: no names appended.
-- d2-client not built (Bevy); its tests only gained `mode_chart: false`.
+  d2-client not built (Bevy); its tests only gained `mode_chart: false`.
