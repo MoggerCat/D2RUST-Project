@@ -98,6 +98,8 @@ SL_PLAIN_BYTES = 0x3C     # plain list size; extended lists are 0x64
 EXTENDED = 0x80000000     # stat-lists.md §2: flag bit of the 0x64-byte form
 MAX_STATS = 0x2000        # sanity bound on an array count (i16) before reading it
 WALK_LIMIT = 100000       # per list: a longer chain is a broken link
+# the client's unit hash sets (client/model.md §2 r1): S = announced by the server, C = client-only
+CLIENT_SETS = (("S", 0x007A5E70), ("C", 0x007A5270))
 
 FULL_STATS = (("hp", 6), ("hpx", 7), ("mp", 8), ("mpx", 9), ("st", 10), ("stx", 11))
 BASE_STATS = (("str", 0), ("ene", 1), ("dex", 2), ("vit", 3), ("lvl", 12))
@@ -324,6 +326,34 @@ class StateReader:
                 n += 1
         return out
 
+    def client_snapshot(self, game):
+        """The 1.14d client's own units (client/model.md §2 r1): hash set S (units the
+        server announced) and set C (client-only units), 6 types x 128 buckets each,
+        chain link unit +0xE4. {"units": [...]} with every unit read as a server unit
+        (same record) plus "set": "S" | "C", sorted by (set, ut, g)."""
+        self.levels = {}
+        self.game = game
+        recs = []
+        for name, base in CLIENT_SETS:
+            table = self.read(base, 6 * 0x200)
+            for t in range(6):
+                for b in range(BUCKETS):
+                    ua, n = struct.unpack_from("<I", table, 0x200 * t + 4 * b)[0], 0
+                    while ua and n < WALK_LIMIT:
+                        try:
+                            rec = self.unit(ua)
+                        except OSError:
+                            self.note("client unit unreadable")
+                            break
+                        if rec["ut"] != t:
+                            self.note("client unit type differs from its list's type")
+                        rec["set"] = name
+                        recs.append(rec)
+                        ua = self.u32(ua + U_HASH_NEXT)
+                        n += 1
+        recs.sort(key=lambda r: (r["set"], r["ut"], r["g"]))
+        return {"units": recs}
+
     def snapshot(self, game):
         """{"seed": [lo, hi], "units": [...] sorted by (ut, g)}, and the unit addresses."""
         self.levels = {}
@@ -351,6 +381,8 @@ def make_recorder(rt):
             self.snaps = 0
             self.reader_notes = {}
             self.save_watch = None   # --save-watch FILE: stop once the game rewrote it
+            self.client_out = None   # --client-out FILE: the client's units at every tick end
+            self.client_file = None
 
         def handle(self, addr, ctx):
             if addr == rt.TICK:
@@ -369,6 +401,18 @@ def make_recorder(rt):
                 self.snaps += 1
                 for k, v in rd.notes.items():
                     self.reader_notes[k] = self.reader_notes.get(k, 0) + v
+                if self.client_out:
+                    if self.client_file is None:
+                        self.client_file = open(self.client_out, "w", encoding="utf-8", newline="\n")
+                        h = header(self.command, self.sha, self.args, self.every)
+                        h["side"] = "orig-client"
+                        self.client_file.write(json.dumps(h, separators=(",", ":")) + "\n")
+                    cr = StateReader(self.read)
+                    cs = cr.client_snapshot(self.game)
+                    self.client_file.write(json.dumps({"k": "snap", "f": n, **cs},
+                                                      separators=(",", ":")) + "\n")
+                    for k, v in cr.notes.items():
+                        self.reader_notes["client: " + k] = self.reader_notes.get("client: " + k, 0) + v
             if self.max_ticks and self.ticks >= self.max_ticks:
                 self.notes.append(f"tick limit {self.max_ticks} reached")
                 self.done = True
@@ -402,6 +446,10 @@ def make_recorder(rt):
                 self.out.write(json.dumps({"k": "footer", "snaps": self.snaps, "notes": notes},
                                           separators=(",", ":")) + "\n")
                 self.out.close()
+                if self.client_file:
+                    self.client_file.write(json.dumps({"k": "footer", "snaps": self.snaps},
+                                                      separators=(",", ":")) + "\n")
+                    self.client_file.close()
 
     return StateRecorder
 
@@ -742,6 +790,9 @@ def main():
     ap.add_argument("--write-save", action="store_true",
                     help="without -nosave: the game writes the character's .d2s (the save channel, "
                          "specs/tools/scenario-diff.md §3 rule 13); needs a Save and Exit --send")
+    ap.add_argument("--client-out", default=os.environ.get("D2_CLIENT_OUT"), metavar="FILE",
+                    help="also write the 1.14d client's own units (hash sets S and C, "
+                         "client/model.md §2) at every snapshot, format state-1 with side orig-client")
     ap.add_argument("--save-watch", default=None, metavar="FILE",
                     help="end the recording shortly after the game rewrote FILE")
     ap.add_argument("--selftest", action="store_true", help="check the snapshot reader on a synthetic game, exit")
@@ -769,6 +820,7 @@ def main():
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
     r.save_watch = a.save_watch
+    r.client_out = a.client_out
     if auto and auto.has_frames():
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:

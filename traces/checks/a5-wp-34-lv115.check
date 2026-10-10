@@ -5,7 +5,7 @@ save ScnAm5 --class ama --expansion --act 4 --quests acts=4 --waypoints all
 seed 1234
 ticks 540
 seconds 420
-channels state
+channels state packets
 at 4 poke warp 115
 at 20 poke goto preset 115 2:511
 at 450 poke msg 0x13 2 @2:511

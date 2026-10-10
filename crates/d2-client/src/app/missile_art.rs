@@ -1,13 +1,13 @@
 // Spec: specs/render/unit-composite.md (§9)
-//! The play app's effect rows (`skills`, `missiles`, `overlay`, `states`
-//! `.bin`), read from the user's tables and handed to the world view's
+//! The play app's effect rows (`skills`, `missiles`, `overlay`, `states`,
+//! `monstats`, `monstats2` `.bin`), read from the user's tables and handed to the world view's
 //! client missile layer (`world_view::missiles`).
 
 use std::sync::Arc;
 
 use bevy::prelude::*;
 use d2_data::bin::TableFiles;
-use d2_data::tables::{decode_all, Missiles, Overlay, Skills, States};
+use d2_data::tables::{decode_all, Missiles, Monstats, Monstats2, Overlay, Skills, States};
 
 use crate::assets::path::FileSource;
 use crate::world_view::missiles::{EffectRows, Missiles as MissileLayer};
@@ -31,6 +31,10 @@ pub fn effect_rows(archives: &dyn TableFiles) -> Result<EffectRows, String> {
         &all::<Missiles>(&set, "missiles")?,
         &all::<Overlay>(&set, "overlay")?,
         &all::<States>(&set, "states")?,
+    )
+    .with_monsters(
+        &all::<Monstats>(&set, "monstats")?,
+        &all::<Monstats2>(&set, "monstats2")?,
     ))
 }
 

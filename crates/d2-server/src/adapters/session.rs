@@ -161,6 +161,10 @@ pub struct Entry {
     /// messages (`intents-events.md` §8.2 rule 3.1 (b)). False for the
     /// stub (load §1 reads no section) and a caller without a load.
     pub base_skills: bool,
+    /// The full-save load's post-load selections (`formats/d2s.md` §2.4
+    /// rule 6.2-6.3): the left class skill, then the right one, each one
+    /// S→C 0x23 (owner −1) right after the add messages.
+    pub load_selects: [Option<u16>; 2],
 }
 
 impl Entry {
@@ -173,14 +177,16 @@ impl Entry {
             record: None,
             load_skill: None,
             base_skills: false,
+            load_selects: [None; 2],
         }
     }
 
     /// A loaded full save's entry: act `act`, and the skills section's
     /// S→C 0x94 ([`Entry::base_skills`]).
-    pub fn loaded(act: u8, name: [u8; 16]) -> Self {
+    pub fn loaded(act: u8, name: [u8; 16], selects: [Option<u16>; 2]) -> Self {
         Self {
             base_skills: true,
+            load_selects: selects,
             ..Self::new(act, name)
         }
     }
@@ -405,6 +411,15 @@ pub fn enter_game<D: ActionEvents, W>(
             a.sys.hooks.x.send(player, m);
         }
     }
+    // Rule 3.1, the full save's post-load selections: left (hand 1), right.
+    for (hand, sel) in [(1u8, entry.load_selects[0]), (0, entry.load_selects[1])] {
+        if let Some(skill) = sel {
+            a.sys
+                .hooks
+                .x
+                .send(player, &msg::set_skill(hand, guid, 0, skill, u32::MAX));
+        }
+    }
     // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
     if let Some(h) = entry.load_skill {
         a.sys
@@ -586,7 +601,7 @@ pub fn load_save<D: ActionEvents, W>(
         let portals = s.events.action().sys.hooks.drlg.data.portal_levels();
         Entry::new_character(save.header.name, &portals, report.right_skill)
     } else {
-        Entry::loaded(report.act, save.header.name)
+        Entry::loaded(report.act, save.header.name, report.mouse_selected)
     };
     Ok((entry, report))
 }

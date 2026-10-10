@@ -405,7 +405,14 @@ impl MissileBodies for Fake {
     fn is_dead(&self, unit: UnitId) -> bool {
         self.mb.dead.contains(&unit)
     }
-    fn area_units(&mut self, _: &Game, _: UnitId, at: (i32, i32), r: i32, f: u32) -> Vec<UnitId> {
+    fn area_units(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
         self.log.push(format!("scan {at:?} {r} {f:#x}"));
         self.mb.area.clone()
     }
@@ -423,7 +430,7 @@ impl MissileBodies for Fake {
     }
     fn scan_units(
         &mut self,
-        _: &Game,
+        _: &mut Game,
         _: UnitId,
         at: (i32, i32),
         r: i32,

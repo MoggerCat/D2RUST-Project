@@ -8,7 +8,7 @@ save ScnSor --class sor --expansion --level 30 --all-skills 20 --right-skill 41
 seed 1234
 ticks 70
 seconds 300
-channels state
+channels state packets
 variant blood-moor-empty
 at 4 poke warp 2
 input frame 20; rclick 330 300
