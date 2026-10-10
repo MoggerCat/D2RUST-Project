@@ -77,5 +77,8 @@ pub fn refresh<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32)
     }
     w.list_set(l, PASSIVE_SKILL, skill);
     w.list_set(l, PASSIVE_LEVEL, level);
+    // `0x00639E30(unit, p, 1)`: the state-changed bit, so the next update
+    // sends 0xA8 with the new values (msg-skills.md §2 rule 4).
+    w.mark_state_changed(u, p);
     w.queue_update(u);
 }

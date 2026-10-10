@@ -433,6 +433,15 @@ the item whose stats propagate, or none), the stat id with its layer
 | 151 `item_aura` | §7.5 |
 | 204 `item_charged_skill` | §7.6 |
 
+**d2rs wiring (rc-c012-a8bytes, REC-3780).** The stat lists raise the
+handler for stats 83, 126, 127, 188 (`ActionHooks::skill_stat_changed`);
+refresh all runs at the owner's next player update, before its state
+messages. 1.14d `bar-battle-command` frame 28: Battle Command's state list
+carries stat 127 (+1 all skills), and the same update re-sends 0xA8 for
+every passive state (74–83) with the raised values. Stats 83 / 188 run for
+a player of the layer's class only (hireling / disguise tests unwritten).
+Stats 97, 98, 107, 151, 204 are not routed through this path.
+
 #### 7.1 Oskill entries (stats 97, 107)
 
 s = the layer.

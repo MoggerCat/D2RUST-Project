@@ -157,7 +157,9 @@ handlers (the server specs link here for the steps).
    the param S→C 0xA8 sends with the entry, `sim/intents-events.md` §3.5
    rule 6: 1.14d `gen-skill-ass-*` frame 2, the masteries); then stat 350
    := skill, stat 351 := L (layer 0); mark state p for update
-   (`0x00639E30`). Otherwise (no E, or the aura state is on) the state
+   (`0x00639E30`). The state-changed bit is what makes the next
+   update send 0xA8 (1.14d `bar-battle-command` frame 28: all passive
+   states re-sent after a +skills state). Otherwise (no E, or the aura state is on) the state
    list of p, if any, is detached and freed (`0x006277E0`,
    `0x00626CD0`). L = 0 removes the list (`0x00643620` with level 0).
 5. **Remove in detail** `0x00646FD0` (unit in EBX, skill id s, flag d;

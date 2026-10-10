@@ -434,6 +434,11 @@ Rows: shout (149), battlecommand (236), battleorders (237).
    skill, level)` (`0x005D8290`, `skills/bodies.md` §6.8).
 3. Return 0.
 
+1.14d `bar-shout` frame 29: the 64 ring missiles meet the caster itself
+(shout has no `LastCollide`; the ally test passes for the same unit), so
+`shout_state` runs on the caster a second time and the update after the
+cast sends 0xA8 of the shout state again (same bytes as frame 28).
+
 Result 0: the missile flies on through every unit (`CollideFriend` 1 on
 all three). shout has no `LastCollide`, so a unit standing in its path
 is met on every step; battlecommand and battleorders (`LastCollide`,

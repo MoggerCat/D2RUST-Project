@@ -503,6 +503,11 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         if let (Some(p), None, false) = (receiver, new, is_player) {
             v.state_change_messages(p, unit);
         }
+        if !is_player && !v.h.skill_refresh.is_empty() {
+            // Only a player's refresh is written (the callbacks of other
+            // units are dropped with their update).
+            v.h.skill_refresh.retain(|e| e.0 != unit);
+        }
         if is_player {
             // §7.3 rule 1 (`0x00580860`): steps 1 and 3 (the path part),
             // step 4's soft hit, then step 5 (any state-changed bit, whether announced or
@@ -519,6 +524,20 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 v.send_event_records(game, p, unit);
                 // A unit still new to the client keeps its join order; so
                 // does one without item messages pending (update bit 0).
+                // Skill stat callbacks (stats 83, 126, 127, 188) raised
+                // since the last update: refresh all, then the messages.
+                if v.h.skill_refresh.iter().any(|&(u, ..)| u == unit) {
+                    let q = std::mem::take(&mut v.h.skill_refresh);
+                    for (u, stat, layer) in q {
+                        if u == unit {
+                            super::missiles::with_sim(&mut v, game, |h, sim| {
+                                X::skill_stat_refresh(h, sim, u, stat, layer)
+                            });
+                        } else {
+                            v.h.skill_refresh.push((u, stat, layer));
+                        }
+                    }
+                }
                 v.h.capture_tail =
                     new.is_none() && v.units.get(unit).is_some_and(|r| r.flags2 & 1 != 0);
                 v.state_change_messages(p, unit);

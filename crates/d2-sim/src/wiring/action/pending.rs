@@ -1671,6 +1671,36 @@ pub trait Pending {
     {
         (-1, 0)
     }
+    /// The skill handlers of stats 83, 126, 127, 188 (`skills/levels.md`
+    /// §7.2, refresh all `0x0056DFA0`): routed to
+    /// [`crate::wiring::interaction::skill_events::skill_stat_refresh`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn skill_stat_refresh(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        stat: u16,
+        layer: u16,
+    ) where
+        Self: Sized,
+    {
+    }
+    /// `shout_state(game, unit, owner, skill, level)` (`0x005D8290`,
+    /// `skills/bodies.md` §6.8) for the Shout, Battle Command and Battle
+    /// Orders missiles' hit (`missiles/bodies.md` §13 step 2): routed to
+    /// [`crate::wiring::interaction::skill_events::missile_shout_state`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn missile_shout_state(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
     /// The Bone Wall maker's summon spawn (§33 step 7, flags 0xD).
     /// Default: none.
     #[allow(clippy::too_many_arguments)]
