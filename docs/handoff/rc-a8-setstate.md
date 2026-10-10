@@ -1,6 +1,6 @@
 # rc-a8-setstate hand-back
 
-EQUAL (merged ledger) 2778 -> 2820. gen-skill packets MATCH 91 -> 137 of 210.
+EQUAL (merged ledger, after syncing with specs-staging) 2759 -> 2801 (before the sync: 2778 -> 2820). gen-skill packets MATCH 91 -> 137 of 210.
 
 ## Cause fixed: S->C 0xA8 byte 9 at frame 2 (assassin masteries, ~60 checks)
 - 1.14d `0x005711D0` (0xA8 builder, sender `0x0053E8D0`) writes each state-list entry as
