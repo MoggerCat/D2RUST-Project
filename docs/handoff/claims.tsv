@@ -11,6 +11,11 @@ C024	rc-promote	16:59	skill.ass 6 + shrine.17/.7: packets C->S/S->C divergence a
 C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	open
 fatal-exit	rc-run-3b	16:59	1.14d fatal exit(-1): gen-obj-374/385/400/403/450 (A client Mode<m>=0, done), 375 (B gfx file), 59/60/377 (C portal partner level)	open
 obj-39-78-approach	rc-run-3b	16:59	gen-obj-39/78 player m 5 vs 3 (object walk path end)	open
+C054	rc-c022-playerstate	17:05	gen-qkill-blood-raven frame 64 player m 5 vs 4 (monster missile hit damage + hit recovery on player)	open
+C056	rc-c022-playerstate	17:05	gen-su-12 frame 54 player m 19 vs 5 (knockback/hit one frame late)	open
+C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed draws)	open
+C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	open
+C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
 C-draw-cursor-press	rc-draw-row173	16:20	cursor press 0x00467F20 on every click: rain seed after scripted clicks (ui-draws-minipanel-ama)	done 0 -> 0
 C-draw-registry	rc-draw-row173	16:45	mini panel open/closed at entry: host registry as check input (play --registry)	done 0 -> 0
 C-draw-script-timing	rc-draw-row173	17:00	scripted input one drawn frame early on odd-tick recordings; headless control-panel strip walk (C2S 0x01 frame 40)	done 0 -> 0
