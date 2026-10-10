@@ -483,7 +483,9 @@ class Runner:
                     print(f"[draws] warning: d2rs play exited {code} after writing the dump")
         if sides != {"orig", "d2rs"}:
             return None
-        cmp_args = ["--ignore", "tick"] + (["--skip-weather"] if c["skip_weather"] else []) \
+        # the presented frame holds the particles and the cursor too (facts-render.md §6 r5)
+        skipped = c["skip_weather"] or c["skip_cursor"]
+        cmp_args = ["--ignore", "tick,index_sha256" if skipped else "tick"] + (["--skip-weather"] if c["skip_weather"] else []) \
             + (["--skip-cursor"] if c["skip_cursor"] else [])
         code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d]
                        + cmp_args, check=False, timeout=300)
