@@ -266,8 +266,30 @@ impl<X> ActionHooks<X> {
         arg: Option<UnitId>,
         mode: u8,
     ) -> bool {
-        self.with_monster_world(|w, h| w.umods(sim, h, unit, arg, mode))
-            .is_some()
+        let ran = self
+            .with_monster_world(|w, h| w.umods(sim, h, unit, arg, mode))
+            .is_some();
+        // A umod callback that deals damage (fire's death burst) reaches
+        // the attacker's mode-3 dispatch while the world is out; the
+        // original runs it nested, right after that hit's crit draw. Here
+        // it runs when the outer dispatch is done (REC-2861, PROVISIONAL
+        // order: only the attacker's own seed is drawn in between).
+        if ran {
+            while !self.deferred_umod_hits.is_empty() {
+                let a = self.deferred_umod_hits.remove(0);
+                self.with_monster_world(|w, h| w.umods(sim, h, a, None, umod_mode::HIT));
+            }
+        }
+        ran
+    }
+    /// Asks a mode-3 dispatch for `attacker` when the world is out.
+    pub(super) fn defer_umod_hit(&mut self, attacker: UnitId) -> bool {
+        if self.monster_world_out {
+            self.deferred_umod_hits.push(attacker);
+            true
+        } else {
+            false
+        }
     }
 }
 
