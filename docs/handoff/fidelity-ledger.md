@@ -716,7 +716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2647
 - Rows set exercised = yes from the coverage reports' seen lists: 20
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 5247
+- Duplicate areas between parts: 5248
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2161,6 +2161,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.plague-javelin`: rc-packets-chan.tsv:28 kept, rc-pkt-misc.tsv:14 dropped
   - `skill.ama.poison-javelin`: rc-packets-chan.tsv:29 kept, rc-pkt-misc.tsv:15 dropped
   - `skill.ama.strafe`: rc-packets-chan.tsv:32 kept, rc-pkt-misc.tsv:16 dropped
+  - `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90`: rc-gen-client.tsv:62 kept, rc-pkt-misc.tsv:17 dropped
   - `system.sim.units.4-1-setting-a-mode`: rc-pc1-audit.tsv:48 kept, rc-player-fc.tsv:3 dropped
   - `system.combat.damage.7-reaction-and-death-trigger`: rc-pc1-audit.tsv:22 kept, rc-player-hit.tsv:4 dropped
   - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-gen-client.tsv:107 kept, rc-player-hit.tsv:5 dropped
