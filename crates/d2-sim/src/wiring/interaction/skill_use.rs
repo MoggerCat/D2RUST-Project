@@ -562,9 +562,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.x().state_mask(u, mask)
     }
     /// `0x00622C40(a, d, 0x00622870(a))` (the action wiring's seams).
+    /// `0x00622C40(unit, target, moving)` (`skills/use.md` §3 step 6): the
+    /// third argument is `0x00622DC0(target)`, whether the target is in a
+    /// moving mode (`0x00622D00`), 0 or 1.
     fn in_melee_range(&self, u: UnitId, target: UnitId) -> bool {
-        let x = self.x();
-        x.in_melee_range(u, target, x.melee_range(u))
+        use crate::combat::CombatWorld;
+        let moving = i32::from(self.cv.moving_mode(target));
+        self.cv.in_melee_range(u, target, moving)
     }
 
     /// Unit +0x10.
@@ -752,6 +756,7 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         let v = &mut self.cv.v;
         v.stats.free_state_list(&mut *v.h, u, u32::from(state));
         v.set_state(u, state, false);
+        BodyWorld::queue_update(self, u);
     }
     /// `0x0056FF10`, the aura select's non-immediate branch (`use.md`
     /// §7): state on (`0x00639DB0`); the state's list (`0x006256B0`, else
@@ -1158,7 +1163,20 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         self.xm().passive_refresh(u);
     }
+    /// `0x0056DE40(unit)`: the passive refresh `0x00646F20`, then for a
+    /// player the skill resync `0x00575900` (read 1.14d; shout, battle
+    /// orders and battle command re-send the passives' states, `bar-battle-command`).
     fn buff_refresh(&mut self, u: UnitId) {
+        BodyWorld::passive_refresh(self, u);
+        if self
+            .cv
+            .v
+            .units
+            .get(u)
+            .is_some_and(|r| r.ty == UnitType::Player)
+        {
+            BodyWorld::skill_resync(self, u);
+        }
         self.xm().buff_refresh(u);
     }
     fn skill_resync(&mut self, u: UnitId) {
@@ -1280,6 +1298,46 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             };
             return;
         }
+        // `0x005A4850(game, m, umod, arg)` (`bodies.md` §6.2 step 8: the
+        // summon's `sumumod`, arg 1 = unique; `init.md` §14.1): on the
+        // lent monster world.
+        if let bodies::BodyEffect::Umod { m, umod, arg } = e {
+            if let Ok(umod) = u8::try_from(umod) {
+                let cv = &mut self.cv;
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                cv.v.h.assign_umod_arg(&mut sim, m, umod, arg != 0);
+            }
+            return;
+        }
+        // `0x0058EF40(control, params)` (`monsters/ai.md` §8): the command
+        // {type, x, y, tx, ty} inserted before the current one, which it
+        // becomes (the Blade Sentinel's walk, `bodies-2.md` §4.11 step 7).
+        if let bodies::BodyEffect::AiCommand {
+            m,
+            kind,
+            x,
+            y,
+            tx,
+            ty,
+        } = e
+        {
+            if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+                let at = c.cur.min(c.commands.len());
+                c.commands.insert(
+                    at,
+                    crate::monsters::ai::AiCommand {
+                        params: [kind, x, y, tx, ty],
+                    },
+                );
+                c.cur = at;
+                return;
+            }
+        }
         if let bodies::BodyEffect::WaitThink { m, frames } = e {
             let game = &mut *self.cv.game;
             crate::monsters::ai::delete_thinks(game, m);
@@ -1395,6 +1453,59 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         // the egg hatch's last step (`bodies-3.md` §5.7 step 6).
         if let bodies::BodyEffect::KillBy { u, killer, .. } = e {
             crate::wiring::action::reaction::kill_by(&mut self.cv, u, killer);
+            return;
+        }
+        // `0x00571AA0` as the bodies call it (`bodies-2.md` §2.21): the
+        // 0xA3 record {v, skill, lvl, unit, T, x, y}, the unit queued.
+        if let bodies::BodyEffect::MsgA3 {
+            u,
+            target,
+            skill,
+            lvl,
+            x,
+            y,
+            v,
+        } = e
+        {
+            use crate::wiring::action::event_records::EventRecord;
+            let units = &self.cv.v.units;
+            let of = |id: Option<UnitId>| {
+                id.and_then(|id| units.get(id))
+                    .map_or((0, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+            };
+            let r = EventRecord::Progressive {
+                charges: v as u8,
+                skill: skill as u16,
+                level: lvl as u16,
+                unit: of(Some(u)),
+                target: of(target),
+                x: x as u32,
+                y: y as u32,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
+            return;
+        }
+        // `0x0053CDF0(client, m)` (`bodies.md` §8.9 step 7): 0x7F about
+        // the pet m, sent at once to the caster's client.
+        if let bodies::BodyEffect::AllyInfo { u, m } = e {
+            let life = bodies::b4_helpers::life_percent(self, m).clamp(0, 0xFFFF) as u16;
+            let game = &*self.cv.game;
+            let level = game
+                .lists
+                .unit(m)
+                .and_then(|e| e.room())
+                .and_then(|r| self.cv.v.h.drlg.level_id(game, r))
+                .unwrap_or(0) as u16;
+            if let Some(r) = self.cv.v.units.get(m) {
+                let mut msg = [0u8; 10];
+                msg[0] = 0x7F;
+                msg[1] = u8::from(r.ty == UnitType::Player);
+                msg[2..4].copy_from_slice(&life.to_le_bytes());
+                msg[4..8].copy_from_slice(&r.guid.to_le_bytes());
+                msg[8..10].copy_from_slice(&level.to_le_bytes());
+                Pending::send(self.xm(), u, &msg);
+            }
             return;
         }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {

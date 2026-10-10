@@ -1,0 +1,20 @@
+check 1
+# Census: experience and level-up (combat/vitals.md §3-§4), state channel:
+# save-levelup-ama's kills (Fire Bolt missiles into a level-63 spawn from a
+# 499-strength-point amazon) compared on the state channel instead of the
+# save channel.
+name sys-levelup-state-cs
+save SavAma --class ama --expansion --stat 13=499
+seed 1234
+ticks 110
+seconds 300
+channels cstate
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 63 @x+4 @y+4 normal
+at 34 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 42 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 50 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 58 poke missile 12 @x @y @x+4 @y+4 skill 7 20
+at 66 poke missile 12 @x @y @x+4 @y+4 skill 7 20

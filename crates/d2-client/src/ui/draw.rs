@@ -100,6 +100,20 @@ pub enum CelCall {
     Clipped,
 }
 
+/// What the rendering facts print of a UI draw besides its wrapper: the
+/// draw mode and the palette / colour argument (`tools/facts-render.md`
+/// §2 r3), kept per UI draw in `WorldFrame::ui_calls`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UiCelInfo {
+    pub call: CelCall,
+    pub mode: u8,
+    /// The palette argument: `Some(0)` null, `Some(k)` the colour index of
+    /// the colour draw; `None` not known (an item palette pointer).
+    pub pal: Option<i32>,
+    /// A text draw: each glyph's colour index is read from its shade map.
+    pub text: bool,
+}
+
 impl CelCall {
     /// The `draws.tsv` op name.
     pub fn op(self) -> &'static str {

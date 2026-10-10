@@ -182,6 +182,12 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             self.rest.npc_ai_param(npc, param);
         }
     }
+    /// AI params 1 and 2 (C→S 0x59): the game's AI store; the rest keeps
+    /// no AI params.
+    fn npc_ai_point(&mut self, npc: UnitId, x: u32, y: u32) {
+        self.econ.hooks.set_ai_param(npc, 1, x as i32);
+        self.econ.hooks.set_ai_param(npc, 2, y as i32);
+    }
     /// Cancel the NPC's type-2 events (`tick.md` §5.4), then one at the
     /// next frame (§5.2), after the state-54 check of §5.2 rule 4 (as
     /// the monster neutral start does, `units.md` §4.6).

@@ -521,6 +521,52 @@ pub fn missile_summon_class<X: Pending + UseRest>(
     crate::skills::use_::bodies::summon_class(&w, &t.skills, &ct, owner, skill)
 }
 
+/// The skill handlers of stats 83, 126, 127 and 188 (`skills/levels.md`
+/// §7.2): refresh all `0x0056DFA0`, every skill entry with a
+/// `passivestate` p > 0 in list order: state p on (`0x00639DB0`), then
+/// `0x00646D60`. Stats 83 / 188 only for a player of the layer's class
+/// (hirelings and disguised units: not written).
+pub fn skill_stat_refresh<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    stat: u16,
+    layer: u16,
+) {
+    if matches!(stat, 83 | 188) {
+        let c = if stat == 83 { layer } else { layer >> 3 };
+        let ok = sim
+            .units
+            .get(unit)
+            .is_some_and(|r| r.ty == UnitType::Player && r.class == u32::from(c));
+        if !ok {
+            return;
+        }
+    }
+    let t = h.tables.clone();
+    let entries = h
+        .skill_lists
+        .get(&unit)
+        .map(|l| l.view())
+        .unwrap_or_default();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    for e in entries {
+        let p = t
+            .skills
+            .skill(e.skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if p > 0 {
+            crate::skills::use_::bodies::BodyWorld::state_on(&mut w, unit, p, true);
+            crate::skills::use_::bodies::BodyWorld::passive_state_apply(&mut w, unit, &e);
+        }
+    }
+}
+
 /// The missile area bodies' scan (`missiles.md` §R9.6): the units
 /// `scan_unit(game, owner, x, y, r, f, …, noaura 0)` (`0x0056B7E0`,
 /// `skills/bodies.md` §2.12) accepts, in scan order, for the per-unit
@@ -559,6 +605,42 @@ pub fn missile_area_units<X: Pending + UseRest>(
         },
     );
     out
+}
+
+/// The ally test `0x00554DE0` for the missile bodies.
+pub fn missile_ally_test<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    a: UnitId,
+    b: UnitId,
+) -> bool {
+    let w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    BodyWorld::allied(&w, a, b)
+}
+
+/// The shout missile's hit (`missiles/bodies.md` §13 step 2): `shout_state`
+/// (`0x005D8290`, `skills/bodies.md` §6.8) on `unit` from `owner`.
+pub fn missile_shout_state<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    owner: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    crate::skills::use_::bodies::shout_state(&mut w, &t.skills, unit, owner, skill, level);
 }
 
 /// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`

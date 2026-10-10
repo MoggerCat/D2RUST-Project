@@ -44,7 +44,7 @@ REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
 DEFAULT_CACHE = os.path.join(REPO, "traces", "orig-cache")
 FORMAT_LINE = "check 1"
-CHANNELS = ("state", "draws", "rng", "packets", "items", "save", "frontend")
+CHANNELS = ("state", "draws", "rng", "packets", "items", "save", "frontend", "cstate")
 WINDOWS = os.name == "nt"
 
 
@@ -412,6 +412,34 @@ class Runner:
             code = max(code, 2) if code != 1 else 1
         return code
 
+    def cstate(self, save, sides):
+        """The cstate channel (state-snapshot.md §3 rule 5): the 1.14d client's own
+        unit sets (record_state.py --client-out; the recording of this check in
+        traces/pc1/client-state is the 1.14d side when it exists, else recorded;
+        D2_CSTATE_RECORD=1 records it again)
+        against d2-client state-dump --client-out, compared by cstate_diff.py."""
+        orig, d2rs = self.path("orig.cstate.jsonl"), self.path("d2rs.cstate.jsonl")
+        if "orig" in sides:
+            keep = os.path.join(REPO, "traces", "pc1", "client-state",
+                                self.c["name"].removesuffix("-cs") + ".cstate.jsonl")
+            if os.path.exists(keep) and not os.environ.get("D2_CSTATE_RECORD"):
+                shutil.copyfile(keep, orig)
+            else:
+                self.recorder("record_state.py", ["--snap-every", "1", "--client-out", orig],
+                              self.path("orig.state.jsonl"))
+        if "d2rs" in sides and not (self.reuse and os.path.exists(d2rs)):
+            args = ["state-dump"] + self.d2rs_common(save) + [
+                "--ticks", str(self.c["ticks"]), "--out", self.path("d2rs.state.jsonl"),
+                "--client-out", d2rs]
+            if self.d2rs_input() and not shared_script_error(self.d2rs_input()):
+                args += ["--input", self.d2rs_input()]
+            self.cargo("d2-client", args)
+        if sides != {"orig", "d2rs"}:
+            return None
+        argv = [sys.executable, os.path.join(HERE, "cstate_diff.py"), orig, d2rs,
+                "--next", str(self.next)] + self.json_args("cstate")
+        return self.sh(argv, check=False)
+
     def not_available(self, ch):
         print(f"[{ch}] not compared: no d2rs recorder for this channel yet "
               f"(scenario-diff.md §3 rule 4)")
@@ -640,7 +668,9 @@ def write_frame_schedule(raw, out):
     frame (server tick `f`), with the host clock of its cursor step: the
     cursor's `last_step` captured at the start of the next frame (the
     capture reads the cursor at frame start, `render/capture.md` §3.3),
-    `-` for the last frame (its step follows every compared draw); the
+    `-` for the last frame (its step follows every compared draw); the light quality and the
+    pointer position of the frame (host inputs: the pointer after a panel's cursor jump,
+    `ui/panels-3.md` §4.3, is where the OS put it); the
     cursor's `last_step` and `idle_since` at the first frame. A capture
     without them fails the check: d2rs never falls back to its own clock."""
     import json
@@ -661,10 +691,14 @@ def write_frame_schedule(raw, out):
         raise CheckError(f"{raw}: no captured frame: no frame schedule for d2rs")
     c0 = frames[0]["cursor"]
     rows = ["# frame-schedule 1", f"# cursor_last {c0['last_step']}",
-            f"# cursor_idle {c0['idle_since']}", "tick\tnow"]
+            f"# cursor_idle {c0['idle_since']}", "tick\tnow\tquality\tcursor_x\tcursor_y"]
     for i, r in enumerate(frames):
         now = frames[i + 1]["cursor"]["last_step"] if i + 1 < len(frames) else "-"
-        rows.append(f"{r['f']}\t{now}")
+        q = (r.get("light") or {}).get("quality")
+        cur = r.get("cursor") or {}
+        cx, cy = cur.get("x"), cur.get("y")
+        rows.append(f"{r['f']}\t{now}\t{'-' if q is None else q}\t"
+                    f"{'-' if cx is None else cx}\t{'-' if cy is None else cy}")
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
 
@@ -1066,6 +1100,8 @@ def main(argv=None):
             elif ch == "save":
                 r.shared_error = shared_script_error
                 codes[ch] = save_channel.run(r, save, sides)
+            elif ch == "cstate":
+                codes[ch] = r.cstate(save, sides)
             elif ch == "frontend":
                 import frontend_channel
                 codes[ch] = frontend_channel.run(r, save, sides)

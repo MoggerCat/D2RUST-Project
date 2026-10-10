@@ -39,19 +39,19 @@
 |   1. Quest flag records | 97–314 |
 |   2. Quest control and quest records | 315–421 |
 |   3. Game entry: picking the quest set | 422–469 |
-|   4. Events and dispatch | 470–554 |
-|   5. Quest updater and timers (tick step 8) | 555–576 |
-|   6. Status reporting | 577–771 |
-|   7. NPC dialog hooks | 772–804 |
-|   8. Act transitions, warps and portals | 805–892 |
-|   9. Quest items, rewards and helpers | 893–1085 |
-|   11. Acts II–V | 1086–1102 |
-| Constants & data dependencies | 1103–1117 |
-| Randomness | 1118–1145 |
-| Edge cases & original bugs | 1146–1164 |
-| Test vectors | 1165–1197 |
-| Provenance | 1198–1226 |
-| Open questions | 1227–1299 |
+|   4. Events and dispatch | 470–561 |
+|   5. Quest updater and timers (tick step 8) | 562–583 |
+|   6. Status reporting | 584–778 |
+|   7. NPC dialog hooks | 779–811 |
+|   8. Act transitions, warps and portals | 812–899 |
+|   9. Quest items, rewards and helpers | 900–1092 |
+|   11. Acts II–V | 1093–1109 |
+| Constants & data dependencies | 1110–1124 |
+| Randomness | 1125–1152 |
+| Edge cases & original bugs | 1153–1171 |
+| Test vectors | 1172–1204 |
+| Provenance | 1205–1233 |
+| Open questions | 1234–1306 |
 <!-- /index -->
 
 ## Summary
@@ -526,6 +526,13 @@ passes 0, so pick-up and drop events reach only active records.
    60 Nihlathak Boss; or its class id is 242 mephisto, 243 diablo,
    391 hellbovine, 544 baalcrab. Else 0.
 5. Dispatch event 8 along the victim's chain (§4.3) with force.
+
+Timing: the kill (`0x0057CCB0`) calls it after the victim's treasure drop,
+inside the tick's unit steps, so a quest drop it makes (Radament's `ass `,
+Hephasto's `hfh `) takes the next item GUID after the treasure items and is
+queued for update (prepended) after them: the tick's client pass announces
+it first (recorded 2026-10-10, `items-drops-nor-09` frame 36,
+`items-drops-nor-12` frame 113).
 
 #### 4.5 Player leaving (`0x00543BD0`)
 

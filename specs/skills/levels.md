@@ -29,13 +29,13 @@
 |   4. Mana cost | 307–346 |
 |   5. To-hit | 347–354 |
 |   6. Learning a skill | 355–416 |
-|   7. Skill stat callbacks | 417–610 |
-| Constants & data dependencies | 611–633 |
-| Randomness | 634–645 |
-| Edge cases & original bugs | 646–668 |
-| Test vectors | 669–730 |
-| Provenance | 731–771 |
-| Open questions | 772–803 |
+|   7. Skill stat callbacks | 417–619 |
+| Constants & data dependencies | 620–642 |
+| Randomness | 643–654 |
+| Edge cases & original bugs | 655–677 |
+| Test vectors | 678–739 |
+| Provenance | 740–780 |
+| Open questions | 781–812 |
 <!-- /index -->
 
 ## Summary
@@ -432,6 +432,15 @@ the item whose stats propagate, or none), the stat id with its layer
 | 98 `state` | §7.3 |
 | 151 `item_aura` | §7.5 |
 | 204 `item_charged_skill` | §7.6 |
+
+**d2rs wiring (rc-c012-a8bytes, REC-3780).** The stat lists raise the
+handler for stats 83, 126, 127, 188 (`ActionHooks::skill_stat_changed`);
+refresh all runs at the owner's next player update, before its state
+messages. 1.14d `bar-battle-command` frame 28: Battle Command's state list
+carries stat 127 (+1 all skills), and the same update re-sends 0xA8 for
+every passive state (74–83) with the raised values. Stats 83 / 188 run for
+a player of the layer's class only (hireling / disguise tests unwritten).
+Stats 97, 98, 107, 151, 204 are not routed through this path.
 
 #### 7.1 Oskill entries (stats 97, 107)
 

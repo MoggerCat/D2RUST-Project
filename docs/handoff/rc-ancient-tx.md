@@ -35,3 +35,14 @@ not d2-sim: LocalSeams is the Pending impl the state-dump uses.
   a5-warp-l110-siege-1-ama state 160/160 + rng 158/158 MATCH.
 - Open: 6 checks (anodized-elite, bonesaw-breaker, dac-farren, magma-torquer,
   pindleskin, vinvear-molech) differ at frame 16 on the game seed.
+
+## Update 2 (all 20 checks)
+- Cause 3: death-drop took Pending::superunique (None live); superunique TC now
+  from monster data (same fix landed upstream; merged).
+- Cause 4: anodized-elite: umod 9 fire death burst damages -> attacker's umod 7
+  mode-3 dispatch (0x005A2530 step) was dropped (world out). Deferred until the
+  outer dispatch ends (wiring/action/monsters.rs run_umods; PROVISIONAL order).
+- Charge remove callback 0x005D3310 added to the state-off match, with tests.
+- Result: 19 a5-su-* + a5-warp-l110-siege-1-ama state 0 differences; siege rng MATCH.
+  Other a5-*/gen-boss/gen-su/gen-mon-54x/gen-ai-*: no check moved to an earlier
+  divergence (first frames equal or later than the ledger's).

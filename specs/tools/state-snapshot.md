@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–199 |
-|   4. Comparison | 200–226 |
-| Constants & data dependencies | 227–230 |
-| Randomness | 231–234 |
-| Edge cases & original bugs | 235–253 |
-| Test vectors | 254–263 |
-| Provenance | 264–268 |
-| Open questions | 269–274 |
+|   3. Snapshot point and frame | 128–216 |
+|   4. Comparison | 217–243 |
+| Constants & data dependencies | 244–247 |
+| Randomness | 248–251 |
+| Edge cases & original bugs | 252–270 |
+| Test vectors | 271–280 |
+| Provenance | 281–285 |
+| Open questions | 286–291 |
 <!-- /index -->
 
 ## Summary
@@ -194,8 +194,25 @@ Unit = the unit record; path = unit +0x2C.
    17 checks are recorded (town arrival, cave warp, melee and kill,
    Magic Arrow, Fire Bolt, Frost Nova, Raise Skeleton, ground items,
    inventory picks, loaded items, level up, stats, states, corpse,
-   hire). The d2rs side (a dump of `d2-client`'s `ClientWorld` in the
-   same format) and the comparison are not written yet.
+   hire). The d2rs side is `d2-client state-dump --client-out FILE`
+   (`app/client_state.rs`; header `side` = `d2rs-client`): the client
+   model's units, set S from `ClientWorld::units`, set C from
+   `objclient.set_c`, one `snap` per server tick, **taken before that
+   tick's messages are read** (the 1.14d recorder snapshots at the tick
+   end, before the client's next receive; a snapshot after the frame's
+   receive is one frame early). Keys the model does not hold are gaps
+   (`tx`, `ty`, `act`, `own`, `q`, the item keys); a path the model never
+   writes is the zeroed allocation (`d` = 0, `sp` = 0). The comparison is
+   `tools/scenario-diff/cstate_diff.py` (the `cstate` channel of
+   `scenario_diff.py`, checks `traces/checks/<name>-cs.check`): units are
+   keyed by (`set`, `ut`, `g`) with a set C unit as `ut` + 8, the local
+   player's `s` is dropped on both sides (rule above), everything else
+   goes to `state_diff.py` unchanged. First run 2026-10-10 (rc-pc1-wine,
+   Wine): 16 of 17 checks DIVERGED, one PARTIAL with every compared field
+   equal over 70 frames; the first differences are the local player's
+   stat words at frame 3 on saves above level 1, walking server monsters
+   from frame 26 (1.14d copies the server path at the client update end,
+   `0x00465070`; d2rs predicts), and the item keys.
 
 ### 4. Comparison
 
