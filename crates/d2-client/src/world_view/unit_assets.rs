@@ -540,6 +540,7 @@ impl UnitArt {
                         .and_then(|f| facing(cell_centre(f.at), cell_centre(pos)))
                 })
                 .or(old.map(|f| f.dir64))
+                .or(unit.path_dir)
                 .unwrap_or(0);
             self.facing.insert(
                 unit.key,
