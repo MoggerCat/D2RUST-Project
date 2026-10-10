@@ -46,20 +46,20 @@
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
 |   7. Operate dispatch | 324–503 |
 |   8. Chests and breakables | 504–639 |
-|   9. Shrines | 640–755 |
-|   10. Doors, operate 8 (`0x00581D40`) | 756–779 |
-|   11. Wells, operate 22 (`0x005858A0`) | 780–811 |
-|   12. Portals, operate 15 (`0x00584870`) | 812–882 |
-|   13. Torch, operate 11 (`0x005843D0`) | 883–887 |
-|   14. Client messages | 888–915 |
-|   15. Not covered yet | 916–930 |
-|   16.–18. Moved | 931–937 |
-| Constants & data dependencies | 938–984 |
-| Randomness | 985–1031 |
-| Edge cases & original bugs | 1032–1098 |
-| Test vectors | 1099–1137 |
-| Provenance | 1138–1204 |
-| Open questions | 1205–1258 |
+|   9. Shrines | 640–761 |
+|   10. Doors, operate 8 (`0x00581D40`) | 762–785 |
+|   11. Wells, operate 22 (`0x005858A0`) | 786–817 |
+|   12. Portals, operate 15 (`0x00584870`) | 818–888 |
+|   13. Torch, operate 11 (`0x005843D0`) | 889–893 |
+|   14. Client messages | 894–921 |
+|   15. Not covered yet | 922–936 |
+|   16.–18. Moved | 937–943 |
+| Constants & data dependencies | 944–990 |
+| Randomness | 991–1037 |
+| Edge cases & original bugs | 1038–1104 |
+| Test vectors | 1105–1143 |
+| Provenance | 1144–1210 |
+| Open questions | 1211–1264 |
 <!-- /index -->
 
 ## Summary
@@ -746,6 +746,12 @@ stat 162 is "other" → a · stat162(P) / 100.
   := the shrine's position, target offset (+5i if i odd else −5i, +5j if
   j odd else −5j), skill level := clamp(stat 12 of P / 5 (signed), 1,
   8); created by `0x0059FA30`.
+- **Item drop near P** (`0x00582AC0`, gem 18 and the potions): the request
+  names no source unit (its unit fields stay zero), item level from P's
+  level, quality 2, spot from the floor search at P (`0x00555DA0`: start
+  (x+2, y+3) when a room exists there). The item takes its seeds from the
+  game seed (derive, then one step) and its own seed stays `{start, 666}`
+  with no draw; quantity (stat 70) := 1. Verified: `gen-shrine-18`.
 - **Potion drop** (21, 22; inline in `0x005830E0` / `0x00583410`): code
   index `0x00633680('opm ' / 'gpm ')` (−1 → fatal); per potion a free
   item spot next to P (`0x00555DA0`); none → that potion is skipped but
