@@ -700,10 +700,18 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
     hooks.x.not_att = not_att;
     // d2rs-own, unverified (q-assassin-gaps, REC-233): a listed pet is on the
     // player side (the summon's alignment effect, `0x005543B0`, is not wired).
+    // A monster owner's pets take the owner's alignment through the wired
+    // effect (a council member's Hydras are evil), so only the pets of
+    // players and allied owners are listed here.
     let pets: std::collections::BTreeSet<u32> = hooks
         .pet_lists
-        .values()
-        .flat_map(|l| l.entries.iter())
+        .iter()
+        .filter(|(o, _)| {
+            game.lists
+                .unit(**o)
+                .is_none_or(|e| e.ty != UnitType::Monster || e.allied)
+        })
+        .flat_map(|(_, l)| l.entries.iter())
         .flat_map(|e| e.nodes.iter().map(|n| n.guid as u32))
         .collect();
     let mut sides = BTreeMap::new();
@@ -1008,17 +1016,6 @@ impl Pending for LocalSeams {
     ) -> u32 {
         skill_events::action_frame(h, sim, unit, a1, a2)
     }
-    fn missile_area_units(
-        v: &mut d2_sim::wiring::action::View<'_, Self>,
-        game: &mut d2_sim::game::Game,
-        owner: UnitId,
-        at: (i32, i32),
-        r: i32,
-        f: u32,
-        noaura: bool,
-    ) -> Vec<UnitId> {
-        skill_events::missile_area_units(v, game, owner, at, r, f, noaura)
-    }
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }
@@ -1059,6 +1056,16 @@ impl Pending for LocalSeams {
         level: i32,
     ) -> (i32, i32) {
         skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_area_units(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+    ) -> Vec<UnitId> {
+        skill_events::missile_area_units(h, sim, owner, at, r, f)
     }
     fn missile_summon_spawn(
         h: &mut ActionHooks<Self>,

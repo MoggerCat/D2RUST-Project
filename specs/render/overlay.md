@@ -26,9 +26,9 @@
 |   5. Create call sites (1.14d) | 206–232 |
 | Constants & data dependencies | 233–244 |
 | Edge cases & original bugs | 245–258 |
-| Test vectors | 259–270 |
-| Provenance | 271–283 |
-| Open questions | 284–292 |
+| Test vectors | 259–284 |
+| Provenance | 285–297 |
+| Open questions | 298–306 |
 <!-- /index -->
 
 ## Summary
@@ -266,7 +266,21 @@ kind-8 cycle length 50 updates; the monster default height +75.
 | create id 140 twice | two records (stacking id) | §2 r5 |
 | create kind 8, state 40, U already has kind 8 of state 30 active | new record +0x3C = 0 | §3 r6 |
 
-Synthetic (from the rules); no capture yet.
+Synthetic (from the rules), except the `npcalert` row below.
+
+Captured (`draws-town-arrival-ama`, `gen-ui-hud`; 2026-10-10): S→C 0x8A
+for Warriv (guid 7) arrives in client update 23; the UI's kind-3 create
+of overlay 72 `npcalert` (`0x004B3380`, `client/msg-ui.md` §9 r3; a = b =
+0, rate `AnimRate` 9 × 16 = 144) runs at delivery, before that update's
+overlay walk, so the record is advanced once in the same update: the
+captures every second update draw frames 0, 1, 2, 3, 5, 6, … (+0x18 =
+144 · n after n updates). The record is drawn by `0x0046E300` in the
+front call, right after the host's last component cel, inside the host's
+unit draw (draw-list row "CelDraw" at `0x0046E539`, no unit row of its
+own), direction byte = the host's, draw mode 3 (`Trans`). d2rs: the UI
+queues its create / remove calls (`OverlayCall`); the world view's
+effect layer runs them before the next update's advance
+(`world_view::missiles`).
 
 ## Provenance
 

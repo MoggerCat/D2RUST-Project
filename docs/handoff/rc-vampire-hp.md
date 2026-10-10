@@ -17,11 +17,7 @@ Cause (fixed): the area scan behind missile area damage (srvhit 1 fireball,
 the wired missile view (`Pending::missile_area_units` returned none), so
 VampireFireball (class 129) exploded on the player with fire 1409 but hit
 nobody (1.14d: player life 11623 -> 10214, get-hit, draw at 0x0057CB00).
-Changes (d2-sim): `Pending::missile_area_units` is now a static fn on the
-missile `View` (+ `noaura`); `skill_events::missile_area_units` runs the real
-`scan_unit` (0x0056B7E0) on the `UseView`; `MissileWorld::area_units` /
-`scan_units` take `&mut Game`; d2-client overrides the hook. Spec note:
-missiles/missiles.md §R9.6. d2-sim nextest 4776/4776.
+Fix: the same area-scan fix landed first on integ-r23 (rc-rng-player-draws: `Pending::missile_area_units` via `with_sim`, `skill_events::missile_area_units`). After the merge no code of this branch remains; gen-mon-135 is EQUAL on that version. Spec: missiles/missiles.md §R9.6 (theirs).
 
 Ledger: docs/handoff/ledger/rc-vampire-hp.tsv (7 rows EQUAL).
 

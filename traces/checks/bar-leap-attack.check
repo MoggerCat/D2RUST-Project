@@ -11,7 +11,7 @@ save ScnBar --class bar --expansion --level 30 --all-skills 20 --right-skill 143
 seed 1234
 ticks 70
 seconds 300
-channels state
+channels state packets
 variant blood-moor-empty
 at 4 poke warp 2
 at 10 poke spawn 179 @x+4 @y normal

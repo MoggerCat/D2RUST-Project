@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 578–722 |
 |   R7. Lifetime and expiry | 723–776 |
 |   R8. Pierce | 777–803 |
-|   R9. Server-do and server-hit catalogues | 804–1041 |
-|   R10. Behaviour of the recorded missiles | 1042–1076 |
-|   R11. `missiles.txt` columns and their server use | 1077–1124 |
-| Constants & data dependencies | 1125–1151 |
-| Randomness | 1152–1190 |
-| Edge cases & original bugs | 1191–1217 |
-| Test vectors | 1218–1300 |
-| Provenance | 1301–1353 |
-| Open questions | 1354–1435 |
+|   R9. Server-do and server-hit catalogues | 804–1034 |
+|   R10. Behaviour of the recorded missiles | 1035–1069 |
+|   R11. `missiles.txt` columns and their server use | 1070–1117 |
+| Constants & data dependencies | 1118–1144 |
+| Randomness | 1145–1183 |
+| Edge cases & original bugs | 1184–1210 |
+| Test vectors | 1211–1293 |
+| Provenance | 1294–1346 |
+| Open questions | 1347–1437 |
 <!-- /index -->
 
 ## Summary
@@ -985,13 +985,6 @@ result bits per §R5. Helpers:
   4, 0x10 adds no result bit; only the "b ≠ 0 → clear 1" applies
   (asm of `0x0056B9C0`).
 
-The area scan of `area_damage`, `next_unit` and the other area bodies
-is the real `scan_unit` of `skills/bodies.md` §2.12 (acceptance tests of
-the skill use pipeline, default filter 0x8583 for f = 0), run on the
-skill use view; with no scan the fireball of a vampire (class 129)
-exploded on the player without damaging it (gen-mon-135 frame 135:
-1.14d player life 11623 → 10214, get-hit mode 4, draw at `0x0057CB00`).
-
 Bodies:
 
 1. **1 Fireball, Exploding / Freezing Arrow explosion** `0x005A9A70`:
@@ -1432,3 +1425,12 @@ Reading:
     bypass 103 / 104 / 106 → hit flags 0x100 / 0x200 / 0x400 (§R6.2;
     `0x005A89A0`).
 15. Does the server's 75 % speed step have the same `v > 0x100000` branch as the client's (`missiles/client.md` §C2 r7)? Settle: read the server speed step (R-section for missile speed) in the asm.
+
+**d2rs note (REC-2660, rc-rng-player-draws).** The `scan_unit` of
+`area_damage` (`0x0056BAD0`) runs on the skill use view and gathers the
+accepted units before the first per-unit hit; the original hits each in
+its callback. A hit that changes a later unit's acceptance (kill, move)
+would differ: PROVISIONAL, no measured case. Without the scan no area
+body (fireball, glacial spike, ...) reached any unit: no monster crit
+(`0x005A5560`), cold (`0x0057AF80`) or get-hit (`0x0057CB00`) draws on
+the player.

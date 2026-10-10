@@ -1569,16 +1569,17 @@ pub trait Pending {
     /// The units `scan_unit(game, owner, x, y, r, f, …, noaura 0)`
     /// (`skills/bodies.md` §2.12) accepts, in order, for the missile
     /// area bodies (`missiles.md` §R9.6). The scan runs on the skill use
-    /// view (`UseView`, which needs `UseRest`); the action view has no
-    /// provider. Default: none.
+    /// view (`UseView`, which needs `UseRest`), so a seam value that also
+    /// implements `UseRest` routes it to
+    /// [`crate::wiring::interaction::skill_events::missile_area_units`].
+    /// Default: none.
     fn missile_area_units(
-        v: &mut super::View<'_, Self>,
-        game: &mut Game,
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
         owner: UnitId,
         at: (i32, i32),
         r: i32,
         f: u32,
-        noaura: bool,
     ) -> Vec<UnitId>
     where
         Self: Sized,

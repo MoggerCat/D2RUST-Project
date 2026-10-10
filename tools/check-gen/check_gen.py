@@ -17,10 +17,14 @@ Families (one check per table row, written under traces/checks/gen/):
   shrine one shrine operated per reachable shrines.txt row
   ui    one UI scenario (a panel opened by key, a hover tip, the control panel) per group of
         system.ui ledger rows: draws channel, input script, compared at a fixed tick
+  sysc  one scenario per client / sim / seam / flow spec section the ledger lists
+        (system.client|sim|seams|flows.*) that a poke or input reaches
   obj   one object created and operated per objects.txt row (interact-operate-*)
   itemq the same items at each quality (low .. crafted) over three game seeds
   aud   one audio-diff scenario per reachable system.audio ledger row group (channel
         audio; written to traces/audio/gen/, outside the scenario-diff suite)
+  npc   one talk scenario per town NPC the ledger has no check for (interact, chat open,
+        chat close; state + packets channels)
   item  a census of ITEM_CHUNK base items per check, each created on the ground by
         the game's own creation path (poke `item`), compared by the items channel
 
@@ -43,7 +47,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -335,7 +339,7 @@ def fam_skill(ctx):
             c = Check(
                 f"gen-skill-{cl}-{sid}", "skill", f"skills.txt Id {sid}",
                 f"{cl} skill {name} ({sid})", f"{CLASS_SAVE[cl]} --class {cl} --expansion "
-                f"--level 30 --all-skills 20 --right-skill {sid}", 70, 300, "state",
+                f"--level 30 --all-skills 20 --right-skill {sid}", 70, 300, "state packets",
                 BM + ["input frame 20; rclick 330 300"], variant="blood-moor-empty",
                 comment=[f"Cast of {name} (skill {sid}, class {cl}): expansion character, level 30, "
                          f"every skill at 20, right skill {sid}; warp to the Blood Moor "
@@ -521,6 +525,56 @@ QUALITIES = {1: "low", 2: "normal", 3: "superior", 4: "magic", 5: "set", 6: "rar
              7: "unique", 8: "crafted"}
 QSEEDS = [(0x1234, 666), (0x2222, 77), (0x5A5A, 4242)]
 QEXTRA = ["rin", "amu", "cm1", "jew"]
+
+
+# town NPCs without a hand-written talk check: (ledger name, monstats class, act 1..5,
+# quest rows the first talk can touch).  Source: the vendors.tsv rows of the ledger.
+NPC_ROWS = [
+    ("warriv1", 155, 1, ["quest.a1q0-warriv-gossip"]), ("charsi", 154, 1, []),
+    ("gheed", 147, 1, []), ("cain1", 146, 1, []), ("navi", 266, 1, []),
+    ("geglash", 200, 2, []), ("act2guard2", 331, 2, []), ("act2guard4", 377, 2, []),
+    ("act2guard5", 378, 2, []),
+    ("alkor", 254, 3, []), ("hratli", 253, 3, ["quest.a3q0-hratli-gossip"]),
+    ("ormus", 255, 3, []), ("natalya", 297, 3, []), ("meshif2", 264, 3, []),
+    ("cain3", 245, 3, []), ("tyrael1", 251, 3, []),
+    ("halbu", 257, 4, []), ("jamella", 405, 4, []), ("izualghost", 406, 4, []),
+    ("malachai", 408, 4, []), ("tyrael2", 367, 4, ["quest.a4q0-tyrael-gossip"]),
+    ("cain4", 246, 4, []),
+    ("drehya", 512, 5, []), ("tyrael3", 521, 5, []),
+]
+
+# ledger rows the item-quality census reaches: item creation at a forced quality runs the
+# affix pick / unique pick / socket / ethereal rolls of that quality and the items channel
+# compares the whole 0x9C stream (the rolls are not forced one by one).
+ITEMQ_AREAS = {
+    "all": ["item.gen.create-wrapper", "item.gen.sockets", "item.gen.ethereal",
+            "item.affix.ids-slots", "item.affix.fit-tests", "item.affix.alvl"],
+    "low": ["item.quality.low", "item.quality.dispatch"],
+    "normal": ["item.quality.dispatch"],
+    "superior": ["item.quality.superior", "item.quality.dispatch"],
+    "magic": ["item.affix.magic", "item.affix.magic-roller", "item.quality.dispatch"],
+    "set": ["item.quality.set", "item.set-item", "item.quality.dispatch"],
+    "rare": ["item.affix.rare", "item.affix.rare-name", "item.quality.dispatch"],
+    "unique": ["item.quality.unique", "item.unique", "item.quality.dispatch"],
+    "crafted": ["item.affix.crafted", "item.props.craft", "item.quality.dispatch"],
+}
+
+
+def fam_npc(ctx):
+    out = []
+    for name, cls, act, quests in NPC_ROWS:
+        lines = [f"at 4 poke goto unit 1:{cls}",
+                 f"at 14 send InteractWithEntity type=1 id=@1:{cls}",
+                 f"at 16 send InitEntityChat id=@1:{cls}",
+                 f"at 18 send TerminateEntityChat id=@1:{cls}"]
+        c = Check(f"gen-npc-{name}", "npc", f"npc {name} ({cls})",
+                  f"talk to {name} (monstats {cls}, act {act})",
+                  ACT_SAVE[act - 1], 50, 300, "state packets", lines,
+                  comment=["NPC talk (world/npc.md): goto the NPC, interact (0x13), open the "
+                           "chat (0x2F), close it (0x30); state + packets channels."])
+        c.extra = {"areas": [f"npc.{name}"] + quests}
+        out.append(c)
+    return out
 
 
 def fam_itemq(ctx):
@@ -745,7 +799,7 @@ def fam_obj(ctx):
         c = Check(
             f"gen-obj-{oid}", "obj", f"objects.txt Id {oid}",
             f"object {name} ({oid}) created and operated",
-            "ScnAma --class ama --expansion", 80, 300, "state items rng",
+            "ScnAma --class ama --expansion", 80, 300, "state items rng packets",
             [f"at 10 poke object {oid} @x @y",
              f"at 20 poke operate @2:{oid}"],
             comment=[f"Object {oid} {name} ({desc}; OperateFn {t.get(r, 'OperateFn')}, "
@@ -959,8 +1013,248 @@ def fam_render(ctx):
     return out
 
 
+def fam_monskill(ctx):
+    """One check per monster skill row (skills.txt, charclass blank) that has a ledger row
+    `skill.monster.<slug>`: a monster class that lists the skill in monstats Skill1..8 (first
+    enabled non-boss class, else the lowest enabled) is spawned next to the player in the Blood
+    Moor; its AI picks and casts the skill on its own (specs/skills/monster-skills.md)."""
+    sk = excel(ctx.excel, "skills.txt", ["skill", "Id", "charclass"])
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx", "enabled", "boss"] +
+               [f"Skill{k}" for k in range(1, 9)])
+    wanted = {a[len("skill.monster."):] for a, _ in load_ledger(ctx.ledger)
+              if a.startswith("skill.monster.") and a != "skill.monster.table"}
+    users = {}
+    for r in ms.rows:
+        hc = ms.get(r, "hcIdx")
+        if not hc.isdigit():
+            continue
+        key = (ms.get(r, "enabled") != "1", ms.get(r, "boss") == "1", int(hc))
+        for k in range(1, 9):
+            n = ms.get(r, f"Skill{k}")
+            if n:
+                users.setdefault(n, []).append((key, int(hc), ms.get(r, "Id"), k))
+    out = []
+    for r in sk.rows:
+        name = sk.get(r, "skill")
+        if sk.get(r, "charclass") or not name or slug(name) not in wanted:
+            continue
+        sid = int(sk.get(r, "Id"))
+        if name not in users:
+            raise GenError(f"monster skill {name} ({sid}) is used by no monstats row")
+        _, hc, ident, slot = min(users[name])
+        c = spawn_check(f"gen-monskill-{sid}", "monskill", f"skills.txt Id {sid}",
+                        f"monster skill {name} ({sid}), class {hc} {ident}",
+                        f"spawn {hc} @x+3 @y-2 normal",
+                        [f"Monster skill {name} (skill {sid}): class {hc} ({ident}, monstats "
+                         f"Skill{slot}) spawned normal next to the player; its AI casts the "
+                         "skill on its own (the cast is compared, not forced)."], ticks=500)
+        c.save = "ScnAma --class ama --expansion --level 70"
+        c.comment.append("Expansion character, level 70: it outlives the first seconds, so the AI "
+                         "gets many think frames to pick the skill.")
+        c.extra = {"skill": sid, "slug": slug(name), "class": hc}
+        out.append(c)
+    return out
+
+
+# Quest monsters (ledger monster.quest.*): kind of monster by spawn directive.
+# (area suffix, [(spawn directive kind, row or class)])
+QKILL = [("ancients", [("su", 44), ("su", 45), ("su", 46)]), ("baal", [("boss", 544)]),
+         ("blood-raven", [("boss", 267)]), ("cain-rescue-guard", [("su", 3), ("su", 4)]),
+         ("countess", [("su", 6)]), ("cow-king", [("su", 39)]),
+         ("griswold", [("boss", 365)]), ("hellforge-hephasto", [("su", 41)]),
+         ("izual", [("boss", 256)]), ("nihlathak", [("boss", 526)]),
+         ("radament", [("boss", 229)]), ("summoner", [("boss", 250)])]
+
+
+def fam_qkill(ctx):
+    """Quest monster kill: the monster (or superunique) spawned in the empty Blood Moor, its
+    life set to 1, killed by a missile; the state channel compares the death, corpse and
+    drops frame by frame."""
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx"])
+    cls = {ms.get(r, "Id"): ms.get(r, "hcIdx") for r in ms.rows if ms.get(r, "hcIdx").isdigit()}
+    su = excel(ctx.excel, "superuniques.txt", ["Superunique", "Class", "hcIdx"])
+    out = []
+    for slug_, parts in QKILL:
+        # a table without the superunique row (the selftest's synthetic view) skips that quest
+        if any(k == "su" and (n >= len(su.rows) or su.get(su.rows[n], "Class") not in cls)
+               for k, n in parts):
+            continue
+        lines, refs = [], []
+        for i, (kind, n) in enumerate(parts):
+            dx = 4 + 3 * i
+            if kind == "su":
+                refs.append(cls[su.get(su.rows[n], "Class")])
+                lines.append(f"at 30 poke superunique {n} @x+{dx} @y+4")
+            else:
+                refs.append(str(n))
+                lines.append(f"at 30 poke spawn {n} @x+{dx} @y+4 normal")
+        for r in dict.fromkeys(refs):
+            lines.append(f"at 50 poke stat @1:{r} 6 0 256")
+        for i in range(len(parts)):
+            lines.append(f"at 54 poke missile 58 @x @y @x+{4 + 3 * i} @y+4 skill 36 30")
+        c = Check(f"gen-qkill-{slug_}", "qkill", "quest monster " + slug_,
+                  f"quest monster {slug_} spawned and killed", "ScnAma --class ama --expansion",
+                  180, 360, "state", BM + SEEDS + lines, variant="blood-moor-empty",
+                  comment=[f"Quest monster {slug_} ({', '.join(f'{k} {n}' for k, n in parts)}) "
+                           "spawned next to the player in the empty Blood Moor, life set to 1 "
+                           "at frame 50, hit by missile 58 with skill 36 level 30 (the combat-kill-fallen form) at frame 54; the state channel compares "
+                           "death, corpse, drops and quest-record effects frame by frame."])
+        c.extra = {"area": f"monster.quest.{slug_}"}
+        out.append(c)
+    return out
+
+
+# system.client / system.sim / system.seams / system.flows rows: the
+# sections are behaviour of the client model, the message handlers and the
+# server pass, which a scenario reaches through its inputs: the S->C bytes
+# (packets), the unit state (state), the RNG draws, the items and the save.
+# Each scenario template is a form an existing recorded check already runs
+# on both sides; the row decides which template carries it.
+SYSC_T = {
+    "login": (60, "ScnAma --class ama --expansion", "packets state rng", []),
+    "walk": (100, "ScnAma --class ama --expansion", "packets state",
+             ["at 6 send Walk x=@x+6 y=@y", "at 20 send Run x=@x y=@y+5",
+              "at 36 send Walk x=@x-3 y=@y-3"]),
+    "talk": (30, "ScnAma --class ama --expansion", "state packets",
+             ["at 4 poke pos @player 4888 4228", "at 7 poke pos @player 4903 4224",
+              "at 10 poke pos @player 4918 4216", "at 13 poke pos @player 4928 4210",
+              "at 16 poke talk @1:148 trade"]),
+    "waypoint": (30, "ScnAma --class ama --expansion", "state packets",
+                 ["at 4 poke pos @player 4888 4220", "at 7 poke pos @player 4896 4213",
+                  "at 10 poke operate @2:119"]),
+    "stash": (30, "ScnAma --class ama --expansion", "state packets",
+              ["at 10 poke object 267 @x @y", "at 20 poke operate @2:267"]),
+    "act": (100, "ScnAma --class ama --expansion", "packets state",
+            ["at 10 poke warp 40"]),
+    "warp": (60, "ScnAma --class ama --expansion", "packets state", ["at 4 poke warp 2"]),
+    "skill": (80, "ScnAma --class ama --expansion --level 12 --stat 4=3 --stat 5=2",
+              "packets state rng",
+              ["at 10 send SelectSkill skill=36 left=0 item=0xFFFFFFFF",
+               "at 20 send RightSkill x=@x+4 y=@y+4"]),
+    "item": (60, "SavAma --class ama --expansion", "items packets state",
+             ["at 4 poke seed-game 0x00001234 666", "at 4 poke item hp1 @x+2 @y",
+              "at 4 poke item gld @x+2 @y+3", "at 10 send PickItem type=4 id=@4 cursor=0"]),
+    "state": (50, "ScnAma --class ama --expansion", "state packets",
+              ["at 6 poke state @player 2 on", "at 30 poke state @player 2 off"]),
+    "stat": (40, "ScnAma --class ama --expansion", "state packets",
+             ["at 6 poke stat @player 0 0 50"]),
+    "mon": (80, "ScnAma --class ama --expansion", "state rng packets",
+            ["at 10 poke spawn 19 @x+5 @y-4 normal"]),
+    "save": (20, "SavAma --class ama --expansion", "save", []),
+    "draw": (80, "ScnAma --class ama --expansion", "draws", ["draws-at 73"]),
+}
+
+# (area regex, template or None, reason when None); first match wins
+SYSC_RULES = [
+    (r"system\.client\.assets\.a-|system\.client\.audio\.|system\.client\.render-pipeline\.a-|system\.client\.ui\.a-", None,
+     "design of d2rs (ours, section A) or audio: no 1.14d behaviour or recorder to compare"),
+    (r"system\.client\.(assets|render-pipeline|ui)\.b-", "draw", None),
+    (r"system\.client\.bridge\.(1|3|7|8|9|10)-", None,
+     "d2rs-internal seam (bridge boundary, link, Bevy mirror, pacing, versioning, outputs): no 1.14d counterpart"),
+    (r"system\.client\.bridge\.(2|5|6)-", "login", None),
+    (r"system\.client\.bridge\.4-", "walk", None),
+    (r"system\.client\.model\.(1|2|3|4|5|7|9|10|11|13)-", "login", None),
+    (r"system\.client\.model\.(6|8)-", "walk", None),
+    (r"system\.client\.model\.12-", "warp", None),
+    (r"system\.client\.model\.15-", "stash", None),
+    (r"system\.client\.model\.19-", "mon", None),
+    (r"system\.client\.model\.(14|16|17|18)-", None,
+     "needs a hireling / a teleport with a hireling / UI writes / audio inputs: no poke or input reaches it"),
+    (r"system\.client\.msg-skills\.(1|2|3|4|5|6|9)-", "login", None),
+    (r"system\.client\.msg-skills\.(7)-", "state", None),
+    (r"system\.client\.msg-skills\.(8|10)-", "skill", None),
+    (r"system\.client\.msg-stats-items\.1-", "stat", None),
+    (r"system\.client\.msg-stats-items\.(2|3|5)-", "item", None),
+    (r"system\.client\.msg-stats-items\.4-", None, "hireling stats: no hireling in the scenario saves"),
+    (r"system\.client\.msg-ui\.(1|12|13|14|21|22)-", "login", None),
+    (r"system\.client\.msg-ui\.2-", "waypoint", None),
+    (r"system\.client\.msg-ui\.(3|8)-", "stash", None),
+    (r"system\.client\.msg-ui\.(5|9|10|11|16|17|18)-", "talk", None),
+    (r"system\.client\.msg-ui\.20-", "act", None),
+    (r"system\.client\.msg-ui\.(4|6|7|15|19)-", None,
+     "chat text, hire offers, quest special and event text: no input or poke triggers the S->C message"),
+    (r"system\.client\.msg-units\.(1|8)-", "login", None),
+    (r"system\.client\.msg-units\.2-", "mon", None),
+    (r"system\.client\.msg-units\.(4|7)-", "walk", None),
+    (r"system\.client\.msg-units\.5-", "stat", None),
+    (r"system\.client\.msg-units\.6-", "state", None),
+    (r"system\.client\.msg-units\.3-", None, "0x15 ReassignPlayer needs a second player"),
+    (r"system\.client\.stat-lists\.(1|4)-", "stat", None),
+    (r"system\.client\.stat-lists\.2-", "item", None),
+    (r"system\.client\.stat-lists\.3-", "state", None),
+    (r"system\.flows\.act-change\.(1|3)-", "act", None),
+    (r"system\.flows\.act-change\.2-", "warp", None),
+    (r"system\.flows\.client-frame\.(1|2)-", "walk", None),
+    (r"system\.flows\.client-frame\.3-", None, "d2rs mapping of one Bevy frame: no 1.14d counterpart"),
+    (r"system\.flows\.save-exit\.5-", "save", None),
+    (r"system\.flows\.save-exit\.(1|2|3|4)-", None,
+     "save-and-exit leaves the game / periodic save: the scenario runner has no exit input and the save channel reads the file at the end"),
+    (r"system\.flows\.server-tick\.(1|2|3)-", "login", None),
+    (r"system\.flows\.server-tick\.4-", "mon", None),
+    (r"system\.seams\.(bridge-app|messages|sim-server)\.", "login", None),
+    (r"system\.seams\.drlg-coords\.", "warp", None),
+    (r"system\.seams\.item-grids", "item", None),
+    (r"system\.seams\.world-screen\.", "draw", None),
+    (r"system\.sim\.intents-events\.(1|3|8)-", "login", None),
+    (r"system\.sim\.intents-events\.(2|7|9)-", "walk", None),
+    (r"system\.sim\.intents-events\.(4|5|6)-", None,
+     "mapping, machine-readable tables and the comparison rule itself: not behaviour a run compares"),
+    (r"system\.sim\.pathing\.4-", "walk", None),
+    (r"system\.sim\.pathing\.9-", "warp", None),
+    (r"system\.sim\.pets\.", None, "needs a summoned pet: the scenario saves have no summon skill and no poke creates a pet"),
+    (r"system\.sim\.stat-lists\.(1|2|3|4|5|6|7|11)-", "stat", None),
+    (r"system\.sim\.stat-lists\.(8|9|10)-", "state", None),
+    (r"system\.sim\.stats\.", "stat", None),
+    (r"system\.sim\.tick\.8-", None, "wall clock and host-only parts: no tick-number comparison"),
+    (r"system\.sim\.tick\.", "login", None),
+    (r"system\.sim\.units\.7-", None, "scheduler inventory table, not a run behaviour"),
+    (r"system\.sim\.units\.8-", "skill", None),
+    (r"system\.sim\.units\.", "mon", None),
+]
+
+
+def sysc_rows(ctx):
+    """(area, source) of the ledger snapshot that the rules carry or skip."""
+    return [(a, s) for a, s in load_ledger(ctx.ledger)
+            if re.match(r"system\.(client|sim|seams|flows)\.", a)]
+
+
+def sysc_rule(area):
+    for rx, tpl, why in SYSC_RULES:
+        if re.match(rx, area):
+            return tpl, why
+    return None, "no rule"
+
+
+def fam_sysc(ctx):
+    """One check per ledger row system.client|sim|seams|flows.* whose rule
+    names a scenario template (SYSC_T); the rows with no reachable
+    behaviour are not generated (SYSC_RULES gives the reason, the ledger
+    note carries it). Rows with an existing check (EQUAL / DIVERGED) are
+    not in the snapshot."""
+    out = []
+    for area, src in sysc_rows(ctx):
+        tpl, _ = sysc_rule(area)
+        if tpl is None:
+            continue
+        ticks, save, chans, lines = SYSC_T[tpl]
+        short = slug(area[len("system."):])[:60].strip("-")
+        c = Check(
+            f"gen-sysc-{short}", "sysc", area, f"{area}: scenario {tpl}",
+            save, ticks, 300, chans, list(lines),
+            comment=[f"Ledger row {area} ({src}): carried by the {tpl} scenario "
+                     f"(inputs {', '.join(l.split(' ', 2)[2].split(' ')[0] for l in lines if l.startswith('at ')) or 'none: the login and tick stream'}); "
+                     "the channels compare what the section specifies on both sides "
+                     "(S->C bytes, unit state, RNG draws, items, save, draws). "
+                     "The check is the template's reach into the section, not a proof of "
+                     "every rule in it (PROVISIONAL REC-2550)."])
+        c.extra = {"area": area}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1022,13 +1316,22 @@ def resolve_area(c, areas):
     elif f == "mon":
         pick = [a for a, s in areas if a.startswith("monster.")
                 and s.endswith(f"(hcIdx {x['class']})")]
+    elif f == "monskill":
+        pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
+    elif f == "qkill":
+        pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
+    elif f == "sysc":
+        pick = [x["area"]]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":
         c.area = ",".join(x["rows"]) if x["rows"] else "-"
         return
-    elif f == "aud":
+    elif f in ("aud", "npc"):
         c.area = ",".join(x["areas"])
+        return
+    elif f == "itemq":
+        c.area = ",".join(ITEMQ_AREAS["all"] + ITEMQ_AREAS[x["quality"]])
         return
     elif f == "fmt":
         pre = FMT_ROWS[c.name]

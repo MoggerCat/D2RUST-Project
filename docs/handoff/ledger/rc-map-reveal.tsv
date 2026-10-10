@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-system.seams.messages.warp-0x07-frame	system	systems	poke warp tick-end (0x0053AEC0 queues 0x07)	specs/tools/poke.md	draft	combat-melee-fallen	DIVERGED@1	yes	0	n	claude/rc-map-reveal	DIVERGED	S	rc-map-reveal: 0x07 now frame 3 (packets 147->149/150); first divergence now frame 46 MonsterState 0x69
+system.seams.messages.warp-0x07-frame	system	systems	poke warp tick-end (0x0053AEC0 queues 0x07)	specs/tools/poke.md	draft	combat-melee-fallen	DIVERGED@46	yes	0	n	claude/rc-map-reveal	DIVERGED	S	rc-map-reveal: 0x07 now frame 3 (packets 147->149/150); first divergence now frame 46 MonsterState 0x69

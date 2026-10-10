@@ -1,0 +1,29 @@
+# pc1-pixel-compare 1
+# tool: d2rs-probes/pixel_check.py: 1.14d record_frames.py PNG of the last drawn frame at or before the check's draws-at tick vs d2-client play --dump-draws --at-tick T --dump-image, RGB pixels equal; real Windows 10, Intel HD Graphics 630 (Vulkan), d2rs at claude/local-pc1-today 0ff6dd380, 2026-10-10
+check	tick	orig_frame_f	equal_pixels	total_pixels	percent	diff_bbox
+draws-town-arrival-ama	73	72	468292	480000	97.56	0 0 794 582
+ui-draws-automap-ama	73	73	448184	480000	93.37	0 0 789 582
+ui-draws-belt-ama	73	73	470428	480000	98.01	0 0 771 582
+ui-draws-char-skill-ama	73	73	474563	480000	98.87	12 74 713 582
+ui-draws-character-ama	73	73	469803	480000	97.88	12 1 777 582
+ui-draws-help-ama	73	73	58554	480000	12.20	0 0 799 586
+ui-draws-hover-life-ama	73	72	468885	480000	97.68	0 0 799 582
+ui-draws-hover-mana-ama	73	73	471036	480000	98.13	0 0 800 582
+ui-draws-hover-npc-ama	73	73	471036	480000	98.13	0 0 800 582
+ui-draws-hover-stamina-ama	73	73	471338	480000	98.20	0 0 799 600
+ui-draws-hover-xp-ama	73	73	471039	480000	98.13	0 0 800 583
+ui-draws-inv-char-ama	73	73	478504	480000	99.69	12 235 404 582
+ui-draws-inv-char-l5-ama	73	72	478567	480000	99.70	17 235 404 582
+ui-draws-inv-char-tip-ama	73	72	465905	480000	97.06	12 252 588 582
+ui-draws-inventory-ama	73	73	471070	480000	98.14	0 0 404 582
+ui-draws-item-tip-ama	73	73	459828	480000	95.80	0 1 588 582
+ui-draws-left-skill-pick-ama	73	72	448075	480000	93.35	0 0 783 595
+ui-draws-minipanel-ama	73	72	468550	480000	97.61	0 0 799 600
+ui-draws-msglog-ama	73	73	119614	480000	24.92	0 0 786 582
+ui-draws-party-ama	73	72	467690	480000	97.44	0 0 771 582
+ui-draws-quest-inv-ama	73	73	478591	480000	99.71	12 235 549 582
+ui-draws-quest-skill-ama	73	72	474653	480000	98.89	12 74 713 582
+ui-draws-questlog-ama	73	73	469908	480000	97.90	12 1 777 582
+ui-draws-right-skill-pick-ama	73	73	448808	480000	93.50	0 0 799 595
+ui-draws-skillbar-ama	73	72	460940	480000	96.03	0 0 799 582
+ui-draws-skilltree-ama	73	72	467426	480000	97.38	0 1 713 592

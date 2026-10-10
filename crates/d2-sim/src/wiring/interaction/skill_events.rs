@@ -24,7 +24,6 @@
 //! is never scheduled in 1.14d and its body is not specified.
 
 use crate::combat::apply_melee;
-use crate::game::Game;
 use crate::skills::levels::skill_level;
 use crate::skills::use_::bodies::b4_mon::monster_mode_missile;
 use crate::skills::use_::bodies::{melee_setup, mode_damage, BodyWorld};
@@ -115,40 +114,6 @@ pub fn monster_skill_start<X: Pending + UseRest>(
         },
     };
     start(&mut w, &t.skills, unit)
-}
-
-/// The units `scan_unit(game, owner, x, y, r, f, …, noaura)` (`0x0056B7E0`,
-/// `skills/bodies.md` §2.12) accepts, in callback order, for the missile
-/// area bodies (`missiles/missiles.md` §R9.6 `area_damage`, `next_unit`,
-/// the `scan_unit` of the area bodies): the scan runs on the skill use
-/// view because the acceptance tests are the use pipeline's.
-pub fn missile_area_units<X: Pending + UseRest>(
-    v: &mut View<'_, X>,
-    game: &mut Game,
-    owner: UnitId,
-    at: (i32, i32),
-    r: i32,
-    f: u32,
-    noaura: bool,
-) -> Vec<UnitId> {
-    let t = v.h.tables.clone();
-    let mut w = UseView { cv: v.combat(game) };
-    let mut out = Vec::new();
-    crate::skills::use_::bodies::scan_unit(
-        &mut w,
-        &t.skills,
-        &t.combat,
-        owner,
-        at,
-        r,
-        f,
-        noaura,
-        &mut |_, u| {
-            out.push(u);
-            1
-        },
-    );
-    out
 }
 
 /// A monster's aura as its right skill (`monsters/init.md` §19.5 umod 30
@@ -530,6 +495,46 @@ pub fn missile_summon_class<X: Pending + UseRest>(
         },
     };
     crate::skills::use_::bodies::summon_class(&w, &t.skills, &ct, owner, skill)
+}
+
+/// The missile area bodies' scan (`missiles.md` §R9.6): the units
+/// `scan_unit(game, owner, x, y, r, f, …, noaura 0)` (`0x0056B7E0`,
+/// `skills/bodies.md` §2.12) accepts, in scan order, for the per-unit
+/// area hit (`0x0056B9C0`) the missile body then runs on each.
+/// PROVISIONAL (REC-2660): the units are gathered before the first hit
+/// is applied; the original hits each in the scan callback.
+pub fn missile_area_units<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    owner: UnitId,
+    at: (i32, i32),
+    r: i32,
+    f: u32,
+) -> Vec<UnitId> {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let mut out = Vec::new();
+    crate::skills::use_::bodies::scan_unit(
+        &mut w,
+        &t.skills,
+        &ct,
+        owner,
+        at,
+        r,
+        f,
+        false,
+        &mut |_, u| {
+            out.push(u);
+            1
+        },
+    );
+    out
 }
 
 /// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`
