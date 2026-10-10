@@ -13,13 +13,15 @@
   "SceSor",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.packets.jsonl"
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "03bc67f5197d499231b147d6312ed082be4d6cd2985bb8db9d311879f0fb57ab",
-   "size": 193127
+   "sha256": "9adea37cf15195804ef98137cbbf2e229a482299240e96b9fd4724c45214c1c6",
+   "size": 97143
   }
  },
  "format": "orig-cache-1",
@@ -28,7 +30,7 @@
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "cdb34be43fbbad3d6b4dde997201cf9ac810447ec77c1b633ddcd85d46e51a47",
+  "recorder": "890e1d10983891572c923cd4a25dd5dbaeb22e6940d455ea36c91b02eafaacd6",
   "save": "1ceabea53f96762dc8b0cd7ce51be2693a28d29d1267eb8ab9a9dd8c8b693167"
  }
 }
