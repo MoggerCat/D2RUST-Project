@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2984
 - Rows set exercised = yes from the coverage reports' seen lists: 14
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6586
+- Duplicate areas between parts: 6591
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1162,6 +1162,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.toorc-icefist`: rc-c018-monstate.tsv:9 kept, rc-c022-playerstate.tsv:20 dropped
   - `monster.superunique.wyand-voidfinger`: rc-c018-monstate.tsv:10 kept, rc-c022-playerstate.tsv:21 dropped
   - `audio.cast-frost-nova-sor.novaice`: rc-audio-rain2.tsv:3 kept, rc-client-skill-do.tsv:3 dropped
+  - `monster.deathmauler1`: rc-c022-playerstate.tsv:22 kept, rc-combat-seed-3.tsv:14 dropped
+  - `monster.deathmauler2`: rc-c022-playerstate.tsv:23 kept, rc-combat-seed-3.tsv:15 dropped
+  - `monster.deathmauler3`: rc-c022-playerstate.tsv:24 kept, rc-combat-seed-3.tsv:16 dropped
+  - `monster.deathmauler4`: rc-c022-playerstate.tsv:25 kept, rc-combat-seed-3.tsv:17 dropped
+  - `monster.deathmauler5`: rc-c022-playerstate.tsv:26 kept, rc-combat-seed-3.tsv:18 dropped
   - `system.render.camera.1-frame-size-and-play-area`: rc-00-local-pc1-today.tsv:25 kept, rc-draw-row173.tsv:41 dropped
   - `system.render.camera.2-world-coordinates-client-pixels`: rc-00-local-pc1-today.tsv:27 kept, rc-draw-row173.tsv:42 dropped
   - `system.render.camera.3-camera-origins-once-per-drawn-frame`: rc-00-local-pc1-today.tsv:28 kept, rc-draw-row173.tsv:43 dropped
@@ -1350,11 +1355,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.siegebeast2`: rc-combat-seed-3.tsv:51 kept, rc-gen-mon-triage.tsv:109 dropped
   - `monster.siegebeast3`: rc-combat-seed-3.tsv:52 kept, rc-gen-mon-triage.tsv:110 dropped
   - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-gen-mon-triage.tsv:122 dropped
-  - `monster.deathmauler1`: rc-combat-seed-3.tsv:14 kept, rc-gen-mon-triage.tsv:134 dropped
-  - `monster.deathmauler2`: rc-combat-seed-3.tsv:15 kept, rc-gen-mon-triage.tsv:135 dropped
-  - `monster.deathmauler3`: rc-combat-seed-3.tsv:16 kept, rc-gen-mon-triage.tsv:136 dropped
-  - `monster.deathmauler4`: rc-combat-seed-3.tsv:17 kept, rc-gen-mon-triage.tsv:137 dropped
-  - `monster.deathmauler5`: rc-combat-seed-3.tsv:18 kept, rc-gen-mon-triage.tsv:138 dropped
+  - `monster.deathmauler1`: rc-c022-playerstate.tsv:22 kept, rc-gen-mon-triage.tsv:134 dropped
+  - `monster.deathmauler2`: rc-c022-playerstate.tsv:23 kept, rc-gen-mon-triage.tsv:135 dropped
+  - `monster.deathmauler3`: rc-c022-playerstate.tsv:24 kept, rc-gen-mon-triage.tsv:136 dropped
+  - `monster.deathmauler4`: rc-c022-playerstate.tsv:25 kept, rc-gen-mon-triage.tsv:137 dropped
+  - `monster.deathmauler5`: rc-c022-playerstate.tsv:26 kept, rc-gen-mon-triage.tsv:138 dropped
   - `monster.ancientbarb1`: rc-damage-draws.tsv:11 kept, rc-gen-mon-triage.tsv:139 dropped
   - `monster.ancientbarb2`: rc-damage-draws.tsv:12 kept, rc-gen-mon-triage.tsv:140 dropped
   - `monster.ancientbarb3`: rc-damage-draws.tsv:13 kept, rc-gen-mon-triage.tsv:141 dropped
@@ -2411,7 +2416,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-player-mode.tsv:12 dropped
   - `monster.clawviper10`: rc-damage-draws.tsv:16 kept, rc-player-mode.tsv:13 dropped
   - `monster.boss.baalcrab`: rc-c022-playerstate.tsv:16 kept, rc-player-mode.tsv:14 dropped
-  - `monster.deathmauler5`: rc-combat-seed-3.tsv:18 kept, rc-player-mode.tsv:15 dropped
+  - `monster.deathmauler5`: rc-c022-playerstate.tsv:26 kept, rc-player-mode.tsv:15 dropped
   - `render.effect.fx-frost-nova-cast`: rc-client-skill-do.tsv:5 kept, rc-render-effect.tsv:17 dropped
   - `render.effect.fx-frost-nova-flight`: rc-client-skill-do.tsv:6 kept, rc-render-effect.tsv:18 dropped
   - `render.effect.fx-fire-ball-cast`: rc-render-effect.tsv:11 kept, rc-render-wp-click.tsv:3 dropped
@@ -3440,11 +3445,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.cr-lancer8`: rc-gen-mon-triage.tsv:252 kept, rc-run-4.tsv:101 dropped
   - `monster.crownest1`: rc-gen-mon-triage.tsv:52 kept, rc-run-4.tsv:102 dropped
   - `monster.crownest2`: rc-gen-mon-triage.tsv:53 kept, rc-run-4.tsv:103 dropped
-  - `monster.deathmauler1`: rc-combat-seed-3.tsv:14 kept, rc-run-4.tsv:104 dropped
-  - `monster.deathmauler2`: rc-combat-seed-3.tsv:15 kept, rc-run-4.tsv:105 dropped
-  - `monster.deathmauler3`: rc-combat-seed-3.tsv:16 kept, rc-run-4.tsv:106 dropped
-  - `monster.deathmauler4`: rc-combat-seed-3.tsv:17 kept, rc-run-4.tsv:107 dropped
-  - `monster.deathmauler5`: rc-combat-seed-3.tsv:18 kept, rc-run-4.tsv:108 dropped
+  - `monster.deathmauler1`: rc-c022-playerstate.tsv:22 kept, rc-run-4.tsv:104 dropped
+  - `monster.deathmauler2`: rc-c022-playerstate.tsv:23 kept, rc-run-4.tsv:105 dropped
+  - `monster.deathmauler3`: rc-c022-playerstate.tsv:24 kept, rc-run-4.tsv:106 dropped
+  - `monster.deathmauler4`: rc-c022-playerstate.tsv:25 kept, rc-run-4.tsv:107 dropped
+  - `monster.deathmauler5`: rc-c022-playerstate.tsv:26 kept, rc-run-4.tsv:108 dropped
   - `monster.dkfig1`: rc-gen-mon-triage.tsv:242 kept, rc-run-4.tsv:109 dropped
   - `monster.dkfig2`: rc-gen-mon-triage.tsv:244 kept, rc-run-4.tsv:110 dropped
   - `monster.dkmag1`: rc-missile-class-off.tsv:8 kept, rc-run-4.tsv:111 dropped
@@ -5091,8 +5096,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.willowisp`: rc-run-1.tsv:111 kept, rc-runner-a.tsv:36 dropped
   - `monster.baboon6`: rc-combat-seed-3.tsv:3 kept, rc-runner-a.tsv:37 dropped
   - `monster.bloodlord2`: rc-combat-seed-3.tsv:5 kept, rc-runner-a.tsv:38 dropped
-  - `monster.deathmauler2`: rc-combat-seed-3.tsv:15 kept, rc-runner-a.tsv:39 dropped
-  - `monster.deathmauler4`: rc-combat-seed-3.tsv:17 kept, rc-runner-a.tsv:40 dropped
+  - `monster.deathmauler2`: rc-c022-playerstate.tsv:23 kept, rc-runner-a.tsv:39 dropped
+  - `monster.deathmauler4`: rc-c022-playerstate.tsv:25 kept, rc-runner-a.tsv:40 dropped
   - `monster.fingermage1`: rc-combat-seed-3.tsv:20 kept, rc-runner-a.tsv:41 dropped
   - `monster.fingermage3`: rc-combat-seed-3.tsv:22 kept, rc-runner-a.tsv:42 dropped
   - `monster.mon-lvl-304`: rc-combat-seed-3.tsv:27 kept, rc-runner-a.tsv:43 dropped
@@ -9000,11 +9005,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.cr-lancer8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH; missile lvl from monstats Sk<i>lvl (client seam mirrors natural_skills) |
 | `monster.crownest1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.crownest2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
-| `monster.deathmauler1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-combat-seed (2026-10-10, REC-3531, causes-99 C003): the checks behind this row re-run on 1.14d with the 'ignore q seed' line removed (q and the unit seed compared): every channel MATCH or PARTIAL, every frame equal, every state field of both sides compared; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which these pokes-only checks do not exercise (PROVISIONAL REC-2055/2056) |
-| `monster.deathmauler2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-combat-seed (2026-10-10, REC-3531, causes-99 C003): the checks behind this row re-run on 1.14d with the 'ignore q seed' line removed (q and the unit seed compared): every channel MATCH or PARTIAL, every frame equal, every state field of both sides compared; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which these pokes-only checks do not exercise (PROVISIONAL REC-2055/2056) |
-| `monster.deathmauler3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-combat-seed (2026-10-10, REC-3531, causes-99 C003): the checks behind this row re-run on 1.14d with the 'ignore q seed' line removed (q and the unit seed compared): every channel MATCH or PARTIAL, every frame equal, every state field of both sides compared; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which these pokes-only checks do not exercise (PROVISIONAL REC-2055/2056) |
-| `monster.deathmauler4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-combat-seed (2026-10-10, REC-3531, causes-99 C003): the checks behind this row re-run on 1.14d with the 'ignore q seed' line removed (q and the unit seed compared): every channel MATCH or PARTIAL, every frame equal, every state field of both sides compared; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which these pokes-only checks do not exercise (PROVISIONAL REC-2055/2056) |
-| `monster.deathmauler5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-combat-seed (2026-10-10, REC-3531, causes-99 C003): the checks behind this row re-run on 1.14d with the 'ignore q seed' line removed (q and the unit seed compared): every channel MATCH or PARTIAL, every frame equal, every state field of both sides compared; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which these pokes-only checks do not exercise (PROVISIONAL REC-2055/2056) |
+| `monster.deathmauler1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c022-playerstate | - | rc-c022-playerstate (2026-10-10): `ignore q seed` removed from -; strict run on integ-r23 head: state 150/150, rng MATCH; PARTIAL only for the d2rs client gap (REC-2055/2056); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/-.check --orig-cache traces/orig-cache |
+| `monster.deathmauler2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c022-playerstate | - | rc-c022-playerstate (2026-10-10): `ignore q seed` removed from -; strict run on integ-r23 head: state 150/150, rng MATCH; PARTIAL only for the d2rs client gap (REC-2055/2056); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/-.check --orig-cache traces/orig-cache |
+| `monster.deathmauler3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c022-playerstate | - | rc-c022-playerstate (2026-10-10): `ignore q seed` removed from -; strict run on integ-r23 head: state 150/150, rng MATCH; PARTIAL only for the d2rs client gap (REC-2055/2056); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/-.check --orig-cache traces/orig-cache |
+| `monster.deathmauler4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c022-playerstate | - | rc-c022-playerstate (2026-10-10): `ignore q seed` removed from -; strict run on integ-r23 head: state 150/150, rng MATCH; PARTIAL only for the d2rs client gap (REC-2055/2056); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/-.check --orig-cache traces/orig-cache |
+| `monster.deathmauler5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c022-playerstate | - | rc-c022-playerstate (2026-10-10): `ignore q seed` removed from -; strict run on integ-r23 head: state 150/150, rng MATCH; PARTIAL only for the d2rs client gap (REC-2055/2056); repro: python3 tools/scenario-diff/scenario_diff.py traces/checks/gen/-.check --orig-cache traces/orig-cache |
 | `monster.dkfig1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.dkfig2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.dkmag1` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-missile-class-off | - | state 150/150, rng equal; missile class = srvmissilea + chain position (bodies-3.md 4.9, 3.25); fixed by 569af56cf |
