@@ -131,6 +131,19 @@ pub trait QuestObjectHost<X> {
         let _ = (game, v, player, npc, class, interact);
         false
     }
+    /// Object init 13 (`objects-2.md` §17): chain `chain`'s record exists
+    /// → link `object` to it (`0x005436B0`) and answer true. Default: no
+    /// record.
+    fn object_link(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        object: UnitId,
+        chain: u8,
+    ) -> bool {
+        let _ = (game, v, object, chain);
+        false
+    }
     /// The Jerhyn AI hooks of `ai-bodies.md` §9.9 step 2
     /// (`world/quests-act2.md` §10): `0x0059F570` (palace active),
     /// `0x0059F580` (palace NPC state, the AI unit at its path position
@@ -1196,6 +1209,16 @@ impl<X: Pending> ObjectWorld for ObjectView<'_, X> {
     }
     fn staff_tomb_level(&self) -> u32 {
         self.v.h.x.object_staff_tomb()
+    }
+    /// Init 13 on the lent quest control; a host without one has no
+    /// chain record.
+    fn quest_link(&mut self, object: UnitId, chain: u8) -> bool {
+        let Some(mut host) = self.v.h.quest_host.take() else {
+            return false;
+        };
+        let linked = host.object_link(&mut *self.game, &mut self.v, object, chain);
+        self.v.h.quest_host = Some(host);
+        linked
     }
     /// Unit +0x10 only (`objects-2.md` §18.1, §18.6).
     fn store_mode(&mut self, unit: UnitId, mode: u8) {
