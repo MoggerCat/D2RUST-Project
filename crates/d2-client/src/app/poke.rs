@@ -277,6 +277,18 @@ pub type ServerHost<C> = d2_server::host::Host<
 pub fn queue_sent_now<C: d2_server::seams::Clock>(h: &mut ServerHost<C>) {
     use d2_server::adapters::handlers::world::WorldHost;
     let sent = h.game.world.take_sent(&mut h.game.events);
+    // The queue walk's host-only marks (ground item, player items / sound)
+    // are the tick's to turn into the real messages (`SimGame` tick,
+    // `take_sent`): left queued, not sent raw.
+    let (marks, sent): (Vec<_>, Vec<_>) = sent.into_iter().partition(|(_, b)| {
+        use d2_sim::wiring::action::{GROUND_ITEM_MARK, PLAYER_ITEMS_MARK, PLAYER_SOUND_MARK};
+        b.len() == 5
+            && matches!(
+                b[0],
+                GROUND_ITEM_MARK | PLAYER_ITEMS_MARK | PLAYER_SOUND_MARK
+            )
+    });
+    h.game.world.rest.sent.splice(0..0, marks);
     for (unit, bytes) in sent {
         // A player without a client receives nothing.
         if let Some(c) = h.game.client_of(unit) {
