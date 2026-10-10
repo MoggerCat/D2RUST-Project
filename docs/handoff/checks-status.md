@@ -225,7 +225,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-tal-rasha-tomb-ama | state | PARTIAL | 160/160 | - | - |
 | a2-wp-40 | packets | MATCH | 50/50 | - | - |
 | a2-wp-40 | state | PARTIAL | 50/50 | - | - |
-| a2-wp-42 | packets | MATCH | 50/50 | - | - |
+| a2-wp-42 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | unrouted |
 | a2-wp-42 | state | PARTIAL | 50/50 | - | - |
 | a2-wp-43 | packets | MATCH | 50/50 | - | - |
 | a2-wp-43 | state | PARTIAL | 50/50 | - | - |
@@ -296,11 +296,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a3-warp-l98-temple-5-ama | state | PARTIAL | 160/160 | - | - |
 | a3-warp-l99-temple-6-ama | rng | MATCH | 140/140 | - | - |
 | a3-warp-l99-temple-6-ama | state | PARTIAL | 160/160 | - | - |
-| a4-deseis-seal-early | state | DIVERGED | 45/200 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| a4-deseis-seal-early | state | DIVERGED | 125/200 | frame 126 monster 1:91 class 312, field sp: 1.14d 314 vs d2rs 256 | unrouted |
 | a4-deseis-seal-loaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| a4-deseis-seal-unloaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| a4-deseis-seal-unloaded | state | PARTIAL | 560/560 | - | - |
 | a4-fortress-arrival-ama | state | PARTIAL | 60/60 | - | - |
-| a4-hellforge-smash | state | DIVERGED | 42/330 | frame 43 monster 1:8 class 153, field m: 1.14d 4 vs d2rs 1 | unrouted |
+| a4-hellforge-smash | state | DIVERGED | 141/330 | frame 57 monster 1:58 class 311, field fr: 1.14d 1686 vs d2rs 9728 | unrouted |
 | a4-start-noquest-sor | state | PARTIAL | 30/30 | - | - |
 | a4-warp-l104-mesa-1-ama | rng | DIVERGED | 158/159 | frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:193 | unrouted |
 | a4-warp-l104-mesa-1-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [3965398309, 792411527] vs d2rs [1235504095, 1059482100] | unrouted |
@@ -335,7 +335,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-su-shenk | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-snapchip | state | PARTIAL | 90/90 | - | - |
 | a5-su-threash-socket | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | coord-resume-3 |
+| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | - |
 | a5-town-arrival-bar | state | PARTIAL | 40/40 | - | - |
 | a5-town-npc-sweep | state | PARTIAL | 170/170 | - | - |
 | a5-warp-crystalized-ama | rng | MATCH | 133/133 | - | - |
@@ -542,7 +542,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | diff-a3-hell-champion | items | MATCH | 4/4 | - | - |
 | diff-a3-hell-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a3-hell-champion-bm | state | PARTIAL | 4/4 | - | - |
 | diff-a3-hell-normal | items | MATCH | 4/4 | - | - |
 | diff-a3-hell-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
@@ -566,11 +566,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | diff-a4-hell-champion | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-champion-bm | state | PARTIAL | 4/4 | - | - |
 | diff-a4-hell-normal | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-hell-normal-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-normal-bm | state | PARTIAL | 4/4 | - | - |
 | diff-a4-hell-unique | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
@@ -1151,8 +1151,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-vendor-drognan-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | - |
 | items-vendor-elzix-stock | items | MATCH | 49/49 | - | - |
 | items-vendor-elzix-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | - |
-| items-vendor-fara-stock | items | MATCH | 2/2 | - | - |
-| items-vendor-fara-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | - |
+| items-vendor-fara-stock | items | PARTIAL | 0/0 | - | - |
+| items-vendor-fara-stock | packets | DIVERGED | 3/4 | frame 3 stream s2c #18 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
 | items-vendor-gheed-gamble | items | MATCH | 14/14 | - | - |
 | items-vendor-gheed-gamble | packets | DIVERGED | 26/30 | frame 4 stream s2c #0 extra (d2rs only) (id 0x15) | - |
 | items-vendor-gheed-stock | items | MATCH | 30/30 | - | - |
@@ -1186,8 +1186,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
 | merc-sorc-cow | state | PARTIAL | 120/120 | - | - |
 | milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-act5-entry | state | PARTIAL | 40/40 | - | - |
+| milestone-act4-entry | state | PARTIAL | 4/4 | - | - |
+| milestone-act5-entry | state | PARTIAL | 4/4 | - | - |
 | milestone-anya | state | PARTIAL | 111/111 | - | - |
 | milestone-baal-chamber | state | PARTIAL | 40/40 | - | - |
 | milestone-baal-throne | state | PARTIAL | 87/87 | - | - |
@@ -1363,8 +1363,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | sys-corpse-state | state | PARTIAL | 220/220 | - | - |
 | sys-difficulty-hell | rng | DIVERGED | 96/101 | frame 67, unit 1:21, draw #0, field missing: 1.14d site 0x5f05f8 vs d2rs site None | - |
 | sys-difficulty-hell | state | DIVERGED | 67/100 | frame 67 monster 1:21 class 19, field m: 1.14d 5 vs d2rs 1 | - |
-| sys-difficulty-nightmare | rng | DIVERGED | 96/101 | frame 68, unit 1:21, draw #0, field missing: 1.14d site 0x5f05f8 vs d2rs site None | - |
-| sys-difficulty-nightmare | state | DIVERGED | 68/100 | frame 68 monster 1:21 class 19, field m: 1.14d 5 vs d2rs 1 | - |
+| sys-difficulty-nightmare | rng | MATCH | 100/100 | - | - |
+| sys-difficulty-nightmare | state | PARTIAL | 100/100 | - | - |
 | sys-gold-pickup | items | MATCH | 2/2 | - | - |
 | sys-gold-pickup | packets | MATCH | 120/120 | - | - |
 | sys-gold-pickup | rng | MATCH | 33/33 | - | - |
