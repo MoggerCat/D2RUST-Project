@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-object.init.functions	entity	world	objects.txt init fn column (79 functions, object-functions.tsv kind=init)	specs/world/objects.md,specs/world/objects-2.md	draft	-	PARTIAL	yes	20	n	claude/rc-gen-obj-six	PARTIAL	M	gen-obj-61, -189, -369 (the three init rows) now equal where compared (rng MATCH): init 13 quest-routed, snapshot holds objects (cain portal event), init 46 trapped soul placeholder; rc-gen-obj-six
+object.init.functions	entity	world	objects.txt init fn column (79 functions, object-functions.tsv kind=init)	specs/world/objects.md,specs/world/objects-2.md	draft	-	PARTIAL	yes	20	n	claude/rc-gen-obj-six	EQUAL	M	gen-obj-61, -189, -369 (the three init rows) now equal where compared (rng MATCH): init 13 quest-routed, snapshot holds objects (cain portal event), init 46 trapped soul placeholder; rc-gen-obj-six
