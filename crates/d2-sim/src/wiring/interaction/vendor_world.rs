@@ -402,30 +402,26 @@ where
                 .collect(),
         })
     }
-    /// The store repair's recharge `0x0055FE80` (`generation.md` §12.2,
-    /// called from `0x00576231`): each stat-204 entry of the item's
-    /// extended list below its maximum is set to it, so a store item
-    /// shows current = maximum. A store item has no inventory of its own.
+    /// Recharge `0x0055FE80` (`generation.md` §12.2) on the store item: each
+    /// stat-204 entry of its extended list below its maximum is set to the
+    /// maximum (`items/properties.md` §5 rule 9: a store item always shows
+    /// current = max; as `InvDesk::recharge_item`, without the item's own
+    /// inventory).
     fn recharge(&mut self, item: UnitId) {
-        let econ = &mut *self.desk.econ;
-        let stats = &*econ.stats;
-        let entries: Vec<(u16, i32)> = stats
-            .unit_list(item)
-            .filter(|&l| stats.is_extended(l))
-            .map(|l| {
-                stats
-                    .full_entries(l)
-                    .into_iter()
-                    .filter(|&(k, _)| key_stat(k) == recharge::CHARGED_SKILL)
-                    .map(|(k, v)| (key_layer(k), v))
-                    .take(64)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let entries = {
+            let stats = &self.desk.econ.stats;
+            match stats.unit_list(item).filter(|&l| stats.is_extended(l)) {
+                Some(_) => self.entries(item, stat::CHARGED_SKILL),
+                None => Vec::new(),
+            }
+        };
         let mut sets = Vec::new();
         recharge::recharge(&entries, |k, m| sets.push((k, m)));
         for (k, m) in sets {
-            let _ = econ.with_item(item, |s| recharge::set_charges(&mut s.item.stats, k, m));
+            let _ = self
+                .desk
+                .econ
+                .with_item(item, |s| recharge::set_charges(&mut s.item.stats, k, m));
         }
         self.desk.rest.recharge(item);
     }

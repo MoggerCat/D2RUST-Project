@@ -26,13 +26,13 @@
 |   2. Jerhyn's objects and spawns (replaces `quests-act2.md` §6.10) | 240–301 |
 |   3. The staff in the orifice (C→S 0x44, S→C 0x58) | 302–347 |
 |   4. `quests.tsv` addresses not named in part 1 | 348–364 |
-|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 365–449 |
-| Constants & data dependencies | 450–459 |
-| Randomness | 460–464 |
-| Edge cases & original bugs | 465–483 |
-| Test vectors | 484–502 |
-| Provenance | 503–515 |
-| Open questions | 516–525 |
+|   5. Helpers the Act II–III quest code calls (QuestWorld seams) | 365–457 |
+| Constants & data dependencies | 458–467 |
+| Randomness | 468–472 |
+| Edge cases & original bugs | 473–491 |
+| Test vectors | 492–510 |
+| Provenance | 511–523 |
+| Open questions | 524–533 |
 <!-- /index -->
 
 ## Summary
@@ -438,6 +438,14 @@ two functions draw nothing.
 2. Then the unit is freed (`0x00555600`, `sim/units.md`).
 
 Used by chain 7's event 3 (§2 item 3.1).
+
+Send order (recorded `a2-quest-tombs` frame 32; 1.14d
+sender `0x0053BDC2`): the event runs in the client's level-change step
+(`sim/tick.md` §6 rule 5, before the room switch `0x00537B50`), so
+Jerhyn's 0x0A (type 1, GUID 1) leaves before the switch's 0x07 joins.
+d2rs queues it into the sim's own outbox (`HostQuests::remove_unit`),
+which keeps the order; the quest world's rest buffer is collected after
+the outbox.
 
 #### 5.4 Scroll text (`0x005456A0(player, object, string)`)
 
