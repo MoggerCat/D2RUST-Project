@@ -190,7 +190,7 @@ impl MapState {
         self.draw
             .retain(|(id, _, _), _| active.iter().any(|a| a.room == *id));
         // A freed unit's bits go with it.
-        self.unit_draw.retain(|k, _| world.units.contains_key(k));
+        self.unit_draw.retain(|k, _| world.view_unit(k).is_some());
         let (Some(cd), Some(own)) = (world.drlg.as_ref(), world.local_room().copied()) else {
             return Ok(());
         };
@@ -265,13 +265,13 @@ impl MapState {
                 }
             }
             for &key in world.room_units.list(id) {
-                let unit = world.units.get(&key).ok_or_else(|| {
+                let unit = world.view_unit(&key).ok_or_else(|| {
                     unresolved(
                         "room unit list",
                         format!("unit {key:?} listed but not in the model"),
                     )
                 })?;
-                let mut f = facts(unit)?;
+                let mut f = facts(&unit)?;
                 // `draw-order.md` §5 r3, r4: the bits of the last frame's
                 // draw (the sight test's 0x80 gates this frame's shadow).
                 if let Some(&(flags, ex)) = self.unit_draw.get(&key) {

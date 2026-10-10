@@ -1,0 +1,62 @@
+{
+ "channel": "state",
+ "check": "gen-wp-9",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "460",
+  "--auto",
+  "ScnSo2",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "8 pos @player 5145 5193",
+  "--poke",
+  "11 pos @player 5138 5184",
+  "--poke",
+  "14 pos @player 5131 5174",
+  "--poke",
+  "17 pos @player 5124 5165",
+  "--poke",
+  "20 pos @player 5116 5155",
+  "--poke",
+  "23 pos @player 5109 5146",
+  "--poke",
+  "26 pos @player 5102 5136",
+  "--poke",
+  "29 pos @player 5095 5127",
+  "--poke",
+  "32 pos @player 5087 5117",
+  "--poke",
+  "35 pos @player 5080 5108",
+  "--poke",
+  "38 pos @player 5073 5098",
+  "--poke",
+  "41 pos @player 5066 5089",
+  "--poke",
+  "400 msg 0x49 @wp 40"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "fc4b239c14991c0a0756c7e642a61f2697282da00b0806c8d8c38e59d368bf9b",
+   "size": 4121601
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "9c8b05aa4f4fee9d3d6b1de21761c6859729cea13ff62872772f804d376fa537",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "041dd6f834023c5af28557111ffe8b9aed7b17bd50fddfc2881f719776b8f7da",
+  "save": "f8b02a9852b829370b1930c229f46cd4d0fcc4c926dd289790b19d3ab3da14e5"
+ }
+}
