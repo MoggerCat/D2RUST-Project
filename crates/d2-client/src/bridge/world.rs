@@ -220,6 +220,13 @@ pub struct ClientUnit {
     /// bookkeeping (no 1.14d field), so a reader can tell a new request
     /// from a repeat of the same one.
     pub mode_requests: u32,
+    /// How many 0x15 placements moved the unit: d2rs bookkeeping, so the
+    /// view can tell a teleport (no turn in 1.14d) from a walk step.
+    pub placements: u32,
+    /// The path direction (+0x64) a monster of set S was created with
+    /// (`msg-units.md` §1.2 r6.9, d2rs bookkeeping: the model holds no
+    /// client path record): 6 bits.
+    pub path_dir: Option<u8>,
     pub kind: KindData,
     /// The skill list (+0xA8, `msg-skills.md` §1 rule 1); `None` = no
     /// list.
@@ -325,6 +332,8 @@ impl ClientUnit {
             queue: Vec::new(),
             last_mode_request: None,
             mode_requests: 0,
+            placements: 0,
+            path_dir: None,
             kind: KindData::None,
             skills: None,
             quest_untargetable: false,
