@@ -28,16 +28,16 @@
 |   5. Ops | 176–195 |
 |   6. Input matching | 196–264 |
 |   7. Outputs | 265–399 |
-|   8. Commit | 400–471 |
-|   9. Portals | 472–491 |
-|   10. C→S 0x4C is not the cube | 492–506 |
-|   11. Where a cube comes from; the cube leaving while open | 507–550 |
-| Constants & data dependencies | 551–574 |
-| Randomness | 575–609 |
-| Edge cases & original bugs | 610–644 |
-| Test vectors | 645–692 |
-| Provenance | 693–743 |
-| Open questions | 744–862 |
+|   8. Commit | 400–472 |
+|   9. Portals | 473–493 |
+|   10. C→S 0x4C is not the cube | 494–508 |
+|   11. Where a cube comes from; the cube leaving while open | 509–552 |
+| Constants & data dependencies | 553–576 |
+| Randomness | 577–611 |
+| Edge cases & original bugs | 612–646 |
+| Test vectors | 647–694 |
+| Provenance | 695–745 |
+| Open questions | 746–864 |
 <!-- /index -->
 
 ## Summary
@@ -84,7 +84,7 @@ C→S 0x4C is **not** the cube (§10).
 
 | Event | 1.14d | Behaviour |
 |---|---|---|
-| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`), reached through the item-use dispatcher `0x005BF240` (owner: `items/use.md` §1, §3). Item-use table at `0x00741790`: 31 entries (count at `0x0074178C`) of 8 bytes {check function, use function}, indexed by the item record's `pSpell` (+0x94, read at `0x005BF2C9`); live `misc.bin` row 41 `box ` has `pSpell` 7 → entry 7 = {none, `0x005BF0C0`} at `0x007417C8` / `0x007417CC` | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. |
+| open cube (use the cube item) | `0x005BF0C0` (`SkillItem.cpp`), reached through the item-use dispatcher `0x005BF240` (owner: `items/use.md` §1, §3). Item-use table at `0x00741790`: 31 entries (count at `0x0074178C`) of 8 bytes {check function, use function}, indexed by the item record's `pSpell` (+0x94, read at `0x005BF2C9`); live `misc.bin` row 41 `box ` has `pSpell` 7 → entry 7 = {none, `0x005BF0C0`} at `0x007417C8` / `0x007417CC` | If the player is interacting with the stash object (type 2, class 0x10B): clear the interaction (`0x00554190`), run `0x0055FA40`, queue 0x77 with 0x11. Then set interaction (type 4, cube GUID) through `0x00554120` (only if no interaction is active), queue 0x77 with 0x15, run `0x0055FA40`. The function returns 0, so the dispatcher `0x005BF240` (which set item flag 0x4 on the cube before the call, slot 2 of the table) then runs the reset `0x005BE1C0` (S→C 0x3F per flagged item, here the cube: `3F FF`, GUID, `FF FF`) and S→C 0x7C (type 4, cube GUID); the 0x20 handler `0x0055E170` ends with 0 (REC-3860; check `cube-000`, `cube-002`: bytes `77 15 [22…] 3F… 7C…`). |
 | C→S 0x4F, any button | `0x00568060` | No active interaction (player +0x6C = 0): queue 0x77 with 0x0C, result 0. |
 | C→S 0x4F button 0x17 | `0x00568060` → `0x00566AE0` | Interaction type ≠ 4 → result 3. Else reset it (GUID −1, type 6, active 0, `0x00554190`), then `0x0055FA40`; result 0. |
 | C→S 0x4F button 0x18 | `0x00568060` → `0x00566AE0` → `0x005665F0` | Interaction type ≠ 4 → result 3. Type 4: transmute (§3); result 0. The GUID is not checked: any interaction of type 4 transmutes page 3. |
@@ -420,7 +420,8 @@ is sent; outputs already made in out[] are neither placed nor freed
    the unit (`0x00555600`), the output is lost. Placed → item flag 0x10
    (identified) set; if its items record `quest` ≠ 0: code `hst ` →
    `0x0059E5C0` (Act 2 Horadric Staff hook, `world/quests-act2.md`
-   §4.9), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
+   §4.9; runs inline in the 0x4F handler, so its S→C 0x28 follows the
+   0x9D removals and precedes the next tick's item pass: `cube-000`), `qf2 ` → `0x005B86E0` (Act 3 Khalim's Will hook,
    `world/quests-act3.md` §4.8); quest state changes: `world/quests.md`.
    The client plays the Horadric animation when such an `hst ` /
    `qf2 ` arrives in page 3 (its 0x9C action 4), never for other
@@ -481,7 +482,8 @@ table is the only route to `0x00594140` (`world/quests.md` open question
 - **Cow portal** (kind 1, record 2: `leg` + `tbk`): conditions, the
   free-spot search, the portal object (class 60 → level 39) and the game
   quest flag are owned by `world/quests.md` §8.4. On failure it attaches
-  sound event 20 to the player and returns 0 (`0x0059424B`), so the
+  sound event 20 to the player and returns 0 (`0x0059424B`; recorded in
+  `cube-002`: S→C 0x2C with event 20 in the next unit update), so the
   contents stay; on success the transmute commits (§8): `leg` and `tbk`
   are removed and sound event 4 follows.
 - **Pandemonium portals** (kinds 2, 3; records 148, 149: enabled,

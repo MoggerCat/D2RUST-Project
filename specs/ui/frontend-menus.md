@@ -14,40 +14,41 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–61 |
-| Inputs | 62–72 |
-| Outputs / state changes | 73–82 |
-| Rules | 83–84 |
-|   F1.1 Control descriptors (the data every front-end screen is built from) | 85–180 |
-|   F1.2 Art preload | 181–208 |
-|   F1.3 Screen flow (single player) | 209–240 |
-|   F1.4 Main menu (`0x004336C0`) | 241–269 |
-|   F1.5 Title animation (logo fire) | 270–301 |
-|   F1.6 Palette and sounds | 302–329 |
-|   F2.1 Save folder (`0x00407050`) | 330–354 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 355–381 |
-|   F2.3 Sort order (`0x00438AD0`) | 382–387 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 388–413 |
-|   F2.5 Selection, scrolling and keys | 414–458 |
-|   F2.6 OK / Enter (`0x00439840`) | 459–471 |
-|   F2.7 Other buttons | 472–496 |
-|   F2.8 Difficulty box (`0x00439780`) | 497–516 |
-|   F2.9 Control records and art | 517–553 |
-|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–681 |
-|   F3.1 Character-create screen build (`0x00435580`) | 682–717 |
-|   F3.2 Class line-up (positions, creation order) | 718–733 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 734–794 |
-|   F3.4 Name entry (edit box, descriptor 204) | 795–809 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 810–833 |
-|   F3.6 OK / Cancel behaviour and the new save | 834–868 |
-|   F3.7 Sounds (deferred) | 869–873 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 874–904 |
-| Constants & data dependencies | 905–941 |
-| Randomness | 942–945 |
-| Edge cases & original bugs | 946–977 |
-| Test vectors | 978–1011 |
-| Provenance | 1012–1057 |
-| Open questions | 1058–1102 |
+| Summary | 54–62 |
+| Inputs | 63–73 |
+| Outputs / state changes | 74–83 |
+| Rules | 84–85 |
+|   F1.1 Control descriptors (the data every front-end screen is built from) | 86–181 |
+|   F1.2 Art preload | 182–209 |
+|   F1.3 Screen flow (single player) | 210–241 |
+|   F1.4 Main menu (`0x004336C0`) | 242–270 |
+|   F1.5 Title animation (logo fire) | 271–302 |
+|   F1.6 Palette and sounds | 303–330 |
+|   F2.1 Save folder (`0x00407050`) | 331–355 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 356–382 |
+|   F2.3 Sort order (`0x00438AD0`) | 383–388 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 389–414 |
+|   F2.5 Selection, scrolling and keys | 415–459 |
+|   F2.6 OK / Enter (`0x00439840`) | 460–472 |
+|   F2.7 Other buttons | 473–497 |
+|   F2.8 Difficulty box (`0x00439780`) | 498–517 |
+|   F2.9 Control records and art | 518–554 |
+|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 555–682 |
+|   F2.11 Whole-screen check and the layout it measured (REC-3760) | 683–707 |
+|   F3.1 Character-create screen build (`0x00435580`) | 708–743 |
+|   F3.2 Class line-up (positions, creation order) | 744–759 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 760–820 |
+|   F3.4 Name entry (edit box, descriptor 204) | 821–835 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 836–859 |
+|   F3.6 OK / Cancel behaviour and the new save | 860–894 |
+|   F3.7 Sounds (deferred) | 895–899 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 900–930 |
+| Constants & data dependencies | 931–967 |
+| Randomness | 968–971 |
+| Edge cases & original bugs | 972–1003 |
+| Test vectors | 1004–1037 |
+| Provenance | 1038–1083 |
+| Open questions | 1084–1128 |
 <!-- /index -->
 
 ## Summary
@@ -678,6 +679,31 @@ list is scanned. It is not a unit: no inventory, no light, no direction other th
    has all-0xFF appearance bytes and shows the class default figure: the header is written by 1.14d's own
    save. Still PROVISIONAL (REC-2181): the palette argument of (d) and the pixels against d2rs (the saves
    and the capture frames are in the private repo, `recordings/pc1-2026-10-10/dolls/`).
+
+### F2.11 Whole-screen check and the layout it measured (REC-3760)
+
+Check `ui-frontend-screens` (`channels frontend`; `tools/frontend-sbs/frontend_sbs.py
+--script screens`, `screens_check.py`): the menu walk (main, character select, create
+with the 7 classes, credits, cinematics, back) on 1.14d and d2rs by X input; per screen 6
+1.14d shots and 40 d2rs shots. The fire, snow-free sky, class sprites and the credits
+scroll run on wall-clock time, so the shots are never phase locked: a pixel is compared
+when it is stable (>= 70 % of the shots equal their median) on both sides, at tolerance
+0; the animated rest is counted, not judged. EQUAL needs 0 differing pixels.
+Measured r1 (1.14d window origin y = 97: screen row 0 black, art rows 1 .. 599; d2rs window
+origin 0, so the harness crops 1.14d at (112, 98) and d2rs at (0, 1)):
+1. The last tile row of a multi-row image (the 88 rows of an 800 x 600 background) ends on
+   the control's bottom row y = 599, one row above the unclamped
+   `top + 256 r + row_h` (which is 600); rows 0 and 1 of tiles are unchanged (art rows
+   1 .. 256, 257 .. 512; the last row overwrites row 512). Seen on main, credits,
+   cinematics, create: 26500 -> 920 differing stable pixels on the main menu.
+   PROVISIONAL for images other than 800 x 600.
+2. The cinematics heading (`5114`, descriptor text 272 x 35 at (262, y), Font24) is added
+   by `0x004FD060` (colour k = 4) and centred (flag 2): equal pixel for pixel.
+3. Open (first divergences after r1, by size): the mouse cursor, which 1.14d draws into
+   the frame at the pointer on every front-end screen (cel of `CURSOR\ohand` / `gaunt`)
+   and d2rs does not (372 px on credits and cinematics, the whole remainder); the
+   `GATEWAY: <name>` label (glyph rows 1 px apart, 549 px); charselect slot figures
+   (`ui-charselect-dolls`); create: the class sprites and fire phase.
 
 ### F3.1 Character-create screen build (`0x00435580`)
 

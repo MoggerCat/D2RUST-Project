@@ -79,6 +79,18 @@ pub enum HandlerError {
     Drlg(#[from] super::drlg::ClientDrlgError),
 }
 
+impl HandlerError {
+    /// What ends the 1.14d process (a fatal assert or an access
+    /// violation), as a note; `None` for a refusal the original
+    /// survives (`scenario-diff.md` §3 rule 17).
+    pub fn fatal_exit(&self) -> Option<String> {
+        match self {
+            Self::Fatal(_) | Self::Crash { .. } => Some(self.to_string()),
+            _ => None,
+        }
+    }
+}
+
 pub type HandlerFn = fn(&mut ClientWorld, &Message<'_>) -> Result<(), HandlerError>;
 pub type UnitHandlerFn = fn(&mut ClientWorld, &UnitMessage<'_>) -> Result<(), HandlerError>;
 

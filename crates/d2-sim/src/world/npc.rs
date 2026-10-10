@@ -640,14 +640,14 @@ impl NpcControl {
     }
 
     /// `0x0054CA10`: C→S 0x59 MakeEntityMove (`monsters/ai-bodies.md`
-    /// §9.9; read in the 1.14d export). Size 17, else 3; unit type
-    /// (u32@1) above 5 → 2; no such unit, farther than 50
-    /// (`0x00641530`) or not a monster of an `npc` + `interact` class →
-    /// 1. Else the NPC's path is cleared, its AI think rescheduled at
-    /// frame + 1 and its AI params 0, 1, 2 := 40, x (u32@9), y (u32@13);
-    /// 0. Only a monster (type 1) is looked up here; another unit type
-    /// reads its class as a monstats index in 1.14d (not specified:
-    /// refused with 1).
+    /// §9.9; read in the 1.14d export). The size is 17, else result 3; a
+    /// unit type (u32@1) above 5 gives 2; no such unit, a distance of 51
+    /// or more (`0x00641530`), or a monster whose class lacks `npc` and
+    /// `interact` gives 1. Else the NPC's path is cleared, its AI think
+    /// rescheduled at the next frame and its AI params 0, 1 and 2 set to
+    /// 40, x (u32@9) and y (u32@13); the result is 0. Only a monster
+    /// (type 1) is looked up here; another unit type reads its class as
+    /// a monstats index in 1.14d (not specified: refused with 1).
     pub fn make_entity_move<W: NpcWorld + NpcVendors>(
         &mut self,
         w: &mut W,
