@@ -281,9 +281,14 @@ struct Shared {
     /// The transmute animation (`panels.md` §12 r4, [`cube_ui`]).
     cube_anim: std::cell::Cell<super::panels::stash_cube::HoradricAnim>,
     /// The mouse cursor machine (`panels-3.md` §23), drawn last by
-    /// [`TopUi`], and the local copy of the client seed its step draws on.
+    /// [`TopUi`], and the local copy of the client seed its step draws on
+    /// when no shared seed is linked.
     cursor: RefCell<super::cursor::Cursor>,
     cursor_seed: std::cell::Cell<Option<u64>>,
+    /// The local player's client seed shared with the weather and sound
+    /// draws (`client/model.md` Randomness r4: one stream); the cursor
+    /// step draws on it when linked ([`OriginalUi::set_client_seed`]).
+    client_seed: Option<std::sync::Arc<std::sync::Mutex<crate::audio::driver::ClientSeed>>>,
     /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
     /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
     client_quest: [u8; 96],
@@ -454,6 +459,7 @@ impl OriginalUi {
             // default, not the screen (REC-2175).
             cursor: RefCell::new(super::cursor::Cursor::init(0, 640, 480, 0)),
             cursor_seed: std::cell::Cell::new(None),
+            client_seed: None,
             client_quest: [0; 96],
             level_names: Vec::new(),
             horadric_start: Default::default(),
@@ -576,6 +582,16 @@ impl OriginalUi {
     /// drawn. The draws name fonts ([`CHARACTER_FONTS`]) whose `.tbl` and
     /// DC6 the frame's assets must then hold
     /// ([`crate::world_view::ui_bind::TextAssetLoader`]).
+    /// Links the cursor step to the client seed the weather and sound
+    /// draws share (`client/model.md` Randomness r4, `ui/panels-3.md` §23
+    /// r8).
+    pub fn set_client_seed(
+        &mut self,
+        seed: std::sync::Arc<std::sync::Mutex<crate::audio::driver::ClientSeed>>,
+    ) {
+        self.shared.borrow_mut().client_seed = Some(seed);
+    }
+
     pub fn set_fonts(&mut self, fonts: FontMeasure) {
         self.hire.borrow_mut().fonts = Some(fonts.clone());
         self.shared.borrow_mut().fonts = Some(fonts);

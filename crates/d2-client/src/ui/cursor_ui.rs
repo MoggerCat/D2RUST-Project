@@ -71,18 +71,40 @@ pub(super) fn draw(sh: &Shared, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         c.set_item(item.is_some());
     }
     let me = ctx.world.local();
-    let mut seed = sh.cursor_seed.get().unwrap_or_else(|| {
-        me.and_then(|u| u.seed)
-            .map_or(0, |(lo, hi)| u64::from(lo) | (u64::from(hi) << 32))
-    });
     let gfx = item
         .as_ref()
         .and_then(|it| sh.items.cursor_graphic_size(&sh.tables.files, it));
     let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-    let d = c.draw(w, h, gfx, now(ctx.world), me.is_some(), &mut seed);
-    if me.is_some() {
-        sh.cursor_seed.set(Some(seed));
-    }
+    // `client/model.md` Randomness r4: the step draws on the client seed
+    // the weather update of this frame and the sound tick also draw on.
+    let shared = sh
+        .client_seed
+        .as_ref()
+        .map(|s| s.lock().unwrap_or_else(|e| e.into_inner()));
+    let d = match shared {
+        Some(mut held) => {
+            held.sync(ctx.world);
+            let mut seed = held
+                .seed()
+                .map_or(0, |s| u64::from(s.lo) | (u64::from(s.hi) << 32));
+            let d = c.draw(w, h, gfx, now(ctx.world), me.is_some(), &mut seed);
+            if let Some(s) = held.seed() {
+                *s = d2_sim::rng::Seed::new(seed as u32, (seed >> 32) as u32);
+            }
+            d
+        }
+        None => {
+            let mut seed = sh.cursor_seed.get().unwrap_or_else(|| {
+                me.and_then(|u| u.seed)
+                    .map_or(0, |(lo, hi)| u64::from(lo) | (u64::from(hi) << 32))
+            });
+            let d = c.draw(w, h, gfx, now(ctx.world), me.is_some(), &mut seed);
+            if me.is_some() {
+                sh.cursor_seed.set(Some(seed));
+            }
+            d
+        }
+    };
     match d {
         Ok(Some(CursorDraw::Item { .. })) => {
             // The item's graphic, centred on the mouse (`inv_items`).
