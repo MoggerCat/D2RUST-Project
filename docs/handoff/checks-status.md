@@ -14,6 +14,9 @@ Rows of 183 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h
 88 checks, 108 channel results: DIVERGED 68, MATCH 1, PARTIAL 39.
 Rows of 192 checks (the 5 save-* checks of the half cannot run: suite.py has no ORIG_OUTPUTS entry for channel save) re-run 2026-10-10 by rc-run-2b on claude/integ-r23 (`suite.py --filter … --orig-cache traces/orig-cache --no-playthrough`): rows replaced.
 
+
+Rows of 35 checks re-run 2026-10-10 by rc-c008-monmode on claude/rc-c008-monmode (`suite.py --filter <C008 list> --orig-cache traces/orig-cache --no-playthrough`): rows replaced in place, totals not recomputed.
+
 Rows of 240 checks re-run 2026-10-10 by rc-promote (`suite.py --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough --json`, the checks of the PARTIAL/DIVERGED rows plus every gen-sysc-*): rows replaced in place, the totals above are not recomputed.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
@@ -488,37 +491,37 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | cube-005-3-small-rejuvs-one-large | state | PARTIAL | 24/24 | - | - |
 | death-town-ama | state | PARTIAL | 120/120 | - | - |
 | diff-a3-hell-champion | items | MATCH | 4/4 | - | - |
-| diff-a3-hell-champion | state | DIVERGED | 325/400 | frame 306 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
 | diff-a3-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-normal | items | MATCH | 4/4 | - | - |
-| diff-a3-hell-normal | state | DIVERGED | 63/400 | frame 64 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-hell-normal-bm | state | DIVERGED | 63/400 | frame 64 monster 1:4 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-unique | items | MATCH | 4/4 | - | - |
-| diff-a3-hell-unique | state | DIVERGED | 271/400 | frame 272 monster 1:23 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a3-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-hell-unique-bm | state | DIVERGED | 67/400 | frame 68 monster 1:7 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-unique-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-champion | items | MATCH | 4/4 | - | - |
-| diff-a3-nm-champion | state | DIVERGED | 331/400 | frame 307 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-nm-champion-bm | state | DIVERGED | 101/400 | frame 89 monster 1:4 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-normal | items | MATCH | 4/4 | - | - |
-| diff-a3-nm-normal | state | DIVERGED | 64/400 | frame 65 monster 1:21 class 50, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a3-nm-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-nm-normal-bm | state | DIVERGED | 98/400 | frame 65 monster 1:4 class 50, field s: 1.14d [1822557175, 1305741563] vs d2rs [4285903474, 480484601] | q-fix-seed-order |
+| diff-a3-nm-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-unique | items | MATCH | 4/4 | - | - |
-| diff-a3-nm-unique | state | DIVERGED | 76/400 | frame 65 monster 1:22 class 50, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a3-nm-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a3-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a3-nm-unique-bm | state | DIVERGED | 93/400 | frame 69 monster 1:7 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-unique-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-champion | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-hell-champion-bm | state | DIVERGED | 72/400 | frame 73 monster 1:5 class 120, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| diff-a4-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-normal | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-hell-normal-bm | state | DIVERGED | 201/400 | frame 53 monster 1:5 class 120, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a4-hell-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-unique | items | PARTIAL | 0/0 | - | - |
 | diff-a4-hell-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a4-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
@@ -526,11 +529,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | diff-a4-nm-champion | items | PARTIAL | 0/0 | - | - |
 | diff-a4-nm-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a4-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-nm-champion-bm | state | DIVERGED | 73/400 | frame 74 monster 1:5 class 120, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| diff-a4-nm-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a4-nm-normal | items | PARTIAL | 0/0 | - | - |
 | diff-a4-nm-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a4-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a4-nm-normal-bm | state | DIVERGED | 267/400 | frame 54 monster 1:5 class 120, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a4-nm-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a4-nm-unique | items | PARTIAL | 0/0 | - | - |
 | diff-a4-nm-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a4-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
@@ -540,25 +543,25 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | diff-a5-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
 | diff-a5-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a5-hell-normal | items | PARTIAL | 0/0 | - | - |
-| diff-a5-hell-normal | state | DIVERGED | 71/400 | frame 72 monster 1:22 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a5-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a5-hell-normal-bm | state | DIVERGED | 71/400 | frame 72 monster 1:8 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a5-hell-unique | items | PARTIAL | 0/0 | - | - |
 | diff-a5-hell-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a5-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a5-hell-unique-bm | state | DIVERGED | 85/400 | frame 66 monster 1:11 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-unique-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-champion | items | PARTIAL | 0/0 | - | - |
 | diff-a5-nm-champion | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a5-nm-champion-bm | state | DIVERGED | 144/400 | frame 90 monster 1:8 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-champion-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-normal | items | PARTIAL | 0/0 | - | - |
-| diff-a5-nm-normal | state | DIVERGED | 72/400 | frame 73 monster 1:24 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-normal | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a5-nm-normal-bm | state | DIVERGED | 72/400 | frame 73 monster 1:8 class 446, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a5-nm-normal-bm | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-unique | items | PARTIAL | 0/0 | - | - |
 | diff-a5-nm-unique | state | PARTIAL | 400/400 | - | - |
 | diff-a5-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
-| diff-a5-nm-unique-bm | state | DIVERGED | 91/400 | frame 67 monster 1:11 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-unique-bm | state | PARTIAL | 400/400 | - | - |
 | draws-town-arrival-ama | draws | DIVERGED | 0/1 | tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit | coord-resume-3 |
 | dru-arctic-blast | packets | MATCH | 70/70 | - | - |
 | dru-arctic-blast | state | PARTIAL | 70/70 | - | - |
