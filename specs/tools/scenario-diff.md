@@ -24,13 +24,13 @@
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
 |   3. Run | 145–531 |
-|   4. Suite | 532–647 |
-| Constants & data dependencies | 648–651 |
-| Randomness | 652–655 |
-| Edge cases & original bugs | 656–679 |
-| Test vectors | 680–702 |
-| Provenance | 703–706 |
-| Open questions | 707–755 |
+|   4. Suite | 532–652 |
+| Constants & data dependencies | 653–656 |
+| Randomness | 657–660 |
+| Edge cases & original bugs | 661–684 |
+| Test vectors | 685–707 |
+| Provenance | 708–711 |
+| Open questions | 712–760 |
 <!-- /index -->
 
 ## Summary
@@ -555,9 +555,14 @@ playthrough's playability next to it.
 3. Per check: work dir `traces/raw/suite/<name>/`, `scenario_diff.py
    <check> --work <dir> --json <dir>/result.json --next 5`, its output in
    `suite.log`. **Reuse of 1.14d**: the key (`suite.key`, format
-   `suite-key-1`) is the sha256 of the check file, of the save that
+   `suite-key-2`) is the sha256 of the check file, of the save that
    `d2s-tool` makes from the check's `save` line with `--time 1` (d2s-tool
-   otherwise stamps the current time), and of `Game.exe`. Same key and
+   otherwise stamps the current time), of `Game.exe`, and of the recorders:
+   the scripts (with the same-folder modules they import) of the check's
+   channels plus `autostart.py`, hashed as in the orig-cache key (`items`
+   uses packets'). A changed recorder therefore never reuses `orig.*` (a
+   stale raw recording gave verdicts against outdated 1.14d output; found
+   by rc-rerun-r10). Same key and
    no `--fresh`: `scenario_diff.py --reuse-orig` (keeps `orig.*`
    recordings, re-runs d2rs and the comparators); otherwise the 1.14d
    outputs and the key are removed and recorded again. The key is written
@@ -686,7 +691,7 @@ None in the tool. Both games run on `seed`.
 
 | `--selftest` (variant) | `variant only-fallen` builds `<base>/../variants/only-fallen` with `data-tool variant build traces/variants/only-fallen/only-fallen.d2stack --game <base>` and the recorder gets `--game <that dir>/Game.exe`; a name outside `[a-z0-9-]` and a repeated `variant` are rejected |
 | `--selftest` (input) | a shared `input` line reaches `record_state.py`, `state-dump`, `record_frames.py` and `play` as `--input '<script>'`; a script not starting with `frame`, with `wait` / `shot`, a frame 0 or going back, a `hold` without N or non-integer arguments, and a shared line next to `input orig` are rejected; an `input d2rs` in play's tick form goes to `play` only |
-| `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
+| `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save, Game.exe or a recorder script/imported module; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
 | `items_diff.py --selftest` | items in creation order from synthetic recordings (a later message of a GUID is no creation; a 0x9D filler's owner by index); GUIDs offset by 2 on one side match; every stream byte perturbed is found at its item and byte, a changed code named `code`; a changed action, frame, filler owner and a missing item are reported; fewer ticks on one side and no item at all are partial; the summary counts items |
 | `--selftest` (items) | with `packets` and `items` one 1.14d recording and one `state-dump --packets` serve both; `items` alone records them; the comparator gets both files and `--json <work>/items.summary.json` |
