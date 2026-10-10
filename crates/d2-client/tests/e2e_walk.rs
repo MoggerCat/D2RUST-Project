@@ -621,14 +621,16 @@ fn run() -> Transcript {
     assert_eq!(fx.room(), Some(a));
     walks.push(w);
 
-    // 3. Walk to the waypoint object (unit form): it stops on the
-    // object's position (objects have no footprint).
+    // 3. Walk to the waypoint object (unit form): it stops beside the
+    // object, 2 sub-tiles short (`unit_distance`, `pathing.md` §9.5: a
+    // negative `dist8_unit` entry returns 0 at once; recorded, the stash
+    // run stops at Δ=(2,0); rc-object-approach, gen-obj-267/385).
     let og = fx.guid(wp);
     let w = fx.walk(&bytes(&WalkToUnit { type_: 2, id: og }), 0x02, 30);
-    assert_eq!(w.len(), 11);
+    assert_eq!(w.len(), 6);
     assert_eq!(
-        (w[10].0, w[10].1, w[10].2),
-        (centre(WP_AT.0), centre(WP_AT.1), 1)
+        (w[5].0, w[5].1, w[5].2),
+        (centre(WP_AT.0 + 2), centre(WP_AT.1), 1)
     );
     assert!(w.iter().all(|f| f.3.is_empty()));
     walks.push(w);
