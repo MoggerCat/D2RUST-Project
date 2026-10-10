@@ -449,13 +449,10 @@ impl OriginalUi {
             bubbles: Default::default(),
             cube_opened: false,
             cube_anim: Default::default(),
-            // §23 r3: init with adj 0 (the only caller passes 0).
-            cursor: RefCell::new(super::cursor::Cursor::init(
-                0,
-                config.screen.w,
-                config.screen.h,
-                0,
-            )),
+            // §23 r3: init with adj 0 (the only caller passes 0). The init
+            // runs before the resolution is set, so W x H is the 640 x 480
+            // default, not the screen (REC-2175).
+            cursor: RefCell::new(super::cursor::Cursor::init(0, 640, 480, 0)),
             cursor_seed: std::cell::Cell::new(None),
             client_quest: [0; 96],
             level_names: Vec::new(),
