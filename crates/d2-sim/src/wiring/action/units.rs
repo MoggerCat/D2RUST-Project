@@ -970,6 +970,9 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         let Some(ty) = UnitType::ALL.get(usize::from(owner_type)).copied() else {
             return;
         };
+        if ty == UnitType::Player {
+            self.hireling_units.insert(unit);
+        }
         if let Some(c) = self.ai.as_mut().and_then(|s| s.control_mut(unit)) {
             c.minion_owner = Some(ai::UnitRef {
                 ty,
