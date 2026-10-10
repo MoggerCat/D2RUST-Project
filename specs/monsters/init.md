@@ -36,32 +36,32 @@
 |   8. Base values from monlvl | 431–465 |
 |   9. Player-count bonus (`0x00573930`) | 466–477 |
 |   10. Components (`0x005739D0`) | 478–488 |
-|   11. monprop (`monprop.txt`) | 489–497 |
-|   12. monequip (`0x005D6B60`) | 498–514 |
-|   13. Classic scaling (`0x0063EEF0`) | 515–522 |
-|   14. Normal mods and boss mods | 523–624 |
-|   15. Party minions | 625–629 |
-|   16. Boss spawns | 630–665 |
-|   17. Choosing umods (`0x005A0760`) | 666–709 |
-|   18. Boss minions and umod init (`0x005A2120`) | 710–727 |
-|   19. Umod init functions | 728–820 |
-|   20. Superuniques (`0x005A49B0`) | 821–875 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 876–890 |
-|   22. Umod callbacks and the type-7 event | 891–942 |
-|   23. Unique names (client) | 943–952 |
-|   24. Monster assign message | 953–1009 |
-|   25. Calling the spawn functions outside population (tools) | 1010–1100 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1101–1160 |
-|   27. Class reinit (`0x00574370`) | 1161–1206 |
-| Constants & data dependencies | 1207–1228 |
-| Randomness | 1229–1273 |
-| Edge cases & original bugs | 1274–1305 |
-| Test vectors | 1306–1307 |
-|   Synthetic (CI-safe) | 1308–1330 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1331–1361 |
-|   Recorded checks (monster assign 0xAC) | 1362–1374 |
-| Provenance | 1375–1464 |
-| Open questions | 1465–1545 |
+|   11. monprop (`monprop.txt`) | 489–506 |
+|   12. monequip (`0x005D6B60`) | 507–523 |
+|   13. Classic scaling (`0x0063EEF0`) | 524–531 |
+|   14. Normal mods and boss mods | 532–633 |
+|   15. Party minions | 634–638 |
+|   16. Boss spawns | 639–674 |
+|   17. Choosing umods (`0x005A0760`) | 675–718 |
+|   18. Boss minions and umod init (`0x005A2120`) | 719–736 |
+|   19. Umod init functions | 737–829 |
+|   20. Superuniques (`0x005A49B0`) | 830–884 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 885–899 |
+|   22. Umod callbacks and the type-7 event | 900–951 |
+|   23. Unique names (client) | 952–961 |
+|   24. Monster assign message | 962–1018 |
+|   25. Calling the spawn functions outside population (tools) | 1019–1109 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1110–1169 |
+|   27. Class reinit (`0x00574370`) | 1170–1215 |
+| Constants & data dependencies | 1216–1237 |
+| Randomness | 1238–1282 |
+| Edge cases & original bugs | 1283–1314 |
+| Test vectors | 1315–1316 |
+|   Synthetic (CI-safe) | 1317–1339 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1340–1370 |
+|   Recorded checks (monster assign 0xAC) | 1371–1383 |
+| Provenance | 1384–1473 |
+| Open questions | 1474–1554 |
 <!-- /index -->
 
 ## Summary
@@ -494,6 +494,15 @@ property id < 0. If `chance<i>` (for d) is 0, apply; else one inline unit
 seed step and apply if lo' % 100 < chance. Apply = item property
 assignment on the unit (`0x0065FD70`, property spec) with `par`, `min`,
 `max`. None of the recorded Act 1 classes has a MonProp.
+Implemented (rc-pkt-handwritten, REC-3372): the record goes through the
+item property dispatcher on the unit as the item (owner none): the list
+is state 0, flags 0x40 (`items/properties.md` §4.2), rolls draw on the
+unit's seed (`WorldHost::apply_property`, `ActionHooks::item_tables`).
+Evidence: the druid raven's class (monprop row `druidhawk`, `stupidity`
+−1) sends 9 stat bits in 0xAC (list found, nothing sendable, §24 rule 6)
+in `traces/checks/dru-raven.check`, and so does every monprop class. The
+dispatcher's mode argument for this call is not read (mode 0 assumed).
+
 
 ### 12. monequip (`0x005D6B60`)
 

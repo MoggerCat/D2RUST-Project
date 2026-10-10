@@ -164,6 +164,13 @@ pub trait UnitHooks: StatHost {
         false
     }
 
+    /// `0x0058EC00(unit, index + 1, v)`: AI param `index` (0..=2) of the
+    /// unit's AI control := v (`monsters/ai-bodies.md` §9.9, the C→S 0x59
+    /// entry). False: no AI store or no control.
+    fn set_ai_param(&mut self, unit: UnitId, index: usize, v: i32) -> bool {
+        false
+    }
+
     // ---- players (units.md §4.5, §6.1) --------------------------------
 
     /// `0x0057EDD0` / `0x0057EEC0`: the mode request check. Provider:
