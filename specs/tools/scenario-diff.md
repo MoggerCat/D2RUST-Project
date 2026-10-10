@@ -24,13 +24,13 @@
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
 |   3. Run | 145–549 |
-|   4. Suite | 550–670 |
-| Constants & data dependencies | 671–674 |
-| Randomness | 675–678 |
-| Edge cases & original bugs | 679–702 |
-| Test vectors | 703–725 |
-| Provenance | 726–729 |
-| Open questions | 730–778 |
+|   4. Suite | 550–677 |
+| Constants & data dependencies | 678–681 |
+| Randomness | 682–685 |
+| Edge cases & original bugs | 686–709 |
+| Test vectors | 710–732 |
+| Provenance | 733–736 |
+| Open questions | 737–800 |
 <!-- /index -->
 
 ## Summary
@@ -594,8 +594,11 @@ playthrough's playability next to it.
    text output (state `orig.state.jsonl`, draws `orig.frames.jsonl`, rng
    `orig.rng.jsonl`, packets `orig.packets.jsonl`; the draws channel's
    `draws-orig` is derived from the frames file by `facts_render.py` and
-   is rebuilt each run). Key (format `orig-cache-key-1`): sha256 of the check
-   file, of the `--time 1` save (rule 3), of `Game.exe`, of the private
+   is rebuilt each run). Key (format `orig-cache-key-2`): sha256 of the check
+   file's recording lines (its lines without comments, blank lines and the
+   comparator-only `ignore` lines, an `input` line kept whole, each
+   stripped and ended by a newline; `orig_cache.recording_text`), of the
+   `--time 1` save (rule 3), of `Game.exe`, of the private
    repo's `install/manifest.json` (else of `Game.exe` alone, marked
    `game-exe:`), and of the channel's recorder (its script and, transitively,
    the same-folder modules it imports). A hit restores the file into the
@@ -605,6 +608,10 @@ playthrough's playability next to it.
    it with `--fill-cache`). The cache holds small text only; a file with a
    PNG signature or a NUL byte, or over 64 MiB, is not stored, and
    rendered frames go to the private repo, never here (CLAUDE.md rule 1).
+   `orig_cache.py --migrate-v1 DIR CHECKS_DIR...` rewrites each
+   `orig-cache-key-1` entry whose check hash still equals the sha256 of
+   its check file to `orig-cache-key-2` (the recorded files untouched);
+   the others stay misses.
 4. Comparator summaries: `state_diff.py`, `rng_diff.py` and
    `packets_diff.py` take `--json FILE` (format `diff-summary-1`:
    `channel`, `code`, `verdict`, `frames_compared`, `frames_equal`,
@@ -775,3 +782,18 @@ d2rs-own tool; no 1.14d fact.
    call (drop / store / gamble / cube / quest) directly instead of the
    message action; it needs the d2rs creation path to write the same
    record.
+6. PROVISIONAL REC-2055: a fidelity-ledger row counts as EQUAL when
+   every channel of its checks is MATCH except a state channel whose
+   only PARTIAL cause is the d2rs header's client gap (`state_dump.rs`
+   `RUN_GAPS`: the headless bridge's C→S set), with every unit field of
+   both sides compared (no `ignore` line, nothing one-sided), and either
+   no `input` or `send` line in the check (pokes only) or a packets
+   channel that MATCHes (its C→S stream equal: the gap's condition, a
+   1.14d client sending another message, did not occur). The comparator's verdict stays PARTIAL (`state-
+   snapshot.md` §1 rule 1, §4 rule 5); settled by the coordinator's
+   ledger rule, or by the bridge covering the 1.14d client's C→S set
+   (the gap removed).
+7. PROVISIONAL REC-2056: likewise, an items channel PARTIAL whose only
+   cause is "no item created on either side" (§3 rule 13, edge: nothing
+   compared) counts as equal for such a row (zero items on both sides);
+   settled with REC-2055.

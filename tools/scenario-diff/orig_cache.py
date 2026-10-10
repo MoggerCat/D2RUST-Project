@@ -10,7 +10,8 @@ files with size and sha256) and the recorder's small text output
 1). Anything with rendered game art (PNG frames) is never stored here: a
 recorder output with a PNG, or a file that is not text, is refused.
 
-The key is what the recorded bytes depend on: the check file, the save
+The key is what the recorded bytes depend on: the check file's recording
+lines (comments and the comparator-only `ignore` lines left out), the save
 d2s-tool makes from it (`--time 1`), `Game.exe`, the install manifest, and the
 channel's recorder (its script and the sibling modules it imports). A changed
 check, recorder or install is a miss, never a stale hit.
@@ -21,7 +22,7 @@ import os
 import re
 import shutil
 
-KEY_FORMAT = "orig-cache-key-1"
+KEY_FORMAT = "orig-cache-key-2"
 ENTRY_FORMAT = "orig-cache-1"
 # recorder script -> (channel, output file name in the work dir)
 RECORDERS = {"record_state.py": ("state", "orig.state.jsonl"),
@@ -77,9 +78,21 @@ def install_manifest_hash(game_dir):
     return "game-exe:" + sha256_file(os.path.join(game_dir, "Game.exe"))
 
 
+def recording_text(check_text):
+    """The part of a check file the 1.14d recording depends on: its lines
+    without comments (an `input` line keeps its `#`, as the parser does),
+    blank lines and `ignore` lines (comparator only), joined by newlines."""
+    out = []
+    for ln in check_text.splitlines():
+        ln = ln.strip() if ln.lstrip().startswith("input ") else ln.split("#", 1)[0].strip()
+        if ln and ln.partition(" ")[0] != "ignore":
+            out.append(ln)
+    return "\n".join(out) + "\n"
+
+
 def make_key(check_text, save_bytes, game_dir, rec_dir, script):
     return {"format": KEY_FORMAT,
-            "check": sha256_bytes(check_text.encode()),
+            "check": sha256_bytes(recording_text(check_text).encode()),
             "save": sha256_bytes(save_bytes),
             "game_exe": sha256_file(os.path.join(game_dir, "Game.exe")),
             "install": install_manifest_hash(game_dir),
@@ -142,6 +155,44 @@ class OrigCache:
         return True
 
 
+def migrate_v1(root, check_dirs):
+    """Rewrite each `orig-cache-key-1` entry whose check hash is still the
+    sha256 of its check file's text to `orig-cache-key-2` (the hash of
+    `recording_text`); the recorded files are not touched. Returns
+    (migrated, left) counts; a left entry is stale and misses as before."""
+    paths = {}
+    for d in check_dirs:
+        for n in sorted(os.listdir(d)):
+            if n.endswith(".check"):
+                paths.setdefault(n[:-6], os.path.join(d, n))
+    done = left = 0
+    for name in sorted(os.listdir(root)):
+        for ch in sorted(os.listdir(os.path.join(root, name))):
+            p = os.path.join(root, name, ch, "cache.json")
+            try:
+                with open(p, encoding="utf-8") as f:
+                    entry = json.load(f)
+            except (OSError, ValueError):
+                continue
+            key = entry.get("key") or {}
+            if key.get("format") != "orig-cache-key-1":
+                continue
+            text = None
+            if name in paths:
+                with open(paths[name], encoding="utf-8") as f:
+                    text = f.read()
+            if text is None or key.get("check") != sha256_bytes(text.encode()):
+                left += 1
+                continue
+            entry["key"] = dict(key, format=KEY_FORMAT,
+                                check=sha256_bytes(recording_text(text).encode()))
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(entry, f, indent=1, sort_keys=True)
+                f.write("\n")
+            done += 1
+    return done, left
+
+
 def selftest():
     import tempfile
     with tempfile.TemporaryDirectory() as td:
@@ -160,6 +211,10 @@ def selftest():
         # M08: a changed check, save, recorder (also an imported module) or exe misses
         assert k1 != make_key("check b", b"save", game, rec, "record_state.py")
         assert k1 != make_key("check a", b"save2", game, rec, "record_state.py")
+        # comments, blank lines and comparator-only `ignore` lines do not change it
+        assert k1 == make_key("# note\ncheck a  # x\n\nignore q seed\n", b"save", game, rec,
+                              "record_state.py")
+        assert recording_text("input a # b\n") == "input a # b\n"
         with open(os.path.join(rec, "helper.py"), "w") as f:
             f.write("X = 2\n")
         k2 = make_key("check a", b"save", game, rec, "record_state.py")
@@ -189,4 +244,9 @@ def selftest():
 
 
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:2] == ["--migrate-v1"]:
+        # orig_cache.py --migrate-v1 DIR CHECKS_DIR...
+        print("migrated %d, left %d (stale)" % migrate_v1(sys.argv[2], sys.argv[3:]))
+        raise SystemExit(0)
     raise SystemExit(selftest())
