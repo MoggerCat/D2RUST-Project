@@ -1067,6 +1067,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
         self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
+        self.natural_skills.remove(&unit);
         // A summon's skill list (the aura assignment of
         // `interaction::summon`); players keep theirs (the save).
         if ty == Some(UnitType::Monster) {
