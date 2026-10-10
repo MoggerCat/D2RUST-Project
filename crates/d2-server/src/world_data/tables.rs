@@ -217,6 +217,7 @@ macro_rules! item_gfx {
             transform: r.transform,
             gemoffset: r.gemoffset as i32,
             wclass: r.wclass,
+            wclass2: r.f_2handedwclass,
         }
     }};
 }
