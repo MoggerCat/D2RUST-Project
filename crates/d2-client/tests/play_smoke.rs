@@ -1580,6 +1580,7 @@ impl Run {
                     let r = sim.events.action.sys.units.get(m)?;
                     Some((r.class, r.mode, r.flags))
                 });
+                eprintln!("drawn {:?} server {:?}", self.drawn(), self.pos());
                 eprintln!(
                     "attack {:?} {mmode:?}: modes {seen:?}, life {:?}, player {:?}, monster {mp:?}, log {log:?} errors {errs}",
                     key.guid,
