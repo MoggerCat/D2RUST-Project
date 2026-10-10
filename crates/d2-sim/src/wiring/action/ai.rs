@@ -807,14 +807,19 @@ impl<X: Pending> AiActs for View<'_, X> {
     /// A summoned monster's entry: the id and its mode, fixed when the
     /// entry is created (`skills/use.md` §5.1: a monster's `monanim`).
     fn skill_entry(&self, unit: UnitId, skill: i32) -> Option<(i32, u8)> {
-        match self.h.monster_skills.get(&unit) {
-            Some(m) => {
-                m.get(&skill)?;
-                let mode = self.h.tables.skills.skill(skill)?.monanim;
-                Some((skill, mode))
-            }
-            None => self.h.x.ai_skill_entry(unit, skill),
+        // `0x006439F0(unit, skill)`: the unit's entry from its summon
+        // entries, else its init entries (`monsters/init.md` §6 step 14:
+        // `Sk<i>lvl` skills; REC-3182, `gen-su-60`: Nihlathak's E1/E3/E4
+        // exist, so the think draws in steps 6-8).
+        let own = self.h.monster_skills.get(&unit);
+        let natural = self.h.natural_skills.get(&unit);
+        if own.is_none() && natural.is_none() {
+            return self.h.x.ai_skill_entry(unit, skill);
         }
+        own.and_then(|m| m.get(&skill))
+            .or_else(|| natural.and_then(|m| m.get(&skill)))?;
+        let mode = self.h.tables.skills.skill(skill)?.monanim;
+        Some((skill, mode))
     }
     /// A monster with a skill list (an assigned aura,
     /// [`Pending::monster_right_aura`]): its hand's entry, id and base
