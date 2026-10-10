@@ -41,3 +41,4 @@ C-pkt-0xac-size	rc-pkt-sizes	19:27	0xAC size ass-shadow-master 23 vs 14, ama-val
 C-pkt-0xa8-shrine7	rc-pkt-sizes	19:27	gen-shrine-7 0xA8 size 15 vs 12	open
 C-pkt-0x67-dru	rc-pkt-sizes	19:27	dru-cycle-of-life/plague-poppy/vines 0x67 byte[6] + tx 5143 vs 5144; gen-skill-ass-257/261 0x67/0x21	open
 C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops the player light); ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	done (ui-draws MATCH 0 -> 6; player light, q replay, S key)
+C-ui-skillpick	rc-ui-skillpick	19:47	skill-pick list ui-draws skillbar/right/left-skill-pick row 232 (1.14d 3 icons y514 before level.dc6; d2rs 6+ y552 after)	open
