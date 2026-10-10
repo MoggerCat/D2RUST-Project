@@ -546,6 +546,13 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         self.source.unit_shadow_slot(unit)
     }
 
+    fn unit_listed_key(&self, unit: &ClientUnit) -> Option<OrderKey> {
+        match self.source.unit_slot(unit) {
+            UnitSlot::Drawn(at) => Some(at),
+            _ => None,
+        }
+    }
+
     fn component_slot_frame(
         &self,
         unit: &ClientUnit,

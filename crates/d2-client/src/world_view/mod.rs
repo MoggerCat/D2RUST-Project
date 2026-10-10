@@ -397,6 +397,14 @@ pub trait ViewRules {
         None
     }
 
+    /// The unit's slot when the frame's draw order lists it
+    /// (`draw-order.md` §5 r4: the room list walk calls the unit draw
+    /// `0x00471EC0` for every listed unit); `None` (the default): not
+    /// listed, or no draw order.
+    fn unit_listed_key(&self, _unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        None
+    }
+
     /// The component's frame, or `None` when the slot draws nothing
     /// (`render/unit-composite.md` §5 r2, §6 r4: failed component request,
     /// missing file). The default draws every slot with
@@ -643,6 +651,20 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     for unit in world.view_units() {
         let unit = &*unit;
         let Some(pose) = rules.unit_pose(world, unit)? else {
+            // `draw-order.md` §5 r4: a listed unit without a pose (no COF,
+            // e.g. object 78 `invisible town sound`, token TA, `Draw` 0)
+            // still gets the unit draw call; it draws no cel
+            // (`gen-ui-hud` row 176: unit 2:6).
+            if let Some(at) = rules.unit_listed_key(unit) {
+                unit_calls.push(UnitCall {
+                    key: DrawKey::new(at.pass, at.major, at.minor, 0).map_err(ViewError::Scene)?,
+                    tag: ItemTag::Unit(unit.key.guid),
+                    path: None,
+                    dir64: 0,
+                    frame: 0,
+                    shadow: false,
+                });
+            }
             units_hidden += 1;
             continue;
         };
