@@ -65,7 +65,35 @@ pub struct PlayerAnim {
 /// update).
 pub trait PlayerAnims: std::fmt::Debug + Send + Sync {
     fn anim(&self, w: &ClientWorld, key: UnitKey, mode: u32) -> Option<PlayerAnim>;
+
+    /// The AnimData frames and speed of a player `class`'s attack 1 (mode
+    /// 7) with the COF weapon class `weapon` (`hth `, `1hs `, ...), the
+    /// query of the tool tip's speed line (`ui/item-tips.md` §3.2 r1,
+    /// `0x0062A710`). `None`: no record.
+    fn attack1(&self, class: u32, weapon: [u8; 4]) -> Option<(i32, i32)> {
+        let _ = (class, weapon);
+        None
+    }
 }
+
+/// The animation lookup the model carries for the tool tips. Compares
+/// equal always: a handle, not model state.
+#[derive(Clone, Default)]
+pub struct PlayerAnimsRef(pub Option<std::sync::Arc<dyn PlayerAnims>>);
+
+impl std::fmt::Debug for PlayerAnimsRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PlayerAnimsRef({})", self.0.is_some())
+    }
+}
+
+impl PartialEq for PlayerAnimsRef {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for PlayerAnimsRef {}
 
 /// The type class `0x00629FE0` of a COF weapon class index
 /// (`render/unit-composite.md` §2.1 r-dual: `bow` 1 … `xbw` 7, `ht1` 12,
@@ -162,7 +190,26 @@ pub fn step(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) -> Result<(
     let Some(u) = w.units.get(&key) else {
         return Ok(());
     };
-    if key.unit_type != PLAYER || !ENDING_MODES.contains(&u.mode) {
+    if key.unit_type != PLAYER {
+        return Ok(());
+    }
+    // The looping neutral modes (1 and 5): each client update adds the
+    // speed to the frame and a frame at the count wraps to the overshoot
+    // (measured on 1.14d, `gen-render-firebolt`: the neutral mode set by
+    // the 0x15 placement of tick 4 reads 128, 256, ... 1920, 0, 128 at
+    // ticks 4 ... 20 with speed 128 and count 2048). Only after a mode set
+    // (`speed` known).
+    if matches!(u.mode, 1 | 5) {
+        if let (Some(s), true) = (u.speed, u.frame_count > 0) {
+            let u = w.units.get_mut(&key).expect("present");
+            u.frame = u.frame.wrapping_add(s);
+            if u.frame >= u.frame_count {
+                u.frame -= u.frame_count;
+            }
+        }
+        return Ok(());
+    }
+    if !ENDING_MODES.contains(&u.mode) {
         return Ok(());
     }
     let has_skill = u.skills.as_ref().is_some_and(|l| l.current.is_some());

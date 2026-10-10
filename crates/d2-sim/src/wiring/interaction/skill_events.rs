@@ -154,6 +154,15 @@ pub fn monster_right_aura<X: Pending + UseRest>(
 /// form of `schedule_periodic` (q-fix-pt-right-aura). The load selects
 /// the hand before the unit has a room, so the first periodic do runs on
 /// the first tick after game entry.
+///
+/// In 1.14d this is the join's post-load step (d), after part B's 0xAA
+/// (`formats/d2s.md` §2.4 rule 6.3): the aura's stats are in effect for
+/// the join's later messages (the first 0x95 of `gen-skill-pal-115`), but
+/// the 0xAA never lists its state, which the first update sends as 0xA8.
+// PROVISIONAL (REC-3410): d2rs sends part B at game entry, after the
+// load, so the aura state's unit bit is switched off here (its list and
+// its changed bit stay) and [`passive_states_on`] switches it back on
+// after the join messages.
 pub fn assign_right_aura<X: Pending + UseRest>(
     h: &mut ActionHooks<X>,
     sim: &mut Sim<'_>,
@@ -182,6 +191,11 @@ pub fn assign_right_aura<X: Pending + UseRest>(
         w.set_aura_state(unit, r.aurastate, e.skill, l);
     }
     crate::skills::use_::schedule_periodic(&mut w, &t.skills, unit, e.skill, l, true);
+    if let Ok(s) = u16::try_from(r.aurastate as i16) {
+        if w.cv.v.state_list(unit, s).is_some() && w.cv.v.stats.has_state(unit, u32::from(s)) {
+            w.cv.v.set_state(unit, s, false);
+        }
+    }
 }
 
 /// The skill part of the monster sequence event 0 `0x005A8670`
@@ -451,6 +465,16 @@ pub fn passive_states_on<X: Pending + UseRest>(
             w.cv.v.set_state(unit, p, true);
         }
     }
+    // The right aura's state hidden by `assign_right_aura` (REC-3410).
+    let aura = UseWorld::right_skill(&w, unit)
+        .and_then(|e| t.skills.skill(e.skill))
+        .filter(|r| r.aura)
+        .and_then(|r| u16::try_from(r.aurastate as i16).ok());
+    if let Some(s) = aura {
+        if w.cv.v.state_list(unit, s).is_some() && !w.cv.v.stats.has_state(unit, u32::from(s)) {
+            w.cv.v.set_state(unit, s, true);
+        }
+    }
 }
 
 /// The save load's right-skill selection (`formats/d2s.md` §2.4 rule
@@ -535,6 +559,42 @@ pub fn missile_area_units<X: Pending + UseRest>(
         },
     );
     out
+}
+
+/// The ally test `0x00554DE0` for the missile bodies.
+pub fn missile_ally_test<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    a: UnitId,
+    b: UnitId,
+) -> bool {
+    let w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    BodyWorld::allied(&w, a, b)
+}
+
+/// The shout missile's hit (`missiles/bodies.md` §13 step 2): `shout_state`
+/// (`0x005D8290`, `skills/bodies.md` §6.8) on `unit` from `owner`.
+pub fn missile_shout_state<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    owner: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    crate::skills::use_::bodies::shout_state(&mut w, &t.skills, unit, owner, skill, level);
 }
 
 /// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`

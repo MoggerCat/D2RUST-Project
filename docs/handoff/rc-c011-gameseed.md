@@ -2,9 +2,11 @@
 
 Branch `claude/rc-c011-gameseed` (from `claude/integ-r23`). REC ids
 REC-3330..3349 (none used). Ledger part `docs/handoff/ledger/rc-c011-gameseed.tsv`.
-EQUAL 3116 → 3210 (+94; 0 rows went EQUAL → DIVERGED). Sweeps (all checked
-against the ledger / checks-status, 0 worse): gen-mon-* 337, gen-boss/su/ai 237,
-the 194 class-skill checks, a5-su-*, dru/ass/milestone C011 checks.
+EQUAL 3328 → 3415 on the current integ-r23 parts (+87; 0 rows lost EQUAL;
+cause 1 alone moved no row). Sweeps (checked against the ledger and
+checks-status, 0 worse): gen-mon-* 337, gen-boss/su/ai 237, the 194
+class-skill checks, a5-su-*, the C011 checks; the 78 checks behind the
+part's rows re-run after the last integ merge.
 
 ## Fixes (draw site in 1.14d → d2rs gap)
 
@@ -17,7 +19,7 @@ the 194 class-skill checks, a5-su-*, dru/ass/milestone C011 checks.
 | `0x00553540`, `0x0056D2C0`, path target point | umod host seams always none → path provider | multishot / curse targets |
 | `0x00463740`, `0x005B2F20` in the AI | seams none → DRLG room + `spawn_at` | maggot queen 43 → 74 |
 | A1Q4 `0x005944B0` / `0x005943B0` / `0x00594450` / `0x005944F0` | not wired → quest loan; specced `quests-act1-rest.md` §3 | gen-ai-npcoutoftown EQUAL |
-| `0x00571CD0` in the player update (`intents-events.md` §7.3 r1 step 4) + `MsgA3` | player records never sent; MsgA3 dropped | dru-volcano, dru-armageddon packets MATCH |
+| `0x00571CD0` in the player update (`intents-events.md` §7.3 r1 step 4) + `MsgA3` | player records never sent; MsgA3 dropped → one send before the soft hit (rc-whirlwind's later duplicate send merged into it) | dru-volcano, dru-armageddon, bar-whirlwind packets MATCH |
 
 ## Open (with sizes)
 

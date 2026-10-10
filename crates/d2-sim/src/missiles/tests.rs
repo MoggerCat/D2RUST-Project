@@ -491,7 +491,7 @@ impl MissileBodies for Fake {
     fn is_ally(&self, _: &Game, _: UnitId, unit: UnitId, _: i32) -> bool {
         self.mb.allies.contains(&unit)
     }
-    fn ally_test(&self, _: &Game, _: UnitId, unit: UnitId) -> bool {
+    fn ally_test(&mut self, _: &mut Game, _: UnitId, unit: UnitId) -> bool {
         self.mb.allies.contains(&unit)
     }
     fn accepts(&self, _: &Game, _: UnitId, _: UnitId, _: u32) -> bool {

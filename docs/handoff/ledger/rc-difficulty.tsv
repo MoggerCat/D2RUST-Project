@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-monster.difficulty.stats-a3a5	entity	rc-difficulty	levels.txt MonLvl, monlvl.txt, difficultylevels.txt	specs/monsters/init.md	-	diff-a4-nm-normal-bm,diff-a5-hell-normal-bm	DIVERGED@54	yes	0	n	q-fix-b-monster-combat	DIVERGED	M	stats/seed/spawn equal to 1.14d until frames 39-90; first divergences are monster attack/mode (missile 320 missing, m 2 vs 1) and player fc 256 after the hit, not difficulty scaling
+monster.difficulty.stats-a3a5	entity	rc-difficulty	levels.txt MonLvl, monlvl.txt, difficultylevels.txt	specs/monsters/init.md	-	diff-a4-nm-normal-bm,diff-a5-hell-normal-bm	PARTIAL	yes	0	n	q-fix-b-monster-combat	DIVERGED	M	stats/seed/spawn equal to 1.14d until frames 39-90; first divergences are monster attack/mode (missile 320 missing, m 2 vs 1) and player fc 256 after the hit, not difficulty scaling

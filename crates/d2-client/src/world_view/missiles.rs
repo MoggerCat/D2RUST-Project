@@ -352,8 +352,12 @@ pub struct Missiles {
     /// The overlay records of the UI's calls by host (`render/overlay.md`
     /// §1–§3; the unit's graphics-record list).
     unit_overlays: BTreeMap<UnitKey, OverlayList>,
-    /// The UI's overlay calls not run yet, in call order.
-    overlay_calls: Vec<OverlayCall>,
+    /// The UI's overlay calls not run yet, in call order, each with the
+    /// server tick of its delivery.
+    overlay_calls: Vec<(u64, OverlayCall)>,
+    /// The frame count of each created overlay's file (§2 r6), loaded
+    /// before the update advance runs the calls.
+    overlay_frames: BTreeMap<u16, Option<i32>>,
 }
 
 impl std::fmt::Debug for Missiles {
@@ -390,12 +394,14 @@ impl Missiles {
         }
     }
 
-    /// Queues the UI's overlay calls of one delivery, in call order; the
-    /// next [`Self::add_to_frame`] runs them before the update advance
-    /// (`render/overlay.md` §3 r2: a record created before the walk runs
-    /// in the same update).
-    pub fn overlay_calls(&mut self, calls: impl IntoIterator<Item = OverlayCall>) {
-        self.overlay_calls.extend(calls);
+    /// Queues the UI's overlay calls of one delivery at server tick
+    /// `tick`, in call order; the update advance runs them just before
+    /// that tick's step, however many ticks the next
+    /// [`Self::add_to_frame`] catches up (`render/overlay.md` §3 r2: a
+    /// record created before the walk runs in the same update).
+    pub fn overlay_calls(&mut self, tick: u64, calls: impl IntoIterator<Item = OverlayCall>) {
+        self.overlay_calls
+            .extend(calls.into_iter().map(|c| (tick, c)));
     }
 
     /// The overlay records on `unit`, list head first.
@@ -585,16 +591,19 @@ impl Missiles {
     }
 
     /// Runs the effects up to the model's server tick.
-    fn advance(&mut self, world: &ClientWorld) {
+    fn advance(&mut self, world: &ClientWorld, log: &mut Vec<String>) {
         let to = world.server_ticks;
         if to < self.now || to - self.now > MAX_CATCH_UP {
+            self.run_overlay_calls(world, u64::MAX, log);
             self.now = to;
             return;
         }
         while self.now < to {
             self.now += 1;
+            self.run_overlay_calls(world, self.now, log);
             self.step(world);
         }
+        self.run_overlay_calls(world, to, log);
     }
 
     fn step(&mut self, world: &ClientWorld) {
@@ -679,24 +688,40 @@ impl Missiles {
         self.files.get(&files[0])?.as_ref()
     }
 
-    /// Runs the queued UI overlay calls in order (`render/overlay.md` §2,
-    /// §3 r9) on the model's units; a call on a unit the model no longer
-    /// has does nothing. The create's frame count is the overlay file's
-    /// (§2 r6: the file loaded here; one that does not load gives 1).
-    fn run_overlay_calls(&mut self, world: &ClientWorld, assets: &mut ViewAssets) -> Vec<String> {
-        let mut log = Vec::new();
-        for call in std::mem::take(&mut self.overlay_calls) {
+    /// Makes the files of the queued creates resident and keeps their
+    /// frame counts (`render/overlay.md` §2 r6: one that does not load
+    /// gives 1, `None` here).
+    fn load_overlay_art(&mut self, assets: &mut ViewAssets, log: &mut Vec<String>) {
+        let ids: Vec<u16> = self
+            .overlay_calls
+            .iter()
+            .filter(|(_, c)| c.on)
+            .map(|(_, c)| c.id)
+            .filter(|id| !self.overlay_frames.contains_key(id))
+            .collect();
+        for id in ids {
+            let frames = match self.overlay_art(id, true) {
+                Some((art, _)) => self
+                    .resident(&art.files, assets, log)
+                    .and_then(|r| i32::try_from(r.frames).ok()),
+                None => None,
+            };
+            self.overlay_frames.insert(id, frames);
+        }
+    }
+
+    /// Runs the queued UI overlay calls delivered at or before tick `upto`,
+    /// in order (`render/overlay.md` §2, §3 r9), on the model's units; a
+    /// call on a unit the model no longer has does nothing.
+    fn run_overlay_calls(&mut self, world: &ClientWorld, upto: u64, log: &mut Vec<String>) {
+        let n = self.overlay_calls.partition_point(|(t, _)| *t <= upto);
+        for (_, call) in self.overlay_calls.drain(..n).collect::<Vec<_>>() {
             let Some(unit) = world.units.get(&call.unit) else {
                 continue;
             };
             let id = i32::from(call.id);
             if call.on {
-                let frames = match self.overlay_art(call.id, true) {
-                    Some((art, _)) => self
-                        .resident(&art.files, assets, &mut log)
-                        .and_then(|r| i32::try_from(r.frames).ok()),
-                    None => None,
-                };
+                let frames = self.overlay_frames.get(&call.id).copied().flatten();
                 let mut env = HostEnv::new(&self.rows, unit, frames);
                 // The UI's creates: kind 3, a = b = 0 (no seed draw, §4).
                 self.unit_overlays
@@ -710,7 +735,6 @@ impl Missiles {
                 }
             }
         }
-        log
     }
 
     /// Makes the art of the live effects and of the units' state overlays
@@ -1014,8 +1038,9 @@ impl Missiles {
         }
         let at = |u: &ClientUnit| unit_at(feed, u);
         self.observe(world, &at);
-        let mut log = self.run_overlay_calls(world, assets);
-        self.advance(world);
+        let mut log = Vec::new();
+        self.load_overlay_art(assets, &mut log);
+        self.advance(world, &mut log);
         log.extend(self.ensure(world, assets));
         let camera = match (feed.player(world), feed.open_mode(world)) {
             // The frame's one camera, shake included

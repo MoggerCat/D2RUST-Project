@@ -65,6 +65,8 @@ pub trait ActionEvents: EventDispatch {
         a.sys.hooks.game_seed = fields.seed;
         a.sys.hooks.ai_info = fields.ai_info();
         a.sys.data.difficulty = fields.difficulty;
+        // Spec: specs/monsters/ai.md §1.3 rule 1: game +0x6A or +0x74 set.
+        a.sys.data.aidel_by_difficulty = fields.game_type != 0 || fields.ladder;
         a.sys.data.expansion = fields.expansion;
     }
 }
@@ -128,6 +130,8 @@ impl<X: WorldPending> ActionEvents for WorldSim<X> {
         a.sys.hooks.game_seed = fields.seed;
         a.sys.hooks.ai_info = fields.ai_info();
         a.sys.data.difficulty = fields.difficulty;
+        // Spec: specs/monsters/ai.md §1.3 rule 1: game +0x6A or +0x74 set.
+        a.sys.data.aidel_by_difficulty = fields.game_type != 0 || fields.ladder;
         a.sys.data.expansion = fields.expansion;
         let w = &mut self.world;
         w.init_info.difficulty = fields.difficulty;
