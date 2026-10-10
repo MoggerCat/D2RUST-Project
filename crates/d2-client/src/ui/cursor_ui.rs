@@ -35,11 +35,63 @@ pub(super) fn cursor_files() -> Vec<String> {
 }
 
 /// The client clock of the cursor (module doc).
-fn now(world: &ClientWorld) -> u32 {
-    (world.frames as u32).wrapping_mul(40)
+/// The cursor's `GetTickCount()`: the host clock the app sets
+/// ([`OriginalUi::set_host_now`]: a check run's recorded frame clock,
+/// `tools/scenario-diff.md`), else 40 ms per bridge frame (d2rs-own).
+fn now(sh: &Shared, world: &ClientWorld) -> u32 {
+    sh.host_now
+        .get()
+        .unwrap_or_else(|| (world.frames as u32).wrapping_mul(40))
 }
 
 impl OriginalUi {
+    /// The owed cursor step (§23 r8) of the last cursor draw, on the
+    /// client seed shared with the weather and sound draws: run once per
+    /// drawn frame, after the frame's weather update (`client/model.md`
+    /// Randomness r4). Nothing owed, or no linked seed: nothing.
+    pub fn cursor_step(
+        &mut self,
+        world: &ClientWorld,
+    ) -> Result<(), crate::ui::cursor::CursorFatal> {
+        let sh = self.shared.borrow();
+        if !sh.cursor_step_owed.replace(false) {
+            return Ok(());
+        }
+        let Some(shared) = sh.client_seed.as_ref() else {
+            return Ok(());
+        };
+        let mut held = shared.lock().unwrap_or_else(|e| e.into_inner());
+        held.sync(world);
+        let mut seed = held
+            .seed()
+            .map_or(0, |s| u64::from(s.lo) | (u64::from(s.hi) << 32));
+        let player = world.local().is_some();
+        let r = sh
+            .cursor
+            .borrow_mut()
+            .step(now(&sh, world), player, &mut seed);
+        if let Some(s) = held.seed() {
+            *s = d2_sim::rng::Seed::new(seed as u32, (seed >> 32) as u32);
+        }
+        r
+    }
+
+    /// The host clock the cursor reads (`GetTickCount()`): a check run
+    /// replays the recorded clock of each drawn frame; `None`: 40 ms per
+    /// bridge frame.
+    pub fn set_host_now(&mut self, now: Option<u32>) {
+        self.shared.borrow().host_now.set(now);
+    }
+
+    /// The recorded cursor timers at the first drawn frame of a check run
+    /// (`last_step`, `idle_since`, `ui/panels-3.md` §23 r2).
+    pub fn set_cursor_timers(&mut self, last: u32, idle: u32) {
+        let sh = self.shared.borrow();
+        let mut c = sh.cursor.borrow_mut();
+        c.last = last;
+        c.idle = idle;
+    }
+
     /// The pointer events the cursor's window handlers see (§23 r14): the
     /// move, the button down and up (none is consumed), and the pointer
     /// leaving the window (`WM_NCMOUSEMOVE`: not drawn).
@@ -47,7 +99,7 @@ impl OriginalUi {
         let sh = self.shared.borrow();
         let (w, h) = (sh.config.screen.w, sh.config.screen.h);
         let mut c = sh.cursor.borrow_mut();
-        let t = now(world);
+        let t = now(&sh, world);
         match e {
             UiEvent::CursorMoved(p) => {
                 c.mouse_move(p.x, p.y, t, w, h, false);
@@ -71,18 +123,30 @@ pub(super) fn draw(sh: &Shared, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         c.set_item(item.is_some());
     }
     let me = ctx.world.local();
-    let mut seed = sh.cursor_seed.get().unwrap_or_else(|| {
-        me.and_then(|u| u.seed)
-            .map_or(0, |(lo, hi)| u64::from(lo) | (u64::from(hi) << 32))
-    });
     let gfx = item
         .as_ref()
         .and_then(|it| sh.items.cursor_graphic_size(&sh.tables.files, it));
     let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-    let d = c.draw(w, h, gfx, now(ctx.world), me.is_some(), &mut seed);
-    if me.is_some() {
-        sh.cursor_seed.set(Some(seed));
-    }
+    // `client/model.md` Randomness r4: with the shared client seed linked,
+    // the step is owed and runs after the frame's weather update
+    // ([`OriginalUi::cursor_step`]); unlinked, it runs here on a local copy.
+    let d = if sh.client_seed.is_some() {
+        let (d, step) = c.place(w, h, gfx);
+        if step {
+            sh.cursor_step_owed.set(true);
+        }
+        Ok(d)
+    } else {
+        let mut seed = sh.cursor_seed.get().unwrap_or_else(|| {
+            me.and_then(|u| u.seed)
+                .map_or(0, |(lo, hi)| u64::from(lo) | (u64::from(hi) << 32))
+        });
+        let d = c.draw(w, h, gfx, now(sh, ctx.world), me.is_some(), &mut seed);
+        if me.is_some() {
+            sh.cursor_seed.set(Some(seed));
+        }
+        d
+    };
     match d {
         Ok(Some(CursorDraw::Item { .. })) => {
             // The item's graphic, centred on the mouse (`inv_items`).

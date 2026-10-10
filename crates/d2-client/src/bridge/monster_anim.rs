@@ -118,6 +118,36 @@ pub fn first_frame(w: &mut ClientWorld, key: UnitKey) {
     u.seed = Some((s.lo, s.hi));
 }
 
+/// `msg-units.md` §1.2 r6.9: the initial path direction of a monster of
+/// set S that is not an `npc`: 0, or the low 6 bits of one step of the
+/// unit seed when the class has mode 2 (`modes` bit 2, `0x0046C140`);
+/// classes 351 → 0x18, 353 → 0x28, 352, 357, 344 → 0. The base-class
+/// rules (96 → 7, 301 → `0x0046C570`) need the `BaseId` link the client
+/// tables do not hold: PROVISIONAL (REC-2981), not run.
+pub fn first_direction(w: &mut ClientWorld, key: UnitKey, npc: bool, modes: u16) {
+    if npc {
+        return;
+    }
+    let Some(u) = w.units.get_mut(&key) else {
+        return;
+    };
+    let mut dir = 0;
+    if modes & (1 << 2) != 0 {
+        if let Some((lo, hi)) = u.seed {
+            let mut s = Seed::new(lo, hi);
+            dir = (s.step() & 0x3F) as u8;
+            u.seed = Some((s.lo, s.hi));
+        }
+    }
+    dir = match u.class {
+        351 => 0x18,
+        353 => 0x28,
+        352 | 357 | 344 => 0,
+        _ => dir,
+    };
+    u.path_dir = Some(dir);
+}
+
 /// The anim step of the monster update (`model.md` §19 r8.5, anim
 /// kind 0, `0x00623E00`): frame += speed, wrapping at the count.
 /// PROVISIONAL (client/model.md §19 r8.5; REC-503): every mode takes
