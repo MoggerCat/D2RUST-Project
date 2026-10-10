@@ -633,6 +633,7 @@ impl Fx {
         let unit_data = UnitData {
             monsters: (0..N_MONSTATS)
                 .map(|_| MonsterInfo {
+                    mode_chart: false,
                     enabled: true,
                     aidel: [15; 3],
                     moves: 0,
