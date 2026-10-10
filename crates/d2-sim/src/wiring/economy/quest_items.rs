@@ -263,7 +263,7 @@ impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
 
     /// The queue when a reward is already in it (the sends then follow
     /// it, [`QuestDeferred`]).
-    pub(crate) fn behind_reward(&mut self) -> Option<&mut Vec<QuestDeferred>> {
+    fn behind_reward(&mut self) -> Option<&mut Vec<QuestDeferred>> {
         self.deferred.as_deref_mut().filter(|q| !q.is_empty())
     }
 }
