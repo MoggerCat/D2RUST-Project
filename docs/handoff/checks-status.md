@@ -19,7 +19,7 @@ Rows of 35 checks re-run 2026-10-10 by rc-c008-monmode on claude/rc-c008-monmode
 
 Rows of 240 checks re-run 2026-10-10 by rc-promote (`suite.py --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough --json`, the checks of the PARTIAL/DIVERGED rows plus every gen-sysc-*): rows replaced in place, the totals above are not recomputed.
 
-Rows of 44 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, the passiveitype layer and the right aura at join): rows replaced in place, the totals above are not recomputed.
+Rows of 50 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 / 0xA7 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, the passiveitype layer, the right aura at join, the skill-delay queue): rows replaced in place, the totals above are not recomputed.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
 First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q-scenes-compare 8, q-prov-recording-2 3, q-fix-server-store-fill 2, q-fix-b-monster-combat 1, q-fix-pc1-proto-items 1
@@ -590,6 +590,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | dru-firestorm | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | q-fix-join-items |
 | dru-firestorm | state | PARTIAL | 70/70 | - | - |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
+| dru-fissure | packets | MATCH | 70/70 | - | - |
 | dru-grizzly | state | PARTIAL | 70/70 | - | - |
 | dru-heart-of-wolverine | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | q-fix-join-items |
 | dru-heart-of-wolverine | state | PARTIAL | 70/70 | - | - |
@@ -1231,6 +1232,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | save-levelup-ama | save | MATCH | 1/1 | - | - |
 | sor-blaze | state | PARTIAL | 70/70 | - | - |
 | sor-blizzard | state | PARTIAL | 70/70 | - | - |
+| sor-blizzard | packets | MATCH | 70/70 | - | - |
 | sor-chain-lightning | state | PARTIAL | 70/70 | - | - |
 | sor-charged-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-chilling-armor | state | PARTIAL | 70/70 | - | - |
@@ -1239,18 +1241,22 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | sor-fire-ball | state | PARTIAL | 70/70 | - | - |
 | sor-fire-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-fire-wall | state | PARTIAL | 70/70 | - | - |
+| sor-fire-wall | packets | MATCH | 70/70 | - | - |
 | sor-frost-nova | state | PARTIAL | 70/70 | - | - |
 | sor-frost-nova-twice | packets | MATCH | 100/100 | - | - |
 | sor-frost-nova-twice | state | PARTIAL | 100/100 | - | - |
 | sor-frozen-armor | state | PARTIAL | 70/70 | - | - |
 | sor-frozen-orb | state | PARTIAL | 70/70 | - | - |
+| sor-frozen-orb | packets | MATCH | 70/70 | - | - |
 | sor-glacial-spike | state | PARTIAL | 70/70 | - | - |
 | sor-hydra | state | PARTIAL | 70/70 | - | - |
+| sor-hydra | packets | MATCH | 70/70 | - | - |
 | sor-ice-blast | state | PARTIAL | 70/70 | - | - |
 | sor-ice-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-inferno | state | PARTIAL | 70/70 | - | - |
 | sor-lightning | state | PARTIAL | 70/70 | - | - |
 | sor-meteor | state | PARTIAL | 70/70 | - | - |
+| sor-meteor | packets | MATCH | 70/70 | - | - |
 | sor-nova | state | PARTIAL | 70/70 | - | - |
 | sor-shiver-armor | state | PARTIAL | 70/70 | - | - |
 | sor-static-field | state | PARTIAL | 70/70 | - | - |

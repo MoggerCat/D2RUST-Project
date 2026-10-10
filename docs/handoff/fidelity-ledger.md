@@ -31,10 +31,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 80 | 0 | 11 | 0 | 564 | 16 | 75 | 0 | 158–632 | 6 | 545 / 99 / 11 |
+| skills | 655 | 73 | 0 | 11 | 0 | 571 | 14 | 70 | 0 | 147–588 | 6 | 545 / 99 / 11 |
 | systems | 918 | 332 | 46 | 251 | 0 | 289 | 240 | 387 | 2 | 910–3576+ | 39 | 571 / 0 / 347 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 806 | 46 | 414 | 0 | 3213 | 420 | 834 | 12 | 1974–7512+ | 286 | 3540 / 382 / 557 |
+| **all** | 4479 | 799 | 46 | 414 | 0 | 3220 | 418 | 829 | 12 | 1963–7468+ | 286 | 3540 / 382 / 557 |
 
 ## By family
 
@@ -672,14 +672,14 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `skill.ama` | 30 | 16 | 0 | 0 | 0 | 14 | 0 | 0 | 16 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 12 | 0 | 0 | 0 | 18 | 0 | 0 | 12 | 0 | 0 | 23 |
 | `skill.bar` | 30 | 5 | 0 | 0 | 0 | 25 | 0 | 4 | 1 | 0 | 0 | 26 |
-| `skill.dru` | 31 | 16 | 0 | 0 | 0 | 15 | 0 | 4 | 12 | 0 | 0 | 21 |
+| `skill.dru` | 31 | 14 | 0 | 0 | 0 | 17 | 0 | 2 | 12 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
 | `skill.monster` | 65 | 13 | 0 | 0 | 0 | 52 | 0 | 4 | 9 | 0 | 0 | 18 |
 | `skill.nec` | 30 | 3 | 0 | 0 | 0 | 27 | 0 | 1 | 2 | 0 | 0 | 0 |
 | `skill.pal` | 30 | 4 | 0 | 0 | 0 | 26 | 0 | 0 | 4 | 0 | 0 | 0 |
 | `skill.sequences` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| `skill.sor` | 30 | 5 | 0 | 0 | 0 | 25 | 0 | 0 | 5 | 0 | 0 | 0 |
+| `skill.sor` | 30 | 0 | 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `state` | 185 | 1 | 0 | 0 | 0 | 184 | 0 | 1 | 0 | 0 | 0 | 11 |
 | `system.act` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.audio` | 47 | 39 | 0 | 8 | 0 | 0 | 0 | 4 | 43 | 0 | 0 | 0 |
@@ -6864,7 +6864,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1971
+- Rows whose state disagrees with their checks: 1978
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6925,7 +6925,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1911 more (rerun with the tsv to list them)
+  - … and 1918 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -9145,7 +9145,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ama.plague-javelin` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/functions.tsv | ama-plague-javelin packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.poison-javelin` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/functions.tsv | ama-poison-javelin packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.strafe` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ama-strafe packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
-| `skill.ama.valkyrie` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-ama-32 packets: frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) |
+| `skill.ama.valkyrie` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: ama-valkyrie packets: frame 30 stream s2c #2 size: 1.14d 18 vs d2rs 14 (id 0xac) |
 | `skill.ass.blade-fury` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-blade-fury: channel packets DIVERGED |
 | `skill.ass.blade-sentinel` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-1 ass-blade-sentinel: state: frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] (1/1 of its a* checks diverge) |
 | `skill.ass.charged-bolt-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-charged-bolt-sentry: channel packets DIVERGED |
@@ -9165,10 +9165,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.bar.whirlwind` | entity | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-whirlwind | specs/skills/bodies-2.md | bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players) |
 | `skill.dru.armageddon` | entity | DIVERGED | M | DIVERGED@37 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-armageddon: state channel first divergence: frame 37 game, field seed: 1.14d [3385903807, 408973908] vs d2rs [980535581, 1085454190] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-cycle-of-life: state channel first divergence: frame 31 monster 1:8 class 426, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.dru.eruption` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-dru-234 packets: frame 29 stream s2c #0 missing in d2rs (id 0xa7) |
 | `skill.dru.firestorm` | entity | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | dru-firestorm: state channel first divergence: frame 30 missile 3:2 class 458, field xf: 1.14d 32768 vs d2rs 25052 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.heart-of-wolverine` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c008-monmode: state channel of all checks 100% after aidel difficulty column fix (ai.md 1.3); other channels PARTIAL [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.dru.molten-boulder` | entity | DIVERGED | S | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate: gen-skill-dru-229 packets: frame 29 stream s2c #0 missing in d2rs (id 0xa7) |
 | `skill.dru.oak-sage` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-oak-sage: state channel first divergence: frame 31 player 0:1 class 5, field hp: 1.14d 56736 vs d2rs 25216 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.plague-poppy` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-plague-poppy: state channel first divergence: frame 31 monster 1:8 class 425, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.raven` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | dru-raven: state channel first divergence: frame 29 monster 1:8 class 419, field s: 1.14d [1601510352, 1471677176] vs d2rs [3528420285, 1166992223] (q-chk-skills-bda, Wine run 2026-10-09); |
@@ -9200,11 +9198,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.pal.holy-freeze` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-2b: PARTIAL pal-holy-freeze (not EQUAL under REC-2055/2056) |
 | `skill.pal.holy-shock` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-2b: PARTIAL pal-holy-shock (not EQUAL under REC-2055/2056) |
 | `skill.pal.sanctuary` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-2b: PARTIAL pal-sanctuary (not EQUAL under REC-2055/2056) |
-| `skill.sor.blizzard` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-59 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.fire-wall` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-51 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.frozen-orb` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate: gen-skill-sor-64 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.hydra` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-62 packets: frame 26 stream s2c #3 id: 1.14d a7 vs d2rs ac (id 0xa7) |
-| `skill.sor.meteor` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-56 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
 | `state.item.own.monster-equip` | content | DIVERGED | S | DIVERGED@30 | yes | 1 | n | claude/rc-gen-skill | specs/tools/state-snapshot.md | gen-skill-ama-32 packets: frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) |
 | `hireling.skills.barbarian` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
 | `hireling.skills.eastern-sorceror` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
@@ -9454,12 +9447,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.bar.war-cry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-war-cry,gen-skill-bar-154 |
 | `skill.dru.arctic-blast` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-arctic-blast) |
 | `skill.dru.cyclone-armor` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-cyclone-armor,gen-skill-dru-235 |
+| `skill.dru.eruption` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in dru-fissure,gen-skill-dru-234 |
 | `skill.dru.feral-rage` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-feral-rage,gen-skill-dru-232 |
 | `skill.dru.fire-claws` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-fire-claws,gen-skill-dru-239 |
 | `skill.dru.fury` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-fury,gen-skill-dru-248 |
 | `skill.dru.hunger` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in dru-hunger,gen-skill-dru-242 |
 | `skill.dru.hurricane` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-hurricane,gen-skill-dru-250 |
 | `skill.dru.maul` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-maul,gen-skill-dru-233 |
+| `skill.dru.molten-boulder` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in dru-molten-boulder,gen-skill-dru-229 |
 | `skill.dru.rabies` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in dru-rabies,gen-skill-dru-238 |
 | `skill.dru.shape-shifting` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in dru-passives,gen-skill-dru-224 |
 | `skill.dru.shock-wave` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-gen-skill-2 | specs/skills/use.md,specs/ui/controls.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in gen-skill-dru-243 |
@@ -9573,6 +9568,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.pal.vigor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in pal-vigor,gen-skill-pal-115 |
 | `skill.pal.zeal` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in pal-zeal,gen-skill-pal-106 |
 | `skill.sor.blaze` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-blaze,gen-skill-sor-46 |
+| `skill.sor.blizzard` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in sor-blizzard,gen-skill-sor-59 |
 | `skill.sor.chain-lightning` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-chain-lightning,gen-skill-sor-53 |
 | `skill.sor.charged-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-charged-bolt,gen-skill-sor-38 |
 | `skill.sor.chilling-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-chilling-armor,gen-skill-sor-60 |
@@ -9582,14 +9578,18 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.sor.fire-ball` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-fire-ball,gen-skill-sor-47 |
 | `skill.sor.fire-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-fire-bolt,gen-skill-sor-36 |
 | `skill.sor.fire-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in gen-skill-sor-61 |
+| `skill.sor.fire-wall` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in sor-fire-wall,gen-skill-sor-51 |
 | `skill.sor.frost-nova` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-frost-nova,gen-skill-sor-44 |
 | `skill.sor.frozen-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-frozen-armor,gen-skill-sor-40 |
+| `skill.sor.frozen-orb` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in sor-frozen-orb,gen-skill-sor-64 |
 | `skill.sor.glacial-spike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-glacial-spike,gen-skill-sor-55 |
+| `skill.sor.hydra` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/bodies-2.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in sor-hydra,gen-skill-sor-62 |
 | `skill.sor.ice-blast` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-ice-blast,gen-skill-sor-45 |
 | `skill.sor.ice-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-ice-bolt,gen-skill-sor-39 |
 | `skill.sor.inferno` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-inferno,gen-skill-sor-41 |
 | `skill.sor.lightning` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-lightning,gen-skill-sor-49 |
 | `skill.sor.lightning-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in gen-skill-sor-63 |
+| `skill.sor.meteor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in sor-meteor,gen-skill-sor-56 |
 | `skill.sor.nova` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-nova,gen-skill-sor-48 |
 | `skill.sor.shiver-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-shiver-armor,gen-skill-sor-50 |
 | `skill.sor.static-field` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-static-field,gen-skill-sor-42 |
