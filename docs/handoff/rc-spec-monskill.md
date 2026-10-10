@@ -20,7 +20,8 @@ Branch `claude/rc-spec-monskill` (from `claude/specs-staging-7` + `claude/integ-
   about 60 frames and stopped most casts (first try: 29 of 64 never cast).
 - Fix, fire head (`missiles/bodies-2.md` §41, 3 checks 169/171/333): the wired
   host never gave `max_life` / `max_mana` to `MissileBodies`, so the heal clamped
-  the owner's life to 0 (`wiring/action/missiles.rs`).
+  the owner's life to 0 (`wiring/action/missiles.rs`). The same fix was already in
+  `specs-staging-7`; the merge took theirs, the three checks are EQUAL on it.
 - Fix, Mosquito (206): the event-index store `0x006212C0` is the sequence position
   of a unit in a sequence; wired into `Sequence.pos` (`wiring/interaction/skill_use.rs`);
   spec note in `bodies-4.md` §3.2.
