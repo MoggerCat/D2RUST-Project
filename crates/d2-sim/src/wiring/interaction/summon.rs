@@ -216,7 +216,8 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         self.cv.v.allocate(game, &req, at.0, at.1)
     }
 
-    /// [`BodyEffect::PetAdd`] on the lists, [`BodyEffect::OwnerData`] on
+    /// [`BodyEffect::PetAdd`] on the lists, [`BodyEffect::OwnerData`] and
+    /// [`BodyEffect::AiParams`] on
     /// the AI control and [`BodyEffect::SetSkill`] on
     /// [`crate::wiring::action::ActionHooks::monster_skills`]; every other
     /// effect (and the seam parts of these two) comes back for
@@ -242,6 +243,21 @@ impl<X: Pending + UseRest> UseView<'_, X> {
                     .entry(m)
                     .or_default()
                     .insert(skill, lvl);
+            }
+            return Some(e);
+        }
+        // `0x005B0D70(control, p0, p1, p2)`: each param other than −666
+        // written into the AI control (`skills/bodies.md` §6.15 step 4:
+        // −666 = unchanged), e.g. the Hydra's expiry frame (param 0,
+        // `bodies-2b.md` §8.5 step 4) its AI reads (`ai-bodies-6.md` §19).
+        if let BodyEffect::AiParams { m, p0, p1, p2 } = e {
+            if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+                for (slot, v) in c.params.iter_mut().zip([p0, p1, p2]) {
+                    if v != -666 {
+                        *slot = v;
+                    }
+                }
+                return None;
             }
             return Some(e);
         }

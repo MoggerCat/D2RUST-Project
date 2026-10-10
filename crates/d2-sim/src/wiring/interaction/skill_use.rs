@@ -702,12 +702,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
             self.error(WiringError::Unit(e.into()));
         }
     }
-    /// `tick.md` §5.4: the unit's timers of `kind` with that arg1.
+    /// `0x00540E60` (`tick.md` §5.4): the unit's timers of `kind` with
+    /// that arg1; argument 0 = any argument (`sim/stat-lists.md` monster
+    /// regeneration step 3; `monsters/ai.md`: `0x00540E60(2, 0)` cancels
+    /// every think).
     fn delete_timers(&mut self, u: UnitId, kind: u8, arg1: i32) {
-        self.cv
-            .game
-            .timers
-            .cancel_unit_events(u, kind, Some(arg1 as u32));
+        let arg = (arg1 != 0).then_some(arg1 as u32);
+        self.cv.game.timers.cancel_unit_events(u, kind, arg);
     }
 
     fn has_state_list(&self, u: UnitId, state: u16) -> bool {
@@ -1478,8 +1479,32 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mode: i32,
         spread: i32,
     ) -> Option<UnitId> {
-        match self.xm().create_monster(r, at, class, mode, spread) {
-            Some(m) => Some(m),
+        if let Some(m) = self.xm().create_monster(r, at, class, mode, spread) {
+            return Some(m);
+        }
+        // `0x005B2F20(…, spread, 0x42)` through population's placement
+        // search and creation (`population.md` §9) on the monster world;
+        // `Some(None)` = nothing placed (no fallback). Without the world:
+        // the plain allocation at the point (module docs of `summon`).
+        let game = &mut *self.cv.game;
+        let v = &mut self.cv.v;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut *v.units,
+            stats: &mut *v.stats,
+            data: v.data,
+        };
+        let mode8 = u8::try_from(mode).unwrap_or(1);
+        let placed = if v.h.monster_world.is_some() {
+            v.h.with_monster_world(|w, h| {
+                w.spawn_at(&mut sim, h, r, at.0, at.1, class, mode8, spread, 0x42)
+            })
+            .flatten()
+        } else {
+            None
+        };
+        match placed {
+            Some(m) => m,
             None => self.alloc_monster(r, at, class, mode),
         }
     }
