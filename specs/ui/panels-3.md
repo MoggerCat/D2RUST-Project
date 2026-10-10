@@ -115,7 +115,11 @@ waypoint row table `[0x007BF03C]`.
 3. **Init** `0x004680B0` (ECX = `adj`; the only caller `0x0044F3ED`
    passes 0): registers the cursor's window handlers (`0x00451DB0(3)`),
    loads the cels, drawn := 1, s := 1, t := 5, f := 0, idle := now, mouse
-   := (W / 2, H / 2).
+   := (W / 2, H / 2) with the start-up display size 640 x 480: the
+   caller `0x0044F3ED` (`0x0044F360`) runs before the resolution setter
+   `0x0044BA20` writes 800 x 600, so the first draw is at (320, 240) in
+   every mode (measured: 1.14d capture, cursor (320, 240) at 800 x 600;
+   side-by-side `a1-panel-*`; REC-2175).
 4. **Mouse move** `0x00468840`: mouse := the event's position, drawn :=
    1. When `0x004F6270()` ≠ 0 and `0x00407FF0()` = 0 and the position is
    outside [0, W − 1] × [0, H − 1], it is clamped to that range, the OS
