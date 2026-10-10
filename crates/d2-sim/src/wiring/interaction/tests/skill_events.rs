@@ -216,6 +216,22 @@ fn monster_attack_event0_runs_the_used_skills_do_on_every_event() {
     fx.sim.sys.units.get_mut(m).unwrap().mode = 5;
     fx.sim.sys.hooks.x.used.insert(m, entry(AURA));
     fx.sim.sys.hooks.x.skills.insert(m, vec![entry(AURA)]);
+    {
+        // The codes come from the animation record through the frame
+        // advance `0x00623E00` (frames 1, 2, 3; `sim/units.md` §4.2).
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        events[1] = 3;
+        events[2] = 2;
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 1 << 8,
+            byte_0f: 0,
+            events,
+        });
+        r.anim.speed = 256;
+        r.anim.frame = 0;
+        r.anim.frame_count = 1 << 16;
+    }
     for (i, code) in [3u32, 2, 0].into_iter().enumerate() {
         fx.game
             .schedule_event(
@@ -232,6 +248,7 @@ fn monster_attack_event0_runs_the_used_skills_do_on_every_event() {
         fx.frame();
     }
     assert_eq!(srvdo_count(&fx, AURA_DO), 3);
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 2);
+    // Each advance rewrites +0x4E: frame 3 holds no code.
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 0);
     fx.assert_clean();
 }

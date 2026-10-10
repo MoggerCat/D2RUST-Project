@@ -43,10 +43,10 @@
 |   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1156–1305 |
 | Constants & data dependencies | 1306–1342 |
 | Randomness | 1343–1353 |
-| Edge cases & original bugs | 1354–1401 |
-| Test vectors | 1402–1440 |
-| Provenance | 1441–1496 |
-| Open questions | 1497–1570 |
+| Edge cases & original bugs | 1354–1411 |
+| Test vectors | 1412–1450 |
+| Provenance | 1451–1506 |
+| Open questions | 1507–1580 |
 <!-- /index -->
 
 ## Summary
@@ -1359,6 +1359,16 @@ Reproduced by default.
 2. A* propagation stack has no bound check (200 entries); a deep
    improvement chain could overflow it in 1.14d (not seen; treat > 200
    as a fatal error and log it).
+2a. **Walking around a wall past 18 sub-tiles** (read 2026-10-10,
+   `0x0067B850`: node cap 200, best-node rule as §7 rule 5, node
+   storage full ends the search). A player order whose target is more
+   than 18 sub-tiles away (d² > 324) runs Toward only (§6), which stops
+   at a wall; and a target whose plus (pattern 1) touches a wall cell
+   collides, so target preparation (§3 step 7) refuses it and no path
+   results. Both are the original's: a player walks around a building
+   in several clicks. Kurast Docks, from (5139, 5087) to Cain at (5141,
+   5060): the wall's east face is x = 5140, so x = 5141 collides and the
+   walkable column starts at x = 5142 (REC-2045).
 3. Toward appends the first corner twice when the ray stopped at P ≠
    start and the first greedy step turns (vector W9); the duplicate is
    dropped when the unit reaches it (§8.4 rule 1).

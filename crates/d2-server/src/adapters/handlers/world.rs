@@ -441,6 +441,12 @@ pub trait WorldHost<D> {
     ) -> Option<Vec<Vec<u8>>> {
         None
     }
+    /// The item messages the tick's client pass sends (S→C 0x9C of items
+    /// queued for the update pass since the last tick, `sim/tick.md` §6
+    /// rule 5), in queue order. Default: none.
+    fn take_client_pass_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
     /// The messages the seams sent since the last take, in send order:
     /// (receiving player unit, bytes).
     fn take_sent(&mut self, events: &mut D) -> Vec<(UnitId, Vec<u8>)> {
@@ -689,9 +695,9 @@ impl WaypointCall for WaypointRun<'_> {
 ///
 /// TODO(waypoints.md §5.2): the 0x13 result after the operate is not
 /// stated; read as 0.
-struct WaypointOperate {
-    player: UnitId,
-    guid: u32,
+pub(super) struct WaypointOperate {
+    pub(super) player: UnitId,
+    pub(super) guid: u32,
 }
 
 impl WaypointCall for WaypointOperate {

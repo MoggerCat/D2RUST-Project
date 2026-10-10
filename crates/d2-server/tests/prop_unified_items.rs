@@ -662,7 +662,6 @@ impl NpcRest for Rest {
     fn act_change(&mut self, _: UnitId, _: u32, _: u32) {}
     fn activate_waypoint(&mut self, _: UnitId, _: u32) {}
     fn npc_ai_param(&mut self, _: UnitId, _: u32) {}
-    fn stat_sent(&mut self, _: UnitId, _: u16, _: u32) {}
     fn respec_sound(&mut self, _: UnitId) {}
     fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
         [0; 34]
@@ -702,7 +701,6 @@ impl NpcRest for Rest {
 
 impl HirelingRest for Rest {
     fn set_mode(&mut self, _: UnitId, _: u8) {}
-    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
     fn skill_count(&self) -> u32 {
         0
     }
@@ -714,8 +712,6 @@ impl HirelingRest for Rest {
     fn owner(&self, _: UnitId) -> Option<(u32, u8)> {
         None
     }
-    fn join_team(&mut self, _: UnitId, _: UnitId) {}
-    fn hireling_ai(&mut self, _: UnitId) {}
     fn free_unit(&mut self, _: UnitId) {}
     fn queue_room_removal(&mut self, _: UnitId) {}
     fn death_event(&mut self, _: UnitId) {}
@@ -867,7 +863,6 @@ impl QuestRest for Rest {
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
     }
-    fn attach_sound(&mut self, _: UnitId, _: u16) {}
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
@@ -1963,16 +1958,18 @@ fn check_stream(
     }
     // §6.1 rule 2: a pass that sent item messages ends with 0x47, 0x48,
     // then at most the player's S→C 0x2C (`world/cube.md` §8 rule 3: the
-    // sound slot after the item messages).
-    if ticked.iter().any(|m| m[0] == 0x9C || m[0] == 0x9D) {
-        let n = ticked.len() - usize::from(ticked.last().is_some_and(|m| m[0] == 0x2C));
-        let tail: Vec<u8> = ticked[n.saturating_sub(2)..n]
-            .iter()
-            .map(|m| m[0])
-            .collect();
+    // sound slot after the item messages). A trade open's store records
+    // (0x9C action 11, `world/vendors.md` §4 step 3) are not the player's
+    // pass: 1.14d sends them in the client pass with no 0x47 / 0x48 after
+    // (`items-vendor-akara-buy` frame 20, 41 records).
+    let store = |m: &Vec<u8>| m[0] == 0x9C && m.get(1) == Some(&0x0B);
+    let pass: Vec<Vec<u8>> = ticked.iter().filter(|m| !store(m)).cloned().collect();
+    if pass.iter().any(|m| m[0] == 0x9C || m[0] == 0x9D) {
+        let n = pass.len() - usize::from(pass.last().is_some_and(|m| m[0] == 0x2C));
+        let tail: Vec<u8> = pass[n.saturating_sub(2)..n].iter().map(|m| m[0]).collect();
         if tail != [0x47, 0x48] {
             return Err(format!(
-                "update pass without 0x47, 0x48 at its end: {ticked:02X?}"
+                "update pass without 0x47, 0x48 at its end: {pass:02X?}"
             ));
         }
     }

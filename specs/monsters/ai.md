@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–298 |
-|   2. Think dispatch `0x005B1740` | 299–438 |
-|   3. AI control and AI tables | 439–610 |
-|   4. AI parameters | 611–629 |
-|   5. Target selection | 630–966 |
-|   6. Distances and line tests | 967–982 |
-|   7. Tactics helpers | 983–1222 |
-|   8. AI commands and minions | 1223–1249 |
-|   10. The catalogue `ai-functions.tsv` | 1250–1270 |
-| Constants & data dependencies | 1271–1294 |
-| Randomness | 1295–1324 |
-| Edge cases & original bugs | 1325–1366 |
-| Test vectors | 1367–1455 |
-| Provenance | 1456–1517 |
-| Open questions | 1518–1624 |
+|   1. Think scheduling | 97–302 |
+|   2. Think dispatch `0x005B1740` | 303–449 |
+|   3. AI control and AI tables | 450–621 |
+|   4. AI parameters | 622–640 |
+|   5. Target selection | 641–977 |
+|   6. Distances and line tests | 978–993 |
+|   7. Tactics helpers | 994–1239 |
+|   8. AI commands and minions | 1240–1266 |
+|   10. The catalogue `ai-functions.tsv` | 1267–1287 |
+| Constants & data dependencies | 1288–1311 |
+| Randomness | 1312–1341 |
+| Edge cases & original bugs | 1342–1383 |
+| Test vectors | 1384–1472 |
+| Provenance | 1473–1534 |
+| Open questions | 1535–1641 |
 <!-- /index -->
 
 ## Summary
@@ -209,6 +209,10 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
   `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
   `0x005A8100`–`0x005A8140`).
+  Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
+  a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
+  also: Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107
+  (path target (0, 0)).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
@@ -415,6 +419,13 @@ Only when a target was found:
    target distance is < 20, the target is a player, and control flag 0x10
    is clear: play sound 16, set flag 0x10, idle 20, stop. Once per
    monster.
+   Recorded (rc-drop-content, `items-drops-nor-11` with the rng channel,
+   2026-10-10): Griswold (class 365, monstats `boss`) spawned at frame 30
+   with a player < 20 away makes its first think at frame 31 and idles
+   20 (no draw); its Griswold body (`0x005E5AC0`) first draws at frame 51,
+   then 61 and 66. The boss, demon, undead and prime-evil tests read the
+   monstats flags of the unit's class (monster units only); d2rs answered
+   false for all four until the action hooks read the row.
 2. **Teleport** (`0x005B11F0`, monsters given control flag 0x20 by a
    monumod; `monsters/init.md`). Not if dead or flag 0x20 clear. Draws:
    1. `lo' % 100` ≥ 40 → continue with 3.
@@ -518,7 +529,7 @@ name):
 | 3 | SpecialState03 | 1 | `0x005E5730` | `0x005E5870` | – |
 | 4 | Hireable | 0 | – | `0x005E52D0` | `0x005E5280` |
 | 5 | GoodNpcRanged | 0 | – | `0x005E7AC0` | – |
-| 6 | SpecialState06 | 0 | – | `0x005E7C10` | – |
+| 6 | SpecialState06 | 0 | – | `0x005E7C10` (`ai-bodies.md` §9.33) | – |
 | 7 | NecroPet | 0 | – | `0x005E4CF0` | – |
 | 8 | TownRogue | 1 | – | `0x005E7DC0` | – |
 | 9 | SpecialState09 | 1 | – | `0x005E7F80` | – |
@@ -1100,6 +1111,12 @@ the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
 9. Any other skill → 1.
 
 1.14d-confirmed (`0x005FD470`, register use in the disassembly).
+Implemented (rc-mon-frame31, REC-1996): `View::skill_check` runs the rules
+above on the DRLG rooms once the path provider is on (rule 5, DiabPrison,
+stays false). Before this the host stub answered 0, so a ClawViper never
+cast SerpentCharge (srvdofunc 67, rule 7). gen-mon-77: first divergence
+31 → 34 (the Charge hit).
+
 
 #### 7.5 Path target and re-path budget on a mode request
 

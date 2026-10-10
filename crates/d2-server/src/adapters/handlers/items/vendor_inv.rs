@@ -292,6 +292,8 @@ where
         self.with_desk(|d| d.gamble_place(npc, player, item))
             .unwrap_or(false)
     }
+    /// The item leaves the gamble inventory, then the wrapped world's
+    /// removal.
     fn remove_gamble_item(&mut self, npc_class: u16, player: u32, item: UnitId) {
         if let Some(npc) = self.inner.record_npc(npc_class) {
             self.with_desk(|d| d.gamble_unlink(npc, player, item));

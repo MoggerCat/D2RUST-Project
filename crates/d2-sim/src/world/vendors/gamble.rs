@@ -145,12 +145,16 @@ pub fn make_list<W: VendorWorld>(
     }
 }
 
-/// Drops the player's list here `0x00537190` (§5.4).
+/// Drops the player's list here `0x00537190` (§5.4): the node is
+/// unlinked, its items removed and destroyed. Recorded:
+/// `a2-npc-elzix-gamble` frame 21, the 14 list items are gone after the
+/// 0x30.
 pub fn drop_list<W: VendorWorld>(rec: &mut VendorRecord, w: &mut W, player: u32) {
     if let Some(i) = rec.gamble_lists.iter().position(|g| g.player == player) {
         let g = rec.gamble_lists.remove(i);
         for item in g.items {
             w.remove_gamble_item(rec.class, player, item);
+            w.destroy_item(item);
         }
     }
 }

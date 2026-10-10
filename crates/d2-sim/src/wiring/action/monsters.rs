@@ -317,4 +317,47 @@ impl<X: Pending> ActionHooks<X> {
             None => self.x.monster_flag(unit, mask),
         }
     }
+
+    /// The monstats row of a monster with monster data in the lent world.
+    fn monstats_of(&self, unit: UnitId) -> Option<&d2_data::tables::Monstats> {
+        let class = self.monster_data(unit)?.class;
+        self.tables
+            .combat
+            .monstats
+            .get(usize::try_from(class).ok()?)
+    }
+
+    /// `0x0063E9F0`: the unit is a monster whose monstats row has the
+    /// `boss` flag (`ai.md` §2.4 step 1). A unit without monster data asks
+    /// [`Pending::is_boss`].
+    pub fn is_boss(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.boss,
+            None => self.x.is_boss(unit),
+        }
+    }
+
+    /// `0x0063E940`: monstats `demon`.
+    pub fn is_demon(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.demon,
+            None => self.x.is_demon(unit),
+        }
+    }
+
+    /// `0x0063E990`: monstats `lUndead` or `hUndead`.
+    pub fn is_undead(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.lundead || m.hundead,
+            None => self.x.is_undead(unit),
+        }
+    }
+
+    /// `0x0063EDC0`: monstats `primeevil`.
+    pub fn is_prime_evil(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.primeevil,
+            None => self.x.is_prime_evil(unit),
+        }
+    }
 }
