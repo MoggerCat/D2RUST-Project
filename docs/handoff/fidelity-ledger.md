@@ -16,7 +16,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | coverage | 77 | 22 | 0 | 7 | 0 | 0 | 48 | 6 | 23 | 0 | 49–196 | 0 | 63 / 7 / 7 |
 | drlg | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
-| items | 721 | 28 | 0 | 37 | 0 | 0 | 656 | 13 | 52 | 0 | 110.5–442 | 65 | 664 / 0 / 57 |
+| items | 721 | 22 | 0 | 37 | 0 | 0 | 662 | 11 | 48 | 0 | 101.5–406 | 65 | 664 / 0 / 57 |
 | missiles | 117 | 1 | 0 | 0 | 0 | 0 | 116 | 0 | 1 | 0 | 2–8 | 0 | 115 / 2 / 0 |
 | monsters | 660 | 52 | 0 | 5 | 0 | 0 | 603 | 1 | 56 | 0 | 112.5–450 | 5 | 458 / 187 / 15 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
@@ -33,8 +33,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 46 | 0 | 10 | 0 | 0 | 599 | 8 | 48 | 0 | 100–400 | 6 | 556 / 88 / 11 |
 | systems | 918 | 339 | 16 | 136 | 0 | 99 | 328 | 147 | 342 | 2 | 773.5–3030+ | 69 | 620 / 0 / 298 |
-| world | 826 | 40 | 0 | 40 | 0 | 0 | 746 | 11 | 64 | 5 | 173.5–534+ | 171 | 772 / 16 / 38 |
-| **all** | 4479 | 647 | 16 | 260 | 0 | 99 | 3457 | 283 | 628 | 12 | 1493.5–5590+ | 316 | 3713 / 311 / 455 |
+| world | 826 | 39 | 0 | 40 | 0 | 0 | 747 | 11 | 63 | 5 | 171.5–526+ | 171 | 772 / 16 / 38 |
+| **all** | 4479 | 640 | 16 | 260 | 0 | 99 | 3464 | 281 | 623 | 12 | 1482.5–5546+ | 316 | 3713 / 311 / 455 |
 
 ## By family
 
@@ -58,7 +58,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `format` | 4 | 0 | 0 | 2 | 0 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 |
 | `hireling` | 8 | 1 | 0 | 2 | 0 | 0 | 5 | 0 | 0 | 3 | 0 | 0 | 0 |
 | `hirelings` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
-| `inv` | 12 | 7 | 0 | 2 | 0 | 0 | 3 | 0 | 5 | 4 | 0 | 10 | 0 |
+| `inv` | 12 | 6 | 0 | 2 | 0 | 0 | 4 | 0 | 4 | 4 | 0 | 10 | 0 |
 | `item.0-hax` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `item.100-9bt` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `item.101-9ga` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -662,7 +662,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `monster` | 669 | 48 | 0 | 7 | 0 | 0 | 614 | 0 | 0 | 54 | 1 | 4 | 188 |
 | `net.c2s` | 113 | 9 | 0 | 1 | 0 | 22 | 81 | 0 | 3 | 7 | 0 | 26 | 0 |
 | `net.s2c` | 183 | 36 | 0 | 30 | 0 | 58 | 59 | 0 | 52 | 14 | 0 | 1 | 0 |
-| `npc` | 48 | 11 | 0 | 6 | 0 | 0 | 31 | 0 | 6 | 11 | 0 | 1 | 10 |
+| `npc` | 48 | 10 | 0 | 6 | 0 | 0 | 32 | 0 | 6 | 10 | 0 | 1 | 10 |
 | `object` | 524 | 2 | 0 | 16 | 0 | 0 | 506 | 5 | 6 | 12 | 0 | 10 | 0 |
 | `quest` | 53 | 14 | 0 | 15 | 0 | 0 | 24 | 0 | 2 | 22 | 5 | 27 | 7 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
@@ -701,7 +701,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `system.ui` | 174 | 111 | 0 | 61 | 0 | 0 | 2 | 0 | 77 | 95 | 0 | 3 | 0 |
 | `tools` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `ui` | 21 | 16 | 0 | 4 | 0 | 0 | 1 | 0 | 11 | 7 | 2 | 0 | 0 |
-| `vendor` | 25 | 11 | 0 | 5 | 0 | 0 | 9 | 0 | 3 | 13 | 0 | 3 | 0 |
+| `vendor` | 25 | 6 | 0 | 5 | 0 | 0 | 14 | 0 | 2 | 9 | 0 | 3 | 0 |
 | `waypoint` | 39 | 8 | 0 | 0 | 0 | 0 | 31 | 0 | 0 | 8 | 0 | 26 | 0 |
 | `world` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 |
 
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2984
 - Rows set exercised = yes from the coverage reports' seen lists: 13
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6749
+- Duplicate areas between parts: 6759
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1989,6 +1989,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.sandmaggot7`: rc-combat-seed-3.tsv:49 kept, rc-mon-spawn-think.tsv:82 dropped
   - `monster.succubuswitch9`: rc-combat-seed-3.tsv:70 kept, rc-mon-spawn-think.tsv:83 dropped
   - `monster.cr-archer8`: rc-combat-seed-3.tsv:13 kept, rc-mon-spawn-think.tsv:84 dropped
+  - `vendor.prices`: rc-link-2.tsv:188 kept, rc-net-div.tsv:15 dropped
+  - `vendor.store-gen`: rc-items-ground.tsv:3 kept, rc-net-div.tsv:16 dropped
+  - `system.seams.messages.warp-0x07-frame`: rc-map-reveal.tsv:3 kept, rc-net-div.tsv:17 dropped
   - `net.s2c.0x07`: rc-goto-settle.tsv:3 kept, rc-net-s2c.tsv:3 dropped
   - `net.s2c.0x15`: rc-goto-settle.tsv:4 kept, rc-net-s2c.tsv:4 dropped
   - `net.s2c.0x51`: rc-goto-settle.tsv:5 kept, rc-net-s2c.tsv:5 dropped
@@ -2430,6 +2433,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.124.act-5-temple-boss`: rc-gen-misc.tsv:25 kept, rc-pc1-audit.tsv:78 dropped
   - `level.a5.131.act-5-throne-room`: rc-gen-misc.tsv:26 kept, rc-pc1-audit.tsv:80 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-pc1-audit.tsv:81 dropped
+  - `npc.akara`: rc-net-div.tsv:18 kept, rc-pc1-audit.tsv:82 dropped
   - `quest.a4q3-hell-s-forge`: rc-link-2.tsv:168 kept, rc-pc1-audit.tsv:107 dropped
   - `shrine.1.refill`: rc-link-2.tsv:135 kept, rc-pc1-audit.tsv:111 dropped
   - `shrine.10.resist-lightning-boost`: rc-link-2.tsv:136 kept, rc-pc1-audit.tsv:112 dropped
@@ -2656,7 +2660,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.36.tundra-wastelands`: rc-link-2.tsv:155 kept, rc-run-1.tsv:288 dropped
   - `waypoint.38.the-worldstone-keep-level-2`: rc-link-2.tsv:156 kept, rc-run-1.tsv:289 dropped
   - `drop.gold`: rc-link-2.tsv:117 kept, rc-run-2.tsv:55 dropped
+  - `inv.item-use`: rc-net-div.tsv:9 kept, rc-run-2.tsv:56 dropped
+  - `vendor.akara`: rc-net-div.tsv:10 kept, rc-run-2.tsv:57 dropped
+  - `vendor.alkor`: rc-net-div.tsv:11 kept, rc-run-2.tsv:60 dropped
+  - `vendor.ormus`: rc-net-div.tsv:14 kept, rc-run-2.tsv:61 dropped
+  - `vendor.jamella`: rc-net-div.tsv:12 kept, rc-run-2.tsv:63 dropped
   - `vendor.drehya`: rc-packets-chan.tsv:3 kept, rc-run-2.tsv:65 dropped
+  - `vendor.malah`: rc-net-div.tsv:13 kept, rc-run-2.tsv:66 dropped
   - `monster.ai.abyssknight`: rc-link-2.tsv:166 kept, rc-run-2.tsv:68 dropped
   - `monster.ai.corruptarcher`: rc-promote.tsv:24 kept, rc-run-2.tsv:69 dropped
   - `monster.ai.corruptlancer`: rc-link-2.tsv:34 kept, rc-run-2.tsv:70 dropped
@@ -2750,17 +2760,17 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `item.gen.base-stats`: rc-link-2.tsv:164 kept, rc-run-2b.tsv:51 dropped
   - `item.gen.pipeline`: rc-link-2.tsv:165 kept, rc-run-2b.tsv:52 dropped
   - `net.c2s.0x32`: rc-promote.tsv:30 kept, rc-run-2b.tsv:55 dropped
-  - `vendor.akara`: rc-run-2.tsv:57 kept, rc-run-2b.tsv:56 dropped
-  - `vendor.alkor`: rc-run-2.tsv:60 kept, rc-run-2b.tsv:57 dropped
+  - `vendor.akara`: rc-net-div.tsv:10 kept, rc-run-2b.tsv:56 dropped
+  - `vendor.alkor`: rc-net-div.tsv:11 kept, rc-run-2b.tsv:57 dropped
   - `vendor.asheara`: rc-run-2.tsv:58 kept, rc-run-2b.tsv:58 dropped
   - `vendor.drehya`: rc-packets-chan.tsv:3 kept, rc-run-2b.tsv:60 dropped
   - `vendor.halbu`: rc-run-2.tsv:62 kept, rc-run-2b.tsv:63 dropped
   - `vendor.hratli`: rc-run-2.tsv:59 kept, rc-run-2b.tsv:64 dropped
-  - `vendor.jamella`: rc-run-2.tsv:63 kept, rc-run-2b.tsv:65 dropped
+  - `vendor.jamella`: rc-net-div.tsv:12 kept, rc-run-2b.tsv:65 dropped
   - `vendor.larzuk`: rc-run-2.tsv:64 kept, rc-run-2b.tsv:66 dropped
-  - `vendor.malah`: rc-run-2.tsv:66 kept, rc-run-2b.tsv:67 dropped
+  - `vendor.malah`: rc-net-div.tsv:13 kept, rc-run-2b.tsv:67 dropped
   - `vendor.nihlathak`: rc-run-2.tsv:67 kept, rc-run-2b.tsv:68 dropped
-  - `vendor.ormus`: rc-run-2.tsv:61 kept, rc-run-2b.tsv:69 dropped
+  - `vendor.ormus`: rc-net-div.tsv:14 kept, rc-run-2b.tsv:69 dropped
   - `vendor.store-gen`: rc-items-ground.tsv:3 kept, rc-run-2b.tsv:70 dropped
   - `monster.ai.abyssknight`: rc-link-2.tsv:166 kept, rc-run-2b.tsv:71 dropped
   - `monster.ai.corruptlancer`: rc-link-2.tsv:34 kept, rc-run-2b.tsv:72 dropped
@@ -2943,7 +2953,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a3.75.act-3-town`: rc-promote.tsv:17 kept, rc-run-2b.tsv:267 dropped
   - `level.a4.103.act-4-town`: rc-promote.tsv:21 kept, rc-run-2b.tsv:268 dropped
   - `level.a5.109.act-5-town`: rc-promote.tsv:22 kept, rc-run-2b.tsv:269 dropped
-  - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:270 dropped
+  - `npc.akara`: rc-net-div.tsv:18 kept, rc-run-2b.tsv:270 dropped
   - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:271 dropped
   - `quest.a4q3-hell-s-forge`: rc-link-2.tsv:168 kept, rc-run-2b.tsv:272 dropped
   - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:273 dropped
@@ -5402,11 +5412,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.ui.text.7-the-draw-call`: rc-00-local-pc1-today.tsv:177 kept, rc-runner-a.tsv:269 dropped
   - `system.ui.text.8-framed-text-hover-boxes`: rc-00-local-pc1-today.tsv:178 kept, rc-runner-a.tsv:270 dropped
   - `system.ui.text.9-variants-of-the-draw-call`: rc-00-local-pc1-today.tsv:179 kept, rc-runner-a.tsv:271 dropped
-  - `vendor.alkor`: rc-run-2.tsv:60 kept, rc-runner-a.tsv:272 dropped
+  - `vendor.alkor`: rc-net-div.tsv:11 kept, rc-runner-a.tsv:272 dropped
   - `vendor.drehya`: rc-packets-chan.tsv:3 kept, rc-runner-a.tsv:273 dropped
   - `vendor.gamble`: rc-run-2b.tsv:61 kept, rc-runner-a.tsv:274 dropped
-  - `vendor.malah`: rc-run-2.tsv:66 kept, rc-runner-a.tsv:275 dropped
-  - `vendor.ormus`: rc-run-2.tsv:61 kept, rc-runner-a.tsv:276 dropped
+  - `vendor.malah`: rc-net-div.tsv:13 kept, rc-runner-a.tsv:275 dropped
+  - `vendor.ormus`: rc-net-div.tsv:14 kept, rc-runner-a.tsv:276 dropped
   - `vendor.store-gen`: rc-items-ground.tsv:3 kept, rc-runner-a.tsv:277 dropped
   - `waypoint.33.crystalized-cavern-level-1`: rc-link-2.tsv:152 kept, rc-runner-a.tsv:278 dropped
   - `skill.pal.holy-shock`: rc-run-2b.tsv:139 kept, rc-runner-d.tsv:5 dropped
@@ -7392,7 +7402,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `shrine.22.poison-shrine`: rc-run-5.tsv:801 kept, world.tsv:294 dropped
   - `npc.cain1`: rc-link-2.tsv:96 kept, world.tsv:295 dropped
   - `npc.gheed`: rc-link-2.tsv:101 kept, world.tsv:296 dropped
-  - `npc.akara`: rc-pc1-audit.tsv:82 kept, world.tsv:297 dropped
+  - `npc.akara`: rc-net-div.tsv:18 kept, world.tsv:297 dropped
   - `npc.kashya`: rc-pc1-audit.tsv:92 kept, world.tsv:298 dropped
   - `npc.charsi`: rc-link-2.tsv:99 kept, world.tsv:299 dropped
   - `npc.warriv1`: rc-link-2.tsv:111 kept, world.tsv:300 dropped
@@ -7468,7 +7478,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 2220
+- Rows whose state disagrees with their checks: 2223
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -7480,6 +7490,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `inv.shared-checks`: EQUAL but checks say PARTIAL
   - `net.c2s.0x19`: EQUAL but checks say PARTIAL
   - `inv.corpse`: EQUAL but checks say PARTIAL
+  - `inv.item-use`: EQUAL but checks say PARTIAL
+  - `vendor.akara`: EQUAL but checks say PARTIAL
   - `vendor.drognan`: EQUAL but checks say PARTIAL
   - `vendor.fara`: EQUAL but checks say PARTIAL
   - `vendor.elzix`: EQUAL but checks say PARTIAL
@@ -7527,9 +7539,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.druidwolf`: EQUAL but checks say PARTIAL
   - `monster.ai.duriel`: EQUAL but checks say PARTIAL
   - `monster.ai.elementalbeast`: EQUAL but checks say PARTIAL
-  - `monster.ai.evilhole`: EQUAL but checks say PARTIAL
-  - `monster.ai.fallenshaman`: EQUAL but checks say PARTIAL
-  - … and 2160 more (rerun with the tsv to list them)
+  - … and 2163 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -8044,22 +8054,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `inv.equip` | system | DIVERGED | S | DIVERGED | yes | 0 | y | claude/q-fix-items-shop | specs/items/inventory.md | [inv-pick-*] inv-pick-equip: same first divergence as pickup (0x9C missing at frame 10), equip 0x1A not reached; state also differs from frame 2 (player q field, 1.14d has 9 entries, d2rs none) |
 | `inv.gold` | system | DIVERGED | M | DIVERGED@12 | yes | 0 | y | - | specs/items/inventory-moves.md | rc-link-2 (2026-10-10): gold drop and pickup (inventory gold, 0x19 SmallGoldPickup); net-s2c-gold-pickup packets DIVERGED (checks-status.md) |
 | `inv.grid` | system | DIVERGED | S | DIVERGED | yes | 0 | y | claude/q-fix-items-shop | specs/items/inventory.md | [inv-pick-*] inv-pick-store: same first divergence as pickup (0x9C missing at frame 10), buffer insert 0x18 not reached; state also differs from frame 2 (player q field, 1.14d has 9 entries, d2rs none) |
-| `inv.item-use` | system | DIVERGED | S | PARTIAL | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/use.md | rc-run-2: combat-potion-midfight state PARTIAL first: state PARTIAL outside REC-2055/2056 (input/send in check without packets MATCH) |
 | `inv.mercenary-items` | system | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-diff-skills-2 | specs/items/inventory-moves.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-items-kashya=DIVERGED \| hire-items-kashya (take cap, give, take back) diverges first at the hire frame 14; the 0x61 steps are not reached |
 | `item.drop.monster-walk-negative-picks` | system | DIVERGED | M | DIVERGED | yes | 0 | n | claude/rc-drop-content | specs/items/treasure.md | Griswold (picks -3, nested Uitem C / Melee B) drops the same 3 items as 1.14d once the monster seed is not advanced by an early think; the walk itself needed no change [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `net.c2s.0x16` | message | DIVERGED | M | DIVERGED | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-run-2b: DIVERGED save-items-ama: suite.py crashes on channel save (no ORIG_OUTPUTS entry) |
 | `net.c2s.0x20` | message | DIVERGED | M | PARTIAL | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-runner-a 2026-10-10 fresh run at b1e8c8893: cube-000-staff-of-kings-viper-amulet-ho: packets: frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) |
 | `net.c2s.0x4f` | message | DIVERGED | M | PARTIAL | yes | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors-2.md | rc-runner-a 2026-10-10 fresh run at b1e8c8893: cube-000-staff-of-kings-viper-amulet-ho: packets: frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) |
 | `net.c2s.0x61` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-2 | specs/items/inventory-moves.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-items-kashya=DIVERGED \| hire-items-kashya diverges first at the hire; 0x61 not reached |
-| `vendor.akara` | entity | DIVERGED | S | PARTIAL | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: a check of this row diverges (see checks-status.md); store contents: items-vendor-akara-stock 39/41 equal (charges of 2 wands differ); buy flow still diverges at frame 16 (items-vendor-akara-buy) |
-| `vendor.alkor` | entity | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-alkor-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.drehya` | entity | DIVERGED | S | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | items-vendor-drehya-stock packets: frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) |
-| `vendor.gamble` | system | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md | rc-run-2b: all checks MATCH [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `vendor.drehya` | entity | DIVERGED | S | DIVERGED@15 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | items-vendor-drehya-stock packets: frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) |
+| `vendor.gamble` | system | DIVERGED | M | DIVERGED@15 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md | rc-run-2b: all checks MATCH [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `vendor.halbu` | entity | DIVERGED | M | DIVERGED@66 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-halbu-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.jamella` | entity | DIVERGED | M | DIVERGED@139 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-jamella-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.malah` | entity | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-malah-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.nihlathak` | entity | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-nihlathak-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.ormus` | entity | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-ormus-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `vendor.nihlathak` | entity | DIVERGED | M | DIVERGED@15 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-nihlathak-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `vendor.prices` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/world/vendors.md | rc-link-2 (2026-10-10): buy price path; items-vendor-akara-buy packets DIVERGED (checks-status.md) |
 | `vendor.store-gen` | system | DIVERGED | S | PARTIAL | ? | 4 | y | claude/rc-items-ground | specs/world/vendors.md | items-vendor-akara-buy state 40/40 equal after the store-item own fix (vendors.md §3.1/§4 note); packets diverge at frame 4 (player startup framing, not store); rc-items-ground 2026-10-10 |
 | `cube.ops` | system | NO-CHECK | M | - | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/cube.md | recipe op eligibility (day-of-month etc.); gap tests 46/49 only; size M: needs a recording of the original plus a compare check |
@@ -8112,6 +8116,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `drop.monster` | system | EQUAL | - | MATCH | ? | 0 | y | claude/q-fix-server-store-fill | specs/items/treasure.md | rc-run-2: items-drop-monster-kill |
 | `drop.placement` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/treasure.md | rc-link-2 C006 (2026-10-10): re-run on integ-r23 (checks-status.md): no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap; stale DIVERGED settled |
 | `inv.corpse` | system | EQUAL | - | PARTIAL | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-link-2 (2026-10-10): corpse and its item pickup after death; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
+| `inv.item-use` | system | EQUAL | - | PARTIAL | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/use.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
 | `inv.model` | system | EQUAL | - | PARTIAL | yes | 16 | y | claude/q-fix-server-store-fill | specs/items/inventory.md | rc-link-2 (2026-10-10): inventory model, pages and equip; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
 | `inv.shared-checks` | system | EQUAL | - | PARTIAL | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory.md | rc-link-2 (2026-10-10): shared inventory pick/drop/store/equip checks; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
 | `item.0-hax` | entity | EQUAL | - | MATCH | yes | 0 | n | - | - | [gen-item-00] 0x9C bit stream byte-equal (poke item, normal quality, seed-game 0x1234/666) |
@@ -8746,6 +8751,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x37` | message | EQUAL | - | MATCH | yes | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors.md | rc-run-6: gen-netc2s-37 MATCH |
 | `net.c2s.0x50` | message | EQUAL | - | MATCH | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-run-6: gen-netc2s-50 MATCH |
 | `net.c2s.0x63` | message | EQUAL | - | MATCH | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-run-6: gen-netc2s-63 MATCH |
+| `vendor.akara` | entity | EQUAL | - | PARTIAL | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
+| `vendor.alkor` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
 | `vendor.asheara` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-asheara-stock |
 | `vendor.charsi` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2b: all checks MATCH |
 | `vendor.drognan` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-staging-regress | specs/world/vendors.md,specs/world/vendors-2.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
@@ -8753,8 +8760,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `vendor.fara` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | a2-npc-fara-trade (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `vendor.gheed` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2b: all checks MATCH |
 | `vendor.hratli` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-hratli-stock |
+| `vendor.jamella` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
 | `vendor.larzuk` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-larzuk-stock |
 | `vendor.lysander` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | a2-npc-lysander-trade (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `vendor.malah` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
+| `vendor.ormus` | entity | EQUAL | - | MATCH | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
 
 ## missiles
 
@@ -9583,7 +9593,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `item.gamble.place-mode0` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-pc1late-npc | specs/world/vendors.md | gamble list items in mode 0 on a per-(NPC, player) node inventory; stream bytes 00 12 (REC-1946) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `item.gamble.place-mode0` | entity | DIVERGED | M | MATCH | yes | 0 | n | rc-pc1late-npc | specs/world/vendors.md | gamble list items in mode 0 on a per-(NPC, player) node inventory; stream bytes 00 12 (REC-1946) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.walk-in-radius` | entity | EQUAL | - | MATCH | yes | 0 | n | rc-pc1late-npc | specs/monsters/ai.md | town-ama-10k replay-diff frames 270-300: Warriv frame 287 ty 4228 equal; radius_point takes the unit size, always returns a point (REC-1945) |
 
 ## rc-pc1late-world
@@ -11321,7 +11331,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a3.94.act-3-temple-1` | entity | DIVERGED | M | DIVERGED@43 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@43 1 over gen-lvl-94; PARTIAL never counts as equal. gen-lvl-94 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 43 monster 1:10 class 47, field m: 1.14d 1 vs d2rs 15; rng DIVERGED frame 54, unit 1:10, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src… |
 | `level.a4.104.act-4-mesa-1` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-104; PARTIAL never counts as equal. gen-lvl-104 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [3965398309, 792411527] vs d2rs [1235504095, 1059482100]; rng DIVERGED frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/m… |
 | `level.a4.106.act-4-mesa-3` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-106; PARTIAL never counts as equal. gen-lvl-106 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [268807636, 1446976384] vs d2rs [3343186878, 1210264819]; rng DIVERGED frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None |
-| `npc.akara` | entity | DIVERGED | M | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: items-vendor-akara-buy=DIVERGED,interact-talk-akara=DIVERGED \| talk @1:148 trade (interact-talk-akara): codes 0,0,0 on both, state no difference; packets: S->C 0x27 text list bytes 10/14 swapped at frame 15 (1.14d 40..0b, d2rs 0b..40; world/quests.md §7.1), then the store messages: 1.14d frame 16, d2rs frame 15 with the chat open; menu, dialogue, store also items-vendor-akara-buy |
 | `npc.asheara` | entity | DIVERGED | M | DIVERGED@86 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-asheara=PARTIAL,hire-resurrect-asheara=DIVERGED \| hire flow: hire divergence at frame 20 (game seed, spawn tile) |
 | `npc.atma` | entity | DIVERGED | M | DIVERGED@131 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-atma-talk=PARTIAL,a2-quest-radament=DIVERGED \| talk: state PARTIAL; d2rs sends 0x8a NpcWantsInteract at f34 and f49 that 1.14d never sends; 1.14d 0x27 NpcInfo at f15 (answer to the client 0x31) absent in d2rs; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `npc.drehya` | entity | DIVERGED | M | DIVERGED@7 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@7 1 over gen-npc-drehya; PARTIAL never counts as equal. menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -11534,6 +11543,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `npc.act2guard2` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `npc.act2guard4` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `npc.act2guard5` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `npc.akara` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-net-div 2026-10-10 fresh run (suite.py, orig-cache): every check of this row packets MATCH, state PARTIAL only for the d2rs RunGaps header, every field compared, no ignore line; DECIDED REC-2055/2056. Fixes: quest removal/5D order, store recharge, pos poke 0x15 |
 | `npc.alkor` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `npc.cain1` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `npc.cain2` | entity | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | a2-npc-cain-talk,a2-quest-staff (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |

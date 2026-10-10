@@ -148,7 +148,7 @@ confirmed):
 | # | Step | 1.14d | When | Does |
 |---|---|---|---|---|
 | 0 | frame | `0x0052D870` | always | frame += 1; then debug trap switch on game +0x1DC8 (1, 2: write to an invalid address; 3: fatal error; 4: huge allocation), never set in normal play |
-| 1 | environment | `0x0052D7B0` | always | per act a = 0..4 with an act (game +0xBC + 4a): advance the act's day/night cycle (`0x0061C040(act, a)`: advance only, `A` = a, no `L`; returns 1 when the index or type changed or the hour moved more than 16 degrees since the last report, `render/lighting.md` §9.3 rule 5); on 1, the 0x53 values from `0x0061C330(act)`, then every client (client-list order) gets its player's items refreshed (`0x0055FDE0`) and, if in-game (state 4) in that act, message 0x53 |
+| 1 | environment | `0x0052D7B0` | always | per act a = 0..4 with an act (game +0xBC + 4a): advance the act's day/night cycle (`0x0061C040(act, a)`: advance only, `A` = a, no `L`; returns 1 when the index or type changed or the hour moved more than 16 degrees since the last report, `render/lighting.md` §9.3 rule 5); on 1, the 0x53 values from `0x0061C330(act)`, then every client (client-list order) gets its player's items refreshed (`0x0055FDE0`) (= the owner refresh `0x00621000(player, 1)`: queued for update with unit +0xC8 bits 0 and 1, so the player's unit update sends 0x47 and 0x48 after the 0x53; recorded `a2-super-fangskin` frames 6, 74) and, if in-game (state 4) in that act, message 0x53 |
 | 2 | frame-rate stats | `0x0052D720` | always | wall-clock statistics only (§8) |
 | 3 | rooms | `0x0052D160` | always | room pass (§4) |
 | 4 | **timer events** | `0x005414D0` | always | the timer-event queue (§5): all unit behaviour |

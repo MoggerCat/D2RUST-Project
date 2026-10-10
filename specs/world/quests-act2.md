@@ -33,18 +33,18 @@
 |   2. Act II records | 196–215 |
 |   3. A2Q1 Radament's Lair (chain 8, slot 9) | 216–299 |
 |   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 300–405 |
-|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–669 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 670–705 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 706–979 |
-|   9. Act II gossip and intro records | 980–988 |
-|   10. Hooks called from other systems | 989–1007 |
-| Constants & data dependencies | 1008–1021 |
-| Randomness | 1022–1036 |
-| Edge cases & original bugs | 1037–1070 |
-| Test vectors | 1071–1093 |
-| Provenance | 1094–1125 |
-| Open questions | 1126–1213 |
+|   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–539 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 540–674 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 675–710 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 711–984 |
+|   9. Act II gossip and intro records | 985–993 |
+|   10. Hooks called from other systems | 994–1012 |
+| Constants & data dependencies | 1013–1026 |
+| Randomness | 1027–1041 |
+| Edge cases & original bugs | 1042–1075 |
+| Test vectors | 1076–1098 |
+| Provenance | 1099–1130 |
+| Open questions | 1131–1218 |
 <!-- /index -->
 
 ## Summary
@@ -440,6 +440,11 @@ outcome as below.
   quick remove).
 - Act load (`0x0059AC40(act, n)`, from `0x0053ACB3`): n = 1 and +0x03 =
   1: start the Tainted Sun on that act, +0x03 := 0, +0x02 := 1.
+  d2rs: `QuestObjectHost::act_loaded` at the act's first build in the
+  act change (`wiring/path/act_change.rs` step 16); `client_in_act`
+  (`0x005382B0`) is the act of the client's room and `has_act2` the Act II
+  record being built (the play host's stubs answered false, so the darken
+  of `a2-super-fangskin` frame 5 never sent its 0x53 / 0x5D).
 - Altar init (§5.8) and game start (§5.6).
 
 #### 5.4 Flag iterate (`0x0059A4F0`)
