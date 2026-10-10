@@ -183,7 +183,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l53-basement-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l54-basement-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l54-basement-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | unrouted |
+| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/… | unrouted |
 | a2-warp-l55-tomb-1-a-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | unrouted |
 | a2-warp-l56-tomb-2-a-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l56-tomb-2-a-ama | state | PARTIAL | 160/160 | - | - |
@@ -207,7 +207,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l67-tomb-tal-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | unrouted |
+| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim… | unrouted |
 | a2-warp-l69-tomb-tal-4-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | unrouted |
 | a2-warp-l70-tomb-tal-5-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l70-tomb-tal-5-ama | state | PARTIAL | 160/160 | - | - |
