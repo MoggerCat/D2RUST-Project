@@ -37,13 +37,13 @@
 |   7. Reaction and death trigger | 647–752 |
 |   8. Event functions (table `0x007325B0`, 32 entries) | 753–816 |
 |   9. Durability `0x0057D3D0` | 817–844 |
-|   10. Monster melee on a player, end to end | 845–937 |
-| Constants & data dependencies | 938–959 |
-| Randomness | 960–992 |
-| Edge cases & original bugs | 993–1027 |
-| Test vectors | 1028–1110 |
-| Provenance | 1111–1136 |
-| Open questions | 1137–1186 |
+|   10. Monster melee on a player, end to end | 845–938 |
+| Constants & data dependencies | 939–960 |
+| Randomness | 961–993 |
+| Edge cases & original bugs | 994–1028 |
+| Test vectors | 1029–1111 |
+| Provenance | 1112–1137 |
+| Open questions | 1138–1187 |
 <!-- /index -->
 
 ## Summary
@@ -873,7 +873,8 @@ and the recorded check (Test vectors, "Recorded").
    without a used skill (`skills/use.md` §5.2 "Monsters"): no mode
    missile (`MissA1`/`MissA2` empty) → melee set-up `0x005A5490`
    (`skills/bodies-2.md` §2.13 "Monster pre-hit": T' = `target(game,
-   unit)`, zeroed record) and then, in the same event,
+   unit)`, zeroed record; **no path target unit → it returns first: no hit
+   test, no draw**, read 2026-10-10, REC-3181, `gen-su-56` frame 142) and then, in the same event,
    `apply_melee(game, unit, path target)` (§5.1). Roll and application
    happen on one frame.
 3. **Hit** `melee_result` (`combat/hit.md` §4): range `1 + 2` for a
