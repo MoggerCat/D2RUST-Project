@@ -30,7 +30,7 @@ Branch claude/rc-partial-promote = specs-staging-7 + integ-r16. Ledger EQUAL 113
   `suite.py --checks-dir traces/checks/gen --filter 'gen-missile-*,gen-obj-*' --orig-cache DIR --fill-cache`.
   Mind disk: ~8 MB per work dir; delete finished `*.jsonl`.
 - gen-state packets@2 (184 rows) belongs to the join/AddUnit owner.
-- Pre-existing, not mine: `ledger.py --check` 2 errors (rc-whirlwind.tsv); check_gen `--check` /
+- Pre-existing, not mine (`ledger.py --check` is clean after the staging merge): check_gen `--check` /
   `--selftest` fail on HEAD (deletes 75 gen-netc2s checks it does not generate);
   `d2-sim::prop_walk_motion chase_a_moving_target` failed once, passed on re-run (proptest input
   w=8 h=17 all masks 1, both monsters, budget 3, mvel 1669).
