@@ -470,6 +470,9 @@ where
             }
         }
         self.last_flush = Some(now);
+        // The vitals sync ends the tick's batch (`combat/vitals.md` §5.1
+        // rule 1): queued inside the flush, before any buffer is sent.
+        self.game.flush_sync(&mut self.buffers);
         let (mut sent, mut discarded) = (0, 0);
         for client in self.game.clients() {
             while let Some(buf) = self.buffers.pop(client) {
