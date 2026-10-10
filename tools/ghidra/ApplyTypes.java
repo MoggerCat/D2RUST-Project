@@ -219,76 +219,83 @@ public class ApplyTypes extends GhidraScript {
         decomp.openProgram(currentProgram);
         try {
             for (String line : lines) {
-                String[] col = line.split("\t", -1);
-                if (col.length < 4 || !col[0].startsWith("0x")) {
-                    continue;
-                }
-                Function f = getFunctionAt(toAddr(Long.decode(col[0])));
-                if (f == null) {
-                    missing++;
-                    continue;
-                }
-                int nargs = Integer.parseInt(col[1]);
-                String[] types = col[3].split(",");
-                if (f.getSignatureSource() == SourceType.DEFAULT) {
-                    // The database has no parameters yet: commit the decompiler's
-                    // inferred ones (convention and storage) first.
-                    DecompileResults r = decomp.decompileFunction(f, 60, monitor);
-                    if (r != null && r.decompileCompleted()) {
-                        HighFunctionDBUtil.commitParamsToDatabase(r.getHighFunction(), false,
-                                ReturnCommitOption.NO_COMMIT, SourceType.ANALYSIS);
+                try {
+                    String[] col = line.split("\t", -1);
+                    if (col.length < 4 || !col[0].startsWith("0x")) {
+                        continue;
                     }
-                }
-                Parameter[] params = f.getParameters();
-                if (params.length == nargs) {
-                    for (int i = 0; i < nargs; i++) {
-                        DataType dt = types[i].equals("-") ? null : resolveSig(types[i]);
-                        if (dt != null && params[i].getLength() == dt.getLength()) {
-                            params[i].setDataType(dt, SourceType.USER_DEFINED);
-                            String name = argName(types[i], i, types);
-                            if (params[i].getName().startsWith("param_") && name != null) {
-                                params[i].setName(name, SourceType.USER_DEFINED);
-                            }
+                    Function f = getFunctionAt(toAddr(Long.decode(col[0])));
+                    if (f == null) {
+                        missing++;
+                        continue;
+                    }
+                    int nargs = Integer.parseInt(col[1]);
+                    String[] types = col[3].split(",");
+                    if (f.getSignatureSource() == SourceType.DEFAULT) {
+                        // The database has no parameters yet: commit the decompiler's
+                        // inferred ones (convention and storage) first.
+                        DecompileResults r = decomp.decompileFunction(f, 60, monitor);
+                        if (r != null && r.decompileCompleted()) {
+                            HighFunctionDBUtil.commitParamsToDatabase(r.getHighFunction(), false,
+                                    ReturnCommitOption.NO_COMMIT, SourceType.ANALYSIS);
                         }
                     }
-                    retyped++;
-                    continue;
-                }
-                String cc = f.getCallingConventionName();
-                int purge = f.getStackPurgeSize();
-                // Register arguments: from the convention when it is known,
-                // else from the purge (a callee-cleaned function with nargs
-                // arguments and purge 4k passes nargs - k in registers).
-                int regs = switch (cc) {
-                    case "__fastcall" -> 2;
-                    case "__thiscall" -> 1;
-                    case "__stdcall" -> 0;
-                    default -> purge > 0 ? nargs - purge / 4 : -1;
-                };
-                if (regs < 0 || regs > 2 || nargs < regs || purge != 4 * (nargs - regs)) {
-                    skipped++;
-                    continue;
-                }
-                String newCc = regs == 2 ? "__fastcall" : regs == 1 ? "__thiscall" : "__stdcall";
-                List<Parameter> list = new ArrayList<>();
-                for (int i = 0; i < nargs; i++) {
-                    DataType dt = types[i].equals("-") ? null : resolveSig(types[i]);
-                    if (dt == null) {
-                        dt = i < params.length && params[i].getLength() == 4
-                                ? params[i].getDataType() : Undefined4DataType.dataType;
+                    Parameter[] params = f.getParameters();
+                    if (params.length == nargs) {
+                        for (int i = 0; i < nargs; i++) {
+                            DataType dt = types[i].equals("-") ? null : resolveSig(types[i]);
+                            if (dt != null && params[i].getLength() == dt.getLength()
+                                    && !params[i].isAutoParameter()) {
+                                params[i].setDataType(dt, SourceType.USER_DEFINED);
+                                String name = argName(types[i], i, types);
+                                if (params[i].getName().startsWith("param_") && name != null) {
+                                    params[i].setName(name, SourceType.USER_DEFINED);
+                                }
+                            }
+                        }
+                        retyped++;
+                        continue;
                     }
-                    String name = i < params.length ? params[i].getName() : "param_" + (i + 1);
-                    if (name.startsWith("param_") && argName(types[i], i, types) != null) {
-                        name = argName(types[i], i, types);
+                    String cc = f.getCallingConventionName();
+                    int purge = f.getStackPurgeSize();
+                    // Register arguments: from the convention when it is known,
+                    // else from the purge (a callee-cleaned function with nargs
+                    // arguments and purge 4k passes nargs - k in registers).
+                    int regs = switch (cc) {
+                        case "__fastcall" -> 2;
+                        case "__thiscall" -> 1;
+                        case "__stdcall" -> 0;
+                        default -> purge > 0 ? nargs - purge / 4 : -1;
+                    };
+                    if (regs < 0 || regs > 2 || nargs < regs || purge != 4 * (nargs - regs)) {
+                        skipped++;
+                        continue;
                     }
-                    list.add(new ParameterImpl(name, dt, currentProgram));
-                }
-                try {
-                    f.updateFunction(newCc, f.getReturn(), list,
-                            FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS, true, SourceType.USER_DEFINED);
-                    rebuilt++;
+                    String newCc = regs == 2 ? "__fastcall" : regs == 1 ? "__thiscall" : "__stdcall";
+                    List<Parameter> list = new ArrayList<>();
+                    // __thiscall: the ECX argument is Ghidra's automatic 'this'.
+                    for (int i = regs == 1 ? 1 : 0; i < nargs; i++) {
+                        DataType dt = types[i].equals("-") ? null : resolveSig(types[i]);
+                        if (dt == null) {
+                            dt = i < params.length && params[i].getLength() == 4
+                                    ? params[i].getDataType() : Undefined4DataType.dataType;
+                        }
+                        String name = i < params.length ? params[i].getName() : "param_" + (i + 1);
+                        if (name.startsWith("param_") && argName(types[i], i, types) != null) {
+                            name = argName(types[i], i, types);
+                        }
+                        list.add(new ParameterImpl(name, dt, currentProgram));
+                    }
+                    try {
+                        f.updateFunction(newCc, f.getReturn(), list,
+                                FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS, true, SourceType.USER_DEFINED);
+                        rebuilt++;
+                    } catch (Exception e) {
+                        printerr("signature " + f.getEntryPoint() + ": " + e.getMessage());
+                        skipped++;
+                    }
                 } catch (Exception e) {
-                    printerr("signature " + f.getEntryPoint() + ": " + e.getMessage());
+                    printerr("signature " + line.split("\t")[0] + ": " + e.getMessage());
                     skipped++;
                 }
             }
