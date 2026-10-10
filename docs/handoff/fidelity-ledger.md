@@ -33,8 +33,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 68 | 0 | 10 | 0 | 577 | 10 | 68 | 0 | 141–564 | 6 | 556 / 88 / 11 |
 | systems | 918 | 325 | 46 | 249 | 0 | 298 | 231 | 387 | 2 | 905.5–3558+ | 39 | 576 / 0 / 342 |
-| world | 826 | 39 | 0 | 45 | 0 | 742 | 11 | 68 | 5 | 181.5–566+ | 171 | 770 / 18 / 38 |
-| **all** | 4479 | 752 | 46 | 386 | 0 | 3295 | 397 | 775 | 12 | 1844.5–6994+ | 286 | 3614 / 366 / 499 |
+| world | 826 | 40 | 0 | 40 | 0 | 746 | 11 | 64 | 5 | 173.5–534+ | 171 | 772 / 16 / 38 |
+| **all** | 4479 | 753 | 46 | 381 | 0 | 3299 | 397 | 771 | 12 | 1836.5–6962+ | 286 | 3616 / 364 / 499 |
 
 ## By family
 
@@ -664,7 +664,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `net.s2c` | 183 | 36 | 21 | 67 | 0 | 59 | 0 | 114 | 10 | 0 | 1 | 0 |
 | `npc` | 48 | 11 | 0 | 6 | 0 | 31 | 0 | 6 | 11 | 0 | 1 | 10 |
 | `object` | 524 | 0 | 0 | 16 | 0 | 508 | 5 | 6 | 10 | 0 | 10 | 0 |
-| `quest` | 53 | 13 | 0 | 20 | 0 | 20 | 0 | 2 | 26 | 5 | 27 | 9 |
+| `quest` | 53 | 14 | 0 | 15 | 0 | 24 | 0 | 2 | 22 | 5 | 27 | 7 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
 | `shrine` | 24 | 2 | 0 | 4 | 0 | 18 | 0 | 0 | 6 | 0 | 5 | 0 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 14
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6248
+- Duplicate areas between parts: 6253
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -6950,10 +6950,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `quest.a2q7-guard-gossip`: rc-link-2.tsv:182 kept, world.tsv:353 dropped
   - `quest.a2q8-guard-gossip`: rc-link-2.tsv:183 kept, world.tsv:354 dropped
   - `quest.a3q0-hratli-gossip`: rc-link-2.tsv:113 kept, world.tsv:355 dropped
+  - `quest.a3q1-lam-esen-s-tome`: rc-link-2.tsv:194 kept, world.tsv:356 dropped
+  - `quest.a3q4-the-golden-bird`: rc-link-2.tsv:195 kept, world.tsv:359 dropped
+  - `quest.a3q5-the-blackened-temple`: rc-link-2.tsv:196 kept, world.tsv:360 dropped
   - `quest.a4q0-tyrael-gossip`: rc-link-2.tsv:114 kept, world.tsv:363 dropped
   - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, world.tsv:365 dropped
   - `quest.a4q3-hell-s-forge`: rc-link-2.tsv:168 kept, world.tsv:366 dropped
   - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, world.tsv:369 dropped
+  - `quest.a5q2-rescue-on-mount-arreat`: rc-link-2.tsv:197 kept, world.tsv:370 dropped
+  - `quest.a5q3-prison-of-ice`: rc-link-2.tsv:198 kept, world.tsv:371 dropped
   - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:46 kept, world.tsv:372 dropped
   - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:47 kept, world.tsv:374 dropped
   - `quest.act-i-intro`: rc-link-2.tsv:177 kept, world.tsv:375 dropped
@@ -6967,7 +6972,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 2043
+- Rows whose state disagrees with their checks: 2047
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -7028,7 +7033,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.diablo`: EQUAL but checks say PARTIAL
   - `monster.ai.druidbear`: EQUAL but checks say PARTIAL
   - `monster.ai.druidwolf`: EQUAL but checks say PARTIAL
-  - … and 1983 more (rerun with the tsv to list them)
+  - … and 1987 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -10840,6 +10845,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a2q6-the-seven-tombs` | entity | DIVERGED | L | DIVERGED@32 | yes | 36 | n | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-quest-tombs=DIVERGED \| Jerhyn 430, Duriel kill, Tyrael 302, Jerhyn 442, Meshif 450: state frame 14 Jerhyn tx; d2rs sends 17 quest/NPC records vs 6 in 1.14d (NpcInfo/0x28 for Meshif at f134, 0x5D 0D at f140 where 1.14d has one at f20); orifice+staff not exercised |
 | `quest.a4q2-terror-s-end` | entity | DIVERGED | M | DIVERGED@28 | yes | 36 | n | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-izual=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a5q1-siege-on-harrogath` | entity | DIVERGED | M | DIVERGED@30 | no | 36 | n | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-nihlathak=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `quest.a5q3-prison-of-ice` | entity | DIVERGED | M | DIVERGED@7 | yes | 36 | y | - | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): Malah 20132 and Drehya 20136 message handlers; gen-qflow-a5q3-drehya packets DIVERGED (checks-status.md) |
 | `shrine.17.portal-to-unknown` | entity | DIVERGED | M | DIVERGED@40 | yes | 15 | n | - | specs/world/objects.md | rc-link-2 batch 3 (2026-10-10): gen-shrine-17 packets DIVERGED (checks-status.md) |
 | `shrine.7.combat-boost` | entity | DIVERGED | M | DIVERGED@40 | yes | 15 | n | - | specs/world/objects.md | rc-link-2 batch 3 (2026-10-10): gen-shrine-7 packets DIVERGED (checks-status.md) |
 | `system.act.travel` | system | DIVERGED | M | DIVERGED@10 | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/1 of its a* checks diverge) |
@@ -10876,17 +10882,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a1q5-the-forgotten-tower` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q6-sisters-to-the-slaughter` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a1q7-flavie` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a3q1-lam-esen-s-tome` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q2-khalim-s-will` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q3-blade-of-the-old-religion` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a3q4-the-golden-bird` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a3q5-the-blackened-temple` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q6-the-guardian` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a3q7-dark-wanderer` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a4q1-the-fallen-angel` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a4q4-malachai` | entity | NO-CHECK | M | - | no | 36 | y | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a5q2-rescue-on-mount-arreat` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `quest.a5q3-prison-of-ice` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a5q5-rite-of-passage` | entity | NO-CHECK | M | - | yes | 36 | y | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.respec-akara-a1q7-handlers` | entity | NO-CHECK | M | - | ? | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quests.sound-event.queue` | system | NO-CHECK | S | - | yes | 0 | n | claude/rc-blade-hostcalls | specs/world/quests.md,specs/audio/triggers-2.md | quest/NPC sounds now queue the game's sound slot (flushed as S->C 0x2C) instead of a rest log; no 1.14d trace of the 0x2C after a quest pick-up |
@@ -11580,8 +11581,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a2q7-guard-gossip` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): gen-npc-act2guard2: state channel (units, stats and the quest list q) equal on every frame, nothing ignored, packets MATCH where sent (quest init/gossip state); PARTIAL only for the d2rs client gap |
 | `quest.a2q8-guard-gossip` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): gen-npc-act2guard4,gen-npc-act2guard5: state channel (units, stats and the quest list q) equal on every frame, nothing ignored, packets MATCH where sent (quest init/gossip state); PARTIAL only for the d2rs client gap |
 | `quest.a3q0-hratli-gossip` | entity | EQUAL | - | PARTIAL | yes | 36 | n | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `quest.a3q1-lam-esen-s-tome` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): Alkor messages 549 and 564 (state machine message handlers); every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
+| `quest.a3q4-the-golden-bird` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): Ormus 594 and Cain 626 message handlers; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
+| `quest.a3q5-the-blackened-temple` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-play-act3 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act3.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): Ormus 628 message handler; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
 | `quest.a4q0-tyrael-gossip` | entity | EQUAL | - | PARTIAL | yes | 36 | n | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `quest.a4q3-hell-s-forge` | entity | EQUAL | - | PARTIAL | yes | 37 | n | claude/q-fix-d3-player-mode | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | rc-link-2 C006 (2026-10-10): re-run on integ-r23 (checks-status.md): no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap; stale DIVERGED settled |
+| `quest.a5q2-rescue-on-mount-arreat` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): Qual-Kehk 20104 message handler; every linked check ran on integ-r23 with no DIVERGED channel, no ignore line, MATCH packets for input/send checks (REC-2055/2056) |
 | `quest.a5q4-betrayal-of-harrogath` | entity | EQUAL | - | PARTIAL | yes | 37 | n | claude/q-fix-d3-player-mode | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | milestone-anya (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `quest.a5q6-eve-of-destruction` | entity | EQUAL | - | PARTIAL | yes | 36 | n | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | milestone-baal-chamber (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `quest.act-i-intro` | entity | EQUAL | - | PARTIAL | yes | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | rc-link-2 (2026-10-10): a1-town-arrival-ama: state channel (units, stats and the quest list q) equal on every frame, nothing ignored, packets MATCH where sent (quest init/gossip state); PARTIAL only for the d2rs client gap |
