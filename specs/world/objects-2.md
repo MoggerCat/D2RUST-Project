@@ -200,7 +200,7 @@ sets here run before the unit is added to the world (§3).
 |---|---|---|---|
 | 8 torch | `0x005500C0` | 29, 37, 38, 102, 117 | mode 2 |
 | 10 | `0x0054F860` | none | room level (`0x0061A1B0`) = 1 → event 8 at f + 60; else mode 2 and event 0 at f + 25 |
-| 13 invisible object | `0x00594020` | 61 | quest chain 4 record exists (`0x00543640(game, 4)`) → link O to it (`0x005436B0(…, O, 4)`, `world/quests.md` §4.6); else mode 2 unless O is already in mode 2 |
+| 13 invisible object | `0x00594020` | 61 | quest chain 4 record exists (`0x00543640(game, 4)`) → link O to it (`0x005436B0(…, O, 4)`, `world/quests.md` §4.6); else mode 2 unless O is already in mode 2 | (wired: the lent quest control answers; with a chain 4 record the object stays in mode 0, gen-wp-2 frame 401)
 | 14 brazier | `0x005500D0` | 101 | mode 1 |
 | 22 fire | `0x0054FB40` | 160–162, 245, 345–347 | `Mode2` (+0x141) ≠ 0 and mode 0 (or none) and `Mode0` (+0x13F) = 0 → mode 2; then event 0 at f + 25 |
 | 24 spike floor trap | `0x0054FB90` | 196, 261 | event 3 at f + 25 |

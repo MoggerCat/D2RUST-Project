@@ -1515,7 +1515,7 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    > 0x1D → "unknown"). "W(f)" = walk flag: flags-ex bit 0x2000 := f and
    path +0x38 := 0 (`0x006491B0`; fatal 0x9A2 without a path). "F" =
    the **neutral fallback** `0x004AE1D0`: U a monster with mode 1…15,
-   ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490`), mode set 1;
+   ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490` -> `0x00650590`: the path's precise position becomes the centre of the cell it is in, `(p & 0xFFFF0000) + 0x8000` per axis; Warriv's draw on `draws-town-arrival-ama` tick 72 moves from the walk's rest point 376 short of the centre to the centre), mode set 1;
    any other mode → nothing. "NPC busy" = monster data +0x28 bit 0
    (`0x004AE080(U, 1)`; set only by the NPC hold §17 r7, cleared by
    §17 r1.7 and at creation / set-up / re-init). Missing record where a row says
