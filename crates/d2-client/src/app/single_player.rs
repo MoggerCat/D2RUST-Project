@@ -1648,6 +1648,26 @@ pub fn client_drlg_source(data: &GameData) -> DrlgSource {
     }
 }
 
+/// The `objects.txt` records after their load fix-up (`data/fixups.md`
+/// §13 r2: `FrameCnt0`–`7` in 1/256 frames), for the sim tables that read
+/// them as `>> 8` (waypoint init 17, `waypoints.md` §5.1: ENDANIM at
+/// frame + `FrameCnt1`). Without the fixed table: the raw rows, shifted.
+// Spec: specs/world/waypoints.md §5.1
+fn fixed_objects(d: &LiveData) -> Vec<Objects> {
+    let fixed: Option<Vec<Objects>> = d
+        .tables
+        .fixed
+        .table("objects")
+        .and_then(|t| decode_all(t).ok());
+    fixed.unwrap_or_else(|| {
+        let mut rows = d.waypoints.objects.clone();
+        for o in &mut rows {
+            o.framecnt1 = o.framecnt1.wrapping_shl(8);
+        }
+        rows
+    })
+}
+
 /// The `objects.txt` rows of the client object update
 /// (`world/objects-client.md` §28 r1): the live table **after its load
 /// fix-up** (`data/fixups.md` §13 r2: `FrameCnt0`–`7` in 1/256 frames, as
@@ -2240,10 +2260,8 @@ pub fn build_with(
         .map(Arc::new);
     // Init function 17 of the waypoint objects (`waypoints.md` §5.1) on
     // the game's tables.
-    hooks.waypoint_init = Some(Arc::new(WaypointData::new(
-        &wp_tables.levels,
-        &wp_tables.objects,
-    )));
+    let wp_objects = fixed_objects(d);
+    hooks.waypoint_init = Some(Arc::new(WaypointData::new(&wp_tables.levels, &wp_objects)));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
     // The hireling calls (save restore, join follow, act change;
@@ -2358,7 +2376,7 @@ pub fn build_with(
         .collect();
     // The wired host on the created controls.
     let action = ActionWorld {
-        waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_tables.objects)),
+        waypoints: Some(WaypointData::new(&wp_tables.levels, &wp_objects)),
         // The skill handlers (C→S 0x05–0x11, 0x3A–0x3C) on the action
         // wiring, their open seams on `LocalSeams` (`super::skill_rest`).
         skills: WiredSkills::default(),
