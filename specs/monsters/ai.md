@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 305–451 |
 |   3. AI control and AI tables | 452–640 |
 |   4. AI parameters | 641–659 |
-|   5. Target selection | 660–1094 |
-|   6. Distances and line tests | 1095–1110 |
-|   7. Tactics helpers | 1111–1390 |
-|   8. AI commands and minions | 1391–1417 |
-|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
-| Constants & data dependencies | 1439–1462 |
-| Randomness | 1463–1492 |
-| Edge cases & original bugs | 1493–1534 |
-| Test vectors | 1535–1623 |
-| Provenance | 1624–1685 |
-| Open questions | 1686–1796 |
+|   5. Target selection | 660–1109 |
+|   6. Distances and line tests | 1110–1125 |
+|   7. Tactics helpers | 1126–1405 |
+|   8. AI commands and minions | 1406–1432 |
+|   10. The catalogue `ai-functions.tsv` | 1433–1453 |
+| Constants & data dependencies | 1454–1477 |
+| Randomness | 1478–1507 |
+| Edge cases & original bugs | 1508–1549 |
+| Test vectors | 1550–1638 |
+| Provenance | 1639–1700 |
+| Open questions | 1701–1811 |
 <!-- /index -->
 
 ## Summary
@@ -768,6 +768,16 @@ second caller, `0x00460EEA`, is the client's (`client/model.md`).
 1.14d-confirmed (`0x0061AA40`–`0x0061AA57`, `0x0066BA70`, call site
 `0x005DD9A0`–`0x005DD9B1`, read 2026-10-10, PC 1 today).
 
+Implemented (rc-c008-monmode, 2026-10-10): `DrlgWorld::los_draw`
+(`wiring/action/rooms.rs`) reads the DRLG room's kind and flag 0x80000.
+Until then the wired host answered false in every room, so an outdoor or
+`Outdoors` preset room (e.g. level 124, lvlprest 864 `Outdoors` 1) ran
+the collision test `0x00622AA0` that 1.14d skips. `milestone-nihlathak`
+frame 30: the succubus 1:28 at (12740,5323) takes the player at
+(12723,5297) across the room's north wall (collision bit 4 at row 5320);
+75/75 ticks after the change (was 29/75), `a4-deseis-seal-early` 45/200
+→ 125/200.
+
 Level 108 (Chaos Sanctum): **true in every room**. levels.txt
 `DrlgType` is 3 (outdoor), its fill rooms are type 1 and its six
 presets (lvlprest Def 857–862, Diablo Entry / Arm W, E, S, N / Heart)
@@ -939,6 +949,11 @@ started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
 4. Line test `0x00622AA0(C, scanner, 4)` (a = C: C's room, C's end
    pulled first, `render/draw-order-2.md` §15.1) blocked → skip; else
    the slot := (C, d). The callback always returns 0 (whole scan).
+   Implemented with a = C (rc-c008-monmode, 2026-10-10): d2rs had the two
+   ends swapped; the swap made `milestone-baal-throne` and
+   `milestone-worldstone-portal` equal (SuccubusWitch 1:52, frame 82: the
+   line from the player to the witch is blocked, so no secondary target,
+   and the AI walks instead of casting `Skill5`).
 
 Against the q-fix-ass-traps recordings (Lightning Sentry, `ai-bodies-6.md`
 §14): the hp-0 poked `cow` 6 away was never a candidate (no `isAtt` →
