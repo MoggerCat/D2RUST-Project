@@ -1461,12 +1461,35 @@ impl Panel for SkillTreeUi {
             .world
             .local()
             .is_some_and(|u| u.states.contains(&STATE_UNINTERRUPTABLE));
+        let mut captions: Vec<super::draw::UiDraw> = Vec::new();
+        if let (Some(class), Some(fonts)) = (view.class(), sh.fonts.as_ref()) {
+            let s = sh.config.screen;
+            let (a, b) = super::panels::skilltree::caption_span(&s);
+            let font = super::panels::skilltree::FONT16;
+            for (id, k) in super::panels::skilltree::caption_lines(class) {
+                if let Some(t) = ctx.strings.get_id(id) {
+                    let t = t.to_vec();
+                    if let Some(w) = fonts.width(font, &t) {
+                        captions.push(text(t, centered_in(a, b, w), s.h + s.sy() + k, font, 0));
+                    }
+                }
+            }
+            // No free points: the "0" (`0x004AC4D0`).
+            if view.free_points() < 1 {
+                let (a, b, y) = super::panels::skilltree::zero_points_span(&s);
+                let t: Vec<u16> = vec![u16::from(b'0')];
+                if let Some(w) = fonts.width(font, &t) {
+                    captions.push(text(t, centered_in(a, b, w), y, font, 0));
+                }
+            }
+        }
         self.panel.draw_with_points(
             &sh.tables,
             &sh.env(),
             &view,
             sh.mouse,
             Some(uninterruptable),
+            &captions,
             out,
         );
         let s = sh.config.screen;
@@ -1659,8 +1682,40 @@ pub struct ModelCharacter<'a> {
     pub experience: &'a [[u32; 7]],
 }
 
+impl ModelCharacter<'_> {
+    /// The defense line of the panel: the getter `0x006223F0` that the
+    /// panel's stat 31 path (`0x004A86BF`) calls instead of reading the
+    /// stat. `base = armorclass(31) + dexterity(2) / 4` (truncating), the
+    /// armor percents (stats 171 and 16) of `base` (negative bases use the
+    /// negated divisor), then the override percent (stat 182) of the sum.
+    /// Spec: specs/ui/panels.md §8.7 (stat 31), specs/combat/hit.md §2.
+    /// The Holy Shield term is not modelled here (state 101 is rare on the
+    /// character screen; it needs the skill formula).
+    fn defense(&self) -> i32 {
+        let w = self.world;
+        let t = |id| w.total(self.key, id, 0);
+        let base = t(31).wrapping_add(t(2) / 4);
+        let p = t(171).wrapping_add(t(16));
+        let bonus = if base > 0 {
+            p.wrapping_mul(base) / 100
+        } else {
+            p.wrapping_mul(base) / -100
+        };
+        let total = base.wrapping_add(bonus);
+        let ovr = t(182);
+        if ovr != 0 {
+            total.wrapping_add(total.wrapping_mul(ovr) / 100)
+        } else {
+            total
+        }
+    }
+}
+
 impl CharacterView for ModelCharacter<'_> {
     fn stat(&self, id: u16) -> i32 {
+        if id == 31 {
+            return self.defense();
+        }
         self.world.total(self.key, id, 0)
     }
 
@@ -1979,14 +2034,17 @@ impl Panel for TopUi {
                 sh.mouse,
             );
             let (w, h) = (sh.config.screen.w, sh.config.screen.h);
-            item_tip::draw_tip(
-                &lines,
-                sh.mouse,
-                (w, h),
-                sh.fonts.as_ref(),
-                &sh.tables.files,
-                out,
-            );
+            let anchor = sh
+                .items
+                .hover_anchor(
+                    ctx.world,
+                    &sh.tables.files,
+                    &sh.config.screen,
+                    class,
+                    sh.mouse,
+                )
+                .unwrap_or_else(|| item_tip::TipAnchor::at_point(sh.mouse));
+            item_tip::draw_tip_at(&lines, anchor, (w, h), sh.fonts.as_ref(), out);
         }
         // The cursor last: the item's graphic or the type's cel
         // (`panels-3.md` §23 r9–r11, `cursor_ui`).

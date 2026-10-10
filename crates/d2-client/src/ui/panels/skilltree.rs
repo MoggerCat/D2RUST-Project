@@ -207,6 +207,86 @@ pub fn close_hit(s: &Screen, class: u8, tab: u8, p: Point) -> bool {
     at.x <= p.x && p.x <= at.x + CLOSE_SIZE && at.y - CLOSE_SIZE <= p.y && p.y <= at.y
 }
 
+/// Tab captions per class (`0x004AACE0`, `panels-2.md` §19 r6): string id and
+/// the offset K of y = `H + sy + K`; the three header lines come first for
+/// every class. Transcribed from the 1.14d code's call sequence.
+const HEADER_CAPTIONS: [(u16, i32); 3] = [(4227, -455), (4228, -443), (4229, -431)];
+
+fn class_captions(class: u8) -> &'static [(u16, i32)] {
+    match class {
+        0 => &[
+            (4232, -330),
+            (4233, -318),
+            (4230, -306),
+            (4234, -222),
+            (4235, -210),
+            (4230, -198),
+            (4236, -121),
+            (4237, -109),
+            (4230, -97),
+        ],
+        1 => &[
+            (4249, -324),
+            (4231, -312),
+            (4250, -216),
+            (4231, -204),
+            (4251, -110),
+            (4231, -98),
+        ],
+        2 => &[
+            (4242, -324),
+            (4231, -312),
+            (4243, -222),
+            (4244, -210),
+            (4231, -198),
+            (4245, -104),
+        ],
+        3 => &[
+            (4238, -324),
+            (4239, -312),
+            (4240, -216),
+            (4239, -204),
+            (4241, -110),
+            (4230, -98),
+        ],
+        4 => &[
+            (4246, -318),
+            (4247, -216),
+            (4248, -204),
+            (4247, -110),
+            (4230, -98),
+        ],
+        5 => &[(22512, -318), (22510, -216), (22511, -204), (22509, -110)],
+        6 => &[
+            (22516, -330),
+            (22517, -318),
+            (22514, -216),
+            (22515, -204),
+            (22513, -110),
+        ],
+        _ => &[],
+    }
+}
+
+/// The caption lines of the class's tab column: the header lines then the
+/// class's own, as (string id, y offset K) (y = `H + sy + K`).
+pub fn caption_lines(class: u8) -> impl Iterator<Item = (u16, i32)> {
+    HEADER_CAPTIONS
+        .into_iter()
+        .chain(class_captions(class).iter().copied())
+}
+
+/// Span of the captions (`0x004A7080` from `W − sx − 90`).
+pub fn caption_span(s: &Screen) -> (i32, i32) {
+    (s.w - s.sx() - 90, s.w - s.sx())
+}
+
+/// The "no free points" number's span and y (`0x004AC4D0`: "0" centered
+/// in [`W − sx − 65`, `W − sx − 25`] at `H + sy − 400`, color 0).
+pub fn zero_points_span(s: &Screen) -> (i32, i32, i32) {
+    (s.w - s.sx() - 65, s.w - s.sx() - 25, s.h + s.sy() - 400)
+}
+
 /// Skill tree panel state (§10).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkillTreePanel {
@@ -287,6 +367,8 @@ impl SkillTreePanel {
                 // The colored cel draw `0x004F64B0` with `k` (§10.3); k 0 is
                 // the plain draw (`text.md` §4.3).
                 if let UiDraw::Image(r) = &mut image {
+                    // `0x004F64B0` always goes through the colour draw.
+                    r.call = crate::ui::draw::CelCall::Color;
                     r.look.remap = crate::ui::Remap::Palette(i32::from(remap));
                 }
                 IconDraw {
@@ -309,7 +391,7 @@ impl SkillTreePanel {
         mouse: Point,
         out: &mut dyn UiDrawSink,
     ) {
-        self.draw_with_points(t, env, view, mouse, None, out);
+        self.draw_with_points(t, env, view, mouse, None, &[], out);
     }
 
     /// [`Self::draw`] with the free-points number (`panels-2.md` §19 r3,
@@ -322,6 +404,7 @@ impl SkillTreePanel {
         view: &dyn SkillTreeView,
         mouse: Point,
         uninterruptable: Option<bool>,
+        captions: &[UiDraw],
         out: &mut dyn UiDrawSink,
     ) {
         self.drawn.set(true);
@@ -330,6 +413,11 @@ impl SkillTreePanel {
         let cond = env.cond(false, &extra);
         let class = view.class();
         emit_static_draws(t, PanelKey::Ui(UI_SKILLTREE), &cond, class, &|_| true, out);
+        // `0x004AC690`: the tab captions (and the "0" without points) come
+        // before the number and the icons.
+        for c in captions {
+            out.push(c.clone());
+        }
         if let Some((n, at, font, color)) =
             uninterruptable.and_then(|u| self.free_points_number(&env.screen, view, u))
         {
