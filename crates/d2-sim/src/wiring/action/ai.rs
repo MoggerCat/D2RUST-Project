@@ -24,6 +24,7 @@ use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
 use super::{Pending, View, WiringError};
 use crate::world::objects::Dispatch;
+use crate::world::quests::act2::q4::JerhynStep;
 
 /// Monster mode 3, get-hit (`ai.md` §1.2).
 const MODE_GETHIT: u32 = 3;
@@ -141,6 +142,12 @@ impl<X: Pending> AiUnits for View<'_, X> {
             Some(m) => m.ai_state,
             None => self.h.x.ai_state(unit),
         }
+    }
+    fn source_unit(&self, unit: UnitId) -> Option<UnitId> {
+        if self.units.get(unit)?.flags2 & 0x400 == 0 {
+            return None;
+        }
+        self.h.unit_source.get(&unit).copied()
     }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
@@ -344,7 +351,16 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn class_has_mode(&self, class: i32, mode: u8) -> bool {
         self.h.x.class_has_mode(class, mode)
     }
+    /// `0x00553380(unit, sound, to)` ([`crate::units::sound::queue_sound`]:
+    /// S→C 0x2C in the tick's client pass), then [`Pending::play_sound`].
+    /// Recorded: `a2-npc-warriv-talk` frame 41, Jerhyn's greeting (§9.9
+    /// interaction step 6) `2c 01 01000000 1200`.
     fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        if let Ok(event) = u16::try_from(sound) {
+            if let Err(e) = crate::units::sound::queue_sound(game, unit, event, to) {
+                self.unit_error(crate::game::GameError::from(e).into());
+            }
+        }
         self.h.x.play_sound(game, unit, sound, to);
     }
     /// `0x005A8520` get-hit branch: mode change to get-hit (3).
@@ -356,9 +372,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
     /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
-    /// k = 0 or t on the unit → the request is still made, at the unit's
-    /// own cell (§7.5 rule 8, REC-665): no path, neutral, and the think at
-    /// f + `aidel`.
+    /// A point on the unit's own cell (k = 0 or t on the unit) is still
+    /// requested (§7.5 rule 8, REC-665): no path, neutral, and the think
+    /// at f + `aidel`.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -643,14 +659,34 @@ impl<X: Pending> AiQuests for View<'_, X> {
     fn drehya_wait(&mut self, game: &mut Game) -> bool {
         self.h.x.drehya_wait(game)
     }
+    /// The lent quest control's A2Q4 hooks (`world/quests-act2.md` §10);
+    /// without one (a host without quests) [`Pending`]'s.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
-        self.h.x.jerhyn_palace_active(game)
+        match self.h.quest_host.as_mut() {
+            Some(q) => q.jerhyn_palace_active(),
+            None => self.h.x.jerhyn_palace_active(game),
+        }
     }
-    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
-        self.h.x.jerhyn_npc_state(game, unit)
+    fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> JerhynStep {
+        let Some(mut host) = self.h.quest_host.take() else {
+            let (a, b) = self.h.x.jerhyn_npc_state(game, unit);
+            return JerhynStep::Out(a, b);
+        };
+        let at = self.h.path_position(unit);
+        let r = host.jerhyn_npc_state(game, self, at);
+        self.h.quest_host = Some(host);
+        r
+    }
+    fn jerhyn_placed(&mut self, _game: &mut Game) {
+        if let Some(q) = self.h.quest_host.as_mut() {
+            q.jerhyn_placed();
+        }
     }
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
-        self.h.x.guard_moving(game, unit)
+        match self.h.quest_host.as_mut() {
+            Some(q) => q.guard_moving(),
+            None => self.h.x.guard_moving(game, unit),
+        }
     }
     fn alkor_bird(&mut self, game: &mut Game) -> bool {
         self.h.x.alkor_bird(game)
@@ -767,11 +803,33 @@ impl<X: Pending> AiActs for View<'_, X> {
             None => self.h.x.ai_skill_entry(unit, skill),
         }
     }
+    /// A monster with a skill list (an assigned aura,
+    /// [`Pending::monster_right_aura`]): its hand's entry, id and base
+    /// level; else the seam.
     fn hand_skill(&self, unit: UnitId, right: bool) -> Option<(i32, i32)> {
-        self.h.x.ai_hand_skill(unit, right)
+        match self.h.skill_lists.get(&unit) {
+            Some(l) => {
+                let i = if right { l.right } else { l.left };
+                i.and_then(|i| l.view().get(i).map(|e| (e.skill, e.base)))
+            }
+            None => self.h.x.ai_hand_skill(unit, right),
+        }
     }
+    /// `0x0056DEB0` + `0x005701B0`: an aura goes to
+    /// [`Pending::monster_right_aura`] (`ai-bodies-2.md` §14 Duriel), any
+    /// other skill to the seam.
     fn add_right_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
-        self.h.x.ai_add_right_skill(game, unit, skill, level);
+        if self.h.tables.skills.skill(skill).is_some_and(|r| r.aura) {
+            let mut sim = Sim {
+                game,
+                units: &mut *self.units,
+                stats: &mut *self.stats,
+                data: self.data,
+            };
+            X::monster_right_aura(&mut *self.h, &mut sim, unit, skill, level);
+        } else {
+            self.h.x.ai_add_right_skill(game, unit, skill, level);
+        }
     }
     fn assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
         self.h.x.ai_assign_skill(game, unit, skill, level);
@@ -1028,8 +1086,9 @@ impl<X: Pending> AiSummons for View<'_, X> {
             .and_then(|(d, r)| d.coord_at(r, x, y))
             .map_or(-1, |c| c.index as i32)
     }
-    /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
-    /// from the quest control's published states
+    /// The palace guard's door hooks from the lent quest control. The Act
+    /// V prisoner AI's hooks (`quests-act5.md` §4.10): the reads from the
+    /// quest control's published states
     /// ([`Pending::quest_rescue`]); the calls with an effect queued for
     /// it ([`Pending::queue_quest_event`]); `0x00588E10` read here. Other
     /// hooks keep the default.
@@ -1044,6 +1103,20 @@ impl<X: Pending> AiSummons for View<'_, X> {
         use crate::monsters::ai::QuestHook;
         let guid = game.lists.unit(unit).map_or(0, |e| e.guid);
         match hook {
+            // The palace guard's A2Q4 hooks (`world/quests-act2.md` §10)
+            // on the lent quest control; none: false. PROVISIONAL
+            // (REC-1633): `0x0059B8F0` ([`AiSummons::palace_guard_point`])
+            // keeps its default, its return value is not stated.
+            QuestHook::PalaceDoorOpen => self
+                .h
+                .quest_host
+                .as_mut()
+                .is_some_and(|q| q.palace_door_open()),
+            QuestHook::PalaceGuardAside => self
+                .h
+                .quest_host
+                .as_mut()
+                .is_some_and(|q| q.palace_guard_aside()),
             QuestHook::WussieLeaving => self.h.x.quest_rescue(guid).0,
             QuestHook::WussieLeave => {
                 self.h.x.queue_quest_event(QuestEvent::WussieLeft { guid });

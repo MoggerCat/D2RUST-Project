@@ -1,0 +1,62 @@
+{
+ "channel": "packets",
+ "check": "a2-quest-arcane",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "600",
+  "--ticks",
+  "114",
+  "--auto",
+  "ScnAm2",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 goto unit 1:177",
+  "--poke",
+  "24 goto unit 1:201",
+  "--poke",
+  "36 warp 52",
+  "--poke",
+  "40 goto unit 2:357",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:177",
+  "--send",
+  "16 InitEntityChat id=@1:177",
+  "--send",
+  "18 QuestMessage npc=@1:177 msg=373",
+  "--send",
+  "20 TerminateEntityChat id=@1:177",
+  "--send",
+  "26 InteractWithEntity type=1 id=@1:201",
+  "--send",
+  "28 InitEntityChat id=@1:201",
+  "--send",
+  "30 QuestMessage npc=@1:201 msg=377",
+  "--send",
+  "32 TerminateEntityChat id=@1:201",
+  "--send",
+  "74 InteractWithEntity type=2 id=@2:357",
+  "--send",
+  "80 QuestMessage npc=@2:357 msg=396"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "701447d4cf6a2c1f690cf7acea3ce8f7a75159bbc098a2e33c6a6fb05fd2c58d",
+   "size": 333375
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f5971737903a5ce1d0d4cfc7b95769b6eccc9c2bf36a0497689b48f40ae37989",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "cdb34be43fbbad3d6b4dde997201cf9ac810447ec77c1b633ddcd85d46e51a47",
+  "save": "a7834d3013f37244198274ade198a6ca618ac511a5607f742fe94728a8c6a713"
+ }
+}

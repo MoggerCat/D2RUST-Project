@@ -168,11 +168,23 @@ impl<X: Pending + UseRest> UseView<'_, X> {
         r: Option<RoomId>,
         at: (i32, i32),
     ) -> Option<bool> {
+        self.rooms_place_unit_exact(u, r, at, false)
+    }
+
+    /// `0x00554EA0(game, unit, room, x, y, exact, 0)`: `exact` skips the
+    /// free-point search (`path-placement.md` §10 rule 3).
+    pub(super) fn rooms_place_unit_exact(
+        &mut self,
+        u: UnitId,
+        r: Option<RoomId>,
+        at: (i32, i32),
+        exact: bool,
+    ) -> Option<bool> {
         if !self.on_rooms() {
             return None;
         }
         let c = PathCtx::of(&mut self.cv.v, &mut *self.cv.game);
-        Some(place_unit(c, u, r, at.0, at.1, false, false))
+        Some(place_unit(c, u, r, at.0, at.1, exact, false))
     }
 }
 
