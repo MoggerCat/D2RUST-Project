@@ -1512,6 +1512,18 @@ pub struct SkillRow {
     /// The flag columns `ui/controls.md` §6 r8 reads, by `skills.txt`
     /// bit (`controls::click::skill_flag`).
     pub flags: u32,
+    /// `InGame` (`skills/use.md` §2 use state test 1).
+    pub ingame: bool,
+    /// `aura` (use state test 3).
+    pub aura: bool,
+    /// `mana`, `lvlmana` (i16 read signed) and `manashift` (low byte):
+    /// the cost of `skills/levels.md` §4 (use state test 6).
+    pub mana: u16,
+    pub lvlmana: u16,
+    pub manashift: u16,
+    /// `cltstfunc` (+0xF2): the client start of `client/model.md` §8 r7
+    /// step 5.
+    pub cltstfunc: u16,
 }
 
 /// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):

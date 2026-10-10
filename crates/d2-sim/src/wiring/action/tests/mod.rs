@@ -82,6 +82,8 @@ pub struct TestPending {
     pub missing_modes: Vec<u8>,
     /// Used skills (`0x00620250`) by unit.
     pub used: BTreeMap<UnitId, crate::skills::SkillEntry>,
+    /// Used-skill entry flags +0x0C (`0x006446A0`) by unit (default 0).
+    pub entry_flags: BTreeMap<UnitId, u32>,
     /// What the monster skill start `0x0056FAF0` answers (logged).
     pub skill_start: i32,
     /// What `object_approach` answers (default: operate).
@@ -176,6 +178,9 @@ impl Pending for TestPending {
     }
     fn used_skill(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
         self.used.get(&unit).copied()
+    }
+    fn entry_flags(&self, unit: UnitId, _: &crate::skills::SkillEntry) -> u32 {
+        self.entry_flags.get(&unit).copied().unwrap_or(0)
     }
     fn monster_skill_start(
         h: &mut ActionHooks<Self>,

@@ -191,3 +191,73 @@ fn a_lower_skill_level_resyncs_the_maximum_and_trims_the_list() {
     assert_eq!(pets(&fx, p).len(), 1);
     fx.assert_clean();
 }
+
+// Covers: specs/skills/bodies.md §6.5 r6; specs/skills/use.md §7
+#[test]
+fn a_summons_aura_sumskill_becomes_its_right_skill_with_the_aura_running() {
+    // Skill 1 summons with `sumskill1` = skill 2 at `eval(sumsk1calc)` 1
+    // (§6.5 skips skill 0); skill 2 is an `aura` (state 30, not
+    // `immediate`): the monster gets a skill list with skill 2 on the
+    // right and the type-8 aura timer (arg −1), as `0x005701B0(m, 0, 2,
+    // −1)` does (its aura state is the host's `set_aura_state`).
+    const SUMMON: i32 = 1;
+    const AURA: i32 = 2;
+    const AURA_STATE: u16 = 30;
+    let mut r = body_rec();
+    r.srvdofunc = 119;
+    r.summon = 0;
+    r.summode = 1;
+    r.pettype = 2;
+    r.petmax = F_2;
+    r.calc2 = F_5;
+    r.sumskill1 = AURA as u16;
+    r.sumsk1calc = F_1;
+    let mut a = body_rec();
+    a.aura = true;
+    a.aurastate = AURA_STATE;
+    let mut t = crate::skills::fake::skill_tables(vec![body_rec(), r, a]);
+    let mut code = Vec::new();
+    for v in [2i16, 1, 5] {
+        code.push(0x08);
+        code.extend(v.to_le_bytes());
+        code.push(0x00);
+    }
+    t.skills_code = code;
+    let mut fx = Fx::with(stat_data(), t);
+    fx.sim.sys.hooks.bodies = Some(Arc::new(BodyTables {
+        stats: vec![BodyStat::default(); 359],
+        state_group: vec![0; N_STATES],
+        state_aura: vec![false; N_STATES],
+        pettype_count: 3,
+        pettype_group: vec![0; 3],
+        ..BodyTables::default()
+    }));
+    let p = fx.spawn(UnitType::Player, 10, 10);
+    fx.set(p, &[(12, 10)]);
+    let e = SkillEntry {
+        skill: SUMMON,
+        base: 1,
+        owner_guid: -1,
+        ..SkillEntry::default()
+    };
+    let x = &mut fx.sim.hooks().x;
+    x.skills.insert(p, vec![e]);
+    x.used.insert(p, e);
+    x.aim_at = (12, 10);
+    let t = fx.sim.sys.hooks.tables.skills.clone();
+    let game = &mut fx.game;
+    assert_eq!(fx.sim.skill_use(game, |w| do_skill(w, &t, p, SUMMON, 1)), 1);
+    let m = fx.game.lists.units_of_type(UnitType::Monster)[0];
+    let list = fx.sim.sys.hooks.skill_lists.get(&m).expect("a skill list");
+    let right = list.right.map(|i| list.view()[i]);
+    assert_eq!(right.map(|e| (e.skill, e.owner_guid)), Some((AURA, -1)));
+    let periodic = fx
+        .game
+        .timers
+        .unit_timers(m)
+        .into_iter()
+        .filter_map(|t| fx.game.timers.event(t))
+        .any(|e| e.0 == crate::tick::events::event::PERIODIC_SKILLS);
+    assert!(periodic, "the type-8 aura timer");
+    fx.assert_clean();
+}
