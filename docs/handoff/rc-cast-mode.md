@@ -1,10 +1,6 @@
-# rc-cast-mode hand-back (REC-1830..1834: none used)
-
-Task: d2rs sent two cast mode requests per local cast (code 0x15/0x16,
-level 0 then level 20) where 1.14d sends one.
+# rc-cast-mode hand-back (REC-1830..1834 unused)
 
 ## Cause and fix
-
 - Request 1 (level 0) is the client's own click request
   (`d2-client/src/bridge/click.rs` `skill_request`, `skills/sequences.md`
   local player rules 1-2): correct.
@@ -24,9 +20,8 @@ level 0 then level 20) where 1.14d sends one.
 
 - Before: 150 PARTIAL (no difference), 60 DIVERGED, 12597/14700 ticks.
 - After: identical (150 / 60 / 12597). The state channel compares
-  server state, and this was a server-to-own-client message, so no first
-  divergence moved. The brief's guess that this sits in the gen-skill
-  first divergences is not borne out.
+  server state; this was a message to the own client, so no first
+  divergence moved (the brief's guess is not borne out).
 - Ledger part `q-run-gen-skills.tsv` is stale (199 DIVERGED, mostly @2
   `q`); the current run is 150 PARTIAL / 60 DIVERGED. Its owner should
   refresh it (my part can't override it: name order).
@@ -42,5 +37,4 @@ level 0 then level 20) where 1.14d sends one.
   in 1.14d / missing in d2rs (sor 36-55 odd, 64; nec 67, 84; pal 101;
   dru 225, 230; ass 266), 10 player `tx`, 5 monster `m`, 5 game `seed`.
   Not started (one root cause per session). Size M.
-- d2-client debug tests not run (disk 3.7 GB free); the client crate is
-  unchanged and the 210-check release suite exercises it.
+- d2-client debug tests not run (low disk); client crate unchanged.
