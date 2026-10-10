@@ -457,6 +457,11 @@ pub fn kill_by<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: Option<Unit
                 distribute(cv, &t, a, d);
             }
         }
+        // `0x0053F720`: a player killer of a monster raises its arena
+        // record; the other branches (player victims) are not modelled.
+        if ty == UnitType::Monster && cv.v.units.get(a).is_some_and(|r| r.ty == UnitType::Player) {
+            cv.v.h.arena.monster_kill(a);
+        }
         let game = &mut *cv.game;
         cv.v.h
             .x

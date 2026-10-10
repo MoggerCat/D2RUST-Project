@@ -247,6 +247,14 @@ impl<X: Pending> View<'_, X> {
             target,
             cell: (path.x() as u16, path.y() as u16),
             path_target: (path.target_x, path.target_y),
+            // `0x00648A40` / `0x00648A60`: the last computed path point,
+            // (0, 0) without one; never the target +0x10 / +0x12
+            // (`intents-events.md` §7.7 "Path end", REC-594).
+            path_end: path
+                .point_count
+                .checked_sub(1)
+                .and_then(|i| path.points.get(i as usize))
+                .map_or((0, 0), |p| (p.x, p.y)),
             direction: path.direction,
             path_type: path.path_type,
             path_90: path.dist_budget,

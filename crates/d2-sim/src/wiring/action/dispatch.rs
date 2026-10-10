@@ -33,6 +33,15 @@ pub struct ActionSim<X> {
 }
 
 impl<X: Pending> ActionSim<X> {
+    /// Sends the player step 5 / 7 messages held by
+    /// [`ActionHooks::defer_player_tail`]: the host calls it after its item
+    /// update pass.
+    pub fn flush_player_tail(&mut self) {
+        for (receiver, m) in std::mem::take(&mut self.sys.hooks.player_tail) {
+            self.sys.hooks.x.send(receiver, &m);
+        }
+    }
+
     pub fn new(stat_data: Arc<StatData>, data: UnitData, hooks: ActionHooks<X>) -> Self {
         Self {
             sys: UnitSystem::new(stat_data, data, hooks),
@@ -359,6 +368,30 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         self.with(game, |g, v| v.send_room_deletes(g, client));
     }
 
+    /// Per-client update arena sync (`0x0053FC20`, `intents-events.md`
+    /// §7.6 rule 5): with the game's arena bit 0x400 set and the client's
+    /// player record seen, S→C 0x65 (GUID, count) to that player.
+    /// TODO(§7.6 rule 5): the other in-game players' counts
+    /// (`0x0053FB90`) for a multi-player game.
+    fn arena_sync(&mut self, game: &mut Game, client: ClientId) {
+        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let (Some(count), Some(guid)) = (
+            self.sys.hooks.arena.sync_count(p),
+            self.sys.units.get(p).map(|r| r.guid),
+        ) else {
+            return;
+        };
+        let m = crate::units::messages::player_kill_count(guid, count);
+        self.sys.hooks.x.send(p, &m);
+    }
+
+    /// Step 6, last (`0x0053FAE0`): the arena bit 0x400 is cleared.
+    fn clear_arena_flag(&mut self, _: &mut Game) {
+        self.sys.hooks.arena.flag_0x400 = false;
+    }
+
     /// Step 7 (`0x0061A2C0`): the room's removal records are freed.
     fn free_removal_records(&mut self, _: &mut Game, room: RoomId) {
         self.sys.hooks.removed_items.retain(|&(_, r)| r != room);
@@ -492,8 +525,13 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {
+                // A unit still new to the client keeps its join order; so
+                // does one without item messages pending (update bit 0).
+                v.h.capture_tail =
+                    new.is_none() && v.units.get(unit).is_some_and(|r| r.flags2 & 1 != 0);
                 v.state_change_messages(p, unit);
                 v.player_stat_sends(p, unit);
+                v.h.capture_tail = false;
             }
             return;
         }

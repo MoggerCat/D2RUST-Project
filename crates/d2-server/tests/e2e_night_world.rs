@@ -1325,7 +1325,14 @@ fn a_population_monster_killed_with_a_missile() {
     // mode request wrote, `monsters/init.md` §4.1 step 1.1: (40013,
     // 40022)), w 0.
     let skill_4d = vec![0x4D, 1, 3, 0, 0, 0, 1, 0, 0, 0, 10, 77, 156, 86, 156, 0, 0];
-    assert_eq!(transcript, vec![skill_4d; 2]);
+    // The player's kill of the monster raises its arena record: S→C 0x65
+    // (GUID 1, count 1) from the kill tick's client pass, between the two
+    // (`intents-events.md` §7.6 rule 5; 1.14d `combat-melee-fallen`).
+    let kill_count = vec![0x65, 1, 0, 0, 0, 1, 0];
+    assert_eq!(
+        transcript,
+        vec![skill_4d.clone(), kill_count, skill_4d.clone()]
+    );
     // Nothing is logged.
     assert_eq!(fx.errors(), Vec::<String>::new());
 }

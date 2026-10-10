@@ -127,8 +127,12 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
             .dynamic_mut(m)
             .unwrap();
         d.direction = 0x38;
-        d.target_x = 0x1295;
-        d.target_y = 0x1555;
+        // The path end: the last computed point (`intents-events.md` §7.7).
+        d.points[0] = crate::path::record::PathPoint {
+            x: 0x1295,
+            y: 0x1555,
+        };
+        d.point_count = 1;
     }
     let f = fx.game.frame;
     kill_now(&mut fx, m, p);
@@ -141,7 +145,10 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     // the kill's direction toward the killer (`units.md` §4.6 rule 1.2,
     // `0x006488A0`; `damage.md` §7.2 rule 3): from (13, 10) to (10, 10).
     want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x17, 0x00]);
-    assert_eq!(sent(&mut fx), vec![(p, want)]);
+    // The player's kill raised its arena record: 0x65 (GUID 1, count 1)
+    // from the same tick's client pass (`intents-events.md` §7.6 r5).
+    let kills = (p, vec![0x65, 1, 0, 0, 0, 1, 0]);
+    assert_eq!(sent(&mut fx), vec![(p, want), kills]);
     assert_eq!(
         fx.sim.sys.units.get(m).unwrap().flags & (flags::CHANGED | flags::MODE_CHANGING),
         0
