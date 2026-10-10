@@ -2273,11 +2273,10 @@ fn run_with(game_seed: u32) -> Transcript {
 
     // 9. Run to Akara (C→S 0x04, unit form, type 1): the path targets
     // her unit. The player's stop distance (path +0x93) has no written
-    // setter (0: `pathing.md` §9.5 rule 3 never stops early) and the
-    // player's move mask 0x1C09 (`path-placement.md` §2.4) does not hold
-    // the monster footprint bit 0x100, so the run ends on Akara's own
-    // sub-tile (`pathing.md` §9.5 rule 3: no player walk / run path sets
-    // the stop distance, so it stays 0).
+    // setter (0: `pathing.md` §9.5 rule 3), so the run stops at the first
+    // step where the unit distance is 0: a negative `dist8_unit` entry
+    // (§9.5) one diagonal cell short of her sub-tile (`npc.md` §2 rule
+    // 3.3: short of the NPC's own sub-tile for any NPC size ≥ 2).
     let ng = fx.guid(npc);
     let w = walk(
         &mut fx,
@@ -2355,10 +2354,13 @@ fn run_with(game_seed: u32) -> Transcript {
         store_rows.push((guid, it.record, it.item_seed, ac));
     }
     assert_eq!(store_rows.last().unwrap().1, CAP, "permanent codes last");
-    // One 0x9C action 11 per store item, in store order (§4 step 3).
+    // One 0x9C action 11 per store item, in store order (§4 step 3). The
+    // frame also carries the 0x2F's heal SetStat (Akara heals,
+    // `npc.md` §5 step 1).
     let shown: Vec<(u8, u8, u32)> = frames[trade_frame]
         .2
         .iter()
+        .filter(|m| m[0] == 0x9C)
         .map(|m| (m[0], m[1], u32::from_le_bytes(m[4..8].try_into().unwrap())))
         .collect();
     let want: Vec<(u8, u8, u32)> = store_rows.iter().map(|r| (0x9C, 11, r.0)).collect();
@@ -2587,8 +2589,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
     // + the picked gold pile's removal 0x0A (REC-281).
+    // + the 0x2F's heal at Akara (`npc.md` §5): its sound 0x2C.
     // + the two pick-up sounds 0x2C (gold, cap; REC-1402..1404).
-    assert_eq!(log.handled, 28 + store.len() as u64);
+    assert_eq!(log.handled, 29 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // The player's own 0x4D echo (REC-95) is gone: the caster's own
@@ -2606,6 +2609,10 @@ fn run_with(game_seed: u32) -> Transcript {
         .collect();
     let mut want = vec![(0x07, "fatal assert 0x58A".to_owned()); 11];
     want.extend(vec![(0x08, "fatal assert 0x59E".to_owned()); 4]);
+    // The heal's SetStat 0x1E at Akara (`npc.md` §5 step 1), after the
+    // join's four 0x07: no local player in this staged game
+    // (`msg-stats-items.md` §1 rule 1, fatal 0x9AA).
+    want.insert(4, (0x1E, "fatal assert 0x9AA".to_owned()));
     assert_eq!(rejected, want);
     assert!(log.discarded.is_empty());
     // No local player: the world view has no camera (`model.md` §3 rule 3).

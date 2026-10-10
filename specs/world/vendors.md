@@ -33,18 +33,18 @@
 |   1. Vendor columns and per-NPC store lists | 87–141 |
 |   2. Store item level | 142–147 |
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–300 |
-|   5. Gambling | 301–393 |
-|   6. Refresh | 394–425 |
-|   7. Buying and selling | 426–619 |
-|   8. Repair | 620–674 |
-|   9. Prices | 675–874 |
-| Constants & data dependencies | 875–894 |
-| Randomness | 895–913 |
-| Edge cases & original bugs | 914–953 |
-| Test vectors | 954–976 |
-| Provenance | 977–1015 |
-| Open questions | 1016–1099 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–303 |
+|   5. Gambling | 304–405 |
+|   6. Refresh | 406–437 |
+|   7. Buying and selling | 438–631 |
+|   8. Repair | 632–686 |
+|   9. Prices | 687–886 |
+| Constants & data dependencies | 887–906 |
+| Randomness | 907–925 |
+| Edge cases & original bugs | 926–965 |
+| Test vectors | 966–988 |
+| Provenance | 989–1027 |
+| Open questions | 1028–1111 |
 <!-- /index -->
 
 ## Summary
@@ -280,7 +280,10 @@ From `npc.md` §4 (actions 1, 2):
      (gamble): vendor item flag (unit +0xC8 |= 4), flag 1 if it has
      filled sockets, add to the NPC's trade inventory
      (`0x00576C30`); the client receives one 0x9C action 11 per item
-     (recorded, frame 899). Order (handoff `impl-vendors` V14): the
+     (recorded, frame 899). They are sent by the next tick's client pass,
+     after the monster updates (recorded 2026-10-09,
+     `interact-talk-akara`: 0x13, 0x2F, 0x38 at the frame-16 poke, the
+     store records in tick 16 after Akara's 0x8A and 0x6D). Order (handoff `impl-vendors` V14): the
      walk is the NPC's (or the gamble node's) inventory item list, first
      `0x0063B2C0`, next `0x0063DFA0`, which is link order
      (`items/inventory.md` §1.4 rule 1): items in the order they were
@@ -357,6 +360,13 @@ list (+0x08). L_p = player level. c := 0. Loop:
    and the stream shows `10 00` (mode 4, x 0, y 0).
 8. Stop after c reaches 14.
 
+Recorded (2026-10-09, `a2-npc-elzix-gamble`, 1.14d under Wine): after
+action 2 the 14 list items are in mode 0 (stored) at grid positions of
+the node's inventory (page 0, first free position in creation order:
+`rin` at (9, 0), `amu` at (9, 1), then (0, 0), (0, 2), …), i.e. step 7's
+placement is the page placement `0x00560200` (`items/inventory.md`
+§2.4) into an inventory owned by the NPC.
+
 Exact (handoff `impl-vendors` V9, `0x00578790`): the gamble index
 `0x00638CC0` is the fixed block `0x0096CAB0` and is never none; with a
 gamble count of 0 every threshold is 0, idx = 0 and the read of index
@@ -382,6 +392,8 @@ the list item is taken out of the list (§7.1 step 12).
 - `0x00537190(player)`: when the player's 0x30 empties the NPC's
   interaction list (`npc.md` §3): unlink the player's node, remove its
   items, free it. The next gamble open makes a new list (§5.1 draws).
+  Recorded (`a2-npc-elzix-gamble` frame 21): after the 0x30 the 14 list
+  items are gone from the unit lists (removed and destroyed).
 - Clearing the record's data (§6 rule 4) drops every player's list.
 
 #### 5.5 C→S 0x37 IdentifyGamble

@@ -326,7 +326,7 @@ pub struct RunInfo {
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
     "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
-     the model's own answers (0x6B, 0x5F, 0x28's 0x2F and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
+     the model's own answers (0x6B, 0x5F, 0x28's 0x2F / 0x30 and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
      with the play preview's hover pick, the local player at the play preview's walk \
      prediction, held repeat once per server frame; keys: belt 1-4, run lock, weapon swap, \
      speech only), so a run \
@@ -787,7 +787,13 @@ fn overlay_item_owners(
             .and_then(|(_, d)| d.inv)
             .and_then(|o| lists.unit(o))
             .map(|e| e.guid);
-        u.own = holder.filter(|&g| g != 0 && !vendor);
+        // A monster's equipment has no inventory model: the snapshot's
+        // own holder (sim `owner`) stays.
+        if vendor {
+            u.own = None;
+        } else if holder.is_some() {
+            u.own = holder.filter(|&g| g != 0);
+        }
     }
 }
 
