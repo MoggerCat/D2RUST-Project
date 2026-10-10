@@ -1783,8 +1783,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             r.anim.speed = v as i16;
         }
     }
+    /// `0x0064A300`: the missile's +0x0E total frames from the real
+    /// missile store (0 without missile data); the host's hook only
+    /// while the store is lent out.
     fn missile_frames(&self, m: UnitId) -> i32 {
-        self.x().body_missile_frames(m)
+        match self.cv.v.h.missiles.as_ref() {
+            Some(s) => s.get(m).map_or(0, |d| i32::from(d.total)),
+            None => self.x().body_missile_frames(m),
+        }
     }
     /// Total frames and frames left of a missile in the store
     /// (`0x0064A2B0`, `0x0064A330`; `specs/skills/bodies-3.md` §3.2).

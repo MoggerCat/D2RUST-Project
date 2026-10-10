@@ -785,6 +785,36 @@ fn missile_data_words_reach_the_missile_store() {
     fx.assert_clean();
 }
 
+// Covers: specs/skills/bodies-3.md §3.2
+#[test]
+fn inferno_frames_reach_the_missile_store() {
+    use crate::skills::use_::bodies::{BodyWorld, MissileRequest};
+    // The Inferno frames helper `0x005CC2E0` sets the new missile's
+    // total frames and frames left (`0x0064A2B0`, `0x0064A330`) and
+    // DeathMaul reads the total back (`0x0064A300`): both on the real
+    // store, so DiabLight's bolts live `Param2 + L − 1` frames, not
+    // `Range` (gen-ai-diablo: 32, not 30).
+    let mut fx = Fx::new();
+    let player = fx.spawn(UnitType::Player, 10, 10);
+    let got = fx.sim.skill_use(&mut fx.game, |w| {
+        let m = w.spawn_missile(MissileRequest {
+            flags: 1,
+            x: 12,
+            y: 10,
+            ..MissileRequest::new(player, 0)
+        })?;
+        w.set_missile_frames(m, 32, 31);
+        let a = w.missile_frames(m);
+        w.set_missile_frames(m, 0x9000, -0x9000);
+        Some((m, a, w.missile_frames(m)))
+    });
+    let (m, a, b) = got.expect("created");
+    assert_eq!((a, b), (32, 0x7FFF));
+    let data = fx.sim.hooks().missile_store().get(m).unwrap().clone();
+    assert_eq!((data.total, data.current), (0x7FFF, -0x8000));
+    fx.assert_clean();
+}
+
 // Covers: specs/skills/bodies.md §2.12
 #[test]
 fn use_allied_resolves_a_monster_to_its_minion_owner() {
