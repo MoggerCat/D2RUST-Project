@@ -413,6 +413,15 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             return;
         };
         self.sys.hooks.x.environment_refresh_items(player);
+        // The refresh ends in the owner refresh `0x00621000(player, 1)`
+        // (`0x0055DBC0`): queue the player for update and set its +0xC8
+        // bits 0 and 1, so the item pass of the client pass sends
+        // 0x47 / 0x48 (`inventory-moves.md` §6.1; recorded
+        // `items-vendor-jamella-stock` frame 139, after the 0x53).
+        let _ = game.lists.queue_update(player);
+        if let Some(r) = self.sys.units.get_mut(player) {
+            r.flags2 |= 3;
+        }
         let in_act = room
             .and_then(|r| game.lists.room(r))
             .is_some_and(|r| r.act == act);
