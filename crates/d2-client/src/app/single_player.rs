@@ -1198,6 +1198,9 @@ impl Pending for LocalSeams {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         self.monsters.set_current(unit, skill)
     }
+    fn clear_current_skill(&mut self, unit: UnitId) {
+        self.monsters.clear_current(unit);
+    }
     fn class_has_mode(&self, class: i32, mode: u8) -> bool {
         self.monsters.class_has_mode(class, mode)
     }

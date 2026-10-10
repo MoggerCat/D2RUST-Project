@@ -455,10 +455,12 @@ impl Outdoor {
     /// Type data reset when the level's rooms are freed (`0x006754C0`,
     /// `levels.md` §9.4): grids, polygon, paths and the build list.
     pub fn reset_level(&mut self, drlg: &Drlg, l: LevelIdx) {
-        // TODO(outdoor.md §3, levels.md §9.4): what `0x006754C0` frees is
-        // not stated. Kept: flags (+0x00) and neighbour entries, which
-        // only act creation writes; a regeneration then starts from the
-        // flags the last generation left (0x20, 0x40 included).
+        // `0x006754C0`: clears flags 0x20 (cliffs) and 0x40 (cave placed),
+        // frees the four grids, the polygon and the six path lists, zeroes
+        // the path end-points and the path count (+0x260). The remaining
+        // flags and the neighbour entries (+0x264) stay: only act creation
+        // writes them. A regeneration therefore places cliffs and the cave
+        // entrance again (`outdoor.md` §1.3, §6).
         // `levels.md` §9.4: the type data reset runs after every room of
         // the level was freed, while the level's room list still names
         // them, so the list cannot be walked here (it read freed rooms:
@@ -466,6 +468,7 @@ impl Outdoor {
         // record goes with the room: drop the records of freed rooms.
         self.rooms.retain(|&r, _| drlg.try_room(r).is_some());
         if let Some(info) = self.levels.get_mut(&l) {
+            info.flags &= !(0x20 | 0x40);
             info.grids = Default::default();
             info.vertices.clear();
             info.path_ends.clear();

@@ -129,6 +129,16 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         self.on_world(game, v, call) == LoanOut::Active(true)
     }
 
+    fn object_link(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        object: UnitId,
+        chain: u8,
+    ) -> bool {
+        self.on_world(game, v, LoanCall::ObjectLink { object, chain }) == LoanOut::Active(true)
+    }
+
     fn jerhyn_palace_active(&mut self) -> bool {
         q4::jerhyn_palace_active(&self.quests)
     }
@@ -240,6 +250,8 @@ enum LoanCall<'c> {
     },
     /// Jerhyn's palace NPC state `0x0059F580` (`world/quests-act2.md` §10).
     JerhynState { at: (i32, i32) },
+    /// Object init 13: `0x005436B0` for `chain` (`world/quests.md` §4.6).
+    ObjectLink { object: UnitId, chain: u8 },
 }
 
 /// What a [`LoanCall`] gave back.
@@ -300,6 +312,13 @@ fn on_host<'e, X: Pending, R: QuestRest>(
             quests.npc_wants_interact(&mut w, player, npc, class, interact) == Ok(true),
         ),
         LoanCall::JerhynState { at } => LoanOut::Jerhyn(q4::jerhyn_npc_state(quests, &mut w, at)),
+        // `0x00543640` finds the record; the link itself may already
+        // exist. Chain 4 on a class-61 object runs `0x00592F80` first.
+        LoanCall::ObjectLink { object, chain } => {
+            let special = (chain == 4).then_some(0x0059_2F80);
+            quests.add_link(&mut w, object, chain, special);
+            LoanOut::Active(quests.find(chain).is_some())
+        }
     }
 }
 
