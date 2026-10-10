@@ -492,8 +492,8 @@ NETS2C_GROUPS = [
     ("stat", "s2c", [0x20], 30, ["at 10 poke stat @player 0 0 40"],
      "base Strength changed by a poke: the stat update queue"),
     ("trade", "s2c", [0x58], 110,
-     ["at 4 poke goto unit 148", "at 70 poke talk @1:148 trade"],
-     "open the Akara trade window: OpenUi"),
+     ["at 4 poke goto unit 2:267", "at 70 poke operate @2:267"],
+     "operate the Rogue Encampment stash: OpenUi"),
     ("overhead", "c2s", [0x14], 30, ["at 10 send hex 14 00 00 68 69 00 00"],
      "one overhead chat text (0x14) with an empty name"),
 ]
