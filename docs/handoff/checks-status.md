@@ -9,6 +9,8 @@ Rows of 262 checks re-run 2026-10-10 by rc-run-1 on integ-r23 (`suite.py --filte
 Rows of 119 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h*,i*,j*,m*,n*,p*,r*,s*,u*,w*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`, partial: whatever finished by 12:00Z): rows replaced in place, the totals above are not recomputed.
 
 Rows of 183 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h*,i*,j*,m*,n*,p*,r*,s*,u*,w*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`, partial: whatever finished by 12:20Z): rows replaced in place, the totals above are not recomputed.
+
+Rows of 16 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, passive stats on the passiveitype layer): rows replaced in place, the totals above are not recomputed.
 88 checks, 108 channel results: DIVERGED 68, MATCH 1, PARTIAL 39.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
@@ -409,38 +411,54 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-blade-fury | state | PARTIAL | 70/70 | - | - |
 | ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | q-fix-seed-order |
 | ass-blade-shield | state | PARTIAL | 70/70 | - | - |
+| ass-blade-shield | packets | MATCH | 70/70 | - | - |
 | ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
+| ass-blades-of-ice | packets | MATCH | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
 | ass-charged-bolt-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-claws-of-thunder | state | PARTIAL | 70/70 | - | - |
+| ass-claws-of-thunder | packets | MATCH | 70/70 | - | - |
 | ass-cloak-of-shadows | state | PARTIAL | 70/70 | - | - |
+| ass-cloak-of-shadows | packets | MATCH | 70/70 | - | - |
 | ass-cobra-strike | state | PARTIAL | 70/70 | - | - |
+| ass-cobra-strike | packets | MATCH | 70/70 | - | - |
 | ass-death-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-dragon-claw | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-claw | packets | MATCH | 70/70 | - | - |
 | ass-dragon-flight | state | PARTIAL | 70/70 | - | - |
 | ass-dragon-tail | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-tail | packets | MATCH | 70/70 | - | - |
 | ass-dragon-talon | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-talon | packets | MATCH | 70/70 | - | - |
 | ass-fade | state | PARTIAL | 70/70 | - | - |
 | ass-fire-blast | state | PARTIAL | 70/70 | - | - |
 | ass-fists-of-fire | state | PARTIAL | 70/70 | - | - |
+| ass-fists-of-fire | packets | MATCH | 70/70 | - | - |
 | ass-inferno-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry-hit | state | PARTIAL | 160/160 | - | - |
 | ass-lightning-sentry-kill | state | PARTIAL | 160/160 | - | - |
 | ass-mind-blast | state | PARTIAL | 70/70 | - | - |
+| ass-mind-blast | packets | MATCH | 70/70 | - | - |
 | ass-passives | state | PARTIAL | 70/70 | - | - |
+| ass-passives | packets | MATCH | 70/70 | - | - |
 | ass-psychic-hammer | state | PARTIAL | 70/70 | - | - |
 | ass-royal-strike | state | PARTIAL | 70/70 | - | - |
+| ass-royal-strike | packets | MATCH | 70/70 | - | - |
 | ass-shadow-master | state | DIVERGED | 47/70 | frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 | unrouted |
 | ass-shadow-warrior | state | PARTIAL | 70/70 | - | - |
 | ass-shock-field | state | PARTIAL | 70/70 | - | - |
 | ass-tiger-strike | state | PARTIAL | 70/70 | - | - |
+| ass-tiger-strike | packets | MATCH | 70/70 | - | - |
 | ass-venom | state | PARTIAL | 70/70 | - | - |
+| ass-venom | packets | MATCH | 70/70 | - | - |
 | ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
 | autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
+| bar-battle-orders | packets | MATCH | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
+| bar-war-cry | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind | state | DIVERGED | 43/70 | frame 20 player 0:1 class 4, field sp: 1.14d 304 vs d2rs 256 | unrouted |
 | combat-umod-life | state | PARTIAL | 24/24 | - | - |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
