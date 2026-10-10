@@ -1,0 +1,14 @@
+check 1
+# UI draw list (PC 1 2026-10-10, local-pc1-today): Rogue Encampment arrival, then the inventory open with a short sword and a potion, the cursor over the sword (item tooltip);
+# the draw list of server tick 73 on both sides (as draws-town-arrival-ama).
+# ScnAma, -seed 1234. Under the debugger 1.14d does not draw every tick: the run
+# compares its last drawn tick <= 73 on both sides.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/ui/item-tips.md, specs/ui/inventory.md, specs/ui/text.md.
+name ui-draws-item-tip-ama
+save ScnAma --class ama --expansion --item ssd@0,0 --item hp1@2,0
+seed 1234
+ticks 76
+seconds 600
+channels draws
+draws-at 73
+input frame 40; key I; frame 44; move 430 330

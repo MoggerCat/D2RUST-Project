@@ -16,7 +16,7 @@ use super::bodies4::{
 use super::common::*;
 use super::tactics::*;
 use super::{
-    delete_thinks, idle, install, mode, request_mode_byte, state, AiHost, Ctx, ModeTarget,
+    delete_thinks, idle, install, mode, request_mode_keep_skill, state, AiHost, Ctx, ModeTarget,
     QuestCall, TickParam, UnitRef,
 };
 
@@ -715,10 +715,11 @@ fn talic<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId, p:
         let dx = a4.wrapping_mul(tx - ox) / s;
         let dy = a4.wrapping_mul(ty - oy) / s;
         let skill = cx.world.skill_entry(u, s1).map_or(s1, |e| e.0);
+        cx.world.clear_current_skill(u);
         cx.world.set_current_skill(u, skill);
         cx.world.set_path_steps(u, 1);
         // The request byte +0x15 := 100: no path (ai.md §7.1).
-        request_mode_byte(
+        request_mode_keep_skill(
             game,
             cx,
             u,
