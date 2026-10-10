@@ -902,3 +902,4 @@ Then the rest:
 
 - [rc-client-seed] Local player's client seed at game start in 1.14d: hook the roll `0x004E40A0` and the weather draws (`0x00473F50`, `0x00473E50`) and log the seed (lo, hi) before the first rain-cycle draw and at the first sound tick of `audio-town-ambience-ama` (seed 1234). Needed: after weather and sound share one seed (REC-1845), rain2 still starts at T 10 in d2rs vs T 3 in 1.14d, so the start value or the draw order before T 3 differs.
 - [q-fix-d9-arcane] (duplicate of item 62, answered → `world/quests-act2.md` §6.6)
+- [rc-frontend] Character-select paper dolls (REC-1907): `0x005066C0` builds a 0xC70-byte sprite object (class', mode, 16 component tokens via `0x0063D900` table, 16 colours); the draw/animation path (`0x00503640`, `0x00504D60`, loader) is not read yet. Needs the DCC component file names and idle frame timing from a 1.14d recording.
