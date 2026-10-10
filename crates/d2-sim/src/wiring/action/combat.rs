@@ -225,8 +225,13 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn melee_range(&self, u: UnitId) -> i32 {
         self.v.h.x.melee_range(u)
     }
+    /// A monster attacker with the path provider takes the exact test
+    /// (reach `MeleeRng` + `range` + 1 against the unit distance, then the
+    /// collision line, [`View::monster_in_melee_range`]); else the host's.
     fn in_melee_range(&self, a: UnitId, d: UnitId, range: i32) -> bool {
-        self.v.h.x.in_melee_range(a, d, range)
+        self.v
+            .monster_in_melee_range(self.game, a, d, range)
+            .unwrap_or_else(|| self.v.h.x.in_melee_range(a, d, range))
     }
     fn has_shield(&self, u: UnitId) -> bool {
         self.v.h.x.has_shield(u)
@@ -325,7 +330,16 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     }
     fn create_state_list(&mut self, u: UnitId, state: u16, owner: UnitId, expiry: i32) {
         let owner = self.game.lists.unit(owner).map(|e| (e.ty, e.guid));
-        self.v.create_state_list(u, state, owner, expiry);
+        let l = self.v.create_state_list(u, state, owner, expiry);
+        // Cold's own remove callback (`0x0057AD80`, damage.md §5.6).
+        if let (Some(l), 11) = (l, state) {
+            self.v.stats.set_remove_callback(
+                l,
+                Some(crate::stats::lists::RemoveCallback(
+                    crate::skills::use_::bodies::callback::COLD,
+                )),
+            );
+        }
     }
     fn set_state_list_stat(&mut self, u: UnitId, state: u16, stat: u16, value: i32) {
         if let Some(l) = self.v.state_list(u, state) {
