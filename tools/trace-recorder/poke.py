@@ -29,8 +29,9 @@ function returns "gap" naming it and its pc1-data.md item. Record fields the
 directives use are FIELDS (None = gap). `--forms FILE` (JSON, poke-forms-1)
 overrides both for one run. Every directive has its forms (pos, warp, item,
 stat, state: pc1-data.md Step 4 item 22 (a)-(d), stated in the owning specs).
-Any `@wp` reference is a gap too (this tool does not read the objects table's
-operate function).
+`@wp[#n]` resolves among the objects (type 2) of the 16 waypoint classes
+(world/waypoints.md §5 rule 1: the 1.14d `objects.txt` rows with operate
+function 23), as `@2:<class>` does.
 
 `msg <id> <value>...` (poke.md §1 `msg`) writes one C→S message (layout from
 specs/sim/client-messages.tsv) at S+0x300 and calls the client sender
@@ -121,6 +122,10 @@ ACT_ENV = 0x04                   # act +0x04 = environment record (render/lighti
 ENV_PERIOD, ENV_TICKS = 0x00, 0x08   # period index 0-5, ticks (render/lighting.md §9.1)
 MIS_FLAGS = 0x21                 # position given (1) | target absolute (0x20) (missiles.md §R2.1; poke.md §1)
 MIS_SIZE = 0x5C                  # parameter record size (missiles.md §R2.1)
+# Waypoint object classes: objects.txt rows with OperateFn 23 in 1.14d
+# (world/waypoints.md §5 rule 1).
+WP_CLASSES = frozenset((119, 145, 156, 157, 237, 238, 288, 323, 324, 398, 402,
+                        429, 494, 496, 511, 539))
 OBJECT_TYPE = 2                  # unit type of objects (poke.md §1 `object`)
 OBJECT_FLAGS = 1                 # allocation flags 1 = SUNIT_Add (sim/units.md §3.1 step 8)
 SPAWN_MODE = 1                   # monster mode 1 (original-hooks-spawn.md §2 rule 6)
@@ -1148,7 +1153,8 @@ def resolve_unit(mem, game, ref):
     if ref.kind == "player":
         u = player_of(mem, game)
     elif ref.kind == "wp":
-        raise Gap("@wp needs the objects table's operate function; not read by poke.py")
+        us = [x for x in units_of(mem, game, OBJECT_TYPE) if x[1] in WP_CLASSES]
+        u = us[ref.n][2] if ref.n < len(us) else 0
     elif ref.kind == "guid":
         u = find_unit(mem, game, ref.type, ref.guid)
     else:
@@ -2262,8 +2268,8 @@ def selftest(repo):
             n += 1
     try:
         resolve_unit(m, game, parse_ref("@wp", 1))
-        raise AssertionError("@wp resolved")
-    except Gap:
+        raise AssertionError("@wp resolved with no waypoint object")
+    except Unresolved:
         n += 1
     assert resolve_pos(m, game, Pos("x", 3)) == 5003 and resolve_pos(m, game, Pos("y", -10)) == 3990
     try:
