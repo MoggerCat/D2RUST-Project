@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–272 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 273–282 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 283–325 |
-|   4. Queued movement and action messages | 326–413 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 414–444 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 445–475 |
-|   7. Other unit messages (general handlers, act at receive) | 476–611 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 612–762 |
-| Constants & data dependencies | 763–774 |
-| Randomness | 775–782 |
-| Edge cases & original bugs | 783–805 |
-| Test vectors | 806–856 |
-| Provenance | 857–908 |
-| Open questions | 909–954 |
+|   1. Unit add | 77–276 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 277–286 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 287–329 |
+|   4. Queued movement and action messages | 330–417 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 418–448 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 449–479 |
+|   7. Other unit messages (general handlers, act at receive) | 480–615 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 616–766 |
+| Constants & data dependencies | 767–778 |
+| Randomness | 779–786 |
+| Edge cases & original bugs | 787–809 |
+| Test vectors | 810–860 |
+| Provenance | 861–912 |
+| Open questions | 913–958 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -187,7 +187,11 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
       (byte `+0x06` bit 3) is clear: path settings `0x00649560(unit, 1)`,
       `0x00649190(unit, 5)`, `0x00648C30(path, 0x8000)`.
    5. Current frame `+0x44` := rnd(`+0x48`) from the unit seed `+0x20`
-      (`0x0045C3E0`, `sim/rng.md` range rule).
+      (`0x0045C3E0`, `sim/rng.md` range rule). A later mode set to the
+      same mode keeps it (`0x00624690` restarts only a new mode,
+      `client/model.md` §19 r1): recorded, `draws-fire-bolt-sor`'s
+      poke-spawned cow (NU, 10 frames, speed 128) reads +0x44 = 1192 at
+      tick 11 and +128 every tick after, through its NU sets.
    6. Unit flags (`+0xC4`): 0x2 := `monstats2` `isSel` (byte `+4`
       bit 3); 0x20 := not `shadow` (byte `+5` bit 6); 0x8 set; 0x4 :=
       `isAtt` (byte `+5` bit 1).

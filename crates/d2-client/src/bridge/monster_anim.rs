@@ -81,9 +81,19 @@ pub fn rate_of(u: &ClientUnit, inputs: &ModelInputs, total: impl Fn(u16) -> i32)
     }
 }
 
-/// The mode set's animation part (`0x00624690` → `0x00624390`): frame
-/// := 0, count := the mode's AnimData frames << 8, speed := [`rate`].
+/// The mode set's animation part (`0x00624690`, `sim/units.md` §4.1):
+/// the unit's own mode again restarts nothing (frame, count and rate
+/// kept); a new mode runs the restart [`mode_restart`].
 pub fn mode_set(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
+    if w.units.get(&key).is_some_and(|u| u.mode == mode) {
+        return;
+    }
+    mode_restart(w, inputs, key, mode);
+}
+
+/// The animation restart `0x00624390` with mode := `mode`: frame := 0,
+/// count := the mode's AnimData frames << 8, speed := [`rate`].
+pub fn mode_restart(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
     let Some(u) = w.units.get_mut(&key) else {
         return;
     };
@@ -234,6 +244,23 @@ mod tests {
             let want = (192 * (t - 32) / 256) % 8;
             assert_eq!(w.units[&key].frame >> 8, want, "tick {t}");
         }
+    }
+
+    // Covers: specs/client/model.md §19 r1
+    #[test]
+    fn the_same_mode_again_keeps_the_frame() {
+        // `0x00624690`: no restart for the unit's own mode. Recorded
+        // (`draws-fire-bolt-sor`): a poke-spawned cow's NU frame runs on
+        // from its rolled start through the later NU sets.
+        let (mut w, inputs, key) = kashya();
+        mode_set(&mut w, &inputs, key, 1);
+        w.units.get_mut(&key).unwrap().frame = 5 << 8;
+        mode_set(&mut w, &inputs, key, 1);
+        assert_eq!(w.units[&key].frame, 5 << 8);
+        mode_restart(&mut w, &inputs, key, 1);
+        assert_eq!(w.units[&key].frame, 0);
+        mode_set(&mut w, &inputs, key, 2);
+        assert_eq!(w.units[&key].frame_count, 8 << 8);
     }
 
     // Covers: specs/sim/units.md §4.7
