@@ -953,6 +953,22 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     fn aura_fill(&mut self, game: &mut Game, unit: UnitId, s: i32, skill: i32, level: i32) {
         self.aura_fill_from(game, unit, unit, s, skill, level);
     }
+    /// `0x00554DE0(game, O, unit)` (`skills/bodies.md` §2.11): a monster
+    /// stands for its minion owner (`0x0058F0D0`); the same unit after
+    /// that is an ally, else the host's party test.
+    fn ally_test(&self, game: &Game, owner: UnitId, unit: UnitId) -> bool {
+        let stand_for = |u: UnitId| {
+            self.h
+                .ai
+                .as_ref()
+                .and_then(|s| s.control(u))
+                .and_then(|c| c.minion_owner)
+                .and_then(|r| game.lists.find_unit(r.ty, r.guid))
+                .unwrap_or(u)
+        };
+        let (a, b) = (stand_for(owner), stand_for(unit));
+        a == b || self.h.x.allied(a, b)
+    }
     /// `shout_state(game, T, src, skill, L)` (`0x005D8290`,
     /// `skills/bodies.md` §6.8): the state list of `aurastate` on T
     /// (created with `src` as owner, flags 2, expiry F + `auralencalc` on

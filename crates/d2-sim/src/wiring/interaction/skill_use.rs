@@ -1277,6 +1277,30 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
             return;
         }
+        // `0x0058EF40(control, params)` (`monsters/ai.md` §8): the command
+        // {type, x, y, tx, ty} inserted before the current one, which it
+        // becomes (the Blade Sentinel's walk, `bodies-2.md` §4.11 step 7).
+        if let bodies::BodyEffect::AiCommand {
+            m,
+            kind,
+            x,
+            y,
+            tx,
+            ty,
+        } = e
+        {
+            if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+                let at = c.cur.min(c.commands.len());
+                c.commands.insert(
+                    at,
+                    crate::monsters::ai::AiCommand {
+                        params: [kind, x, y, tx, ty],
+                    },
+                );
+                c.cur = at;
+                return;
+            }
+        }
         if let bodies::BodyEffect::WaitThink { m, frames } = e {
             let game = &mut *self.cv.game;
             crate::monsters::ai::delete_thinks(game, m);

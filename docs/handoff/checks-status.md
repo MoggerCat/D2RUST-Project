@@ -415,7 +415,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ama-strafe | state | PARTIAL | 70/70 | - | - |
 | ama-valkyrie | state | PARTIAL | 70/70 | - | - |
 | ass-blade-fury | state | PARTIAL | 70/70 | - | - |
-| ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | {'area': 'act1-town, seed order, client critters, NPC tracks', 'session': 'session_01JhQc4nNShp9YNmxNXpqAdx', 'branch': 'claude/q-fix-seed-order'} |
+| ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 monster 1:9 class 413, field tx: 1.14d 5148 vs d2rs 5150 | {'area': 'rendering, draw order, client path, walk-run', 'session': 'session_01KcnkwCTXbuv5ZbToEUpBSj', 'branch': 'claude/coord-resume-3'} |
 | ass-blade-shield | state | PARTIAL | 70/70 | - | - |
 | ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
@@ -453,7 +453,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
 | bar-whirlwind | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind | state | PARTIAL | 70/70 | - | - |
-| bar-whirlwind-unit | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 bytes[11]: 1.14d 1 vs d2rs 13 (id 0x69) | {'area': 'progression, potions, join packets, waypoints, act travel, death/corpse', 'session': 'session_018xX7oT4tFDSXSSE6xXgiv5', 'branch': 'claude/q-fix-join-items'} |
+| bar-whirlwind-unit | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind-unit | state | DIVERGED | 59/70 | frame 21 player 0:1 class 4, field fr: 1.14d 0 vs d2rs 5120 | unrouted |
 | combat-arrow-kill | state | PARTIAL | 110/110 | - | - |
 | combat-arrow-quillrat | state | PARTIAL | 130/130 | - | - |
