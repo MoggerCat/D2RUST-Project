@@ -1422,7 +1422,11 @@ fn world_view_frame(
     // rate; the schedule's `quality` column, `tools/scenario-diff.md` §3
     // r7 step 5).
     let feed = &mut state.feed;
-    feed.set_light_quality(schedule.as_ref().and_then(|s| s.quality.get(&tick).copied()));
+    feed.set_light_quality(
+        schedule
+            .as_ref()
+            .and_then(|s| s.quality.get(&tick).copied()),
+    );
     bridge
         .0
         .light_frame(|w, lights| feed.light_frame(w, lights));
