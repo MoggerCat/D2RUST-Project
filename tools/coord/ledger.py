@@ -10,7 +10,7 @@ Parts: docs/handoff/ledger/<part>.tsv (one per ledger session), format
 `ledger 1`: line 1 `#ledger 1`, line 2 the header (COLS below), tab-separated.
 Cells: kind entity|system|message|ui|content; last_verdict MATCH|PARTIAL|
 DIVERGED@frame|-; exercised yes|no|?; provisional a count; needs_pc1 y|n;
-state EQUAL|DIVERGED|NO-CHECK|NOT-IMPLEMENTED|UNKNOWN; size S (<2 session-
+state EQUAL|DIVERGED|NO-CHECK|NOT-IMPLEMENTED|UNKNOWN|NOT-APPLICABLE; size S (<2 session-
 hours) | M (2-8) | L (>8), `-` exactly for EQUAL. Fixed by the coordinator
 (docs/handoff/q-ledger-monsters-task.md on claude/q-ledger-monsters).
 Merge: rows of the coverage parts (group `coverage`) whose area is also in an
@@ -47,7 +47,9 @@ COLS = ["area", "kind", "group", "source_1.14d", "specs", "spec_status", "checks
         "last_verdict", "exercised", "provisional", "needs_pc1", "owner", "state",
         "size", "note"]
 KINDS = {"entity", "system", "message", "ui", "content"}
-STATES = ["DIVERGED", "NOT-IMPLEMENTED", "NO-CHECK", "UNKNOWN", "EQUAL"]
+# NOT-APPLICABLE: owner decision 2026-10-10 — not part of the game (e.g. network ids 1.14d never
+# sends or accepts); counted outside the 99% denominator, needs the reason in note
+STATES = ["DIVERGED", "NOT-IMPLEMENTED", "NO-CHECK", "UNKNOWN", "NOT-APPLICABLE", "EQUAL"]
 SIZES = {"S", "M", "L", "-"}
 EXERCISED = {"yes", "no", "?"}
 PC1 = {"y", "n"}
@@ -157,8 +159,10 @@ def check_row(r, repo):
         e.append(f"{at}: state '{r['state']}' not in {STATES}")
     if r["size"] not in SIZES:
         e.append(f"{at}: size '{r['size']}' not S|M|L|-")
-    elif (r["size"] == "-") != (r["state"] == "EQUAL"):
-        e.append(f"{at}: size must be '-' exactly when state is EQUAL")
+    elif (r["size"] == "-") != (r["state"] in ("EQUAL", "NOT-APPLICABLE")):
+        e.append(f"{at}: size must be '-' exactly when state is EQUAL or NOT-APPLICABLE")
+    if r["state"] == "NOT-APPLICABLE" and not r["note"]:
+        e.append(f"{at}: NOT-APPLICABLE needs the reason in note")
     if r["state"] == "UNKNOWN" and not r["note"]:
         e.append(f"{at}: UNKNOWN needs the reason in note")
     return e
@@ -276,7 +280,7 @@ def reconcile(r, repo, status):
         issues.append(f"last_verdict {r['last_verdict']} but checks say {v}")
         r["last_verdict"] = v
     v = r["last_verdict"]
-    if v.startswith("DIVERGED") and r["state"] in ("NO-CHECK", "UNKNOWN", "EQUAL"):
+    if v.startswith("DIVERGED") and r["state"] in ("NO-CHECK", "UNKNOWN", "EQUAL", "NOT-APPLICABLE"):
         issues.append(f"state {r['state']} but checks say {v}")
         r["note"] += f" [ledger.py: {r['state']} -> DIVERGED from its checks]"
         r["state"] = "DIVERGED"
@@ -284,7 +288,7 @@ def reconcile(r, repo, status):
         issues.append(f"state UNKNOWN but checks say {v}")
         r["note"] += " [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL]"
         r["state"] = "NO-CHECK"
-    if r["state"] != "EQUAL" and r["size"] == "-":
+    if r["state"] not in ("EQUAL", "NOT-APPLICABLE") and r["size"] == "-":
         issues.append(f"state {r['state']} without a size")
         r["size"] = "M"
         r["note"] += " [ledger.py: size M assumed]"

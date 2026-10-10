@@ -30,17 +30,17 @@
 | Outputs / state changes | 63–67 |
 | Rules | 68–69 |
 |   1. Format `rng-raw-1` with frames and owners | 70–92 |
-|   2. Owners | 93–131 |
-|   3. The d2rs log | 132–151 |
-|   4. The 1.14d recorder (`record_rng.py --frames`) | 152–188 |
-|   5. Comparison (`rng_diff.py`) | 189–218 |
-|   6. The `rng` channel of `scenario-diff` | 219–240 |
-| Constants & data dependencies | 241–244 |
-| Randomness | 245–248 |
-| Edge cases & original bugs | 249–258 |
-| Test vectors | 259–268 |
-| Provenance | 269–273 |
-| Open questions | 274–310 |
+|   2. Owners | 93–132 |
+|   3. The d2rs log | 133–152 |
+|   4. The 1.14d recorder (`record_rng.py --frames`) | 153–189 |
+|   5. Comparison (`rng_diff.py`) | 190–219 |
+|   6. The `rng` channel of `scenario-diff` | 220–241 |
+| Constants & data dependencies | 242–245 |
+| Randomness | 246–249 |
+| Edge cases & original bugs | 250–259 |
+| Test vectors | 260–269 |
+| Provenance | 270–274 |
+| Open questions | 275–311 |
 <!-- /index -->
 
 ## Summary
@@ -112,8 +112,9 @@ and exit code (§5). Neither game changes (§3 rule 2).
    the game seed's address: d2rs takes a draw for `game` only at the
    game seed's address (it never moves); 1.14d takes a helper or setter
    at game +0xD0, and never an inline draw in the DRLG code
-   (`0x642000`–`0x643000`, `0x66B000`–`0x682000`, the `sim/rng.md` §7
-   DRLG rows), which is `other:drlg`.
+   (`0x642000`–`0x643000`, `0x66B000`–`0x682000` without `0x67A240`–`0x67A390`, the
+   charged-bolt path compute `FUN_0067a240`, whose inline draws step a missile's unit
+   seed (REC-3120); the `sim/rng.md` §7 DRLG rows), which is `other:drlg`.
 6. A 1.14d helper or setter whose seed address minus 0x20 reads as a
    server unit (type ≤ 5, unit +0xC8 bit 0x04000000) at the time of the
    draw names that unit, if a tick record lists the unit. An owner not
