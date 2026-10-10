@@ -15,6 +15,8 @@ Families (one check per table row, written under traces/checks/gen/):
   umod  one unique spawn per monumod row          (boss-kinds.poke)
   skill one right-click cast per class skill      (dru-* / bar-* / ass-*)
   shrine one shrine operated per reachable shrines.txt row
+  ui    one UI scenario (a panel opened by key, a hover tip, the control panel) per group of
+        system.ui ledger rows: draws channel, input script, compared at a fixed tick
   obj   one object created and operated per objects.txt row (interact-operate-*)
   itemq the same items at each quality (low .. crafted) over three game seeds
   aud   one audio-diff scenario per reachable system.audio ledger row group (channel
@@ -41,7 +43,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -639,6 +641,88 @@ def fam_state(ctx):
     return out
 
 
+# ---- ui family: system.ui rows (specs/ui/*.md sections) by the scenario that draws them.
+# Each scenario: (name, title, input script, ticks, draws-at, pokes/sends, ledger row patterns).
+# A pattern is a regex on the area after "system.ui."; a row joins the first scenario that lists
+# it, and the check's `ledger_rows` list holds every row the scenario exercises (rows can be in
+# several scenarios: ui_rows() returns them all).  The compare is the draws channel's: the draw
+# list of the last tick <= draws-at on both sides (specs/tools/scenario-diff.md section 3 rule 7).
+UI_ITEM = ["at 4 poke seed-game 0x00001234 666",
+           "at 4 poke item hp1 @x+1 @y",
+           "at 8 send PickItem type=4 id=@4 cursor=0",
+           "at 12 send InsertItemInBuffer item=@4 x=0 y=0 page=0"]
+UI_SCENARIOS = [
+    ("inv", "inventory panel (key I) open, empty", "frame 20; key I", 60, 58, [],
+     [r"inventory\.(1|6|7|b5)-", r"panels\.(1|4|7|9)-", r"panels-2\.18-", r"controls\.(1|3|4|b4)-",
+      r"text\.(1|2|3|4|5|6|7|11)-"]),
+    ("inv-item", "inventory panel with one potion, cursor over it (tip)", "frame 30; key I; frame 40; move 432 330", 70, 68,
+     UI_ITEM,
+     [r"inventory\.(2|3|4|5|8|9)-", r"item-tips\.(1|2|3|4|5|6|7|8|10)-", r"text\.8-", r"panels-3\.23-"]),
+    ("beltuse", "potion in the belt used with key 1", "frame 30; key 1", 50, 0,
+     ["at 4 poke seed-game 0x00001234 666", "at 4 poke item hp1 @x+1 @y",
+      "at 8 send PickItem type=4 id=@4 cursor=0", "at 12 send ItemToBelt item=@4 slot=0"],
+     [r"controls\.7-"]),
+    ("walkclick", "left click and right click on the ground (walk, cast)", "frame 20; click 500 300; frame 60; rclick 300 300",
+     100, 0, [], [r"controls\.6-"]),
+    ("stash", "stash opened by clicking the chest", "frame 20; click 268 226", 130, 128, [],
+     [r"panels\.11-", r"panels-2\.20-"]),
+    ("npc", "Akara's menu and intro text (click her)", "frame 20; clickunit 1 148", 200, 198, [],
+     [r"panels\.14-", r"panels-2\.14-", r"menus\.2-", r"messages\.(6|7|13|14)-", r"text\.10-"]),
+    ("char", "character panel (key C)", "frame 20; key C", 60, 58, [],
+     [r"panels\.8-", r"panels-2\.17-", r"controls\.3-"]),
+    ("skill", "skill tree (key T)", "frame 20; key T", 60, 58, [],
+     [r"panels\.10-", r"panels-2\.19-", r"controls\.3-"]),
+    ("automap", "automap (key TAB) in the Rogue Encampment", "frame 20; key TAB", 60, 58, [],
+     [r"automap\.(1|2|3|4|5|6|8|9|10|11|13|14)-", r"controls\.3-"]),
+    ("belt", "belt rows opened (key `)", "frame 20; key 0xC0", 60, 58, [],
+     [r"control-panel\.(5|9)-", r"controls\.3-"]),
+    ("cube", "Horadric Cube opened (right click on the inventory cube)", "frame 20; key I; frame 30; rclick 446 345", 70, 68, [],
+     [r"panels\.12-", r"panels-2\.20-"]),
+    ("hud", "control panel at rest in town", "", 60, 58, [],
+     [r"control-panel\.(1|2|3|4|6|7)-", r"panels\.6-"]),
+    ("wp", "waypoint menu (walk to the Act I waypoint and click it)",
+     "frame 20; click 700 300; frame 80; click 650 300", 170, 168, [],
+     [r"menus\.1-", r"panels\.13-", r"panels-3\.26-"]),
+]
+
+
+UI_CHANNELS = {"beltuse": "packets", "walkclick": "packets"}
+UI_SAVE = {}
+
+
+def ui_rows(ledger):
+    """ledger areas system.ui.* -> {scenario name: [areas]}"""
+    rows = {}
+    for a, _ in ledger:
+        if not a.startswith("system.ui."):
+            continue
+        tail = a[len("system.ui."):]
+        for name, _, _, _, _, _, pats in UI_SCENARIOS:
+            if any(re.match(p, tail) for p in pats):
+                rows.setdefault(name, []).append(a)
+    return rows
+
+
+def fam_ui(ctx):
+    """One check per UI scenario; the ledger rows it exercises are named in its header and joined
+    by resolve_area (the first row; the rest in the check's comment)."""
+    areas = load_ledger(ctx.ledger) if ctx.ledger else []
+    rows = ui_rows(areas)
+    out = []
+    for name, title, inp, ticks, at, pokes, _ in UI_SCENARIOS:
+        lines = list(pokes) + ([f"input {inp}"] if inp else [])
+        chans = UI_CHANNELS.get(name, "draws")
+        c = Check(f"gen-ui-{name}", "ui", f"ui scenario {name}", title,
+                  "SceSor --class sor --expansion", ticks, 900, chans,
+                  (["draws-at %d" % at] if chans == "draws" else []) + lines,
+                  comment=[f"UI scenario {name}: {title}; input `{inp or '(none)'}`. Compared: the "
+                           "channel(s) named above (draws: the draw list of the last drawn tick <= draws-at). Ledger rows exercised: "
+                           + (", ".join(a[len("system.ui."):] for a in rows.get(name, [])) or "(none)") + "."])
+        c.extra = {"scenario": name, "rows": rows.get(name, [])}
+        out.append(c)
+    return out
+
+
 def fam_obj(ctx):
     """One object of every objects.txt row (the Id column; the 143 rows
     without a ledger area are generated too, area `-`): created next to the
@@ -875,8 +959,51 @@ def fam_render(ctx):
     return out
 
 
+def fam_monskill(ctx):
+    """One check per monster skill row (skills.txt, charclass blank) that has a ledger row
+    `skill.monster.<slug>`: a monster class that lists the skill in monstats Skill1..8 (first
+    enabled non-boss class, else the lowest enabled) is spawned next to the player in the Blood
+    Moor; its AI picks and casts the skill on its own (specs/skills/monster-skills.md)."""
+    sk = excel(ctx.excel, "skills.txt", ["skill", "Id", "charclass"])
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx", "enabled", "boss"] +
+               [f"Skill{k}" for k in range(1, 9)])
+    wanted = {a[len("skill.monster."):] for a, _ in load_ledger(ctx.ledger)
+              if a.startswith("skill.monster.") and a != "skill.monster.table"}
+    users = {}
+    for r in ms.rows:
+        hc = ms.get(r, "hcIdx")
+        if not hc.isdigit():
+            continue
+        key = (ms.get(r, "enabled") != "1", ms.get(r, "boss") == "1", int(hc))
+        for k in range(1, 9):
+            n = ms.get(r, f"Skill{k}")
+            if n:
+                users.setdefault(n, []).append((key, int(hc), ms.get(r, "Id"), k))
+    out = []
+    for r in sk.rows:
+        name = sk.get(r, "skill")
+        if sk.get(r, "charclass") or not name or slug(name) not in wanted:
+            continue
+        sid = int(sk.get(r, "Id"))
+        if name not in users:
+            raise GenError(f"monster skill {name} ({sid}) is used by no monstats row")
+        _, hc, ident, slot = min(users[name])
+        c = spawn_check(f"gen-monskill-{sid}", "monskill", f"skills.txt Id {sid}",
+                        f"monster skill {name} ({sid}), class {hc} {ident}",
+                        f"spawn {hc} @x+3 @y-2 normal",
+                        [f"Monster skill {name} (skill {sid}): class {hc} ({ident}, monstats "
+                         f"Skill{slot}) spawned normal next to the player; its AI casts the "
+                         "skill on its own (the cast is compared, not forced)."], ticks=500)
+        c.save = "ScnAma --class ama --expansion --level 70"
+        c.comment.append("Expansion character, level 70: it outlives the first seconds, so the AI "
+                         "gets many think frames to pick the skill.")
+        c.extra = {"skill": sid, "slug": slug(name), "class": hc}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill}
 
 
 # ----------------------------------------------------------- ledger join
@@ -938,8 +1065,13 @@ def resolve_area(c, areas):
     elif f == "mon":
         pick = [a for a, s in areas if a.startswith("monster.")
                 and s.endswith(f"(hcIdx {x['class']})")]
+    elif f == "monskill":
+        pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
+    elif f == "ui":
+        c.area = ",".join(x["rows"]) if x["rows"] else "-"
+        return
     elif f == "aud":
         c.area = ",".join(x["areas"])
         return

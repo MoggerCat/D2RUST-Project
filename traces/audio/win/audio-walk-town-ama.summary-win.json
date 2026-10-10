@@ -1,0 +1,379 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 31,
+  "d2rs": 37,
+  "matched": 5,
+  "differences": 69,
+  "first": {
+   "tick": 0,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0; 1.14d starts no voice with these samples"
+  },
+  "by_kind": {
+   "voice": 6,
+   "variant": 5,
+   "dev_pan": 16,
+   "dev_vol": 21,
+   "tick": 21
+  },
+  "partial": [
+   "DATA\\GLOBAL\\SFX\\ambient\\scene\\wilderness day 2.wav at T 0: partial: the capture holds 655360 of 671432 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 119,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "audio-walk-town-ama",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 8,
+   "what": "variant",
+   "text": "T 8: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 13,
+   "what": "variant",
+   "text": "T 13: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 18,
+   "what": "variant",
+   "text": "T 18: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 22,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 22: dev_pan 1.14d 0, d2rs -1746"
+  },
+  {
+   "tick": 22,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 22: dev_vol 1.14d 0, d2rs -1271"
+  },
+  {
+   "tick": 22,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 27, d2rs at T 22"
+  },
+  {
+   "tick": 27,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 27: dev_pan 1.14d -3253, d2rs 0"
+  },
+  {
+   "tick": 27,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 27: dev_vol 1.14d -1397, d2rs 0"
+  },
+  {
+   "tick": 27,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 30, d2rs at T 27"
+  },
+  {
+   "tick": 30,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 30: dev_pan 1.14d -2124, d2rs -3253"
+  },
+  {
+   "tick": 30,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 30: dev_vol 1.14d -722, d2rs -1017"
+  },
+  {
+   "tick": 30,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 30: dev_vol 1.14d -914, d2rs -996"
+  },
+  {
+   "tick": 30,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 46, d2rs at T 30"
+  },
+  {
+   "tick": 30,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 38, d2rs at T 30"
+  },
+  {
+   "tick": 35,
+   "what": "variant",
+   "text": "T 35: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 38,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 38: dev_pan 1.14d 328, d2rs -2124"
+  },
+  {
+   "tick": 38,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 38: dev_vol 1.14d -804, d2rs -914"
+  },
+  {
+   "tick": 38,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 57, d2rs at T 38"
+  },
+  {
+   "tick": 41,
+   "what": "variant",
+   "text": "T 41: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 46,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 46: dev_pan 1.14d -1447, d2rs 328"
+  },
+  {
+   "tick": 46,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 46: dev_pan 1.14d 328, d2rs -1650"
+  },
+  {
+   "tick": 46,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 46: dev_vol 1.14d -1214, d2rs -722"
+  },
+  {
+   "tick": 46,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 46: dev_vol 1.14d -762, d2rs -839"
+  },
+  {
+   "tick": 46,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 51, d2rs at T 46"
+  },
+  {
+   "tick": 46,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 51, d2rs at T 46"
+  },
+  {
+   "tick": 51,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 51: dev_pan 1.14d -1197, d2rs 328"
+  },
+  {
+   "tick": 51,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 51: dev_vol 1.14d -730, d2rs -762"
+  },
+  {
+   "tick": 51,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 59, d2rs at T 51"
+  },
+  {
+   "tick": 54,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 54: dev_pan 1.14d 328, d2rs -1344"
+  },
+  {
+   "tick": 54,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 54: dev_vol 1.14d -857, d2rs -770"
+  },
+  {
+   "tick": 54,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 62, d2rs at T 54"
+  },
+  {
+   "tick": 57,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 57: dev_vol 1.14d -894, d2rs -804"
+  },
+  {
+   "tick": 57,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 67, d2rs at T 57"
+  },
+  {
+   "tick": 62,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 62: dev_pan 1.14d 328, d2rs -1119"
+  },
+  {
+   "tick": 62,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 62: dev_pan 1.14d -920, d2rs 328"
+  },
+  {
+   "tick": 62,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 62: dev_vol 1.14d -1017, d2rs -699"
+  },
+  {
+   "tick": 62,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 62: dev_vol 1.14d -1040, d2rs -857"
+  },
+  {
+   "tick": 62,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 78, d2rs at T 62"
+  },
+  {
+   "tick": 62,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 72, d2rs at T 62"
+  },
+  {
+   "tick": 67,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 67: dev_vol 1.14d -1074, d2rs -894"
+  },
+  {
+   "tick": 67,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 83, d2rs at T 67"
+  },
+  {
+   "tick": 70,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 70: dev_pan 1.14d 328, d2rs -961"
+  },
+  {
+   "tick": 70,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 70: dev_vol 1.14d -954, d2rs -640"
+  },
+  {
+   "tick": 70,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 73, d2rs at T 70"
+  },
+  {
+   "tick": 73,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 73: dev_pan 1.14d -775, d2rs 328"
+  },
+  {
+   "tick": 73,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 73: dev_vol 1.14d -565, d2rs -954"
+  },
+  {
+   "tick": 73,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 80, d2rs at T 73"
+  },
+  {
+   "tick": 78,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 78: dev_pan 1.14d -348, d2rs -809"
+  },
+  {
+   "tick": 78,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 78: dev_vol 1.14d -762, d2rs -578"
+  },
+  {
+   "tick": 78,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 78: dev_vol 1.14d -1200, d2rs -1017"
+  },
+  {
+   "tick": 78,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 114, d2rs at T 78"
+  },
+  {
+   "tick": 78,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 94, d2rs at T 78"
+  },
+  {
+   "tick": 83,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 83: dev_pan 1.14d -595, d2rs 328"
+  },
+  {
+   "tick": 83,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 83: dev_vol 1.14d -885, d2rs -1074"
+  },
+  {
+   "tick": 83,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 93, d2rs at T 83"
+  },
+  {
+   "tick": 86,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 86: dev_pan 1.14d 328, d2rs -695"
+  },
+  {
+   "tick": 86,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 86: dev_vol 1.14d -1135, d2rs -527"
+  },
+  {
+   "tick": 86,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 89, d2rs at T 86"
+  },
+  {
+   "tick": 89,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 89; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 94,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 94: dev_vol 1.14d -1256, d2rs -1200"
+  },
+  {
+   "tick": 94,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 99, d2rs at T 94"
+  },
+  {
+   "tick": 94,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 94; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 99,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 99: dev_pan 1.14d -492, d2rs 328"
+  },
+  {
+   "tick": 99,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 99: dev_vol 1.14d -426, d2rs -1256"
+  },
+  {
+   "tick": 99,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 101, d2rs at T 99"
+  },
+  {
+   "tick": 102,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 102; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 110,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 110; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 118,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 118; 1.14d starts no voice with these samples"
+  }
+ ]
+}

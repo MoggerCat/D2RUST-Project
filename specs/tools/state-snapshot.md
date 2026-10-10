@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–164 |
-|   4. Comparison | 165–191 |
-| Constants & data dependencies | 192–195 |
-| Randomness | 196–199 |
-| Edge cases & original bugs | 200–218 |
-| Test vectors | 219–228 |
-| Provenance | 229–233 |
-| Open questions | 234–239 |
+|   3. Snapshot point and frame | 128–167 |
+|   4. Comparison | 168–194 |
+| Constants & data dependencies | 195–198 |
+| Randomness | 199–202 |
+| Edge cases & original bugs | 203–221 |
+| Test vectors | 222–231 |
+| Provenance | 232–236 |
+| Open questions | 237–242 |
 <!-- /index -->
 
 ## Summary
@@ -156,11 +156,14 @@ Unit = the unit record; path = unit +0x2C.
    server's point instead of sending 0x5F that would walk the player
    back (before: the d2rs player turned from mode 5 to 1 (`milestone-*`)
    or from 5 to 6 (`combat-cold-plains-wp`) at the first 0x96 after a
-   server-side move; first divergences D3 of the ledger). PROVISIONAL
-   (REC-1385): the 1.14d code that moves the client player after a
-   `pos` poke is not found (no S→C message, no call of `0x00650BE0`,
-   `0x00650910` or `0x004654C0` in that window); the model reproduces
-   the observed positions, not the mechanism.
+   server-side move; first divergences D3 of the ledger). Settled
+   (REC-1385, 2026-10-10, PC 1 today): the 1.14d mechanism is the
+   single-player server copy `0x00465070` at the end of every client
+   unit update (`client/model.md` §5 r7: the client unit takes the
+   server unit's path through the forced placement `0x00650C20`, hence
+   no S→C message and no call of `0x00650BE0`, `0x00650910` or
+   `0x004654C0`). The d2rs writer still reproduces the positions by
+   prediction, not by that copy (PROVISIONAL REC-2416 there).
 
 ### 4. Comparison
 
