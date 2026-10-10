@@ -15,7 +15,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 30 | 3 | 0 | 27 | 0 | 0 | 9 | 18 | 3 | 64.5–162+ | 0 | 2 / 0 / 28 |
 | items | 721 | 33 | 0 | 60 | 0 | 628 | 27 | 66 | 0 | 145.5–582 | 89 | 640 / 0 / 81 |
-| monsters | 640 | 305 | 0 | 179 | 0 | 156 | 3 | 487 | 0 | 975.5–3902 | 4 | 327 / 246 / 67 |
+| monsters | 640 | 305 | 0 | 179 | 0 | 156 | 3 | 481 | 0 | 963.5–3854 | 4 | 327 / 246 / 67 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | q-chk-render-ui | 12 | 10 | 0 | 2 | 0 | 0 | 5 | 5 | 2 | 28.5–50+ | 0 | 10 / 0 / 2 |
 | rc-client-seed-2 | 2 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 2.5–10 | 0 | 2 / 0 / 0 |
@@ -29,7 +29,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | skills | 590 | 55 | 0 | 534 | 0 | 1 | 436 | 153 | 0 | 524–2096 | 6 | 494 / 84 / 12 |
 | systems | 913 | 209 | 46 | 579 | 0 | 79 | 205 | 626 | 3 | 1378.5–5418+ | 293 | 263 / 0 / 650 |
 | world | 824 | 125 | 0 | 585 | 0 | 114 | 529 | 176 | 5 | 656.5–2466+ | 300 | 700 / 46 / 78 |
-| **all** | 4449 | 960 | 46 | 2186 | 269 | 988 | 1501 | 1953 | 13 | 4760.5–18626+ | 692 | 3066 / 454 / 929 |
+| **all** | 4449 | 960 | 46 | 2186 | 269 | 988 | 1501 | 1947 | 13 | 4748.5–18578+ | 692 | 3066 / 454 / 929 |
 
 ## By family
 
@@ -653,7 +653,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `item.unique` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `level` | 136 | 26 | 0 | 15 | 0 | 95 | 15 | 13 | 28 | 0 | 136 | 5 |
 | `missile` | 299 | 5 | 0 | 294 | 0 | 0 | 175 | 293 | 6 | 0 | 0 | 4 |
-| `monster` | 651 | 313 | 0 | 182 | 0 | 156 | 51 | 4 | 496 | 1 | 4 | 247 |
+| `monster` | 651 | 313 | 0 | 182 | 0 | 156 | 51 | 4 | 490 | 1 | 4 | 247 |
 | `net.c2s` | 113 | 12 | 9 | 14 | 0 | 78 | 0 | 31 | 4 | 0 | 27 | 0 |
 | `net.s2c` | 183 | 53 | 21 | 82 | 0 | 27 | 1 | 154 | 2 | 0 | 1 | 0 |
 | `npc` | 48 | 18 | 0 | 30 | 0 | 0 | 0 | 9 | 39 | 0 | 43 | 34 |
@@ -4596,12 +4596,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.maggotbaby4` | entity | EQUAL | - | MATCH | no | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.maggotbaby5` | entity | EQUAL | - | MATCH | no | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.maggotbaby6` | entity | EQUAL | - | MATCH | no | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
-| `monster.maggotegg1` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
-| `monster.maggotegg2` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
-| `monster.maggotegg3` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
-| `monster.maggotegg4` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
-| `monster.maggotegg5` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
-| `monster.maggotegg6` | entity | EQUAL | M | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg1` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg2` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg3` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg4` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg5` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
+| `monster.maggotegg6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state 150/150 frames equal, rng channel MATCH (egg hatch: Near spawn, KillBy, DeadFootprint, init skill levels); was DIVERGED@41 on seed |
 | `monster.minion1` | entity | EQUAL | - | MATCH | yes | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.minion10` | entity | EQUAL | - | MATCH | no | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.minion11` | entity | EQUAL | - | MATCH | no | 0 | n | - | - | spawn + 150 ticks: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
