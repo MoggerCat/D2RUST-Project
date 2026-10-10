@@ -1,0 +1,46 @@
+{
+ "channel": "state",
+ "check": "gen-npc-natalya",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "50",
+  "--auto",
+  "ScnAm3",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto unit 1:297",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:297",
+  "--send",
+  "16 InitEntityChat id=@1:297",
+  "--send",
+  "18 TerminateEntityChat id=@1:297"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "eaf0c721e36876bccea7536f4d388a2d418730d279991f16986b3f0a76b66b99",
+   "size": 576801
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "7fbec91ea4c57087f5101231871e8a36c2d5cd2e7cb621645df8a9d79329880a",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "162feeda99dba3863626f49614928844687e4b2eb2618576ec9ea3f4e1addba6"
+ }
+}
