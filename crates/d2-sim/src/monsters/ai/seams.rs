@@ -151,6 +151,9 @@ pub trait AiModes {
     fn stop_path(&mut self, unit: UnitId);
     /// Current skill := `skill`; false when the id is out of range.
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool;
+    /// The request builder `0x005A7E60` clears the current skill
+    /// (`0x00620210(unit, 0)`): a plain mode request has no used skill.
+    fn clear_current_skill(&mut self, _unit: UnitId) {}
     /// Unit flag 0x40 (set by `0x005DEAD0`).
     fn set_skill_flag(&mut self, unit: UnitId);
     /// `0x0046C140(class, mode)`: the class has the mode.

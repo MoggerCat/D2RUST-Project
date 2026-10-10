@@ -342,6 +342,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         self.h.x.set_current_skill(unit, skill)
     }
+    fn clear_current_skill(&mut self, unit: UnitId) {
+        self.h.x.clear_current_skill(unit);
+    }
     /// Unit flag 0x40 (`units.md` §2).
     fn set_skill_flag(&mut self, unit: UnitId) {
         if let Some(r) = self.units.get_mut(unit) {

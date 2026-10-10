@@ -780,6 +780,8 @@ pub trait Pending {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         false
     }
+    /// The used skill := none (`0x00620210(unit, 0)`).
+    fn clear_current_skill(&mut self, unit: UnitId) {}
     /// A missile parameter record's init callback with an id no spec
     /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
     /// 21).
