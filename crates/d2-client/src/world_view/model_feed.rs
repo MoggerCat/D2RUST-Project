@@ -448,6 +448,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         self.inner.follow_frame_schedule();
     }
 
+    fn level_weather(&self) -> Option<(bool, bool)> {
+        self.weather.as_ref().and_then(|w| w.level_flags())
+    }
+
     fn weather_update(&mut self, world: &ClientWorld, assets: &mut ViewAssets) {
         let local_at = self.local_at;
         let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);

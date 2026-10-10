@@ -661,10 +661,11 @@ def write_frame_schedule(raw, out):
         raise CheckError(f"{raw}: no captured frame: no frame schedule for d2rs")
     c0 = frames[0]["cursor"]
     rows = ["# frame-schedule 1", f"# cursor_last {c0['last_step']}",
-            f"# cursor_idle {c0['idle_since']}", "tick\tnow"]
+            f"# cursor_idle {c0['idle_since']}", "tick\tnow\tquality"]
     for i, r in enumerate(frames):
         now = frames[i + 1]["cursor"]["last_step"] if i + 1 < len(frames) else "-"
-        rows.append(f"{r['f']}\t{now}")
+        q = (r.get("light") or {}).get("quality")
+        rows.append(f"{r['f']}\t{now}\t{'-' if q is None else q}")
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
 

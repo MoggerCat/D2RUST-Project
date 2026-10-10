@@ -4,7 +4,9 @@
 use std::path::Path;
 
 use super::compare::{compare, compare_dirs, FactSet, Outcome, Stage};
-use super::export::{add_cycle_rows, draw_rows, frame_rows, ExportContext, FrameState, Rows};
+use super::export::{
+    add_cycle_rows, draw_rows, frame_rows, ExportContext, FrameInputs, FrameState, Rows,
+};
 use super::*;
 use crate::frames::{FrameAnchor, FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
 use crate::scene::{DrawItem, DrawKey, ItemTag};
@@ -331,6 +333,7 @@ fn exported_frame_rows_have_every_key_in_order() {
         level: None,
         camera: None,
         open_mode: Some(0),
+        inputs: FrameInputs::default(),
         draws: 3,
         index_sha256: None,
         palette_sha256: sha256_hex(&[]),

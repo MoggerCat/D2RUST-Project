@@ -191,6 +191,10 @@ pub struct FrameSchedule {
     /// Drawn tick → the clock of its cursor step (`None`: not recorded,
     /// allowed for the last frame only: its step follows the dump).
     pub frames: std::collections::BTreeMap<u64, Option<u32>>,
+    /// Drawn tick → the recorded light quality `[0x007B567C]` (a host
+    /// input: it follows the measured draw rate, `render/lighting.md` §5),
+    /// where the schedule has the column.
+    pub quality: std::collections::BTreeMap<u64, u8>,
     /// `last_step` and `idle_since` of the cursor at the first frame.
     pub cursor_last: u32,
     pub cursor_idle: u32,
@@ -235,6 +239,10 @@ impl FrameSchedule {
                 None => return Err(at("no now column")),
             };
             s.frames.insert(tick, now);
+            if let Some(q) = c.next().filter(|q| *q != "-") {
+                s.quality
+                    .insert(tick, q.parse().map_err(|_| at("quality"))?);
+            }
         }
         if !version {
             return Err("frame schedule: no `# frame-schedule 1` line".into());
@@ -1496,6 +1504,16 @@ fn world_view_frame(
                 blank_screen,
                 open_mode,
                 seq: d.seen,
+                inputs: crate::facts::export::FrameInputs {
+                    player: anchor.map(|a| {
+                        let c = a.player.client();
+                        (c.x, c.y)
+                    }),
+                    light_quality: schedule
+                        .as_ref()
+                        .and_then(|s| s.quality.get(&tick).copied()),
+                    weather: state.feed.level_weather(),
+                },
             };
             match crate::facts::export::dump(&d.request, &dir, &frame_in) {
                 Ok(()) => {
@@ -1756,6 +1774,18 @@ mod schedule_tests {
         // refused, never a fallback clock.
         let gap = text.replace("3\t6403156", "3\t-");
         assert!(FrameSchedule::parse(&gap).is_err());
+        // The optional light-quality column (a recorded host input).
+        let q = FrameSchedule::parse(
+            &text
+                .replace("tick\tnow\n", "tick\tnow\tquality\n")
+                .replace("3\t6403156", "3\t6403156\t2")
+                .replace("5\t6403281", "5\t6403281\t0"),
+        )
+        .unwrap();
+        assert_eq!(
+            (q.quality.get(&3), q.quality.get(&5), q.quality.get(&6)),
+            (Some(&2), Some(&0), None)
+        );
         assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
         assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
     }

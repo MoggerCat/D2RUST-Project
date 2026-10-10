@@ -256,6 +256,28 @@ def read_cel_header(mem, cel):
     return {"flip": flip, "w": w, "h": h, "xoff": xoff, "yoff": yoff}
 
 
+def cel_header_from_file(mem, c):
+    """The frame header of a cel op that never reaches the rasterizer (`CelDrawEx`, whose context
+    +0x3C is still null): the frame pointer table of the loaded DC6 (dirs +0x10, frames per dir
+    +0x14, pointers from +0x18; absolute after the load), then `read_cel_header`. None when the
+    context holds no plausible file or frame."""
+    try:
+        f = int(c.get("file") or "0x0", 16)
+        if f < 0x10000:
+            return None
+        dirs, fpd = struct.unpack("<II", mem.read(f + 0x10, 8))
+        d, fr = c.get("dir") or 0, c.get("frame") or 0
+        if not (0 <= d < dirs <= 64 and 0 <= fr < fpd <= 4096):
+            return None
+        ptr = struct.unpack("<I", mem.read(f + 0x18 + 4 * (d * fpd + fr), 4))[0]
+        if ptr < 0x10000:
+            return None
+        h = read_cel_header(mem, ptr)
+        return h if 0 < h["w"] <= 4096 and 0 < h["h"] <= 4096 else None
+    except (OSError, struct.error):
+        return None
+
+
 def read_dt1_list(mem, limit=4096):
     """capture.md §3.5: every loaded DT1 as (tile array, count, path)."""
     out, rec, seen = [], u32(mem, DT1_LIST), set()
@@ -589,6 +611,11 @@ def make_recorder(rt):
                     self.libs = read_dt1_list(self)
                 rec = read_draw(self, name, args, self.light_full, self.libs)
                 rec["at"] = f"{ret - 5:#x}"
+                c = rec.get("cel")
+                if name == "CelDrawEx" and c and "hdr" not in c:
+                    hdr = cel_header_from_file(self, c)
+                    if hdr:
+                        c["hdr"] = hdr
             self.draws.append(rec)
 
         def raster(self, ctx):

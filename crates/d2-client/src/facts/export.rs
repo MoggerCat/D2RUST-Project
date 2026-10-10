@@ -170,7 +170,12 @@ fn unit_row(
 /// (X, Y, light 0xFF, mode, palette / colour index), `CelDrawEx` (X, Y,
 /// skip, lines, mode) and `CelDrawClipped` (X, Y, clip, mode) carry no
 /// light and no palette (`-`).
-fn ui_cells(info: &crate::ui::draw::UiCelInfo, item: &DrawItem, text: &[MapId], row: &mut [String]) {
+fn ui_cells(
+    info: &crate::ui::draw::UiCelInfo,
+    item: &DrawItem,
+    text: &[MapId],
+    row: &mut [String],
+) {
     use crate::ui::draw::CelCall;
     let k = if info.text {
         // The glyph's colour: its text map's position + 1, else 0.
@@ -437,6 +442,16 @@ pub fn add_cycle_rows(rows: &mut Rows, blank_screen: bool, clear_after: bool) {
     }
 }
 
+/// The `frame.tsv` input cells d2rs has: the player's client position
+/// (the camera anchor), the light quality replayed from the frame schedule
+/// (a host input), the level's `Rain` / `Mud` flags.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FrameInputs {
+    pub player: Option<(i32, i32)>,
+    pub light_quality: Option<u8>,
+    pub weather: Option<(bool, bool)>,
+}
+
 /// The `frame.tsv` values d2rs knows (§5 r7–r8).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameState {
@@ -448,6 +463,9 @@ pub struct FrameState {
     pub level: Option<u16>,
     pub camera: Option<Camera>,
     pub open_mode: Option<u8>,
+    /// The inputs of the frame d2rs runs on (`frame.tsv` `player_x`,
+    /// `player_y`, `light_quality`, `rain`, `snow`).
+    pub inputs: FrameInputs,
     pub draws: usize,
     pub index_sha256: Option<String>,
     pub palette_sha256: String,
@@ -471,6 +489,11 @@ pub fn frame_rows(s: &FrameState) -> Vec<Vec<String>> {
             "unit_origin_y" => opt(cam.map(|c| i64::from(c.unit.y))),
             "open_mode" => opt(s.open_mode.map(i64::from)),
             "shift_x" => opt(cam.map(|c| i64::from(c.view.shift_x))),
+            "player_x" => opt(s.inputs.player.map(|p| i64::from(p.0))),
+            "player_y" => opt(s.inputs.player.map(|p| i64::from(p.1))),
+            "light_quality" => opt(s.inputs.light_quality.map(i64::from)),
+            "rain" => opt(s.inputs.weather.map(|w| i64::from(w.0))),
+            "snow" => opt(s.inputs.weather.map(|w| i64::from(w.1))),
             "draws" => s.draws.to_string(),
             "index_sha256" => s.index_sha256.clone().unwrap_or_else(|| UNKNOWN.into()),
             "palette_sha256" => s.palette_sha256.clone(),
@@ -540,6 +563,7 @@ pub struct DumpFrame<'a> {
     pub blank_screen: bool,
     pub open_mode: Option<u8>,
     pub seq: u64,
+    pub inputs: FrameInputs,
 }
 
 /// Writes the three files of `d` (and with `req.image` the frame's
@@ -561,7 +585,11 @@ pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), Fact
         unit_calls: &d.frame.unit_calls,
         color_rows: d.assets.color_rows,
         ui_calls: &d.frame.ui_calls,
-        text_maps: d.assets.text_colors.as_ref().map_or(&[][..], |t| &t.maps[..]),
+        text_maps: d
+            .assets
+            .text_colors
+            .as_ref()
+            .map_or(&[][..], |t| &t.maps[..]),
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();
@@ -602,6 +630,7 @@ pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), Fact
         level: d.world.local_room().map(|r| r.level),
         camera: d.frame.camera,
         open_mode: d.open_mode,
+        inputs: d.inputs,
         draws: rows.draws.len(),
         index_sha256: Some(index),
         palette_sha256: sha256_hex(&palette),
