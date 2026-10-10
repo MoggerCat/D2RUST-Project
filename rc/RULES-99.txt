@@ -23,3 +23,9 @@ A full test gate runs on integ-r23 about every 45 min; if it names your commit, 
 NEVER: edit another session's ledger part (only docs/handoff/ledger/NAME.tsv); add `ignore` lines, skip/exclude directives or comparator exceptions (rule 10: replay recorded host inputs instead, e.g. clock, frame schedule, -ns, registry); mark a row EQUAL that a fresh run doesn't prove under REC-2055/2056; force-push.
 
 UPDATE 17:00Z: if your session may only push claude/NAME (most can't push another branch), do steps 1-3 of SELF-MERGE and push claude/NAME; the merge bot rc-merger merges every claude/rc-* branch into integ-r23 within ~10 min and tells you if it conflicts (then merge integ-r23 yourself and push again). Claims the same way: commit your claim line to docs/handoff/claims.tsv on claude/NAME and push it at once, before the fix.
+
+TOKEN BUDGET (owner 17:05Z; same speed, fewer tokens):
+- Context is the cost: every turn re-reads it. After 3 causes, or once your conversation is long (roughly 300k tokens; e.g. many big tool outputs), write the hand-back, push, send "retire NAME: <next cause>" and STOP; the coordinator starts a fresh session on the next cause.
+- Never print big outputs: always `| tail -20`/`grep`, `--quiet` builds, suite `--md` to a file then grep the summary line. Don't read hand-backs/specs whole.
+- Long runs (suite, builds, nextest) in the background with a completion notification; no polling loops, no sleep.
+- Don't re-run what checks-status.md already has for the current integ head.
