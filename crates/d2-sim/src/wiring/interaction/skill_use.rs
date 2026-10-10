@@ -1142,6 +1142,25 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
             return;
         }
+        // "wait N" `0x005DE0F0(game, m, N)` (`monsters/ai-bodies-2.md`):
+        // delete the thinks and schedule one at frame + N; the mode is
+        // not changed. A fresh spawn has no uninterruptable state to clear.
+        if let bodies::BodyEffect::WaitThink { m, frames } = e {
+            let game = &mut *self.cv.game;
+            crate::monsters::ai::delete_thinks(game, m);
+            let at = game
+                .frame
+                .wrapping_add(if frames == 0 { 1 } else { frames });
+            let _ = game.schedule_event(
+                m,
+                u32::from(crate::monsters::ai::EVENT_THINK),
+                at,
+                None,
+                0,
+                0,
+            );
+            return;
+        }
         // Find Item `0x005A8000` (`treasure.md` §3.6) on the game's drop
         // state ([`super::super::action::ActionHooks::object_drops`]); a
         // game without it drops nothing. The quality value is ignored.
@@ -1651,6 +1670,47 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_point_collides(room, at, mask)
     }
     fn spawn_monster(&mut self, q: bodies::MonsterSpawn<UnitId, RoomId>) -> Option<UnitId> {
+        // `0x005B2F20` through the lent monster world (`MonsterWorld::
+        // spawn_at`, `monsters/population.md` §9): the placement and the
+        // allocation draw on the game seed as the original's creation
+        // does. Without a lent world, the host's answer.
+        if let bodies::MonsterSpawn::At {
+            room,
+            x,
+            y,
+            class,
+            mode,
+            spread,
+            flags,
+        } = q
+        {
+            let game = &mut *self.cv.game;
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let placed =
+                v.h.with_monster_world(|w, h| {
+                    w.spawn_at(
+                        &mut sim,
+                        h,
+                        room,
+                        x,
+                        y,
+                        class,
+                        u8::try_from(mode).unwrap_or(0),
+                        spread,
+                        flags as u16,
+                    )
+                })
+                .flatten();
+            if let Some(placed) = placed {
+                return placed;
+            }
+        }
         self.xm().body_spawn_monster(q)
     }
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
