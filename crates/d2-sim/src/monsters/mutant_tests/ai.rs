@@ -157,7 +157,7 @@ fn spl_end_generic_cases() {
         assert_eq!(w.thinks(), want, "{case}");
         // Every case that is not inline requests neutral, except the
         // frozen inline case, which does neither.
-        let neutral = w.logged(&at_unit(mode::NEUTRAL, mon));
+        let neutral = w.logged("mode 1 Point(0, 0)");
         assert_eq!(neutral, !inline && !frozen, "{case}");
     }
 }

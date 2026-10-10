@@ -711,7 +711,14 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    // The request carries the path's target unit (`0x00553540`, none when
+    // it is the unit itself); without one the request's point is (0, 0)
+    // (`0x005A7C20`), so the path target becomes (0, 0).
+    let target = match cx.world.path_target(unit) {
+        Some(t) if t != unit => ModeTarget::Unit(t),
+        _ => ModeTarget::Point(0, 0),
+    };
+    request_mode(game, cx, unit, mode::NEUTRAL, target);
 }
 
 /// Installing an AI `0x005B0E00` (§3.3).

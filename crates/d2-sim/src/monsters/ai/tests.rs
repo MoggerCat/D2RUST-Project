@@ -1434,11 +1434,20 @@ fn mode_end_inline_think() {
     w.fake.states.insert((mon, state::FREEZE));
     w.with(|g, cx| mode_end(g, cx, mon, mode::RUN));
     assert!(w.thinks().is_empty());
-    // An attack end requests neutral.
+    // An attack end requests neutral at the path's target point (0, 0)
+    // when the path has no target unit (`0x00553540`, 0x005A8030).
     let mut w = World::new(monstats(1, [0; 5], 15));
     let mon = w.mon;
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
-    assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
+    // With a target unit the request carries it; the unit itself counts
+    // as none.
+    w.fake.path_target = Some(UnitId(77));
+    w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
+    assert_eq!(last_mode(&w), "mode 1 Unit(UnitId(77))");
+    w.fake.path_target = Some(mon);
+    w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
 }
 
 // Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1

@@ -86,13 +86,19 @@ pub fn velocity_percent(t: &PathTables, f: &VelocityFacts, mode: u32) -> Option<
     Some((e + f.velocitypercent).max(VELOCITY_PERCENT_FLOOR))
 }
 
-/// The facts of [`velocity_percent`] read through the walk seams.
-fn facts<U: WalkUnits + ?Sized>(t: &PathTables, u: &U, unit: UnitId) -> VelocityFacts {
-    let ty = u.unit_type(unit);
+/// The facts of [`velocity_percent`] read through the walk seams, for
+/// the unit's own (type, class) or the draw identity `ident`.
+fn facts<U: WalkUnits + ?Sized>(
+    t: &PathTables,
+    u: &U,
+    unit: UnitId,
+    ident: Option<(UnitType, u32)>,
+) -> VelocityFacts {
+    let (ty, class) = ident.unwrap_or_else(|| (u.unit_type(unit), u.class(unit)));
     let [_, _, scale_stat] = t.animstat[4];
     VelocityFacts {
         ty,
-        class: u.class(unit),
+        class,
         npc: ty == UnitType::Monster && u.monstats_velocity(unit).1,
         used_flags: u.used_skill(unit).map(|s| s.skill_flags),
         item_fastermove: u.item_stat(unit, scale_stat as u16),
@@ -111,14 +117,31 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
     mode: u32,
 ) -> Option<i32> {
     let ty = u.unit_type(unit);
-    if (ty == UnitType::Player && mode == 19) || (ty == UnitType::Monster && mode == 13) {
-        return Some(KNOCKBACK_VELOCITY);
-    }
-    let p = velocity_percent(t, &facts(t, u, unit), mode)?;
     let base = match ty {
         UnitType::Player => u.charstats_velocity(unit).0 * 256,
         _ => u.monstats_velocity(unit).0 * 256,
     };
+    mode_velocity_as(t, u, unit, None, mode, base)
+}
+
+/// [`mode_velocity`] for the draw identity `0x00645270` (§8.1 rule 2: the
+/// routine runs on the substituted (type, class, mode), `units.md` §4.7):
+/// `ident` is the substituted (type, class) and `mode` the substituted
+/// mode; `base` is that identity's `WalkVelocity` / `Velocity` × 256
+/// (`0x00621360`).
+pub fn mode_velocity_as<U: WalkUnits + ?Sized>(
+    t: &PathTables,
+    u: &U,
+    unit: UnitId,
+    ident: Option<(UnitType, u32)>,
+    mode: u32,
+    base: i32,
+) -> Option<i32> {
+    let ty = ident.map_or_else(|| u.unit_type(unit), |i| i.0);
+    if (ty == UnitType::Player && mode == 19) || (ty == UnitType::Monster && mode == 13) {
+        return Some(KNOCKBACK_VELOCITY);
+    }
+    let p = velocity_percent(t, &facts(t, u, unit, ident), mode)?;
     Some(base.wrapping_mul(p) / 100)
 }
 

@@ -35,18 +35,18 @@
 |   5. Toward (type 2, `0x00679C80`) | 385–452 |
 |   6. Straight (type 7, `0x00679ED0`) | 453–462 |
 |   7. A* (type 1, `0x0067B850`) | 463–500 |
-|   8. Velocity, direction vector, facing | 501–606 |
-|   9. Per-tick movement | 607–800 |
-|   10. Messages | 801–863 |
-|   11. Missile paths (`0x00649760`) | 864–916 |
-|   12. Other path types (1.14d-read 2026-10-08) | 917–1130 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1131–1280 |
-| Constants & data dependencies | 1281–1317 |
-| Randomness | 1318–1328 |
-| Edge cases & original bugs | 1329–1376 |
-| Test vectors | 1377–1415 |
-| Provenance | 1416–1471 |
-| Open questions | 1472–1545 |
+|   8. Velocity, direction vector, facing | 501–615 |
+|   9. Per-tick movement | 616–809 |
+|   10. Messages | 810–872 |
+|   11. Missile paths (`0x00649760`) | 873–925 |
+|   12. Other path types (1.14d-read 2026-10-08) | 926–1139 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1140–1289 |
+| Constants & data dependencies | 1290–1326 |
+| Randomness | 1327–1337 |
+| Edge cases & original bugs | 1338–1385 |
+| Test vectors | 1386–1424 |
+| Provenance | 1425–1480 |
+| Open questions | 1481–1554 |
 <!-- /index -->
 
 ## Summary
@@ -525,6 +525,15 @@ animation-speed half of it belongs to the future animation-rate spec,
    (truncated), base = charstats `WalkVelocity` × 256 for players,
    monstats `Velocity` × 256 for monsters (`0x00621360`; the mode does
    not change the base).
+   The routine runs on the draw identity (type, class, mode) of
+   `0x00645270` (`render/unit-composite.md` §1.1), not the unit's own:
+   a monster with state 93 `valkyrie` (or 63 `dopplezon`, 119
+   `shadowwarrior`; `gfxtype` 2) is a player of the state's `gfxclass`
+   with the monster→player mode map, so a summoned Valkyrie (class 357,
+   stat 67 total 70) takes the Amazon's `WalkVelocity` 6: velocity 6 ·
+   256 · 70 / 100 = 1075, not its monstats `Velocity` 11 (2816 · 70 /
+   100 = 1971). 1.14d-confirmed (`0x00623F50` at `0x00623F6B`, `0x006241A9`;
+   check `ama-valkyrie`, step 17200 per frame = 16 · 1075).
 3. Velocity write (`0x00648690`): +0x38 := 15 only when the new value
    differs from the current velocity; velocity and max velocity (+0x84)
    := the new value always.
