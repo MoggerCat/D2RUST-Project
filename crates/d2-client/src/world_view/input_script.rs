@@ -1245,7 +1245,7 @@ mod tests {
             assert_eq!(h.pending(), 0);
         }
 
-        // Covers: specs/tools/scenario-diff.md §2 r5, §3 r8
+        // Covers: specs/tools/scenario-diff.md §2 r4, §3 r8
         #[test]
         fn headless_click_on_a_monsters_body_picks_it() {
             let (mut b, link) = scene();
@@ -1268,7 +1268,7 @@ mod tests {
             assert_eq!(sent[0][5..9], 10u32.to_le_bytes(), "{sent:?}");
         }
 
-        // Covers: specs/tools/scenario-diff.md §2 r5
+        // Covers: specs/tools/scenario-diff.md §2 r4
         #[test]
         fn headless_press_in_the_pass_of_its_move_is_a_point_click() {
             let (mut b, link) = scene();
