@@ -318,7 +318,7 @@ impl<X: WorldPending> FindWorld for Finder<'_, '_, X> {
         self.h.v.units.get(unit).map_or(0, |r| r.flags)
     }
     fn is_undead(&self, unit: UnitId) -> bool {
-        self.h.v.h.x.is_undead(unit)
+        self.h.v.h.is_undead(unit)
     }
     fn missile_explosion(&self, unit: UnitId) -> Option<bool> {
         let class = self.h.v.units.get(unit)?.class;
