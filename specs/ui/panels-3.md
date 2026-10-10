@@ -30,20 +30,20 @@
 | Inputs | 65–76 |
 | Outputs / state changes | 77–82 |
 | Rules | 83–84 |
-|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 85–190 |
-|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 191–235 |
-|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 236–271 |
-|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 272–306 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 307–380 |
-|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 381–541 |
-|   29. Inventory body-location clicks (`panels.md` §15, row "body location click") | 542–627 |
-|   30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary") | 628–714 |
-| Constants & data dependencies | 715–738 |
-| Randomness | 739–744 |
-| Edge cases & original bugs | 745–772 |
-| Test vectors | 773–814 |
-| Provenance | 815–854 |
-| Open questions | 855–871 |
+|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 85–194 |
+|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 195–239 |
+|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 240–275 |
+|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 276–310 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 311–384 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 385–545 |
+|   29. Inventory body-location clicks (`panels.md` §15, row "body location click") | 546–631 |
+|   30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary") | 632–718 |
+| Constants & data dependencies | 719–742 |
+| Randomness | 743–748 |
+| Edge cases & original bugs | 749–776 |
+| Test vectors | 777–818 |
+| Provenance | 819–858 |
+| Open questions | 859–875 |
 <!-- /index -->
 
 ## Summary
