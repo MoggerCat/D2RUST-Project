@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1004 |
-|   5. Event dispatch | 1005–1019 |
-|   6. Events per kind | 1020–1142 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1143–1164 |
-|   8. Collision line between two units | 1165–1169 |
-| Constants & data dependencies | 1170–1186 |
-| Randomness | 1187–1194 |
-| Edge cases & original bugs | 1195–1215 |
-| Test vectors | 1216–1275 |
-| Provenance | 1276–1362 |
-| Open questions | 1363–1442 |
+|   4. Modes and mode schedules | 454–1029 |
+|   5. Event dispatch | 1030–1044 |
+|   6. Events per kind | 1045–1167 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1168–1189 |
+|   8. Collision line between two units | 1190–1194 |
+| Constants & data dependencies | 1195–1211 |
+| Randomness | 1212–1219 |
+| Edge cases & original bugs | 1220–1240 |
+| Test vectors | 1241–1300 |
+| Provenance | 1301–1392 |
+| Open questions | 1393–1472 |
 <!-- /index -->
 
 ## Summary
