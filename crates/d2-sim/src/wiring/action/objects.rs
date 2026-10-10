@@ -33,6 +33,7 @@ use crate::game::Game;
 use crate::rng::Seed;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId, UnitType};
+use crate::world::objects::shrines::MissileRequest;
 use crate::world::objects::{
     self, ChestWorld, Created, Dispatch, EventRun, MiscWorld, ObjectControl, ObjectError,
     ObjectTables, ObjectWorld, Operate, Operator, Preset, ShrineWorld, StateList, StateRequest,
@@ -1581,6 +1582,47 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     }
     fn max_stamina(&self, unit: UnitId) -> i32 {
         self.v.stats.max_stamina(unit)
+    }
+    /// Missile creation `0x0059FA30` on the missile store, with the
+    /// parameter record the storm (`0x00582DA0`) and potion
+    /// (`0x005830E0`, `0x00583410`) shrines build (`objects.md` §9.3,
+    /// `missiles.md` §R2.1): the start is the shrine's path position, the
+    /// target is that position plus the offset when the absolute-target
+    /// flag (0x20) is set, else the offset itself (relative, flag 2).
+    fn create_missile(&mut self, m: MissileRequest) {
+        use crate::missiles::{self, param_flags, MissileParams};
+        let (x, y) = self.v.h.path_position(m.from);
+        let (target_x, target_y) = if m.flags & param_flags::TARGET_ABSOLUTE != 0 {
+            (x.wrapping_add(m.offset.0), y.wrapping_add(m.offset.1))
+        } else {
+            m.offset
+        };
+        let p = MissileParams {
+            flags: m.flags,
+            owner: Some(m.owner),
+            origin: Some(m.from),
+            class: i32::from(m.class),
+            x,
+            y,
+            target_x,
+            target_y,
+            level: m.skill_level,
+            ..MissileParams::default()
+        };
+        let Some(mut store) = self.v.h.missiles.take() else {
+            self.v.h.errors.push(WiringError::Reentrant("missiles"));
+            return;
+        };
+        let t = self.v.h.tables.clone();
+        {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut self.v,
+            };
+            let _ = missiles::create_missile(self.game, &mut cx, &p);
+        }
+        self.v.h.missiles = Some(store);
     }
     fn player_level(&self, player: UnitId) -> i32 {
         self.v.stat(player, STAT_LEVEL)

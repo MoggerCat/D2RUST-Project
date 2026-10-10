@@ -71,6 +71,11 @@ pub struct ItemFacts {
     pub weap: bool,
     /// `rangeadder`: the player's melee reach (`combat/hit.md` §7.3).
     pub range_adder: i32,
+    /// `StrBonus` / `DexBonus` (`combat/damage.md` §3.2).
+    pub str_bonus: i32,
+    pub dex_bonus: i32,
+    /// Row `durability` > 0 and `nodurability` = 0 (`0x00629930`).
+    pub breakable: bool,
 }
 
 /// A player's hands.
@@ -215,6 +220,11 @@ pub(crate) fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
         wclass2: t.item(record).map_or([0; 4], |r| r.wclass2),
         weap: is_any(t, record, &weap),
         range_adder: t.item(record).map_or(0, |r| i32::from(r.rangeadder)),
+        str_bonus: t.item(record).map_or(0, |r| i32::from(r.strbonus)),
+        dex_bonus: t.item(record).map_or(0, |r| i32::from(r.dexbonus)),
+        breakable: t
+            .item(record)
+            .is_some_and(|r| r.durability > 0 && r.nodurability == 0),
     }
 }
 
@@ -336,6 +346,30 @@ pub fn sync<R, S>(_: &Game, sim: &mut WorldSim<LocalSeams>, world: &mut WiredWor
             w.hands.insert(owner, hands);
         }
     }
+    // Monsters with a usable shield (`0x006225F0`, `combat/hit.md` §5).
+    let mut shielded = std::collections::BTreeSet::new();
+    if let Some(looks) = sim.action.sys.hooks.x.looks.clone() {
+        for &u in sim.action.sys.hooks.x.sides.keys() {
+            let Some(r) = sim.action.sys.units.get(u) else {
+                continue;
+            };
+            if r.ty != d2_sim::units::UnitType::Monster {
+                continue;
+            }
+            let Some(&mask) = looks.shield_choices.get(&r.class) else {
+                continue;
+            };
+            let v = sim
+                .world
+                .monsters
+                .get(u)
+                .map_or(0, |m| usize::from(m.components[7]));
+            if v < 16 && mask & (1 << v) != 0 {
+                shielded.insert(u);
+            }
+        }
+    }
+    sim.action.sys.hooks.x.shielded = shielded;
     if sim.action.sys.hooks.x.weapons != w {
         sim.action.sys.hooks.x.weapons = w;
     }

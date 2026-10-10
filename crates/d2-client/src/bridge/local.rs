@@ -45,9 +45,23 @@ pub struct PendingSession {
     pub received: Vec<(u32, Vec<u8>, usize)>,
 }
 
+/// S→C 0x8F (`0x0053E020`): the id and 32 zero bytes (0x21 bytes;
+/// `sim/intents-events.md` §2.5 row 0x6D).
+const PONG: [u8; 33] = {
+    let mut b = [0; 33];
+    b[0] = 0x8F;
+    b
+};
+
 impl SessionHandler for PendingSession {
-    fn system_message(&mut self, client: u32, msg: &[u8], size: usize, _out: &mut dyn MessageSink) {
+    fn system_message(&mut self, client: u32, msg: &[u8], size: usize, out: &mut dyn MessageSink) {
         self.received.push((client, msg.to_vec(), size));
+        // C→S 0x6D (ping, `0x0052C400` → `0x005389A0`): the server logs the
+        // round trip and answers the pong. The bytes of the ping are data
+        // (the client's clock); the answer does not depend on them.
+        if msg.first() == Some(&0x6D) {
+            let _ = out.queue(client, &PONG);
+        }
     }
 }
 
