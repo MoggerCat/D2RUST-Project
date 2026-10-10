@@ -133,9 +133,9 @@ fn save_unidentified_socketed_keeps_everything() {
     // the type values (§2 rule 2, §4.5 rule 6).
     let (net, _) = write(&i, &isc_114d()).unwrap();
     assert_eq!(&net[..4], &0x0080_0000u32.to_le_bytes());
-    // 125 bits: no marker, no unit+0x28, no affixes, no trailer, no
-    // sockets, no list.
-    assert_eq!(net.len(), 16);
+    // 129 bits: no marker, no unit+0x28, no affixes, no trailer, no list;
+    // the 4-bit socket count stays (recorded, §4.5 rule 5).
+    assert_eq!(net.len(), 17);
 }
 
 /// Parent `lax ` (identified, socketed, 1 socket filled) then its child

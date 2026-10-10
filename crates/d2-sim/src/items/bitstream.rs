@@ -613,7 +613,10 @@ fn full(
     if item.stackable {
         w.put(9, item.total_quantity);
     }
-    if f & hflag::SOCKETED != 0 {
+    // Measured (gen-item-05 `9cl`, gen-item-10 `7yw`, unidentified magic
+    // items): the socket count follows although the header word had 0x800
+    // cleared, so this test reads the item's own flag, not F.
+    if item.flags & hflag::SOCKETED != 0 {
         w.put(
             u32::from(t.isc(stat::NUMSOCKETS).save_bits),
             item.base_sockets,
