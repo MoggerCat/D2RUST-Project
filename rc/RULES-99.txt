@@ -21,3 +21,5 @@ SELF-MERGE (replaces "push to claude/NAME only"; the coordinator no longer merge
 A full test gate runs on integ-r23 about every 45 min; if it names your commit, fix it first, before anything else.
 
 NEVER: edit another session's ledger part (only docs/handoff/ledger/NAME.tsv); add `ignore` lines, skip/exclude directives or comparator exceptions (rule 10: replay recorded host inputs instead, e.g. clock, frame schedule, -ns, registry); mark a row EQUAL that a fresh run doesn't prove under REC-2055/2056; force-push.
+
+UPDATE 17:00Z: if your session may only push claude/NAME (most can't push another branch), do steps 1-3 of SELF-MERGE and push claude/NAME; the merge bot rc-merger merges every claude/rc-* branch into integ-r23 within ~10 min and tells you if it conflicts (then merge integ-r23 yourself and push again). Claims the same way: commit your claim line to docs/handoff/claims.tsv on claude/NAME and push it at once, before the fix.
