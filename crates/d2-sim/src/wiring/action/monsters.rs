@@ -140,6 +140,7 @@ pub trait MonsterWorld<X> {
     /// unit (`monsters/population.md` §9 around the unit's position in its
     /// room) on the lent world. `None`: the world cannot run it;
     /// `Some(None)`: nothing placed.
+    #[allow(clippy::too_many_arguments)]
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,

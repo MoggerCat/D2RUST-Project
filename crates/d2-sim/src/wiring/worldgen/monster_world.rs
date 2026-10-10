@@ -145,6 +145,7 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
 
     /// `0x005B23C0` through population's placement around the unit
     /// ([`placement::place_near`], `population.md` §9).
+    #[allow(clippy::too_many_arguments)]
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
