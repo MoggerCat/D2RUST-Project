@@ -5,7 +5,7 @@ Task: gen-obj-39 and gen-obj-78 (second path compute "returns 0 in 1.14d").
 ## Checks (state / rng, single runs, orig-cache)
 - gen-obj-39: state DIVERGED -> PARTIAL (80/80), rng DIVERGED -> MATCH.
 - gen-obj-78: state DIVERGED -> PARTIAL (80/80), rng MATCH.
-- gen-obj-*: family re-run, see the coordinator's number below if listed.
+- gen family (571 checks, filter gen-obj-* matched all): 0 DIVERGED, 62597/62597 ticks equal (655 MATCH, 1058 PARTIAL).
 EQUAL rows: 2 of 2 clean (the six gen-obj rows are all clean now).
 
 ## Cause (premise was wrong)
