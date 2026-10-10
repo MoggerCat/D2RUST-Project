@@ -1,0 +1,13 @@
+check 1
+# Front end, every screen of the menu walk (main, charselect, create x8, credits, cinematics):
+# 1.14d under Wine (6 timed shots per screen) against d2rs (40 back-to-back shots per
+# screen). Compared per pixel on the layers that do not move (tolerance 0); the animated
+# pixels (logo fire, credits scroll) are counted, not compared (tools/frontend-sbs/screens_check.py).
+# Needs the three saves of tools/cloud-game/prepare_saves.sh (TestSor, ScnSor, ScnAma).
+# Spec: specs/ui/frontend-menus.md §F2.11, specs/tools/scenario-diff.md §3 rule 16.
+name ui-frontend-screens
+save TestSor --class sor --expansion
+seed 1234
+ticks 1
+seconds 400
+channels frontend
