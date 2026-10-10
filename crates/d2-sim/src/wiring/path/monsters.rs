@@ -17,7 +17,7 @@ use crate::monsters::ai::{self, ModeTarget, VelocityRequest};
 use crate::path::record::path_types;
 use crate::path::walk::find::{compute, reset_type};
 use crate::path::walk::seams::{PathWorld, WalkUnits};
-use crate::path::walk::velocity::{mode_velocity_as, set_velocity};
+use crate::path::walk::velocity::{mode_velocity, set_velocity};
 use crate::path::walk::Step;
 use crate::path::DynamicPath;
 use crate::tick::events::event;
@@ -323,31 +323,11 @@ impl<X: Pending> ActionHooks<X> {
         if r.ty != UnitType::Monster {
             return;
         }
-        let own = (r.ty, r.class, r.mode);
+        let mode = r.mode;
         let tables = p.tables.clone();
-        // `0x00623F50` runs on the draw identity `0x00645270`: a summoned
-        // Valkyrie (state 93, `gfxtype` 2, class 0) reads the Amazon's
-        // `WalkVelocity` and the player's mode rows.
-        let (ty, class, mode) = self.draw_identity(sim, unit).unwrap_or(own);
-        let base = if ty == UnitType::Player {
-            self.tables
-                .combat
-                .charstats
-                .get(class as usize)
-                .map(|c| i32::from(c.walkvelocity))
-        } else {
-            self.tables
-                .combat
-                .monstats
-                .get(class as usize)
-                .map(|m| i32::from(m.velocity))
-        }
-        .unwrap_or(0)
-            * 256;
         let mut v = View::of(sim.units, sim.stats, sim.data, self);
         let c = PathCtx::of(&mut v, sim.game);
-        let ident = ((ty, class) != (own.0, own.1)).then_some((ty, class));
-        let Some(vel) = mode_velocity_as(&tables, &c, unit, ident, mode, base) else {
+        let Some(vel) = mode_velocity(&tables, &c, unit, mode) else {
             return;
         };
         if let Some(d) = self.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {

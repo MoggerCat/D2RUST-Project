@@ -382,21 +382,6 @@ fn v_velocities() {
     assert_eq!(mode_velocity(&t, &c, P, 1), None);
 }
 
-// Covers: specs/sim/pathing.md §8.1 r2
-#[test]
-fn v_velocity_draw_identity() {
-    use crate::path::walk::velocity::mode_velocity_as;
-    let t = tables();
-    let mut c = units_only();
-    // A summoned Valkyrie: stat 67 total 70, identity (player, Amazon),
-    // WalkVelocity 6: 6 · 256 · 70 / 100 = 1075 (ama-valkyrie, 1.14d).
-    c.u.unit(P).stats.insert(67, 70);
-    assert_eq!(
-        mode_velocity_as(&t, &c, P, Some((UnitType::Player, 0)), 2, 6 * 256),
-        Some(1075)
-    );
-}
-
 // ---- movement M1, M2 ------------------------------------------------
 
 fn run_ticks(t: &PathTables, c: &mut Ctx, max: usize) -> Vec<(u32, u32, Step)> {
