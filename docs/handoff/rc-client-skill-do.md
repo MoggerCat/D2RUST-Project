@@ -1,12 +1,13 @@
 # rc-client-skill-do hand-back (REC-2205..2208 used; 2209 unused)
 
-Base: claude/specs-staging-7 + claude/integ-r17 (merged).
+Base: claude/specs-staging-7 + claude/integ-r17, then staging with r18 (sync); all results re-measured on the final head.
 
 ## Checks
 | check | before (r17) | after |
 |---|---|---|
 | audio-cast-frost-nova-sor | voices 1.14d 12 / d2rs 10, paired 10, 2 differences (novaice.wav T 25, T 65); mixed 2/99 | voices 12 / 12, paired 12, **0 differences**; mixed 2/99 (unchanged, first at T 2) |
 | sor-frost-nova, sor-frost-nova-twice, sor-nova, gen-skill-sor-44, gen-skill-sor-48 (state) | 100% PARTIAL | 100% PARTIAL (no change) |
+| fxfrostnova render scenes (cast / flight / hit / later) | 14.8 / 14.3 / 14.2 / 15.5 % pixels, first diff tick 3 (frame.tsv row 5 level) | 19.1 / 17.3 / 16.6 / 15.4 %, first diff tick 3 (row 8 tile_origin_x) |
 EQUAL count: 0 -> 0 (the audio check stays DIVERGED on the mixed channel only).
 
 ## What changed (read in re/exports-typed; spec: specs/client/msg-skills.md §11)
@@ -28,7 +29,10 @@ EQUAL count: 0 -> 0 (the audio check stays DIVERGED on the mixed channel only).
 - Private repo: 7 names appended to re/exports/names.tsv.
 
 ## Open
-- Effect render scenes (fxfrostnova / fxnova): see below.
+- Effect render scenes: fxfrostnova re-run (fxnova not, same blocker): the
+  first difference is still the scene's world placement (tile origin, before
+  any cast), so no nova sprite is compared; re-run after that (owner: client
+  click / waypoint path, q-chk-render-effects.md). Size: re-run only.
 - Other cltdofunc bodies (26 Fire Wall, 28, 30 (13 skills), ...), the
   `cltmissile` create, dosound / tgtsound / overlay / delay UI of §11 r5 and
   the monster update's do (`0x004AF4C0`): size L, PROVISIONAL REC-2207.
