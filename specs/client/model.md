@@ -46,14 +46,14 @@
 |   16. C→S 0x4B after a teleport (the hireling case) | 1161–1195 |
 |   17. Model writes made by 1.14d UI code | 1196–1401 |
 |   18. Audio driver inputs and the client object functions | 1402–1432 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1433–1677 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1678–1838 |
-| Constants & data dependencies | 1839–1851 |
-| Randomness | 1852–1867 |
-| Edge cases & original bugs | 1868–1892 |
-| Test vectors | 1893–1950 |
-| Provenance | 1951–2056 |
-| Open questions | 2057–2262 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1433–1682 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1683–1843 |
+| Constants & data dependencies | 1844–1856 |
+| Randomness | 1857–1872 |
+| Edge cases & original bugs | 1873–1897 |
+| Test vectors | 1898–1955 |
+| Provenance | 1956–2061 |
+| Open questions | 2062–2267 |
 <!-- /index -->
 
 ## Summary
@@ -1590,9 +1590,14 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    (Raise Skeleton, Skeletal Mage), 21 (Corpse / Poison Explosion), 23
    (Iron Golem), 24 (Revive) and 5 (Psychic Hammer, Dragon Flight), and
    sends 0x0C for 22 (Bone Prison), 18 (curses), 19 (Teeth) and the
-   rest): 5 returns 0 without a target unit; 20, 21, 24 without a dead
-   monster target; 23 without an item target; every other function
-   returns non-zero (because a click sends only when the request
+   rest): 5 (`0x004F2010`, read from the 1.14d export 2026-10-09)
+   returns 1 only with a target T that is a player or monster (T type
+   < 2), with neither U's nor T's room in town (`0x0061AB00`) and T
+   hostile (`0x00465C60`, `ui/controls.md` §6 r9.7); 20 (`0x004F3870`
+   reads T: a monster, then `0x004638A0`, `0x00645510(T, 0)`,
+   `0x004B11F0`, `0x00451FE0`), 21 and 24 are read as "a dead monster
+   target"; 23 as "an item target"; every other function returns
+   non-zero (because a click sends only when the request
    returned non-zero, `skills/sequences.md` local player rule 2, and
    the use check r9.1 passes for all of these); settled by REC-1641
    (the table bodies at `0x00727A90` read in a spec-writing session,

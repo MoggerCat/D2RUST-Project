@@ -251,7 +251,7 @@ fn player(
             // set 1, and the request returns 0. 0x15's start clears the
             // target (§8 r7); 0x16's is the unit of (r2 type, r3 GUID).
             let target = (code == 0x16).then(|| UnitKey::new(r[2] as u8, r[3] as u32));
-            if !super::use_state::client_start_passes(w, inputs, r[0] as u16, target) {
+            if !super::use_state::client_start_passes(w, inputs, key, r[0] as u16, target) {
                 if let Some(l) = w.units.get_mut(&key).and_then(|u| u.skills.as_mut()) {
                     l.current = None;
                 }

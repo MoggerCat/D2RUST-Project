@@ -106,6 +106,7 @@ fn can_afford(w: &ClientWorld, key: UnitKey, r: &SkillRow, e: &SkillEntry, level
 pub fn client_start_passes(
     w: &ClientWorld,
     inputs: &ModelInputs,
+    caster: UnitKey,
     skill: u16,
     target: Option<UnitKey>,
 ) -> bool {
@@ -114,7 +115,15 @@ pub fn client_start_passes(
     };
     let unit = target.and_then(|k| w.units.get(&k));
     match r.cltstfunc {
-        5 => unit.is_some(),
+        // `0x004F2010` (1.14d export read 2026-10-09): a target T, U's
+        // and T's rooms not in town (`0x0061AB00`), T a player or monster
+        // and hostile (`0x00465C60`).
+        5 => unit.is_some_and(|u| {
+            u.key.unit_type <= MONSTER
+                && !super::modes::in_town(w, caster)
+                && !super::modes::in_town(w, u.key)
+                && super::combat::hostile(w, inputs, u.key)
+        }),
         20 | 21 | 24 => unit.is_some_and(|u| u.key.unit_type == MONSTER && u.is_dead()),
         23 => unit.is_some_and(|u| u.key.unit_type == ITEM),
         _ => true,
@@ -156,6 +165,8 @@ mod tests {
         (w, inputs, key)
     }
 
+    const PLAYER_KEY: UnitKey = UnitKey::new(PLAYER, 1);
+
     fn entry(skill: u16, base: i32) -> SkillEntry {
         SkillEntry {
             skill,
@@ -186,15 +197,15 @@ mod tests {
     #[test]
     fn a_corpse_start_without_a_dead_monster_fails() {
         let (mut w, i, _) = world(0);
-        assert!(!client_start_passes(&w, &i, 70, None));
+        assert!(!client_start_passes(&w, &i, PLAYER_KEY, 70, None));
         let m = UnitKey::new(MONSTER, 9);
         let mut cow = ClientUnit::new(m);
         cow.mode = 1;
         w.units.insert(m, cow);
-        assert!(!client_start_passes(&w, &i, 70, Some(m)));
+        assert!(!client_start_passes(&w, &i, PLAYER_KEY, 70, Some(m)));
         w.units.get_mut(&m).expect("cow").mode = 12;
-        assert!(client_start_passes(&w, &i, 70, Some(m)));
+        assert!(client_start_passes(&w, &i, PLAYER_KEY, 70, Some(m)));
         // A function without a rule passes.
-        assert!(client_start_passes(&w, &i, 85, None));
+        assert!(client_start_passes(&w, &i, PLAYER_KEY, 85, None));
     }
 }
