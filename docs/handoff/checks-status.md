@@ -391,7 +391,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-wp-36-lv117 | state | PARTIAL | 540/540 | - | - |
 | a5-wp-37-lv118 | state | PARTIAL | 540/540 | - | - |
 | a5-wp-38-lv129 | state | PARTIAL | 540/540 | - | - |
-| act-travel-lut-ama | state | DIVERGED | 9/80 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| act-travel-lut-ama | state | PARTIAL | 80/80 | - | - |
 | ama-charged-strike | state | PARTIAL | 70/70 | - | - |
 | ama-cold-arrow | state | PARTIAL | 70/70 | - | - |
 | ama-dopplezon | state | PARTIAL | 70/70 | - | - |
@@ -772,8 +772,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | MATCH | 30/30 | - | q-fix-join-items |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
-| gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | state | DIVERGED | 9/100 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | packets | MATCH | 100/100 | - | - |
+| gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | state | PARTIAL | 100/100 | - | - |
 | gen-sysc-client-msg-ui-21-0x76-overhead-clear-0x0045e050-0x0049f8c0 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-21-0x76-overhead-clear-0x0045e050-0x0049f8c0 | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-ui-21-0x76-overhead-clear-0x0045e050-0x0049f8c0 | state | PARTIAL | 60/60 | - | - |
@@ -816,12 +816,12 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-stat-lists-4-skills | packets | MATCH | 40/40 | - | - |
 | gen-sysc-client-stat-lists-4-skills | state | PARTIAL | 40/40 | - | - |
 | gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp | - | ERROR | - | d2rs play wrote no /home/user/D2RUST-Project/traces/raw/suite/gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp/draws-d2rs/draws.tsv (exit 1) | - |
-| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
-| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | state | DIVERGED | 9/100 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | packets | MATCH | 100/100 | - | - |
+| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | state | PARTIAL | 100/100 | - | - |
 | gen-sysc-flows-act-change-2-same-act-travel | packets | MATCH | 60/60 | - | - |
 | gen-sysc-flows-act-change-2-same-act-travel | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-flows-act-change-3-client-side | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
-| gen-sysc-flows-act-change-3-client-side | state | DIVERGED | 9/100 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| gen-sysc-flows-act-change-3-client-side | packets | MATCH | 100/100 | - | - |
+| gen-sysc-flows-act-change-3-client-side | state | PARTIAL | 100/100 | - | - |
 | gen-sysc-flows-client-frame-1-loop-pass-order-1-14d | packets | MATCH | 100/100 | - | - |
 | gen-sysc-flows-client-frame-1-loop-pass-order-1-14d | state | PARTIAL | 100/100 | - | - |
 | gen-sysc-flows-client-frame-2-prediction-correction-interpolation | packets | MATCH | 100/100 | - | - |
@@ -1061,7 +1061,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-load-mixed | state | PARTIAL | 60/60 | - | - |
 | items-pickup-ama | packets | MATCH | 60/60 | - | - |
 | items-pickup-ama | state | PARTIAL | 60/60 | - | - |
-| items-vendor-akara-buy | packets | DIVERGED | 39/40 | frame 20 stream s2c #7 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| items-vendor-akara-buy | packets | MATCH | 40/40 | - | - |
 | items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | items-vendor-akara-stock | items | MATCH | 41/41 | - | - |
 | items-vendor-akara-stock | packets | MATCH | 140/140 | - | - |
@@ -1070,36 +1070,36 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-vendor-asheara-stock | items | MATCH | 3/3 | - | - |
 | items-vendor-asheara-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-charsi-stock | items | MATCH | 43/43 | - | - |
-| items-vendor-charsi-stock | packets | DIVERGED | 26/30 | frame 4 stream s2c #0 extra (d2rs only) (id 0x15) | q-fix-join-items |
+| items-vendor-charsi-stock | packets | MATCH | 30/30 | - | - |
 | items-vendor-charsi-stock-goto | items | MATCH | 43/43 | - | - |
 | items-vendor-charsi-stock-goto | packets | MATCH | 140/140 | - | - |
 | items-vendor-drehya-stock | items | PARTIAL | 0/0 | - | - |
 | items-vendor-drognan-stock | items | MATCH | 16/16 | - | - |
-| items-vendor-drognan-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
+| items-vendor-drognan-stock | packets | DIVERGED | 139/140 | frame 66 stream s2c #0 id: 1.14d 9c vs d2rs 67 (id 0x9c) | unrouted |
 | items-vendor-elzix-stock | items | MATCH | 49/49 | - | - |
-| items-vendor-elzix-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
+| items-vendor-elzix-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-fara-stock | items | MATCH | 2/2 | - | - |
-| items-vendor-fara-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
+| items-vendor-fara-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-gheed-gamble | items | MATCH | 14/14 | - | - |
-| items-vendor-gheed-gamble | packets | DIVERGED | 26/30 | frame 4 stream s2c #0 extra (d2rs only) (id 0x15) | q-fix-join-items |
+| items-vendor-gheed-gamble | packets | MATCH | 30/30 | - | - |
 | items-vendor-gheed-stock | items | MATCH | 30/30 | - | - |
-| items-vendor-gheed-stock | packets | DIVERGED | 26/30 | frame 4 stream s2c #0 extra (d2rs only) (id 0x15) | q-fix-join-items |
+| items-vendor-gheed-stock | packets | MATCH | 30/30 | - | - |
 | items-vendor-gheed-stock-goto | items | MATCH | 44/44 | - | - |
 | items-vendor-gheed-stock-goto | packets | MATCH | 140/140 | - | - |
 | items-vendor-halbu-stock | items | MATCH | 2/2 | - | - |
-| items-vendor-halbu-stock | packets | DIVERGED | 138/140 | frame 66 stream s2c #0 id: 1.14d 9c vs d2rs 67 (id 0x9c) | q-fix-join-items |
+| items-vendor-halbu-stock | packets | DIVERGED | 138/140 | frame 66 stream s2c #0 id: 1.14d 9c vs d2rs 67 (id 0x9c) | unrouted |
 | items-vendor-hratli-stock | items | MATCH | 3/3 | - | - |
 | items-vendor-hratli-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-jamella-stock | items | MATCH | 31/31 | - | - |
-| items-vendor-jamella-stock | packets | DIVERGED | 139/140 | frame 139 stream s2c #1 missing in d2rs (id 0x47) | q-fix-join-items |
+| items-vendor-jamella-stock | packets | DIVERGED | 139/140 | frame 139 stream s2c #1 missing in d2rs (id 0x47) | unrouted |
 | items-vendor-larzuk-stock | items | MATCH | 2/2 | - | - |
 | items-vendor-larzuk-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-lysander-stock | items | MATCH | 8/8 | - | - |
-| items-vendor-lysander-stock | packets | DIVERGED | 138/140 | frame 3 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
+| items-vendor-lysander-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-malah-stock | items | MATCH | 17/17 | - | - |
 | items-vendor-malah-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-nihlathak-stock | items | MATCH | 14/14 | - | - |
-| items-vendor-nihlathak-stock | packets | DIVERGED | 138/140 | frame 15 stream s2c #49 id: 1.14d 07 vs d2rs 5d (id 0x07) | q-fix-join-items |
+| items-vendor-nihlathak-stock | packets | DIVERGED | 139/140 | frame 15 stream s2c #30 id: 1.14d 07 vs d2rs 5d (id 0x07) | unrouted |
 | items-vendor-ormus-stock | items | MATCH | 10/10 | - | - |
 | items-vendor-ormus-stock | packets | MATCH | 140/140 | - | - |
 | join-act2-quests-ama | state | PARTIAL | 40/40 | - | - |
@@ -1120,7 +1120,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | milestone-baal-throne | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
 | milestone-hellforge | state | PARTIAL | 177/177 | - | - |
 | milestone-hephasto | state | PARTIAL | 177/177 | - | - |
-| milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | q-fix-seed-order |
+| milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | unrouted |
 | milestone-nihlathak | state | DIVERGED | 29/75 | frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | milestone-worldstone-portal | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
 | nec-amplify-damage | state | PARTIAL | 70/70 | - | - |
@@ -1424,3 +1424,10 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-wp-36-lv117 | packets | DIVERGED | 539/540 | frame 4 stream s2c #42 extra (d2rs only) (id 0x5d) | unrouted |
 | a5-wp-38-lv129 | packets | DIVERGED | 539/540 | frame 4 stream s2c #34 extra (d2rs only) (id 0x5d) | unrouted |
 | items-drop-gold-potion | items | MATCH | 6/6 | - | - |
+| interact-operate-stash | state | PARTIAL | 30/30 | - | - |
+| interact-operate-stash | packets | MATCH | 30/30 | - | - |
+| interact-operate-waypoint | state | PARTIAL | 30/30 | - | - |
+| interact-operate-waypoint | packets | MATCH | 30/30 | - | - |
+| interact-talk-akara | state | PARTIAL | 30/30 | - | - |
+| interact-talk-akara | packets | MATCH | 30/30 | - | - |
+| items-vendor-drehya-stock | packets | DIVERGED | 139/140 | frame 15 stream s2c #30 id: 1.14d 07 vs d2rs 5d (id 0x07) | unrouted |

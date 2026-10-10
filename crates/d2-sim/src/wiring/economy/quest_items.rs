@@ -41,6 +41,13 @@ pub trait QuestRest {
     /// question 7).
     fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
     fn send(&mut self, player: UnitId, msg: &[u8]);
+    /// The messages [`Self::send`] queued since the last take, in send
+    /// order. A call that 1.14d answers in place (a level change: the
+    /// quest's 0x5D precedes the room removals) takes them at once and
+    /// sends them through the transport. Default: none queued here.
+    fn take_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
     /// The player's inventory items in list order (inventory spec;
     /// `cube.md` open question 5).

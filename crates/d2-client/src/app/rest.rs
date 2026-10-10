@@ -456,6 +456,9 @@ impl QuestRest for AppRest {
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
     }
+    fn take_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        std::mem::take(&mut self.sent)
+    }
     /// S→C 0x27 (`npc.md` §2 step 5): type 1, the NPC's GUID, the
     /// encoded list.
     fn send_text_list(&mut self, p: UnitId, n: UnitId, list: &[(u16, u32)]) {
