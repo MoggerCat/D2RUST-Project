@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2739
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6057
+- Duplicate areas between parts: 6025
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -4794,60 +4794,28 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.valkyrie`: rc-packets-chan.tsv:33 kept, rc-skill-hydra-valk.tsv:3 dropped
   - `skill.sor.hydra`: rc-packets-chan.tsv:166 kept, rc-skill-hydra-valk.tsv:4 dropped
   - `vendor.drognan`: rc-link-2.tsv:33 kept, rc-staging-regress.tsv:3 dropped
-  - `monster.superunique.ancient-barbarian-1`: rc-run-4.tsv:325 kept, rc-su-fc-tx.tsv:3 dropped
-  - `monster.superunique.ancient-barbarian-2`: rc-gen-monai.tsv:23 kept, rc-su-fc-tx.tsv:4 dropped
-  - `monster.superunique.ancient-barbarian-3`: rc-mon-fr.tsv:47 kept, rc-su-fc-tx.tsv:5 dropped
-  - `monster.superunique.ancient-kaa-the-soulless`: rc-run-4.tsv:328 kept, rc-su-fc-tx.tsv:6 dropped
-  - `monster.superunique.anodized-elite`: rc-run-4.tsv:329 kept, rc-su-fc-tx.tsv:7 dropped
-  - `monster.superunique.axe-dweller`: rc-run-4.tsv:330 kept, rc-su-fc-tx.tsv:8 dropped
-  - `monster.superunique.baal-subject-1`: rc-run-4.tsv:331 kept, rc-su-fc-tx.tsv:9 dropped
-  - `monster.superunique.baal-subject-2`: rc-gen-monai.tsv:24 kept, rc-su-fc-tx.tsv:10 dropped
-  - `monster.superunique.baal-subject-3`: rc-run-4.tsv:333 kept, rc-su-fc-tx.tsv:11 dropped
-  - `monster.superunique.baal-subject-4`: rc-gen-monai.tsv:25 kept, rc-su-fc-tx.tsv:12 dropped
-  - `monster.superunique.bishibosh`: rc-run-4.tsv:336 kept, rc-su-fc-tx.tsv:13 dropped
-  - `monster.superunique.blaze-ripper`: rc-run-4.tsv:337 kept, rc-su-fc-tx.tsv:14 dropped
-  - `monster.superunique.bloodwitch-the-wild`: rc-run-4.tsv:338 kept, rc-su-fc-tx.tsv:15 dropped
-  - `monster.superunique.boneash`: rc-run-4.tsv:339 kept, rc-su-fc-tx.tsv:16 dropped
-  - `monster.superunique.bonesaw-breaker`: rc-run-4.tsv:341 kept, rc-su-fc-tx.tsv:17 dropped
-  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-su-fc-tx.tsv:18 dropped
-  - `monster.superunique.coldcrow`: rc-run-4.tsv:343 kept, rc-su-fc-tx.tsv:19 dropped
-  - `monster.superunique.dac-farren`: rc-run-4.tsv:345 kept, rc-su-fc-tx.tsv:20 dropped
-  - `monster.superunique.eyeback-unleashed`: rc-run-4.tsv:346 kept, rc-su-fc-tx.tsv:21 dropped
-  - `monster.superunique.flamespike-the-crawler`: rc-gen-monai.tsv:29 kept, rc-su-fc-tx.tsv:22 dropped
-  - `monster.superunique.frozenstein`: rc-gen-monai.tsv:30 kept, rc-su-fc-tx.tsv:23 dropped
-  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-su-fc-tx.tsv:24 dropped
-  - `monster.superunique.grand-vizier-of-chaos`: rc-mon-fr.tsv:51 kept, rc-su-fc-tx.tsv:25 dropped
-  - `monster.superunique.icehawk-riftwing`: rc-run-4.tsv:352 kept, rc-su-fc-tx.tsv:26 dropped
-  - `monster.superunique.infector-of-souls`: rc-run-4.tsv:353 kept, rc-su-fc-tx.tsv:27 dropped
-  - `monster.superunique.ismail-vilehand`: rc-gen-monai.tsv:32 kept, rc-su-fc-tx.tsv:28 dropped
-  - `monster.superunique.lord-de-seis`: rc-gen-monai.tsv:33 kept, rc-su-fc-tx.tsv:29 dropped
-  - `monster.superunique.maffer-dragonhand`: rc-gen-monai.tsv:34 kept, rc-su-fc-tx.tsv:30 dropped
-  - `monster.superunique.magma-torquer`: rc-run-4.tsv:357 kept, rc-su-fc-tx.tsv:31 dropped
-  - `monster.superunique.megaflow-rectifier`: rc-run-4.tsv:358 kept, rc-su-fc-tx.tsv:32 dropped
-  - `monster.superunique.nihlathak-boss`: rc-run-4.tsv:359 kept, rc-su-fc-tx.tsv:33 dropped
-  - `monster.superunique.pindleskin`: rc-run-4.tsv:360 kept, rc-su-fc-tx.tsv:34 dropped
-  - `monster.superunique.pitspawn-fouldog`: rc-run-4.tsv:361 kept, rc-su-fc-tx.tsv:35 dropped
-  - `monster.superunique.radament`: rc-gen-monai.tsv:35 kept, rc-su-fc-tx.tsv:36 dropped
-  - `monster.superunique.rakanishu`: rc-run-4.tsv:363 kept, rc-su-fc-tx.tsv:37 dropped
-  - `monster.superunique.riftwraith-the-cannibal`: rc-run-4.tsv:364 kept, rc-su-fc-tx.tsv:38 dropped
-  - `monster.superunique.sarina-the-battlemaid`: rc-run-4.tsv:365 kept, rc-su-fc-tx.tsv:39 dropped
-  - `monster.superunique.sharp-tooth-sayer`: rc-run-4.tsv:366 kept, rc-su-fc-tx.tsv:40 dropped
-  - `monster.superunique.siege-boss`: rc-run-4.tsv:367 kept, rc-su-fc-tx.tsv:41 dropped
-  - `monster.superunique.snapchip-shatter`: rc-mon-fr.tsv:54 kept, rc-su-fc-tx.tsv:42 dropped
-  - `monster.superunique.stormtree`: rc-run-4.tsv:369 kept, rc-su-fc-tx.tsv:43 dropped
-  - `monster.superunique.taintbreeder`: rc-gen-monai.tsv:36 kept, rc-su-fc-tx.tsv:44 dropped
-  - `monster.superunique.the-countess`: rc-gen-monai.tsv:37 kept, rc-su-fc-tx.tsv:45 dropped
-  - `monster.superunique.the-cow-king`: rc-run-4.tsv:372 kept, rc-su-fc-tx.tsv:46 dropped
-  - `monster.superunique.the-feature-creep`: rc-run-4.tsv:373 kept, rc-su-fc-tx.tsv:47 dropped
-  - `monster.superunique.the-summoner`: rc-gen-monai.tsv:38 kept, rc-su-fc-tx.tsv:48 dropped
-  - `monster.superunique.the-tormentor`: rc-run-4.tsv:376 kept, rc-su-fc-tx.tsv:49 dropped
-  - `monster.superunique.threash-socket`: rc-run-4.tsv:377 kept, rc-su-fc-tx.tsv:50 dropped
-  - `monster.superunique.toorc-icefist`: rc-gen-monai.tsv:39 kept, rc-su-fc-tx.tsv:51 dropped
-  - `monster.superunique.treehead-woodfist`: rc-run-4.tsv:379 kept, rc-su-fc-tx.tsv:52 dropped
-  - `monster.superunique.vinvear-molech`: rc-gen-monai.tsv:40 kept, rc-su-fc-tx.tsv:53 dropped
-  - `monster.superunique.winged-death`: rc-run-4.tsv:382 kept, rc-su-fc-tx.tsv:54 dropped
-  - `monster.superunique.witch-doctor-endugu`: rc-run-4.tsv:383 kept, rc-su-fc-tx.tsv:55 dropped
-  - `monster.superunique.wyand-voidfinger`: rc-gen-monai.tsv:41 kept, rc-su-fc-tx.tsv:56 dropped
+  - `monster.superunique.ancient-barbarian-2`: rc-gen-monai.tsv:23 kept, rc-su-fc-tx.tsv:3 dropped
+  - `monster.superunique.ancient-barbarian-3`: rc-mon-fr.tsv:47 kept, rc-su-fc-tx.tsv:4 dropped
+  - `monster.superunique.baal-subject-2`: rc-gen-monai.tsv:24 kept, rc-su-fc-tx.tsv:5 dropped
+  - `monster.superunique.baal-subject-4`: rc-gen-monai.tsv:25 kept, rc-su-fc-tx.tsv:6 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-su-fc-tx.tsv:7 dropped
+  - `monster.superunique.coldworm-the-burrower`: rc-gen-monai.tsv:27 kept, rc-su-fc-tx.tsv:8 dropped
+  - `monster.superunique.fangskin`: rc-gen-monai.tsv:28 kept, rc-su-fc-tx.tsv:9 dropped
+  - `monster.superunique.flamespike-the-crawler`: rc-gen-monai.tsv:29 kept, rc-su-fc-tx.tsv:10 dropped
+  - `monster.superunique.frozenstein`: rc-gen-monai.tsv:30 kept, rc-su-fc-tx.tsv:11 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-su-fc-tx.tsv:12 dropped
+  - `monster.superunique.grand-vizier-of-chaos`: rc-mon-fr.tsv:51 kept, rc-su-fc-tx.tsv:13 dropped
+  - `monster.superunique.ismail-vilehand`: rc-gen-monai.tsv:32 kept, rc-su-fc-tx.tsv:14 dropped
+  - `monster.superunique.lord-de-seis`: rc-gen-monai.tsv:33 kept, rc-su-fc-tx.tsv:15 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-gen-monai.tsv:34 kept, rc-su-fc-tx.tsv:16 dropped
+  - `monster.superunique.radament`: rc-gen-monai.tsv:35 kept, rc-su-fc-tx.tsv:17 dropped
+  - `monster.superunique.snapchip-shatter`: rc-mon-fr.tsv:54 kept, rc-su-fc-tx.tsv:18 dropped
+  - `monster.superunique.taintbreeder`: rc-gen-monai.tsv:36 kept, rc-su-fc-tx.tsv:19 dropped
+  - `monster.superunique.the-countess`: rc-gen-monai.tsv:37 kept, rc-su-fc-tx.tsv:20 dropped
+  - `monster.superunique.the-summoner`: rc-gen-monai.tsv:38 kept, rc-su-fc-tx.tsv:21 dropped
+  - `monster.superunique.toorc-icefist`: rc-gen-monai.tsv:39 kept, rc-su-fc-tx.tsv:22 dropped
+  - `monster.superunique.vinvear-molech`: rc-gen-monai.tsv:40 kept, rc-su-fc-tx.tsv:23 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-gen-monai.tsv:41 kept, rc-su-fc-tx.tsv:24 dropped
   - `monster.boss.baalcrab`: rc-mon-fr.tsv:9 kept, rc-su-mode.tsv:3 dropped
   - `monster.boss.bloodraven`: rc-run-4.tsv:53 kept, rc-su-mode.tsv:4 dropped
   - `monster.boss.griswold`: rc-run-4.tsv:56 kept, rc-su-mode.tsv:5 dropped
