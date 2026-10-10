@@ -14,6 +14,8 @@
 
 use crate::rules::camera::{moving_to_client, static_to_client, Camera};
 
+use std::collections::BTreeMap;
+
 use super::world::{ClientWorld, UnitKey};
 
 /// Half the box width, in screen pixels. d2rs-own, unverified.
@@ -91,6 +93,93 @@ pub fn pick(world: &ClientWorld, cam: &Camera, mouse: (i32, i32)) -> Option<Unit
     best.map(|(_, k)| k)
 }
 
+/// How far 1.14d's hover test widens a unit's drawn frame rectangle on each
+/// side (`0x00470860`: the mouse must lie inside `left − 16 .. right + 16`
+/// and `top − 16 .. bottom + 16`).
+pub const FRAME_RECT_PAD: i32 = 16;
+
+/// The screen rectangle `(left, top, right, bottom)` of each unit's drawn
+/// cels (shadows left out) of one built frame, by unit: an item belongs to
+/// the unit whose draw-order slot (`slots`) it carries.
+// Spec: specs/tools/scenario-diff.md §3 r8.2 (hover = drawn frame rectangle)
+pub fn unit_rects(
+    items: &[crate::scene::DrawItem],
+    frames: &crate::frames::FrameStore,
+    slots: &BTreeMap<UnitKey, crate::rules::draw_order::UnitSlot>,
+) -> BTreeMap<UnitKey, (i32, i32, i32, i32)> {
+    let mut by_slot: BTreeMap<u64, UnitKey> = BTreeMap::new();
+    for (k, s) in slots {
+        if let crate::rules::draw_order::UnitSlot::Drawn(o) = s {
+            if let Ok(dk) = crate::scene::DrawKey::new(o.pass, o.major, o.minor, 0) {
+                by_slot.insert(dk.slot(), *k);
+            }
+        }
+    }
+    let mut out: BTreeMap<UnitKey, (i32, i32, i32, i32)> = BTreeMap::new();
+    for it in items {
+        if !matches!(it.tag, crate::scene::ItemTag::Unit(_))
+            || it.key.pass() == crate::scene::order::pass::SHADOWS
+        {
+            continue;
+        }
+        let (Some(key), Some(f)) = (by_slot.get(&it.key.slot()), frames.frame(it.frame)) else {
+            continue;
+        };
+        let (l, t) = (it.x, it.y);
+        let (r, b) = (l + f.width as i32, t + f.height as i32);
+        out.entry(*key)
+            .and_modify(|e| *e = (e.0.min(l), e.1.min(t), e.2.max(r), e.3.max(b)))
+            .or_insert((l, t, r, b));
+    }
+    out
+}
+
+/// The hover target at `mouse` by the drawn frame rectangles of the last
+/// pass ([`unit_rects`]) widened by [`FRAME_RECT_PAD`]; the same units as
+/// [`pick`]. PROVISIONAL (REC-2801): the nearest rectangle centre wins; the
+/// original's candidate loop `0x00467AC0` ranks by a unit-type priority
+/// table `0x00711F98` first.
+pub fn pick_rects(
+    world: &ClientWorld,
+    rects: &BTreeMap<UnitKey, (i32, i32, i32, i32)>,
+    mouse: (i32, i32),
+) -> Option<UnitKey> {
+    let mut best: Option<(i32, UnitKey)> = None;
+    for (key, u) in &world.units {
+        if !matches!(key.unit_type, 1 | 2 | 4) || Some(*key) == world.local_player {
+            continue;
+        }
+        if key.unit_type == 1 && u.is_dead() {
+            continue;
+        }
+        if key.unit_type == 2
+            && world
+                .objclient
+                .selectable
+                .get(u.class as usize)
+                .is_some_and(|s| s[(u.mode & 7) as usize] == 0)
+        {
+            continue;
+        }
+        let Some(&(l, t, r, b)) = rects.get(key) else {
+            continue;
+        };
+        let (x, y) = mouse;
+        if x < l - FRAME_RECT_PAD
+            || x >= r + FRAME_RECT_PAD
+            || y < t - FRAME_RECT_PAD
+            || y >= b + FRAME_RECT_PAD
+        {
+            continue;
+        }
+        let d = (x - (l + r) / 2).abs() + (y - (t + b) / 2).abs();
+        if best.is_none_or(|(bd, _)| d < bd) {
+            best = Some((d, *key));
+        }
+    }
+    best.map(|(_, k)| k)
+}
+
 #[cfg(test)]
 mod feet_tests {
     use super::*;
@@ -133,5 +222,40 @@ mod feet_tests {
         assert_eq!(pick(&w, &cam, mouse), Some(UnitKey::new(1, 7)));
         w.objclient.selectable = vec![[1; 8], [1; 8]];
         assert_eq!(pick(&w, &cam, mouse), Some(UnitKey::new(2, 8)));
+    }
+}
+
+#[cfg(test)]
+mod rect_tests {
+    use super::*;
+    use crate::bridge::world::ClientUnit;
+
+    fn world_with_monster() -> (ClientWorld, UnitKey) {
+        let mut w = ClientWorld::default();
+        let key = UnitKey::new(1, 7);
+        let mut m = ClientUnit::new(key);
+        m.mode = 1;
+        m.position = Some((10, 10));
+        w.units.insert(key, m);
+        (w, key)
+    }
+
+    // Covers: specs/tools/scenario-diff.md §3 r8.2
+    #[test]
+    fn the_cursor_hits_a_drawn_frame_rectangle_widened_by_16() {
+        let (w, key) = world_with_monster();
+        let rects = BTreeMap::from([(key, (100, 100, 140, 180))]);
+        assert_eq!(pick_rects(&w, &rects, (84, 100)), Some(key));
+        assert_eq!(pick_rects(&w, &rects, (83, 100)), None);
+        assert_eq!(pick_rects(&w, &rects, (155, 195)), Some(key));
+        assert_eq!(pick_rects(&w, &rects, (156, 195)), None);
+        assert_eq!(pick_rects(&w, &rects, (120, 196)), None);
+    }
+
+    // Covers: specs/tools/scenario-diff.md §3 r8.2
+    #[test]
+    fn a_unit_without_a_drawn_rectangle_is_not_hovered() {
+        let (w, _) = world_with_monster();
+        assert_eq!(pick_rects(&w, &BTreeMap::new(), (120, 120)), None);
     }
 }
