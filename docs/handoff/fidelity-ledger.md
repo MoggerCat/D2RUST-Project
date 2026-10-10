@@ -31,10 +31,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 93 | 0 | 11 | 0 | 551 | 13 | 91 | 0 | 188.5–754 | 6 | 584 / 60 / 11 |
+| skills | 655 | 84 | 0 | 11 | 0 | 560 | 13 | 82 | 0 | 170.5–682 | 6 | 592 / 52 / 11 |
 | systems | 918 | 332 | 46 | 251 | 0 | 289 | 240 | 387 | 2 | 910–3576+ | 39 | 571 / 0 / 347 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 819 | 46 | 414 | 0 | 3200 | 417 | 850 | 12 | 2004.5–7634+ | 286 | 3579 / 343 / 557 |
+| **all** | 4479 | 810 | 46 | 414 | 0 | 3209 | 417 | 841 | 12 | 1986.5–7562+ | 286 | 3587 / 335 / 557 |
 
 ## By family
 
@@ -670,7 +670,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `shrine` | 24 | 2 | 0 | 4 | 0 | 18 | 0 | 0 | 6 | 0 | 5 | 0 |
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 16 | 0 | 0 | 0 | 14 | 0 | 0 | 16 | 0 | 0 | 0 |
-| `skill.ass` | 30 | 12 | 0 | 0 | 0 | 18 | 0 | 0 | 12 | 0 | 0 | 9 |
+| `skill.ass` | 30 | 3 | 0 | 0 | 0 | 27 | 0 | 0 | 3 | 0 | 0 | 1 |
 | `skill.bar` | 30 | 1 | 0 | 0 | 0 | 29 | 0 | 1 | 0 | 0 | 0 | 1 |
 | `skill.dru` | 31 | 16 | 0 | 0 | 0 | 15 | 0 | 4 | 12 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6155
+- Duplicate areas between parts: 6164
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1126,51 +1126,51 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x16`: q-run-net.tsv:3 kept, q-tool-replay-diff.tsv:3 dropped
   - `net.c2s.0x01`: q-run-net.tsv:32 kept, q-tool-replay-diff.tsv:4 dropped
   - `net.c2s.0x03`: q-run-net.tsv:34 kept, q-tool-replay-diff.tsv:5 dropped
-  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:3 kept, rc-a8-setstate.tsv:25 dropped
-  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:4 kept, rc-a8-setstate.tsv:26 dropped
-  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:5 kept, rc-a8-setstate.tsv:27 dropped
-  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:6 kept, rc-a8-setstate.tsv:28 dropped
-  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:7 kept, rc-a8-setstate.tsv:29 dropped
-  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:8 kept, rc-a8-setstate.tsv:30 dropped
-  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:9 kept, rc-a8-setstate.tsv:31 dropped
-  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:10 kept, rc-a8-setstate.tsv:32 dropped
-  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:11 kept, rc-a8-setstate.tsv:33 dropped
-  - `skill.ass.fade`: rc-0skill-div-a.tsv:12 kept, rc-a8-setstate.tsv:34 dropped
-  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:13 kept, rc-a8-setstate.tsv:35 dropped
-  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:14 kept, rc-a8-setstate.tsv:36 dropped
-  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:15 kept, rc-a8-setstate.tsv:37 dropped
-  - `skill.ass.quickness`: rc-0skill-div-a.tsv:16 kept, rc-a8-setstate.tsv:38 dropped
-  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:17 kept, rc-a8-setstate.tsv:39 dropped
-  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:18 kept, rc-a8-setstate.tsv:40 dropped
-  - `skill.ass.venom`: rc-0skill-div-a.tsv:19 kept, rc-a8-setstate.tsv:41 dropped
-  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:20 kept, rc-a8-setstate.tsv:42 dropped
-  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:21 kept, rc-a8-setstate.tsv:43 dropped
-  - `skill.bar.bash`: rc-0skill-div-a.tsv:22 kept, rc-a8-setstate.tsv:44 dropped
-  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:24 kept, rc-a8-setstate.tsv:45 dropped
-  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:25 kept, rc-a8-setstate.tsv:46 dropped
-  - `skill.bar.berserk`: rc-0skill-div-a.tsv:26 kept, rc-a8-setstate.tsv:47 dropped
-  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:27 kept, rc-a8-setstate.tsv:48 dropped
-  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:28 kept, rc-a8-setstate.tsv:49 dropped
-  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:29 kept, rc-a8-setstate.tsv:50 dropped
-  - `skill.bar.find-item`: rc-0skill-div-a.tsv:30 kept, rc-a8-setstate.tsv:51 dropped
-  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:31 kept, rc-a8-setstate.tsv:52 dropped
-  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:32 kept, rc-a8-setstate.tsv:53 dropped
-  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:33 kept, rc-a8-setstate.tsv:54 dropped
-  - `skill.bar.howl`: rc-0skill-div-a.tsv:34 kept, rc-a8-setstate.tsv:55 dropped
-  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:35 kept, rc-a8-setstate.tsv:56 dropped
-  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:36 kept, rc-a8-setstate.tsv:57 dropped
-  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:37 kept, rc-a8-setstate.tsv:58 dropped
-  - `skill.bar.leap`: rc-0skill-div-a.tsv:38 kept, rc-a8-setstate.tsv:59 dropped
-  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:39 kept, rc-a8-setstate.tsv:60 dropped
-  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:40 kept, rc-a8-setstate.tsv:61 dropped
-  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:41 kept, rc-a8-setstate.tsv:62 dropped
-  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:42 kept, rc-a8-setstate.tsv:63 dropped
-  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:43 kept, rc-a8-setstate.tsv:65 dropped
-  - `skill.bar.stun`: rc-0skill-div-a.tsv:44 kept, rc-a8-setstate.tsv:66 dropped
-  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:45 kept, rc-a8-setstate.tsv:67 dropped
-  - `skill.bar.taunt`: rc-0skill-div-a.tsv:46 kept, rc-a8-setstate.tsv:68 dropped
-  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:47 kept, rc-a8-setstate.tsv:69 dropped
-  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:48 kept, rc-a8-setstate.tsv:70 dropped
+  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:4 kept, rc-a8-setstate.tsv:25 dropped
+  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:5 kept, rc-a8-setstate.tsv:26 dropped
+  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:7 kept, rc-a8-setstate.tsv:27 dropped
+  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:8 kept, rc-a8-setstate.tsv:28 dropped
+  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:9 kept, rc-a8-setstate.tsv:29 dropped
+  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:10 kept, rc-a8-setstate.tsv:30 dropped
+  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:12 kept, rc-a8-setstate.tsv:31 dropped
+  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:14 kept, rc-a8-setstate.tsv:32 dropped
+  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:15 kept, rc-a8-setstate.tsv:33 dropped
+  - `skill.ass.fade`: rc-0skill-div-a.tsv:16 kept, rc-a8-setstate.tsv:34 dropped
+  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:18 kept, rc-a8-setstate.tsv:35 dropped
+  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:20 kept, rc-a8-setstate.tsv:36 dropped
+  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:21 kept, rc-a8-setstate.tsv:37 dropped
+  - `skill.ass.quickness`: rc-0skill-div-a.tsv:23 kept, rc-a8-setstate.tsv:38 dropped
+  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:24 kept, rc-a8-setstate.tsv:39 dropped
+  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:26 kept, rc-a8-setstate.tsv:40 dropped
+  - `skill.ass.venom`: rc-0skill-div-a.tsv:27 kept, rc-a8-setstate.tsv:41 dropped
+  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:29 kept, rc-a8-setstate.tsv:42 dropped
+  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:30 kept, rc-a8-setstate.tsv:43 dropped
+  - `skill.bar.bash`: rc-0skill-div-a.tsv:31 kept, rc-a8-setstate.tsv:44 dropped
+  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:33 kept, rc-a8-setstate.tsv:45 dropped
+  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:34 kept, rc-a8-setstate.tsv:46 dropped
+  - `skill.bar.berserk`: rc-0skill-div-a.tsv:35 kept, rc-a8-setstate.tsv:47 dropped
+  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:36 kept, rc-a8-setstate.tsv:48 dropped
+  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:37 kept, rc-a8-setstate.tsv:49 dropped
+  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:38 kept, rc-a8-setstate.tsv:50 dropped
+  - `skill.bar.find-item`: rc-0skill-div-a.tsv:39 kept, rc-a8-setstate.tsv:51 dropped
+  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:40 kept, rc-a8-setstate.tsv:52 dropped
+  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:41 kept, rc-a8-setstate.tsv:53 dropped
+  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:42 kept, rc-a8-setstate.tsv:54 dropped
+  - `skill.bar.howl`: rc-0skill-div-a.tsv:43 kept, rc-a8-setstate.tsv:55 dropped
+  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:44 kept, rc-a8-setstate.tsv:56 dropped
+  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:45 kept, rc-a8-setstate.tsv:57 dropped
+  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:46 kept, rc-a8-setstate.tsv:58 dropped
+  - `skill.bar.leap`: rc-0skill-div-a.tsv:47 kept, rc-a8-setstate.tsv:59 dropped
+  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:48 kept, rc-a8-setstate.tsv:60 dropped
+  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:49 kept, rc-a8-setstate.tsv:61 dropped
+  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:50 kept, rc-a8-setstate.tsv:62 dropped
+  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:51 kept, rc-a8-setstate.tsv:63 dropped
+  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:52 kept, rc-a8-setstate.tsv:65 dropped
+  - `skill.bar.stun`: rc-0skill-div-a.tsv:53 kept, rc-a8-setstate.tsv:66 dropped
+  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:54 kept, rc-a8-setstate.tsv:67 dropped
+  - `skill.bar.taunt`: rc-0skill-div-a.tsv:55 kept, rc-a8-setstate.tsv:68 dropped
+  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:56 kept, rc-a8-setstate.tsv:69 dropped
+  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:57 kept, rc-a8-setstate.tsv:70 dropped
   - `audio.cast-frost-nova-sor.novaice`: rc-audio-rain2.tsv:3 kept, rc-client-skill-do.tsv:3 dropped
   - `system.render.camera.1-frame-size-and-play-area`: rc-00-local-pc1-today.tsv:25 kept, rc-draw-row173.tsv:41 dropped
   - `system.render.camera.2-world-coordinates-client-pixels`: rc-00-local-pc1-today.tsv:27 kept, rc-draw-row173.tsv:42 dropped
@@ -1614,6 +1614,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.110.act-5-siege-1`: rc-gen-wine168.tsv:30 kept, rc-level-pop-2.tsv:15 dropped
   - `net.s2c.0x65`: rc-census-missing.tsv:3 kept, rc-link-2.tsv:39 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-link-2.tsv:94 dropped
+  - `skill.ass.blade-fury`: rc-0skill-div-a.tsv:3 kept, rc-link-2.tsv:121 dropped
+  - `skill.ass.charged-bolt-sentry`: rc-0skill-div-a.tsv:6 kept, rc-link-2.tsv:122 dropped
+  - `skill.ass.death-sentry`: rc-0skill-div-a.tsv:11 kept, rc-link-2.tsv:123 dropped
+  - `skill.ass.dragon-flight`: rc-0skill-div-a.tsv:13 kept, rc-link-2.tsv:124 dropped
+  - `skill.ass.fire-trauma`: rc-0skill-div-a.tsv:17 kept, rc-link-2.tsv:125 dropped
+  - `skill.ass.inferno-sentry`: rc-0skill-div-a.tsv:19 kept, rc-link-2.tsv:126 dropped
+  - `skill.ass.psychic-hammer`: rc-0skill-div-a.tsv:22 kept, rc-link-2.tsv:127 dropped
+  - `skill.ass.shock-field`: rc-0skill-div-a.tsv:25 kept, rc-link-2.tsv:129 dropped
+  - `skill.ass.wake-of-fire-sentry`: rc-0skill-div-a.tsv:28 kept, rc-link-2.tsv:130 dropped
   - `skill.nec.golem-mastery`: rc-a8-setstate.tsv:79 kept, rc-link-2.tsv:131 dropped
   - `skill.nec.skeleton-mastery`: rc-a8-setstate.tsv:80 kept, rc-link-2.tsv:132 dropped
   - `skill.nec.summon-resist`: rc-a8-setstate.tsv:81 kept, rc-link-2.tsv:133 dropped
@@ -1851,52 +1860,52 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.poison-javelin`: rc-a8-setstate.tsv:22 kept, rc-packets-chan.tsv:29 dropped
   - `skill.ama.strafe`: rc-a8-setstate.tsv:23 kept, rc-packets-chan.tsv:32 dropped
   - `skill.ama.valkyrie`: rc-a8-setstate.tsv:24 kept, rc-packets-chan.tsv:33 dropped
-  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:3 kept, rc-packets-chan.tsv:34 dropped
-  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:4 kept, rc-packets-chan.tsv:35 dropped
-  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:5 kept, rc-packets-chan.tsv:36 dropped
-  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:6 kept, rc-packets-chan.tsv:37 dropped
-  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:7 kept, rc-packets-chan.tsv:38 dropped
-  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:8 kept, rc-packets-chan.tsv:39 dropped
-  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:9 kept, rc-packets-chan.tsv:40 dropped
-  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:10 kept, rc-packets-chan.tsv:41 dropped
-  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:11 kept, rc-packets-chan.tsv:42 dropped
-  - `skill.ass.fade`: rc-0skill-div-a.tsv:12 kept, rc-packets-chan.tsv:43 dropped
-  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:13 kept, rc-packets-chan.tsv:44 dropped
-  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:14 kept, rc-packets-chan.tsv:45 dropped
-  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:15 kept, rc-packets-chan.tsv:46 dropped
-  - `skill.ass.quickness`: rc-0skill-div-a.tsv:16 kept, rc-packets-chan.tsv:47 dropped
-  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:17 kept, rc-packets-chan.tsv:48 dropped
-  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:18 kept, rc-packets-chan.tsv:49 dropped
-  - `skill.ass.venom`: rc-0skill-div-a.tsv:19 kept, rc-packets-chan.tsv:50 dropped
-  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:20 kept, rc-packets-chan.tsv:51 dropped
-  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:21 kept, rc-packets-chan.tsv:52 dropped
-  - `skill.bar.bash`: rc-0skill-div-a.tsv:22 kept, rc-packets-chan.tsv:53 dropped
-  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:24 kept, rc-packets-chan.tsv:54 dropped
-  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:25 kept, rc-packets-chan.tsv:55 dropped
-  - `skill.bar.berserk`: rc-0skill-div-a.tsv:26 kept, rc-packets-chan.tsv:56 dropped
-  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:27 kept, rc-packets-chan.tsv:57 dropped
-  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:28 kept, rc-packets-chan.tsv:58 dropped
-  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:29 kept, rc-packets-chan.tsv:59 dropped
-  - `skill.bar.find-item`: rc-0skill-div-a.tsv:30 kept, rc-packets-chan.tsv:60 dropped
-  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:31 kept, rc-packets-chan.tsv:61 dropped
-  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:32 kept, rc-packets-chan.tsv:62 dropped
-  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:33 kept, rc-packets-chan.tsv:63 dropped
-  - `skill.bar.howl`: rc-0skill-div-a.tsv:34 kept, rc-packets-chan.tsv:64 dropped
-  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:35 kept, rc-packets-chan.tsv:65 dropped
-  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:36 kept, rc-packets-chan.tsv:66 dropped
-  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:37 kept, rc-packets-chan.tsv:67 dropped
-  - `skill.bar.leap`: rc-0skill-div-a.tsv:38 kept, rc-packets-chan.tsv:68 dropped
-  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:39 kept, rc-packets-chan.tsv:69 dropped
-  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:40 kept, rc-packets-chan.tsv:70 dropped
-  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:41 kept, rc-packets-chan.tsv:71 dropped
-  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:42 kept, rc-packets-chan.tsv:72 dropped
+  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:4 kept, rc-packets-chan.tsv:34 dropped
+  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:5 kept, rc-packets-chan.tsv:35 dropped
+  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:7 kept, rc-packets-chan.tsv:36 dropped
+  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:8 kept, rc-packets-chan.tsv:37 dropped
+  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:9 kept, rc-packets-chan.tsv:38 dropped
+  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:10 kept, rc-packets-chan.tsv:39 dropped
+  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:12 kept, rc-packets-chan.tsv:40 dropped
+  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:14 kept, rc-packets-chan.tsv:41 dropped
+  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:15 kept, rc-packets-chan.tsv:42 dropped
+  - `skill.ass.fade`: rc-0skill-div-a.tsv:16 kept, rc-packets-chan.tsv:43 dropped
+  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:18 kept, rc-packets-chan.tsv:44 dropped
+  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:20 kept, rc-packets-chan.tsv:45 dropped
+  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:21 kept, rc-packets-chan.tsv:46 dropped
+  - `skill.ass.quickness`: rc-0skill-div-a.tsv:23 kept, rc-packets-chan.tsv:47 dropped
+  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:24 kept, rc-packets-chan.tsv:48 dropped
+  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:26 kept, rc-packets-chan.tsv:49 dropped
+  - `skill.ass.venom`: rc-0skill-div-a.tsv:27 kept, rc-packets-chan.tsv:50 dropped
+  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:29 kept, rc-packets-chan.tsv:51 dropped
+  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:30 kept, rc-packets-chan.tsv:52 dropped
+  - `skill.bar.bash`: rc-0skill-div-a.tsv:31 kept, rc-packets-chan.tsv:53 dropped
+  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:33 kept, rc-packets-chan.tsv:54 dropped
+  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:34 kept, rc-packets-chan.tsv:55 dropped
+  - `skill.bar.berserk`: rc-0skill-div-a.tsv:35 kept, rc-packets-chan.tsv:56 dropped
+  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:36 kept, rc-packets-chan.tsv:57 dropped
+  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:37 kept, rc-packets-chan.tsv:58 dropped
+  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:38 kept, rc-packets-chan.tsv:59 dropped
+  - `skill.bar.find-item`: rc-0skill-div-a.tsv:39 kept, rc-packets-chan.tsv:60 dropped
+  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:40 kept, rc-packets-chan.tsv:61 dropped
+  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:41 kept, rc-packets-chan.tsv:62 dropped
+  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:42 kept, rc-packets-chan.tsv:63 dropped
+  - `skill.bar.howl`: rc-0skill-div-a.tsv:43 kept, rc-packets-chan.tsv:64 dropped
+  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:44 kept, rc-packets-chan.tsv:65 dropped
+  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:45 kept, rc-packets-chan.tsv:66 dropped
+  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:46 kept, rc-packets-chan.tsv:67 dropped
+  - `skill.bar.leap`: rc-0skill-div-a.tsv:47 kept, rc-packets-chan.tsv:68 dropped
+  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:48 kept, rc-packets-chan.tsv:69 dropped
+  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:49 kept, rc-packets-chan.tsv:70 dropped
+  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:50 kept, rc-packets-chan.tsv:71 dropped
+  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:51 kept, rc-packets-chan.tsv:72 dropped
   - `skill.bar.shout`: rc-a8-setstate.tsv:64 kept, rc-packets-chan.tsv:73 dropped
-  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:43 kept, rc-packets-chan.tsv:74 dropped
-  - `skill.bar.stun`: rc-0skill-div-a.tsv:44 kept, rc-packets-chan.tsv:75 dropped
-  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:45 kept, rc-packets-chan.tsv:76 dropped
-  - `skill.bar.taunt`: rc-0skill-div-a.tsv:46 kept, rc-packets-chan.tsv:77 dropped
-  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:47 kept, rc-packets-chan.tsv:78 dropped
-  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:48 kept, rc-packets-chan.tsv:79 dropped
+  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:52 kept, rc-packets-chan.tsv:74 dropped
+  - `skill.bar.stun`: rc-0skill-div-a.tsv:53 kept, rc-packets-chan.tsv:75 dropped
+  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:54 kept, rc-packets-chan.tsv:76 dropped
+  - `skill.bar.taunt`: rc-0skill-div-a.tsv:55 kept, rc-packets-chan.tsv:77 dropped
+  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:56 kept, rc-packets-chan.tsv:78 dropped
+  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:57 kept, rc-packets-chan.tsv:79 dropped
   - `skill.dru.eruption`: rc-a8-setstate.tsv:71 kept, rc-packets-chan.tsv:81 dropped
   - `skill.dru.molten-boulder`: rc-a8-setstate.tsv:72 kept, rc-packets-chan.tsv:88 dropped
   - `skill.dru.summon-grizzly`: rc-a8-setstate.tsv:74 kept, rc-packets-chan.tsv:91 dropped
@@ -2326,33 +2335,33 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.strafe`: rc-a8-setstate.tsv:23 kept, rc-run-1.tsv:148 dropped
   - `skill.ama.valkyrie`: rc-a8-setstate.tsv:24 kept, rc-run-1.tsv:149 dropped
   - `skill.ass.blade-fury`: rc-promote.tsv:64 kept, rc-run-1.tsv:150 dropped
-  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:3 kept, rc-run-1.tsv:152 dropped
-  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:4 kept, rc-run-1.tsv:153 dropped
+  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:4 kept, rc-run-1.tsv:152 dropped
+  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:5 kept, rc-run-1.tsv:153 dropped
   - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:65 kept, rc-run-1.tsv:154 dropped
-  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:5 kept, rc-run-1.tsv:155 dropped
-  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:6 kept, rc-run-1.tsv:156 dropped
-  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:7 kept, rc-run-1.tsv:157 dropped
-  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:8 kept, rc-run-1.tsv:158 dropped
+  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:7 kept, rc-run-1.tsv:155 dropped
+  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:8 kept, rc-run-1.tsv:156 dropped
+  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:9 kept, rc-run-1.tsv:157 dropped
+  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:10 kept, rc-run-1.tsv:158 dropped
   - `skill.ass.death-sentry`: rc-promote.tsv:66 kept, rc-run-1.tsv:159 dropped
-  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:9 kept, rc-run-1.tsv:160 dropped
+  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:12 kept, rc-run-1.tsv:160 dropped
   - `skill.ass.dragon-flight`: rc-promote.tsv:67 kept, rc-run-1.tsv:161 dropped
-  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:10 kept, rc-run-1.tsv:162 dropped
-  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:11 kept, rc-run-1.tsv:163 dropped
-  - `skill.ass.fade`: rc-0skill-div-a.tsv:12 kept, rc-run-1.tsv:164 dropped
+  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:14 kept, rc-run-1.tsv:162 dropped
+  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:15 kept, rc-run-1.tsv:163 dropped
+  - `skill.ass.fade`: rc-0skill-div-a.tsv:16 kept, rc-run-1.tsv:164 dropped
   - `skill.ass.fire-trauma`: rc-promote.tsv:68 kept, rc-run-1.tsv:165 dropped
-  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:13 kept, rc-run-1.tsv:166 dropped
+  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:18 kept, rc-run-1.tsv:166 dropped
   - `skill.ass.inferno-sentry`: rc-promote.tsv:69 kept, rc-run-1.tsv:167 dropped
-  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:14 kept, rc-run-1.tsv:168 dropped
-  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:15 kept, rc-run-1.tsv:169 dropped
+  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:20 kept, rc-run-1.tsv:168 dropped
+  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:21 kept, rc-run-1.tsv:169 dropped
   - `skill.ass.psychic-hammer`: rc-promote.tsv:70 kept, rc-run-1.tsv:170 dropped
-  - `skill.ass.quickness`: rc-0skill-div-a.tsv:16 kept, rc-run-1.tsv:171 dropped
-  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:17 kept, rc-run-1.tsv:172 dropped
+  - `skill.ass.quickness`: rc-0skill-div-a.tsv:23 kept, rc-run-1.tsv:171 dropped
+  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:24 kept, rc-run-1.tsv:172 dropped
   - `skill.ass.shadow-warrior`: rc-promote.tsv:71 kept, rc-run-1.tsv:174 dropped
   - `skill.ass.shock-field`: rc-promote.tsv:72 kept, rc-run-1.tsv:175 dropped
-  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:18 kept, rc-run-1.tsv:176 dropped
-  - `skill.ass.venom`: rc-0skill-div-a.tsv:19 kept, rc-run-1.tsv:177 dropped
+  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:26 kept, rc-run-1.tsv:176 dropped
+  - `skill.ass.venom`: rc-0skill-div-a.tsv:27 kept, rc-run-1.tsv:177 dropped
   - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:73 kept, rc-run-1.tsv:178 dropped
-  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:20 kept, rc-run-1.tsv:179 dropped
+  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:29 kept, rc-run-1.tsv:179 dropped
   - `net.s2c.0x04`: rc-link-2.tsv:37 kept, rc-run-1.tsv:193 dropped
   - `net.s2c.0x05`: rc-gen-nets2c.tsv:3 kept, rc-run-1.tsv:194 dropped
   - `net.s2c.0x07`: rc-goto-settle.tsv:3 kept, rc-run-1.tsv:195 dropped
@@ -4736,49 +4745,49 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.135.act-5-pandemonium-3`: rc-rng-level-pop.tsv:94 kept, rc-run-7.tsv:133 dropped
   - `level.a5.136.act-5-pandemonium-finale`: rc-level-population.tsv:18 kept, rc-run-7.tsv:134 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-7.tsv:138 dropped
-  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:3 kept, rc-run-7b.tsv:3 dropped
-  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:4 kept, rc-run-7b.tsv:4 dropped
-  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:6 kept, rc-run-7b.tsv:5 dropped
-  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:7 kept, rc-run-7b.tsv:6 dropped
-  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:8 kept, rc-run-7b.tsv:7 dropped
-  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:9 kept, rc-run-7b.tsv:8 dropped
-  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:10 kept, rc-run-7b.tsv:9 dropped
-  - `skill.ass.fade`: rc-0skill-div-a.tsv:12 kept, rc-run-7b.tsv:10 dropped
-  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:13 kept, rc-run-7b.tsv:11 dropped
-  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:14 kept, rc-run-7b.tsv:12 dropped
-  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:15 kept, rc-run-7b.tsv:13 dropped
-  - `skill.ass.quickness`: rc-0skill-div-a.tsv:16 kept, rc-run-7b.tsv:14 dropped
-  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:17 kept, rc-run-7b.tsv:15 dropped
-  - `skill.ass.venom`: rc-0skill-div-a.tsv:19 kept, rc-run-7b.tsv:16 dropped
-  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:20 kept, rc-run-7b.tsv:17 dropped
-  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:21 kept, rc-run-7b.tsv:18 dropped
-  - `skill.bar.bash`: rc-0skill-div-a.tsv:22 kept, rc-run-7b.tsv:19 dropped
-  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:24 kept, rc-run-7b.tsv:20 dropped
-  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:25 kept, rc-run-7b.tsv:21 dropped
-  - `skill.bar.berserk`: rc-0skill-div-a.tsv:26 kept, rc-run-7b.tsv:22 dropped
-  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:27 kept, rc-run-7b.tsv:23 dropped
-  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:28 kept, rc-run-7b.tsv:24 dropped
-  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:29 kept, rc-run-7b.tsv:25 dropped
-  - `skill.bar.find-item`: rc-0skill-div-a.tsv:30 kept, rc-run-7b.tsv:26 dropped
-  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:31 kept, rc-run-7b.tsv:27 dropped
-  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:32 kept, rc-run-7b.tsv:28 dropped
-  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:33 kept, rc-run-7b.tsv:29 dropped
-  - `skill.bar.howl`: rc-0skill-div-a.tsv:34 kept, rc-run-7b.tsv:30 dropped
-  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:35 kept, rc-run-7b.tsv:31 dropped
-  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:36 kept, rc-run-7b.tsv:32 dropped
-  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:37 kept, rc-run-7b.tsv:33 dropped
-  - `skill.bar.leap`: rc-0skill-div-a.tsv:38 kept, rc-run-7b.tsv:34 dropped
-  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:39 kept, rc-run-7b.tsv:35 dropped
-  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:40 kept, rc-run-7b.tsv:36 dropped
-  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:41 kept, rc-run-7b.tsv:37 dropped
-  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:42 kept, rc-run-7b.tsv:38 dropped
+  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:4 kept, rc-run-7b.tsv:3 dropped
+  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:5 kept, rc-run-7b.tsv:4 dropped
+  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:8 kept, rc-run-7b.tsv:5 dropped
+  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:9 kept, rc-run-7b.tsv:6 dropped
+  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:10 kept, rc-run-7b.tsv:7 dropped
+  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:12 kept, rc-run-7b.tsv:8 dropped
+  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:14 kept, rc-run-7b.tsv:9 dropped
+  - `skill.ass.fade`: rc-0skill-div-a.tsv:16 kept, rc-run-7b.tsv:10 dropped
+  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:18 kept, rc-run-7b.tsv:11 dropped
+  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:20 kept, rc-run-7b.tsv:12 dropped
+  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:21 kept, rc-run-7b.tsv:13 dropped
+  - `skill.ass.quickness`: rc-0skill-div-a.tsv:23 kept, rc-run-7b.tsv:14 dropped
+  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:24 kept, rc-run-7b.tsv:15 dropped
+  - `skill.ass.venom`: rc-0skill-div-a.tsv:27 kept, rc-run-7b.tsv:16 dropped
+  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:29 kept, rc-run-7b.tsv:17 dropped
+  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:30 kept, rc-run-7b.tsv:18 dropped
+  - `skill.bar.bash`: rc-0skill-div-a.tsv:31 kept, rc-run-7b.tsv:19 dropped
+  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:33 kept, rc-run-7b.tsv:20 dropped
+  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:34 kept, rc-run-7b.tsv:21 dropped
+  - `skill.bar.berserk`: rc-0skill-div-a.tsv:35 kept, rc-run-7b.tsv:22 dropped
+  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:36 kept, rc-run-7b.tsv:23 dropped
+  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:37 kept, rc-run-7b.tsv:24 dropped
+  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:38 kept, rc-run-7b.tsv:25 dropped
+  - `skill.bar.find-item`: rc-0skill-div-a.tsv:39 kept, rc-run-7b.tsv:26 dropped
+  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:40 kept, rc-run-7b.tsv:27 dropped
+  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:41 kept, rc-run-7b.tsv:28 dropped
+  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:42 kept, rc-run-7b.tsv:29 dropped
+  - `skill.bar.howl`: rc-0skill-div-a.tsv:43 kept, rc-run-7b.tsv:30 dropped
+  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:44 kept, rc-run-7b.tsv:31 dropped
+  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:45 kept, rc-run-7b.tsv:32 dropped
+  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:46 kept, rc-run-7b.tsv:33 dropped
+  - `skill.bar.leap`: rc-0skill-div-a.tsv:47 kept, rc-run-7b.tsv:34 dropped
+  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:48 kept, rc-run-7b.tsv:35 dropped
+  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:49 kept, rc-run-7b.tsv:36 dropped
+  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:50 kept, rc-run-7b.tsv:37 dropped
+  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:51 kept, rc-run-7b.tsv:38 dropped
   - `skill.bar.shout`: rc-a8-setstate.tsv:64 kept, rc-run-7b.tsv:39 dropped
-  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:43 kept, rc-run-7b.tsv:40 dropped
-  - `skill.bar.stun`: rc-0skill-div-a.tsv:44 kept, rc-run-7b.tsv:41 dropped
-  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:45 kept, rc-run-7b.tsv:42 dropped
-  - `skill.bar.taunt`: rc-0skill-div-a.tsv:46 kept, rc-run-7b.tsv:43 dropped
-  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:47 kept, rc-run-7b.tsv:44 dropped
-  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:48 kept, rc-run-7b.tsv:45 dropped
+  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:52 kept, rc-run-7b.tsv:40 dropped
+  - `skill.bar.stun`: rc-0skill-div-a.tsv:53 kept, rc-run-7b.tsv:41 dropped
+  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:54 kept, rc-run-7b.tsv:42 dropped
+  - `skill.bar.taunt`: rc-0skill-div-a.tsv:55 kept, rc-run-7b.tsv:43 dropped
+  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:56 kept, rc-run-7b.tsv:44 dropped
+  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:57 kept, rc-run-7b.tsv:45 dropped
   - `skill.dru.cyclone-armor`: rc-packets-chan.tsv:80 kept, rc-run-7b.tsv:46 dropped
   - `skill.dru.eruption`: rc-a8-setstate.tsv:71 kept, rc-run-7b.tsv:47 dropped
   - `skill.dru.feral-rage`: rc-packets-chan.tsv:82 kept, rc-run-7b.tsv:48 dropped
@@ -5010,7 +5019,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
   - `client.s-monsters.path-stop`: rc-draw-row173.tsv:189 kept, rc-warriv-draw.tsv:3 dropped
-  - `skill.bar.whirlwind`: rc-0skill-div-a.tsv:49 kept, rc-whirlwind.tsv:3 dropped
+  - `skill.bar.whirlwind`: rc-0skill-div-a.tsv:58 kept, rc-whirlwind.tsv:3 dropped
   - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:3 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, rc-wp-arrival-mode.tsv:4 dropped
   - `waypoint.3.dark-wood`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:5 dropped
@@ -5155,36 +5164,36 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.pal.conviction`: rc-a8-setstate.tsv:86 kept, skills.tsv:120 dropped
   - `skill.pal.redemption`: rc-a8-setstate.tsv:93 kept, skills.tsv:121 dropped
   - `skill.pal.salvation`: rc-a8-setstate.tsv:97 kept, skills.tsv:122 dropped
-  - `skill.bar.bash`: rc-0skill-div-a.tsv:22 kept, skills.tsv:123 dropped
-  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:45 kept, skills.tsv:124 dropped
-  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:21 kept, skills.tsv:125 dropped
-  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:40 kept, skills.tsv:126 dropped
-  - `skill.bar.howl`: rc-0skill-div-a.tsv:34 kept, skills.tsv:127 dropped
-  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:31 kept, skills.tsv:128 dropped
-  - `skill.bar.leap`: rc-0skill-div-a.tsv:38 kept, skills.tsv:129 dropped
-  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:28 kept, skills.tsv:130 dropped
-  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:42 kept, skills.tsv:131 dropped
-  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:47 kept, skills.tsv:132 dropped
-  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:43 kept, skills.tsv:133 dropped
-  - `skill.bar.taunt`: rc-0skill-div-a.tsv:46 kept, skills.tsv:134 dropped
+  - `skill.bar.bash`: rc-0skill-div-a.tsv:31 kept, skills.tsv:123 dropped
+  - `skill.bar.sword-mastery`: rc-0skill-div-a.tsv:54 kept, skills.tsv:124 dropped
+  - `skill.bar.axe-mastery`: rc-0skill-div-a.tsv:30 kept, skills.tsv:125 dropped
+  - `skill.bar.mace-mastery`: rc-0skill-div-a.tsv:49 kept, skills.tsv:126 dropped
+  - `skill.bar.howl`: rc-0skill-div-a.tsv:43 kept, skills.tsv:127 dropped
+  - `skill.bar.find-potion`: rc-0skill-div-a.tsv:40 kept, skills.tsv:128 dropped
+  - `skill.bar.leap`: rc-0skill-div-a.tsv:47 kept, skills.tsv:129 dropped
+  - `skill.bar.double-swing`: rc-0skill-div-a.tsv:37 kept, skills.tsv:130 dropped
+  - `skill.bar.pole-arm-mastery`: rc-0skill-div-a.tsv:51 kept, skills.tsv:131 dropped
+  - `skill.bar.throwing-mastery`: rc-0skill-div-a.tsv:56 kept, skills.tsv:132 dropped
+  - `skill.bar.spear-mastery`: rc-0skill-div-a.tsv:52 kept, skills.tsv:133 dropped
+  - `skill.bar.taunt`: rc-0skill-div-a.tsv:55 kept, skills.tsv:134 dropped
   - `skill.bar.shout`: rc-a8-setstate.tsv:64 kept, skills.tsv:135 dropped
-  - `skill.bar.stun`: rc-0skill-div-a.tsv:44 kept, skills.tsv:136 dropped
-  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:29 kept, skills.tsv:137 dropped
-  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:36 kept, skills.tsv:138 dropped
-  - `skill.bar.find-item`: rc-0skill-div-a.tsv:30 kept, skills.tsv:139 dropped
-  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:39 kept, skills.tsv:140 dropped
-  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:27 kept, skills.tsv:141 dropped
-  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:37 kept, skills.tsv:142 dropped
-  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:24 kept, skills.tsv:143 dropped
-  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:32 kept, skills.tsv:144 dropped
-  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:35 kept, skills.tsv:145 dropped
-  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:25 kept, skills.tsv:146 dropped
-  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:33 kept, skills.tsv:147 dropped
-  - `skill.bar.whirlwind`: rc-0skill-div-a.tsv:49 kept, skills.tsv:148 dropped
-  - `skill.bar.berserk`: rc-0skill-div-a.tsv:26 kept, skills.tsv:149 dropped
-  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:41 kept, skills.tsv:150 dropped
-  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:48 kept, skills.tsv:151 dropped
-  - `skill.bar.battle-command`: rc-0skill-div-a.tsv:23 kept, skills.tsv:152 dropped
+  - `skill.bar.stun`: rc-0skill-div-a.tsv:53 kept, skills.tsv:136 dropped
+  - `skill.bar.double-throw`: rc-0skill-div-a.tsv:38 kept, skills.tsv:137 dropped
+  - `skill.bar.increased-stamina`: rc-0skill-div-a.tsv:45 kept, skills.tsv:138 dropped
+  - `skill.bar.find-item`: rc-0skill-div-a.tsv:39 kept, skills.tsv:139 dropped
+  - `skill.bar.leap-attack`: rc-0skill-div-a.tsv:48 kept, skills.tsv:140 dropped
+  - `skill.bar.concentrate`: rc-0skill-div-a.tsv:36 kept, skills.tsv:141 dropped
+  - `skill.bar.iron-skin`: rc-0skill-div-a.tsv:46 kept, skills.tsv:142 dropped
+  - `skill.bar.battle-cry`: rc-0skill-div-a.tsv:33 kept, skills.tsv:143 dropped
+  - `skill.bar.frenzy`: rc-0skill-div-a.tsv:41 kept, skills.tsv:144 dropped
+  - `skill.bar.increased-speed`: rc-0skill-div-a.tsv:44 kept, skills.tsv:145 dropped
+  - `skill.bar.battle-orders`: rc-0skill-div-a.tsv:34 kept, skills.tsv:146 dropped
+  - `skill.bar.grim-ward`: rc-0skill-div-a.tsv:42 kept, skills.tsv:147 dropped
+  - `skill.bar.whirlwind`: rc-0skill-div-a.tsv:58 kept, skills.tsv:148 dropped
+  - `skill.bar.berserk`: rc-0skill-div-a.tsv:35 kept, skills.tsv:149 dropped
+  - `skill.bar.natural-resistance`: rc-0skill-div-a.tsv:50 kept, skills.tsv:150 dropped
+  - `skill.bar.war-cry`: rc-0skill-div-a.tsv:57 kept, skills.tsv:151 dropped
+  - `skill.bar.battle-command`: rc-0skill-div-a.tsv:32 kept, skills.tsv:152 dropped
   - `skill.dru.raven`: q-chk-skills-bda.tsv:33 kept, skills.tsv:153 dropped
   - `skill.dru.plague-poppy`: q-chk-skills-bda.tsv:34 kept, skills.tsv:154 dropped
   - `skill.dru.wearwolf`: rc-packets-chan.tsv:93 kept, skills.tsv:155 dropped
@@ -5216,35 +5225,35 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.dru.armageddon`: q-chk-skills-bda.tsv:61 kept, skills.tsv:181 dropped
   - `skill.dru.hurricane`: rc-packets-chan.tsv:86 kept, skills.tsv:182 dropped
   - `skill.ass.fire-trauma`: rc-promote.tsv:68 kept, skills.tsv:183 dropped
-  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:5 kept, skills.tsv:184 dropped
+  - `skill.ass.claw-mastery`: rc-0skill-div-a.tsv:7 kept, skills.tsv:184 dropped
   - `skill.ass.psychic-hammer`: rc-promote.tsv:70 kept, skills.tsv:185 dropped
-  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:18 kept, skills.tsv:186 dropped
-  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:11 kept, skills.tsv:187 dropped
+  - `skill.ass.tiger-strike`: rc-0skill-div-a.tsv:26 kept, skills.tsv:186 dropped
+  - `skill.ass.dragon-talon`: rc-0skill-div-a.tsv:15 kept, skills.tsv:187 dropped
   - `skill.ass.shock-field`: rc-promote.tsv:72 kept, skills.tsv:188 dropped
   - `skill.ass.blade-sentinel`: rc-run-1.tsv:151 kept, skills.tsv:189 dropped
-  - `skill.ass.quickness`: rc-0skill-div-a.tsv:16 kept, skills.tsv:190 dropped
-  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:13 kept, skills.tsv:191 dropped
-  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:9 kept, skills.tsv:192 dropped
+  - `skill.ass.quickness`: rc-0skill-div-a.tsv:23 kept, skills.tsv:190 dropped
+  - `skill.ass.fists-of-fire`: rc-0skill-div-a.tsv:18 kept, skills.tsv:191 dropped
+  - `skill.ass.dragon-claw`: rc-0skill-div-a.tsv:12 kept, skills.tsv:192 dropped
   - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:65 kept, skills.tsv:193 dropped
   - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:73 kept, skills.tsv:194 dropped
-  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:20 kept, skills.tsv:195 dropped
-  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:7 kept, skills.tsv:196 dropped
-  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:8 kept, skills.tsv:197 dropped
+  - `skill.ass.weapon-block`: rc-0skill-div-a.tsv:29 kept, skills.tsv:195 dropped
+  - `skill.ass.cloak-of-shadows`: rc-0skill-div-a.tsv:9 kept, skills.tsv:196 dropped
+  - `skill.ass.cobra-strike`: rc-0skill-div-a.tsv:10 kept, skills.tsv:197 dropped
   - `skill.ass.blade-fury`: rc-promote.tsv:64 kept, skills.tsv:198 dropped
-  - `skill.ass.fade`: rc-0skill-div-a.tsv:12 kept, skills.tsv:199 dropped
+  - `skill.ass.fade`: rc-0skill-div-a.tsv:16 kept, skills.tsv:199 dropped
   - `skill.ass.shadow-warrior`: rc-promote.tsv:71 kept, skills.tsv:200 dropped
-  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:6 kept, skills.tsv:201 dropped
-  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:10 kept, skills.tsv:202 dropped
-  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:14 kept, skills.tsv:203 dropped
+  - `skill.ass.claws-of-thunder`: rc-0skill-div-a.tsv:8 kept, skills.tsv:201 dropped
+  - `skill.ass.dragon-tail`: rc-0skill-div-a.tsv:14 kept, skills.tsv:202 dropped
+  - `skill.ass.lightning-sentry`: rc-0skill-div-a.tsv:20 kept, skills.tsv:203 dropped
   - `skill.ass.inferno-sentry`: rc-promote.tsv:69 kept, skills.tsv:204 dropped
-  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:15 kept, skills.tsv:205 dropped
-  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:4 kept, skills.tsv:206 dropped
+  - `skill.ass.mind-blast`: rc-0skill-div-a.tsv:21 kept, skills.tsv:205 dropped
+  - `skill.ass.blades-of-ice`: rc-0skill-div-a.tsv:5 kept, skills.tsv:206 dropped
   - `skill.ass.dragon-flight`: rc-promote.tsv:67 kept, skills.tsv:207 dropped
   - `skill.ass.death-sentry`: rc-promote.tsv:66 kept, skills.tsv:208 dropped
-  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:3 kept, skills.tsv:209 dropped
-  - `skill.ass.venom`: rc-0skill-div-a.tsv:19 kept, skills.tsv:210 dropped
+  - `skill.ass.blade-shield`: rc-0skill-div-a.tsv:4 kept, skills.tsv:209 dropped
+  - `skill.ass.venom`: rc-0skill-div-a.tsv:27 kept, skills.tsv:210 dropped
   - `skill.ass.shadow-master`: rc-run-1.tsv:173 kept, skills.tsv:211 dropped
-  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:17 kept, skills.tsv:212 dropped
+  - `skill.ass.royal-strike`: rc-0skill-div-a.tsv:24 kept, skills.tsv:212 dropped
   - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, skills.tsv:213 dropped
   - `hireling.skills.desert-mercenary`: rc-run-2.tsv:100 kept, skills.tsv:214 dropped
   - `skill.generic.attack-kick-throw`: rc-run-2.tsv:153 kept, skills.tsv:220 dropped
@@ -6874,7 +6883,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1958
+- Rows whose state disagrees with their checks: 1967
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6935,7 +6944,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1898 more (rerun with the tsv to list them)
+  - … and 1907 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -9156,18 +9165,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ama.poison-javelin` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/functions.tsv | rc-a8-setstate: gen-skill-ama-15 packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.strafe` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-ama-26 packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.valkyrie` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-ama-32 packets: frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) |
-| `skill.ass.blade-fury` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-blade-fury: channel packets DIVERGED |
 | `skill.ass.blade-sentinel` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-1 ass-blade-sentinel: state: frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] (1/1 of its a* checks diverge) |
-| `skill.ass.charged-bolt-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-charged-bolt-sentry: channel packets DIVERGED |
-| `skill.ass.death-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-death-sentry: channel packets DIVERGED |
-| `skill.ass.dragon-flight` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-dragon-flight: channel packets DIVERGED |
-| `skill.ass.fire-trauma` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: ass-fire-blast: channel packets DIVERGED |
-| `skill.ass.inferno-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-inferno-sentry: channel packets DIVERGED |
-| `skill.ass.psychic-hammer` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-psychic-hammer: channel packets DIVERGED |
 | `skill.ass.shadow-master` | entity | DIVERGED | M | DIVERGED@48 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
 | `skill.ass.shadow-warrior` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-shadow-warrior: channel packets DIVERGED |
-| `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-shock-field: channel packets DIVERGED |
-| `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-wake-of-fire-sentry: channel packets DIVERGED |
 | `skill.bar.shout` | entity | DIVERGED | S | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
 | `skill.dru.armageddon` | entity | DIVERGED | M | DIVERGED@37 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-armageddon: state channel first divergence: frame 37 game, field seed: 1.14d [3385903807, 408973908] vs d2rs [980535581, 1085454190] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-cycle-of-life: state channel first divergence: frame 31 monster 1:8 class 426, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
@@ -9432,23 +9432,32 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ama.pierce` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in gen-skill-ama-33 |
 | `skill.ama.power-strike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in ama-power-strike,gen-skill-ama-14 |
 | `skill.ama.slow-missiles` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in ama-slow-missiles,gen-skill-ama-17 |
+| `skill.ass.blade-fury` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.blade-shield` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.blades-of-ice` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.charged-bolt-sentry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.claw-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.claws-of-thunder` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.cloak-of-shadows` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.cobra-strike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.death-sentry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.dragon-claw` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.dragon-flight` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md,specs/skills/bodies-2.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.dragon-tail` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.dragon-talon` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.fade` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.fire-trauma` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.fists-of-fire` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.inferno-sentry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.lightning-sentry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.mind-blast` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.psychic-hammer` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.quickness` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.royal-strike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.shock-field` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.tiger-strike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.ass.venom` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
+| `skill.ass.wake-of-fire-sentry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets channel added to the check; packets MATCH + state PARTIAL only RUN_GAPS (REC-2055/2056) |
 | `skill.ass.weapon-block` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.bar.axe-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
 | `skill.bar.bash` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh |
@@ -9799,7 +9808,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `audio.cast-start-sound` | system | DIVERGED | S | DIVERGED | yes | 0 | n | rc-audio-cast-run | specs/skills/sequences.md | audio-diff traces/audio/audio-cast-frost-nova-sor.check: coldcast.wav now T 18/58 = 1.14d (click start served one sound tick later); open: rain2.wav T 3 vs 9, unknown 35015-byte sound at T 25/65 (frost nova missile/hit) |
 | `net.c2s.0x01` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED save-items-ama: suite.py crashes on channel save (no ORIG_OUTPUTS entry) |
 | `net.c2s.0x06` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/rc-unit-guid-order | specs/sim/client-messages.tsv | rc-promote 2026-10-10 fresh run: combat-melee-fallen: channel packets DIVERGED |
-| `net.c2s.0x0c` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (3/3 of its a* checks diverge) |
+| `net.c2s.0x0c` | message | DIVERGED | M | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (3/3 of its a* checks diverge) |
 | `net.c2s.0x15` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED@20 net-s2c-chat: packets: frame 20 stream s2c #0 missing in d2rs (id 0x26) |
 | `net.c2s.0x4b` | message | DIVERGED | S | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED hire-follow-warp-kashya: None |
 | `net.c2s.0x5f` | message | DIVERGED | M | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
@@ -9813,7 +9822,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x19` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED@12 net-s2c-gold-pickup: packets: frame 12 stream s2c #0 missing in d2rs (id 0x0a) |
 | `net.s2c.0x1a` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-follow-waypoint-kashya@315 missing in d2rs; 1 equal pair(s) |
 | `net.s2c.0x1b` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED combat-melee-fallen: None |
-| `net.s2c.0x1c` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (2/3 of its a* checks diverge) |
+| `net.s2c.0x1c` | message | DIVERGED | M | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (2/3 of its a* checks diverge) |
 | `net.s2c.0x1f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-asheara@22 missing in d2rs; 10 equal pair(s) |
 | `net.s2c.0x20` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): items-drops-cha-01 items DIVERGED (checks-status.md) |
 | `net.s2c.0x22` | message | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: all checks MATCH or PARTIAL under DECIDED REC-2055/2056 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
