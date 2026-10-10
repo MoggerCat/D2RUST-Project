@@ -1561,6 +1561,11 @@ pub struct SkillRow {
     /// The flag columns `ui/controls.md` §6 r8 reads, by `skills.txt`
     /// bit (`controls::click::skill_flag`).
     pub flags: u32,
+    /// `itypea1..3`, `itypeb1..3` (i16, <= 0 = none): the item type sets
+    /// of `skills/use.md` §2 "Item type test".
+    pub itypes: [[i16; 3]; 2],
+    /// `etypea1..2`, `etypeb1..2` (i16, <= 0 = none).
+    pub etypes: [[i16; 2]; 2],
     /// `InGame` (`skills/use.md` §2 use state test 1).
     pub ingame: bool,
     /// `aura` (use state test 3).

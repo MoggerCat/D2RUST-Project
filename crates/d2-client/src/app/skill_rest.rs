@@ -121,6 +121,14 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         seqinput: s.seqinput,
         range: s.range,
         flags: crate::bridge::combat::skill_flags(s),
+        itypes: [
+            [s.itypea1 as i16, s.itypea2 as i16, s.itypea3 as i16],
+            [s.itypeb1 as i16, s.itypeb2 as i16, s.itypeb3 as i16],
+        ],
+        etypes: [
+            [s.etypea1 as i16, s.etypea2 as i16],
+            [s.etypeb1 as i16, s.etypeb2 as i16],
+        ],
         ingame: s.ingame,
         aura: s.aura,
         mana: s.mana,

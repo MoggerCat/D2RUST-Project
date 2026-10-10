@@ -158,7 +158,8 @@ def run():
              "aud ledger area")
         # every family is generated here or skipped with a reason
         skipped = {"mon": "needs real monstats rows with ledger monster.* areas",
-                   "monskill": "needs a ledger skill.monster.* row"}
+                   "monskill": "needs a ledger skill.monster.* row",
+                   "quest": "needs the real quest monster rows in monstats"}
         for fam in cg.FAMILIES:
             t.ok(by.get(fam) or fam in skipped, f"family {fam} generated nothing and is not skipped")
         parse_all(checks, t)
