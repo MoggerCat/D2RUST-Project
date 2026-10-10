@@ -23,14 +23,14 @@
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
 |   2. Shared helpers, batch 4 (continued) | 68–198 |
-|   3. Bodies used by one monster skill (continued) | 199–515 |
-|   4. Bodies used by no monster skill row | 516–644 |
-| Constants & data dependencies | 645–656 |
-| Randomness | 657–672 |
-| Edge cases & original bugs | 673–705 |
-| Test vectors | 706–716 |
-| Provenance | 717–727 |
-| Open questions | 728–749 |
+|   3. Bodies used by one monster skill (continued) | 199–522 |
+|   4. Bodies used by no monster skill row | 523–651 |
+| Constants & data dependencies | 652–663 |
+| Randomness | 664–679 |
+| Edge cases & original bugs | 680–712 |
+| Test vectors | 713–723 |
+| Provenance | 724–734 |
+| Open questions | 735–756 |
 <!-- /index -->
 
 ## Summary
@@ -508,6 +508,13 @@ Each eaten corpse adds one more list of the state (Edge case 6).
 3. Unit flags |= 0x40.
 4. R `lob` → lob `skill_missile`, else straight, with (m, unit, skill,
    L, 0, 0, 0, 0, quant 0). Return 1.
+
+S3 is the byte monster init wrote (§10 variant, then doomknight2/3's
+own roll of 4), read live from the monster data, never a default 0;
+L is the used entry's level, for a monster its init entry's base
+(`Sk<i>lvl` plus the bonus, `monsters/init.md` §6), not 1. Measured:
+`milestone-hellforge` frame 83, three doomknight2 (`Sk1lvl` 3) fire
+missiles 324, 323, 324 at missile level 3 (rc-coverage-warps).
 
 #### 3.26 srvdo 149 NecromageMissile `0x005CE0B0`
 

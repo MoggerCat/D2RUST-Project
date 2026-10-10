@@ -408,11 +408,25 @@ impl<X: Pending> ActionHooks<X> {
 
     /// The unit's current skill entry (`use.md` §1 rule 2, +0x10): its
     /// list's current entry when it has a list, else
-    /// [`Pending::used_skill`].
+    /// [`Pending::used_skill`] with the base level of the monster's entry
+    /// for that skill: its summon entry ([`ActionHooks::monster_skills`]),
+    /// else its init entry ([`ActionHooks::natural_skills`]: `Sk<i>lvl`
+    /// plus the bonus, `monsters/init.md` §6), as the AI's `skill_level`
+    /// reads them.
     pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
         match self.skill_lists.get(&unit) {
             Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
-            None => self.x.used_skill(unit),
+            None => {
+                let mut e = self.x.used_skill(unit)?;
+                let levels = self
+                    .monster_skills
+                    .get(&unit)
+                    .or_else(|| self.natural_skills.get(&unit));
+                if let Some(&base) = levels.and_then(|m| m.get(&e.skill)) {
+                    e.base = base;
+                }
+                Some(e)
+            }
         }
     }
 
