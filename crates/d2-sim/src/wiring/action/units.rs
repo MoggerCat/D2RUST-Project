@@ -456,6 +456,12 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// §2.3, `vitals.md` §4.8 rule 2).
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
+        // In the original the corpse is made before the mode set
+        // `0x00553570` queues the player (`vitals.md` §4.8 rule 2), so the
+        // player's update goes out before the corpse's (recorded
+        // `items-drops-cha-00` frame 96: 0x0D of the player, then 0x59).
+        let _ = sim.game.lists.unqueue_update(unit);
+        let _ = sim.game.lists.queue_update(unit);
         if let Some(q) = self.owner_deaths.as_mut() {
             q.push(unit);
         }
