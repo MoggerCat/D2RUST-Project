@@ -441,6 +441,13 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         r
     }
 
+    fn follow_frame_schedule(&mut self) {
+        if let Some(w) = self.weather.as_mut() {
+            w.follow_frame_schedule();
+        }
+        self.inner.follow_frame_schedule();
+    }
+
     fn weather_update(&mut self, world: &ClientWorld, assets: &mut ViewAssets) {
         let local_at = self.local_at;
         let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);

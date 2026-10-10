@@ -58,11 +58,11 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO};
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO, JUSTHIT};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         if matches!(
             callback.0,
-            DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+            JUSTHIT | DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
         ) {
             self.removed_lists.push((unit, state, callback.0));
         }
