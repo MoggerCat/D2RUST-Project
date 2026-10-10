@@ -362,9 +362,6 @@ pub struct ActionHooks<X> {
     /// itemstatcost flags, state groups or overlays (every lookup answers
     /// "no record").
     pub bodies: Option<Arc<crate::skills::use_::bodies::BodyTables>>,
-    /// The item tables' property rows, for a monster's `monprop` records
-    /// (`monsters/init.md` §11): `None` applies none.
-    pub item_tables: Option<Arc<crate::items::ItemTables>>,
     /// Unit event handler lists (unit +0x90, `bodies.md` §2.13), first =
     /// head.
     pub handlers: BTreeMap<UnitId, Vec<crate::skills::use_::bodies::Handler>>,
@@ -570,7 +567,6 @@ impl<X> ActionHooks<X> {
             death: death::DeathState::default(),
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
-            item_tables: None,
             pet_lists: BTreeMap::new(),
             hireling_units: std::collections::BTreeSet::new(),
             monster_skills: BTreeMap::new(),

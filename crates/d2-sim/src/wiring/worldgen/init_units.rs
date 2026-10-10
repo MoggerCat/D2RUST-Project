@@ -101,38 +101,6 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.h.ai_info.difficulty = d;
     }
 
-    /// The `monprop` record as an item property written on the unit
-    /// (`monsters/init.md` §11: the dispatcher `0x0065FD70` with the unit
-    /// as the item, owner none: its list is state 0, flags 0x40, §4.2
-    /// `properties.md`); rolls draw on the unit's seed.
-    // PROVISIONAL (REC-3372): the dispatcher's mode argument for the monprop
-    // call is not read; mode 0 (no base reset, which only mode 1 runs).
-    fn apply_property(&mut self, unit: UnitId, prop: i32, par: i32, min: i32, max: i32) {
-        use crate::items::props::{apply_property, mode, PropCtx};
-        use crate::wiring::economy::item_stats::{StatCtx, UnitStats};
-        let Some(t) = self.v.h.item_tables.clone() else {
-            return;
-        };
-        let Some(seed) = self.v.units.get(unit).map(|r| r.seed) else {
-            return;
-        };
-        let cell = std::cell::RefCell::new(StatCtx::new(&mut *self.v.stats, &mut *self.v.h));
-        let mut item = crate::items::Item::new(0, 101, UnitStats::new(&cell, unit));
-        item.item_seed = seed;
-        let mut ctx = PropCtx::item(mode::AFFIX);
-        let rec = crate::items::tables::PropRec {
-            code: prop,
-            param: par,
-            min,
-            max,
-        };
-        apply_property(&t, &mut item, &mut ctx, &rec);
-        let seed = item.item_seed;
-        if let Some(r) = self.v.units.get_mut(unit) {
-            r.seed = seed;
-        }
-    }
-
     /// `StatLists::unit_base`, layer 0.
     fn stat(&self, unit: UnitId, stat: u16) -> i32 {
         self.v.stats.unit_base(unit, stat, 0)
