@@ -5252,7 +5252,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `audio.cast-start-sound` | system | DIVERGED | S | DIVERGED | yes | 0 | n | rc-audio-cast-run | specs/skills/sequences.md | coldcast.wav now T 18/58 = 1.14d (click start served one sound tick later); open: rain2.wav T 3 vs 9, unknown 35015-byte sound at T 25/65 (frost nova missile/hit) |
+| `audio.cast-start-sound` | system | DIVERGED | S | DIVERGED | yes | 0 | n | rc-audio-cast-run | specs/skills/sequences.md | audio-diff traces/audio/audio-cast-frost-nova-sor.check: coldcast.wav now T 18/58 = 1.14d (click start served one sound tick later); open: rain2.wav T 3 vs 9, unknown 35015-byte sound at T 25/65 (frost nova missile/hit) |
 | `net.c2s.0x01` | message | DIVERGED | S | DIVERGED@11 | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | packet-census: first diverged save-items-ama@11 missing in d2rs; 1 equal pair(s) |
 | `net.c2s.0x06` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/rc-unit-guid-order | specs/sim/client-messages.tsv | rc-unit-guid-order (integ-r10): the 0x06 bytes are now equal on both sides, 06 01000000 15000000 at frame 39 (target GUID 21; the old 21 vs 19 offset no longer reproduces). The check still diverges on other ids: packets frame 3 S->C 0x07 missing in d2rs, state frame 46 game seed |
 | `net.c2s.0x2f` | message | DIVERGED | S | DIVERGED@158 | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: first diverged a5-npc-larzuk@158 missing in d2rs; 96 equal pair(s) |

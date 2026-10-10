@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-audio.cast-start-sound	system	systems	0x004C6140 skill start sound, local click	specs/skills/sequences.md	implemented	traces/audio/audio-cast-frost-nova-sor.check	DIVERGED	yes	0	n	rc-audio-cast-run	DIVERGED	S	coldcast.wav now T 18/58 = 1.14d (click start served one sound tick later); open: rain2.wav T 3 vs 9, unknown 35015-byte sound at T 25/65 (frost nova missile/hit)
+audio.cast-start-sound	system	systems	0x004C6140 skill start sound, local click	specs/skills/sequences.md	implemented	-	DIVERGED	yes	0	n	rc-audio-cast-run	DIVERGED	S	audio-diff traces/audio/audio-cast-frost-nova-sor.check: coldcast.wav now T 18/58 = 1.14d (click start served one sound tick later); open: rain2.wav T 3 vs 9, unknown 35015-byte sound at T 25/65 (frost nova missile/hit)
