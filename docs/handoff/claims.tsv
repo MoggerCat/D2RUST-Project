@@ -34,3 +34,4 @@ C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops t
 C-mon-inv-9d	rc-skill-promote-9d	19:03	0x9D monster inventory (0x00534F80) for ass shadow-warrior/master	open
 C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	done ass-shadow-master state 61->70/70 (player skill levels for the pet); 20 checks improved, 0 worse
 C070	rc-drops-2	19:22	items-drops-nor-10 monsters 0x16/0x17/0x1b never die (1.14d frames 183/187)	open
+C-pc1-wine-2	rc-pc1-wine	19:24	object.preset 574-579 (DS1 data has none), system.formats d2s-appearance 4/5 + d2s-load variants (Wine saves), Step 4 list	open
