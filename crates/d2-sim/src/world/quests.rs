@@ -18,6 +18,7 @@ pub mod act4;
 pub mod act5;
 pub mod helpers;
 pub mod late;
+pub mod placeholders;
 pub mod tables;
 
 #[cfg(test)]
@@ -1240,6 +1241,11 @@ pub trait QuestWorld {
     // function through `unhandled` (chain 0xFE) and returns the neutral
     // value.
 
+    /// The object control's seed (game +0x10F0, `0x00546FA0`): the stream
+    /// the object inits draw from. `None`: no object state.
+    fn object_seed(&mut self) -> Option<&mut Seed> {
+        None
+    }
     /// `0x00619730`: the room's sub-tile box (X, Y, W, H). `None`: not
     /// known (the helpers then use the all-zero box `0x00619730` returns
     /// for a null room).

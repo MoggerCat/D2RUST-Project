@@ -1,6 +1,17 @@
 {
   "permissions": {
     "allow": [
+      "mcp__claude-code-remote__send_message",
+      "mcp__claude-code-remote__create_session",
+      "mcp__claude-code-remote__archive_session",
+      "mcp__claude-code-remote__get_session",
+      "mcp__claude-code-remote__list_events",
+      "mcp__claude-code-remote__send_later",
+      "Bash(git:*)",
+      "Bash(python3 tools/:*)",
+      "Bash(sh tools/:*)",
+      "Bash(tools/coord/coordinator/mergeone.sh:*)",
+      "Bash(cargo:*)"
       "Bash(sh tools/coord/sync.sh)",
       "Bash(sh tools/coord/sync.sh:*)",
       "Bash(sh tools/cloud-setup.sh)",

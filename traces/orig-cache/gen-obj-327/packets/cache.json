@@ -1,0 +1,40 @@
+{
+ "channel": "packets",
+ "check": "gen-obj-327",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "80",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "10 object 327 @x @y",
+  "--poke",
+  "20 operate @2:327"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "88f58698a8cb7682d0ed10b2a5515e28446da630815ed22742db96041eec3e75",
+   "size": 90249
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "44761228f6d81cd0912654931c10e4bb2d96688151b87be9bd871a719c891767",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e31aa9e52ef56d3ca9875582c130e42fa08e4920bf2976748e60620618970e8a",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

@@ -28,14 +28,14 @@
 |   1. Conventions | 66–93 |
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
-|   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–1003 |
-| Constants & data dependencies | 1004–1039 |
-| Randomness | 1040–1056 |
-| Edge cases & original bugs | 1057–1096 |
-| Test vectors | 1097–1111 |
-| Provenance | 1112–1134 |
-| Open questions | 1135–1170 |
+|   4. Bodies used by several monster skills | 356–551 |
+|   5. Bodies used by one monster skill | 552–1010 |
+| Constants & data dependencies | 1011–1046 |
+| Randomness | 1047–1063 |
+| Edge cases & original bugs | 1064–1103 |
+| Test vectors | 1104–1118 |
+| Provenance | 1119–1141 |
+| Open questions | 1142–1177 |
 <!-- /index -->
 
 ## Summary
@@ -494,6 +494,13 @@ The missile belongs to the summoner's owner and starts on the corpse.
 Each member of a monster family (`NextInClass` chain) fires the next
 missile row: fallenshaman1 `srvmissilea`, fallenshaman2 the row after,
 and so on.
+
+Recorded (items-drops-nor-04, 1.14d): fallenshaman5 (class 62, position
+4) fires missile class 26 (shafire5); firing class 22 (position read as 0)
+changed the missile's start offset and the hit frame, which moved the
+dropper's death and the unit seed. The production position is the fixups.md
+§8 pass-A value computed from the loaded monstats rows
+(`population::data::chain_position`), not a default.
 
 #### 4.10 srvdo 96 ZakarumHeal, Bestow `0x005CC840`
 
