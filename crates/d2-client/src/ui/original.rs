@@ -289,6 +289,11 @@ struct Shared {
     /// draws (`client/model.md` Randomness r4: one stream); the cursor
     /// step draws on it when linked ([`OriginalUi::set_client_seed`]).
     client_seed: Option<std::sync::Arc<std::sync::Mutex<crate::audio::driver::ClientSeed>>>,
+    /// A cursor step owed by the last cursor draw (run by
+    /// [`OriginalUi::cursor_step`]).
+    cursor_step_owed: std::cell::Cell<bool>,
+    /// The host clock set by the app ([`OriginalUi::set_host_now`]).
+    host_now: std::cell::Cell<Option<u32>>,
     /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
     /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
     client_quest: [u8; 96],
@@ -460,6 +465,8 @@ impl OriginalUi {
             cursor: RefCell::new(super::cursor::Cursor::init(0, 640, 480, 0)),
             cursor_seed: std::cell::Cell::new(None),
             client_seed: None,
+            cursor_step_owed: std::cell::Cell::new(false),
+            host_now: std::cell::Cell::new(None),
             client_quest: [0; 96],
             level_names: Vec::new(),
             horadric_start: Default::default(),
