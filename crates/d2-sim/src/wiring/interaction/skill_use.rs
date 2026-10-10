@@ -1718,7 +1718,12 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     // ---- batch 4
 
     fn dir64(&self, u: UnitId, at: (i32, i32)) -> i32 {
-        self.x().body_dir64(u, at)
+        // `0x00621DC0` through the path provider; the host's answer
+        // only without one (MagottLay egg side, `gen-mon-72`).
+        self.cv
+            .v
+            .path_dir64(u, at)
+            .unwrap_or_else(|| self.x().body_dir64(u, at))
     }
     /// Unit +0x4E.
     fn action_frame(&self, u: UnitId) -> i32 {
