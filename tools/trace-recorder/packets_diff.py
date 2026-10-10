@@ -186,16 +186,22 @@ def masked(masks, b):
 
 # --- windows and streams ------------------------------------------------------
 
+# S->C 0xB4 ConnectionRefused: compared although it is a transport row.
+KEPT_S2C = 0xB4
+
+
 def transport_rows():
     """Ids excluded with their rows (intents-events.md §6 rule 3, §4 rule
     4): C->S 0x66 (warden) and 0x6D (ping); S->C rows `produced_by`
-    transport (0x8F pong, 0xAE, 0xAF-0xB4)."""
+    transport (0x8F pong, 0xAE, 0xAF-0xB3). 0xB4 (ConnectionRefused) is kept:
+    it is the load result of a refused join (formats/d2s-load.md §5 r2a),
+    sent only then."""
     c2s, s2c = {0x66, 0x6D}, set()
     p = os.path.join(SPECS, "sim", "server-messages.tsv")
     if os.path.exists(p):
         with open(p, newline="", encoding="utf-8") as f:
             s2c = {int(r["id"], 16) for r in csv.DictReader(f, delimiter="\t")
-                   if r.get("produced_by") == "transport"}
+                   if r.get("produced_by") == "transport"} - {KEPT_S2C}
     return {"c2s": c2s, "s2c": s2c}
 
 

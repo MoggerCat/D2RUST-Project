@@ -24,8 +24,8 @@ use d2_sim::world::quests::HostRequest;
 
 use super::handlers;
 use super::handlers::player::{HotKey, HOTKEY_SLOTS};
-use super::handlers::world::ActionEvents;
 use super::handlers::world::{self as world_handlers, NoWorld, WorldError, WorldHost};
+use super::handlers::world::{ActionEvents, Outbox};
 use super::session_flow::{SessionFlow, SessionRunner};
 use super::storage::{CharacterStore, SaveFault};
 use crate::seams::{
@@ -250,6 +250,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
     pub fn set_session(&mut self, flow: SessionFlow<D, W>)
     where
         D: ActionEvents + 'static,
+        D::X: Outbox,
         W: 'static,
     {
         self.session = Some(Box::new(flow));

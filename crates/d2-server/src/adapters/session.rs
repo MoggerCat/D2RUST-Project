@@ -81,9 +81,11 @@ use d2_sim::wiring::path::place::game_entry;
 use d2_sim::wiring::path::walk::PathCtx;
 
 use super::character::{self, ActionCharacter, CharacterWorld, LoadContext, LoadError, LoadReport};
+use super::handlers::world::Outbox;
 use super::handlers::world::{ActionEvents, StartItems, WiredWorld};
 use super::SimGame;
 use crate::seams::ClientId;
+use crate::seams::MessageSink;
 
 /// The game fields of S→C 0x01 (`intents-events.md` §8.1 rule 3).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -337,6 +339,78 @@ pub fn create_game<D: ActionEvents, W>(
         .hooks
         .x
         .send(player, &msg::LOAD_SUCCESSFUL);
+    Ok(())
+}
+
+/// The skill levels a refused load had applied before it failed (internal
+/// codes 20–23, `d2_formats::d2s::skills_before_failure`): the player's
+/// native skills (`player_skills`) and one `add_skill_level` per non-zero
+/// byte, as [`character::load`] does for a full save.
+pub fn apply_skills_before_failure<D: ActionEvents, W>(
+    s: &mut SimGame<D, W>,
+    player: UnitId,
+    skills: &[u8],
+) {
+    s.events.action().with(&mut s.game, |_, v| {
+        let mut cw = ActionCharacter { v, player };
+        let _ = cw.player_skills();
+        for (i, &level) in skills.iter().enumerate() {
+            if level != 0 {
+                let _ = cw.add_skill_level(i, level);
+            }
+        }
+    });
+}
+
+/// The player's own add messages of a join (rule 3.1: S→C 0x59 and its
+/// part B), sent when the load then refuses the save after the player unit
+/// exists (`formats/d2s-load.md` §5 r2b): the 1.14d stream of a section
+/// error holds them before the 0xB4.
+pub fn announce_player<D: ActionEvents, W>(
+    s: &mut SimGame<D, W>,
+    client: ClientId,
+    name: &[u8; 16],
+    base_skills: bool,
+    out: &mut dyn MessageSink,
+) -> Result<(), JoinError>
+where
+    D::X: Outbox,
+{
+    let player = s.player_of(client).ok_or(JoinError::NoPlayer(client))?;
+    let a = s.events.action();
+    let (class, guid) = a
+        .sys
+        .units
+        .get(player)
+        .map(|r| (r.class, r.guid))
+        .ok_or(JoinError::NoPlayer(client))?;
+    a.sys
+        .hooks
+        .x
+        .send(player, &assign_player(guid, class as u8, name, 0, 0));
+    a.with(&mut s.game, |g, v| v.player_part_b(g, player, player));
+    // The skills section was read before the failure: S→C 0x94 as the join's
+    // rule 3.1 (b).
+    if base_skills {
+        let m = a
+            .sys
+            .hooks
+            .skill_lists
+            .get(&player)
+            .and_then(|l| msg::base_skill_levels(guid, &l.base_levels()));
+        if let Some(m) = m {
+            a.sys.hooks.x.send(player, &m);
+        }
+    }
+    // Queued now: the client is removed right after (the outbox would
+    // find no client).
+    let sent = s.events.action().hooks().x.take_sent();
+    for (unit, bytes) in sent {
+        if let Some(c) = s.client_of(unit) {
+            // A full queue loses the message, as in the original.
+            let _ = out.queue(c, &bytes);
+        }
+    }
     Ok(())
 }
 
