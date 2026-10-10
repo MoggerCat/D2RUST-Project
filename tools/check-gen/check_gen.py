@@ -1002,12 +1002,6 @@ def fam_monskill(ctx):
     return out
 
 
-FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill}
-
-
-# ----------------------------------------------------------- ledger join
-
 # Quest monsters (ledger monster.quest.*): kind of monster by spawn directive.
 # (area suffix, [(spawn directive kind, row or class)])
 QKILL = [("ancients", [("su", 44), ("su", 45), ("su", 46)]), ("baal", [("boss", 544)]),
@@ -1051,6 +1045,12 @@ def fam_qkill(ctx):
         out.append(c)
     return out
 
+
+FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill}
+
+
+# ----------------------------------------------------------- ledger join
 
 def load_ledger(path):
     """area ids of the fidelity ledger, for the headers of the checks."""
