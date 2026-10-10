@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–720 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 721–762 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 763–788 |
-| Constants & data dependencies | 789–795 |
-| Randomness | 796–799 |
-| Edge cases & original bugs | 800–812 |
-| Test vectors | 813–840 |
-| Provenance | 841–859 |
-| Open questions | 860–907 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–727 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 728–769 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 770–795 |
+| Constants & data dependencies | 796–802 |
+| Randomness | 803–806 |
+| Edge cases & original bugs | 807–819 |
+| Test vectors | 820–847 |
+| Provenance | 848–866 |
+| Open questions | 867–914 |
 <!-- /index -->
 
 ## Summary
