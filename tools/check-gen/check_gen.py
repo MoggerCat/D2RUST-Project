@@ -673,7 +673,7 @@ SYSC_T = {
     "mon": (80, "ScnAma --class ama --expansion", "state rng packets",
             ["at 10 poke spawn 19 @x+5 @y-4 normal"]),
     "save": (20, "SavAma --class ama --expansion", "save", []),
-    "draw": (60, "ScnAma --class ama --expansion", "draws", []),
+    "draw": (80, "ScnAma --class ama --expansion", "draws", ["draws-at 73"]),
 }
 
 # (area regex, template or None, reason when None); first match wins
@@ -775,7 +775,7 @@ def fam_sysc(ctx):
             f"gen-sysc-{short}", "sysc", area, f"{area}: scenario {tpl}",
             save, ticks, 300, chans, list(lines),
             comment=[f"Ledger row {area} ({src}): carried by the {tpl} scenario "
-                     f"(inputs {', '.join(l.split(' ', 2)[2].split(' ')[0] for l in lines) or 'none: the login and tick stream'}); "
+                     f"(inputs {', '.join(l.split(' ', 2)[2].split(' ')[0] for l in lines if l.startswith('at ')) or 'none: the login and tick stream'}); "
                      "the channels compare what the section specifies on both sides "
                      "(S->C bytes, unit state, RNG draws, items, save, draws). "
                      "The check is the template's reach into the section, not a proof of "

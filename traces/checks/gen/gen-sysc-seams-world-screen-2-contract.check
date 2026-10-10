@@ -6,6 +6,7 @@ check 1
 name gen-sysc-seams-world-screen-2-contract
 save ScnAma --class ama --expansion
 seed 1234
-ticks 60
+ticks 80
 seconds 300
 channels draws
+draws-at 73

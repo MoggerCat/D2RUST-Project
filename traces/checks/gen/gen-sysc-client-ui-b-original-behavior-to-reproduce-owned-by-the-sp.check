@@ -6,6 +6,7 @@ check 1
 name gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp
 save ScnAma --class ama --expansion
 seed 1234
-ticks 60
+ticks 80
 seconds 300
 channels draws
+draws-at 73
