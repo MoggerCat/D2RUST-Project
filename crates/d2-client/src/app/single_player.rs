@@ -613,11 +613,8 @@ impl LocalSeams {
     /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
     /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
     /// scan 5 callback's reading.
-    fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
-    }
-
-    /// [`Self::nearest_foe`] among the candidates `keep` accepts.
+    ///
+    /// Among the candidates `keep` accepts.
     fn nearest_foe_where(
         &self,
         unit: UnitId,
@@ -1243,7 +1240,7 @@ impl Pending for LocalSeams {
     fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
         d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
-    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
+    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe_where`]
     /// within 35 (`ai.md` §5.2 step 4), no-size distance.
     fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
         // Scan 5 callback `0x005DCA70` rule 2 (`ai.md` §5.4): the full-size
@@ -1267,7 +1264,7 @@ impl Pending for LocalSeams {
             .filter(|&(_, d)| d <= GOOD_SEARCH_RANGE)
             .min_by_key(|&(u, d)| (d, u))
     }
-    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
+    /// `0x005DDC30`: [`LocalSeams::nearest_foe_where`] at full-size distance
     /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
     /// 0x4 (scan 6 rule 1, `0x00451F30(C, 4)`), with the preview's melee
     /// flag; none: distance 0x7FFFFFFF.
