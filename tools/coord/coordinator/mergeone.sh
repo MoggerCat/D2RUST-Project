@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: mergeone.sh <branch>; returns 0 merged, 2 stop (code conflict)
 b=$1; S=tools/coord/coordinator
-eq() { python3 tools/coord/ledger.py | grep -o 'EQUAL [0-9]*$' | grep -o '[0-9]*'; }
+eq() { python3 tools/coord/ledger.py | grep -o 'EQUAL [0-9]*;' | grep -o '[0-9]*'; }
 E0=$(eq)
 # a merge that loses EQUAL rows (a stale part overriding newer verdicts) is reported, not hidden
 chk() { E1=$(eq); [ "$E1" -lt "$E0" ] && echo "$b WARN: EQUAL $E0 -> $E1 (check the part for stale rows)"; }
