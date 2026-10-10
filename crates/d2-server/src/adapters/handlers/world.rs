@@ -462,6 +462,10 @@ pub trait WorldHost<D> {
     {
         d2_sim::tick::tick(game, events);
     }
+    /// Runs after the host's item update pass: the player step 5 / 7 sends
+    /// the action wiring held back so the item messages precede them
+    /// (`intents-events.md` §7.3 rule 1). Default: nothing held.
+    fn flush_player_tail(&mut self, events: &mut D) {}
     /// Runs after the tick's steps, before its sends are taken (the
     /// quest routes the tick queued, `WiredWorld`).
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {}

@@ -1945,3 +1945,38 @@ fn dragon_flight_odd_frames_kick() {
     let (more, _) = run(100);
     assert_eq!(more, 42 * 256);
 }
+
+// ---------------------------------------------------------------- passive
+
+// Covers: specs/client/msg-skills.md §2 r4
+#[test]
+fn passive_refresh_sets_the_stats_on_the_passiveitype_layer() {
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.passivestate = 7;
+    r.passiveitype = 0x0F;
+    r.passivestat1 = 20;
+    r.passivecalc1 = c.f(9);
+    r.passivestat2 = 0xFFFF;
+    let t = tabs(r, Code(c.0.clone()), 1);
+    let (mut f, u) = world();
+    passive::refresh(&mut f, &t, u, 1);
+    let l = f.lists.iter().find(|l| l.state == 7).expect("state 7 list");
+    // `0x00646D60`: passivestat1 on layer `passiveitype`, markers on 0.
+    assert_eq!(l.stats.get(&(0x0F << 16 | 20)), Some(&9));
+    assert_eq!(l.stats.get(&20), None);
+    assert_eq!(l.stats.get(&passive::PASSIVE_SKILL), Some(&1));
+    // `passiveitype` ≤ 0 → layer 0.
+    let mut c = Code::new();
+    let mut r = body_rec();
+    r.passivestate = 7;
+    r.passiveitype = 0xFFFF;
+    r.passivestat1 = 20;
+    r.passivecalc1 = c.f(9);
+    r.passivestat2 = 0xFFFF;
+    let t = tabs(r, Code(c.0.clone()), 1);
+    let (mut f, u) = world();
+    passive::refresh(&mut f, &t, u, 1);
+    let l = f.lists.iter().find(|l| l.state == 7).expect("state 7 list");
+    assert_eq!(l.stats.get(&20), Some(&9));
+}

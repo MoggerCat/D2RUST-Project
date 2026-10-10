@@ -9,7 +9,6 @@ seed 1234
 ticks 140
 seconds 360
 channels state rng
-ignore q
 variant blood-moor-empty
 at 4 poke warp 2
 at 30 poke seed-game 0x00001234 666
