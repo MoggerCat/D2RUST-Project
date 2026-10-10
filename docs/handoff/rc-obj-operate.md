@@ -13,3 +13,6 @@ Packets causes by count (`rc-obj-operate-causes.tsv`):
 3. OperateFn 60: no check. Size S.
 
 Also: object.populate/preset rows are level-generation rows (gen-lvl), not operate; not touched. Ledger part: `docs/handoff/ledger/rc-obj-operate.tsv` (17 rows).
+
+## Update after merging integ-r23
+Rerun of the 9 cause-1 checks: 8 now packets MATCH (rows 26, 39, 40, 41, 57, 58, 59 EQUAL). EQUAL now 0 -> 13 of 17. Left: gen-obj-149 (row 24), the player's PlaySound 0x2C ahead of the object's 0x0E (cause 1, size M, row in causes tsv). Cause 2 is rc-run-3b's (REC-3160).
