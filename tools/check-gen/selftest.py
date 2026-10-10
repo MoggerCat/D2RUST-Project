@@ -101,11 +101,15 @@ def mkctx(excel, wp, shrines=None):
 
 
 def parse_all(checks, t):
+    # audio checks are parsed the way audio_diff.py run does: with the audio channel added
+    channels = scenario_diff.CHANNELS
+    scenario_diff.CHANNELS = channels + ("audio",)
     for c in checks:
         text = c.render()
         p = scenario_diff.parse(text)
         t.ok(p is not None, c.name)
         t.ok(f"name {c.name}\n" in text, c.name)
+    scenario_diff.CHANNELS = channels
 
 
 def run():
@@ -148,6 +152,9 @@ def run():
         t.ok(by["obj"] == ["gen-obj-1", "gen-obj-2", "gen-obj-250"], by["obj"])
         t.ok("\x85" not in next(c for c in checks if c.name == "gen-obj-250").render(),
              "NEL kept in a header comment")
+        t.ok(len(by["aud"]) == len(cg.AUD_SCEN) and by["aud"][0] == "gen-aud-town-idle", by["aud"])
+        t.ok(next(c for c in checks if c.name == "gen-aud-ui-panels").area.startswith("system.audio."),
+             "aud ledger area")
         parse_all(checks, t)
         # the lowest enabled non-boss class of an AI is the spawn
         sk = next(c for c in checks if c.name == "gen-ai-skeleton")
@@ -159,6 +166,7 @@ def run():
         # write, then --check
         out = os.path.join(tmp, "out")
         args = ["--excel", ex, "--waypoints", wp, "--out", out,
+                "--audio-out", os.path.join(tmp, "audio-out"),
                 "--waypoint-towns", os.path.join(HERE, "waypoint-towns.tsv"),
                 "--shrine-seeds", os.path.join(tmp, "seeds.tsv")]
         with open(os.path.join(tmp, "seeds.tsv"), "w") as f:
@@ -182,6 +190,8 @@ def run():
         t.ok(cg.main(args + ["--check"]) == 1, "table change detected")
         stale = []
         for c in cg.generate(mkctx(ex, wp), cg.FAMILIES):
+            if c.family == "aud":
+                continue
             pth = os.path.join(out, c.name + ".check")
             if open(pth).read() != c.render():
                 stale.append(c.name)
