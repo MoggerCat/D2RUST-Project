@@ -417,8 +417,23 @@ pub fn update_messages<X: Pending>(
         let msg = reassign_player(ty, guid, path.x() as u16, path.y() as u16, flag);
         v.h.x.send(receiver, &msg);
     }
+    // `intents-events.md` §7.3 rule 1 step 2: the item messages come
+    // after the 0x15 and before the mode messages (step 3); the host
+    // sends them at this mark.
+    if v.h.item_marks {
+        let mut m = [crate::wiring::action::PLAYER_ITEMS_MARK; 5];
+        m[1..].copy_from_slice(&guid.to_le_bytes());
+        v.h.x.send(receiver, &m);
+    }
     if flags & crate::units::record::flags::CHANGED != 0 {
         mode_update_messages(v, game, receiver, unit);
+    }
+    // Step 4: unit flag 0x400 → the sound (`0x00571740`), after the mode
+    // messages; sent by the host at this mark.
+    if v.h.item_marks {
+        let mut m = [crate::wiring::action::PLAYER_SOUND_MARK; 5];
+        m[1..].copy_from_slice(&guid.to_le_bytes());
+        v.h.x.send(receiver, &m);
     }
 }
 
