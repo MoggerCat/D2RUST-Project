@@ -1568,6 +1568,20 @@ mod key_commands {
         u.key(&w, Action::ToggleMessageLog);
         assert!(!u.ui.is_open(0x18));
     }
+
+    // S (command 13): SetUIState(3, toggle, 0), then `0x004A8CE0(0)`.
+    // Covers: specs/ui/controls.md §3 row14
+    #[test]
+    fn s_toggles_the_right_skill_pick() {
+        let w = world(AMAZON, 1, true);
+        let mut u = ui(Some(areas()), true);
+        u.ui.shared.borrow_mut().hud.select_left = true;
+        u.key(&w, Action::ToggleSkillMenuRight);
+        assert!(u.ui.is_open(3));
+        assert!(!u.ui.shared.borrow().hud.select_left);
+        u.key(&w, Action::ToggleSkillMenuRight);
+        assert!(!u.ui.is_open(3));
+    }
 }
 
 /// The centre of the inventory close rectangle (`panels.md` §9.3).

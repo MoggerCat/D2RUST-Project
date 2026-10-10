@@ -37,15 +37,15 @@
 | Rules | 86–87 |
 |   1. Conventions | 88–170 |
 |   2. Act V records | 171–198 |
-|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–321 |
-|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 322–446 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 447–681 |
-| Constants & data dependencies | 682–699 |
-| Randomness | 700–709 |
-| Edge cases & original bugs | 710–744 |
-| Test vectors | 745–759 |
-| Provenance | 760–784 |
-| Open questions | 785–852 |
+|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–325 |
+|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 326–451 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 452–687 |
+| Constants & data dependencies | 688–705 |
+| Randomness | 706–715 |
+| Edge cases & original bugs | 716–750 |
+| Test vectors | 751–765 |
+| Provenance | 766–790 |
+| Open questions | 791–858 |
 <!-- /index -->
 
 ## Summary

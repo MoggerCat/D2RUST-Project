@@ -876,6 +876,12 @@ impl OriginalUi {
                 if self.shared.borrow().facts.has_belt {
                     self.set_ui(0x1F, 2, false)?;
                 }
+            } else if a == ActionId(Action::ToggleSkillMenuRight.index() as u16) {
+                // Command 13 (`0x00468B00`, `ui/controls.md` §3):
+                // SetUIState(3, toggle, 0), then `0x004A8CE0(0)`: the
+                // right skill button's pick, as its release (§7 r3).
+                self.set_ui(3, 2, false)?;
+                self.shared.borrow_mut().hud.select_left = false;
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
                 // Hireling keys pass jump 1, every other hot key 0; mode 2

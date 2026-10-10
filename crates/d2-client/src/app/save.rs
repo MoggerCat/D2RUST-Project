@@ -127,6 +127,11 @@ pub fn base_save(character: &Character) -> D2s {
     match character {
         Character::Save(save, _) => (**save).clone(),
         Character::Named(c) => fresh(c.class, c.name(), c.difficulty),
+        Character::Refused(r) => fresh(
+            0,
+            &r.name[..r.name.iter().position(|&b| b == 0).unwrap_or(16)],
+            r.difficulty,
+        ),
         Character::New => fresh(
             single_player::PLAYER_CLASS as u8,
             single_player::PLAYER_NAME,
