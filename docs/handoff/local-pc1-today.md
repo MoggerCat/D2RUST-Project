@@ -97,3 +97,22 @@ Not stable on the 1.14d side (re-record before trusting): `ui-draws-questlog`,
 text in one of three runs.
 Private repo: `recordings/pc1-2026-10-10/frames` (d313e3ac).
 Rows so far: 23 `q-fix-pc1today-*`.
+
+## Push 4 (14:46) — client state, pixels
+
+- **system.client (36 rows) and seams (2)**: new 1.14d-side channel:
+  `record_state.py --client-out` writes the client's own unit sets S and C per
+  frame (`tools/state-snapshot.md` §3 r5). 17 checks recorded in
+  `traces/pc1/client-state/` (30 MB); two runs equal but the local player's
+  client seed. needs_pc1 → n; still NO-CHECK until d2rs dumps its
+  `ClientWorld` (row `client-state-dump`).
+- **system.render unit-composite, sprite-placement (18 rows)**: pixel
+  comparison on real Windows for 26 scenes (`traces/pc1/pixel-compare.tsv`):
+  town arrival 97.56 % equal; UI-only scenes 98.9–99.7 %; help overlay 12 %,
+  message log 25 % (d2rs draws neither). DIVERGED, needs_pc1 → n. Row
+  `pixel-diffs` (Defense 6 vs 0 on the character panel, the missing globe
+  label, missing overlays).
+- needs_pc1 = y and not EQUAL: 235 → 179 (of the audit's 217 only
+  `ui/frontend-credits`, 11 rows, is left: Credits / Cinematics do not take
+  posted clicks on Windows).
+Rows so far: 25 `q-fix-pc1today-*`.
