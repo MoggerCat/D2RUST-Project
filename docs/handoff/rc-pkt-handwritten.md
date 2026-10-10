@@ -18,3 +18,11 @@ ui-draws-left/right-skill-pick, minipanel; sizes M each, owner d2-server/d2-prot
 Ledger: docs/handoff/ledger/rc-pkt-handwritten.tsv (25 rows EQUAL: sys-tick-idle, sys-units-census,
 dru-tornado/twister/arctic-blast); `ledger.py --fix` also touched 8 other parts (contradiction fixes).
 checks-status.md: rows of the 73 checks replaced/added.
+
+## Next cause, diagnosed not fixed (12 checks, largest first-difference group)
+s2c 0xAC size: dru-raven frame 29 1.14d 15 vs d2rs 14; 11 hire-* checks 23 vs 19 (25 vs 21).
+Decoded: the 1.14d stream has the unit's child stat list with flag 0x40 (init.md §24 rule 6): raven = list
+present, nothing sendable -> 2 zero bits (stream 08 00); hirelings send real stats. d2rs sends `stats: None`
+(1 bit) because no pet/hireling creation path allocates a 0x40 list (`monster_add.rs` reads
+`list_by_state_flags(unit,0,0x40)`; nothing in crates/d2-sim allocates one). Needs: find in re/exports which
+function allocs the 0x40 list for summons/hirelings and what it holds. Owner: pets/hirelings.
