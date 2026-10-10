@@ -355,8 +355,11 @@ impl<X: Pending> View<'_, X> {
             Some(UnitPath::Static(s)) => s.room_changed = 0,
             None => {}
         }
-        // Step 4.
-        self.stats.clear_states_changed(unit);
+        // Step 4. A player's bits are cleared once its deferred update has
+        // run ([`ActionHooks::player_state_done`]).
+        if !(ty == UnitType::Player && self.h.defer_player_tail) {
+            self.stats.clear_states_changed(unit);
+        }
         // Step 6.
         for _ in 0..2 {
             let flagged = self.stats.unit_list(unit).is_some_and(|l| {

@@ -40,6 +40,11 @@ impl<X: Pending> ActionSim<X> {
         for (receiver, m) in std::mem::take(&mut self.sys.hooks.player_tail) {
             self.sys.hooks.x.send(receiver, &m);
         }
+        // The room clean-up's step 4 (`0x00639EE0`) for the players whose
+        // update has now run.
+        for u in std::mem::take(&mut self.sys.hooks.player_state_done) {
+            self.sys.stats.clear_states_changed(u);
+        }
     }
 
     pub fn new(stat_data: Arc<StatData>, data: UnitData, hooks: ActionHooks<X>) -> Self {
@@ -520,6 +525,9 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 v.state_change_messages(p, unit);
                 v.player_stat_sends(p, unit);
                 v.h.capture_tail = false;
+                if v.h.defer_player_tail && !v.h.player_state_done.contains(&unit) {
+                    v.h.player_state_done.push(unit);
+                }
             }
             return;
         }

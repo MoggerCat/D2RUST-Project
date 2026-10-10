@@ -270,6 +270,11 @@ pub struct ActionHooks<X> {
     pub capture_tail: bool,
     /// The held sends: (receiving player, bytes).
     pub player_tail: Vec<(UnitId, Vec<u8>)>,
+    /// Players whose state-changed bits wait for [`ActionSim::flush_player_tail`]:
+    /// with [`Self::defer_player_tail`] their update runs after the tick's
+    /// room clean-up, which therefore leaves their bits (`tick.md` §3 step 5
+    /// before step 6).
+    pub player_state_done: Vec<UnitId>,
     /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
     /// creation), for the host that holds the hireling lists:
     /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
@@ -531,6 +536,7 @@ impl<X> ActionHooks<X> {
             defer_player_tail: false,
             capture_tail: false,
             player_tail: Vec::new(),
+            player_state_done: Vec::new(),
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
