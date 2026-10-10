@@ -338,12 +338,14 @@ fn level_changes() {
     assert_eq!(ctl.record(CHAIN).unwrap().state, 2);
     assert!(f.sent.is_empty());
     // State 0 entering level 111 from 109: the first test fails, the
-    // Harrogath branch runs (status 1, state stays 0).
+    // Harrogath branch runs but its tail needs state 2: nothing is sent
+    // (REC-3100, a5-wp-34).
     let (mut ctl, _) = control();
     let mut f = fake();
     lvl(&mut ctl, &mut f, 109, 111);
     let r = ctl.record(CHAIN).unwrap();
-    assert_eq!((r.state, r.status), (0, 1));
+    assert_eq!((r.state, r.status), (0, 0));
+    assert!(f.sent.is_empty());
     // Intro: level 111 does not move the state.
     let (mut ctl, _) = control();
     let mut f = fake();

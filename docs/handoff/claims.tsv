@@ -25,6 +25,9 @@ C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
+C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open
+C014v	rc-vendor-pkts	18:40	vendor.akara-buy s2c 07 vs 15 frame 4	done packets MATCH akara-buy (already fixed by integ+rc-pkt-handwritten; no code change)
+C058v	rc-vendor-pkts	18:40	vendor charsi/gheed x3 extra 0x15 frame 4	done packets MATCH charsi x2, gheed x3 (no code change)
 C068	rc-ctail-packets	18:55	s2c 0x0a missing gold pickup via 0x13	done net-s2c-gold-pickup packets MATCH
 C024	rc-net-div	18:37	a2-super-fangskin frame 5 s2c 0x53 Darkness missing (act-load quest hook 0x0059AC40 never called: Tainted Sun at Act II first build)	done +10 rows EQUAL (vendor.*, npc.akara, inv.item-use, warp-0x07-frame); fangskin f5->f46
 C067	rc-drops-order	17:39	items-drops-nor-09 category ass 16 vs 5; nor-10 gld missing (drop pick)	done EQUAL 3456 -> 3457 (nor-09/-12 order, hel-04/-05 MATCH; nor-10 is a separate cause: 3 monsters never die in d2rs, not drop picking)

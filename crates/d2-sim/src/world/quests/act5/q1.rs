@@ -220,16 +220,20 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
     } else if args.a == 109 {
         quick_remove(ctl, w, i, p);
         let f = flags(w, p);
+        // The status and iterate sends sit inside the state 2 test (the
+        // same shape as `0x00588200`, `0x00589D80`; PROVISIONAL REC-3100:
+        // `0x005873E0` is not in the export, the shape is read from
+        // a5-wp-34 where 1.14d sends no chain-31 0x5D on leaving 109).
         if ctl.records[i].state == 2
             && !f.get(SLOT, bit::REWARD_GRANTED)
             && !f.get(SLOT, bit::REWARD_PENDING)
         {
             set_state(ctl, i, 3);
+            if ctl.records[i].status == 0 {
+                status_to_all(ctl, w, i, 1);
+            }
+            flag_iterate_all(ctl, w, i);
         }
-        if ctl.records[i].status == 0 {
-            status_to_all(ctl, w, i, 1);
-        }
-        flag_iterate_all(ctl, w, i);
     }
 }
 

@@ -319,16 +319,17 @@ fn changed_level<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize, arg
     } else if args.a == 109 {
         quick_remove(ctl, w, i, p);
         let f = flags(w, p);
+        // The whole tail is inside the state 2 test (`0x00588200`).
         if ctl.records[i].state == 2
             && !f.get(SLOT, bit::REWARD_GRANTED)
             && !f.get(SLOT, bit::REWARD_PENDING)
         {
             set_state(ctl, i, 3);
             flag_iterate_all(ctl, w, i);
-        }
-        if ctl.records[i].status == 0 && not_intro && killed < 5 {
-            status_to_all(ctl, w, i, 1);
-            ctl.records[i].clear_callback(event::NPC_DEACTIVATE);
+            if ctl.records[i].status == 0 && not_intro && killed < 5 {
+                status_to_all(ctl, w, i, 1);
+                ctl.records[i].clear_callback(event::NPC_DEACTIVATE);
+            }
         }
     }
 }
