@@ -336,8 +336,8 @@ REC-1002	6749		The click gate `0x00480BA0` is not run (PROVISIONAL, `bridge/clic
 REC-1030	6525		Monster and summon equipment (PROVISIONAL, `d2-sim` `wiring/economy/monster_equip.rs`, `wi	recording	no		5	
 REC-1250	6750		A non-walking mode request ends the local player's predicted walk (PROVISIONAL, `d2-client	recording	no		3	
 REC-1251	6751		Client object footprints on the client path (PROVISIONAL, `d2-client` `bridge/client_path.	recording	no		6	
-REC-1270	6752		Trap target scan skips a monster in melee range (PROVISIONAL, `d2-sim` `wiring/action/ai.r	unstated	no		2	
-REC-1271	6753		Alternative target order (PROVISIONAL, same code): with no main candidate the alternative 	unstated	no		1	
+REC-1270	6752		Trap target scan skips a monster in melee range (PROVISIONAL, `d2-sim` `wiring/action/ai.r	unstated	no		1	
+REC-1271	6753		Alternative target order (PROVISIONAL, same code): with no main candidate the alternative 	unstated	no		0	
 REC-1360	6754		audio-diff's 1.14d voice start tick (PROVISIONAL, `tools/audio-diff/audio_diff.py` `build_	recording	no		1	
 REC-1361	6755		DirectSound volume / pan conversion is f64 with truncation (PROVISIONAL, `d2-client` `app/	recording	no		2	
 REC-1362	6756		audio-diff's mixed check mixes both voice sets through d2rs' mixer (PROVISIONAL, `specs/to	unstated	no		1	
