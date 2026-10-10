@@ -420,6 +420,10 @@ fn monster(
     let set = |w: &mut ClientWorld, mode: u32| {
         super::monster_anim::mode_set(w, inputs, key, mode);
     };
+    // +0xB0 (§19 r4: r6 for 0x06 / 0x14, r0 for 0x13).
+    let hit = |w: &mut ClientWorld, h: i32| {
+        w.units.get_mut(&key).expect("present").hit_class = h as u32;
+    };
     match code {
         // Path to the unit (r0 type, r1 GUID): an absent unit → F.
         0x00 | 0x18 => {
@@ -433,7 +437,10 @@ fn monster(
         0x01 | 0x17 => set(w, if code == 0x01 { m::WALK } else { m::RUN }),
         0x04 | 0x0B | 0x0C | 0x0E | 0x11 | 0x1A | 0x1C | 0x05 | 0x0A | 0x0D | 0x0F | 0x10
         | 0x1B | 0x1D => set(w, monster_table_mode(code).expect("table code")),
-        0x06 => set(w, m::GET_HIT),
+        0x06 => {
+            hit(w, r[6]);
+            set(w, m::GET_HIT);
+        }
         0x07 => {
             // Position check (§6, kind 0), then within 1 sub-tile of
             // (r0, r1) → F; else walk (state 143 `attached` → F).
@@ -454,9 +461,13 @@ fn monster(
         // `msg-units.md` §4 r6.2: mode := 0xC.
         0x09 => set(w, m::DEAD),
         0x12 => set(w, m::BLOCK),
-        // No mode change (the KB mode comes with 0x14).
-        0x13 => {}
-        0x14 => set(w, m::KNOCKBACK),
+        // No mode change (the KB mode comes with 0x14); the mode sound
+        // `0x004CC5B0(U, 0xD, 1)` is the audio feed's.
+        0x13 => hit(w, r[0]),
+        0x14 => {
+            hit(w, r[6]);
+            set(w, m::KNOCKBACK);
+        }
         // The skill entry's mode; 0xE (sequence) sets no mode.
         0x15 | 0x16 => {
             if let Some(mode) = skill_mode(inputs, r[0], MONSTER) {

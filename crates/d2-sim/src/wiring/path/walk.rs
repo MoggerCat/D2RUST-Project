@@ -27,6 +27,7 @@ use crate::path::walk::{Step, Walk, WalkError};
 use crate::path::{CollisionRooms, DynamicPath, PathTables, UnitPath};
 use crate::rng::Seed;
 use crate::units::{ClientId, RoomId, UnitId, UnitType};
+use crate::wiring::action::reaction::UNIT_FLAG_SOFT_HIT;
 use crate::wiring::action::{Pending, View, WiringError};
 
 /// The walk context ([module doc](self)).
@@ -449,6 +450,46 @@ fn life_percent<X: Pending>(v: &View<'_, X>, unit: UnitId) -> u8 {
     ((v.stats.unit_total(unit, 6, 0) >> 8).wrapping_mul(100) / m) as u8
 }
 
+/// `intents-events.md` §7.3 rule 1 step 4: unit flag 0x8000 (the soft
+/// hit, `combat/damage.md` §7.1) → `0x00547F70` → S→C 0x0D (`0x0053B4B0`):
+/// type, GUID, 0x13, the path cell, unit +0xB0, life percent
+/// (`damage.md` §10 rule 8).
+pub fn soft_hit_message<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &Game,
+    client: ClientId,
+    unit: UnitId,
+) {
+    let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
+        return;
+    };
+    let Some(r) = v.units.get(unit) else {
+        return;
+    };
+    if r.ty != UnitType::Player || r.flags & UNIT_FLAG_SOFT_HIT == 0 {
+        return;
+    }
+    let (ty, guid) = (r.ty as u8, r.guid);
+    let Some(pos) =
+        v.h.paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .map(|p| p.cell())
+    else {
+        return;
+    };
+    let m = crate::path::walk::messages::player_stop(
+        ty,
+        guid,
+        0x13,
+        pos.x as u16,
+        pos.y as u16,
+        v.unit_b0(unit),
+        life_percent(v, unit),
+    );
+    v.h.x.send(receiver, &m);
+}
+
 /// One client's message of a [`StopRow`] (§10 rule 2).
 fn stop_row_messages<X: Pending>(
     v: &mut View<'_, X>,
@@ -462,7 +503,7 @@ fn stop_row_messages<X: Pending>(
     use crate::path::walk::messages::{player_move, player_stop};
     let pos = path.cell();
     let (x, y) = (pos.x as u16, pos.y as u16);
-    let b0 = v.h.x.unit_b0(unit);
+    let b0 = v.unit_b0(unit);
     let life = life_percent(v, unit);
     let (code, b) = match row {
         StopRow::Neutral if own => return,

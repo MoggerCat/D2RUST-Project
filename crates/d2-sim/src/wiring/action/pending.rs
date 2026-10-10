@@ -897,8 +897,8 @@ pub trait Pending {
         false
     }
 
-    /// Reaction `0x0057CEE0` (`damage.md` §7.1) steps 1–2 (the town rule
-    /// and the hit class store); steps 3–5 run in
+    /// Reaction `0x0057CEE0` (`damage.md` §7.1) step 1 (the town rule);
+    /// steps 2–5 run in
     /// [`super::reaction::reaction`].
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
     /// AI state setter `0x005734C0(unit, v)` (monster data `dwAiState`,
@@ -1231,14 +1231,6 @@ pub trait Pending {
 
     // ---- the monster mode message and the death end (`intents-events.md` §7.4, §7.7)
 
-    /// Unit +0xB0, read as e of a mode-0 and mode-3 message and f of a
-    /// mode-13 message (§7.4 rule 5). Its writers are not specified
-    /// (`stat-lists.md` §10: the regeneration kill sets it to 0;
-    /// `audio/triggers.md` OQ3 reads the client copy as the hit class of
-    /// the last hit). Default: 0.
-    fn unit_b0(&self, unit: UnitId) -> u8 {
-        0
-    }
     /// `0x005A0180(unit, 0x100)`, which sets bit 0x80 of a mode-3
     /// message's d (§7.4 rule 5; not specified). Default: false.
     fn monster_flag_100(&self, unit: UnitId) -> bool {

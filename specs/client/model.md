@@ -35,25 +35,25 @@
 |   5. Client update pass | 251–480 |
 |   6. Position check (`0x004804E0`) | 481–524 |
 |   7. Session messages | 525–722 |
-|   8. Mode requests | 723–815 |
-|   9. Room-in-sight messages | 816–850 |
-|   10. Bit reader | 851–865 |
-|   11. Current act and level (join and later) | 866–911 |
-|   12. Client DRLG and the room of a point | 912–953 |
-|   13. Visibility predicate (`0x004DBF20`) | 954–1005 |
-|   14. Pet list and the hireling GUID | 1006–1070 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1071–1160 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1161–1195 |
-|   17. Model writes made by 1.14d UI code | 1196–1401 |
-|   18. Audio driver inputs and the client object functions | 1402–1432 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1433–1662 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1663–1823 |
-| Constants & data dependencies | 1824–1836 |
-| Randomness | 1837–1852 |
-| Edge cases & original bugs | 1853–1877 |
-| Test vectors | 1878–1935 |
-| Provenance | 1936–2041 |
-| Open questions | 2042–2247 |
+|   8. Mode requests | 723–823 |
+|   9. Room-in-sight messages | 824–858 |
+|   10. Bit reader | 859–873 |
+|   11. Current act and level (join and later) | 874–919 |
+|   12. Client DRLG and the room of a point | 920–961 |
+|   13. Visibility predicate (`0x004DBF20`) | 962–1013 |
+|   14. Pet list and the hireling GUID | 1014–1078 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1079–1168 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1169–1203 |
+|   17. Model writes made by 1.14d UI code | 1204–1409 |
+|   18. Audio driver inputs and the client object functions | 1410–1440 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1441–1670 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1671–1831 |
+| Constants & data dependencies | 1832–1844 |
+| Randomness | 1845–1860 |
+| Edge cases & original bugs | 1861–1885 |
+| Test vectors | 1886–1943 |
+| Provenance | 1944–2049 |
+| Open questions | 2050–2255 |
 <!-- /index -->
 
 ## Summary
@@ -762,6 +762,14 @@ position check of the local player.
    | 0x18 | `0x00480780(U, r0, r1)`; mode := 3 |
    | 0x19 | mode := 0xD; `check(U, r0, r1, 0, 0, 0)` |
    | 3–5, 0x0A–0x11, > 0x19 | fatal 0x432 |
+
+   PROVISIONAL (REC-1835): d2rs runs the explicit mode sound of code
+   0x13 (player m = 0x13, monster 0xD, §19 r4) from the audio feed when
+   it sees a new request count with code 0x13 (because the model keeps
+   only the last request of a frame and holds no shapeshift flag +0xC8
+   bit 0x8: a player's m is always 0x13, and a 0x13 followed by another
+   request in the same audio frame makes no sound); settled by
+   `traces/audio/audio-monster-hit-ama.check` with a were-form variant.
 
    A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
    neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.

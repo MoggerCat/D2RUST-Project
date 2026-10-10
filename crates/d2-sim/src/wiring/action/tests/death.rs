@@ -1122,6 +1122,74 @@ fn a_hit_puts_the_monster_into_get_hit_or_marks_it_soft() {
     assert_ne!(fx.sim.sys.units.get(m).unwrap().flags & 0x8000, 0);
 }
 
+/// `damage.md` §7.1 step 2: a hit stores its class at D +0xB0; an
+/// unfixed class without an element nibble first takes the element hit
+/// class (§6.1: base 3, no element → 3; base 0 → 13 `over`; a cold hit →
+/// 0x30 with the counter at 0). A miss stores nothing. Step 5.7 with
+/// `intents-events.md` §7.3 rule 1 step 4: the player's soft hit (unit
+/// flag 0x8000) reaches its client as S→C 0x0D (type 0, GUID, 0x13, the
+/// cell, +0xB0, life percent) in the next client pass, once.
+// Covers: specs/combat/damage.md §7.1 r2; specs/sim/intents-events.md §7.3 r1
+#[test]
+fn a_soft_hit_on_a_player_stores_the_hit_class_and_sends_0x0d() {
+    use crate::combat::result;
+    use crate::units::lists::client_state;
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let (p, m) = kill_setup(&mut fx);
+    fx.stats(p, &[(st::MAXHP, 100 << 8), (st::HITPOINTS, 96 << 8)]);
+    fx.game
+        .lists
+        .add_client(Some(p), Some(fx.a), client_state::IN_GAME);
+    let hit = |fx: &mut Fx, result: u16, class: u32, cold: i32| {
+        let mut rec = crate::combat::DamageRecord {
+            result,
+            total: 100,
+            hit_class: class,
+            cold,
+            ..Default::default()
+        };
+        fx.sim.combat(&mut fx.game, |w, _| {
+            crate::wiring::action::reaction::reaction(w, m, p, &mut rec);
+        });
+        fx.sim.sys.units.get(p).unwrap().hit_class
+    };
+    fx.sim.hooks().hit_class = 0;
+    assert_eq!(hit(&mut fx, result::HIT, 0, 0), 13);
+    assert_eq!(
+        hit(&mut fx, result::HIT, 2, 1),
+        0x32,
+        "counter 1: fire is 0, cold next"
+    );
+    assert_eq!(hit(&mut fx, 0, 5, 0), 0x32, "a miss stores nothing");
+    assert_eq!(hit(&mut fx, result::HIT | result::SOFT_HIT, 3, 0), 3);
+    assert_ne!(fx.sim.sys.units.get(p).unwrap().flags & 0x8000, 0);
+    let guid = fx.sim.sys.units.get(p).unwrap().guid;
+    fx.sim.hooks().x.sent.clear();
+    fx.tick();
+    let soft: Vec<Vec<u8>> = fx
+        .sim
+        .hooks()
+        .x
+        .sent
+        .iter()
+        .filter(|(_, m)| m[0] == 0x0D && m[6] == 0x13)
+        .map(|(_, m)| m.clone())
+        .collect();
+    assert_eq!(soft.len(), 1, "{soft:02x?}");
+    assert_eq!(soft[0][1], 0);
+    assert_eq!(soft[0][2..6], guid.to_le_bytes());
+    assert_eq!(soft[0][11..], [3, 96]);
+    assert_eq!(
+        fx.sim.sys.units.get(p).unwrap().flags & 0x8000,
+        0,
+        "cleaned up"
+    );
+    fx.sim.hooks().x.sent.clear();
+    fx.tick();
+    assert!(!fx.sim.hooks().x.sent.iter().any(|(_, m)| m[0] == 0x0D));
+}
+
 fn react(fx: &mut Fx, a: UnitId, d: UnitId, result: u16) {
     let mut rec = crate::combat::DamageRecord {
         result,

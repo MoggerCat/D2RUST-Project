@@ -62,7 +62,7 @@ use d2_data::tables::{
 use d2_formats::animdata::AnimData;
 
 use crate::audio::triggers::identity::{monsounds_row, RecordInputs};
-use crate::audio::triggers::modes::mode_set;
+use crate::audio::triggers::modes::{mode_set, mode_sound};
 use crate::audio::triggers::movement::{
     footstep, footstep_called, footstep_material, init_voice, neutral, Floor, TOWN_LEVELS,
 };
@@ -328,6 +328,8 @@ struct Track {
     frame_count: u32,
     speed: i32,
     states: BTreeSet<u8>,
+    /// `ClientUnit::mode_requests` at the last pass (a new request).
+    requests: u32,
 }
 
 /// One unit of a frame with the inputs the rules read.
@@ -335,6 +337,11 @@ struct Planned {
     key: UnitKey,
     first: bool,
     mode_changed: bool,
+    /// The explicit m of a new code 0x13 mode request (`client/model.md`
+    /// §8 r4 / §19 r4: `0x004CC5B0(U, m, 1)` with no mode change).
+    explicit: Option<u8>,
+    /// +0xB0, the hit class of the unit's last hit request.
+    hit_class: u8,
     states_on: Vec<u8>,
     states_off: Vec<u8>,
     is_local: bool,
@@ -465,6 +472,8 @@ impl UnitFeed {
             let t = self.tracks.entry(key).or_default();
             let mode = effective_mode(u, drawn);
             let mode_changed = !first && t.mode != mode;
+            let explicit = explicit_mode_sound(u, first, t.requests);
+            t.requests = u.mode_requests;
             let states_on: Vec<u8> = u
                 .states
                 .iter()
@@ -489,6 +498,8 @@ impl UnitFeed {
                 key,
                 first,
                 mode_changed,
+                explicit,
+                hit_class: u.hit_class as u8,
                 states_on,
                 states_off,
                 is_local,
@@ -601,6 +612,7 @@ impl UnitFeed {
             u.frame_count = t.frame_count;
             u.speed = t.speed;
             let us = unit_sounds.entry((p.key, false)).or_default();
+            us.hit_class = p.hit_class;
             cx.c = updates.first().copied().unwrap_or(c0);
             match p.key.unit_type {
                 PLAYER | MONSTER => {
@@ -609,6 +621,9 @@ impl UnitFeed {
                     }
                     if p.mode_changed {
                         mode_set(cx, &u, us, mode, None)?;
+                    }
+                    if let Some(m) = p.explicit {
+                        mode_sound(cx, &u, us, m)?;
                     }
                 }
                 MISSILE if p.first => {
@@ -668,6 +683,26 @@ impl UnitFeed {
     }
 }
 
+/// The explicit mode sound of a mode request the pass has not seen: code
+/// 0x13 (hit, no mode change) calls `0x004CC5B0(U, m, 1)` with m = 0x13
+/// for a player (`client/model.md` §8 r4; 3 in a were-form, `0x0063A400`)
+/// and 0xD for a monster (§19 r4). A unit first seen has no new request.
+///
+/// PROVISIONAL (REC-1835): the model holds no shapeshift flag (+0xC8 bit
+/// 0x8), so a player's m is always 0x13; and the pass sees only the last
+/// request of a frame, so a 0x13 followed by another request before the
+/// next audio frame makes no sound (one server tick per frame in play).
+fn explicit_mode_sound(u: &ClientUnit, first: bool, seen: u32) -> Option<u8> {
+    if first || u.mode_requests == seen {
+        return None;
+    }
+    match (u.key.unit_type, u.last_mode_request) {
+        (PLAYER, Some(r)) if r.code == 0x13 => Some(0x13),
+        (MONSTER, Some(r)) if r.code == 0x13 => Some(0x0D),
+        _ => None,
+    }
+}
+
 /// The mode the unit sounds read: the model's, except the local player's
 /// drawn mode while the preview walks it (REC-51: the client's own path
 /// code is not in the model, so the prediction's walk / run mode stands
@@ -709,6 +744,37 @@ fn item_sound(cx: &mut Ctx, p: &Planned) {
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod explicit_tests {
+    use super::*;
+    use crate::bridge::world::ModeRequest;
+
+    /// `client/model.md` §8 r4 / §19 r4: a new code 0x13 request is the
+    /// explicit mode sound (player m = 0x13, monster 0xD); a repeat of
+    /// the count, another code, a unit first seen: none.
+    // Covers: specs/client/model.md §8 r4
+    #[test]
+    fn a_new_hit_request_is_the_explicit_mode_sound() {
+        let mut u = ClientUnit::new(UnitKey::new(PLAYER, 1));
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x13,
+            record: [0; 7],
+        });
+        u.mode_requests = 3;
+        assert_eq!(explicit_mode_sound(&u, false, 2), Some(0x13));
+        assert_eq!(explicit_mode_sound(&u, false, 3), None);
+        assert_eq!(explicit_mode_sound(&u, true, 2), None);
+        let mut m = u.clone();
+        m.key = UnitKey::new(MONSTER, 7);
+        assert_eq!(explicit_mode_sound(&m, false, 2), Some(0x0D));
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x14,
+            record: [0; 7],
+        });
+        assert_eq!(explicit_mode_sound(&u, false, 2), None);
     }
 }
 

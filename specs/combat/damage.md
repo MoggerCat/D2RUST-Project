@@ -32,18 +32,18 @@
 |   2. Pipeline | 142–156 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 157–302 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 303–404 |
-|   5. Application | 405–599 |
-|   6. Hit class and hit recovery | 600–630 |
-|   7. Reaction and death trigger | 631–736 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 737–800 |
-|   9. Durability `0x0057D3D0` | 801–822 |
-|   10. Monster melee on a player, end to end | 823–915 |
-| Constants & data dependencies | 916–937 |
-| Randomness | 938–970 |
-| Edge cases & original bugs | 971–1005 |
-| Test vectors | 1006–1088 |
-| Provenance | 1089–1114 |
-| Open questions | 1115–1164 |
+|   5. Application | 405–605 |
+|   6. Hit class and hit recovery | 606–636 |
+|   7. Reaction and death trigger | 637–742 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 743–806 |
+|   9. Durability `0x0057D3D0` | 807–828 |
+|   10. Monster melee on a player, end to end | 829–921 |
+| Constants & data dependencies | 922–943 |
+| Randomness | 944–976 |
+| Edge cases & original bugs | 977–1011 |
+| Test vectors | 1012–1094 |
+| Provenance | 1095–1120 |
+| Open questions | 1121–1170 |
 <!-- /index -->
 
 ## Summary
@@ -422,6 +422,12 @@ the stat read; the 0x24 / 0x25 compares at `0x0057BE47`–`0x0057BE4F`).
    3. Overlay +0x6C > 0 → on the defender (`0x00621E40`).
    4. Hit class: if the byte +0x64 = 0 and the low nibble of +0x60 is
       0: OR in the attacker's weapon hit class (`0x00623C20`).
+      PROVISIONAL (REC-1836): for a monster attacker `0x00623C20` is
+      its monstats2 `HitClass` (+0x14, through monstats `MonStatsEx`)
+      (because the Fallen's 3 is the hit class byte of 1.14d's S→C 0x0D
+      on its soft hits, `combat-fallen-hits-player` packets frames 77,
+      98, 124, 137, 173; the function body is not read); settled by a
+      reading of `0x00623C20` (PC 1, Ghidra).
    5. Durability (§9).
 5. Unit event 7 (`domeleeattack`) on the attacker, then event 3
    (`attackedinmelee`) on the defender (both with the copy).
