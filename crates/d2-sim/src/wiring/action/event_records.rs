@@ -58,6 +58,11 @@ pub enum EventRecord {
         target: (u8, u32),
         w: u16,
     },
+    /// 0x9E / 0x9F / 0xA0 (`0x005718C0`, `0x0053BEE0`): a stat of the unit
+    /// the record sits on (`world/hirelings.md` §13 rule 4); sent by the
+    /// same flush as the others, so a unit new to a client sends it in its
+    /// add and again in its first update.
+    UnitStat { stat: u16, value: u32 },
     /// 0x9A (`0x00571840`, `0x0053D4D0`, 17 bytes): an item cast at a
     /// point.
     CastOnPoint {
@@ -101,6 +106,11 @@ impl EventRecord {
                 y,
             } => progressive(charges, skill, level, unit, target, x, y).to_vec(),
             EventRecord::Preload { class } => preload(class).to_vec(),
+            // A stat id above 0xFE is a fatal assertion in the original: nothing is sent.
+            EventRecord::UnitStat { stat, value } => {
+                crate::world::hirelings::level::stat_message(stat, unit.1, value)
+                    .unwrap_or_default()
+            }
         }
     }
 }
@@ -246,7 +256,9 @@ impl<X: super::Pending> super::View<'_, X> {
                 ),
                 _ => rec.message((ty, guid)),
             };
-            self.h.x.send(receiver, &m);
+            if !m.is_empty() {
+                self.h.x.send(receiver, &m);
+            }
         }
     }
 }

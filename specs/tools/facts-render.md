@@ -26,15 +26,15 @@
 |   2. `draws.tsv` | 90–136 |
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
-|   5. d2rs export | 190–351 |
-|   6. Comparison | 352–408 |
-|   7. Requests | 409–420 |
-| Constants & data dependencies | 421–424 |
-| Randomness | 425–428 |
-| Edge cases & original bugs | 429–436 |
-| Test vectors | 437–445 |
-| Provenance | 446–450 |
-| Open questions | 451–465 |
+|   5. d2rs export | 190–355 |
+|   6. Comparison | 356–419 |
+|   7. Requests | 420–431 |
+| Constants & data dependencies | 432–435 |
+| Randomness | 436–439 |
+| Edge cases & original bugs | 440–447 |
+| Test vectors | 448–456 |
+| Provenance | 457–461 |
+| Open questions | 462–476 |
 <!-- /index -->
 
 ## Summary
@@ -199,7 +199,11 @@ composition, through `d2-client` only (game logic untouched).
    cell (two draw keys) stay two rows, as 1.14d calls the drawer per
    record (revision 2026-10-09: `a4-town-pandemonium-fortress` rows
    12–13). Before the first item of
-   each run of items tagged with the same unit, one `unit` row.
+   each run of items tagged with the same unit, one `unit` row. A run
+   is one unit draw, i.e. one draw-order slot: a new slot starts a new
+   run under the same tag (the tag is the GUID alone, and a GUID repeats
+   across unit types: monster 1:3 then object 2:3, `gen-ui-hud`
+   2026-10-10 rows 174–178).
 2. A frame of a DT1 part is a tile op; of a direction part a cel op;
    `file` / `dir` / `frame` come from the frame store's owner of the
    item's frame id.
@@ -375,7 +379,14 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
 5. `--skip-weather` (REC-510): pass 9's rows are left out on both
    sides before r2, for scenes whose 1.14d rain is not reproducible
    (`docs/handoff/q-facts-scenes.md`: two runs of the same tick draw
-   other particles). A pass-9 row is a `DrawLine` or `DrawBox` row
+   other particles).
+   *Revision (2026-10-10, rc-draw-row173; REC-510 settled):* the rain is
+   reproducible. Its seed is the client player seed, which the idle
+   cursor steps once per drawn frame for 5,000 ms of host time and the
+   weather update once per drawn frame, so two runs differ only by their
+   host clock and frame schedule. A check run replays both from the
+   recording (`tools/scenario-diff.md` §3 r7 step 5) and compares pass 9
+   in full; `--skip-weather` stays a tool option and no check uses it. A pass-9 row is a `DrawLine` or `DrawBox` row
    whose `at` is in [`0x00473470`, `0x00473F50`) on the 1.14d side (the
    particle draw `0x00473470` and pass 9 `0x00473910`,
    `draw-order-2.md` §11.7), and a row whose `at` is `pass9` on the d2rs

@@ -1,0 +1,18 @@
+check 1
+# World draw list in action (PC 1 2026-10-10, local-pc1-today): a Barbarian attacking a spawned Fallen (class 19) in the Blood Moor: the list of tick 46, mid-attack (player attack mode, monster, hit overlays).
+# Seed 1234. Under the debugger 1.14d does not draw every tick: the run compares its
+# last drawn tick at or before draws-at on both sides.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/render/unit-composite.md,
+# specs/render/sprite-placement.md, specs/missiles/client.md.
+name draws-melee-bar
+save CmbBar --class bar --expansion --level 3 --item ssd/body=4
+seed 1234
+ticks 50
+seconds 600
+channels draws
+draws-at 46
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 19 @x+3 @y normal
+input frame 28; move 790 10; frame 39; clickunit 1 19

@@ -150,7 +150,7 @@ pub fn request<C: PathWorld + WalkUnits + ?Sized>(
             path.set_target_point(p.x as u16, p.y as u16);
         }
         StartTarget::Unit(tu) => {
-            if m == mode::KNOCKBACK && c.mode(tu) == mode::KNOCKBACK {
+            if m == mode::KNOCKBACK && c.mode(unit) == mode::KNOCKBACK {
                 return Ok(Outcome::KnockbackIgnored);
             }
             // `0x00648B90`.

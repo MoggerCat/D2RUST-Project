@@ -111,6 +111,9 @@ pub fn start(index: u16) -> Option<i32> {
 
 /// The remove callbacks of §2.8 (list +0x38 ids; the 1.14d addresses).
 pub mod callback {
+    /// Missile just-hit list `0x005ADAF0` (`missiles.md` §R5 step 6.1):
+    /// state off and the update queue only.
+    pub const JUSTHIT: u32 = 0x005A_DAF0;
     /// Default `0x0056E900`.
     pub const DEFAULT: u32 = 0x0056_E900;
     /// Cold `0x0057AD80` (`combat/damage.md` §5.6): state off; a living
@@ -144,12 +147,9 @@ pub mod callback {
     pub const MIND_BLAST: u32 = 0x005D_7310;
     /// Pregnant `0x005D21B0` (`bodies-4.md` §3.16).
     pub const PREGNANT: u32 = 0x005D_21B0;
-    /// Just-hit list `0x005ADAF0` (`missiles.md` §R5 step 6.1): state off.
-    pub const JUSTHIT: u32 = 0x005A_DAF0;
     /// Every callback id the bodies specify.
-    pub const ALL: [u32; 16] = [
+    pub const ALL: [u32; 15] = [
         DEFAULT,
-        JUSTHIT,
         SELF_AURA,
         BUFF,
         AI_CURSE,
@@ -488,6 +488,9 @@ pub trait BodyWorld: UseWorld + KickItems {
     fn list_get(&self, l: Self::List, s: i32) -> i32;
     /// List set `0x00627150(list, s, v, 0)` (`0x006270B0` in the fills).
     fn list_set(&mut self, l: Self::List, s: i32, v: i32);
+    /// List set on a layer: `0x00627150(list, s, v, layer)` (the passive
+    /// refresh's `passiveitype` layer, `client/msg-skills.md` §2 rule 4).
+    fn list_set_layer(&mut self, l: Self::List, s: i32, v: i32, layer: u16);
     /// `0x00626E10(unit, list, 1)`.
     fn attach(&mut self, u: Self::Unit, l: Self::List);
     /// `0x00625CE0(list, f)`.
@@ -1175,7 +1178,7 @@ pub fn remove_callback<W: BodyWorld>(
         callback::SELF_AURA => remove_self_aura(w, t, u, state),
         callback::BUFF => remove_buff(w, u, state),
         callback::AI_CURSE => remove_ai_curse(w, u, state),
-        callback::CHARGE | callback::JUSTHIT => w.state_on(u, state, false),
+        callback::CHARGE => w.state_on(u, state, false),
         callback::INFERNO | callback::BLADE_FURY => {
             w.state_on(u, state, false);
             flags_or(w, u, FLAG_40);

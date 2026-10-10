@@ -619,6 +619,7 @@ impl Fx {
             skill_modes: Vec::new(),
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         };
         let hooks = ActionHooks::new(
             Arc::new(tables),

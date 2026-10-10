@@ -13,7 +13,7 @@ Wine 1.14d recorded, 2026-10-10.
    Fix: `callback::JUSTHIT`, set in `apply_justhit`
    (`wiring/action/missiles.rs`), run in `ActionHooks::list_removed`
    (`wiring/action/units.rs`). -> gen-boss-544, gen-mon-533.
-   Spec: `specs/missiles/missiles.md` R5 step 6.1 and R9.6.
+   The same fix landed on integ-r23 while I worked; merged to theirs.
 
 ## Checks
 - All 13: state 150/150 (PARTIAL only for ignored harness fields), rng MATCH

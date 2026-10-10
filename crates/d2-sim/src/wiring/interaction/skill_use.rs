@@ -485,7 +485,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
         match self.list(u) {
             Some(l) => l.view().into_iter().find(|e| e.skill == skill),
-            None => self.x().find_entry(u, skill),
+            None => self
+                .x()
+                .find_entry(u, skill)
+                .or_else(|| self.cv.v.h.monster_entry_of(u, skill)),
         }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
@@ -884,6 +887,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn list_set(&mut self, l: ListId, s: i32, v: i32) {
         if let Ok(s) = u16::try_from(s) {
             self.cv.v.set_list_stat(l, s, v);
+        }
+    }
+    fn list_set_layer(&mut self, l: ListId, s: i32, v: i32, layer: u16) {
+        if let Ok(s) = u16::try_from(s) {
+            self.cv.v.stats.set(&mut *self.cv.v.h, l, s, v, layer, None);
         }
     }
     fn attach(&mut self, u: UnitId, l: ListId) {
@@ -1331,6 +1339,15 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         // Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9): the
         // egg's start gives up its monster footprint (§5.6).
+        // Alignment `0x005543B0(u, a, 1)` (`bodies-3.md` §8.5: the Hydras
+        // of a monster owner take the owner's alignment, so the Council's
+        // stay hostile to the player instead of the class row's good).
+        if let bodies::BodyEffect::Alignment { u, a, .. } = e {
+            if let Ok(a) = u8::try_from(a) {
+                self.cv.v.set_alignment(&mut *self.cv.game, u, a);
+            }
+            return;
+        }
         if let bodies::BodyEffect::DeadFootprint(u) = e {
             self.cv.v.dead_body_footprint(u);
             return;

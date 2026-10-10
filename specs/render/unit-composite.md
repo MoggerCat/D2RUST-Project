@@ -29,15 +29,15 @@
 |   5. The slot loop (`0x00470EC0`) | 270–390 |
 |   6. Component file and cel | 391–431 |
 |   7. Colormap source per component | 432–456 |
-|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 457–559 |
-|   9. Single-cel units (missiles, items) | 560–574 |
-|   10. d2rs mapping | 575–589 |
-| Constants & data dependencies | 590–603 |
-| Randomness | 604–607 |
-| Edge cases & original bugs | 608–622 |
-| Test vectors | 623–643 |
-| Provenance | 644–691 |
-| Open questions | 692–755 |
+|   8. Extra offsets (`0x004DA0B0`, `0x004DA0D0`, `0x004DA0F0`) | 457–563 |
+|   9. Single-cel units (missiles, items) | 564–578 |
+|   10. d2rs mapping | 579–593 |
+| Constants & data dependencies | 594–607 |
+| Randomness | 608–611 |
+| Edge cases & original bugs | 612–626 |
+| Test vectors | 627–647 |
+| Provenance | 648–695 |
+| Open questions | 696–759 |
 <!-- /index -->
 
 ## Summary
@@ -460,7 +460,11 @@ The unit draw adds `X += ox`, `Y += oy + oz` from the unit's **client
 motion record** (the 0x4C-byte record at gfx +0x30, gfx = unit +0x54;
 `0x0046F060`), 0 when there is none; then for objects (§1)
 `objects` Xoffset/Yoffset (+0x148/+0x14C), skipping the unit when Draw
-(+0x150) is 0; for missiles (unit draw entry `0x004DC7B0`) `missiles`
+(+0x150) is 0 (the unit draw returns 0 before the cel: the caller's unit
+call stands alone and the shadow pass, which does not read Draw, still
+draws the shadow; capture `gen-ui-hud` 2026-10-10: object 385 `cain
+start position` 2:2, unit row 179 without a cel, its `CelDrawShadow`
+at row 112); for missiles (unit draw entry `0x004DC7B0`) `missiles`
 xoffset to X, yoffset + zoffset to Y (i16, +0xA2/+0xA4/+0xA6), not drawn
 without a missiles row. (`camera.md` §4, OQ3.)
 
