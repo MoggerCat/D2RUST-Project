@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 305–451 |
 |   3. AI control and AI tables | 452–640 |
 |   4. AI parameters | 641–659 |
-|   5. Target selection | 660–996 |
-|   6. Distances and line tests | 997–1012 |
-|   7. Tactics helpers | 1013–1261 |
-|   8. AI commands and minions | 1262–1288 |
-|   10. The catalogue `ai-functions.tsv` | 1289–1309 |
-| Constants & data dependencies | 1310–1333 |
-| Randomness | 1334–1363 |
-| Edge cases & original bugs | 1364–1405 |
-| Test vectors | 1406–1494 |
-| Provenance | 1495–1556 |
-| Open questions | 1557–1663 |
+|   5. Target selection | 660–1087 |
+|   6. Distances and line tests | 1088–1103 |
+|   7. Tactics helpers | 1104–1375 |
+|   8. AI commands and minions | 1376–1402 |
+|   10. The catalogue `ai-functions.tsv` | 1403–1423 |
+| Constants & data dependencies | 1424–1447 |
+| Randomness | 1448–1477 |
+| Edge cases & original bugs | 1478–1519 |
+| Test vectors | 1520–1608 |
+| Provenance | 1609–1670 |
+| Open questions | 1671–1777 |
 <!-- /index -->
 
 ## Summary
@@ -714,8 +714,14 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    +0x24 and T := (S = 0). Else T = 0. V is the monster's DRLG
    coordinate record (§5.2.1).
 3. Forced target (§5.1) → use it.
-4. Alignment (`0x006259B0`) not evil (0): scan 5 (§5.4) within 35 with
-   T; choose between its best and alternative via `0x005DD510` (§5.3).
+4. Alignment (`0x006259B0`) not evil (≠ 0): scan 5 (§5.4, callback
+   `0x005DCA70` there) with context {main 0, main d 0x7FFFFFFF, T, 35,
+   coordinate index of the unit's position (`0x0061B130(room, x, y)`,
+   `drlg/levels.md` §11.4), alt 0, alt d 0x7FFFFFFF}. Alt = 0 → target
+   := main, B := main d; else `0x005DD510(unit; &main, &main d, alt,
+   alt d)` (§5.3): 1 → target := alt, B := alt d; 0 → main, main d (as
+   its scan 7 may have rewritten them). 1.14d-confirmed
+   (`0x005DDB44`–`0x005DDBC4`, read 2026-10-10, PC 1 today).
 5. Evil: best distance B = monstats `aidist` of the difficulty, 0 → 35.
    Walk the game's target-node lists (game +0x10F8, 10 heads; D2MOO
    `pTargetNodes`; slots 0–7 hold one player each followed by that
@@ -742,6 +748,34 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
 7. Target: if alignment ≠ good (2): set control flag 0x08, and if V ≠
    none, V +0x24 := (S = 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
+
+**LOS-draw test `0x0061AA40(room)`** (step 2; D2MOO
+`DUNGEON_CheckLOSDraw`). No room → false. Else it reads only the
+active room's DRLG room (+0x10; `drlg/rooms.md` §2) through
+`0x0066BA70`: room type (+0x48) 1, an outdoor-grid room → **true**;
+type 2, a preset (DS1) room → room flag 0x80000 (+0x28) set, i.e. the
+room was built from a lvlprest row with `Outdoors` ≠ 0
+(`drlg/preset.md` §6 rule 1; outdoor-grid rooms also carry the flag,
+`drlg/outdoor.md` §12.2, but their type already answers); any other
+type → false. No level, levels.txt, unit or seed read. So the test is
+true for a monster standing in open-air ground and false in a dungeon
+(maze and interior presets have `Outdoors` 0, e.g. the Tower Cellar of
+§5.2.1). True means: T = 0 (unless control flag 0x40 forced T = 1
+first), V stays none and the token is neither read nor written: an
+outdoor monster's main search never runs the collision test
+`0x00622AA0`, for the node walk of step 5 and for scan 5 alike. The
+second caller, `0x00460EEA`, is the client's (`client/model.md`).
+1.14d-confirmed (`0x0061AA40`–`0x0061AA57`, `0x0066BA70`, call site
+`0x005DD9A0`–`0x005DD9B1`, read 2026-10-10, PC 1 today).
+
+Level 108 (Chaos Sanctum): **true in every room**. levels.txt
+`DrlgType` is 3 (outdoor), its fill rooms are type 1 and its six
+presets (lvlprest Def 857–862, Diablo Entry / Arm W, E, S, N / Heart)
+all have `Outdoors` 1 (1.14d `patch_d2` tables). `a4-deseis-seal-early`
+frame 46 agrees: Oblivion Knight 1:88 at (7773,5195) takes the player
+at (7767,5186), no-size distance 12, with T = 0 (no line test, token
++0x24 untouched). Level 110 (Bloody Foothills, `DrlgType` 3, every
+Siege / Barricade preset `Outdoors` 1) likewise.
 
 Implemented (`monsters/ai/target.rs`, `wiring/action/ai.rs`): the
 record is loaded on the LOS-draw-false path whatever T is; S is its
@@ -936,14 +970,14 @@ e.g. a cow) takes the alternative at once in d2rs; the spec's
 order of those two rules is unread (an idle cow poked next to a trap was
 not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
 had hp 0, so the dead test may be the cause instead). Not applied.
-PROVISIONAL (REC-1642): the scan 5 callback `0x005DCA70` (§5.2 step 4,
-the not-evil search) skips a candidate without unit flag 4 (+0xC4,
-monstats2 `isAtt`, `monsters/init.md`) like rule 1 here (because
-1.14d's pets never take the poked cow, class 179, `isAtt` 0, neutral
-alignment, four sub-tiles away: a Clay Golem and a Valkyrie in
-`nec-clay-golem.check` / `ama-valkyrie.check` follow and wander for
-50 frames, q-fix-skills-4cls 2026-10-09); settled by reading
-`0x005DCA70`.
+Settled (REC-1642, 1.14d-confirmed `0x005DCAAB`–`0x005DCAB7`, read
+2026-10-10, PC 1 today): the scan 5 callback `0x005DCA70` (§5.4) does
+**not** call the filter `0x005DC970`, but its own filter also skips a
+candidate without unit flag 4 (+0xC4, monstats2 `isAtt`,
+`monsters/init.md`). That is why 1.14d's pets never take the poked
+cow (class 179, `isAtt` 0) in `nec-clay-golem.check` /
+`ama-valkyrie.check`. It has no state-146 step and no town test of its
+own (scan mode 2 skips town rooms).
 
 PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
 `wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)
@@ -993,6 +1027,63 @@ room's near-room list, own room included (`sim/unit-order.md` §4,
 DRLG). A scan stops at the first callback that returns a unit; most
 callbacks record a best candidate in `arg` and return 0. 1.14d-confirmed
 (table dump, `0x005DD0B0`).
+
+**Scan 5 callback `0x005DCA70(game, scanner; C, ctx)`** (the not-evil
+main search of §5.2 step 4 and the confused search of §5.1 k = 3;
+1.14d-confirmed `0x005DCA70`–`0x005DCBBF` and the walk `0x005DCF70`,
+read 2026-10-10, PC 1 today; settles REC-1642). Context, 7 dwords:
+{main, main d, L (line-test flag), range, coordinate index, alt,
+alt d}; the callers start it {0, 0x7FFFFFFF, T or a, 35, index of the
+scanner's position, 0, 0x7FFFFFFF}.
+
+Walk (mode 2, `0x005DCF70`): the scanner must be a player or monster,
+not dead (`0x005541B0`) and have a room, else nothing is scanned. The
+room's near-room list (`0x00619790`, own room included) in array order;
+a room in town (`0x0061AB00`) or with client count (+0x78) 0 is skipped
+whole; per room its unit list from the head (+0x74, next +0xE8, every
+unit type; the list is newest first, `sim/unit-order.md` §5). The
+scanner itself is offered too and fails rule 1.4.
+
+For each candidate C (none → nothing):
+
+1. Candidate test, in this order; the first failure sends C to rule 5:
+   1. C is a player or monster (type 0 / 1);
+   2. C not dead (`0x005541B0`: flag +0xC6 & 1, mode 0, or mode 12 for
+      a monster / 17 for a player; no life test);
+   3. C has unit flag 4 (+0xC4 & 4, monstats2 `isAtt`; §5.3 scan 6
+      rule 1.4);
+   4. hostility `0x00554200(game, scanner, C)` (`combat/hit.md` §7.1)
+      ≠ 0.
+
+   This is not `0x005DC970`: the scanner's own death, the town room and
+   the state-146 `invis` step with its draw are absent. No draws.
+2. d := `0x005DC380(C, scanner)`, the full-size distance with **C's**
+   size subtracted (§6; a = C). d > range (signed; 35 is in) → skip.
+3. Class t := 14 for a player, monstats `threat` (byte +0x4E) for a
+   monster (`0x005DC920`). t ≥ 2 competes for main, t 0 / 1 for alt:
+   d ≥ that slot's distance (signed) → skip. So the nearest wins and
+   **a tie keeps the earlier candidate** of the walk above (near-room
+   array order, then newest unit first within a room).
+4. L ≠ 0 and the line `0x00622AA0(C, scanner, 4)` (a = C) is blocked →
+   skip. Else the slot := (C, d).
+5. C failed rule 1 ("an ally that has already seen something"): only
+   when C is a monster, the scanner is not a player, the scanner's
+   alignment (`0x006259B0`) is 0, L ≠ 0, C is not in mode 0 or 12
+   (`0x0063EA40`), C's AI control (monster data +0x28) has flag 0x08
+   and C's coordinate index (`0x0061B130(C's room, C.x, C.y)`) equals
+   the context's: **L := 0** for the rest of the scan (the flag 0x08 is
+   written again, unchanged). Candidates after C in walk order are then
+   taken without the line test; earlier ones are not revisited.
+   Reachable only from §5.1 k = 3 with the alignment left at 0 (§5.2
+   step 4 runs scan 5 only for alignment ≠ 0).
+
+The callback always returns 0, so the whole walk runs. The distance is
+not the no-size one: `a5-warp-l110-siege-1-ama` frame 23, Barbarian
+1:15 (act5barb1, size 2) at (4328,5094) against Death Maulers (size 3,
+`threat` 10) 1:16 (4321,5092), 1:17 (4321,5089), 1:18 (4321,5095) and
+1:19 (4324,5089): d = 4, 5, 4 and **2**; 1.14d runs (mode 15) to
+(4324,5089), the position of 1:19 (the no-size distances 8, 9, 7, 7
+would tie 1:18 and 1:19). L is 0 there (LOS-draw true, §5.2).
 
 ### 6. Distances and line tests
 
@@ -1187,6 +1278,29 @@ Rules 4–7 (1.14d-read 2026-10-08, gaps MV4–MV7 of
       (`0x00648BF0`), else −1. P +0x10 := v.
    5. Counters: game +0x1D70 + 4·c += 1; c ≠ 0 → game +0x1DB4 += 1 (no
       reader in this spec).
+   6. **Speed bonus hook** `0x005A6380` (EAX = P, EDI = U), the only
+      reader of P +0x10: called by `0x005A7C20` for every mode but GH
+      **after** the start function (or the neutral start that replaced
+      it), unit flag 0x80000 and the animation prepare `0x005533D0`,
+      before the mode-1 umod callbacks (`umod-callbacks.md` §2 site 2).
+      v := P +0x10; v = 0 → nothing (no list is made or changed). Else
+      L := the unit's stat list with flag 0x4000 (`0x00625760(U,
+      0x4000)`), or a new list of flags 0x4004 (`0x006251F0`, owner U's
+      type and GUID) attached to U (`0x00626E10(U, L, 1)`); allocation
+      failed → return. Stat 67 `velocitypercent` of L := v (set, not
+      add, `0x006270B0(L, 67, v, 0)`); then the rate routine
+      `0x00623F50(U)` runs again (`sim/units.md` §4.7 step 7,
+      `sim/pathing.md` §8.1 rule 2), so the mode's animation speed and
+      velocity use p = stat 96 term + total(67) with the bonus in. The
+      list carries flag 0x4 like the player's run list
+      (TEMPONLY, `sim/stat-lists.md` §8.1: freed by the next set-mode,
+      `sim/units.md` §4.1, so the bonus lasts for the one mode and a
+      request with v = 0 walks at the plain rate). 1.14d-confirmed (asm `0x005A6380`–
+      `0x005A63E5`, call in `0x005A7C20`; read 2026-10-10, PC 1 today;
+      settles REC-1111). Recorded: Fallen escape v = 50 → 192 · 125 /
+      75 = 320 (`combat-melee-fallen`); vine pet move k 1 v = 43 → 256
+      · 118 / 100 = 302 (`gen-skill-dru-222` frame 67,
+      `ai-bodies-7.md` §20).
 5. **Compute** `0x005A6290(t)` (U, P, n as in rule 4): step counts :=
    n (`0x00648E70`, `sim/pathing.md` §13.1 rule 1). Target cache: when
    (path target unit, target x, target y) (`0x00648BF0`, `0x00648A00`,

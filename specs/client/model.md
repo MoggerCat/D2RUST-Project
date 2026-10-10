@@ -32,28 +32,28 @@
 |   2. Unit table | 140–189 |
 |   3. Local player | 190–212 |
 |   4. Receive and the unit message queue | 213–250 |
-|   5. Client update pass | 251–515 |
-|   6. Position check (`0x004804E0`) | 516–559 |
-|   7. Session messages | 560–757 |
-|   8. Mode requests | 758–858 |
-|   9. Room-in-sight messages | 859–893 |
-|   10. Bit reader | 894–908 |
-|   11. Current act and level (join and later) | 909–954 |
-|   12. Client DRLG and the room of a point | 955–996 |
-|   13. Visibility predicate (`0x004DBF20`) | 997–1048 |
-|   14. Pet list and the hireling GUID | 1049–1113 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1114–1203 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1204–1238 |
-|   17. Model writes made by 1.14d UI code | 1239–1444 |
-|   18. Audio driver inputs and the client object functions | 1445–1475 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1476–1725 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1726–1886 |
-| Constants & data dependencies | 1887–1899 |
-| Randomness | 1900–1915 |
-| Edge cases & original bugs | 1916–1940 |
-| Test vectors | 1941–1998 |
-| Provenance | 1999–2104 |
-| Open questions | 2105–2319 |
+|   5. Client update pass | 251–601 |
+|   6. Position check (`0x004804E0`) | 602–645 |
+|   7. Session messages | 646–843 |
+|   8. Mode requests | 844–969 |
+|   9. Room-in-sight messages | 970–1004 |
+|   10. Bit reader | 1005–1019 |
+|   11. Current act and level (join and later) | 1020–1065 |
+|   12. Client DRLG and the room of a point | 1066–1107 |
+|   13. Visibility predicate (`0x004DBF20`) | 1108–1159 |
+|   14. Pet list and the hireling GUID | 1160–1224 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1225–1314 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1315–1349 |
+|   17. Model writes made by 1.14d UI code | 1350–1555 |
+|   18. Audio driver inputs and the client object functions | 1556–1586 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1587–1849 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1850–2010 |
+| Constants & data dependencies | 2011–2023 |
+| Randomness | 2024–2039 |
+| Edge cases & original bugs | 2040–2064 |
+| Test vectors | 2065–2122 |
+| Provenance | 2123–2229 |
+| Open questions | 2230–2444 |
 <!-- /index -->
 
 ## Summary
@@ -275,7 +275,13 @@ position check of the local player.
    S players, S monsters, S objects, S items, C monsters. The S sets are
    walked by `0x00463C90` (next link read before the unit runs, so a
    unit may free itself); the C sets by `0x00463CC0`. The rest of
-   `0x00465AA0` and of `0x0044C790` runs no handler (Phase 6).
+   `0x00465AA0` (`0x00465B0A`–`0x00465BDA`, read 2026-10-10) runs no
+   message handler: four empty chain walks (C monsters, S items, S
+   players, S monsters), then `0x00463D80` (= `0x00625960(U)`,
+   the mod-array clear of `sim/stat-lists.md` §11 r3) on C monsters, S
+   items and S players,
+   then the single-player server copy of rule 7. The rest of
+   `0x0044C790` is Phase 6.
    `0x00463CC0` runs rule 2's per-unit step (`0x00480810`), then looks
    the unit up again in its C set; still present: type 2 →
    `0x004BDEE0` once more, result ignored (`world/objects-client.md`
@@ -512,6 +518,86 @@ position check of the local player.
       C keys are unchanged. Checked 2026-10-09 against the committed
       scene at tick 73: rows 1–110 equal; with the client path above
       (2026-10-10) rows 1–171 equal, the chickens included.
+7. **Single-player server copy** `0x00465070(U)` (1.14d-confirmed
+   `0x00465BB8`–`0x00465BDA`, `0x00465070`–`0x004653CF`, `0x00534650`,
+   `0x00650C20`, read 2026-10-10, PC 1 today; settles REC-1385). The
+   last step of every unit update `0x00465AA0`, after all per-unit
+   updates and queue drains of rule 3, **only when the client game
+   type `[0x007A0610]` is 0** (the function is a fatal 0xBAA in any
+   other type): for every S player, then every S monster (`0x00463C90`
+   order), the client unit takes the path of the **server's unit of
+   the same (type, GUID)** in the in-process game. This is the only
+   client position sync that needs no S→C message: a server-side move
+   the client was never told about (a teleport, a walk the server
+   started or ended, a knockback) reaches the client unit at the next
+   client update, one per server tick (rule 1).
+   1. V := `0x00534650(type, GUID)` (the local game `0x0052F6E0`, its
+      unit find `0x00552F60`, game lock released `0x0052DF40`); no game
+      or no V → nothing. U without a room (`0x00620BB0`) → nothing.
+      P := U's path, Q := V's path.
+   2. Cell: when Q's cell (u16 +0x02, +0x06) ≠ P's: room' := the client
+      room of that cell looked up from U's room (`0x00463740`); none →
+      **nothing at all** (no copy, no mode step); else the forced
+      placement `0x00650C20(P, U, U's room, x, y)` (`sim/path-placement.md`
+      §6 rule 2: footprint moved, position := the cell centre with the
+      room recache, movement reset, point count 0). It is not the
+      teleport `0x00650910` / `0x00650BE0` and not the place
+      `0x004654C0` (no client room-change step, no palette or town
+      work here; the local player's room change follows from the path's
+      room-changed flag, §17 r6).
+   3. Copy Q → P, raw: +0x00..+0x0F (precise position and client pixel
+      point), +0x10..+0x1B (target), +0x24, +0x28 (point index, count),
+      +0x38, +0x5C, +0x60, bytes +0x67, +0x68, +0x6A..+0x71,
+      +0x7C..+0x8F (speed, saved speed and the three after), bytes
+      +0x91..+0x94, +0x98, the point list +0x9C (count +0x28 dwords),
+      the saved steps +0x1D8 (count +0x1D4 dwords) and +0x1D4, path type
+      +0x3C unless Q's is 8 or 0xB, +0x40, +0x44, and the moving flag
+      (path flags +0x34 bit 0x20, `0x00648770` → `0x00648750`). Not
+      copied: the room +0x1C, the other path flags, the unit +0x30, the
+      target unit, the collision fields +0x48..+0x54.
+   4. Mode, only when U's mode c ≠ V's mode s (set with `0x00624690`
+      directly: no overlay, sound or graphics call of `0x00480E70`):
+
+      | U | s | c | new mode |
+      |---|---|---|---|
+      | player | 1, 5 | 2, 3, 6 | 5 in a town room (`0x0061AB00` of U's room), else 1 |
+      | player | 2, 6 | 1, 5 | 6 in a town room, else 2 |
+      | player | 3 | 1, 5 | 3 |
+      | player | 18 | any | no change |
+      | player | other | 19 | s |
+      | player | other | not 19 | no change; but with U's used skill E having E-flag bit 0, and V's used skill none, or without bit 0, or with bit 1: E-flags \|= 2, then step 5, return |
+      | monster | 1 | 2, 15 | 1 |
+      | monster | 2 | 1 | 2 |
+      | monster | 15 | 1 | 15 |
+
+      Every other pair: no change.
+   5. `0x006491B0(U, 0)`: flags-ex bit 0x2000 cleared, P +0x38 := 0 (so
+      the walk resume of §19 r8.3 never counts up in single player).
+
+   Consequences. (a) The client's own path step of a walking unit
+   (§20 r2.1, §19 r8) runs earlier in the same update on the path
+   copied one update before, and is then overwritten: in single player
+   a player's or monster's client position after a client update is
+   the server's after the tick of that pass, whatever the client
+   predicted, as long as the server's cell lies in a loaded client
+   room. (b) The position check (§6) of a later message therefore finds
+   the local player on the server's point and sends no 0x5F; measured
+   (q-fix-d3-player-mode, 1.14d under Wine 2026-10-09,
+   `tools/state-snapshot.md` §3 r4): after a `pos` poke the client
+   player is on the poked point from the poke's tick on;
+   `combat-cold-plains-wp`: the client runs from tick 11 in mode 3 (row
+   s = 3) and stands at tick 34 where the server stands (row s = 1, 5).
+   (c) A client walk the server never starts (a request the server
+   refuses) is pulled back to NU / TN at the next update.
+   d2rs: no such copy; the play preview and `state-dump`
+   (`Headless::sync_local`) reproduce the positions with the walk
+   prediction of open question 2 instead. PROVISIONAL (REC-2416): d2rs
+   keeps the prediction until the bridge hands the model the server
+   unit's path (because the model reads the server only through
+   messages, `client/bridge.md`); settled by build-queue proposal
+   `q-fix-pc1today-sp-path-copy` and a state check with a server-side
+   move the prediction cannot know (`milestone-anya` client positions
+   per update, `tools/state-snapshot.md` §3 r4).
 
 ### 6. Position check (`0x004804E0`)
 
@@ -808,13 +894,38 @@ position check of the local player.
 
    A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
    neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.
-   PROVISIONAL: on the local player, every code but the walks 0x00,
-   0x01, 0x17, 0x18 and the interact sender 0x02 ends the walk the
-   client predicts (open question 2): the player stands from that
-   request on (because the client steps its path only in a walking mode
-   and the server stops its player's walk on the same mode change; a hit
-   or death while walking otherwise walks the client on alone); settled
-   by REC-1250.
+   **A request while walking** (modes 2 / 3 / 6; 1.14d-confirmed
+   `0x00461250`–`0x00461436`, `0x00648DC0`, `0x00463390`, read
+   2026-10-10, PC 1 today; settles REC-1250). The entry does not stop
+   the path: `0x00650590` runs only for a unit in mode 0x13, and
+   `0x00648DC0(path)` only restores the saved speed (path flag 0x8000:
+   +0x7C := +0x80) and sets a player's path type to 7 (`0x00648CF0`);
+   the point list, counts and target stay. The path is stepped only by
+   the player update, in a mode of path kind 1, or kind 2 with E-flag
+   bit 0 (§20 r2.1–r2.2). So:
+   - code 6 (get-hit): +0xB0 := r2, mode := 4 (kinds 0,1,2), `check(U,
+     r0, r1, 1, 0, 0)` (§6: tolerance 10; the local player is never
+     moved by it, at most C→S 0x5F). No step runs while in mode 4: the
+     unit stands on the cell it had reached, with the stale route still
+     in its path. When the GH animation completes the mode end (§20 r3)
+     sets NU / TN, never WL / RN: **the walk does not resume by the
+     mode machine**. It resumes only through a new walk request (click
+     or held repeat, §20 r5; a pending action, §20 r6, which keeps mode
+     4 one update and then acts) or, in single player, through the mode
+     half of the server copy (§5 r7: server in 2 / 6 / 3 while the
+     client is in 1 / 5), which also keeps the position at the server's
+     during the hit;
+   - codes 7, 8, 9, 0x14, 0x19, a successful 0x15 / 0x16 and 0x12 when
+     it sets mode 9 (table) set a mode of another path kind: the walk
+     ends the same way (0x14 stops the path and builds its own);
+   - **code 0x13, and code 0x12 when it sets no mode, leave the mode**
+     (overlay / sound and the check only, `0x00461439`, `0x004614E3`):
+     a walking unit stays in its walking mode and keeps stepping.
+
+   d2rs (`bridge::predict::server_walk`) drops the predicted walk on
+   every code but 0x00, 0x01, 0x02, 0x17, 0x18, so also on 0x13 and on
+   a 0x12 that sets no mode: differs (build-queue proposal
+   `q-fix-pc1today-walk-hit`).
 5. **Object** (`0x004BD6D0`): code 3 → `0x004BCF60(U, record)` (object
    mode change: lights `render/lighting.md` §8), then `0x004BD650` when
    `0x00621B00(U)`; code 0x15 → `0x004BD5C0(record)`; any other code is
@@ -1626,25 +1737,38 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    `firetower`: then direction := (direction + 0x38) & 0x3F), clears
    the target, then starts.
 
-   PROVISIONAL: the `cltstfunc` bodies are read from their effect on
-   the local player's click (q-fix-skills-4cls; 1.14d under Wine,
-   2026-10-09, checks `traces/checks/{nec,ass}-*.check`: a right click
-   on open ground beside a live cow sends **no** C→S for functions 20
-   (Raise Skeleton, Skeletal Mage), 21 (Corpse / Poison Explosion), 23
-   (Iron Golem), 24 (Revive) and 5 (Psychic Hammer, Dragon Flight), and
-   sends 0x0C for 22 (Bone Prison), 18 (curses), 19 (Teeth) and the
-   rest): 5 (`0x004F2010`, read from the 1.14d export 2026-10-09)
-   returns 1 only with a target T that is a player or monster (T type
-   < 2), with neither U's nor T's room in town (`0x0061AB00`) and T
-   hostile (`0x00465C60`, `ui/controls.md` §6 r9.7); 20 (`0x004F3870`
-   reads T: a monster, then `0x004638A0`, `0x00645510(T, 0)`,
-   `0x004B11F0`, `0x00451FE0`), 21 and 24 are read as "a dead monster
-   target"; 23 as "an item target"; every other function returns
-   non-zero (because a click sends only when the request
-   returned non-zero, `skills/sequences.md` local player rule 2, and
-   the use check r9.1 passes for all of these); settled by REC-1641
-   (the table bodies at `0x00727A90` read in a spec-writing session,
-   and a 1.14d check of each function on its target kind).
+   **`cltstfunc` bodies 5, 20–24** (table `0x00727A90`: dword i at
+   +4·i, entry 0 null, count `[0x00727A8C]` = 0x46; 1.14d-confirmed
+   from each body's disassembly, read 2026-10-10, PC 1 today; settles
+   REC-1641, whose 2026-10-09 reading from clicks had 20 at the body
+   of 24 and guessed 21–24). T := U's target unit (`0x004648F0`), E :=
+   U's used skill entry (`0x00620250`). Each returns 1 only when every
+   test of its row passes, in the order given, else 0; the writes
+   happen on the passing path only.
+
+   | # | Body | Skills | Tests, then writes |
+   |---|---|---|---|
+   | 5 | `0x004F2010` | Psychic Hammer, Dragon Flight | T set; U's room not in town (`0x0061AB00`); T's room not in town; T a player or monster (type < 2); T hostile (`0x00465C60(U, T)` ≠ 0, `ui/controls.md` §6 r9.7) |
+   | 20 | `0x004F3870` | Raise Skeleton, Skeletal Mage | E set; T set; the raise test `0x00645510(T, 0)` (`skills/bodies.md` §3.6: monster, mode 12, no `udead`-group state, `corpseSel`, `Velocity` ≠ 0). E +0x18 := T's x (`0x0045ADF0`), E +0x1C := T's y (`0x0045AE20`) |
+   | 21 | `0x004F39A0` | Corpse Explosion, Poison Explosion | E set; T set; **only when U is the local player** (`0x00463DD0`): the corpse test `0x00645680(T)` (`skills/bodies.md` §7.5: as the raise test without `Velocity`). E +0x18 / +0x1C := T's position (static path +0x0C / +0x10 for types 2, 4, 5; else the dynamic path's `0x006488C0` / `0x00648900`; no path → 0), E +0x20 := T's class (unit +0x04) |
+   | 22 | `0x004F3EB0` | Bone Prison | S a valid row; U has a room R (`0x00620BB0`); (x, y) := U's client target position (`0x004C52E0`: T's position, else the path target); a room R' holds (x, y) (`0x00463740` from R); S has `InTown` (row +5 bit 0) or R' is not in town. No write |
+   | 23 | `0x004F3F50` | Iron Golem | T an item (type 4); its base record has +0xDC bit 1 (`0x00629CC0`, the metal test of `skills/bodies-2b.md` §7.11); T's mode (+0x10) = 3 (on the ground); T identified (item flag 0x10, `0x006280A0`); T has a room; T's stat list is not linked to a unit (`0x00625820(T, 0)` = 0). No write |
+   | 24 | `0x004F4000` | Revive | S a valid row; T a monster; monstats2 flag 8 `revive` (`0x004638A0(class, 8)`); the raise test; `0x004B11F0(T)`: class switch-capable (`0x00623470`, `skills/bodies.md` `can_switch`) and neither type flag 0x8 nor 0x2 (`0x004AC7E0`); a monstats2 row m (`0x00451FE0`); missile := S `cltmissilea` (+0xEA), `cltmissileb` (+0xEC) when m +0x0C = 1, `cltmissilec` (+0xEE) when m +0x0C = 3, inside the missiles table; the client missile create `0x004CD540` with a zeroed 0x5C record {+0x00 flags 0x2000, +0x04 owner U, +0x08 T, +0x10 missile, +0x2C S, +0x30 L} returns a missile |
+
+   The skill column is the measured one (q-fix-skills-4cls, 1.14d
+   under Wine 2026-10-09, `traces/checks/{nec,ass}-*.check`: a right
+   click on open ground beside a live cow sends no C→S for 20, 21, 23,
+   24 and 5, and 0x0C for 22, 18 (curses) and 19 (Teeth)); the other
+   bodies of the table are not read here (`skills/sequences.md` owns
+   30, 31; `audio/triggers.md` 25). d2rs (`bridge::use_state::
+   client_start_passes`): 5 as above; 20 / 21 / 24 as "a dead
+   monster", 23 as "an item", 22 always passing. PROVISIONAL
+   (REC-2415): d2rs keeps those shorter tests (because the model's
+   click path hands the start no corpse flags, item flags or target
+   room yet); settled by a 1.14d check that right-clicks each skill on
+   a target failing one test only (a `udead` corpse for 20, a corpse
+   without `revive` for 24, an unidentified ground item for 23, a town
+   point for 22) and compares the C→S sent.
 8. **Client mode steps** (monster update `0x004B13A0`, §5 r2; a monster
    with state 1 `freeze` runs only while dead; mode ≥ 16 nothing):
    1. Mode record `0x004AF400` {path kind, anim kind, end kind}: class
@@ -2101,6 +2225,7 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
 `20261006-022633-packets.jsonl`.
 - 2026-10-09 (pc1-day3-c, REC-10 / REC-576 (4)): a scripted Kashya hire recorded with `record_packets.py` on Windows; §14 rule 3.
 - 2026-10-09 (pc1-day4, static asm): §20 from `0x00463390`–`0x0046370C` (mode record table `0x00711E00`, 20 × 12 bytes, read from the image with `re/scripts/rd.py`), `0x004611F0`, `0x006217C0`, `0x00623E00`, `0x004807C0`, `0x00460DE0`, `0x00460F10`, `0x00463260` (entries only); next action `0x00464600`, `0x004645B0`, `0x00480BA0`, `0x00481030`, loop `0x0044EFA0` (`0x0044F039`–`0x0044F167`); pending `0x00481600`, `0x00481400`, `0x004814A0`, `0x004815A0`, `0x004812E0`, `0x00480C80`, `0x0045C470`, `0x00460780`. §17 r7: `0x00461DC0` (`0x004620BE`–`0x00462118`), the +0x28 writers `0x004AE0A0` (callers `0x004664B0`, `0x004AEB71`, `0x004AF047`), `0x004B3CEB`, `0x00460730` (no reference: byte search of the image).
+- 2026-10-10 (PC 1 today, static asm / exports): §5 r3 tail and r7 from `0x00465AA0` (`0x00465B0A`–`0x00465BE0`), `0x00465070` (jump table `0x004653D0`, byte map `0x004653E4`), `0x00534650`, `0x00650C20` → `0x00650AA0`, `0x006491B0`, `0x00648770`, `0x00648750`; the writers of a path's position found by xref of `0x0064FB90` (callers `0x00650590`, `0x006505E0`, `0x006507B0`, `0x00650840`, `0x00650910`, `0x00650AA0`, `0x00650CA0`) and the raw copy at `0x00465125` (REC-1385). §8 r4 walking note from `0x00461250` (jump table `0x004616A4`, byte map `0x004616E4`), `0x00648DC0`, `0x00648CF0` (REC-1250). §8 r7 bodies `0x004F2010`, `0x004F3870`, `0x004F39A0`, `0x004F3EB0`, `0x004F3F50`, `0x004F4000` with `0x00645510`, `0x00645680`, `0x004B11F0`, `0x004C52E0` (table dwords read from the image; REC-1641).
 
 ## Open questions
 
