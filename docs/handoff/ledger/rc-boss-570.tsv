@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+monster.boss.baalclone	entity	monsters	monstats.txt baalclone (570) boss=1, AI BaalCrabClone; act/quest boss	specs/monsters/ai-bodies-5.md,specs/combat/damage.md	draft	gen-boss-570	PARTIAL	yes	0	n	claude/rc-boss-570	EQUAL	-	rc-boss-570 2026-10-10: ownerless clone is killed on its first think (0x005FD210 -> 0x0057CCB0); AiWorld::kill was the no-op host stub, now kill_by

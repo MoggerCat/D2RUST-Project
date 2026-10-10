@@ -23,15 +23,15 @@
 |   2. Defense | 90–114 |
 |   3. Chance to hit | 115–194 |
 |   4. Melee result flags | 195–219 |
-|   5. Block chance | 220–242 |
-|   6. Block, weapon block, dodge, avoid, evade | 243–300 |
-|   7. Hostility and melee range | 301–405 |
-| Constants & data dependencies | 406–422 |
-| Randomness | 423–451 |
-| Edge cases & original bugs | 452–472 |
-| Test vectors | 473–497 |
-| Provenance | 498–523 |
-| Open questions | 524–545 |
+|   5. Block chance | 220–248 |
+|   6. Block, weapon block, dodge, avoid, evade | 249–306 |
+|   7. Hostility and melee range | 307–411 |
+| Constants & data dependencies | 412–428 |
+| Randomness | 429–457 |
+| Edge cases & original bugs | 458–478 |
+| Test vectors | 479–503 |
+| Provenance | 504–529 |
+| Open questions | 530–551 |
 <!-- /index -->
 
 ## Summary
@@ -237,6 +237,12 @@ Monster:
    (`SH`, `0x00664860(unit, 7, component)`) is a code other than `tch `
    (table `0x00744580`, 1 entry) whose items record has type 2 (shield).
    Yes → `min(toblock(20), 75)`, no → 0.
+   Read from `0x006225F0` (2026-10-10, REC-2140): the choice byte is the
+   monster's component 7 (monster data +0x0B); the code is `compcode`
+   row of `monstats2` choice byte 38 + 12·7 + v; the lookup is
+   `0x00633640` (items by code) and the record's `type` (+0x11E) must
+   be 2. Fallen (`SHv` nil,sml,buc,tch): choices 1 and 2 carry a shield,
+   so a hit on one draws the block roll even though `toblock` may be 0.
 
 Other unit types: 0.
 

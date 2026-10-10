@@ -1309,6 +1309,18 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
             return;
         }
+        // Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9): the
+        // egg's start gives up its monster footprint (§5.6).
+        if let bodies::BodyEffect::DeadFootprint(u) = e {
+            self.cv.v.dead_body_footprint(u);
+            return;
+        }
+        // Kill `0x0057CCB0(game, u, killer, 1)` (`combat/damage.md` §7.2):
+        // the egg hatch's last step (`bodies-3.md` §5.7 step 6).
+        if let bodies::BodyEffect::KillBy { u, killer, .. } = e {
+            crate::wiring::action::reaction::kill_by(&mut self.cv, u, killer);
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {
@@ -1783,7 +1795,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     /// [`Pending::ai_chain_index`] (`0x006510C0`).
     fn chain_position(&self, class: i32) -> i32 {
-        self.x().ai_chain_index(class)
+        self.cv.v.h.monster_chain_position(class)
     }
     /// [`Pending::ai_class_for_level`] (`0x0063EC70`).
     fn class_for_level(&self, room: Option<RoomId>, class: i32) -> i32 {
@@ -1844,6 +1856,39 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                 return placed;
             }
         }
+        if let bodies::MonsterSpawn::Near {
+            unit,
+            class,
+            mode,
+            spread,
+            flags,
+        } = q
+        {
+            let game = &mut *self.cv.game;
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let placed =
+                v.h.with_monster_world(|w, h| {
+                    w.spawn_near(
+                        &mut sim,
+                        h,
+                        unit,
+                        class,
+                        u8::try_from(mode).unwrap_or(0),
+                        spread,
+                        flags as u16,
+                    )
+                })
+                .flatten();
+            if let Some(placed) = placed {
+                return placed;
+            }
+        }
         self.xm().body_spawn_monster(q)
     }
     /// a = 0: [`BodyWorld::place_unit`]'s provider.
@@ -1857,9 +1902,13 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
         }
     }
-    /// [`Pending::ai_component`].
+    /// Monster data `nComponent[k]` (`0x005CDFB0` reads +0x0E, S3) from
+    /// the lent monster world; [`Pending::ai_component`] without one.
     fn component(&self, u: UnitId, k: usize) -> i32 {
-        i32::from(self.x().ai_component(u, k))
+        match self.cv.v.h.monster_data(u) {
+            Some(d) => i32::from(d.components.get(k).copied().unwrap_or(0)),
+            None => i32::from(self.x().ai_component(u, k)),
+        }
     }
 }
 

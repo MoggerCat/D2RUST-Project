@@ -12,6 +12,7 @@
 //! under REC-168.
 
 pub mod control;
+pub mod doll;
 pub mod flow;
 pub mod glyphs;
 pub mod screen;
@@ -146,6 +147,22 @@ pub enum DrawItem {
         /// Drawn with the frame's bottom-left at `at`, its offsets not
         /// applied (the create fire, [`FIRE_AT_BOX`]).
         boxed: bool,
+    },
+    /// A character-select paper doll (`doll`, §F2.10): the figure of class'
+    /// `class`, mode `mode` built from the entry's component and colour
+    /// bytes, its anchor at `at`, drawn with draw mode `draw_mode` (5; 1 for
+    /// a dead hardcore character) at animation step `ticks` (40 ms ticks
+    /// since the screen was built, PROVISIONAL REC-2182) under `epoch`.
+    Doll {
+        class: u8,
+        mode: u8,
+        components: [u8; 16],
+        colours: [u8; 16],
+        at: Point,
+        draw_mode: u8,
+        key: u32,
+        epoch: u64,
+        ticks: u32,
     },
     /// A dark filled box (menu panels).
     Rect { at: Point, w: i32, h: i32 },
