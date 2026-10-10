@@ -379,7 +379,7 @@ pub trait MissileBodies {
     }
     /// Ally test `0x00554DE0(game, owner, unit)` (`skills/bodies.md` §2.11
     /// flag 0x10000).
-    fn ally_test(&self, game: &Game, owner: UnitId, unit: UnitId) -> bool {
+    fn ally_test(&mut self, game: &mut Game, owner: UnitId, unit: UnitId) -> bool {
         false
     }
     /// `accepts(source, unit, f)` = `0x0056B3E0` (`skills/bodies.md`

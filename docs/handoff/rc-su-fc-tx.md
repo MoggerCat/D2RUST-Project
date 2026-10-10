@@ -24,7 +24,7 @@ first divergences). Before this session's fixes the fresh run was already 47: th
   limited to Council Hydras and a knockback double-request).
 
 ## Second round (REC-3180..3182; owner goal 99/99)
-gen-su-* EQUAL (state PARTIAL, REC-2055) 48 -> 59 of 66 on integ-r23 + fixes. Causes:
+gen-su-* EQUAL (state PARTIAL, REC-2055) 48 -> 61 of 66 on integ-r23 + fixes. Causes:
 1. Hydra missile hit: combat `is_revived()` (unit flag 0x80000000) was always false, so the
    17% pet-vs-player damage percent (damage.md §4.2) never applied (gen-su-18, 26..31, 63).
 2. Radament (hcIdx 10): the closing umod-22 tail repeated the case-10 `roll(5)` (and the
@@ -50,3 +50,14 @@ Checks-status rows of gen-su-* refreshed; `ledger.py --fix` reconciled rc-gen-mo
   in d2rs (fr stays at start frame; 1.14d advances at frame 66/43). Size M.
 - gen-su-34: monster mode m 2 vs 1 (rc-su-mode area). gen-su-45: Ancient 3 max life +36 hp
   (base 4300 vs 4264; equipment order?). Size M.
+
+## Third round additions (REC-3183/3184)
+6. A monster with an aura list (umod 30) lost its AI current skill at event 0: the empty
+   list slot now falls through to the host entry (`used_skill_of`), gen-su-37 (MonBoneSpirit).
+7. AI creations (`0x005B2F20` from an AI body, e.g. the Sand Maggot Queen's eggs): the host
+   `spawn_monster` now runs the monster world's `spawn_at`; AI alloc/install requested while the
+   store is lent are queued (`AiDeferred`) and run at the end of the think / mode end
+   (`monsters/ai/mod.rs drain_deferred_ai`); `room_at` searches the neighbours (gen-su-15).
+Regression: 106 cached gen-mon/ai/nec/pal checks MATCH 80 -> 101 channels, DIVERGED 24 -> 3
+(nec-75/78 packets, nec-93 state: all known in the ledger); gen-mon-688 rng ERROR = empty 1.14d rng
+recording. Remaining gen-su DIVERGED (5): 6, 8, 12, 34, 45 (see Open above; su-15/-37 closed).
