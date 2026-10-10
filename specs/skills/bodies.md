@@ -37,13 +37,13 @@
 |   5. `srvmissile` path | 823–838 |
 |   6. Shared helpers, batch 2 | 839–1177 |
 |   7. Start functions (srvst), batch 2 | 1178–1244 |
-|   8. Do functions (srvdo), batch 2 | 1245–1663 |
-| Constants & data dependencies | 1664–1710 |
-| Randomness | 1711–1729 |
-| Edge cases & original bugs | 1730–1779 |
-| Test vectors | 1780–1800 |
-| Provenance | 1801–1838 |
-| Open questions | 1839–1864 |
+|   8. Do functions (srvdo), batch 2 | 1245–1668 |
+| Constants & data dependencies | 1669–1715 |
+| Randomness | 1716–1734 |
+| Edge cases & original bugs | 1735–1784 |
+| Test vectors | 1785–1805 |
+| Provenance | 1806–1843 |
+| Open questions | 1844–1869 |
 <!-- /index -->
 
 ## Summary

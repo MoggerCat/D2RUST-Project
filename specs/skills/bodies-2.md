@@ -25,16 +25,16 @@
 | Outputs / state changes | 55–60 |
 | Rules | 61–62 |
 |   1. Conventions | 63–74 |
-|   2. Shared helpers, batch 3 | 75–733 |
-|   3. Bodies, required level 1 | 734–918 |
-|   4. Bodies, required level 6 | 919–1130 |
-|   5. Bodies, required level 12 | 1131–1309 |
-| Constants & data dependencies | 1310–1344 |
-| Randomness | 1345–1383 |
-| Edge cases & original bugs | 1384–1453 |
-| Test vectors | 1454–1491 |
-| Provenance | 1492–1511 |
-| Open questions | 1512–1550 |
+|   2. Shared helpers, batch 3 | 75–738 |
+|   3. Bodies, required level 1 | 739–923 |
+|   4. Bodies, required level 6 | 924–1135 |
+|   5. Bodies, required level 12 | 1136–1314 |
+| Constants & data dependencies | 1315–1349 |
+| Randomness | 1350–1388 |
+| Edge cases & original bugs | 1389–1458 |
+| Test vectors | 1459–1496 |
+| Provenance | 1497–1516 |
+| Open questions | 1517–1555 |
 <!-- /index -->
 
 ## Summary
