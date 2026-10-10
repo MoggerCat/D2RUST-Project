@@ -30,8 +30,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | skills | 591 | 239 | 0 | 350 | 0 | 2 | 437 | 152 | 0 | 522.5–2090 | 6 | 496 / 83 / 12 |
 | systems | 918 | 144 | 46 | 579 | 0 | 149 | 207 | 559 | 3 | 1245.5–4886+ | 285 | 268 / 0 / 650 |
-| world | 825 | 96 | 0 | 303 | 0 | 426 | 230 | 164 | 5 | 483–1772+ | 296 | 707 / 46 / 72 |
-| **all** | 4478 | 935 | 46 | 1723 | 269 | 1505 | 1222 | 1737 | 14 | 4197–16340+ | 682 | 3099 / 457 / 922 |
+| world | 825 | 99 | 0 | 301 | 0 | 425 | 230 | 165 | 5 | 485–1780+ | 296 | 707 / 46 / 72 |
+| **all** | 4478 | 938 | 46 | 1721 | 269 | 1504 | 1222 | 1738 | 14 | 4199–16348+ | 682 | 3099 / 457 / 922 |
 
 ## By family
 
@@ -653,14 +653,14 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `item.set-item` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `item.treasure-tables` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `item.unique` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
-| `level` | 136 | 20 | 0 | 3 | 0 | 113 | 3 | 2 | 21 | 0 | 136 | 5 |
+| `level` | 136 | 20 | 0 | 1 | 0 | 115 | 1 | 0 | 21 | 0 | 136 | 5 |
 | `missile` | 299 | 5 | 0 | 294 | 0 | 0 | 175 | 293 | 6 | 0 | 0 | 4 |
 | `mon` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `monster` | 669 | 239 | 0 | 140 | 0 | 290 | 12 | 19 | 359 | 1 | 4 | 250 |
 | `net.c2s` | 113 | 12 | 9 | 14 | 0 | 78 | 0 | 31 | 4 | 0 | 27 | 0 |
 | `net.s2c` | 183 | 53 | 21 | 82 | 0 | 27 | 1 | 154 | 2 | 0 | 1 | 0 |
 | `npc` | 48 | 18 | 0 | 30 | 0 | 0 | 0 | 9 | 39 | 0 | 43 | 34 |
-| `object` | 523 | 0 | 0 | 231 | 0 | 292 | 220 | 220 | 11 | 0 | 10 | 0 |
+| `object` | 523 | 3 | 0 | 231 | 0 | 289 | 220 | 222 | 12 | 0 | 10 | 0 |
 | `quest` | 53 | 14 | 0 | 39 | 0 | 0 | 0 | 8 | 40 | 5 | 41 | 19 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
@@ -715,7 +715,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2154
 - Rows set exercised = yes from the coverage reports' seen lists: 64
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 2151
+- Duplicate areas between parts: 2170
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1446,94 +1446,113 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a4.104.act-4-mesa-1`: rc-level-pop-2.tsv:13 kept, rc-rng-level-pop.tsv:77 dropped
   - `level.a4.106.act-4-mesa-3`: rc-level-pop-2.tsv:14 kept, rc-rng-level-pop.tsv:78 dropped
   - `level.a5.110.act-5-siege-1`: rc-level-pop-2.tsv:15 kept, rc-rng-level-pop.tsv:80 dropped
-  - `level.a1.1.act-1-town`: rc-rng-level-pop.tsv:3 kept, rc-run-7.tsv:3 dropped
-  - `level.a1.10.act-1-cave-3`: rc-rng-level-pop.tsv:7 kept, rc-run-7.tsv:4 dropped
-  - `level.a1.11.act-1-cave-4`: rc-rng-level-pop.tsv:8 kept, rc-run-7.tsv:5 dropped
-  - `level.a1.12.act-1-cave-5`: rc-rng-level-pop.tsv:9 kept, rc-run-7.tsv:6 dropped
-  - `level.a1.13.act-1-cave-2-treasure`: rc-level-population.tsv:3 kept, rc-run-7.tsv:7 dropped
-  - `level.a1.14.act-1-cave-3-treasure`: rc-level-population.tsv:4 kept, rc-run-7.tsv:8 dropped
-  - `level.a1.15.act-1-cave-4-treasure`: rc-rng-level-pop.tsv:10 kept, rc-run-7.tsv:9 dropped
-  - `level.a1.16.act-1-cave-5-treasure`: rc-rng-level-pop.tsv:11 kept, rc-run-7.tsv:10 dropped
-  - `level.a1.17.act-1-graveyard`: rc-rng-level-pop.tsv:12 kept, rc-run-7.tsv:11 dropped
-  - `level.a1.18.act-1-crypt-1-a`: rc-rng-level-pop.tsv:13 kept, rc-run-7.tsv:12 dropped
-  - `level.a1.19.act-1-crypt-2-a`: rc-rng-level-pop.tsv:14 kept, rc-run-7.tsv:13 dropped
-  - `level.a1.20.act-1-tower-2`: rc-rng-level-pop.tsv:15 kept, rc-run-7.tsv:14 dropped
-  - `level.a1.22.act-1-crypt-3-b`: rc-rng-level-pop.tsv:16 kept, rc-run-7.tsv:16 dropped
-  - `level.a1.23.act-1-crypt-3-c`: rc-rng-level-pop.tsv:17 kept, rc-run-7.tsv:17 dropped
-  - `level.a1.24.act-1-crypt-3-d`: rc-rng-level-pop.tsv:18 kept, rc-run-7.tsv:18 dropped
-  - `level.a1.25.act-1-crypt-3-e`: rc-level-population.tsv:5 kept, rc-run-7.tsv:19 dropped
-  - `level.a1.26.act-1-monastery`: rc-rng-level-pop.tsv:19 kept, rc-run-7.tsv:20 dropped
-  - `level.a1.27.act-1-courtyard-1`: rc-rng-level-pop.tsv:20 kept, rc-run-7.tsv:21 dropped
-  - `level.a1.28.act-1-barracks`: rc-rng-level-pop.tsv:21 kept, rc-run-7.tsv:22 dropped
-  - `level.a1.30.act-1-jail-2`: rc-rng-level-pop.tsv:22 kept, rc-run-7.tsv:23 dropped
-  - `level.a1.31.act-1-jail-3`: rc-level-pop-2.tsv:3 kept, rc-run-7.tsv:24 dropped
-  - `level.a1.32.act-1-courtyard-2`: rc-rng-level-pop.tsv:24 kept, rc-run-7.tsv:25 dropped
-  - `level.a1.33.act-1-cathedral`: rc-level-pop-2.tsv:4 kept, rc-run-7.tsv:26 dropped
-  - `level.a1.35.act-1-catacombs-2`: rc-rng-level-pop.tsv:26 kept, rc-run-7.tsv:27 dropped
-  - `level.a1.36.act-1-catacombs-3`: rc-rng-level-pop.tsv:27 kept, rc-run-7.tsv:28 dropped
-  - `level.a1.37.act-1-catacombs-4`: rc-rng-level-pop.tsv:28 kept, rc-run-7.tsv:29 dropped
-  - `level.a1.38.act-1-tristram`: rc-level-population.tsv:6 kept, rc-run-7.tsv:30 dropped
-  - `level.a1.39.act-1-moo-moo-farm`: rc-rng-level-pop.tsv:29 kept, rc-run-7.tsv:31 dropped
-  - `level.a1.5.act-1-wilderness-4`: rc-rng-level-pop.tsv:4 kept, rc-run-7.tsv:32 dropped
-  - `level.a1.6.act-1-wilderness-5`: rc-rng-level-pop.tsv:5 kept, rc-run-7.tsv:33 dropped
-  - `level.a1.7.act-1-wilderness-6`: rc-rng-level-pop.tsv:6 kept, rc-run-7.tsv:34 dropped
-  - `level.a2.41.act-2-desert-1`: rc-rng-level-pop.tsv:30 kept, rc-run-7.tsv:35 dropped
-  - `level.a2.42.act-2-desert-2`: rc-level-population.tsv:7 kept, rc-run-7.tsv:36 dropped
-  - `level.a2.43.act-2-desert-3`: rc-rng-level-pop.tsv:31 kept, rc-run-7.tsv:37 dropped
-  - `level.a2.44.act-2-desert-4`: rc-rng-level-pop.tsv:32 kept, rc-run-7.tsv:38 dropped
-  - `level.a2.45.act-2-desert-5`: rc-rng-level-pop.tsv:33 kept, rc-run-7.tsv:39 dropped
-  - `level.a2.46.act-2-valley-of-the-kings`: rc-rng-level-pop.tsv:34 kept, rc-run-7.tsv:40 dropped
-  - `level.a2.48.act-2-sewer-1-b`: rc-level-population.tsv:8 kept, rc-run-7.tsv:42 dropped
-  - `level.a2.49.act-2-sewer-1-c`: rc-level-population.tsv:9 kept, rc-run-7.tsv:43 dropped
-  - `level.a2.50.act-2-harem`: rc-rng-level-pop.tsv:35 kept, rc-run-7.tsv:44 dropped
-  - `level.a2.51.act-2-corrupt-harem-1`: rc-rng-level-pop.tsv:36 kept, rc-run-7.tsv:45 dropped
-  - `level.a2.52.act-2-basement-1`: rc-rng-level-pop.tsv:37 kept, rc-run-7.tsv:46 dropped
-  - `level.a2.53.act-2-basement-2`: rc-rng-level-pop.tsv:38 kept, rc-run-7.tsv:47 dropped
-  - `level.a2.54.act-2-basement-3`: rc-rng-level-pop.tsv:39 kept, rc-run-7.tsv:48 dropped
-  - `level.a2.55.act-2-tomb-1-a`: rc-level-pop-2.tsv:5 kept, rc-run-7.tsv:49 dropped
-  - `level.a2.56.act-2-tomb-2-a`: rc-rng-level-pop.tsv:41 kept, rc-run-7.tsv:50 dropped
-  - `level.a2.57.act-2-tomb-2-b`: rc-rng-level-pop.tsv:42 kept, rc-run-7.tsv:51 dropped
-  - `level.a2.58.act-2-tomb-3-a`: rc-rng-level-pop.tsv:43 kept, rc-run-7.tsv:52 dropped
-  - `level.a2.59.act-2-tomb-1-treasure`: rc-rng-level-pop.tsv:44 kept, rc-run-7.tsv:53 dropped
-  - `level.a2.60.act-2-tomb-2-treasure`: rc-rng-level-pop.tsv:45 kept, rc-run-7.tsv:54 dropped
-  - `level.a2.61.act-2-tomb-3-treasure`: rc-level-pop-2.tsv:6 kept, rc-run-7.tsv:55 dropped
-  - `level.a2.63.act-2-lair-1-b`: rc-rng-level-pop.tsv:47 kept, rc-run-7.tsv:57 dropped
-  - `level.a2.64.act-2-lair-1-treasure`: rc-rng-level-pop.tsv:48 kept, rc-run-7.tsv:58 dropped
-  - `level.a2.65.act-2-sewer-2-a`: rc-rng-level-pop.tsv:49 kept, rc-run-7.tsv:59 dropped
-  - `level.a2.67.act-2-tomb-tal-2`: rc-rng-level-pop.tsv:50 kept, rc-run-7.tsv:61 dropped
-  - `level.a2.68.act-2-tomb-tal-3`: rc-level-pop-2.tsv:7 kept, rc-run-7.tsv:62 dropped
-  - `level.a2.69.act-2-tomb-tal-4`: rc-level-pop-2.tsv:8 kept, rc-run-7.tsv:63 dropped
-  - `level.a2.70.act-2-tomb-tal-5`: rc-level-pop-2.tsv:9 kept, rc-run-7.tsv:64 dropped
-  - `level.a2.71.act-2-tomb-tal-6`: rc-rng-level-pop.tsv:54 kept, rc-run-7.tsv:65 dropped
-  - `level.a2.72.act-2-tomb-tal-7`: rc-rng-level-pop.tsv:55 kept, rc-run-7.tsv:66 dropped
-  - `level.a2.73.act-2-duriel-s-lair`: rc-rng-level-pop.tsv:56 kept, rc-run-7.tsv:67 dropped
-  - `level.a3.101.act-3-mephisto-2`: rc-rng-level-pop.tsv:75 kept, rc-run-7.tsv:70 dropped
-  - `level.a3.102.act-3-mephisto-3`: rc-rng-level-pop.tsv:76 kept, rc-run-7.tsv:71 dropped
-  - `level.a3.76.act-3-jungle-1`: rc-level-population.tsv:10 kept, rc-run-7.tsv:72 dropped
-  - `level.a4.104.act-4-mesa-1`: rc-level-pop-2.tsv:13 kept, rc-run-7.tsv:73 dropped
-  - `level.a4.106.act-4-mesa-3`: rc-level-pop-2.tsv:14 kept, rc-run-7.tsv:75 dropped
-  - `level.a4.108.act-4-diablo-1`: rc-rng-level-pop.tsv:79 kept, rc-run-7.tsv:77 dropped
-  - `level.a5.110.act-5-siege-1`: rc-level-pop-2.tsv:15 kept, rc-run-7.tsv:78 dropped
-  - `level.a5.111.act-5-barricade-1`: rc-rng-level-pop.tsv:81 kept, rc-run-7.tsv:79 dropped
-  - `level.a5.112.act-5-barricade-2`: rc-rng-level-pop.tsv:82 kept, rc-run-7.tsv:80 dropped
-  - `level.a5.115.act-5-ice-cave-2`: rc-rng-level-pop.tsv:83 kept, rc-run-7.tsv:83 dropped
-  - `level.a5.116.act-5-ice-cave-2a`: rc-level-population.tsv:14 kept, rc-run-7.tsv:84 dropped
-  - `level.a5.117.act-5-barricade-snow`: rc-rng-level-pop.tsv:84 kept, rc-run-7.tsv:85 dropped
-  - `level.a5.118.act-5-ice-cave-3`: rc-rng-level-pop.tsv:85 kept, rc-run-7.tsv:86 dropped
-  - `level.a5.119.act-5-ice-cave-3a`: rc-level-population.tsv:15 kept, rc-run-7.tsv:87 dropped
-  - `level.a5.120.act-5-mountain-top`: rc-rng-level-pop.tsv:86 kept, rc-run-7.tsv:88 dropped
-  - `level.a5.121.act-5-temple-entrance`: rc-rng-level-pop.tsv:87 kept, rc-run-7.tsv:89 dropped
-  - `level.a5.123.act-5-temple-2`: rc-rng-level-pop.tsv:88 kept, rc-run-7.tsv:91 dropped
-  - `level.a5.125.act-5-hell-1`: rc-rng-level-pop.tsv:89 kept, rc-run-7.tsv:93 dropped
-  - `level.a5.126.act-5-hell-2`: rc-rng-level-pop.tsv:90 kept, rc-run-7.tsv:94 dropped
-  - `level.a5.127.act-5-hell-3`: rc-rng-level-pop.tsv:91 kept, rc-run-7.tsv:95 dropped
-  - `level.a5.129.act-5-baal-temple-2`: rc-rng-level-pop.tsv:92 kept, rc-run-7.tsv:97 dropped
-  - `level.a5.130.act-5-baal-temple-3`: rc-rng-level-pop.tsv:93 kept, rc-run-7.tsv:98 dropped
-  - `level.a5.132.act-5-world-stone`: rc-ai-special.tsv:3 kept, rc-run-7.tsv:100 dropped
-  - `level.a5.133.act-5-pandemonium-1`: rc-level-population.tsv:16 kept, rc-run-7.tsv:101 dropped
-  - `level.a5.134.act-5-pandemonium-2`: rc-level-population.tsv:17 kept, rc-run-7.tsv:102 dropped
-  - `level.a5.135.act-5-pandemonium-3`: rc-rng-level-pop.tsv:94 kept, rc-run-7.tsv:103 dropped
-  - `level.a5.136.act-5-pandemonium-finale`: rc-level-population.tsv:18 kept, rc-run-7.tsv:104 dropped
+  - `monster.population.frogdemon-water`: rc-l78-population.tsv:3 kept, rc-run-7.tsv:3 dropped
+  - `level.a1.1.act-1-town`: rc-rng-level-pop.tsv:3 kept, rc-run-7.tsv:4 dropped
+  - `level.a1.10.act-1-cave-3`: rc-rng-level-pop.tsv:7 kept, rc-run-7.tsv:5 dropped
+  - `level.a1.11.act-1-cave-4`: rc-rng-level-pop.tsv:8 kept, rc-run-7.tsv:6 dropped
+  - `level.a1.12.act-1-cave-5`: rc-rng-level-pop.tsv:9 kept, rc-run-7.tsv:7 dropped
+  - `level.a1.13.act-1-cave-2-treasure`: rc-level-population.tsv:3 kept, rc-run-7.tsv:8 dropped
+  - `level.a1.14.act-1-cave-3-treasure`: rc-level-population.tsv:4 kept, rc-run-7.tsv:9 dropped
+  - `level.a1.15.act-1-cave-4-treasure`: rc-rng-level-pop.tsv:10 kept, rc-run-7.tsv:10 dropped
+  - `level.a1.16.act-1-cave-5-treasure`: rc-rng-level-pop.tsv:11 kept, rc-run-7.tsv:11 dropped
+  - `level.a1.17.act-1-graveyard`: rc-rng-level-pop.tsv:12 kept, rc-run-7.tsv:12 dropped
+  - `level.a1.18.act-1-crypt-1-a`: rc-rng-level-pop.tsv:13 kept, rc-run-7.tsv:13 dropped
+  - `level.a1.19.act-1-crypt-2-a`: rc-rng-level-pop.tsv:14 kept, rc-run-7.tsv:14 dropped
+  - `level.a1.20.act-1-tower-2`: rc-rng-level-pop.tsv:15 kept, rc-run-7.tsv:15 dropped
+  - `level.a1.22.act-1-crypt-3-b`: rc-rng-level-pop.tsv:16 kept, rc-run-7.tsv:17 dropped
+  - `level.a1.23.act-1-crypt-3-c`: rc-rng-level-pop.tsv:17 kept, rc-run-7.tsv:18 dropped
+  - `level.a1.24.act-1-crypt-3-d`: rc-rng-level-pop.tsv:18 kept, rc-run-7.tsv:19 dropped
+  - `level.a1.25.act-1-crypt-3-e`: rc-level-population.tsv:5 kept, rc-run-7.tsv:20 dropped
+  - `level.a1.26.act-1-monastery`: rc-rng-level-pop.tsv:19 kept, rc-run-7.tsv:21 dropped
+  - `level.a1.27.act-1-courtyard-1`: rc-rng-level-pop.tsv:20 kept, rc-run-7.tsv:22 dropped
+  - `level.a1.28.act-1-barracks`: rc-rng-level-pop.tsv:21 kept, rc-run-7.tsv:23 dropped
+  - `level.a1.30.act-1-jail-2`: rc-rng-level-pop.tsv:22 kept, rc-run-7.tsv:24 dropped
+  - `level.a1.31.act-1-jail-3`: rc-level-pop-2.tsv:3 kept, rc-run-7.tsv:25 dropped
+  - `level.a1.32.act-1-courtyard-2`: rc-rng-level-pop.tsv:24 kept, rc-run-7.tsv:26 dropped
+  - `level.a1.33.act-1-cathedral`: rc-level-pop-2.tsv:4 kept, rc-run-7.tsv:27 dropped
+  - `level.a1.35.act-1-catacombs-2`: rc-rng-level-pop.tsv:26 kept, rc-run-7.tsv:28 dropped
+  - `level.a1.36.act-1-catacombs-3`: rc-rng-level-pop.tsv:27 kept, rc-run-7.tsv:29 dropped
+  - `level.a1.37.act-1-catacombs-4`: rc-rng-level-pop.tsv:28 kept, rc-run-7.tsv:30 dropped
+  - `level.a1.38.act-1-tristram`: rc-level-population.tsv:6 kept, rc-run-7.tsv:31 dropped
+  - `level.a1.39.act-1-moo-moo-farm`: rc-rng-level-pop.tsv:29 kept, rc-run-7.tsv:32 dropped
+  - `level.a1.5.act-1-wilderness-4`: rc-rng-level-pop.tsv:4 kept, rc-run-7.tsv:33 dropped
+  - `level.a1.6.act-1-wilderness-5`: rc-rng-level-pop.tsv:5 kept, rc-run-7.tsv:34 dropped
+  - `level.a1.7.act-1-wilderness-6`: rc-rng-level-pop.tsv:6 kept, rc-run-7.tsv:35 dropped
+  - `level.a2.41.act-2-desert-1`: rc-rng-level-pop.tsv:30 kept, rc-run-7.tsv:37 dropped
+  - `level.a2.42.act-2-desert-2`: rc-level-population.tsv:7 kept, rc-run-7.tsv:38 dropped
+  - `level.a2.43.act-2-desert-3`: rc-rng-level-pop.tsv:31 kept, rc-run-7.tsv:39 dropped
+  - `level.a2.44.act-2-desert-4`: rc-rng-level-pop.tsv:32 kept, rc-run-7.tsv:40 dropped
+  - `level.a2.45.act-2-desert-5`: rc-rng-level-pop.tsv:33 kept, rc-run-7.tsv:41 dropped
+  - `level.a2.46.act-2-valley-of-the-kings`: rc-rng-level-pop.tsv:34 kept, rc-run-7.tsv:42 dropped
+  - `level.a2.48.act-2-sewer-1-b`: rc-level-population.tsv:8 kept, rc-run-7.tsv:44 dropped
+  - `level.a2.49.act-2-sewer-1-c`: rc-level-population.tsv:9 kept, rc-run-7.tsv:45 dropped
+  - `level.a2.50.act-2-harem`: rc-rng-level-pop.tsv:35 kept, rc-run-7.tsv:46 dropped
+  - `level.a2.51.act-2-corrupt-harem-1`: rc-rng-level-pop.tsv:36 kept, rc-run-7.tsv:47 dropped
+  - `level.a2.52.act-2-basement-1`: rc-rng-level-pop.tsv:37 kept, rc-run-7.tsv:48 dropped
+  - `level.a2.53.act-2-basement-2`: rc-rng-level-pop.tsv:38 kept, rc-run-7.tsv:49 dropped
+  - `level.a2.54.act-2-basement-3`: rc-rng-level-pop.tsv:39 kept, rc-run-7.tsv:50 dropped
+  - `level.a2.55.act-2-tomb-1-a`: rc-level-pop-2.tsv:5 kept, rc-run-7.tsv:51 dropped
+  - `level.a2.56.act-2-tomb-2-a`: rc-rng-level-pop.tsv:41 kept, rc-run-7.tsv:52 dropped
+  - `level.a2.57.act-2-tomb-2-b`: rc-rng-level-pop.tsv:42 kept, rc-run-7.tsv:53 dropped
+  - `level.a2.58.act-2-tomb-3-a`: rc-rng-level-pop.tsv:43 kept, rc-run-7.tsv:54 dropped
+  - `level.a2.59.act-2-tomb-1-treasure`: rc-rng-level-pop.tsv:44 kept, rc-run-7.tsv:55 dropped
+  - `level.a2.60.act-2-tomb-2-treasure`: rc-rng-level-pop.tsv:45 kept, rc-run-7.tsv:56 dropped
+  - `level.a2.61.act-2-tomb-3-treasure`: rc-level-pop-2.tsv:6 kept, rc-run-7.tsv:57 dropped
+  - `level.a2.63.act-2-lair-1-b`: rc-rng-level-pop.tsv:47 kept, rc-run-7.tsv:59 dropped
+  - `level.a2.64.act-2-lair-1-treasure`: rc-rng-level-pop.tsv:48 kept, rc-run-7.tsv:60 dropped
+  - `level.a2.65.act-2-sewer-2-a`: rc-rng-level-pop.tsv:49 kept, rc-run-7.tsv:61 dropped
+  - `level.a2.67.act-2-tomb-tal-2`: rc-rng-level-pop.tsv:50 kept, rc-run-7.tsv:63 dropped
+  - `level.a2.68.act-2-tomb-tal-3`: rc-level-pop-2.tsv:7 kept, rc-run-7.tsv:64 dropped
+  - `level.a2.69.act-2-tomb-tal-4`: rc-level-pop-2.tsv:8 kept, rc-run-7.tsv:65 dropped
+  - `level.a2.70.act-2-tomb-tal-5`: rc-level-pop-2.tsv:9 kept, rc-run-7.tsv:66 dropped
+  - `level.a2.71.act-2-tomb-tal-6`: rc-rng-level-pop.tsv:54 kept, rc-run-7.tsv:67 dropped
+  - `level.a2.72.act-2-tomb-tal-7`: rc-rng-level-pop.tsv:55 kept, rc-run-7.tsv:68 dropped
+  - `level.a2.73.act-2-duriel-s-lair`: rc-rng-level-pop.tsv:56 kept, rc-run-7.tsv:69 dropped
+  - `level.a3.101.act-3-mephisto-2`: rc-rng-level-pop.tsv:75 kept, rc-run-7.tsv:72 dropped
+  - `level.a3.102.act-3-mephisto-3`: rc-rng-level-pop.tsv:76 kept, rc-run-7.tsv:73 dropped
+  - `level.a3.76.act-3-jungle-1`: rc-level-population.tsv:10 kept, rc-run-7.tsv:74 dropped
+  - `level.a3.77.act-3-jungle-2`: rc-rng-level-pop.tsv:57 kept, rc-run-7.tsv:75 dropped
+  - `level.a3.79.act-3-kurast-1`: rc-rng-level-pop.tsv:58 kept, rc-run-7.tsv:76 dropped
+  - `level.a3.80.act-3-kurast-2`: rc-rng-level-pop.tsv:59 kept, rc-run-7.tsv:77 dropped
+  - `level.a3.81.act-3-kurast-3`: rc-rng-level-pop.tsv:60 kept, rc-run-7.tsv:78 dropped
+  - `level.a3.82.act-3-kurast-4`: rc-rng-level-pop.tsv:61 kept, rc-run-7.tsv:79 dropped
+  - `level.a3.83.act-3-travincal`: rc-rng-level-pop.tsv:62 kept, rc-run-7.tsv:80 dropped
+  - `level.a3.84.act-3-spider-1`: rc-rng-level-pop.tsv:63 kept, rc-run-7.tsv:81 dropped
+  - `level.a3.85.act-3-spider-2`: rc-level-population.tsv:11 kept, rc-run-7.tsv:82 dropped
+  - `level.a3.86.act-3-dungeon-1-a`: rc-rng-level-pop.tsv:64 kept, rc-run-7.tsv:83 dropped
+  - `level.a3.87.act-3-dungeon-1-b`: rc-rng-level-pop.tsv:65 kept, rc-run-7.tsv:84 dropped
+  - `level.a3.89.act-3-dungeon-2-b`: rc-rng-level-pop.tsv:66 kept, rc-run-7.tsv:86 dropped
+  - `level.a3.90.act-3-dungeon-1-treasure`: rc-rng-level-pop.tsv:67 kept, rc-run-7.tsv:87 dropped
+  - `level.a3.91.act-3-dungeon-2-treasure`: rc-rng-level-pop.tsv:68 kept, rc-run-7.tsv:88 dropped
+  - `level.a3.92.act-3-sewer-1`: rc-level-population.tsv:12 kept, rc-run-7.tsv:89 dropped
+  - `level.a3.93.act-3-sewer-2`: rc-level-population.tsv:13 kept, rc-run-7.tsv:90 dropped
+  - `level.a3.94.act-3-temple-1`: rc-level-pop-2.tsv:10 kept, rc-run-7.tsv:91 dropped
+  - `level.a3.95.act-3-temple-2`: rc-rng-level-pop.tsv:70 kept, rc-run-7.tsv:92 dropped
+  - `level.a3.96.act-3-temple-3`: rc-rng-level-pop.tsv:71 kept, rc-run-7.tsv:93 dropped
+  - `level.a4.104.act-4-mesa-1`: rc-level-pop-2.tsv:13 kept, rc-run-7.tsv:94 dropped
+  - `level.a4.106.act-4-mesa-3`: rc-level-pop-2.tsv:14 kept, rc-run-7.tsv:96 dropped
+  - `level.a4.108.act-4-diablo-1`: rc-rng-level-pop.tsv:79 kept, rc-run-7.tsv:98 dropped
+  - `level.a5.110.act-5-siege-1`: rc-level-pop-2.tsv:15 kept, rc-run-7.tsv:99 dropped
+  - `level.a5.111.act-5-barricade-1`: rc-rng-level-pop.tsv:81 kept, rc-run-7.tsv:100 dropped
+  - `level.a5.112.act-5-barricade-2`: rc-rng-level-pop.tsv:82 kept, rc-run-7.tsv:101 dropped
+  - `level.a5.115.act-5-ice-cave-2`: rc-rng-level-pop.tsv:83 kept, rc-run-7.tsv:104 dropped
+  - `level.a5.116.act-5-ice-cave-2a`: rc-level-population.tsv:14 kept, rc-run-7.tsv:105 dropped
+  - `level.a5.117.act-5-barricade-snow`: rc-rng-level-pop.tsv:84 kept, rc-run-7.tsv:106 dropped
+  - `level.a5.118.act-5-ice-cave-3`: rc-rng-level-pop.tsv:85 kept, rc-run-7.tsv:107 dropped
+  - `level.a5.119.act-5-ice-cave-3a`: rc-level-population.tsv:15 kept, rc-run-7.tsv:108 dropped
+  - `level.a5.120.act-5-mountain-top`: rc-rng-level-pop.tsv:86 kept, rc-run-7.tsv:109 dropped
+  - `level.a5.121.act-5-temple-entrance`: rc-rng-level-pop.tsv:87 kept, rc-run-7.tsv:110 dropped
+  - `level.a5.123.act-5-temple-2`: rc-rng-level-pop.tsv:88 kept, rc-run-7.tsv:112 dropped
+  - `level.a5.125.act-5-hell-1`: rc-rng-level-pop.tsv:89 kept, rc-run-7.tsv:114 dropped
+  - `level.a5.126.act-5-hell-2`: rc-rng-level-pop.tsv:90 kept, rc-run-7.tsv:115 dropped
+  - `level.a5.127.act-5-hell-3`: rc-rng-level-pop.tsv:91 kept, rc-run-7.tsv:116 dropped
+  - `level.a5.129.act-5-baal-temple-2`: rc-rng-level-pop.tsv:92 kept, rc-run-7.tsv:118 dropped
+  - `level.a5.130.act-5-baal-temple-3`: rc-rng-level-pop.tsv:93 kept, rc-run-7.tsv:119 dropped
+  - `level.a5.132.act-5-world-stone`: rc-ai-special.tsv:3 kept, rc-run-7.tsv:121 dropped
+  - `level.a5.133.act-5-pandemonium-1`: rc-level-population.tsv:16 kept, rc-run-7.tsv:122 dropped
+  - `level.a5.134.act-5-pandemonium-2`: rc-level-population.tsv:17 kept, rc-run-7.tsv:123 dropped
+  - `level.a5.135.act-5-pandemonium-3`: rc-rng-level-pop.tsv:94 kept, rc-run-7.tsv:124 dropped
+  - `level.a5.136.act-5-pandemonium-finale`: rc-level-population.tsv:18 kept, rc-run-7.tsv:125 dropped
   - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-sandmaggot.tsv:3 dropped
   - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-sandmaggot.tsv:4 dropped
   - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-sandmaggot.tsv:5 dropped
@@ -1552,9 +1571,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-succubus-m.tsv:5 dropped
   - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-succubus-m.tsv:6 dropped
   - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-succubus-m.tsv:7 dropped
-  - `waypoint.28.city-of-the-damned`: rc-run-7.tsv:108 kept, rc-wp-last3.tsv:5 dropped
+  - `waypoint.28.city-of-the-damned`: rc-run-7.tsv:126 kept, rc-wp-last3.tsv:5 dropped
   - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-wp-seed400.tsv:3 dropped
-  - `level.a3.100.act-3-mephisto-1`: rc-run-7.tsv:69 kept, rc-wp-walk-tx.tsv:3 dropped
+  - `level.a3.100.act-3-mephisto-1`: rc-run-7.tsv:71 kept, rc-wp-walk-tx.tsv:3 dropped
   - `level.a5.132.act-5-world-stone`: rc-ai-special.tsv:3 kept, rc-wp-walk-tx.tsv:4 dropped
   - `skill.ama.magic-arrow`: q-chk-skills-4cls.tsv:3 kept, skills.tsv:3 dropped
   - `skill.ama.fire-arrow`: q-chk-skills-4cls.tsv:4 kept, skills.tsv:4 dropped
@@ -2572,7 +2591,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.5.act-1-wilderness-4`: rc-rng-level-pop.tsv:4 kept, world.tsv:7 dropped
   - `level.a1.6.act-1-wilderness-5`: rc-rng-level-pop.tsv:5 kept, world.tsv:8 dropped
   - `level.a1.7.act-1-wilderness-6`: rc-rng-level-pop.tsv:6 kept, world.tsv:9 dropped
-  - `level.a1.9.act-1-cave-2`: q-run-gen-wp-shrine.tsv:4 kept, world.tsv:11 dropped
+  - `level.a1.9.act-1-cave-2`: rc-run-7.tsv:36 kept, world.tsv:11 dropped
   - `level.a1.10.act-1-cave-3`: rc-rng-level-pop.tsv:7 kept, world.tsv:12 dropped
   - `level.a1.11.act-1-cave-4`: rc-rng-level-pop.tsv:8 kept, world.tsv:13 dropped
   - `level.a1.12.act-1-cave-5`: rc-rng-level-pop.tsv:9 kept, world.tsv:14 dropped
@@ -2584,7 +2603,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.18.act-1-crypt-1-a`: rc-rng-level-pop.tsv:13 kept, world.tsv:20 dropped
   - `level.a1.19.act-1-crypt-2-a`: rc-rng-level-pop.tsv:14 kept, world.tsv:21 dropped
   - `level.a1.20.act-1-tower-2`: rc-rng-level-pop.tsv:15 kept, world.tsv:22 dropped
-  - `level.a1.21.act-1-crypt-3-a`: rc-run-7.tsv:15 kept, world.tsv:23 dropped
+  - `level.a1.21.act-1-crypt-3-a`: rc-run-7.tsv:16 kept, world.tsv:23 dropped
   - `level.a1.22.act-1-crypt-3-b`: rc-rng-level-pop.tsv:16 kept, world.tsv:24 dropped
   - `level.a1.23.act-1-crypt-3-c`: rc-rng-level-pop.tsv:17 kept, world.tsv:25 dropped
   - `level.a1.24.act-1-crypt-3-d`: rc-rng-level-pop.tsv:18 kept, world.tsv:26 dropped
@@ -2607,7 +2626,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.44.act-2-desert-4`: rc-rng-level-pop.tsv:32 kept, world.tsv:46 dropped
   - `level.a2.45.act-2-desert-5`: rc-rng-level-pop.tsv:33 kept, world.tsv:47 dropped
   - `level.a2.46.act-2-valley-of-the-kings`: rc-rng-level-pop.tsv:34 kept, world.tsv:48 dropped
-  - `level.a2.47.act-2-sewer-1-a`: rc-run-7.tsv:41 kept, world.tsv:49 dropped
+  - `level.a2.47.act-2-sewer-1-a`: rc-run-7.tsv:43 kept, world.tsv:49 dropped
   - `level.a2.48.act-2-sewer-1-b`: rc-level-population.tsv:8 kept, world.tsv:50 dropped
   - `level.a2.49.act-2-sewer-1-c`: rc-level-population.tsv:9 kept, world.tsv:51 dropped
   - `level.a2.50.act-2-harem`: rc-rng-level-pop.tsv:35 kept, world.tsv:52 dropped
@@ -2622,11 +2641,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.59.act-2-tomb-1-treasure`: rc-rng-level-pop.tsv:44 kept, world.tsv:61 dropped
   - `level.a2.60.act-2-tomb-2-treasure`: rc-rng-level-pop.tsv:45 kept, world.tsv:62 dropped
   - `level.a2.61.act-2-tomb-3-treasure`: rc-level-pop-2.tsv:6 kept, world.tsv:63 dropped
-  - `level.a2.62.act-2-lair-1-a`: rc-run-7.tsv:56 kept, world.tsv:64 dropped
+  - `level.a2.62.act-2-lair-1-a`: rc-run-7.tsv:58 kept, world.tsv:64 dropped
   - `level.a2.63.act-2-lair-1-b`: rc-rng-level-pop.tsv:47 kept, world.tsv:65 dropped
   - `level.a2.64.act-2-lair-1-treasure`: rc-rng-level-pop.tsv:48 kept, world.tsv:66 dropped
   - `level.a2.65.act-2-sewer-2-a`: rc-rng-level-pop.tsv:49 kept, world.tsv:67 dropped
-  - `level.a2.66.act-2-tomb-tal-1`: rc-run-7.tsv:60 kept, world.tsv:68 dropped
+  - `level.a2.66.act-2-tomb-tal-1`: rc-run-7.tsv:62 kept, world.tsv:68 dropped
   - `level.a2.67.act-2-tomb-tal-2`: rc-rng-level-pop.tsv:50 kept, world.tsv:69 dropped
   - `level.a2.68.act-2-tomb-tal-3`: rc-level-pop-2.tsv:7 kept, world.tsv:70 dropped
   - `level.a2.69.act-2-tomb-tal-4`: rc-level-pop-2.tsv:8 kept, world.tsv:71 dropped
@@ -2634,7 +2653,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.71.act-2-tomb-tal-6`: rc-rng-level-pop.tsv:54 kept, world.tsv:73 dropped
   - `level.a2.72.act-2-tomb-tal-7`: rc-rng-level-pop.tsv:55 kept, world.tsv:74 dropped
   - `level.a2.73.act-2-duriel-s-lair`: rc-rng-level-pop.tsv:56 kept, world.tsv:75 dropped
-  - `level.a2.74.act-2-arcane`: rc-run-7.tsv:68 kept, world.tsv:76 dropped
+  - `level.a2.74.act-2-arcane`: rc-run-7.tsv:70 kept, world.tsv:76 dropped
   - `level.a3.76.act-3-jungle-1`: rc-level-population.tsv:10 kept, world.tsv:78 dropped
   - `level.a3.77.act-3-jungle-2`: rc-rng-level-pop.tsv:57 kept, world.tsv:79 dropped
   - `level.a3.78.act-3-jungle-3`: q-chk-levels.tsv:68 kept, world.tsv:80 dropped
@@ -2647,7 +2666,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a3.85.act-3-spider-2`: rc-level-population.tsv:11 kept, world.tsv:87 dropped
   - `level.a3.86.act-3-dungeon-1-a`: rc-rng-level-pop.tsv:64 kept, world.tsv:88 dropped
   - `level.a3.87.act-3-dungeon-1-b`: rc-rng-level-pop.tsv:65 kept, world.tsv:89 dropped
-  - `level.a3.88.act-3-dungeon-2-a`: q-run-gen-wp-shrine.tsv:10 kept, world.tsv:90 dropped
+  - `level.a3.88.act-3-dungeon-2-a`: rc-run-7.tsv:85 kept, world.tsv:90 dropped
   - `level.a3.89.act-3-dungeon-2-b`: rc-rng-level-pop.tsv:66 kept, world.tsv:91 dropped
   - `level.a3.90.act-3-dungeon-1-treasure`: rc-rng-level-pop.tsv:67 kept, world.tsv:92 dropped
   - `level.a3.91.act-3-dungeon-2-treasure`: rc-rng-level-pop.tsv:68 kept, world.tsv:93 dropped
@@ -2659,20 +2678,20 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a3.97.act-3-temple-4`: rc-level-pop-2.tsv:11 kept, world.tsv:99 dropped
   - `level.a3.98.act-3-temple-5`: rc-rng-level-pop.tsv:73 kept, world.tsv:100 dropped
   - `level.a3.99.act-3-temple-6`: rc-level-pop-2.tsv:12 kept, world.tsv:101 dropped
-  - `level.a3.100.act-3-mephisto-1`: rc-run-7.tsv:69 kept, world.tsv:102 dropped
+  - `level.a3.100.act-3-mephisto-1`: rc-run-7.tsv:71 kept, world.tsv:102 dropped
   - `level.a3.101.act-3-mephisto-2`: rc-rng-level-pop.tsv:75 kept, world.tsv:103 dropped
   - `level.a3.102.act-3-mephisto-3`: rc-rng-level-pop.tsv:76 kept, world.tsv:104 dropped
   - `level.a4.104.act-4-mesa-1`: rc-level-pop-2.tsv:13 kept, world.tsv:106 dropped
-  - `level.a4.105.act-4-mesa-2`: rc-run-7.tsv:74 kept, world.tsv:107 dropped
+  - `level.a4.105.act-4-mesa-2`: rc-run-7.tsv:95 kept, world.tsv:107 dropped
   - `level.a4.106.act-4-mesa-3`: rc-level-pop-2.tsv:14 kept, world.tsv:108 dropped
-  - `level.a4.107.act-4-lava-1`: rc-run-7.tsv:76 kept, world.tsv:109 dropped
+  - `level.a4.107.act-4-lava-1`: rc-run-7.tsv:97 kept, world.tsv:109 dropped
   - `level.a4.108.act-4-diablo-1`: rc-rng-level-pop.tsv:79 kept, world.tsv:110 dropped
   - `level.a5.109.act-5-town`: q-fix-d2-town-mode.tsv:3 kept, world.tsv:111 dropped
   - `level.a5.110.act-5-siege-1`: rc-level-pop-2.tsv:15 kept, world.tsv:112 dropped
   - `level.a5.111.act-5-barricade-1`: rc-rng-level-pop.tsv:81 kept, world.tsv:113 dropped
   - `level.a5.112.act-5-barricade-2`: rc-rng-level-pop.tsv:82 kept, world.tsv:114 dropped
-  - `level.a5.113.act-5-ice-cave-1`: rc-run-7.tsv:81 kept, world.tsv:115 dropped
-  - `level.a5.114.act-5-ice-cave-1a`: rc-run-7.tsv:82 kept, world.tsv:116 dropped
+  - `level.a5.113.act-5-ice-cave-1`: rc-run-7.tsv:102 kept, world.tsv:115 dropped
+  - `level.a5.114.act-5-ice-cave-1a`: rc-run-7.tsv:103 kept, world.tsv:116 dropped
   - `level.a5.115.act-5-ice-cave-2`: rc-rng-level-pop.tsv:83 kept, world.tsv:117 dropped
   - `level.a5.116.act-5-ice-cave-2a`: rc-level-population.tsv:14 kept, world.tsv:118 dropped
   - `level.a5.117.act-5-barricade-snow`: rc-rng-level-pop.tsv:84 kept, world.tsv:119 dropped
@@ -2680,16 +2699,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.119.act-5-ice-cave-3a`: rc-level-population.tsv:15 kept, world.tsv:121 dropped
   - `level.a5.120.act-5-mountain-top`: rc-rng-level-pop.tsv:86 kept, world.tsv:122 dropped
   - `level.a5.121.act-5-temple-entrance`: rc-rng-level-pop.tsv:87 kept, world.tsv:123 dropped
-  - `level.a5.122.act-5-temple-1`: rc-run-7.tsv:90 kept, world.tsv:124 dropped
+  - `level.a5.122.act-5-temple-1`: rc-run-7.tsv:111 kept, world.tsv:124 dropped
   - `level.a5.123.act-5-temple-2`: rc-rng-level-pop.tsv:88 kept, world.tsv:125 dropped
-  - `level.a5.124.act-5-temple-boss`: rc-run-7.tsv:92 kept, world.tsv:126 dropped
+  - `level.a5.124.act-5-temple-boss`: rc-run-7.tsv:113 kept, world.tsv:126 dropped
   - `level.a5.125.act-5-hell-1`: rc-rng-level-pop.tsv:89 kept, world.tsv:127 dropped
   - `level.a5.126.act-5-hell-2`: rc-rng-level-pop.tsv:90 kept, world.tsv:128 dropped
   - `level.a5.127.act-5-hell-3`: rc-rng-level-pop.tsv:91 kept, world.tsv:129 dropped
-  - `level.a5.128.act-5-baal-temple-1`: rc-run-7.tsv:96 kept, world.tsv:130 dropped
+  - `level.a5.128.act-5-baal-temple-1`: rc-run-7.tsv:117 kept, world.tsv:130 dropped
   - `level.a5.129.act-5-baal-temple-2`: rc-rng-level-pop.tsv:92 kept, world.tsv:131 dropped
   - `level.a5.130.act-5-baal-temple-3`: rc-rng-level-pop.tsv:93 kept, world.tsv:132 dropped
-  - `level.a5.131.act-5-throne-room`: rc-run-7.tsv:99 kept, world.tsv:133 dropped
+  - `level.a5.131.act-5-throne-room`: rc-run-7.tsv:120 kept, world.tsv:133 dropped
   - `level.a5.132.act-5-world-stone`: rc-ai-special.tsv:3 kept, world.tsv:134 dropped
   - `drlg.outdoor.tilesub`: q-fix-d11-stony-objects.tsv:3 kept, world.tsv:137 dropped
   - `waypoint.0.rogue-encampment`: rc-wp-arrival-mode.tsv:3 kept, world.tsv:141 dropped
@@ -2720,7 +2739,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, world.tsv:166 dropped
   - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, world.tsv:167 dropped
   - `waypoint.27.the-pandemonium-fortress`: q-run-gen-wp-shrine.tsv:63 kept, world.tsv:168 dropped
-  - `waypoint.28.city-of-the-damned`: rc-run-7.tsv:108 kept, world.tsv:169 dropped
+  - `waypoint.28.city-of-the-damned`: rc-run-7.tsv:126 kept, world.tsv:169 dropped
   - `waypoint.29.river-of-flame`: q-run-gen-wp-shrine.tsv:65 kept, world.tsv:170 dropped
   - `waypoint.30.harrogath`: rc-wp-seed400.tsv:4 kept, world.tsv:171 dropped
   - `waypoint.31.rigid-highlands`: q-chk-act5.tsv:9 kept, world.tsv:172 dropped
@@ -2803,9 +2822,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `object.operate.71.summitdoor`: q-run-objects.tsv:482 kept, world.tsv:250 dropped
   - `object.operate.72.lastportal`: q-run-objects.tsv:483 kept, world.tsv:251 dropped
   - `object.operate.73.lastlastportal`: q-run-objects.tsv:484 kept, world.tsv:252 dropped
-  - `object.populate.1.casketjarsarcophagusurn`: rc-run-7.tsv:105 kept, world.tsv:253 dropped
-  - `object.populate.2.waypointshrine`: rc-run-7.tsv:106 kept, world.tsv:254 dropped
-  - `object.populate.3.commonobjects`: rc-run-7.tsv:107 kept, world.tsv:255 dropped
+  - `object.populate.1.casketjarsarcophagusurn`: q-run-objects.tsv:487 kept, world.tsv:253 dropped
+  - `object.populate.2.waypointshrine`: q-run-objects.tsv:488 kept, world.tsv:254 dropped
+  - `object.populate.3.commonobjects`: q-run-objects.tsv:489 kept, world.tsv:255 dropped
   - `object.populate.4.barrel`: q-run-objects.tsv:490 kept, world.tsv:256 dropped
   - `object.populate.5.crate`: q-run-objects.tsv:491 kept, world.tsv:257 dropped
   - `object.populate.6.rogueguardcorpse`: q-run-objects.tsv:492 kept, world.tsv:258 dropped
@@ -6745,6 +6764,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `npc.nihlathak` | entity | DIVERGED | M | DIVERGED | no | 4 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | frame 24-30 town NPC wander mode (m 2 vs 1), masks the talk; q-chk-act5 REC-14100; hire/store/identify/heal menus need packets channel + interact pokes (open) |
 | `npc.qual-kehk` | entity | DIVERGED | M | DIVERGED | no | 4 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | frame 24-30 town NPC wander mode (m 2 vs 1), masks the talk; q-chk-act5 REC-14100; hire/store/identify/heal menus need packets channel + interact pokes (open) |
 | `npc.warriv2` | entity | DIVERGED | S | DIVERGED@24 | yes | 4 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | talk: state frame 24 monster 1:1 class 201 field m 1.14d 2 vs d2rs 1 (Jerhyn walking, act-travel-lut-ama); join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
+| `object.populate.1.casketjarsarcophagusurn` | entity | DIVERGED | S | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 3 class/level pairs present on one side only, first 79 in gen-lvl-37 only on d2rs; 17 classes seen |
+| `object.populate.2.waypointshrine` | entity | DIVERGED | S | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 1 class/level pairs present on one side only, first 402 in gen-lvl-134 only on d2rs; 49 classes seen |
+| `object.populate.3.commonobjects` | entity | DIVERGED | M | DIVERGED | yes | 20 | n | - | specs/world/object-population.md | gen-lvl-* state runs: 11 class/level pairs present on one side only, first 144 in gen-lvl-4 only on 1.14d; 142 classes seen |
 | `quest.a2q1-radament-s-lair` | entity | DIVERGED | L | DIVERGED@61 | yes | 36 | y | q-fix-real-unit-seed-order | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Atma 304 -> warp 49 -> kill Radament -> Atma 334: first 0x5D 5D 08 00 01 00 00 equal at f20; state diverges at the warp: frame 61 game seed 1.14d [2980465496,293248760] vs d2rs [1774858267,1306796452] (unit seed order); the kill and 334 are behind it, unproven |
 | `quest.a2q2-the-horadric-staff` | entity | DIVERGED | M | DIVERGED@3 | yes | 36 | y | claude/q-prov-recording-2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Cain msgs 335, 336: state PARTIAL 44/44, 0x5D/0x28 equal; items (tr1/cube chests) not exercised; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `quest.a2q3-tainted-sun` | entity | DIVERGED | L | DIVERGED@24 | yes | 36 | y | claude/q-prov-recording | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act2.md,specs/world/quest-messages.tsv | Drognan 348, warp 44, altar (object 149), 362: state frame 24 object 2:40 class 1.14d 37 vs d2rs 156 (object creation order differs in Far Oasis/Lost City: waypoint created first in d2rs); altar operate unproven |
@@ -6796,8 +6818,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `drlg.preset.lvlprest` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/preset.md,specs/drlg/preset-tables.tsv | all preset levels share one code path; DS1 pick and preset-unit lists not compared per level; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `drlg.wall-remap` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/wall-remap.md | wall remap table; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `hirelings.quest-merc-init.team-ai-alignment` | system | NO-CHECK | S | - | yes | 0 | n | claude/rc-blade-hostcalls | specs/world/hirelings.md | merc init providers read from the 1.14d asm and wired in d2-sim (join team, alignment state list, umod 19 + monster data components 0,1,5,6,7 := 0); only the self-play app_play_act3 blade test runs them, no 1.14d recording of a hire/quest merc |
-| `level.a1.9.act-1-cave-2` | entity | NO-CHECK | S | PARTIAL | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-9: state PARTIAL-only (snapshot gaps) over 160 frames, rng MATCH (no difference) [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
-| `level.a3.88.act-3-dungeon-2-a` | entity | NO-CHECK | S | PARTIAL | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-88: state PARTIAL-only (snapshot gaps) over 160 frames, rng MATCH (no difference) [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `level.a5.132.act-5-world-stone` | entity | NO-CHECK | M | PARTIAL | yes | 13 | y | claude/rc-ai-special | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | gen-lvl-132 state 160/160 equal, rng 145/145 MATCH (after rc-ai-special on staging; was DIVERGED@97 game seed) [ledger.py: UNKNOWN -> NO-CHECK: its checks are PARTIAL] |
 | `npc.act2guard2` | entity | NO-CHECK | M | - | no | 4 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `npc.act2guard4` | entity | NO-CHECK | M | - | no | 4 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
@@ -7128,6 +7148,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a1.5.act-1-wilderness-4` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-5 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a1.6.act-1-wilderness-5` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-6 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a1.7.act-1-wilderness-6` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-7 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
+| `level.a1.9.act-1-cave-2` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | [rc-run-7] 1 checks EQUAL (REC-2055/2056 rules) |
 | `level.a2.41.act-2-desert-1` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-41 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a2.42.act-2-desert-2` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-42 (traces/checks/gen): state and rng equal over 160 ticks after rc-level-population (object drop picks wired in the single-player host; levels 133-136 preset object skips of 0x005559A0) |
 | `level.a2.43.act-2-desert-3` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | gen-lvl-43 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
@@ -7173,6 +7194,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a3.85.act-3-spider-2` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-85 (traces/checks/gen): state and rng equal over 160 ticks after rc-level-population (object drop picks wired in the single-player host; levels 133-136 preset object skips of 0x005559A0) |
 | `level.a3.86.act-3-dungeon-1-a` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-86 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a3.87.act-3-dungeon-1-b` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-87 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
+| `level.a3.88.act-3-dungeon-2-a` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | [rc-run-7] 1 checks EQUAL (REC-2055/2056 rules) |
 | `level.a3.89.act-3-dungeon-2-b` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-89 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a3.90.act-3-dungeon-1-treasure` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | gen-lvl-90 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a3.91.act-3-dungeon-2-treasure` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | gen-lvl-91 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
@@ -7498,9 +7520,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `object.operate.56.diabloseal4` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | gen-obj-396 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055); items PARTIAL only as 'no item created on either side' (0 = 0, PROVISIONAL REC-2056) |
 | `object.operate.7.explodingbarrel` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | gen-obj-11 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055); items PARTIAL only as 'no item created on either side' (0 = 0, PROVISIONAL REC-2056) |
 | `object.operate.9.monolith` | entity | EQUAL | - | PARTIAL | yes | 20 | n | - | specs/world/objects.md,specs/world/objects-2.md | gen-obj-17, gen-obj-18, gen-obj-19, gen-obj-20, gen-obj-21 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055); items PARTIAL only as 'no item created on either side' (0 = 0, PROVISIONAL REC-2056) |
-| `object.populate.1.casketjarsarcophagusurn` | entity | EQUAL | - | MATCH | yes | 20 | n | - | specs/world/object-population.md | [rc-run-7] 1 checks EQUAL (REC-2055/2056 rules) |
-| `object.populate.2.waypointshrine` | entity | EQUAL | - | MATCH | yes | 20 | n | - | specs/world/object-population.md | [rc-run-7] 1 checks EQUAL (REC-2055/2056 rules) |
-| `object.populate.3.commonobjects` | entity | EQUAL | - | MATCH | yes | 20 | n | - | specs/world/object-population.md | [rc-run-7] 1 checks EQUAL (REC-2055/2056 rules) |
 | `shrine.18.gem-upgrade` | entity | EQUAL | - | PARTIAL | ? | 15 | y | claude/rc-shrine-m | specs/world/objects.md | gen-shrine-18 state: all 120 ticks equal |
 | `shrine.19.storm-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | units_in_range wired: unit finder 0x0065A950/0x0065AC70 with filter 0x00582710 (mode filter, no distance test) + dead test |
 | `shrine.21.exploding-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | potion request quality word +0x30 = 0 (rolled), 5 item-seed draws |
