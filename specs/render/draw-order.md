@@ -26,18 +26,18 @@
 |   2. The draw-cell grid (`0x004DCE60`, `0x004DDB70`) | 101–130 |
 |   3. Filling the grid (`0x004DD7C0` per room) | 131–175 |
 |   4. List insertion | 176–186 |
-|   5. Which units draw | 187–209 |
-|   6. The passes | 210–290 |
-|   7. Tile records that never draw | 291–304 |
-|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 305–361 |
-|   9. Map-tile feed | 362–382 |
-|   10. d2rs mapping | 383–432 |
-| Constants & data dependencies | 433–441 |
-| Randomness | 442–447 |
-| Edge cases & original bugs | 448–465 |
-| Test vectors | 466–494 |
-| Provenance | 495–531 |
-| Open questions | 532–639 |
+|   5. Which units draw | 187–215 |
+|   6. The passes | 216–296 |
+|   7. Tile records that never draw | 297–310 |
+|   8. Wall fade targets (`0x004DD180`, `0x004DD060`) | 311–367 |
+|   9. Map-tile feed | 368–388 |
+|   10. d2rs mapping | 389–438 |
+| Constants & data dependencies | 439–447 |
+| Randomness | 448–453 |
+| Edge cases & original bugs | 454–471 |
+| Test vectors | 472–500 |
+| Provenance | 501–537 |
+| Open questions | 538–645 |
 <!-- /index -->
 
 ## Summary
@@ -205,7 +205,13 @@ The unit draw entry `0x004DC7B0` (from the shadow pass and the wall pass,
 4. Draw at the unit's client position through `0x00471EC0`
    (`unit-composite.md` §1, missile offsets §8); players between
    `0x004D8520` / `0x004D85C0`, monsters with flag a = `0x004AE340` ≠ 0.
-   A drawn unit gets flag 0x10000000.
+   A drawn unit gets flag 0x10000000. The call is made for every unit
+   that passes r1–r3, with or without graphics: object 78 `invisible
+   town sound` (token TA, `Draw` 0, no COF) gets the call from the room
+   list walk (`0x004DC952`) and draws no cel (capture `gen-ui-hud`
+   2026-10-10, draw row 176, unit 2:6). d2rs: a listed unit without a
+   pose is the unit draw call alone (`world_view` `UnitCall` without a
+   file).
 
 ### 6. The passes
 

@@ -27,10 +27,10 @@
 |   4. Suite | 550–677 |
 | Constants & data dependencies | 678–681 |
 | Randomness | 682–685 |
-| Edge cases & original bugs | 686–709 |
-| Test vectors | 710–732 |
-| Provenance | 733–736 |
-| Open questions | 737–799 |
+| Edge cases & original bugs | 686–721 |
+| Test vectors | 722–744 |
+| Provenance | 745–748 |
+| Open questions | 749–811 |
 <!-- /index -->
 
 ## Summary
@@ -695,6 +695,18 @@ None in the tool. Both games run on `seed`.
    (`DrawLine` rows: positions and count; 259 vs 267 draws). Rows 0–197
    are otherwise equal. A difference in those columns against d2rs is
    not yet a d2rs finding.
+   A second cause, on real Windows (measured 2026-10-10, PC 1 today,
+   `ui-draws-*-ama`): 1.14d reads the **real pointer** for hover and the
+   cursor draw, so a draws check whose input never moves the cursor
+   leaves it wherever the desktop pointer was; one run then draws a
+   unit's hover name (six glyph rows of "Warriv" at (475, 211) with the
+   cursor at (520, 237)) and another does not (cursor at (720, 234)).
+   A draws check therefore pins the cursor first (`frame 38; move 790
+   10` in the checks of that day); with the pin three runs of
+   `ui-draws-questlog-ama` and the skill-pick checks give the same UI
+   rows but one cursor animation frame. A button of the control panel
+   is clicked with `hold X Y 2`, not `click`: a press and release in one
+   pass was lost in one run of three (`ui-draws-left-skill-pick-ama`).
 3. Two 1.14d runs at the same time on Linux share the Wine prefix and
    the `:99` display unless told apart: the first `run.sh` to end runs
    `wineserver -k` and kills the other's game (seen 2026-10-09: the
