@@ -126,6 +126,10 @@ fn place_critter(w: &mut ClientWorld, inputs: &ModelInputs, room: DrlgRoomId, cl
         if let Some(u) = w.objclient.set_c.get_mut(&key) {
             u.mode = 1;
         }
+        // The create links the unit into its room's list (the recache
+        // `0x0064FAD0`, `sim/unit-order.md` §5 r6): the draw order files
+        // it from there.
+        w.room_units.place(super::world::view_key(key), Some(room));
         let town = (row.npc || row.in_town) && !row.interact;
         let pattern = super::client_missiles::footprint_pattern(size, town);
         super::client_missiles::stamp_footprint(w, x, y, pattern, MONSTER_FOOTPRINT);
@@ -462,5 +466,25 @@ mod tests {
         room_pass(&mut w, &inputs());
         assert!(w.objclient.set_c.is_empty());
         assert_eq!(w.objclient.next_guid, 1);
+    }
+
+    // Covers: specs/client/model.md §5 r6
+    #[test]
+    fn the_view_tells_a_set_c_monster_from_a_set_s_one_of_the_same_guid() {
+        let (mut w, key) = world(None);
+        // A server monster with the critter's GUID.
+        let server = ClientUnit::new(key);
+        w.units.insert(key, server);
+        let vk = crate::bridge::world::view_key(key);
+        assert_ne!(vk, key);
+        let c = w.view_unit(&vk).unwrap();
+        assert_eq!((c.key, c.class), (vk, CHICKEN));
+        assert_eq!(w.view_unit(&key).unwrap().class, 0);
+        let all: Vec<_> = w.view_units().iter().map(|u| u.key).collect();
+        assert_eq!(all, [key, vk]);
+        // Only monsters of set C are drawn units.
+        assert!(w
+            .view_unit(&UnitKey::new(2, 5 | crate::bridge::world::VIEW_CLIENT_BIT))
+            .is_none());
     }
 }

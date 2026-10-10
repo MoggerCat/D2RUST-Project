@@ -29,3 +29,4 @@ Den of Evil flag, Cold Plains waypoint	specs/world/quests-act1,specs/world/waypo
 class rows (whirlwind, right aura, pet warp follow, blessed hammer)	specs/skills/	session_017Zjk6EsU1ooMqhtmpz54ih	claude/q-fix-class-rows
 depcheck, rng_trace feature	crates/d2-sim/src/debug,tools/depcheck	session_01Bw9umZerDFScSEkXWhvchg	claude/q-fix-depcheck
 playthrough sweep, goto cells, class x difficulty matrix	tools/playthrough/,specs/tools/playthrough.md	session_01BU2ZCAxsiRDowTgb9cTSki	claude/q-fix-pt-sweep
+client audio (sound tick base, skill start, river, footsteps), audio-diff fixes	crates/d2-client/src/audio,crates/d2-client/src/app/sound.rs,crates/d2-client/src/app/audio_dump.rs,specs/audio/,specs/client/audio.md	session_011ideiPxX1mzp3W9rFHu6r6	claude/q-fix-audio
