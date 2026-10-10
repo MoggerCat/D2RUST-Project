@@ -320,22 +320,22 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-su-ancient1 | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-ancient2 | state | PARTIAL | 90/90 | - | - |
 | a5-su-ancient3 | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-anodized-elite | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-anodized-elite | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-axe-dweller | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-blaze-ripper | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-bonesaw-breaker | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
-| a5-su-dac-farren | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-bonesaw-breaker | state | PARTIAL | 90/90 | - | coord-resume-3 |
+| a5-su-dac-farren | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-eyeback | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-frozenstein | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-magma-torquer | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-magma-torquer | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-megaflow-rectifier | state | PARTIAL | 90/90 | - | - |
 | a5-su-nihlathak-boss | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-pindleskin | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-pindleskin | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-sharp-tooth-sayer | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-shenk | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-snapchip | state | PARTIAL | 90/90 | - | - |
 | a5-su-threash-socket | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | - |
+| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-town-arrival-bar | state | PARTIAL | 40/40 | - | - |
 | a5-town-npc-sweep | state | PARTIAL | 170/170 | - | - |
 | a5-warp-crystalized-ama | rng | MATCH | 133/133 | - | - |
