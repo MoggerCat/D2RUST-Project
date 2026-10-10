@@ -307,3 +307,65 @@ mod tests {
         assert_eq!(tier_code(&items, *b"zzz ", 2), *b"zzz ");
     }
 }
+
+/// The monprop property assignment on a monster (`init.md` §11, the
+/// dispatcher `0x0065FD70`): the record `{prop, par, min, max}` writes the
+/// stat list with state 0 and flags 0x40 of `unit` (created on demand,
+/// `properties.md` §4.2), the rolls on the unit's own seed (§4.1).
+// PROVISIONAL (REC-2813): mode 0 and format 1 stand in for the caller's
+// arguments (not read from the original); settled for the plain roll
+// functions by the Hell Mephisto / council member 0xAC of
+// `items-drops-hel-09` / `-11` (cast2, swing2, extra-fire).
+#[allow(clippy::too_many_arguments)]
+pub fn monster_property<X: Pending>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    d: &DeathDrops,
+    unit: UnitId,
+    prop: i32,
+    par: i32,
+    min: i32,
+    max: i32,
+) {
+    let t = d.tables.clone();
+    let mut fields = GameFields::from_action(
+        h.game_seed,
+        &h.ai_info,
+        sim.data.expansion,
+        std::mem::take(&mut h.uniques),
+    );
+    let mut items = std::mem::take(&mut h.items);
+    {
+        let mut econ = Economy {
+            game: &mut *sim.game,
+            units: &mut *sim.units,
+            stats: &mut *sim.stats,
+            data: sim.data,
+            hooks: &mut *h,
+            fields: &mut fields,
+            tables: &t.items,
+            items: &mut items,
+        };
+        let seed = econ.units.get(unit).map(|r| r.seed);
+        let rolled = econ.with_stats(|ctx| {
+            let mut item = crate::items::Item::new(0, 1, UnitStats::new(ctx, unit));
+            if let Some(s) = seed {
+                item.item_seed = s;
+            }
+            let mut pc = crate::items::props::PropCtx::item(0);
+            let rec = crate::items::tables::PropRec {
+                code: prop,
+                param: par,
+                min,
+                max,
+            };
+            crate::items::props::apply_property(&t.items, &mut item, &mut pc, &rec);
+            item.item_seed
+        });
+        if let Some(r) = econ.units.get_mut(unit) {
+            r.seed = rolled;
+        }
+    }
+    h.items = items;
+    h.uniques = std::mem::take(&mut fields.uniques);
+}
