@@ -67,7 +67,9 @@ pub use death::{find_item_drop, monster_death_drop, DeathDrops, DropTables, Free
 pub use game_fields::GameFields;
 pub use item_stats::{find_list, StatCtx, UnitStats};
 pub use item_units::{Economy, ItemScope, ItemSpawn, ItemStore};
-pub use monster_equip::{create_monster_equip, item_at as monster_item_at, summon_equipment};
+pub use monster_equip::{
+    create_monster_equip, item_at as monster_item_at, summon_equipment, tier_code,
+};
 pub use quest_drop::unit_quest_drop;
 pub use quest_host::HostQuests;
 pub use quest_items::{EconomyQuests, QuestDeferred, QuestRest};

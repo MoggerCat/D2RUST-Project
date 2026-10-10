@@ -503,6 +503,21 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         }
         self.v.h.object_drops = Some(d);
     }
+    /// `init.md` §14.3 ([`crate::wiring::economy::tier_code`]); without
+    /// the drop state the code stays.
+    fn item_tier_code(&mut self, code: [u8; 4], difficulty: u8) -> [u8; 4] {
+        match self.v.h.object_drops.as_ref() {
+            Some(d) => {
+                crate::wiring::economy::tier_code(&d.tables.treasure_items, code, difficulty)
+            }
+            None => code,
+        }
+    }
+    /// `init.md` §14.3: `0x00573B20(game, unit, &entry, level, 4)`, the
+    /// monequip helper with quality 4 (magic).
+    fn create_boss_item(&mut self, unit: UnitId, code: [u8; 4], loc: u8, level: i32) {
+        self.create_equip_item(unit, code, loc, 4, level);
+    }
     fn steal_belt_item(&mut self, unit: UnitId, target: UnitId) {
         self.v.h.x.steal_belt_item(unit, target);
     }
