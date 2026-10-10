@@ -59,7 +59,7 @@ def parse(text):
     required lines are errors naming the line."""
     c = {"input": {}, "ignore": [], "poke": [], "send": [], "difficulty": "normal", "seconds": 300,
          "channels": ["state"], "save_args": [], "draws_at": None,
-         "skip_weather": False}
+         "skip_weather": False, "skip_cursor": False}
     seen = set()
     lines = [(n, ln.split("#", 1)[0].strip() if not ln.lstrip().startswith("input ")
               else ln.strip()) for n, ln in enumerate(text.splitlines(), 1)]
@@ -127,6 +127,13 @@ def parse(text):
             if toks:
                 raise CheckError(f"line {n}: skip-weather takes no argument")
             c["skip_weather"] = True
+        elif kw == "skip-cursor":
+            # draws only: facts-compare --skip-cursor (facts-render.md §6 r6): the cursor cels
+            # follow 1.14d's wall clock (idle 5000 ms, a step per 16 ms), not the tick
+            once(kw)
+            if toks:
+                raise CheckError(f"line {n}: skip-cursor takes no argument")
+            c["skip_cursor"] = True
         elif kw == "draws-at":
             once(kw)
             c["draws_at"] = num(toks[0] if len(toks) == 1 else "x", 1, 1_000_000)
@@ -476,12 +483,14 @@ class Runner:
                     print(f"[draws] warning: d2rs play exited {code} after writing the dump")
         if sides != {"orig", "d2rs"}:
             return None
-        cmp_args = ["--ignore", "tick"] + (["--skip-weather"] if c["skip_weather"] else [])
+        cmp_args = ["--ignore", "tick"] + (["--skip-weather"] if c["skip_weather"] else []) \
+            + (["--skip-cursor"] if c["skip_cursor"] else [])
         code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d]
                        + cmp_args, check=False, timeout=300)
         if not self.dry:
             sm = draws_summary(os.path.join(scene_o, "scenes", "s", "draws.tsv"),
-                               os.path.join(scene_d, "draws.tsv"), code, at, c["skip_weather"])
+                               os.path.join(scene_d, "draws.tsv"), code, at, c["skip_weather"],
+                               c["skip_cursor"])
             with open(self.path("draws.summary.json"), "w", encoding="utf-8") as f:
                 json.dump(sm, f, indent=1)
         return code
@@ -608,7 +617,7 @@ def is_weather_row(cols, row, orig):
         return False
 
 
-def draws_summary(orig_tsv, d2rs_tsv, code, tick, skip_weather=False):
+def draws_summary(orig_tsv, d2rs_tsv, code, tick, skip_weather=False, skip_cursor=False):
     """The draws channel's summary (scenario-diff.md §4): rows aligned by
     position, a row equal when every compared column is (a '?' cell counts
     as equal, as facts-compare's unmeasured cells); one compared frame.
@@ -627,6 +636,11 @@ def draws_summary(orig_tsv, d2rs_tsv, code, tick, skip_weather=False):
     if skip_weather:
         ra = [r for r in ra if not is_weather_row(ca, r, True)]
         rb = [r for r in rb if not is_weather_row(cb, r, False)]
+    if skip_cursor:
+        ra = [r for r in ra if not (ca.index("file") < len(r) and
+                                    r[ca.index("file")].startswith("data/global/ui/cursor/"))]
+        rb = [r for r in rb if not (cb.index("file") < len(r) and
+                                    r[cb.index("file")].startswith("data/global/ui/cursor/"))]
     cols = [c for c in ca if c in cb and c not in DRAWS_INFO]
     ia, ib = [ca.index(c) for c in cols], [cb.index(c) for c in cols]
     equal, first = 0, None

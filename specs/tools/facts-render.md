@@ -409,6 +409,17 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
    PROVISIONAL (REC-708): `0x00473BD0` is the pool draw's only call
    site; settled by a recording of a water floor in the rain with the
    call sites of every pool cel.
+6. `--skip-cursor` (PROVISIONAL, REC-2980): the cursor cels (a file under
+   `data/global/ui/cursor/`) are left out on both sides before r2. The
+   1.14d cursor is a function of `GetTickCount`, not of the tick
+   (`ui/panels-3.md` §23 r4, r8: ohand after 5000 ms without input, one
+   step per 16 ms of draw time), so the same check on the same tick draws
+   `ohand` frame 2 in one Wine run and another frame or `protate` in the
+   next (measured 2026-10-10, `gen-render-town-dawn`: with the pointer
+   pinned by `move 790 10` the position matches, the art and frame do
+   not). A check that names `skip-cursor` (`scenario-diff.md` §2) leaves
+   the cursor to the UI checks that pin its input time. Exact equality of
+   the cursor's art needs a recording with a fixed clock; none exists.
 
 ### 7. Requests
 

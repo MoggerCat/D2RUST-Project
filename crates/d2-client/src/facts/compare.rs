@@ -287,7 +287,27 @@ pub fn is_weather_row(row: &[String]) -> bool {
     }
 }
 
+/// The cursor art folder: its draw follows the wall clock in 1.14d
+/// (`ui/panels-3.md` §23 r8: idle after 5000 ms, a step per 16 ms
+/// of `GetTickCount`), so its state at a tick is not a tick fact.
+const CURSOR_DIR: &str = "data/global/ui/cursor/";
+
+/// Whether a `draws.tsv` row is a cursor cel (`--skip-cursor`, §6 r6).
+pub fn is_cursor_row(row: &[String]) -> bool {
+    let file = DRAW_COLUMNS
+        .iter()
+        .position(|c| *c == "file")
+        .expect("file column");
+    row[file].starts_with(CURSOR_DIR)
+}
+
 impl FactSet {
+    /// `--skip-cursor` (§6 r6): drops the cursor cels.
+    pub fn without_cursor(mut self) -> FactSet {
+        self.draws.rows.retain(|r| !is_cursor_row(r));
+        self
+    }
+
     /// `--skip-weather` (§6 r5): drops pass 9's rows.
     pub fn without_weather(mut self) -> FactSet {
         self.draws.rows.retain(|r| !is_weather_row(r));
@@ -304,12 +324,27 @@ pub fn compare_dirs(
     ignore: &[String],
     skip_weather: bool,
 ) -> Result<Outcome, FactsError> {
+    compare_dirs_with(original, d2rs, ignore, skip_weather, false)
+}
+
+/// [`compare_dirs`] with `skip_cursor` (§6 r6).
+pub fn compare_dirs_with(
+    original: &Path,
+    d2rs: &Path,
+    ignore: &[String],
+    skip_weather: bool,
+    skip_cursor: bool,
+) -> Result<Outcome, FactsError> {
     let fallback = original.join("..").join("..");
     let mut o = FactSet::read(original, Some(&fallback))?;
     let mut d = FactSet::read(d2rs, None)?;
     if skip_weather {
         o = o.without_weather();
         d = d.without_weather();
+    }
+    if skip_cursor {
+        o = o.without_cursor();
+        d = d.without_cursor();
     }
     Ok(compare(&o, &d, ignore))
 }
