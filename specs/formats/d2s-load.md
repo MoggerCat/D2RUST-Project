@@ -25,16 +25,16 @@
 |   2. Load effects (`0x0056B180`) | 92–118 |
 |   3. Join after the load: Iron Golem re-summon (`0x005394A0`) | 119–144 |
 |   4. Hotkey and mouse-skill item indices after a reload | 145–162 |
-|   5. Load failure: result codes and the message shown | 163–208 |
-|   6. Runeword items that no longer match (`0x00563470`) | 209–254 |
-|   7. Map seed restore in single player | 255–266 |
-|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 267–308 |
-| Constants & data dependencies | 309–313 |
-| Randomness | 314–318 |
-| Edge cases & original bugs | 319–327 |
-| Test vectors | 328–335 |
-| Provenance | 336–376 |
-| Open questions | 377–396 |
+|   5. Load failure: result codes and the message shown | 163–224 |
+|   6. Runeword items that no longer match (`0x00563470`) | 225–270 |
+|   7. Map seed restore in single player | 271–282 |
+|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 283–324 |
+| Constants & data dependencies | 325–329 |
+| Randomness | 330–334 |
+| Edge cases & original bugs | 335–343 |
+| Test vectors | 344–351 |
+| Provenance | 352–392 |
+| Open questions | 393–412 |
 <!-- /index -->
 
 ## Summary
@@ -200,6 +200,22 @@ own sections are written "load §1", "load §2".
    refuses the same file in `play_start::resolve` with the same internal code 13
    (`d2s.rs` offset 0x25) and writes no packets file, so a `packets` check of a
    refused load cannot compare until d2rs's dump emits those four packets and stops.
+2b. **What the stream holds before the 0xB4** (rc-audio-fmt-div, 2026-10-10,
+   15 refused loads recorded on 1.14d under Wine, packets channel, all equal
+   in d2rs): the loader applies each section as it reads it, so the S→C
+   stream shows how far the load got. Header-level refusals (internal
+   codes 4–14 and 25–26: magic, size, checksum, version, difficulty, mode
+   and expansion checks) happen before the player unit exists: the join's
+   four packets (0x01, 0x00, 0x02, 0x8F) and the 0xB4. A refusal in a
+   section reader (codes 15–23) happens with the player allocated: the
+   player's add messages (0x59, 0xAA, 0x76: rule 3.1 and its part B of
+   `intents-events.md` §8.2) come first, then, when the failing section is
+   after the skills (codes 20–23: items, corpse, hireling, golem), the 0x94
+   of the skill levels already applied, then the 0xB4. The game ends at the
+   second tick: the 0xB4 goes out in the first tick's input phase and the
+   client is removed. `tools/trace-recorder/packets_diff.py` compares the
+   0xB4 although it is a transport row; the checks are
+   `gen-fmt-refuse-*` (`tools/check-gen`, `d2s-tool new --break KIND`).
 3. The join itself also refuses before or after the load
    (`0x00539760`): 0x18 when the game is classic and the client class
    is above 4, and after the load 0x17 / 0x18 (expansion status vs

@@ -1392,3 +1392,27 @@ fn swap_pairs_and_switch_byte_sit_at_their_offsets() {
     assert_eq!(&b[0x80..0x84], &[0x24, 0, 0, 0]);
     assert_eq!(&b[0x84..0x88], &[0, 0, 0, 0]);
 }
+
+// Covers: specs/formats/d2s-load.md §5 r2
+#[test]
+fn skills_are_known_when_a_later_section_fails() {
+    let t = Tables::v114d();
+    let good = write(&sample(true), &t).unwrap();
+    let want = read(&good, &opts(true), &t).unwrap().body.unwrap().skills;
+    // The player item list's marker broken (internal 20): the skills read
+    // before it are still reported.
+    let at = (0..good.len() - 1)
+        .find(|&i| &good[i..i + 2] == b"JM")
+        .unwrap();
+    let mut bad = good.clone();
+    bad[at] = 0;
+    let bad = fix(bad);
+    assert_eq!(code_of(&bad, &opts(true)), Some(20));
+    assert_eq!(skills_before_failure(&bad, &t), Some(want));
+    // A failure before the skills (quests, internal 15) reports none.
+    let mut early = good;
+    early[0x14F] = 0;
+    let early = fix(early);
+    assert_eq!(code_of(&early, &opts(true)), Some(15));
+    assert_eq!(skills_before_failure(&early, &t), None);
+}

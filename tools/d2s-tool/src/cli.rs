@@ -47,6 +47,8 @@ edit flags:
                                location, or 1.14d drops it at load) /belt=0..15
   --merc ID,NAME,SEED,EXP      hireling block (d2s.md §2.5): hireling.txt Id, name
                                index, seed, experience; expansion: an empty jf list
+  --break KIND                 damage the written file (d2s.md §10): checksum|size|version|magic|
+                               quests|waypoints|npcs|stats|skills|items|corpse|hireling|golem|class|newflag|dead|short
   --seed S                     game seed the items' seeds derive from (default 1)
   --map-seed S                 header map seed (new: default = the time)
   --time T                     create/save time (new: default now; set: save time)
@@ -95,6 +97,8 @@ struct Common {
     out: Option<PathBuf>,
     files: Vec<PathBuf>,
     expansion_read: Option<bool>,
+    /// `--break KIND`: damage the written file the way [`break_save`] says.
+    break_kind: Option<String>,
 }
 
 /// Parses the flags of a subcommand into edits and common options.
@@ -105,6 +109,7 @@ fn parse(rest: Vec<String>) -> Result<(Edits, Common)> {
     while let Some(f) = a.next() {
         match f.as_str() {
             "--game-dir" => c.game_dir = Some(a.value(&f)?.into()),
+            "--break" => c.break_kind = Some(a.value(&f)?),
             "-o" | "--out" => c.out = Some(a.value(&f)?.into()),
             "--classic" => c.expansion_read = Some(false),
             "--items" => crate::dump::ITEM_DETAIL.store(true, std::sync::atomic::Ordering::Relaxed),
@@ -165,8 +170,89 @@ fn tables(c: &Common) -> Result<Tables> {
 
 fn write_out(c: &Common, bytes: &[u8]) -> Result<PathBuf> {
     let p = c.out.clone().context("-o OUT.d2s is required")?;
+    let broken;
+    let bytes = match &c.break_kind {
+        Some(kind) => {
+            broken = break_save(bytes, kind)?;
+            &broken[..]
+        }
+        None => bytes,
+    };
     std::fs::write(&p, bytes).with_context(|| format!("writing {}", p.display()))?;
     Ok(p)
+}
+
+/// Damages a written save so 1.14d refuses it (`formats/d2s.md` §10): the
+/// internal code each kind reaches is in brackets. The checksum is
+/// recomputed after every kind but `checksum`, so the damage is the first
+/// check to fail.
+///
+/// `checksum` [6], `size` [5], `version` [7], `magic` (result 9 before the
+/// master), `quests` [15], `waypoints` [16], `npcs` [17], `stats` [18]
+/// (the section marker's first byte zeroed); `skills` [19], `items` [20],
+/// `corpse` [21], `hireling` [22], `golem` [23] likewise (a save with no
+/// corpse items, hireling or golem).
+fn break_save(bytes: &[u8], kind: &str) -> Result<Vec<u8>> {
+    let mut b = bytes.to_vec();
+    let marker = |b: &mut Vec<u8>, at: usize| -> Result<()> {
+        *b.get_mut(at)
+            .context("file shorter than the marker offset")? = 0;
+        Ok(())
+    };
+    match kind {
+        "checksum" => {
+            b[0x0C] ^= 1;
+            return Ok(b);
+        }
+        "size" => {
+            let n = u32::from_le_bytes(b[8..12].try_into()?).wrapping_add(1);
+            b[8..12].copy_from_slice(&n.to_le_bytes());
+        }
+        "version" => b[4..8].copy_from_slice(&0x61u32.to_le_bytes()),
+        "magic" => b[0] ^= 1,
+        "quests" => marker(&mut b, 0x14F)?,
+        "waypoints" => marker(&mut b, 0x279)?,
+        "npcs" => marker(&mut b, 0x2C9)?,
+        "stats" => marker(&mut b, 0x2FD)?,
+        // Header-level refusals (the class byte +0x28, the status word
+        // +0x24): class > 7 [4], the new-character flag with more data [2],
+        // a dead hardcore character [10]; `short` cuts the file inside the
+        // header [4].
+        "class" => b[0x28] = 8,
+        "newflag" => b[0x24] |= 0x01,
+        "dead" => b[0x24] |= 0x0C,
+        "short" => {
+            b.truncate(0x100);
+            let n = b.len() as u32;
+            b[8..12].copy_from_slice(&n.to_le_bytes());
+        }
+        // The skills section is 2 + 30 bytes and the item list's `JM` follows
+        // it; the trailer of a save without corpse items, hireling or golem
+        // is `JM 00 00` `jf` `kf g` (§2 table).
+        "skills" | "items" => {
+            let at = (0x2FD..b.len().saturating_sub(34))
+                .find(|&i| &b[i..i + 2] == b"if" && &b[i + 32..i + 34] == b"JM")
+                .context("no skills section found")?;
+            marker(&mut b, if kind == "skills" { at } else { at + 32 })?
+        }
+        "corpse" => {
+            let at = b.len().checked_sub(9).context("short file")?;
+            marker(&mut b, at)?
+        }
+        "hireling" => {
+            let at = b.len().checked_sub(5).context("short file")?;
+            marker(&mut b, at)?
+        }
+        "golem" => {
+            let at = b.len().checked_sub(3).context("short file")?;
+            marker(&mut b, at)?
+        }
+        k => bail!("--break {k}: checksum|size|version|magic|quests|waypoints|npcs|stats|skills|items|corpse|hireling|golem|class|newflag|dead|short"),
+    }
+    b[0x0C..0x10].fill(0);
+    let sum = d2s::checksum(&b);
+    b[0x0C..0x10].copy_from_slice(&sum.to_le_bytes());
+    Ok(b)
 }
 
 fn one_file(c: &Common) -> Result<&Path> {

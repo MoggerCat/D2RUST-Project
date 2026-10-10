@@ -983,6 +983,24 @@ impl<'a> Reader<'a> {
     }
 }
 
+/// The skill levels (§7.2) a load had read when a later section failed
+/// (internal codes 20–23: the game applies each section as it reads it, so
+/// the player holds these levels when the join is refused,
+/// `formats/d2s-load.md` §5 r2b). `None` when the sections up to the
+/// skills do not read.
+pub fn skills_before_failure(file: &[u8], t: &dyn SaveTables) -> Option<Vec<u8>> {
+    let buf = &file[..file.len().min(MAX_FILE)];
+    if buf.len() < HEADER_SIZE {
+        return None;
+    }
+    let header = Header::parse(buf);
+    let mut r = Reader {
+        buf,
+        pos: HEADER_SIZE,
+    };
+    read_prefix(&mut r, &header, t).ok().map(|p| p.4)
+}
+
 /// Reads a file (§1 rule 6, §2.2, §4–§8). The bytes past 0x2000 are cut
 /// first, as the game's `fread` does (§10 rule 4).
 pub fn read(file: &[u8], opts: &ReadOptions, t: &dyn SaveTables) -> Result<D2s, D2sError> {
@@ -1040,12 +1058,13 @@ pub fn read(file: &[u8], opts: &ReadOptions, t: &dyn SaveTables) -> Result<D2s, 
     })
 }
 
-fn read_body(
+/// The sections up to the skills (§4–§7.2): quests, waypoints, NPC flags,
+/// stats and the skill levels.
+fn read_prefix(
     r: &mut Reader<'_>,
     h: &Header,
-    opts: &ReadOptions,
     t: &dyn SaveTables,
-) -> Result<Body, D2sError> {
+) -> Result<(Quests, Waypoints, Npcs, Stats, Vec<u8>), D2sError> {
     // §4 rule 2.
     let at = r.pos;
     if r.left() < QUEST_SIZE
@@ -1105,6 +1124,16 @@ fn read_body(
     }
     r.pos += 2;
     let skills = r.take(n).to_vec();
+    Ok((quests, waypoints, npcs, stats, skills))
+}
+
+fn read_body(
+    r: &mut Reader<'_>,
+    h: &Header,
+    opts: &ReadOptions,
+    t: &dyn SaveTables,
+) -> Result<Body, D2sError> {
+    let (quests, waypoints, npcs, stats, skills) = read_prefix(r, h, t)?;
     // §8.1–§8.2: the player list; errors surface as 20.
     let items = r.item_list(t, 20, "player items")?;
     // §8.3 rule 4.
