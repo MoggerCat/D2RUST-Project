@@ -31,11 +31,19 @@ EQUAL (merged ledger, after syncing with specs-staging) 2759 -> 2801 (before the
   (16 of 20). Held back: ass-burst-of-speed, ass-fade, ass-lightning-sentry, bar-leap-attack (now DIVERGED@46).
   Their fresh rows contradict net.s2c.0xa7/0xa9/0x7a and leap-attack rows in q-run-net, q-tool-packet-census, rc-run-1, skills.tsv.
 
+## Cause 2 fixed: paladin right aura at join (C018 0xAA size, C026 0xA8 size; REC-3410)
+- 1.14d (`intents-events.md` §8.2 r3.1, `d2s.md` §2.4 r6.3): the join's 0xAA goes out at player creation, and the
+  post-load right-skill select `0x005701B0` -> `0x0056FF10` comes after it. Non-immediate: state on, list with only 350/351.
+  Immediate: the do (`0x0056F7F0`) applies the stats, which the first 0x95 already shows (pal-115 Vigor stamina).
+  The state reaches the client as 0xA8 at the first update.
+- d2rs: the aura starts once at load (it ran twice). The non-immediate branch now makes the markers-only list
+  (`UseView::set_aura_state`; the client seam only logged it before). The state's unit bit is hidden through the
+  join and turned back on after the join messages, with the passive states (PROVISIONAL REC-3410, like REC-2105).
+- `0x00639E30` queues the unit itself (`0x0064C040`), so the skill bodies' `mark_state_changed` now queues too:
+  frame-51 0xA8 of Holy Fire / Freeze / Shock ... `sim/stat-lists.md` §9.2 corrected.
+- gen-skill packets MATCH 137 -> 178/210 (pal 9 -> 29/30; no regressions). The hand-written 0xA8 rows' checks
+  plus pal-* (69): packets MATCH 64. gen-state-2? sample clean. EQUAL on integ-r23: 3195 -> 3213 for this cause.
+
 ## Open (gen-skill packets first differences after the fix)
-- 15: c2s 0x0C extra at frame 20 (rclick intent; not mine).
-- 10 + 13 (S/M): paladin right aura at join. 1.14d `0x005701B0` -> `0x0056FF10` turns the aura state on with a list
-  holding only markers 350 (skill) and 351 (level). The first update then sends it as 0xA8 after the join 0xAA.
-  d2rs (`skill_events::right_aura_select`) either omits it (0xA8 "size 14 vs 17" at #72: Prayer, Holy Fire, Thorns ...)
-  or puts it in the join 0xAA with the aura's stats ("0xAA size 12 vs 21-29" at #1: Might, Resist Fire ...).
-  This ties in with REC-2105's join order. Not started.
+- pal-107 Charge: frame 22, 0xA5 vs 0xA9 (one check).
 - 8 + 5: 0xA7 missing / 0xA7 vs 0xAC at frame 27+ (summons and sentries); 6: 0xAC size; 6: 0x6B bytes[6]; 4: 0xA5 vs 0xA9.
