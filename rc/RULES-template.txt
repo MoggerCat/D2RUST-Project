@@ -17,3 +17,4 @@ Work rules:
 - Push to claude/NAME only (git push -u origin claude/NAME), after: `cargo fmt --all`, `cargo clippy -p <crates> --all-targets -- -D warnings`, `cargo nextest run -p <crates> 2>&1 | tail -30`, `python3 tools/coverage.py --check`, `python3 tools/spec_index.py --check`, `python3 tools/coord/ledger.py --check`. Run `sh tools/coord/sync.sh` before each push.
 - Ledger: put every row you settled (EQUAL/DIVERGED with the check that proves it) in docs/handoff/ledger/NAME.tsv (copy the header of an existing part); session parts override the base rows.
 - Hand-back: docs/handoff/NAME.md, at most 40 lines: checks before/after (EQUAL counts), what changed, what's open with sizes. Push, send "done NAME: <EQUAL before> -> <after>" once, stop.
+Find the 1.14d function fast: tools/ghidra/site2fn.py <addr>, lookup.py <name|addr>.
