@@ -156,7 +156,7 @@ pub fn script_camera(world: &ClientWorld, local_at: Option<(u32, u32)>) -> Optio
 /// chat, held modifiers, the skill hotkeys F1–F8, whose use sender
 /// `ui/controls.md` §3.1 r2 does not name and the window does not wire)
 /// is refused headless.
-pub const HEADLESS_KEY_ACTIONS: [Action; 14] = [
+pub const HEADLESS_KEY_ACTIONS: [Action; 23] = [
     Action::BeltSlot1,
     Action::BeltSlot2,
     Action::BeltSlot3,
@@ -171,6 +171,18 @@ pub const HEADLESS_KEY_ACTIONS: [Action; 14] = [
     Action::Say5,
     Action::Say6,
     Action::Say7X,
+    // The panel toggles: no client-to-server message but the quest log's
+    // 0x40 on every open (`apply`; PROVISIONAL, REC-2960: the headless run
+    // has no panel tree, so only that message is modelled).
+    Action::ToggleCharacter,
+    Action::ToggleInventory,
+    Action::ToggleParty,
+    Action::ToggleQuests,
+    Action::ToggleHelp,
+    Action::ToggleAutomap,
+    Action::ToggleSkillTree,
+    Action::ToggleSkillMenuRight,
+    Action::ToggleBelt,
 ];
 
 /// The world action a headless `key` step runs (the original key
@@ -545,6 +557,9 @@ pub struct Headless {
     bindings: Bindings,
     /// The run lock and modifier word of the world click (command 35).
     run: crate::bridge::click::RunMods,
+    /// The quest screen is open (its toggle key was pressed an odd number
+    /// of times; every open asks for the quest data, C→S 0x40).
+    quests_open: bool,
     /// The pending interaction of a click on a unit out of reach
     /// ([`PreviewInteract`], as `play`'s preview).
     interact: PreviewInteract,
@@ -589,6 +604,7 @@ impl Headless {
             click: ClickState::default(),
             bindings,
             run: Default::default(),
+            quests_open: false,
             interact: PreviewInteract::default(),
             prev_pick: None,
             walk: None,
@@ -866,6 +882,13 @@ impl Headless {
         self.prev_pick = next_pick;
         super::swap_key::send_swaps(&events, bridge)?;
         super::swap_key::send_says(&events, bridge)?;
+        let quests = UiEvent::Action(ActionId(Action::ToggleQuests.index() as u16));
+        for _ in events.iter().filter(|e| **e == quests) {
+            self.quests_open = !self.quests_open;
+            if self.quests_open {
+                bridge.send_bytes(&[0x40])?;
+            }
+        }
         Ok(log)
     }
 }
