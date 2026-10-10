@@ -391,8 +391,9 @@ pub struct SoundDriver {
     local_at: Option<(UnitKey, (u32, u32))>,
     /// The mode the local player is drawn in while the preview walks it.
     local_mode: Option<(UnitKey, u32)>,
-    /// The local player's client seed (§4 r5).
-    seed: ClientSeed,
+    /// The local player's client seed (§4 r5), shared with the weather's
+    /// draws through [`SoundLink`] (`sound-table-2.md` §14.3).
+    seed: Arc<Mutex<ClientSeed>>,
     /// The ambience, rain, music and level-entry machines
     /// (`environment.md`); `None` when no `soundenviron` row has a song.
     env: Option<Environment>,
@@ -448,7 +449,7 @@ impl SoundDriver {
             pending: Vec::new(),
             local_at: None,
             local_mode: None,
-            seed: ClientSeed::default(),
+            seed: Arc::default(),
             unit_sounds: BTreeMap::new(),
             feed: UnitFeed::default(),
             dialog: DialogState::default(),
@@ -551,12 +552,14 @@ impl SoundDriver {
                 world.units.contains_key(&k)
             }
         });
-        self.seed.sync(world);
+        let seed_arc = self.seed.clone();
+        let mut seed_guard = seed_arc.lock().unwrap_or_else(|e| e.into_inner());
+        seed_guard.sync(world);
         let captured = RefCell::new(self.seen.clone());
         let mut sw = ModelSoundWorld::with_env(world, levels, &self.env_indoors);
         sw.captured = Some(&captured);
         sw.local_at = self.local_at;
-        sw.seed = self.seed.seed();
+        sw.seed = seed_guard.seed();
         // Sound init at a game start (`environment.md` §2 r9, §4 r4,
         // `triggers.md` §1 r6): the first frame with a local player.
         let has_player = world.local_player.is_some();
@@ -739,6 +742,7 @@ fn capture_point(unit: UnitKey, at: (u16, u16)) -> (i32, i32) {
 /// requests through it (`audio/triggers.md` §12).
 #[derive(Clone, Default, bevy::prelude::Resource)]
 pub struct SoundLink {
+    seed: Arc<Mutex<ClientSeed>>,
     driver: Arc<Mutex<Option<Arc<Mutex<SoundDriver>>>>>,
     weather: Arc<Mutex<WeatherSound>>,
 }
@@ -785,7 +789,16 @@ impl SoundLink {
         };
         if !same {
             *l = driver.cloned();
+            if let Some(d) = driver {
+                // The draws of both layers step one seed.
+                d.lock().unwrap_or_else(|e| e.into_inner()).seed = self.seed.clone();
+            }
         }
+    }
+
+    /// The client seed the sound and weather draws share.
+    pub fn client_seed(&self) -> Arc<Mutex<ClientSeed>> {
+        self.seed.clone()
     }
 
     fn driver(&self) -> Option<Arc<Mutex<SoundDriver>>> {
