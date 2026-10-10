@@ -524,18 +524,6 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn spawn_near(&mut self, unit: UnitId, class: u32, mode: u32, spread: i32, flags: u32) {
         self.v.h.x.spawn_near(unit, class, mode, spread, flags);
     }
-    /// `init.md` §6 step 14: the monster's skill entry, its base level
-    /// `SkNlvl` plus the difficulty's `MonsterSkillBonus`; the skill
-    /// entries the AI and the skill do read
-    /// ([`crate::wiring::action::ActionHooks::monster_skills`]).
-    fn give_skill(&mut self, unit: UnitId, skill: u16, level: i32, _mode: Option<u8>) {
-        self.v
-            .h
-            .monster_skills
-            .entry(unit)
-            .or_default()
-            .insert(i32::from(skill as i16), level);
-    }
     fn footprint_occupied(&mut self, unit: UnitId) -> bool {
         self.umod_footprint_occupied(unit)
     }
