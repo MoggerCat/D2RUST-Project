@@ -30,19 +30,19 @@
 | Rules | 95–96 |
 |   1. Think scheduling | 97–298 |
 |   2. Think dispatch `0x005B1740` | 299–438 |
-|   3. AI control and AI tables | 439–610 |
-|   4. AI parameters | 611–629 |
-|   5. Target selection | 630–966 |
-|   6. Distances and line tests | 967–982 |
-|   7. Tactics helpers | 983–1222 |
-|   8. AI commands and minions | 1223–1249 |
-|   10. The catalogue `ai-functions.tsv` | 1250–1270 |
-| Constants & data dependencies | 1271–1294 |
-| Randomness | 1295–1324 |
-| Edge cases & original bugs | 1325–1366 |
-| Test vectors | 1367–1455 |
-| Provenance | 1456–1517 |
-| Open questions | 1518–1624 |
+|   3. AI control and AI tables | 439–627 |
+|   4. AI parameters | 628–646 |
+|   5. Target selection | 647–983 |
+|   6. Distances and line tests | 984–999 |
+|   7. Tactics helpers | 1000–1239 |
+|   8. AI commands and minions | 1240–1266 |
+|   10. The catalogue `ai-functions.tsv` | 1267–1287 |
+| Constants & data dependencies | 1288–1311 |
+| Randomness | 1312–1341 |
+| Edge cases & original bugs | 1342–1383 |
+| Test vectors | 1384–1472 |
+| Provenance | 1473–1534 |
+| Open questions | 1535–1641 |
 <!-- /index -->
 
 ## Summary
@@ -573,6 +573,23 @@ think. Installers that reach a running monster: curse AI `0x005C34B0`
 own switch back to 0. Monster creation, the class reinit
 (`0x00574250`) and the inactive restore (`0x005424F0`) install on a
 fresh control (function 0), so never step 3.
+
+**Special state 16 (possessed imp), 1.14d-confirmed.** Init `0x005E2CD0`:
+one raw step of the unit seed; its low bit b picks the first slot
+index (b + 1) mod 2 of the table `0x006E34E0` (pairs {2, 0}, {4, 0}); the
+slot is the unit's monstats `Skill<slot + 1>`; the first slot whose skill
+the unit has an entry of (owner −1, `0x006439B0`) is stored: AI param 1
+:= slot, param 2 := the second dword (0); neither: both 0. Think
+`0x005E2D80` (target mode 1): no source unit (`0x00552FD0`) or no state
+143 → AI state 0, idle 1. Distance > 24, source dead, source alignment
+≠ 0 (`0x006259B0`) or param 1 = 0 → teleport in range imp1's `aip1`
+with imp1's `Skill1` / `Sk1mode` (`0x005DF850`), param 0 := −1. Else when
+distance < imp2's (monstats 493) `aip1` and `roll(100)` < imp2's `aip2`:
+param 2 ≠ 0 → two `roll(2 · imp2.aip3)`; imp1's `Skill<slot + 1>` in its
+mode at the target (`0x005DEAD0`), idle 20 when the skill is < 0.
+Otherwise `roll(100)` < 50 → mode 8 at the target (`0x005DDF90`), else
+idle 20. Imp Teleport's exact placement `0x00554EA0(…, exact 1)` skips
+the free-point search (`sim/path-placement.md` §10 rule 3).
 
 **Installed special states in 1.14d.** Literal states pushed: 0, 5, 6
 (Hireable `0x005E52D0`), 10 (`0x005D6520`), 11 (`0x005DDD00`), 13
