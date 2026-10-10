@@ -349,7 +349,7 @@ impl<X: Pending> AiModes for View<'_, X> {
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
     /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
-    /// No point (k ≤ 0 or t on the unit) → the request is still made, at
+    /// No movement (k = 0 or t on the unit) → the request is still made, at
     /// the unit's own cell (§7.5 rule 8, REC-665): no path, neutral, and
     /// the think at f + `aidel`.
     fn walk_in_radius(
@@ -363,7 +363,8 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         let at = self.h.path_position(unit);
         let to = self.h.path_position(target);
-        let (x, y) = crate::monsters::ai::radius_point(at, to, a, b).unwrap_or(at);
+        let size = self.path_size(unit);
+        let (x, y) = crate::monsters::ai::radius_point(at, size, to, a, b);
         AiModes::set_path_steps(self, unit, 1);
         self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
@@ -398,6 +399,8 @@ impl<X: Pending> AiModes for View<'_, X> {
 
 /// The AI's line-of-sight mask (`draw-order-2.md` §15.1 caller table).
 const LINE_MASK_AI: u16 = 4;
+/// Collision mask of the direct-reach probes (`0x005DC640`: 0x805).
+const REACH_MASK: u16 = 0x805;
 
 impl<X: Pending> AiWorld for View<'_, X> {
     fn in_town(&self, game: &Game, room: RoomId) -> bool {
@@ -439,8 +442,20 @@ impl<X: Pending> AiWorld for View<'_, X> {
             None => self.h.x.in_melee_range(a, b, 0),
         }
     }
+    // Spec: specs/monsters/ai.md §6 (`0x005DC640`).
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
-        self.h.x.can_reach_directly(game, unit, target)
+        if self.h.paths.is_none() {
+            return self.h.x.can_reach_directly(game, unit, target);
+        }
+        let (u, t) = (self.h.path_position(unit), self.h.path_position(target));
+        let d = crate::monsters::ai::distance_full_size(u, self.path_size(unit), t);
+        crate::monsters::ai::reach_directly_probes(u, t, d)
+            .into_iter()
+            .any(|p| {
+                !self
+                    .unit_point_line_blocked(game, unit, p, REACH_MASK)
+                    .unwrap_or(true)
+            })
     }
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)

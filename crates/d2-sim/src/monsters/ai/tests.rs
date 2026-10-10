@@ -1864,13 +1864,44 @@ mod skill_check;
 // Covers: specs/monsters/ai.md §7.2
 #[test]
 fn walk_in_radius_points_follow_the_recorded_walks() {
-    // Warriv's three walks at the Rogue Encampment arrival (1.14d under
-    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
+    // Warriv's walks at the Rogue Encampment arrival (1.14d under Wine,
+    // `-seed 1234`, player at (4873, 4228)), REC-501.
     let p = (4873, 4228);
-    assert_eq!(radius_point((4866, 4235), p, 3, 2), Some((4868, 4233)));
-    assert_eq!(radius_point((4868, 4233), p, 2, 2), Some((4869, 4232)));
-    assert_eq!(radius_point((4869, 4232), p, 1, 2), Some((4870, 4231)));
-    // Already within b, or on the target: no point.
-    assert_eq!(radius_point((4872, 4229), p, 3, 2), None);
-    assert_eq!(radius_point(p, p, 3, 0), None);
+    assert_eq!(radius_point((4866, 4235), 0, p, 3, 2), (4868, 4233));
+    assert_eq!(radius_point((4868, 4233), 0, p, 2, 2), (4869, 4232));
+    assert_eq!(radius_point((4869, 4232), 0, p, 1, 2), (4870, 4231));
+    // `town-ama-10k` frame 287: n = 19, (0, 2) fixed up to (1, 3).
+    assert_eq!(
+        radius_point((4870, 4231), 0, (4876, 4218), 3, 2),
+        (4871, 4228)
+    );
+    // A target on the unit: the unit's own cell.
+    assert_eq!(radius_point(p, 0, p, 3, 0), p);
+    // Superunique minion (`gen-su-47`, frame 31): size 2, d = 3, k = 3.
+    assert_eq!(
+        radius_point((5144, 4268), 2, (5143, 4263), 4, 0),
+        (5143, 4265)
+    );
+}
+
+// Covers: specs/monsters/ai.md §6
+#[test]
+fn reach_directly_probes_follow_the_distance_table() {
+    // gen-su-47 frame 31: minion at (5149, 4270), player at (5143, 4263).
+    let (u, t) = ((5149, 4270), (5143, 4263));
+    // d = 10 → k = 3, sign(6, 7) = (1, 1): (sx, sy) = (3, 3).
+    assert_eq!(
+        reach_directly_probes(u, t, 10),
+        [t, (5140, 4266), (5146, 4260)]
+    );
+    // k by distance: 2 below 3, 3 for 3–10, 4 for 11–24, else 3.
+    let k = |d| reach_directly_probes((10, 0), (0, 0), d)[1];
+    assert_eq!(k(2), (0, 2));
+    assert_eq!(k(3), (0, 3));
+    assert_eq!(k(10), (0, 3));
+    assert_eq!(k(11), (0, 4));
+    assert_eq!(k(24), (0, 4));
+    assert_eq!(k(25), (0, 3));
+    // An equal axis gives sign 0.
+    assert_eq!(reach_directly_probes((0, 5), (0, 0), 5)[1], (-3, 0));
 }

@@ -37,6 +37,28 @@ pub fn unit_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, a: UnitId, b: UnitId) 
     distance_full_size(cx.world.position(a), cx.world.size(a), cx.world.position(b))
 }
 
+/// The three probe points of "can reach directly" `0x005DC640`
+/// (`specs/monsters/ai.md` §6): the target, then the target moved by
+/// ±(sy, −sx) where (sx, sy) is the sign of unit − target scaled by k,
+/// k from the full-size distance `d` (2 below 3, 3 below 11, 4 below 25,
+/// else 3). The call is reachable when any probe's collision line
+/// (`0x006229F0`, mask 0x805) is clear.
+pub fn reach_directly_probes(unit: (i32, i32), target: (i32, i32), d: i32) -> [(i32, i32); 3] {
+    let k = match d {
+        i32::MIN..=2 => 2,
+        3..=10 => 3,
+        11..=24 => 4,
+        _ => 3,
+    };
+    let sx = (unit.0 - target.0).signum() * k;
+    let sy = (unit.1 - target.1).signum() * k;
+    [
+        target,
+        (target.0 - sy, target.1 + sx),
+        (target.0 + sy, target.1 - sx),
+    ]
+}
+
 /// `0x005DE190` `AITACTICS_SetVelocity` (§7.3): asserts −126 ≤ speed ≤
 /// 126, maps method 1 to 7, and overwrites each nonzero field; steps
 /// capped at 77.
@@ -487,28 +509,32 @@ pub fn walk_in_radius<W: AiHost + ?Sized>(
     ok
 }
 
-/// The point `0x005DE4E0` walks to: from the unit at `u` toward `t` by
-/// k = min(a, dist − b) of the no-size distance dist, each axis
-/// `u + Δ·k / dist` rounded to the nearest (halves away from zero);
-/// `None` when k ≤ 0 or dist = 0.
-/// PROVISIONAL (§7.2, REC-501): the geometry is D2MOO's and unread in
-/// 1.14d; this reading reproduces the three recorded walks of Warriv at
-/// the Rogue Encampment arrival (`-seed 1234`, player at (4873, 4228)):
-/// from (4866, 4235) with (a, b) = (3, 2) to (4868, 4233); from
-/// (4868, 4233) with (2, 2) to (4869, 4232); from (4869, 4232) with
-/// (1, 2) to (4870, 4231). Settled by `pc1-data.md` Step 4 "walk in
-/// radius geometry".
-pub fn radius_point(u: (i32, i32), t: (i32, i32), a: i32, b: i32) -> Option<(i32, i32)> {
-    let dist = distance_no_size(u, t);
-    let k = a.min(dist - b);
-    if dist == 0 || k <= 0 {
-        return None;
+/// The point `0x005DE4E0` walks to (`specs/monsters/ai.md` §7.2;
+/// 1.14d-read, REC-501): d := the full-size distance `0x005DC380` from
+/// the unit (of size `size`) at `u` to `t`; s := −1 when d < b, else +1;
+/// k := min(|d − b|, a). With ax, ay the axis distances and n :=
+/// max(ax + ay, k): kx := ax·k / n and ky := ay·k / n (truncated), then
+/// while kx + ky < k both grow by 1. The point is u + sign(t − u)·k_axis·s
+/// per axis. There is no early exit: k = 0 or t on u gives u itself.
+pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> (i32, i32) {
+    let d = distance_full_size(u, size, t);
+    let s = if d < b { -1 } else { 1 };
+    let k = (d - b).abs().min(a);
+    let (ax, ay) = ((t.0 - u.0).abs(), (t.1 - u.1).abs());
+    let n = (ax + ay).max(k);
+    let (mut kx, mut ky) = (0, 0);
+    if n > 0 {
+        kx = ax * k / n;
+        ky = ay * k / n;
+        while kx + ky < k {
+            kx += 1;
+            ky += 1;
+        }
     }
-    let step = |d: i32| {
-        let n = d * k;
-        (2 * n + n.signum() * dist) / (2 * dist)
-    };
-    Some((u.0 + step(t.0 - u.0), u.1 + step(t.1 - u.1)))
+    (
+        u.0 + (t.0 - u.0).signum() * kx * s,
+        u.1 + (t.1 - u.1).signum() * ky * s,
+    )
 }
 
 /// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):

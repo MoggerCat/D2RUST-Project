@@ -501,6 +501,42 @@ impl<X: Pending> View<'_, X> {
 }
 
 impl<X: Pending> View<'_, X> {
+    /// `0x006229F0(unit, x, y, mask)` (`monsters/ai.md` §6 "can reach
+    /// directly"): the unit's collision line to the point, blocked
+    /// (true) or clear. It is `0x00622AA0` with the point as the second
+    /// end, of size 2 (`edx = 2` at `0x00622A80`), and answers clear for
+    /// a unit without a room. `None` without the path provider.
+    pub fn unit_point_line_blocked(
+        &self,
+        game: &Game,
+        unit: UnitId,
+        at: (i32, i32),
+        mask: u16,
+    ) -> Option<bool> {
+        self.h.paths.as_ref()?;
+        let (x, y) = self.h.path_position(unit);
+        let a = crate::path::line::LineUnit {
+            room: game.lists.unit(unit).and_then(|e| e.room()),
+            x,
+            y,
+            size: self.path_size(unit),
+        };
+        let b = crate::path::line::LineUnit {
+            room: None,
+            x: at.0,
+            y: at.1,
+            size: 2,
+        };
+        Some(crate::path::line::units_line_blocked(
+            &self.h.drlg,
+            &a,
+            &b,
+            mask,
+        ))
+    }
+}
+
+impl<X: Pending> View<'_, X> {
     /// `0x00622AA0(a, b, mask)` (`render/draw-order-2.md` §15.1,
     /// [`crate::path::line::units_line_blocked`]) on the path records and
     /// the DRLG rooms: `a`'s room (`0x00620BB0`), the path positions
