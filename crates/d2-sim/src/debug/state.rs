@@ -484,6 +484,17 @@ fn owner<X>(sys: &UnitSystem<ActionHooks<X>>, id: UnitId, ty: UnitType) -> Optio
     let guid = match ty {
         UnitType::Monster => sys.hooks.ai.as_ref()?.control(id)?.minion_owner?.guid,
         UnitType::Missile => sys.hooks.missiles.as_ref()?.get(id)?.owner?.guid,
+        // A monster's equipment: the monster has no inventory model, its
+        // holdings are the host's (PROVISIONAL, REC-1030); the holder is
+        // the monster the item is held for.
+        UnitType::Item => {
+            let (&holder, _) = sys
+                .hooks
+                .monster_equip
+                .iter()
+                .find(|(_, held)| held.values().any(|&i| i == id))?;
+            sys.units.get(holder)?.guid
+        }
         _ => return None,
     };
     (guid != 0 && guid != u32::MAX).then_some(guid)
