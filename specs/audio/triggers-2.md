@@ -30,21 +30,21 @@
 | Outputs / state changes | 70–75 |
 | Rules | 76–77 |
 |   13. Remaining fixed-request conditions (`audio/triggers.md` open question 10) | 78–175 |
-|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 176–242 |
-|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 243–270 |
-|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 271–288 |
-|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 289–297 |
-|   18. Sound identity of a unit and its `monsounds` record | 298–346 |
-|   19. A unit's request list (U +0x78) | 347–393 |
-|   20. When object units make their mode sounds | 394–432 |
-|   21. What the driver needs per rule (inputs and owners) | 433–461 |
-| Constants & data dependencies | 462–471 |
-| Randomness | 472–477 |
-| Edge cases & original bugs | 478–487 |
-| Test vectors | 488–517 |
-| Provenance | 518–546 |
-| Open questions | 547–550 |
-|   14a. Monster greeting reaches the client (rc-packets-s2c) | 551–559 |
+|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 176–243 |
+|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 244–271 |
+|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 272–289 |
+|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 290–298 |
+|   18. Sound identity of a unit and its `monsounds` record | 299–347 |
+|   19. A unit's request list (U +0x78) | 348–394 |
+|   20. When object units make their mode sounds | 395–433 |
+|   21. What the driver needs per rule (inputs and owners) | 434–462 |
+| Constants & data dependencies | 463–472 |
+| Randomness | 473–478 |
+| Edge cases & original bugs | 479–488 |
+| Test vectors | 489–518 |
+| Provenance | 519–547 |
+| Open questions | 548–551 |
+|   14a. Monster greeting reaches the client (rc-packets-s2c) | 552–560 |
 <!-- /index -->
 
 ## Summary
@@ -216,6 +216,7 @@ specs; listed only for order).
    | 16 | monster `Taunt` | `0x005B1140` (`monsters/ai.md`), `0x005EF320`, `0x005FC860` (`monsters/ai-bodies-5.md`; target 0) |
    | 17 | monster flee voice | `0x005F02C0` (`monsters/ai-bodies.md`; target 0) |
    | 18 | NPC greeting on P | `0x005E68F0`, `0x005E73A0`, `0x005E7E20` (`monsters/ai*.md`) |
+<!-- d2rs: the local host's monster `play_sound` calls `queue_sound` (`0x00553380`); recorded `sys-intents-moves` frame 68: `2c 01 07000000 1200`. -->
    | 19 | class `impossible` | `0x0054C5D0`, `0x0055E170`, `0x005628C0`, `0x00564D50`, `0x00582610`, `0x00584870` (2), `0x0058D400`, `0x0058E740`, `0x00591AC0` (2), `0x00593480`, `0x00593710`, `0x00593AF0`, `0x0059A7E0`, `0x0059DC70`, `0x005A5E50`, `0x005B5880`, `0x005B5C10` (3), `0x005B7A60`, `0x005B9B40`, `0x005BB980`, `0x005C98F0`; `0x0055C9A0` with EDX from its callers (`0x0055D01A`, `0x0056363A`: 19) |
    | 20 | class `cantuseyet` | `0x00560F00`, `0x00561220`, `0x00563D20` (target 0), `0x00594140` |
    | 22 | class `needkey` | `0x00581D40`, `0x00585F60` |
