@@ -2191,6 +2191,18 @@ gen-monskill-352	monskill	skills.txt Id 352	skill.monster.serpentcharge	monster 
 gen-monskill-354	monskill	skills.txt Id 354	skill.monster.unholyboltex	monster skill UnHolyBoltEx (354), class 667 unraveler6
 gen-monskill-355	monskill	skills.txt Id 355	skill.monster.shamanfireex	monster skill ShamanFireEx (355), class 646 fallenshaman7
 gen-monskill-356	monskill	skills.txt Id 356	skill.monster.imp-fire-missile-ex	monster skill Imp Fire Missile Ex (356), class 688 imp6
+gen-qkill-ancients	qkill	quest monster ancients	monster.quest.ancients	quest monster ancients spawned and killed
+gen-qkill-baal	qkill	quest monster baal	monster.quest.baal	quest monster baal spawned and killed
+gen-qkill-blood-raven	qkill	quest monster blood-raven	monster.quest.blood-raven	quest monster blood-raven spawned and killed
+gen-qkill-cain-rescue-guard	qkill	quest monster cain-rescue-guard	monster.quest.cain-rescue-guard	quest monster cain-rescue-guard spawned and killed
+gen-qkill-countess	qkill	quest monster countess	monster.quest.countess	quest monster countess spawned and killed
+gen-qkill-cow-king	qkill	quest monster cow-king	monster.quest.cow-king	quest monster cow-king spawned and killed
+gen-qkill-griswold	qkill	quest monster griswold	monster.quest.griswold	quest monster griswold spawned and killed
+gen-qkill-hellforge-hephasto	qkill	quest monster hellforge-hephasto	monster.quest.hellforge-hephasto	quest monster hellforge-hephasto spawned and killed
+gen-qkill-izual	qkill	quest monster izual	monster.quest.izual	quest monster izual spawned and killed
+gen-qkill-nihlathak	qkill	quest monster nihlathak	monster.quest.nihlathak	quest monster nihlathak spawned and killed
+gen-qkill-radament	qkill	quest monster radament	monster.quest.radament	quest monster radament spawned and killed
+gen-qkill-summoner	qkill	quest monster summoner	monster.quest.summoner	quest monster summoner spawned and killed
 gen-npc-warriv1	npc	npc warriv1 (155)	npc.warriv1,quest.a1q0-warriv-gossip	talk to warriv1 (monstats 155, act 1)
 gen-npc-charsi	npc	npc charsi (154)	npc.charsi	talk to charsi (monstats 154, act 1)
 gen-npc-gheed	npc	npc gheed (147)	npc.gheed	talk to gheed (monstats 147, act 1)
