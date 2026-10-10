@@ -261,6 +261,15 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// The host runs the item update pass after the tick and wants a
+    /// player's own state / stat sends after it (`intents-events.md` §7.3
+    /// rule 1: the item messages of step 2 precede step 5 and step 7). On,
+    /// [`View::player_tail`] holds them until [`ActionSim::flush_player_tail`].
+    pub defer_player_tail: bool,
+    /// Set around a player's step 5 / 7 sends while [`Self::defer_player_tail`].
+    pub capture_tail: bool,
+    /// The held sends: (receiving player, bytes).
+    pub player_tail: Vec<(UnitId, Vec<u8>)>,
     /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
     /// creation), for the host that holds the hireling lists:
     /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
@@ -493,6 +502,9 @@ impl<X> ActionHooks<X> {
             pet_follows: None,
             hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
+            defer_player_tail: false,
+            capture_tail: false,
+            player_tail: Vec::new(),
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),

@@ -943,9 +943,9 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | hire-asheara | packets | DIVERGED | 89/90 | frame 20 stream s2c #14 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
 | hire-asheara | state | PARTIAL | 90/90 | - | - |
 | hire-follow-warp-kashya | packets | DIVERGED | 197/200 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
-| hire-follow-warp-kashya | state | PARTIAL | 200/200 | - | - |
+| hire-follow-warp-kashya | state | DIVERGED | 53/200 | frame 54 monster 1:13 class 271 (hireling warp follow), field m: 1.14d 2 vs d2rs 4; tile (5147,4260) vs (5144,4266) | q-diff-skills-2 |
 | hire-follow-waypoint-kashya | packets | DIVERGED | 307/330 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
-| hire-follow-waypoint-kashya | state | DIVERGED | 305/330 | frame 268 missile 3:1 class 12/120, field cl: 1.14d 12 vs d2rs 120 | unrouted |
+| hire-follow-waypoint-kashya | state | DIVERGED | 92/330 | frame 93 player 0:1, field m: 1.14d 5 vs d2rs 6 (waypoint travel) | unrouted |
 | hire-greiz | packets | DIVERGED | 89/90 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
 | hire-greiz | state | PARTIAL | 90/90 | - | - |
 | hire-items-kashya | packets | DIVERGED | 87/90 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
@@ -955,13 +955,13 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | hire-qual-kehk | packets | DIVERGED | 89/90 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
 | hire-qual-kehk | state | PARTIAL | 90/90 | - | - |
 | hire-resurrect-asheara | packets | DIVERGED | 125/130 | frame 20 stream s2c #14 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
-| hire-resurrect-asheara | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/359, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-asheara | state | DIVERGED | 23/130 | frame 24 monster 1:12 class 359 (hireling), field s (as hire-asheara) | q-diff-skills-2 |
 | hire-resurrect-greiz | packets | DIVERGED | 124/130 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
-| hire-resurrect-greiz | state | DIVERGED | 85/130 | frame 86 monster 1:22 class -/338, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-greiz | state | DIVERGED | 69/130 | frame 70 monster 1:22 class 338 (hireling after 0x62), field m: 1.14d 1 vs d2rs 2; tile (5029,5045) vs (5028,5041) | q-diff-skills-2 |
 | hire-resurrect-kashya | packets | DIVERGED | 124/130 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
-| hire-resurrect-kashya | state | DIVERGED | 85/130 | frame 86 monster 1:13 class -/271, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
 | hire-resurrect-qual-kehk | packets | DIVERGED | 125/130 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
-| hire-resurrect-qual-kehk | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/561, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-qual-kehk | state | DIVERGED | 28/130 | frame 29 monster 1:10 class 514, field m (as hire-qual-kehk) | unrouted |
 | inv-pick-belt | items | MATCH | 1/1 | - | - |
 | inv-pick-belt | packets | MATCH | 40/40 | - | - |
 | inv-pick-belt | state | PARTIAL | 40/40 | - | - |
@@ -1284,3 +1284,74 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | walk-town-ama | packets | MATCH | 80/80 | - | - |
 | walk-town-ama | state | PARTIAL | 80/80 | - | - |
 | warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
+| gen-ai-diablo | state | PARTIAL | 150/150 | - | - |
+| gen-ai-megademon | state | PARTIAL | 150/150 | - | - |
+| gen-boss-333 | state | DIVERGED | 70/150 | frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943] | unrouted |
+| gen-fmt-anim-walk | packets | MATCH | 80/80 | - | - |
+| gen-fmt-anim-walk | state | PARTIAL | 80/80 | - | - |
+| gen-fmt-load-ama | packets | MATCH | 20/20 | - | - |
+| gen-fmt-load-ama | state | PARTIAL | 20/20 | - | - |
+| gen-lvl-132 | rng | MATCH | 145/145 | - | - |
+| gen-lvl-132 | state | PARTIAL | 160/160 | - | - |
+| gen-missile-172 | packets | MATCH | 70/70 | - | - |
+| gen-missile-172 | rng | MATCH | 12/12 | - | - |
+| gen-missile-172 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-675 | packets | MATCH | 70/70 | - | - |
+| gen-missile-675 | rng | MATCH | 12/12 | - | - |
+| gen-missile-675 | state | PARTIAL | 70/70 | - | - |
+| gen-npc-act2guard2 | packets | MATCH | 50/50 | - | - |
+| gen-npc-act2guard2 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-act2guard4 | packets | MATCH | 50/50 | - | - |
+| gen-npc-act2guard4 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-act2guard5 | packets | MATCH | 50/50 | - | - |
+| gen-npc-act2guard5 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-alkor | packets | MATCH | 50/50 | - | - |
+| gen-npc-alkor | state | PARTIAL | 50/50 | - | - |
+| gen-npc-cain1 | packets | MATCH | 50/50 | - | - |
+| gen-npc-cain1 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-cain3 | packets | MATCH | 50/50 | - | - |
+| gen-npc-cain3 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-cain4 | packets | MATCH | 50/50 | - | - |
+| gen-npc-cain4 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-charsi | packets | MATCH | 50/50 | - | - |
+| gen-npc-charsi | state | PARTIAL | 50/50 | - | - |
+| gen-npc-geglash | packets | MATCH | 50/50 | - | - |
+| gen-npc-geglash | state | PARTIAL | 50/50 | - | - |
+| gen-npc-gheed | packets | MATCH | 50/50 | - | - |
+| gen-npc-gheed | state | PARTIAL | 50/50 | - | - |
+| gen-npc-halbu | packets | MATCH | 50/50 | - | - |
+| gen-npc-halbu | state | PARTIAL | 50/50 | - | - |
+| gen-npc-hratli | packets | MATCH | 50/50 | - | - |
+| gen-npc-hratli | state | PARTIAL | 50/50 | - | - |
+| gen-npc-izualghost | packets | MATCH | 50/50 | - | - |
+| gen-npc-izualghost | state | PARTIAL | 50/50 | - | - |
+| gen-npc-jamella | packets | MATCH | 50/50 | - | - |
+| gen-npc-jamella | state | PARTIAL | 50/50 | - | - |
+| gen-npc-malachai | packets | MATCH | 50/50 | - | - |
+| gen-npc-malachai | state | PARTIAL | 50/50 | - | - |
+| gen-npc-meshif2 | packets | MATCH | 50/50 | - | - |
+| gen-npc-meshif2 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-navi | packets | MATCH | 50/50 | - | - |
+| gen-npc-navi | state | PARTIAL | 50/50 | - | - |
+| gen-npc-ormus | packets | MATCH | 50/50 | - | - |
+| gen-npc-ormus | state | PARTIAL | 50/50 | - | - |
+| gen-npc-tyrael2 | packets | MATCH | 50/50 | - | - |
+| gen-npc-tyrael2 | state | PARTIAL | 50/50 | - | - |
+| gen-npc-warriv1 | packets | MATCH | 50/50 | - | - |
+| gen-npc-warriv1 | state | PARTIAL | 50/50 | - | - |
+| ass-blade-shield | packets | MATCH | 70/70 | - | - |
+| ass-blades-of-ice | packets | MATCH | 70/70 | - | - |
+| ass-claws-of-thunder | packets | MATCH | 70/70 | - | - |
+| ass-cloak-of-shadows | packets | MATCH | 70/70 | - | - |
+| ass-cobra-strike | packets | MATCH | 70/70 | - | - |
+| ass-dragon-claw | packets | MATCH | 70/70 | - | - |
+| ass-dragon-tail | packets | MATCH | 70/70 | - | - |
+| ass-dragon-talon | packets | MATCH | 70/70 | - | - |
+| ass-fists-of-fire | packets | MATCH | 70/70 | - | - |
+| ass-mind-blast | packets | MATCH | 70/70 | - | - |
+| ass-passives | packets | MATCH | 70/70 | - | - |
+| ass-royal-strike | packets | MATCH | 70/70 | - | - |
+| ass-tiger-strike | packets | MATCH | 70/70 | - | - |
+| ass-venom | packets | MATCH | 70/70 | - | - |
+| bar-battle-orders | packets | MATCH | 70/70 | - | - |
+| bar-war-cry | packets | MATCH | 70/70 | - | - |
