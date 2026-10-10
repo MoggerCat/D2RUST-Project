@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+ui.frontend.charselect.dolls	ui	systems	Character-select paper dolls (3 unequipped saves; 12 timed 1.14d shots vs 70 d2rs shots)	specs/ui/frontend-menus.md	draft	ui-charselect-dolls	MATCH	yes	2	n	claude/rc-dolls-check	EQUAL	-	doll pixels equal at the matching frame (slots 0,1: 0 px; slot 2: <=0.56 %); dy 0 exact (REC-2183), no shadow in 1.14d (REC-2184); equipped saves REC-2181 and the build instant REC-2182 open
