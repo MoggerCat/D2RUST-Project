@@ -1417,7 +1417,16 @@ fn world_view_frame(
     }
     // `render/lighting.md` §6.4: the drawn frame's pass over the client's
     // kept light list (§6.3), held by the model between frames.
+    // A check run lights the frame with 1.14d's recorded light quality
+    // (`render/lighting.md` §5: it follows the host's wall clock and draw
+    // rate; the schedule's `quality` column, `tools/scenario-diff.md` §3
+    // r7 step 5).
     let feed = &mut state.feed;
+    feed.set_light_quality(
+        schedule
+            .as_ref()
+            .and_then(|s| s.quality.get(&tick).copied()),
+    );
     bridge
         .0
         .light_frame(|w, lights| feed.light_frame(w, lights));

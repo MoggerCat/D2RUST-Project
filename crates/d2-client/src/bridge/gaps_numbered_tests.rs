@@ -219,6 +219,8 @@ fn client_world_holds_only_stated_fields() {
         // `drlg/rooms.md` §4.6 (last paragraph).
         room_units,
         lights,
+        // `render/lighting.md` §8 r3: the stat list's cast light.
+        cast_lights,
         // `missiles/client.md` §C13 function 2: the drawn frame's unit
         // origin.
         unit_origin,
@@ -272,6 +274,7 @@ fn client_world_holds_only_stated_fields() {
     assert!(weapon_set == 0 && item_table_ext.is_empty());
     assert!(pets.is_empty() && palette_act.is_none() && active_rooms.is_none());
     assert!(room_units == Default::default() && lights.is_empty() && drlg_updates == 0);
+    assert!(cast_lights.is_empty());
     assert!(drlg.is_none() && unit_origin.is_none() && shake.is_none());
     assert!(environment.is_none() && !eclipse_pending && skill_tree_flag.is_none());
     assert_eq!(env_period_cache, 0);
