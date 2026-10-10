@@ -129,6 +129,17 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         cltstfunc: s.cltstfunc,
         restrict: s.restrict,
         shape_states: [s.state1 as i16, s.state2 as i16, s.state3 as i16],
+        cltdofunc: s.cltdofunc as i16,
+        cltmissile: s.cltmissile as i16,
+        cltmissile_abc: [
+            s.cltmissilea as i16,
+            s.cltmissileb as i16,
+            s.cltmissilec as i16,
+        ],
+        cltcalc1: s.cltcalc1,
+        progressive: s.progressive,
+        aurastate: s.aurastate as i16,
+        aurastat1: s.aurastat1 as i16,
     }
 }
 

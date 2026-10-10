@@ -291,6 +291,17 @@ pub struct ClientUnit {
     /// +0xB0: the last hit class (§18 rule 1), written by the player
     /// mode machine (§8 rule 4: `+0xB0` := r2); 0 at creation.
     pub hit_class: u32,
+    /// Unit flag +0xC4 bit 0x40: the client do ran in this mode
+    /// (`client/msg-skills.md` §11); cleared by the client mode set
+    /// `0x00480E70` (§19 r2), set by the do.
+    pub flag_40: bool,
+    /// +0x4E: the event byte (1–4) of the frames the latest frame
+    /// advance crossed, else 0 (`sim/units.md` §4.2 "Frame advance");
+    /// written by a player's client update ([`super::player_anim`]).
+    pub action_frame: u8,
+    /// The AnimData event bytes of a player's current mode, set by its
+    /// mode set ([`super::player_anim::mode_set`]); `None`: no record.
+    pub anim_events: Option<[u8; d2_formats::animdata::EVENTS]>,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -334,6 +345,9 @@ impl ClientUnit {
             flag_ex: 0,
             flag_4: false,
             hit_class: 0,
+            flag_40: false,
+            action_frame: 0,
+            anim_events: None,
         }
     }
 
@@ -1561,6 +1575,22 @@ pub struct SkillRow {
     pub restrict: u8,
     /// `State1`…`State3` (+0x22A, i16; a negative id ends the list).
     pub shape_states: [i16; 3],
+    /// `cltdofunc` (+0xF4, read signed): the client do of
+    /// `client/msg-skills.md` §11 ([`super::client_do`]).
+    pub cltdofunc: i16,
+    /// `cltmissile` (+0xE8) and `cltmissilea`…`c` (+0xEA…+0xEE), read
+    /// signed (−1 = none; §11 r2, r4).
+    pub cltmissile: i16,
+    pub cltmissile_abc: [i16; 3],
+    /// `cltcalc1` (+0x114): the calc offset of the nova do's velocity
+    /// bonus (§11 r4); `u32::MAX` = none.
+    pub cltcalc1: u32,
+    /// `progressive` (bit 2) with `progstate`… : the charge-indexed
+    /// missile pick `0x004F21B0` (§11 r4): `aurastate` (+0x80) and
+    /// `aurastat1` (+0x54), read signed.
+    pub progressive: bool,
+    pub aurastate: i16,
+    pub aurastat1: i16,
 }
 
 /// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):

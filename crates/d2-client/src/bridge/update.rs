@@ -97,7 +97,9 @@ pub fn update_pass(
         // hit animation over → neutral), before the drain
         // (`skills/sequences.md` client mode machine; REC-1000).
         if key.unit_type == super::world::PLAYER {
-            super::player_anim::step(world, inputs, key);
+            if let Err(error) = super::player_anim::step(world, inputs, key) {
+                log.rejected.push(Rejected { id: 0, error });
+            }
         }
         // Looked up again: an earlier unit's messages or its own update
         // may have removed it (§5 rule 2).

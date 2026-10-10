@@ -17,14 +17,14 @@
 //! the click gate (`bridge::click::can_act`, modes 7–12 refused) dropped
 //! every later click.
 //!
-//! PROVISIONAL (skills/sequences.md client mode-18 machine; REC-1000):
-//! every mode in [`ENDING_MODES`] runs the mode-18 row's steps {advance
-//! 1, end 3} on its AnimData frames (the rows of table `0x00711E00` for
-//! modes 4 and 7–16 are not written; mode 18's is), so a player ends the
+//! The rows of table `0x00711E00` for the modes in [`ENDING_MODES`]
+//! (read from the 1.14d image, `client/msg-skills.md` §11): advance 1
+//! and end 2 (4, 9, 13) or 3 (7, 8, 10–12, 14–16), so a player ends the
 //! mode on the first update whose advanced frame + speed reaches the
-//! count; settled by a read of `0x00711E00` rows 4, 7–16 and a recording
-//! of the local player's mode per client update across one Multiple Shot
-//! and one Frost Nova (`record_state.py` `m`, `fr`, `fc`, `sp`).
+//! count (the end test of 2 and 3 is the same "complete"). PROVISIONAL
+//! (REC-1000, the timing part): unchanged until a recording of the local
+//! player's mode per client update across one Multiple Shot and one
+//! Frost Nova (`record_state.py` `m`, `fr`, `fc`, `sp`).
 //! PROVISIONAL (sim/units.md §4.7; REC-1001): the rate reads no used
 //! skill (`seqtrans`, `UseAttackRate`) and no item rate values (stats
 //! 93–105 read 0), and a player without a base stat 67–69 reads 100, as
@@ -33,6 +33,10 @@
 
 use d2_sim::units::anim_rate::{anim_rate, frame_bonus, mode_row, Rate, RateInput};
 
+use d2_sim::units::anim::advance_frame;
+use d2_sim::units::record::{Anim, AnimRecord};
+
+use super::dispatch::HandlerError;
 use super::world::{ClientWorld, ModelInputs, UnitKey, PLAYER};
 
 /// The modes the client update ends in neutral (REC-1000): GH 4, A1 7,
@@ -50,6 +54,9 @@ pub struct PlayerAnim {
     /// The COF weapon class (`render/unit-composite.md` §2.1) as its
     /// `sequences::CLASSES` index (0 `hth`).
     pub weapon: i32,
+    /// The record's event bytes (+0x10 + i; `formats/animdata.md` §5),
+    /// read by the frame advance for +0x4E.
+    pub events: Option<[u8; d2_formats::animdata::EVENTS]>,
 }
 
 /// The animation lookup of the client player update: the AnimData
@@ -101,15 +108,25 @@ fn rate(w: &ClientWorld, key: UnitKey, mode: u32, s: i32) -> i32 {
     }
 }
 
-/// The player mode set (`0x00624690`): a new mode is written and its
-/// animation restarted (frame := frame bonus · 256, count := frames ·
-/// 256, speed := the rate); the same mode changes nothing. A unit not in
-/// the model or not a player: nothing.
+/// The movement kind of each player mode (table `0x00711E00`, entry +0
+/// of 12-byte rows; read from the 1.14d image): 1 path step, 2 skill
+/// (the do of [`step`]), 0 neither.
+const MOVE_KIND: [u8; 20] = [0, 0, 1, 1, 0, 0, 1, 2, 2, 0, 2, 2, 2, 0, 2, 2, 2, 0, 2, 1];
+
+/// The client player mode set (`0x00480E70` → `0x00624690`): flag 0x40
+/// is cleared (`client/msg-skills.md` §11); a new mode is written and
+/// its animation restarted (frame := frame bonus · 256, count := frames
+/// · 256, speed := the rate, +0x4E := 0); the same mode changes nothing
+/// else. A unit not in the model or not a player: nothing.
 pub fn mode_set(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
-    let Some(u) = w.units.get(&key) else {
+    let Some(u) = w.units.get_mut(&key) else {
         return;
     };
-    if key.unit_type != PLAYER || u.mode == mode {
+    if key.unit_type != PLAYER {
+        return;
+    }
+    u.flag_40 = false;
+    if u.mode == mode {
         return;
     }
     let class = u.class;
@@ -125,27 +142,71 @@ pub fn mode_set(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u
     u.frame = bonus * 256;
     u.frame_count = (anim.frames as i32).wrapping_mul(256);
     u.speed = Some(speed);
+    u.action_frame = 0;
+    u.anim_events = anim.events;
 }
 
-/// The player part of the client update (`0x00463390`) for a player in
-/// an ending mode: advance unless complete, then the neutral end when
-/// complete (module docs; REC-1000).
-pub fn step(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
-    let Some(u) = w.units.get_mut(&key) else {
-        return;
+/// The player part of the client update (`0x00463390`, `client/model.md`
+/// §19 r2) for a player in an ending mode: in a skill mode (kind 2) with
+/// a used skill, flag 0x40 clear and +0x4E ∈ {1, 2, 3} (the previous
+/// advance's byte) the client do (`client_do::generic_do`); then advance
+/// unless complete (`sim/units.md` §4.2: +0x4E := the last event byte
+/// crossed); then, when complete, the mode end (§19 r3): for a player
+/// other than the local player with flag 0x40 still clear the do, used
+/// skill := none, mode set neutral.
+///
+/// PROVISIONAL (REC-2208): the used skill's E-flags bit 0 path (the
+/// path-step do of r2 and r3) is read as clear: the model holds no
+/// client skill-entry flags (`0x006446A0`).
+pub fn step(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) -> Result<(), HandlerError> {
+    let Some(u) = w.units.get(&key) else {
+        return Ok(());
     };
     if key.unit_type != PLAYER || !ENDING_MODES.contains(&u.mode) {
-        return;
+        return Ok(());
     }
+    let has_skill = u.skills.as_ref().is_some_and(|l| l.current.is_some());
+    let kind = MOVE_KIND.get(u.mode as usize).copied().unwrap_or(0);
+    if kind == 2 && has_skill && !u.flag_40 && matches!(u.action_frame, 1..=3) {
+        super::client_do::generic_do(w, inputs, key)?;
+    }
+    let Some(u) = w.units.get_mut(&key) else {
+        return Ok(());
+    };
     let s = u.speed.unwrap_or(0);
-    let complete = |f: i32| f.saturating_add(s) >= u.frame_count;
-    if !complete(u.frame) {
-        u.frame += s;
+    let complete = |u: &super::world::ClientUnit| u.frame.saturating_add(s) >= u.frame_count;
+    if !complete(u) {
+        let mut a = Anim {
+            sequence: None,
+            frame: u.frame,
+            frame_count: u.frame_count,
+            speed: s as i16,
+            action_frame: 0,
+            record: u.anim_events.map(|events| AnimRecord {
+                frames: (u.frame_count >> 8) as u32,
+                byte_0f: 0,
+                events,
+            }),
+        };
+        // Not complete: the frame does not reach the count, so the
+        // advance never wraps and the bonus is not read.
+        advance_frame(&mut a, 0);
+        u.frame = a.frame;
+        u.action_frame = a.action_frame;
     }
-    if complete(u.frame) {
+    if complete(u) {
+        let remote = w.local_player != Some(key);
+        let u = w.units.get(&key).expect("present");
+        if remote && !u.flag_40 && has_skill {
+            super::client_do::generic_do(w, inputs, key)?;
+        }
+        if let Some(l) = w.units.get_mut(&key).and_then(|u| u.skills.as_mut()) {
+            l.current = None;
+        }
         let (neutral, _) = super::modes::neutral_walk(w, key);
         mode_set(w, inputs, key, neutral);
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -163,6 +224,7 @@ mod tests {
                 frames: 10,
                 speed: 256,
                 weapon: 0,
+                events: None,
             })
         }
     }
@@ -192,13 +254,13 @@ mod tests {
         // Updates 1–8 advance to 2048; frame + speed reaches 2560 after
         // update 9's advance (2304 + 256): neutral on update 9.
         for n in 1..=8 {
-            step(&mut w, &inputs, key);
+            step(&mut w, &inputs, key).unwrap();
             assert_eq!(w.units[&key].mode, 10, "update {n}");
         }
-        step(&mut w, &inputs, key);
+        step(&mut w, &inputs, key).unwrap();
         assert_eq!(w.units[&key].mode, 1);
         // Neutral is not an ending mode: nothing more.
-        step(&mut w, &inputs, key);
+        step(&mut w, &inputs, key).unwrap();
         assert_eq!(w.units[&key].mode, 1);
     }
 
@@ -210,7 +272,7 @@ mod tests {
             ..ModelInputs::default()
         };
         mode_set(&mut w, &inputs, key, 7);
-        step(&mut w, &inputs, key);
+        step(&mut w, &inputs, key).unwrap();
         let f = w.units[&key].frame;
         mode_set(&mut w, &inputs, key, 7);
         assert_eq!(w.units[&key].frame, f);
@@ -218,7 +280,7 @@ mod tests {
         let (mut w, key) = world();
         let bare = ModelInputs::default();
         mode_set(&mut w, &bare, key, 7);
-        step(&mut w, &bare, key);
+        step(&mut w, &bare, key).unwrap();
         assert_eq!(w.units[&key].mode, 1);
     }
 }

@@ -18,6 +18,7 @@ pub mod bits;
 pub mod chat_end;
 pub mod check;
 pub mod click;
+pub mod client_do;
 pub mod client_missiles;
 pub mod client_path;
 pub mod combat;
