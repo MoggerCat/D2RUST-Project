@@ -455,7 +455,8 @@ where
         }
         self.desk.rest.take_from_store(npc_class, item);
     }
-    /// As [`Self::place_in_store`] (`vendors.md` §5.1 step 7).
+    /// The node's inventory (`0x00560200`, `vendors.md` §5.1 step 7) when
+    /// the call has the inventory model; else the rest's.
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {
         if let (Some(npc), Some(inv)) = (self.record_npc(npc_class), self.desk.inv.as_deref_mut()) {
             return inv.gamble_place(&mut *self.desk.econ, npc, player, item);

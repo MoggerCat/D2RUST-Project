@@ -31,15 +31,15 @@
 |   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 274–283 |
 |   6. 0x23 SetSkill (`0x0045DE10`) | 284–290 |
 |   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 291–334 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 335–348 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–386 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 387–401 |
-| Constants & data dependencies | 402–413 |
-| Randomness | 414–417 |
-| Edge cases & original bugs | 418–427 |
-| Test vectors | 428–453 |
-| Provenance | 454–479 |
-| Open questions | 480–514 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 335–362 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 363–400 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 401–415 |
+| Constants & data dependencies | 416–427 |
+| Randomness | 428–431 |
+| Edge cases & original bugs | 432–441 |
+| Test vectors | 442–467 |
+| Provenance | 468–493 |
+| Open questions | 494–528 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -345,6 +345,20 @@ level on a unit, toward a unit (0x99, the 16-byte form) or a point
    (client do / target, `audio/triggers.md` §8 r2).
 3. Model state written: none. One `SkillDo` output {unit key, target
    key or none, skill, level, x, y, v} for the client effect layer.
+4. **Client nova do (cltdofunc 25, `0x004E34E0(U, skill, level)`; REC-2185,
+   read in the 1.14d export, NOT implemented).** Skill row valid, class m =
+   `0x004F21B0` (`cltmissilea`) inside the missile count, else 0. Unit
+   flag 0x40 set. v = `0x00663270(m, level)` + `0x00646CA0(U, calc, skill,
+   level)`. Then the ring `0x004C70D0(U, U, m, −1, skill, level, v)`: 64
+   client creates (`0x004CD540`), record flags 3 (| 4 when v ≠ 0), owner and
+   source U, class m, target offsets i = 0…63 from tables `0x006DACC0` /
+   `0x006DABC0` (same values as the server ring, `skills/bodies-2.md`
+   §6.7); m = 176 toggles flag 0x4000. 1.14d's Frost Nova row has no
+   `ClientSend`, so these 64 client missiles (units 3/208…, each requesting
+   its `TravelSound` = novaice.wav through `0x004CD540`) are the only
+   Frost Nova missiles the client has; `Output::SkillDo` is consumed by the
+   audio layer only, so d2rs creates none and plays no novaice.wav
+   (audio-cast-frost-nova-sor: T 25 and T 65).
 
 ### 9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`)
 

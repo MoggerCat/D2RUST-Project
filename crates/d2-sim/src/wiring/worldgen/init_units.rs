@@ -529,6 +529,16 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     }
     /// `0x005DD250(unit, 1)`: AI control flags |= `flag` (`umod-init-bodies.md`
     /// §4 r4); a unit without an AI control writes nothing.
+    /// §19.5: give and assign the aura skill (`0x0056DEB0`, `0x005701B0`).
+    fn give_aura(&mut self, unit: UnitId, skill: u16, level: i32) {
+        let mut sim = Sim {
+            game: &mut *self.game,
+            units: &mut *self.v.units,
+            stats: &mut *self.v.stats,
+            data: self.v.data,
+        };
+        X::monster_right_aura(&mut *self.v.h, &mut sim, unit, i32::from(skill), level);
+    }
     fn set_ai_flag(&mut self, unit: UnitId, flag: u16) {
         if let Some(c) = self.v.h.ai.as_mut().and_then(|ai| ai.control_mut(unit)) {
             c.flags |= flag;

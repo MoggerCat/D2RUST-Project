@@ -993,6 +993,15 @@ impl Pending for LocalSeams {
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::monster_right_aura(h, sim, unit, skill, level);
+    }
     fn monster_sequence_frame(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::monster_sequence_frame(h, sim, unit);
     }
@@ -1291,10 +1300,9 @@ impl Pending for LocalSeams {
     fn object_quest_record(&self, _: UnitId) -> bool {
         true
     }
-    /// d2rs-own, unverified (stitch-objects): the preview's interact reach.
-    fn object_preview_range(&self) -> Option<i32> {
-        Some(crate::world_view::object_click::INTERACT_RANGE)
-    }
+    // No preview reach: the 0x13 object case takes the interact range
+    // `0x00623660` and the server's walk on the path provider
+    // (`objects.md` §7.3; `interact-operate-stash`).
 }
 
 impl WorldPending for LocalSeams {

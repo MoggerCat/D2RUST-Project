@@ -278,6 +278,16 @@ impl<X: Pending> View<'_, X> {
         if self.h.paths.is_none() {
             return self.h.x.size(unit);
         }
+        // An object's size is its `objects.txt` `SizeX` (`path-placement.md`
+        // §3 table; `pathing.md` §3 step 6 lifts a sized target's footprint:
+        // `interact-operate-stash` frame 4, the run aims at the stash's own
+        // cell).
+        if let Some(r) = self.units.get(unit).filter(|r| r.ty == UnitType::Object) {
+            return self
+                .h
+                .object_footprint_shape(Some(r.ty), r.class)
+                .map_or(0, |s| s.size_x as i32);
+        }
         self.path_shape(unit).map_or(0, |s| s.size())
     }
 
