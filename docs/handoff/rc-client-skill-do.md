@@ -7,7 +7,7 @@ Base: claude/specs-staging-7 + claude/integ-r17, then staging with r18 (sync); a
 |---|---|---|
 | audio-cast-frost-nova-sor | voices 1.14d 12 / d2rs 10, paired 10, 2 differences (novaice.wav T 25, T 65); mixed 2/99 | voices 12 / 12, paired 12, **0 differences**; mixed 2/99 (unchanged, first at T 2) |
 | sor-frost-nova, sor-frost-nova-twice, sor-nova, gen-skill-sor-44, gen-skill-sor-48 (state) | 100% PARTIAL | 100% PARTIAL (no change) |
-| fxfrostnova render scenes (cast / flight / hit / later) | 14.8 / 14.3 / 14.2 / 15.5 % pixels, first diff tick 3 (frame.tsv row 5 level) | 19.1 / 17.3 / 16.6 / 15.4 %, first diff tick 3 (row 8 tile_origin_x) |
+| fxfrostnova render scenes (cast / flight / hit / later) | 14.8 / 14.3 / 14.2 / 15.5 % pixels (q-chk-render-effects run), first diff tick 3 (frame.tsv row 5 level) | 19.1 / 17.3 / 16.6 / 15.4 %, first diff tick 3 (row 8 tile_origin_x) |
 EQUAL count: 0 -> 0 (the audio check stays DIVERGED on the mixed channel only).
 
 ## What changed (read in re/exports-typed; spec: specs/client/msg-skills.md §11)
@@ -25,8 +25,7 @@ EQUAL count: 0 -> 0 (the audio check stays DIVERGED on the mixed channel only).
   (entry of r0/r1, `0x006439B0`). ClientUnit: `flag_40`, `action_frame`,
   `anim_events`; SkillRow: cltdofunc, cltmissile(a..c), cltcalc1,
   progressive, aurastate, aurastat1; PlayerAnim: events.
-- Probe: the two rings are units 3/208.. and 3/320.., as 1.14d's 3/208..271.
-- Private repo: 7 names appended to re/exports/names.tsv.
+- Probe: rings are units 3/208.., 3/320.. (1.14d 3/208..271). Private repo: 7 names in re/exports/names.tsv.
 
 ## Open
 - Effect render scenes: fxfrostnova re-run (fxnova not, same blocker): the
