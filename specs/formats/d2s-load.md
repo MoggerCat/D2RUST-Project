@@ -25,16 +25,16 @@
 |   2. Load effects (`0x0056B180`) | 92–118 |
 |   3. Join after the load: Iron Golem re-summon (`0x005394A0`) | 119–144 |
 |   4. Hotkey and mouse-skill item indices after a reload | 145–162 |
-|   5. Load failure: result codes and the message shown | 163–200 |
-|   6. Runeword items that no longer match (`0x00563470`) | 201–246 |
-|   7. Map seed restore in single player | 247–258 |
-|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 259–300 |
-| Constants & data dependencies | 301–305 |
-| Randomness | 306–310 |
-| Edge cases & original bugs | 311–319 |
-| Test vectors | 320–327 |
-| Provenance | 328–368 |
-| Open questions | 369–388 |
+|   5. Load failure: result codes and the message shown | 163–208 |
+|   6. Runeword items that no longer match (`0x00563470`) | 209–254 |
+|   7. Map seed restore in single player | 255–266 |
+|   8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3) | 267–308 |
+| Constants & data dependencies | 309–313 |
+| Randomness | 314–318 |
+| Edge cases & original bugs | 319–327 |
+| Test vectors | 328–335 |
+| Provenance | 336–376 |
+| Open questions | 377–396 |
 <!-- /index -->
 
 ## Summary
@@ -192,6 +192,14 @@ own sections are written "load §1", "load §2".
 
    The texts are the user's string tables' entries for these ids
    (`formats/tbl.md`); d2rs shows them by id and never stores them.
+2a. **Seen in the packets recording** (rc-audio-fmt-div, 2026-10-10, 1.14d under Wine,
+   `ScnAma` expansion Amazon, game difficulty Nightmare, Nightmare not unlocked,
+   internal code 13): the S→C stream holds only the join's first four packets (0x01
+   game flags with the difficulty byte 1, 0x00, 0x02 and the 33-byte 0x8F), no tick
+   after them and no 0xB4 record (the recorder's S→C hook does not see it). d2rs
+   refuses the same file in `play_start::resolve` with the same internal code 13
+   (`d2s.rs` offset 0x25) and writes no packets file, so a `packets` check of a
+   refused load cannot compare until d2rs's dump emits those four packets and stops.
 3. The join itself also refuses before or after the load
    (`0x00539760`): 0x18 when the game is classic and the client class
    is above 4, and after the load 0x17 / 0x18 (expansion status vs

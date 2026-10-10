@@ -32,9 +32,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 40 | 0 | 10 | 0 | 605 | 8 | 42 | 0 | 88–352 | 6 | 556 / 88 / 11 |
-| systems | 918 | 325 | 46 | 249 | 0 | 298 | 231 | 387 | 2 | 905.5–3558+ | 39 | 576 / 0 / 342 |
+| systems | 918 | 327 | 46 | 247 | 0 | 298 | 231 | 387 | 2 | 905.5–3558+ | 39 | 578 / 0 / 340 |
 | world | 826 | 40 | 0 | 40 | 0 | 746 | 11 | 64 | 5 | 173.5–534+ | 171 | 772 / 16 / 38 |
-| **all** | 4479 | 724 | 46 | 381 | 0 | 3328 | 394 | 745 | 12 | 1783–6748+ | 286 | 3616 / 364 / 499 |
+| **all** | 4479 | 726 | 46 | 379 | 0 | 3328 | 394 | 745 | 12 | 1783–6748+ | 286 | 3618 / 364 / 497 |
 
 ## By family
 
@@ -688,7 +688,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `system.death` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.difficulty` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.flows` | 19 | 2 | 4 | 1 | 0 | 12 | 0 | 0 | 7 | 0 | 0 | 0 |
-| `system.formats` | 74 | 43 | 12 | 13 | 0 | 6 | 3 | 0 | 68 | 0 | 12 | 0 |
+| `system.formats` | 74 | 45 | 12 | 11 | 0 | 6 | 3 | 0 | 68 | 0 | 12 | 0 |
 | `system.hireling` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.missiles` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `system.perf` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 14
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6257
+- Duplicate areas between parts: 6261
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1292,6 +1292,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s-appearance.2-token-lookup-0x0063d900`: rc-draw-row173.tsv:10 kept, rc-gen-formats.tsv:14 dropped
   - `system.formats.d2s-appearance.3-the-fill-0x0063e510-player-components-colours`: rc-draw-row173.tsv:11 kept, rc-gen-formats.tsv:15 dropped
   - `system.formats.d2s-appearance.6-colour-byte-0x0062c100-player-item-byte-0`: rc-draw-row173.tsv:12 kept, rc-gen-formats.tsv:18 dropped
+  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-audio-fmt-div.tsv:11 kept, rc-gen-formats.tsv:23 dropped
+  - `system.formats.d2s.10-errors`: rc-audio-fmt-div.tsv:12 kept, rc-gen-formats.tsv:28 dropped
   - `system.formats.dc6.file-header-24-bytes`: rc-draw-row173.tsv:13 kept, rc-gen-formats.tsv:30 dropped
   - `system.formats.dc6.frame`: rc-draw-row173.tsv:14 kept, rc-gen-formats.tsv:31 dropped
   - `system.formats.dc6.pixel-decoding`: rc-draw-row173.tsv:15 kept, rc-gen-formats.tsv:32 dropped
@@ -1311,6 +1313,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.dt1.file-header-276-bytes`: rc-draw-row173.tsv:29 kept, rc-gen-formats.tsv:46 dropped
   - `system.formats.dt1.tile-header-96-bytes-each-consecutive`: rc-draw-row173.tsv:30 kept, rc-gen-formats.tsv:47 dropped
   - `system.formats.dt1.unknown-and-runtime-fields`: rc-draw-row173.tsv:31 kept, rc-gen-formats.tsv:48 dropped
+  - `system.formats.font-tbl.glyph-records-14-bytes-each`: rc-audio-fmt-div.tsv:9 kept, rc-gen-formats.tsv:49 dropped
+  - `system.formats.font-tbl.header-12-bytes`: rc-audio-fmt-div.tsv:10 kept, rc-gen-formats.tsv:50 dropped
   - `system.formats.palette.dat-palette`: rc-draw-row173.tsv:32 kept, rc-gen-formats.tsv:51 dropped
   - `system.formats.palette.pl2-palette-transform`: rc-draw-row173.tsv:33 kept, rc-gen-formats.tsv:52 dropped
   - `system.formats.wav.1-header`: rc-audio-fmt-div.tsv:4 kept, rc-gen-formats.tsv:53 dropped
@@ -6565,7 +6569,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s-load.2-load-effects-0x0056b180`: rc-link-2.tsv:78 kept, systems.tsv:881 dropped
   - `system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005`: rc-gen-formats.tsv:21 kept, systems.tsv:882 dropped
   - `system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re`: rc-gen-formats.tsv:22 kept, systems.tsv:883 dropped
-  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-gen-formats.tsv:23 kept, systems.tsv:884 dropped
+  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-audio-fmt-div.tsv:11 kept, systems.tsv:884 dropped
   - `system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470`: rc-gen-formats.tsv:24 kept, systems.tsv:885 dropped
   - `system.formats.d2s-load.7-map-seed-restore-in-single-player`: rc-link-2.tsv:79 kept, systems.tsv:886 dropped
   - `system.formats.d2s-load.8-player-record-values-sent-at-the-join-sim-inte`: rc-link-2.tsv:80 kept, systems.tsv:887 dropped
@@ -6578,9 +6582,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s.7-stats-and-skills`: rc-run-2b.tsv:94 kept, systems.tsv:894 dropped
   - `system.formats.d2s.8-item-sections`: rc-run-2b.tsv:95 kept, systems.tsv:895 dropped
   - `system.formats.d2s.9-load-sequence-0x0056b180`: rc-link-2.tsv:82 kept, systems.tsv:896 dropped
-  - `system.formats.d2s.10-errors`: rc-gen-formats.tsv:28 kept, systems.tsv:897 dropped
-  - `system.formats.font-tbl.header-12-bytes`: rc-gen-formats.tsv:50 kept, systems.tsv:898 dropped
-  - `system.formats.font-tbl.glyph-records-14-bytes-each`: rc-gen-formats.tsv:49 kept, systems.tsv:899 dropped
+  - `system.formats.d2s.10-errors`: rc-audio-fmt-div.tsv:12 kept, systems.tsv:897 dropped
+  - `system.formats.font-tbl.header-12-bytes`: rc-audio-fmt-div.tsv:10 kept, systems.tsv:898 dropped
+  - `system.formats.font-tbl.glyph-records-14-bytes-each`: rc-audio-fmt-div.tsv:9 kept, systems.tsv:899 dropped
   - `system.formats.palette.dat-palette`: rc-draw-row173.tsv:32 kept, systems.tsv:900 dropped
   - `system.formats.palette.pl2-palette-transform`: rc-draw-row173.tsv:33 kept, systems.tsv:901 dropped
   - `system.formats.cof.header-28-bytes`: rc-draw-row173.tsv:7 kept, systems.tsv:902 dropped
@@ -10020,6 +10024,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.dt1.file-header-276-bytes` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/dt1.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.dt1.tile-header-96-bytes-each-consecutive` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/dt1.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.dt1.unknown-and-runtime-fields` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/dt1.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
+| `system.formats.font-tbl.glyph-records-14-bytes-each` | system | DIVERGED | M | DIVERGED@57 | yes | 0 | n | - | specs/formats/font-tbl.md | draws traces/checks/gen/gen-ui-char.check (rc-audio-fmt-div): the character panel draws its text as font glyph cels (CelDrawColor, facts-render.md r18), 98.4% of rows match; first divergence tick 57 draw row 195 (DrawLine) column x: 1.14d 724 vs d2rs 758, not a glyph row; glyph rows after it are uncompared until that is fixed (ui owner) |
+| `system.formats.font-tbl.header-12-bytes` | system | DIVERGED | M | DIVERGED@57 | yes | 0 | n | - | specs/formats/font-tbl.md | draws traces/checks/gen/gen-ui-char.check (rc-audio-fmt-div): the character panel draws its text as font glyph cels (CelDrawColor, facts-render.md r18), 98.4% of rows match; first divergence tick 57 draw row 195 (DrawLine) column x: 1.14d 724 vs d2rs 758, not a glyph row; glyph rows after it are uncompared until that is fixed (ui owner) |
 | `system.formats.palette.dat-palette` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/palette.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.palette.pl2-palette-transform` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/palette.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.wav.1-header` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
@@ -10419,11 +10425,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.d2s-appearance.5-body-armour-composite-branch-of-0x0063e510` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-appearance.md | NO-CHECK: needs equipped items on the character (helm/hands/armour) in a draws check |
 | `system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
 | `system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
-| `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
+| `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: 1.14d's refused load is visible in the packets channel (S->C stream ends after the join's first four packets, d2s-load.md section 5 r2a, Nightmare-not-unlocked game measured) but d2rs refuses earlier and writes no packets file; next: state-dump emits the 0x01/0x00/0x02/0x8F packets and stops on a refused load, then a check with `difficulty nightmare` per result code (d2s-tool --allow-locked builds the town-byte variants); the message text needs the frontend channel |
 | `system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
-| `system.formats.d2s.10-errors` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s.md | NO-CHECK: needs a corrupt save file; checks cannot supply one |
-| `system.formats.font-tbl.glyph-records-14-bytes-each` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/font-tbl.md | NO-CHECK: no channel compares text glyph draws |
-| `system.formats.font-tbl.header-12-bytes` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/font-tbl.md | NO-CHECK: no channel compares text glyph draws |
+| `system.formats.d2s.10-errors` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s.md | NO-CHECK: 1.14d's refused load is visible in the packets channel (S->C stream ends after the join's first four packets, d2s-load.md section 5 r2a, Nightmare-not-unlocked game measured) but d2rs refuses earlier and writes no packets file; next: state-dump emits the 0x01/0x00/0x02/0x8F packets and stops on a refused load, then a check with `difficulty nightmare` per result code (d2s-tool --allow-locked builds the town-byte variants); the message text needs the frontend channel |
 | `system.perf.budget` | system | NO-CHECK | S | - | ? | 0 | n | - | - | bench baselines exist (docs/handoff/bench-baselines.md); no 1.14d-side budget to compare, original timing is tick-based (tick.md) |
 | `system.render.blend-modes.8-lines-and-rectangles-gdi` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/blend-modes.md | no check: no generated scene reaches it by pokes |
 | `system.render.capture.1-configuration` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/capture.md | no check: tooling row (1.14d capture hooks); no scenario reaches it |
