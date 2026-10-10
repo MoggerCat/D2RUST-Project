@@ -82,7 +82,7 @@ pub fn run<X: SkillRest>(
         // The vitals' view is the action wiring's (`VitalsUnits` on its
         // `View`: unit records, stat lists, `Pending`'s refresh).
         Some(0x3A) => match vitals_t {
-            Some(t) => code(vitals::handle_add_stat_point(&mut w.u.cv.v, t, u, msg)),
+            Some(t) => code(vitals::handle_add_stat_point(&mut w.u.cv, t, u, msg)),
             None => ResultCode::Malformed,
         },
         Some(0x3B) => add_skill_point(w, skills, u, msg),
