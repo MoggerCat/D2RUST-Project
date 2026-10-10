@@ -1509,7 +1509,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-ai-desertturret | state | DIVERGED | 80/150 | frame 81 monster 1:8 class 348, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
 | gen-ai-gargoyletrap | state | DIVERGED | 30/150 | frame 31 monster 1:8 class 273, field d: 1.14d 49 vs d2rs 0 | unrouted |
 | gen-ai-genericspawner | state | DIVERGED | 30/150 | frame 31 monster 1:8 class 528, field s: 1.14d [2409280208, 8913528] vs d2rs [21370634, 838424606] | unrouted |
-| gen-ai-highpriest | state | DIVERGED | 85/150 | frame 86 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] | unrouted |
+| gen-ai-highpriest | state | PARTIAL | 150/150 | - | - |
 | gen-ai-mephisto | state | DIVERGED | 60/150 | frame 61 monster 1:8 class 242, field s: 1.14d [4285903474, 480484601] vs d2rs [1151986076, 1319447910] | unrouted |
 | gen-ai-navi | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 266, field s: 1.14d [4094205064, 1004892389] vs d2rs [2409280208, 8913528] | unrouted |
 | gen-ai-nihlathak | state | DIVERGED | 72/150 | frame 73 monster 1:8 class 526, field s: 1.14d [3163442939, 446165621] vs d2rs [4094205064, 1004892389] | unrouted |
@@ -1821,11 +1821,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-su-12 | state | DIVERGED | 53/150 | frame 54 player 0:1 class 0, field m: 1.14d 19 vs d2rs 5 | unrouted |
 | gen-su-15 | state | DIVERGED | 42/150 | frame 43 game, field seed: 1.14d [3692043304, 618654564] vs d2rs [1483255534, 419929858] | unrouted |
 | gen-su-18 | state | PARTIAL | 150/150 | - | - |
-| gen-su-26 | state | DIVERGED | 67/150 | frame 68 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-26 | state | PARTIAL | 150/150 | - | - |
 | gen-su-27 | state | PARTIAL | 150/150 | - | - |
-| gen-su-28 | state | DIVERGED | 68/150 | frame 69 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
-| gen-su-29 | state | DIVERGED | 91/150 | frame 92 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] | unrouted |
-| gen-su-30 | state | DIVERGED | 105/150 | frame 106 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-28 | state | PARTIAL | 150/150 | - | - |
+| gen-su-29 | state | PARTIAL | 150/150 | - | - |
+| gen-su-30 | state | PARTIAL | 150/150 | - | - |
 | gen-su-31 | state | PARTIAL | 150/150 | - | - |
 | gen-su-34 | state | DIVERGED | 72/150 | frame 73 monster 1:10 class 299, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | gen-su-37 | state | DIVERGED | 65/150 | frame 66 game, field seed: 1.14d [1996604610, 653070085] vs d2rs [1565768481, 650785885] | unrouted |
@@ -1833,7 +1833,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-su-56 | state | DIVERGED | 102/150 | frame 103 monster 1:10 class 463/455, field cl: 1.14d 463 vs d2rs 455 | unrouted |
 | gen-su-6 | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] | unrouted |
 | gen-su-60 | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 526, field s: 1.14d [4285903474, 480484601] vs d2rs [3163442939, 446165621] | unrouted |
-| gen-su-63 | state | DIVERGED | 68/150 | frame 69 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [85, 666] | unrouted |
+| gen-su-63 | state | PARTIAL | 150/150 | - | - |
 | gen-su-65 | state | PARTIAL | 150/150 | - | - |
 | gen-su-8 | state | DIVERGED | 79/150 | frame 80 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [1944982531, 35] | unrouted |
 | gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 282 | unrouted |
@@ -1950,3 +1950,4 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-missile-546 | packets | MATCH | 70/70 | - | - |
 | gen-missile-546 | rng | DIVERGED | 39/71 | frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None | unrouted |
 | gen-missile-546 | state | PARTIAL | 70/70 | - | - |
+| gen-boss-544 | state | PARTIAL | 150/150 | - | - |
