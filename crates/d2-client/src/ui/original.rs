@@ -294,6 +294,9 @@ struct Shared {
     cursor_step_owed: std::cell::Cell<bool>,
     /// The host clock set by the app ([`OriginalUi::set_host_now`]).
     host_now: std::cell::Cell<Option<u32>>,
+    /// A jump move the cursor machine already took
+    /// ([`OriginalUi::cursor_jump_moved`]).
+    cursor_moved_now: std::cell::Cell<Option<Point>>,
     /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
     /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
     client_quest: [u8; 96],
@@ -439,7 +442,11 @@ impl OriginalUi {
                 has_hireling: false,
                 has_belt: false,
             },
-            mouse: Point::new(0, 0),
+            // `ui/panels-3.md` §23 r3: the cursor init sets the mouse to
+            // (W / 2, H / 2) of the 640 × 480 front end, the position the
+            // cursor jump of `ui/panels.md` §4 r3 reads until the first move
+            // (measured: `ui-draws-inv-char-tip-ama`, (320, 240) → (120, 237)).
+            mouse: Point::new(320, 240),
             outputs: Vec::new(),
             input_reset: false,
             clear_automap: false,
@@ -467,6 +474,7 @@ impl OriginalUi {
             client_seed: None,
             cursor_step_owed: std::cell::Cell::new(false),
             host_now: std::cell::Cell::new(None),
+            cursor_moved_now: std::cell::Cell::new(None),
             client_quest: [0; 96],
             level_names: Vec::new(),
             horadric_start: Default::default(),
@@ -759,10 +767,24 @@ impl OriginalUi {
         self.shared.borrow().states.open_mode()
     }
 
+    /// The mouse move a cursor jump causes (`ui/panels.md` §4 r3): the
+    /// original handles the `WM_MOUSEMOVE` of its `SetCursorPos` in the same
+    /// message pump, before the pass's frame, so the cursor machine takes
+    /// it now (§23 r4); the queued [`UiEvent::CursorMoved`] that brings it
+    /// to the other handlers skips the machine.
+    pub fn cursor_jump_moved(&mut self, at: Point, world: &ClientWorld) {
+        self.cursor_event(UiEvent::CursorMoved(at), world);
+        let sh = self.shared.borrow();
+        sh.cursor_moved_now.set(Some(at));
+    }
+
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
         self.refresh_facts(world);
-        self.cursor_event(e, world);
+        let taken = self.shared.borrow().cursor_moved_now.take();
+        if !matches!((e, taken), (UiEvent::CursorMoved(p), Some(q)) if p == q) {
+            self.cursor_event(e, world);
+        }
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
             // d2rs-own (PROVISIONAL, REC-707): a move or a press tracks

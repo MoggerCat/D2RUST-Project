@@ -334,6 +334,10 @@ pub struct WorldViewUi {
     /// The window lost the focus since the last pass (`ui/controls.md`
     /// §4.3 r3): the held world buttons are released.
     focus_lost: bool,
+    /// A `play --input` script drives the pointer (no window pointer): a
+    /// cursor jump then queues the mouse move the original's
+    /// `SetCursorPos` causes instead of moving the window cursor.
+    scripted: bool,
 }
 
 impl WorldViewUi {
@@ -349,6 +353,7 @@ impl WorldViewUi {
             cursor: None,
             last_at: crate::ui::Point::new(0, 0),
             focus_lost: false,
+            scripted: false,
         }
     }
 
@@ -918,6 +923,20 @@ fn ui_input(
     Ok(())
 }
 
+/// `GetSystemMetrics(SM_CYFIXEDFRAME)` of the windowed (`-w`) game the
+/// checks record: the border height `0x00468770` leaves out.
+const WINDOW_FRAME_Y: i32 = 3;
+
+/// The mouse move a cursor jump to `at` causes in the windowed game
+/// (`ui/panels.md` §4 r3, `0x00468770`): `SetCursorPos(window left +
+/// SM_CXFIXEDFRAME + x, window top + SM_CYCAPTION + y)` misses the top
+/// border, so the next `WM_MOUSEMOVE` reports (x, y − SM_CYFIXEDFRAME)
+/// (measured 2026-10-10: `ui-draws-inv-char-ama` (790, 10) → (590, 7),
+/// `ui-draws-inv-char-tip-ama` (320, 240) → (120, 237)).
+pub fn cursor_jump_move(at: crate::ui::Point) -> crate::ui::Point {
+    crate::ui::Point::new(at.x, at.y - WINDOW_FRAME_Y)
+}
+
 /// `play --input` (`facts-render.md` §5 r11): the script's events, once
 /// per new server tick, into the UI queue in place of the window pointer.
 fn script_input(
@@ -929,6 +948,7 @@ fn script_input(
     let (Some(mut ui), Some(mut script)) = (ui, script) else {
         return;
     };
+    ui.scripted = true;
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || tick == *last {
         return;
@@ -1103,13 +1123,24 @@ fn world_view_frame(
                 ui.original.as_mut(),
             )?;
             if let Some(original) = ui.original.as_mut() {
-                // The cursor jump of §4.3: warp the window cursor.
-                if let (Some(at), Ok(mut window)) =
-                    (original.take_cursor_warp(), windows.single_mut())
-                {
-                    if let Ok(pos) = edge::frame_to_window(&window, at) {
-                        window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                // The cursor jump of `ui/panels.md` §4 r3 (`0x00468770`):
+                // the window cursor moves; a scripted pointer gets the
+                // mouse move that move causes at the next pass.
+                match (original.take_cursor_warp(), ui.scripted) {
+                    (Some(at), true) => {
+                        let moved = cursor_jump_move(at);
+                        original.cursor_jump_moved(moved, bridge.0.world());
+                        ui.queue.0.push(UiEvent::CursorMoved(moved));
+                        ui.cursor = Some(FramePos::Inside(moved));
                     }
+                    (Some(at), false) => {
+                        if let Ok(mut window) = windows.single_mut() {
+                            if let Ok(pos) = edge::frame_to_window(&window, at) {
+                                window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                            }
+                        }
+                    }
+                    (None, _) => {}
                 }
                 let outcome = original.take_outcome();
                 for e in &outcome.effects {
@@ -1758,5 +1789,18 @@ mod schedule_tests {
         assert!(FrameSchedule::parse(&gap).is_err());
         assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
         assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod cursor_jump_tests {
+    use super::cursor_jump_move;
+    use crate::ui::Point;
+
+    // Covers: specs/ui/panels.md §4 r3
+    #[test]
+    fn the_jump_move_misses_the_top_border() {
+        assert_eq!(cursor_jump_move(Point::new(590, 10)), Point::new(590, 7));
+        assert_eq!(cursor_jump_move(Point::new(120, 240)), Point::new(120, 237));
     }
 }

@@ -344,9 +344,15 @@ fn conflict_table_vectors() {
     assert_eq!(u.ui.open_mode().get(), 1);
     let fx = u.ui.take_outcome().effects;
     assert_eq!(fx[0], UiEffect::Closed(1));
-    assert_eq!(
-        *fx.last().unwrap(),
-        UiEffect::OpenMode(OpenMode::new(1).unwrap())
+    // The mode change, then only the cursor jump of §4 r3 (the mouse
+    // starts at the cursor init's (320, 240), §23 r3).
+    let mode = fx
+        .iter()
+        .rposition(|e| *e == UiEffect::OpenMode(OpenMode::new(1).unwrap()))
+        .expect("mode 1");
+    assert!(
+        matches!(fx[mode + 1..], [] | [UiEffect::CursorX(_)]),
+        "{fx:?}"
     );
 }
 
