@@ -503,6 +503,33 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         }
         self.v.h.object_drops = Some(d);
     }
+    /// `init.md` §11: the monprop property assignment `0x0065FD70` on the
+    /// unit ([`crate::wiring::economy::monster_property`]); without the
+    /// drop state (no item tables) nothing is written.
+    fn apply_property(&mut self, unit: UnitId, prop: i32, par: i32, min: i32, max: i32) {
+        let Some(d) = self.v.h.object_drops.take() else {
+            return;
+        };
+        {
+            let mut sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::monster_property(
+                &mut *self.v.h,
+                &mut sim,
+                &d,
+                unit,
+                prop,
+                par,
+                min,
+                max,
+            );
+        }
+        self.v.h.object_drops = Some(d);
+    }
     /// `init.md` §14.3 ([`crate::wiring::economy::tier_code`]); without
     /// the drop state the code stays.
     fn item_tier_code(&mut self, code: [u8; 4], difficulty: u8) -> [u8; 4] {
