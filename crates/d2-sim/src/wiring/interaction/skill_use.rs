@@ -562,9 +562,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.x().state_mask(u, mask)
     }
     /// `0x00622C40(a, d, 0x00622870(a))` (the action wiring's seams).
+    /// `0x00622C40(unit, target, moving)` (`skills/use.md` §3 step 6): the
+    /// third argument is `0x00622DC0(target)`, whether the target is in a
+    /// moving mode (`0x00622D00`), 0 or 1.
     fn in_melee_range(&self, u: UnitId, target: UnitId) -> bool {
-        let x = self.x();
-        x.in_melee_range(u, target, x.melee_range(u))
+        use crate::combat::CombatWorld;
+        let moving = i32::from(self.cv.moving_mode(target));
+        self.cv.in_melee_range(u, target, moving)
     }
 
     /// Unit +0x10.
@@ -752,6 +756,7 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         let v = &mut self.cv.v;
         v.stats.free_state_list(&mut *v.h, u, u32::from(state));
         v.set_state(u, state, false);
+        BodyWorld::queue_update(self, u);
     }
     /// `0x0056FF10`, the aura select's non-immediate branch (`use.md`
     /// §7): state on (`0x00639DB0`); the state's list (`0x006256B0`, else
@@ -1158,7 +1163,20 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         self.xm().passive_refresh(u);
     }
+    /// `0x0056DE40(unit)`: the passive refresh `0x00646F20`, then for a
+    /// player the skill resync `0x00575900` (read 1.14d; shout, battle
+    /// orders and battle command re-send the passives' states, `bar-battle-command`).
     fn buff_refresh(&mut self, u: UnitId) {
+        BodyWorld::passive_refresh(self, u);
+        if self
+            .cv
+            .v
+            .units
+            .get(u)
+            .is_some_and(|r| r.ty == UnitType::Player)
+        {
+            BodyWorld::skill_resync(self, u);
+        }
         self.xm().buff_refresh(u);
     }
     fn skill_resync(&mut self, u: UnitId) {
@@ -1279,6 +1297,46 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                 None => self.cv.v.h.unit_source.remove(&m),
             };
             return;
+        }
+        // `0x005A4850(game, m, umod, arg)` (`bodies.md` §6.2 step 8: the
+        // summon's `sumumod`, arg 1 = unique; `init.md` §14.1): on the
+        // lent monster world.
+        if let bodies::BodyEffect::Umod { m, umod, arg } = e {
+            if let Ok(umod) = u8::try_from(umod) {
+                let cv = &mut self.cv;
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                cv.v.h.assign_umod_arg(&mut sim, m, umod, arg != 0);
+            }
+            return;
+        }
+        // `0x0058EF40(control, params)` (`monsters/ai.md` §8): the command
+        // {type, x, y, tx, ty} inserted before the current one, which it
+        // becomes (the Blade Sentinel's walk, `bodies-2.md` §4.11 step 7).
+        if let bodies::BodyEffect::AiCommand {
+            m,
+            kind,
+            x,
+            y,
+            tx,
+            ty,
+        } = e
+        {
+            if let Some(c) = self.cv.v.h.ai.as_mut().and_then(|s| s.control_mut(m)) {
+                let at = c.cur.min(c.commands.len());
+                c.commands.insert(
+                    at,
+                    crate::monsters::ai::AiCommand {
+                        params: [kind, x, y, tx, ty],
+                    },
+                );
+                c.cur = at;
+                return;
+            }
         }
         if let bodies::BodyEffect::WaitThink { m, frames } = e {
             let game = &mut *self.cv.game;

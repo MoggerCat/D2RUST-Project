@@ -145,6 +145,13 @@ pub trait ViewFeed: ViewSource {
     /// a tick already updated changes nothing. The default has no weather.
     fn weather_update(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) {}
 
+    /// The level's `Rain` and `Mud` flags the weather runs on (the
+    /// rendering facts' `rain` / `snow`, `render/capture.md` §3.4); `None`
+    /// without weather or a level.
+    fn level_weather(&self) -> Option<(bool, bool)> {
+        None
+    }
+
     /// A check run follows the recorded frame schedule
     /// (`tools/scenario-diff.md`): the weather runs only in drawn frames,
     /// with no replay of client updates without one. The default has no
@@ -158,6 +165,12 @@ pub trait ViewFeed: ViewSource {
     /// walks, dead records removed, kind-2 caches built and kept). The
     /// default builds no light map and leaves the list alone.
     fn light_frame(&mut self, _world: &ClientWorld, _lights: &mut LightList) {}
+
+    /// The light quality `q` (`render/lighting.md` §5) of the next light
+    /// passes: a check run's recorded value (it follows the host's wall
+    /// clock and draw rate), `None` for the feed's own. The default has
+    /// no light pass.
+    fn set_light_quality(&mut self, _q: Option<u8>) {}
 
     /// The facts of a room unit the draw order reads (`draw-order.md` §3
     /// r4, §5) that the client model does not hold: unit flags (+0xC4),

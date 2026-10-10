@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+item.drop.quest-kill-order	system	items	Game.exe 0x00543A30 kill parse inside the kill (after the TC drop)	specs/world/quests.md	draft	items-drops-nor-09,items-drops-nor-12	DIVERGED	yes	1	n	claude/rc-drops-order	DIVERGED	M	rc-drops-order: the quest kill parse (Radament ass, Hephasto hfh) ran after the tick, so its drop missed the client pass queue walk and was announced after the TC items; now run at the end of tick step 4 (before the client pass); nor-09/-12 items 8/8 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed]

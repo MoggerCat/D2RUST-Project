@@ -511,7 +511,7 @@ pub fn dump<W: Write>(
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
         if let Some(h) = input.as_mut() {
-            for l in h.apply(&mut bridge, last_frame)? {
+            for l in h.apply_with(&mut bridge, last_frame, &mut |b, e| ui.route(b, e))? {
                 eprintln!("input: {l}");
                 input_notes.push(format!("input: {l}"));
             }
@@ -935,6 +935,10 @@ pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
 /// it. Audio and effects outputs have no consumer here.
 struct DialogUi {
     ui: crate::ui::original::OriginalUi,
+    /// The root the panels are installed in: `--input` events go through
+    /// it first, as `play`'s `run_ui_with` does (a panel key or a click on
+    /// the control panel is taken there, not by the world).
+    root: crate::ui::root::UiRoot,
     /// The UI errors met, once each (footer notes).
     notes: Vec<String>,
 }
@@ -950,10 +954,43 @@ impl DialogUi {
         };
         let ui = crate::ui::original::OriginalUi::new(config, None)
             .map_err(|e| anyhow::anyhow!("original UI: {e:?}"))?;
+        let mut root = crate::ui::root::UiRoot::new(Box::new(crate::ui::NoPanelRules));
+        ui.install(&mut root)
+            .map_err(|e| anyhow::anyhow!("original UI install: {e:?}"))?;
         Ok(Self {
             ui,
+            root,
             notes: Vec::new(),
         })
+    }
+
+    /// The `--input` events of a pass through the panels; the events no
+    /// panel took (for the world handlers).
+    fn route(
+        &mut self,
+        bridge: &mut Bridge<DumpLink>,
+        events: Vec<crate::ui::UiEvent>,
+    ) -> Result<Vec<crate::ui::UiEvent>, crate::bridge::BridgeError> {
+        use crate::world_view::ui_bind::{run_ui_with, UiQueue, UiRunError};
+        let mut q = UiQueue(events.clone());
+        match run_ui_with(
+            &mut self.root,
+            &mut q,
+            bridge,
+            &crate::ui::panel::NoStrings,
+            Some(&mut self.ui),
+        ) {
+            Ok(f) => Ok(f.unhandled),
+            Err(UiRunError::Bridge(e)) => Err(e),
+            Err(UiRunError::Original(e)) => {
+                let note = format!("ui: {e}");
+                if !self.notes.contains(&note) {
+                    eprintln!("{note}");
+                    self.notes.push(note);
+                }
+                Ok(events)
+            }
+        }
     }
 
     fn deliver(&mut self, bridge: &mut Bridge<DumpLink>, outputs: &[Output]) -> Result<()> {

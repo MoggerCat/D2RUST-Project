@@ -668,7 +668,9 @@ def write_frame_schedule(raw, out):
     frame (server tick `f`), with the host clock of its cursor step: the
     cursor's `last_step` captured at the start of the next frame (the
     capture reads the cursor at frame start, `render/capture.md` §3.3),
-    `-` for the last frame (its step follows every compared draw); the
+    `-` for the last frame (its step follows every compared draw); the light quality and the
+    pointer position of the frame (host inputs: the pointer after a panel's cursor jump,
+    `ui/panels-3.md` §4.3, is where the OS put it); the
     cursor's `last_step` and `idle_since` at the first frame. A capture
     without them fails the check: d2rs never falls back to its own clock."""
     import json
@@ -689,10 +691,14 @@ def write_frame_schedule(raw, out):
         raise CheckError(f"{raw}: no captured frame: no frame schedule for d2rs")
     c0 = frames[0]["cursor"]
     rows = ["# frame-schedule 1", f"# cursor_last {c0['last_step']}",
-            f"# cursor_idle {c0['idle_since']}", "tick\tnow"]
+            f"# cursor_idle {c0['idle_since']}", "tick\tnow\tquality\tcursor_x\tcursor_y"]
     for i, r in enumerate(frames):
         now = frames[i + 1]["cursor"]["last_step"] if i + 1 < len(frames) else "-"
-        rows.append(f"{r['f']}\t{now}")
+        q = (r.get("light") or {}).get("quality")
+        cur = r.get("cursor") or {}
+        cx, cy = cur.get("x"), cur.get("y")
+        rows.append(f"{r['f']}\t{now}\t{'-' if q is None else q}\t"
+                    f"{'-' if cx is None else cx}\t{'-' if cy is None else cy}")
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
 

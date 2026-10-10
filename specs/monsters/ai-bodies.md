@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–1039 |
+|   9. Per-AI behaviours | 29–1046 |
 <!-- /index -->
 
 ## Summary
@@ -335,7 +335,14 @@ unsigned. "Walk to (x, y)" = `0x005DED90`; "walk step 0" = `0x005DEF30`
 AI params 0–2 come from NPC messages: `0x00548B00` (interaction start,
 `world/npc.md` §2) sets param 0 := 40; `0x0054CA10` (C→S 0x59
 MakeEntityMove, `sim/client-messages.tsv`: unit type, GUID, x, y) sets
-param 0 := 40 and params 1, 2 := x, y; both stop the path and schedule a think at +1 (`ai.md` §1.2). Param 1 is
+param 0 := 40 and params 1, 2 := x, y; both stop the path and schedule a think at +1 (`ai.md` §1.2). Entry of `0x0054CA10` (read in the 1.14d export, rc-sim-combat-div;
+`NpcControl::make_entity_move`): size 17, else result 3; unit type (u32@1)
+> 5 → 2; the unit of type and GUID (u32@5) missing, at `0x00641530`
+distance ≥ 51 from the player, or of a class without monstats `npc` and
+`interact` → 1; else clear its path, cancel its type-2 events and
+schedule one at frame + 1, then AI params 0, 1, 2 := 40, x (u32@9), y
+(u32@13); result 0. Replay check: `town-ama-10k` frame 611 (Kashya, after
+the player's 0x59 at frame 600) is equal over all 10,000 frames. Param 1 is
 also the greeting countdown of step 6 (one field, two uses: kept).
 Effect of param 0 := 40 (every C→S 0x13 within distance 50,
 `0x00548D4A`): the next 40 thinks take step 4; while param 0 > 36 (the

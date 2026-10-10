@@ -749,6 +749,12 @@ pub struct ClientWorld {
     /// callback (`rooms.md` §5 rule 9) runs over it for every new active
     /// room.
     pub lights: LightList,
+    /// Each unit's cast light, held in its stat list (`0x00643A00`,
+    /// `render/lighting.md` §8 r3), apart from the unit's own light
+    /// (`+0x64`, e.g. the player light): the mode requests and the client
+    /// skill end detach and remove only this one (`client/model.md` §8
+    /// rule 4). No model rule creates one yet.
+    pub cast_lights: BTreeMap<UnitKey, crate::rules::lighting::records::LightId>,
     /// The unit origin of the last drawn frame (`render/camera.md` §3,
     /// §4), read by the client missile function 2
     /// (`missiles/client.md` §C13); set by the play app on each drawn
@@ -913,6 +919,7 @@ impl ClientWorld {
         for id in lit {
             let _ = self.lights.remove(id);
         }
+        self.cast_lights.remove(&key);
         // The unit free leaves the room list (`unit-order.md` §5 rule 6).
         self.room_units.leave(key);
         if self.local_player == Some(key) {

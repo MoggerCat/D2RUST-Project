@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–622 |
-|   4. Suite | 623–750 |
-| Constants & data dependencies | 751–754 |
-| Randomness | 755–758 |
-| Edge cases & original bugs | 759–794 |
-| Test vectors | 795–817 |
-| Provenance | 818–821 |
-| Open questions | 822–884 |
+|   3. Run | 145–629 |
+|   4. Suite | 630–757 |
+| Constants & data dependencies | 758–761 |
+| Randomness | 762–765 |
+| Edge cases & original bugs | 766–801 |
+| Test vectors | 802–824 |
+| Provenance | 825–828 |
+| Open questions | 829–891 |
 <!-- /index -->
 
 ## Summary
@@ -225,6 +225,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
       clock on any frame, or a schedule in which a frame other than the
       last lacks `now`, fails the check; d2rs never falls back to a clock
       of its own in a check run. Live play keeps the host clock.
+      An optional third column `quality` (2026-10-10, rc-ui-div /
+      rc-ui-pixels; `-` when not captured) holds the frame's light
+      quality (`light.quality`, `render/lighting.md` §5), which 1.14d
+      derives from the host clock and its measured draw rate, so it is a
+      recorded input too (under the debugger the rate falls to 1 and `q`
+      drops from 2 to 0 at about tick 16). The world view lights each
+      drawn tick with its row's `quality`; without one, its own `q` (2).
       Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
       the client seed matches the capture's `seed_start` of every frame
       through tick 25 and the rain lines (endpoints and colors) are equal
