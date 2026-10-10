@@ -1557,6 +1557,7 @@ fn merc_give_swaps_onto_the_hosts_hireling() {
     // Alive (`0x005541B0`): a player in mode 1.
     sim.events.sys.units.get_mut(p).unwrap().mode = 1;
     sim.events.sys.data.monsters = vec![d2_sim::units::hooks::MonsterInfo {
+        mode_chart: false,
         enabled: true,
         aidel: [15; 3],
         moves: 0,

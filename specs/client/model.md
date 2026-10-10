@@ -53,7 +53,7 @@
 | Edge cases & original bugs | 1895–1919 |
 | Test vectors | 1920–1977 |
 | Provenance | 1978–2083 |
-| Open questions | 2084–2289 |
+| Open questions | 2084–2298 |
 <!-- /index -->
 
 ## Summary
@@ -2154,6 +2154,15 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    the monster's own client path, which d2rs's model positions only
    sample); settled by REC-706 (a recording of the 1.14d client grid
    under a walking NPC).
+   *Revision (2026-10-10, q-fix-rd-misc, REC-1251 and REC-1565 settled
+   by a read of `0x004BC720`):* the private grids also carry each model
+   object's footprint while the client holds it (stamped by the 0x51 object init
+   when `HasCollision[mode]` is set, freed by `0x00623830`,
+   `client/msg-units.md` §1.3 r2), as its `SizeX` × `SizeY` box with the
+   objects footprint mask (`sim/path-placement.md` §3; 0x400 for a
+   torch), re-stamped with the monsters. Without them d2rs drew the
+   player through the Rogue Encampment torches (class 37) while the
+   server stopped short.
    *Recorded, REC-706* (2026-10-09, PC 1, Windows; scratch poll probe
    with no breakpoints, ScnAma `-seed 1234`, 46 distinct samples 30–50
    ms apart while Warriv (class 155) walks (4866, 4235) → (4870, 4231),

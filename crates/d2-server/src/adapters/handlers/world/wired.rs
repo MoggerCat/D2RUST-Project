@@ -131,6 +131,11 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
+    /// Ground items picked up by a move call (player, item), whose quest
+    /// hook ITEMPICKEDUP (event 4) runs after the tick
+    /// ([`Self::run_quest_events`]; PROVISIONAL, REC-1556: the original
+    /// calls it inside the pick-up).
+    pub(super) item_picks: Vec<(UnitId, UnitId)>,
     /// An approach arrival's 0x13 is running ([`WiredWorld::handler_work`]
     /// starts no approach for it).
     pub(super) arriving: bool,
@@ -206,6 +211,7 @@ impl<R, S> WiredWorld<R, S> {
             taken_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
+            item_picks: Vec::new(),
             arriving: false,
             start_extra: Vec::new(),
         }
@@ -701,6 +707,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             .as_mut()
             .map(std::mem::take)
             .unwrap_or_default();
+        // The summoned pet types (`hirelings.md` §6 rule 1) have their lists
+        // on the action hooks; the hireling's is the desk's below.
+        for &p in &q {
+            events.action().summon_follow(game, p);
+        }
         if q.is_empty() || self.state.hireling_tables.is_none() {
             return;
         }
@@ -1133,6 +1144,7 @@ where
             .hireling_tables
             .is_some()
             .then(|| self.state.hirelings.clone());
+        let mut picks = Vec::new();
         let out = self.with_economy(game, events, |econ, parts| {
             // d2rs-own, unverified (D1): the preview rest reads the
             // places staged here (`MoveRest::stage`).
@@ -1202,8 +1214,21 @@ where
                     }
                 }
             }
+            for (owner, guid) in inv.rest.take_picked_items() {
+                let Some(&(_, u)) = by_owner.iter().find(|(o, _)| *o == owner) else {
+                    continue;
+                };
+                if let Some(item) = econ
+                    .game
+                    .lists
+                    .find_unit(d2_sim::units::UnitType::Item, guid)
+                {
+                    picks.push((u, item));
+                }
+            }
             out
         });
+        self.item_picks.extend(picks);
         inv.state.hirelings = None;
         self.inventory = Some(inv);
         Some(out)

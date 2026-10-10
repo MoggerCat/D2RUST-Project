@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–478 |
-|   5. Client vitals sync (`0x00548760`) | 479–617 |
-| Constants & data dependencies | 618–634 |
-| Randomness | 635–638 |
-| Edge cases & original bugs | 639–650 |
-| Test vectors | 651–671 |
-| Provenance | 672–707 |
-| Open questions | 708–744 |
+|   4. Experience | 179–485 |
+|   5. Client vitals sync (`0x00548760`) | 486–624 |
+| Constants & data dependencies | 625–641 |
+| Randomness | 642–645 |
+| Edge cases & original bugs | 646–657 |
+| Test vectors | 658–678 |
+| Provenance | 679–714 |
+| Open questions | 715–751 |
 <!-- /index -->
 
 ## Summary

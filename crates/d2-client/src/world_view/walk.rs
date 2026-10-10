@@ -142,9 +142,11 @@ pub fn other_units(
         .collect()
 }
 
-/// The model's objects whose mode has collision (`HasCollision[mode]`
-/// ≠ 0, `sim/path-placement.md` §2.5) with an `objects` row: their
-/// footprint inputs (PROVISIONAL REC-1251, `bridge::client_path`).
+/// The model's objects whose footprint is on the client grid (stamped by
+/// the 0x51 object init `0x004BC720` when `HasCollision[mode]` ≠ 0, not
+/// yet freed by `0x00623830`: [`crate::bridge::world::ObjectData::footprint`],
+/// `msg-units.md` §1.3 r2) with an `objects` row: their footprint inputs
+/// (`bridge::client_path`).
 pub fn other_objects(
     world: &ClientWorld,
     rows: &[crate::bridge::objects::ObjClientRow],
@@ -152,17 +154,18 @@ pub fn other_objects(
     world
         .units
         .values()
-        .filter(|u| u.key.unit_type == crate::bridge::world::OBJECT)
+        .filter(|u| {
+            u.key.unit_type == crate::bridge::world::OBJECT
+                && matches!(&u.kind, crate::bridge::world::KindData::Object(d) if d.footprint)
+        })
         .filter_map(|u| {
             let (x, y) = u.position?;
             let r = rows.get(u.class as usize)?;
-            r.shape
-                .collides_in(u.mode)
-                .then_some(crate::bridge::client_path::OtherObject {
-                    x,
-                    y,
-                    shape: r.shape,
-                })
+            Some(crate::bridge::client_path::OtherObject {
+                x,
+                y,
+                shape: r.shape,
+            })
         })
         .collect()
 }

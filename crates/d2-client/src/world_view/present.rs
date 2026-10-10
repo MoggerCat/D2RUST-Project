@@ -1225,6 +1225,13 @@ fn world_view_frame(
         None => None,
     };
     if !draw {
+        // A new tick whose draw waits for the GPU still is a client
+        // update: the weather steps (REC-1900).
+        if !state.last.is_some_and(|l| l.server_tick == tick) {
+            state
+                .feed
+                .weather_update(bridge.0.world(), &mut state.assets);
+        }
         return Ok(());
     }
     if let Some(d) = drawn.as_deref_mut() {

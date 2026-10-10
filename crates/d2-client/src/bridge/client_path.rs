@@ -107,9 +107,9 @@ pub struct OtherUnit {
     pub interact: bool,
 }
 
-/// An object of the model whose mode has collision (`HasCollision[mode]`
-/// ≠ 0): its sub-tile and footprint inputs (`sim/path-placement.md` §3,
-/// §2.5).
+/// An object of the model whose footprint is on the client grid
+/// (`client/msg-units.md` §1.3 r2): its sub-tile and footprint inputs
+/// (`sim/path-placement.md` §3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OtherObject {
     pub x: u16,
@@ -159,16 +159,11 @@ impl ClientPath {
             add_footprint(&mut rooms, &fp);
             self.others.push(fp);
         }
-        // PROVISIONAL (`client/msg-units.md` §1.3 r2, `world/objects-client.md`
-        // §25 r9; REC-1251): the client object init `0x004BC720` stamps
-        // the object's footprint as the server's add does
-        // (`sim/path-placement.md` §2.5: `HasCollision[mode]`, box
-        // `SizeX` × `SizeY`, §3 mask), and the client's frees
-        // (`0x00623830`, door open, mode 1 → 2) leave it on exactly while
-        // `HasCollision[mode]` ≠ 0; settled by a recording of the 1.14d
-        // client grid at a colliding object (`cold-plains-2` soak: the
-        // server player stops at class 370 at (5128, 5150), the client
-        // path walked through it).
+        // `client/msg-units.md` §1.3 r2 (read of `0x004BC720`; REC-1251,
+        // REC-1565): the 0x51 object init stamps the footprint with the
+        // server's stamp `0x00620A70` (box `SizeX` × `SizeY`, the §3 mask)
+        // when `HasCollision[mode]` ≠ 0; `0x00623830` frees it. The
+        // callers pass the objects holding it (`world_view::walk::other_objects`).
         for o in objects {
             let (x, y) = (i32::from(o.x), i32::from(o.y));
             let Some(room) = room_at(drlg, x, y) else {

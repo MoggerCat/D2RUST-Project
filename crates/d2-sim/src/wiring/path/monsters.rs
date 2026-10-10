@@ -22,7 +22,9 @@ use crate::path::walk::Step;
 use crate::path::DynamicPath;
 use crate::tick::events::event;
 use crate::units::hooks::Sim;
-use crate::units::modes::{monster_mode, monster_moves, MONSTER_MODES};
+use crate::units::modes::{
+    monster_mode, monster_moves, MONSTER_MODES, TRAPPED_SOUL_END_A, TRAPPED_SOUL_END_S,
+};
 use crate::units::record::flags as unit_flags;
 use crate::units::{UnitId, UnitType};
 use crate::wiring::action::unit_update::anim_complete;
@@ -386,6 +388,10 @@ impl<X: Pending> ActionHooks<X> {
                 true
             }
             S3_EVENT1 => true,
+            TRAPPED_SOUL_END_A | TRAPPED_SOUL_END_S => {
+                self.with_ai(sim, |g, cx| ai::trapped_soul_end(g, cx, unit));
+                true
+            }
             _ => return None,
         };
         Some(started)
