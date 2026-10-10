@@ -548,6 +548,8 @@ pub struct Headless {
     /// The pending interaction of a click on a unit out of reach
     /// ([`PreviewInteract`], as `play`'s preview).
     interact: PreviewInteract,
+    /// The hover pick of the previous pass (`ClickView::prev_hover`).
+    prev_pick: Option<crate::bridge::world::UnitKey>,
     /// The local player's walk prediction (the walks its link records,
     /// the charstats speeds), as `play` keeps it (`world_view::walk`):
     /// the click reads the predicted position.
@@ -588,6 +590,7 @@ impl Headless {
             bindings,
             run: Default::default(),
             interact: PreviewInteract::default(),
+            prev_pick: None,
             walk: None,
         })
     }
@@ -814,6 +817,7 @@ impl Headless {
             game_menu_open: false,
             pick: true,
             shake: (0, 0),
+            prev_hover: Some(self.prev_pick),
         }
     }
 
@@ -835,7 +839,12 @@ impl Headless {
             Some(c) => unit_point(world, c, sel),
             None => Err("no local player".into()),
         });
+        // The pass's draw: the hover under the cursor, seen by the next press.
+        let next_pick = cam
+            .as_ref()
+            .and_then(|c| crate::bridge::hover::pick(world, c, (self.mouse.x, self.mouse.y)));
         if events.is_empty() && !self.holding() {
+            self.prev_pick = next_pick;
             return Ok(log);
         }
         let toggle = UiEvent::Action(ActionId(Action::ToggleRun.index() as u16));
@@ -854,6 +863,7 @@ impl Headless {
         )?;
         let pressed = events.iter().any(|e| matches!(e, UiEvent::Press { .. }));
         self.interact.note(&outs, pressed);
+        self.prev_pick = next_pick;
         super::swap_key::send_swaps(&events, bridge)?;
         super::swap_key::send_says(&events, bridge)?;
         Ok(log)
@@ -1235,20 +1245,43 @@ mod tests {
             assert_eq!(h.pending(), 0);
         }
 
-        // Covers: specs/tools/scenario-diff.md §3 r8
+        // Covers: specs/tools/scenario-diff.md §2 r5, §3 r8
         #[test]
         fn headless_click_on_a_monsters_body_picks_it() {
             let (mut b, link) = scene();
             let cam = script_camera(b.world(), None).unwrap();
             // 40 rows above the feet: the cell under the point is not the
-            // monster's, the hover box (hover::pick) still holds it.
+            // monster's, the hover box (hover::pick) still holds it. The
+            // cursor moves a frame before the press (1.14d hovers while it
+            // draws).
+            let (fx, fy) = unit_feet(&cam, MONSTER, (110, 100));
+            let script = format!(
+                "frame 1; move {fx} {}; frame 2; click {fx} {}",
+                fy - 40,
+                fy - 40
+            );
+            let mut h = Headless::new(parse(&script).unwrap()).unwrap();
+            h.apply(&mut b, 0).unwrap();
+            h.apply(&mut b, 1).unwrap();
+            let sent = link.sent.lock().unwrap();
+            assert_eq!(sent.len(), 1, "{sent:?}");
+            assert_eq!(sent[0][5..9], 10u32.to_le_bytes(), "{sent:?}");
+        }
+
+        // Covers: specs/tools/scenario-diff.md §2 r5
+        #[test]
+        fn headless_press_in_the_pass_of_its_move_is_a_point_click() {
+            let (mut b, link) = scene();
+            let cam = script_camera(b.world(), None).unwrap();
             let (fx, fy) = unit_feet(&cam, MONSTER, (110, 100));
             let script = format!("frame 1; click {fx} {}", fy - 40);
             let mut h = Headless::new(parse(&script).unwrap()).unwrap();
             h.apply(&mut b, 0).unwrap();
             let sent = link.sent.lock().unwrap();
-            assert_eq!(sent.len(), 1, "{sent:?}");
-            assert_eq!(sent[0][5..9], 10u32.to_le_bytes(), "{sent:?}");
+            assert!(
+                sent.iter().all(|m| m[0] != 0x06),
+                "no skill on a unit nothing hovered: {sent:?}"
+            );
         }
 
         // Covers: specs/ui/controls.md §7 r2, §7 r3

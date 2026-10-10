@@ -18,6 +18,11 @@ use super::world::{ClientWorld, UnitKey};
 
 /// Half the box width, in screen pixels. d2rs-own, unverified.
 pub const HIT_HALF_WIDTH: i32 = 24;
+/// Half the box width of an object: its sprite (a waypoint stone, a chest)
+/// is wider than a unit's. PROVISIONAL (REC-2116): 1.14d hit-tests the drawn
+/// sprite pixels (`0x00467A10`); the Act I waypoint click path of the
+/// scene scripts hovers the waypoint 28 px from its feet. d2rs-own, unverified.
+pub const HIT_HALF_WIDTH_OBJECT: i32 = 48;
 /// How far the box reaches above the feet. d2rs-own, unverified.
 pub const HIT_ABOVE: i32 = 96;
 /// How far the box reaches below the feet. d2rs-own, unverified.
@@ -70,7 +75,12 @@ pub fn pick(world: &ClientWorld, cam: &Camera, mouse: (i32, i32)) -> Option<Unit
         }
         let (fx, fy) = unit_feet(cam, key.unit_type, cell);
         let (dx, dy) = (mouse.0 - fx, mouse.1 - fy);
-        if dx.abs() > HIT_HALF_WIDTH || !(-HIT_ABOVE..=HIT_BELOW).contains(&dy) {
+        let half = if key.unit_type == 2 {
+            HIT_HALF_WIDTH_OBJECT
+        } else {
+            HIT_HALF_WIDTH
+        };
+        if dx.abs() > half || !(-HIT_ABOVE..=HIT_BELOW).contains(&dy) {
             continue;
         }
         let d = dx.abs() + dy.abs();
