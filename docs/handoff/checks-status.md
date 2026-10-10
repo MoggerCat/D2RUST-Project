@@ -18,6 +18,8 @@ Rows of 192 checks (the 5 save-* checks of the half cannot run: suite.py has no 
 Rows of 35 checks re-run 2026-10-10 by rc-c008-monmode on claude/rc-c008-monmode (`suite.py --filter <C008 list> --orig-cache traces/orig-cache --no-playthrough`): rows replaced in place, totals not recomputed.
 
 Rows of 240 checks re-run 2026-10-10 by rc-promote (`suite.py --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough --json`, the checks of the PARTIAL/DIVERGED rows plus every gen-sysc-*): rows replaced in place, the totals above are not recomputed.
+
+Rows of 44 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, the passiveitype layer and the right aura at join): rows replaced in place, the totals above are not recomputed.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
 First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q-scenes-compare 8, q-prov-recording-2 3, q-fix-server-store-fill 2, q-fix-b-monster-combat 1, q-fix-pc1-proto-items 1
@@ -417,40 +419,56 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-blade-fury | state | PARTIAL | 70/70 | - | - |
 | ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | q-fix-seed-order |
 | ass-blade-shield | state | PARTIAL | 70/70 | - | - |
+| ass-blade-shield | packets | MATCH | 70/70 | - | - |
 | ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
+| ass-blades-of-ice | packets | MATCH | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
 | ass-charged-bolt-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-claws-of-thunder | state | PARTIAL | 70/70 | - | - |
+| ass-claws-of-thunder | packets | MATCH | 70/70 | - | - |
 | ass-cloak-of-shadows | state | PARTIAL | 70/70 | - | - |
+| ass-cloak-of-shadows | packets | MATCH | 70/70 | - | - |
 | ass-cobra-strike | state | PARTIAL | 70/70 | - | - |
+| ass-cobra-strike | packets | MATCH | 70/70 | - | - |
 | ass-death-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-dragon-claw | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-claw | packets | MATCH | 70/70 | - | - |
 | ass-dragon-flight | state | PARTIAL | 70/70 | - | - |
 | ass-dragon-tail | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-tail | packets | MATCH | 70/70 | - | - |
 | ass-dragon-talon | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-talon | packets | MATCH | 70/70 | - | - |
 | ass-fade | state | PARTIAL | 70/70 | - | - |
 | ass-fire-blast | state | PARTIAL | 70/70 | - | - |
 | ass-fists-of-fire | state | PARTIAL | 70/70 | - | - |
+| ass-fists-of-fire | packets | MATCH | 70/70 | - | - |
 | ass-inferno-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry-hit | state | PARTIAL | 160/160 | - | - |
 | ass-lightning-sentry-kill | state | PARTIAL | 160/160 | - | - |
 | ass-mind-blast | state | PARTIAL | 70/70 | - | - |
+| ass-mind-blast | packets | MATCH | 70/70 | - | - |
 | ass-passives | state | PARTIAL | 70/70 | - | - |
+| ass-passives | packets | MATCH | 70/70 | - | - |
 | ass-psychic-hammer | state | PARTIAL | 70/70 | - | - |
 | ass-royal-strike | state | PARTIAL | 70/70 | - | - |
+| ass-royal-strike | packets | MATCH | 70/70 | - | - |
 | ass-shadow-master | state | DIVERGED | 47/70 | frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 | unrouted |
 | ass-shadow-warrior | state | PARTIAL | 70/70 | - | - |
 | ass-shock-field | state | PARTIAL | 70/70 | - | - |
 | ass-tiger-strike | state | PARTIAL | 70/70 | - | - |
+| ass-tiger-strike | packets | MATCH | 70/70 | - | - |
 | ass-venom | state | PARTIAL | 70/70 | - | - |
+| ass-venom | packets | MATCH | 70/70 | - | - |
 | ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
 | autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
 | bar-battle-command | packets | DIVERGED | 67/70 | frame 2 stream s2c #72 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) | q-fix-join-items |
 | bar-battle-command | state | DIVERGED | 27/70 | frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 | q-fix-join-items |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
+| bar-battle-orders | packets | MATCH | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
+| bar-war-cry | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) | q-fix-join-items |
 | bar-whirlwind | state | PARTIAL | 70/70 | - | - |
 | bar-whirlwind-unit | packets | DIVERGED | 64/70 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
@@ -1139,43 +1157,69 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | net-s2c-townportal | packets | MATCH | 50/50 | - | - |
 | packets-town-arrival-ama | packets | MATCH | 40/40 | - | - |
 | pal-blessed-aim | state | PARTIAL | 70/70 | - | - |
+| pal-blessed-aim | packets | MATCH | 70/70 | - | - |
 | pal-blessed-hammer | state | PARTIAL | 70/70 | - | - |
+| pal-blessed-hammer | packets | MATCH | 70/70 | - | - |
 | pal-charge | state | PARTIAL | 70/70 | - | - |
 | pal-cleansing | state | PARTIAL | 70/70 | - | - |
+| pal-cleansing | packets | MATCH | 70/70 | - | - |
 | pal-concentration | state | PARTIAL | 70/70 | - | - |
+| pal-concentration | packets | MATCH | 70/70 | - | - |
 | pal-conversion | state | PARTIAL | 70/70 | - | - |
+| pal-conversion | packets | MATCH | 70/70 | - | - |
 | pal-conviction | state | PARTIAL | 70/70 | - | - |
+| pal-conviction | packets | MATCH | 70/70 | - | - |
 | pal-defiance | state | PARTIAL | 70/70 | - | - |
+| pal-defiance | packets | MATCH | 70/70 | - | - |
 | pal-fanaticism | state | PARTIAL | 70/70 | - | - |
+| pal-fanaticism | packets | MATCH | 70/70 | - | - |
 | pal-fist-of-the-heavens | state | PARTIAL | 70/70 | - | - |
-| pal-hammer-rat | packets | DIVERGED | 129/130 | frame 50 stream s2c #0 bytes[6]: 1.14d 0 vs d2rs 24 (id 0x69) | q-fix-join-items |
+| pal-fist-of-the-heavens | packets | MATCH | 70/70 | - | - |
 | pal-hammer-rat | state | PARTIAL | 130/130 | - | - |
+| pal-hammer-rat | packets | MATCH | 130/130 | - | - |
 | pal-holy-bolt | state | PARTIAL | 70/70 | - | - |
+| pal-holy-bolt | packets | MATCH | 70/70 | - | - |
 | pal-holy-fire | state | PARTIAL | 70/70 | - | - |
+| pal-holy-fire | packets | MATCH | 70/70 | - | - |
 | pal-holy-freeze | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holy-freeze | state | PARTIAL | 70/70 | - | - |
 | pal-holy-shield | state | PARTIAL | 70/70 | - | - |
+| pal-holy-shield | packets | MATCH | 70/70 | - | - |
 | pal-holy-shock | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holy-shock | state | PARTIAL | 70/70 | - | - |
-| pal-holyfire | packets | DIVERGED | 118/120 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holyfire | state | PARTIAL | 120/120 | - | - |
+| pal-holyfire | packets | MATCH | 120/120 | - | - |
 | pal-holyfire-noclick | state | PARTIAL | 120/120 | - | - |
 | pal-meditation | state | PARTIAL | 70/70 | - | - |
+| pal-meditation | packets | MATCH | 70/70 | - | - |
 | pal-might | state | PARTIAL | 70/70 | - | - |
+| pal-might | packets | MATCH | 70/70 | - | - |
 | pal-prayer | state | PARTIAL | 70/70 | - | - |
+| pal-prayer | packets | MATCH | 70/70 | - | - |
 | pal-redemption | state | PARTIAL | 70/70 | - | - |
+| pal-redemption | packets | MATCH | 70/70 | - | - |
 | pal-resist-cold | state | PARTIAL | 70/70 | - | - |
+| pal-resist-cold | packets | MATCH | 70/70 | - | - |
 | pal-resist-fire | state | PARTIAL | 70/70 | - | - |
+| pal-resist-fire | packets | MATCH | 70/70 | - | - |
 | pal-resist-lightning | state | PARTIAL | 70/70 | - | - |
+| pal-resist-lightning | packets | MATCH | 70/70 | - | - |
 | pal-sacrifice | state | PARTIAL | 70/70 | - | - |
+| pal-sacrifice | packets | MATCH | 70/70 | - | - |
 | pal-salvation | state | PARTIAL | 70/70 | - | - |
+| pal-salvation | packets | MATCH | 70/70 | - | - |
 | pal-sanctuary | packets | DIVERGED | 65/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-sanctuary | state | PARTIAL | 70/70 | - | - |
 | pal-smite | state | PARTIAL | 70/70 | - | - |
+| pal-smite | packets | MATCH | 70/70 | - | - |
 | pal-thorns | state | PARTIAL | 70/70 | - | - |
+| pal-thorns | packets | MATCH | 70/70 | - | - |
 | pal-vengeance | state | PARTIAL | 70/70 | - | - |
+| pal-vengeance | packets | MATCH | 70/70 | - | - |
 | pal-vigor | state | PARTIAL | 70/70 | - | - |
+| pal-vigor | packets | MATCH | 70/70 | - | - |
 | pal-zeal | state | PARTIAL | 70/70 | - | - |
+| pal-zeal | packets | MATCH | 70/70 | - | - |
 | poke-fallen-town | state | PARTIAL | 54/54 | - | - |
 | poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
 | poke-firebolt | state | PARTIAL | 60/60 | - | - |
@@ -1342,22 +1386,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-npc-tyrael2 | state | PARTIAL | 50/50 | - | - |
 | gen-npc-warriv1 | packets | MATCH | 50/50 | - | - |
 | gen-npc-warriv1 | state | PARTIAL | 50/50 | - | - |
-| ass-blade-shield | packets | MATCH | 70/70 | - | - |
-| ass-blades-of-ice | packets | MATCH | 70/70 | - | - |
-| ass-claws-of-thunder | packets | MATCH | 70/70 | - | - |
-| ass-cloak-of-shadows | packets | MATCH | 70/70 | - | - |
-| ass-cobra-strike | packets | MATCH | 70/70 | - | - |
-| ass-dragon-claw | packets | MATCH | 70/70 | - | - |
-| ass-dragon-tail | packets | MATCH | 70/70 | - | - |
-| ass-dragon-talon | packets | MATCH | 70/70 | - | - |
-| ass-fists-of-fire | packets | MATCH | 70/70 | - | - |
-| ass-mind-blast | packets | MATCH | 70/70 | - | - |
-| ass-passives | packets | MATCH | 70/70 | - | - |
-| ass-royal-strike | packets | MATCH | 70/70 | - | - |
-| ass-tiger-strike | packets | MATCH | 70/70 | - | - |
-| ass-venom | packets | MATCH | 70/70 | - | - |
-| bar-battle-orders | packets | MATCH | 70/70 | - | - |
-| bar-war-cry | packets | MATCH | 70/70 | - | - |
 | gen-shrine-1 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-10 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-11 | packets | MATCH | 120/120 | - | - |

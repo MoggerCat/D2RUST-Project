@@ -30,15 +30,15 @@
 |   6. Full values | 230–295 |
 |   7. Value-change notification | 296–332 |
 |   8. Chain operations | 333–440 |
-|   9. States | 441–479 |
-|   10. Timer event handlers | 480–572 |
-|   11. Mod array and stat messages | 573–610 |
-| Constants & data dependencies | 611–622 |
-| Randomness | 623–626 |
-| Edge cases & original bugs | 627–650 |
-| Test vectors | 651–687 |
-| Provenance | 688–711 |
-| Open questions | 712–742 |
+|   9. States | 441–482 |
+|   10. Timer event handlers | 483–575 |
+|   11. Mod array and stat messages | 576–613 |
+| Constants & data dependencies | 614–625 |
+| Randomness | 626–629 |
+| Edge cases & original bugs | 630–653 |
+| Test vectors | 654–690 |
+| Provenance | 691–714 |
+| Open questions | 715–745 |
 <!-- /index -->
 
 ## Summary
@@ -451,7 +451,10 @@ have no states.
 Set or clear bit s. If it changed: set bit s of the second half; if the
 state has flag `disguise` (states flag bit 16): on → unit +0xC8 |= 8;
 off → clear it unless another disguise state is still on (`0x0063A7B0`).
-`0x00639E30` sets or clears a second-half bit only.
+`0x00639E30`(unit, s, on) sets or clears second-half bit s only (no
+toggle), when the unit has the state bits and s is below the states
+count, and then inserts the unit into the update queue (`0x0064C040`,
+both branches; read 2026-10-10, `0x00639E30`).
 
 `0x00639DB0`(unit, s, on): s outside 0 … states count − 1 → nothing
 (no toggle, no queue). Else the toggle above, then the update-queue
