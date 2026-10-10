@@ -241,8 +241,10 @@ Rules beyond the table:
    store item (guid 8, magic, prefix 1156 Beryl, suffix 552 "of Teeth",
    ilvl 6; `mod1` charged, param 67, min −60, max −10) has level
    (6 − 1) / 9 = 0 → 1, c = 60 + 60/8 = 67, layer 0x10C1 (67 << 6 + 1).
-   1.14d shows 67 / 67 because of the recharge. d2rs shows 65 (its
-   creation roll, r = 56) because its play host's recharge is a stub. The
+   1.14d shows 67 / 67 because of the recharge. d2rs showed 65 (its
+   creation roll, r = 56) while its play host's recharge was a stub; now
+   `VendorDesk::recharge` sets every stat-204 entry to its maximum
+   (rc-net-div C014, `items-vendor-akara-buy` packets MATCH). The
    item seeds are equal and the draw order is not involved (the magic
    routine's order is confirmed in `items/affixes.md` §6).
 10. **20:** add stat 152 := 1 (when itemstatcost has > 152 rows). Return 1.

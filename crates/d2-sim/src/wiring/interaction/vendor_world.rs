@@ -11,7 +11,7 @@
 use super::npc_vendors::VendorDesk;
 use super::NpcRest;
 use super::{InteractionError, PlayerQuestsRef};
-use crate::items::{create::CreateError, ItemRequest};
+use crate::items::{create::CreateError, recharge, ItemRequest};
 use crate::stats::{key_layer, key_stat};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::{UnitId, UnitType};
@@ -402,7 +402,31 @@ where
                 .collect(),
         })
     }
+    /// The store repair's recharge `0x0055FE80` (`generation.md` §12.2,
+    /// called from `0x00576231`): each stat-204 entry of the item's
+    /// extended list below its maximum is set to it, so a store item
+    /// shows current = maximum. A store item has no inventory of its own.
     fn recharge(&mut self, item: UnitId) {
+        let econ = &mut *self.desk.econ;
+        let stats = &*econ.stats;
+        let entries: Vec<(u16, i32)> = stats
+            .unit_list(item)
+            .filter(|&l| stats.is_extended(l))
+            .map(|l| {
+                stats
+                    .full_entries(l)
+                    .into_iter()
+                    .filter(|&(k, _)| key_stat(k) == recharge::CHARGED_SKILL)
+                    .map(|(k, v)| (key_layer(k), v))
+                    .take(64)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut sets = Vec::new();
+        recharge::recharge(&entries, |k, m| sets.push((k, m)));
+        for (k, m) in sets {
+            let _ = econ.with_item(item, |s| recharge::set_charges(&mut s.item.stats, k, m));
+        }
         self.desk.rest.recharge(item);
     }
     fn repair_broken(&mut self, item: UnitId) {
