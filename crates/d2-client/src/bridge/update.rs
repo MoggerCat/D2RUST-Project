@@ -177,6 +177,7 @@ fn c_missiles(
     super::client_missiles::tick_just_hit(world);
     // PROVISIONAL REC-546: the unit footprints the missiles read.
     super::client_missiles::stamp_unit_footprints(world, &inputs.tables.monsters);
+    super::client_missiles::stamp_object_footprints(world, &inputs.objclient.rows);
     for key in objects::c_order(world, super::world::MISSILE) {
         let env = super::client_missiles::Env {
             rows: &inputs.tables.missiles,

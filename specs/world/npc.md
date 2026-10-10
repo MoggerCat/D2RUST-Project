@@ -38,16 +38,16 @@
 |   4. Menu actions (C→S 0x38) | 299–357 |
 |   5. Healing on chat open | 358–393 |
 |   6. Cain identify (C→S 0x34) | 394–422 |
-|   7. Mercenaries | 423–546 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 547–626 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 627–660 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 661–672 |
-| Constants & data dependencies | 673–685 |
-| Randomness | 686–698 |
-| Edge cases & original bugs | 699–774 |
-| Test vectors | 775–798 |
-| Provenance | 799–849 |
-| Open questions | 850–908 |
+|   7. Mercenaries | 423–549 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 550–629 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 630–663 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 664–675 |
+| Constants & data dependencies | 676–688 |
+| Randomness | 689–701 |
+| Edge cases & original bugs | 702–777 |
+| Test vectors | 778–801 |
+| Provenance | 802–852 |
+| Open questions | 853–911 |
 <!-- /index -->
 
 ## Summary
@@ -514,9 +514,12 @@ Handler `0x0054BC00`: expansion game and size 5, else 3; `0x00579C00
    greiz, asheara, tyrael2, qual-kehk → code 9.
 2. Dead hireling of the player (`0x00574EC0(7, 1)`) missing → code 9.
    `(7, 1)` returns the first hireling node dead or alive; 1.14d does
-   not test the dead bit (edge case 11). d2rs: a living node is
-   answered like a missing one (code 9, nothing changed;
-   `world/hirelings.md` edge case 5).
+   not test the dead bit (edge case 11): a living node is revived too
+   (rc-pkt-handwritten, REC-3374; recorded in
+   `traces/checks/hire-resurrect-*.check`, a hireling with life poked to
+   0 that never died: the cost, 0x9B and 0x2A code 5 follow as for a dead
+   one; the earlier d2rs code-9 policy, `world/hirelings.md` edge case 5,
+   is withdrawn).
 3. cost = min((L·L / 2)·15, 50000), L = mercenary level (stat 12),
    signed division, unsigned cap (`0x006637B0`). Pay → else code 12.
 4. Clear unit flag 0x10000, mode 1, life := max, revive `0x00579AA0`

@@ -97,7 +97,9 @@ def cel_file(c, celfiles, compfiles):
     if c.get("file") not in (None, "0x0"):
         return canon(celfiles.get(c["file"]))
     name = comp_name(c.get("tokens"))
-    return canon(compfiles.get(name.lower())) if name else None
+    if name:
+        return canon(compfiles.get(name.lower()))
+    return canon(c["cache_path"]) if c.get("cache_path") else None  # an item graphic (§2 r3)
 
 
 def draw_row(i, d, celfiles, compfiles, sprites):
@@ -136,10 +138,19 @@ def draw_row(i, d, celfiles, compfiles, sprites):
         size = sprites.get((f, c.get("dir"), c.get("frame"))) if f else None
         if sprite:
             size = sprite[3:]
+        if size is None and h:  # the header in memory is measured even when the file is not named
+            size = [str(h[k]) for k in ("w", "h", "xoff", "yoff")]
         r.update(zip(("w", "h", "xoff", "yoff"), size or [UNK] * 4))
         if op == "CelDraw":  # (X, Y, light, mode, palette): capture.md §8 cursor vector
             r.update(light=hex32(a[2] if len(a) > 2 else None), mode=val(a[3] if len(a) > 3 else None),
                      pal="0" if len(a) > 4 and a[4] == 0 else UNK)
+        elif op == "CelDrawColor":  # (X, Y, light, mode, colour index k): ui/text.md §4 r1
+            r.update(light=hex32(a[2] if len(a) > 2 else None), mode=val(a[3] if len(a) > 3 else None),
+                     pal=val(a[4] if len(a) > 4 else None))
+        elif op == "CelDrawEx":  # (X, Y, rows skipped, rows drawn, mode): ui/control-panel.md §3
+            r.update(mode=val(a[4] if len(a) > 4 else None), light=NA, pal=NA)
+        elif op == "CelDrawClipped":  # (X, Y, clip, mode): ui/automap.md §9
+            r.update(mode=val(a[3] if len(a) > 3 else None), light=NA, pal=NA)
         else:  # argument positions of the other cel wrappers are not specified
             r.update(mode=UNK, light=UNK, pal=UNK)
     elif op in RECT_OPS:  # §2 r6: RECT*, color
@@ -323,7 +334,7 @@ def selftest():
          "46", "-13", "7", "?", "?", "?", "-", "0x4dbd00"],
         ["6", "DrawLine", "-", "-", "-", "-", "596", "151", "-", "-", "-", "-", "185", "-", "-", "-", "0x47368e"],
         ["7", "CelDrawEx", "data/global/ui/cursor/protate.dc6", "0", "1", "-", "29", "587", "?", "?", "?", "?",
-         "?", "?", "?", "-", "0x4ff100"],
+         "5", "-", "-", "-", "0x4ff100"],
     ]
     assert draws == want, "\n".join("\t".join(r) for r in draws)
     assert [s[0] for s in sprites] == ["data/global/chars/am/lg/amlglittn1ht.dcc",

@@ -387,8 +387,23 @@ impl VendorRest for AppRest {
 }
 
 impl QuestRest for AppRest {
+    /// Everything but the host-only marks of the queue walk (`GROUND_ITEM_MARK`,
+    /// `PLAYER_ITEMS_MARK`, `PLAYER_SOUND_MARK`), which the tick's `take_sent`
+    /// turns into the real item / sound messages and so stay queued.
     fn drain_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-        std::mem::take(&mut self.sent)
+        use d2_sim::wiring::action::{GROUND_ITEM_MARK, PLAYER_ITEMS_MARK, PLAYER_SOUND_MARK};
+        let (marks, out): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.sent)
+                .into_iter()
+                .partition(|(_, b)| {
+                    b.len() == 5
+                        && matches!(
+                            b[0],
+                            GROUND_ITEM_MARK | PLAYER_ITEMS_MARK | PLAYER_SOUND_MARK
+                        )
+                });
+        self.sent = marks;
+        out
     }
     fn client_save_flags(&self, p: UnitId) -> Option<u16> {
         self.save_flags.get(&p).copied()

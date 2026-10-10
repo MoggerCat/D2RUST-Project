@@ -1098,6 +1098,8 @@ where
         self.lend_quests(events, |_, ev| d2_sim::tick::tick_through_timers(game, ev));
         self.collect_sent(events);
         self.timer_step_work(game, events);
+        self.run_kill_events(game, events);
+        self.collect_sent(events);
         self.lend_quests(events, |_, ev| {
             d2_sim::tick::tick_from_client_pass(game, ev)
         });

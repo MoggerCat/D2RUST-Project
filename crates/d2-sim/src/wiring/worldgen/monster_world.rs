@@ -96,6 +96,19 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         init::assign_umod(&t.init(), &mut wh, unit, umod, false);
     }
 
+    fn assign_umod_arg(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        umod: u8,
+        unique: bool,
+    ) {
+        let t = self.tables.clone();
+        let mut wh = host(sim, h, self);
+        init::assign_umod(&t.init(), &mut wh, unit, umod, unique);
+    }
+
     fn forget(&mut self, unit: UnitId) {
         WorldState::forget(self, unit);
     }

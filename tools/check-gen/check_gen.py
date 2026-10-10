@@ -269,9 +269,6 @@ def fam_mon(ctx):
                         [f"Monster class {hc} ({ident}, AI {ai}) spawned normal next to the "
                          "player: its spawn state and its idle and think frames."])
         c.channels = "state rng"
-        # the player's quest list (q) and the game seed differ on every check of every
-        # family at frame 2 / 30 (harness level, not the monster): not compared here
-        c.lines = ["ignore q seed"] + c.lines
         c.extra = {"class": hc, "id": ident}
         out.append(c)
     return out
