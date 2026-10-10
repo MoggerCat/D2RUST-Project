@@ -7,7 +7,7 @@
 use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
-use super::bodies::{a1, param, pct, run_bonus, set_param};
+use super::bodies::{a1, param, pct, roll, run_bonus, set_param};
 use super::bodies2::reinstall;
 use super::bodies3::{skill_range, STATE_INFERNO};
 use super::common::*;
@@ -476,6 +476,109 @@ pub(super) fn home_point<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, u: UnitId) -> 
         k = find_command(cx, u, 10, false);
     }
     k.and_then(|k| command_mut(cx, u, k).map(|c| (c.params[1], c.params[2])))
+}
+
+/// Special state 13 (`0x005E5C50`, the Countess-only state installed by
+/// `monsters/init.md` §20 step 5): keeps the unit at its home point.
+/// Spec: specs/monsters/ai-bodies-2.md §17.
+pub fn special_state_13<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    u: UnitId,
+    p: &TickParam,
+) {
+    let Some(t) = p.target else {
+        return;
+    };
+    let Some(room) = game.lists.unit(u).and_then(|e| e.room()) else {
+        return;
+    };
+    let _ = room;
+    // 1. The home point; a missing record is copied from the own position
+    // (`0x0058EF40`), a record with a zero coordinate is overwritten by it.
+    let (ox, oy) = cx.world.position(u);
+    let _ = home_point(cx, u);
+    let Some(k) = find_command(cx, u, 10, false) else {
+        return;
+    };
+    let (mut hx, mut hy) = command_mut(cx, u, k).map_or((0, 0), |c| (c.params[1], c.params[2]));
+    if hx == 0 || hy == 0 {
+        if let Some(c) = command_mut(cx, u, k) {
+            c.params[1] = ox;
+            c.params[2] = oy;
+        }
+        (hx, hy) = (ox, oy);
+    }
+    // "Velocity (1, 0, 0)" written to the record directly (`0x005A6260`).
+    let head_home = |game: &mut Game, cx: &mut Ctx<'_, W>| -> bool {
+        cx.store.entry(u).velocity.method = 1;
+        if run_to_point(game, cx, u, hx, hy) {
+            return true;
+        }
+        delete_thinks(game, u);
+        false
+    };
+    // 2. Home in another room than the unit: run home.
+    let home_room = cx.world.room_at(game, u, hx, hy);
+    if home_room != cx.world.room_at(game, u, ox, oy) && head_home(game, cx) {
+        return;
+    }
+    // 3. The target in another room than home.
+    let (tx, ty) = cx.world.position(t);
+    if home_room != cx.world.room_at(game, u, tx, ty) {
+        if (ox, oy) == (hx, hy) {
+            if p.distance < 25 && state13_nodes(game, cx, u) {
+                return;
+            }
+            idle(game, cx, u, 10);
+            return;
+        }
+        if head_home(game, cx) {
+            return;
+        }
+    }
+    // 4. Too far from home (path distance, unsigned).
+    if path_distance(cx, u, hx, hy) as u32 > 0x28 && head_home(game, cx) {
+        return;
+    }
+    if state13_nodes(game, cx, u) {
+        return;
+    }
+    // 5. Fight or return to idle.
+    let r = roll(cx, u, 100);
+    if p.combat {
+        if r < cx.aip(p, 3) + 10 {
+            mode_at(game, cx, u, mode::ATTACK1, Some(t));
+        } else {
+            idle(game, cx, u, cx.aip(p, 2));
+        }
+    } else if r < cx.aip(p, 1) {
+        set_velocity(cx, u, 0, 100, 0);
+        run_to(game, cx, u, Some(t), 0);
+    } else {
+        idle(game, cx, u, cx.aip(p, 2));
+    }
+}
+
+/// `0x005E5B70`: the map-AI node walk of state 13. With no nodes (or all
+/// used) a 700-frame-old stamp resets the index; returns whether a node
+/// action started.
+// TODO(monsters/ai-bodies-2.md §17): the node action itself (a skill at the
+// node, `0x005DEAD0`) is not modelled; no scenario gives the Countess a
+// node list.
+fn state13_nodes<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) -> bool {
+    let len = cx
+        .store
+        .control(u)
+        .and_then(|c| c.map_ai.as_ref().map(Vec::len));
+    let idx = param(cx, u, 0);
+    if len.is_none_or(|n| n as i32 <= idx) {
+        if (game.frame.wrapping_sub(param(cx, u, 1))).abs() > 700 {
+            set_param(cx, u, 0, 0);
+        }
+        return false;
+    }
+    false
 }
 
 /// Which score a pick uses.
