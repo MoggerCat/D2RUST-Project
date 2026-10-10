@@ -31,10 +31,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 46 | 0 | 10 | 0 | 0 | 599 | 8 | 48 | 0 | 100–400 | 6 | 556 / 88 / 11 |
+| skills | 655 | 46 | 0 | 10 | 0 | 0 | 599 | 7 | 49 | 0 | 101.5–406 | 6 | 557 / 87 / 11 |
 | systems | 918 | 347 | 16 | 136 | 0 | 99 | 320 | 147 | 350 | 2 | 789.5–3094+ | 69 | 620 / 0 / 298 |
 | world | 826 | 39 | 0 | 40 | 0 | 0 | 747 | 11 | 63 | 5 | 171.5–526+ | 171 | 772 / 16 / 38 |
-| **all** | 4480 | 656 | 16 | 260 | 0 | 99 | 3449 | 282 | 638 | 12 | 1513–5668+ | 316 | 3714 / 311 / 455 |
+| **all** | 4480 | 656 | 16 | 260 | 0 | 99 | 3449 | 281 | 639 | 12 | 1514.5–5674+ | 316 | 3715 / 310 / 455 |
 
 ## By family
 
@@ -671,7 +671,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 2 | 0 | 0 | 0 | 0 | 28 | 0 | 0 | 2 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 8 | 0 | 0 | 0 | 0 | 22 | 0 | 0 | 8 | 0 | 0 | 15 |
-| `skill.bar` | 30 | 5 | 0 | 0 | 0 | 0 | 25 | 0 | 4 | 1 | 0 | 0 | 25 |
+| `skill.bar` | 30 | 5 | 0 | 0 | 0 | 0 | 25 | 0 | 3 | 2 | 0 | 0 | 24 |
 | `skill.dru` | 31 | 14 | 0 | 0 | 0 | 0 | 17 | 0 | 1 | 13 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2984
 - Rows set exercised = yes from the coverage reports' seen lists: 13
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6802
+- Duplicate areas between parts: 6819
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -5498,48 +5498,64 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.unit-order.7-client-list`: rc-combat-seed-2.tsv:17 kept, rc-sim-combat-div.tsv:47 dropped
   - `system.sim.unit-order.8-unit-timer-lists`: rc-combat-seed-2.tsv:18 kept, rc-sim-combat-div.tsv:48 dropped
   - `system.sim.unit-order.9-adjacent-room-arrays-dependency`: rc-combat-seed-2.tsv:19 kept, rc-sim-combat-div.tsv:49 dropped
-  - `skill.ass.blade-shield`: rc-a8-setstate.tsv:11 kept, rc-skill-div-a.tsv:3 dropped
-  - `skill.ass.blades-of-ice`: rc-a8-setstate.tsv:12 kept, rc-skill-div-a.tsv:4 dropped
-  - `skill.ass.claw-mastery`: rc-a8-setstate.tsv:13 kept, rc-skill-div-a.tsv:5 dropped
-  - `skill.ass.claws-of-thunder`: rc-a8-setstate.tsv:14 kept, rc-skill-div-a.tsv:6 dropped
-  - `skill.ass.cloak-of-shadows`: rc-a8-setstate.tsv:15 kept, rc-skill-div-a.tsv:7 dropped
-  - `skill.ass.cobra-strike`: rc-a8-setstate.tsv:16 kept, rc-skill-div-a.tsv:8 dropped
-  - `skill.ass.dragon-claw`: rc-a8-setstate.tsv:17 kept, rc-skill-div-a.tsv:9 dropped
-  - `skill.ass.dragon-tail`: rc-a8-setstate.tsv:18 kept, rc-skill-div-a.tsv:10 dropped
-  - `skill.ass.dragon-talon`: rc-a8-setstate.tsv:19 kept, rc-skill-div-a.tsv:11 dropped
-  - `skill.ass.fade`: rc-a8-setstate.tsv:20 kept, rc-skill-div-a.tsv:12 dropped
-  - `skill.ass.fists-of-fire`: rc-a8-setstate.tsv:21 kept, rc-skill-div-a.tsv:13 dropped
-  - `skill.ass.lightning-sentry`: rc-a8-setstate.tsv:22 kept, rc-skill-div-a.tsv:14 dropped
-  - `skill.ass.mind-blast`: rc-a8-setstate.tsv:23 kept, rc-skill-div-a.tsv:15 dropped
-  - `skill.ass.quickness`: rc-a8-setstate.tsv:24 kept, rc-skill-div-a.tsv:16 dropped
-  - `skill.ass.royal-strike`: rc-a8-setstate.tsv:25 kept, rc-skill-div-a.tsv:17 dropped
-  - `skill.ass.tiger-strike`: rc-a8-setstate.tsv:26 kept, rc-skill-div-a.tsv:18 dropped
-  - `skill.ass.venom`: rc-a8-setstate.tsv:27 kept, rc-skill-div-a.tsv:19 dropped
-  - `skill.ass.weapon-block`: rc-a8-setstate.tsv:28 kept, rc-skill-div-a.tsv:20 dropped
-  - `skill.bar.axe-mastery`: rc-a8-setstate.tsv:29 kept, rc-skill-div-a.tsv:21 dropped
-  - `skill.bar.bash`: rc-a8-setstate.tsv:30 kept, rc-skill-div-a.tsv:22 dropped
-  - `skill.bar.battle-cry`: rc-a8-setstate.tsv:31 kept, rc-skill-div-a.tsv:23 dropped
-  - `skill.bar.battle-orders`: rc-a8-setstate.tsv:32 kept, rc-skill-div-a.tsv:24 dropped
-  - `skill.bar.berserk`: rc-a8-setstate.tsv:33 kept, rc-skill-div-a.tsv:25 dropped
-  - `skill.bar.concentrate`: rc-a8-setstate.tsv:34 kept, rc-skill-div-a.tsv:26 dropped
-  - `skill.bar.double-swing`: rc-a8-setstate.tsv:35 kept, rc-skill-div-a.tsv:27 dropped
-  - `skill.bar.find-item`: rc-a8-setstate.tsv:37 kept, rc-skill-div-a.tsv:28 dropped
-  - `skill.bar.find-potion`: rc-a8-setstate.tsv:38 kept, rc-skill-div-a.tsv:29 dropped
-  - `skill.bar.frenzy`: rc-a8-setstate.tsv:39 kept, rc-skill-div-a.tsv:30 dropped
-  - `skill.bar.grim-ward`: rc-a8-setstate.tsv:40 kept, rc-skill-div-a.tsv:31 dropped
-  - `skill.bar.howl`: rc-a8-setstate.tsv:41 kept, rc-skill-div-a.tsv:32 dropped
-  - `skill.bar.increased-speed`: rc-a8-setstate.tsv:42 kept, rc-skill-div-a.tsv:33 dropped
-  - `skill.bar.increased-stamina`: rc-a8-setstate.tsv:43 kept, rc-skill-div-a.tsv:34 dropped
-  - `skill.bar.iron-skin`: rc-a8-setstate.tsv:44 kept, rc-skill-div-a.tsv:35 dropped
-  - `skill.bar.mace-mastery`: rc-a8-setstate.tsv:47 kept, rc-skill-div-a.tsv:36 dropped
-  - `skill.bar.natural-resistance`: rc-a8-setstate.tsv:48 kept, rc-skill-div-a.tsv:37 dropped
-  - `skill.bar.pole-arm-mastery`: rc-a8-setstate.tsv:49 kept, rc-skill-div-a.tsv:38 dropped
-  - `skill.bar.spear-mastery`: rc-a8-setstate.tsv:51 kept, rc-skill-div-a.tsv:39 dropped
-  - `skill.bar.stun`: rc-a8-setstate.tsv:52 kept, rc-skill-div-a.tsv:40 dropped
-  - `skill.bar.sword-mastery`: rc-a8-setstate.tsv:53 kept, rc-skill-div-a.tsv:41 dropped
-  - `skill.bar.taunt`: rc-a8-setstate.tsv:54 kept, rc-skill-div-a.tsv:42 dropped
-  - `skill.bar.throwing-mastery`: rc-a8-setstate.tsv:55 kept, rc-skill-div-a.tsv:43 dropped
-  - `skill.bar.war-cry`: rc-a8-setstate.tsv:56 kept, rc-skill-div-a.tsv:44 dropped
+  - `skill.ass.blade-fury`: rc-link-2-override.tsv:41 kept, rc-skill-div-a.tsv:3 dropped
+  - `skill.ass.blade-sentinel`: rc-run-1.tsv:151 kept, rc-skill-div-a.tsv:4 dropped
+  - `skill.ass.blade-shield`: rc-a8-setstate.tsv:11 kept, rc-skill-div-a.tsv:5 dropped
+  - `skill.ass.blades-of-ice`: rc-a8-setstate.tsv:12 kept, rc-skill-div-a.tsv:6 dropped
+  - `skill.ass.charged-bolt-sentry`: rc-link-2.tsv:119 kept, rc-skill-div-a.tsv:7 dropped
+  - `skill.ass.claw-mastery`: rc-a8-setstate.tsv:13 kept, rc-skill-div-a.tsv:8 dropped
+  - `skill.ass.claws-of-thunder`: rc-a8-setstate.tsv:14 kept, rc-skill-div-a.tsv:9 dropped
+  - `skill.ass.cloak-of-shadows`: rc-a8-setstate.tsv:15 kept, rc-skill-div-a.tsv:10 dropped
+  - `skill.ass.cobra-strike`: rc-a8-setstate.tsv:16 kept, rc-skill-div-a.tsv:11 dropped
+  - `skill.ass.death-sentry`: rc-link-2.tsv:120 kept, rc-skill-div-a.tsv:12 dropped
+  - `skill.ass.dragon-claw`: rc-a8-setstate.tsv:17 kept, rc-skill-div-a.tsv:13 dropped
+  - `skill.ass.dragon-flight`: rc-link-2-override.tsv:42 kept, rc-skill-div-a.tsv:14 dropped
+  - `skill.ass.dragon-tail`: rc-a8-setstate.tsv:18 kept, rc-skill-div-a.tsv:15 dropped
+  - `skill.ass.dragon-talon`: rc-a8-setstate.tsv:19 kept, rc-skill-div-a.tsv:16 dropped
+  - `skill.ass.fade`: rc-a8-setstate.tsv:20 kept, rc-skill-div-a.tsv:17 dropped
+  - `skill.ass.fire-trauma`: rc-link-2-override.tsv:43 kept, rc-skill-div-a.tsv:18 dropped
+  - `skill.ass.fists-of-fire`: rc-a8-setstate.tsv:21 kept, rc-skill-div-a.tsv:19 dropped
+  - `skill.ass.inferno-sentry`: rc-link-2.tsv:123 kept, rc-skill-div-a.tsv:20 dropped
+  - `skill.ass.lightning-sentry`: rc-a8-setstate.tsv:22 kept, rc-skill-div-a.tsv:21 dropped
+  - `skill.ass.mind-blast`: rc-a8-setstate.tsv:23 kept, rc-skill-div-a.tsv:22 dropped
+  - `skill.ass.psychic-hammer`: rc-link-2-override.tsv:44 kept, rc-skill-div-a.tsv:23 dropped
+  - `skill.ass.quickness`: rc-a8-setstate.tsv:24 kept, rc-skill-div-a.tsv:24 dropped
+  - `skill.ass.royal-strike`: rc-a8-setstate.tsv:25 kept, rc-skill-div-a.tsv:25 dropped
+  - `skill.ass.shadow-master`: rc-run-1.tsv:173 kept, rc-skill-div-a.tsv:26 dropped
+  - `skill.ass.shadow-warrior`: rc-link-2.tsv:125 kept, rc-skill-div-a.tsv:27 dropped
+  - `skill.ass.shock-field`: rc-link-2.tsv:126 kept, rc-skill-div-a.tsv:28 dropped
+  - `skill.ass.tiger-strike`: rc-a8-setstate.tsv:26 kept, rc-skill-div-a.tsv:29 dropped
+  - `skill.ass.venom`: rc-a8-setstate.tsv:27 kept, rc-skill-div-a.tsv:30 dropped
+  - `skill.ass.wake-of-fire-sentry`: rc-link-2.tsv:127 kept, rc-skill-div-a.tsv:31 dropped
+  - `skill.ass.weapon-block`: rc-a8-setstate.tsv:28 kept, rc-skill-div-a.tsv:32 dropped
+  - `skill.bar.axe-mastery`: rc-a8-setstate.tsv:29 kept, rc-skill-div-a.tsv:33 dropped
+  - `skill.bar.bash`: rc-a8-setstate.tsv:30 kept, rc-skill-div-a.tsv:34 dropped
+  - `skill.bar.battle-cry`: rc-a8-setstate.tsv:31 kept, rc-skill-div-a.tsv:36 dropped
+  - `skill.bar.battle-orders`: rc-a8-setstate.tsv:32 kept, rc-skill-div-a.tsv:37 dropped
+  - `skill.bar.berserk`: rc-a8-setstate.tsv:33 kept, rc-skill-div-a.tsv:38 dropped
+  - `skill.bar.concentrate`: rc-a8-setstate.tsv:34 kept, rc-skill-div-a.tsv:39 dropped
+  - `skill.bar.double-swing`: rc-a8-setstate.tsv:35 kept, rc-skill-div-a.tsv:40 dropped
+  - `skill.bar.double-throw`: rc-link-2-override.tsv:45 kept, rc-skill-div-a.tsv:41 dropped
+  - `skill.bar.find-item`: rc-a8-setstate.tsv:37 kept, rc-skill-div-a.tsv:42 dropped
+  - `skill.bar.find-potion`: rc-a8-setstate.tsv:38 kept, rc-skill-div-a.tsv:43 dropped
+  - `skill.bar.frenzy`: rc-a8-setstate.tsv:39 kept, rc-skill-div-a.tsv:44 dropped
+  - `skill.bar.grim-ward`: rc-a8-setstate.tsv:40 kept, rc-skill-div-a.tsv:45 dropped
+  - `skill.bar.howl`: rc-a8-setstate.tsv:41 kept, rc-skill-div-a.tsv:46 dropped
+  - `skill.bar.increased-speed`: rc-a8-setstate.tsv:42 kept, rc-skill-div-a.tsv:47 dropped
+  - `skill.bar.increased-stamina`: rc-a8-setstate.tsv:43 kept, rc-skill-div-a.tsv:48 dropped
+  - `skill.bar.iron-skin`: rc-a8-setstate.tsv:44 kept, rc-skill-div-a.tsv:49 dropped
+  - `skill.bar.leap`: rc-a8-setstate.tsv:45 kept, rc-skill-div-a.tsv:50 dropped
+  - `skill.bar.leap-attack`: rc-a8-setstate.tsv:46 kept, rc-skill-div-a.tsv:51 dropped
+  - `skill.bar.mace-mastery`: rc-a8-setstate.tsv:47 kept, rc-skill-div-a.tsv:52 dropped
+  - `skill.bar.natural-resistance`: rc-a8-setstate.tsv:48 kept, rc-skill-div-a.tsv:53 dropped
+  - `skill.bar.pole-arm-mastery`: rc-a8-setstate.tsv:49 kept, rc-skill-div-a.tsv:54 dropped
+  - `skill.bar.shout`: rc-a8-setstate.tsv:50 kept, rc-skill-div-a.tsv:55 dropped
+  - `skill.bar.spear-mastery`: rc-a8-setstate.tsv:51 kept, rc-skill-div-a.tsv:56 dropped
+  - `skill.bar.stun`: rc-a8-setstate.tsv:52 kept, rc-skill-div-a.tsv:57 dropped
+  - `skill.bar.sword-mastery`: rc-a8-setstate.tsv:53 kept, rc-skill-div-a.tsv:58 dropped
+  - `skill.bar.taunt`: rc-a8-setstate.tsv:54 kept, rc-skill-div-a.tsv:59 dropped
+  - `skill.bar.throwing-mastery`: rc-a8-setstate.tsv:55 kept, rc-skill-div-a.tsv:60 dropped
+  - `skill.bar.war-cry`: rc-a8-setstate.tsv:56 kept, rc-skill-div-a.tsv:61 dropped
   - `skill.ama.valkyrie`: rc-a8-setstate.tsv:10 kept, rc-skill-hydra-valk.tsv:3 dropped
   - `skill.sor.hydra`: rc-a8-setstate.tsv:99 kept, rc-skill-hydra-valk.tsv:4 dropped
   - `skill.monster.doomknightmissile`: rc-link-2-override.tsv:47 kept, rc-spec-monskill.tsv:11 dropped
@@ -5643,6 +5659,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
   - `client.s-monsters.path-stop`: rc-draw-row173.tsv:189 kept, rc-warriv-draw.tsv:3 dropped
+  - `skill.bar.whirlwind`: rc-skill-div-a.tsv:62 kept, rc-whirlwind.tsv:3 dropped
   - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:3 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, rc-wp-arrival-mode.tsv:4 dropped
   - `waypoint.3.dark-wood`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:5 dropped
@@ -5812,11 +5829,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.bar.increased-speed`: rc-a8-setstate.tsv:42 kept, skills.tsv:145 dropped
   - `skill.bar.battle-orders`: rc-a8-setstate.tsv:32 kept, skills.tsv:146 dropped
   - `skill.bar.grim-ward`: rc-a8-setstate.tsv:40 kept, skills.tsv:147 dropped
-  - `skill.bar.whirlwind`: rc-whirlwind.tsv:3 kept, skills.tsv:148 dropped
+  - `skill.bar.whirlwind`: rc-skill-div-a.tsv:62 kept, skills.tsv:148 dropped
   - `skill.bar.berserk`: rc-a8-setstate.tsv:33 kept, skills.tsv:149 dropped
   - `skill.bar.natural-resistance`: rc-a8-setstate.tsv:48 kept, skills.tsv:150 dropped
   - `skill.bar.war-cry`: rc-a8-setstate.tsv:56 kept, skills.tsv:151 dropped
-  - `skill.bar.battle-command`: q-chk-skills-bda.tsv:32 kept, skills.tsv:152 dropped
+  - `skill.bar.battle-command`: rc-skill-div-a.tsv:35 kept, skills.tsv:152 dropped
   - `skill.dru.raven`: rc-c028-skillmsgs.tsv:10 kept, skills.tsv:153 dropped
   - `skill.dru.plague-poppy`: q-chk-skills-bda.tsv:34 kept, skills.tsv:154 dropped
   - `skill.dru.wearwolf`: rc-packets-chan.tsv:93 kept, skills.tsv:155 dropped
@@ -7971,7 +7988,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.missile.481` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | rc-c028-skillmsgs REC-3840: state PARTIAL, packets MATCH in dru-volcano (0xA3 body messages, 0x7F ally info sent) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `cov.missile.483` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | rc-c028-skillmsgs REC-3840: state PARTIAL, packets MATCH in dru-volcano (0xA3 body messages, 0x7F ally info sent) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `cov.monster.148` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | rc-run-2: a check of this row diverges (see checks-status.md); exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.179` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | rc-run-1 ass-fire-blast: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
+| `cov.monster.179` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-run-1 ass-fire-blast: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
 | `cov.monster.19` | system | DIVERGED | M | PARTIAL | yes | 0 | n | rc-melee-fallen | - | state 100% on 6 checks (REC-2140); combat-melee-fallen packets still DIVERGED (s2c 0x07 MapReveal frame 3) |
 | `cov.monster.418` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | - | - | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
 | `cov.monster.458` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-run-2b: DIVERGED@30 milestone-nihlathak: state: frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 |
@@ -8942,7 +8959,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.bloodraven` | system | DIVERGED | M | DIVERGED@94 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-bloodraven ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@94; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.desertturret` | system | DIVERGED | M | DIVERGED@81 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-desertturret ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@81; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.doomknight` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.fallen` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/7 of its a* checks diverge) |
+| `monster.ai.fallen` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/7 of its a* checks diverge) |
 | `monster.ai.fingermage` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.gargoyletrap` | system | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-gargoyletrap ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@31; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.genericspawner` | system | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-genericspawner ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@31; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
@@ -8953,13 +8970,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.nihlathak` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-nihlathak ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@73; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.npcoutoftown` | system | DIVERGED | M | DIVERGED@78 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-npcoutoftown ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@78; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.putriddefiler` | system | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.quillrat` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/6 of its a* checks diverge) |
+| `monster.ai.quillrat` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/6 of its a* checks diverge) |
 | `monster.ai.regurgitator` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.sandmaggotqueen` | system | DIVERGED | M | DIVERGED@43 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-sandmaggotqueen ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@43; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.succubuswitch` | system | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.vilemother` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.willowisp` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.zombie` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/8 of its a* checks diverge) |
+| `monster.ai.zombie` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/8 of its a* checks diverge) |
 | `monster.boss.bloodraven` | entity | DIVERGED | M | DIVERGED@93 | yes | 0 | n | claude/rc-player-mode | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-player-mode 2026-10-10: state 150/150 + rng MATCH (boss-267; 500/500 monskill-348) after a monster's wielded weapon reached the missile damage set-up (damage.md 1 step 6: grip 2 -> stats 23/24); fields q, seed ignored: harness level [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.boss.diablo` | entity | DIVERGED | M | DIVERGED@95 | yes | 0 | n | - | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-boss-243: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 95 missile 3:1 class 172, field sp: 1.14d 120 vs d2rs 128 |
 | `monster.boss.diabloclone` | entity | DIVERGED | M | DIVERGED@95 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 gen-boss-333: game seed equal now (Armageddon state function srvdo 146 fires: 0x006439F0 finds the monster init entry); first divergence frame 95 monster 1:8 unit seed (was DIVERGED@71 game seed) |
@@ -9789,18 +9806,18 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ama.dopplezon` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-ama-28 packets: frame 30 stream s2c #1 size: 1.14d 23 vs d2rs 14 (id 0xac) |
 | `skill.ama.valkyrie` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: ama-valkyrie packets: frame 30 stream s2c #2 size: 1.14d 18 vs d2rs 14 (id 0xac) |
 | `skill.ass.blade-sentinel` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-1 ass-blade-sentinel: state: frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] (1/1 of its a* checks diverge) |
-| `skill.ass.charged-bolt-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.ass.death-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.ass.inferno-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.ass.charged-bolt-sentry` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.ass.death-sentry` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.ass.inferno-sentry` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.ass.shadow-master` | entity | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
 | `skill.ass.shadow-warrior` | entity | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.ass.shock-field` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | bar-battle-command: state channel first divergence: frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.bar.leap` | entity | DIVERGED | S | DIVERGED@34 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap packets: frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
-| `skill.bar.leap-attack` | entity | DIVERGED | S | DIVERGED@38 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap-attack packets: frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
-| `skill.bar.shout` | entity | DIVERGED | S | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
-| `skill.bar.whirlwind` | entity | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-whirlwind | specs/skills/bodies-2.md | bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players) |
+| `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.bar.battle-command` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/functions.tsv,specs/skills/bodies.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `skill.bar.leap` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap packets: frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
+| `skill.bar.leap-attack` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap-attack packets: frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
+| `skill.bar.shout` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
+| `skill.bar.whirlwind` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-div-a | specs/skills/bodies-2.md | rc-skill-div-a: packets MATCH + state PARTIAL only RUN_GAPS for every check of the row (REC-2055/2056); causes: passive layer, summon umod, monster 0x21, delay/mark-changed queue, player event records 0xA5, shout/buff refresh [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.dru.armageddon` | entity | DIVERGED | M | DIVERGED@37 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c028-skillmsgs REC-3840: state PARTIAL, packets MATCH in dru-armageddon (0xA3 body messages, 0x7F ally info sent) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@67 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-runner-a 2026-10-10 fresh run at b1e8c8893: dru-cycle-of-life: state: frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 |
 | `skill.dru.eruption` | entity | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in dru-fissure,gen-skill-dru-234 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
@@ -10479,9 +10496,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0xa0` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): hire-asheara state DIVERGED (checks-status.md) |
 | `net.s2c.0xa1` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-runner-d 2026-10-10 fresh run: hire-follow-waypoint-kashya: channel packets DIVERGED, state DIVERGED |
 | `net.s2c.0xa3` | message | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-c028-skillmsgs REC-3840: state PARTIAL, packets MATCH in dru-volcano (0xA3 body messages, 0x7F ally info sent) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `net.s2c.0xa5` | message | DIVERGED | S | DIVERGED@46 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-05@57 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0xa7` | message | DIVERGED | S | DIVERGED@28 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
-| `net.s2c.0xa9` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-00@86 missing in d2rs; 1 equal pair(s) |
+| `net.s2c.0xa5` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-05@57 missing in d2rs; 0 equal pair(s) |
+| `net.s2c.0xa7` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
+| `net.s2c.0xa9` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-00@86 missing in d2rs; 1 equal pair(s) |
 | `net.s2c.0xab` | message | DIVERGED | S | DIVERGED@56 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-04@56 extra (d2rs only); 0 equal pair(s) |
 | `system.audio.environment.2-music-0x004dcaa0-t` | system | DIVERGED | S | - | ? | 0 | n | - | specs/audio/environment.md | audio-diff: act1 town1.wav starts T 1 in d2rs, T 0 in 1.14d (samples equal over the 3.3 MB captured); wild.wav T 78 vs T 77 (Blood Moor checks) [checks: traces/audio/audio-town-ambience-ama.check, traces/audio/audio-walk-town-ama.check, traces/audio/audio-cast-frost-nova-sor.check, traces/audio/audio-monster-hit-ama.check; DIVERGED@0] |
 | `system.audio.environment.4-level-entry-lines-0x004cc270` | system | DIVERGED | M | - | ? | 0 | n | - | specs/audio/environment.md | audio-diff: 1.14d plays the class act-1 wilderness entry line (sor_act1_entry_wilderness.wav / ama_act1_entry_wilderness.wav) at T 64 after the warp to the Blood Moor; d2rs plays none [checks: traces/audio/audio-cast-frost-nova-sor.check, traces/audio/audio-monster-hit-ama.check; DIVERGED@64] |
