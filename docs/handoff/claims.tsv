@@ -25,3 +25,4 @@ C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
+C063	rc-skill-pkts2	18:13	gen-skill-nec-93 missile ty 4268 vs 4269	open
