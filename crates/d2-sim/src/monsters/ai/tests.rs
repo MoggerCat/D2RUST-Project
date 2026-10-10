@@ -1864,13 +1864,17 @@ mod skill_check;
 // Covers: specs/monsters/ai.md §7.2
 #[test]
 fn walk_in_radius_points_follow_the_recorded_walks() {
-    // Warriv's three walks at the Rogue Encampment arrival (1.14d under
-    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
+    // Warriv's walks at the Rogue Encampment arrival (`-seed 1234`).
     let p = (4873, 4228);
-    assert_eq!(radius_point((4866, 4235), p, 3, 2), Some((4868, 4233)));
-    assert_eq!(radius_point((4868, 4233), p, 2, 2), Some((4869, 4232)));
-    assert_eq!(radius_point((4869, 4232), p, 1, 2), Some((4870, 4231)));
-    // Already within b, or on the target: no point.
-    assert_eq!(radius_point((4872, 4229), p, 3, 2), None);
-    assert_eq!(radius_point(p, p, 3, 0), None);
+    assert_eq!(radius_point((4866, 4235), 0, p, 3, 2), (4868, 4233));
+    assert_eq!(radius_point((4868, 4233), 0, p, 2, 2), (4869, 4232));
+    assert_eq!(radius_point((4869, 4232), 0, p, 1, 2), (4870, 4231));
+    // Within b: walks away; on the target: own cell (k = 0).
+    assert_eq!(radius_point((4872, 4229), 0, p, 3, 2), (4871, 4230));
+    assert_eq!(radius_point(p, 0, p, 3, 0), p);
+    // town-ama-10k frame 287: Warriv to the player at (4876, 4218).
+    assert_eq!(
+        radius_point((4870, 4231), 0, (4876, 4218), 3, 2),
+        (4871, 4228)
+    );
 }

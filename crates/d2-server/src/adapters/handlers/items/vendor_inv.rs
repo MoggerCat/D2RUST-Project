@@ -279,10 +279,21 @@ where
         self.with_desk(|d| d.store_unlink(item));
         self.inner.take_from_store(npc_class, item)
     }
+    /// A gamble list item is placed by the same `0x00560200` as a store
+    /// item (`vendors.md` §5.1 step 7): mode 0 on the NPC's page-0 grid.
     fn place_in_gamble(&mut self, npc_class: u16, player: u32, item: UnitId) -> bool {
-        self.inner.place_in_gamble(npc_class, player, item)
+        let Some(npc) = self
+            .inner
+            .record_npc(npc_class)
+            .filter(|_| self.inv.is_some())
+        else {
+            return self.inner.place_in_gamble(npc_class, player, item);
+        };
+        self.with_desk(|d| d.store_place(npc, item))
+            .unwrap_or(false)
     }
     fn remove_gamble_item(&mut self, npc_class: u16, player: u32, item: UnitId) {
+        self.with_desk(|d| d.store_unlink(item));
         self.inner.remove_gamble_item(npc_class, player, item)
     }
     fn refresh_npc_inventory(&mut self, npc: UnitId) {
