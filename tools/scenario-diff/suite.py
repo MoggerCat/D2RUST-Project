@@ -55,7 +55,8 @@ ORIG_OUTPUTS = {"state": ["orig.state.jsonl", "run-record_state"],
                 "rng": ["orig.rng.jsonl", "run-record_rng"],
                 "packets": ["orig.packets.jsonl", "run-record_packets"],
                 "items": ["orig.packets.jsonl", "run-record_packets"],
-                "frontend": ["frontend/orig/d00.png", "frontend/orig"]}  # packets' recording
+                "frontend": ["frontend/orig/d00.png", "frontend/orig"],
+                "cstate": ["orig.cstate.jsonl"]}  # packets' recording
 # measured 2026-10-09 under Wine (scenario-diff.md §4): the menu is left as soon
 # as it is up (autostart waits for launcher mode 4), 0 s passed 6 runs in a row
 AUTO_AFTER = "0"

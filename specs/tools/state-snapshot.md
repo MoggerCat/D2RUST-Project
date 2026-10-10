@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–199 |
-|   4. Comparison | 200–226 |
-| Constants & data dependencies | 227–230 |
-| Randomness | 231–234 |
-| Edge cases & original bugs | 235–253 |
-| Test vectors | 254–263 |
-| Provenance | 264–268 |
-| Open questions | 269–274 |
+|   3. Snapshot point and frame | 128–212 |
+|   4. Comparison | 213–239 |
+| Constants & data dependencies | 240–243 |
+| Randomness | 244–247 |
+| Edge cases & original bugs | 248–266 |
+| Test vectors | 267–276 |
+| Provenance | 277–281 |
+| Open questions | 282–287 |
 <!-- /index -->
 
 ## Summary
@@ -194,8 +194,21 @@ Unit = the unit record; path = unit +0x2C.
    17 checks are recorded (town arrival, cave warp, melee and kill,
    Magic Arrow, Fire Bolt, Frost Nova, Raise Skeleton, ground items,
    inventory picks, loaded items, level up, stats, states, corpse,
-   hire). The d2rs side (a dump of `d2-client`'s `ClientWorld` in the
-   same format) and the comparison are not written yet.
+   hire). The d2rs side is `d2-client state-dump --client-out FILE`
+   (`app/state_dump.rs`, rule 5 of the d2rs writer): per snapshot the units of
+   set S of `ClientWorld::units` in format `state-1`, side `d2rs-client`, with
+   `ut g cl m x y`, the seed `s` when held and the stat fields of the unit's
+   list (hp hpx mp mpx st stx, str ene dex vit, lvl) only for stats it holds;
+   set C (client-only critters and objects) is not modelled, and the other
+   fields (xf yf tx ty d fr fc sp act lv) have no home in `ClientUnit`: the
+   header lists the fields written, the comparison covers those both files
+   list. The comparison is `tools/scenario-diff/cstate_diff.py` (set C units
+   paired by type, class and cell, the local player's `s` not compared), the
+   channel `cstate` of `scenario-diff.md` §3. First result (17 checks,
+   rc-link-2, 2026-10-10): all DIVERGED at frame 2: the 1.14d client holds no
+   unit at frame 2 (the first units appear at frame 3), d2rs already holds the
+   local player; set C (15 critters, 190 objects in the Rogue Encampment) is
+   absent in d2rs.
 
 ### 4. Comparison
 

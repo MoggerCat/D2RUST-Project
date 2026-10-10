@@ -77,7 +77,8 @@ class Repo:
         # generated checks (tools/check-gen) may be named in `checks`; they are not
         # part of the completeness rule above
         self.gen_checks = sorted(os.path.basename(p)[:-6] for p in
-                                 glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check")))
+                                 glob.glob(os.path.join(root, "traces", "checks", "gen", "*.check"))
+                                 + glob.glob(os.path.join(root, "traces", "checks", "cstate", "*.check")))
         self.messages = []
         for d, f in (("c2s", "client-messages.tsv"), ("s2c", "server-messages.tsv")):
             p = os.path.join(root, "specs", "sim", f)

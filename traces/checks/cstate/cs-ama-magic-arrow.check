@@ -1,0 +1,18 @@
+check 1
+# Client state of ama-magic-arrow: the 1.14d client unit sets (traces/pc1/client-state/ama-magic-arrow.cstate.jsonl, state-snapshot.md section 3 rule 5) against the ClientWorld of d2-client (state-dump --client-out); same save, seed, pokes and input as ama-magic-arrow.
+# Magic Arrow (skill 6) past the cow: ScnAma (expansion, level 30, every skill at 20, right skill 6),
+# -seed 1234; warp to the Blood Moor (level 2; variant blood-moor-empty), a cow (class 179, AI Idle) 4 sub-tiles
+# away along +x before frame 10, then one right click at client pixel (544, 336) before frame 20's drain.
+# Compares the cast (mode, states, stats), its missiles' or summons' effects and the draws.
+# Pattern of dru-tornado / bar-leap-attack. Authored by q-chk-skills-4cls.
+# Spec: specs/tools/scenario-diff.md.
+name cs-ama-magic-arrow
+save ScnAma --class ama --expansion --level 30 --all-skills 20 --right-skill 6
+seed 1234
+ticks 70
+seconds 300
+channels cstate
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+4 @y normal
+input frame 20; rclick 544 336

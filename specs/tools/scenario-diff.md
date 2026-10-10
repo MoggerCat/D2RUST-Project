@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–580 |
-|   4. Suite | 581–708 |
-| Constants & data dependencies | 709–712 |
-| Randomness | 713–716 |
-| Edge cases & original bugs | 717–752 |
-| Test vectors | 753–775 |
-| Provenance | 776–779 |
-| Open questions | 780–842 |
+|   3. Run | 145–590 |
+|   4. Suite | 591–718 |
+| Constants & data dependencies | 719–722 |
+| Randomness | 723–726 |
+| Edge cases & original bugs | 727–762 |
+| Test vectors | 763–785 |
+| Provenance | 786–789 |
+| Open questions | 790–852 |
 <!-- /index -->
 
 ## Summary
@@ -86,7 +86,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend`, `cstate` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -577,6 +577,16 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **cstate** (`channels cstate`; `tools/scenario-diff/cstate_channel.py`,
+    `cstate_diff.py`; `state-snapshot.md` §3 rule 5): the client's own unit
+    sets. 1.14d side: the recording `traces/pc1/client-state/<name>.cstate.jsonl`
+    made on Windows by `record_state.py --client-out` (the check `cs-<name>`,
+    kept in `traces/checks/cstate/`, reads `<name>`; a missing recording is an
+    error, never a match); d2rs side: `state-dump --client-out`
+    (`ClientWorld`). `cstate_diff.py` compares with `state_diff.py` on the
+    fields both files list; set C units are paired by type, class and cell, the
+    local player's client seed `s` is not compared.
 
 ### 4. Suite
 

@@ -16,7 +16,7 @@ def main():
     new = {}
     for l in open(src, encoding="utf-8"):
         p = [x.strip() for x in l.strip().strip("|").split("|")]
-        if len(p) == 7 and p[0].startswith("gen-") or (len(p) == 7 and p[1] in ("state", "packets", "rng", "items", "draws", "save", "frontend", "sounds")):
+        if len(p) == 7 and p[0].startswith("gen-") or (len(p) == 7 and p[1] in ("state", "packets", "rng", "items", "draws", "save", "frontend", "sounds", "cstate")):
             chk, ch, ticks, eq, _m, v, first = p
             owner = "-" if v in ("MATCH", "PARTIAL") else "unrouted"
             new[(chk, ch)] = f"| {chk} | {ch} | {v} | {eq}/{ticks} | {first} | {owner} |"

@@ -121,6 +121,10 @@ pub struct DumpArgs {
     /// path, so a `--send "<f> hex 69"` (Save and Exit) writes the `.d2s`
     /// there (the `save` channel of `specs/tools/scenario-diff.md`).
     pub save_out: Option<PathBuf>,
+    /// `--client-out FILE`: also write the client model's units per
+    /// snapshot (`specs/tools/state-snapshot.md` §3 rule 5, the d2rs side
+    /// of the `cstate` channel).
+    pub client_out: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -141,6 +145,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         packets: None,
         rng: None,
         save_out: None,
+        client_out: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -162,6 +167,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--packets" => a.packets = Some(PathBuf::from(value()?)),
             "--rng" => a.rng = Some(PathBuf::from(value()?)),
             "--save-out" => a.save_out = Some(PathBuf::from(value()?)),
+            "--client-out" => a.client_out = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
@@ -261,6 +267,8 @@ pub struct DumpGame {
     /// `--save-out FILE`: where the server's character writer puts the
     /// `.d2s` (`play`'s [`super::save::FileStore`]).
     pub save_out: Option<PathBuf>,
+    /// `--client-out FILE` ([`client_header_line`], [`client_snap_line`]).
+    pub client_out: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -300,6 +308,7 @@ impl DumpGame {
             packets: args.packets.clone(),
             rng: args.rng.clone(),
             save_out: args.save_out.clone(),
+            client_out: args.client_out.clone(),
         })
     }
 }
@@ -405,6 +414,14 @@ pub fn dump<W: Write>(
         seed: Some(game.seed),
     };
     writeln!(out, "{}", header.to_json_line())?;
+    let mut client_out = match &game.client_out {
+        Some(p) => {
+            let mut f = std::io::BufWriter::new(std::fs::File::create(p)?);
+            writeln!(f, "{}", client_header_line(info))?;
+            Some(f)
+        }
+        None => None,
+    };
 
     // `poke.md` §5 rule 5: the pokes due after a tick run at the tick end
     // (the 1.14d hook's point), after that frame's snapshot; a `goto` steps
@@ -563,7 +580,13 @@ pub fn dump<W: Write>(
         if s.frame.rem_euclid(every as i32) == 0 {
             writeln!(out, "{}", s.to_json_line())?;
             snaps += 1;
+            if let Some(f) = client_out.as_mut() {
+                writeln!(f, "{}", client_snap_line(s.frame, bridge.world()))?;
+            }
         }
+    }
+    if let Some(f) = client_out.as_mut() {
+        f.flush()?;
     }
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
@@ -617,6 +640,77 @@ pub fn dump<W: Write>(
     writeln!(out, "{}", state::footer_line(snaps, &notes))?;
     out.flush()?;
     Ok(DumpReport { ticks: ran, snaps })
+}
+
+/// The unit fields the client model holds, in `state-1` field names
+/// (`state-snapshot.md` §2); the rest of the 1.14d client unit record
+/// (sub-tile fractions, path, frame, animation, speed, flags) has no home
+/// in `bridge::world::ClientUnit` yet.
+const CLIENT_FIELDS: [&str; 18] = [
+    "ut", "g", "cl", "m", "x", "y", "s", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene",
+    "dex", "vit", "lvl",
+];
+
+/// The header of the `--client-out` file: format `state-1`, side
+/// `d2rs-client` (`state-snapshot.md` §3 rule 5; the 1.14d side is
+/// `orig-client`).
+fn client_header_line(info: &RunInfo) -> String {
+    serde_json::json!({
+        "k": "header",
+        "format": "state-1",
+        "side": "d2rs-client",
+        "tool": info.tool,
+        "date": info.date,
+        "command": info.command,
+        "fields": CLIENT_FIELDS,
+        "gaps": [
+            "client model: set C (client-only critters and objects) is not modelled, and the unit \
+             fields xf yf tx ty d fr fc sp act lv are not held by bridge::world::ClientUnit",
+        ],
+    })
+    .to_string()
+}
+
+/// One `snap` line of the `--client-out` file: the units of set S of the
+/// client model (`bridge::world::ClientWorld::units`, key order), `f` the
+/// server frame whose tick just ended. Stats are the layer 0 base values
+/// of stat ids 0-3 (attributes), 6-11 (life, mana, stamina) and 12 (level).
+fn client_snap_line(frame: i32, world: &crate::bridge::world::ClientWorld) -> String {
+    // (field, stat id): written only for the stats the unit's list holds
+    const STAT_FIELDS: [(&str, u16); 11] = [
+        ("hp", 6),
+        ("hpx", 7),
+        ("mp", 8),
+        ("mpx", 9),
+        ("st", 10),
+        ("stx", 11),
+        ("str", 0),
+        ("ene", 1),
+        ("dex", 2),
+        ("vit", 3),
+        ("lvl", 12),
+    ];
+    let units: Vec<serde_json::Value> = world
+        .units
+        .values()
+        .map(|u| {
+            let (x, y) = u.position.unwrap_or((0, 0));
+            let mut v = serde_json::json!({
+                "set": "S", "ut": u.key.unit_type, "g": u.key.guid, "cl": u.class,
+                "m": u.mode, "x": x, "y": y,
+            });
+            if let Some((lo, hi)) = u.seed {
+                v["s"] = serde_json::json!([lo, hi]);
+            }
+            for (name, id) in STAT_FIELDS {
+                if let Some(val) = u.stats.get(&id) {
+                    v[name] = serde_json::json!(val);
+                }
+            }
+            v
+        })
+        .collect();
+    serde_json::json!({"k": "snap", "f": frame, "units": units}).to_string()
 }
 
 /// Runs every pending poke due after `last_frame` (absolute `f` with
@@ -936,6 +1030,32 @@ mod tests {
     }
 
     #[test]
+    fn client_out_lines() {
+        // Spec: specs/tools/state-snapshot.md section 3 rule 5
+        let a = parse_args(&args(&[
+            "--ticks",
+            "3",
+            "--out",
+            "o.jsonl",
+            "--client-out",
+            "c.jsonl",
+        ]))
+        .unwrap();
+        assert_eq!(a.client_out, Some("c.jsonl".into()));
+        let w = crate::bridge::world::ClientWorld::default();
+        assert_eq!(client_snap_line(7, &w), r#"{"f":7,"k":"snap","units":[]}"#);
+        let info = RunInfo {
+            tool: "t".into(),
+            date: "2026-10-10".into(),
+            command: "c".into(),
+            save: None,
+        };
+        let h: serde_json::Value = serde_json::from_str(&client_header_line(&info)).unwrap();
+        assert_eq!(h["side"], "d2rs-client");
+        assert_eq!(h["format"], "state-1");
+    }
+
+    #[test]
     fn options_parse() {
         let a = parse_args(&args(&[
             "--save",
@@ -999,6 +1119,7 @@ mod tests {
                 packets: Some("p.jsonl".into()),
                 rng: None,
                 save_out: Some("out.d2s".into()),
+                client_out: None,
             }
         );
         assert!(parse_args(&args(&[

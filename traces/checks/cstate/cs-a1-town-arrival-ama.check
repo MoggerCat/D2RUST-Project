@@ -1,0 +1,10 @@
+check 1
+# Client state of a1-town-arrival-ama: the 1.14d client unit sets (traces/pc1/client-state/a1-town-arrival-ama.cstate.jsonl, state-snapshot.md section 3 rule 5) against the ClientWorld of d2-client (state-dump --client-out); same save, seed, pokes and input as a1-town-arrival-ama.
+# Rogue Encampment arrival, idle (docs/handoff/q-cloud-game.md Step 4):
+# ScnAma, -seed 1234, no input. Spec: specs/tools/scenario-diff.md.
+name cs-a1-town-arrival-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels cstate

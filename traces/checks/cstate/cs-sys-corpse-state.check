@@ -1,0 +1,12 @@
+check 1
+# Client state of sys-corpse-state: the 1.14d client unit sets (traces/pc1/client-state/sys-corpse-state.cstate.jsonl, state-snapshot.md section 3 rule 5) against the ClientWorld of d2-client (state-dump --client-out); same save, seed, pokes and input as sys-corpse-state.
+# Census: death and the player's corpse on the state channel (combat/vitals.md
+# §4.7-§4.8): hitpoints to zero at frame 10, 200 ticks idle through the death
+# animation, the corpse unit and the respawn timer.
+name cs-sys-corpse-state
+save ScnAma --class ama --expansion --level 15 --gold 900
+seed 1234
+ticks 220
+seconds 300
+channels cstate
+at 10 poke stat @player 6 0 0
