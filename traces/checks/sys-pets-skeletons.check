@@ -9,7 +9,6 @@ seed 1234
 ticks 220
 seconds 400
 channels state rng packets
-ignore q
 variant blood-moor-empty
 at 4 poke warp 2
 at 10 poke spawn 179 @x+4 @y normal
