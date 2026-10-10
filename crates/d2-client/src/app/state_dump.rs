@@ -771,7 +771,11 @@ fn overlay_item_owners(
             .and_then(|d| d.inv)
             .and_then(|o| lists.unit(o))
             .map(|e| e.guid);
-        u.own = holder.filter(|&g| g != 0);
+        // A monster's equipment has no inventory model: the snapshot's
+        // own holder (sim `owner`) stays.
+        if holder.is_some() {
+            u.own = holder.filter(|&g| g != 0);
+        }
     }
 }
 
