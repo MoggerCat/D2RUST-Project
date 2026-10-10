@@ -1023,7 +1023,11 @@ fn the_live_run() {
         .map(|i| (i.key.guid, i.code))
         .collect();
     assert!(left.is_empty(), "everything picked up: {left:?}");
-    assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    // The gold check holds for a drop with gold (a kill may drop items
+    // only, e.g. a lone scroll).
+    if ground.iter().any(|i| i.code == Some(*b"gld ")) {
+        assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    }
     let mine = run.local_items();
     for it in ground.iter().filter(|i| i.code != Some(*b"gld ")) {
         assert!(
@@ -2061,10 +2065,10 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
     );
 }
 
-// PROVISIONAL REC-1565: the client path sees the model's objects whose
-// `HasCollision` of their mode is set (`sim/path-placement.md` §2.5, §3),
-// so a walk onto a town torch (objects class 37) stops short of it, as
-// the server's does.
+// `client/msg-units.md` §1.3 r2 (REC-1565): the client path sees the
+// footprints the 0x51 object init stamped (`HasCollision[mode]`, box and
+// mask of `sim/path-placement.md` §3), so a walk onto a town torch
+// (objects class 37) stops short of it, as the server's does.
 #[test]
 #[ignore = "needs the D2 install (D2_GAME_DIR)"]
 fn the_client_path_stops_short_of_an_object_footprint() {

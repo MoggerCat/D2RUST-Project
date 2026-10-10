@@ -143,9 +143,10 @@ pub fn other_units(
         .collect()
 }
 
-/// The model's objects whose `HasCollision` of their mode is set, with a
-/// cell and an `objects` row: the client path's object footprints
-/// (PROVISIONAL REC-1565, [`crate::bridge::client_path::OtherUnit::object`]).
+/// The model's objects whose footprint is on the client grid (stamped by
+/// the 0x51 init, not yet freed, [`crate::bridge::world::ObjectData::footprint`])
+/// with a cell and an `objects` row: the client path's object footprints
+/// ([`crate::bridge::client_path::OtherUnit::object`]).
 pub fn other_objects(
     world: &ClientWorld,
     rows: &[crate::bridge::objects::ObjClientRow],
@@ -153,21 +154,22 @@ pub fn other_objects(
     world
         .units
         .values()
-        .filter(|u| u.key.unit_type == crate::bridge::world::OBJECT)
+        .filter(|u| {
+            u.key.unit_type == crate::bridge::world::OBJECT
+                && matches!(&u.kind, crate::bridge::world::KindData::Object(d) if d.footprint)
+        })
         .filter_map(|u| {
             let (x, y) = u.position?;
             let shape = rows.get(u.class as usize)?.shape();
-            shape
-                .collides_in(u.mode)
-                .then_some(crate::bridge::client_path::OtherUnit {
-                    x,
-                    y,
-                    size_x: shape.size_x as i8,
-                    npc: false,
-                    in_town: false,
-                    interact: false,
-                    object: Some(shape),
-                })
+            Some(crate::bridge::client_path::OtherUnit {
+                x,
+                y,
+                size_x: shape.size_x as i8,
+                npc: false,
+                in_town: false,
+                interact: false,
+                object: Some(shape),
+            })
         })
         .collect()
 }

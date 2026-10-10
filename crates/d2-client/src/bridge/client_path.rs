@@ -106,10 +106,9 @@ pub struct OtherUnit {
     pub in_town: bool,
     pub interact: bool,
     /// An object: its sizeX × sizeY box and table mask
-    /// (`sim/path-placement.md` §3) in place of the monster pattern.
-    /// PROVISIONAL (REC-1565): the 1.14d client stamps an object's
-    /// footprint where its `HasCollision[mode]` is set, as the server's
-    /// add does (`path-placement.md` §2.5).
+    /// (`sim/path-placement.md` §3) in place of the monster pattern: the
+    /// 1.14d client's object init `0x004BC720` stamps it with the
+    /// server's stamp `0x00620A70` (`msg-units.md` §1.3 r2).
     pub object: Option<d2_sim::path::ObjectShape>,
 }
 

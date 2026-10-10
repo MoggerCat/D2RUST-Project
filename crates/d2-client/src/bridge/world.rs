@@ -163,6 +163,12 @@ pub struct ObjectData {
     /// (`msg-units.md` §1.3 r3, `0x004BD6B0`: the shrines record of
     /// index interact).
     pub shrine: Option<u8>,
+    /// The object's footprint is on the client grid: stamped by the
+    /// object init `0x004BC720` (`0x00620A70`, when objects
+    /// `HasCollision[mode]` +0x120 + mode ≠ 0, `msg-units.md` §1.3 r2),
+    /// freed by `0x00623830` (`world/objects-client.md` §25 r9). The
+    /// client path stamps it ([`crate::world_view::walk::other_objects`]).
+    pub footprint: bool,
 }
 
 /// The per-kind data at unit +0x14 (model §1 rule 2).

@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–260 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 261–270 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 271–313 |
-|   4. Queued movement and action messages | 314–401 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 402–432 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 433–463 |
-|   7. Other unit messages (general handlers, act at receive) | 464–599 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 600–750 |
-| Constants & data dependencies | 751–762 |
-| Randomness | 763–770 |
-| Edge cases & original bugs | 771–793 |
-| Test vectors | 794–844 |
-| Provenance | 845–896 |
-| Open questions | 897–942 |
+|   1. Unit add | 77–267 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 268–277 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 278–320 |
+|   4. Queued movement and action messages | 321–408 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 409–439 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 440–470 |
+|   7. Other unit messages (general handlers, act at receive) | 471–606 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 607–757 |
+| Constants & data dependencies | 758–769 |
+| Randomness | 770–777 |
+| Edge cases & original bugs | 778–800 |
+| Test vectors | 801–851 |
+| Provenance | 852–903 |
+| Open questions | 904–949 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -234,7 +234,14 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    kind's init (player `0x00460BF0`, missile `0x004CD0A0`, item
    `0x004C1910`, tile: unit flags |= 0x22, static path; jump table
    `0x004661A0` read from the file). Add; an object
-   then gets `0x004BC8D0`.
+   then gets `0x004BC8D0`. The object init sets the static path
+   (`0x00620AE0(unit, room, x, y)`) and then, when the objects byte
+   +0x120 + mode (`HasCollision[mode]`) ≠ 0, stamps the footprint on the
+   client grid with the server's stamp `0x00620A70(unit, room, x, y)`
+   (box and mask of `sim/path-placement.md` §3; read 2026-10-10,
+   `0x004BC720`, REC-1565). The client frees it only through
+   `0x00623830` (`world/objects-client.md` §25 r9); the client path
+   (`client/model.md` open question 2) walks around it.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`:
    object data +8 := the shrines record of index interact (`0x006414B0`:
    table `[0x0096D468]`, 0xB8-byte rows, count `[0x0096D46C]`; out of
