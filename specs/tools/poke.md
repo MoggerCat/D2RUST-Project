@@ -398,8 +398,8 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    after the tick and before that frame's flush, so a handler's replies
    leave in the same frame's buffer (first run: `interact-talk-akara`,
    0x27 / 0x29 / 0x28 flushed in frame 15 on 1.14d, 16 on d2rs between
-   frames). `state-dump` therefore runs every poke of a frame that
-   holds an `operate`, a `talk` or a `goto` at the same point: a
+   frames). `state-dump` therefore runs every poke due after a tick
+   (absolute frame 2 or later) at the same point: a
    tick-end hook of the link (`Host::frame_with`, after the tick, before
    the flush), in file order, after taking that frame's snapshot there
    (as `record_state.py` snapshots before its pokes, §5 rule 2). A
@@ -409,10 +409,11 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    the client's buffer right after them (`Host::queue_now`), so it
    leaves in that frame's flush, as on 1.14d (first run:
    `a2-npc-atma-talk`, the walk's 0x07 in frames 3–12 on 1.14d, one
-   frame later on d2rs before; rc-net-s2c). Other frames keep the
-   between-frames point; a directive there whose path queues an S→C
-   message at once would show the same one-frame shift in the packets
-   channel. `play --poke` runs every poke between frames: its
+   frame later on d2rs before; rc-net-s2c; `warp`: the landing room's
+   0x07 in the poke's frame window, the neighbours' in the next tick,
+   448 generated checks with `4 warp 2`, rc-packets-join-order). Only a
+   poke due before the first tick keeps the between-frames point.
+   `play --poke` runs every poke between frames: its
    `operate` / `talk` replies reach the client one frame later than on
    1.14d (a play aid, not a comparison).
 
