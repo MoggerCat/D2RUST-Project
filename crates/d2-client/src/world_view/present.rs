@@ -110,6 +110,8 @@ pub struct WorldViewState {
     /// in draw order: what the frame shows, for logs and tests.
     pub last_tags: Vec<crate::scene::ItemTag>,
     pub last_ui: Vec<crate::ui::UiDraw>,
+    /// The hover target the previous pass left (`ClickView::prev_hover`).
+    pub prev_hover: Option<crate::bridge::world::UnitKey>,
     /// The preview's pending interaction (`super::interact`).
     pub interact: super::interact::PreviewInteract,
     /// Ground items (`super::ground_items`): the app hands in the item art
@@ -164,6 +166,7 @@ impl WorldViewState {
             preview_error: None,
             last_tags: Vec::new(),
             last_ui: Vec::new(),
+            prev_hover: None,
             interact: Default::default(),
             ground_items: Default::default(),
             corpse_clicks: Default::default(),
@@ -1040,6 +1043,8 @@ fn world_view_frame(
                 // frame's shaken camera (the anchor decided on a drawn
                 // tick).
                 shake: anchor.map_or((0, 0), |a| a.shake),
+                // 1.14d's press sees the hover the previous pass drew.
+                prev_hover: state.preview.then_some(state.prev_hover),
             };
             // d2rs-own, unverified (D2): the run lock (command 35) is the
             // toggle action no panel took; the click reads the predicted
@@ -1073,6 +1078,7 @@ fn world_view_frame(
                 .filter(|_| over && state.preview)
                 .and_then(|c| crate::bridge::hover::pick(bridge.0.world(), c, mouse));
             state.feed.set_hover(hover);
+            state.prev_hover = hover;
             // d2rs-own, unverified (REC-239): the hovered object's name.
             if let Some(label) = cam.as_ref().and_then(|c| {
                 state
