@@ -9,6 +9,9 @@ entries (`monster_skills`) and fell back to 1; the levels monster init
 step 14 gives (`Sk<i>lvl` + skill bonus, `ActionHooks::natural_skills`)
 were never passed. Missiles from the used skill therefore got level 1.
 
+## Note
+staging-7 gained the identical change (rc-gen-skill-2) while this ran; the merge took theirs.
+
 ## Changed
 - `d2-client/src/app/single_player.rs`: levels handed to the AI mirror =
   `natural_skills` overlaid with `monster_skills`.
