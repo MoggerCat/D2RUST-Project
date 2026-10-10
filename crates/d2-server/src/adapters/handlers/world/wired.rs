@@ -707,6 +707,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             .as_mut()
             .map(std::mem::take)
             .unwrap_or_default();
+        // The summoned pet types (`hirelings.md` §6 rule 1) have their lists
+        // on the action hooks; the hireling's is the desk's below.
+        for &p in &q {
+            events.action().summon_follow(game, p);
+        }
         if q.is_empty() || self.state.hireling_tables.is_none() {
             return;
         }

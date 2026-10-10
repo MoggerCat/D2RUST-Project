@@ -302,6 +302,28 @@ pub fn player_request<X: Pending>(
     }
 }
 
+/// Player mode request, unit form `0x00580A70` with re-entry 1
+/// (`pathing.md` §1.2, rule 3 skipped): the Swing of the skill bodies
+/// (`bodies-2.md` §2.15). `None`: a fatal path (logged).
+pub fn player_request_reentry<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    player: UnitId,
+    skill: Option<u16>,
+    mode: u32,
+    target: WalkTarget,
+) -> Option<Outcome> {
+    let mut c = PathCtx::of(v, game);
+    let t = c.tables();
+    match request(&t, &mut c, player, skill, mode, target, true) {
+        Ok(o) => Some(o),
+        Err(e) => {
+            c.walk_error(e);
+            None
+        }
+    }
+}
+
 /// Player event 0 of modes 2, 3, 6, 19: `0x00580C20` (`pathing.md`
 /// §9.2); the action result for `units.md` §4.5 (2 = stopped).
 pub fn player_step<X: Pending>(v: &mut View<'_, X>, game: &mut Game, unit: UnitId) -> u32 {
@@ -806,6 +828,23 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     /// The player of a client record (`unit-order.md` §7).
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.game.lists.client(client)?.player
+    }
+    /// §9.8: S→C 0x0A (`0x00571600`) to the client's player.
+    fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {
+        let (Some(receiver), Some(e)) = (self.client_player(client), self.game.lists.unit(unit))
+        else {
+            return;
+        };
+        let m = crate::units::messages::remove_unit(e.ty as u8, e.guid);
+        self.v.h.x.send(receiver, &m);
+    }
+    /// §9.8: the add messages `0x00571F90` (`intents-events.md` §7.2) to
+    /// the client's player.
+    fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
+        let Some(receiver) = self.client_player(client) else {
+            return;
+        };
+        self.v.add_messages(self.game, receiver, unit);
     }
     /// [`crate::wiring::path::PathState::history`] (players only).
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {

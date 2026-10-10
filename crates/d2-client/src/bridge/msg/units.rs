@@ -459,6 +459,13 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
     // unit's client seed. Nothing without rows.
     if let Some(row) = msg.inputs.objclient.rows.get(class as usize) {
         crate::bridge::objects::anim_setup(u, row, u.mode)?;
+        // Rule 2: the init stamps the footprint (`0x00620A70`) when
+        // `HasCollision[mode]` is set (a mode past 7 reads as 0, as
+        // `d2_sim::path::record::ObjectShape::collides_in`).
+        let footprint = row.shape.collides_in(u.mode);
+        if let KindData::Object(d) = &mut u.kind {
+            d.footprint = footprint;
+        }
     }
     let mode = u.mode;
     c.add(w);
@@ -577,6 +584,10 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     // (`0x0064E7B0`), which needs the client's collision map.
     if let Some(u) = w.units.get_mut(&key) {
         u.position = Some((x, y));
+    }
+    // Rule 4.6: the local player's placement ends in `0x00472C20(flag)`.
+    if w.local_player == Some(key) {
+        w.local_places.push(b.u8(10)?);
     }
     // The teleport's room recache (`sim/unit-order.md` §5 rule 6): leave
     // the old room's list, head of room''s.

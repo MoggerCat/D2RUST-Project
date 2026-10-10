@@ -185,6 +185,31 @@ fn assign_object_b160() {
     assert_eq!(m.rejected(), [(0x51, "fatal assert 0x202".to_owned())]);
 }
 
+// Covers: specs/client/msg-units.md §1.3 r2
+#[test]
+fn assign_object_stamps_the_footprint_of_a_colliding_mode() {
+    use crate::bridge::objects::ObjClientRow;
+    let mut m = Model::default();
+    let mut torch = ObjClientRow {
+        has_collision: [1, 1, 1, 0, 0, 0, 0, 0],
+        ..ObjClientRow::default()
+    };
+    torch.shape.has_collision = [true, true, true, false, false, false, false, false];
+    torch.frame_cnt = [0x100; 8];
+    m.inputs.objclient.rows = vec![ObjClientRow::default(); 38];
+    m.inputs.objclient.rows[37] = torch;
+    let footprint = |m: &Model, guid| match &m.w.units[&UnitKey::new(OBJECT, guid)].kind {
+        KindData::Object(d) => d.footprint,
+        _ => panic!("an object"),
+    };
+    // Class 37 in mode 2 (`HasCollision2` = 1): stamped.
+    m.hex("51 02 0d 00 00 00 25 00 14 12 c0 11 02 00");
+    assert!(footprint(&m, 13));
+    // Mode 3 (`HasCollision3` = 0): not stamped.
+    m.hex("51 02 0e 00 00 00 25 00 16 12 c0 11 03 00");
+    assert!(!footprint(&m, 14));
+}
+
 // Covers: specs/client/msg-units.md §2 r1, §2 r2
 #[test]
 fn remove_unit_a7228_a215606() {

@@ -33,7 +33,7 @@ save trap --name PtClsTrap --class ass --expansion --level 30 --all-skills 20 --
 save move --name PtClsMove --class sor --expansion --level 30 --all-skills 20 --stat 6=128000 --stat 7=128000 --stat 8=128000 --stat 9=128000 --right-skill {move}
 
 milestone main-skill-kill
-  only class ama,sor,nec,pal,bar,dru
+  only class ama,sor,nec,bar,dru
   use main
   deadline 300
   poke 5 warp 2
@@ -41,6 +41,17 @@ milestone main-skill-kill
   poke 31 stat @p1 6 0 256
   input frame 40; rclick 448 324; frame 70; rclick 448 324; frame 100; rclick 448 324; frame 130; rclick 448 324; frame 160; rclick 448 324
   note the class's main skill (right) at the Quill Rat, five casts 30 frames apart; the Quill Rat is set to 1 hp so one hit kills on every difficulty (Hell monsters have thousands of hp)
+  need unit ut 1 g @p1 dead
+
+milestone main-skill-kill-pal
+  only class pal
+  use main
+  deadline 300
+  poke 5 warp 2
+  poke 30 spawn 63 @x+1 @y+1 normal
+  poke 31 stat @p1 6 0 256
+  input frame 40; rclickunit 1 63; frame 70; rclickunit 1 63; frame 100; rclickunit 1 63
+  note Blessed Hammer circles the caster (a spiral, pathing.md 11.3): a Quill Rat 3 sub-tiles away survives three casts on 1.14d too (traces/checks/pal-hammer-rat.check, d2rs equal for 130 frames); one diagonal sub-tile away it dies at frame 50 on both
   need unit ut 1 g @p1 dead
 
 milestone main-skill-kill-trap

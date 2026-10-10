@@ -45,7 +45,8 @@ pub fn path_op<X: Pending>(
 /// target position `0x0056D2C0` (`pathing.md` §13.2: the path's target
 /// point when the target unit is none) and the skill message 0x4D sends
 /// (`pathing.md` §10 rule 2: target x, y = the path target). Charge's run
-/// (mode 3) computes its path to it. Unit targets are the mode start's.
+/// (mode 3) computes its path to it. A unit target sets the path's target
+/// unit (`0x00648B90`).
 // Settled by specs/skills/use.md §4 "Where the target goes": the
 // point-form start `0x0057FE90` writes the point with `0x00648AD0`
 // (path +0x10 / +0x12, target unit := none); `DynamicPath::set_target_point`
@@ -56,7 +57,12 @@ pub fn point_target<X: Pending>(
     target: crate::skills::use_::ModeTarget<UnitId>,
 ) {
     use crate::skills::use_::ModeTarget;
-    if let ModeTarget::Point(x, y) = target {
-        v.h.path_set_target_point(unit, x, y);
+    match target {
+        ModeTarget::Point(x, y) => v.h.path_set_target_point(unit, x, y),
+        // The unit-form start `0x0057FEF0` ends in `0x00620C10(U, T)` →
+        // `0x00648B90(path, T)`: the path's target unit := T (use.md §4
+        // "Where the target goes"); the moving skills' path (Whirlwind's
+        // type 7) is computed toward it (q-fix-pt-whirlwind).
+        ModeTarget::Unit(t) => v.path_set_target_unit(unit, t),
     }
 }

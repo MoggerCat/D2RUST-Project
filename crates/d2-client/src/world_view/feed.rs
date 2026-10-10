@@ -138,6 +138,13 @@ pub trait ViewFeed: ViewSource {
         Ok(())
     }
 
+    /// The weather's client update for the current server tick: run for
+    /// the tick of a frame whose draw was skipped (the GPU still busy), so
+    /// that every client update steps the weather once, as the original's
+    /// loop pass does (`draw-order-2.md` §11.2, REC-1900). Repeating it for
+    /// a tick already updated changes nothing. The default has no weather.
+    fn weather_update(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) {}
+
     /// The drawn frame's light pass (`render/lighting.md` §6.4, once per
     /// drawn frame after [`Self::prepare`]): `lights` is the client's
     /// kept light list (`ClientWorld::lights`, §6.3), handed out of the

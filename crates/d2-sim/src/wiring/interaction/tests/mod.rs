@@ -726,6 +726,7 @@ impl World {
                 enabled: true,
                 aidel: [15, 15, 15],
                 moves: 0,
+                mode_chart: false,
             })
             .collect();
         let ctl = NpcControl::new(
