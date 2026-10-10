@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "a5-npc-qual-kehk",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "190",
+  "--auto",
+  "ScnAm5",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto preset 109 1:515",
+  "--poke",
+  "150 msg 0x13 1 @1:515"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "14752eef935b29c8f5381fd766c36161ddbd448178f539da1f0460ebf71c6e19",
+   "size": 1444104
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f3ff0708896654b866435f68e128a761aff4b9938d3ae4cd8e484fd31c23bf25",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "7979928cb53e3f211b88719d929df45eddb589ca197afbc87f67cbef5ac51dc4",
+  "save": "10be42b3d0de4c0eef1df21bda78321303f56640578591e8ae0dddbb10e4e6db"
+ }
+}

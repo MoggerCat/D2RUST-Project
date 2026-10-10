@@ -27,18 +27,18 @@
 | Rules | 75–76 |
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
-|   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1044 |
-|   5. Event dispatch | 1045–1059 |
-|   6. Events per kind | 1060–1182 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1183–1204 |
-|   8. Collision line between two units | 1205–1209 |
-| Constants & data dependencies | 1210–1226 |
-| Randomness | 1227–1234 |
-| Edge cases & original bugs | 1235–1255 |
-| Test vectors | 1256–1315 |
-| Provenance | 1316–1407 |
-| Open questions | 1408–1487 |
+|   3. Lifecycle | 156–466 |
+|   4. Modes and mode schedules | 467–1094 |
+|   5. Event dispatch | 1095–1109 |
+|   6. Events per kind | 1110–1232 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1233–1254 |
+|   8. Collision line between two units | 1255–1259 |
+| Constants & data dependencies | 1260–1276 |
+| Randomness | 1277–1284 |
+| Edge cases & original bugs | 1285–1305 |
+| Test vectors | 1306–1365 |
+| Provenance | 1366–1457 |
+| Open questions | 1458–1537 |
 <!-- /index -->
 
 ## Summary
@@ -423,7 +423,20 @@ of its list.
       plain spawn; dead records in mode 12, others in mode 1. Records
       with flag 0x400 and alignment 1 or 2 (0x80 / 0x100) are skipped. In
       level 108 with `0x005B5210` true only class 243 records are
-      restored.
+      restored. **Quest links**: the restore itself links nothing and
+      the record keeps no chain. All three spawn paths end in the common
+      creation `0x005B2A00` (plain `0x005B30E0` with flags 0x62, 0x6A
+      for a record with bit 0x40, |= 0x80 by the monstats byte +0x0D
+      test; minion `0x005A46E0` → `0x005B30E0`; boss `0x005A4440` →
+      `0x005A09E0` → `0x005B30E0`), whose step 4 runs the boss mods
+      `0x005B1CF0` with no condition (`0x005B2EDB`–`0x005B2EDF`, its
+      only caller; flag 2 skips only the normal mods `0x005B21B0`). So
+      a restored monster gets its **whole** boss-mod case again
+      (`monsters/init.md` §14.3: chain link `0x005436B0`, umods, unit
+      flags, states, the Ancients' items with their draws), dead
+      (mode 12) records included; with flag 0x40 set no party minions.
+      1.14d-confirmed (`0x005424F0`, `0x005B30E0`, `0x005B2A00`; read
+      2026-10-10, PC 1 today; settles REC-1560).
    2. items (`0x00541AC0`): a record whose expiry ≠ 0 and < the current
       frame is dropped; others are re-created from their stream
       (`0x00541990`) by the record reader `0x00558CB0`
@@ -506,7 +519,24 @@ Main form `0x005539B0` (start index = frame bonus b = `0x00623B10(unit)`):
    E[i] = 3 → event 0 at n, args (3, 0); other values nothing; i += 1.
    Then a += s.
 4. If n = f: n = f + 1. Schedule event 1 at n + 1, args (0, 0).
-5. Current frame +0x44 := f · 256.
+5. Current frame +0x44 := f · 256, f read again from game +0xA8 (the
+   store at `0x00553AE7`–`0x00553AF1`; 1.14d-confirmed, read
+   2026-10-10, PC 1 today). On the server +0x44 is thus the start frame
+   of the schedule, which the variants below read back (cur).
+
+The value does not survive a player's attack start: the starts of §4.5
+(`0x0057FE90`, `0x0057FEF0`) call the skill start `0x0056FAF0` after
+this schedule, and the start function of skill-start slot 1 (Attack,
+Left Hand Swing `0x0056CA40`, `skills/bodies.md` §3.1 step 1) writes
++0x44 := frame bonus · 256 first thing, with no re-schedule. Recorded:
+`combat-melee-fallen-msg`, an Amazon's A1 started at frames 34 and 54
+reads +0x44 = 256 (bonus 1) from the start frame to the mode's end.
+Any other writer after the schedule is the skill's own (`0x0056F640`
+calls the slot of the used skill); a start that returns before the
+slot call (`skills/use.md` §5.3) leaves f · 256. The frame bonus is
+written to +0x44 by three server functions only: the mode re-init
+`0x00624390` (§4.1), the frame advance `0x00623E00` (wrap, below) and
+`0x0056CA40`.
 
 So events of one schedule are scheduled in frame order, each action
 event before the end, and the end is at f + max(⌈(F − 256·b) / s⌉, 2)
@@ -613,14 +643,34 @@ prepared (`0x005533D0`), cancel 0/1, then, if the record of the mode the
 unit is now in has its schedule flag: every-tick (§4.4) when
 `0x005A6B10` says the mode moves, else §4.2.
 
-PROVISIONAL: the result of `0x005A7C20` for a live unit is 1 when the
-requested mode's start returned non-zero and 0 when the neutral start
-ran in its place (so the AI's failure branches of `monsters/ai.md` §7.2
-run after a walk with no path point) (because the 1.14d recording
-`merc-rogue-cow` frame 33 shows the hireling's wander to a point one
-sub-tile away followed, with no draw between, by the escape of
-`monsters/ai-bodies-6.md` §7 step 11); settled by a read of
-`0x005A7C20`'s return path (REC-1390).
+**Result** (1.14d-confirmed `0x005A7C20`, read 2026-10-10, PC 1 today;
+settles REC-1390). With r the requested mode's start result, in the
+function's order:
+
+- (a) The record's unit is null or not a monster → 0, nothing done.
+- (b) No record for the requested mode (`0x005A78A0`), or its start is
+  null → fallback `0x005A7B30`, 0.
+- (c) r = 0: used skill := none (`0x00620210(U, 0)`); then, if the
+  requested mode is neither 0 nor 12 and the unit is dead
+  (`0x005541B0`) → **1** at once (no neutral start, no flag 0x80000,
+  no prepare, no cancel, no schedule: "What keeps a dead monster
+  dead" below); else the neutral start `0x005A73E0` runs.
+- (d) After the prepare and cancel, no record for the mode the unit is
+  now in → fallback `0x005A7B30`, 0.
+- (e) Otherwise the result is **r itself** (the start's value, not
+  normalised to 1): so 0 whenever the neutral start ran in place of
+  the requested one, for a live unit as for a refused request of mode
+  0 or 12. The AI's failure branches of `monsters/ai.md` §7.2 so run
+  after a walk whose start `0x005A7520` found no path point (recorded:
+  `merc-rogue-cow` frame 33, the hireling's wander to a point one
+  sub-tile away followed, with no draw between, by the escape of
+  `monsters/ai-bodies-6.md` §7 step 11).
+
+Two more steps of the same read: after the animation prepare, when the
+flag argument ≠ 0 and the unit's mode equals the requested one, used
+skill := none again (`0x00620210(U, 0)`, at `0x005A7DDB`); and after
+the schedule, when the mode the unit is now in is 3 (GH), the path's
+`0x00648CF0(path, 0)` and `0x00648E70(path, 0)` run (monster spec).
 
 Mode table (`0x005A78A0`): 16-byte records {start, event-0 function,
 event-1 function, schedule flag} at `0x006E2260` + 16·mode. Null
@@ -1073,7 +1123,7 @@ becomes f + 1 (`tick.md` §5.2). Sites: `unit-events.tsv`.
 | 6 | hover text set `0x0054A290`; handler | the hover's timeout | `0x00580B70`: timeout (`0x006611D0`) ≤ f → free the hover, +0xA4 := 0, queue for update, flags \|= 0x100; else reschedule at the timeout |
 | 11 | join `0x00534AD0` (f + 250); handler (f + 30) | (0, 0) | `0x00580BE0`: party refresh (`0x005406A0`), pet refresh (`0x00575630`), reschedule f + 30. D2MOO calls it DELAYEDPORTAL; in 1.14d it is a 30-frame refresh |
 | 13 | trade and vendor code `0x00567620`–`0x00568D10` | per caller | `0x005689D0`: reschedules itself (`unit-events.tsv` rows 55–63). Out of scope (Phases 0–6): its player-trade body (multiplayer only) |
-| 14 | `0x00554EA0` | f + 50, callback `0x00554570` | the callback (skill cooldown end); the class table entry is null |
+| 14 | `0x00554EA0` | f + 50, callback `0x00554570` | the callback: clears the player's last placed point and cancels its other type-14 events (`path-placement.md` §10 rule 6; 1.14d-read 2026-10-10, PC 1 today: it ends no skill cooldown, the earlier reading was wrong); the class table entry is null |
 | 2, 4, 7, 10 | none for players | — | null entries |
 
 Join `0x00534AD0`: neutral mode start (`0x005809D0`, mode 1), then

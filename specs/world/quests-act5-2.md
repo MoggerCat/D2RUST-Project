@@ -28,17 +28,17 @@
 | Outputs / state changes | 65–73 |
 | Rules | 74–75 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
-|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–370 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–504 |
-|   9. Act V intro (chain 40, slot 42) | 505–531 |
-|   10. Hooks called from other systems | 532–554 |
-|   11. NPC services and game completion | 555–568 |
-| Constants & data dependencies | 569–588 |
-| Randomness | 589–600 |
-| Edge cases & original bugs | 601–636 |
-| Test vectors | 637–651 |
-| Provenance | 652–674 |
-| Open questions | 675–755 |
+|   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–376 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 377–510 |
+|   9. Act V intro (chain 40, slot 42) | 511–537 |
+|   10. Hooks called from other systems | 538–560 |
+|   11. NPC services and game completion | 561–574 |
+| Constants & data dependencies | 575–594 |
+| Randomness | 595–606 |
+| Edge cases & original bugs | 607–642 |
+| Test vectors | 643–657 |
+| Provenance | 658–680 |
+| Open questions | 681–761 |
 <!-- /index -->
 
 ## Summary
@@ -360,8 +360,14 @@ Where the altar (object 546) and the doors stand: `drlg/levels.md` §12.4.
 #### 7.9 Hooks with no caller
 
 `0x0058CFB0` (portal count; called from `0x005EEAB1`), `0x0058CF90`
-(armed = 0; from the Ancients' AI `0x005EEB83`, `0x005EEDB7`,
-`0x005EF027`) are used; `0x0058CFE0`, `0x0058D000`, `0x0058D030` have no
+(from the Ancients' AI `0x005EEB83`, `0x005EEDB7`, `0x005EF027`) are
+used. `0x0058CF90(game)` is a pure test: it takes chain 35's record
+(`0x00543640`), reads the armed byte (extra data +0x11) and returns 1
+when it is 0 ("not armed"), else 0; it writes nothing, so the armed
+byte set by §7.6 stays set through every Ancient think and the kill
+rule counts (1.14d-confirmed `0x0058CF90`–`0x0058CFA7`: one `cmp byte
+[+0x11], 0` / `sete`, no store; read 2026-10-10, PC 1 today; settles
+REC-1561, the earlier reading "armed := 0" was wrong). `0x0058CFE0`, `0x0058D000`, `0x0058D030` have no
 caller; `0x0058CFD0` is a `ret` stub (part 1 edge case 7).
 
 #### 7.10 Sequence function (`0x0058CD30`)

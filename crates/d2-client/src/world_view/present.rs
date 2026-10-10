@@ -433,7 +433,7 @@ pub fn deliver_outputs(
     outputs: Option<ResMut<FrameOutputs>>,
     ui: Option<NonSendMut<WorldViewUi>>,
     sounds: Option<ResMut<UiSounds>>,
-    state: Option<Res<WorldViewState>>,
+    state: Option<ResMut<WorldViewState>>,
 ) -> Result {
     let Some(mut outputs) = outputs else {
         return Ok(());
@@ -442,9 +442,17 @@ pub fn deliver_outputs(
     if list.is_empty() {
         return Ok(());
     }
-    let original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
-    let preview = state.is_some_and(|s| s.preview);
-    let requests = deliver_with(&mut bridge.0, &list, original, preview)?;
+    let mut original = ui.map(|u| u.into_inner()).and_then(|u| u.original.as_mut());
+    let preview = state.as_ref().is_some_and(|s| s.preview);
+    let requests = deliver_with(&mut bridge.0, &list, original.as_deref_mut(), preview)?;
+    // The UI's overlay calls (`client/msg-ui.md` §9 r3, §16 r4.1) go to
+    // the effect layer, which runs them before the next update advance.
+    if let (Some(ui), Some(mut s)) = (original, state) {
+        let calls = ui.take_overlay_calls();
+        if !calls.is_empty() {
+            s.missiles.overlay_calls(calls);
+        }
+    }
     if let Some(mut s) = sounds {
         s.0.extend(requests);
     }

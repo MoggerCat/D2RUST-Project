@@ -34,33 +34,33 @@
 |   4. GargoyleTrap (63) `0x005F9490` | 150–171 |
 |   5. Trap-RightArrow (78) `0x005FB6C0`, Trap-LeftArrow (79) `0x005FB7E0` | 172–192 |
 |   6. Trap-Poison (80) `0x005FB900`, Trap-Nova (92) `0x005FB9B0` | 193–206 |
-|   7. JarJar (81) `0x005E7590` | 207–240 |
-|   8. InvisoSpawner (82) `0x005E0160` | 241–258 |
-|   9. BoneWall (84) `0x005E0400`, init `0x005E0390` | 259–265 |
-|   10. Trap-Melee (87) `0x005FBA60` | 266–270 |
-|   11. 7TIllusion (88) `0x005EA080` | 271–279 |
-|   12. DarkWanderer (91) `0x005EA130` | 280–296 |
-|   13. ArcaneTower (93) `0x005E0F60` | 297–312 |
-|   14. Spirit (97) `0x005E3840` | 313–322 |
-|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 323–352 |
-|   16. InvisoPet (103) `0x005EA7A0` | 353–367 |
-|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 368–390 |
-|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 391–468 |
-|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 469–507 |
-|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 508–528 |
-|   21. DruidBear (112) `0x005ED730` | 529–555 |
-|   22. SiegeTower (113) `0x005E1860` | 556–570 |
-|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 571–599 |
-|   24. Wussie (131) `0x005EE3C0` | 600–627 |
-|   25. UberIzual (144) `0x005F8C80` | 628–643 |
-|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 644–696 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 697–846 |
-| Constants & data dependencies | 847–869 |
-| Randomness | 870–877 |
-| Edge cases & original bugs | 878–894 |
-| Test vectors | 895–915 |
-| Provenance | 916–947 |
-| Open questions | 948–959 |
+|   7. JarJar (81) `0x005E7590` | 207–241 |
+|   8. InvisoSpawner (82) `0x005E0160` | 242–259 |
+|   9. BoneWall (84) `0x005E0400`, init `0x005E0390` | 260–266 |
+|   10. Trap-Melee (87) `0x005FBA60` | 267–271 |
+|   11. 7TIllusion (88) `0x005EA080` | 272–280 |
+|   12. DarkWanderer (91) `0x005EA130` | 281–297 |
+|   13. ArcaneTower (93) `0x005E0F60` | 298–313 |
+|   14. Spirit (97) `0x005E3840` | 314–323 |
+|   15. BladeCreeper (102) `0x005EA540`, init `0x005EA510` | 324–353 |
+|   16. InvisoPet (103) `0x005EA7A0` | 354–368 |
+|   17. DeathSentry (104) `0x005EA980`, init `0x005EA290` | 369–391 |
+|   18. ShadowWarrior (105) `0x005EAFA0`, init `0x005EAF50` | 392–469 |
+|   19. Raven (107) `0x005ECC10`, init `0x005ECB70` | 470–508 |
+|   20. Vines (110) `0x005EC6C0`, init `0x005EC6A0` | 509–579 |
+|   21. DruidBear (112) `0x005ED730` | 580–606 |
+|   22. SiegeTower (113) `0x005E1860` | 607–621 |
+|   23. GenericSpawner (129) `0x005E61B0`, init `0x005E6190` | 622–650 |
+|   24. Wussie (131) `0x005EE3C0` | 651–678 |
+|   25. UberIzual (144) `0x005F8C80` | 679–694 |
+|   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 695–747 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 748–929 |
+| Constants & data dependencies | 930–952 |
+| Randomness | 953–960 |
+| Edge cases & original bugs | 961–977 |
+| Test vectors | 978–998 |
+| Provenance | 999–1030 |
+| Open questions | 1031–1042 |
 <!-- /index -->
 
 ## Summary
@@ -215,7 +215,8 @@ table).
 1. Home `0x005E6800` ≠ 0 → end.
 2. Seam `0x0059B8B0(game)` = 0 (the guard keeps the door):
    1. (hx, hy) := H's params 1, 2. stay := 1; seam `0x0059B8F0(game,
-      &(hx, hy))` ≠ 0 → stay := 0 (the seam may move the point).
+      &(hx, hy))` ≠ 0 → stay := 0 (the seam then has replaced the
+      point; return and point rule: `world/quests-act2.md` §10).
    2. w < frame and frame − w < 200 → idle 20. End.
    3. Path distance to (hx, hy) > 1 (unsigned) → walk to (hx, hy)
       (`0x005DED90`); w := frame. End.
@@ -525,6 +526,56 @@ last attack frame f. O := the minion owner.
 7. Idle aip3.
 
 1.14d-confirmed.
+
+**The vine's walks** (1.14d-confirmed, read 2026-10-10, PC 1 today:
+`0x005EC6C0`, `0x005E45D0`, `0x005E3EA0` case 1 `0x005E4187`–
+`0x005E4386`, `0x005DEE50`, `0x005A7E60`, `0x005A63F0`, `0x005A6380`,
+`0x00554570`; answers `[rc-gen-skill-2]`). The think never calls the
+mode set itself: every walk of a vine with no target comes from step 5,
+pet follow (`ai-bodies-6.md` §2) → pet move → a walk helper →
+`0x005A7C20`. The vine's size is 0 (monstats2 `SizeX`), so pet follow's
+D is the plain (2·max + min) / 2 of the position difference, and R = 6
++ (O's pet count >> 1) = 6 with one pet.
+
+Recorded (`traces/orig-cache/gen-skill-dru-222`, vine class 425 g 8,
+owner O standing at (5143, 4263) since its level warp at frame 4, O's
+path target point (5142, 4266) from the cast):
+
+- Frame 54, vine at (5142, 4266): D = 3 ≤ R. Four draws and mode 2
+  toward (5143, 4270) = the vine + (1, 4), no speed bonus (animation
+  speed 256 · 75 / 100 = 192, velocity 1792 · 75 / 100 = 1344): pet
+  move k 0 whose eight tries start nothing, ending in wander' 4 (d2rs
+  takes this branch and agrees through frame 66). The trace does not
+  hold O's final point F, so the k = 0 cause (target ≠ F on both axes)
+  is read from the code, not recorded.
+- Frame 67, the walk-end think (`ai.md` §1.4) at (5143, 4270): D = 7 >
+  R → k = 1. The path distance from the vine to O's last placed point
+  is not < 28, because that point is (0, 0) by then: the placement's
+  type-14 callback cleared it 50 frames after the warp
+  (`sim/path-placement.md` §10 rule 6), so k stays 1 (with the point still set it would be 4:
+  D < 30). Pet move k 1: O is not walking; speed = 0 → s := `roll(40)`
+  + 40, the frame's **one** draw (`lo'` = 4143816763, % 40 = 3 → s =
+  43). History walk from the newest entry: the warp's placement (5143,
+  4263) is non-zero and its path distance from the vine is 7 > 5 →
+  velocity (method 0, speed 43, steps 100) then walk-del
+  `0x005DEE50(5143, 4263)` (call site `0x005E4293`), which sets stop
+  distance 1, builds the mode-2 record and calls `0x005A7C20(game,
+  record, 1)`.
+- That request (`ai.md` §7.5 rules 4–5; 4.6 the speed bonus): method 0 does not
+  replace the record's path type byte 101 → **path type 13**; steps :=
+  77 (100 capped by `0x005DE190`); speed bonus 43 → stat 67 +43 for the
+  mode: p = 75 + 43 = 118, animation speed 256 · 118 / 100 = **302**,
+  velocity 1792 · 118 / 100 = 2114 (33824 / 65536 of a sub-tile a
+  frame, the recorded y step). The requested point is O's own cell, so
+  the computed path ends next to it and the path target becomes its
+  last point (5143, 4264) (`sim/pathing.md` §3 step 10).
+
+So a recording confirms: draw count 1 at the walk-end frame with s =
+`lo' % 40` + 40; path target = the last point of the type-13 path to
+the newest history entry of O farther than 5; `sp` = 256 · (75 + s) /
+100. The same holds for classes 426 and 427 (`gen-skill-dru-231` /
+`-241`): CycleOfLife (`ai-bodies-6.md` §25) reaches the same pet
+follow.
 
 ### 21. DruidBear (112) `0x005ED730`
 
@@ -843,6 +894,38 @@ Draws, in order: step 4's `roll(100)` and draws; step 7; step 11's
 (`0x005EB970`, jump tables `0x005EC634` / `0x005EC650` (`EType`) and
 `0x005EC660` (`aitype`), `0x005EB490`, `0x005EB5C0`, `0x005EB420`,
 `0x005EB6D0`, `0x005EB650`, `0x005EB7F0`, `0x005EB8B0`, `0x0063A2B0`).
+
+**List order and the first think** (1.14d-confirmed `0x00647110`,
+`0x00643910`, `0x006438F0`, `0x005EB490`, read 2026-10-10, PC 1 today;
+answers the `[q-fix-skills-bda]` question). A new skill entry is
+appended at the **tail** of the unit's list (`0x00647110` walks the
+next pointers +0x04 from the list's first entry +0x04; an entry the
+unit already has is reused in place), and steps 4 and 12 walk from the
+first entry. So the Shadow Master's list is: its monstats skills from
+spawn (`Skill1`… = Fists of Fire, Blade Fury, Blades of Ice, …;
+`monsters/init.md`), skill 0, then the owner's class skills not yet
+present, in class-list order (`data/runtime-maps.md` §5: record order;
+the Assassin's 251…280). Its `aitype` 1 skills with an `aurastate` are,
+in that order, 258 Burst of Speed (`quickness`, state group 2), 267 Fade
+(`fade`, group 2), 277 Blade Shield (`bladeshield`), 278 Venom
+(`venomclaws`); all `range` none and monster mode `SC` (7).
+
+With no target (T = 0 from the dispatch, or D > A2m) the first think
+therefore takes the step-4 buff pass on **258 Burst of Speed**: the unit
+lacks `quickness`, no group-2 state is active (so the `roll(100)` < 4
+is not drawn), the one draw `lo' % 100` is < 60, the entry exists,
+`range` ≠ 1 → `0x005DEAD0(mode 7, 258, unit 0, 0, 0)`: mode 7 with path
+target point (0, 0) and no target unit (`ai.md` §7.5 rule 6). Recorded
+(`traces/orig-cache/ass-shadow-master`, class 418 g 8, owner alone, the
+poked cow not attackable): frame 48 exactly one step of the unit seed,
+`lo'` = 1016988915, % 100 = 15 → mode 7, path target (0, 0); mode 1
+again at frame 62; no further draw through frame 70. A draw ≥ 60 skips
+that skill for the think and the pass goes on to 267 (same test, its
+own draw), 277, 278; once `quickness` is on, 267 Fade needs the
+`roll(100)` < 4 first (same group). d2rs idles 100 at step 1 while the
+host does not provide the unit's skill list (`has_skill_list`,
+`unit_skills`, `class_skills`, `entry_mode`, `skill_base_level` of the
+AI host).
 
 ## Constants & data dependencies
 

@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-drop.player-dead-body	system	items	vitals.md §4.6 r1.5 dead clean-up 0x0057F330 (0x00649F70)	specs/combat/vitals.md	draft	items-drops-nor-04	DIVERGED@53	?	0	n	claude/rc-bolt-target	DIVERGED	S	dead player now gets the 0x8000 dead-body footprint; bolt no longer hits the monster beside the body (f40). items-drops-nor-04 2/5 -> 4/5 equal; next divergence: drop 1 frame late (f54 vs f53), known. REC-1990
+drop.player-dead-body	system	items	vitals.md §4.6 r1.5 dead clean-up 0x0057F330 (0x00649F70)	specs/combat/vitals.md	draft	items-drops-nor-04	DIVERGED	?	0	n	claude/rc-bolt-target	DIVERGED	S	dead player now gets the 0x8000 dead-body footprint; bolt no longer hits the monster beside the body (f40). items-drops-nor-04 2/5 -> 4/5 equal; next divergence: drop 1 frame late (f54 vs f53), known. REC-1990

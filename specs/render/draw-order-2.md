@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–362 |
-|   12. Level backgrounds (pass 1) | 363–416 |
-|   13. Pass 8 (`0x00475B20`) | 417–425 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 426–451 |
-|   15. Sight test (`draw-order.md` §5 r3) | 452–498 |
-|   16. Line test (`0x0064E260`) | 499–528 |
-| Constants & data dependencies | 529–539 |
-| Randomness | 540–551 |
-| Edge cases & original bugs | 552–568 |
-| Test vectors | 569–590 |
-| Provenance | 591–623 |
-| Open questions | 624–699 |
+|   11. Weather (passes 4 and 9; water floors) | 68–391 |
+|   12. Level backgrounds (pass 1) | 392–445 |
+|   13. Pass 8 (`0x00475B20`) | 446–454 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 455–480 |
+|   15. Sight test (`draw-order.md` §5 r3) | 481–527 |
+|   16. Line test (`0x0064E260`) | 528–557 |
+| Constants & data dependencies | 558–568 |
+| Randomness | 569–580 |
+| Edge cases & original bugs | 581–597 |
+| Test vectors | 598–619 |
+| Provenance | 620–653 |
+| Open questions | 654–729 |
 <!-- /index -->
 
 ## Summary
@@ -152,6 +152,35 @@ Runs unless the snow lock `[0x007A8A1C]` is set and the phase is not 2
    0 and 2 keep it. Intensity := float(target) × (1/256).
 
 Units are weather updates (one per client update with rain on).
+
+**Seed and the first cycle** (1.14d-confirmed `0x00473F50`, `0x00473E50`,
+`0x00473D00`, `0x00472610`, `0x00472890`, `0x004547B0`, read 2026-10-10,
+PC 1 today). The cycle has no seed of its own: `0x00473F50` passes the
+local player's client unit seed (unit `[0x007A6A70]` + 0x20) to every
+draw, and nothing seeds it at game or act start; its value there is the
+prefix of `client/model.md` Randomness rule 4. In the first game of a
+client process (phase 0, countdown 0, §11.1) the first weather update of
+a raining level therefore draws, in order: `D` := 250 + (step mod 250)
+(phase 0 → 1); the three steps of `0x00472610` (phase entry 1 →
+`0x004726F0(0)`, §11.8 r1); peak := 32 + (step mod 224). Five steps, no
+other draw in that update (target = ⌊peak / `D`⌋ = 0 unless peak ≥ `D`).
+Update `k` (the first is `k` = 1) then has target ⌊peak × `k` / `D`⌋,
+and the top-up spawns 5 steps per missing particle (§11.4 r5). The rain
+sound starts in the sound tick of the first update with target ≥ 2
+(`audio/environment.md` §6: trunc(target × 255 / 256) ≠ 0), i.e. `k` =
+⌈2`D` / peak⌉. A join into an act I–IV town (any game seed, any save):
+steps 11–15 of the stream of `client/model.md` Randomness rule 4 give
+`D` = 498, retarget countdown 465, lightning countdown 1,968, wind =
+goal = 147, peak = 255; target 1 at `k` = 2, 2 at `k` = 4, 3 at `k` = 6;
+rain request at `k` = 4 (these values need the first rain update in the
+join's first drawn frame, i.e. a start level with `Rain`). Recorded: `facts/client/weather/a1-town-rain-start.tsv`
+(targets), `traces/audio/win/audio-town-ambience-ama.orig-win.jsonl`
+(request 64 from `0x004E448A` at T 3, C 4), and the 12 steps of the
+first drawn frame in `traces/orig-cache/draws-town-arrival-ama`
+(`seed_start` {0xB6AAB839, 0x10B1BFE6} → `seed_end` {0xE4CA4C4E,
+0x3A4FDE2B}). In a later game of the same process the cycle state
+carries over (§11.1), so the first update draws only when the old
+countdown is 0.
 
 #### 11.4 Particles: top-up, wind, lightning timer (`0x004737B0`)
 
@@ -620,6 +649,7 @@ header. Level lists from
 `patch_d2` `levels.txt`. Rain seen in run 2 (`20261006-141725`, Rogue
 Encampment): splash ripples on the river, drop lines.
 - 2026-10-09 (pc1-day3-c, REC-576 (6)): `[0x007BB390]` polled with no breakpoints on Windows (scratch probe on `autostart.py`'s hook-free debugger), §11.7 r2.
+- 2026-10-10 (PC 1 today, static asm / exports): §11.3 "Seed and the first cycle" from `0x00473F50` (seed argument unit + 0x20), `0x00473E50`, `0x00473D00`, `0x004726F0`, `0x00472610`, `0x00472890`, `0x004547B0`; values from the stream of `client/model.md` Randomness rule 4, checked against `traces/orig-cache/draws-town-arrival-ama` (frame seeds), `facts/client/weather/a1-town-rain-start.tsv` and the 1.14d request log of `traces/audio/win/` (rain request T 3).
 
 ## Open questions
 

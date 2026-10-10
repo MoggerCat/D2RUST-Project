@@ -3,6 +3,10 @@
 Suite run 2026-10-09 17:34 UTC at 739dd943: `suite.py --no-playthrough --workers 3 --json /tmp/claude-0/s/suite.json --md /tmp/claude-0/s/suite.md`.
 
 Rows of 29 checks re-run 2026-10-10 on claude/integ-r16 + rc-coverage-warps (warps, milestones, combat-elements; `suite.py --filter … --orig-cache traces/orig-cache --no-playthrough`): rows replaced in place, the totals above are the full run's.
+
+Rows of 262 checks re-run 2026-10-10 by rc-run-1 on integ-r23 (`suite.py --filter 'a*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`): rows replaced in place, the totals above are the full run's.
+
+Rows of 119 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h*,i*,j*,m*,n*,p*,r*,s*,u*,w*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`, partial: whatever finished by 12:00Z): rows replaced in place, the totals above are not recomputed.
 88 checks, 108 channel results: DIVERGED 68, MATCH 1, PARTIAL 39.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
@@ -10,109 +14,459 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 
 | Check | Channel | Verdict | Frames equal | First divergence | Owner |
 |---|---|---|---|---|---|
+| a1-quest-andariel-reward | packets | MATCH | 60/60 | - | - |
+| a1-quest-andariel-reward | state | PARTIAL | 60/60 | - | - |
+| a1-quest-den-reward | packets | MATCH | 60/60 | - | - |
+| a1-quest-den-reward | state | PARTIAL | 60/60 | - | - |
 | a1-town-arrival-ama | state | PARTIAL | 40/40 | - | - |
-| a1-warp-catacombs-ama | state | PARTIAL | 160/160 | - | - |
 | a1-warp-catacombs-ama | rng | MATCH | 133/133 | - | - |
-| a1-warp-cave-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-catacombs-ama | state | PARTIAL | 160/160 | - | - |
 | a1-warp-cave-ama | rng | MATCH | 133/133 | - | - |
-| a1-warp-den-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-cave-ama | state | PARTIAL | 160/160 | - | - |
 | a1-warp-den-ama | rng | MATCH | 133/133 | - | - |
-| a1-warp-jail-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-den-ama | state | PARTIAL | 160/160 | - | - |
 | a1-warp-jail-ama | rng | MATCH | 133/133 | - | - |
-| a1-warp-tower-cellar-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-jail-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l1-town-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l1-town-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l10-cave-3-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l10-cave-3-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l11-cave-4-ama | rng | MATCH | 148/148 | - | - |
+| a1-warp-l11-cave-4-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l12-cave-5-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l12-cave-5-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l13-cave-2-treasure-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l13-cave-2-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l14-cave-3-treasure-ama | rng | MATCH | 161/161 | - | - |
+| a1-warp-l14-cave-3-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l15-cave-4-treasure-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l15-cave-4-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l16-cave-5-treasure-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l16-cave-5-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l17-graveyard-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l17-graveyard-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l18-crypt-1-a-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l18-crypt-1-a-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l19-crypt-2-a-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l19-crypt-2-a-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l20-tower-2-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l20-tower-2-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l22-crypt-3-b-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l22-crypt-3-b-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l23-crypt-3-c-ama | rng | MATCH | 142/142 | - | - |
+| a1-warp-l23-crypt-3-c-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l24-crypt-3-d-ama | rng | MATCH | 160/160 | - | - |
+| a1-warp-l24-crypt-3-d-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l25-crypt-3-e-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l25-crypt-3-e-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l26-monastery-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l26-monastery-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l27-courtyard-1-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l27-courtyard-1-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l28-barracks-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l28-barracks-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l30-jail-2-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l30-jail-2-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l31-jail-3-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l31-jail-3-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l32-courtyard-2-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l32-courtyard-2-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l33-cathedral-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l33-cathedral-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l35-catacombs-2-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l35-catacombs-2-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l36-catacombs-3-ama | rng | MATCH | 159/159 | - | - |
+| a1-warp-l36-catacombs-3-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l37-catacombs-4-ama | rng | MATCH | 161/161 | - | - |
+| a1-warp-l37-catacombs-4-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l38-tristram-ama | rng | MATCH | 161/161 | - | - |
+| a1-warp-l38-tristram-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l39-moo-moo-farm-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l39-moo-moo-farm-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l5-wilderness-4-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l5-wilderness-4-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l6-wilderness-5-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l6-wilderness-5-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-l7-wilderness-6-ama | rng | MATCH | 133/133 | - | - |
+| a1-warp-l7-wilderness-6-ama | state | PARTIAL | 160/160 | - | - |
 | a1-warp-tower-cellar-ama | rng | MATCH | 161/161 | - | - |
-| a2-warp-arcane-ama | state | PARTIAL | 160/160 | - | - |
+| a1-warp-tower-cellar-ama | state | PARTIAL | 160/160 | - | - |
+| a2-npc-atma-talk | packets | MATCH | 50/50 | - | - |
+| a2-npc-atma-talk | state | PARTIAL | 50/50 | - | - |
+| a2-npc-cain-talk | packets | MATCH | 50/50 | - | - |
+| a2-npc-cain-talk | state | PARTIAL | 50/50 | - | - |
+| a2-npc-drognan-trade | packets | MATCH | 50/50 | - | - |
+| a2-npc-drognan-trade | state | PARTIAL | 50/50 | - | - |
+| a2-npc-elzix-gamble | packets | MATCH | 50/50 | - | - |
+| a2-npc-elzix-gamble | state | PARTIAL | 50/50 | - | - |
+| a2-npc-elzix-trade | packets | MATCH | 50/50 | - | - |
+| a2-npc-elzix-trade | state | PARTIAL | 50/50 | - | - |
+| a2-npc-fara-heal | packets | MATCH | 50/50 | - | - |
+| a2-npc-fara-heal | state | PARTIAL | 50/50 | - | - |
+| a2-npc-fara-trade | packets | MATCH | 50/50 | - | - |
+| a2-npc-fara-trade | state | PARTIAL | 50/50 | - | - |
+| a2-npc-greiz-hire | packets | MATCH | 60/60 | - | - |
+| a2-npc-greiz-hire | state | PARTIAL | 60/60 | - | - |
+| a2-npc-greiz-hirelist | packets | MATCH | 50/50 | - | - |
+| a2-npc-greiz-hirelist | state | PARTIAL | 50/50 | - | - |
+| a2-npc-jerhyn-talk | packets | MATCH | 50/50 | - | - |
+| a2-npc-jerhyn-talk | state | PARTIAL | 50/50 | - | - |
+| a2-npc-lysander-trade | packets | MATCH | 50/50 | - | - |
+| a2-npc-lysander-trade | state | PARTIAL | 50/50 | - | - |
+| a2-npc-meshif-talk | packets | MATCH | 50/50 | - | - |
+| a2-npc-meshif-talk | state | PARTIAL | 50/50 | - | - |
+| a2-npc-warriv-talk | packets | MATCH | 50/50 | - | - |
+| a2-npc-warriv-talk | state | PARTIAL | 50/50 | - | - |
+| a2-quest-arcane | packets | DIVERGED | 110/114 | frame 84 stream s2c #0 bytes[6]: 1.14d 103 vs d2rs 114 (id 0x67) | q-fix-join-items |
+| a2-quest-arcane | state | PARTIAL | 114/114 | - | - |
+| a2-quest-radament | packets | DIVERGED | 130/138 | frame 61 stream s2c #36 id: 1.14d 9c vs d2rs 51 (id 0x9c) | q-fix-join-items |
+| a2-quest-radament | state | DIVERGED | 83/138 | frame 84 monster 1:106 class 229, field s: 1.14d [1664319924, 1195937719] vs d2rs [1880661819, 694175140] | q-fix-seed-order |
+| a2-quest-staff | packets | MATCH | 44/44 | - | - |
+| a2-quest-staff | state | PARTIAL | 44/44 | - | - |
+| a2-quest-summoner | packets | DIVERGED | 56/76 | frame 16 stream s2c #22 size: 1.14d 16 vs d2rs 10 (id 0xaa) | q-fix-join-items |
+| a2-quest-summoner | state | DIVERGED | 19/76 | frame 20 game, field seed: 1.14d [1037325479, 564040154] vs d2rs [123760680, 1255268544] | q-fix-seed-order |
+| a2-quest-taintedsun | packets | DIVERGED | 72/82 | frame 44 stream s2c #17 id: 1.14d 9c vs d2rs 67 (id 0x9c) | q-fix-join-items |
+| a2-quest-taintedsun | state | DIVERGED | 76/82 | frame 77 monster 1:162 class 9, field m: 1.14d 15 vs d2rs 1 | unrouted |
+| a2-quest-tombs | packets | DIVERGED | 132/150 | frame 32 stream s2c #1 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-quest-tombs | state | PARTIAL | 150/150 | - | - |
+| a2-super-beetleburst | packets | DIVERGED | 113/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-beetleburst | state | PARTIAL | 120/120 | - | - |
+| a2-super-coldworm | packets | DIVERGED | 91/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-coldworm | state | PARTIAL | 120/120 | - | - |
+| a2-super-darkelder | packets | DIVERGED | 118/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-darkelder | state | PARTIAL | 120/120 | - | - |
+| a2-super-fangskin | packets | DIVERGED | 88/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-fangskin | state | DIVERGED | 47/120 | frame 48 player 0:1 class 0, field hp: 1.14d 7459 vs d2rs 12413 | q-fix-join-items |
+| a2-super-fireeye | packets | DIVERGED | 119/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-super-fireeye | state | PARTIAL | 120/120 | - | - |
+| a2-super-leatherarm | packets | DIVERGED | 116/120 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-super-leatherarm | state | DIVERGED | 69/120 | frame 70 item 4:1 class 523, field fr: 1.14d 4096 vs d2rs 0 | unrouted |
 | a2-warp-arcane-ama | rng | MATCH | 22/22 | - | - |
-| a2-warp-maggot-lair-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-arcane-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l41-desert-1-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l41-desert-1-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l42-desert-2-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l42-desert-2-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l43-desert-3-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l43-desert-3-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l44-desert-4-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l44-desert-4-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l45-desert-5-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l45-desert-5-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l46-valley-of-the-kings-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l46-valley-of-the-kings-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l48-sewer-1-b-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l48-sewer-1-b-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l49-sewer-1-c-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l49-sewer-1-c-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l50-harem-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l50-harem-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l51-corrupt-harem-1-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l51-corrupt-harem-1-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l52-basement-1-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l52-basement-1-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l53-basement-2-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l53-basement-2-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l54-basement-3-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l54-basement-3-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | q-fix-seed-order |
+| a2-warp-l55-tomb-1-a-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | q-fix-seed-order |
+| a2-warp-l56-tomb-2-a-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l56-tomb-2-a-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l57-tomb-2-b-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l57-tomb-2-b-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l58-tomb-3-a-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l58-tomb-3-a-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l59-tomb-1-treasure-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l59-tomb-1-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l60-tomb-2-treasure-ama | rng | MATCH | 159/159 | - | - |
+| a2-warp-l60-tomb-2-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l61-tomb-3-treasure-ama | rng | DIVERGED | 125/140 | frame 64, unit 1:6, draw #0, field n: 1.14d site 0x57b5f7 vs d2rs site crates/d2-sim/src/combat/damage.rs:319 | q-fix-seed-order |
+| a2-warp-l61-tomb-3-treasure-ama | state | DIVERGED | 63/160 | frame 64 player 0:1 class 0, field hp: 1.14d 7459 vs d2rs 12413 | q-fix-join-items |
+| a2-warp-l63-lair-1-b-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l63-lair-1-b-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l64-lair-1-treasure-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l64-lair-1-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l65-sewer-2-a-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l65-sewer-2-a-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l67-tomb-tal-2-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l67-tomb-tal-2-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l68-tomb-tal-3-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l68-tomb-tal-3-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | q-fix-seed-order |
+| a2-warp-l69-tomb-tal-4-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | q-fix-seed-order |
+| a2-warp-l70-tomb-tal-5-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l70-tomb-tal-5-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l71-tomb-tal-6-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l71-tomb-tal-6-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l72-tomb-tal-7-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-l72-tomb-tal-7-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-l73-duriel-s-lair-ama | rng | MATCH | 152/152 | - | - |
+| a2-warp-l73-duriel-s-lair-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-maggot-lair-ama | rng | MATCH | 22/22 | - | - |
-| a2-warp-sewers-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-maggot-lair-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-sewers-ama | rng | MATCH | 52/52 | - | - |
-| a2-warp-tal-rasha-tomb-ama | state | PARTIAL | 160/160 | - | - |
+| a2-warp-sewers-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-tal-rasha-tomb-ama | rng | MATCH | 22/22 | - | - |
+| a2-warp-tal-rasha-tomb-ama | state | PARTIAL | 160/160 | - | - |
+| a2-wp-40 | packets | MATCH | 50/50 | - | - |
+| a2-wp-40 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-42 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-42 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-43 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-43 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-44 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-44 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-46 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-wp-46 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-48 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-48 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-52 | packets | DIVERGED | 49/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-52 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-57 | packets | DIVERGED | 48/50 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
+| a2-wp-57 | state | PARTIAL | 50/50 | - | - |
+| a2-wp-74 | packets | DIVERGED | 11/50 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-wp-74 | state | DIVERGED | 13/50 | frame 14 game, field seed: 1.14d [3301680733, 432660541] vs d2rs [2249109384, 51619635] | q-fix-seed-order |
 | a3-start-noquest-sor | state | PARTIAL | 30/30 | - | - |
-| a3-warp-durance-ama | state | PARTIAL | 160/160 | - | - |
 | a3-warp-durance-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-durance-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-flayer-dungeon-ama | rng | MATCH | 133/133 | - | - |
 | a3-warp-flayer-dungeon-ama | state | PARTIAL | 160/160 | - | - |
-| a3-warp-flayer-dungeon-ama | rng | DIVERGED | 132/133 | frame 2, unit 1:1, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
-| a3-warp-kurast-sewers-ama | state | PARTIAL | 160/160 | - | - |
 | a3-warp-kurast-sewers-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-kurast-sewers-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l101-mephisto-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l101-mephisto-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l102-mephisto-3-ama | rng | MATCH | 152/152 | - | - |
+| a3-warp-l102-mephisto-3-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l76-jungle-1-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l76-jungle-1-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l77-jungle-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l77-jungle-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l78-jungle-3-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l78-jungle-3-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l79-kurast-1-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l79-kurast-1-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l80-kurast-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l80-kurast-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l81-kurast-3-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l81-kurast-3-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l82-kurast-4-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l82-kurast-4-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l83-travincal-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l83-travincal-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l84-spider-1-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l84-spider-1-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l85-spider-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l85-spider-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l86-dungeon-1-a-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l86-dungeon-1-a-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l87-dungeon-1-b-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l87-dungeon-1-b-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l89-dungeon-2-b-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l89-dungeon-2-b-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l90-dungeon-1-treasure-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l90-dungeon-1-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l91-dungeon-2-treasure-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l91-dungeon-2-treasure-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l93-sewer-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l93-sewer-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l94-temple-1-ama | rng | DIVERGED | 111/157 | frame 54, unit 1:10, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:412 | q-fix-seed-order |
+| a3-warp-l94-temple-1-ama | state | DIVERGED | 42/160 | frame 43 monster 1:10 class 47, field m: 1.14d 1 vs d2rs 15 | unrouted |
+| a3-warp-l95-temple-2-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l95-temple-2-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l96-temple-3-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l96-temple-3-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l97-temple-4-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l97-temple-4-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l98-temple-5-ama | rng | MATCH | 133/133 | - | - |
+| a3-warp-l98-temple-5-ama | state | PARTIAL | 160/160 | - | - |
+| a3-warp-l99-temple-6-ama | rng | DIVERGED | 128/144 | frame 89, unit 1:5, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/combat/damage.rs:319 | q-fix-seed-order |
+| a3-warp-l99-temple-6-ama | state | DIVERGED | 88/160 | frame 89 player 0:1 class 0, field m: 1.14d 1 vs d2rs 19 | unrouted |
+| a4-deseis-seal-early | state | DIVERGED | 45/200 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| a4-deseis-seal-loaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| a4-deseis-seal-unloaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | a4-fortress-arrival-ama | state | PARTIAL | 60/60 | - | - |
+| a4-hellforge-smash | state | DIVERGED | 42/330 | frame 43 monster 1:8 class 153, field m: 1.14d 4 vs d2rs 1 | unrouted |
 | a4-start-noquest-sor | state | PARTIAL | 30/30 | - | - |
+| a4-warp-l104-mesa-1-ama | rng | DIVERGED | 158/159 | frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:193 | q-fix-seed-order |
+| a4-warp-l104-mesa-1-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [3965398309, 792411527] vs d2rs [1235504095, 1059482100] | q-fix-seed-order |
+| a4-warp-l106-mesa-3-ama | rng | DIVERGED | 144/145 | frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None | q-fix-seed-order |
+| a4-warp-l106-mesa-3-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [268807636, 1446976384] vs d2rs [3343186878, 1210264819] | q-fix-seed-order |
+| a4-warp-l108-diablo-1-ama | rng | MATCH | 156/156 | - | - |
+| a4-warp-l108-diablo-1-ama | state | PARTIAL | 160/160 | - | - |
 | a4-warp-plains-ama | state | PARTIAL | 80/80 | - | - |
-| a4-warp-river-ama | state | PARTIAL | 160/160 | - | - |
 | a4-warp-river-ama | rng | MATCH | 137/137 | - | - |
-| a5-harrogath-arrival-ama | state | DIVERGED | 23/60 | frame 24 monster 1:1 class 511, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| a5-town-arrival-bar | state | DIVERGED | 23/40 | frame 24 monster 1:1 class 511, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| a5-warp-crystalized-ama | state | PARTIAL | 160/160 | - | - |
+| a4-warp-river-ama | state | PARTIAL | 160/160 | - | - |
+| a5-harrogath-arrival-ama | state | PARTIAL | 60/60 | - | - |
+| a5-npc-cain5 | state | PARTIAL | 190/190 | - | - |
+| a5-npc-larzuk | state | PARTIAL | 190/190 | - | - |
+| a5-npc-malah | state | PARTIAL | 190/190 | - | - |
+| a5-npc-nihlathak-town | state | PARTIAL | 190/190 | - | - |
+| a5-npc-qual-kehk | state | PARTIAL | 190/190 | - | - |
+| a5-su-ancient1 | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-ancient2 | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-ancient3 | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-anodized-elite | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-axe-dweller | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-blaze-ripper | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-bonesaw-breaker | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-dac-farren | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-eyeback | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-frozenstein | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-magma-torquer | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-megaflow-rectifier | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-nihlathak-boss | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-pindleskin | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-sharp-tooth-sayer | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-shenk | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-snapchip | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-threash-socket | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-su-vinvear-molech | state | DIVERGED | 6/90 | frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-town-arrival-bar | state | PARTIAL | 40/40 | - | - |
+| a5-town-npc-sweep | state | PARTIAL | 170/170 | - | - |
 | a5-warp-crystalized-ama | rng | MATCH | 133/133 | - | - |
-| a5-warp-halls-anguish-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-crystalized-ama | state | PARTIAL | 160/160 | - | - |
 | a5-warp-halls-anguish-ama | rng | MATCH | 133/133 | - | - |
-| a5-warp-wsk-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-halls-anguish-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l110-siege-1-ama | rng | DIVERGED | 107/161 | frame 29, unit 1:18, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:412 | q-fix-seed-order |
+| a5-warp-l110-siege-1-ama | state | DIVERGED | 22/160 | frame 23 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321 | coord-resume-3 |
+| a5-warp-l111-barricade-1-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l111-barricade-1-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l112-barricade-2-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l112-barricade-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l115-ice-cave-2-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l115-ice-cave-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l116-ice-cave-2a-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l116-ice-cave-2a-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l117-barricade-snow-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l117-barricade-snow-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l118-ice-cave-3-ama | rng | MATCH | 152/152 | - | - |
+| a5-warp-l118-ice-cave-3-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l119-ice-cave-3a-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l119-ice-cave-3a-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l120-mountain-top-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l120-mountain-top-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l121-temple-entrance-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l121-temple-entrance-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l123-temple-2-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l123-temple-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l125-hell-1-ama | rng | MATCH | 156/156 | - | - |
+| a5-warp-l125-hell-1-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l126-hell-2-ama | rng | MATCH | 161/161 | - | - |
+| a5-warp-l126-hell-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l127-hell-3-ama | rng | MATCH | 160/160 | - | - |
+| a5-warp-l127-hell-3-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l129-baal-temple-2-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l129-baal-temple-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l130-baal-temple-3-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l130-baal-temple-3-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l133-pandemonium-1-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l133-pandemonium-1-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l134-pandemonium-2-ama | rng | MATCH | 133/133 | - | - |
+| a5-warp-l134-pandemonium-2-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l135-pandemonium-3-ama | rng | MATCH | 154/154 | - | - |
+| a5-warp-l135-pandemonium-3-ama | state | PARTIAL | 160/160 | - | - |
+| a5-warp-l136-pandemonium-finale-ama | rng | MATCH | 161/161 | - | - |
+| a5-warp-l136-pandemonium-finale-ama | state | PARTIAL | 160/160 | - | - |
 | a5-warp-wsk-ama | rng | MATCH | 133/133 | - | - |
-| act-travel-lut-ama | state | DIVERGED | 31/80 | frame 32 monster 1:8 class 201, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| a5-warp-wsk-ama | state | PARTIAL | 160/160 | - | - |
+| a5-wp-30-harrogath | state | PARTIAL | 220/220 | - | - |
+| a5-wp-31-lv111 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-32-lv112 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-33-lv113 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-34-lv115 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-35-lv123 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-36-lv117 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-37-lv118 | state | PARTIAL | 540/540 | - | - |
+| a5-wp-38-lv129 | state | PARTIAL | 540/540 | - | - |
+| act-travel-lut-ama | state | DIVERGED | 9/80 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| ama-charged-strike | state | PARTIAL | 70/70 | - | - |
+| ama-cold-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-dopplezon | state | PARTIAL | 70/70 | - | - |
+| ama-exploding-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-fend | state | PARTIAL | 70/70 | - | - |
+| ama-fire-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-freezing-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-guided-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-ice-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-immolation-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-impale | state | PARTIAL | 70/70 | - | - |
+| ama-inner-sight | state | PARTIAL | 70/70 | - | - |
+| ama-jab | state | PARTIAL | 70/70 | - | - |
+| ama-lightning-bolt | state | PARTIAL | 70/70 | - | - |
+| ama-lightning-fury | state | PARTIAL | 70/70 | - | - |
+| ama-lightning-strike | state | PARTIAL | 70/70 | - | - |
+| ama-magic-arrow | state | PARTIAL | 70/70 | - | - |
+| ama-multiple-shot | state | PARTIAL | 70/70 | - | - |
+| ama-plague-javelin | state | PARTIAL | 70/70 | - | - |
+| ama-poison-javelin | state | PARTIAL | 70/70 | - | - |
+| ama-power-strike | state | PARTIAL | 70/70 | - | - |
+| ama-slow-missiles | state | PARTIAL | 70/70 | - | - |
+| ama-strafe | state | PARTIAL | 70/70 | - | - |
+| ama-valkyrie | state | PARTIAL | 70/70 | - | - |
+| ass-blade-fury | state | PARTIAL | 70/70 | - | - |
+| ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | q-fix-seed-order |
+| ass-blade-shield | state | PARTIAL | 70/70 | - | - |
+| ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
+| ass-charged-bolt-sentry | state | PARTIAL | 70/70 | - | - |
+| ass-claws-of-thunder | state | PARTIAL | 70/70 | - | - |
+| ass-cloak-of-shadows | state | PARTIAL | 70/70 | - | - |
+| ass-cobra-strike | state | PARTIAL | 70/70 | - | - |
+| ass-death-sentry | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-claw | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-flight | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-tail | state | PARTIAL | 70/70 | - | - |
+| ass-dragon-talon | state | PARTIAL | 70/70 | - | - |
 | ass-fade | state | PARTIAL | 70/70 | - | - |
-| ass-fire-blast | state | DIVERGED | 52/70 | frame 28 game, field seed: 1.14d [3184650063, 1412234640] vs d2rs [367684955, 1328293240] | q-fix-real-unit-seed-order |
+| ass-fire-blast | state | PARTIAL | 70/70 | - | - |
+| ass-fists-of-fire | state | PARTIAL | 70/70 | - | - |
+| ass-inferno-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry | state | PARTIAL | 70/70 | - | - |
+| ass-lightning-sentry-hit | state | PARTIAL | 160/160 | - | - |
+| ass-lightning-sentry-kill | state | PARTIAL | 160/160 | - | - |
 | ass-mind-blast | state | PARTIAL | 70/70 | - | - |
-| ass-shadow-master | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [896181489, 1511496387] vs d2rs [3385903807, 408973908] | q-fix-real-unit-seed-order |
+| ass-passives | state | PARTIAL | 70/70 | - | - |
+| ass-psychic-hammer | state | PARTIAL | 70/70 | - | - |
+| ass-royal-strike | state | PARTIAL | 70/70 | - | - |
+| ass-shadow-master | state | DIVERGED | 47/70 | frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| ass-shadow-warrior | state | PARTIAL | 70/70 | - | - |
+| ass-shock-field | state | PARTIAL | 70/70 | - | - |
+| ass-tiger-strike | state | PARTIAL | 70/70 | - | - |
+| ass-venom | state | PARTIAL | 70/70 | - | - |
+| ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
+| autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
 | bar-whirlwind | state | DIVERGED | 43/70 | frame 20 player 0:1 class 4, field sp: 1.14d 304 vs d2rs 256 | unrouted |
-| combat-arrow-kill | state | DIVERGED | 4/110 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-arrow-quillrat | state | DIVERGED | 4/130 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-champion-pack | state | DIVERGED | 4/176 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-cold-plains-wp | state | DIVERGED | 92/520 | frame 93 player 0:1 class 0, field m: 1.14d 5 vs d2rs 6 | unrouted |
-| combat-elements | state | PARTIAL | 226/226 | - | - |
-| combat-fallen-hits-player | state | DIVERGED | 4/200 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-kill-fallen | state | DIVERGED | 4/146 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-melee-fallen | state | DIVERGED | 4/150 | frame 5 game, field seed: 1.14d [2204983786, 786361590] vs d2rs [452392060, 1458054186] | q-fix-real-unit-seed-order |
-| combat-melee-fallen | packets | DIVERGED | 121/150 | frame 1 stream c2s #0 bytes[18]: 1.14d 0 vs d2rs 4 (id 0x67) | q-prov-recording-2 |
-| combat-melee-fallen-msg | state | DIVERGED | 4/260 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-monster-missiles | state | DIVERGED | 4/260 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-pop-blood-moor | state | DIVERGED | 4/400 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| combat-pop-cold-plains | state | DIVERGED | 3/400 | frame 4 player 0:1 class 0, field x: 1.14d 5168 vs d2rs 5183 | q-scenes-compare |
-| combat-pop-stony-field | state | DIVERGED | 3/400 | frame 4 object 2:18 class 37/119, field cl: 1.14d 37 vs d2rs 119 | unrouted |
-| combat-potion-midfight | state | DIVERGED | 4/150 | frame 5 game, field seed: 1.14d [2050998685, 832042106] vs d2rs [4279811999, 840453112] | q-fix-real-unit-seed-order |
-| combat-potion-midfight | packets | DIVERGED | 108/150 | frame 1 stream c2s #0 bytes[18]: 1.14d 0 vs d2rs 4 (id 0x67) | q-prov-recording-2 |
-| combat-random-boss | state | DIVERGED | 4/186 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
 | combat-umod-life | state | PARTIAL | 24/24 | - | - |
-| combat-unique-pack | state | DIVERGED | 4/226 | frame 5 game, field seed: 1.14d [452392060, 1458054186] vs d2rs [515905870, 972665225] | q-fix-real-unit-seed-order |
-| death-town-ama | state | PARTIAL | 120/120 | - | - |
-| draws-town-arrival-ama | draws | DIVERGED | 0/1 | tick 73 draw row 113 (CelDrawShadow) column file: 1.14d data/global/monsters/ck/tr/cktrlitwlhth.dcc vs d2rs data/global/objects/to/tr/totrlitonhth.dcc | q-scenes-compare |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
 | dru-grizzly | state | PARTIAL | 70/70 | - | - |
 | dru-hurricane | state | PARTIAL | 70/70 | - | - |
 | dru-tornado | state | DIVERGED | 29/70 | frame 30 missile 3:1 class 478, field xf: 1.14d 32768 vs d2rs 57170 | q-scenes-compare |
 | dru-volcano | state | DIVERGED | 33/70 | frame 34 missile 3:1 class 479, field s: 1.14d [2238081736, 1028392181] vs d2rs [3365183618, 277] | q-fix-real-unit-seed-order |
 | dru-werewolf | state | PARTIAL | 70/70 | - | - |
+| hire-asheara | state | DIVERGED | 23/90 | frame 24 monster 1:12 class 359 (hireling), field s: unit seed (follow AI draws; tile from frame 64) | q-diff-skills-2 |
+| hire-greiz | state | PARTIAL | 90/90 | - | - |
+| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306 (cap): 1.14d present vs d2rs absent | unrouted |
+| hire-kashya | state | PARTIAL | 90/90 | - | - |
+| hire-qual-kehk | state | DIVERGED | 28/90 | frame 29 monster 1:10 class 514, field m: 1.14d 2 vs d2rs 1 (NPC walk; hireling equal) | unrouted |
 | items-ground-many | state | DIVERGED | 3/30 | frame 4 item 4:19 class 518, field if: 1.14d 524304 vs d2rs 524288 | q-fix-server-store-fill |
 | items-ground-pokes | state | DIVERGED | 3/40 | frame 4 item 4:1 class 587, field if: 1.14d 524304 vs d2rs 524288 | q-fix-server-store-fill |
 | items-load-mixed | state | PARTIAL | 60/60 | - | - |
-| items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | items-vendor-akara-buy | packets | DIVERGED | 35/40 | frame 16 stream s2c #0 bytes[10]: 1.14d 64 vs d2rs 11 (id 0x27) | q-fix-pc1-proto-items |
+| items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | join-act2-quests-ama | state | DIVERGED | 23/40 | frame 24 monster 1:1 class 201, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | merc-barb-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 561, field tx: 1.14d 5146 vs d2rs 4874 | q-scenes-compare |
 | merc-desert-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 338, field tx: 1.14d 5146 vs d2rs 4876 | q-scenes-compare |
-| merc-rogue-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
-| merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
-| merc-sorc-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
-| hire-kashya | state | PARTIAL | 90/90 | - | - |
-| hire-greiz | state | PARTIAL | 90/90 | - | - |
-| hire-asheara | state | DIVERGED | 23/90 | frame 24 monster 1:12 class 359 (hireling), field s: unit seed (follow AI draws; tile from frame 64) | q-diff-skills-2 |
-| hire-qual-kehk | state | DIVERGED | 28/90 | frame 29 monster 1:10 class 514, field m: 1.14d 2 vs d2rs 1 (NPC walk; hireling equal) | unrouted |
-| hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
-| hire-resurrect-greiz | state | DIVERGED | 69/130 | frame 70 monster 1:22 class 338 (hireling after 0x62), field m: 1.14d 1 vs d2rs 2; tile (5029,5045) vs (5028,5041) | q-diff-skills-2 |
-| hire-resurrect-asheara | state | DIVERGED | 23/130 | frame 24 monster 1:12 class 359 (hireling), field s (as hire-asheara) | q-diff-skills-2 |
-| hire-resurrect-qual-kehk | state | DIVERGED | 28/130 | frame 29 monster 1:10 class 514, field m (as hire-qual-kehk) | unrouted |
-| hire-follow-warp-kashya | state | DIVERGED | 53/200 | frame 54 monster 1:13 class 271 (hireling warp follow), field m: 1.14d 2 vs d2rs 4; tile (5147,4260) vs (5144,4266) | q-diff-skills-2 |
-| hire-follow-waypoint-kashya | state | DIVERGED | 92/330 | frame 93 player 0:1, field m: 1.14d 5 vs d2rs 6 (waypoint travel) | unrouted |
-| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306 (cap): 1.14d present vs d2rs absent | unrouted |
 | merc-levelup-a1 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
 | merc-levelup-a2 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 338, field tx: 1.14d 5146 vs d2rs 4876 | q-scenes-compare |
 | merc-levelup-a3 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
 | merc-levelup-a5 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 561, field tx: 1.14d 5146 vs d2rs 4874 | q-scenes-compare |
+| merc-rogue-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
+| merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
+| merc-sorc-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
 | milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act5-entry | state | PARTIAL | 40/40 | - | - |
@@ -129,7 +483,173 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
 | poke-firebolt | state | PARTIAL | 60/60 | - | - |
 | rng-town-arrival-ama | rng | DIVERGED | 32/33 | frame 2, unit 1:3, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
-| rng-town-idle-sor | rng | DIVERGED | 40/41 | frame 2, unit 1:3, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
 | rng-town-idle-sor | packets | DIVERGED | 116/120 | frame 1 stream c2s #0 bytes[18]: 1.14d 0 vs d2rs 1 (id 0x67) | q-prov-recording-2 |
+| rng-town-idle-sor | rng | DIVERGED | 40/41 | frame 2, unit 1:3, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
 | walk-town-ama | state | PARTIAL | 80/80 | - | - |
 | warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
+| bar-whirlwind-unit | state | DIVERGED | 59/70 | frame 21 player 0:1 class 4, field fr: 1.14d 0 vs d2rs 5120 | unrouted |
+| bar-whirlwind-unit | packets | DIVERGED | 64/70 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
+| combat-arrow-kill | state | PARTIAL | 110/110 | - | - |
+| combat-arrow-quillrat | state | PARTIAL | 130/130 | - | - |
+| combat-champion-pack | state | PARTIAL | 176/176 | - | - |
+| combat-cold-plains-wp | state | PARTIAL | 520/520 | - | - |
+| combat-elements | state | PARTIAL | 226/226 | - | - |
+| combat-fallen-hits-player | state | PARTIAL | 200/200 | - | - |
+| combat-kill-fallen | state | PARTIAL | 146/146 | - | - |
+| combat-melee-fallen | state | PARTIAL | 150/150 | - | - |
+| combat-melee-fallen | packets | DIVERGED | 149/150 | frame 46 stream s2c #0 bytes[6]: 1.14d 0 vs d2rs 23 (id 0x69) | q-fix-join-items |
+| combat-melee-fallen-msg | state | PARTIAL | 260/260 | - | - |
+| combat-monster-missiles | state | PARTIAL | 260/260 | - | - |
+| combat-pop-blood-moor | state | PARTIAL | 400/400 | - | - |
+| combat-pop-cold-plains | state | PARTIAL | 400/400 | - | - |
+| combat-pop-stony-field | state | PARTIAL | 400/400 | - | - |
+| combat-potion-midfight | state | PARTIAL | 150/150 | - | - |
+| combat-potion-midfight | packets | DIVERGED | 149/150 | frame 70 stream s2c #3 id: 1.14d 9d vs d2rs a8 (id 0x9d) | q-fix-join-items |
+| combat-random-boss | state | PARTIAL | 186/186 | - | - |
+| combat-unique-pack | state | PARTIAL | 226/226 | - | - |
+| death-town-ama | state | PARTIAL | 120/120 | - | - |
+| diff-a3-hell-champion | state | DIVERGED | 325/400 | frame 306 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-champion | items | MATCH | 4/4 | - | - |
+| diff-a3-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a3-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a3-hell-normal | state | DIVERGED | 63/400 | frame 64 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-normal | items | MATCH | 4/4 | - | - |
+| diff-a3-hell-normal-bm | state | DIVERGED | 63/400 | frame 64 monster 1:4 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a3-hell-unique | state | DIVERGED | 271/400 | frame 272 monster 1:23 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-unique | items | MATCH | 4/4 | - | - |
+| diff-a3-hell-unique-bm | state | DIVERGED | 67/400 | frame 68 monster 1:7 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a3-nm-champion | state | DIVERGED | 331/400 | frame 307 monster 1:21 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-champion | items | MATCH | 4/4 | - | - |
+| diff-a3-nm-champion-bm | state | DIVERGED | 101/400 | frame 89 monster 1:4 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a3-nm-normal | state | DIVERGED | 64/400 | frame 65 monster 1:21 class 50, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a3-nm-normal | items | MATCH | 4/4 | - | - |
+| diff-a3-nm-normal-bm | state | DIVERGED | 98/400 | frame 65 monster 1:4 class 50, field s: 1.14d [1822557175, 1305741563] vs d2rs [4285903474, 480484601] | q-fix-seed-order |
+| diff-a3-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a3-nm-unique | state | DIVERGED | 76/400 | frame 65 monster 1:22 class 50, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a3-nm-unique | items | MATCH | 4/4 | - | - |
+| diff-a3-nm-unique-bm | state | DIVERGED | 93/400 | frame 69 monster 1:7 class 50, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a3-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-champion | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-champion | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-champion-bm | state | DIVERGED | 72/400 | frame 73 monster 1:5 class 120, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| diff-a4-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-normal | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-normal | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-normal-bm | state | DIVERGED | 201/400 | frame 53 monster 1:5 class 120, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a4-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-unique | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-unique | items | PARTIAL | 0/0 | - | - |
+| diff-a4-hell-unique-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a4-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-champion | state | PARTIAL | 400/400 | - | - |
+| diff-a4-nm-champion | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-champion-bm | state | DIVERGED | 73/400 | frame 74 monster 1:5 class 120, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| diff-a4-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-normal | state | PARTIAL | 400/400 | - | - |
+| diff-a4-nm-normal | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-normal-bm | state | DIVERGED | 267/400 | frame 54 monster 1:5 class 120, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a4-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-unique | state | PARTIAL | 400/400 | - | - |
+| diff-a4-nm-unique | items | PARTIAL | 0/0 | - | - |
+| diff-a4-nm-unique-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a4-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-champion | state | PARTIAL | 400/400 | - | - |
+| diff-a5-hell-champion | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-champion-bm | state | PARTIAL | 400/400 | - | - |
+| diff-a5-hell-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-normal | state | DIVERGED | 71/400 | frame 72 monster 1:22 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-normal | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-normal-bm | state | DIVERGED | 71/400 | frame 72 monster 1:8 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-unique | state | PARTIAL | 400/400 | - | - |
+| diff-a5-hell-unique | items | PARTIAL | 0/0 | - | - |
+| diff-a5-hell-unique-bm | state | DIVERGED | 85/400 | frame 66 monster 1:11 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-hell-unique-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-champion | state | PARTIAL | 400/400 | - | - |
+| diff-a5-nm-champion | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-champion-bm | state | DIVERGED | 144/400 | frame 90 monster 1:8 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-champion-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-normal | state | DIVERGED | 72/400 | frame 73 monster 1:24 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-normal | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-normal-bm | state | DIVERGED | 72/400 | frame 73 monster 1:8 class 446, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| diff-a5-nm-normal-bm | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-unique | state | PARTIAL | 400/400 | - | - |
+| diff-a5-nm-unique | items | PARTIAL | 0/0 | - | - |
+| diff-a5-nm-unique-bm | state | DIVERGED | 91/400 | frame 67 monster 1:11 class 446, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| diff-a5-nm-unique-bm | items | PARTIAL | 0/0 | - | - |
+| draws-town-arrival-ama | draws | DIVERGED | 0/1 | tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit | coord-resume-3 |
+| hire-follow-warp-kashya | state | PARTIAL | 200/200 | - | - |
+| hire-follow-waypoint-kashya | state | DIVERGED | 305/330 | frame 268 missile 3:1 class 12/120, field cl: 1.14d 12 vs d2rs 120 | unrouted |
+| hire-resurrect-asheara | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/359, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-greiz | state | DIVERGED | 85/130 | frame 86 monster 1:22 class -/338, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-kashya | state | DIVERGED | 85/130 | frame 86 monster 1:13 class -/271, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-qual-kehk | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/561, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| inv-pick-belt | state | PARTIAL | 40/40 | - | - |
+| inv-pick-belt | packets | MATCH | 40/40 | - | - |
+| inv-pick-belt | items | MATCH | 1/1 | - | - |
+| inv-pick-drop | state | PARTIAL | 40/40 | - | - |
+| inv-pick-drop | packets | MATCH | 40/40 | - | - |
+| inv-pick-drop | items | MATCH | 1/1 | - | - |
+| inv-pick-equip | state | PARTIAL | 40/40 | - | - |
+| inv-pick-equip | packets | MATCH | 40/40 | - | - |
+| inv-pick-equip | items | MATCH | 1/1 | - | - |
+| inv-pick-store | state | PARTIAL | 40/40 | - | - |
+| inv-pick-store | packets | MATCH | 40/40 | - | - |
+| inv-pick-store | items | MATCH | 1/1 | - | - |
+| items-drop-monster-kill | items | MATCH | 1/1 | - | - |
+| items-drops-cha-00 | items | MATCH | 18/18 | - | - |
+| items-drops-cha-01 | items | DIVERGED | 11/20 | item #11 (hp1) frame: 1.14d 131 vs d2rs 186 | unrouted |
+| items-drops-cha-02 | items | MATCH | 15/15 | - | - |
+| items-drops-cha-03 | items | DIVERGED | 19/25 | item #13 (hp2) frame: 1.14d 123 vs d2rs 124 | unrouted |
+| items-drops-cha-04 | items | DIVERGED | 10/15 | item #10 (hp2) stream byte 11, code (bit 16 of 32): 1.14d 4215020d4e0604 vs d2rs 4215020d6e0604 | unrouted |
+| items-drops-cha-05 | items | DIVERGED | 3/6 | item #3 (rvs) frame: 1.14d 97 vs d2rs 64 | unrouted |
+| items-drops-hel-00 | items | DIVERGED | 0/1 | item #0 (tsc) frame: 1.14d 124 vs d2rs 130 | unrouted |
+| items-drops-hel-01 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-02 | items | MATCH | 1/1 | - | - |
+| items-drops-hel-03 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-04 | items | DIVERGED | 0/1 | item #0 (gps) stream byte 5, x (bit 0 of 16): 1.14d 208000658c83c215e2 vs d2rs 20800065ac83c215e2 | unrouted |
+| items-drops-hel-05 | items | DIVERGED | 0/1 | item #0 (hp5) missing in d2rs | unrouted |
+| items-drops-hel-06 | items | DIVERGED | 0/1 | item #0 (isc) missing in 1.14d | unrouted |
+| items-drops-hel-07 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-08 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-09 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-10 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-11 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-12 | items | PARTIAL | 0/0 | - | - |
+| items-drops-hel-13 | items | PARTIAL | 0/0 | - | - |
+| items-drops-nig-00 | items | MATCH | 2/2 | - | - |
+| items-drops-nig-01 | items | MATCH | 2/2 | - | - |
+| items-drops-nig-02 | items | MATCH | 5/5 | - | - |
+| items-drops-nig-03 | items | MATCH | 2/2 | - | - |
+| items-drops-nig-04 | items | MATCH | 4/4 | - | - |
+| items-drops-nig-05 | items | MATCH | 2/2 | - | - |
+| items-drops-nig-06 | items | DIVERGED | 1/3 | item #1 (9xf) stream byte 5, x (bit 1 of 16): 1.14d 208000650c83621522 vs d2rs 208000654c83621522 | unrouted |
+| items-drops-nig-07 | items | MATCH | 2/2 | - | - |
+| items-drops-nig-08 | items | DIVERGED | 1/2 | item #1 (xui) missing in 1.14d | unrouted |
+| items-drops-nig-09 | items | MATCH | 1/1 | - | - |
+| items-drops-nig-10 | items | PARTIAL | 0/0 | - | - |
+| items-drops-nig-11 | items | MATCH | 7/7 | - | - |
+| items-drops-nig-12 | items | DIVERGED | 0/3 | item #0 (scl) stream byte 5, x (bit 0 of 16): 1.14d 288000654c83421562 vs d2rs 288000652c83421562 | unrouted |
+| items-drops-nig-13 | items | PARTIAL | 0/0 | - | - |
+| items-drops-nor-00 | items | MATCH | 2/2 | - | - |
+| items-drops-nor-01 | items | PARTIAL | 0/0 | - | - |
+| items-drops-nor-02 | items | MATCH | 4/4 | - | - |
+| items-drops-nor-03 | items | MATCH | 3/3 | - | - |
+| items-drops-nor-04 | items | DIVERGED | 4/5 | item #2 (mp5) frame: 1.14d 54 vs d2rs 55 | unrouted |
+| items-drops-nor-05 | items | MATCH | 1/1 | - | - |
+| items-drops-nor-06 | items | MATCH | 4/4 | - | - |
+| items-drops-nor-07 | items | DIVERGED | 0/9 | item #0 (gsv) stream byte 7, y (bit 1 of 16): 1.14d 00658c822215e26cce vs d2rs 00658c826215e26cce | unrouted |
+| items-drops-nor-08 | items | MATCH | 1/1 | - | - |
+| items-drops-nor-09 | items | MATCH | 8/8 | - | - |
+| items-drops-nor-10 | items | DIVERGED | 6/8 | item #6 (gld) missing in d2rs | unrouted |
+| items-drops-nor-11 | items | MATCH | 6/6 | - | - |
+| items-drops-nor-12 | items | MATCH | 8/8 | - | - |
+| items-drops-nor-13 | items | MATCH | 2/2 | - | - |
+| items-drops-rbo-00 | items | DIVERGED | 12/20 | item #12 (aqv) stream byte 15, after the head (bit 18 past bit 109): 1.14d ce0e040fc1e67f vs d2rs ce0e040f41ce7f | unrouted |
+| items-drops-rbo-01 | items | DIVERGED | 12/23 | item #12 (hp1) frame: 1.14d 121 vs d2rs 97 | unrouted |
+| items-drops-rbo-02 | items | DIVERGED | 9/23 | item #9 (mp3) frame: 1.14d 84 vs d2rs 108 | unrouted |
+| items-drops-rbo-03 | items | DIVERGED | 19/27 | item #16 (hp3) frame: 1.14d 126 vs d2rs 121 | unrouted |
+| items-drops-rbo-04 | items | DIVERGED | 10/17 | item #10 (mac) stream byte 2, flags (bit 22 of 32): 1.14d 00208000652c83 vs d2rs 0020c000652c83 | unrouted |
