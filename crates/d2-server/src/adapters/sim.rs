@@ -129,6 +129,9 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// update lists only).
     pub announce_ground: bool,
     pub(crate) announced_ground: std::collections::BTreeSet<(ClientId, UnitId)>,
+    /// The ground items announced inside this tick's queue walk
+    /// (`handlers::items::moves::announce_marked`), for the pass's clean-up.
+    pub(crate) walk_announced: Vec<(ClientId, UnitId)>,
     /// The host calls the quest rules raised (`quests-helpers.md` §6:
     /// game end `0x00530590`, save pass `0x0052E2A0`), drained from the
     /// world after each tick's steps, in call order. Running them is the
@@ -191,6 +194,7 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             world,
             tick_faults: Vec::new(),
             announce_ground: false,
+            walk_announced: Vec::new(),
             announced_ground: std::collections::BTreeSet::new(),
             host_requests: Vec::new(),
             hotkeys: BTreeMap::new(),
@@ -643,6 +647,12 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
         let requests = self.world.take_host_requests();
         self.host_requests.extend(requests);
         for (unit, bytes) in self.world.take_sent(&mut self.events) {
+            // A ground-item mark of the queue walk: the item's 0x9C here.
+            if bytes.len() == 5 && bytes[0] == d2_sim::wiring::action::GROUND_ITEM_MARK {
+                let guid = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]);
+                handlers::items::moves::announce_marked(self, out, unit, guid);
+                continue;
+            }
             if let Some(c) = self.client_of(unit) {
                 if let Err(e) = out.queue(c, &bytes) {
                     self.tick_faults.push((c, WorldError::from(e)));

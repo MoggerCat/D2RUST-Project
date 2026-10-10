@@ -518,6 +518,27 @@ pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
     m
 }
 
+/// S→C 0x5A code 6 from `0x0054D8A0` (40 bytes): u8@2 4, the killer's GUID
+/// u32@3, its unit type u8@7, the victim's name @8, and @0x18 either the
+/// killer player's name or, for a monster with type flag 2, its u16
+/// `boss_hc_idx` (`intents-events.md` §7.6).
+pub fn death_notice(
+    killer_guid: u32,
+    killer_type: u8,
+    victim: &[u8; 16],
+    killer_name: &[u8; 16],
+    boss_hc_idx: Option<u16>,
+) -> [u8; 40] {
+    let mut m = player_event(6, victim);
+    m[3..7].copy_from_slice(&killer_guid.to_le_bytes());
+    m[7] = killer_type;
+    m[0x18..0x28].copy_from_slice(killer_name);
+    if let Some(i) = boss_hc_idx {
+        m[0x18..0x1A].copy_from_slice(&i.to_le_bytes());
+    }
+    m
+}
+
 /// S→C 0x5B PlayerJoined (`0x0053C940`, `client/msg-units.md` §8 r3, 36
 /// bytes here): size u16@1, GUID u32@3, class u8@7, name @8 (16 bytes),
 /// level u16@0x18 (stat 12), party id u16@0x1A (0xFFFF: no party),
@@ -777,5 +798,23 @@ mod tests {
             [0x23, 0, 1, 0, 0, 0, 0, 36, 0, 0xFF, 0xFF, 0xFF, 0xFF]
         );
         assert_eq!(GAME_ENTRY_DONE, [0x7E, 0, 0, 0, 0]);
+    }
+}
+
+#[cfg(test)]
+mod death_notice_tests {
+    use super::death_notice;
+
+    #[test]
+    fn the_death_notice_matches_the_recorded_layout() {
+        // items-drops-cha-00 frame 73 (1.14d): `5a 06 04 0a000000 01 name`.
+        let mut name = [0u8; 16];
+        name[..6].copy_from_slice(b"ScnAma");
+        let m = death_notice(10, 1, &name, &[0; 16], None);
+        assert_eq!(&m[..8], &[0x5a, 6, 4, 10, 0, 0, 0, 1]);
+        assert_eq!(&m[8..14], b"ScnAma");
+        assert!(m[0x18..].iter().all(|&b| b == 0));
+        let m = death_notice(10, 1, &name, &[0; 16], Some(0x0102));
+        assert_eq!(&m[0x18..0x1a], &[2, 1]);
     }
 }

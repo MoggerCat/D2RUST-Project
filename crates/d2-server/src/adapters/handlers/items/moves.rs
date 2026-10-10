@@ -404,6 +404,9 @@ struct UpdateRun {
     receivers: Vec<Receiver>,
     /// Every player of the pass, for the clean-up.
     players: Vec<UnitId>,
+    /// Ground items announced inside the tick's walk ([`GroundRun`]):
+    /// their flags clear with the pass's.
+    walked: Vec<UnitId>,
 }
 
 impl UpdateRun {
@@ -492,6 +495,11 @@ impl MoveCall for UpdateRun {
                 if let Some(it) = d.econ.items.get_mut(u) {
                     it.flags &= !0x2020;
                 }
+            }
+        }
+        for &u in &self.walked {
+            if let Some(it) = d.econ.items.get_mut(u) {
+                it.flags &= !0x2020;
             }
         }
         // The update-list reset of the room clean-up (`tick.md` §3 step 6,
@@ -597,9 +605,14 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
             ground,
         });
     }
+    let walked: Vec<UnitId> = std::mem::take(&mut sim.walk_announced)
+        .into_iter()
+        .map(|(_, u)| u)
+        .collect();
     let run = UpdateRun {
         receivers,
         players: players.iter().map(|&(p, _)| p).collect(),
+        walked,
     };
     let (game, events) = (&mut sim.game, &mut sim.events);
     let sound_only = run.clone();
@@ -633,3 +646,64 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+/// The announcement of one ground item at its place in the client pass's
+/// queue walk (`inventory-moves.md` §6.3 part 1: the unit-add 0x9C of
+/// `0x00571F90` inside the per-unit update).
+struct GroundRun {
+    item: UnitId,
+}
+
+impl MoveCall for GroundRun {
+    type Out = Option<Result<Vec<u8>, MoveFatal>>;
+    fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
+        let d = parts.desk(econ);
+        let guid = d.guid_of(self.item);
+        if !(d.unit_exists(Owner::item(guid)) && d.mode(guid) == GROUND) {
+            return None;
+        }
+        let was_dropped = d.was_dropped(self.item);
+        Some(sim_moves::announce_item_as(&d, guid, was_dropped))
+    }
+}
+
+/// The host's answer to a ground-item mark of the tick's client pass
+/// ([`d2_sim::wiring::action::GROUND_ITEM_MARK`]): the item's 0x9C to the
+/// marked client now, so it stands where the queue walk put it. Only the
+/// play host's pass announces ground items ([`SimGame::announce_ground`]).
+pub fn announce_marked<D: EventDispatch, W: WorldHost<D>>(
+    sim: &mut SimGame<D, W>,
+    out: &mut dyn MessageSink,
+    receiver: UnitId,
+    guid: u32,
+) {
+    use d2_sim::units::UnitType;
+    if !sim.announce_ground {
+        return;
+    }
+    let Some(c) = sim.client_of(receiver) else {
+        return;
+    };
+    let Some(item) = sim.game.lists.find_unit(UnitType::Item, guid) else {
+        return;
+    };
+    if sim.announced_ground.contains(&(c, item))
+        || sim.game.lists.unit(item).and_then(|e| e.room()).is_none()
+    {
+        return;
+    }
+    let (game, events) = (&mut sim.game, &mut sim.events);
+    let Some(Some(r)) = sim.world.moves(game, events, GroundRun { item }) else {
+        return;
+    };
+    match r {
+        Ok(m) => {
+            if let Err(e) = out.queue(c, &m) {
+                sim.tick_faults.push((c, WorldError::from(e)));
+            }
+        }
+        Err(e) => sim.tick_faults.push((c, WorldError::Move(e))),
+    }
+    sim.announced_ground.insert((c, item));
+    sim.walk_announced.push((c, item));
+}

@@ -180,6 +180,7 @@ impl Fx {
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
