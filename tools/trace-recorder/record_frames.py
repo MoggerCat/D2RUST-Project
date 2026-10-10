@@ -301,10 +301,21 @@ def dt1_lookup(libs, tile):
 
 def read_cel_context(mem, ctx):
     raw = mem.read(ctx, CEL_CONTEXT_SIZE)
-    return {"raw": raw.hex(), "ctx": f"{ctx:#x}", "frame": struct.unpack_from("<i", raw, 0)[0],
-            "dir": struct.unpack_from("<i", raw, 0x40)[0],
-            "file": f"{struct.unpack_from('<I', raw, 0x34)[0]:#x}",
-            "tokens": [text4(raw[o:o + 4]) for o in (0x18, 0x1C, 0x20, 0x24, 0x28)]}
+    rec = {"raw": raw.hex(), "ctx": f"{ctx:#x}", "frame": struct.unpack_from("<i", raw, 0)[0],
+           "dir": struct.unpack_from("<i", raw, 0x40)[0],
+           "file": f"{struct.unpack_from('<I', raw, 0x34)[0]:#x}",
+           "tokens": [text4(raw[o:o + 4]) for o in (0x18, 0x1C, 0x20, 0x24, 0x28)]}
+    # An item graphic (unit type 4 at +0x08, 0x004DABC0): +0x2C points at the inventory file name
+    # and 0x005FE610 builds `DATA\GLOBAL\items\<name>.dc6` (`ui/inventory.md` §8 r2); no +0x34 file.
+    ptr = struct.unpack_from("<I", raw, 0x2C)[0]
+    if ptr >= 0x10000 and rec["file"] == "0x0" and struct.unpack_from("<I", raw, 8)[0] == 4:
+        try:
+            t = mem.read(ptr, 64).split(b"\0")[0]
+            if t and all(32 < c < 127 for c in t):
+                rec["cache_path"] = "DATA\\GLOBAL\\items\\" + t.decode("latin-1") + ".dc6"
+        except OSError:
+            pass
+    return rec
 
 
 def read_draw(mem, name, args, light_full=False, libs=None):

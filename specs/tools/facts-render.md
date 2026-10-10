@@ -121,7 +121,9 @@ frame record's `draws`, `capture.md` §3.5; d2rs: §5).
    `?`. `w h xoff yoff` come from the header in the context's memory when
    the file is not named (a font glyph: the recorder also follows the
    `D2Win_LoadCelFile` `0x004FA9B0` loads in game, so the font files are
-   named). d2rs writes the same cells for its UI cels (`CelDraw`,
+   named). An item graphic (cel context unit type 4 at `+0x08`, no `+0x34`
+   file) names `DATA\GLOBAL\items\<name>.dc6` with `<name>` the string at
+   context `+0x2C` (`ui/inventory.md` §8 r2, builder `0x005FE610`). d2rs writes the same cells for its UI cels (`CelDraw`,
    `CelDrawColor`: draw mode, light `0xffffffff`, null palette `0` or the
    colour index of the glyph's text-colour map) (revision 2026-10-10,
    REC-3650).

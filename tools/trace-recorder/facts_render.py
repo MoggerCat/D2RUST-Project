@@ -97,7 +97,9 @@ def cel_file(c, celfiles, compfiles):
     if c.get("file") not in (None, "0x0"):
         return canon(celfiles.get(c["file"]))
     name = comp_name(c.get("tokens"))
-    return canon(compfiles.get(name.lower())) if name else None
+    if name:
+        return canon(compfiles.get(name.lower()))
+    return canon(c["cache_path"]) if c.get("cache_path") else None  # an item graphic (§2 r3)
 
 
 def draw_row(i, d, celfiles, compfiles, sprites):
