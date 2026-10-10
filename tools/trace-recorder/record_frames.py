@@ -39,7 +39,7 @@ import send  # noqa: E402  (--send: C->S message injection, specs/tools/original
 
 sys.dont_write_bytecode = True
 
-TOOL = "trace-recorder record_frames 0.3.1"
+TOOL = "trace-recorder record_frames 0.3.2"
 FORMAT = "frames-raw-3"
 
 # capture.md §2: hooks and the in-game caller
@@ -123,6 +123,63 @@ D2WIN_LOAD_BYTES = b"\x55\x8B\xEC\x81\xEC\x08\x01\x00"   # measured 2026-10-09 (
 X_ORIGIN = (112, 98)
 X_KEYS = {0x1B: "Escape", 0x09: "Tab", 0x0D: "Return", 0x20: "space", 0x10: "Shift_L",
           0x11: "Control_L", 0x12: "Alt_L", **{0x6F + i: f"F{i}" for i in range(1, 13)}}
+
+
+REG_KEY = r"Software\Blizzard Entertainment\Diablo II"
+
+
+def registry_rows(values):
+    """capture.md §5 `registry`: (name, data, type) as winreg gives them ->
+    [name, kind, value] rows: REG_DWORD (4) `dword` int, REG_SZ (1) `sz`
+    text, any other type `type<N>` with the value's bytes in hex (text
+    types as UTF-16LE with the terminator, a multi-string's parts each
+    terminated plus one more)."""
+    rows = []
+    for name, data, kind in values:
+        if kind == 4:
+            rows.append([name, "dword", int(data) & 0xFFFFFFFF])
+        elif kind == 1:
+            rows.append([name, "sz", str(data)])
+        else:
+            if isinstance(data, (bytes, bytearray)):
+                raw = bytes(data)
+            elif isinstance(data, list):
+                raw = "".join(p + "\0" for p in data).encode("utf-16-le") + b"\0\0"
+            elif isinstance(data, str):
+                raw = (data + "\0").encode("utf-16-le")
+            elif data is None:
+                raw = b""
+            else:
+                raw = int(data).to_bytes(8, "little")
+            rows.append([name, f"type{kind}", raw.hex()])
+    return rows
+
+
+def read_registry():
+    """capture.md §5: the `Diablo II` key as 1.14d sees it at start (HKCU,
+    then HKLM; the 32-bit view, KEY_WOW64_32KEY), every value, in the
+    order the registry enumerates them. A missing key is an empty list; a
+    host without a registry API stops the recording (the values are a
+    check input, tools/scenario-diff.md §3 r7 step 7)."""
+    import winreg
+    out = {}
+    for scope, root in (("hkcu", winreg.HKEY_CURRENT_USER), ("hklm", winreg.HKEY_LOCAL_MACHINE)):
+        values = []
+        try:
+            k = winreg.OpenKey(root, REG_KEY, 0, winreg.KEY_READ | winreg.KEY_WOW64_32KEY)
+        except FileNotFoundError:
+            out[scope] = []
+            continue
+        with k:
+            i = 0
+            while True:
+                try:
+                    values.append(winreg.EnumValue(k, i))
+                except OSError:
+                    break
+                i += 1
+        out[scope] = registry_rows(values)
+    return out
 
 
 def png_bytes(width, height, pixels, palette_rgb):
@@ -789,6 +846,10 @@ class FakeMem:
 
 
 def selftest():
+    # capture.md §5 registry rows: DWORD, SZ, binary, expand-string
+    assert registry_rows([("Mini Panel", 1, 4), ("CmdLine", "-w -ns", 1), ("B", b"\x01\xff", 3),
+                          ("E", "a", 2)]) == [["Mini Panel", "dword", 1], ["CmdLine", "sz", "-w -ns"],
+                                              ["B", "type3", "01ff"], ["E", "type2", "61000000"]]
     w, h = 5, 3
     pixels = bytes((7 * i) & 0xFF for i in range(w * h))
     pal = bytes(range(256)) * 3
@@ -1015,6 +1076,8 @@ def main():
     if a.sounds:
         rt.EXPECT[SOUND_REQUEST] = SOUND_REQUEST_BYTES
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
+    # capture.md §5: the host's registry values the game reads at start
+    rt.HEADER_EXTRA = {"registry": read_registry()}
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds,
                           a.ticks, img_dir, max(1, a.every or 1), a.max_frames, a.allow_any_size,
                           max(0, a.draws_every), a.draws_light, fe)

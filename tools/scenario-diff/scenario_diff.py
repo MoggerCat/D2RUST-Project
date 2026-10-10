@@ -465,6 +465,10 @@ class Runner:
                     # rule 7.6: the recording's -ns (no sound device)
                     if capture_no_sound(raw):
                         args += ["--no-sound"]
+                    # rule 7.7: the recording host's registry values
+                    reg = self.path("registry.tsv")
+                    write_registry(raw, reg)
+                    args += ["--registry", reg]
                 if self.d2rs_input():
                     args += ["--input", self.d2rs_input()]
                 with self.display() as env:
@@ -651,6 +655,45 @@ def capture_no_sound(raw):
                 return "-ns" in args or "-nosound" in args
             break
     raise CheckError(f"{raw}: no capture header (-ns unknown)")
+
+
+def write_registry(raw, out):
+    """Rule 7.7: the recording host's `Diablo II` registry values (the
+    capture header's `registry`, record_frames 0.3.2) as the `play
+    --registry` file (format `registry 1`: scope, name, kind, value; text
+    escaped). A capture without them fails the check: d2rs never assumes
+    the host's values."""
+    import json
+    with open(raw, encoding="utf-8") as f:
+        first = f.readline()
+    try:
+        head = json.loads(first)
+    except ValueError:
+        head = {}
+    if head.get("k") != "header":
+        raise CheckError(f"{raw}: no capture header (registry values unknown)")
+    reg = head.get("registry")
+    if not isinstance(reg, dict) or not all(isinstance(reg.get(s), list) for s in ("hkcu", "hklm")):
+        raise CheckError(f"{raw}: the capture header has no registry values (recorded by "
+                         f"{head.get('tool', '?')}; record_frames 0.3.2 records them): record again")
+
+    def esc(t):
+        return (t.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+                .replace("\r", "\\r"))
+    rows = ["# registry 1", "scope\tname\tkind\tvalue"]
+    for scope in ("hkcu", "hklm"):
+        for name, kind, value in reg[scope]:
+            if kind == "dword":
+                v = str(int(value))
+            elif kind == "sz":
+                v = esc(str(value))
+            elif kind.startswith("type"):
+                v = str(value)
+            else:
+                raise CheckError(f"{raw}: registry value {name!r} has an unknown kind {kind!r}")
+            rows.append(f"{scope}\t{esc(name)}\t{kind}\t{v}")
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(rows) + "\n")
 
 
 def write_frame_schedule(raw, out):
@@ -849,6 +892,23 @@ def selftest():
         with open(os.path.join(td, "frame.tsv"), "w", encoding="utf-8") as fh:
             fh.write("# facts v1\nkey\tvalue\nseq\t36\ntick\t73\n")
         assert scene_tick(td) == 73 and scene_tick(os.path.join(td, "none")) is None
+        # rule 7.7: the header's registry values -> `registry 1`; none -> error
+        reg = {"hkcu": [["Mini Panel", "dword", 1], ["CmdLine", "sz", "-w\t-ns\\"]],
+               "hklm": [["B", "type3", "01ff"]]}
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"k": "header", "tool": "t", "registry": reg}) + "\n")
+        out = os.path.join(td, "r.tsv")
+        write_registry(p, out)
+        with open(out, encoding="utf-8") as fh:
+            assert fh.read() == ("# registry 1\nscope\tname\tkind\tvalue\nhkcu\tMini Panel\tdword\t1\n"
+                                 "hkcu\tCmdLine\tsz\t-w\\t-ns\\\\\nhklm\tB\ttype3\t01ff\n")
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write('{"k": "header", "tool": "trace-recorder record_frames 0.3.1"}\n')
+        try:
+            write_registry(p, out)
+            raise AssertionError("a capture without registry values must fail")
+        except CheckError as e:
+            assert "no registry values" in str(e)
     ok += 1
     # a shared `input <script>` (§2 rule 4) reaches both sides of both channels
     walk = "frame 10; click 600 300; hold 400 200 3; key r"

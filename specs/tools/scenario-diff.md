@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–604 |
-|   4. Suite | 605–732 |
-| Constants & data dependencies | 733–736 |
-| Randomness | 737–740 |
-| Edge cases & original bugs | 741–776 |
-| Test vectors | 777–799 |
-| Provenance | 800–803 |
-| Open questions | 804–866 |
+|   3. Run | 145–639 |
+|   4. Suite | 640–767 |
+| Constants & data dependencies | 768–771 |
+| Randomness | 772–775 |
+| Edge cases & original bugs | 776–811 |
+| Test vectors | 812–834 |
+| Provenance | 835–838 |
+| Open questions | 839–901 |
 <!-- /index -->
 
 ## Summary
@@ -224,7 +224,19 @@ state first. It is the default way to compare a behaviour with 1.14d.
       recorded timers. A capture without a server tick or the cursor
       clock on any frame, or a schedule in which a frame other than the
       last lacks `now`, fails the check; d2rs never falls back to a clock
-      of its own in a check run. Live play keeps the host clock.
+      of its own in a check run. Live play keeps the host clock. The input
+      script follows the same schedule: 1.14d posts the steps of `frame F`
+      at the stop of tick F − 1 (rule 8.1) and its message pump takes
+      them at the start of the next client frame, after the frame that
+      ran tick F − 1 has drawn; a d2rs pass runs its UI events before its
+      draw, so on a drawn tick `play` times the script by the tick before
+      (`present::script_tick`; measured 2026-10-10: `ui-draws-minipanel-ama`
+      recorded on PC 1 draws even ticks and shows the click's mouse move
+      at tick 40, recorded in the cloud it draws odd ticks and shows it
+      at 41, not at 39). Open: the C→S of a click handled on an undrawn
+      pass leaves with the next drawn pass in d2rs (`world_view_frame`
+      handles events only on drawn ticks), one pass or more after
+      1.14d's.
       Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
       the client seed matches the capture's `seed_start` of every frame
       through tick 25 and the rain lines (endpoints and colors) are equal
@@ -246,6 +258,29 @@ state first. It is the default way to compare a behaviour with 1.14d.
       (an Xvfb display's centre) is ignored. With steps 5 and 6 the client
       seed of `draws-town-arrival-ama` equals the capture's at every frame
       through tick 73 and the rain rows are equal.
+   7. **The recording host's registry** (decided 2026-10-10,
+      coordinator). 1.14d reads `Diablo II` registry values at
+      start (`0x00414F10`: HKCU, then HKLM; a REG_DWORD as is, a REG_SZ
+      through `strtoul(s, NULL, 0)`, `ui/frontend-options.md` §O7 r1):
+      `Mini Panel` decides whether the mini panel opens at entry
+      (`ui/control-panel.md` §9 r9), `Help Menu` the help caption (§11
+      r2), `PopupHireling` the hire pop-up (`ui/messages.md` §9 r2), the
+      Options values their rows (§O6 r4). They differ between recording
+      hosts (a clean game exit writes `Mini Panel`; a killed recording
+      writes nothing), so they are inputs of the recording, like the
+      clock. `record_frames.py` 0.3.2 records the whole key, HKCU and
+      HKLM (32-bit view), before the game starts, as the header's
+      `registry` (`render/capture.md` §5); `scenario_diff.py` writes it
+      as `[registry.tsv]` (format `registry 1`: `# registry 1`, the header
+      `scope name kind value`, one row per value: `hkcu` / `hklm`, the
+      name, `dword` (decimal) / `sz` (text, `\\ \t \n \r` escaped) /
+      `type<N>` (hex bytes)) and passes `play --registry registry.tsv`. A
+      capture without `registry` fails the check (no default; a cache
+      entry of an older recorder misses by the recorder key and is
+      recorded again). `play` applies the Options rows to the settings
+      and the UI values before the first frame; a value of another type
+      that d2rs reads, or an Options value out of its row's range, is an
+      error. Live play has no registry (`settings.toml` only).
 9. **packets** (`tools/packets-trace.md`; work dir files in brackets):
    1.14d `record_packets.py` with the rule 2 start
    [`orig.packets.jsonl`]; d2rs `d2-client state-dump --save --seed

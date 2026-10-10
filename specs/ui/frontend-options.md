@@ -28,15 +28,15 @@
 |   O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`) | 223–313 |
 |   O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open) | 314–358 |
 |   O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD) | 359–403 |
-|   O7. Settings storage and the d2rs config mapping | 404–437 |
-|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 438–462 |
-|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 463–556 |
-| Constants & data dependencies | 557–576 |
-| Randomness | 577–580 |
-| Edge cases & original bugs | 581–605 |
-| Test vectors | 606–636 |
-| Provenance | 637–676 |
-| Open questions | 677–684 |
+|   O7. Settings storage and the d2rs config mapping | 404–441 |
+|   O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect) | 442–466 |
+|   O9. Configure Controls (ui 11, `UI_CONFIG`) | 467–560 |
+| Constants & data dependencies | 561–580 |
+| Randomness | 581–584 |
+| Edge cases & original bugs | 585–609 |
+| Test vectors | 610–640 |
+| Provenance | 641–680 |
+| Open questions | 681–688 |
 <!-- /index -->
 
 ## Summary
@@ -434,6 +434,10 @@ cel runs); the cel draw `0x00502680` passes the row mode to the renderer unchang
 
 3. Writes happen at the same moments as the original's registry writes (each apply; Gamma /
    Contrast init write-back), so a crash right after a change keeps it.
+4. Check runs (`tools/scenario-diff.md` §3 r7 step 7): `play --registry` replays the recording
+   host's values; each row's value read as r1 replaces the row's `settings.toml` value
+   (d2rs-own: a value outside the row's range is an error, the rows' own clamps of §O6 are not
+   applied). Live play reads no registry.
 
 ### O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect)
 

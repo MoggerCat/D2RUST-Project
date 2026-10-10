@@ -852,9 +852,27 @@ impl Headless {
         let local_at = self.walk.as_ref().and_then(|(p, _, _)| p.position());
         let cam = script_camera(bridge.world(), local_at);
         let world = bridge.world();
-        let (events, log) = self.events(last, &mut |sel| match &cam {
+        let (mut events, mut log) = self.events(last, &mut |sel| match &cam {
             Some(c) => unit_point(world, c, sel),
             None => Err("no local player".into()),
+        });
+        // The control panel strip (`ui/control-panel.md` §10 r1–r2): with a
+        // live local player a left press or release below y = H − 48 is
+        // the control panel's (consumed), so it never reaches the world
+        // dispatcher; the strip's own effects (skill list, mini panel, run
+        // button, belt) are UI, not modelled headless.
+        let alive = world.local().is_some_and(|u| !u.is_dead());
+        let strip_y = FrameSize::play().play_height();
+        events.retain(|e| {
+            let taken = alive
+                && matches!(e, UiEvent::Press { button: PointerButton::Left, at }
+                    | UiEvent::Release { button: PointerButton::Left, at } if at.y > strip_y);
+            if taken {
+                log.push(format!(
+                    "control panel strip takes {e:?} (not modelled headless)"
+                ));
+            }
+            !taken
         });
         // The pass's draw: the hover under the cursor, seen by the next press.
         let next_pick = cam
@@ -1268,6 +1286,22 @@ mod tests {
             want.extend_from_slice(&9u32.to_le_bytes());
             assert_eq!(link.sent.lock().unwrap().as_slice(), [want]);
             assert_eq!(h.pending(), 0);
+        }
+
+        // Covers: specs/tools/scenario-diff.md §3 r8; specs/ui/control-panel.md §10 r1
+        #[test]
+        fn headless_click_on_the_control_panel_strip_never_walks() {
+            let (mut b, link) = scene();
+            let mut h = Headless::new(parse("frame 1; click 400 590").unwrap()).unwrap();
+            let log = h.apply(&mut b, 0).unwrap();
+            assert!(link.sent.lock().unwrap().is_empty(), "{log:?}");
+            assert!(log
+                .iter()
+                .any(|l| l.starts_with("control panel strip takes")));
+            // the row above the strip is the world's
+            let mut h = Headless::new(parse("frame 1; click 400 552").unwrap()).unwrap();
+            h.apply(&mut b, 0).unwrap();
+            assert_eq!(link.sent.lock().unwrap().len(), 1);
         }
 
         // Covers: specs/tools/scenario-diff.md §2 r4, §3 r8

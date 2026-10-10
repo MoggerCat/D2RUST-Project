@@ -39,6 +39,9 @@ import autostart  # noqa: E402  (unattended start, input script)
 
 TOOL = "trace-recorder record_tick 0.2.0"
 FORMAT = "tick-raw-1"
+# Extra header fields a recorder built on this one adds (record_frames:
+# `registry`, specs/render/capture.md §5); read before the game starts.
+HEADER_EXTRA = {}
 
 # Game record offsets (tick.md, unit-order.md)
 G_FRAME, G_CLIENTS, G_ACTS = 0xA8, 0x88, 0xBC
@@ -399,7 +402,7 @@ class TickRecorder:
         self.out.write(json.dumps({"k": "header", "format": FORMAT, "tool": TOOL,
                                    "date": datetime.date.today().isoformat(),
                                    "game_exe_sha256": self.sha, "args": self.args,
-                                   "snap_every": self.snap_every}) + "\n")
+                                   "snap_every": self.snap_every, **HEADER_EXTRA}) + "\n")
         t0 = time.perf_counter()
         try:
             self.loop(t0 + self.seconds)

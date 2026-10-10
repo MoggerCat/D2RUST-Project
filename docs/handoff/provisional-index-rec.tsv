@@ -110,7 +110,7 @@ REC-146	6602		Act V synthetic set and play walk (PROVISIONAL, `test-fixtures` `a
 REC-147	6598		Act 2 dungeons in the play preview (PROVISIONAL, `d2-client` `synthetic_act2.rs`, `synthet	recording	no		0	
 REC-148	6603		Act V quest hooks in the play host (PROVISIONAL, `d2-server` `wired/quest_events.rs`, `d2-	recording	no		1	
 REC-149	6608		NPC approach in the play preview (PROVISIONAL, `d2-sim` `wiring/interaction`, `d2-server` 	data	yes		0	
-REC-150	6604		Amazon skills in the play preview (PROVISIONAL, `d2-client` `app/weapons.rs`, `skill_rest.	data	yes		1	
+REC-150	6604		Amazon skills in the play preview (PROVISIONAL, `d2-client` `app/weapons.rs`, `skill_rest.	data	yes		0	
 REC-151	6605		Necromancer casts in the play host (PROVISIONAL, `d2-client` `tests/app_necro.rs`; M22; q-	data	yes		0	
 REC-152	6606		Barbarian skills in the play preview (PROVISIONAL, `d2-client` `app/skill_rest.rs`, `app/s	data	yes		1	
 REC-153	6633		Paladin skills in the preview (PROVISIONAL, `d2-sim` `wiring/interaction/body_path.rs`, `d	recording	no		0	
@@ -214,7 +214,7 @@ REC-275	6657		Leap arc and Whirlwind spin in the play preview (PROVISIONAL; M22;
 REC-276	6725		Trap missiles in the play host (PROVISIONAL, `d2-sim` `wiring/interaction/skill_use.rs` `U	data	yes		0	
 REC-277	6678		The shop opens on the NPC menu's Trade / Gamble choice (PROVISIONAL, `d2-client` `ui/npc_m	recording	no		13	
 REC-278	6680		Synthetic town smoke data and the town fixes it found (PROVISIONAL, `d2-client`, `d2-sim`,	data	yes		6	
-REC-279	6656		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes	yes	6	
+REC-279	6656		Combat smoke fills (PROVISIONAL; M22; q-smoke-combat; `// d2rs-own, unverified`): (1) **re	data	yes	yes	5	
 REC-280	6681		Warriv in the synthetic Act I town (PROVISIONAL, `d2-client` `app/town_npcs.rs` `ACT1`; M2	data	yes		0	
 REC-281	6728		Item smoke test fills (PROVISIONAL, M22; q-smoke-items; every point `d2rs-own, unverified`	recording	no		8	
 REC-282	6648		Save smoke fills (PROVISIONAL, `d2-client` `app/save_gaps.rs` `seed_new_flags`, `app/save_	recording	no		1	
@@ -295,7 +295,7 @@ REC-542	6700		Hostility between client units (PROVISIONAL, `d2-client` `bridge/c
 REC-543	6699		Owner direction of a missile body's child (PROVISIONAL, `d2-client` `bridge/client_missile	recording	no		2	
 REC-544	6698		Unit flags 0x4 / 0x8 of client units (PROVISIONAL, `d2-client` `bridge/client_missiles.rs`	unstated	no		1	
 REC-545	6697		Client state 86 of a missile hit (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `en	recording	no		2	
-REC-546	6696		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		5	
+REC-546	6696		Unit footprints for the client missiles (PROVISIONAL, `d2-client` `bridge/client_missiles.	recording	no		6	
 REC-547	6695		A client hit body the model cannot run (PROVISIONAL, `d2-client` `bridge/client_missiles.r	unstated	no		1	
 REC-548	6694		Travel sound detach force (PROVISIONAL, `d2-client` `audio/driver.rs` `SoundRequest::Group	unstated	no		1	
 REC-549	6693		Umod 29's client hook target (PROVISIONAL, `d2-client` `bridge/client_missiles.rs` `umod_m	recording	no		1	
@@ -331,10 +331,10 @@ REC-797	6740		The player's act byte at the join (PROVISIONAL, `d2-server` `adapt
 REC-798	6741		*settled 2026-10-09 (q-play-act5)*: quest monster spawns `0x005B2F20` now run population's	recording	no		0	
 REC-799	6742		The prisoner AI's quest hooks after the tick (PROVISIONAL, `d2-sim` `wiring/action/ai.rs` 	recording	no		0	
 REC-1000	6747		Client player mode end (PROVISIONAL, `d2-client` `bridge/player_anim.rs` `step` / `mode_se	recording	no		4	
-REC-1001	6748		Client player animation rate (PROVISIONAL, `bridge/player_anim.rs` `rate`; q-fix-input-loc	recording	no		3	
+REC-1001	6748		Client player animation rate (PROVISIONAL, `bridge/player_anim.rs` `rate`; q-fix-input-loc	recording	no		4	
 REC-1002	6749		The click gate `0x00480BA0` is not run (PROVISIONAL, `bridge/click.rs` `apply` / `skill_re	unstated	no		2	
-REC-1030	6525		Monster and summon equipment (PROVISIONAL, `d2-sim` `wiring/economy/monster_equip.rs`, `wi	recording	no		5	
-REC-1250	6750		A non-walking mode request ends the local player's predicted walk (PROVISIONAL, `d2-client	recording	no		3	
+REC-1030	6525		Monster and summon equipment (PROVISIONAL, `d2-sim` `wiring/economy/monster_equip.rs`, `wi	recording	no		6	
+REC-1250	6750		A non-walking mode request ends the local player's predicted walk (PROVISIONAL, `d2-client	recording	no		1	
 REC-1251	6751		Client object footprints on the client path (PROVISIONAL, `d2-client` `bridge/client_path.	recording	no		0	
 REC-1270	6752		Trap target scan skips a monster in melee range (PROVISIONAL, `d2-sim` `wiring/action/ai.r	unstated	no		2	
 REC-1271	6753		Alternative target order (PROVISIONAL, same code): with no main candidate the alternative 	unstated	no		1	
@@ -342,14 +342,15 @@ REC-1360	6754		audio-diff's 1.14d voice start tick (PROVISIONAL, `tools/audio-di
 REC-1361	6755		DirectSound volume / pan conversion is f64 with truncation (PROVISIONAL, `d2-client` `app/	recording	no		2	
 REC-1362	6756		audio-diff's mixed check mixes both voice sets through d2rs' mixer (PROVISIONAL, `specs/to	unstated	no		1	
 REC-1363	6757		1.14d's DirectSound calls do not depend on Wine (PROVISIONAL, `specs/tools/audio-diff.md` 	recording	no		0	
-REC-1385	6579		Headless state-dump client follows the server (PROVISIONAL, `d2-client` `app/state_dump.rs	unstated	no		2	
+REC-1385	6579		Headless state-dump client follows the server (PROVISIONAL, `d2-client` `app/state_dump.rs	unstated	no		1	
 REC-1651	6758		Mode-end neutral request target (settled 2026-10-09 by the read of `0x005A8030`, `monsters	unstated	no		0	
 REC-1652	6759		Velocity base of a disguised unit (settled 2026-10-09 by the read of `0x00623F50` → `0x006	data	yes		0	
 REC-1680	6763		`object_river` (2599) reads its unit from set C first (PROVISIONAL, `d2-client` `audio/sou	unstated	no		1	
 REC-1681	6764		S→C 0x5A lines request UI sound 6 (PROVISIONAL, `d2-client` `world_view/present.rs` `event	unstated	no		1	
 REC-1682	6765		A monster's footstep reads the animation frame before the update's advance (PROVISIONAL, `	recording	no		1	
-REC-1683	6766		Skill start sounds from the unit's mode request (PROVISIONAL, `audio/unit_feed.rs` `run` /	unstated	no		0	
-REC-1684	6767		The first server tick has no client update (q-fix-audio; `audio/sound-table.md` §6.1, `aud	recording	no		0	
+REC-1683	6767		Skill start sounds from the unit's mode request (PROVISIONAL, `audio/unit_feed.rs` `run` /	unstated	no		0	
+REC-1684	6768		The first server tick has no client update (q-fix-audio; `audio/sound-table.md` §6.1, `aud	recording	no		0	
 REC-1695	6760		`0x005DDC30` composition in the sim (PROVISIONAL, `d2-sim` `wiring/action/ai_scan.rs` `sec	unstated	no		4	
 REC-1696	6761		The Compelling Orb's spawn flags (PROVISIONAL, `d2-sim` `world/quests.rs` `QuestWorld::spa	unstated	no		2	
 REC-1698	6762		The vision record (PROVISIONAL, `d2-sim` `monsters/init/mod.rs` `MonsterData::vision`, `wi	unstated	no		2	
+REC-3000	6766		A monster's first update in a new mode makes no footstep call (PROVISIONAL, `audio/unit_fe	recording	no		3	

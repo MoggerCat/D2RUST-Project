@@ -123,6 +123,16 @@ pub fn set_waypoint_map(app: &mut App, map: d2_sim::world::waypoints::WaypointMa
     }
 }
 
+/// The recording host's registry values the UI reads at start
+/// ([`OriginalUi::set_registry`]); nothing without the original UI.
+pub fn set_registry(app: &mut App, r: super::registry::UiRegistry) {
+    if let Some(mut ui) = app.world_mut().get_non_send_mut::<WorldViewUi>() {
+        if let Some(o) = ui.original.as_mut() {
+            o.set_registry(r);
+        }
+    }
+}
+
 /// The store prices the server host publishes for the shop panel
 /// ([`OriginalUi::set_shop_prices`]); nothing without the original UI.
 pub fn set_shop_prices(app: &mut App, prices: crate::ui::original::ShopPrices) {

@@ -423,8 +423,9 @@ impl OriginalUi {
         tables.files.extend(skill_tree_ui::icon_files());
         // `control-panel.md` §9 r9 (REC-519 settled) and §11 r1: the game
         // entry set-up `0x00456970` opens the mini panel (state 0x15) and
-        // then the help button (0x22). d2rs-own: no registry, so neither
-        // `Mini Panel` nor `Help Menu` is set at the start.
+        // then the help button (0x22). Without a registry neither `Mini
+        // Panel` nor `Help Menu` is set at the start; a check run replays
+        // the recording host's ([`OriginalUi::set_registry`]).
         let mut states = UiStates::new()?;
         states.force(UI_MINI_PANEL, true);
         states.force(crate::ui::panels::control::buttons::UI_HELP_BUTTON, true);
@@ -1116,6 +1117,21 @@ impl OriginalUi {
     /// The play bindings accepted on the Controls screen, once.
     pub fn take_accepted_bindings(&mut self) -> Option<crate::controls::Bindings> {
         self.shared.borrow_mut().esc.accepted.take()
+    }
+
+    /// The recording host's registry values (`play --registry`,
+    /// `tools/scenario-diff.md` §3 r7 step 7), before the first frame:
+    /// `Mini Panel` ≠ 0 keeps the mini panel closed at entry
+    /// (`control-panel.md` §9 r9), `Help Menu` fills the help button's
+    /// cache (§11 r2), `PopupHireling` the hire pop-up flag
+    /// (`messages.md` §9 r2). Absent values keep the d2rs start (no
+    /// registry: all absent).
+    pub fn set_registry(&mut self, r: crate::app::registry::UiRegistry) {
+        if r.mini_panel.is_some_and(|v| v != 0) {
+            self.shared.borrow_mut().states.force(UI_MINI_PANEL, false);
+        }
+        self.shared.borrow_mut().hud.help.setting = r.help_menu.unwrap_or(0);
+        self.more_mut().popup_hireling = r.popup_hireling.unwrap_or(0);
     }
 
     /// The settings the Esc menu's Options page shows (`app::config`).
