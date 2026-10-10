@@ -461,7 +461,7 @@ impl<X: Pending> AiWorld for View<'_, X> {
             .unwrap_or_else(|| self.h.x.line_blocked(game, a, b))
     }
     fn in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
-        match self.monster_in_melee_range(game, a, b) {
+        match self.monster_in_melee_range(game, a, b, 0) {
             Some(r) => r,
             None => self.h.x.in_melee_range(a, b, 0),
         }
@@ -1239,7 +1239,7 @@ impl<X: Pending> AiSummons for View<'_, X> {
 }
 
 impl<X: Pending> View<'_, X> {
-    /// `0x00622C40(a, b, 0)` (`combat/hit.md` §7.2) for a monster `a`
+    /// `0x00622C40(a, b, extra)` (`combat/hit.md` §7.2) for a monster `a`
     /// with the path provider and a monstats2 row: reach `MeleeRng` + 1
     /// against the unit distance `0x00641530` (`pathing.md` §9.5), then
     /// the collision line (mask 0x804). `None`: not answerable here (the
@@ -1248,7 +1248,13 @@ impl<X: Pending> View<'_, X> {
     /// PROVISIONAL (hit.md §7.3 step 3, REC-1110): `MeleeRng` 255 reads
     /// the unit's weapon class in its current mode; monsters carry no
     /// weapon here, so it is reach 0.
-    fn monster_in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> Option<bool> {
+    pub(crate) fn monster_in_melee_range(
+        &self,
+        game: &Game,
+        a: UnitId,
+        b: UnitId,
+        extra: i32,
+    ) -> Option<bool> {
         let paths = self.h.paths.as_ref()?;
         let t = &self.h.tables.combat;
         let class = self
@@ -1290,7 +1296,7 @@ impl<X: Pending> View<'_, X> {
         if d <= 0 {
             return Some(true);
         }
-        if reach + 1 < d {
+        if reach.wrapping_add(extra).wrapping_add(1) < d {
             return Some(false);
         }
         Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))

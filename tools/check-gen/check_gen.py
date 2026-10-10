@@ -17,6 +17,8 @@ Families (one check per table row, written under traces/checks/gen/):
   shrine one shrine operated per reachable shrines.txt row
   obj   one object created and operated per objects.txt row (interact-operate-*)
   itemq the same items at each quality (low .. crafted) over three game seeds
+  aud   one audio-diff scenario per reachable system.audio ledger row group (channel
+        audio; written to traces/audio/gen/, outside the scenario-diff suite)
   item  a census of ITEM_CHUNK base items per check, each created on the ground by
         the game's own creation path (poke `item`), compared by the items channel
 
@@ -39,7 +41,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -673,9 +675,208 @@ def fam_obj(ctx):
         out.append(c)
     return out
 
+# Audio scenarios (family aud).  Each entry is one audio-diff check
+# (specs/tools/audio-diff.md): 1.14d's DirectSound writes and d2rs' voices
+# compared per voice (decoded samples, start tick, device volume and pan)
+# and mixed.  `areas` are the system.audio ledger rows the scenario reaches;
+# AUD_NOCHECK lists the rows no scenario can reach, with the reason.
+AUD_TOWN = "ScnAma --class ama --expansion"
+AUD_SOR = "ScnSor --class sor --expansion"
+AUD_SCEN = [
+    dict(id="town-idle", ticks=250, save=AUD_TOWN, lines=[],
+         areas=["sound-table.3-file-path", "sound-table.4-groups-and-variants", "sound-table.5-requests",
+                "sound-table.7-starting-on-a-channel", "sound-table.9-settings", "sound-table.10-sample-cache",
+                "sound-table.11-live-data-1-14d", "sound-table.12-edge-cases-kept", "triggers.1-conventions-and-shared-state"],
+         what="the Rogue Encampment idle for 250 ticks: town music, ambience bed, NPC voices; every voice's sample file, "
+              "group, variant, channel start, settings-driven volume and the sound tick / client update counters"),
+    dict(id="warp-levels", ticks=260, save=AUD_TOWN,
+         lines=["at 4 poke warp 2", "at 120 poke warp 3", "at 200 poke warp 1"],
+         areas=["environment.8-sample-pins-on-level-change-0x004e42e0-last-pa"],
+         what="three level changes (Blood Moor, Cold Plains, back to the Rogue Encampment): the ambience, "
+              "music and sample pins re-made on each level change"),
+    dict(id="npc-talk-akara", ticks=120, save=AUD_TOWN,
+         lines=["at 4 poke pos @player 4888 4228", "at 7 poke pos @player 4903 4224",
+                "at 10 poke pos @player 4918 4216", "at 13 poke pos @player 4928 4210",
+                "at 16 poke talk @1:148 trade"],
+         areas=["triggers.10-npc-speech"],
+         what="the player poked next to Akara and talking to her (greeting line, chat open)"),
+    dict(id="item-drop", ticks=120, save=AUD_TOWN,
+         lines=["at 10 poke item hp1 @x+2 @y", "at 14 poke item cap @x-2 @y", "at 18 poke item axe @x @y+2"],
+         areas=["triggers.9-items"],
+         what="a potion, a cap and an axe created on the ground: the flippy and drop sounds (mode 5)"),
+    dict(id="object-chest", ticks=140, save=AUD_TOWN,
+         lines=["at 10 poke object 5 @x @y", "at 30 poke operate @2:5",
+                "at 60 poke object 26 @x @y"],
+         areas=["triggers.7-object-mode-sounds-0x004cb460-objects", "triggers-2.20-when-object-units-make-their-mode-sounds"],
+         what="a chest created and opened, then Cain's gibbet (class 26) created next to the player: object mode loops, "
+              "transitions and the gibbet's help line"),
+    dict(id="monster-idle", ticks=420, save=AUD_TOWN, variant="blood-moor-empty",
+         lines=["at 4 poke warp 2"] + SEEDS + ["at 30 poke spawn 19 @x+6 @y normal", "at 30 poke spawn 19 @x-6 @y normal"],
+         areas=["triggers.6-monster-idle-voices", "triggers-2.18-sound-identity-of-a-unit-and-its-monsounds-re",
+                "triggers-2.19-a-unit-s-request-list-u-0x78"],
+         what="two fallen near the player in the empty Blood Moor, seeds pinned, 420 ticks: the neutral idle voices, "
+              "their timers and each unit's request list"),
+    dict(id="monster-attack", ticks=260, save=AUD_TOWN, variant="blood-moor-empty",
+         lines=["at 4 poke warp 2"] + SEEDS + ["at 30 poke spawn 19 @x+2 @y normal"],
+         areas=["triggers-2.15-animation-event-3-sound-audio-triggers-md-ope"],
+         what="a fallen attacking the player: the animation-event sound (event 3) of its attack frames"),
+    dict(id="ui-panels", ticks=120, save=AUD_TOWN, input="frame 10; key I; frame 30; key I; frame 40; key C; frame 60; key C",
+         lines=[],
+         areas=["triggers.11-ui-sounds", "triggers-2.17-options-menu-ui-sounds-audio-triggers-md-open"],
+         what="the inventory and character panels opened and closed: the UI cursor sounds"),
+    dict(id="player-chat-event", ticks=80, save=AUD_TOWN,
+         lines=["at 10 poke msg 0x3F 25"],
+         areas=["triggers.3-player-event-sounds-0x004cb9c0-u-event-e", "triggers.2-server-sound-events-s-c-0x2c"],
+         what="C->S 0x3F PlayAudio event 25 (chat line 1): the player event sound and the server sound event path"),
+    dict(id="hit-sequence", ticks=260, save=AUD_TOWN, variant="blood-moor-empty",
+         lines=["at 4 poke warp 2"] + SEEDS + ["at 30 poke spawn 19 @x+2 @y normal"],
+         input="frame 40; click 430 300; frame 80; click 430 300",
+         areas=["triggers-2.13-remaining-fixed-request-conditions-audio-trig"],
+         what="the player attacking a fallen by clicking it: attack, impact and death sounds of the fixed requests"),
+]
+AUD_NOCHECK = {
+    "environment.1-sound-environment": "EAX room settings run in mixer mode 2 only and are not reproduced; mode 0 (what d2rs and the capture use) has no effect on decoded samples or trigger ticks",
+    "environment.3-quest-stingers-0x004dcd40-m-dm-h-k-s-ds-play": "stingers start from quest events (server 0x2C events 33-83) that no poke can raise; needs a quest-completion scenario",
+    "environment.9-front-end-music-options-music-answers-open-que": "front-end music plays in the menu screens, outside the in-game audio capture",
+    "sound-table.1-loading-the-table": "table loading has no timing or sample output of its own; sounds.txt content is compared row by row through the voices of every audio check",
+    "sound-table.2-sound-environment-table-load-only": "load only, no behaviour a scenario can reach (the table feeds the EAX path, not reproduced)",
+    "sound-table.13-d2rs-mapping": "d2rs-internal mapping of the original structures, no 1.14d output to compare",
+    "sound-table-2.14-other-users-of-the-local-player-s-client-unit": "needs a run that consumes the client seed from another user (weather thunder, event cues) at a pinned tick; none is reachable by pokes yet",
+    "sound-table-2.15-options-menu-sliders-audio-sound-table-md-ope": "the options-menu sliders are front-end/menu input not covered by the in-game capture",
+    "sound-table-2.16-sample-cache-exact-refines-audio-sound-table-": "cache residency (hits, evictions) is not visible in decoded samples or trigger ticks",
+    "sound-table-2.17-start-failures-on-a-channel-refines-audio-sou": "needs more than 16 simultaneous voices at pinned ticks; no poke raises that load deterministically",
+    "triggers.12-other-fixed-requests": "the fixed requests are wall-clock driven (shake, panels) or need events no poke raises (thunder, steal life, Inifuss); the reachable ones are covered by hit-sequence",
+    "triggers-2.14-server-senders-of-s-c-0x2c-audio-triggers-md-": "senders are server events (quests, cube, NPC, inventory, AI); only the client side of 0x2C is reachable by pokes",
+    "triggers-2.16-progsound-conditions-audio-triggers-md-open-q": "ProgSound needs the quest/progress states of the original; no poke sets them",
+    "triggers-2.21-what-the-driver-needs-per-rule-inputs-and-own": "a table of driver inputs and owners, no behaviour of its own",
+}
+
+
+def fam_aud(ctx):
+    out = []
+    for sc in AUD_SCEN:
+        c = Check(
+            f"gen-aud-{sc['id']}", "aud", f"audio scenario {sc['id']}",
+            f"audio {sc['id']}", sc["save"], sc["ticks"], 300, "audio",
+            list(sc["lines"]) + (["input " + sc["input"]] if sc.get("input") else []),
+            variant=sc.get("variant"),
+            comment=[f"Audio scenario {sc['id']}: {sc['what']}.",
+                     "Compared by tools/audio-diff (decoded samples, start ticks, device "
+                     "volume and pan per voice, and the mixed output).",
+                     "Ledger rows: " + ", ".join("system.audio." + a for a in sc["areas"]) + "."])
+        c.extra = {"areas": ["system.audio." + a for a in sc["areas"]], "input": sc.get("input")}
+        out.append(c)
+    return out
+
+
+# File-format rows (ledger area system.formats.*): a scenario reaches a
+# format only through what the game does with the file, so each check runs a
+# fixed scene in which the formats' output shows: the draw list of the town
+# arrival (every DCC/DC6/DT1 file drawn, palette, COF layer order, animation
+# frame data), the load of a saved character (the .d2s sections), a
+# walk/run (animation frame counts drive the movement ticks). The rows each
+# check stands for are listed in FMT_ROWS (area prefix -> check).
+FMT_ROWS = {
+    "gen-fmt-draws-town": ["dcc.", "cof.", "dt1.", "palette.", "dc6.", "animdata.1-", "animdata.2-",
+                           "animdata.3-", "d2s-appearance.1-", "d2s-appearance.2-",
+                           "d2s-appearance.3-", "d2s-appearance.6-"],
+    "gen-fmt-load-ama": ["d2s.1-", "d2s.9-", "d2s-load.1-", "d2s-load.2-", "d2s-load.7-", "d2s-load.8-"],
+    "gen-fmt-anim-walk": ["animdata.4-", "animdata.5-", "animdata.6-"],
+}
+
+
+def fam_fmt(ctx):
+    town = Check(
+        "gen-fmt-draws-town", "fmt", "formats: town arrival draw list",
+        "draw list of the Rogue Encampment arrival (DCC/DC6/DT1/COF/palette/animdata)",
+        "ScnAma --class ama --expansion", 76, 600, "draws", ["draws-at 73"],
+        comment=["Every file the town arrival draws goes through the format readers: the draw "
+                 "rows name the DCC, DC6 and DT1 files, the palette shift and the COF layer "
+                 "order. Same scene as draws-town-arrival-ama (server tick 73)."])
+    load = Check(
+        "gen-fmt-load-ama", "fmt", "formats: load of a saved character",
+        "load of a saved expansion Amazon, 20 idle ticks: state and packets",
+        "ScnAma --class ama --expansion", 20, 300, "state packets", [],
+        comment=["The .d2s sections (header, quests, waypoints, stats, skills, items) "
+                 "become the player's state; the join packets carry the loaded values "
+                 "(specs/formats/d2s-load.md sections 1, 2, 7, 8)."])
+    anim = Check(
+        "gen-fmt-anim-walk", "fmt", "formats: animation data in movement",
+        "Walk and Run in the Rogue Encampment: movement ticks come from AnimData",
+        "ScnAma --class ama --expansion --level 12", 80, 300, "state packets",
+        ["ignore q",
+         "at 6 send Walk x=@x+6 y=@y",
+         "at 36 send Run x=@x y=@y+5"],
+        comment=["Frame counts and speed of the walk/run modes come from the animation data "
+                 "(specs/formats/animdata.md sections 4-6); the player's position per tick shows them."])
+    out = [town, load, anim]
+    for c in out:
+        c.extra = {"fmt": True}
+    return out
+
+
+# Scenes of the render family: (slug, title, warp level or None, pokes
+# (frame, text), ledger area prefixes of system.render.* the scene reaches).
+RENDER_SCENES = [
+    ("town-dawn", "Rogue Encampment at dawn", None, [(4, "time 0 600")],
+     ["lighting.1-", "lighting.2-", "lighting.3-", "lighting.9-", "lighting.11-", "shading.1-", "shading.2-", "shading.3-", "shading.9-", "composition.3-", "composition.4-", "composition.5-"]),
+    ("town-night", "Rogue Encampment at night", None, [(4, "time 3 600")],
+     ["lighting.5-", "lighting.6-", "lighting.7-", "lighting.10-", "shading.4-"]),
+    ("blood-moor", "Blood Moor by day (tiles, walls, view culling)", 2, [],
+     ["camera.1-", "camera.2-", "camera.3-", "camera.4-", "camera.5-", "camera.6-", "camera.7-", "camera.9-",
+      "sprite-placement.1-", "sprite-placement.2-", "sprite-placement.3-", "sprite-placement.5-", "sprite-placement.6-", "sprite-placement.7-"]),
+    ("den-of-evil", "Den of Evil (dark cave: blocks-light flags, light radius, translucent walls)", 8, [],
+     ["lighting.4-", "lighting.8-", "blend-modes.6-"]),
+    ("firebolt", "Fire Bolt in flight (missile light, overlay, blend mode)", 2,
+     [(8, "spawn 179 @x+6 @y normal"), (12, "missile 58 @x @y @x+6 @y skill 36 1")],
+     ["blend-modes.1-", "blend-modes.2-", "blend-modes.4-", "blend-modes.5-", "blend-modes.7-", "overlay.1-", "overlay.2-", "overlay.3-", "overlay.4-", "overlay.5-",
+      "unit-composite.9-", "sprite-placement.4-"]),
+    ("frozen", "Frozen player and a cow beside (colormap remap)", None,
+     [(6, "spawn 179 @x+3 @y normal"), (8, "state @player 1 on")],
+     ["unit-composite.1-", "unit-composite.2-", "unit-composite.3-", "unit-composite.4-", "unit-composite.5-", "unit-composite.6-", "unit-composite.7-", "unit-composite.8-",
+      "blend-modes.3-", "shading.6-", "shading.7-"]),
+    ("kurast-rain", "Kurast Docks (weather passes)", 75, [],
+     ["camera.8-", "shading.8-"]),
+]
+
+
+def render_areas(prefixes):
+    """The system.render.* ledger rows whose id starts with one of the prefixes."""
+    import glob as _g
+    ids = set()
+    for fn in sorted(_g.glob(os.path.join(ROOT, "docs", "handoff", "ledger", "*.tsv"))):
+        with open(fn, encoding="utf-8") as f:
+            for line in f:
+                a = line.split("\t", 1)[0]
+                if a.startswith("system.render."):
+                    ids.add(a)
+    return sorted(a for a in ids if any(a.startswith("system.render." + p) for p in prefixes))
+
+
+def fam_render(ctx):
+    """Draw-list scenes for the system.render rows: the same pokes on both sides,
+    the draws channel compared at the last ticks (the draw list: files, frames,
+    positions, draw modes, palettes). One check covers the rows it names."""
+    out = []
+    for slug_, title, level, pokes, prefixes in RENDER_SCENES:
+        lines = []
+        if level is not None:
+            lines.append(f"at 4 poke warp {level}")
+        lines += [f"at {f} poke {t}" for f, t in pokes]
+        ticks = {"firebolt": 24, "frozen": 30}.get(slug_, 60 if level is not None else 40)
+        save = ACT_SAVE[2] if slug_ == "kurast-rain" else ACT_SAVE[0]
+        c = Check(f"gen-render-{slug_}", "render", f"scene {slug_}", title,
+                  save, ticks, 600, "draws",
+                  lines + [f"draws-at {ticks - 2}"],
+                  comment=[f"Render scene {slug_}: {title}. The draw list of tick {ticks - 2} "
+                           "(files, frames, positions, draw modes, palettes) on both sides."])
+        c.extra = {"areas": render_areas(prefixes), "scene": slug_}
+        out.append(c)
+    return out
+
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render}
 
 
 # ----------------------------------------------------------- ledger join
@@ -739,6 +940,18 @@ def resolve_area(c, areas):
                 and s.endswith(f"(hcIdx {x['class']})")]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
+    elif f == "aud":
+        c.area = ",".join(x["areas"])
+        return
+    elif f == "fmt":
+        pre = FMT_ROWS[c.name]
+        c.area = ",".join(a for a, _ in areas if a.startswith("system.formats.")
+                          and any(a[len("system.formats."):].split(".", 1)[-1].startswith(p)
+                                  or a[len("system.formats."):].startswith(p) for p in pre)) or "-"
+        return
+    elif f == "render":
+        c.area = ",".join(x["areas"]) or "-"
+        return
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
@@ -785,6 +998,8 @@ def main(argv=None):
     ap.add_argument("--excel")
     ap.add_argument("--out", default=os.path.join(ROOT, "traces", "checks", "gen"))
     ap.add_argument("--family", action="append", choices=FAMILIES)
+    ap.add_argument("--audio-out", default=os.path.join(ROOT, "traces", "audio", "gen"),
+                    help="where the aud family is written (audio checks stay out of the suite dir)")
     ap.add_argument("--ledger", default=os.path.join(HERE, "ledger-areas.tsv"),
                     help="ledger area ids for the headers (default: the committed snapshot; "
                          "the full fidelity-ledger.tsv is read too)")
@@ -801,7 +1016,7 @@ def main(argv=None):
         import selftest
         return selftest.run()
     ctx = Ctx()
-    ctx.excel = a.excel or default_excel()
+    ctx.excel = a.excel or (None if a.family == ["aud"] else default_excel())
     ctx.waypoints = a.waypoints
     ctx.waypoint_towns = a.waypoint_towns
     ctx.ledger = a.ledger
@@ -822,39 +1037,50 @@ def main(argv=None):
         for c in checks:
             print(c.name, c.area, c.title, sep="\t")
         return 0
-    want = {f"{c.name}.check": c.render() for c in checks}
-    index_name = "INDEX.tsv"
-    if not a.family:
-        want[index_name] = index_text(checks)
-    os.makedirs(a.out, exist_ok=True)
-    have = {f for f in os.listdir(a.out) if f.endswith(".check") or f == index_name}
-    bad = []
-    if a.check:
+    aud = [c for c in checks if c.family == "aud"]
+    checks = [c for c in checks if c.family != "aud"]
+    groups = []
+    if checks or not aud:
+        groups.append((a.out, checks, True))
+    if aud:
+        groups.append((a.audio_out, aud, False))
+    status = 0
+    for out_dir, grp, with_index in groups:
+        want = {f"{c.name}.check": c.render() for c in grp}
+        index_name = "INDEX.tsv"
+        if with_index and not a.family:
+            want[index_name] = index_text(grp)
+        os.makedirs(out_dir, exist_ok=True)
+        have = {f for f in os.listdir(out_dir) if f.endswith(".check") or f == index_name}
+        whole = not a.family or (not with_index)
+        if a.check:
+            bad = []
+            for f, text in want.items():
+                p = os.path.join(out_dir, f)
+                if not os.path.isfile(p) or open(p, encoding="utf-8").read() != text:
+                    bad.append(f)
+            if whole:
+                bad += sorted(have - set(want))
+            if bad:
+                print(f"check-gen: {len(bad)} generated files are stale or missing, e.g. {bad[:3]}",
+                      file=sys.stderr)
+                status = 1
+            else:
+                print(f"check-gen: {len(want)} files current")
+            continue
         for f, text in want.items():
-            p = os.path.join(a.out, f)
-            if not os.path.isfile(p) or open(p, encoding="utf-8").read() != text:
-                bad.append(f)
-        if not a.family:
-            bad += sorted(have - set(want))
-        if bad:
-            print(f"check-gen: {len(bad)} generated files are stale or missing, e.g. {bad[:3]}",
-                  file=sys.stderr)
-            return 1
-        print(f"check-gen: {len(want)} files current")
-        return 0
-    for f, text in want.items():
-        with open(os.path.join(a.out, f), "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-    if not a.family:
-        for f in sorted(have - set(want)):
-            os.remove(os.path.join(a.out, f))
-    counts = {}
-    for c in checks:
-        counts[c.family] = counts.get(c.family, 0) + 1
-    print("check-gen: wrote %d checks to %s: %s" % (
-        len(checks), os.path.relpath(a.out, ROOT),
-        ", ".join(f"{k} {v}" for k, v in counts.items())))
-    return 0
+            with open(os.path.join(out_dir, f), "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+        if whole:
+            for f in sorted(have - set(want)):
+                os.remove(os.path.join(out_dir, f))
+        counts = {}
+        for c in grp:
+            counts[c.family] = counts.get(c.family, 0) + 1
+        print("check-gen: wrote %d checks to %s: %s" % (
+            len(grp), os.path.relpath(out_dir, ROOT),
+            ", ".join(f"{k} {v}" for k, v in counts.items())))
+    return status
 
 
 if __name__ == "__main__":

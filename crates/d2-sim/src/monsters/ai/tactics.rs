@@ -6,8 +6,8 @@ use crate::game::Game;
 use crate::units::UnitId;
 
 use super::{
-    delete_thinks, flag, idle, mode, request_mode, state, AiCommand, AiHost, Ctx, ModeTarget,
-    Unhandled, UnitRef,
+    delete_thinks, flag, idle, mode, request_mode, request_mode_keep_skill, state, AiCommand,
+    AiHost, Ctx, ModeTarget, Unhandled, UnitRef,
 };
 
 /// `(2·max + min) / 2` of the axis distances, truncated (§6).
@@ -103,10 +103,13 @@ pub fn use_skill<W: AiHost + ?Sized>(
     if m >= 16 {
         return false;
     }
+    // The builder's clear comes first; a skill id the unit has no entry
+    // for leaves none (`0x006439B0` gives 0).
+    cx.world.clear_current_skill(unit);
     cx.world.set_current_skill(unit, skill);
     cx.world.set_skill_flag(unit);
     cx.world.set_path_steps(unit, 1);
-    if !request_mode(game, cx, unit, m, target) {
+    if !request_mode_keep_skill(game, cx, unit, m, target, None) {
         idle(game, cx, unit, 10);
         return false;
     }
@@ -126,7 +129,7 @@ pub fn use_sequence_skill<W: AiHost + ?Sized>(
         return;
     }
     cx.world.set_path_steps(unit, 1);
-    request_mode(game, cx, unit, mode::SEQUENCE, target);
+    request_mode_keep_skill(game, cx, unit, mode::SEQUENCE, target, None);
 }
 
 /// Failure flags of [`move_to`].

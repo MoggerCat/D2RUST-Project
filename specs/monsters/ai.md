@@ -34,15 +34,15 @@
 |   4. AI parameters | 641–659 |
 |   5. Target selection | 660–996 |
 |   6. Distances and line tests | 997–1012 |
-|   7. Tactics helpers | 1013–1261 |
-|   8. AI commands and minions | 1262–1288 |
-|   10. The catalogue `ai-functions.tsv` | 1289–1309 |
-| Constants & data dependencies | 1310–1333 |
-| Randomness | 1334–1363 |
-| Edge cases & original bugs | 1364–1405 |
-| Test vectors | 1406–1494 |
-| Provenance | 1495–1556 |
-| Open questions | 1557–1663 |
+|   7. Tactics helpers | 1013–1269 |
+|   8. AI commands and minions | 1270–1296 |
+|   10. The catalogue `ai-functions.tsv` | 1297–1317 |
+| Constants & data dependencies | 1318–1341 |
+| Randomness | 1342–1371 |
+| Edge cases & original bugs | 1372–1413 |
+| Test vectors | 1414–1502 |
+| Provenance | 1503–1564 |
+| Open questions | 1565–1671 |
 <!-- /index -->
 
 ## Summary
@@ -1050,6 +1050,14 @@ compute of types 2, 7, 9 or 13 retries with type 15). Exact steps:
 requested mode, the current skill is cleared again. 1.14d-confirmed
 (`0x005A7E60`, `0x005A7C20`, `0x005A63F0`, `0x005A6290`,
 `0x005A6B10`).
+
+Order in the skill requests (1.14d-read 2026-10-10, `0x005DEAD0`,
+`0x005DE000`): the builder (its clear) runs **first**, then the current
+skill is set (`0x006439B0(-1)` entry, none when the unit has no such
+skill), then `0x005A7C20`. A request that sets no skill therefore leaves
+the used skill none: a monster whose sequence skill (mode 14) is over and
+that then attacks in A1 strikes with its A1 damage (REC-2355, check
+`gen-mon-189`: the Smite caster's A1 hit rolled 12, not 6, damage units).
 
 Mode numbers: 1 neutral, 2 walk, 4 attack1 (A1), 5 attack2 (A2), 8
 skill1 (S1), 9 skill2 (S2), 14 sequence, 15 run (`sim/units.md`).
