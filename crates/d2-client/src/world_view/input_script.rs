@@ -156,7 +156,7 @@ pub fn script_camera(world: &ClientWorld, local_at: Option<(u32, u32)>) -> Optio
 /// chat, held modifiers, the skill hotkeys F1–F8, whose use sender
 /// `ui/controls.md` §3.1 r2 does not name and the window does not wire)
 /// is refused headless.
-pub const HEADLESS_KEY_ACTIONS: [Action; 23] = [
+pub const HEADLESS_KEY_ACTIONS: [Action; 24] = [
     Action::BeltSlot1,
     Action::BeltSlot2,
     Action::BeltSlot3,
@@ -183,6 +183,7 @@ pub const HEADLESS_KEY_ACTIONS: [Action; 23] = [
     Action::ToggleSkillTree,
     Action::ToggleSkillMenuRight,
     Action::ToggleBelt,
+    Action::ToggleMessageLog,
 ];
 
 /// The world action a headless `key` step runs (the original key
@@ -199,7 +200,7 @@ pub fn headless_key_action(bindings: &Bindings, vk: u32) -> Result<Action, Strin
         Some(a) if HEADLESS_KEY_ACTIONS.contains(&a) => Ok(a),
         other => Err(format!(
             "key 0x{vk:02X} ({}): not applied headless ({}); headless keys: 1-4 (belt), \
-             R (run lock), W (weapon swap), NumPad 0-7 (speech); panels, automap, chat, \
+             R (run lock), W (weapon swap), NumPad 0-7 (speech), the panel toggles; chat, \
              held modifiers and the skill hotkeys F1-F8 are not (use `input d2rs` with \
              `play`, or a C->S `send` line)",
             key.name(),
@@ -1045,7 +1046,8 @@ mod tests {
             "no frame"
         );
         assert!(Headless::new(parse("frame 2; wait 3").unwrap()).is_err());
-        assert!(Headless::new(parse("frame 2; key i").unwrap()).is_err());
+        assert!(Headless::new(parse("frame 2; key i").unwrap()).is_ok());
+        assert!(Headless::new(parse("frame 2; key F1").unwrap()).is_err());
         let mut none = |_: &UnitSel| -> Result<(UnitKey, Point), String> { Err("none".into()) };
         let mut h = Headless::new(
             parse("frame 10; click 600 300; hold 1 2 3; frame 20; move 5 6; frame 21; rclick 7 8")
@@ -1307,6 +1309,29 @@ mod tests {
             );
         }
 
+        // `ui-draws-questlog-ama` (1.14d): the quest key sends C→S 0x40 on
+        // every open, nothing on the close; other panel keys send nothing.
+        #[test]
+        fn the_quest_key_asks_for_quest_data_on_each_open() {
+            let (mut br, link) = scene();
+            let mut h = Headless::new(
+                parse("frame 1; key q; key i; frame 2; key q; frame 3; key q").unwrap(),
+            )
+            .unwrap();
+            for last in 0..3 {
+                h.apply(&mut br, last).unwrap();
+            }
+            br.send_outgoing().unwrap();
+            let n = link
+                .sent
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.first() == Some(&0x40))
+                .count();
+            assert_eq!(n, 2);
+        }
+
         // Covers: specs/ui/controls.md §7 r2, §7 r3
         #[test]
         fn headless_keys_run_their_world_actions() {
@@ -1316,7 +1341,10 @@ mod tests {
             assert_eq!(act("4"), Ok(Action::BeltSlot4));
             assert_eq!(act("R"), Ok(Action::ToggleRun));
             assert_eq!(act("W"), Ok(Action::SwapWeapons));
-            for refused in ["I", "TAB", "F1", "F8", "ESC", "SHIFT", "5"] {
+            // The panel toggles run headless (REC-2960).
+            assert_eq!(act("I"), Ok(Action::ToggleInventory));
+            assert_eq!(act("Q"), Ok(Action::ToggleQuests));
+            for refused in ["F1", "F8", "ESC", "SHIFT", "5"] {
                 assert!(act(refused).is_err(), "{refused}");
             }
             assert!(Headless::new(parse("frame 1; key F1").unwrap()).is_err());
