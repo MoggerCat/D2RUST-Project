@@ -18,3 +18,7 @@ C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
 C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open
+C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35 C008 checks state 100% (11 rows EQUAL)
+C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
+C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
+C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
