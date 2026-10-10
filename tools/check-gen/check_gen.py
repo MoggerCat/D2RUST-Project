@@ -428,6 +428,10 @@ def fam_shrine(ctx):
 QFLOWS = [
     ("a1q2-sisters", ["quest.a1q2-sisters-burial-grounds", "quest.done2-sisters-burial-grounds"], "2.1", 150, [92],
      "Sisters' Burial Grounds reward: Kashya, message 92", 1),
+    ("a1q1-den", ["quest.a1q1-den-of-evil"], "1.1", 148, [76],
+     "Den of Evil reward: Akara, message 76", 1),
+    ("a1q6-sisters-slaughter", ["quest.a1q6-sisters-to-the-slaughter", "quest.done6-sisters-to-the-slaughter"], "6.1", 155, [183],
+     "Sisters to the Slaughter reward: Warriv, message 183", 1),
     ("a1q3-tools", ["quest.a1q3-tools-of-the-trade"], "3.1", 154, [163],
      "Tools of the Trade reward: Charsi, message 163", 1),
     ("a1q4-cain", ["quest.a1q4-the-search-for-cain", "quest.done4-search-for-cain"], "4.1", 148, [118],
