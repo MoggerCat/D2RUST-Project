@@ -96,6 +96,14 @@ length; +0x6C demon %, +0x70 undead %, +0x74 target AC; +0x78 damage %.
       inventory present and wield type `0x0063D340` = 2 → 23/24; else
       21/22 (owner unit getter), each `<< 8`. W of item type 57 (blunt,
       `0x00629BB0`) → +0x70 += 50.
+   Monster weapons (1.14d-recorded 2026-10-10, gen-boss-267): a monster
+   wielding equipment (`monsters/init.md` §12) has an item here, so Blood
+   Raven's bow (grip 2) takes the base from stats 23 / 24 (2 / 6), not 21 /
+   22 (4 / 6): the roll range is 1024 (`n` of the missile's draw) and the
+   second element roll, `roll(0)` on a zero range, is still a recorded
+   call. d2rs reads the monster's equipment as its hands (d2-client
+   `weapons::sync`; PROVISIONAL REC-3270: the pick `0x0063C9B0` read as the
+   right-hand item with a hand class).
    2. No item: owner is a monster and a hireling (`0x0063EE90`) → `p =
       dexterity(2)`. Base = `mindamage(21) << 8`, `maxdamage(22) << 8`.
    3. `smin = trunc(base_min × S / 128)`, `smax` likewise (S after the

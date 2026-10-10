@@ -1497,9 +1497,10 @@ fn resurrect_at_tyrael() {
 
 // Covers: specs/world/npc.md §7.4 r2, §edge-cases-original-bugs r11; specs/world/hirelings.md §9 r3, §edge-cases-original-bugs r5
 #[test]
-fn resurrect_refuses_a_living_hireling() {
-    // Test vector "crafted 0x62 at Kashya, hireling living": 0x2A code 9;
-    // no gold taken, no 0x9B, nothing changed (d2rs policy).
+fn resurrect_revives_a_living_hireling() {
+    // 1.14d does not test the dead bit (`traces/checks/hire-resurrect-kashya.check`:
+    // a hireling with life poked to 0 that never died is revived): the cost is
+    // paid, 0x9B and 0x2A code 5 follow, as for a dead one.
     let mut c = control(0);
     let mut w = Fake::new();
     let kashya = w.npc(class::KASHYA, 0x30);
@@ -1521,9 +1522,10 @@ fn resurrect_refuses_a_living_hireling() {
     w.sent.clear();
     w.log.clear();
     assert_eq!(c.resurrect(&mut w, PLAYER, &msg5(0x62, 0x30)), 0);
-    assert_eq!(w.sent, [transaction(0, 9, u32::MAX, 1000).to_vec()]);
-    assert_eq!(w.get(PLAYER, stat::GOLD), 1000);
-    assert!(w.log.is_empty(), "{:?}", w.log);
+    assert_eq!(w.sent[0], hex("9b ffff 00000000"));
+    // The tail reads the GUID of the record revive's rule 3 freed (−1).
+    assert_eq!(w.sent[1], transaction(0, 5, u32::MAX, 250).to_vec());
+    assert_eq!(w.get(PLAYER, stat::GOLD), 250);
 }
 
 // ------------------------------------------------------------ §7.5

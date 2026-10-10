@@ -191,6 +191,13 @@ pub struct FrameSchedule {
     /// Drawn tick → the clock of its cursor step (`None`: not recorded,
     /// allowed for the last frame only: its step follows the dump).
     pub frames: std::collections::BTreeMap<u64, Option<u32>>,
+    /// Drawn tick → the recorded light quality `[0x007B567C]` (a host
+    /// input: it follows the measured draw rate, `render/lighting.md` §5),
+    /// where the schedule has the column.
+    pub quality: std::collections::BTreeMap<u64, u8>,
+    /// Drawn tick → the pointer the frame started with (frame pixels): where
+    /// the OS put it after a panel's cursor jump (`ui/panels-3.md` §4.3).
+    pub pointer: std::collections::BTreeMap<u64, (i32, i32)>,
     /// `last_step` and `idle_since` of the cursor at the first frame.
     pub cursor_last: u32,
     pub cursor_idle: u32,
@@ -235,6 +242,17 @@ impl FrameSchedule {
                 None => return Err(at("no now column")),
             };
             s.frames.insert(tick, now);
+            if let Some(q) = c.next().filter(|q| *q != "-") {
+                s.quality
+                    .insert(tick, q.parse().map_err(|_| at("quality"))?);
+            }
+            if let (Some(x), Some(y)) = (c.next(), c.next()) {
+                if x != "-" && y != "-" {
+                    let x = x.parse().map_err(|_| at("cursor_x"))?;
+                    let y = y.parse().map_err(|_| at("cursor_y"))?;
+                    s.pointer.insert(tick, (x, y));
+                }
+            }
         }
         if !version {
             return Err("frame schedule: no `# frame-schedule 1` line".into());
@@ -1105,11 +1123,24 @@ fn world_view_frame(
             )?;
             if let Some(original) = ui.original.as_mut() {
                 // The cursor jump of §4.3: warp the window cursor.
-                if let (Some(at), Ok(mut window)) =
-                    (original.take_cursor_warp(), windows.single_mut())
-                {
+                let warp = original.take_cursor_warp();
+                if let (Some(at), Ok(mut window)) = (warp, windows.single_mut()) {
                     if let Ok(pos) = edge::frame_to_window(&window, at) {
                         window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                    }
+                }
+                // A check run replays the pointer the OS reported after the
+                // jump (the recorded host input) when d2rs's own jump agrees
+                // on x; a different x is left to show in the cursor row.
+                if let (Some(at), Some(s)) = (warp, schedule.as_deref()) {
+                    if let Some((_, &(x, y))) = s.pointer.range(tick + 1..).next() {
+                        if x == at.x {
+                            let p = crate::ui::Point::new(x, y);
+                            ui.queue.0.push(UiEvent::CursorMoved(p));
+                            ui.cursor = Some(FramePos::Inside(p));
+                        } else {
+                            warn!("cursor jump: d2rs x {} vs recorded {x}", at.x);
+                        }
                     }
                 }
                 let outcome = original.take_outcome();
@@ -1512,6 +1543,16 @@ fn world_view_frame(
                 blank_screen,
                 open_mode,
                 seq: d.seen,
+                inputs: crate::facts::export::FrameInputs {
+                    player: anchor.map(|a| {
+                        let c = a.player.client();
+                        (c.x, c.y)
+                    }),
+                    light_quality: schedule
+                        .as_ref()
+                        .and_then(|s| s.quality.get(&tick).copied()),
+                    weather: state.feed.level_weather(),
+                },
             };
             match crate::facts::export::dump(&d.request, &dir, &frame_in) {
                 Ok(()) => {
@@ -1772,6 +1813,18 @@ mod schedule_tests {
         // refused, never a fallback clock.
         let gap = text.replace("3\t6403156", "3\t-");
         assert!(FrameSchedule::parse(&gap).is_err());
+        // The optional light-quality column (a recorded host input).
+        let q = FrameSchedule::parse(
+            &text
+                .replace("tick\tnow\n", "tick\tnow\tquality\n")
+                .replace("3\t6403156", "3\t6403156\t2")
+                .replace("5\t6403281", "5\t6403281\t0"),
+        )
+        .unwrap();
+        assert_eq!(
+            (q.quality.get(&3), q.quality.get(&5), q.quality.get(&6)),
+            (Some(&2), Some(&0), None)
+        );
         assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
         assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
     }

@@ -1100,6 +1100,95 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// `0x0056EDE0(game, owner, skill, level, missile, x, y)`
+    /// (`skills/bodies.md` §6.13): both coordinates 0 take the owner's
+    /// target position; still 0, or farther than 100 (`0x006417F0`, max +
+    /// min / 2): none; else a missile at the point (record flags 1) on the
+    /// real missile store. 1.14d `ass-blade-sentinel` frame 28: the
+    /// creeper's blade missile is the unit allocation that steps the game
+    /// seed.
+    fn skill_missile(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+        missile: i32,
+        x: i32,
+        y: i32,
+    ) -> Option<UnitId> {
+        use crate::missiles::{self, MissileBodies, MissileParams};
+        let (mut tx, mut ty) = (x, y);
+        if tx == 0 && ty == 0 {
+            (tx, ty) = MissileBodies::target_position(self, game, owner).unwrap_or((0, 0));
+            if tx == 0 && ty == 0 {
+                return None;
+            }
+        }
+        let (ox, oy) = self.h.path_position(owner);
+        let (dx, dy) = (
+            ox.wrapping_sub(tx).wrapping_abs(),
+            oy.wrapping_sub(ty).wrapping_abs(),
+        );
+        if dx.max(dy).wrapping_add(dx.min(dy) / 2) as u32 > 100 {
+            return None;
+        }
+        let p = MissileParams {
+            flags: 1,
+            owner: Some(owner),
+            class: missile,
+            x: tx,
+            y: ty,
+            skill,
+            level,
+            ..MissileParams::default()
+        };
+        let mut store = self.h.missiles.take()?;
+        let t = self.h.tables.clone();
+        let made = {
+            let mut cx = missiles::Ctx {
+                tables: &t.missiles,
+                store: &mut store,
+                world: &mut *self,
+            };
+            missiles::create_missile(game, &mut cx, &p)
+        };
+        self.h.missiles = Some(store);
+        made
+    }
+    /// `0x00621CE0(a, b)`: `a` stores `b` as its owner (type +0x94, id
+    /// +0x98, flag-ex 0x400; the source map the missile owner lookups
+    /// read).
+    fn link_owner(&mut self, game: &mut Game, a: UnitId, b: UnitId) {
+        // A missile's owner is the unit this stores (`0x00621CE0`, missile
+        // creation step 24): 1.14d `ass-blade-sentinel` gives the blade
+        // missile the creeper as owner.
+        if let Some(m) = self.h.missiles.as_mut().and_then(|s| s.get_mut(a)) {
+            m.owner = self.units.get(b).map(|r| crate::missiles::UnitRef {
+                ty: r.ty,
+                guid: r.guid,
+            });
+            return;
+        }
+        let link = self
+            .units
+            .get(b)
+            .map(|r| r.ty.index() as u32)
+            .zip(game.lists.unit(b).map(|e| e.guid));
+        if let Some(r) = self.units.get_mut(a) {
+            match link {
+                Some(l) => {
+                    r.source = l;
+                    r.flags2 |= 0x400;
+                }
+                None => {
+                    r.source = (0, 0);
+                    r.flags2 &= !0x400;
+                }
+            }
+        }
+        self.h.unit_source.insert(a, b);
+    }
     /// `0x006439B0` entry +0x08 of a monster's entry: the skill's
     /// `monanim` (fixed when the entry is created, `skills/use.md` §5.1).
     fn entry_mode(&self, unit: UnitId, skill: i32) -> Option<u8> {

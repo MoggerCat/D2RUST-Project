@@ -56,10 +56,10 @@
 |   16.–18. Moved | 952–958 |
 | Constants & data dependencies | 959–1005 |
 | Randomness | 1006–1052 |
-| Edge cases & original bugs | 1053–1119 |
-| Test vectors | 1120–1158 |
-| Provenance | 1159–1225 |
-| Open questions | 1226–1290 |
+| Edge cases & original bugs | 1053–1123 |
+| Test vectors | 1124–1162 |
+| Provenance | 1163–1229 |
+| Open questions | 1230–1294 |
 <!-- /index -->
 
 ## Summary
@@ -1112,6 +1112,10 @@ Reproduced by default.
     data; unreachable through init and presets.
 27. **Shrine 17 portal room**: created in P's room even when the free
     spot lies in a neighbouring room.
+    **In a town** (P's room `0x0061AB00`, recorded gen-shrine-17, Wine
+    1.14d) the creation `0x0056D130` is refused (class 0x3B, not a quest
+    portal): no portal, sound event 0x18 on P targeted at P
+    (`0x00553380`), result 0.
 28. **No null-operator guard** in the portal (fatal assert) or the chest
     lock (fatal in the key test).
 29. **Portals close only for the linked owner**: removal needs player

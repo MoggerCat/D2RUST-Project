@@ -625,6 +625,23 @@ fn portal_shrine_code_17() {
     assert_eq!(run(17, |_| {}), vec!["spot 20 3 0x1c09"]);
 }
 
+// Covers: specs/world/objects.md §9.2, §edge-cases-original-bugs r27
+#[test]
+fn portal_shrine_in_town_plays_the_refusal_sound() {
+    let mut s = setup(17);
+    s.w.stats.insert((P, K_SPOT_X), 100);
+    s.w.stats.insert((P, K_SPOT_Y), 200);
+    s.w.levels.insert(P, 40);
+    assert_eq!(s.op(Some(P)), 1);
+    // No portal; sound event 0x18 on P, targeted at P, queued (not sent now).
+    assert_eq!(s.others(), vec!["spot 20 3 0x1c09"]);
+    assert!(s
+        .w
+        .calls
+        .iter()
+        .any(|c| matches!(c, Call::Sound(u, 0x18, Some(t), false) if *u == P && *t == P)));
+}
+
 // ------------------------------------------------------------------ §9.3
 
 // Covers: specs/world/objects.md §9.3

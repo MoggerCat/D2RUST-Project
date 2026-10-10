@@ -29,3 +29,15 @@ size L. Owner: client input/hover (d2rs `bridge/hover.rs`, `world_view/input_scr
 - Hover = drawn frame rectangle +-16 px (above), size L.
 - Frozen Armor / Might: draws row 97 (aura / overlay art order), size S.
 - 40 later-mark scenes to re-run once the first difference moves.
+
+## Walk path after tick 260 (measured 2026-10-10, not fixed)
+Per-tick `tile_origin` (every 1.14d frame, Fire Ball scene): equal on all ticks to 261 (the whole walk of the first left click),
+then at the second click (`click 300 200`, cast on the Fallen under the previous cursor, F = 264, posted at tick 263):
+1.14d keeps walking two more steps and TURNS (dir 32 -> 24, origin 7744,78299 -> 7738,78293 -> 7732,78290), starts SC at
+f265 facing dir 24/25; d2rs keeps its walk direction (dir 32), stops after one step (7744,78286) and starts SC at tick 264.
+The client sends a cast on the hovered unit at once for an `rng` skill (ui/controls.md §6 r9.3, 1.14d `range` counts: loc 0),
+the server's `use_on_unit` (skills/use.md §3) uses it now, so the two ticks of walking towards the target and the turn are not
+explained by those rules; needs the 1.14d S->C packets of the scene (`record_packets.py` with the scene input) to see whether the
+server sends a walk/run-to-target (0x03/0x01/0x02) before the 0x4C skill message. Size M; owner: movement / skill start
+(d2-sim `wiring/action`, `bridge/predict.rs`). Row impact: 36 effect rows move from `tile_origin_x` to the next difference
+(units' positions / draw rows), they stay DIVERGED either way.

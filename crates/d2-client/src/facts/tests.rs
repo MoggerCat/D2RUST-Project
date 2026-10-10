@@ -4,7 +4,9 @@
 use std::path::Path;
 
 use super::compare::{compare, compare_dirs, FactSet, Outcome, Stage};
-use super::export::{add_cycle_rows, draw_rows, frame_rows, ExportContext, FrameState, Rows};
+use super::export::{
+    add_cycle_rows, draw_rows, frame_rows, ExportContext, FrameInputs, FrameState, Rows,
+};
 use super::*;
 use crate::frames::{FrameAnchor, FramePart, FrameSet, FrameSetKey, FrameStore, IndexFrame};
 use crate::scene::{DrawItem, DrawKey, ItemTag};
@@ -291,6 +293,7 @@ fn export_rows_invert_placement_and_merge_tile_blocks() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[floor, floor_block, unit, ui], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..8].join(" ")).collect();
@@ -330,6 +333,7 @@ fn exported_frame_rows_have_every_key_in_order() {
         level: None,
         camera: None,
         open_mode: Some(0),
+        inputs: FrameInputs::default(),
         draws: 3,
         index_sha256: None,
         palette_sha256: sha256_hex(&[]),
@@ -436,6 +440,7 @@ fn sky_calls_replace_their_pixel_items() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     // Item rows by op; call rows with x, y and mode.
     let rows = |items: &[DrawItem]| -> Vec<String> {
@@ -514,6 +519,7 @@ fn block_frames_of_one_tile_are_one_row() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(
         &[
@@ -601,6 +607,7 @@ fn unit_shadows_name_the_cel_and_write_no_unit_row() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[shadow, body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -647,6 +654,7 @@ fn unit_cel_dir_is_the_context_dir64() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[body, other], &cx).unwrap();
     let dirs: Vec<&str> = rows
@@ -696,6 +704,7 @@ fn unit_calls_are_rows_at_their_keys() {
         unit_calls: &calls,
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[body], &cx).unwrap();
     let cols: Vec<String> = rows.draws.iter().map(|r| r[..12].join(" ")).collect();
@@ -810,6 +819,7 @@ fn ui_rectangles_are_drawbox_rows() {
         unit_calls: &[],
         color_rows: Some(MapId(10)),
         ui_calls: &[],
+        text_maps: &[],
     };
     let mut next = item;
     next.x = 227;
@@ -855,6 +865,7 @@ fn a_culled_body_is_its_unit_row_alone() {
         unit_calls: &calls,
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[], &cx).unwrap();
     let ops: Vec<(&str, &str)> = rows
@@ -882,7 +893,13 @@ fn a_ui_cel_writes_its_wrapper_op() {
         it
     };
     let unit_type = |_: u32| None;
-    let calls = [CelCall::Ex, CelCall::Color];
+    let info = |call| crate::ui::draw::UiCelInfo {
+        call,
+        mode: 5,
+        pal: Some(0),
+        text: false,
+    };
+    let calls = [info(CelCall::Ex), info(CelCall::Color)];
     let cx = ExportContext {
         frames: &s,
         view_left: Some(0),
@@ -892,6 +909,7 @@ fn a_ui_cel_writes_its_wrapper_op() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &calls,
+        text_maps: &[],
     };
     let rows = draw_rows(&[ui(0, 10), ui(1, 20), ui(2, 30)], &cx).unwrap();
     let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();
@@ -953,6 +971,7 @@ fn a_guid_shared_by_two_slots_starts_two_unit_runs() {
         unit_calls: &[],
         color_rows: None,
         ui_calls: &[],
+        text_maps: &[],
     };
     let rows = draw_rows(&[first, second], &cx).unwrap();
     let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();

@@ -25,6 +25,7 @@ mod objects;
 mod player_death;
 #[cfg(test)]
 mod proto_msgs;
+mod remove_callbacks;
 #[cfg(test)]
 mod rooms;
 #[cfg(test)]
