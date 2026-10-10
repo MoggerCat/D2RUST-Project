@@ -1,4 +1,4 @@
-# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/pc1today/fe-a.jsonl --shot trademark --scene frontend-trademark --out facts/render; game: 1.14d
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/pc1today/fe-c.jsonl --shot credits --scene frontend-credits --out facts/render; game: 1.14d
 file	dir	frame	w	h	xoff	yoff
 data/global/chars/am/hd/amhdlittn1ht.dcc	0	2	14	15	-14	-52
 data/global/chars/am/hd/amhdlittn1ht.dcc	0	3	14	17	-14	-51
@@ -619,12 +619,16 @@ data/global/ui/frontend/charactercreationscreenexp.dc6	0	11	32	88	0	0
 data/global/ui/frontend/clickbox.dc6	0	0	15	16	0	0
 data/global/ui/frontend/clickbox.dc6	0	1	15	16	0	0
 data/global/ui/frontend/d2logoblackleft.dc6	0	0	159	122	-169	47
+data/global/ui/frontend/d2logoblackleft.dc6	0	1	159	122	-169	47
 data/global/ui/frontend/d2logoblackleft.dc6	0	19	159	122	-169	47
 data/global/ui/frontend/d2logoblackright.dc6	0	0	159	122	9	47
+data/global/ui/frontend/d2logoblackright.dc6	0	1	159	122	9	47
 data/global/ui/frontend/d2logoblackright.dc6	0	19	159	122	9	47
 data/global/ui/frontend/d2logofireleft.dc6	0	0	170	155	-174	52
+data/global/ui/frontend/d2logofireleft.dc6	0	1	170	155	-174	52
 data/global/ui/frontend/d2logofireleft.dc6	0	19	172	155	-177	52
 data/global/ui/frontend/d2logofireright.dc6	0	0	174	148	0	53
+data/global/ui/frontend/d2logofireright.dc6	0	1	173	150	0	53
 data/global/ui/frontend/d2logofireright.dc6	0	19	179	145	-2	53
 data/global/ui/frontend/druid/dznu1.dc6	0	17	86	199	-40	48
 data/global/ui/frontend/fire.dc6	0	25	110	145	-34	132

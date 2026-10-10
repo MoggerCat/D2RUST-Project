@@ -1,0 +1,13 @@
+check 1
+# World draw list (PC 1 2026-10-10, local-pc1-today): Pandemonium Fortress arrival, idle; the draw list of
+# server tick 73 on both sides (as draws-town-arrival-ama). Seed 1234. Under the
+# debugger 1.14d does not draw every tick: the run compares its last drawn tick <= 73.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/render/unit-composite.md,
+# specs/render/sprite-placement.md, specs/render/draw-order.md.
+name draws-a4-town-ama
+save ScnAm4 --class ama --expansion --act 3 --quests acts=3
+seed 1234
+ticks 76
+seconds 600
+channels draws
+draws-at 73
