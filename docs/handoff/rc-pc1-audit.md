@@ -22,4 +22,4 @@ Audit of the 517 non-EQUAL `needs_pc1=y` ledger rows (518 found).
   (size M each). Not started: out of this session's ~2 h budget.
 
 ## Not run
-- Rust fmt/clippy/nextest: no Rust changed. coverage/spec_index checks not run.
+- Rust fmt/clippy/nextest: no Rust changed. coverage.py, spec_index.py, ledger.py --check pass.
