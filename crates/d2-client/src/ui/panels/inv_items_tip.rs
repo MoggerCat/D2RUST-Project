@@ -107,6 +107,34 @@ impl ItemsUi {
         items::stream(world, it.key).map_or_else(Vec::new, |s| tips.tip_lines(s, &ctx))
     }
 
+    /// The hover anchor (`inventory.md` §5 r1) of the grid item under
+    /// `at`: x = left + cellW·c + (w·cellW)/2, top = top + cellH·r, bottom
+    /// = top + cellH·(r + h). `None` for an equipped item (the box anchors
+    /// are not specified: the caller falls back to the mouse point).
+    pub fn hover_anchor(
+        &self,
+        world: &ClientWorld,
+        files: &UiFiles,
+        screen: &Screen,
+        class: Option<u32>,
+        at: Point,
+    ) -> Option<crate::ui::item_tip::TipAnchor> {
+        let layout = self.layout(class, screen)?;
+        let it = self.item_at(world, files, &layout, at)?;
+        if it.mode != mode::STORED {
+            return None;
+        }
+        let g = &layout.grid;
+        let cell = (i32::from(g.cell_w), i32::from(g.cell_h));
+        let (w, h) = self.art(files, &it, cell).map_or((1, 1), |a| (a.w, a.h));
+        Some(crate::ui::item_tip::TipAnchor::of_cell(
+            (g.left, g.top),
+            cell,
+            (i32::from(it.x), i32::from(it.y)),
+            (w, h),
+        ))
+    }
+
     /// A right press in the panel: an identify item in the grid becomes
     /// the used item (cursor state 6); while the state is set it cancels.
     /// A stored Horadric Cube (`box `) or Town Portal scroll / tome is used

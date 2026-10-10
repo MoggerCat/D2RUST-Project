@@ -45,6 +45,20 @@ pub fn assign_player_to_party(guid: u32, party: u16) -> [u8; 7] {
 /// 0x5B and 0x75 as 0xFFFF).
 pub const NO_PARTY: u16 = 0xFFFF;
 
+/// S→C 0x75 PlayerPartyInfo (`0x0053DA90`, 13 bytes): GUID u32@1, party
+/// u16@5 (`0x00554630`, 0xFFFF in none), level u16@7 (stat 12), u16@9 and
+/// u16@11 (`0x0055B350`, `0x0055B3F0`: 0 for a player in no party). Sent
+/// right after every 0x59 (`0x0053E8F0`; recorded `75 02000000 ffff 0000
+/// 0000 0000`, `items-drops-cha-00` frame 96).
+pub fn player_party_info(guid: u32, level: u16) -> [u8; 13] {
+    let mut m = [0u8; 13];
+    m[0] = 0x75;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5..7].copy_from_slice(&NO_PARTY.to_le_bytes());
+    m[7..9].copy_from_slice(&level.to_le_bytes());
+    m
+}
+
 /// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
 /// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
 /// rule 3).

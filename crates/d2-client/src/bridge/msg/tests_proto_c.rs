@@ -573,7 +573,7 @@ fn walk_verify_0x96_one_layout() {
 #[test]
 fn player_corpse_assign_0x74_one_layout() {
     for c in cases(1, 32) {
-        let sim = corpse_assign(c[0]);
+        let sim = corpse_assign(c[0], c[0]);
         one_layout(
             &sim,
             &gen::PlayerCorpseAssign {

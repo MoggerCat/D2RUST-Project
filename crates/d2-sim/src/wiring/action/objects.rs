@@ -114,6 +114,12 @@ pub trait QuestObjectHost<X> {
     ) {
         let _ = (game, v, player, from, to);
     }
+    /// The quest part of the town-leave refresh `0x00537340(game, player,
+    /// from, to)` (`world/quests.md` §6.7, §8.1), run by the level warp
+    /// before the act change `0x0053ACC0`. Default: nothing.
+    fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
+        let _ = (game, v, player, to);
+    }
     /// The quest active test `0x00544590(game, player, npc)`
     /// (`world/quests.md` §6.4) for the NPC AI's interact gate
     /// (`monsters/ai.md` §5.3 scan 2): `class` and `interact` are the
