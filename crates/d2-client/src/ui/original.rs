@@ -284,6 +284,9 @@ struct Shared {
     /// [`TopUi`], and the local copy of the client seed its step draws on.
     cursor: RefCell<super::cursor::Cursor>,
     cursor_seed: std::cell::Cell<Option<u64>>,
+    /// The local player's client seed shared with the sound and weather
+    /// draws; the cursor step draws on it when set (REC-2255).
+    client_seed: Option<std::sync::Arc<std::sync::Mutex<crate::audio::driver::ClientSeed>>>,
     /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
     /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
     client_quest: [u8; 96],
@@ -457,6 +460,7 @@ impl OriginalUi {
                 0,
             )),
             cursor_seed: std::cell::Cell::new(None),
+            client_seed: None,
             client_quest: [0; 96],
             level_names: Vec::new(),
             horadric_start: Default::default(),
@@ -588,6 +592,15 @@ impl OriginalUi {
     /// (§8.9 expansion penalty, `0x00611D30`; `panels-2.md` §24 r2).
     pub fn set_resist_penalties(&mut self, penalties: Vec<i32>) {
         self.shared.borrow_mut().resist_penalties = Some(penalties);
+    }
+
+    /// The client seed the sound and weather draws share; the cursor step
+    /// draws on it too (`panels-3.md` §23 r13, REC-2255).
+    pub fn set_client_seed(
+        &mut self,
+        seed: std::sync::Arc<std::sync::Mutex<crate::audio::driver::ClientSeed>>,
+    ) {
+        self.shared.borrow_mut().client_seed = Some(seed);
     }
 
     /// The character panel's class keys, state flags and skilldesc rows.

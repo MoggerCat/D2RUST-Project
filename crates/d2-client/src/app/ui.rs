@@ -151,6 +151,11 @@ pub fn add_original_ui_with(
     if let Some(penalties) = parts.resist_penalties {
         original.set_resist_penalties(penalties);
     }
+    let link = app
+        .world_mut()
+        .get_resource_or_insert_with(crate::audio::driver::SoundLink::default)
+        .clone();
+    original.set_client_seed(link.client_seed());
     // `UiStates` is the authority and the root mirrors it (§2): the
     // root's own rules are never asked.
     let mut root = UiRoot::new(Box::new(NoPanelRules));
