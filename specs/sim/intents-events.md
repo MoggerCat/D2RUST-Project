@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1376 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1377–1721 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1722–1894 |
-| Constants & data dependencies | 1895–1913 |
-| Randomness | 1914–1919 |
-| Edge cases & original bugs | 1920–1965 |
-| Test vectors | 1966–2052 |
-| Provenance | 2053–2179 |
-| Open questions | 2180–2332 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1386 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1387–1731 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1732–1904 |
+| Constants & data dependencies | 1905–1923 |
+| Randomness | 1924–1929 |
+| Edge cases & original bugs | 1930–1975 |
+| Test vectors | 1976–2062 |
+| Provenance | 2063–2189 |
+| Open questions | 2190–2342 |
 <!-- /index -->
 
 ## Summary
@@ -882,6 +882,16 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    6. `0x00625A20(U)` ≠ 0 → `0x005715A0(U, C)`.
    7. The stat sends `0x00625870(U, Q, s, 0x00548520)` for s = 0x43,
       0x44, 0x0C, 0, 2 in that order.
+
+   Placement in the room update walk (recorded 2026-10-10, gen-obj-149,
+   Wine 1.14d): the player's item messages (step 2: the update-list pass,
+   0x47, 0x48) and the 0x2C sound of step 4 stand at the player's place in
+   the walk, which visits the units newest-queued first; so a player
+   queued before an object that was queued earlier sends its sound before
+   the object's 0x0E (caller `0x0053D79A` vs `0x0053B4A0`). d2rs sends them
+   from host marks at that place (`PLAYER_ITEMS_MARK` after the 0x15,
+   `PLAYER_SOUND_MARK` after the mode messages; the item pass of players
+   the walk did not reach still runs after the tick).
 2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
    1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
       x, y, flag 1; the dynamic path's cell, a static path's +0x0C /
