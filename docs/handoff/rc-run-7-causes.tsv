@@ -1,0 +1,7 @@
+cause	checks	examples	likely	size
+unit U, draw #N, field n: N.14d site NxH vs d2rs site crates/d2-sim/src/monsters/init/create.rs:N	1	gen-lvl-55	d2-sim monsters/init	M
+unit U, draw #N, field n: N.14d site NxH vs d2rs site crates/d2-sim/src/combat/damage.rs:N	1	gen-lvl-61	d2-sim	M
+game, draw #N, field extra: N.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:N	1	gen-lvl-104	d2-sim monsters/init	M
+unit U, draw #N, field before: N.14d site NxH vs d2rs site crates/d2-sim/src/monsters/init/create.rs:N	1	gen-lvl-69	d2-sim monsters/init	M
+unit U, draw #N, field extra: N.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:N	1	gen-lvl-110	d2-sim monsters/init	M
+game, draw #N, field missing: N.14d site NxH vs d2rs site None	1	gen-lvl-106	?	M
