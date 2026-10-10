@@ -940,27 +940,27 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-sim-units-8-collision-line-between-two-units | state | PARTIAL | 80/80 | - | - |
 | gen-wp-27 | state | PARTIAL | 460/460 | - | - |
 | gen-wp-29 | state | PARTIAL | 460/460 | - | - |
-| hire-asheara | packets | DIVERGED | 89/90 | frame 20 stream s2c #14 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-asheara | packets | MATCH | 90/90 | - | - |
 | hire-asheara | state | PARTIAL | 90/90 | - | - |
-| hire-follow-warp-kashya | packets | DIVERGED | 197/200 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-follow-warp-kashya | packets | DIVERGED | 199/200 | frame 39 stream s2c #1 missing in d2rs (id 0x0a) | q-fix-join-items |
 | hire-follow-warp-kashya | state | DIVERGED | 53/200 | frame 54 monster 1:13 class 271 (hireling warp follow), field m: 1.14d 2 vs d2rs 4; tile (5147,4260) vs (5144,4266) | q-diff-skills-2 |
-| hire-follow-waypoint-kashya | packets | DIVERGED | 307/330 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-follow-waypoint-kashya | packets | DIVERGED | 313/330 | frame 30 stream s2c #0 extra (d2rs only) (id 0x15) | q-fix-join-items |
 | hire-follow-waypoint-kashya | state | DIVERGED | 92/330 | frame 93 player 0:1, field m: 1.14d 5 vs d2rs 6 (waypoint travel) | unrouted |
-| hire-greiz | packets | DIVERGED | 89/90 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
+| hire-greiz | packets | MATCH | 90/90 | - | - |
 | hire-greiz | state | PARTIAL | 90/90 | - | - |
-| hire-items-kashya | packets | DIVERGED | 87/90 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
+| hire-items-kashya | packets | DIVERGED | 88/90 | frame 34 stream s2c #0 missing in d2rs (id 0x42) | q-fix-join-items |
 | hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306, field x: 1.14d 0 vs d2rs (absent) | coord-resume-3 |
-| hire-kashya | packets | DIVERGED | 89/90 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-kashya | packets | MATCH | 90/90 | - | - |
 | hire-kashya | state | PARTIAL | 90/90 | - | - |
-| hire-qual-kehk | packets | DIVERGED | 89/90 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-qual-kehk | packets | MATCH | 90/90 | - | - |
 | hire-qual-kehk | state | PARTIAL | 90/90 | - | - |
-| hire-resurrect-asheara | packets | DIVERGED | 125/130 | frame 20 stream s2c #14 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-resurrect-asheara | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
 | hire-resurrect-asheara | state | DIVERGED | 23/130 | frame 24 monster 1:12 class 359 (hireling), field s (as hire-asheara) | q-diff-skills-2 |
-| hire-resurrect-greiz | packets | DIVERGED | 124/130 | frame 14 stream s2c #13 size: 1.14d 25 vs d2rs 21 (id 0xac) | q-fix-join-items |
+| hire-resurrect-greiz | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
 | hire-resurrect-greiz | state | DIVERGED | 69/130 | frame 70 monster 1:22 class 338 (hireling after 0x62), field m: 1.14d 1 vs d2rs 2; tile (5029,5045) vs (5028,5041) | q-diff-skills-2 |
-| hire-resurrect-kashya | packets | DIVERGED | 124/130 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-resurrect-kashya | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
 | hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
-| hire-resurrect-qual-kehk | packets | DIVERGED | 125/130 | frame 14 stream s2c #13 size: 1.14d 23 vs d2rs 19 (id 0xac) | q-fix-join-items |
+| hire-resurrect-qual-kehk | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
 | hire-resurrect-qual-kehk | state | DIVERGED | 28/130 | frame 29 monster 1:10 class 514, field m (as hire-qual-kehk) | unrouted |
 | inv-pick-belt | items | MATCH | 1/1 | - | - |
 | inv-pick-belt | packets | MATCH | 40/40 | - | - |

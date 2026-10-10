@@ -31,9 +31,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
-| systems | 918 | 360 | 46 | 251 | 0 | 261 | 250 | 405 | 2 | 951–3740+ | 39 | 554 / 0 / 364 |
+| systems | 918 | 359 | 46 | 251 | 0 | 262 | 250 | 404 | 2 | 949–3732+ | 39 | 554 / 0 / 364 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 859 | 46 | 459 | 0 | 3115 | 475 | 877 | 12 | 2087.5–7966+ | 286 | 3522 / 382 / 575 |
+| **all** | 4479 | 858 | 46 | 459 | 0 | 3116 | 475 | 876 | 12 | 2085.5–7958+ | 286 | 3522 / 382 / 575 |
 
 ## By family
 
@@ -659,7 +659,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `missile` | 299 | 4 | 0 | 46 | 0 | 249 | 0 | 44 | 6 | 0 | 0 | 2 |
 | `mon` | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | 0 |
 | `monster` | 669 | 155 | 0 | 12 | 0 | 502 | 0 | 14 | 152 | 1 | 4 | 241 |
-| `net.c2s` | 113 | 12 | 9 | 14 | 0 | 78 | 0 | 27 | 8 | 0 | 26 | 0 |
+| `net.c2s` | 113 | 11 | 9 | 14 | 0 | 79 | 0 | 27 | 7 | 0 | 26 | 0 |
 | `net.s2c` | 183 | 39 | 21 | 68 | 0 | 55 | 1 | 118 | 10 | 0 | 1 | 0 |
 | `npc` | 48 | 11 | 0 | 6 | 0 | 31 | 0 | 6 | 11 | 0 | 1 | 10 |
 | `object` | 524 | 0 | 0 | 16 | 0 | 508 | 5 | 6 | 10 | 0 | 10 | 0 |
@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2661
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6163
+- Duplicate areas between parts: 6166
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2162,6 +2162,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi`: rc-packets-chan.tsv:188 kept, rc-pets.tsv:18 dropped
   - `system.sim.pets.8-broadcast-and-message-0x7a`: rc-packets-chan.tsv:189 kept, rc-pets.tsv:19 dropped
   - `system.sim.pets.9-lookup-0x00574a20-player-guid`: rc-packets-chan.tsv:190 kept, rc-pets.tsv:20 dropped
+  - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, rc-pkt-handwritten.tsv:29 dropped
+  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-pkt-handwritten.tsv:31 dropped
+  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-pkt-handwritten.tsv:32 dropped
   - `system.sim.units.4-1-setting-a-mode`: rc-pc1-audit.tsv:48 kept, rc-player-fc.tsv:3 dropped
   - `system.combat.damage.7-reaction-and-death-trigger`: rc-combat-seed.tsv:11 kept, rc-player-hit.tsv:4 dropped
   - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-link-2.tsv:91 kept, rc-player-hit.tsv:5 dropped
@@ -5674,7 +5677,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x33`: rc-run-6.tsv:15 kept, systems.tsv:54 dropped
   - `net.c2s.0x34`: rc-run-6.tsv:213 kept, systems.tsv:55 dropped
   - `net.c2s.0x35`: rc-run-6.tsv:16 kept, systems.tsv:56 dropped
-  - `net.c2s.0x36`: q-chk-hirelings.tsv:13 kept, systems.tsv:57 dropped
+  - `net.c2s.0x36`: rc-pkt-handwritten.tsv:30 kept, systems.tsv:57 dropped
   - `net.c2s.0x37`: rc-run-6.tsv:17 kept, systems.tsv:58 dropped
   - `net.c2s.0x38`: rc-run-1.tsv:185 kept, systems.tsv:59 dropped
   - `net.c2s.0x39`: rc-run-6.tsv:214 kept, systems.tsv:60 dropped
@@ -6881,7 +6884,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:290 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1876
+- Rows whose state disagrees with their checks: 1875
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6942,7 +6945,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1816 more (rerun with the tsv to list them)
+  - … and 1815 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -7575,7 +7578,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `inv.equip` | system | DIVERGED | S | DIVERGED | yes | 0 | y | claude/q-fix-items-shop | specs/items/inventory.md | [inv-pick-*] inv-pick-equip: same first divergence as pickup (0x9C missing at frame 10), equip 0x1A not reached; state also differs from frame 2 (player q field, 1.14d has 9 entries, d2rs none) |
 | `inv.grid` | system | DIVERGED | S | DIVERGED | yes | 0 | y | claude/q-fix-items-shop | specs/items/inventory.md | [inv-pick-*] inv-pick-store: same first divergence as pickup (0x9C missing at frame 10), buffer insert 0x18 not reached; state also differs from frame 2 (player q field, 1.14d has 9 entries, d2rs none) |
 | `inv.item-use` | system | DIVERGED | S | DIVERGED@70 | ? | 0 | n | claude/q-fix-server-store-fill | specs/items/use.md | rc-run-2: combat-potion-midfight state PARTIAL first: state PARTIAL outside REC-2055/2056 (input/send in check without packets MATCH) |
-| `inv.mercenary-items` | system | DIVERGED | M | DIVERGED@14 | yes | 0 | n | claude/q-diff-skills-2 | specs/items/inventory-moves.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-items-kashya=DIVERGED \| hire-items-kashya (take cap, give, take back) diverges first at the hire frame 14; the 0x61 steps are not reached |
+| `inv.mercenary-items` | system | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-diff-skills-2 | specs/items/inventory-moves.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-items-kashya=DIVERGED \| hire-items-kashya (take cap, give, take back) diverges first at the hire frame 14; the 0x61 steps are not reached |
 | `item.affix.alvl` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/affixes.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@4 9, MATCH 15 over gen-itemq-crafted-0,gen-itemq-crafted-1,gen-itemq-crafted-2,gen-itemq-low-0...; PARTIAL never counts as equal. affix level; no 1.14d recording of item creation (R1); size M: needs a recording of the original plus a compare check |
 | `item.affix.crafted` | system | DIVERGED | S | DIVERGED@4 | yes | 0 | n | claude/q-fix-d7d8-items-net | specs/items/affixes.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@4 2, MATCH 1 over gen-itemq-crafted-0,gen-itemq-crafted-1,gen-itemq-crafted-2; PARTIAL never counts as equal. [gen-itemq-crafted-0..2] crafted-0 dr6 stream byte 25 bit 95 (last byte 0x10 vs 0x00); crafted-1 7gd length 25 vs 24; crafted-2 equal |
 | `item.affix.fit-tests` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/affixes.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@4 9, MATCH 15 over gen-itemq-crafted-0,gen-itemq-crafted-1,gen-itemq-crafted-2,gen-itemq-low-0...; PARTIAL never counts as equal. fit tests (itype/etype/level/class); no 1.14d recording of item creation (R1); size M: needs a recording of the original plus a compare check |
@@ -9803,7 +9806,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x06` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/rc-unit-guid-order | specs/sim/client-messages.tsv | rc-promote 2026-10-10 fresh run: combat-melee-fallen: channel packets DIVERGED |
 | `net.c2s.0x0c` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (3/3 of its a* checks diverge) |
 | `net.c2s.0x15` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED@20 net-s2c-chat: packets: frame 20 stream s2c #0 missing in d2rs (id 0x26) |
-| `net.c2s.0x36` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | state channel only (the packets of the 0x2A answer were seen equal for the refusal case); hire result diverges: game seed + spawn tile |
 | `net.c2s.0x4b` | message | DIVERGED | S | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED hire-follow-warp-kashya: None |
 | `net.c2s.0x5f` | message | DIVERGED | M | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x60` | message | DIVERGED | S | DIVERGED@20 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-60 packets DIVERGED at frame 20: first difference stream s2c #1 id: 1.14d 0x23 vs d2rs 0x47 (c2s bytes equal) |
@@ -9822,7 +9824,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x22` | message | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: all checks MATCH or PARTIAL under DECIDED REC-2055/2056 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `net.s2c.0x27` | message | DIVERGED | M | PARTIAL | ? | 1 | n | claude/q-fix-d7d8-items-net | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `net.s2c.0x3f` | message | DIVERGED | S | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged cube-000-staff-of-kings-viper-amulet-ho@4 id (1.14d 3f vs d2rs 47); 2 equal pair(s) |
-| `net.s2c.0x42` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-items-kashya@34 missing in d2rs; 0 equal pair(s) |
+| `net.s2c.0x42` | message | DIVERGED | S | DIVERGED@34 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-items-kashya@34 missing in d2rs; 0 equal pair(s) |
 | `net.s2c.0x4d` | message | DIVERGED | S | DIVERGED@48 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/2 of its a* checks diverge) |
 | `net.s2c.0x5d` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
 | `net.s2c.0x65` | message | DIVERGED | S | DIVERGED@108 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-census-missing REC-2810: arena kill event + 0x65 sync implemented (1st kill count 1 equal, items-drops-cha-00 frame 37); 185 equal / 13 diverged pairs over the 60 items-drops-* checks, the divergences follow other first differences (player death: killer, corpse sequence 0x8E); packet-census: first diverged items-drops-nig-05@108 bytes[5] (1.14d 4 vs d2rs 3); 185 equal pair(s) |
@@ -9831,7 +9833,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x74` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): items-drops-cha-01 items DIVERGED (checks-status.md) |
 | `net.s2c.0x75` | message | DIVERGED | S | DIVERGED@50 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-rbo-00@50 id (1.14d 75 vs d2rs 6d); 0 equal pair(s) |
 | `net.s2c.0x77` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged interact-operate-stash@13 missing in d2rs; 7 equal pair(s) |
-| `net.s2c.0x7a` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-lightning-sentry: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
+| `net.s2c.0x7a` | message | DIVERGED | S | DIVERGED@86 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-lightning-sentry: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
 | `net.s2c.0x7f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-follow-waypoint-kashya@251 missing in d2rs; 0 equal pair(s) |
 | `net.s2c.0x8a` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/6 of its a* checks diverge) |
 | `net.s2c.0x8e` | message | DIVERGED | S | DIVERGED@96 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-00@96 missing in d2rs; 0 equal pair(s) |
@@ -10478,6 +10480,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x30` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x31` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x34` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-34 MATCH |
+| `net.c2s.0x36` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | rc-pkt-handwritten: state equal, every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (hire-kashya,hire-greiz,hire-asheara,hire-qual-kehk) |
 | `net.c2s.0x38` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x39` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-39 MATCH |
 | `net.c2s.0x3a` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: 1 equal pair(s), first gen-netc2s-3a@20; no diverged pair in any check; gen checks (traces/checks/gen): gen-netc2s-3a |
@@ -10528,7 +10531,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x26` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-5: 1 checks EQUAL (gen-shrine-1..) |
 | `net.s2c.0x28` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x29` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
-| `net.s2c.0x2a` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `net.s2c.0x2a` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x2c` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x47` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x48` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
@@ -10724,7 +10727,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `client.c-monsters.draw` | system | DIVERGED | S | DIVERGED@72 | ? | 1 | n | claude/rc-draw-row173 | specs/client/model.md,specs/render/draw-order.md | rc-draw-row173 #3: draws-town-arrival-ama DIVERGED: tick 73 draw row 198 (DrawLine) column x: 1.14d 400 vs d2rs 282 (rows 173-194 equal; next: pass-9 rain lines 0x0047368E, not reproducible in 1.14d, REC-510: the check needs --skip-weather) |
 | `client.s-monsters.path-stop` | system | DIVERGED | M | DIVERGED@72 | yes | 0 | n | claude/rc-draw-row173 | specs/client/model.md | rc-draw-row173 #3: draws-town-arrival-ama DIVERGED: tick 73 draw row 198 (DrawLine) column x: 1.14d 400 vs d2rs 282 (rows 173-194 equal; next: pass-9 rain lines 0x0047368E, not reproducible in 1.14d, REC-510: the check needs --skip-weather) |
 | `drlg.level-seed` | system | DIVERGED | M | MATCH | ? | 13 | n | claude/q-prov-recording | specs/drlg/levels.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: rng-town-arrival-ama=MATCH \| level seeds and get-or-allocate; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `hireling.eastern-sorceror.act3` | entity | DIVERGED | M | DIVERGED@20 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-ai.md | rc-run-2b: DIVERGED hire-asheara: None |
+| `hireling.eastern-sorceror.act3` | entity | DIVERGED | M | DIVERGED@24 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-ai.md | rc-run-2b: DIVERGED hire-asheara: None |
 | `level.a2.40.act-2-town` | entity | DIVERGED | M | DIVERGED@10 | yes | 13 | n | claude/q-prov-recording-2 | specs/drlg/levels.md,specs/drlg/preset.md,specs/drlg/rooms.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: act-travel-lut-ama=DIVERGED,join-act2-quests-ama=PARTIAL \| DRLG kind preset; layout+population compared only if a check lists it; no per-level layout check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `level.a2.55.act-2-tomb-1-a` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-55; PARTIAL never counts as equal. gen-lvl-55 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819]; rng DIVERGED frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/… |
 | `level.a2.69.act-2-tomb-tal-4` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-69; PARTIAL never counts as equal. gen-lvl-69 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722]; rng DIVERGED frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim… |
@@ -10733,12 +10736,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a4.106.act-4-mesa-3` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-106; PARTIAL never counts as equal. gen-lvl-106 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [268807636, 1446976384] vs d2rs [3343186878, 1210264819]; rng DIVERGED frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None |
 | `level.a5.110.act-5-siege-1` | entity | DIVERGED | M | DIVERGED@23 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@23 1 over gen-lvl-110; PARTIAL never counts as equal. gen-lvl-110 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 23 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321; rng DIVERGED frame 29, unit 1:18, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src… |
 | `npc.akara` | entity | DIVERGED | M | DIVERGED@4 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: items-vendor-akara-buy=DIVERGED,interact-talk-akara=DIVERGED \| talk @1:148 trade (interact-talk-akara): codes 0,0,0 on both, state no difference; packets: S->C 0x27 text list bytes 10/14 swapped at frame 15 (1.14d 40..0b, d2rs 0b..40; world/quests.md §7.1), then the store messages: 1.14d frame 16, d2rs frame 15 with the chat open; menu, dialogue, store also items-vendor-akara-buy |
-| `npc.asheara` | entity | DIVERGED | M | DIVERGED@20 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-asheara=PARTIAL,hire-resurrect-asheara=DIVERGED \| hire flow: hire divergence at frame 20 (game seed, spawn tile) |
+| `npc.asheara` | entity | DIVERGED | M | DIVERGED@24 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-asheara=PARTIAL,hire-resurrect-asheara=DIVERGED \| hire flow: hire divergence at frame 20 (game seed, spawn tile) |
 | `npc.atma` | entity | DIVERGED | M | DIVERGED@61 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-atma-talk=PARTIAL,a2-quest-radament=DIVERGED \| talk: state PARTIAL; d2rs sends 0x8a NpcWantsInteract at f34 and f49 that 1.14d never sends; 1.14d 0x27 NpcInfo at f15 (answer to the client 0x31) absent in d2rs; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `npc.drehya` | entity | DIVERGED | M | DIVERGED@7 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@7 1 over gen-npc-drehya; PARTIAL never counts as equal. menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `npc.drognan` | entity | DIVERGED | M | DIVERGED@84 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-drognan-trade=PARTIAL,a2-quest-arcane=DIVERGED \| talk+trade open: state PARTIAL 50/50 (store contents equal in state), s2c/buf equal from frame 13; after the join stream (frame>=13): c2s 0x31 QuestMessage sent by the 1.14d client after 0x2F, never by the d2rs headless client; quest 0x27 NpcInfo (Arcane, f18) bytes differ 1.14d 01 00 02 00 75 01 vs d2rs 02 00 00 00 1d 01 02; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `npc.jerhyn` | entity | DIVERGED | M | DIVERGED@32 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-jerhyn-talk=PARTIAL,a2-quest-tombs=DIVERGED \| state frame 14 monster 1:1 class 201 field tx 1.14d 0 vs d2rs 5146 (1.14d stops Jerhyn on interact); 0x8A NpcWantsInteract at f14 missing in d2rs, 0x6D MonsterStop at f29 missing; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
-| `npc.kashya` | entity | DIVERGED | M | DIVERGED@14 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-kashya=PARTIAL,hire-resurrect-kashya=DIVERGED \| hire flow (0x13/0x2F/0x36, 0x62): hire divergence at frame 14 (game seed, spawn tile) |
+| `npc.kashya` | entity | DIVERGED | M | DIVERGED@71 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-kashya=PARTIAL,hire-resurrect-kashya=DIVERGED \| hire flow (0x13/0x2F/0x36, 0x62): hire divergence at frame 14 (game seed, spawn tile) |
 | `npc.meshif1` | entity | DIVERGED | S | DIVERGED@32 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-meshif-talk=PARTIAL,a2-quest-tombs=DIVERGED \| talk: state PARTIAL; act travel (action 3-style menu) not run; after the join stream (frame>=13): c2s 0x31 QuestMessage sent by the 1.14d client after 0x2F, never by the d2rs headless client; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `npc.natalya` | entity | DIVERGED | M | DIVERGED@13 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@13 1 over gen-npc-natalya; PARTIAL never counts as equal. menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `npc.tyrael1` | entity | DIVERGED | M | DIVERGED@13 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@13 1 over gen-npc-tyrael1; PARTIAL never counts as equal. menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
