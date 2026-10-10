@@ -123,6 +123,7 @@ pub fn assign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         ..PlayerData::default()
     });
     c.add(w);
+    super::super::player_anim::mode_init(w, msg.inputs, key, 5);
     // Player init (`0x00460BF0`): the player light (`render/lighting.md`
     // §8 player row).
     super::lighting::player_light(w, key);
@@ -314,7 +315,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             // Rules 6.4–6.5: the mode set's animation part (frame 0, the
             // mode's count, the rate), then the first frame drawn from the
             // unit seed.
-            super::super::monster_anim::mode_set(w, msg.inputs, key, mode);
+            super::super::monster_anim::mode_init(w, msg.inputs, key, mode);
             super::super::monster_anim::first_frame(w, key);
             // Rule 6.9: the initial path direction (after the frame draw:
             // the other order gives 40 / 29 where 1.14d draws 57 / 46,

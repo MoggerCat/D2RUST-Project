@@ -22,32 +22,33 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 53–73 |
-| Inputs | 74–82 |
-| Outputs / state changes | 83–89 |
-| Rules | 90–91 |
-|   1. Scope and order | 92–127 |
-|   2. PantherJavelin (95) `0x005E1080` | 128–154 |
-|   3. GreaterMummy (22) `0x005F2B10` | 155–208 |
-|   4. Mummy (21) `0x005F2850` | 209–221 |
-|   5. PantherWoman (18) `0x005F22B0` | 222–236 |
-|   6. MaggotLarva (38) `0x005F6220` | 237–247 |
-|   7. SandLeaper (17) `0x005F20A0` | 248–264 |
-|   8. MaggotEgg (40) `0x005F6530` | 265–278 |
-|   9. PinHead (39) `0x005F6340` | 279–293 |
-|   10. ClawViper (16) `0x005F1B60` | 294–316 |
-|   11. Vulture (23) `0x005F3170` | 317–382 |
-|   12. BatDemon (29) `0x005F5040`, alternate `0x005F4FD0` | 383–425 |
-|   13. SandMaggotQueen (66) `0x005F9CF0` | 426–494 |
-|   14. Duriel (44) `0x005F67B0` | 495–516 |
-|   15. Summoner (53) `0x005F85C0` | 517–549 |
-|   16. Special-state thinks 10/17, 11, 12 | 550–604 |
-| Constants & data dependencies | 605–622 |
-| Randomness | 623–632 |
-| Edge cases & original bugs | 633–647 |
-| Test vectors | 648–665 |
-| Provenance | 666–693 |
-| Open questions | 694–719 |
+| Summary | 54–74 |
+| Inputs | 75–83 |
+| Outputs / state changes | 84–90 |
+| Rules | 91–92 |
+|   1. Scope and order | 93–128 |
+|   2. PantherJavelin (95) `0x005E1080` | 129–155 |
+|   3. GreaterMummy (22) `0x005F2B10` | 156–209 |
+|   4. Mummy (21) `0x005F2850` | 210–222 |
+|   5. PantherWoman (18) `0x005F22B0` | 223–237 |
+|   6. MaggotLarva (38) `0x005F6220` | 238–248 |
+|   7. SandLeaper (17) `0x005F20A0` | 249–265 |
+|   8. MaggotEgg (40) `0x005F6530` | 266–279 |
+|   9. PinHead (39) `0x005F6340` | 280–294 |
+|   10. ClawViper (16) `0x005F1B60` | 295–317 |
+|   11. Vulture (23) `0x005F3170` | 318–383 |
+|   12. BatDemon (29) `0x005F5040`, alternate `0x005F4FD0` | 384–426 |
+|   13. SandMaggotQueen (66) `0x005F9CF0` | 427–495 |
+|   14. Duriel (44) `0x005F67B0` | 496–517 |
+|   15. Summoner (53) `0x005F85C0` | 518–550 |
+|   16. Special-state thinks 10/17, 11, 12 | 551–605 |
+|   17. Special state 13 `0x005E5C50` (Countess only) | 606–640 |
+| Constants & data dependencies | 641–658 |
+| Randomness | 659–668 |
+| Edge cases & original bugs | 669–683 |
+| Test vectors | 684–701 |
+| Provenance | 702–729 |
+| Open questions | 730–755 |
 <!-- /index -->
 
 ## Summary
@@ -601,6 +602,41 @@ target (`0x00553540`).
 
 No draws in 11 init, 11 or 12 except the helpers' (wander) and the
 finder's. 1.14d-confirmed (all four).
+
+### 17. Special state 13 `0x005E5C50` (Countess only)
+
+Installed by the Countess superunique (hcIdx 6, `monsters/init.md` §20.1)
+through `0x005B0E00`; target mode 1, no init and no alternate. Read in
+`0x005E5C50` (965 bytes), disassembly checked. H := the type-10 command
+(`0x0058EEF0`, as Diablo `ai-bodies-4.md` §7 step 1: none → copy {10, own
+x, own y} first); when H's x or y is 0 both are overwritten with the
+unit's own (x, y). "Home room" := the room at H (`0x0061B130`, the room
+at a point from the unit's room), "home run" := velocity record method
+1 written directly (`0x005A6260(record, 1, 0, 0)`), run to (H.x, H.y)
+(`0x005DEDE0`); not started → delete the thinks (`0x00540E60(2, 0)`).
+Unit with no room, or no monstats AI row → end.
+
+1. Home room ≠ the unit's room: home run; started → end.
+2. Home room ≠ the target's room: the unit already at exactly H → D < 25
+   and the node walk (below) started → end; else idle 10, end. Not at H:
+   home run; started → end.
+3. Path distance unit→H (`0x005DC5C0`, unsigned) > 40: home run;
+   started → end.
+4. The node walk `0x005E5B70` started → end.
+5. Draw `lo' % 100` = r. C: r < aip3 + 10 → A1 at T (`0x005DDF90(4,
+   T)`); else idle aip2. Not C: r < aip1 → velocity (0, 100, 0) and run
+   to T (`0x005DED20`); else idle aip2. (aip1..3 of the difficulty,
+   shorts at monstats +0x56 / +0x5C / +0x62.)
+
+**Node walk** `0x005E5B70`: AI control param 0 = index, param 1 = frame
+stamp, map nodes (+0x38, 12 bytes each). With no nodes, or index ≥
+count: |frame − stamp| > 700 → index := 0; returns 0. Otherwise a skill
+is used at node[index] and index++, stamp := frame; returns 1.
+PROVISIONAL (REC-3800): the skill-at-node branch is not modelled (no
+scenario gives the Countess nodes).
+
+Recorded: `gen-su-6` (Countess): the first think at frame 51 draws once
+at `0x005E5F89` (step 5); 150/150 state frames equal with this body.
 
 ## Constants & data dependencies
 
