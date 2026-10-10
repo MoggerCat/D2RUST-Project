@@ -173,6 +173,16 @@ pub struct HirelingAiFacts {
 /// item's announcement.
 pub const GROUND_ITEM_MARK: u8 = 0xFF;
 
+/// Host-only marks of a player's unit update in the client pass's queue
+/// walk when [`ActionHooks::item_marks`] is on: `[MARK, guid LE u32]` of
+/// the updated player. [`PLAYER_ITEMS_MARK`]: `0x00580860` step 2 (the
+/// item dispatcher, 0x47 / 0x48, `intents-events.md` §7.3 rule 1) after the
+/// 0x15; [`PLAYER_SOUND_MARK`]: step 4's unit flag 0x400 sound
+/// (`0x00571740`) after the mode messages. The host sends them there.
+pub const PLAYER_ITEMS_MARK: u8 = 0xFE;
+/// See [`PLAYER_ITEMS_MARK`].
+pub const PLAYER_SOUND_MARK: u8 = 0xFD;
+
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
 pub struct ActionHooks<X> {

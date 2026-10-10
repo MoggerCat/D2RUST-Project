@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1389 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1390–1734 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1735–1907 |
-| Constants & data dependencies | 1908–1926 |
-| Randomness | 1927–1932 |
-| Edge cases & original bugs | 1933–1978 |
-| Test vectors | 1979–2065 |
-| Provenance | 2066–2192 |
-| Open questions | 2193–2345 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1386 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1387–1731 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1732–1904 |
+| Constants & data dependencies | 1905–1923 |
+| Randomness | 1924–1929 |
+| Edge cases & original bugs | 1930–1975 |
+| Test vectors | 1976–2062 |
+| Provenance | 2063–2189 |
+| Open questions | 2190–2342 |
 <!-- /index -->
 
 ## Summary
@@ -863,17 +863,6 @@ else `0x00534F80`;
 mode message (§7.4), then `0x00534F80` when `0x00639DF0(unit, 93)` holds or the
 class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 
-Read 2026-10-10 (rc-skill-div-a, 1.14d `ass-inferno-sentry`, `ass-shadow-warrior`):
-"the unit has that skill" for a summoned monster is the skill entry the summon
-gave it (`sumskill1..5`, base level = the formula at the caster's level, bonus
-0); the 0x21 carries (unit type 1, remove 0, GUID, skill, base, bonus).
-`0x00639DB0` (the state set) is `0x00625A70` followed by the update-queue
-insert `0x0064C040(unit)`: a cooldown state 121 set on a player queues the player,
-which is why the 0xA7 for state 121 reaches the client in the cast's frame. The
-0xAC's source-link bit reads the unit's owner fields (type +0x94, id +0x98) written
-by `0x00621C30` with flag-ex 0x400, and its type block lists the summon's
-`sumumod` (`0x005A4850(game, m, sumumod, 1)`: with "unique" 1, so type flag 8).
-
 #### 7.3 Type updates
 
 1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
@@ -885,9 +874,7 @@ by `0x00621C30` with flag-ex 0x400, and its type block lists the summon's
    2. announced = 0 and flag-ex bit 0x1 → `0x00597890(game, U, C, 0)`,
       `0x0053D370(C, U)`, `0x0053D3C0(C, U, 0)`.
    3. Unit flag 0x1 → `0x005484B0(game, U, C)` (mode messages).
-   4. `0x00571CD0(U, C)` (a player's pending event records too: the
-      landing 0xA5 of Leap / Whirlwind goes out before that frame's
-      state messages of step 5, 1.14d `bar-leap` frame 34); unit flag 0x400 → `0x00571740`; 0x100 →
+   4. `0x00571CD0(U, C)`; unit flag 0x400 → `0x00571740`; 0x100 →
       `0x00571620`; 0x8000 → `0x00547F70` (each (U, C)).
    5. Any state-changed bit (`0x00639F20`) → `0x00571580(U, C, 0)` →
       `0x005711D0(U, C)`: the 0xA7 / 0xA8 / 0xA9 state messages (§7.3
@@ -895,6 +882,16 @@ by `0x00621C30` with flag-ex 0x400, and its type block lists the summon's
    6. `0x00625A20(U)` ≠ 0 → `0x005715A0(U, C)`.
    7. The stat sends `0x00625870(U, Q, s, 0x00548520)` for s = 0x43,
       0x44, 0x0C, 0, 2 in that order.
+
+   Placement in the room update walk (recorded 2026-10-10, gen-obj-149,
+   Wine 1.14d): the player's item messages (step 2: the update-list pass,
+   0x47, 0x48) and the 0x2C sound of step 4 stand at the player's place in
+   the walk, which visits the units newest-queued first; so a player
+   queued before an object that was queued earlier sends its sound before
+   the object's 0x0E (caller `0x0053D79A` vs `0x0053B4A0`). d2rs sends them
+   from host marks at that place (`PLAYER_ITEMS_MARK` after the 0x15,
+   `PLAYER_SOUND_MARK` after the mode messages; the item pass of players
+   the walk did not reach still runs after the tick).
 2. **Monster** `0x00598220(game, unit, client, announced)`, in order:
    1. Flag-ex (+0xC8) bit 0x10000: S→C 0x15 (`0x0053BC10`: type, GUID,
       x, y, flag 1; the dynamic path's cell, a static path's +0x0C /

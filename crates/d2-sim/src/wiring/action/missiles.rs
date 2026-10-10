@@ -477,51 +477,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
 }
 
 impl<X: Pending> View<'_, X> {
-    /// [`Self::aura_fill`] with the formulas on `from` and the list of
-    /// state `s` on `unit`.
-    fn aura_fill_from(
-        &mut self,
-        game: &mut Game,
-        from: UnitId,
-        unit: UnitId,
-        s: i32,
-        skill: i32,
-        level: i32,
-    ) {
-        use crate::combat::CombatWorld;
-        let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) else {
-            return;
-        };
-        let t = self.h.tables.clone();
-        let Some(r) = t.skills.skill(skill) else {
-            return;
-        };
-        let pairs = [
-            (r.aurastat1, r.aurastatcalc1),
-            (r.aurastat2, r.aurastatcalc2),
-            (r.aurastat3, r.aurastatcalc3),
-            (r.aurastat4, r.aurastatcalc4),
-            (r.aurastat5, r.aurastatcalc5),
-            (r.aurastat6, r.aurastatcalc6),
-        ];
-        let mut cv = self.combat(game);
-        for (st, calc) in pairs {
-            let st = i32::from(st as i16);
-            if !(0..t.skills.stat_count).contains(&st) {
-                continue;
-            }
-            let v = crate::skills::eval_skill(&mut cv, &t.skills, Some(from), calc, skill, level);
-            if v != 0 {
-                cv.v.set_list_stat(l, st as u16, v);
-                // Stats 68 (attackrate) and 69 (other_animrate).
-                if st == 68 {
-                    cv.v.set_list_stat(l, 69, v);
-                }
-            }
-        }
-        cv.refresh_anim_rate(unit);
-    }
-
     /// The damage part of `0x005ADCD0` (`missiles.md` §R6.1) on a
     /// record: the missile's hit class (`HitClass`), the hit flags from
     /// its data flags 1, 2 and pierce percent (stat 327), then `apply(game, owner, unit, missile = 1, record)`
@@ -675,6 +630,24 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         with_sim(self, game, |h, sim| {
             X::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
         })
+    }
+    /// `0x00554DE0` ([`Pending::missile_ally_test`]).
+    fn ally_test(&mut self, game: &mut Game, a: UnitId, b: UnitId) -> bool {
+        with_sim(self, game, |h, sim| X::missile_ally_test(h, sim, a, b))
+    }
+    /// `shout_state` (`0x005D8290`) on the skill use view
+    /// ([`Pending::missile_shout_state`]).
+    fn shout_state(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        with_sim(self, game, |h, sim| {
+            X::missile_shout_state(h, sim, unit, owner, skill, level)
+        });
     }
     /// `missiles/bodies-2.md` §33 step 8 ([`Pending::missile_bone_wall_piece`]).
     fn bind_bone_wall_piece(
@@ -951,63 +924,38 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     /// each non-zero value set in the list (attack rate also as the other
     /// anim rate), then the anim rate refreshed. Nothing without a list.
     fn aura_fill(&mut self, game: &mut Game, unit: UnitId, s: i32, skill: i32, level: i32) {
-        self.aura_fill_from(game, unit, unit, s, skill, level);
-    }
-    /// `0x00554DE0(game, O, unit)` (`skills/bodies.md` §2.11): a monster
-    /// stands for its minion owner (`0x0058F0D0`); the same unit after
-    /// that is an ally, else the host's party test.
-    fn ally_test(&self, game: &Game, owner: UnitId, unit: UnitId) -> bool {
-        let stand_for = |u: UnitId| {
-            self.h
-                .ai
-                .as_ref()
-                .and_then(|s| s.control(u))
-                .and_then(|c| c.minion_owner)
-                .and_then(|r| game.lists.find_unit(r.ty, r.guid))
-                .unwrap_or(u)
+        use crate::combat::CombatWorld;
+        let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) else {
+            return;
         };
-        let (a, b) = (stand_for(owner), stand_for(unit));
-        a == b || self.h.x.allied(a, b)
-    }
-    /// `shout_state(game, T, src, skill, L)` (`0x005D8290`,
-    /// `skills/bodies.md` §6.8): the state list of `aurastate` on T
-    /// (created with `src` as owner, flags 2, expiry F + `auralencalc` on
-    /// `src`, state on and T queued when new), its changed bit, expiry,
-    /// the type-12 timer, `aura_fill` on `src` into the list and the
-    /// buff refresh. The party hit of a Shout / Battle Orders /
-    /// Battle Command missile (`missiles/bodies.md` §13; 1.14d
-    /// `bar-shout`: the caster's state is sent again one frame later).
-    fn shout_state(
-        &mut self,
-        game: &mut Game,
-        unit: UnitId,
-        owner: UnitId,
-        skill: i32,
-        level: i32,
-    ) {
-        use crate::missiles::SkillCalc;
         let t = self.h.tables.clone();
         let Some(r) = t.skills.skill(skill) else {
             return;
         };
-        let a = i32::from(r.aurastate as i16);
-        if !(0..self.states_count()).contains(&a) {
-            return;
+        let pairs = [
+            (r.aurastat1, r.aurastatcalc1),
+            (r.aurastat2, r.aurastatcalc2),
+            (r.aurastat3, r.aurastatcalc3),
+            (r.aurastat4, r.aurastatcalc4),
+            (r.aurastat5, r.aurastatcalc5),
+            (r.aurastat6, r.aurastatcalc6),
+        ];
+        let mut cv = self.combat(game);
+        for (st, calc) in pairs {
+            let st = i32::from(st as i16);
+            if !(0..t.skills.stat_count).contains(&st) {
+                continue;
+            }
+            let v = crate::skills::eval_skill(&mut cv, &t.skills, Some(unit), calc, skill, level);
+            if v != 0 {
+                cv.v.set_list_stat(l, st as u16, v);
+                // Stats 68 (attackrate) and 69 (other_animrate).
+                if st == 68 {
+                    cv.v.set_list_stat(l, 69, v);
+                }
+            }
         }
-        let len = self.skill_calc(game, Some(owner), skill, SkillCalc::AuraLen, level);
-        let e = game.frame.wrapping_add(len);
-        if self.state_list_expiry(unit, a).is_none()
-            && !self.new_state_list(game, unit, a, e, owner)
-        {
-            return;
-        }
-        // `0x00639E30` queues the unit for update (`0x0064C040`).
-        self.mark_state_changed(unit, a);
-        let _ = game.lists.queue_update(unit);
-        self.set_state_list_expiry(unit, a, e);
-        let _ = game.schedule_event(unit, 12, e, None, 0, 0);
-        self.aura_fill_from(game, owner, unit, a, skill, level);
-        self.h.x.buff_refresh(unit);
+        cv.refresh_anim_rate(unit);
     }
     /// `0x00639E30(unit, s, 1)`: the state-changed bit.
     fn mark_state_changed(&mut self, unit: UnitId, s: i32) {

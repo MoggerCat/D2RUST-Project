@@ -1,0 +1,45 @@
+{
+ "channel": "draws",
+ "check": "gen-render-frozen",
+ "command": [
+  "tools/trace-recorder/record_frames.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "600",
+  "--ticks",
+  "30",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.frames.jsonl",
+  "--every",
+  "1",
+  "--draws-every",
+  "1",
+  "--no-save",
+  "--poke",
+  "6 spawn 179 @x+3 @y normal",
+  "--poke",
+  "8 state @player 1 on"
+ ],
+ "files": {
+  "orig.frames.jsonl": {
+   "sha256": "e3f2e8e8c78c58c5dc9c8b34da4553ba4277aeea7ddd3de553cc5b1fb4419043",
+   "size": 1576150
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "9b2c68c627edb386fff60f4ecf29a0ed2c5ceea741aa6abd52870377dc0689cd",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6acab5c77636638a790840c542c51dd7472887044888df9f164764661dcb9c53",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
