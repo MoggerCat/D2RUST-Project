@@ -32,18 +32,18 @@
 |   2. Pipeline | 142–156 |
 |   3. Rolling: `start_combat` = `0x0057DBF0` | 157–302 |
 |   4. Totals and resistances: `totals` = `0x0057C1E0` | 303–404 |
-|   5. Application | 405–610 |
-|   6. Hit class and hit recovery | 611–641 |
-|   7. Reaction and death trigger | 642–747 |
-|   8. Event functions (table `0x007325B0`, 32 entries) | 748–811 |
-|   9. Durability `0x0057D3D0` | 812–839 |
-|   10. Monster melee on a player, end to end | 840–932 |
-| Constants & data dependencies | 933–954 |
-| Randomness | 955–987 |
-| Edge cases & original bugs | 988–1022 |
-| Test vectors | 1023–1105 |
-| Provenance | 1106–1131 |
-| Open questions | 1132–1181 |
+|   5. Application | 405–615 |
+|   6. Hit class and hit recovery | 616–646 |
+|   7. Reaction and death trigger | 647–752 |
+|   8. Event functions (table `0x007325B0`, 32 entries) | 753–816 |
+|   9. Durability `0x0057D3D0` | 817–844 |
+|   10. Monster melee on a player, end to end | 845–937 |
+| Constants & data dependencies | 938–959 |
+| Randomness | 960–992 |
+| Edge cases & original bugs | 993–1027 |
+| Test vectors | 1028–1110 |
+| Provenance | 1111–1136 |
+| Open questions | 1137–1186 |
 <!-- /index -->
 
 ## Summary
@@ -428,6 +428,11 @@ the stat read; the 0x24 / 0x25 compares at `0x0057BE47`–`0x0057BE4F`).
       monstats `MonStatsEx` (`0x00451FE0`; no row → 0); any other type
       or none → 0. Measured: the Fallen's 3 is the hit class byte of
       1.14d's S→C 0x0D on its soft hits (`combat-fallen-hits-player`).
+      A player's weapon: the item row's `hit class` byte (+0x13C, an
+      index of `hitclass.txt`): a short sword (`ssd`, `1hsl`) gives 3 —
+      measured in the Fallen's death message, `69 15000000 08 0000 0000
+      28 03` (e = unit +0xB0 = the killing hit's class), check
+      `combat-melee-fallen` (REC-2820, 2026-10-10).
    5. Durability (§9).
 5. Unit event 7 (`domeleeattack`) on the attacker, then event 3
    (`attackedinmelee`) on the defender (both with the copy).
