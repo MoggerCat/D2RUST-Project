@@ -903,3 +903,6 @@ Then the rest:
 
 - [rc-client-seed] Local player's client seed at game start in 1.14d: hook the roll `0x004E40A0` and the weather draws (`0x00473F50`, `0x00473E50`) and log the seed (lo, hi) before the first rain-cycle draw and at the first sound tick of `audio-town-ambience-ama` (seed 1234). Needed: after weather and sound share one seed (REC-1845), rain2 still starts at T 10 in d2rs vs T 3 in 1.14d, so the start value or the draw order before T 3 differs.
 - [q-fix-d9-arcane] (duplicate of item 62, answered → `world/quests-act2.md` §6.6)
+
+- [rc-town-npc-state] SpecialState06 think `0x005E7C10` (AI table row 6; installed on an unowned act3hire, class 359, by Hireable step 1, `ai-bodies-6.md` §7): 1.14d draws the unit seed once at frame 37 and walks at frame 57 (`gen-wp-18..26`, Kurast); d2rs logs it Unhandled and draws nothing. Read the body and write its spec (draws, idle, walk), then implement it.
+- [rc-town-npc-state] Poke `@wp` on the 1.14d side: `tools/trace-recorder/poke.py` raises Gap ("@wp needs the objects table's operate function"), so `gen-wp-1..8,17,28..38` never travel on 1.14d and the frame-400 `game.seed` difference is a tool gap, not a sim bug. Needs the objects-table operate address (`0x00584540`) wired into poke.py; then re-record those checks.

@@ -753,12 +753,15 @@ pub trait Pending {
         false
     }
     /// The Npc class cases (`ai-bodies.md` §9.9 step 2); defaults: no quest
-    /// state (jerhyn's palace inactive, nothing brought or found).
+    /// state. Jerhyn without a palace spawn (chain 11 extra +0x0D = 0: a
+    /// fresh or act-1-done character) gives `0x0059F570` = 1 and (a, b) =
+    /// (1, 0), so his think goes on to the interaction step (`quests-act2.md`
+    /// §10). PROVISIONAL REC-1855: the palace-Jerhyn states are not read.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
-        false
+        true
     }
     fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
-        (0, 0)
+        (1, 0)
     }
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
         false
