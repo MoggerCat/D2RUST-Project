@@ -949,6 +949,22 @@ pub fn superunique_finish<H: InitHost + ?Sized>(
     row: u16,
     aura: bool,
 ) {
+    superunique_finish_with(cx, h, unit, row, aura, true);
+}
+
+/// [`superunique_finish`] where the caller says whether the per-`hcIdx`
+/// extra spawns (and Radament's `roll(5)`) are still due. Population's
+/// `preset::superunique` runs them itself (`population.md` §11.4 step 6),
+/// so its wiring passes `false`: 1.14d `0x005A49B0` does them once
+/// (REC-3800).
+pub fn superunique_finish_with<H: InitHost + ?Sized>(
+    cx: &Ctx<'_>,
+    h: &mut H,
+    unit: UnitId,
+    row: u16,
+    aura: bool,
+    extra_spawns: bool,
+) {
     let Some(su) = cx.tables.superuniques.get(usize::from(row)) else {
         return;
     };
@@ -957,18 +973,24 @@ pub fn superunique_finish<H: InitHost + ?Sized>(
         run_umod_init(cx, h, unit, 30, true);
     }
     // Step 5.
-    superunique_quest(h, unit, su.hcidx);
+    superunique_quest(h, unit, su.hcidx, extra_spawns);
 }
 
 /// The per-`hcIdx` cases of `0x005A49B0` (§20.1), before the closing
 /// umod 22.
-fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32) {
+fn superunique_quest<H: InitHost + ?Sized>(
+    h: &mut H,
+    unit: UnitId,
+    hc_idx: u32,
+    extra_spawns: bool,
+) {
     match hc_idx {
         6 => {
             h.set_state(unit, 118);
             h.quest_chain(unit, 5);
             h.ai_install(unit, 13);
         }
+        10 if !extra_spawns => {}
         10 => {
             // U `roll(5)` + 2 class-4 spawns, then one of each class.
             let n = seed(h, unit).roll(5) as i32 + 2;
@@ -986,7 +1008,9 @@ fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32)
         36..=38 => h.quest_chain(unit, 23),
         39 => h.quest_chain(unit, 4),
         42 => {
-            h.spawn_group(unit, 453, 20, 20, 0);
+            if extra_spawns {
+                h.spawn_group(unit, 453, 20, 20, 0);
+            }
             h.quest_chain(unit, 31);
             h.quest_preset_boss(unit);
             h.set_state(unit, 118);
@@ -996,12 +1020,14 @@ fn superunique_quest<H: InitHost + ?Sized>(h: &mut H, unit: UnitId, hc_idx: u32)
             h.quest_preset_boss(unit);
         }
         60 => {
-            h.owner_data_self(unit);
-            let c = h.class_for_level(unit, 453);
-            h.spawn_group(unit, c, 10, 20, 0x40);
+            if extra_spawns {
+                h.owner_data_self(unit);
+                let c = h.class_for_level(unit, 453);
+                h.spawn_group(unit, c, 10, 20, 0x40);
+            }
             h.quest_chain(unit, 34);
         }
-        62 => h.spawn_group(unit, 381, 20, 10, 0x40),
+        62 if extra_spawns => h.spawn_group(unit, 381, 20, 10, 0x40),
         _ => {}
     }
 }
@@ -1129,7 +1155,7 @@ pub fn restore_boss<H: InitHost + ?Sized>(
         flags_or(h, unit, type_flag::SUPERUNIQUE);
         h.monsters().entry(unit).boss_hc_idx = row;
         if let Some(su) = cx.tables.superuniques.get(usize::from(row)) {
-            superunique_quest(h, unit, su.hcidx);
+            superunique_quest(h, unit, su.hcidx, true);
         }
     }
     Some(unit)

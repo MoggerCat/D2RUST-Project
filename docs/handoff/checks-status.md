@@ -19,9 +19,7 @@ Rows of 35 checks re-run 2026-10-10 by rc-c008-monmode on claude/rc-c008-monmode
 
 Rows of 240 checks re-run 2026-10-10 by rc-promote (`suite.py --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough --json`, the checks of the PARTIAL/DIVERGED rows plus every gen-sysc-*): rows replaced in place, the totals above are not recomputed.
 
-Rows of 50 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 / 0xA7 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, the passiveitype layer, the right aura at join, the skill-delay queue): rows replaced in place, the totals above are not recomputed.
-
-Rows of 61 gen-skill checks re-run 2026-10-10 by rc-a8-setstate after the skill-delay fix (`suite.py --checks-dir traces/checks/gen --filter 'gen-skill-*' --orig-cache traces/orig-cache --workers 3 --no-playthrough`): rows replaced in place.
+Rows of 44 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, the passiveitype layer and the right aura at join): rows replaced in place, the totals above are not recomputed.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
 First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q-scenes-compare 8, q-prov-recording-2 3, q-fix-server-store-fill 2, q-fix-b-monster-combat 1, q-fix-pc1-proto-items 1
@@ -183,8 +181,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l53-basement-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l54-basement-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l54-basement-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | q-fix-seed-order |
-| a2-warp-l55-tomb-1-a-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | q-fix-seed-order |
+| a2-warp-l55-tomb-1-a-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | unrouted |
+| a2-warp-l55-tomb-1-a-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | unrouted |
 | a2-warp-l56-tomb-2-a-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l56-tomb-2-a-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l57-tomb-2-b-ama | rng | MATCH | 22/22 | - | - |
@@ -207,8 +205,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-warp-l67-tomb-tal-2-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l68-tomb-tal-3-ama | state | PARTIAL | 160/160 | - | - |
-| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | q-fix-seed-order |
-| a2-warp-l69-tomb-tal-4-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | q-fix-seed-order |
+| a2-warp-l69-tomb-tal-4-ama | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | unrouted |
+| a2-warp-l69-tomb-tal-4-ama | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | unrouted |
 | a2-warp-l70-tomb-tal-5-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-l70-tomb-tal-5-ama | state | PARTIAL | 160/160 | - | - |
 | a2-warp-l71-tomb-tal-6-ama | rng | MATCH | 22/22 | - | - |
@@ -284,7 +282,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a3-warp-l91-dungeon-2-treasure-ama | state | PARTIAL | 160/160 | - | - |
 | a3-warp-l93-sewer-2-ama | rng | MATCH | 133/133 | - | - |
 | a3-warp-l93-sewer-2-ama | state | PARTIAL | 160/160 | - | - |
-| a3-warp-l94-temple-1-ama | rng | DIVERGED | 111/157 | frame 54, unit 1:10, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:412 | q-fix-seed-order |
+| a3-warp-l94-temple-1-ama | rng | DIVERGED | 111/157 | frame 54, unit 1:10, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:412 | unrouted |
 | a3-warp-l94-temple-1-ama | state | DIVERGED | 42/160 | frame 43 monster 1:10 class 47, field m: 1.14d 1 vs d2rs 15 | unrouted |
 | a3-warp-l95-temple-2-ama | rng | MATCH | 133/133 | - | - |
 | a3-warp-l95-temple-2-ama | state | PARTIAL | 160/160 | - | - |
@@ -294,8 +292,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a3-warp-l97-temple-4-ama | state | PARTIAL | 160/160 | - | - |
 | a3-warp-l98-temple-5-ama | rng | MATCH | 133/133 | - | - |
 | a3-warp-l98-temple-5-ama | state | PARTIAL | 160/160 | - | - |
-| a3-warp-l99-temple-6-ama | rng | DIVERGED | 128/144 | frame 89, unit 1:5, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/combat/damage.rs:319 | q-fix-seed-order |
-| a3-warp-l99-temple-6-ama | state | DIVERGED | 88/160 | frame 89 player 0:1 class 0, field m: 1.14d 1 vs d2rs 19 | unrouted |
+| a3-warp-l99-temple-6-ama | rng | MATCH | 140/140 | - | - |
+| a3-warp-l99-temple-6-ama | state | PARTIAL | 160/160 | - | - |
 | a4-deseis-seal-early | state | DIVERGED | 45/200 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | a4-deseis-seal-loaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | a4-deseis-seal-unloaded | state | DIVERGED | 45/560 | frame 46 monster 1:88 class 312, field m: 1.14d 2 vs d2rs 1 | unrouted |
@@ -320,30 +318,30 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-su-ancient1 | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-ancient2 | state | PARTIAL | 90/90 | - | - |
 | a5-su-ancient3 | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-anodized-elite | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-anodized-elite | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-axe-dweller | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-blaze-ripper | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-bonesaw-breaker | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
-| a5-su-dac-farren | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-bonesaw-breaker | state | PARTIAL | 90/90 | - | coord-resume-3 |
+| a5-su-dac-farren | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-eyeback | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-frozenstein | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-magma-torquer | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-magma-torquer | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-megaflow-rectifier | state | PARTIAL | 90/90 | - | - |
 | a5-su-nihlathak-boss | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-pindleskin | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-pindleskin | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-sharp-tooth-sayer | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-shenk | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-snapchip | state | PARTIAL | 90/90 | - | - |
 | a5-su-threash-socket | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | - |
+| a5-su-vinvear-molech | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-town-arrival-bar | state | PARTIAL | 40/40 | - | - |
 | a5-town-npc-sweep | state | PARTIAL | 170/170 | - | - |
 | a5-warp-crystalized-ama | rng | MATCH | 133/133 | - | - |
 | a5-warp-crystalized-ama | state | PARTIAL | 160/160 | - | - |
 | a5-warp-halls-anguish-ama | rng | MATCH | 133/133 | - | - |
 | a5-warp-halls-anguish-ama | state | PARTIAL | 160/160 | - | - |
-| a5-warp-l110-siege-1-ama | rng | MATCH | 158/158 | - | q-fix-seed-order |
-| a5-warp-l110-siege-1-ama | state | PARTIAL | 160/160 | - | coord-resume-3 |
+| a5-warp-l110-siege-1-ama | rng | MATCH | 158/158 | - | - |
+| a5-warp-l110-siege-1-ama | state | PARTIAL | 160/160 | - | - |
 | a5-warp-l111-barricade-1-ama | rng | MATCH | 133/133 | - | - |
 | a5-warp-l111-barricade-1-ama | state | PARTIAL | 160/160 | - | - |
 | a5-warp-l112-barricade-2-ama | rng | MATCH | 133/133 | - | - |
@@ -418,7 +416,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ama-slow-missiles | state | PARTIAL | 70/70 | - | - |
 | ama-strafe | state | PARTIAL | 70/70 | - | - |
 | ama-valkyrie | state | PARTIAL | 70/70 | - | - |
-| ama-valkyrie | packets | DIVERGED | 69/70 | frame 30 stream s2c #2 size: 1.14d 18 vs d2rs 14 (id 0xac) | q-fix-join-items |
 | ass-blade-fury | state | PARTIAL | 70/70 | - | - |
 | ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | unrouted |
 | ass-blade-shield | state | PARTIAL | 70/70 | - | - |
@@ -426,7 +423,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
 | ass-blades-of-ice | packets | MATCH | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
-| ass-burst-of-speed | packets | MATCH | 70/70 | - | - |
 | ass-charged-bolt-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-claws-of-thunder | state | PARTIAL | 70/70 | - | - |
 | ass-claws-of-thunder | packets | MATCH | 70/70 | - | - |
@@ -443,13 +439,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-dragon-talon | state | PARTIAL | 70/70 | - | - |
 | ass-dragon-talon | packets | MATCH | 70/70 | - | - |
 | ass-fade | state | PARTIAL | 70/70 | - | - |
-| ass-fade | packets | MATCH | 70/70 | - | - |
 | ass-fire-blast | state | PARTIAL | 70/70 | - | - |
 | ass-fists-of-fire | state | PARTIAL | 70/70 | - | - |
 | ass-fists-of-fire | packets | MATCH | 70/70 | - | - |
 | ass-inferno-sentry | state | PARTIAL | 70/70 | - | - |
 | ass-lightning-sentry | state | PARTIAL | 70/70 | - | - |
-| ass-lightning-sentry | packets | MATCH | 70/70 | - | - |
 | ass-lightning-sentry-hit | state | PARTIAL | 160/160 | - | - |
 | ass-lightning-sentry-kill | state | PARTIAL | 160/160 | - | - |
 | ass-mind-blast | state | PARTIAL | 70/70 | - | - |
@@ -473,12 +467,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | packets | MATCH | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
-| bar-leap-attack | packets | MATCH | 70/70 | - | - |
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
 | bar-war-cry | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind | packets | DIVERGED | 69/70 | frame 37 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
 | bar-whirlwind | state | PARTIAL | 70/70 | - | - |
-| bar-whirlwind-unit | packets | DIVERGED | 64/70 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
+| bar-whirlwind-unit | packets | DIVERGED | 66/70 | frame 21 stream s2c #0 missing in d2rs (id 0xa5) | unrouted |
 | bar-whirlwind-unit | state | DIVERGED | 59/70 | frame 21 player 0:1 class 4, field fr: 1.14d 0 vs d2rs 5120 | unrouted |
 | combat-arrow-kill | state | PARTIAL | 110/110 | - | - |
 | combat-arrow-quillrat | state | PARTIAL | 130/130 | - | - |
@@ -500,7 +493,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | combat-umod-life | state | PARTIAL | 24/24 | - | - |
 | combat-unique-pack | state | PARTIAL | 226/226 | - | - |
 | cube-000-staff-of-kings-viper-amulet-ho | items | MATCH | 4/4 | - | - |
-| cube-000-staff-of-kings-viper-amulet-ho | packets | DIVERGED | 22/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
+| cube-000-staff-of-kings-viper-amulet-ho | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
 | cube-000-staff-of-kings-viper-amulet-ho | state | PARTIAL | 24/24 | - | - |
 | cube-001-khalim-flail-khalim-heart-khal | items | MATCH | 6/6 | - | - |
 | cube-001-khalim-flail-khalim-heart-khal | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
@@ -594,23 +587,22 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | dru-armageddon | state | PARTIAL | 70/70 | - | - |
 | dru-cycle-of-life | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
 | dru-cycle-of-life | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
-| dru-firestorm | packets | MATCH | 70/70 | - | - |
+| dru-firestorm | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | dru-firestorm | state | PARTIAL | 70/70 | - | - |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
-| dru-fissure | packets | MATCH | 70/70 | - | - |
 | dru-grizzly | state | PARTIAL | 70/70 | - | - |
-| dru-heart-of-wolverine | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | unrouted |
+| dru-heart-of-wolverine | packets | MATCH | 70/70 | - | - |
 | dru-heart-of-wolverine | state | PARTIAL | 70/70 | - | - |
 | dru-hurricane | state | PARTIAL | 70/70 | - | - |
-| dru-oak-sage | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | q-fix-join-items |
+| dru-oak-sage | packets | MATCH | 70/70 | - | - |
 | dru-oak-sage | state | PARTIAL | 70/70 | - | - |
-| dru-plague-poppy | packets | DIVERGED | 68/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
-| dru-plague-poppy | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
-| dru-raven | packets | DIVERGED | 69/70 | frame 29 stream s2c #1 size: 1.14d 15 vs d2rs 14 (id 0xac) | q-fix-join-items |
+| dru-plague-poppy | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
+| dru-plague-poppy | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| dru-raven | packets | MATCH | 70/70 | - | - |
 | dru-raven | state | PARTIAL | 70/70 | - | - |
 | dru-shock-wave | packets | MATCH | 70/70 | - | - |
 | dru-shock-wave | state | PARTIAL | 70/70 | - | - |
-| dru-spirit-of-barbs | packets | DIVERGED | 69/70 | frame 29 stream s2c #2 size: 1.14d 19 vs d2rs 12 (id 0xaa) | unrouted |
+| dru-spirit-of-barbs | packets | MATCH | 70/70 | - | - |
 | dru-spirit-of-barbs | state | PARTIAL | 70/70 | - | - |
 | dru-summon-fenris | packets | MATCH | 70/70 | - | - |
 | dru-summon-fenris | state | PARTIAL | 70/70 | - | - |
@@ -622,7 +614,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | dru-twister | state | PARTIAL | 70/70 | - | - |
 | dru-vines | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
 | dru-vines | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
-| dru-volcano | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa3) | q-fix-join-items |
+| dru-volcano | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa3) | unrouted |
 | dru-volcano | state | PARTIAL | 70/70 | - | - |
 | dru-werewolf | state | PARTIAL | 70/70 | - | - |
 | gen-boss-708 | state | PARTIAL | 150/150 | - | - |
@@ -655,22 +647,15 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-shrine-8 | state | PARTIAL | 120/120 | - | - |
 | gen-shrine-9 | state | PARTIAL | 120/120 | - | - |
 | gen-skill-nec-69 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-nec-69 | packets | MATCH | 70/70 | - | - |
 | gen-skill-nec-79 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-nec-79 | packets | MATCH | 70/70 | - | - |
 | gen-skill-nec-89 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-nec-89 | packets | MATCH | 70/70 | - | - |
 | gen-skill-sor-37 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-sor-37 | packets | MATCH | 70/70 | - | - |
 | gen-skill-sor-61 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-sor-61 | packets | MATCH | 70/70 | - | - |
 | gen-skill-sor-63 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-sor-63 | packets | MATCH | 70/70 | - | - |
 | gen-skill-sor-65 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-sor-65 | packets | MATCH | 70/70 | - | - |
 | gen-state-1 | packets | MATCH | 40/40 | - | - |
 | gen-state-1 | state | PARTIAL | 40/40 | - | - |
-| gen-sysc-client-assets-b-original-behavior-to-reproduce-not-specified | draws | DIVERGED | 0/1 | tick 72 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
+| gen-sysc-client-assets-b-original-behavior-to-reproduce-not-specified | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 106 | unrouted |
 | gen-sysc-client-bridge-2-receive-path | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-bridge-2-receive-path | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-bridge-2-receive-path | state | PARTIAL | 60/60 | - | - |
@@ -766,9 +751,9 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-12-0x29-game-quest-flags-0x0045d3a0-0x004b2620 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-12-0x29-game-quest-flags-0x0045d3a0-0x004b2620 | rng | MATCH | 33/33 | - | - |
@@ -779,13 +764,13 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | MATCH | 30/30 | - | q-fix-join-items |
+| gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | packets | DIVERGED | 99/100 | frame 9 stream s2c #18 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
 | gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | state | PARTIAL | 100/100 | - | - |
@@ -797,11 +782,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0 | state | PARTIAL | 60/60 | - | - |
 | gen-sysc-client-msg-ui-3-0x77-ui-action-0x0045e800-0x004b8cf0 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-3-0x77-ui-action-0x0045e800-0x004b8cf0 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-8-0x58-ui-open-0x0045e490-0x004c0550 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-8-0x58-ui-open-0x0045e490-0x004c0550 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-units-1-unit-add | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-units-1-unit-add | rng | MATCH | 33/33 | - | - |
@@ -820,7 +805,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-units-8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-units-8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-units-8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-client-render-pipeline-b-original-behavior-to-reproduce-not | draws | DIVERGED | 0/1 | tick 73 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
+| gen-sysc-client-render-pipeline-b-original-behavior-to-reproduce-not | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 106 | unrouted |
 | gen-sysc-client-stat-lists-1-the-list-of-a-client-unit | packets | MATCH | 40/40 | - | - |
 | gen-sysc-client-stat-lists-1-the-list-of-a-client-unit | state | PARTIAL | 40/40 | - | - |
 | gen-sysc-client-stat-lists-2-items | items | MATCH | 2/2 | - | - |
@@ -984,18 +969,18 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | hire-follow-waypoint-kashya | state | DIVERGED | 305/330 | frame 268 missile 3:1 class 12/120, field cl: 1.14d 12 vs d2rs 120 | unrouted |
 | hire-greiz | packets | MATCH | 90/90 | - | - |
 | hire-greiz | state | PARTIAL | 90/90 | - | - |
-| hire-items-kashya | packets | DIVERGED | 88/90 | frame 34 stream s2c #0 missing in d2rs (id 0x42) | q-fix-join-items |
-| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306, field x: 1.14d 0 vs d2rs (absent) | coord-resume-3 |
+| hire-items-kashya | packets | DIVERGED | 88/90 | frame 34 stream s2c #0 missing in d2rs (id 0x42) | unrouted |
+| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306, field x: 1.14d 0 vs d2rs (absent) | unrouted |
 | hire-kashya | packets | MATCH | 90/90 | - | - |
 | hire-kashya | state | PARTIAL | 90/90 | - | - |
 | hire-qual-kehk | packets | MATCH | 90/90 | - | - |
 | hire-qual-kehk | state | PARTIAL | 90/90 | - | - |
-| hire-resurrect-asheara | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-asheara | state | DIVERGED | 23/130 | frame 24 monster 1:12 class 359 (hireling), field s (as hire-asheara) | q-diff-skills-2 |
+| hire-resurrect-asheara | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | unrouted |
+| hire-resurrect-asheara | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/359, field (unit): 1.14d absent vs d2rs extra | unrouted |
 | hire-resurrect-greiz | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | unrouted |
 | hire-resurrect-greiz | state | DIVERGED | 85/130 | frame 86 monster 1:22 class -/338, field (unit): 1.14d absent vs d2rs extra | unrouted |
-| hire-resurrect-kashya | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
+| hire-resurrect-kashya | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | unrouted |
+| hire-resurrect-kashya | state | DIVERGED | 85/130 | frame 86 monster 1:13 class -/271, field (unit): 1.14d absent vs d2rs extra | unrouted |
 | hire-resurrect-qual-kehk | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | unrouted |
 | hire-resurrect-qual-kehk | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/561, field (unit): 1.14d absent vs d2rs extra | unrouted |
 | inv-pick-belt | items | MATCH | 1/1 | - | - |
@@ -1136,7 +1121,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | milestone-hellforge | state | PARTIAL | 177/177 | - | - |
 | milestone-hephasto | state | PARTIAL | 177/177 | - | - |
 | milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | unrouted |
-| milestone-nihlathak | state | DIVERGED | 29/75 | frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| milestone-nihlathak | state | PARTIAL | 75/75 | - | - |
 | milestone-worldstone-portal | state | PARTIAL | 87/87 | - | - |
 | nec-amplify-damage | state | PARTIAL | 70/70 | - | - |
 | nec-attract | state | PARTIAL | 70/70 | - | - |
@@ -1176,7 +1161,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | pal-blessed-hammer | state | PARTIAL | 70/70 | - | - |
 | pal-blessed-hammer | packets | MATCH | 70/70 | - | - |
 | pal-charge | state | PARTIAL | 70/70 | - | - |
-| pal-charge | packets | DIVERGED | 69/70 | frame 25 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
 | pal-cleansing | state | PARTIAL | 70/70 | - | - |
 | pal-cleansing | packets | MATCH | 70/70 | - | - |
 | pal-concentration | state | PARTIAL | 70/70 | - | - |
@@ -1197,12 +1181,12 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | pal-holy-bolt | packets | MATCH | 70/70 | - | - |
 | pal-holy-fire | state | PARTIAL | 70/70 | - | - |
 | pal-holy-fire | packets | MATCH | 70/70 | - | - |
-| pal-holy-freeze | state | PARTIAL | 70/70 | - | - |
 | pal-holy-freeze | packets | MATCH | 70/70 | - | - |
+| pal-holy-freeze | state | PARTIAL | 70/70 | - | - |
 | pal-holy-shield | state | PARTIAL | 70/70 | - | - |
 | pal-holy-shield | packets | MATCH | 70/70 | - | - |
-| pal-holy-shock | state | PARTIAL | 70/70 | - | - |
 | pal-holy-shock | packets | MATCH | 70/70 | - | - |
+| pal-holy-shock | state | PARTIAL | 70/70 | - | - |
 | pal-holyfire | state | PARTIAL | 120/120 | - | - |
 | pal-holyfire | packets | MATCH | 120/120 | - | - |
 | pal-holyfire-noclick | state | PARTIAL | 120/120 | - | - |
@@ -1224,8 +1208,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | pal-sacrifice | packets | MATCH | 70/70 | - | - |
 | pal-salvation | state | PARTIAL | 70/70 | - | - |
 | pal-salvation | packets | MATCH | 70/70 | - | - |
-| pal-sanctuary | state | PARTIAL | 70/70 | - | - |
 | pal-sanctuary | packets | MATCH | 70/70 | - | - |
+| pal-sanctuary | state | PARTIAL | 70/70 | - | - |
 | pal-smite | state | PARTIAL | 70/70 | - | - |
 | pal-smite | packets | MATCH | 70/70 | - | - |
 | pal-thorns | state | PARTIAL | 70/70 | - | - |
@@ -1247,7 +1231,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | save-levelup-ama | save | MATCH | 1/1 | - | - |
 | sor-blaze | state | PARTIAL | 70/70 | - | - |
 | sor-blizzard | state | PARTIAL | 70/70 | - | - |
-| sor-blizzard | packets | MATCH | 70/70 | - | - |
 | sor-chain-lightning | state | PARTIAL | 70/70 | - | - |
 | sor-charged-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-chilling-armor | state | PARTIAL | 70/70 | - | - |
@@ -1256,22 +1239,18 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | sor-fire-ball | state | PARTIAL | 70/70 | - | - |
 | sor-fire-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-fire-wall | state | PARTIAL | 70/70 | - | - |
-| sor-fire-wall | packets | MATCH | 70/70 | - | - |
 | sor-frost-nova | state | PARTIAL | 70/70 | - | - |
 | sor-frost-nova-twice | packets | MATCH | 100/100 | - | - |
 | sor-frost-nova-twice | state | PARTIAL | 100/100 | - | - |
 | sor-frozen-armor | state | PARTIAL | 70/70 | - | - |
 | sor-frozen-orb | state | PARTIAL | 70/70 | - | - |
-| sor-frozen-orb | packets | MATCH | 70/70 | - | - |
 | sor-glacial-spike | state | PARTIAL | 70/70 | - | - |
 | sor-hydra | state | PARTIAL | 70/70 | - | - |
-| sor-hydra | packets | MATCH | 70/70 | - | - |
 | sor-ice-blast | state | PARTIAL | 70/70 | - | - |
 | sor-ice-bolt | state | PARTIAL | 70/70 | - | - |
 | sor-inferno | state | PARTIAL | 70/70 | - | - |
 | sor-lightning | state | PARTIAL | 70/70 | - | - |
 | sor-meteor | state | PARTIAL | 70/70 | - | - |
-| sor-meteor | packets | MATCH | 70/70 | - | - |
 | sor-nova | state | PARTIAL | 70/70 | - | - |
 | sor-shiver-armor | state | PARTIAL | 70/70 | - | - |
 | sor-static-field | state | PARTIAL | 70/70 | - | - |
@@ -1414,7 +1393,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-shrine-13 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-14 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-15 | packets | MATCH | 120/120 | - | - |
-| gen-shrine-17 | packets | DIVERGED | 119/120 | frame 40 stream s2c #2 id: 1.14d 2c vs d2rs 0e (id 0x2c) | unrouted |
+| gen-shrine-17 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-18 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-18 | state | PARTIAL | 120/120 | - | - |
 | gen-shrine-19 | packets | MATCH | 120/120 | - | - |
@@ -1430,6 +1409,13 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-shrine-7 | packets | DIVERGED | 119/120 | frame 40 stream s2c #0 size: 1.14d 15 vs d2rs 12 (id 0xa8) | unrouted |
 | gen-shrine-8 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-9 | packets | MATCH | 120/120 | - | - |
+| gen-skill-nec-69 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-79 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-89 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-37 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-61 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-63 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-65 | packets | MATCH | 70/70 | - | - |
 | a5-wp-31-lv111 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
 | a5-wp-32-lv112 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
 | a5-wp-33-lv113 | packets | DIVERGED | 539/540 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
@@ -1453,23 +1439,28 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ama-plague-javelin | packets | MATCH | 70/70 | - | - |
 | ama-poison-javelin | packets | MATCH | 70/70 | - | - |
 | ama-strafe | packets | MATCH | 70/70 | - | - |
+| ama-valkyrie | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
 | ass-blade-fury | packets | MATCH | 70/70 | - | - |
+| ass-burst-of-speed | packets | MATCH | 70/70 | - | - |
 | ass-charged-bolt-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #2 id: 1.14d 21 vs d2rs aa (id 0x21) | unrouted |
 | ass-death-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
 | ass-dragon-flight | packets | MATCH | 70/70 | - | - |
+| ass-fade | packets | MATCH | 70/70 | - | - |
 | ass-fire-blast | packets | MATCH | 70/70 | - | - |
 | ass-inferno-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| ass-lightning-sentry | packets | MATCH | 70/70 | - | - |
 | ass-psychic-hammer | packets | MATCH | 70/70 | - | - |
 | ass-shadow-master | packets | DIVERGED | 67/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
 | ass-shadow-warrior | packets | DIVERGED | 69/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
 | ass-shock-field | packets | DIVERGED | 69/70 | frame 27 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | ass-wake-of-fire-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
-| bar-double-throw | state | PARTIAL | 70/70 | - | - |
 | bar-double-throw | packets | MATCH | 70/70 | - | - |
+| bar-double-throw | state | PARTIAL | 70/70 | - | - |
+| bar-leap | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
 | bar-leap | state | PARTIAL | 70/70 | - | - |
-| bar-leap | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
+| bar-leap-attack | packets | DIVERGED | 69/70 | frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| bar-shout | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | unrouted |
 | bar-shout | state | PARTIAL | 70/70 | - | - |
-| bar-shout | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | q-fix-join-items |
 | cube-007-1-ring-1-perfect-ruby-1-explod | items | MATCH | 5/5 | - | - |
 | cube-007-1-ring-1-perfect-ruby-1-explod | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
 | cube-007-1-ring-1-perfect-ruby-1-explod | state | PARTIAL | 24/24 | - | - |
@@ -1484,18 +1475,42 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | draws-melee-bar | draws | DIVERGED | 0/1 | tick 45 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/ba/ra/baralita11hs.dcc vs d2rs data/global/chars/ba/lg/balglita1hth.dcc | unrouted |
 | draws-run-ama | draws | DIVERGED | 0/1 | tick 59 draw row 1 (FloorTileDraw) column x: 1.14d -31 vs d2rs -24 | unrouted |
 | draws-walk-ama | draws | DIVERGED | 0/1 | tick 59 draw row 1 (FloorTileDraw) column y: 1.14d -62 vs d2rs -55 | unrouted |
+| dru-fissure | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | dru-grizzly | packets | MATCH | 70/70 | - | - |
 | dru-hurricane | packets | MATCH | 70/70 | - | - |
+| dru-molten-boulder | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | dru-molten-boulder | state | PARTIAL | 70/70 | - | - |
-| dru-molten-boulder | packets | MATCH | 70/70 | - | - |
 | dru-werewolf | packets | MATCH | 70/70 | - | - |
 | interact-talk-akara | packets | MATCH | 30/30 | - | - |
 | interact-talk-akara | state | PARTIAL | 30/30 | - | - |
 | items-vendor-drehya-stock | packets | DIVERGED | 137/140 | frame 3 stream s2c #17 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
 | nec-bone-wall | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
-| nec-clay-golem | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | unrouted |
+| nec-clay-golem | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
+| pal-blessed-aim | packets | MATCH | 70/70 | - | - |
+| pal-charge | packets | DIVERGED | 69/70 | frame 25 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| pal-cleansing | packets | MATCH | 70/70 | - | - |
+| pal-concentration | packets | MATCH | 70/70 | - | - |
+| pal-conviction | packets | MATCH | 70/70 | - | - |
+| pal-defiance | packets | MATCH | 70/70 | - | - |
+| pal-fanaticism | packets | MATCH | 70/70 | - | - |
+| pal-holy-fire | packets | MATCH | 70/70 | - | - |
+| pal-meditation | packets | MATCH | 70/70 | - | - |
+| pal-might | packets | MATCH | 70/70 | - | - |
+| pal-prayer | packets | MATCH | 70/70 | - | - |
+| pal-redemption | packets | MATCH | 70/70 | - | - |
+| pal-resist-cold | packets | MATCH | 70/70 | - | - |
+| pal-resist-fire | packets | MATCH | 70/70 | - | - |
+| pal-resist-lightning | packets | MATCH | 70/70 | - | - |
+| pal-salvation | packets | MATCH | 70/70 | - | - |
+| pal-thorns | packets | MATCH | 70/70 | - | - |
+| pal-vigor | packets | MATCH | 70/70 | - | - |
 | save-fresh-ama | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | save-merc-bar | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
+| sor-blizzard | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-fire-wall | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-frozen-orb | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-hydra | packets | DIVERGED | 69/70 | frame 26 stream s2c #3 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| sor-meteor | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
 | ui-draws-char-skill-ama | draws | PARTIAL | 0/1 | - | - |
 | ui-draws-inv-char-l5-ama | draws | DIVERGED | 0/1 | tick 72 draw row 329 (CelDraw) column x: 1.14d 590 vs d2rs 790 | unrouted |
 | ui-draws-inv-char-tip-ama | draws | DIVERGED | 0/1 | tick 72 draw row 249 (CelDrawColor) column frame: 1.14d 54 vs d2rs 48 | unrouted |
@@ -1706,118 +1721,118 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-qkill-blood-raven | state | DIVERGED | 63/180 | frame 64 player 0:1 class 0, field m: 1.14d 5 vs d2rs 4 | unrouted |
 | gen-qkill-countess | state | DIVERGED | 50/180 | frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] | unrouted |
 | gen-render-den-of-evil | draws | DIVERGED | 0/1 | tick 58 draw row 70 (CelDrawShadow) column frame: 1.14d 3 vs d2rs 2 | unrouted |
-| gen-render-firebolt | draws | DIVERGED | 0/1 | tick 22 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
-| gen-render-frozen | draws | DIVERGED | 0/1 | tick 28 draw row 108 (CelDrawShadow) column dir: 1.14d 46 vs d2rs 0 | unrouted |
-| gen-render-kurast-rain | draws | DIVERGED | 0/1 | tick 58 draw row 97 (CelDraw) column x: 1.14d 584 vs d2rs 563 | unrouted |
+| gen-render-firebolt | draws | DIVERGED | 0/1 | tick 22 draw row 106 (CelDrawShadow) column dir: 1.14d 56 vs d2rs 57 | unrouted |
+| gen-render-frozen | draws | DIVERGED | 0/1 | tick 28 draw row 108 (CelDrawShadow) column frame: 1.14d 7 vs d2rs 1 | unrouted |
+| gen-render-kurast-rain | draws | DIVERGED | 0/1 | tick 58 draw row 97 (CelDraw) column frame: 1.14d 1 vs d2rs 3 | unrouted |
 | gen-render-town-dawn | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 734 vs d2rs 74 | unrouted |
-| gen-render-town-night | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 49 vs d2rs 237 | unrouted |
-| gen-skill-ama-11 | state | PARTIAL | 70/70 | - | - |
+| gen-render-town-night | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 49 vs d2rs 563 | unrouted |
 | gen-skill-ama-11 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-12 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-11 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-12 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-15 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-12 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-15 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-16 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-15 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-16 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-20 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-16 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-20 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-21 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-20 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-21 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-22 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-21 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-22 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-25 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-22 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-25 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-26 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-25 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-26 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-27 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-26 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-27 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-28 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-27 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-28 | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 size: 1.14d 23 vs d2rs 14 (id 0xac) | q-fix-join-items |
-| gen-skill-ama-31 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-28 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-31 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-32 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-31 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-32 | packets | DIVERGED | 69/70 | frame 30 stream s2c #2 size: 1.14d 18 vs d2rs 14 (id 0xac) | q-fix-join-items |
-| gen-skill-ama-35 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-32 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-35 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-6 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-35 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-6 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ama-7 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-6 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-7 | packets | MATCH | 70/70 | - | - |
-| gen-skill-ass-268 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-7 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ass-268 | packets | DIVERGED | 69/70 | frame 28 stream s2c #2 size: 1.14d 23 vs d2rs 14 (id 0xac) | q-fix-join-items |
-| gen-skill-bar-132 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-268 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-132 | packets | MATCH | 70/70 | - | - |
-| gen-skill-bar-138 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-132 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-138 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | q-fix-join-items |
-| gen-skill-bar-140 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-138 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-140 | packets | MATCH | 70/70 | - | - |
-| gen-skill-bar-143 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-140 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-143 | packets | DIVERGED | 69/70 | frame 38 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
-| gen-skill-dru-222 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
+| gen-skill-bar-143 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-dru-222 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | q-fix-join-items |
-| gen-skill-dru-229 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-222 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
 | gen-skill-dru-229 | packets | MATCH | 70/70 | - | - |
-| gen-skill-dru-231 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-skill-dru-229 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-dru-231 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
-| gen-skill-dru-234 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-231 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
 | gen-skill-dru-234 | packets | MATCH | 70/70 | - | - |
-| gen-skill-dru-241 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
+| gen-skill-dru-234 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-dru-241 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | q-fix-join-items |
-| gen-skill-dru-247 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-241 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
 | gen-skill-dru-247 | packets | MATCH | 70/70 | - | - |
-| gen-skill-nec-75 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-247 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-nec-75 | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | q-fix-join-items |
-| gen-skill-nec-78 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-75 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-nec-78 | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
-| gen-skill-nec-93 | state | DIVERGED | 31/70 | frame 32 missile 3:1 class 193, field ty: 1.14d 4268 vs d2rs 4269 | coord-resume-3 |
+| gen-skill-nec-78 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-nec-93 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-100 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-93 | state | DIVERGED | 31/70 | frame 32 missile 3:1 class 193, field ty: 1.14d 4268 vs d2rs 4269 | coord-resume-3 |
 | gen-skill-pal-100 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-102 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-100 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-102 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-103 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-102 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-103 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-104 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-103 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-104 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-105 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-104 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-105 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-107 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-105 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-107 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-108 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-107 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-108 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-109 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-108 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-109 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-110 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-109 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-110 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-113 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-110 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-113 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-115 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-113 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-115 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-120 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-115 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-120 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-122 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-120 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-122 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-123 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-122 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-123 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-124 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-123 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-124 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-125 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-124 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-125 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-98 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-125 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-98 | packets | MATCH | 70/70 | - | - |
-| gen-skill-pal-99 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-98 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-99 | packets | MATCH | 70/70 | - | - |
-| gen-skill-sor-51 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-99 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-sor-51 | packets | MATCH | 70/70 | - | - |
-| gen-skill-sor-56 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-51 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-sor-56 | packets | MATCH | 70/70 | - | - |
-| gen-skill-sor-59 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-56 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-sor-59 | packets | MATCH | 70/70 | - | - |
-| gen-skill-sor-62 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-59 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-sor-62 | packets | MATCH | 70/70 | - | - |
-| gen-skill-sor-64 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-62 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-sor-64 | packets | MATCH | 70/70 | - | - |
-| gen-su-10 | state | DIVERGED | 29/150 | frame 30 monster 1:8 class 229, field s: 1.14d [3163442939, 446165621] vs d2rs [1151986076, 1319447910] | unrouted |
+| gen-skill-sor-64 | state | PARTIAL | 70/70 | - | - |
+| gen-su-10 | state | PARTIAL | 150/150 | - | - |
 | gen-su-12 | state | DIVERGED | 53/150 | frame 54 player 0:1 class 0, field m: 1.14d 19 vs d2rs 5 | unrouted |
 | gen-su-15 | state | DIVERGED | 42/150 | frame 43 game, field seed: 1.14d [3692043304, 618654564] vs d2rs [1483255534, 419929858] | unrouted |
 | gen-su-18 | state | PARTIAL | 150/150 | - | - |
@@ -1833,18 +1848,18 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-su-56 | state | DIVERGED | 102/150 | frame 103 monster 1:10 class 463/455, field cl: 1.14d 463 vs d2rs 455 | unrouted |
 | gen-su-6 | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] | unrouted |
 | gen-su-60 | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 526, field s: 1.14d [4285903474, 480484601] vs d2rs [3163442939, 446165621] | unrouted |
-| gen-su-63 | state | DIVERGED | 68/150 | frame 69 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [85, 666] | unrouted |
+| gen-su-63 | state | PARTIAL | 150/150 | - | - |
 | gen-su-65 | state | PARTIAL | 150/150 | - | - |
 | gen-su-8 | state | DIVERGED | 79/150 | frame 80 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [1944982531, 35] | unrouted |
-| gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 282 | unrouted |
-| gen-ui-automap | draws | DIVERGED | 0/1 | tick 57 draw row 198 (DrawLine) column x: 1.14d 237 vs d2rs 605 | unrouted |
-| gen-ui-char | draws | DIVERGED | 0/1 | tick 57 draw row 195 (DrawLine) column x: 1.14d 724 vs d2rs 605 | unrouted |
-| gen-ui-cube | draws | DIVERGED | 0/1 | tick 68 draw row 195 (DrawLine) column x: 1.14d 283 vs d2rs 297 | unrouted |
-| gen-ui-hud | draws | DIVERGED | 0/1 | tick 58 draw row 198 (DrawLine) column x: 1.14d 289 vs d2rs 602 | unrouted |
-| gen-ui-inv | draws | DIVERGED | 0/1 | tick 58 draw row 195 (DrawLine) column x: 1.14d 336 vs d2rs 61 | unrouted |
-| gen-ui-inv-item | draws | DIVERGED | 0/1 | tick 68 draw row 195 (DrawLine) column x: 1.14d 373 vs d2rs 297 | unrouted |
-| gen-ui-npc | draws | DIVERGED | 0/1 | tick 198 draw row 198 (DrawLine) column x: 1.14d 570 vs d2rs 709 | unrouted |
-| gen-ui-skill | draws | DIVERGED | 0/1 | tick 57 draw row 195 (DrawLine) column x: 1.14d 398 vs d2rs 264 | unrouted |
+| gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 744 | unrouted |
+| gen-ui-automap | draws | DIVERGED | 0/1 | tick 57 draw row 198 (DrawLine) column x: 1.14d 237 vs d2rs 527 | unrouted |
+| gen-ui-char | draws | DIVERGED | 0/1 | tick 57 draw row 195 (DrawLine) column x: 1.14d 724 vs d2rs 758 | unrouted |
+| gen-ui-cube | draws | DIVERGED | 0/1 | tick 68 draw row 195 (DrawLine) column x: 1.14d 283 vs d2rs 94 | unrouted |
+| gen-ui-hud | draws | DIVERGED | 0/1 | tick 58 draw row 198 (DrawLine) column x: 1.14d 289 vs d2rs 41 | unrouted |
+| gen-ui-inv | draws | DIVERGED | 0/1 | tick 58 draw row 195 (DrawLine) column x: 1.14d 336 vs d2rs 241 | unrouted |
+| gen-ui-inv-item | draws | DIVERGED | 0/1 | tick 68 draw row 195 (DrawLine) column x: 1.14d 373 vs d2rs 222 | unrouted |
+| gen-ui-npc | draws | DIVERGED | 0/1 | tick 198 draw row 198 (DrawLine) column x: 1.14d 570 vs d2rs 206 | unrouted |
+| gen-ui-skill | draws | DIVERGED | 0/1 | tick 57 draw row 196 (DrawLine) column x: 1.14d 217 vs d2rs 146 | unrouted |
 | gen-ui-stash | draws | DIVERGED | 0/1 | tick 128 draw row 100 (CelDrawShadow) column frame: 1.14d 13 vs d2rs 7 | unrouted |
 | gen-ui-wp | draws | DIVERGED | 0/1 | tick 168 draw row 1 (FloorTileDraw) column frame: 1.14d 38 vs d2rs 34 | unrouted |
 | gen-wp-18 | state | PARTIAL | 460/460 | - | - |
@@ -1857,6 +1872,550 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-wp-25 | state | PARTIAL | 460/460 | - | - |
 | gen-wp-26 | state | PARTIAL | 460/460 | - | - |
 | gen-wp-28 | state | DIVERGED | 400/460 | frame 401 monster 1:29 class 403/308, field cl: 1.14d 403 vs d2rs 308 | unrouted |
+| gen-mon-100 | rng | MATCH | 133/133 | - | - |
+| gen-mon-100 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-102 | rng | MATCH | 133/133 | - | - |
+| gen-mon-102 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-104 | rng | MATCH | 133/133 | - | - |
+| gen-mon-104 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-11 | rng | MATCH | 133/133 | - | - |
+| gen-mon-11 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-110 | rng | MATCH | 135/135 | - | - |
+| gen-mon-110 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-112 | rng | MATCH | 149/149 | - | - |
+| gen-mon-112 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-113 | rng | MATCH | 142/142 | - | - |
+| gen-mon-113 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-114 | rng | MATCH | 144/144 | - | - |
+| gen-mon-114 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-115 | rng | MATCH | 144/144 | - | - |
+| gen-mon-115 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-118 | rng | MATCH | 133/133 | - | - |
+| gen-mon-118 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-12 | rng | MATCH | 135/135 | - | - |
+| gen-mon-12 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-120 | rng | MATCH | 133/133 | - | - |
+| gen-mon-120 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-122 | rng | MATCH | 138/138 | - | - |
+| gen-mon-122 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-124 | rng | MATCH | 137/137 | - | - |
+| gen-mon-124 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-125 | rng | MATCH | 149/149 | - | - |
+| gen-mon-125 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-126 | rng | MATCH | 149/149 | - | - |
+| gen-mon-126 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-127 | rng | MATCH | 145/145 | - | - |
+| gen-mon-127 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-13 | rng | MATCH | 135/135 | - | - |
+| gen-mon-13 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-132 | rng | MATCH | 149/149 | - | - |
+| gen-mon-132 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-136 | rng | MATCH | 151/151 | - | - |
+| gen-mon-136 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-137 | rng | MATCH | 150/150 | - | - |
+| gen-mon-137 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-138 | rng | MATCH | 149/149 | - | - |
+| gen-mon-138 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-139 | rng | MATCH | 148/148 | - | - |
+| gen-mon-139 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-14 | rng | MATCH | 133/133 | - | - |
+| gen-mon-14 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-140 | rng | MATCH | 146/146 | - | - |
+| gen-mon-140 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-141 | rng | MATCH | 133/133 | - | - |
+| gen-mon-141 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-142 | rng | MATCH | 133/133 | - | - |
+| gen-mon-142 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-143 | rng | MATCH | 133/133 | - | - |
+| gen-mon-143 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-144 | rng | MATCH | 133/133 | - | - |
+| gen-mon-144 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-15 | rng | MATCH | 145/145 | - | - |
+| gen-mon-15 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-16 | rng | MATCH | 145/145 | - | - |
+| gen-mon-16 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-161 | rng | MATCH | 141/141 | - | - |
+| gen-mon-161 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-163 | rng | MATCH | 135/135 | - | - |
+| gen-mon-163 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-164 | rng | MATCH | 149/149 | - | - |
+| gen-mon-164 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-166 | rng | MATCH | 136/136 | - | - |
+| gen-mon-166 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-167 | rng | MATCH | 134/134 | - | - |
+| gen-mon-167 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-171 | rng | MATCH | 140/140 | - | - |
+| gen-mon-171 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-173 | rng | MATCH | 140/140 | - | - |
+| gen-mon-173 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-174 | rng | MATCH | 140/140 | - | - |
+| gen-mon-174 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-18 | rng | MATCH | 133/133 | - | - |
+| gen-mon-18 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-180 | rng | MATCH | 133/133 | - | - |
+| gen-mon-180 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-181 | rng | MATCH | 135/135 | - | - |
+| gen-mon-181 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-182 | rng | MATCH | 133/133 | - | - |
+| gen-mon-182 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-183 | rng | MATCH | 133/133 | - | - |
+| gen-mon-183 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-184 | rng | MATCH | 144/144 | - | - |
+| gen-mon-184 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-186 | rng | MATCH | 143/143 | - | - |
+| gen-mon-186 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-188 | rng | MATCH | 147/147 | - | - |
+| gen-mon-188 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-189 | rng | MATCH | 133/133 | - | - |
+| gen-mon-189 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-190 | rng | MATCH | 146/146 | - | - |
+| gen-mon-190 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-191 | rng | MATCH | 145/145 | - | - |
+| gen-mon-191 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-192 | rng | MATCH | 150/150 | - | - |
+| gen-mon-192 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-193 | rng | MATCH | 150/150 | - | - |
+| gen-mon-193 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-194 | rng | MATCH | 151/151 | - | - |
+| gen-mon-194 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-2 | rng | MATCH | 141/141 | - | - |
+| gen-mon-2 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-206 | rng | MATCH | 133/133 | - | - |
+| gen-mon-206 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-207 | rng | MATCH | 133/133 | - | - |
+| gen-mon-207 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-21 | rng | MATCH | 150/150 | - | - |
+| gen-mon-21 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-214 | rng | MATCH | 147/147 | - | - |
+| gen-mon-214 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-215 | rng | MATCH | 147/147 | - | - |
+| gen-mon-215 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-216 | rng | MATCH | 146/146 | - | - |
+| gen-mon-216 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-235 | rng | MATCH | 134/134 | - | - |
+| gen-mon-235 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-236 | rng | MATCH | 134/134 | - | - |
+| gen-mon-236 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-237 | rng | MATCH | 134/134 | - | - |
+| gen-mon-237 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-238 | rng | MATCH | 133/133 | - | - |
+| gen-mon-238 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-239 | rng | MATCH | 133/133 | - | - |
+| gen-mon-239 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-24 | rng | MATCH | 139/139 | - | - |
+| gen-mon-24 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-240 | rng | MATCH | 133/133 | - | - |
+| gen-mon-240 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-247 | rng | MATCH | 133/133 | - | - |
+| gen-mon-247 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-248 | rng | MATCH | 133/133 | - | - |
+| gen-mon-248 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-249 | rng | MATCH | 133/133 | - | - |
+| gen-mon-249 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-25 | rng | MATCH | 143/143 | - | - |
+| gen-mon-25 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-26 | rng | MATCH | 146/146 | - | - |
+| gen-mon-26 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-27 | rng | MATCH | 143/143 | - | - |
+| gen-mon-27 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-277 | rng | MATCH | 145/145 | - | - |
+| gen-mon-277 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-279 | rng | MATCH | 133/133 | - | - |
+| gen-mon-279 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-280 | rng | MATCH | 133/133 | - | - |
+| gen-mon-280 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-281 | rng | MATCH | 133/133 | - | - |
+| gen-mon-281 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-29 | rng | MATCH | 133/133 | - | - |
+| gen-mon-29 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-298 | rng | MATCH | 151/151 | - | - |
+| gen-mon-298 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-299 | rng | MATCH | 145/145 | - | - |
+| gen-mon-299 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-30 | rng | MATCH | 149/149 | - | - |
+| gen-mon-30 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-300 | rng | MATCH | 144/144 | - | - |
+| gen-mon-300 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-301 | rng | MATCH | 133/133 | - | - |
+| gen-mon-301 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-302 | rng | MATCH | 151/151 | - | - |
+| gen-mon-302 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-303 | rng | MATCH | 150/150 | - | - |
+| gen-mon-303 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-307 | rng | MATCH | 148/148 | - | - |
+| gen-mon-307 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-308 | rng | MATCH | 146/146 | - | - |
+| gen-mon-308 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-309 | rng | MATCH | 133/133 | - | - |
+| gen-mon-309 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-31 | rng | MATCH | 144/144 | - | - |
+| gen-mon-31 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-310 | rng | MATCH | 149/149 | - | - |
+| gen-mon-310 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-311 | rng | MATCH | 133/133 | - | - |
+| gen-mon-311 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-312 | rng | MATCH | 133/133 | - | - |
+| gen-mon-312 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-32 | rng | MATCH | 144/144 | - | - |
+| gen-mon-32 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-360 | rng | MATCH | 138/138 | - | - |
+| gen-mon-360 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-361 | rng | MATCH | 137/137 | - | - |
+| gen-mon-361 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-362 | rng | MATCH | 133/133 | - | - |
+| gen-mon-362 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-376 | rng | MATCH | 142/142 | - | - |
+| gen-mon-376 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-383 | rng | MATCH | 149/149 | - | - |
+| gen-mon-383 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-386 | rng | MATCH | 145/145 | - | - |
+| gen-mon-386 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-387 | rng | MATCH | 149/149 | - | - |
+| gen-mon-387 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-388 | rng | MATCH | 149/149 | - | - |
+| gen-mon-388 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-39 | rng | MATCH | 141/141 | - | - |
+| gen-mon-39 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-390 | rng | MATCH | 145/145 | - | - |
+| gen-mon-390 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-391 | rng | MATCH | 133/133 | - | - |
+| gen-mon-391 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-395 | rng | MATCH | 151/151 | - | - |
+| gen-mon-395 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-397 | rng | MATCH | 137/137 | - | - |
+| gen-mon-397 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-398 | rng | MATCH | 137/137 | - | - |
+| gen-mon-398 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-399 | rng | MATCH | 137/137 | - | - |
+| gen-mon-399 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-41 | rng | MATCH | 142/142 | - | - |
+| gen-mon-41 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-42 | rng | MATCH | 141/141 | - | - |
+| gen-mon-42 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-43 | rng | MATCH | 151/151 | - | - |
+| gen-mon-43 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-436 | rng | MATCH | 133/133 | - | - |
+| gen-mon-436 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-437 | rng | MATCH | 133/133 | - | - |
+| gen-mon-437 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-438 | rng | MATCH | 151/151 | - | - |
+| gen-mon-438 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-439 | rng | MATCH | 133/133 | - | - |
+| gen-mon-439 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-44 | rng | MATCH | 142/142 | - | - |
+| gen-mon-44 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-440 | rng | MATCH | 145/145 | - | - |
+| gen-mon-440 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-446 | rng | MATCH | 145/145 | - | - |
+| gen-mon-446 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-447 | rng | MATCH | 151/151 | - | - |
+| gen-mon-447 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-449 | rng | MATCH | 145/145 | - | - |
+| gen-mon-449 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-453 | rng | MATCH | 148/148 | - | - |
+| gen-mon-453 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-454 | rng | MATCH | 148/148 | - | - |
+| gen-mon-454 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-455 | rng | MATCH | 148/148 | - | - |
+| gen-mon-455 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-456 | rng | MATCH | 148/148 | - | - |
+| gen-mon-456 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-457 | rng | MATCH | 148/148 | - | - |
+| gen-mon-457 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-458 | rng | MATCH | 148/148 | - | - |
+| gen-mon-458 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-459 | rng | MATCH | 148/148 | - | - |
+| gen-mon-459 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-46 | rng | MATCH | 144/144 | - | - |
+| gen-mon-46 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-466 | rng | MATCH | 133/133 | - | - |
+| gen-mon-466 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-47 | rng | MATCH | 151/151 | - | - |
+| gen-mon-47 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-479 | rng | MATCH | 133/133 | - | - |
+| gen-mon-479 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-48 | rng | MATCH | 147/147 | - | - |
+| gen-mon-48 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-480 | rng | MATCH | 133/133 | - | - |
+| gen-mon-480 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-483 | rng | MATCH | 133/133 | - | - |
+| gen-mon-483 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-492 | rng | MATCH | 133/133 | - | - |
+| gen-mon-492 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-493 | rng | MATCH | 133/133 | - | - |
+| gen-mon-493 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-494 | rng | MATCH | 133/133 | - | - |
+| gen-mon-494 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-495 | rng | MATCH | 133/133 | - | - |
+| gen-mon-495 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-496 | rng | MATCH | 133/133 | - | - |
+| gen-mon-496 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-50 | rng | MATCH | 145/145 | - | - |
+| gen-mon-50 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-501 | rng | MATCH | 150/150 | - | - |
+| gen-mon-501 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-502 | rng | MATCH | 150/150 | - | - |
+| gen-mon-502 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-503 | rng | MATCH | 150/150 | - | - |
+| gen-mon-503 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-51 | rng | MATCH | 145/145 | - | - |
+| gen-mon-51 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-52 | rng | MATCH | 149/149 | - | - |
+| gen-mon-52 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-540 | rng | MATCH | 133/133 | - | - |
+| gen-mon-540 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-541 | rng | MATCH | 133/133 | - | - |
+| gen-mon-541 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-542 | rng | MATCH | 133/133 | - | - |
+| gen-mon-542 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-545 | rng | MATCH | 133/133 | - | - |
+| gen-mon-545 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-546 | rng | MATCH | 133/133 | - | - |
+| gen-mon-546 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-547 | rng | MATCH | 133/133 | - | - |
+| gen-mon-547 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-548 | rng | MATCH | 133/133 | - | - |
+| gen-mon-548 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-549 | rng | MATCH | 133/133 | - | - |
+| gen-mon-549 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-57 | rng | MATCH | 148/148 | - | - |
+| gen-mon-57 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-575 | rng | MATCH | 140/140 | - | - |
+| gen-mon-575 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-579 | rng | MATCH | 149/149 | - | - |
+| gen-mon-579 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-580 | rng | MATCH | 133/133 | - | - |
+| gen-mon-580 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-586 | rng | MATCH | 133/133 | - | - |
+| gen-mon-586 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-587 | rng | MATCH | 133/133 | - | - |
+| gen-mon-587 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-588 | rng | MATCH | 133/133 | - | - |
+| gen-mon-588 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-589 | rng | MATCH | 133/133 | - | - |
+| gen-mon-589 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-590 | rng | MATCH | 133/133 | - | - |
+| gen-mon-590 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-594 | rng | MATCH | 133/133 | - | - |
+| gen-mon-594 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-595 | rng | MATCH | 146/146 | - | - |
+| gen-mon-595 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-596 | rng | MATCH | 133/133 | - | - |
+| gen-mon-596 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-597 | rng | MATCH | 150/150 | - | - |
+| gen-mon-597 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-598 | rng | MATCH | 138/138 | - | - |
+| gen-mon-598 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-60 | rng | MATCH | 144/144 | - | - |
+| gen-mon-60 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-600 | rng | MATCH | 144/144 | - | - |
+| gen-mon-600 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-602 | rng | MATCH | 144/144 | - | - |
+| gen-mon-602 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-603 | rng | MATCH | 144/144 | - | - |
+| gen-mon-603 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-605 | rng | MATCH | 145/145 | - | - |
+| gen-mon-605 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-606 | rng | MATCH | 145/145 | - | - |
+| gen-mon-606 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-607 | rng | MATCH | 145/145 | - | - |
+| gen-mon-607 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-608 | rng | MATCH | 146/146 | - | - |
+| gen-mon-608 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-610 | rng | MATCH | 150/150 | - | - |
+| gen-mon-610 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-611 | rng | MATCH | 150/150 | - | - |
+| gen-mon-611 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-612 | rng | MATCH | 150/150 | - | - |
+| gen-mon-612 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-615 | rng | MATCH | 146/146 | - | - |
+| gen-mon-615 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-616 | rng | MATCH | 147/147 | - | - |
+| gen-mon-616 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-618 | rng | MATCH | 135/135 | - | - |
+| gen-mon-618 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-619 | rng | MATCH | 135/135 | - | - |
+| gen-mon-619 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-620 | rng | MATCH | 148/148 | - | - |
+| gen-mon-620 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-621 | rng | MATCH | 148/148 | - | - |
+| gen-mon-621 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-622 | rng | MATCH | 148/148 | - | - |
+| gen-mon-622 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-623 | rng | MATCH | 148/148 | - | - |
+| gen-mon-623 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-625 | rng | MATCH | 145/145 | - | - |
+| gen-mon-625 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-626 | rng | MATCH | 145/145 | - | - |
+| gen-mon-626 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-628 | rng | MATCH | 134/134 | - | - |
+| gen-mon-628 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-631 | rng | MATCH | 141/141 | - | - |
+| gen-mon-631 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-632 | rng | MATCH | 141/141 | - | - |
+| gen-mon-632 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-633 | rng | MATCH | 141/141 | - | - |
+| gen-mon-633 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-639 | rng | MATCH | 149/149 | - | - |
+| gen-mon-639 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-64 | rng | MATCH | 135/135 | - | - |
+| gen-mon-64 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-640 | rng | MATCH | 149/149 | - | - |
+| gen-mon-640 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-641 | rng | MATCH | 149/149 | - | - |
+| gen-mon-641 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-642 | rng | MATCH | 133/133 | - | - |
+| gen-mon-642 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-643 | rng | MATCH | 133/133 | - | - |
+| gen-mon-643 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-644 | rng | MATCH | 133/133 | - | - |
+| gen-mon-644 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-646 | rng | MATCH | 133/133 | - | - |
+| gen-mon-646 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-647 | rng | MATCH | 133/133 | - | - |
+| gen-mon-647 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-648 | rng | MATCH | 151/151 | - | - |
+| gen-mon-648 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-649 | rng | MATCH | 151/151 | - | - |
+| gen-mon-649 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-65 | rng | MATCH | 149/149 | - | - |
+| gen-mon-65 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-650 | rng | MATCH | 146/146 | - | - |
+| gen-mon-650 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-651 | rng | MATCH | 146/146 | - | - |
+| gen-mon-651 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-654 | rng | MATCH | 138/138 | - | - |
+| gen-mon-654 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-655 | rng | MATCH | 138/138 | - | - |
+| gen-mon-655 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-656 | rng | MATCH | 133/133 | - | - |
+| gen-mon-656 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-658 | rng | MATCH | 133/133 | - | - |
+| gen-mon-658 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-659 | rng | MATCH | 141/141 | - | - |
+| gen-mon-659 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-66 | rng | MATCH | 147/147 | - | - |
+| gen-mon-66 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-660 | rng | MATCH | 141/141 | - | - |
+| gen-mon-660 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-661 | rng | MATCH | 141/141 | - | - |
+| gen-mon-661 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-662 | rng | MATCH | 133/133 | - | - |
+| gen-mon-662 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-664 | rng | MATCH | 133/133 | - | - |
+| gen-mon-664 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-665 | rng | MATCH | 149/149 | - | - |
+| gen-mon-665 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-666 | rng | MATCH | 149/149 | - | - |
+| gen-mon-666 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-667 | rng | MATCH | 142/142 | - | - |
+| gen-mon-667 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-668 | rng | MATCH | 142/142 | - | - |
+| gen-mon-668 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-669 | rng | MATCH | 142/142 | - | - |
+| gen-mon-669 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-670 | rng | MATCH | 142/142 | - | - |
+| gen-mon-670 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-671 | rng | MATCH | 134/134 | - | - |
+| gen-mon-671 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-672 | rng | MATCH | 134/134 | - | - |
+| gen-mon-672 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-673 | rng | MATCH | 133/133 | - | - |
+| gen-mon-673 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-674 | rng | MATCH | 133/133 | - | - |
+| gen-mon-674 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-675 | rng | MATCH | 144/144 | - | - |
+| gen-mon-675 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-676 | rng | MATCH | 144/144 | - | - |
+| gen-mon-676 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-677 | rng | MATCH | 150/150 | - | - |
+| gen-mon-677 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-678 | rng | MATCH | 150/150 | - | - |
+| gen-mon-678 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-680 | rng | MATCH | 144/144 | - | - |
+| gen-mon-680 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-681 | rng | MATCH | 145/145 | - | - |
+| gen-mon-681 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-682 | rng | MATCH | 148/148 | - | - |
+| gen-mon-682 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-683 | rng | MATCH | 148/148 | - | - |
+| gen-mon-683 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-684 | rng | MATCH | 148/148 | - | - |
+| gen-mon-684 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-685 | rng | MATCH | 149/149 | - | - |
+| gen-mon-685 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-686 | rng | MATCH | 133/133 | - | - |
+| gen-mon-686 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-687 | rng | MATCH | 133/133 | - | - |
+| gen-mon-687 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-688 | rng | ERROR | 0/0 | - | unrouted |
+| gen-mon-688 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-689 | rng | MATCH | 133/133 | - | - |
+| gen-mon-689 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-690 | rng | MATCH | 146/146 | - | - |
+| gen-mon-690 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-691 | rng | MATCH | 146/146 | - | - |
+| gen-mon-691 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-694 | rng | MATCH | 133/133 | - | - |
+| gen-mon-694 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-698 | rng | MATCH | 135/135 | - | - |
+| gen-mon-698 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-699 | rng | MATCH | 149/149 | - | - |
+| gen-mon-699 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-700 | rng | MATCH | 149/149 | - | - |
+| gen-mon-700 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-701 | rng | MATCH | 133/133 | - | - |
+| gen-mon-701 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-702 | rng | MATCH | 133/133 | - | - |
+| gen-mon-702 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-703 | rng | MATCH | 133/133 | - | - |
+| gen-mon-703 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-712 | rng | MATCH | 133/133 | - | - |
+| gen-mon-712 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-713 | rng | MATCH | 133/133 | - | - |
+| gen-mon-713 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-714 | rng | MATCH | 133/133 | - | - |
+| gen-mon-714 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-715 | rng | MATCH | 133/133 | - | - |
+| gen-mon-715 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-717 | rng | MATCH | 149/149 | - | - |
+| gen-mon-717 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-718 | rng | MATCH | 133/133 | - | - |
+| gen-mon-718 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-721 | rng | MATCH | 151/151 | - | - |
+| gen-mon-721 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-723 | rng | MATCH | 146/146 | - | - |
+| gen-mon-723 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-724 | rng | MATCH | 133/133 | - | - |
+| gen-mon-724 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-77 | rng | MATCH | 133/133 | - | - |
+| gen-mon-77 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-8 | rng | MATCH | 137/137 | - | - |
+| gen-mon-8 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-80 | rng | MATCH | 147/147 | - | - |
+| gen-mon-80 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-81 | rng | MATCH | 147/147 | - | - |
+| gen-mon-81 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-82 | rng | MATCH | 147/147 | - | - |
+| gen-mon-82 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-85 | rng | MATCH | 135/135 | - | - |
+| gen-mon-85 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-86 | rng | MATCH | 134/134 | - | - |
+| gen-mon-86 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-88 | rng | MATCH | 147/147 | - | - |
+| gen-mon-88 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-9 | rng | MATCH | 137/137 | - | - |
+| gen-mon-9 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-90 | rng | MATCH | 133/133 | - | - |
+| gen-mon-90 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-93 | rng | MATCH | 135/135 | - | - |
+| gen-mon-93 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-95 | rng | MATCH | 138/138 | - | - |
+| gen-mon-95 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-97 | rng | MATCH | 133/133 | - | - |
+| gen-mon-97 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-99 | rng | MATCH | 133/133 | - | - |
+| gen-mon-99 | state | PARTIAL | 150/150 | - | - |
 | gen-netc2s-5f | packets | MATCH | 40/40 | - | - |
 | gen-netc2s-60 | packets | DIVERGED | 39/40 | frame 20 stream s2c #1 id: 1.14d 23 vs d2rs 47 (id 0x23) | unrouted |
 | gen-wp-9 | state | PARTIAL | 460/460 | - | - |
@@ -1950,6 +2509,55 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-missile-546 | packets | MATCH | 70/70 | - | - |
 | gen-missile-546 | rng | DIVERGED | 39/71 | frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None | unrouted |
 | gen-missile-546 | state | PARTIAL | 70/70 | - | - |
+| gen-boss-544 | state | PARTIAL | 150/150 | - | - |
+| gen-render-blood-moor | draws | DIVERGED | 0/1 | tick 58 draw row 137 (DrawLine) column x: 1.14d 651 vs d2rs 518 | unrouted |
+| gen-ui-belt | draws | DIVERGED | 0/1 | tick 58 draw row 199 (DrawLine) column x: 1.14d 717 vs d2rs 581 | unrouted |
+| gen-ui-beltuse | packets | MATCH | 50/50 | - | - |
+| gen-ui-conflict | draws | DIVERGED | 0/1 | tick 77 draw row 353 (CelDraw) column file: 1.14d data/global/ui/cursor/ohand.dc6 vs d2rs data/global/ui/cursor/orotate.dc6 | unrouted |
+| gen-ui-setitem | draws | DIVERGED | 0/1 | tick 67 draw row 195 (DrawLine) column x: 1.14d 102 vs d2rs 199 | unrouted |
+| gen-ui-walkclick | packets | MATCH | 100/100 | - | - |
+| gen-umod-1 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-10 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-11 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-12 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-13 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-14 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-15 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-16 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-17 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-18 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-19 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-2 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-20 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-21 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-22 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-23 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-24 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-25 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-26 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-27 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-28 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-29 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-3 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-30 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-31 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-32 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-33 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-34 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-35 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-36 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-37 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-38 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-39 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-4 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-40 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-41 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-42 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-5 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-6 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-7 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-8 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-9 | state | PARTIAL | 150/150 | - | - |
 | ama-charged-strike | packets | MATCH | 70/70 | - | - |
 | bar-berserk | packets | MATCH | 70/70 | - | - |
 | bar-berserk | state | PARTIAL | 70/70 | - | - |
@@ -1970,3 +2578,1031 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | sor-static-field | packets | MATCH | 70/70 | - | - |
 | sor-teleport | packets | MATCH | 70/70 | - | - |
 | sys-statpoints | packets | MATCH | 70/70 | - | - |
+| gen-ai-baalcrabclone | state | PARTIAL | 150/150 | - | - |
+| gen-ai-baalminion | state | PARTIAL | 150/150 | - | - |
+| gen-ai-batdemon | state | PARTIAL | 150/150 | - | - |
+| gen-ai-bighead | state | PARTIAL | 150/150 | - | - |
+| gen-ai-bloodlord | state | PARTIAL | 150/150 | - | - |
+| gen-ai-catapultspotter | state | PARTIAL | 150/150 | - | - |
+| gen-ai-clawviperex | state | PARTIAL | 150/150 | - | - |
+| gen-ai-doomknight | state | PARTIAL | 150/150 | - | - |
+| gen-ai-druidbear | state | PARTIAL | 150/150 | - | - |
+| gen-ai-fallenshaman | state | PARTIAL | 150/150 | - | - |
+| gen-ai-fetish | state | PARTIAL | 150/150 | - | - |
+| gen-ai-fingermage | state | PARTIAL | 150/150 | - | - |
+| gen-ai-imp | state | PARTIAL | 150/150 | - | - |
+| gen-ai-izual | state | PARTIAL | 150/150 | - | - |
+| gen-ai-mosquito | state | PARTIAL | 150/150 | - | - |
+| gen-ai-npcbarb | state | PARTIAL | 150/150 | - | - |
+| gen-ai-npcstationary | state | PARTIAL | 150/150 | - | - |
+| gen-ai-raven | state | PARTIAL | 150/150 | - | - |
+| gen-ai-skeletonbow | state | PARTIAL | 150/150 | - | - |
+| gen-ai-skeletonmage | state | PARTIAL | 150/150 | - | - |
+| gen-ai-smith | state | PARTIAL | 150/150 | - | - |
+| gen-ai-tentaclehead | state | PARTIAL | 150/150 | - | - |
+| gen-ai-uberbaal | state | PARTIAL | 150/150 | - | - |
+| gen-ai-vendor | state | PARTIAL | 150/150 | - | - |
+| gen-ai-willowisp | state | PARTIAL | 150/150 | - | - |
+| gen-ai-zakarumpriest | state | PARTIAL | 150/150 | - | - |
+| gen-boss-156 | state | PARTIAL | 150/150 | - | - |
+| gen-boss-250 | state | PARTIAL | 150/150 | - | - |
+| gen-boss-267 | state | DIVERGED | 92/150 | frame 93 player 0:1 class 0, field s: 1.14d [37638007, 1705587472] vs d2rs [2032329932, 1625895153] | unrouted |
+| gen-boss-549 | state | PARTIAL | 150/150 | - | - |
+| gen-lvl-100 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-100 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-102 | rng | MATCH | 152/152 | - | - |
+| gen-lvl-102 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-109 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-109 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-114 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-114 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-116 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-116 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-121 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-121 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-123 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-123 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-135 | rng | MATCH | 154/154 | - | - |
+| gen-lvl-135 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-14 | rng | MATCH | 161/161 | - | - |
+| gen-lvl-14 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-16 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-16 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-23 | rng | MATCH | 142/142 | - | - |
+| gen-lvl-23 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-28 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-28 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-35 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-35 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-37 | rng | MATCH | 161/161 | - | - |
+| gen-lvl-37 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-40 | rng | MATCH | 49/49 | - | - |
+| gen-lvl-40 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-42 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-42 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-49 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-49 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-5 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-5 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-54 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-54 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-56 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-56 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-63 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-63 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-68 | rng | MATCH | 22/22 | - | - |
+| gen-lvl-68 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-7 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-7 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-75 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-75 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-77 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-77 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-80 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-80 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-82 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-82 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-89 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-89 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-96 | rng | MATCH | 133/133 | - | - |
+| gen-lvl-96 | state | PARTIAL | 160/160 | - | - |
+| gen-missile-104 | packets | MATCH | 70/70 | - | - |
+| gen-missile-104 | rng | MATCH | 12/12 | - | - |
+| gen-missile-104 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-106 | packets | MATCH | 70/70 | - | - |
+| gen-missile-106 | rng | MATCH | 37/37 | - | - |
+| gen-missile-106 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-119 | packets | MATCH | 70/70 | - | - |
+| gen-missile-119 | rng | MATCH | 12/12 | - | - |
+| gen-missile-119 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-125 | packets | MATCH | 70/70 | - | - |
+| gen-missile-125 | rng | MATCH | 12/12 | - | - |
+| gen-missile-125 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-127 | packets | MATCH | 70/70 | - | - |
+| gen-missile-127 | rng | MATCH | 12/12 | - | - |
+| gen-missile-127 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-131 | packets | MATCH | 70/70 | - | - |
+| gen-missile-131 | rng | MATCH | 12/12 | - | - |
+| gen-missile-131 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-133 | packets | MATCH | 70/70 | - | - |
+| gen-missile-133 | rng | MATCH | 12/12 | - | - |
+| gen-missile-133 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-14 | packets | MATCH | 70/70 | - | - |
+| gen-missile-14 | rng | MATCH | 12/12 | - | - |
+| gen-missile-14 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-144 | packets | MATCH | 70/70 | - | - |
+| gen-missile-144 | rng | MATCH | 12/12 | - | - |
+| gen-missile-144 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-152 | packets | MATCH | 70/70 | - | - |
+| gen-missile-152 | rng | MATCH | 12/12 | - | - |
+| gen-missile-152 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-16 | packets | MATCH | 70/70 | - | - |
+| gen-missile-16 | rng | MATCH | 12/12 | - | - |
+| gen-missile-16 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-171 | packets | MATCH | 70/70 | - | - |
+| gen-missile-171 | rng | MATCH | 12/12 | - | - |
+| gen-missile-171 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-173 | packets | MATCH | 70/70 | - | - |
+| gen-missile-173 | rng | MATCH | 12/12 | - | - |
+| gen-missile-173 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-184 | packets | MATCH | 70/70 | - | - |
+| gen-missile-184 | rng | MATCH | 12/12 | - | - |
+| gen-missile-184 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-186 | packets | MATCH | 70/70 | - | - |
+| gen-missile-186 | rng | MATCH | 12/12 | - | - |
+| gen-missile-186 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-190 | packets | MATCH | 70/70 | - | - |
+| gen-missile-190 | rng | MATCH | 12/12 | - | - |
+| gen-missile-190 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-192 | packets | MATCH | 70/70 | - | - |
+| gen-missile-192 | rng | MATCH | 12/12 | - | - |
+| gen-missile-192 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-199 | packets | MATCH | 70/70 | - | - |
+| gen-missile-199 | rng | MATCH | 12/12 | - | - |
+| gen-missile-199 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-200 | packets | MATCH | 70/70 | - | - |
+| gen-missile-200 | rng | MATCH | 12/12 | - | - |
+| gen-missile-200 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-214 | packets | MATCH | 70/70 | - | - |
+| gen-missile-214 | rng | MATCH | 12/12 | - | - |
+| gen-missile-214 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-235 | packets | MATCH | 70/70 | - | - |
+| gen-missile-235 | rng | MATCH | 12/12 | - | - |
+| gen-missile-235 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-237 | packets | MATCH | 70/70 | - | - |
+| gen-missile-237 | rng | MATCH | 12/12 | - | - |
+| gen-missile-237 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-249 | packets | MATCH | 70/70 | - | - |
+| gen-missile-249 | rng | MATCH | 17/17 | - | - |
+| gen-missile-249 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-268 | packets | MATCH | 70/70 | - | - |
+| gen-missile-268 | rng | MATCH | 12/12 | - | - |
+| gen-missile-268 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-277 | packets | MATCH | 70/70 | - | - |
+| gen-missile-277 | rng | MATCH | 12/12 | - | - |
+| gen-missile-277 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-28 | packets | MATCH | 70/70 | - | - |
+| gen-missile-28 | rng | MATCH | 12/12 | - | - |
+| gen-missile-28 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-280 | packets | MATCH | 70/70 | - | - |
+| gen-missile-280 | rng | MATCH | 12/12 | - | - |
+| gen-missile-280 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-282 | packets | MATCH | 70/70 | - | - |
+| gen-missile-282 | rng | MATCH | 12/12 | - | - |
+| gen-missile-282 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-385 | packets | MATCH | 70/70 | - | - |
+| gen-missile-385 | rng | MATCH | 62/62 | - | - |
+| gen-missile-385 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-398 | packets | MATCH | 70/70 | - | - |
+| gen-missile-398 | rng | MATCH | 12/12 | - | - |
+| gen-missile-398 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-40 | packets | MATCH | 70/70 | - | - |
+| gen-missile-40 | rng | MATCH | 12/12 | - | - |
+| gen-missile-40 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-42 | packets | MATCH | 70/70 | - | - |
+| gen-missile-42 | rng | MATCH | 12/12 | - | - |
+| gen-missile-42 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-422 | packets | MATCH | 70/70 | - | - |
+| gen-missile-422 | rng | MATCH | 37/37 | - | - |
+| gen-missile-422 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-460 | packets | MATCH | 70/70 | - | - |
+| gen-missile-460 | rng | MATCH | 12/12 | - | - |
+| gen-missile-460 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-469 | packets | MATCH | 70/70 | - | - |
+| gen-missile-469 | rng | MATCH | 12/12 | - | - |
+| gen-missile-469 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-474 | packets | MATCH | 70/70 | - | - |
+| gen-missile-474 | rng | MATCH | 31/31 | - | - |
+| gen-missile-474 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-495 | packets | MATCH | 70/70 | - | - |
+| gen-missile-495 | rng | MATCH | 12/12 | - | - |
+| gen-missile-495 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-5 | packets | MATCH | 70/70 | - | - |
+| gen-missile-5 | rng | MATCH | 12/12 | - | - |
+| gen-missile-5 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-506 | packets | MATCH | 70/70 | - | - |
+| gen-missile-506 | rng | MATCH | 12/12 | - | - |
+| gen-missile-506 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-519 | packets | MATCH | 70/70 | - | - |
+| gen-missile-519 | rng | MATCH | 12/12 | - | - |
+| gen-missile-519 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-525 | packets | MATCH | 70/70 | - | - |
+| gen-missile-525 | rng | MATCH | 12/12 | - | - |
+| gen-missile-525 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-533 | packets | MATCH | 70/70 | - | - |
+| gen-missile-533 | rng | MATCH | 12/12 | - | - |
+| gen-missile-533 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-550 | packets | MATCH | 70/70 | - | - |
+| gen-missile-550 | rng | MATCH | 12/12 | - | - |
+| gen-missile-550 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-559 | packets | MATCH | 70/70 | - | - |
+| gen-missile-559 | rng | MATCH | 12/12 | - | - |
+| gen-missile-559 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-56 | packets | MATCH | 70/70 | - | - |
+| gen-missile-56 | rng | MATCH | 12/12 | - | - |
+| gen-missile-56 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-578 | packets | MATCH | 70/70 | - | - |
+| gen-missile-578 | rng | MATCH | 12/12 | - | - |
+| gen-missile-578 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-592 | packets | MATCH | 70/70 | - | - |
+| gen-missile-592 | rng | MATCH | 12/12 | - | - |
+| gen-missile-592 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-61 | packets | MATCH | 70/70 | - | - |
+| gen-missile-61 | rng | MATCH | 12/12 | - | - |
+| gen-missile-61 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-614 | packets | MATCH | 70/70 | - | - |
+| gen-missile-614 | rng | MATCH | 12/12 | - | - |
+| gen-missile-614 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-63 | packets | MATCH | 70/70 | - | - |
+| gen-missile-63 | rng | MATCH | 12/12 | - | - |
+| gen-missile-63 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-661 | packets | MATCH | 70/70 | - | - |
+| gen-missile-661 | rng | MATCH | 12/12 | - | - |
+| gen-missile-661 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-663 | packets | MATCH | 70/70 | - | - |
+| gen-missile-663 | rng | MATCH | 12/12 | - | - |
+| gen-missile-663 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-668 | packets | MATCH | 70/70 | - | - |
+| gen-missile-668 | rng | MATCH | 12/12 | - | - |
+| gen-missile-668 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-68 | packets | MATCH | 70/70 | - | - |
+| gen-missile-68 | rng | MATCH | 59/59 | - | - |
+| gen-missile-68 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-682 | packets | MATCH | 70/70 | - | - |
+| gen-missile-682 | rng | MATCH | 12/12 | - | - |
+| gen-missile-682 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-77 | packets | MATCH | 70/70 | - | - |
+| gen-missile-77 | rng | MATCH | 12/12 | - | - |
+| gen-missile-77 | state | PARTIAL | 70/70 | - | - |
+| gen-missile-96 | packets | MATCH | 70/70 | - | - |
+| gen-missile-96 | rng | MATCH | 52/52 | - | - |
+| gen-missile-96 | state | PARTIAL | 70/70 | - | - |
+| gen-monskill-158 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-166 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-179 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-215 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-283 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-295 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-310 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-319 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-327 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-333 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-344 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-352 | state | PARTIAL | 500/500 | - | - |
+| gen-nets2c-trade | packets | MATCH | 110/110 | - | - |
+| gen-obj-100 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-100 | packets | PARTIAL | 18/18 | - | - |
+| gen-obj-100 | rng | MATCH | 20/20 | - | - |
+| gen-obj-100 | state | PARTIAL | 19/19 | - | - |
+| gen-obj-102 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-102 | packets | MATCH | 80/80 | - | - |
+| gen-obj-102 | rng | MATCH | 33/33 | - | - |
+| gen-obj-102 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-114 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-114 | packets | MATCH | 80/80 | - | - |
+| gen-obj-114 | rng | MATCH | 33/33 | - | - |
+| gen-obj-114 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-121 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-121 | packets | MATCH | 80/80 | - | - |
+| gen-obj-121 | rng | MATCH | 33/33 | - | - |
+| gen-obj-121 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-123 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-123 | packets | MATCH | 80/80 | - | - |
+| gen-obj-123 | rng | MATCH | 33/33 | - | - |
+| gen-obj-123 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-128 | items | MATCH | 1/1 | - | - |
+| gen-obj-128 | packets | MATCH | 80/80 | - | - |
+| gen-obj-128 | rng | MATCH | 33/33 | - | - |
+| gen-obj-128 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-135 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-135 | packets | MATCH | 80/80 | - | - |
+| gen-obj-135 | rng | MATCH | 33/33 | - | - |
+| gen-obj-135 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-137 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-137 | packets | MATCH | 80/80 | - | - |
+| gen-obj-137 | rng | MATCH | 33/33 | - | - |
+| gen-obj-137 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-14 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-14 | packets | MATCH | 80/80 | - | - |
+| gen-obj-14 | rng | MATCH | 33/33 | - | - |
+| gen-obj-14 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-140 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-140 | packets | MATCH | 80/80 | - | - |
+| gen-obj-140 | rng | MATCH | 33/33 | - | - |
+| gen-obj-140 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-142 | items | MATCH | 1/1 | - | - |
+| gen-obj-142 | packets | MATCH | 80/80 | - | - |
+| gen-obj-142 | rng | MATCH | 33/33 | - | - |
+| gen-obj-142 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-149 | items | MATCH | 11/11 | - | - |
+| gen-obj-149 | packets | MATCH | 80/80 | - | - |
+| gen-obj-149 | rng | MATCH | 33/33 | - | - |
+| gen-obj-149 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-154 | items | MATCH | 1/1 | - | - |
+| gen-obj-154 | packets | MATCH | 80/80 | - | - |
+| gen-obj-154 | rng | MATCH | 33/33 | - | - |
+| gen-obj-154 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-156 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-156 | packets | MATCH | 80/80 | - | - |
+| gen-obj-156 | rng | MATCH | 33/33 | - | - |
+| gen-obj-156 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-16 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-16 | packets | MATCH | 80/80 | - | - |
+| gen-obj-16 | rng | MATCH | 33/33 | - | - |
+| gen-obj-16 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-161 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-161 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-161 | rng | MATCH | 21/21 | - | - |
+| gen-obj-161 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-163 | items | MATCH | 1/1 | - | - |
+| gen-obj-163 | packets | MATCH | 80/80 | - | - |
+| gen-obj-163 | rng | MATCH | 33/33 | - | - |
+| gen-obj-163 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-168 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-168 | packets | MATCH | 80/80 | - | - |
+| gen-obj-168 | rng | MATCH | 33/33 | - | - |
+| gen-obj-168 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-175 | items | MATCH | 1/1 | - | - |
+| gen-obj-175 | packets | MATCH | 80/80 | - | - |
+| gen-obj-175 | rng | MATCH | 33/33 | - | - |
+| gen-obj-175 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-177 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-177 | packets | MATCH | 80/80 | - | - |
+| gen-obj-177 | rng | MATCH | 33/33 | - | - |
+| gen-obj-177 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-180 | items | MATCH | 1/1 | - | - |
+| gen-obj-180 | packets | MATCH | 80/80 | - | - |
+| gen-obj-180 | rng | MATCH | 33/33 | - | - |
+| gen-obj-180 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-182 | items | MATCH | 1/1 | - | - |
+| gen-obj-182 | packets | MATCH | 80/80 | - | - |
+| gen-obj-182 | rng | MATCH | 33/33 | - | - |
+| gen-obj-182 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-189 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-189 | packets | MATCH | 80/80 | - | - |
+| gen-obj-189 | rng | MATCH | 33/33 | - | - |
+| gen-obj-189 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-194 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-194 | packets | MATCH | 80/80 | - | - |
+| gen-obj-194 | rng | MATCH | 33/33 | - | - |
+| gen-obj-194 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-196 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-196 | packets | MATCH | 80/80 | - | - |
+| gen-obj-196 | rng | MATCH | 33/33 | - | - |
+| gen-obj-196 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-204 | items | MATCH | 1/1 | - | - |
+| gen-obj-204 | packets | MATCH | 80/80 | - | - |
+| gen-obj-204 | rng | MATCH | 33/33 | - | - |
+| gen-obj-204 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-206 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-206 | packets | MATCH | 80/80 | - | - |
+| gen-obj-206 | rng | MATCH | 33/33 | - | - |
+| gen-obj-206 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-21 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-21 | packets | MATCH | 80/80 | - | - |
+| gen-obj-21 | rng | MATCH | 33/33 | - | - |
+| gen-obj-21 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-210 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-210 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-210 | rng | MATCH | 21/21 | - | - |
+| gen-obj-210 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-212 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-212 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-212 | rng | MATCH | 21/21 | - | - |
+| gen-obj-212 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-219 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-219 | packets | MATCH | 80/80 | - | - |
+| gen-obj-219 | rng | MATCH | 33/33 | - | - |
+| gen-obj-219 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-225 | items | MATCH | 1/1 | - | - |
+| gen-obj-225 | packets | MATCH | 80/80 | - | - |
+| gen-obj-225 | rng | MATCH | 33/33 | - | - |
+| gen-obj-225 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-227 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-227 | packets | MATCH | 80/80 | - | - |
+| gen-obj-227 | rng | MATCH | 33/33 | - | - |
+| gen-obj-227 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-23 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-23 | packets | MATCH | 80/80 | - | - |
+| gen-obj-23 | rng | MATCH | 33/33 | - | - |
+| gen-obj-23 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-231 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-231 | packets | MATCH | 80/80 | - | - |
+| gen-obj-231 | rng | MATCH | 33/33 | - | - |
+| gen-obj-231 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-233 | items | MATCH | 1/1 | - | - |
+| gen-obj-233 | packets | MATCH | 80/80 | - | - |
+| gen-obj-233 | rng | MATCH | 33/33 | - | - |
+| gen-obj-233 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-238 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-238 | packets | MATCH | 80/80 | - | - |
+| gen-obj-238 | rng | MATCH | 33/33 | - | - |
+| gen-obj-238 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-244 | items | MATCH | 1/1 | - | - |
+| gen-obj-244 | packets | MATCH | 80/80 | - | - |
+| gen-obj-244 | rng | MATCH | 33/33 | - | - |
+| gen-obj-244 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-246 | items | MATCH | 1/1 | - | - |
+| gen-obj-246 | packets | MATCH | 80/80 | - | - |
+| gen-obj-246 | rng | MATCH | 33/33 | - | - |
+| gen-obj-246 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-250 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-250 | packets | MATCH | 80/80 | - | - |
+| gen-obj-250 | rng | MATCH | 33/33 | - | - |
+| gen-obj-250 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-252 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-252 | packets | MATCH | 80/80 | - | - |
+| gen-obj-252 | rng | MATCH | 33/33 | - | - |
+| gen-obj-252 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-259 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-259 | packets | MATCH | 80/80 | - | - |
+| gen-obj-259 | rng | MATCH | 33/33 | - | - |
+| gen-obj-259 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-265 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-265 | packets | MATCH | 80/80 | - | - |
+| gen-obj-265 | rng | MATCH | 33/33 | - | - |
+| gen-obj-265 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-267 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-267 | packets | MATCH | 80/80 | - | - |
+| gen-obj-267 | rng | MATCH | 33/33 | - | - |
+| gen-obj-267 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-271 | items | MATCH | 1/1 | - | - |
+| gen-obj-271 | packets | MATCH | 80/80 | - | - |
+| gen-obj-271 | rng | MATCH | 33/33 | - | - |
+| gen-obj-271 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-273 | items | PARTIAL | 1/1 | - | - |
+| gen-obj-273 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-273 | rng | MATCH | 21/21 | - | - |
+| gen-obj-273 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-278 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-278 | packets | MATCH | 80/80 | - | - |
+| gen-obj-278 | rng | MATCH | 33/33 | - | - |
+| gen-obj-278 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-28 | items | MATCH | 1/1 | - | - |
+| gen-obj-28 | packets | MATCH | 80/80 | - | - |
+| gen-obj-28 | rng | MATCH | 33/33 | - | - |
+| gen-obj-28 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-284 | items | MATCH | 1/1 | - | - |
+| gen-obj-284 | packets | MATCH | 80/80 | - | - |
+| gen-obj-284 | rng | MATCH | 33/33 | - | - |
+| gen-obj-284 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-286 | items | PARTIAL | 1/1 | - | - |
+| gen-obj-286 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-286 | rng | MATCH | 21/21 | - | - |
+| gen-obj-286 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-290 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-290 | packets | MATCH | 80/80 | - | - |
+| gen-obj-290 | rng | MATCH | 33/33 | - | - |
+| gen-obj-290 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-292 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-292 | packets | MATCH | 80/80 | - | - |
+| gen-obj-292 | rng | MATCH | 33/33 | - | - |
+| gen-obj-292 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-299 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-299 | packets | MATCH | 80/80 | - | - |
+| gen-obj-299 | rng | MATCH | 33/33 | - | - |
+| gen-obj-299 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-301 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-301 | packets | MATCH | 80/80 | - | - |
+| gen-obj-301 | rng | MATCH | 33/33 | - | - |
+| gen-obj-301 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-303 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-303 | packets | MATCH | 80/80 | - | - |
+| gen-obj-303 | rng | MATCH | 33/33 | - | - |
+| gen-obj-303 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-308 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-308 | packets | MATCH | 80/80 | - | - |
+| gen-obj-308 | rng | MATCH | 33/33 | - | - |
+| gen-obj-308 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-315 | items | MATCH | 1/1 | - | - |
+| gen-obj-315 | packets | MATCH | 80/80 | - | - |
+| gen-obj-315 | rng | MATCH | 33/33 | - | - |
+| gen-obj-315 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-317 | items | MATCH | 1/1 | - | - |
+| gen-obj-317 | packets | MATCH | 80/80 | - | - |
+| gen-obj-317 | rng | MATCH | 33/33 | - | - |
+| gen-obj-317 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-320 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-320 | packets | MATCH | 80/80 | - | - |
+| gen-obj-320 | rng | MATCH | 33/33 | - | - |
+| gen-obj-320 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-322 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-322 | packets | MATCH | 80/80 | - | - |
+| gen-obj-322 | rng | MATCH | 33/33 | - | - |
+| gen-obj-322 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-329 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-329 | packets | MATCH | 80/80 | - | - |
+| gen-obj-329 | rng | MATCH | 33/33 | - | - |
+| gen-obj-329 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-334 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-334 | packets | MATCH | 80/80 | - | - |
+| gen-obj-334 | rng | MATCH | 33/33 | - | - |
+| gen-obj-334 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-336 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-336 | packets | MATCH | 80/80 | - | - |
+| gen-obj-336 | rng | MATCH | 33/33 | - | - |
+| gen-obj-336 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-341 | items | MATCH | 1/1 | - | - |
+| gen-obj-341 | packets | MATCH | 80/80 | - | - |
+| gen-obj-341 | rng | MATCH | 33/33 | - | - |
+| gen-obj-341 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-343 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-343 | packets | MATCH | 80/80 | - | - |
+| gen-obj-343 | rng | MATCH | 33/33 | - | - |
+| gen-obj-343 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-348 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-348 | packets | MATCH | 80/80 | - | - |
+| gen-obj-348 | rng | MATCH | 33/33 | - | - |
+| gen-obj-348 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-35 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-35 | packets | MATCH | 80/80 | - | - |
+| gen-obj-35 | rng | MATCH | 33/33 | - | - |
+| gen-obj-35 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-355 | items | MATCH | 11/11 | - | - |
+| gen-obj-355 | packets | MATCH | 80/80 | - | - |
+| gen-obj-355 | rng | MATCH | 33/33 | - | - |
+| gen-obj-355 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-357 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-357 | packets | DIVERGED | 79/80 | frame 19 stream s2c #1 extra (d2rs only) (id 0x5d) | unrouted |
+| gen-obj-357 | rng | MATCH | 33/33 | - | - |
+| gen-obj-357 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-360 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-360 | packets | MATCH | 80/80 | - | - |
+| gen-obj-360 | rng | MATCH | 33/33 | - | - |
+| gen-obj-360 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-362 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-362 | packets | MATCH | 80/80 | - | - |
+| gen-obj-362 | rng | MATCH | 33/33 | - | - |
+| gen-obj-362 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-369 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-369 | packets | MATCH | 80/80 | - | - |
+| gen-obj-369 | rng | MATCH | 33/33 | - | - |
+| gen-obj-369 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-37 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-37 | packets | MATCH | 80/80 | - | - |
+| gen-obj-37 | rng | MATCH | 33/33 | - | - |
+| gen-obj-37 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-374 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-374 | packets | PARTIAL | 20/20 | - | - |
+| gen-obj-374 | rng | MATCH | 21/21 | - | - |
+| gen-obj-374 | state | PARTIAL | 20/20 | - | - |
+| gen-obj-376 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-376 | packets | MATCH | 80/80 | - | - |
+| gen-obj-376 | rng | MATCH | 33/33 | - | - |
+| gen-obj-376 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-381 | items | MATCH | 1/1 | - | - |
+| gen-obj-381 | packets | MATCH | 80/80 | - | - |
+| gen-obj-381 | rng | MATCH | 33/33 | - | - |
+| gen-obj-381 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-383 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-383 | packets | MATCH | 80/80 | - | - |
+| gen-obj-383 | rng | MATCH | 33/33 | - | - |
+| gen-obj-383 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-388 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-388 | packets | MATCH | 80/80 | - | - |
+| gen-obj-388 | rng | MATCH | 33/33 | - | - |
+| gen-obj-388 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-395 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-395 | packets | MATCH | 80/80 | - | - |
+| gen-obj-395 | rng | MATCH | 33/33 | - | - |
+| gen-obj-395 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-397 | items | MATCH | 20/20 | - | - |
+| gen-obj-397 | packets | MATCH | 80/80 | - | - |
+| gen-obj-397 | rng | MATCH | 33/33 | - | - |
+| gen-obj-397 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-4 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-4 | packets | MATCH | 80/80 | - | - |
+| gen-obj-4 | rng | MATCH | 33/33 | - | - |
+| gen-obj-4 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-40 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-40 | packets | MATCH | 80/80 | - | - |
+| gen-obj-40 | rng | MATCH | 33/33 | - | - |
+| gen-obj-40 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-405 | items | MATCH | 11/11 | - | - |
+| gen-obj-405 | packets | MATCH | 80/80 | - | - |
+| gen-obj-405 | rng | MATCH | 33/33 | - | - |
+| gen-obj-405 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-407 | items | MATCH | 11/11 | - | - |
+| gen-obj-407 | packets | MATCH | 80/80 | - | - |
+| gen-obj-407 | rng | MATCH | 33/33 | - | - |
+| gen-obj-407 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-413 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-413 | packets | MATCH | 80/80 | - | - |
+| gen-obj-413 | rng | MATCH | 33/33 | - | - |
+| gen-obj-413 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-418 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-418 | packets | MATCH | 80/80 | - | - |
+| gen-obj-418 | rng | MATCH | 33/33 | - | - |
+| gen-obj-418 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-42 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-42 | packets | MATCH | 80/80 | - | - |
+| gen-obj-42 | rng | MATCH | 33/33 | - | - |
+| gen-obj-42 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-424 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-424 | packets | MATCH | 80/80 | - | - |
+| gen-obj-424 | rng | MATCH | 33/33 | - | - |
+| gen-obj-424 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-426 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-426 | packets | MATCH | 80/80 | - | - |
+| gen-obj-426 | rng | MATCH | 33/33 | - | - |
+| gen-obj-426 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-430 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-430 | packets | MATCH | 80/80 | - | - |
+| gen-obj-430 | rng | MATCH | 33/33 | - | - |
+| gen-obj-430 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-432 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-432 | packets | MATCH | 80/80 | - | - |
+| gen-obj-432 | rng | MATCH | 33/33 | - | - |
+| gen-obj-432 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-439 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-439 | packets | MATCH | 80/80 | - | - |
+| gen-obj-439 | rng | MATCH | 33/33 | - | - |
+| gen-obj-439 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-445 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-445 | packets | MATCH | 80/80 | - | - |
+| gen-obj-445 | rng | MATCH | 33/33 | - | - |
+| gen-obj-445 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-447 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-447 | packets | MATCH | 80/80 | - | - |
+| gen-obj-447 | rng | MATCH | 33/33 | - | - |
+| gen-obj-447 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-451 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-451 | packets | MATCH | 80/80 | - | - |
+| gen-obj-451 | rng | MATCH | 33/33 | - | - |
+| gen-obj-451 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-453 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-453 | packets | MATCH | 80/80 | - | - |
+| gen-obj-453 | rng | MATCH | 33/33 | - | - |
+| gen-obj-453 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-458 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-458 | packets | MATCH | 80/80 | - | - |
+| gen-obj-458 | rng | MATCH | 33/33 | - | - |
+| gen-obj-458 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-464 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-464 | packets | MATCH | 80/80 | - | - |
+| gen-obj-464 | rng | MATCH | 33/33 | - | - |
+| gen-obj-464 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-466 | items | MATCH | 2/2 | - | - |
+| gen-obj-466 | packets | MATCH | 80/80 | - | - |
+| gen-obj-466 | rng | MATCH | 33/33 | - | - |
+| gen-obj-466 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-470 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-470 | packets | MATCH | 80/80 | - | - |
+| gen-obj-470 | rng | MATCH | 33/33 | - | - |
+| gen-obj-470 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-472 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-472 | packets | MATCH | 80/80 | - | - |
+| gen-obj-472 | rng | MATCH | 33/33 | - | - |
+| gen-obj-472 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-479 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-479 | packets | MATCH | 80/80 | - | - |
+| gen-obj-479 | rng | MATCH | 33/33 | - | - |
+| gen-obj-479 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-485 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-485 | packets | MATCH | 80/80 | - | - |
+| gen-obj-485 | rng | MATCH | 33/33 | - | - |
+| gen-obj-485 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-487 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-487 | packets | MATCH | 80/80 | - | - |
+| gen-obj-487 | rng | MATCH | 33/33 | - | - |
+| gen-obj-487 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-49 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-49 | packets | MATCH | 80/80 | - | - |
+| gen-obj-49 | rng | MATCH | 33/33 | - | - |
+| gen-obj-49 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-491 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-491 | packets | MATCH | 80/80 | - | - |
+| gen-obj-491 | rng | MATCH | 33/33 | - | - |
+| gen-obj-491 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-493 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-493 | packets | MATCH | 80/80 | - | - |
+| gen-obj-493 | rng | MATCH | 33/33 | - | - |
+| gen-obj-493 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-498 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-498 | packets | MATCH | 80/80 | - | - |
+| gen-obj-498 | rng | MATCH | 33/33 | - | - |
+| gen-obj-498 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-500 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-500 | packets | MATCH | 80/80 | - | - |
+| gen-obj-500 | rng | MATCH | 33/33 | - | - |
+| gen-obj-500 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-502 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-502 | packets | MATCH | 80/80 | - | - |
+| gen-obj-502 | rng | MATCH | 33/33 | - | - |
+| gen-obj-502 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-509 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-509 | packets | MATCH | 80/80 | - | - |
+| gen-obj-509 | rng | MATCH | 33/33 | - | - |
+| gen-obj-509 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-514 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-514 | packets | MATCH | 80/80 | - | - |
+| gen-obj-514 | rng | MATCH | 33/33 | - | - |
+| gen-obj-514 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-516 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-516 | packets | MATCH | 80/80 | - | - |
+| gen-obj-516 | rng | MATCH | 33/33 | - | - |
+| gen-obj-516 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-521 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-521 | packets | MATCH | 80/80 | - | - |
+| gen-obj-521 | rng | MATCH | 33/33 | - | - |
+| gen-obj-521 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-523 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-523 | packets | MATCH | 80/80 | - | - |
+| gen-obj-523 | rng | MATCH | 33/33 | - | - |
+| gen-obj-523 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-528 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-528 | packets | MATCH | 80/80 | - | - |
+| gen-obj-528 | rng | MATCH | 33/33 | - | - |
+| gen-obj-528 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-535 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-535 | packets | MATCH | 80/80 | - | - |
+| gen-obj-535 | rng | MATCH | 33/33 | - | - |
+| gen-obj-535 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-537 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-537 | packets | MATCH | 80/80 | - | - |
+| gen-obj-537 | rng | MATCH | 33/33 | - | - |
+| gen-obj-537 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-54 | items | MATCH | 1/1 | - | - |
+| gen-obj-54 | packets | MATCH | 80/80 | - | - |
+| gen-obj-54 | rng | MATCH | 33/33 | - | - |
+| gen-obj-54 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-540 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-540 | packets | MATCH | 80/80 | - | - |
+| gen-obj-540 | rng | MATCH | 33/33 | - | - |
+| gen-obj-540 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-542 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-542 | packets | MATCH | 80/80 | - | - |
+| gen-obj-542 | rng | MATCH | 33/33 | - | - |
+| gen-obj-542 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-549 | items | MATCH | 1/1 | - | - |
+| gen-obj-549 | packets | MATCH | 80/80 | - | - |
+| gen-obj-549 | rng | MATCH | 33/33 | - | - |
+| gen-obj-549 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-554 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-554 | packets | MATCH | 80/80 | - | - |
+| gen-obj-554 | rng | MATCH | 33/33 | - | - |
+| gen-obj-554 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-556 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-556 | packets | MATCH | 80/80 | - | - |
+| gen-obj-556 | rng | MATCH | 33/33 | - | - |
+| gen-obj-556 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-56 | items | MATCH | 1/1 | - | - |
+| gen-obj-56 | packets | MATCH | 80/80 | - | - |
+| gen-obj-56 | rng | MATCH | 33/33 | - | - |
+| gen-obj-56 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-561 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-561 | packets | MATCH | 80/80 | - | - |
+| gen-obj-561 | rng | MATCH | 33/33 | - | - |
+| gen-obj-561 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-563 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-563 | packets | DIVERGED | 79/80 | frame 19 stream s2c #18 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
+| gen-obj-563 | rng | MATCH | 74/74 | - | - |
+| gen-obj-563 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-568 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-568 | packets | MATCH | 80/80 | - | - |
+| gen-obj-568 | rng | MATCH | 33/33 | - | - |
+| gen-obj-568 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-6 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-6 | packets | MATCH | 80/80 | - | - |
+| gen-obj-6 | rng | MATCH | 33/33 | - | - |
+| gen-obj-6 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-61 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-61 | packets | MATCH | 80/80 | - | - |
+| gen-obj-61 | rng | MATCH | 33/33 | - | - |
+| gen-obj-61 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-63 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-63 | packets | MATCH | 80/80 | - | - |
+| gen-obj-63 | rng | MATCH | 33/33 | - | - |
+| gen-obj-63 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-68 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-68 | packets | MATCH | 80/80 | - | - |
+| gen-obj-68 | rng | MATCH | 33/33 | - | - |
+| gen-obj-68 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-75 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-75 | packets | MATCH | 80/80 | - | - |
+| gen-obj-75 | rng | MATCH | 33/33 | - | - |
+| gen-obj-75 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-77 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-77 | packets | MATCH | 80/80 | - | - |
+| gen-obj-77 | rng | MATCH | 33/33 | - | - |
+| gen-obj-77 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-80 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-80 | packets | MATCH | 80/80 | - | - |
+| gen-obj-80 | rng | MATCH | 33/33 | - | - |
+| gen-obj-80 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-82 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-82 | packets | MATCH | 80/80 | - | - |
+| gen-obj-82 | rng | MATCH | 33/33 | - | - |
+| gen-obj-82 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-89 | items | MATCH | 1/1 | - | - |
+| gen-obj-89 | packets | MATCH | 80/80 | - | - |
+| gen-obj-89 | rng | MATCH | 33/33 | - | - |
+| gen-obj-89 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-94 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-94 | packets | MATCH | 80/80 | - | - |
+| gen-obj-94 | rng | MATCH | 33/33 | - | - |
+| gen-obj-94 | state | PARTIAL | 80/80 | - | - |
+| gen-obj-96 | items | PARTIAL | 0/0 | - | - |
+| gen-obj-96 | packets | MATCH | 80/80 | - | - |
+| gen-obj-96 | rng | MATCH | 33/33 | - | - |
+| gen-obj-96 | state | PARTIAL | 80/80 | - | - |
+| gen-qkill-cain-rescue-guard | state | PARTIAL | 180/180 | - | - |
+| gen-qkill-cow-king | state | PARTIAL | 180/180 | - | - |
+| gen-qkill-griswold | state | PARTIAL | 180/180 | - | - |
+| gen-qkill-hellforge-hephasto | state | PARTIAL | 180/180 | - | - |
+| gen-quest-baal | state | PARTIAL | 150/150 | - | - |
+| gen-quest-countess | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] | unrouted |
+| gen-skill-ama-17 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-17 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-29 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-29 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-34 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-34 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-8 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-8 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-251 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-251 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-253 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-253 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-258 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-258 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-264 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-264 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-266 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-266 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-270 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ass-270 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-272 | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| gen-skill-ass-272 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-279 | packets | DIVERGED | 66/70 | frame 28 stream s2c #2 size: 1.14d 23 vs d2rs 14 (id 0xac) | unrouted |
+| gen-skill-ass-279 | state | DIVERGED | 47/70 | frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 | unrouted |
+| gen-skill-bar-126 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-126 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-130 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-130 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-139 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-139 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-145 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-145 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-147 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-147 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-151 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-151 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-153 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-153 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-225 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-225 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-227 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-227 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-233 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-233 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-238 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-238 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-244 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 id: 1.14d a3 vs d2rs a7 (id 0xa3) | unrouted |
+| gen-skill-dru-244 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-246 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-246 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-250 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-250 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-67 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-67 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-71 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-71 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-73 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-73 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-84 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-84 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-86 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-86 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-90 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-90 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-92 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-92 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-111 | packets | MATCH | 70/70 | - | - |
+| gen-skill-pal-111 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-118 | packets | MATCH | 70/70 | - | - |
+| gen-skill-pal-118 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-96 | packets | MATCH | 70/70 | - | - |
+| gen-skill-pal-96 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-39 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-39 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-45 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-45 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-47 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-47 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-53 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-53 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-sor-58 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-58 | state | PARTIAL | 70/70 | - | - |
+| gen-state-100 | packets | MATCH | 40/40 | - | - |
+| gen-state-100 | state | PARTIAL | 40/40 | - | - |
+| gen-state-102 | packets | MATCH | 40/40 | - | - |
+| gen-state-102 | state | PARTIAL | 40/40 | - | - |
+| gen-state-109 | packets | MATCH | 40/40 | - | - |
+| gen-state-109 | state | PARTIAL | 40/40 | - | - |
+| gen-state-11 | packets | MATCH | 40/40 | - | - |
+| gen-state-11 | state | PARTIAL | 40/40 | - | - |
+| gen-state-114 | packets | MATCH | 40/40 | - | - |
+| gen-state-114 | state | PARTIAL | 40/40 | - | - |
+| gen-state-116 | packets | MATCH | 40/40 | - | - |
+| gen-state-116 | state | PARTIAL | 40/40 | - | - |
+| gen-state-121 | packets | MATCH | 40/40 | - | - |
+| gen-state-121 | state | PARTIAL | 40/40 | - | - |
+| gen-state-123 | packets | MATCH | 40/40 | - | - |
+| gen-state-123 | state | PARTIAL | 40/40 | - | - |
+| gen-state-128 | packets | MATCH | 40/40 | - | - |
+| gen-state-128 | state | PARTIAL | 40/40 | - | - |
+| gen-state-13 | packets | MATCH | 40/40 | - | - |
+| gen-state-13 | state | PARTIAL | 40/40 | - | - |
+| gen-state-135 | packets | MATCH | 40/40 | - | - |
+| gen-state-135 | state | PARTIAL | 40/40 | - | - |
+| gen-state-137 | packets | MATCH | 40/40 | - | - |
+| gen-state-137 | state | PARTIAL | 40/40 | - | - |
+| gen-state-140 | packets | MATCH | 40/40 | - | - |
+| gen-state-140 | state | PARTIAL | 40/40 | - | - |
+| gen-state-142 | packets | MATCH | 40/40 | - | - |
+| gen-state-142 | state | PARTIAL | 40/40 | - | - |
+| gen-state-149 | packets | MATCH | 40/40 | - | - |
+| gen-state-149 | state | PARTIAL | 40/40 | - | - |
+| gen-state-154 | packets | MATCH | 40/40 | - | - |
+| gen-state-154 | state | PARTIAL | 40/40 | - | - |
+| gen-state-156 | packets | MATCH | 40/40 | - | - |
+| gen-state-156 | state | PARTIAL | 40/40 | - | - |
+| gen-state-161 | packets | MATCH | 40/40 | - | - |
+| gen-state-161 | state | PARTIAL | 40/40 | - | - |
+| gen-state-163 | packets | MATCH | 40/40 | - | - |
+| gen-state-163 | state | PARTIAL | 40/40 | - | - |
+| gen-state-168 | packets | MATCH | 40/40 | - | - |
+| gen-state-168 | state | PARTIAL | 40/40 | - | - |
+| gen-state-175 | packets | MATCH | 40/40 | - | - |
+| gen-state-175 | state | PARTIAL | 40/40 | - | - |
+| gen-state-177 | packets | MATCH | 40/40 | - | - |
+| gen-state-177 | state | PARTIAL | 40/40 | - | - |
+| gen-state-18 | packets | MATCH | 40/40 | - | - |
+| gen-state-18 | state | PARTIAL | 40/40 | - | - |
+| gen-state-180 | packets | MATCH | 40/40 | - | - |
+| gen-state-180 | state | PARTIAL | 40/40 | - | - |
+| gen-state-182 | packets | MATCH | 40/40 | - | - |
+| gen-state-182 | state | PARTIAL | 40/40 | - | - |
+| gen-state-24 | packets | MATCH | 40/40 | - | - |
+| gen-state-24 | state | PARTIAL | 40/40 | - | - |
+| gen-state-26 | packets | MATCH | 40/40 | - | - |
+| gen-state-26 | state | PARTIAL | 40/40 | - | - |
+| gen-state-30 | packets | MATCH | 40/40 | - | - |
+| gen-state-30 | state | PARTIAL | 40/40 | - | - |
+| gen-state-32 | packets | MATCH | 40/40 | - | - |
+| gen-state-32 | state | PARTIAL | 40/40 | - | - |
+| gen-state-39 | packets | MATCH | 40/40 | - | - |
+| gen-state-39 | state | PARTIAL | 40/40 | - | - |
+| gen-state-4 | packets | MATCH | 40/40 | - | - |
+| gen-state-4 | state | PARTIAL | 40/40 | - | - |
+| gen-state-45 | packets | MATCH | 40/40 | - | - |
+| gen-state-45 | state | PARTIAL | 40/40 | - | - |
+| gen-state-47 | packets | MATCH | 40/40 | - | - |
+| gen-state-47 | state | PARTIAL | 40/40 | - | - |
+| gen-state-51 | packets | MATCH | 40/40 | - | - |
+| gen-state-51 | state | PARTIAL | 40/40 | - | - |
+| gen-state-53 | packets | MATCH | 40/40 | - | - |
+| gen-state-53 | state | PARTIAL | 40/40 | - | - |
+| gen-state-58 | packets | MATCH | 40/40 | - | - |
+| gen-state-58 | state | PARTIAL | 40/40 | - | - |
+| gen-state-6 | packets | MATCH | 40/40 | - | - |
+| gen-state-6 | state | PARTIAL | 40/40 | - | - |
+| gen-state-64 | packets | MATCH | 40/40 | - | - |
+| gen-state-64 | state | PARTIAL | 40/40 | - | - |
+| gen-state-66 | packets | MATCH | 40/40 | - | - |
+| gen-state-66 | state | PARTIAL | 40/40 | - | - |
+| gen-state-70 | packets | MATCH | 40/40 | - | - |
+| gen-state-70 | state | PARTIAL | 40/40 | - | - |
+| gen-state-72 | packets | MATCH | 40/40 | - | - |
+| gen-state-72 | state | PARTIAL | 40/40 | - | - |
+| gen-state-79 | packets | MATCH | 40/40 | - | - |
+| gen-state-79 | state | PARTIAL | 40/40 | - | - |
+| gen-state-85 | packets | MATCH | 40/40 | - | - |
+| gen-state-85 | state | PARTIAL | 40/40 | - | - |
+| gen-state-87 | packets | MATCH | 40/40 | - | - |
+| gen-state-87 | state | PARTIAL | 40/40 | - | - |
+| gen-state-91 | packets | MATCH | 40/40 | - | - |
+| gen-state-91 | state | PARTIAL | 40/40 | - | - |
+| gen-state-93 | packets | MATCH | 40/40 | - | - |
+| gen-state-93 | state | PARTIAL | 40/40 | - | - |
+| gen-state-98 | packets | MATCH | 40/40 | - | - |
+| gen-state-98 | state | PARTIAL | 40/40 | - | - |
+| gen-su-0 | state | PARTIAL | 150/150 | - | - |
+| gen-su-19 | state | PARTIAL | 150/150 | - | - |
+| gen-su-2 | state | PARTIAL | 150/150 | - | - |
+| gen-su-25 | state | PARTIAL | 150/150 | - | - |
+| gen-su-33 | state | PARTIAL | 150/150 | - | - |
+| gen-su-38 | state | PARTIAL | 150/150 | - | - |
+| gen-su-44 | state | PARTIAL | 150/150 | - | - |
+| gen-su-46 | state | PARTIAL | 150/150 | - | - |
+| gen-su-50 | state | PARTIAL | 150/150 | - | - |
+| gen-su-52 | state | PARTIAL | 150/150 | - | - |
+| gen-su-59 | state | PARTIAL | 150/150 | - | - |
+| gen-su-9 | state | PARTIAL | 150/150 | - | - |
+| gen-wp-0 | state | PARTIAL | 460/460 | - | - |
+| gen-wp-11 | state | PARTIAL | 460/460 | - | - |
+| gen-wp-13 | state | PARTIAL | 460/460 | - | - |
+| gen-wp-2 | state | PARTIAL | 460/460 | - | - |
+| gen-wp-30 | state | PARTIAL | 460/460 | - | - |
+| gen-wp-32 | state | PARTIAL | 460/460 | - | - |
