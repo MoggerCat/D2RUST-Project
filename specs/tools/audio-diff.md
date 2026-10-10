@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 252–263 |
 | Test vectors | 264–272 |
 | Provenance | 273–281 |
-| Open questions | 282–292 |
+| Open questions | 282–306 |
 <!-- /index -->
 
 ## Summary
@@ -286,6 +286,20 @@ for this spec.
    one `record_audio.py` run on PC 1 (`docs/handoff/pc1-data.md` Step 4)
    compared with the cloud capture (`audio_diff.py voices` on both: same
    voices, ticks, samples and device integers).
+   Windows run done (2026-10-09, PC 1 late F1; `traces/audio/win/`
+   `audio-town-ambience-ama.orig-win{,.voices}.jsonl`, digests only, the
+   check's save / seed / 250 ticks, Windows 10 DirectSound): 22 voices
+   (the cloud's Wine capture reports 23). T 0: the level song (stereo,
+   buffer 13), sound 6 `cursor_switch` (request at `0x0049E58A`, no unit,
+   vol 220) and a mono object voice (request id 2599 from object units
+   2:8 / 2:166, vol 15, pan 229); the stereo ambience bed with its
+   fade-in parameters starts at **T 3** (play at server frame 5), where
+   the cloud reports `wilderness day 2.wav` at T 0. Both stereo voices are
+   stream voices (Open question 2), so the stream start may depend on
+   the DirectSound / thread timing. Still open: run `audio_diff.py
+   compare` of this file against the cloud's `orig.voices.jsonl` of the
+   same check (not in the repo) to list every difference; until then
+   treat stream-voice start ticks as implementation-dependent.
 2. Stream voices (music) start on the stream thread: their `Play` `T` may
    lag the main thread's by one; the start tick uses the main-thread
    `SetCurrentPosition` (REC-1360).

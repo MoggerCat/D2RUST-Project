@@ -144,6 +144,7 @@ def run():
         # only the Missiles.txt rows a ledger area of the committed snapshot names get a check
         t.ok(set(by["missile"]) <= {"gen-missile-0", "gen-missile-58", "gen-missile-60"}
              and "gen-missile-59" not in by["missile"], by["missile"])
+
         t.ok(by["obj"] == ["gen-obj-1", "gen-obj-2", "gen-obj-250"], by["obj"])
         t.ok("\x85" not in next(c for c in checks if c.name == "gen-obj-250").render(),
              "NEL kept in a header comment")

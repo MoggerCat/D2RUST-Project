@@ -34,17 +34,17 @@
 |   3. A2Q1 Radament's Lair (chain 8, slot 9) | 216–299 |
 |   4. A2Q2 The Horadric Staff (chain 9, slot 10) | 300–405 |
 |   5. A2Q3 Tainted Sun (chain 10, slot 11) | 406–534 |
-|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–662 |
-|   7. A2Q5 The Summoner (chain 12, slot 13) | 663–698 |
-|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 699–972 |
-|   9. Act II gossip and intro records | 973–981 |
-|   10. Hooks called from other systems | 982–999 |
-| Constants & data dependencies | 1000–1013 |
-| Randomness | 1014–1028 |
-| Edge cases & original bugs | 1029–1062 |
-| Test vectors | 1063–1085 |
-| Provenance | 1086–1117 |
-| Open questions | 1118–1205 |
+|   6. A2Q4 Arcane Sanctuary (chain 11, slot 12) | 535–669 |
+|   7. A2Q5 The Summoner (chain 12, slot 13) | 670–705 |
+|   8. A2Q6 The Seven Tombs (chain 13, slot 14) | 706–979 |
+|   9. Act II gossip and intro records | 980–988 |
+|   10. Hooks called from other systems | 989–1006 |
+| Constants & data dependencies | 1007–1020 |
+| Randomness | 1021–1035 |
+| Edge cases & original bugs | 1036–1069 |
+| Test vectors | 1070–1092 |
+| Provenance | 1093–1124 |
+| Open questions | 1125–1212 |
 <!-- /index -->
 
 ## Summary
@@ -586,11 +586,18 @@ callback 2; flag iterate.
 
 #### 6.6 Level changes (event 3, `0x0059F0C0`)
 
+Branch order (`0x0059F0D2`–`0x0059F17C`, read 2026-10-09, REC-1405
+settled): the new level is tested first, and the level-74 branch returns
+on every path (`0x0059F135`, or the exit at `0x0059F299`), so a move
+**into 74 never runs the old-level-40 block**, even from Lut Gholein (the
+start Jerhyn stays; recording `a2-warp-arcane-ama`: alive to frame 143).
+Level 50 falls through to the old-level test.
+
 - New level 74 (Arcane Sanctuary): state < 4 → state := 4; status < 4
   → status 4 to all, then the flag iterate; status ≥ 4 with the state
-  already ≥ 4 → nothing; otherwise the flag iterate.
-- New level 50 (Harem Level 1): set 12.8, 12.7.
-- Old level 40: the Jerhyn start / palace handling (§6.10); quick
+  already ≥ 4 → nothing; otherwise the flag iterate. Then return.
+- New level 50 (Harem Level 1): set 12.8, 12.7; continue below.
+- Old level 40 (new level ≠ 74): the Jerhyn start / palace handling (§6.10); quick
   remove; if the player lacks 12.0, 12.1 and state = 3: state := 4,
   flag iterate.
 

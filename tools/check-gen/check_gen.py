@@ -15,10 +15,10 @@ Families (one check per table row, written under traces/checks/gen/):
   umod  one unique spawn per monumod row          (boss-kinds.poke)
   skill one right-click cast per class skill      (dru-* / bar-* / ass-*)
   shrine one shrine operated per reachable shrines.txt row
+  obj   one object created and operated per objects.txt row (interact-operate-*)
   itemq the same items at each quality (low .. crafted) over three game seeds
   item  a census of ITEM_CHUNK base items per check, each created on the ground by
         the game's own creation path (poke `item`), compared by the items channel
-  obj   one object created and operated per objects.txt row (interact-operate-*)
 
 Every generated file starts with a header naming this generator, its
 format version, the family and the table row; the files are never edited
@@ -567,6 +567,39 @@ def fam_missile(ctx):
                      "the seeds and the packets. `ignore q`: the quest-flag field is not written by d2rs yet "
                      "(REC-1625) and would hide every other first difference."])
         c.extra = {"missile": mid, "name": name, "area": area}
+        out.append(c)
+    return out
+
+
+def fam_state(ctx):
+    """One check per states.txt row 1.. : `poke state` on the player and on a
+    cow at frame 12, off at frame 24 (the toggle and its update-queue insert,
+    stat-lists.md section 9.2); the packets channel carries the set/end state
+    messages, the state channel the stats the toggle moves."""
+    t = excel(ctx.excel, "states.txt", ["state", "id"])
+    out = []
+    for r in t.rows:
+        name, sid = t.get(r, "state"), int(t.get(r, "id"))
+        if sid == 0 or not name:
+            continue
+        c = Check(
+            f"gen-state-{sid}", "state", f"states.txt id {sid}",
+            f"state {name} ({sid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
+            40, 300, "state packets",
+            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+4 @y normal",
+                  f"at 12 poke state @player {sid} on", f"at 12 poke state @1:179 {sid} on",
+                  f"at 24 poke state @player {sid} off", f"at 24 poke state @1:179 {sid} off"],
+            variant="blood-moor-empty",
+            comment=[f"States.txt row {sid} ({name}) set on the player and on a cow (class 179, "
+                     "Blood Moor, variant blood-moor-empty) at frame 12 and cleared at frame 24. "
+                     "Compares the set and end state messages and the stats the toggle moves. `ignore q`: "
+                     "the quest-flag field is not written by d2rs yet (REC-1625) and would hide "
+                     "every other first difference."])
+        c.extra = {"state": sid, "name": name}
+        out.append(c)
+    return out
+
+
 def fam_obj(ctx):
     """One object of every objects.txt row (the Id column; the 143 rows
     without a ledger area are generated too, area `-`): created next to the
@@ -600,35 +633,6 @@ def fam_obj(ctx):
                      "The check compares the object's state after the operate, what it "
                      "creates (items, missiles, monsters, shrine effects) and the RNG draws."])
         c.extra = {"object": oid}
-        out.append(c)
-    return out
-
-
-def fam_state(ctx):
-    """One check per states.txt row 1.. : `poke state` on the player and on a
-    cow at frame 12, off at frame 24 (the toggle and its update-queue insert,
-    stat-lists.md section 9.2); the packets channel carries the set/end state
-    messages, the state channel the stats the toggle moves."""
-    t = excel(ctx.excel, "states.txt", ["state", "id"])
-    out = []
-    for r in t.rows:
-        name, sid = t.get(r, "state"), int(t.get(r, "id"))
-        if sid == 0 or not name:
-            continue
-        c = Check(
-            f"gen-state-{sid}", "state", f"states.txt id {sid}",
-            f"state {name} ({sid})", "ScnSor --class sor --expansion --level 30 --all-skills 20",
-            40, 300, "state packets",
-            ["ignore q"] + BM + ["at 8 poke spawn 179 @x+4 @y normal",
-                  f"at 12 poke state @player {sid} on", f"at 12 poke state @1:179 {sid} on",
-                  f"at 24 poke state @player {sid} off", f"at 24 poke state @1:179 {sid} off"],
-            variant="blood-moor-empty",
-            comment=[f"States.txt row {sid} ({name}) set on the player and on a cow (class 179, "
-                     "Blood Moor, variant blood-moor-empty) at frame 12 and cleared at frame 24. "
-                     "Compares the set and end state messages and the stats the toggle moves. `ignore q`: "
-                     "the quest-flag field is not written by d2rs yet (REC-1625) and would hide "
-                     "every other first difference."])
-        c.extra = {"state": sid, "name": name}
         out.append(c)
     return out
 
