@@ -41,17 +41,17 @@
 |   3. Game entry: picking the quest set | 422–469 |
 |   4. Events and dispatch | 470–554 |
 |   5. Quest updater and timers (tick step 8) | 555–576 |
-|   6. Status reporting | 577–758 |
-|   7. NPC dialog hooks | 759–791 |
-|   8. Act transitions, warps and portals | 792–879 |
-|   9. Quest items, rewards and helpers | 880–1072 |
-|   11. Acts II–V | 1073–1089 |
-| Constants & data dependencies | 1090–1104 |
-| Randomness | 1105–1132 |
-| Edge cases & original bugs | 1133–1151 |
-| Test vectors | 1152–1184 |
-| Provenance | 1185–1213 |
-| Open questions | 1214–1286 |
+|   6. Status reporting | 577–771 |
+|   7. NPC dialog hooks | 772–804 |
+|   8. Act transitions, warps and portals | 805–892 |
+|   9. Quest items, rewards and helpers | 893–1085 |
+|   11. Acts II–V | 1086–1102 |
+| Constants & data dependencies | 1103–1117 |
+| Randomness | 1118–1145 |
+| Edge cases & original bugs | 1146–1164 |
+| Test vectors | 1165–1197 |
+| Provenance | 1198–1226 |
+| Open questions | 1227–1299 |
 <!-- /index -->
 
 ## Summary
@@ -735,6 +735,19 @@ hold 6, 11, 7, 0 and 7 NPCs for acts I–V.
 
 - `0x00544FA0(act)` / `0x00544F60(list, n)` set the intro bit of every
   NPC of the act's list (act transitions, §8.1).
+- `0x00537340(game, player, from, to)` (the town-leave refresh, called by
+  the level warp `0x0053AEC0` before the act change `0x0053ACC0`; read
+  2026-10-10, REC-2900): after the vendor part, by `to` (the destination
+  level) 1 → `0x00545100(0)`; 40 → `0x00545100(1)` then the Act II
+  change of chain 4 `0x00597310` (`quests-act1.md` §10.6); 75 →
+  `0x00545100(2)`; 109 → `0x00545100(4)`. d2rs: `Quests::town_leave`,
+  run from `wiring::path::place::level_warp` (so the NPC travel, the
+  waypoint and `poke warp` all pass it once). Recorded
+  `gen-sysc-client-msg-ui-20` (`warp 40`): 1.14d sends `5D 04 00 0C 00 00`
+  as the first message of the frame, before the act change's 0x08 / 0x07
+  stream; d2rs now sets the same quest bit but its quest sends leave the
+  rest outbox after the sim's (`collect_sent`), so the 0x5D comes last
+  (open, size S-M).
 - `0x00545100(game, player, act)` (caller `0x00537340`): for acts 0, 1,
   2, 4 build 0x91 (26 bytes, `0x0053E060`): u8 0x91, u8 act (the act
   argument, stored from BL at `0x00545176`; the function switches on it,
