@@ -141,7 +141,7 @@ pub fn assign_right_aura<X: Pending + UseRest>(
     let Some(r) = t.skills.skill(e.skill).filter(|r| r.aura) else {
         return;
     };
-    let l = skill_level(&mut w, &t.skills, Some(unit), Some(&e), true);
+    let l = skill_level(&w, &t.skills, Some(unit), Some(&e), true);
     if l == 0 {
         return;
     }

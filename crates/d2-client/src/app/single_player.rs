@@ -2903,9 +2903,10 @@ mod player_melee_range_tests {
         s
     }
 
-    // Covers: specs/combat/hit.md §7.2 step 3, §7.3 step 1 (player reach
-    // = the weapon's rangeadder; the size-adjusted unit distance
-    // `0x00641530`: 3 sub-tiles between two size-2 units is distance 0).
+    // Covers: specs/combat/hit.md §7.2
+    // (§7.2 step 3, §7.3 step 1: a player's reach is the weapon's rangeadder;
+    // the size-adjusted unit distance `0x00641530`: 3 sub-tiles between two
+    // size-2 units is distance 0)
     #[test]
     fn a_player_reaches_by_unit_distance_and_rangeadder() {
         // An axe (adder 0): 3 sub-tiles apart is distance 0, in reach.

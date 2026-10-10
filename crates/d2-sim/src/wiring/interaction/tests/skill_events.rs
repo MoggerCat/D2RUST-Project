@@ -134,8 +134,9 @@ fn periodic_aura_event_without_an_aura_right_skill_is_not_rescheduled() {
     fx.assert_clean();
 }
 
-// Covers: specs/skills/use.md §7 ("0x3C SelectSkill": a new `aura` right skill
-// schedules the aura form; the save load's assign does the same)
+// Covers: specs/skills/use.md §7
+// (0x3C SelectSkill: a new `aura` right skill schedules the aura form; the
+// save load's assign does the same)
 #[test]
 fn the_loaded_right_aura_schedules_the_aura_form_and_a_plain_skill_does_not() {
     let (mut fx, p) = fx();

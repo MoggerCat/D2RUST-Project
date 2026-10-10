@@ -1407,10 +1407,10 @@ const SPEED_MAX: u32 = 0x7FFF;
 const RUN_BASE_ROWS: usize = 410;
 
 impl<X: Pending> ActionHooks<X> {
-    /// Pet follow `0x005754B0(game, player, x, y)` (`hirelings.md` §6 rule
-    /// 1) for the summoned pet types of [`ActionHooks::pet_lists`] (types
-    /// 1 … count − 1 but 7, the hireling's, which has its own list): by
-    /// the `pettype` flag byte, `warp` (bit 0) → every living pet is
+    /// Pet follow `0x005754B0(game, player, x, y)` (`hirelings.md` §6,
+    /// rule one) for the summoned pet types of [`ActionHooks::pet_lists`]
+    /// (types one up to count − 1 but 7, the hireling's, which has its own
+    /// list): by the `pettype` flag byte, `warp` (bit 0) → every living pet is
     /// moved to the player ([`LifecycleHooks::warp_pet`]); else `range`
     /// (bit 1) → the GUIDs of the living pets farther than 1600 (squared
     /// distance, `0x006492A0`) are returned for the caller's remove with
