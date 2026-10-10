@@ -13,6 +13,8 @@
   "ScnCube",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.packets.jsonl",
   "--send",
@@ -22,8 +24,8 @@
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "faeb735fa837326adedb461d6bfb87ce48e8cbd2d6c8a82a09e949ea63aa88e7",
-   "size": 46709
+   "sha256": "e7d0d81fdbef3d09c5e4024e329127d1367bd88c3e9929f98bf92dccc88c8ea5",
+   "size": 38272
   }
  },
  "format": "orig-cache-1",
@@ -32,7 +34,7 @@
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
   "save": "180ce7b5570d1ab8e2aff43bac5da3da156c98917f3e9710f88de9986a449c54"
  }
 }

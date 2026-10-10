@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-vendor.store-gen	system	items	vendors.md §3 store generation 0x00576980	specs/world/vendors.md	draft	items-vendor-akara-buy	DIVERGED@20	?	4	y	claude/rc-items-ground	DIVERGED	S	items-vendor-akara-buy state 40/40 equal after the store-item own fix (vendors.md §3.1/§4 note); packets diverge at frame 4 (player startup framing, not store); rc-items-ground 2026-10-10
+vendor.store-gen	system	items	vendors.md §3 store generation 0x00576980	specs/world/vendors.md	draft	items-vendor-akara-buy	PARTIAL	?	4	y	claude/rc-items-ground	DIVERGED	S	items-vendor-akara-buy state 40/40 equal after the store-item own fix (vendors.md §3.1/§4 note); packets diverge at frame 4 (player startup framing, not store); rc-items-ground 2026-10-10
