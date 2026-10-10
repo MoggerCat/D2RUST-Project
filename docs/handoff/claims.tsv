@@ -35,3 +35,6 @@ C-mon-inv-9d	rc-skill-promote-9d	19:03	0x9D monster inventory (0x00534F80) for a
 C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	done ass-shadow-master state 61->70/70 (player skill levels for the pet); 20 checks improved, 0 worse
 C070	rc-drops-2	19:22	items-drops-nor-10 monsters 0x16/0x17/0x1b never die (1.14d frames 183/187)	open
 C-pc1-wine-2	rc-pc1-wine	19:24	object.preset 574-579 (DS1 data has none), system.formats d2s-appearance 4/5 + d2s-load variants (Wine saves), Step 4 list	open
+C-pkt-0xac-size	rc-pkt-sizes	19:27	0xAC size ass-shadow-master 23 vs 14, ama-valkyrie 18 vs 14, nec-bone-wall 19 vs 14	open
+C-pkt-0xa8-shrine7	rc-pkt-sizes	19:27	gen-shrine-7 0xA8 size 15 vs 12	open
+C-pkt-0x67-dru	rc-pkt-sizes	19:27	dru-cycle-of-life/plague-poppy/vines 0x67 byte[6] + tx 5143 vs 5144; gen-skill-ass-257/261 0x67/0x21	open
