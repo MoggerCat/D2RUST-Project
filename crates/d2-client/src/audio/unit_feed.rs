@@ -46,10 +46,16 @@
 //!   original runs them at the creation call the model does not
 //!   distinguish from a level load. Settles: a request log of a level
 //!   entry.
-//! - **REC-435** (missile `HitSound`, skill start sounds, `ProgSound`):
-//!   they need the result of the client hit / start / progressive
-//!   function, which the model does not run; not requested. Settles:
-//!   the missile client functions in the model.
+//! - **REC-435** (missile `HitSound`, `ProgSound`): they need the result
+//!   of the client hit / progressive function, which the model does not
+//!   run; not requested. Settles: the missile client functions in the
+//!   model.
+//! - **REC-1683** (skill start sounds, `triggers.md` §8 r1): a unit's
+//!   mode request with code 0x15 or 0x16 (`model.md` §8 r4: the client
+//!   skill start, record entry 0 = the skill) plays the skill's start
+//!   sounds after the mode sounds, the start function taken as having
+//!   returned non-zero (the model does not run `cltstfunc`). Settles: a
+//!   request log of a cast with a start function that fails.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -66,7 +72,7 @@ use crate::audio::triggers::modes::mode_set;
 use crate::audio::triggers::movement::{
     footstep, footstep_called, footstep_material, init_voice, neutral, Floor, TOWN_LEVELS,
 };
-use crate::audio::triggers::skills::{state_off, state_on};
+use crate::audio::triggers::skills::{skill_start, state_off, state_on, SkillStart};
 use crate::audio::triggers::{within_700, Ctx, TriggerError, Unit, UnitSound, MONSTER, PLAYER};
 use crate::bridge::items::{self, mode as item_mode};
 use crate::bridge::world::{ClientUnit, ClientWorld, KindData, UnitKey, ITEM, MISSILE};
@@ -114,6 +120,8 @@ pub struct UnitSoundRows {
     critter: Vec<bool>,
     superunique_monsound: Vec<i32>,
     skill_stsound: Vec<i32>,
+    /// The start-sound columns of each `skills` row (`triggers.md` §8 r1).
+    skill_start: Vec<SkillStart>,
     states: Vec<StateSound>,
     /// `TravelSound` of each missile row.
     missile_travel: Vec<i32>,
@@ -193,6 +201,18 @@ impl UnitSoundRows {
             critter: monstats2.iter().map(|m| m.critter).collect(),
             superunique_monsound: supers.iter().map(|s| s.monsound as i32).collect(),
             skill_stsound: skills.iter().map(|s| s16(s.stsound)).collect(),
+            skill_start: skills
+                .iter()
+                .map(|s| SkillStart {
+                    stsound: s16(s.stsound),
+                    stsoundclass: s16(s.stsoundclass),
+                    stsounddelay: s.stsounddelay,
+                    weaponsnd: s.weaponsnd,
+                    stsuccessonly: s.stsuccessonly,
+                    charclass: i32::from(s.charclass as i8),
+                    item_cast_sound: None,
+                })
+                .collect(),
             states: states
                 .iter()
                 .map(|s| StateSound {
@@ -258,6 +278,11 @@ impl UnitSoundRows {
     /// The sound columns of an item code.
     pub fn item_sound(&self, code: [u8; 4]) -> Option<ItemSoundRow> {
         self.item_sounds.get(&code).copied()
+    }
+
+    /// The start-sound columns of a skill (`triggers.md` §8 r1).
+    pub fn skill_start_row(&self, skill: u16) -> Option<SkillStart> {
+        self.skill_start.get(usize::from(skill)).copied()
     }
 
     /// `stsound` of a skill (event 12).
@@ -328,6 +353,8 @@ struct Track {
     frame_count: u32,
     speed: i32,
     states: BTreeSet<u8>,
+    /// `ClientUnit::mode_requests` at the last pass (REC-1683).
+    mode_requests: u32,
 }
 
 /// One unit of a frame with the inputs the rules read.
@@ -348,6 +375,9 @@ struct Planned {
     local_dist: i32,
     record: Option<usize>,
     item: Option<(Option<ItemSoundRow>, u8)>,
+    /// The skill of a client skill start request (code 0x15 / 0x16, record
+    /// entry 0) the unit received since the last pass (REC-1683).
+    skill_request: Option<u16>,
 }
 
 /// The per-unit sound pass state.
@@ -502,6 +532,18 @@ impl UnitFeed {
                 local_dist,
                 record: None,
                 item: None,
+                skill_request: (t.mode_requests != u.mode_requests)
+                    .then_some(u.last_mode_request)
+                    .flatten()
+                    .filter(|r| matches!(r.code, 0x15 | 0x16))
+                    // The local player's start takes its own level
+                    // (`msg-skills.md` §7 r4.3 (b)); the server's message
+                    // for it carries level 0 and the recorded game plays
+                    // one start sound, at the request that has the level
+                    // (REC-1683: the first of the two d2rs requests of a
+                    // cast, level 0, plays nothing).
+                    .filter(|r| !is_local || r.record[4] != 0)
+                    .and_then(|r| u16::try_from(r.record[0]).ok()),
             };
             match key.unit_type {
                 MONSTER => {
@@ -548,6 +590,7 @@ impl UnitFeed {
                 }
             }
             t.mode = mode;
+            t.mode_requests = u.mode_requests;
             t.states = u.states.clone();
             out.push(p);
         }
@@ -607,8 +650,11 @@ impl UnitFeed {
                     if p.key.unit_type == MONSTER && p.first {
                         init_voice(cx, &u, us);
                     }
+                    let start = p.skill_request.and_then(|k| rows.skill_start_row(k));
                     if p.mode_changed {
-                        mode_set(cx, &u, us, mode, None)?;
+                        mode_set(cx, &u, us, mode, start.as_ref().map(|k| (k, true)))?;
+                    } else if let Some(k) = start {
+                        skill_start(cx, &u, &k, true)?;
                     }
                 }
                 MISSILE if p.first => {
@@ -654,6 +700,11 @@ impl UnitFeed {
                 if p.key.unit_type == MONSTER {
                     neutral(cx, &u, us);
                 }
+                // PROVISIONAL (REC-1682): a monster's footstep reads f
+                // before the update's advance like a player's (measured:
+                // audio-town-ambience-ama, the NPC footsteps came one
+                // update early after the sound tick base moved to T 0).
+                u.frame = before;
                 if footstep_called(p.key.unit_type, cu.class as i32, mode)
                     && !(p.key.unit_type == PLAYER && cu.class >= 7)
                 {

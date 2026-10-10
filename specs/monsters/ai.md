@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 283–422 |
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
-|   5. Target selection | 614–813 |
-|   6. Distances and line tests | 814–828 |
-|   7. Tactics helpers | 829–1068 |
-|   8. AI commands and minions | 1069–1095 |
-|   10. The catalogue `ai-functions.tsv` | 1096–1116 |
-| Constants & data dependencies | 1117–1140 |
-| Randomness | 1141–1162 |
-| Edge cases & original bugs | 1163–1204 |
-| Test vectors | 1205–1293 |
-| Provenance | 1294–1354 |
-| Open questions | 1355–1458 |
+|   5. Target selection | 614–925 |
+|   6. Distances and line tests | 926–940 |
+|   7. Tactics helpers | 941–1180 |
+|   8. AI commands and minions | 1181–1207 |
+|   10. The catalogue `ai-functions.tsv` | 1208–1228 |
+| Constants & data dependencies | 1229–1252 |
+| Randomness | 1253–1282 |
+| Edge cases & original bugs | 1283–1324 |
+| Test vectors | 1325–1413 |
+| Provenance | 1414–1474 |
+| Open questions | 1475–1581 |
 <!-- /index -->
 
 ## Summary
@@ -660,10 +660,13 @@ the override holds. 1.14d-confirmed (`0x005DD610`, jump table
 D2MOO `sub_6FCF2110`. Returns target, distance, combat:
 
 1. No room: nothing.
-2. Line-of-sight test flag T: if control flag 0x40 is set, T = 1 and the
-   flag is cleared. Else if the room's "LOS draw" test `0x0061AA40` is
-   false: T = (flag 0x08 clear); for monsters with a vision record
-   (monster data +0x50) and T = 1, T = (vision +0x24 == 0). Else T = 0.
+2. Line-of-sight test flag T, vision record V := none, seen value
+   S := 0: if control flag 0x40 is set, T = 1 and the flag is cleared.
+   Else if the room's "LOS draw" test `0x0061AA40` is false: T = (flag
+   0x08 clear); for a monster (type 1) with monster data, V := monster
+   data +0x50 (loaded whatever T is); if T = 1 and V ≠ none, S := V
+   +0x24 and T := (S = 0). Else T = 0. V is the monster's DRLG
+   coordinate record (§5.2.1).
 3. Forced target (§5.1) → use it.
 4. Alignment (`0x006259B0`) not evil (0): scan 5 (§5.4) within 35 with
    T; choose between its best and alternative via `0x005DD510` (§5.3).
@@ -690,8 +693,8 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
       (1.14d-confirmed, `0x005DDA85`–`0x005DDB1D`).
 6. No target: combat := 0, distance := M (0x7FFFFFFF when no player
    qualified). Return 0.
-7. Target: if alignment ≠ good (2): set control flag 0x08 and vision
-   +0x24 := (it was 0). Combat := melee-range test `0x00622C40(unit,
+7. Target: if alignment ≠ good (2): set control flag 0x08, and if V ≠
+   none, V +0x24 := (S = 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
 PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
@@ -703,6 +706,29 @@ that call (no population placement) has none. Settled by: PC 1 item
 "[q-fix-seed-game] Monster "vision" record" and
 `a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
 the player once minion 1:12 has seen it).
+##### 5.2.1 The vision record (monster data +0x50)
+
+V is a DRLG coordinate record (`D2RoomCoordListStrc`, the record r of
+`population.md` §3.2; layout `drlg/levels.md` §11.1, where +0x24 is
+otherwise never written), shared by every monster whose record it is.
+It is set once at creation (`population.md` §9.6 step 3) and cleared
+to none on the monster's first room change (`sim/pathing.md` §9.8);
+`0x00552D60` and `0x00554670` are its only writers. Steps 2 and 7 make
++0x24 a "someone here has seen a target" token. A monster whose flag
+0x08 is clear tests line of sight while the token is 0, and if it
+finds a target the token becomes 1. While the token is 1 it searches
+**without** the collision test (T = 0) once; a find then writes 0 (it
+consumes the token). A monster whose flag 0x08 is already set rewrites
+1 on every find. Nothing is written without a target, with alignment
+2, on the flag-0x40 path, or when the LOS-draw test is true (V stays
+none there). This explains `a1-warp-tower-cellar-ama`. A fallen3 party
+minion finds the player at frame 43 and sets the token. At frame 45
+its pack leader (1:10) has flag 0x08 clear and the same record (the
+leader holds the pack's rect r, the minion the record at its own point,
+`population.md` §9.6). It skips the collision test, finds the player at
+distance 32 and resets the token to 0.
+1.14d-confirmed (`0x005DD9B6`–`0x005DDA0F`, `0x005DDBE6`–`0x005DDC08`,
+`0x00552D60`, `0x00554670`, read 2026-10-09, PC 1 late).
 
 Draws: none here (except §5.1 k = 3). Ties keep the earlier node.
 
@@ -724,43 +750,129 @@ a, next, prev}; unit +0xD0 = its slot, 11 = none):
 
 | 1.14d | D2MOO | Does |
 |---|---|---|
-| `0x005DD510` | `sub_6FCF27B0` | alternative-target choice: never for players or without an alternative; take it if no main target; refuse if the alternative is farther than 5; else trial path toward the main target, keep main if a path exists; else scan 7 for something closer than 20 |
-| `0x005DDC30` | `sub_6FCF2CC0` | target search for "good" shooters and secondary picks: forced target, else scan 6 + `0x005DD510`; returns target, distance (0x7FFFFFFF if none), melee flag |
+| `0x005DD510` | `sub_6FCF27B0` | alternative-target choice `(unit; &main, &main d, alt, alt d)` → 1 = take the alternative, 0 = keep main (main / main d may be rewritten). Order (1.14d-confirmed `0x005DD510`–`0x005DD601`, read 2026-10-09, PC 1 night; settles REC-1271): (1) the unit is a player → 0; (2) no alternative → 0; (3) **no main target → 1, whatever the alternative's distance**; (4) alt d > 5 (signed) → 0; (5) trial path toward main on the unit's path record (settings saved, target := main, path type 2, `0x00649970(path, unit, 0)`, settings restored); the path has points (`0x00648780` ≠ 0) → 0; (6) scan 7 (§5.4) with context {0, 0x7FFFFFFF, main}: found and its d < 20 → main := it, main d := d, return 0; else → 1. No draws of its own, but scan 7 runs the filter `0x005DC970`, so its state-146 draw (scan 6 step 1.5 below) can happen here too; no life test (an hp-0 unit is judged like any other). Scan 7 callback `0x005DCC60`, context {best, best d, excluded = main}: C = main → skip (before the filter, so main draws nothing here); filter; d := `0x005DC380(C, unit)` > 48 → skip; class t (step 3 below) < 2 → skip; d ≥ best d → skip; line `0x00622AA0(C, unit, 4)` blocked → skip; else best := (C, d); always returns 0 (1.14d-confirmed `0x005DCC60`–`0x005DCCBC`, PC 1 late) |
+| `0x005DDC30` | `sub_6FCF2CC0` | secondary target search: forced target, else scan 6 + `0x005DD510`; returns target S, distance E (0x7FFFFFFF if none), melee flag M. In full below |
 | `0x005DDF20` | `sub_6FCCFD70` | nearest interacting player within 15 for NPCs (scan 2, callback D2MOO `sub_6FCCFDE0`); "close" when distance < 4; returns the NPC itself when none. Callback `0x005DDE80(game, npc, C, ctx)` (1.14d-confirmed, settles REC-500): C not a player → skip; d := full-size distance `0x005DC380(npc, C)` (the NPC's size subtracted, §6); d > 15 → skip (so ≤ 15 is in); NPC without monstats flag `interact` (byte +0xD & 2, mask `0x006CE26C` = 2, flag bit 9) → take C; with it → take C only if the quest active-cycler test `0x00544590(game, C, npc)` holds and d < best. Taking C writes (C, d) and **returns C, which stops the scan** (§5.4), so the first qualifying player in scan-1 order wins and there are no ties |
+
+**`0x005DDC30(game, unit; &E, &M)`, in full** (1.14d-confirmed
+`0x005DDC30`–`0x005DDCF5` and its 29 call sites in `all.asm`, read
+2026-10-09, PC 1 late). Register call (ECX game, EDX unit), stack
+pointers &E then &M, `ret 8`; each pointer may be null and is tested
+before the write. The "second argument 0" of the `ai-bodies*.md` files
+is a null &M: the caller does not want the melee flag.
+
+1. Forced target (§5.1) with (a = 0, s = 1). Accepted → S, E := its
+   unit and distance; go to step 4. This S skips the 49 window, the
+   threat classes and `0x005DD510`, and may be a missile.
+2. Else scan 6 (§5.4; mode 0: the unit's room `0x00620BB0`, none →
+   nothing found; that room's near-room list `0x00619790` in list
+   order, own room included; per room its unit list, head room +0x74,
+   next unit +0xE8, every unit type) with the callback `0x005DCBD0`
+   below, context {main 0, 0x7FFFFFFF, alt 0, 0x7FFFFFFF}.
+3. `0x005DD510(unit; &main, &main d, alt, alt d)` (table above): 1 → S,
+   E := alt, alt d; 0 → S, E := main, main d (main as its scan 7 may
+   have replaced it).
+4. S = 0 → E := 0x7FFFFFFF, M := 0, return 0. Else M := melee-range
+   test `0x00622C40(unit, S, 0)` (`sim/units.md`), E as found, return S.
+
+What it scans: every player and monster of the near rooms that the
+filter keeps (not dead, not in town, unit flag 4, hostile by
+`0x00554200`): players, hirelings, pets and summons, monsters, of any
+act. It reads no target-node list (unlike §5.2 step 5), so there is no
+55 limit, no act test and no `aidist`. Range: full-size distance with
+C's size subtracted ≤ 48. Priority: class t ≥ 2 (every player, t = 14,
+and monsters by `nThreat`) fills main; t 0 / 1 fills alt, which wins
+only through `0x005DD510` (no main, or a main it rejects). Nearest
+wins; ties keep the earlier unit in room-list, then unit-list order.
+
+Draws: none on the unit's own seed except §5.1 k = 3 (one raw step,
+confused units only). The filter's state-146 draw (step 1.5 below) is
+on the candidate player's own seed, once per such player in scan 6 and
+again in `0x005DD510`'s scan 7. The callers' own tests draw after the
+call returns. Side effects: a failed §5.1 clears the override (k, g :=
+0); §5.1 k = 3 swaps and restores the alignment; `0x005DD510` step 5
+makes a trial path and restores the path settings.
+
+Use of the result: `0x005DDC30` never writes the AI control's target,
+state or vision flags. S is a local of the calling think, used as the
+target of that call's skill or attack. Callers (29 sites, 26 thinks):
+with a non-null &M (12 sites): NecroPet ranged `0x005E4AC0`, Hireable
+`0x005E52D0`, BloodRaven `0x005E6320`, GoodNpcRanged `0x005E7AC0`,
+TownRogue `0x005E7D60` and its never-run special state `0x005E7DC0`
+(§3.3), Navi `0x005E7E20`, AssassinSentry `0x005EA3D0`, DeathSentry
+`0x005EA980`, Vines `0x005EC6C0`, Bighead `0x005EFF50` (two sites).
+With &M null (17 sites): PantherJavelin `0x005E1080`, FetishBlowgun
+`0x005E1250`, Succubus `0x005E1E00`, SuccubusWitch `0x005E2120` (two),
+Imp `0x005E2FF0`, FallenShaman `0x005F1440`, SandMaggot `0x005F1800`,
+GreaterMummy `0x005F2B10`, Vampire `0x005F4A70`, CorruptArcher
+`0x005F5A20`, SkeletonBow `0x005F6070` (two), Summoner `0x005F85C0`,
+TentacleHead `0x005F9270`, SkeletonMage `0x005F96C0`, OblivionKnight
+`0x005FAF00`. A caller that keeps a distance variable across steps
+(e.g. SuccubusWitch E, `ai-bodies-5.md` §6) sees it overwritten by the
+call, with 0x7FFFFFFF when nothing was found.
+
+```
+s, e = forced_target(unit, a=0, s=1)
+if !s:
+    ctx = scan6(unit)                       # main (t>=2) / alt (t<2), d <= 48
+    take_alt = alt_choice(unit, &ctx.main, &ctx.main_d, ctx.alt, ctx.alt_d)
+    s, e = take_alt ? (ctx.alt, ctx.alt_d) : (ctx.main, ctx.main_d)
+if !s: return (0, 0x7FFFFFFF, 0)
+return (s, e, melee_range(unit, s, 0))
+```
 
 **Scan 6 callback `0x005DCBD0`** (the search window of `0x005DDC30`;
 2026-10-09, pc1-data Step 4 item 3). Context {main, main d, alt, alt d},
 started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
 
-1. Filter `0x005DC970` (scanner and C each a player or monster, neither
-   dead `0x005541B0`, C's room not in town `0x0061AB00`, C has unit flag
-   4 `0x00451F30(C, 4)`; C with state 146 (`0x00639DF0(C, 0x92)`): a
-   player C is skipped when `roll(100)` on C's seed (`0x0045C390`) < 80
-   and the scanner is not in melee range of it, a monster C is skipped
-   when in melee range; then `0x00554200(C)`) fails → skip.
-2. d := full-size distance (§6 `0x005DC380`); d ≥ 49 (0x31) → skip.
+1. Filter `0x005DC970(game, scanner, C)` → 1 = keep; tests in this
+   order, the first failure skips C (1.14d-confirmed
+   `0x005DC970`–`0x005DCA1D`, read 2026-10-09, PC 1 night; settles
+   REC-1270):
+   1. scanner present and a player or monster (type 0 / 1); C the same;
+   2. C not dead, then the scanner not dead (`0x005541B0`: flag-ex bit
+      +0xC6 & 1, mode 0, or mode 12 for a monster / 17 for a player; no
+      life test, so an hp-0 unit in a living mode passes);
+   3. C's room not in town (`0x00620BB0`, `0x0061AB00`);
+   4. C has unit flag 4 (`0x00451F30(C, 4)`, +0xC4 & 4). A monster gets
+      it at creation only when its monstats2 `isAtt` is set (`0x00573CB0`
+      at `0x00574141`–`0x0057414E`); a class without `isAtt` (e.g.
+      `cow`, the traps) is never a scan 6 candidate;
+   5. only when **C** has state 146 `invis` (`0x00639DF0(C, 0x92)`; the
+      scanner's states are not read): a player C draws `roll(100)` on
+      C's own unit seed (+0x20, `0x0045C390`); draw < 80 and the scanner
+      not in melee range of C (`0x00622C40(scanner, C, 0)`) → skip (draw
+      ≥ 80, or in range → go on). A monster C (no draw): in melee range
+      `0x00622C40(scanner, C, 0)` → skip. Without state 146 nothing in
+      this step runs: no melee test, no draw, no distance;
+   6. hostility `0x00554200(game, scanner, C)` (`combat/hit.md` §7.1)
+      = 0 → skip.
+
+   No step reads a distance except the state-146 melee test, so for a
+   C without state 146 the filter cannot tell distance 1 from 2.
+2. d := `0x005DC380(C, scanner)`: the full-size distance with **C's**
+   size subtracted (§6; a = C). d ≥ 49 (`cmp d, 0x30; jg`) → skip.
 3. Class t := 14 for a player, the monstats byte +0x4E (`nThreat`) for
    a monster (`0x005DC920`). t ≥ 2 competes for main, else for alt; d
-   not below that slot's distance → skip.
-4. Line test `0x00622AA0(scanner, C, 4)` blocked → skip; else the slot
-   := (C, d). The callback always returns 0 (whole scan).
+   not below that slot's distance (signed) → skip (ties keep the
+   earlier candidate in scan order).
+4. Line test `0x00622AA0(C, scanner, 4)` (a = C: C's room, C's end
+   pulled first, `render/draw-order-2.md` §15.1) blocked → skip; else
+   the slot := (C, d). The callback always returns 0 (whole scan).
 
-PROVISIONAL (REC-1270): rule 1's "monster C in melee range → skip" holds
-for every monster C, not only one with state 146 (as d2rs reads it: C in
-the scanner's melee range, `0x00622C40` step 3 without the line, d ≤ 0 or
-d ≤ `MeleeRng` + 1, is skipped). 1.14d measured (`ass-lightning-sentry-kill`
-and its probes, Fallen packs, Lightning Sentry `MeleeRng` 0): of three
-Fallen the one at distance 1 (dx 1, dy 0) is never the trap's target
-while one at distance 2–3 is, in three placements; the trap fires at it
-once the nearer one has moved off. Settled by: a run that puts a monster
-of another class on the trap (a state-146 test) or reads `0x005DC970`
-(PC 1 item "[q-fix-ass-traps] 0x005DC970 melee-range rule").
-PROVISIONAL (REC-1271): a main-less scan (only `nThreat` < 2 candidates,
-e.g. a cow) takes the alternative at once in d2rs; the spec's
-`0x005DD510` row also refuses an alternative farther than 5, and the
-order of those two rules is unread (an idle cow poked next to a trap was
-not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
-had hp 0, so the dead test may be the cause instead). Not applied.
+Against the q-fix-ass-traps recordings (Lightning Sentry, `ai-bodies-6.md`
+§14): the hp-0 poked `cow` 6 away was never a candidate (no `isAtt` →
+no unit flag 4, step 1.4), so `0x005DD510`'s order is not what refused
+it (with no main and a candidate alternative, step 3 takes it at any
+distance). The Fallen (`isAtt` 1, `threat` 10 → main) refused at
+distance 1 but taken at 2 is **not** explained by steps 1–3: the only
+distance-dependent test left in the scan is step 4's line, whose ends
+are pulled by the Fallen's size 2 (the sentry's size is 0), so at a
+diagonal 1 the Fallen's end lands on the far side of the sentry and the
+cells tested differ from those at 2. Whether that cell carries
+collision bit 4, or the refusal lies after the scan (the think's
+`0x005DEAD0` / the skill), needs the recorded dx, dy and the collision
+grid at both points (open, REC-1270 follow-up).
 
 PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
 `wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)
@@ -892,7 +1004,7 @@ flag 4 → delete thinks; flag 1 → set control flag 0x40; flag 2 → draw
 | `0x005DEFE0(t, n, del)` | `D2GAME_AICORE_Escape` | unit or t = 0 → return 0, nothing done; if n > 5 velocity request steps n; walk to (own x + sign(own x − t.x)·n, own y + sign(own y − t.y)·n), step 1, flags del ? 4 : 0 | none |
 | `0x005DF140(t, n, del)` | `sub_6FCD06D0` | same, running | none |
 | `0x005DF7D0(t, n, del)` | `sub_6FCD0E80` ("circle n") | one step: low byte of `lo'` < 128 → velocity method 5, else 6, with steps n; then walk toward t, step 1, flags del ? 4 : 0 | one |
-| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). A target equal to U's own position: §7.5 rule 8 (no points, neutral at once, think at f + `aidel`; settles REC-665) | none |
+| `0x005DE6D0(t, a, b)` → `0x005DE4E0` | `AITACTICS_WalkInRadiusToTarget` | walk to the point that brings the distance to t toward b by at most a. `0x005DE4E0(game, U, t, mode 2, a, b)`, 1.14d-confirmed (settles REC-501): d := full-size distance `0x005DC380(U, t)`; s := −1 if d < b else +1; k := min(\|d − b\|, a). ax = \|t.x − U.x\|, ay = \|t.y − U.y\|, n := max(ax + ay, k); if n > 0: kx := ax·k / n, ky := ay·k / n (truncated), then **while kx + ky < k: kx += 1, ky += 1** (both, so the sum may pass k). Point = (U.x + sign(t.x − U.x)·kx·s, U.y + sign(t.y − U.y)·ky·s) (sign 0 on an equal axis). No early exit: k = 0, or t on U's position, gives U's own position and the request is still made. Request: `0x005A7E60(U, 2, rec)`, path step count 1 (`0x00649070(path, 1)`), coordinates into the record, `0x005A7C20(game, rec, 1)`; the result is not read. Warriv's recorded arrival walks (`-seed 1234`, player at (4873, 4228)): (4866, 4235)→(4868, 4233) with (3, 2), →(4869, 4232) with (2, 2), →(4870, 4231) with (1, 2). Second recorded case (`town-ama-10k` frame 287, re-read 2026-10-09 PC 1 late, decompile `0x005DE4E0`): Warriv at (4870, 4231), player at (4876, 4218), (3, 2) → (4871, 4228) (n = 19, (0, 2) fixed up to (1, 3)); a "round to nearest of Δ·k / dist" reading gives (4871, 4229), so this vector separates the two (`world/npc.md` Test vectors). A target equal to U's own position: §7.5 rule 8 (no points, neutral at once, think at f + `aidel`; settles REC-665) | none |
 | `0x005DF680(t, n)` | `AITACTICS_RunCloseToTargetUnit` ("run near t n") | 15 (2 with the velocity reset if state 60), point near t, 1, no flags; returns the mode-change result | as wander, around t, n as a byte |
 | `0x005DEF30(x, y)` | `WalkToTargetCoordinatesNoSteps` | 2, coordinates, 0, no flags; returns the mode-change result | none |
 
@@ -1157,7 +1269,15 @@ All AI draws use the thinking monster's unit seed (unit +0x20, `rng.md`
    helpers' draws (§7.2) at the point the helper is called.
 
 Precheck A, the scheduling rules of §1 and the helpers of §6 and §8
-draw nothing. Skill draws after a mode request belong to the skills
+draw nothing. Apart from the forced-target mode-3 draw (item 2), the
+searches of §5 draw nothing on the thinker's seed; the other draw inside
+them is the scan 6 filter's `roll(100)` on a
+**candidate player's** seed when that player has state 146 (§5.3 rule
+1.5). A body's search call (e.g. `0x005DDC30`) therefore decides
+whether the body's next draw happens (its distance gate), without
+drawing itself: FallenShaman and Fallen site-by-site lists are in
+`ai-bodies.md` §9.6 item 8 and §9.4 item 8 (1.14d-confirmed, read
+2026-10-09, PC 1 late). Skill draws after a mode request belong to the skills
 spec and happen later, when the mode's action frame runs.
 
 ## Edge cases & original bugs
@@ -1384,8 +1504,11 @@ Other recorded checks:
    (`drlg/preset.md` §7, `0x00667510`), and the preset spawn
    `0x00555910` (`population.md` §11.1) moves the pointer to control
    +0x38 (`0x0058F000` gives &control +0x38; `0x00666120` moves and
-   clears the preset's). Quest code swaps it later
-   (`world/quests-act3.md`, `0x00587950`). The idle-10 source is settled in
+   clears the preset's). An object preset's path goes instead to
+   `0x00545C90` (objects 459, 461, 543 only), which hands a copy to the
+   Act V quest NPC it spawned (Anya, Nihlathak, Larzuk:
+   `world/quests-act5.md` §3.8 "Where Larzuk's map AI comes from", §5.8);
+   Act III's equivalents are dead (`world/quests-act3-2.md` §11.6). The idle-10 source is settled in
    `ai-bodies.md` §9.9 (command 4 delay). Left: confirm with a town recording that logs command 4 next to thinks.
 9. The 2 recorded fallen1 type-1 runs with no schedule and later
    activity: likely a death end followed by a shaman resurrect; check

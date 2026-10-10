@@ -37,15 +37,15 @@
 | Rules | 86–87 |
 |   1. Conventions | 88–170 |
 |   2. Act V records | 171–198 |
-|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–285 |
-|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 286–410 |
-|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 411–645 |
-| Constants & data dependencies | 646–663 |
-| Randomness | 664–673 |
-| Edge cases & original bugs | 674–708 |
-| Test vectors | 709–723 |
-| Provenance | 724–748 |
-| Open questions | 749–816 |
+|   3. A5Q1 Siege on Harrogath (chain 31, slot 35) | 199–321 |
+|   4. A5Q2 Rescue on Mount Arreat (chain 32, slot 36) | 322–446 |
+|   5. A5Q3 Prison of Ice (chain 33, slot 37) | 447–681 |
+| Constants & data dependencies | 682–699 |
+| Randomness | 700–709 |
+| Edge cases & original bugs | 710–744 |
+| Test vectors | 745–759 |
+| Provenance | 760–784 |
+| Open questions | 785–852 |
 <!-- /index -->
 
 ## Summary
@@ -266,6 +266,42 @@ status < 3 → status 3 to all.
   `0x00666120`, +0x17 := 1). `0x00587950` (map-AI store, from
   `0x00545CB3`) copies the map AI to +0x00 and applies it the same way
   when Larzuk exists. Init 70 (object 542) is a bare `ret`.
+- **Where Larzuk's map AI comes from, and when** (1.14d-confirmed
+  `0x00555910`, `0x00545C90`, `0x00587950`, `0x006660B0`, `0x00666120`,
+  `0x0058F000`, `0x0054F5D0`, read 2026-10-09, PC 1 late). Larzuk has no
+  preset of his own: his nodes are the DS1 path of the object 543 preset
+  (Act V DS1 object id 126, `drlg/preset.md` §5.2 step 10, §5.3; the path
+  points are offset with the preset by the unit filter, §7). Order, all
+  inside the first population of the DRLG room holding the dummy
+  (`drlg/rooms.md` first spawn, non-monster walk, before any preset
+  monster of that room):
+  1. `0x00555910` creates object 543 (`0x005557D0` → `0x00555230` →
+     `0x0054F5D0`); its init 71 runs inside the creation (`objects.md`
+     §3 rule 6) and spawns Larzuk as above. Record +0x00 is still 0, so
+     the init's "apply once" does nothing.
+  2. Back in `0x00555910`, type 2 → `0x00545C90(game, object, path)`:
+     path ≠ 0 and class 543 → `0x00587950(path)`: chain-31 record
+     (`0x00543640`) and path ≠ 0 → +0x00 := a fresh copy (`0x006660B0`:
+     count and points copied to new allocations; the preset keeps its
+     own path). +0x15 set, Larzuk found by GUID (`0x00552F60`), copy and
+     its point pointer non-null, +0x17 clear → control +0x38 := the copy
+     (`0x00666120` moves it and zeroes +0x00), +0x17 := 1.
+  No draw anywhere in steps 1–2 beyond the spawn's own (the copy is pool
+  allocation only). Without a chain-31 record neither Larzuk nor the
+  store happens. The map AI is then used by the Npc AI think
+  (`monsters/ai-bodies.md` §9.9 Map AI: `lo' % 100` < 66 → `roll(count)`
+  node). Generic preset monsters take their own path directly
+  (`monsters/population.md` §11.1); the other Act V objects with this
+  store are 459 (Anya) and 461 (Nihlathak), §5.8.
+  Measured (townWest.ds1 from d2exp.mpq, parsed 2026-10-09 by the DS1
+  rules of `drlg/preset.md` §5): object 126 at (143, 28) carries a
+  2-point path, (action 2; 144, 37) and (action 4; 142, 44), i.e. level
+  sub-tiles (5144, 5037) and (5142, 5044) in the recording below.
+  Recorded (`traces/orig-cache/milestone-act5-entry`, MilA5, seed 1234):
+  Larzuk (1:5) stands at (5145, 5031); frame 26 his seed steps once
+  (`lo % 100` = 81 ≥ 66: map AI returns 0, idle 8); frame 34 it steps
+  twice (25 < 66, then `roll(2)` = 0) and he walks to node 0, (5144,
+  5037). A Larzuk without map AI makes no draw at frame 26.
 - Shenk activated (`0x00587900`, from the AI at `0x005E27D0`): chain 31
   not-intro, status < 2 and the unit's superunique id (`0x005A01E0`) = 42
   → status 2 to all.

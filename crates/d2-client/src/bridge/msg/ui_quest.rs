@@ -18,19 +18,21 @@ fn len(msg: &Message<'_>, n: usize, what: &'static str) -> Result<(), HandlerErr
 }
 
 /// 0x29 GameQuestInfo (§12): the 96-byte game quest record @1.
-pub fn game_quest_flags(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+pub fn game_quest_flags(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 97, "0x29 is 97 bytes")?;
     let mut record = [0u8; 96];
     record.copy_from_slice(&msg.bytes[1..]);
+    w.quest_game = Some(record);
     msg.out.push(Output::GameQuestFlags { record });
     Ok(())
 }
 
 /// 0x52 QuestLogInfo (§13): 41 status bytes @1.
-pub fn quest_log(_: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
+pub fn quest_log(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), HandlerError> {
     len(msg, 42, "0x52 is 42 bytes")?;
     let mut status = [0u8; 41];
     status.copy_from_slice(&msg.bytes[1..]);
+    w.quest_status = Some(status);
     msg.out.push(Output::QuestLog { status });
     Ok(())
 }
@@ -63,6 +65,13 @@ pub fn quest_special(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         // `0x0044D520`; the two flags are the output's.
         w.outgoing.push(vec![0x69]);
         w.exit_requested = true;
+    }
+    if code == 1 {
+        w.quest_counters = [
+            i32::from(words[0]),
+            i32::from(words[1]),
+            i32::from(words[2]),
+        ];
     }
     if code == 36 {
         // `0x004A3100`: the zoo latch of the client chickens
