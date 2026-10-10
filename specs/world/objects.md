@@ -59,7 +59,7 @@
 | Edge cases & original bugs | 1046–1112 |
 | Test vectors | 1113–1151 |
 | Provenance | 1152–1218 |
-| Open questions | 1219–1272 |
+| Open questions | 1219–1283 |
 <!-- /index -->
 
 ## Summary
@@ -1269,3 +1269,14 @@ lists of §2 from the live `shrines.txt`.
 16. `0x0061B060(…, 3)` (portal arrival point without a partner, §12
     rule 8): the DRLG spec owns which point kind 3 is. **Answered**:
     3 is the free-point size (§12 rule 8, `0x00584A59`).
+
+#### 9.3a Shrine missile creation (`0x0059FA30`)
+
+The storm and potion shrines call the missile creator with the parameter
+record of `missiles/missiles.md` §R2.1. Storm: flags 3, start = the shrine's
+path position, target = offset (relative). Potions (`0x005830E0`,
+`0x00583410`): flags 0x520 (absolute target 0x20, frames-from-distance
+0x400); start = the shrine's position, target = shrine position + offset.
+Owner P, class 62 / 45 / 48, skill level clamp(P level / 5, 1, 8); the
+gfx word (+0x24) is 1 and unread. Wired in `ObjectView::create_missile`
+(rc-shrine-missile).
