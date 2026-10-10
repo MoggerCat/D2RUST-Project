@@ -1189,13 +1189,17 @@ pub trait Pending {
     fn party_size(&self, unit: UnitId) -> Option<i32> {
         None
     }
-    /// `treasure.md` §3.3 for recipient `r`: the quest owner `P` is a
-    /// player whose quest flags for the difficulty have none of 15, 1 and
-    /// `cp` (quests and owner resolution `0x0058F0D0`, `0x0063A690`,
-    /// `0x00552F60`). False: no quest TC.
-    fn quest_tc_open(&self, r: UnitId, cp: u8) -> bool {
+    /// `treasure.md` §3.3 for the quest owner `p` (resolved by the
+    /// caller): `p` is a player whose quest flags for the difficulty
+    /// (`0x00543520`) of quest `quest` have none of 15, 1 and `cp`. False:
+    /// no quest TC.
+    fn quest_tc_open(&self, p: UnitId, quest: u8, cp: u8) -> bool {
         false
     }
+    /// The players' quest flags for the game's difficulty, published by
+    /// the quest control once per tick (for [`Self::quest_tc_open`]).
+    /// Default: nothing.
+    fn publish_quest_flags(&mut self, flags: &[(UnitId, crate::world::quests::QuestFlags)]) {}
 
     // ---- vitals (`combat/vitals.md` §3; the rest of `VitalsRest`) ------
 

@@ -26,4 +26,4 @@ C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-thro
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
 C067	rc-drops-order	17:39	items-drops-nor-09 category ass 16 vs 5; nor-10 gld missing (drop pick)	done EQUAL 3456 -> 3457 (nor-09/-12 order, hel-04/-05 MATCH; nor-10 is a separate cause: 3 monsters never die in d2rs, not drop picking)
-C010q	rc-drops-order	18:27	items-drops-nor-07 Andariel quest TC (TreasureClass4/TCQuestId, quest_tc_open never implemented)	open
+C010q	rc-drops-order	18:27	items-drops-nor-07 Andariel quest TC (TreasureClass4/TCQuestId, quest_tc_open never implemented)	done EQUAL 3457 -> 3458 (nor-07 MATCH)

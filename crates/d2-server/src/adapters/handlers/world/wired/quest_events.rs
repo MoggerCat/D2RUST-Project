@@ -154,6 +154,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         let mut armed = false;
         let mut not_intro = Vec::new();
         let mut rescue = Vec::new();
+        let mut quest_flags = Vec::new();
         self.desk(game, events, |desk, ctl, inv| {
             let ((), _) = quest_call(desk, ctl, inv, |q, w| {
                 for e in &queued {
@@ -262,6 +263,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 armed = act5::q5::armed(q);
                 not_intro = q.records.iter().map(|r| (r.chain, r.not_intro)).collect();
                 rescue = act5::q2::barbarian_states(q);
+                let d = usize::from(w.difficulty());
+                for p in w.players() {
+                    if let Some(f) = w.quests(p).map(|r| r.flags[d]) {
+                        quest_flags.push((p, f));
+                    }
+                }
             });
         });
         if let Some(open) = lair {
@@ -279,6 +286,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
             events.action().sys.hooks.x.set_durance_open(open);
         }
         events.action().sys.hooks.x.set_ancients_armed(armed);
+        events
+            .action()
+            .sys
+            .hooks
+            .x
+            .publish_quest_flags(&quest_flags);
         if let Some(open) = summit {
             events.action().sys.hooks.x.set_summit_open(open);
         }

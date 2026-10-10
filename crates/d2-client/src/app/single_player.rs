@@ -561,6 +561,10 @@ pub struct LocalSeams {
     /// control once per tick (`Pending::publish_not_intro`): the not-intro
     /// test `0x005444B0` of population and the missile bodies.
     pub not_intro: BTreeMap<u8, bool>,
+    /// The players' quest flags for the difficulty, published by the
+    /// quest control once per tick (`Pending::publish_quest_flags`), for
+    /// the quest TC test (`treasure.md` §3.3).
+    pub quest_flags: BTreeMap<UnitId, QuestFlags>,
     /// The caged barbarians' group states by GUID (counting, portal
     /// GUID), published by the quest control once per tick
     /// (`Pending::publish_rescue`).
@@ -889,6 +893,17 @@ impl Pending for LocalSeams {
     }
     fn publish_not_intro(&mut self, records: &[(u8, bool)]) {
         self.not_intro = records.iter().copied().collect();
+    }
+    fn publish_quest_flags(&mut self, flags: &[(UnitId, QuestFlags)]) {
+        self.quest_flags = flags.iter().copied().collect();
+    }
+    /// `treasure.md` §3.3: `p` is a player (it has a published record)
+    /// whose flags of `quest` have none of 15 (completed before), 1
+    /// (reward pending) and `cp`.
+    fn quest_tc_open(&self, p: UnitId, quest: u8, cp: u8) -> bool {
+        self.quest_flags
+            .get(&p)
+            .is_some_and(|f| !(f.get(quest, 15) || f.get(quest, 1) || f.get(quest, cp)))
     }
     /// d2rs-own, unverified (REC-799): the prisoner AI's hooks with an
     /// effect run on the quest control after the tick.

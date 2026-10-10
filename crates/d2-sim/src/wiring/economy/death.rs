@@ -326,7 +326,17 @@ fn drop_of<X: Pending, F: FreeSpot>(
     // query) and handed to the TC choice, which uses it only when its
     // other conditions hold.
     let quest_open = match target {
-        Some(r) if m.tcquestid != 0 => h.x.quest_tc_open(r, m.tcquestcp),
+        // `P` = `R` if `R` is a player, else `R`'s minion owner
+        // (`0x0058F0D0`) when it has one, else `R`.
+        // TODO(treasure.md §3.3): the owner named by a stat list with
+        // flag 0x800 (`0x0063A690`, `0x00552F60`) is not read.
+        Some(r) if m.tcquestid != 0 => {
+            let p = match sim.units.get(r).map(|u| u.ty) {
+                Some(UnitType::Player) => r,
+                _ => h.x.minion_owner(r).unwrap_or(r),
+            };
+            h.x.quest_tc_open(p, m.tcquestid, m.tcquestcp)
+        }
         _ => false,
     };
     let start_room = room.and_then(|rm| h.drlg.find_room(sim.game, rm, x + 2, y + 3));

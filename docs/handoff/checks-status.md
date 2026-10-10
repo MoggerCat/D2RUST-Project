@@ -1052,7 +1052,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-nor-04 | items | DIVERGED | 4/5 | item #2 (mp5) frame: 1.14d 54 vs d2rs 55 | unrouted |
 | items-drops-nor-05 | items | MATCH | 1/1 | - | - |
 | items-drops-nor-06 | items | MATCH | 4/4 | - | - |
-| items-drops-nor-07 | items | DIVERGED | 0/9 | item #0 (gsv) stream byte 7, y (bit 1 of 16): 1.14d 00658c822215e26cce vs d2rs 00658c826215e26cce | unrouted |
+| items-drops-nor-07 | items | MATCH | 7/7 | - | - |
 | items-drops-nor-08 | items | MATCH | 1/1 | - | - |
 | items-drops-nor-09 | items | MATCH | 8/8 | - | - |
 | items-drops-nor-10 | items | DIVERGED | 6/8 | item #6 (gld) missing in d2rs | unrouted |

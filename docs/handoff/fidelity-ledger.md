@@ -16,7 +16,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | coverage | 77 | 22 | 0 | 7 | 0 | 0 | 48 | 6 | 23 | 0 | 49–196 | 0 | 63 / 7 / 7 |
 | drlg | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
-| items | 722 | 28 | 0 | 37 | 0 | 0 | 657 | 13 | 52 | 0 | 110.5–442 | 65 | 665 / 0 / 57 |
+| items | 723 | 28 | 0 | 37 | 0 | 0 | 658 | 13 | 52 | 0 | 110.5–442 | 65 | 666 / 0 / 57 |
 | missiles | 117 | 1 | 0 | 0 | 0 | 0 | 116 | 0 | 1 | 0 | 2–8 | 0 | 115 / 2 / 0 |
 | monsters | 660 | 55 | 0 | 5 | 0 | 0 | 600 | 1 | 59 | 0 | 118.5–474 | 5 | 458 / 187 / 15 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
@@ -34,7 +34,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | skills | 655 | 46 | 0 | 10 | 0 | 0 | 599 | 8 | 48 | 0 | 100–400 | 6 | 556 / 88 / 11 |
 | systems | 918 | 339 | 16 | 136 | 0 | 99 | 328 | 147 | 342 | 2 | 773.5–3030+ | 69 | 620 / 0 / 298 |
 | world | 826 | 38 | 0 | 40 | 0 | 0 | 748 | 11 | 62 | 5 | 169.5–518+ | 171 | 772 / 16 / 38 |
-| **all** | 4480 | 648 | 16 | 260 | 0 | 99 | 3457 | 283 | 629 | 12 | 1495.5–5598+ | 316 | 3714 / 311 / 455 |
+| **all** | 4481 | 648 | 16 | 260 | 0 | 99 | 3458 | 283 | 629 | 12 | 1495.5–5598+ | 316 | 3715 / 311 / 455 |
 
 ## By family
 
@@ -644,7 +644,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `item.base` | 4 | 0 | 0 | 1 | 0 | 0 | 3 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `item.bitstream` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `item.desc` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
-| `item.drop` | 2 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
+| `item.drop` | 3 | 1 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `item.gamble` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `item.gen` | 10 | 0 | 0 | 4 | 0 | 0 | 6 | 0 | 0 | 4 | 0 | 5 | 0 |
 | `item.identify` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -8555,6 +8555,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `item.base.weapons` | content | EQUAL | - | MATCH | yes | 0 | n | - | specs/items/generation.md | rc-combat-seed (2026-10-10, REC-3532, causes-99 C010): the checks behind this row re-run on 1.14d: items channel MATCH on every frame, 44/44 checks (gen-item-00..19, gen-itemq-*); no ignore line. Cause: the unidentified socketed item's 4-bit socket count is sent from the item's own flags, not the header word (bitstream.md section 4.5 rule 5) |
 | `item.bitstream` | system | EQUAL | - | PARTIAL | ? | 2 | n | claude/q-fix-server-store-fill | specs/items/bitstream.md,specs/items/bitstream-legacy.md | rc-run-2b: all checks MATCH or PARTIAL under DECIDED REC-2055/2056 |
 | `item.drop.quest-kill-order` | system | EQUAL | - | MATCH | yes | 1 | n | claude/rc-drops-order | specs/world/quests.md | rc-drops-order: the quest kill parse (Radament ass, Hephasto hfh) ran after the tick, so its drop missed the client pass queue walk and was announced after the TC items; now run at the end of tick step 4 (before the client pass); nor-09/-12 items 8/8 |
+| `item.drop.quest-tc` | system | EQUAL | - | MATCH | yes | 0 | n | claude/rc-drops-order | specs/items/treasure.md | rc-drops-order: the quest TC test (Pending::quest_tc_open) had no host answer, so Andariel always used TC1 (gold first); now the players quest flags are published by the quest control and the test reads quest TCQuestId flags 15/1/cp; nor-07 items 7/7. The stat-list 0x800 owner case is not read (TODO) |
 | `item.gen.base-stats` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/generation.md | rc-link-2 C006 (2026-10-10): re-run on integ-r23 (checks-status.md): no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap; stale DIVERGED settled |
 | `item.gen.create-wrapper` | system | EQUAL | - | MATCH | yes | 0 | n | - | specs/items/generation.md | rc-combat-seed (2026-10-10, REC-3532, causes-99 C010): the checks behind this row re-run on 1.14d: items channel MATCH on every frame, 44/44 checks (gen-item-00..19, gen-itemq-*); no ignore line. Cause: the unidentified socketed item's 4-bit socket count is sent from the item's own flags, not the header word (bitstream.md section 4.5 rule 5) |
 | `item.gen.ethereal` | system | EQUAL | - | MATCH | yes | 0 | n | - | specs/items/generation.md | rc-combat-seed (2026-10-10, REC-3532, causes-99 C010): the checks behind this row re-run on 1.14d: items channel MATCH on every frame, 44/44 checks (gen-item-00..19, gen-itemq-*); no ignore line. Cause: the unidentified socketed item's 4-bit socket count is sent from the item's own flags, not the header word (bitstream.md section 4.5 rule 5) |
