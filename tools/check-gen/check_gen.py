@@ -43,7 +43,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -1003,10 +1003,54 @@ def fam_monskill(ctx):
 
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill}
 
 
 # ----------------------------------------------------------- ledger join
+
+# Quest monsters (ledger monster.quest.*): kind of monster by spawn directive.
+# (area suffix, [(spawn directive kind, row or class)])
+QKILL = [("ancients", [("su", 44), ("su", 45), ("su", 46)]), ("baal", [("boss", 544)]),
+         ("blood-raven", [("boss", 267)]), ("cain-rescue-guard", [("su", 3), ("su", 4)]),
+         ("countess", [("su", 6)]), ("cow-king", [("su", 39)]),
+         ("griswold", [("boss", 365)]), ("hellforge-hephasto", [("su", 41)]),
+         ("izual", [("boss", 256)]), ("nihlathak", [("boss", 526)]),
+         ("radament", [("boss", 229)]), ("summoner", [("boss", 250)])]
+
+
+def fam_qkill(ctx):
+    """Quest monster kill: the monster (or superunique) spawned in the empty Blood Moor, its
+    life set to 1, killed by a missile; the state channel compares the death, corpse and
+    drops frame by frame."""
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx"])
+    cls = {ms.get(r, "Id"): ms.get(r, "hcIdx") for r in ms.rows if ms.get(r, "hcIdx").isdigit()}
+    su = excel(ctx.excel, "superuniques.txt", ["Superunique", "Class", "hcIdx"])
+    out = []
+    for slug_, parts in QKILL:
+        lines, refs = [], []
+        for i, (kind, n) in enumerate(parts):
+            dx = 4 + 3 * i
+            if kind == "su":
+                refs.append(cls[su.get(su.rows[n], "Class")])
+                lines.append(f"at 30 poke superunique {n} @x+{dx} @y+4")
+            else:
+                refs.append(str(n))
+                lines.append(f"at 30 poke spawn {n} @x+{dx} @y+4 normal")
+        for r in dict.fromkeys(refs):
+            lines.append(f"at 50 poke stat @1:{r} 6 0 256")
+        for i in range(len(parts)):
+            lines.append(f"at 54 poke missile 58 @x @y @x+{4 + 3 * i} @y+4")
+        c = Check(f"gen-qkill-{slug_}", "qkill", "quest monster " + slug_,
+                  f"quest monster {slug_} spawned and killed", "ScnAma --class ama --expansion",
+                  180, 360, "state", BM + SEEDS + lines, variant="blood-moor-empty",
+                  comment=[f"Quest monster {slug_} ({', '.join(f'{k} {n}' for k, n in parts)}) "
+                           "spawned next to the player in the empty Blood Moor, life set to 1 "
+                           "at frame 50, hit by a missile at frame 54; the state channel compares "
+                           "death, corpse, drops and quest-record effects frame by frame."])
+        c.extra = {"area": f"monster.quest.{slug_}"}
+        out.append(c)
+    return out
+
 
 def load_ledger(path):
     """area ids of the fidelity ledger, for the headers of the checks."""
@@ -1067,6 +1111,8 @@ def resolve_area(c, areas):
                 and s.endswith(f"(hcIdx {x['class']})")]
     elif f == "monskill":
         pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
+    elif f == "qkill":
+        pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":
