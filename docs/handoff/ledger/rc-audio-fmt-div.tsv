@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+system.audio.triggers.5-footsteps-0x004caf60-u	system	systems	specs/audio/triggers.md §5. Footsteps (`0x004CAF60(U)`)	specs/audio/triggers.md	draft	-	-	?	0	n	-	DIVERGED	M	rc-audio-fmt-div cause 1 (REC-3000): NPC first-step artefact fixed, town-ambience footsteps now equal 1.14d in tick and volume at 30/35/38/41; still DIVERGED: the walker NPC pauses 38-51 in 1.14d (NPC path), full run needs a fresh 1.14d capture (no pcm in repo)
