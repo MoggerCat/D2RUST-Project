@@ -1021,6 +1021,10 @@ def fam_qkill(ctx):
     su = excel(ctx.excel, "superuniques.txt", ["Superunique", "Class", "hcIdx"])
     out = []
     for slug_, parts in QKILL:
+        # a table without the superunique row (the selftest's synthetic view) skips that quest
+        if any(k == "su" and (n >= len(su.rows) or su.get(su.rows[n], "Class") not in cls)
+               for k, n in parts):
+            continue
         lines, refs = [], []
         for i, (kind, n) in enumerate(parts):
             dx = 4 + 3 * i
