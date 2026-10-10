@@ -168,17 +168,15 @@ impl<X: Pending> AiUnits for View<'_, X> {
             None => self.h.x.vision_seen(unit),
         }
     }
-    /// §5.2 step 7 on the record: +0x24 := 1.
-    ///
-    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
-    /// REC-1698): the word is set to 1 and never cleared.
-    fn mark_seen(&mut self, unit: UnitId) {
+    /// §5.2 step 7 on the record: +0x24 := `value` (S == 0), written
+    /// only when step 2 loaded the record (`0x005DDBE6`).
+    fn mark_seen(&mut self, unit: UnitId, value: u32) {
         match self.h.monster_data(unit).map(|m| m.vision) {
             Some(Some(r)) => {
-                self.h.vision_seen.insert(r, 1);
+                self.h.vision_seen.insert(r, value);
             }
             Some(None) => {}
-            None => self.h.x.mark_seen(unit),
+            None => self.h.x.mark_seen(unit, value),
         }
     }
     fn ai_reset(&mut self, unit: UnitId) {
@@ -349,9 +347,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     }
     /// `0x005DE4E0`: mode 2 (walk) to [`crate::monsters::ai::radius_point`]
     /// with path step count 1, as the walks to coordinates (`ai.md` §7.2).
-    /// No point (k ≤ 0 or t on the unit) → the request is still made, at
-    /// the unit's own cell (§7.5 rule 8, REC-665): no path, neutral, and
-    /// the think at f + `aidel`.
+    /// k = 0 or t on the unit → the request is still made, at the unit's
+    /// own cell (§7.5 rule 8, REC-665): no path, neutral, and the think at
+    /// f + `aidel`.
     fn walk_in_radius(
         &mut self,
         game: &mut Game,
@@ -363,7 +361,8 @@ impl<X: Pending> AiModes for View<'_, X> {
     ) -> bool {
         let at = self.h.path_position(unit);
         let to = self.h.path_position(target);
-        let (x, y) = crate::monsters::ai::radius_point(at, to, a, b).unwrap_or(at);
+        let size = self.path_size(unit);
+        let (x, y) = crate::monsters::ai::radius_point(at, size, to, a, b);
         AiModes::set_path_steps(self, unit, 1);
         self.change_mode_with(game, unit, 2, ModeTarget::Point(x, y), None, velocity)
     }
@@ -439,8 +438,24 @@ impl<X: Pending> AiWorld for View<'_, X> {
             None => self.h.x.in_melee_range(a, b, 0),
         }
     }
+    /// `0x005DC640` (`ai.md` §6) with the path provider
+    /// ([`crate::path::line::can_reach_directly`] on the path positions,
+    /// `unit`'s size and room); else [`Pending`].
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
-        self.h.x.can_reach_directly(game, unit, target)
+        if self.h.paths.is_none() {
+            return self.h.x.can_reach_directly(game, unit, target);
+        }
+        let (ax, ay) = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let b = self.h.path_position(target);
+        let d = crate::monsters::ai::distance_full_size((ax, ay), size, b);
+        let a = crate::path::line::LineUnit {
+            room: game.lists.unit(unit).and_then(|e| e.room()),
+            x: ax,
+            y: ay,
+            size,
+        };
+        crate::path::line::can_reach_directly(&self.h.drlg, &a, b, d)
     }
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)
@@ -919,6 +934,37 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// Path +0x18 / +0x1A of the unit's dynamic path (`0x00648A20` /
+    /// `0x00648A30`); no dynamic path: (0, 0).
+    fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let f = d.final_target();
+            (f.x, f.y)
+        })
+    }
+    /// Path +0x10 / +0x12 of the unit's dynamic path; none: (0, 0).
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let t = d.target();
+            (t.x, t.y)
+        })
+    }
+    /// `0x0061B130` → `0x0066CE30` (`drlg/levels.md` §11.4), as the
+    /// population view's: the room holding the point among `room` and its
+    /// adjacency array; none (or no room) → 0; that room's record at the
+    /// point → its index; no record → −1.
+    fn coord_index(&self, game: &Game, room: Option<RoomId>, x: i32, y: i32) -> i32 {
+        let Some(at) = room.and_then(|r| self.h.drlg.find_room(game, r, x, y)) else {
+            return 0;
+        };
+        self.h
+            .drlg
+            .drlg_room(game, at)
+            .and_then(|(d, r)| d.coord_at(r, x, y))
+            .map_or(-1, |c| c.index as i32)
+    }
     /// The Act V prisoner AI's hooks (`quests-act5.md` §4.10): the reads
     /// from the quest control's published states
     /// ([`Pending::quest_rescue`]); the calls with an effect queued for

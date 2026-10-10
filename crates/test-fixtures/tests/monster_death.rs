@@ -24,7 +24,7 @@
 //! function sets its mode), the COF name and the animation rate (the
 //! death record "BEDTHTH", 24 frames, speed 256, added to this test's
 //! AnimData), and unit +0xB0 (6, the recorded e of `-015956` frame
-//! 2724).
+//! 2724; written on the record, as the kill is direct, without a hit).
 
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -93,9 +93,6 @@ impl Pending for Fx {
     /// AnimData speed.
     fn anim_rate(&self, _: UnitId, speed: Option<u32>) -> i16 {
         speed.map_or(0, |s| s as i16)
-    }
-    fn unit_b0(&self, _: UnitId) -> u8 {
-        B0
     }
     /// The death start's body is not written: mode DT (a start function
     /// sets its mode, monster spec).
@@ -259,6 +256,15 @@ fn run() -> Run {
     let kill_frame = host.game.game.frame;
     {
         let s = &mut host.game;
+        // The killing hit's class store (`damage.md` §7.1 step 2): the
+        // direct kill has no hit, so the fixture writes +0xB0.
+        s.events
+            .action
+            .sys
+            .units
+            .get_mut(monster)
+            .unwrap()
+            .hit_class = u32::from(B0);
         s.events
             .action
             .combat(&mut s.game, |cv, _| kill(cv, monster, player));

@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "ass-inferno-sentry",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnAss",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "35a1180827a4e4cb14dad49d9a11556d643ad7a2e461f6b178b2d93573724765",
+   "size": 363396
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "ac2fb2a4c72a147fc669f69b6bdf4af15917d6988e12762839a03a95a15617e1",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
+  "save": "995738a9fc22d291631ea854f890b74cb1d30675427ce58bcde40457226b2ec9"
+ }
+}

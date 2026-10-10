@@ -99,7 +99,9 @@ use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
-use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
+use d2_server::world_data::tables::{
+    class_picks, drop_tables, hireling_tables, LevelTables, SaveData,
+};
 use d2_server::world_data::{self, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::drlg::maze::Maze;
@@ -549,6 +551,9 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The Ancients' fight is armed (`Pending::set_ancients_armed`); the
+    /// Ancients' AI gate `0x0058CF90` answers "not activatable" while not.
+    pub ancients_armed: bool,
     /// The quest records' not-intro bytes by chain, published by the quest
     /// control once per tick (`Pending::publish_not_intro`): the not-intro
     /// test `0x005444B0` of population and the missile bodies.
@@ -587,11 +592,16 @@ impl LocalSeams {
     ///
     /// PROVISIONAL (REC-279 part 2; d2rs-own, unverified): the ranges are
     /// settled (`ai.md` §5.2 step 4: 35; §5.3 scan 6: full-size < 49), but
-    /// the scan 6 filter `0x005DC970`, the `nThreat` main / alternative
-    /// classes, the line test (mask 4) and `0x005DD510` are not applied
-    /// here, nor the scan 5 callback `0x005DCA70`.
+    /// of the scan 6 filter `0x005DC970` only the dead test and unit flag
+    /// 0x4 are applied, and the `nThreat` main / alternative classes, the
+    /// line test (mask 4) and `0x005DD510` are not, nor the rest of the
+    /// scan 5 callback `0x005DCA70`. PROVISIONAL (REC-1642): scan 5 skips
+    /// a monster without unit flag 0x4 like scan 6 (1.14d, q-fix-skills-4cls
+    /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
+    /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
+    /// scan 5 callback's reading.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |_| true)
+        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
     }
 
     /// [`Self::nearest_foe`] among the candidates `keep` accepts.
@@ -791,10 +801,13 @@ impl Pending for LocalSeams {
             QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
             QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
             QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
-            QuestCall::AncientsNotActivatable => {
-                self.quest_events.push(QuestEvent::AncientsDisarm);
-                return false;
-            }
+            // PROVISIONAL (REC-1561, d2rs-own, unverified): the gate
+            // `0x0058CF90` answers "not armed" and changes nothing (its
+            // name, the AI's use as an idle test and the kill rule that
+            // needs the armed byte all agree; `quests-act5-2.md` §7.9
+            // reads it as "armed := 0", under which no Ancient death
+            // counts). PC 1: confirm the instruction.
+            QuestCall::AncientsNotActivatable => return !self.ancients_armed,
             _ => return false,
         }
         true
@@ -830,6 +843,9 @@ impl Pending for LocalSeams {
                 // for the Compelling Orb, except from Durance 2.
                 || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
+    }
+    fn set_ancients_armed(&mut self, armed: bool) {
+        self.ancients_armed = armed;
     }
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
@@ -986,6 +1002,40 @@ impl Pending for LocalSeams {
     }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
+    }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
+    }
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
+        skill_events::right_aura_select(h, sim, player);
     }
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);
@@ -1361,6 +1411,8 @@ pub struct LiveData {
     pub tables: GameTables,
     /// The chest drop's tables (`ActionHooks::object_drops`).
     pub drops: Arc<DropTables>,
+    /// The item class picks of the drop helpers (`DeathDrops::with_picks`).
+    pub picks: Arc<d2_sim::treasure::class_pick::ClassPicks>,
     /// `InteractionState::hireling_tables`.
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
@@ -1398,6 +1450,7 @@ impl LiveData {
             levels,
             files,
             drops: Arc::new(drop_tables(&tables.fixed)?),
+            picks: Arc::new(class_picks(&tables.fixed)?),
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
@@ -2080,8 +2133,7 @@ struct GameParts {
     bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
-    /// The object and quest drop helpers' pick rows (`world/objects-2.md`
-    /// §20.5, `DeathDrops::with_picks`); `None`: none (synthetic).
+    /// The drop helpers' class picks (`DeathDrops::with_picks`).
     picks: Option<Arc<d2_sim::treasure::class_pick::ClassPicks>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
@@ -2114,7 +2166,7 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
-            picks: Some(Arc::new(t.class_picks()?)),
+            picks: Some(d.picks.clone()),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
@@ -2252,8 +2304,6 @@ pub fn build_with(
     })?;
     // The chest drop's state (`treasure.md` §4): its seed, creation
     // fields and unique bits are the action wiring's.
-    // With the pick rows: the object drops (`objects-2.md` §20: the gold
-    // placeholder, armor stands, racks, ...) find their item by code there.
     let picks = parts.picks;
     sim.action.hooks().object_drops = parts.drops.map(|t| {
         let d = DeathDrops::new(t, GameFields::new(Seed::init_low(0), false));

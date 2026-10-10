@@ -26,6 +26,7 @@ use d2_sim::drlg::preset::{MonPresetRow, PresetData, PresetDef, PresetTables};
 use d2_sim::drlg::DrlgData;
 use d2_sim::items::bitstream::read::read_save_entry;
 use d2_sim::items::ItemTables;
+use d2_sim::treasure::class_pick::ClassPicks;
 use d2_sim::treasure::{item_list, TcSources, TreasureClasses};
 use d2_sim::wiring::economy::DropTables;
 use d2_sim::world::hirelings::{HirelingRows, HirelingTables};
@@ -131,6 +132,19 @@ pub fn drop_tables(set: &FixedSet) -> Result<DropTables, WorldDataError> {
         treasure_items,
         superuniques: records::<Superuniques>(set)?,
     })
+}
+
+/// The pick columns of the combined items array (weapons, armor, misc)
+/// the object and quest drop helpers read (`world/objects-2.md` §20.3,
+/// §20.5, `items/treasure.md` §9.1): a host sets them on its drop state
+/// (`DeathDrops::with_picks`); without them the gold-code lookup finds
+/// nothing and no object or quest drop is made.
+pub fn class_picks(set: &FixedSet) -> Result<ClassPicks, WorldDataError> {
+    Ok(ClassPicks::new(
+        &records::<Weapons>(set)?,
+        &records::<Armor>(set)?,
+        &records::<Misc>(set)?,
+    ))
 }
 
 /// The tables the `.d2s` reader and writer read (`formats/d2s.md` Inputs,

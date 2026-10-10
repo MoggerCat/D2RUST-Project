@@ -68,26 +68,26 @@ pub fn mode_request(
     code: u8,
     record: [i32; 7],
     out: &Outputs,
-) -> Result<(), HandlerError> {
+) -> Result<bool, HandlerError> {
     // A missile's request returns 1 at once (rule 1): not stored.
     if key.unit_type == MISSILE {
-        return Ok(());
+        return Ok(true);
     }
     let Some(u) = w.units.get_mut(&key) else {
-        return Ok(());
+        return Ok(true);
     };
     // Rule 3.
     u.last_mode_request = Some(ModeRequest { code, record });
     u.mode_requests = u.mode_requests.wrapping_add(1);
     match key.unit_type {
         PLAYER => player(w, inputs, key, code, record),
-        OBJECT => object(w, inputs, key, code, record, out),
+        OBJECT => object(w, inputs, key, code, record, out).map(|()| true),
         ITEM => {
             item(w, key, code, record);
-            Ok(())
+            Ok(true)
         }
-        MONSTER => monster(w, inputs, key, code, record),
-        _ => Ok(()),
+        MONSTER => monster(w, inputs, key, code, record).map(|()| true),
+        _ => Ok(true),
     }
 }
 
@@ -158,7 +158,7 @@ fn player(
     key: UnitKey,
     code: u8,
     r: [i32; 7],
-) -> Result<(), HandlerError> {
+) -> Result<bool, HandlerError> {
     if matches!(code, 3..=5 | 0x0A..=0x11) || code > 0x19 {
         return Err(HandlerError::Fatal(FATAL_PLAYER_CODE));
     }
@@ -247,6 +247,17 @@ fn player(
             if let Some(m) = skill_mode(inputs, r[0], PLAYER) {
                 set(w, m);
             }
+            // Step 5: the `cltstfunc` returns 0 → current := none, mode
+            // set 1, and the request returns 0. 0x15's start clears the
+            // target (§8 r7); 0x16's is the unit of (r2 type, r3 GUID).
+            let target = (code == 0x16).then(|| UnitKey::new(r[2] as u8, r[3] as u32));
+            if !super::use_state::client_start_passes(w, inputs, key, r[0] as u16, target) {
+                if let Some(l) = w.units.get_mut(&key).and_then(|u| u.skills.as_mut()) {
+                    l.current = None;
+                }
+                set(w, player_mode::NEUTRAL);
+                return Ok(false);
+            }
         }
         0x17 | 0x18 => set(w, player_mode::RUN),
         0x19 => {
@@ -255,7 +266,7 @@ fn player(
         }
         _ => unreachable!("fatal codes returned above"),
     }
-    Ok(())
+    Ok(true)
 }
 
 /// The object machine `0x004BD6D0` (§8 rule 5): code 3 is the mode
@@ -420,6 +431,10 @@ fn monster(
     let set = |w: &mut ClientWorld, mode: u32| {
         super::monster_anim::mode_set(w, inputs, key, mode);
     };
+    // +0xB0 (§19 r4: r6 for 0x06 / 0x14, r0 for 0x13).
+    let hit = |w: &mut ClientWorld, h: i32| {
+        w.units.get_mut(&key).expect("present").hit_class = h as u32;
+    };
     match code {
         // Path to the unit (r0 type, r1 GUID): an absent unit → F.
         0x00 | 0x18 => {
@@ -433,7 +448,10 @@ fn monster(
         0x01 | 0x17 => set(w, if code == 0x01 { m::WALK } else { m::RUN }),
         0x04 | 0x0B | 0x0C | 0x0E | 0x11 | 0x1A | 0x1C | 0x05 | 0x0A | 0x0D | 0x0F | 0x10
         | 0x1B | 0x1D => set(w, monster_table_mode(code).expect("table code")),
-        0x06 => set(w, m::GET_HIT),
+        0x06 => {
+            hit(w, r[6]);
+            set(w, m::GET_HIT);
+        }
         0x07 => {
             // Position check (§6, kind 0), then within 1 sub-tile of
             // (r0, r1) → F; else walk (state 143 `attached` → F).
@@ -454,9 +472,13 @@ fn monster(
         // `msg-units.md` §4 r6.2: mode := 0xC.
         0x09 => set(w, m::DEAD),
         0x12 => set(w, m::BLOCK),
-        // No mode change (the KB mode comes with 0x14).
-        0x13 => {}
-        0x14 => set(w, m::KNOCKBACK),
+        // No mode change (the KB mode comes with 0x14); the mode sound
+        // `0x004CC5B0(U, 0xD, 1)` is the audio feed's.
+        0x13 => hit(w, r[0]),
+        0x14 => {
+            hit(w, r[6]);
+            set(w, m::KNOCKBACK);
+        }
         // The skill entry's mode; 0xE (sequence) sets no mode.
         0x15 | 0x16 => {
             if let Some(mode) = skill_mode(inputs, r[0], MONSTER) {

@@ -14,7 +14,8 @@ No check went down. Newly equal: levels 13 14 25 38 42 48 49 76 85 92 93 116 119
 creating an item. In level population the gold placeholder (object 269, init 28 `0x0054F8C0`) makes 1.14d allocate
 1-9 gold piles (game-seed draws `0x552E31` + item seed `0x552E9F` per pile); d2rs made none, so the game seed split at
 frame 21 and every later population pick (objects 79/144/94/95/148/185/246 in q-run-objects §5) followed from it.
-Fix: `d2-client` single player loads `GameTables::class_picks()` with the live tables and sets them on `object_drops`.
+Fix: `d2-client` single player sets the pick rows on `object_drops`. The same fix landed on staging at the same time
+(`feb243b0`, `355f1f80`, rc-object-operate); the merge keeps staging's version, and the numbers above measure it.
 This should also clear q-run-objects cause 2 (16 operate-drop rows; not re-run here: `gen-obj-*`).
 `d2-server` has no object drop state yet; when it gets one it needs the same call.
 
