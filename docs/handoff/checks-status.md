@@ -1674,3 +1674,110 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-monskill-335 | state | PARTIAL | 500/500 | - | - |
 | gen-monskill-339 | state | PARTIAL | 500/500 | - | - |
 | gen-monskill-340 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-341 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-342 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-343 | state | PARTIAL | 500/500 | - | - |
+| gen-monskill-348 | state | PARTIAL | 500/500 | - | - |
+| gen-npc-drehya | packets | DIVERGED | 48/50 | frame 7 stream s2c #49 extra (d2rs only) (id 0x5d) | unrouted |
+| gen-npc-drehya | state | DIVERGED | 18/50 | frame 19 monster 1:20 class 522, field m: 1.14d 2 vs d2rs 4 | unrouted |
+| gen-npc-natalya | packets | DIVERGED | 49/50 | frame 13 stream s2c #0 id: 1.14d 67 vs d2rs 15 (id 0x67) | unrouted |
+| gen-npc-natalya | state | DIVERGED | 12/50 | frame 13 monster 1:14 class 368, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| gen-npc-tyrael1 | packets | DIVERGED | 49/50 | frame 13 stream s2c #0 id: 1.14d 67 vs d2rs 15 (id 0x67) | unrouted |
+| gen-npc-tyrael1 | state | DIVERGED | 12/50 | frame 13 monster 1:14 class 368, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| gen-npc-tyrael3 | packets | DIVERGED | 48/50 | frame 7 stream s2c #49 extra (d2rs only) (id 0x5d) | unrouted |
+| gen-npc-tyrael3 | state | DIVERGED | 18/50 | frame 19 monster 1:20 class 522, field m: 1.14d 2 vs d2rs 4 | unrouted |
+| gen-qkill-baal | state | DIVERGED | 56/180 | frame 57 game, field seed: 1.14d [1056428698, 25125209] vs d2rs [60238956, 1595794302] | unrouted |
+| gen-qkill-blood-raven | state | DIVERGED | 63/180 | frame 64 player 0:1 class 0, field m: 1.14d 5 vs d2rs 4 | unrouted |
+| gen-qkill-countess | state | DIVERGED | 50/180 | frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] | unrouted |
+| gen-render-den-of-evil | draws | DIVERGED | 0/1 | tick 58 draw row 70 (CelDrawShadow) column frame: 1.14d 3 vs d2rs 2 | unrouted |
+| gen-render-firebolt | draws | DIVERGED | 0/1 | tick 22 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
+| gen-render-frozen | draws | DIVERGED | 0/1 | tick 28 draw row 108 (CelDrawShadow) column dir: 1.14d 46 vs d2rs 0 | unrouted |
+| gen-render-kurast-rain | draws | DIVERGED | 0/1 | tick 58 draw row 97 (CelDraw) column x: 1.14d 584 vs d2rs 563 | unrouted |
+| gen-render-town-dawn | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 734 vs d2rs 237 | unrouted |
+| gen-render-town-night | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 49 vs d2rs 237 | unrouted |
+| gen-skill-ama-11 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-11 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-12 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-12 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-15 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-15 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-16 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-16 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-20 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-20 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-21 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-21 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-22 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-22 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-25 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-25 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-26 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-26 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-27 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-27 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-28 | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 size: 1.14d 23 vs d2rs 14 (id 0xac) | unrouted |
+| gen-skill-ama-28 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-31 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-31 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-32 | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| gen-skill-ama-32 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-35 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-35 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-6 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-6 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ama-7 | packets | MATCH | 70/70 | - | - |
+| gen-skill-ama-7 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-ass-268 | packets | DIVERGED | 69/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| gen-skill-ass-268 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-132 | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| gen-skill-bar-132 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-138 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | unrouted |
+| gen-skill-bar-138 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-140 | packets | MATCH | 70/70 | - | - |
+| gen-skill-bar-140 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-bar-143 | packets | DIVERGED | 69/70 | frame 38 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| gen-skill-bar-143 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-222 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
+| gen-skill-dru-222 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-skill-dru-229 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| gen-skill-dru-229 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-231 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
+| gen-skill-dru-231 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-skill-dru-234 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| gen-skill-dru-234 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-dru-241 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
+| gen-skill-dru-241 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-skill-dru-247 | packets | MATCH | 70/70 | - | - |
+| gen-skill-dru-247 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-75 | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | unrouted |
+| gen-skill-nec-75 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-78 | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| gen-skill-nec-78 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-nec-93 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-93 | state | DIVERGED | 31/70 | frame 32 missile 3:1 class 193, field ty: 1.14d 4268 vs d2rs 4269 | unrouted |
+| gen-skill-pal-100 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| gen-skill-pal-100 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-102 | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| gen-skill-pal-102 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-103 | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| gen-skill-pal-103 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-104 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 22 (id 0xaa) | unrouted |
+| gen-skill-pal-104 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-105 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| gen-skill-pal-105 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-107 | packets | DIVERGED | 69/70 | frame 22 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
+| gen-skill-pal-107 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-108 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 21 (id 0xaa) | unrouted |
+| gen-skill-pal-108 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-109 | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| gen-skill-pal-109 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-110 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| gen-skill-pal-110 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-113 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 24 (id 0xaa) | unrouted |
+| gen-skill-pal-113 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-115 | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 27 (id 0xaa) | unrouted |
+| gen-skill-pal-115 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-120 | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| gen-skill-pal-120 | state | PARTIAL | 70/70 | - | - |
+| gen-skill-pal-122 | packets | DIVERGED | 68/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 29 (id 0xaa) | unrouted |
+| gen-skill-pal-122 | state | PARTIAL | 70/70 | - | - |
