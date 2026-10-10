@@ -8,6 +8,6 @@ save ScnAma --class ama --expansion
 seed 1234
 ticks 80
 seconds 300
-channels state items rng
+channels state items rng packets
 at 10 poke object 64 @x @y
 at 20 poke operate @2:64

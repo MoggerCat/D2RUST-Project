@@ -333,7 +333,7 @@ def fam_skill(ctx):
             c = Check(
                 f"gen-skill-{cl}-{sid}", "skill", f"skills.txt Id {sid}",
                 f"{cl} skill {name} ({sid})", f"{CLASS_SAVE[cl]} --class {cl} --expansion "
-                f"--level 30 --all-skills 20 --right-skill {sid}", 70, 300, "state",
+                f"--level 30 --all-skills 20 --right-skill {sid}", 70, 300, "state packets",
                 BM + ["input frame 20; rclick 330 300"], variant="blood-moor-empty",
                 comment=[f"Cast of {name} (skill {sid}, class {cl}): expansion character, level 30, "
                          f"every skill at 20, right skill {sid}; warp to the Blood Moor "
@@ -661,7 +661,7 @@ def fam_obj(ctx):
         c = Check(
             f"gen-obj-{oid}", "obj", f"objects.txt Id {oid}",
             f"object {name} ({oid}) created and operated",
-            "ScnAma --class ama --expansion", 80, 300, "state items rng",
+            "ScnAma --class ama --expansion", 80, 300, "state items rng packets",
             [f"at 10 poke object {oid} @x @y",
              f"at 20 poke operate @2:{oid}"],
             comment=[f"Object {oid} {name} ({desc}; OperateFn {t.get(r, 'OperateFn')}, "
