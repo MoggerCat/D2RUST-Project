@@ -947,8 +947,15 @@ impl<X: Pending> AiActs for View<'_, X> {
     ) -> Option<(i32, i32)> {
         self.h.x.ai_free_spot_for(game, unit, class, x, y)
     }
+    /// `0x00463740(the unit's room, x, y)`: the room containing the point,
+    /// searched from the unit's room through its neighbours (DRLG provider);
+    /// else the host's.
     fn room_at(&self, game: &Game, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
-        self.h.x.ai_room_at(game, unit, x, y)
+        let from = game.lists.unit(unit).and_then(|e| e.room());
+        match from.and_then(|r| self.h.drlg.find_room(game, r, x, y)) {
+            Some(r) => Some(r),
+            None => self.h.x.ai_room_at(game, unit, x, y),
+        }
     }
     fn move_in_radius(
         &mut self,
@@ -988,9 +995,48 @@ impl<X: Pending> AiActs for View<'_, X> {
         spread: i32,
         flags: u32,
     ) -> Option<UnitId> {
-        self.h
-            .x
-            .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)
+        // The creation `0x005B2F20(room, x, y, class, mode, spread, flags)`
+        // on the lent monster world (`monsters/population.md` §9); without
+        // one, the host's answer.
+        let placed = {
+            let mut sim = crate::units::hooks::Sim {
+                game: &mut *game,
+                units: &mut *self.units,
+                stats: &mut *self.stats,
+                data: self.data,
+            };
+            self.h
+                .with_monster_world(|w, h| {
+                    w.spawn_at(
+                        &mut sim,
+                        h,
+                        room,
+                        x,
+                        y,
+                        class,
+                        mode,
+                        spread,
+                        u16::try_from(flags).unwrap_or(0),
+                    )
+                })
+                .flatten()
+        };
+        match placed {
+            Some(unit) => unit,
+            None => self
+                .h
+                .x
+                .ai_spawn_monster(game, room, x, y, class, mode, spread, flags),
+        }
+    }
+    fn take_deferred_ai(&mut self) -> Vec<(UnitId, Option<u32>)> {
+        std::mem::take(&mut self.h.ai_deferred)
+            .into_iter()
+            .map(|op| match op {
+                super::AiDeferred::Alloc(u) => (u, None),
+                super::AiDeferred::Install(u, s) => (u, Some(s)),
+            })
+            .collect()
     }
     /// `0x0057CCB0(game, unit, killer, 1)`: the kill of `damage.md` §7.2
     /// on this view's parts (the Baal clone with a missing owner,

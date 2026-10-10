@@ -698,6 +698,16 @@ pub fn frozen<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, unit: UnitId) -> bool {
 /// cases and the walk/run ends run the think inline; every other case
 /// requests a mode change to neutral.
 pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, ended: u8) {
+    mode_end_body(game, cx, unit, ended);
+    drain_deferred_ai(game, cx);
+}
+
+fn mode_end_body<W: AiHost + ?Sized>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    unit: UnitId,
+    ended: u8,
+) {
     const INLINE: [u8; 16] = [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
     let class = cx.world.class(unit);
     let generic = cx.monstats(class).is_some_and(|r| r.splendgeneric != 0);
@@ -836,6 +846,23 @@ fn record_for<W: AiHost + ?Sized>(cx: &mut Ctx<'_, W>, unit: UnitId, state: u32)
 
 /// The think handler `0x005B1740` (§2.1).
 pub fn think<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId) {
+    think_body(game, cx, unit);
+    drain_deferred_ai(game, cx);
+}
+
+/// The AI controls and installs of monsters this think created: the store
+/// was lent, so [`AiWorld::take_deferred_ai`] kept them (the creation
+/// `0x005B2F20` of an AI body, e.g. the Sand Maggot Queen's eggs).
+fn drain_deferred_ai<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>) {
+    for (unit, op) in cx.world.take_deferred_ai() {
+        match op {
+            None => cx.store.entry(unit).control = Some(AiControl::default()),
+            Some(state) => install(game, cx, unit, state),
+        }
+    }
+}
+
+fn think_body<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId) {
     let class = cx.world.class(unit);
     let Some(row) = cx.monstats(class) else {
         return;

@@ -183,6 +183,15 @@ pub const PLAYER_ITEMS_MARK: u8 = 0xFE;
 /// See [`PLAYER_ITEMS_MARK`].
 pub const PLAYER_SOUND_MARK: u8 = 0xFD;
 
+/// A deferred AI operation of a unit created inside an AI think.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AiDeferred {
+    /// `alloc_ai`: a fresh control record.
+    Alloc(UnitId),
+    /// `0x005B0E00(unit, state)`.
+    Install(UnitId, u32),
+}
+
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
 pub struct ActionHooks<X> {
@@ -192,6 +201,10 @@ pub struct ActionHooks<X> {
     pub missiles: Option<MissileStore>,
     /// Lent to the AI code during a think (`None` then).
     pub ai: Option<AiStore>,
+    /// AI controls and installs a creation asked for while the AI store was
+    /// lent to a think (`init.md` §5 steps 2-5 inside `0x005B2F20` run by an
+    /// AI body): run at the end of that think, in order.
+    pub ai_deferred: Vec<AiDeferred>,
     /// The +0x24 word of the coordinate records monsters hold as their
     /// vision record (monster data +0x50, `monsters/ai.md` §5.2 steps 2
     /// and 7), by record identity; absent = 0.
@@ -459,7 +472,21 @@ impl<X: Pending> ActionHooks<X> {
     /// plus the bonus, `monsters/init.md` §6), as the AI's `skill_level`
     /// reads them.
     pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
-        match self.skill_lists.get(&unit) {
+        // A monster with a list (an assigned aura) still has its AI's
+        // current skill in the host (`set_current_skill`): the list holds
+        // only the aura entries, so an empty list slot falls through to the
+        // host's entry (REC-3183, `gen-su-37`: a Doom Knight with umod 30
+        // lost the MonBoneSpirit do at its action frame).
+        let monster_without_current = |l: &crate::skills::list::SkillList| {
+            l.current.is_none()
+                && (self.natural_skills.contains_key(&unit)
+                    || self.monster_skills.contains_key(&unit))
+        };
+        match self
+            .skill_lists
+            .get(&unit)
+            .filter(|l| !monster_without_current(l))
+        {
             Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
             None => {
                 let mut e = self.x.used_skill(unit)?;
@@ -518,6 +545,7 @@ impl<X> ActionHooks<X> {
             drlg,
             missiles: Some(MissileStore::new()),
             ai: Some(AiStore::new()),
+            ai_deferred: Vec::new(),
             ai_info: GameInfo::default(),
             combat_lists: BTreeMap::new(),
             event_records: Default::default(),

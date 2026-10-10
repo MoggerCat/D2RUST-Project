@@ -535,6 +535,12 @@ pub trait AiActs {
         spread: i32,
         flags: u32,
     ) -> Option<UnitId>;
+    /// The AI work a creation inside this think could not do while the
+    /// store was lent: `(unit, None)` = a fresh control, `(unit, Some(s))` =
+    /// the install `0x005B0E00(unit, s)`; in the order asked. Default none.
+    fn take_deferred_ai(&mut self) -> Vec<(UnitId, Option<u32>)> {
+        Vec::new()
+    }
     /// `0x0057CCB0(game, unit, killer, 1)` (`combat/damage.md` §7.2).
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>);
     /// The unit leaves its room and is removed (`0x0061A270`,

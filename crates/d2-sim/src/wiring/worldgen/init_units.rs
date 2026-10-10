@@ -31,6 +31,7 @@ use crate::units::hooks::Sim;
 use crate::units::modes;
 use crate::units::record::Units;
 use crate::units::UnitId;
+use crate::wiring::action::AiDeferred;
 
 use super::{View, WiringError, WorldHost, WorldPending, WorldgenError};
 
@@ -115,14 +116,14 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn alloc_ai(&mut self, unit: UnitId) {
         match self.v.h.ai.as_mut() {
             Some(ai) => ai.entry(unit).control = Some(AiControl::default()),
-            None => self.w.errors.push(WorldgenError::AiLent),
+            None => self.v.h.ai_deferred.push(AiDeferred::Alloc(unit)),
         }
     }
 
     /// `0x005B0E00` (`ai.md` §3.3) through the AI module's context.
     fn ai_install(&mut self, unit: UnitId, state: u32) {
         let Some(mut store) = self.v.h.ai.take() else {
-            self.w.errors.push(WorldgenError::AiLent);
+            self.v.h.ai_deferred.push(AiDeferred::Install(unit, state));
             return;
         };
         let t = self.v.h.tables.clone();
