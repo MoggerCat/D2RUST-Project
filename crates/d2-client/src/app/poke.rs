@@ -678,7 +678,7 @@ mod tests {
         assert_eq!(
             text(&end),
             [
-                "goto unit 148",
+                "goto unit 1:148",
                 "talk @1:148",
                 "pos @player 3 4",
                 "talk @1:148",
