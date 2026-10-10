@@ -1331,6 +1331,15 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         // Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9): the
         // egg's start gives up its monster footprint (§5.6).
+        // Alignment `0x005543B0(u, a, 1)` (`bodies-3.md` §8.5: the Hydras
+        // of a monster owner take the owner's alignment, so the Council's
+        // stay hostile to the player instead of the class row's good).
+        if let bodies::BodyEffect::Alignment { u, a, .. } = e {
+            if let Ok(a) = u8::try_from(a) {
+                self.cv.v.set_alignment(&mut *self.cv.game, u, a);
+            }
+            return;
+        }
         if let bodies::BodyEffect::DeadFootprint(u) = e {
             self.cv.v.dead_body_footprint(u);
             return;
@@ -1387,6 +1396,16 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             let t = ModeTarget::Unit(target);
             crate::wiring::interaction::body_path::point_target(&mut cv.v, u, t);
             self.xm().keep_target(u, t);
+            return;
+        }
+        // Alignment `0x005543B0(u, a, v)` (`skills/bodies-2.md` §2.22): the
+        // unit's alignment stat list, e.g. a monster's Hydra takes its
+        // owner's alignment (`skills/bodies-2b.md` Hydra).
+        if let bodies::BodyEffect::Alignment { u, a, .. } = e {
+            if let Ok(a) = u8::try_from(a) {
+                let cv = &mut self.cv;
+                cv.v.set_alignment(&mut *cv.game, u, a);
+            }
             return;
         }
         if let Some(e) = self.pet_effect(e) {

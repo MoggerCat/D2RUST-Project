@@ -1,7 +1,7 @@
 check 1
 # UI draw list (PC 1 2026-10-10, local-pc1-today): Rogue Encampment arrival, then character panel and skill tree together (keys A, T);
 # the draw list of server tick 73 on both sides (as draws-town-arrival-ama).
-# ScnAma, -seed 1234. Under the debugger 1.14d does not draw every tick: the run
+# ScnAma, -seed 1234. The cursor is pinned at (790, 10) first: 1.14d reads the real pointer, and an unpinned one hovers whatever it was left on. Under the debugger 1.14d does not draw every tick: the run
 # compares its last drawn tick <= 73 on both sides.
 # Spec: specs/tools/scenario-diff.md §3 rule 7; specs/ui/panels-2.md, specs/ui/panels-3.md, specs/ui/text.md.
 name ui-draws-char-skill-ama
@@ -11,4 +11,4 @@ ticks 76
 seconds 600
 channels draws
 draws-at 73
-input frame 40; key A; frame 44; key T
+input frame 38; move 790 10; frame 40; key A; frame 44; key T
