@@ -261,9 +261,11 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .stats
             .unit_set(&mut *self.econ.hooks, unit, stat, value as i32, 0);
     }
-    /// `0x00548520`: the stat set, then its message (`0x0053BE40`: S→C
-    /// 0x1D / 0x1E / 0x1F by the value's size; none for a stat above
-    /// 0xFE).
+    /// `0x00548520`: the stat set, then its message to the player's
+    /// client at once (`0x0053BE40`: SetStat 0x1D / 0x1E / 0x1F by the
+    /// value's size; `intents-events.md` §3.5 rule 7). Recorded:
+    /// `a2-npc-fara-heal` frame 14, `1e 06 00 32` inside the 0x2F
+    /// handling, before the client's 0x31.
     fn set_stat_send(&mut self, player: UnitId, stat: u16, value: u32) {
         NpcWorld::set_stat(self, player, stat, value);
         if let Some(m) = crate::wiring::action::vitals_sync::stat_message(stat, value as i32) {
@@ -305,6 +307,9 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .stats
             .free_state_list(&mut *self.econ.hooks, unit, u32::from(state));
     }
+    /// `0x00553380(unit, sound)`: the unit's sound event, sent as S→C
+    /// 0x2C by the client pass of the tick (`units::sound`). Recorded:
+    /// `a2-npc-fara-heal` frame 15, `2c 01 0a000000 0a00` (§5 step 6).
     fn attach_sound(&mut self, unit: UnitId, sound: u16) {
         // `0x00553380(npc, 10, 0)` (asm `0x00578E4F`–`0x00578E59`): no
         // target, every client.

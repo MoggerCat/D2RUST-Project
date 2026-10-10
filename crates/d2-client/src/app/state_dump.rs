@@ -326,7 +326,7 @@ pub struct RunInfo {
 /// client side is the bridge alone.
 pub const RUN_GAPS: [&str; 1] = [
     "client: headless bridge (no UI or visibility art); the only C->S messages are 0x67, \
-     the model's own answers (0x6B, 0x5F, 0x28's 0x2F and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
+     the model's own answers (0x6B, 0x5F, 0x28's 0x2F / 0x30 and its dialog branch's 0x31 from the headless original UI), the --send messages and the --input clicks (world-click dispatcher \
      with the play preview's hover pick, the local player at the play preview's walk \
      prediction, held repeat once per server frame; keys: belt 1-4, run lock, weapon swap, \
      speech only), so a run \

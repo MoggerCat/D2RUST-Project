@@ -64,7 +64,9 @@ pub fn path_distance(t: &PathTables, a: Point, b: Point) -> i32 {
     }
 }
 
-/// Unit distance (`0x00641530`, §9.5) between positions with sizes.
+/// Unit distance (`0x00641530`, §9.5) between positions with sizes: a
+/// negative `dist8_unit` entry returns 0 at once, with no size
+/// adjustment (`0x00641634`).
 pub fn unit_distance(t: &PathTables, a: Point, size_a: i32, b: Point, size_b: i32) -> i32 {
     let dx = (a.x - b.x).abs();
     let dy = (a.y - b.y).abs();
