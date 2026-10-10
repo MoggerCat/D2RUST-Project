@@ -159,3 +159,19 @@ Rows so far: 23 `q-fix-pc1today-*`.
 - Row `frontend-draw-dump`: d2rs needs a draw-list dump for front-end screens
   and paused menus before the 13 front-end / menu scenes can be compared.
 Rows so far: 25 `q-fix-pc1today-*`.
+
+## Push 8 (15:57, before the 14:30Z ledger freeze)
+
+Merged `claude/integ-r23` and `claude/specs-staging-7`; `ledger.py --check`
+0 errors (the part's `last_verdict` cells were re-fixed with `--fix` after
+each merge, since the coordinator's fix pass and this part touch the same
+lines).
+- Three **action scenes** on Windows, draws + pixels: `draws-melee-bar`,
+  `draws-frost-nova-sor`, `draws-fire-bolt-sor`: about 84.5 % of pixels equal
+  (light ring around the player, the Help button / mini panel shown only by
+  d2rs, the player's composite); row `action-scenes`.
+- Private repo 0592b709: the frame pairs of all 35 compared scenes.
+- Totals of this session: Step 4 empty; audit list 216 of 217 rows recorded
+  (left: playing a cinematic); 26 `q-fix-pc1today-*` rows; 36 new checks
+  (`ui-draws-*` 25, `draws-*` 11); facts scenes: 5 option menus, trademark,
+  credits, cinematics; 17 client-state recordings.
