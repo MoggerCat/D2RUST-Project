@@ -385,14 +385,13 @@ pub fn update_messages<X: Pending>(
             v.h.x.send(receiver, &msg);
         } else if let Some(row) = stop_row(mode) {
             stop_row_messages(v, receiver, unit, (ty, guid), &path, row, own);
-        } else if player_skill_mode(mode) {
+        } else if player_skill_mode(mode) && (!own || own_skill_message(v, unit)) {
             // PROVISIONAL (sim/pathing.md §10 rule 2): the skill rows of
             // `0x007319E8` read as `0x00548090` (the skill message with
-            // the path's target unit, else its target point). d2rs-own,
-            // unverified: sent to the own client too (the click's mode
-            // request is not applied, `ui/controls.md` §6 r7, so the
-            // client sets the attack mode from this echo); settled by
-            // REC-95.
+            // the path's target unit, else its target point); settled by
+            // REC-95. The own client gets it only with E flags bit 0x4
+            // (`skills/sequences.md` local player rule 3: the client
+            // starts its own cast at the click).
             let target = path
                 .target_unit
                 .filter(|t| game.lists.find_unit(t.ty, t.guid) == Some(t.unit))
@@ -407,6 +406,14 @@ pub fn update_messages<X: Pending>(
             );
         }
     }
+}
+
+/// `0x00548090` for the unit's own client (`sim/pathing.md` §10 rule 2):
+/// sent only when the used skill's E flags (`0x006446A0`, entry +0x0C)
+/// have bit 0x4 (the dodge / avoid reaction). No used skill → false.
+fn own_skill_message<X: Pending>(v: &View<'_, X>, unit: UnitId) -> bool {
+    v.h.used_skill_of(unit)
+        .is_some_and(|e| v.h.x.entry_flags(unit, &e) & 0x4 != 0)
 }
 
 /// The non-walk, non-skill rows of the player mode-update table
@@ -740,6 +747,9 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     }
     fn monstats_velocity(&self, unit: UnitId) -> (i32, bool) {
         self.v.monster_velocity(unit)
+    }
+    fn velocity_base(&self, unit: UnitId) -> i32 {
+        self.v.velocity_base(unit)
     }
     /// `0x0063E860` (`path-placement.md` §3).
     fn monster_can_be_in_town(&self, unit: UnitId) -> bool {

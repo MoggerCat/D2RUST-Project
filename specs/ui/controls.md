@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–684 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 685–726 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 727–752 |
-| Constants & data dependencies | 753–759 |
-| Randomness | 760–763 |
-| Edge cases & original bugs | 764–776 |
-| Test vectors | 777–804 |
-| Provenance | 805–823 |
-| Open questions | 824–871 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–693 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 694–735 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 736–761 |
+| Constants & data dependencies | 762–768 |
+| Randomness | 769–772 |
+| Edge cases & original bugs | 773–785 |
+| Test vectors | 786–813 |
+| Provenance | 814–832 |
+| Open questions | 833–880 |
 <!-- /index -->
 
 ## Summary
@@ -507,6 +507,15 @@ check reads it.
       state 0 or 5 → passes; else the refusal sound of that state in
       table `0x00711DDC` (u16 per state, count `[0x00711EF0]`, else fatal
       0x2CB) plays when non-zero (`0x004CB9C0`), fails.
+      Measured (q-fix-skills-4cls, 1.14d under Wine 2026-10-09,
+      `nec-bloodgolem.check` / `nec-firegolem.check`): a level-20 Blood
+      Golem (cost (25 + 4·19) << 8 = 25856) or Fire Golem with 21248
+      mana sends nothing at the click. PROVISIONAL: d2rs runs tests 1–4
+      and 6 (mana, `skills/levels.md` §4) of the use state on the
+      model and reads tests 5, 7–10 and the code 8 delay as passing
+      (because the model holds no client cooldown or item-skill facts
+      yet); settled by REC-1640 (a 1.14d check casting a skill on
+      cooldown and one without its item).
    2. **Interact** `0x00461DC0(T, g)`, by U's type (jump table
       `0x004621AC`: 0 → `0x00461F61`, 1 → `0x00462030`, 2 →
       `0x00461DF2`, 3 → `0x00462057`, 4 → `0x00461EE5`, 5 →

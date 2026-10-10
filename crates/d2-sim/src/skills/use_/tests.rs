@@ -1154,8 +1154,14 @@ fn start_refusals() {
     let p = caster(&mut f, 1, 1, 0);
     let m = f.add(U::new(UnitType::Monster, 0));
     f.units[p].target = Some(m);
+    // Neutral is NU in a field room (REC-1644, 1.14d `sor-telekinesis`),
+    // TN in a town room.
+    assert_eq!(start(&mut f, &t, p), 0);
+    assert_eq!(f.take_log(), ["mode 1 1"]);
+    f.units[p].room = RoomKind::Town;
     assert_eq!(start(&mut f, &t, p), 0);
     assert_eq!(f.take_log(), ["mode 1 5"]);
+    f.units[p].room = RoomKind::Field;
     f.hostile = true;
     assert_eq!(start(&mut f, &t, p), 1);
     assert_eq!(f.take_log(), ["srvst 1 1 1 1"]);
@@ -1204,7 +1210,7 @@ fn start_refusals() {
     f.units[p].target = None;
     f.srvst_ret = 0;
     assert_eq!(start(&mut f, &t, p), 0);
-    assert_eq!(f.take_log(), ["srvst 1 1 1 1", "mode 1 5"]);
+    assert_eq!(f.take_log(), ["srvst 1 1 1 1", "mode 1 1"]);
 }
 
 // Covers: specs/skills/use.md §5.3 r6
@@ -1240,7 +1246,7 @@ fn start_core_steps() {
     assert_eq!(f.get(p, stat::MANA), 4000 - 3328);
     // Not enough mana for the check: 0 → neutral, nothing charged.
     assert_eq!(start(&mut f, &t, p), 0);
-    assert_eq!(f.take_log(), ["srvst 4 0 1 10", "mode 0 5"]);
+    assert_eq!(f.take_log(), ["srvst 4 0 1 10", "mode 0 1"]);
     // No room: 0.
     let q = caster(&mut f, 2, 1, 0);
     f.units[q].room = RoomKind::None;

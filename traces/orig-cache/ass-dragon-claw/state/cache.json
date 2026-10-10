@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "ass-dragon-claw",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnAss",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "40bca0fc49498d043da9196f5dd7114320dff8e6b878bd8f5037543a3e7d3516",
+   "size": 351784
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "fea3baa5d848f9b4856e126491e5297d4c6e1fdb01b6509e0ad5b4a6b82db6aa",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
+  "save": "709e5b113d1a1460a551c4c7a2d13ac4a1339378f32653bca72195d30bfc66c2"
+ }
+}

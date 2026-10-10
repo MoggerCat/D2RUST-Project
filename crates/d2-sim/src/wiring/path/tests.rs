@@ -452,3 +452,52 @@ fn a_monster_allocated_dead_carries_the_corpse_mask() {
     assert_eq!(path(&mut fx, keep).foot_mask, 0x100);
     assert_ne!(cell(&mut fx, 24, 10) & 0x100, 0);
 }
+
+/// `pathing.md` §10 rule 2, skill rows (`0x00548090`): a player in a
+/// skill mode sends the skill message to other clients, and to its own
+/// client only with E flags bit 0x4 (`skills/sequences.md` local player
+/// rule 3).
+#[test]
+fn a_cast_skips_the_casters_own_client_unless_e_flag_4() {
+    use crate::units::lists::client_state;
+    let mut fx = fx();
+    let p = player(&mut fx, 10, 10);
+    let q = player(&mut fx, 12, 10);
+    let own = fx
+        .game
+        .lists
+        .add_client(Some(p), None, client_state::IN_GAME);
+    let other = fx
+        .game
+        .lists
+        .add_client(Some(q), None, client_state::IN_GAME);
+    let entry = crate::skills::SkillEntry {
+        skill: 59,
+        base: 20,
+        owner_guid: -1,
+        ..crate::skills::SkillEntry::default()
+    };
+    fx.sim.sys.hooks.x.used.insert(p, entry);
+    {
+        let r = fx.sim.sys.units.get_mut(p).unwrap();
+        r.mode = 10;
+        r.flags |= crate::units::record::flags::CHANGED;
+    }
+    let pass = |fx: &mut Fx, c| {
+        fx.sim.with(&mut fx.game, |g, v| {
+            super::walk::update_messages(v, g, c, p);
+        });
+        std::mem::take(&mut fx.sim.sys.hooks.x.sent)
+    };
+    assert_eq!(pass(&mut fx, own), vec![]);
+    let to_other = pass(&mut fx, other);
+    assert_eq!(to_other.len(), 1);
+    assert_eq!(
+        (to_other[0].0, to_other[0].1[0], to_other[0].1[10]),
+        (q, 0x4D, 20)
+    );
+    fx.sim.sys.hooks.x.entry_flags.insert(p, 0x4);
+    let to_own = pass(&mut fx, own);
+    assert_eq!(to_own.len(), 1);
+    assert_eq!((to_own[0].0, to_own[0].1[0]), (p, 0x4D));
+}
