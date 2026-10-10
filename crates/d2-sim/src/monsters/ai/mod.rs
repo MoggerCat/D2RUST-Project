@@ -711,7 +711,15 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
         }
         return;
     }
-    request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
+    // The request record of `0x005A8030` (§1.4): target unit := the path
+    // target unit (`0x00553540`, the unit itself counting as none), point
+    // (0, 0); so without a target unit the path target point becomes
+    // (0, 0) (`0x00648AD0`, §7.5 rule 2).
+    let target = match cx.world.path_target(unit) {
+        Some(t) => ModeTarget::Unit(t),
+        None => ModeTarget::Point(0, 0),
+    };
+    request_mode(game, cx, unit, mode::NEUTRAL, target);
 }
 
 /// `0x005A8330` / `0x005A83E0`, the trapped soul's A1/A2 and S1/S2 ends

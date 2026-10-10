@@ -1,0 +1,42 @@
+{
+ "channel": "state",
+ "check": "ass-cobra-strike",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnAss",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "350fb4f8bbc2aa576691c6b4b00eb3cc15443ae88e681d48497cd7cc9e2f2669",
+   "size": 351785
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "b9a44413cd24ceb1b3c376592668e271dc1b8eb18b48bc8c1b3051dd686d41de",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
+  "save": "0b9f0672a262399d30edc0309ece376946ec9d6dd0289cde990f95d71c559346"
+ }
+}

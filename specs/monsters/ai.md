@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–282 |
-|   2. Think dispatch `0x005B1740` | 283–422 |
-|   3. AI control and AI tables | 423–594 |
-|   4. AI parameters | 595–613 |
-|   5. Target selection | 614–925 |
-|   6. Distances and line tests | 926–941 |
-|   7. Tactics helpers | 942–1181 |
-|   8. AI commands and minions | 1182–1208 |
-|   10. The catalogue `ai-functions.tsv` | 1209–1229 |
-| Constants & data dependencies | 1230–1253 |
-| Randomness | 1254–1283 |
-| Edge cases & original bugs | 1284–1325 |
-| Test vectors | 1326–1414 |
-| Provenance | 1415–1476 |
-| Open questions | 1477–1583 |
+|   1. Think scheduling | 97–293 |
+|   2. Think dispatch `0x005B1740` | 294–433 |
+|   3. AI control and AI tables | 434–605 |
+|   4. AI parameters | 606–624 |
+|   5. Target selection | 625–961 |
+|   6. Distances and line tests | 962–977 |
+|   7. Tactics helpers | 978–1217 |
+|   8. AI commands and minions | 1218–1244 |
+|   10. The catalogue `ai-functions.tsv` | 1245–1265 |
+| Constants & data dependencies | 1266–1289 |
+| Randomness | 1290–1319 |
+| Edge cases & original bugs | 1320–1361 |
+| Test vectors | 1362–1450 |
+| Provenance | 1451–1512 |
+| Open questions | 1513–1619 |
 <!-- /index -->
 
 ## Summary
@@ -207,6 +207,17 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
+
+The neutral request of the last case (`0x005A8030`, read 2026-10-09)
+first, when the unit has state 54, runs `0x005544B0` and stops if the
+unit is then dead (`0x005541B0`); it clears the used skill (`0x00620210(unit, 0)`), then builds the
+mode-change record {unit, target unit := the path target unit
+(`0x00553540`: none when there is none or it is the unit itself), point
+(0, 0), mode 1} and calls `0x005A7C20(game, record, 1)`. So a monster
+without a path target unit ends with path target point (0, 0) (§7.5
+rule 2): the summons that end S1 at the animation end (raven, plague
+poppy, vines, cycle of life) show it in 1.14d (REC-1651, settled by this
+read).
 
 #### 1.5 First think and player arrival
 
@@ -873,6 +884,31 @@ cells tested differ from those at 2. Whether that cell carries
 collision bit 4, or the refusal lies after the scan (the think's
 `0x005DEAD0` / the skill), needs the recorded dx, dy and the collision
 grid at both points (open, REC-1270 follow-up).
+
+PROVISIONAL (REC-1270): rule 1's "monster C in melee range → skip" holds
+for every monster C, not only one with state 146 (as d2rs reads it: C in
+the scanner's melee range, `0x00622C40` step 3 without the line, d ≤ 0 or
+d ≤ `MeleeRng` + 1, is skipped). 1.14d measured (`ass-lightning-sentry-kill`
+and its probes, Fallen packs, Lightning Sentry `MeleeRng` 0): of three
+Fallen the one at distance 1 (dx 1, dy 0) is never the trap's target
+while one at distance 2–3 is, in three placements; the trap fires at it
+once the nearer one has moved off. Settled by: a run that puts a monster
+of another class on the trap (a state-146 test) or reads `0x005DC970`
+(PC 1 item "[q-fix-ass-traps] 0x005DC970 melee-range rule").
+PROVISIONAL (REC-1271): a main-less scan (only `nThreat` < 2 candidates,
+e.g. a cow) takes the alternative at once in d2rs; the spec's
+`0x005DD510` row also refuses an alternative farther than 5, and the
+order of those two rules is unread (an idle cow poked next to a trap was
+not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
+had hp 0, so the dead test may be the cause instead). Not applied.
+PROVISIONAL (REC-1642): the scan 5 callback `0x005DCA70` (§5.2 step 4,
+the not-evil search) skips a candidate without unit flag 4 (+0xC4,
+monstats2 `isAtt`, `monsters/init.md`) like rule 1 here (because
+1.14d's pets never take the poked cow, class 179, `isAtt` 0, neutral
+alignment, four sub-tiles away: a Clay Golem and a Valkyrie in
+`nec-clay-golem.check` / `ama-valkyrie.check` follow and wander for
+50 frames, q-fix-skills-4cls 2026-10-09); settled by reading
+`0x005DCA70`.
 
 PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
 `wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)

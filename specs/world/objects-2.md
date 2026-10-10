@@ -22,24 +22,24 @@
 | Outputs / state changes | 59–63 |
 | Rules | 64–65 |
 |   16. Operate functions, part 2 | 66–193 |
-|   17. Small init functions | 194–220 |
-|   18. Object events 0, 3, 8, 9, 10 | 221–288 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 289–336 |
-|   20. Item drop helpers (open question 13) | 337–456 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 457–469 |
-|   22. Object allocation modes (open question 8) | 470–518 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 519–536 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 537–578 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 579–675 |
-|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 676–769 |
-|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 770–903 |
-|   28. A chest opened in play (REC-260, read 2026-10-08) | 904–981 |
-| Constants & data dependencies | 982–985 |
-| Randomness | 986–1008 |
-| Edge cases & original bugs | 1009–1046 |
-| Test vectors | 1047–1093 |
-| Provenance | 1094–1152 |
-| Open questions | 1153–1156 |
+|   17. Small init functions | 194–227 |
+|   18. Object events 0, 3, 8, 9, 10 | 228–295 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 296–343 |
+|   20. Item drop helpers (open question 13) | 344–463 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 464–476 |
+|   22. Object allocation modes (open question 8) | 477–525 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 526–543 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 544–585 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 586–682 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 683–776 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 777–910 |
+|   28. A chest opened in play (REC-260, read 2026-10-08) | 911–988 |
+| Constants & data dependencies | 989–992 |
+| Randomness | 993–1015 |
+| Edge cases & original bugs | 1016–1053 |
+| Test vectors | 1054–1100 |
+| Provenance | 1101–1159 |
+| Open questions | 1160–1163 |
 <!-- /index -->
 
 ## Summary
@@ -217,6 +217,13 @@ step & 3; room lookup from the init room at (L.x + dx, L.y + dy)
 (`0x00463740`); found room = the init room → P := (x + dx, y + dy), L :=
 P, and if the point query at P with mask 0x3F11 is free
 (`0x0064D800(room, P, 1, 1)`): gold drop at P (`0x00559300`, §20.3).
+
+The drop needs the combined items array's pick columns (the `gld `
+lookup of §20.3) on the host's drop state; a host that builds the state
+without them creates no gold and the game seed then misses the item-seed
+and gold-amount draws of every pile (seen as the 4 piles of level 76 at
+frame 21, check `a3-warp-l76-jungle-1-ama`, equal since the client sets the
+picks).
 
 ### 18. Object events 0, 3, 8, 9, 10
 
