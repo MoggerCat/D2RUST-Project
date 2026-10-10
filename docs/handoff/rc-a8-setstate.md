@@ -1,16 +1,12 @@
 # rc-a8-setstate hand-back
 Cause 1 (0xA8 byte 9): EQUAL 2759 -> 2801 on its base. Cause 2 (right aura at join): EQUAL 3195 -> 3213 on integ-r23.
 Cause 3 (0xA7 skill delay): EQUAL 3270 -> 3294 on integ-r23 (incl. ledger.py --fix of stale rows in 11 parts).
-gen-skill packets MATCH 91 -> 137 -> 178 -> 187 of 210 (no regressions; gen-state samples clean).
+Cause 4 (item stream regression): EQUAL 3328 -> 3353 on integ-r23. gen-skill packets MATCH 91 -> 187 of 210.
 
 ## Cause 1: S->C 0xA8 byte 9 at frame 2 (assassin masteries, ~60 checks)
-- 1.14d `0x005711D0` (0xA8, sender `0x0053E8D0`) writes each entry as 9-bit stat id, param (send-param bits),
-  value (send bits), ending with 0x1FF. d2rs' encoder already matched that; the list itself differed.
-- 1.14d `0x00646D60` sets `passivestat1-5` on layer `passiveitype` (> 0, else 0): `0x00627150(list, s, v, layer)`.
-  d2rs used layer 0, so it sent param 0 (byte 9: 1.14d 0x87 / 0x3D vs d2rs 0x01).
-- Fix: `BodyWorld::list_set_layer` in `bodies::passive::refresh`. The mastery reader `mastery_of` (`0x00645830`)
-  already filters on the layer. Spec `client/msg-skills.md` §2 r4 (+0xA8 note).
-  Test: `tests6::passive_refresh_sets_the_stats_on_the_passiveitype_layer`.
+- 1.14d `0x00646D60` sets `passivestat1-5` on layer `passiveitype` (`0x00627150(list, s, v, layer)`), sent as the
+  0xA8 entry's param (`0x005711D0`); d2rs used layer 0. Fix: `BodyWorld::list_set_layer` in `passive::refresh`
+  (spec `client/msg-skills.md` §2 r4; test `tests6::passive_refresh_sets_the_stats_on_the_passiveitype_layer`).
 
 ## Cause 2: paladin right aura at join (causes-99 C018 0xAA size, C026 0xA8 size; PROVISIONAL REC-3410)
 - 1.14d (`intents-events.md` §8.2 r3.1, `d2s.md` §2.4 r6.3): the join 0xAA goes out at player creation.
@@ -30,9 +26,14 @@ gen-skill packets MATCH 91 -> 137 -> 178 -> 187 of 210 (no regressions; gen-stat
 - `0x0056EF90` (set_delay) switches state 121 on with `0x00639DB0`, which always queues the unit; d2rs didn't queue.
   Fixed in `UseView::create_delay_list`; `skills/use.md` §6 says so.
 
+## Cause 4: unidentified socketed item's socket count (gen-item* / items-* / vendor 0x9C byte 37)
+- `aa5de032c` (integ-r11) reverted the writer part of `3f2b34259` until `item_bits::decode` could skip the bits.
+  The reader part landed, the writer never came back. Re-applied (`git revert aa5de032c`); `prop_item_bits` passes.
+- gen-item* 57/57 MATCH; the 7 gen-sysc NPC checks and items-vendor-* MATCH; 14 items-* channels fixed.
+  items-drops-nor-09/12 (drop category order) diverge on plain integ-r23 head too: not this change, not bisected.
 ## Ledger / status
-- `ledger/rc-a8-setstate.tsv`: 100 skill rows, 90 EQUAL (REC-2055/2056: state 70/70, no ignore line, every channel
-  incl. packets MATCH), 10 DIVERGED. An EQUAL row needs all of its checks re-run; `last_verdict` matches ledger.py.
+- `ledger/rc-a8-setstate.tsv`: 100 skill rows (90 EQUAL) + 67 item/vendor rows (50 EQUAL), REC-2055/2056 rules;
+  an EQUAL row needs all of its checks re-run; `last_verdict` matches ledger.py.
 - `checks-status.md`: my fresh rows replace 65 hand-written and 61 gen-skill rows in place. `ledger.py --fix` then
   reconciled the stale verdicts this left in 11 other parts (last_verdict / state only).
 ## Open (gen-skill packets first differences, 23 checks)
