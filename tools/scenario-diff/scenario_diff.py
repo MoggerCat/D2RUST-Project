@@ -636,8 +636,10 @@ def draws_summary(orig_tsv, d2rs_tsv, code, tick):
 
 def write_frame_schedule(raw, out):
     """Rule 7.3: the recorded frame schedule d2rs follows (`play
-    --frame-schedule`, format `frame-schedule 1`): one row per captured
-    frame (server tick `f`), with the host clock of its cursor step: the
+    --frame-schedule`, format `frame-schedule 2`): one row per captured
+    frame (server tick `f`), with the host clock of its cursor step and
+    the frame's light quality `q` (`light.quality`, render/lighting.md §5:
+    1.14d derives it from its wall clock and draw rate): the
     cursor's `last_step` captured at the start of the next frame (the
     capture reads the cursor at frame start, `render/capture.md` §3.3),
     `-` for the last frame (its step follows every compared draw); the
@@ -656,15 +658,18 @@ def write_frame_schedule(raw, out):
             if r.get("f") is None or c.get("last_step") is None or c.get("idle_since") is None:
                 raise CheckError(f"{raw}: frame seq {r.get('seq')} has no server tick or cursor "
                                  "clock (cursor.last_step / idle_since): no frame schedule for d2rs")
+            if (r.get("light") or {}).get("quality") is None:
+                raise CheckError(f"{raw}: frame seq {r.get('seq')} has no light.quality: "
+                                 "no frame schedule for d2rs")
             frames.append(r)
     if not frames:
         raise CheckError(f"{raw}: no captured frame: no frame schedule for d2rs")
     c0 = frames[0]["cursor"]
-    rows = ["# frame-schedule 1", f"# cursor_last {c0['last_step']}",
-            f"# cursor_idle {c0['idle_since']}", "tick\tnow"]
+    rows = ["# frame-schedule 2", f"# cursor_last {c0['last_step']}",
+            f"# cursor_idle {c0['idle_since']}", "tick\tnow\tq"]
     for i, r in enumerate(frames):
         now = frames[i + 1]["cursor"]["last_step"] if i + 1 < len(frames) else "-"
-        rows.append(f"{r['f']}\t{now}")
+        rows.append(f"{r['f']}\t{now}\t{r['light']['quality']}")
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
 

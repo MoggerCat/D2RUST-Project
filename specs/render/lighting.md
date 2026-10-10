@@ -750,7 +750,7 @@ sub-tile) clamps the cell to 0…47 on each axis.
 | `LightMap` | §1–§4, §7, rebuilt per presented frame in the client, from client state only |
 | `LightSources` | §6 records created by the client's unit mirror (§8) |
 | `Environment` | §9, advanced per client update, set by S→C 0x53 |
-| `q` | §5; in verify cases taken from the recording, never measured |
+| `q` | §5; in verify cases and check runs taken from the recording (check runs: the frame schedule's `q` column, `tools/scenario-diff.md` §3 r7 step 5), never measured; live play without a schedule: 2 (the high option at a draw rate ≥ 16; the draw-rate meter is not wired yet) |
 | light value per draw | §11; `ShadeChain` from `render/shading.md` |
 | floating point | §9.3, §9.4, §10 use doubles and `sin`; client-only (not `d2-sim`) |
 | blocks-light source | the client's active-room collision grids (§4 r3); a cell in no room or a room without a grid → flag 1 (§4 r2) |
