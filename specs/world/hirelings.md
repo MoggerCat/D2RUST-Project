@@ -34,24 +34,24 @@
 | Rules | 92–93 |
 |   1. `hireling.txt` rows | 94–176 |
 |   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 177–217 |
-|   3. Creating the hireling | 218–272 |
-|   4. Level stats (`0x00572840(game, player, merc, level)`) | 273–314 |
-|   5. Owner link and pet list | 315–376 |
-|   6. Following the player | 377–454 |
-|   7. Experience and level-up | 455–520 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 521–583 |
-|   9. Revive | 584–621 |
-|   10. Restoring from a save | 622–667 |
-|   11. Items (expansion) | 668–737 |
-|   12. Services (links) | 738–741 |
-|   13. Messages | 742–808 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 809–815 |
-| Constants & data dependencies | 816–839 |
-| Randomness | 840–850 |
-| Edge cases & original bugs | 851–902 |
-| Test vectors | 903–965 |
-| Provenance | 966–1022 |
-| Open questions | 1023–1115 |
+|   3. Creating the hireling | 218–325 |
+|   4. Level stats (`0x00572840(game, player, merc, level)`) | 326–367 |
+|   5. Owner link and pet list | 368–429 |
+|   6. Following the player | 430–507 |
+|   7. Experience and level-up | 508–573 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 574–636 |
+|   9. Revive | 637–674 |
+|   10. Restoring from a save | 675–720 |
+|   11. Items (expansion) | 721–790 |
+|   12. Services (links) | 791–794 |
+|   13. Messages | 795–861 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 862–868 |
+| Constants & data dependencies | 869–892 |
+| Randomness | 893–903 |
+| Edge cases & original bugs | 904–955 |
+| Test vectors | 956–1018 |
+| Provenance | 1019–1075 |
+| Open questions | 1076–1168 |
 <!-- /index -->
 
 ## Summary
@@ -221,9 +221,62 @@ case 2). Attack rating is not part of the offer.
 
 1. Hire (`npc.md` §7.3 step 7): `0x005B23C0(class, 1, 4, 0)` near the
    NPC, then the player; class from the NPC record (`0x00575FF0`).
+   Details in §3.1.1.
 2. Quest grant: `npc.md` §7.5 (spawn modes 4, 6, 12).
 3. Restore (`0x005774F0`, §10): `0x00555230` with mode 12 (dead) when
    the saved hireling is dead, else 1.
+
+#### 3.1.1 Hire: spawn spot and draw order (answered 2026-10-09, PC 1 night A)
+
+Read from the binary and recorded on 1.14d (check `hire-kashya`: ScnHi1,
+level-30 expansion Barbarian, `-seed 1234`, C→S 0x36 for name 3411 at
+Kashya on frame 14; `record_state.py` + `record_rng.py --frames`).
+
+**Spawn spot.** `0x005B23C0(game, unit, class, mode 1, spread 4, flags
+0)` fills the create request from the unit (its room `0x00620BB0` and its
+path position) and calls `0x005B2A00`: the placement of
+`monsters/population.md` §9 with no coordinate list, so the bounds are
+the NPC's room box with no index check, the collision mask comes from
+the class's monstats2 `spawnCol` (§9.1 rule 2) and the size from its
+`SizeX`. Hireling classes are not frogs, so it is the ring search §9.3
+with r = 4: rings d = 3, 6, 9, 12 around the NPC's position, four draws
+of the **NPC's room seed** per ring tried (`0x005B2BEC` parity,
+`0x005B2C38` `roll(d)`, `0x005B2C60`, `0x005B2C8A` parities), first
+accepted cell wins. Nothing is tried at d = 0 or between rings. Only
+when that returns null (no cell in 4 rings, or the room box excludes
+them all) is the same call made near the player (the player's room seed
+and position). Both null → 0x2A code 15 (`npc.md` §7.3 step 7).
+
+Kashya at (4891, 4226): ring 3 draws p = 0, q = 0, sx = 0, sy = 1 →
+start (4891, 4223) on the top edge, direction (+1, 0); the first step
+tests (4892, 4223), which is free → the hireling is at **(4892, 4223)**.
+
+**Draws, in order, in the input phase of the hire frame** (the whole
+0x36 handler; nothing of it is deferred):
+
+| # | Site | Seed | Draw | Owner |
+|---|---|---|---|---|
+| 1 | `0x00663801` / `0x0066380C` | local (stack) | `init()`, `init_low(slot seed)` | §2 offer, `npc.md` §7.3 step 5 |
+| 2 | `0x0066385B` | local | `roll(candidates)` | §2 |
+| 3 | `0x0066387E` | local | one step (level L) | §2 |
+| 4 | `0x005B2BEC`, `0x005B2C38`, `0x005B2C60`, `0x005B2C8A` | NPC's room seed | 4 per ring tried (§9.3) | `population.md` §9.3 |
+| 5 | `0x00552E31` (in `0x00552DF0`, called by the allocation `0x00555230`) | **game seed** | **one step**; unit seed := `init_low(lo')` (`rng.md` §5.3) | `sim/units.md` §3.1 |
+| 6 | `0x005BDBF1` ×k, `0x005BDC57`, `0x005BDC74`, `0x005BDCEE` / `0x005BDD48` pairs | unit seed | appearance variants (`0x005BDB20`; the first 271 of the region) | `monsters/init.md` §4.3 row a |
+| 7 | `0x00573A03` | unit seed | `roll(variant count)` (components `0x005739D0`) | `monsters/init.md` §4.3 row b |
+| 8 | `0x00573F8F` | unit seed | the HP roll (`0x00573CB0`) | `monsters/init.md` §4.3 row d |
+| 9 | `0x00663801` … `0x0066387E` | local | the §2 offer again, inside the init §3.2 rule 5 (same values as 1–3) | §3.2 |
+| 10 | — | NPC-control seed | only when the hire empties the offer: the new list (`npc.md` §7.1 steps 3–4) | `npc.md` §7.3 step 8 |
+
+The game seed takes exactly one step in the hire frame (recorded: frame
+13 `[367684955, 1328293240]` → frame 14 `[1282899071, 153358589]`, the
+step at `0x00552E31`); the hireling's unit seed after creation is
+`[3139521052, 389081549]`. Level stats (§4), the owner link, the pet
+node, the AI hook (umod 19, `0x005A4850`) and the messages draw nothing.
+Recorded case: k = 4, row b `roll(3)`, `roll(1)` for the HP. The follow
+AI's first draws are on frame 15 (`0x005DF5BF` …, unit seed; §6).
+
+The client draws in the same frame are its own (client creation of the
+unit, `0x00466474` …; not the server's seeds).
 
 #### 3.2 Init (`0x00573270(game, player, merc, saved_id, slot, restore)`)
 
@@ -843,7 +896,7 @@ pointer): the one reader of `DefaultChance` and the `Chance` columns
 |---|---|---|
 | offer / hire / init (§2) | local {slot seed, 666} | roll(candidates), one step (level) — the same values every time the slot is evaluated |
 | hire list | NPC-control | `npc.md` §7.1 |
-| unit creation | monster spawn spec | `0x005B23C0` / `0x00555230` |
+| unit creation | NPC's room seed (placement), game seed (one step: the unit seed), unit seed (init) | `0x005B23C0` / `0x00555230`; order in §3.1.1 |
 
 Level stats, experience, death, revive, follow and the item swap draw
 nothing here (item duplication: `items/generation.md`).

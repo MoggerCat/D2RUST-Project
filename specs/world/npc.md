@@ -37,16 +37,16 @@
 |   4. Menu actions (C→S 0x38) | 275–333 |
 |   5. Healing on chat open | 334–361 |
 |   6. Cain identify (C→S 0x34) | 362–390 |
-|   7. Mercenaries | 391–513 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 514–593 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 594–627 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 628–639 |
-| Constants & data dependencies | 640–652 |
-| Randomness | 653–665 |
-| Edge cases & original bugs | 666–741 |
-| Test vectors | 742–764 |
-| Provenance | 765–815 |
-| Open questions | 816–874 |
+|   7. Mercenaries | 391–514 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 515–594 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 595–628 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 629–640 |
+| Constants & data dependencies | 641–653 |
+| Randomness | 654–666 |
+| Edge cases & original bugs | 667–742 |
+| Test vectors | 743–766 |
+| Provenance | 767–817 |
+| Open questions | 818–876 |
 <!-- /index -->
 
 ## Summary
@@ -465,7 +465,8 @@ name u16 @5)`; NPC missing or not the interact unit → 0x2A code 9. Then
      the mercenary spec.
 6. Pay the price (`vendors.md` §9.1); not enough → 0x2A code 12.
 7. Create the mercenary unit near the NPC, else near the player
-   (`0x005B23C0(class, 1, 4, 0)` twice; mercenary spec); fails → code
+   (`0x005B23C0(class, 1, 4, 0)` twice; spot and draw order:
+   `hirelings.md` §3.1.1); fails → code
    15 (gold already taken).
 8. Slot hired := 1; mercenary init `0x00573270`; resend the
    list (§7.2, first = node count < 2); 0x2A code 5, flag 0, GUID =
@@ -758,6 +759,7 @@ Reproduced by default.
 | C→S `36 03000000 680d` (hire 0x0D68), gold 296 | S→C 0x81 (`world/hirelings.md` Test vectors), 0x27 (level speech), 0x4F + nine 0x4E (0x0D68 gone), 0x2A `2a 00 05 ?? ?? ?? ?? 0d000000 88000000` (code 5, GUID 13, 136 = gold left), all in the input phase; S→C 0x1D gold 136 next frame; price 160 | same, frames 1730–1731 (§7.3 steps 5–8; Kashya at level ≥ 8 needs no quest, step 2) |
 | identify, 3 unidentified, slot 4 bits 0, 1 clear | pay 300; 0x2A code 3 | synthetic (§6) |
 | client hire request for name 0x0D68 at Kashya (GUID 3) | C→S 9 bytes `36 03000000 680d0000` (u16 id widened to u32, §4 client senders) | `merc1-spawn-packets`, frame 1730 (`client_out`) |
+| Warriv (class 155, GUID 7) at (4870, 4231), player running, at (4876, 4218) after its frame-287 step; Npc think, interaction step 7 (`monsters/ai-bodies.md` §9.9), d ≥ 5 → walk in radius of the player with (3, 2) | mode 2, path target (4871, **4228**); no unit-seed draw (seed unchanged across the think). Geometry: `monsters/ai.md` §7.2 row `0x005DE6D0` (the owner): k = 3, n = 6 + 13 = 19, (kx, ky) = (0, 2) → fix-up (1, 3). With the player read at its pre-step (4876, 4219) the same rule gives (1, 2) → 4229, so the think reads the player's current position | `town-ama-10k` frame 287 (`docs/handoff/q-tool-replay-diff.md` finding 6; d2rs gives 4229 via the old rounding geometry). This is not the town wander (`0x005DE200`, which draws 3–4 times) |
 
 Game-file test (`#[ignore]`): with live `monstats.txt`, §1.1 yields 47
 records in row order; the 43 table entries (`vendors.tsv`) attach.

@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–951 |
+|   9. Per-AI behaviours | 29–1004 |
 <!-- /index -->
 
 ## Summary
@@ -120,6 +120,27 @@ start (`ai.md` §1.3), since the fallen deleted its thinks in step 1.
    without the 5.2 draw (leader not its own owner) gives 64 ≥ 50 →
    89 ≥ 30 → idle 10, then 39 < 50 → param 0 := 0, 76 ≥ 20 → A2 at frame
    41 — the d2rs result of that recording (q-fix-c2-fallen-s2-choice).
+8. Unit-seed steps, in order, with their sites (1.14d-confirmed
+   `0x005F02C0`–`0x005F06A7`, read 2026-10-09, PC 1 late). One inline
+   step (`mov edx, 0x6AC690C5` at `0x005F0438`); the rest are
+   `roll(100)` `0x0045C390` on the fallen's seed. At most one row group
+   runs per think:
+   - step 2, escape started: `0x005F0438` `lo' % 20` (0 → sound 17).
+   - step 4, command type 1, C: `0x005F05F8` aip3; pass → `0x005F0612`
+     aip4.
+   - step 4, not C: walk flags 0 (no draw).
+   - step 5.1: walk flags 0 (no draw).
+   - step 5.2 (D < 15 and leader): `0x005F0498` aip1; pass → end.
+   - then step 5.3 (not C): D > aip2 → `0x005F05A6` pct(30), pass →
+     wander 3 (`0x005DE200`, 3–4 draws, `ai.md` §7.2); D ≤ aip2 → walk
+     flags 7 (`0x005DEC80`: on a failed request one draw inside
+     `0x005DEB60`, < 70 → wander 4 with its draws).
+   - or step 5.4 (C): param 0 = 0 → `0x005F04FE` aip3; fail →
+     `0x005F0518` pct(30) and end; pass or param 0 ≠ 0 → `0x005F0550`
+     aip4.
+   No other callee of the body (`0x00619790` room list, `0x00552F60`,
+   `0x005DC530`, `0x0058ED10`, `0x005DE190`, `0x005DEFE0`, `0x0058F0D0`,
+   `0x0058F730`, `0x0058EF40`, `0x005DDF90`, `0x005DE080`) draws.
 
 #### 9.5 Brute (7) `0x005EFB80`
 
@@ -154,6 +175,38 @@ times.
 Draw order: up to 1 (step 1) + 1 (step 3) + 1 (step 4) + 1 (5) + 1 (6)
 + 1 (7) + 1 (circle). The resurrect itself is a skill (skills spec).
 1.14d-confirmed.
+
+8. Unit-seed steps, in order, with their sites (every one inline
+   `lo' % 100` on the shaman's own seed, `mov r, 0x6AC690C5` at the
+   site; 1.14d-confirmed `0x005F1440`–`0x005F173E`, read 2026-10-09,
+   PC 1 late). The body calls no `roll()`; the scan callbacks
+   (`0x005DD0B0` scan 9 / `0x005F1380`), `0x0058F730`, `0x005FD470`,
+   `0x005DE000`, `0x005DEAD0` and idle `0x005DE080` draw nothing.
+   | # | site | condition to draw | test |
+   |---|---|---|---|
+   | 1 | `0x005F1468` | C (tick +0x18 ≠ 0) | < aip3 → A1 (`0x005DDF90(4)`), end |
+   | 2 | `0x005F1516` | always (after the corpse scan) | < aip1 → command type 1 to the minions |
+   | 3 | `0x005F157B` | corpse ≠ 0 **and** count ≠ 0 | < aip1 and `0x005FD470` → Resurrect, end |
+   | 4 | `0x005F160D` | T ≠ 0 and D (tick +0x14) < aip5 (signed) | < aip2 → Skill2 at T, end |
+   | 5 | `0x005F169A` | `0x005DDC30` returned S ≠ 0 and its distance < aip5 | < aip2 → Skill2 at S, end |
+   | 6 | `0x005F16E1` | always when reached | ≥ aip3 → idle 10, end |
+   | 7 | `0x005DF7DB` | inside circle `0x005DF7D0` (step 6 < aip3) | low byte < 128 → velocity method 5, else 6 |
+   Step 5's search is the full `0x005DDC30` (`ai.md` §5.3): forced
+   target, else scan 6 over players **and** monsters with the
+   `0x005DC970` filter, so a hostile player within full-size distance
+   < 49 is a candidate (it is the shaman's usual S). D and S's distance
+   are different measures: D is the tick's no-size distance, S's is
+   `0x005DC380(S, shaman)` (S's size subtracted), so a player at D ≥ 15
+   can still be S at < 15 and give draw 5.
+9. Recorded vector (1.14d, `check-combat-pop-cold-plains`, Normal;
+   fallenshaman1 GUID 28 at (5155, 4650), its own pack leader, player
+   (size 2) at (5168, 4658), no C, no corpse). Seed at frame 6
+   {3519730397, 933551402}, at frame 7 {2437809167, 980491059}: four
+   steps. Frame-7 think: draw 2 = 7 < 45 → command to minions 29–32
+   (they walk at the player the same frame); draw 4 skipped (D =
+   (2·13 + 8) / 2 = 17 ≥ 15); draw 5 (S = player, distance (2·11 + 6)
+   / 2 = 14 < 15) = 77 ≥ 60; draw 6 = 87 < 100 → circle 3; draw 7 low
+   byte 15 < 128 → method 5; walk toward the player (mode 2).
 
 #### 9.7 QuillRat (14) `0x005F1140`
 
