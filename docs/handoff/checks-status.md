@@ -1006,8 +1006,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-hel-01 | items | PARTIAL | 0/0 | - | - |
 | items-drops-hel-02 | items | MATCH | 1/1 | - | - |
 | items-drops-hel-03 | items | PARTIAL | 0/0 | - | - |
-| items-drops-hel-04 | items | DIVERGED | 0/1 | item #0 (gps) stream byte 5, x (bit 0 of 16): 1.14d 208000658c83c215e2 vs d2rs 20800065ac83c215e2 | unrouted |
-| items-drops-hel-05 | items | DIVERGED | 0/1 | item #0 (hp5) missing in d2rs | unrouted |
+| items-drops-hel-04 | items | MATCH | 1/1 | - | - |
+| items-drops-hel-05 | items | MATCH | 1/1 | - | - |
 | items-drops-hel-06 | items | PARTIAL | 0/0 | - | - |
 | items-drops-hel-07 | items | PARTIAL | 0/0 | - | - |
 | items-drops-hel-08 | items | PARTIAL | 0/0 | - | - |
@@ -1039,7 +1039,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-nor-06 | items | MATCH | 4/4 | - | - |
 | items-drops-nor-07 | items | DIVERGED | 0/9 | item #0 (gsv) stream byte 7, y (bit 1 of 16): 1.14d 00658c822215e26cce vs d2rs 00658c826215e26cce | unrouted |
 | items-drops-nor-08 | items | MATCH | 1/1 | - | - |
-| items-drops-nor-09 | items | DIVERGED | 6/8 | item #0 (ass) category: 1.14d 16 vs d2rs 5 | unrouted |
+| items-drops-nor-09 | items | MATCH | 8/8 | - | - |
 | items-drops-nor-10 | items | DIVERGED | 6/8 | item #6 (gld) missing in d2rs | unrouted |
 | items-drops-nor-11 | items | MATCH | 6/6 | - | - |
 | items-drops-nor-12 | items | MATCH | 8/8 | - | - |
