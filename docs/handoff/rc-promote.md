@@ -55,3 +55,14 @@ written as `cov-promoted` (ledger.py merges group coverage as "exercised" only).
 - 0x9c vendor stock (halbu): frame 66 0x9c vs 0x67 MonsterMove ordering; cube-000..005: 1.14d `0x3f` (targeting reset)
   where d2rs sends `0x47`/`0x48`; assassin sentries (7): 0xA7/0xAC/0x21 summon messages; gen-shrine-7 (0xA8 size),
   -17 (0x2C vs 0x0E); act-video x3.
+
+## Round 4 (0x5D QuestItemState)
+- Found: 1.14d queues the quest messages of the town-leave refresh (`0x00537340`, called by `0x0053AEC0` before the act change
+  `0x0053ACC0`) at once; d2rs held them in the quest rest's outbox until the tick end, so `5d 04 00 0c` came last, not first.
+  `QuestRest::drain_sent` + the loan's `town_leave` now forward them at once. +6 checks packets MATCH (drognan/elzix/fara/
+  lysander stock, act-change-1/3, act-video). Earlier "d2rs sends none" came from a stale binary.
+- Still open (a5-wp-31..38 x7, drehya/nihlathak stock): d2rs sends `5d 1f/20/21 00 01 ..` (chains 31-33) for the event-3 branch
+  `old level == 109` (`quests-act5.md` §3.5, §4.5, §5.5) on a same-act `warp 111/115` from Harrogath; 1.14d sends none of them
+  (wp-31: only chain 32, branch `new level 111`). Hypothesis: in 1.14d the old level `a` of event 3 is not 109 for a poked
+  same-act warp (the placement `0x00554EA0` may change the client's room before `0x005380D0` reads it), so only the
+  new-level branches run. Check the client room (+0x1B4) writers on the `0x00554EA0` path.

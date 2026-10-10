@@ -190,7 +190,26 @@ pub fn step(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) -> Result<(
     let Some(u) = w.units.get(&key) else {
         return Ok(());
     };
-    if key.unit_type != PLAYER || !ENDING_MODES.contains(&u.mode) {
+    if key.unit_type != PLAYER {
+        return Ok(());
+    }
+    // The looping neutral modes (1 and 5): each client update adds the
+    // speed to the frame and a frame at the count wraps to the overshoot
+    // (measured on 1.14d, `gen-render-firebolt`: the neutral mode set by
+    // the 0x15 placement of tick 4 reads 128, 256, ... 1920, 0, 128 at
+    // ticks 4 ... 20 with speed 128 and count 2048). Only after a mode set
+    // (`speed` known).
+    if matches!(u.mode, 1 | 5) {
+        if let (Some(s), true) = (u.speed, u.frame_count > 0) {
+            let u = w.units.get_mut(&key).expect("present");
+            u.frame = u.frame.wrapping_add(s);
+            if u.frame >= u.frame_count {
+                u.frame -= u.frame_count;
+            }
+        }
+        return Ok(());
+    }
+    if !ENDING_MODES.contains(&u.mode) {
         return Ok(());
     }
     let has_skill = u.skills.as_ref().is_some_and(|l| l.current.is_some());
