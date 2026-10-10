@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–580 |
-|   4. Suite | 581–708 |
-| Constants & data dependencies | 709–712 |
-| Randomness | 713–716 |
-| Edge cases & original bugs | 717–752 |
-| Test vectors | 753–775 |
-| Provenance | 776–779 |
-| Open questions | 780–842 |
+|   3. Run | 145–607 |
+|   4. Suite | 608–735 |
+| Constants & data dependencies | 736–739 |
+| Randomness | 740–743 |
+| Edge cases & original bugs | 744–779 |
+| Test vectors | 780–802 |
+| Provenance | 803–806 |
+| Open questions | 807–869 |
 <!-- /index -->
 
 ## Summary
@@ -279,7 +279,16 @@ state first. It is the default way to compare a behaviour with 1.14d.
       `ClickView::pick` the window sets: the unit — monster, NPC,
       object or ground item, never a player — whose feet are nearest
       the click inside a box standing on them; d2rs-own, unverified,
-      the original hit-tests the drawn sprites `0x00467A10`), so a click
+      the original hit-tests the drawn sprites `0x00467A10`; measured
+      2026-10-10 (rc-render-effect): the effect scenes' first left click after
+      the waypoint, spell on the left button, walks in 1.14d (a left click
+      on the ground without Stand Still is a walk, controls.md §6 r7) because
+      nothing is hovered at the previous cursor (207,176), where d2rs's feet
+      box (±24 wide, 96 above) picks a Fallen above its head; the hover
+      candidate loop `0x00467AC0` tests each unit of the player's rooms with
+      `0x00466870`, whose monster / object test `0x00470860` is the unit's
+      drawn frame rectangle widened by 16 px on each side, not its feet
+      box), so a click
       on a monster sends the skill on the unit (`ui/controls.md` §6 r8: C→S 0x06
       for a left click), on
       an NPC or object the walk to the unit, then on arrival the
@@ -577,6 +586,24 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **1.14d fatal exit** (REC-3160): a check can drive 1.14d into a state
+    its own code treats as fatal: it shows its error dialog and calls
+    `0x00681E09(-1)`, the process ends with exit code `0xFFFFFFFF`, and
+    the recorders end the recording there with the footer note `game
+    exited, code 0xffffffff` (measured 2026-10-10, `gen-obj-374`:
+    snapshot 20 written, the client's refresh of the operated object in
+    mode 1 dies, `world/objects-client.md` §25 rule 5). The recording
+    is complete up to that point; a d2rs run that goes on is a
+    difference, not a longer run. The d2rs hosts therefore end the run at
+    the same place when the client model (or the server) raises a
+    1.14d fatal assert (`HandlerError::Fatal` / `Crash`): after the
+    snapshot of the tick in which the client update raised it (a fatal in
+    the server's tick or poke call ends the run before that tick's
+    snapshot), with the footer note `1.14d fatal exit after N ticks: <what>
+    (exit code 0xffffffff)`. All channels of one run end at that frame
+    (the rng and packets dumps share the loop), so the comparison covers
+    the same frames on both sides.
 
 ### 4. Suite
 

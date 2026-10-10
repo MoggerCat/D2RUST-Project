@@ -186,7 +186,7 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
     /// Failure reset `0x005BE1C0` (`items/use.md` §2): every item of the
     /// player's inventory list with flag 0x4 loses it, each with S→C 0x3F
     /// (`3F FF`, GUID, `FF FF`).
-    fn use_failure_reset(&mut self, player: Owner) {
+    pub(super) fn use_failure_reset(&mut self, player: Owner) {
         let Some(items) = self
             .unit_of(player)
             .and_then(|p| self.state.inventories.get(&p))

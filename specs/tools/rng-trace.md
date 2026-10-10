@@ -30,17 +30,17 @@
 | Outputs / state changes | 63–67 |
 | Rules | 68–69 |
 |   1. Format `rng-raw-1` with frames and owners | 70–92 |
-|   2. Owners | 93–131 |
-|   3. The d2rs log | 132–151 |
-|   4. The 1.14d recorder (`record_rng.py --frames`) | 152–188 |
-|   5. Comparison (`rng_diff.py`) | 189–218 |
-|   6. The `rng` channel of `scenario-diff` | 219–240 |
-| Constants & data dependencies | 241–244 |
-| Randomness | 245–248 |
-| Edge cases & original bugs | 249–258 |
-| Test vectors | 259–268 |
-| Provenance | 269–273 |
-| Open questions | 274–310 |
+|   2. Owners | 93–132 |
+|   3. The d2rs log | 133–152 |
+|   4. The 1.14d recorder (`record_rng.py --frames`) | 153–189 |
+|   5. Comparison (`rng_diff.py`) | 190–219 |
+|   6. The `rng` channel of `scenario-diff` | 220–241 |
+| Constants & data dependencies | 242–245 |
+| Randomness | 246–249 |
+| Edge cases & original bugs | 250–259 |
+| Test vectors | 260–269 |
+| Provenance | 270–274 |
+| Open questions | 275–311 |
 <!-- /index -->
 
 ## Summary
