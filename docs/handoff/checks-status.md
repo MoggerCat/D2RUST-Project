@@ -7,6 +7,8 @@ Rows of 29 checks re-run 2026-10-10 on claude/integ-r16 + rc-coverage-warps (war
 Rows of 262 checks re-run 2026-10-10 by rc-run-1 on integ-r23 (`suite.py --filter 'a*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`): rows replaced in place, the totals above are the full run's.
 
 Rows of 119 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h*,i*,j*,m*,n*,p*,r*,s*,u*,w*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`, partial: whatever finished by 12:00Z): rows replaced in place, the totals above are not recomputed.
+
+Rows of 183 checks re-run 2026-10-10 by rc-run-2 (`suite.py --filter 'b*,c*,d*,h*,i*,j*,m*,n*,p*,r*,s*,u*,w*' --orig-cache traces/orig-cache --fill-cache --no-playthrough`, partial: whatever finished by 12:20Z): rows replaced in place, the totals above are not recomputed.
 88 checks, 108 channel results: DIVERGED 68, MATCH 1, PARTIAL 39.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
@@ -458,23 +460,12 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-vendor-akara-buy | packets | DIVERGED | 35/40 | frame 16 stream s2c #0 bytes[10]: 1.14d 64 vs d2rs 11 (id 0x27) | q-fix-pc1-proto-items |
 | items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | join-act2-quests-ama | state | DIVERGED | 23/40 | frame 24 monster 1:1 class 201, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| merc-barb-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 561, field tx: 1.14d 5146 vs d2rs 4874 | q-scenes-compare |
-| merc-desert-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 338, field tx: 1.14d 5146 vs d2rs 4876 | q-scenes-compare |
-| merc-levelup-a1 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
-| merc-levelup-a2 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 338, field tx: 1.14d 5146 vs d2rs 4876 | q-scenes-compare |
-| merc-levelup-a3 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
-| merc-levelup-a5 | state | DIVERGED | 3/220 | frame 4 monster 1:1 class 561, field tx: 1.14d 5146 vs d2rs 4874 | q-scenes-compare |
-| merc-rogue-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 271, field tx: 1.14d 5145 vs d2rs 4877 | q-scenes-compare |
 | merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
-| merc-sorc-cow | state | DIVERGED | 3/120 | frame 4 monster 1:1 class 359, field tx: 1.14d 5147 vs d2rs 4874 | q-scenes-compare |
 | milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
 | milestone-act5-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-anya | state | PARTIAL | 111/111 | - | - |
 | milestone-baal-chamber | state | PARTIAL | 40/40 | - | - |
 | milestone-baal-throne | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
-| milestone-hellforge | state | DIVERGED | 144/177 | frame 145 missile 3:4 class -/675, field (unit): 1.14d absent vs d2rs extra | q-fix-skills-4cls |
-| milestone-hephasto | state | DIVERGED | 144/177 | frame 145 missile 3:4 class -/675, field (unit): 1.14d absent vs d2rs extra | q-fix-skills-4cls |
 | milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | q-fix-seed-order |
 | milestone-nihlathak | state | DIVERGED | 29/75 | frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | milestone-worldstone-portal | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
@@ -482,10 +473,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | poke-fallen-town | state | PARTIAL | 54/54 | - | - |
 | poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
 | poke-firebolt | state | PARTIAL | 60/60 | - | - |
-| rng-town-arrival-ama | rng | DIVERGED | 32/33 | frame 2, unit 1:3, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
-| rng-town-idle-sor | packets | DIVERGED | 116/120 | frame 1 stream c2s #0 bytes[18]: 1.14d 0 vs d2rs 1 (id 0x67) | q-prov-recording-2 |
-| rng-town-idle-sor | rng | DIVERGED | 40/41 | frame 2, unit 1:3, draw #0, field before: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:265 | q-fix-real-unit-seed-order |
-| walk-town-ama | state | PARTIAL | 80/80 | - | - |
 | warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
 | bar-whirlwind-unit | state | DIVERGED | 59/70 | frame 21 player 0:1 class 4, field fr: 1.14d 0 vs d2rs 5120 | unrouted |
 | bar-whirlwind-unit | packets | DIVERGED | 64/70 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
@@ -653,3 +640,89 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-rbo-02 | items | DIVERGED | 9/23 | item #9 (mp3) frame: 1.14d 84 vs d2rs 108 | unrouted |
 | items-drops-rbo-03 | items | DIVERGED | 19/27 | item #16 (hp3) frame: 1.14d 126 vs d2rs 121 | unrouted |
 | items-drops-rbo-04 | items | DIVERGED | 10/17 | item #10 (mac) stream byte 2, flags (bit 22 of 32): 1.14d 00208000652c83 vs d2rs 0020c000652c83 | unrouted |
+| items-drops-rbo-05 | items | MATCH | 6/6 | - | - |
+| items-drops-uni-00 | items | MATCH | 16/16 | - | - |
+| items-drops-uni-01 | items | MATCH | 17/17 | - | - |
+| items-drops-uni-02 | items | DIVERGED | 11/16 | item #11 (hp1) frame: 1.14d 194 vs d2rs 182 | unrouted |
+| items-drops-uni-03 | items | DIVERGED | 5/15 | item #5 (mp3) frame: 1.14d 120 vs d2rs 121 | unrouted |
+| items-drops-uni-04 | items | MATCH | 10/10 | - | - |
+| items-drops-uni-05 | items | DIVERGED | 6/8 | item #6 (gld) frame: 1.14d 53 vs d2rs 92 | unrouted |
+| items-pickup-ama | state | PARTIAL | 60/60 | - | - |
+| items-pickup-ama | packets | MATCH | 60/60 | - | - |
+| items-vendor-akara-stock | items | MATCH | 41/41 | - | - |
+| items-vendor-alkor-stock | items | MATCH | 17/17 | - | - |
+| items-vendor-asheara-stock | items | MATCH | 3/3 | - | - |
+| items-vendor-charsi-stock-goto | items | MATCH | 43/43 | - | - |
+| items-vendor-drehya-stock | items | PARTIAL | 0/0 | - | - |
+| items-vendor-drognan-stock | items | MATCH | 16/16 | - | - |
+| items-vendor-elzix-stock | items | MATCH | 49/49 | - | - |
+| items-vendor-fara-stock | items | MATCH | 2/2 | - | - |
+| items-vendor-gheed-stock-goto | items | MATCH | 44/44 | - | - |
+| items-vendor-halbu-stock | items | MATCH | 2/2 | - | - |
+| items-vendor-hratli-stock | items | MATCH | 3/3 | - | - |
+| items-vendor-jamella-stock | items | MATCH | 31/31 | - | - |
+| items-vendor-larzuk-stock | items | MATCH | 2/2 | - | - |
+| items-vendor-lysander-stock | items | MATCH | 8/8 | - | - |
+| items-vendor-malah-stock | items | MATCH | 17/17 | - | - |
+| items-vendor-nihlathak-stock | items | MATCH | 14/14 | - | - |
+| items-vendor-ormus-stock | items | MATCH | 10/10 | - | - |
+| merc-barb-cow | state | PARTIAL | 120/120 | - | - |
+| merc-desert-cow | state | PARTIAL | 120/120 | - | - |
+| merc-levelup-a1 | state | PARTIAL | 220/220 | - | - |
+| merc-levelup-a2 | state | PARTIAL | 220/220 | - | - |
+| merc-levelup-a3 | state | PARTIAL | 220/220 | - | - |
+| merc-levelup-a5 | state | PARTIAL | 220/220 | - | - |
+| merc-rogue-cow | state | PARTIAL | 120/120 | - | - |
+| merc-sorc-cow | state | PARTIAL | 120/120 | - | - |
+| milestone-anya | state | PARTIAL | 111/111 | - | - |
+| milestone-hellforge | state | PARTIAL | 177/177 | - | - |
+| milestone-hephasto | state | PARTIAL | 177/177 | - | - |
+| pal-hammer-rat | state | PARTIAL | 130/130 | - | - |
+| pal-holyfire | state | PARTIAL | 120/120 | - | - |
+| pal-holyfire-noclick | state | PARTIAL | 120/120 | - | - |
+| rng-town-arrival-ama | rng | MATCH | 33/33 | - | - |
+| rng-town-idle-sor | rng | MATCH | 41/41 | - | - |
+| rng-town-idle-sor | packets | DIVERGED | 119/120 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
+| save-corpse-ama | save | MATCH | 1/1 | - | - |
+| save-items-ama | save | DIVERGED | 0/1 | byte 0x0321 (stats +0x24): 1.14d 0e 0a 00 00 vs d2rs ff 01 69 66; 34 of 866 bytes differ; sizes 866 vs 848 | unrouted |
+| save-levelup-ama | save | MATCH | 1/1 | - | - |
+| sys-corpse-state | state | PARTIAL | 220/220 | - | - |
+| sys-corpse-state | rng | MATCH | 133/133 | - | - |
+| sys-difficulty-hell | state | DIVERGED | 67/100 | frame 67 monster 1:21 class 19, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| sys-difficulty-hell | rng | DIVERGED | 96/101 | frame 67, unit 1:21, draw #0, field missing: 1.14d site 0x5f05f8 vs d2rs site None | q-fix-seed-order |
+| sys-difficulty-nightmare | state | DIVERGED | 68/100 | frame 68 monster 1:21 class 19, field m: 1.14d 5 vs d2rs 1 | unrouted |
+| sys-difficulty-nightmare | rng | DIVERGED | 96/101 | frame 68, unit 1:21, draw #0, field missing: 1.14d site 0x5f05f8 vs d2rs site None | q-fix-seed-order |
+| sys-gold-pickup | state | PARTIAL | 120/120 | - | - |
+| sys-gold-pickup | rng | MATCH | 33/33 | - | - |
+| sys-gold-pickup | items | MATCH | 2/2 | - | - |
+| sys-intents-moves | packets | MATCH | 140/140 | - | - |
+| sys-intents-moves | state | PARTIAL | 140/140 | - | - |
+| sys-levelup-state | state | PARTIAL | 110/110 | - | - |
+| sys-levelup-state | rng | MATCH | 66/66 | - | - |
+| sys-pets-skeletons | state | PARTIAL | 220/220 | - | - |
+| sys-pets-skeletons | rng | MATCH | 133/133 | - | - |
+| sys-states | state | PARTIAL | 100/100 | - | - |
+| sys-states | rng | MATCH | 33/33 | - | - |
+| sys-statpoints | state | PARTIAL | 70/70 | - | - |
+| sys-statpoints | rng | MATCH | 33/33 | - | - |
+| sys-stats-base | state | PARTIAL | 80/80 | - | - |
+| sys-stats-base | rng | MATCH | 33/33 | - | - |
+| sys-stats-clamp | state | PARTIAL | 80/80 | - | - |
+| sys-stats-clamp | rng | MATCH | 33/33 | - | - |
+| sys-tick-idle-a2 | state | PARTIAL | 300/300 | - | - |
+| sys-tick-idle-a2 | rng | MATCH | 244/244 | - | - |
+| sys-tick-idle-a5 | state | PARTIAL | 300/300 | - | - |
+| sys-tick-idle-a5 | rng | MATCH | 285/285 | - | - |
+| sys-town-portal | state | PARTIAL | 29/29 | - | - |
+| sys-town-portal | rng | MATCH | 31/31 | - | - |
+| sys-units-census | state | PARTIAL | 140/140 | - | - |
+| sys-units-census | rng | MATCH | 141/141 | - | - |
+| sys-vitals-create-bar | state | PARTIAL | 220/220 | - | - |
+| sys-vitals-create-bar | rng | MATCH | 133/133 | - | - |
+| sys-vitals-create-sor | state | PARTIAL | 220/220 | - | - |
+| sys-vitals-create-sor | rng | MATCH | 133/133 | - | - |
+| walk-click-walk-sor | state | PARTIAL | 110/110 | - | - |
+| walk-click-walk-town-ama | state | PARTIAL | 70/70 | - | - |
+| walk-click-walk-town-ama | packets | DIVERGED | 68/70 | frame 18 stream c2s #0 bytes[3]: 1.14d 142 vs d2rs 143 (id 0x01) | q-fix-skills-4cls |
+| walk-town-ama | state | PARTIAL | 80/80 | - | - |
+| walk-town-ama | packets | MATCH | 80/80 | - | - |
