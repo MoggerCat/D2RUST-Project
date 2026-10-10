@@ -1165,7 +1165,7 @@ class Recorder:
 # --skip-inline presets: code ranges whose inline draws step no game or unit
 # seed in the measured runs (specs/tools/rng-trace.md §4 r6).
 SKIP_PRESETS = {
-    "drlg": ((0x642000, 0x643000), (0x66B000, 0x682000)),  # rng_owners.DRLG_SITES
+    "drlg": ((0x642000, 0x643000), (0x66B000, 0x67A240), (0x67A390, 0x682000)),  # rng_owners.DRLG_SITES
 }
 
 

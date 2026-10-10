@@ -19,6 +19,14 @@ use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 /// The quest calls no written spec provides yet, each with its expected
 /// provider (`docs/handoff/impl-world.md` "Seams").
 pub trait QuestRest {
+    /// The messages the rest has queued for the clients but not yet handed
+    /// to the transport, taken now: the level warp's town-leave refresh
+    /// (`0x00537340`) queues its quest messages at once, before the act
+    /// change's own (`world/waypoints.md` §11, `flows/act-change.md` §1).
+    /// Default: none (a rest that sends at once).
+    fn drain_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+        Vec::new()
+    }
     /// Game +0xC0 (DRLG).
     fn has_act2(&self) -> bool;
     /// Players in `unit-order.md` §7 order (units / clients).
@@ -41,13 +49,6 @@ pub trait QuestRest {
     /// question 7).
     fn party_members(&self, player: UnitId) -> Option<Vec<UnitId>>;
     fn send(&mut self, player: UnitId, msg: &[u8]);
-    /// The messages [`Self::send`] queued since the last take, in send
-    /// order. A call that 1.14d answers in place (a level change: the
-    /// quest's 0x5D precedes the room removals) takes them at once and
-    /// sends them through the transport. Default: none queued here.
-    fn take_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
-        Vec::new()
-    }
     fn send_text_list(&mut self, player: UnitId, npc: UnitId, list: &[(u16, u32)]);
     /// The player's inventory items in list order (inventory spec;
     /// `cube.md` open question 5).

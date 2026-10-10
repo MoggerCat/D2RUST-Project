@@ -30,15 +30,15 @@
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 211–237 |
 |   4. Mode change gates | 238–295 |
 |   5. Start and do | 296–490 |
-|   6. Cooldown | 491–504 |
-|   7. Periodic skills and auras | 505–554 |
-|   8. Function tables | 555–574 |
-| Constants & data dependencies | 575–595 |
-| Randomness | 596–605 |
-| Edge cases & original bugs | 606–627 |
-| Test vectors | 628–648 |
-| Provenance | 649–668 |
-| Open questions | 669–721 |
+|   6. Cooldown | 491–506 |
+|   7. Periodic skills and auras | 507–556 |
+|   8. Function tables | 557–576 |
+| Constants & data dependencies | 577–597 |
+| Randomness | 598–607 |
+| Edge cases & original bugs | 608–629 |
+| Test vectors | 630–650 |
+| Provenance | 651–670 |
+| Open questions | 671–723 |
 <!-- /index -->
 
 ## Summary
@@ -493,7 +493,9 @@ return null. Then create (`0x0059FA30`) and return the missile.
 `set_delay(game, unit, d)` = `0x0056EF90` (players only, `d ≠ 0`): end
 `e = frame + d`. No stat list for state 121 (`skilldelay`): allocate one
 (flags 2, expire `e`, owner unit), state 121, remove callback
-`0x0056E900`, attach, switch state 121 on. Set the list's expiry to `e`.
+`0x0056E900`, attach, switch state 121 on (`0x00639DB0`, which also
+queues the unit for update: the next update sends S→C 0xA7 for state
+121). Set the list's expiry to `e`.
 Schedule a type-12 timer at `e` (another one per call).
 
 `use_state` returns 8 when a player has state 121 and the requested

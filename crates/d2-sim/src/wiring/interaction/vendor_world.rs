@@ -11,7 +11,7 @@
 use super::npc_vendors::VendorDesk;
 use super::NpcRest;
 use super::{InteractionError, PlayerQuestsRef};
-use crate::items::{create::CreateError, ItemRequest};
+use crate::items::{create::CreateError, recharge, ItemRequest};
 use crate::stats::{key_layer, key_stat};
 use crate::units::lifecycle::LifecycleHooks;
 use crate::units::{UnitId, UnitType};
@@ -402,37 +402,28 @@ where
                 .collect(),
         })
     }
-    /// Recharge `0x0055FE80` (`items/generation.md` §12.2) on a store or
-    /// gamble item: each stat-204 entry below its maximum is set to the
-    /// maximum on the item's own lists (`0x0065C940`). The items of its own
-    /// inventory (socket fillers) are not tried: a vendor's items have none.
+    /// Recharge `0x0055FE80` (`generation.md` §12.2) on the store item: each
+    /// stat-204 entry of its extended list below its maximum is set to the
+    /// maximum (`items/properties.md` §5 rule 9: a store item always shows
+    /// current = max; as `InvDesk::recharge_item`, without the item's own
+    /// inventory).
     fn recharge(&mut self, item: UnitId) {
-        use crate::items::recharge::{recharge, set_charges, CHARGED_SKILL};
-        let stats = &self.desk.econ.stats;
-        let entries: Vec<(u16, i32)> = stats
-            .unit_list(item)
-            .filter(|&l| stats.is_extended(l))
-            .map(|l| {
-                stats
-                    .full_entries(l)
-                    .into_iter()
-                    .filter(|&(k, _)| key_stat(k) == CHARGED_SKILL)
-                    .map(|(k, v)| (key_layer(k), v))
-                    .take(64)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let entries = {
+            let stats = &self.desk.econ.stats;
+            match stats.unit_list(item).filter(|&l| stats.is_extended(l)) {
+                Some(_) => self.entries(item, stat::CHARGED_SKILL),
+                None => Vec::new(),
+            }
+        };
         let mut sets = Vec::new();
-        recharge(&entries, |k, m| sets.push((k, m)));
+        recharge::recharge(&entries, |k, m| sets.push((k, m)));
         for (k, m) in sets {
-            if let Err(e) = self
+            let _ = self
                 .desk
                 .econ
-                .with_item(item, |s| set_charges(&mut s.item.stats, k, m))
-            {
-                self.desk.state.errors.push(InteractionError::Economy(e));
-            }
+                .with_item(item, |s| recharge::set_charges(&mut s.item.stats, k, m));
         }
+        self.desk.rest.recharge(item);
     }
     fn repair_broken(&mut self, item: UnitId) {
         self.desk.rest.repair_broken(item);

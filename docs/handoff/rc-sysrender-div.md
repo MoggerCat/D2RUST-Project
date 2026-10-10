@@ -16,3 +16,10 @@ Measured effect (with the earlier skip directives, now removed): firebolt 89.2 -
 - den-of-evil 44.4%: row 70 shadow frame 3 vs 1 (monster frame). S-M. kurast-rain 35.6%: row 97 frame 8 vs 3. M.
 - 28 rows (camera/sprite-placement/unit-composite, `local-pc1-today`) need Windows pixel compare; render.effect/scene rows (90) need the scene re-runs under Wine; torch: rc-draw-row173.
 - Cloud: disk hit 0 once (deleted target/debug, ~/.wine-d2-suite-*).
+
+## Round 2 (REC-3570..3589 unused)
+- C009 (player cast shadow): a client skill start faces its cast point/unit (modes 0x15/0x16, whole turn, PROVISIONAL) and an ending-mode player draws the model's frame. draws-fire-bolt-sor 60.6 -> 69.4%, draws-frost-nova-sor 35.7 -> 38.4%; first diff moved from player shadow row 98 to row 106, the poke-spawned cow's frame (rc-player-mode's cow cause).
+- den-of-evil row 70: torch B at (510,324) frame 7/19/10 (1.14d) vs 7/18/9 (d2rs) at ticks 13/27/41, torch A equal: B's object animation speed (`roll` on its client seed) differs, so the room's unit-seed stream order (creation order in the room, incl. client-made units) differs. Needs the 1.14d seed per object; not found. M.
+- kurast-rain row 97 is now the rain DrawLines (x 4 vs 47): not mine.
+- render.* scenes: fxfireball re-run on integ-r23 (1.14d under Wine ~15 min): all 4 scenes 15-19% pixels, first diff tick 3 `tile_origin_x` at the scene frame: both sides in Cold Plains but the player stands 31/51 subtiles apart (tile_origin 7729,78285 vs 7760,78336) after the click path: walk/click position, not an effect. The other 19 groups share the click path, not re-run (same cause expected).
+- Windows rows: queued in pc1-data.md Step 4 ([rc-sysrender-div]).

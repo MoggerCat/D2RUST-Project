@@ -109,12 +109,15 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         to: u32,
     ) {
         self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
-        self.flush_sends(v);
     }
 
     fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
         self.on_world(game, v, LoanCall::TownLeave { player, to });
-        self.flush_sends(v);
+        // `0x00537340` queues the quest messages at once (`0x0053D710`), so
+        // they precede the act change's (`flows/act-change.md` §1).
+        for (unit, bytes) in self.rest.drain_sent() {
+            v.h.x.send(unit, &bytes);
+        }
     }
 
     fn npc_wants_interact(
@@ -197,16 +200,6 @@ impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R
     /// Runs `call` on the quest control and a [`HostQuests`] over the
     /// game's parts (the economy of `v`, this loan's rest and tables),
     /// with the lent inventory model when there is one.
-    /// Sends what the quest calls queued on the rest through the
-    /// transport now, so the messages of a level change keep the place
-    /// the original sends them at (the 0x5D before the room removals,
-    /// `world/waypoints.md` §11 note on the recorded act change).
-    fn flush_sends<X: Pending>(&mut self, v: &mut View<'_, X>) {
-        for (p, m) in self.rest.take_queued() {
-            v.h.x.send(p, &m);
-        }
-    }
-
     fn on_world<X: Pending>(
         &mut self,
         game: &mut Game,

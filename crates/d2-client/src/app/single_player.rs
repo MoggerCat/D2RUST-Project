@@ -1064,6 +1064,24 @@ impl Pending for LocalSeams {
     ) -> Vec<UnitId> {
         skill_events::missile_area_units(h, sim, owner, at, r, f)
     }
+    fn missile_ally_test(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        a: UnitId,
+        b: UnitId,
+    ) -> bool {
+        skill_events::missile_ally_test(h, sim, a, b)
+    }
+    fn missile_shout_state(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_shout_state(h, sim, unit, owner, skill, level)
+    }
     fn missile_summon_spawn(
         h: &mut ActionHooks<Self>,
         sim: &mut USim<'_>,
@@ -2425,13 +2443,7 @@ pub fn build_with(
     // (q-fixture-migrate: a second, fresh state left every town without
     // its preset NPCs and objects on the user's files).
     let state = WorldState::new(shared_types, Arc::new(parts.world), info);
-    // The game's difficulty and the neutral delay's column
-    // (`ai.md` §1.3 rule 1: game +0x6A is 3 in single player, so the
-    // difficulty's `aidel` column; recorded Hell first think at f + 13).
-    let mut unit_data = parts.units;
-    unit_data.difficulty = character.difficulty();
-    unit_data.aidel_by_difficulty = GAME_TYPE != 0 || GAME_SETUP.ladder;
-    let mut sim = WorldSim::new(Arc::new(parts.stats), unit_data, hooks, state);
+    let mut sim = WorldSim::new(Arc::new(parts.stats), parts.units, hooks, state);
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
     let fields = GameFields {
