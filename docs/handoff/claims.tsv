@@ -16,4 +16,4 @@ C056	rc-c022-playerstate	17:05	gen-su-12 frame 54 player m 19 vs 5 (knockback/hi
 C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed draws)	open
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	open
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
-C-ui-pix	rc-ui-pixels	17:27	ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	open
+C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops the player light); ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	open
