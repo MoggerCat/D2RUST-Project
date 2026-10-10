@@ -448,6 +448,10 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         self.inner.follow_frame_schedule();
     }
 
+    fn level_weather(&self) -> Option<(bool, bool)> {
+        self.weather.as_ref().and_then(|w| w.level_flags())
+    }
+
     fn weather_update(&mut self, world: &ClientWorld, assets: &mut ViewAssets) {
         let local_at = self.local_at;
         let mode = self.ui_open_mode.unwrap_or(OpenMode::NONE);
@@ -483,6 +487,13 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
         preview
             .light
             .refresh(world, lights, local_at, tables.as_ref());
+    }
+
+    fn set_light_quality(&mut self, q: Option<u8>) {
+        match self.preview.as_mut() {
+            Some(preview) => preview.light.set_quality(q),
+            None => self.inner.set_light_quality(q),
+        }
     }
 
     fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {

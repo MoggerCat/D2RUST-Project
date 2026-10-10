@@ -742,7 +742,14 @@ pub fn gold_pickup<W: MoveWorld>(w: &mut W, player: Owner, pile: Guid) {
             }
         }
     }
-    leave_room(w, pile);
+    // The pile is freed in this call, so its removal reaches the clients
+    // through the room pass of the tick (S→C 0x0A, `0x00571600`), not as
+    // an immediate delete notice (recorded: `net-s2c-gold-pickup`, the
+    // 0x0A, 0x2C and 0x19 all in the tick after the 0x13).
+    if w.in_room(pile) {
+        w.free_collision(pile);
+    }
+    w.remove_from_room(pile);
     clear_uflags(w, pile, uflag::TARGETABLE);
     w.free_item(pile);
     if rest > 0 {

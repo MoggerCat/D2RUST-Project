@@ -121,6 +121,9 @@ pub struct DumpArgs {
     /// path, so a `--send "<f> hex 69"` (Save and Exit) writes the `.d2s`
     /// there (the `save` channel of `specs/tools/scenario-diff.md`).
     pub save_out: Option<PathBuf>,
+    /// `--client-out FILE`: also write the client model's units per tick
+    /// ([`super::client_state`]).
+    pub client_out: Option<PathBuf>,
 }
 
 /// Parses the options after `state-dump`.
@@ -141,6 +144,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
         packets: None,
         rng: None,
         save_out: None,
+        client_out: None,
     };
     let (mut ticks, mut out) = (None, None);
     let mut it = args.iter();
@@ -162,6 +166,7 @@ pub fn parse_args(args: &[String]) -> Result<DumpArgs> {
             "--packets" => a.packets = Some(PathBuf::from(value()?)),
             "--rng" => a.rng = Some(PathBuf::from(value()?)),
             "--save-out" => a.save_out = Some(PathBuf::from(value()?)),
+            "--client-out" => a.client_out = Some(PathBuf::from(value()?)),
             "--poke" => a
                 .pokes
                 .push(pokes::parse_poke_arg(value()?).map_err(anyhow::Error::msg)?),
@@ -261,6 +266,8 @@ pub struct DumpGame {
     /// `--save-out FILE`: where the server's character writer puts the
     /// `.d2s` (`play`'s [`super::save::FileStore`]).
     pub save_out: Option<PathBuf>,
+    /// `--client-out FILE` ([`super::client_state`]).
+    pub client_out: Option<PathBuf>,
 }
 
 impl DumpGame {
@@ -300,6 +307,7 @@ impl DumpGame {
             packets: args.packets.clone(),
             rng: args.rng.clone(),
             save_out: args.save_out.clone(),
+            client_out: args.client_out.clone(),
         })
     }
 }
@@ -390,6 +398,19 @@ pub fn dump<W: Write>(
         )?),
         None => None,
     };
+    let mut client_out = match &game.client_out {
+        Some(p) => {
+            let mut f = std::io::BufWriter::new(std::fs::File::create(p)?);
+            writeln!(
+                f,
+                "{}",
+                super::client_state::header(&info.tool, &info.date, &info.command)
+            )?;
+            Some(f)
+        }
+        None => None,
+    };
+    let mut client_pre = String::new();
     let (mut fields, mut gaps) = link.with(|l| state::coverage_world(&l.host().game.events))?;
     // `q`: the players' quest records, kept by the app's rest (StateSource below)
     fields.extend(state::HOST_FIELDS.iter().map(|k| (*k).to_owned()));
@@ -490,7 +511,7 @@ pub fn dump<W: Write>(
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
         if let Some(h) = input.as_mut() {
-            for l in h.apply(&mut bridge, last_frame)? {
+            for l in h.apply_with(&mut bridge, last_frame, &mut |b, e| ui.route(b, e))? {
                 eprintln!("input: {l}");
                 input_notes.push(format!("input: {l}"));
             }
@@ -501,6 +522,9 @@ pub fn dump<W: Write>(
         }
         bridge.set_now(ms.load(Ordering::SeqCst));
         let t0 = super::perf::enabled().then(std::time::Instant::now);
+        if client_out.is_some() {
+            client_pre = super::client_state::units_json(bridge.world());
+        }
         let rejected_before = bridge.log().rejected.len();
         let report = bridge.frame()?;
         if let Some(t0) = t0 {
@@ -573,10 +597,20 @@ pub fn dump<W: Write>(
         if s.frame.rem_euclid(every as i32) == 0 {
             writeln!(out, "{}", s.to_json_line())?;
             snaps += 1;
+            if let Some(f) = client_out.as_mut() {
+                writeln!(
+                    f,
+                    "{}",
+                    super::client_state::snap_line(&client_pre, s.frame)
+                )?;
+            }
         }
         if fatal.is_some() {
             break;
         }
+    }
+    if let Some(f) = client_out.as_mut() {
+        f.flush()?;
     }
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
@@ -901,6 +935,10 @@ pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
 /// it. Audio and effects outputs have no consumer here.
 struct DialogUi {
     ui: crate::ui::original::OriginalUi,
+    /// The root the panels are installed in: `--input` events go through
+    /// it first, as `play`'s `run_ui_with` does (a panel key or a click on
+    /// the control panel is taken there, not by the world).
+    root: crate::ui::root::UiRoot,
     /// The UI errors met, once each (footer notes).
     notes: Vec<String>,
 }
@@ -916,10 +954,43 @@ impl DialogUi {
         };
         let ui = crate::ui::original::OriginalUi::new(config, None)
             .map_err(|e| anyhow::anyhow!("original UI: {e:?}"))?;
+        let mut root = crate::ui::root::UiRoot::new(Box::new(crate::ui::NoPanelRules));
+        ui.install(&mut root)
+            .map_err(|e| anyhow::anyhow!("original UI install: {e:?}"))?;
         Ok(Self {
             ui,
+            root,
             notes: Vec::new(),
         })
+    }
+
+    /// The `--input` events of a pass through the panels; the events no
+    /// panel took (for the world handlers).
+    fn route(
+        &mut self,
+        bridge: &mut Bridge<DumpLink>,
+        events: Vec<crate::ui::UiEvent>,
+    ) -> Result<Vec<crate::ui::UiEvent>, crate::bridge::BridgeError> {
+        use crate::world_view::ui_bind::{run_ui_with, UiQueue, UiRunError};
+        let mut q = UiQueue(events.clone());
+        match run_ui_with(
+            &mut self.root,
+            &mut q,
+            bridge,
+            &crate::ui::panel::NoStrings,
+            Some(&mut self.ui),
+        ) {
+            Ok(f) => Ok(f.unhandled),
+            Err(UiRunError::Bridge(e)) => Err(e),
+            Err(UiRunError::Original(e)) => {
+                let note = format!("ui: {e}");
+                if !self.notes.contains(&note) {
+                    eprintln!("{note}");
+                    self.notes.push(note);
+                }
+                Ok(events)
+            }
+        }
     }
 
     fn deliver(&mut self, bridge: &mut Bridge<DumpLink>, outputs: &[Output]) -> Result<()> {
@@ -976,6 +1047,8 @@ mod tests {
             "p.jsonl",
             "--save-out",
             "out.d2s",
+            "--client-out",
+            "c.jsonl",
             "--no-own-c2s",
             "0x5f,3,0x5f",
             "--poke",
@@ -1017,6 +1090,7 @@ mod tests {
                 packets: Some("p.jsonl".into()),
                 rng: None,
                 save_out: Some("out.d2s".into()),
+                client_out: Some("c.jsonl".into()),
             }
         );
         assert!(parse_args(&args(&[

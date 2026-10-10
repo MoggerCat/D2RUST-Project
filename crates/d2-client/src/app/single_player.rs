@@ -1054,6 +1054,15 @@ impl Pending for LocalSeams {
     ) -> (i32, i32) {
         skill_events::missile_summon_class(h, sim, owner, skill, level)
     }
+    fn skill_stat_refresh(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        stat: u16,
+        layer: u16,
+    ) {
+        skill_events::skill_stat_refresh(h, sim, unit, stat, layer);
+    }
     fn missile_area_units(
         h: &mut ActionHooks<Self>,
         sim: &mut USim<'_>,

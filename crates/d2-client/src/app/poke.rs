@@ -270,6 +270,12 @@ pub type ServerHost<C> = d2_server::host::Host<
     C,
 >;
 
+/// The first byte of a queue-walk mark (`d2_sim::wiring::action`).
+fn is_walk_mark(b: u8) -> bool {
+    use d2_sim::wiring::action::{GROUND_ITEM_MARK, PLAYER_ITEMS_MARK, PLAYER_SOUND_MARK};
+    matches!(b, GROUND_ITEM_MARK | PLAYER_ITEMS_MARK | PLAYER_SOUND_MARK)
+}
+
 /// Queues what the sim sent during a poke run at the tick end
 /// (`poke.md` §5 rule 5) into the clients' buffers now, so it leaves in
 /// this frame's flush as on 1.14d (a `goto` step's 0x07); left in the
@@ -277,7 +283,25 @@ pub type ServerHost<C> = d2_server::host::Host<
 pub fn queue_sent_now<C: d2_server::seams::Clock>(h: &mut ServerHost<C>) {
     use d2_server::adapters::handlers::world::WorldHost;
     let sent = h.game.world.take_sent(&mut h.game.events);
+    // The queue walk's host-only marks (ground item, player items / sound)
+    // are the tick's to turn into the real messages (`SimGame` tick,
+    // `take_sent`): left queued, not sent raw.
+    let (marks, sent): (Vec<_>, Vec<_>) = sent.into_iter().partition(|(_, b)| {
+        use d2_sim::wiring::action::{GROUND_ITEM_MARK, PLAYER_ITEMS_MARK, PLAYER_SOUND_MARK};
+        b.len() == 5
+            && matches!(
+                b[0],
+                GROUND_ITEM_MARK | PLAYER_ITEMS_MARK | PLAYER_SOUND_MARK
+            )
+    });
+    h.game.world.rest.sent.splice(0..0, marks);
     for (unit, bytes) in sent {
+        // A queue-walk mark (a ground item's, a player's items or sound) is
+        // answered by the tick's client pass, not here: nothing at the tick
+        // end stands for it.
+        if bytes.len() == 5 && is_walk_mark(bytes[0]) {
+            continue;
+        }
         // A player without a client receives nothing.
         if let Some(c) = h.game.client_of(unit) {
             if let Err(e) = h.queue_now(c, &bytes) {

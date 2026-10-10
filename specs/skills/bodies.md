@@ -35,15 +35,15 @@
 |   3. Start functions (srvst) | 535–625 |
 |   4. Do functions (srvdo) | 626–822 |
 |   5. `srvmissile` path | 823–838 |
-|   6. Shared helpers, batch 2 | 839–1177 |
-|   7. Start functions (srvst), batch 2 | 1178–1244 |
-|   8. Do functions (srvdo), batch 2 | 1245–1663 |
-| Constants & data dependencies | 1664–1710 |
-| Randomness | 1711–1729 |
-| Edge cases & original bugs | 1730–1779 |
-| Test vectors | 1780–1800 |
-| Provenance | 1801–1838 |
-| Open questions | 1839–1864 |
+|   6. Shared helpers, batch 2 | 839–1188 |
+|   7. Start functions (srvst), batch 2 | 1189–1255 |
+|   8. Do functions (srvdo), batch 2 | 1256–1679 |
+| Constants & data dependencies | 1680–1726 |
+| Randomness | 1727–1745 |
+| Edge cases & original bugs | 1746–1795 |
+| Test vectors | 1796–1816 |
+| Provenance | 1817–1854 |
+| Open questions | 1855–1880 |
 <!-- /index -->
 
 ## Summary
@@ -990,6 +990,17 @@ x_((i − 16) mod 64).
 
 A recast refreshes the expiry of an existing list (unlike §4.2 step 3).
 
+Read 2026-10-10 (1.14d `bar-shout` / `bar-battle-command`, rc-skill-div-a):
+step 4's passive refresh `0x0056DE40(T)` is `0x00646F20(T)` (every passive
+skill whose state T has: `0x00646D60`, which ends with `0x00639E30(T,
+passivestate, 1)`: changed bit and update queue, so a level change sends the
+state again as 0xA8) and, for a player T, the skill resync `0x00575900`.
+`0x00639E30` always ends with the update-queue insert `0x0064C040`, so the
+step-4 changed mark also queues T. The Shout / Battle Orders / Battle
+Command missiles (srvhit 18, `missiles/bodies.md` §13) run this same
+`shout_state` on every ally they touch, the caster included: the caster's
+state goes out a second time one frame after the cast.
+
 #### 6.9 Sentry spawn `0x005D5E10`
 
 `sentry(game, unit, x, y, R, skill, L)` (ECX game, EDX unit; `ret
@@ -1425,6 +1436,11 @@ calling it).
 6. `golem_stats(game, unit, m, skill, L)` (§6.11).
 7. Message 0x7F (AllyPartyInfo, `sim/server-messages.tsv`) about m to
    the unit's client (`0x005531C0`, `0x0053CDF0(client, m)`).
+   The 10 bytes (`0x0053CDF0`): 0x7F, 1 when m is a player else 0, m's
+   life percent (`0x00621F20`) u16, m's GUID u32, the level id of m's room
+   u16; written to the client's buffer at once (not through the unit's
+   record list). Recorded: `nec-clay-golem` frame 27
+   (`7f 00 64 00 09000000 0200`).
 8. `node_insert(game, m, 0, unit +0xD0)`. Return 1.
 
 #### 8.10 35 Fists of Fire, Claws of Thunder, Blades of Ice `0x005D35D0`

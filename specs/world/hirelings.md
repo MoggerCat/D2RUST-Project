@@ -40,18 +40,18 @@
 |   6. Following the player | 439–516 |
 |   7. Experience and level-up | 517–582 |
 |   8. Death (`0x0057CCB0` → `0x005751A0`) | 583–645 |
-|   9. Revive | 646–683 |
-|   10. Restoring from a save | 684–729 |
-|   11. Items (expansion) | 730–799 |
-|   12. Services (links) | 800–803 |
-|   13. Messages | 804–875 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 876–882 |
-| Constants & data dependencies | 883–906 |
-| Randomness | 907–917 |
-| Edge cases & original bugs | 918–969 |
-| Test vectors | 970–1032 |
-| Provenance | 1033–1089 |
-| Open questions | 1090–1182 |
+|   9. Revive | 646–692 |
+|   10. Restoring from a save | 693–738 |
+|   11. Items (expansion) | 739–808 |
+|   12. Services (links) | 809–812 |
+|   13. Messages | 813–884 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 885–891 |
+| Constants & data dependencies | 892–915 |
+| Randomness | 916–926 |
+| Edge cases & original bugs | 927–978 |
+| Test vectors | 979–1041 |
+| Provenance | 1042–1098 |
+| Open questions | 1099–1191 |
 <!-- /index -->
 
 ## Summary
@@ -669,6 +669,15 @@ gain may carry it past the player's level.
      0x2A with the GUID read from L +0x0C) run on the freed record: use
      after free, outcome set by the allocator, not reproducible. d2rs
      policy: edge case 5.
+   - Settled (rc-pkt-handwritten, REC-3374; `traces/checks/hire-resurrect-*.check`,
+     1.14d recordings of a hireling with life poked to 0 that never died):
+     the revive runs and frees the unit: S→C 0x9B, S→C 0x2A code 5 with GUID
+     **0xFFFFFFFF** (the GUID read from the freed record, `npc.md` §7.4 rule
+     4), then, in the same frame's per-client update, S→C 0x0A for the freed
+     unit; the unit is absent from then on. d2rs: `HirelingWorld::free_unit`
+     (`HireView`) queues the notice ([`LifecycleHooks::queue_removal_notice`])
+     and frees the record (`0x00555600`); the notice goes out with the next
+     per-client update (PROVISIONAL: its place among that step's messages).
 4. Mode 1 again; life := max (stat 6 := `0x00625D10`); mark the node
    living (`0x00574AB0`: bit 0 := 0, broadcast 0x81 for it); join the
    team (`0x005B1900`, §3.2 rule 3).
@@ -1001,7 +1010,7 @@ Synthetic (CI-safe):
 | merc level 97, exp jumps above threshold(99) | level 98 (§7.3); after reload 99 (§10) | edge case 6 |
 | `ExpRatio` (s = 10): e 229, alvl 6 (r 1024) / e 5000, alvl 80 (r 496) / e 3000000, alvl 97 (r 8) / e 2000000, alvl 6 | 229 / 2421 / 23432 (e > limit 2097151: (e >> 10)·8) / 1999872 (e > 1048575) | §7.2 rule 3 |
 | `0x00663750` with class 0, expansion, name 0x0D68 | no `Class` 0 row; name-range row of Act 1 → 0 | §1.2 rule 3 |
-| crafted 0x62, hireling node living | 0x2A code 9; gold, unit, node unchanged; no 0x9B (d2rs policy) | edge case 5 |
+| crafted 0x62, hireling node living | revived like a dead one: cost, 0x9B, 0x2A code 5 (1.14d, `traces/checks/hire-resurrect-kashya.check`; REC-3374 withdraws the code-9 policy) | edge case 5 |
 
 Recorded (`traces-raw-buddy/merc1-spawn-packets.jsonl`, character
 `bdMercTwo` level 8, gold 296; `docs/handoff/local-buddy-recordings.md`
