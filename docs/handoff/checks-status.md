@@ -313,22 +313,22 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-su-ancient1 | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-ancient2 | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-ancient3 | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-anodized-elite | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [2284215331, 110856190] vs d2rs [801779763, 682737871] | coord-resume-3 |
+| a5-su-anodized-elite | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
 | a5-su-axe-dweller | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-blaze-ripper | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-bonesaw-breaker | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [265783310, 334416221] vs d2rs [1636898494, 996462589] | coord-resume-3 |
-| a5-su-dac-farren | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [801779763, 682737871] vs d2rs [2389069335, 1428164363] | coord-resume-3 |
+| a5-su-bonesaw-breaker | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
+| a5-su-dac-farren | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
 | a5-su-eyeback | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-frozenstein | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-magma-torquer | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [265783310, 334416221] vs d2rs [1636898494, 996462589] | coord-resume-3 |
+| a5-su-magma-torquer | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
 | a5-su-megaflow-rectifier | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-nihlathak-boss | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-pindleskin | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [2284215331, 110856190] vs d2rs [801779763, 682737871] | coord-resume-3 |
+| a5-su-pindleskin | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
 | a5-su-sharp-tooth-sayer | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-shenk | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-snapchip | state | PARTIAL | 90/90 | - | coord-resume-3 |
 | a5-su-threash-socket | state | PARTIAL | 90/90 | - | coord-resume-3 |
-| a5-su-vinvear-molech | state | DIVERGED | 15/90 | frame 16 game, field seed: 1.14d [1849502785, 1775890804] vs d2rs [1700105641, 1485675667] | coord-resume-3 |
+| a5-su-vinvear-molech | state | DIVERGED | 35/90 | frame 36 monster 1:18 class 529, field hp: 1.14d 55808 vs d2rs 54409 | coord-resume-3 |
 | a5-town-arrival-bar | state | PARTIAL | 40/40 | - | - |
 | a5-town-npc-sweep | state | PARTIAL | 170/170 | - | - |
 | a5-warp-crystalized-ama | rng | MATCH | 133/133 | - | - |
@@ -1286,7 +1286,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
 | gen-ai-diablo | state | PARTIAL | 150/150 | - | - |
 | gen-ai-megademon | state | PARTIAL | 150/150 | - | - |
-| gen-boss-333 | state | DIVERGED | 70/150 | frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943] | unrouted |
+| gen-boss-333 | state | DIVERGED | 94/150 | frame 95 monster 1:8 class 333, field s: 1.14d [3733357774, 341327381] vs d2rs [144532872, …] | unrouted |
 | gen-fmt-anim-walk | packets | MATCH | 80/80 | - | - |
 | gen-fmt-anim-walk | state | PARTIAL | 80/80 | - | - |
 | gen-fmt-load-ama | packets | MATCH | 20/20 | - | - |
