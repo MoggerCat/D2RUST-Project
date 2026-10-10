@@ -1592,6 +1592,60 @@ pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::worl
     w.objclient.unit_grids = grids;
 }
 
+/// Stamps the footprints of the objects whose init stamped one
+/// (`msg-units.md` §1.3 r2: `HasCollision[mode]`, `0x00620A70`) on the
+/// grids [`stamp_unit_footprints`] built: the objects.txt `SizeX` x
+/// `SizeY` box (`0x0064DE30`) with the object mask of
+/// `sim/path-placement.md` §3 (`ObjectShape::foot_mask`). PROVISIONAL
+/// (REC-3570): stamped at the model position and mode of the pass, as the
+/// units' footprints are.
+pub fn stamp_object_footprints(w: &mut ClientWorld, rows: &[super::objects::ObjClientRow]) {
+    use super::world::{KindData, OBJECT};
+    let Some(d) = w.drlg.as_ref() else {
+        return;
+    };
+    let mut rooms = FootRooms {
+        drlg: &d.drlg,
+        grids: std::mem::take(&mut w.objclient.unit_grids),
+    };
+    let set_c = w
+        .objclient
+        .set_c
+        .iter()
+        .filter(|(k, _)| k.unit_type == OBJECT);
+    for (k, u) in w
+        .units
+        .iter()
+        .filter(|(k, _)| k.unit_type == OBJECT)
+        .chain(set_c)
+    {
+        let _ = k;
+        let KindData::Object(data) = &u.kind else {
+            continue;
+        };
+        if !data.footprint {
+            continue;
+        }
+        let Some(row) = rows.get(u.class as usize) else {
+            continue;
+        };
+        let Some((x, y)) = u.position.map(|(x, y)| (i32::from(x), i32::from(y))) else {
+            continue;
+        };
+        let room = drlg_room_at(&d.drlg, x, y);
+        d2_sim::path::collision::box_apply(
+            &mut rooms,
+            room,
+            x,
+            y,
+            (row.shape.size_x, row.shape.size_y),
+            row.shape.foot_mask(),
+            true,
+        );
+    }
+    w.objclient.unit_grids = rooms.grids;
+}
+
 /// The footprint pattern of a unit size (`sim/path-placement.md` §3:
 /// size 0 → 0, 1 and 2 → 1, 3 → 2, others → 1; a monster that can be
 /// in town without `interact`: 3 → 4, others but 0 → 3).
