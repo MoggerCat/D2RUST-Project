@@ -43,6 +43,11 @@ pub struct ItemProp {
 pub trait StreamProps: Send + Sync {
     /// Empty when the stream does not decode (a compact record has none).
     fn props(&self, stream: &[u8]) -> (Vec<ItemProp>, bool);
+    /// "Item with items-table `code` is of type `t`" (`0x00629BB0`, with
+    /// equivalence); the type test of `use_state` test 5.
+    fn item_is_type(&self, _code: [u8; 4], _t: i16) -> bool {
+        false
+    }
 }
 
 /// The decoder the model uses (`None` until the play app installs it).

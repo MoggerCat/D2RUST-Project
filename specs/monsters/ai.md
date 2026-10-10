@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 305–451 |
 |   3. AI control and AI tables | 452–640 |
 |   4. AI parameters | 641–659 |
-|   5. Target selection | 660–1087 |
-|   6. Distances and line tests | 1088–1103 |
-|   7. Tactics helpers | 1104–1383 |
-|   8. AI commands and minions | 1384–1410 |
-|   10. The catalogue `ai-functions.tsv` | 1411–1431 |
-| Constants & data dependencies | 1432–1455 |
-| Randomness | 1456–1485 |
-| Edge cases & original bugs | 1486–1527 |
-| Test vectors | 1528–1616 |
-| Provenance | 1617–1678 |
-| Open questions | 1679–1785 |
+|   5. Target selection | 660–1094 |
+|   6. Distances and line tests | 1095–1110 |
+|   7. Tactics helpers | 1111–1390 |
+|   8. AI commands and minions | 1391–1417 |
+|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
+| Constants & data dependencies | 1439–1462 |
+| Randomness | 1463–1492 |
+| Edge cases & original bugs | 1493–1534 |
+| Test vectors | 1535–1623 |
+| Provenance | 1624–1685 |
+| Open questions | 1686–1792 |
 <!-- /index -->
 
 ## Summary
@@ -1084,6 +1084,13 @@ not the no-size one: `a5-warp-l110-siege-1-ama` frame 23, Barbarian
 1:19 (4324,5089): d = 4, 5, 4 and **2**; 1.14d runs (mode 15) to
 (4324,5089), the position of 1:19 (the no-size distances 8, 9, 7, 7
 would tie 1:18 and 1:19). L is 0 there (LOS-draw true, §5.2).
+
+Implemented for the live host (`d2-client` `LocalSeams::good_target_search`,
+REC-2860): d is the full-size distance with the **candidate's** size
+subtracted, and d ≤ 35 is in (35 included). `a5-su-ancient1..3` and the
+other level-110 checks had the barbarian run to 1:18 (4321,5095) with the
+no-size distance; 1.14d's target (4324,5089) is 1:19. Still open: the
+`threat` main / alt class split (rule 3) and the walk-order tie-break.
 
 ### 6. Distances and line tests
 

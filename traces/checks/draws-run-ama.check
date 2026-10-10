@@ -1,0 +1,14 @@
+check 1
+# World draw list while the camera moves (PC 1 2026-10-10, local-pc1-today): Rogue Encampment,
+# the player running west (key R, then the left button held at (180, 300) from frame 42), the list of tick 60, mid-run.
+# ScnAma, -seed 1234. Under the debugger 1.14d does not draw every tick: the run compares
+# its last drawn tick <= 60 on both sides.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/render/camera.md §2-§4.
+name draws-run-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 64
+seconds 600
+channels draws
+draws-at 60
+input frame 38; move 790 10; frame 40; key R; frame 42; hold 180 300 30

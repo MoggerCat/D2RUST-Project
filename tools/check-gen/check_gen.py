@@ -47,7 +47,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc", "quest"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -277,6 +277,46 @@ def fam_mon(ctx):
     return out
 
 
+# monster.quest.* ledger rows: the quest monster as a class spawn (monstats Id) or, for the
+# two superunique quest targets, the superunique creation (superuniques row number).
+QUEST_MONSTERS = [
+    ("ancients", "class", "ancientbarb1"), ("baal", "class", "baalcrab"),
+    ("blood-raven", "class", "bloodraven"), ("cain-rescue-guard", "su", 3),
+    ("countess", "su", 6), ("cow-king", "class", "hellbovine"),
+    ("griswold", "class", "griswold"), ("hellforge-hephasto", "class", "hephasto"),
+    ("izual", "class", "izual"), ("nihlathak", "class", "nihlathakboss"),
+    ("radament", "class", "radament"), ("summoner", "class", "summoner"),
+]
+
+
+def fam_quest(ctx):
+    """One spawn check per monster.quest.* ledger row: the quest monster (or superunique)
+    created next to the player in an empty Blood Moor; what a scenario can reach of a quest
+    kill is the monster's own spawn and think frames (the quest side is the milestone-* checks)."""
+    _, mons = monster_rows(ctx)
+    by_id = {ident: hc for hc, ident, _, _, _ in mons}
+    ai_of = {ident: ai for _, ident, ai, _, _ in mons}
+    out = []
+    for slug_, kind, ref in QUEST_MONSTERS:
+        if kind == "class":
+            if ref not in by_id:
+                # the selftest's synthetic monstats has no quest monsters: skip that quest
+                continue
+            spawn = f"spawn {by_id[ref]} @x+5 @y-4 normal"
+            what = f"class {by_id[ref]} {ref} (AI {ai_of[ref]})"
+            extra = {"quest": slug_}
+        else:
+            spawn = f"superunique {ref} @x+4 @y+4"
+            what = f"superunique row {ref}"
+            extra = {"quest": slug_}
+        c = spawn_check(f"gen-quest-{slug_}", "quest", f"quest monster {slug_}",
+                        f"quest monster {slug_} ({what})", spawn,
+                        [f"Quest monster {slug_}: {what} created next to the player."])
+        c.extra = extra
+        out.append(c)
+    return out
+
+
 def fam_su(ctx):
     t = excel(ctx.excel, "superuniques.txt", ["Superunique", "Name", "Class", "hcIdx"])
     out = []
@@ -368,7 +408,7 @@ def fam_shrine(ctx):
         c = Check(
             f"gen-shrine-{n}", "shrine", f"shrines.txt row {n}",
             f"shrine {name} ({t.get(r, 'Shrine Type')})",
-            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state",
+            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state packets",
             [f"at 30 poke object {cls} @x+3 @y",
              f"at 40 send InteractWithEntity type=2 id=@2:{cls}"],
             seed=seed,
@@ -377,7 +417,7 @@ def fam_shrine(ctx):
                      f"shrines.txt) at frame 30, operated by C->S 0x13 at frame 40. With -seed "
                      f"{seed} the shrine pick of the object control (world/objects.md section "
                      f"5.1) gives row {n} ({how}; PROVISIONAL REC-1330: the seed is d2rs's pick, settled by the first 1.14d run); the check compares the shrine's effect, the "
-                     "player's stats and states and the draws."])
+                     "player's stats and states and the draws, and the packets of the window (the 0x13 send needs a MATCHing packets channel, REC-2055/2056)."])
         c.extra = {"shrine": n}
         out.append(c)
     return out
@@ -1254,7 +1294,7 @@ def fam_sysc(ctx):
 
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc, "quest": fam_quest}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1322,6 +1362,8 @@ def resolve_area(c, areas):
         pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
     elif f == "sysc":
         pick = [x["area"]]
+    elif f == "quest":
+        pick = [a for a, _ in areas if a == f"monster.quest.{x['quest']}"]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":

@@ -208,13 +208,21 @@ impl<X: Pending> View<'_, X> {
                         .unit_set(&mut *self.h, unit, STAT_POSITION, v.wrapping_add(1), 0);
                 }
                 ModeMessage::Skill { .. } => {
+                    // The skill message reads the target point +0x10 /
+                    // +0x12, not the path end the mode message reads.
+                    let target_point = self
+                        .h
+                        .paths
+                        .as_ref()
+                        .and_then(|p| p.dynamic(unit))
+                        .map_or((0, 0), |d| (d.target_x, d.target_y));
                     self.skill_message(
                         game,
                         receiver,
                         unit,
                         (UnitType::Monster as u8, input.guid),
                         input.target,
-                        input.path_target,
+                        target_point,
                     );
                 }
                 ModeMessage::Nothing => {}
@@ -246,7 +254,16 @@ impl<X: Pending> View<'_, X> {
             skill_in_use: self.h.used_skill_of(unit).is_some(),
             target,
             cell: (path.x() as u16, path.y() as u16),
-            path_target: (path.target_x, path.target_y),
+            // Path end (`0x00648A40` / `0x00648A60`, REC-594,
+            // `intents-events.md` §7.4): the last computed point, (0, 0)
+            // for a count of 0; never the target +0x10 / +0x12.
+            path_target: match (path.point_count as i32).clamp(0, 78) {
+                0 => (0, 0),
+                n => {
+                    let p = path.point(n as usize - 1);
+                    (p.x as u16, p.y as u16)
+                }
+            },
             direction: path.direction,
             path_type: path.path_type,
             path_90: path.dist_budget,

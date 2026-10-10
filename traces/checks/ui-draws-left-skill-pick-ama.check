@@ -9,6 +9,6 @@ save ScnAma --class ama --expansion
 seed 1234
 ticks 76
 seconds 600
-channels draws
+channels draws packets
 draws-at 73
-input frame 40; click 140 570
+input frame 40; hold 140 570 2

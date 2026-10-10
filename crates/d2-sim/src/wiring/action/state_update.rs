@@ -67,7 +67,7 @@ impl<X: Pending> View<'_, X> {
             }
         }
         for m in out {
-            self.h.x.send(receiver, &m);
+            self.emit(receiver, m);
         }
     }
 
@@ -89,8 +89,18 @@ impl<X: Pending> View<'_, X> {
                 continue;
             };
             if let Some(m) = super::vitals_sync::stat_message(s, v) {
-                self.h.x.send(receiver, &m);
+                self.emit(receiver, m);
             }
+        }
+    }
+
+    /// Sends `m`, or holds it for [`super::ActionSim::flush_player_tail`]
+    /// while a player's tail is captured.
+    fn emit(&mut self, receiver: UnitId, m: Vec<u8>) {
+        if self.h.defer_player_tail && self.h.capture_tail {
+            self.h.player_tail.push((receiver, m));
+        } else {
+            self.h.x.send(receiver, &m);
         }
     }
 
