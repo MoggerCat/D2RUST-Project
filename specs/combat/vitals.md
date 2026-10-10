@@ -28,16 +28,16 @@
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
 |   1. Creation values | 73–103 |
-|   2. Spending stat points (message 0x3A) | 104–156 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–485 |
-|   5. Client vitals sync (`0x00548760`) | 486–626 |
-| Constants & data dependencies | 627–643 |
-| Randomness | 644–647 |
-| Edge cases & original bugs | 648–659 |
-| Test vectors | 660–680 |
-| Provenance | 681–716 |
-| Open questions | 717–753 |
+|   2. Spending stat points (message 0x3A) | 104–161 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 162–183 |
+|   4. Experience | 184–490 |
+|   5. Client vitals sync (`0x00548760`) | 491–631 |
+| Constants & data dependencies | 632–648 |
+| Randomness | 649–652 |
+| Edge cases & original bugs | 653–664 |
+| Test vectors | 665–685 |
+| Provenance | 686–721 |
+| Open questions | 722–758 |
 <!-- /index -->
 
 ## Summary
@@ -129,6 +129,11 @@ current-mana add only (1.14d-confirmed, `0x00570AD7`–`0x00570B25`).
 × n) << 6`; life > max life → life = max life; `maxstamina +=
 (StaminaPerVitality × n) << 6`; if `n > 0`: `stamina += (…) << 6`;
 stamina > max stamina → clamp.
+
+The refresh `0x0064C040` queues the unit for the room update, so the
+player update of the same frame sends the single stat (`stat-lists.md` §11
+rule 4) before the mod flush: `1d 02 xx` twice, then `1d 04 xx`
+(`sys-intents-moves`, frame 70).
 
 All additions go to base stats (add `0x006272B0`). A negative `n`
 (stat reset, §2.1) lowers the maximum but not the current value, which
