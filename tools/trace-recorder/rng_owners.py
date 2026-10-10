@@ -19,7 +19,8 @@ Rules (rng-trace.md §2):
      becomes the value.
   4. A draw that does not step (roll with n < 1) links nothing.
   5. An inline draw in the DRLG code (sim/rng.md §5.4, §7 DRLG rows:
-     0x642000-0x643000, 0x66B000-0x682000) is never a game or unit draw:
+     0x642000-0x643000, 0x66B000-0x682000 without the
+     charged-bolt path compute 0x67A240-0x67A390) is never a game or unit draw:
      owner "other:drlg". With `-seed N` the DRLG seed starts at {N, 666},
      the game seed's own start, and replays its states.
   6. The backward pass gives a draw to an owner only when that owner's
@@ -38,7 +39,9 @@ import os
 import sys
 
 G_SEED = 0xD0
-DRLG_SITES = ((0x642000, 0x643000), (0x66B000, 0x682000))
+# 0x67A240-0x67A390 is the charged-bolt path compute (FUN_0067a240, REC-3120): its
+# inline draws step the missile's unit seed, so it is not skipped.
+DRLG_SITES = ((0x642000, 0x643000), (0x66B000, 0x67A240), (0x67A390, 0x682000))
 
 
 def drlg_site(r):
