@@ -44,7 +44,7 @@ REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
 DEFAULT_CACHE = os.path.join(REPO, "traces", "orig-cache")
 FORMAT_LINE = "check 1"
-CHANNELS = ("state", "draws", "rng", "packets", "items", "save")
+CHANNELS = ("state", "draws", "rng", "packets", "items", "save", "frontend")
 WINDOWS = os.name == "nt"
 
 
@@ -1023,6 +1023,9 @@ def main(argv=None):
             elif ch == "save":
                 r.shared_error = shared_script_error
                 codes[ch] = save_channel.run(r, save, sides)
+            elif ch == "frontend":
+                import frontend_channel
+                codes[ch] = frontend_channel.run(r, save, sides)
             else:
                 codes[ch] = r.not_available(ch)
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:

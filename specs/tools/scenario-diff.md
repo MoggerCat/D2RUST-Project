@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–531 |
-|   4. Suite | 532–652 |
-| Constants & data dependencies | 653–656 |
-| Randomness | 657–660 |
-| Edge cases & original bugs | 661–684 |
-| Test vectors | 685–707 |
-| Provenance | 708–711 |
-| Open questions | 712–760 |
+|   3. Run | 145–549 |
+|   4. Suite | 550–670 |
+| Constants & data dependencies | 671–674 |
+| Randomness | 675–678 |
+| Edge cases & original bugs | 679–702 |
+| Test vectors | 703–725 |
+| Provenance | 726–729 |
+| Open questions | 730–778 |
 <!-- /index -->
 
 ## Summary
@@ -86,7 +86,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -528,6 +528,24 @@ state first. It is the default way to compare a behaviour with 1.14d.
     would walk the player back (measured ScnAma seed 1234: 0x01 replayed
     at frame 10, d2rs 0x5F `5f 09 13 84 10` at frame 86, none on 1.14d);
     `--no-own-c2s 0x5F` removes it. Default: nothing dropped.
+
+16. **frontend** (`channels frontend`; `tools/scenario-diff/frontend_channel.py`;
+    `tools/frontend-sbs/frontend_sbs.py --script dolls`, `dolls_check.py`;
+    REC-2295): front-end screens by X input on both sides (1.14d on
+    `D2_DISPLAY`, d2rs on `D2_DRAWS_DISPLAY`), not ticks; the `save` line only
+    names the character (the charselect lists every save of the folder, the
+    three of `prepare_saves.sh`). 1.14d: 12 shots 0.37 s apart after
+    charselect; d2rs: 70 back-to-back shots (all animation phases). Per slot
+    figure rectangle: the doll mask is every pixel where a d2rs frame departs
+    from the per-pixel median of the 70 (sum of channels > 30); each 1.14d
+    shot takes the d2rs frame with the fewest differing mask pixels (phase is
+    not tick-anchored, REC-2182); a pixel differs above 16 per channel (the
+    screen-level brightness offset of REC-1550 is up to 8, dark noise 16);
+    the slot is EQUAL when every shot differs in at most 1 % of its mask. The
+    channel is MATCH when all three slots are EQUAL. Also reported: the dy
+    probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
+    (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
+    most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
 
 ### 4. Suite
 

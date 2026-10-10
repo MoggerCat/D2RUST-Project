@@ -33,21 +33,21 @@
 |   F2.7 Other buttons | 472–496 |
 |   F2.8 Difficulty box (`0x00439780`) | 497–516 |
 |   F2.9 Control records and art | 517–553 |
-|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–593 |
-|   F3.1 Character-create screen build (`0x00435580`) | 594–629 |
-|   F3.2 Class line-up (positions, creation order) | 630–645 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 646–706 |
-|   F3.4 Name entry (edit box, descriptor 204) | 707–721 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 722–745 |
-|   F3.6 OK / Cancel behaviour and the new save | 746–780 |
-|   F3.7 Sounds (deferred) | 781–785 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 786–816 |
-| Constants & data dependencies | 817–853 |
-| Randomness | 854–857 |
-| Edge cases & original bugs | 858–889 |
-| Test vectors | 890–923 |
-| Provenance | 924–969 |
-| Open questions | 970–1014 |
+|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–594 |
+|   F3.1 Character-create screen build (`0x00435580`) | 595–630 |
+|   F3.2 Class line-up (positions, creation order) | 631–646 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 647–707 |
+|   F3.4 Name entry (edit box, descriptor 204) | 708–722 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 723–746 |
+|   F3.6 OK / Cancel behaviour and the new save | 747–781 |
+|   F3.7 Sounds (deferred) | 782–786 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 787–817 |
+| Constants & data dependencies | 818–854 |
+| Randomness | 855–858 |
+| Edge cases & original bugs | 859–890 |
+| Test vectors | 891–924 |
+| Provenance | 925–970 |
+| Open questions | 971–1015 |
 <!-- /index -->
 
 ## Summary
@@ -582,14 +582,15 @@ list is scanned. It is not a unit: no inventory, no light, no direction other th
 4. Animation: frame f = phase >> 8, phase starts at 0 when the screen is built; each draw adds the COF rate
    (header +0x18, `0x005042F0`); after the add, phase >> 8 ≥ frames − 1 → phase 0 (the last frame is never
    shown). Measured 2026-10-10 (12 captures, 1.14d under Wine, 100 % of figure pixels equal at the matching
-   frame): TN sorceress 16 frames, rate 0x50 → 3 frames per 0.4 s = one add per 40 ms tick. PROVISIONAL
-   REC-2182: one add per front-end tick since the screen build; the build instant relative to the capture is not
-   tick-anchored (needs the scenario-diff tick input).
+   frame): TN sorceress 16 frames, rate 0x50 → 3 frames per 0.4 s = one add per 40 ms tick. Check
+   `ui-charselect-dolls` (scenario-diff.md §3 r16): all 12 timed shots match a d2rs frame, so the rate and the loop
+   are settled (REC-2182 settled for them); only the build instant relative to the capture stays PROVISIONAL
+   REC-2182 (not tick-anchored, input is wall-clock).
 5. Placement: anchor (column x + 30, row bottom − 13) (§F2.4 r3). The 1.14d capture draws every figure one row
-   above `anchor.y + y_min` (best match of offsets −4…4, all three slots): PROVISIONAL REC-2183, d2rs applies
+   above `anchor.y + y_min` (best match of offsets −4…4, all three slots): settled REC-2183 (check `ui-charselect-dolls`: offset 0 differs 0 px, ±1 row 430+ px, ±2 650+, all slots), d2rs applies
    −1 in the doll draw (`DOLL_DY`); cause not read.
 6. Shadows: `0x00503A50` calls the D2GFX shadow vtable entry (+0x90) for each slot before the cels; d2rs draws
-   none (not visible on the capture's dark background; PROVISIONAL REC-2184).
+   none (REC-2184 settled by the capture: the feet band is not darker than the rest, 1.14d minus d2rs +0.4..+1.3 on a channel sum against -0.1..+0.2 elsewhere, so the 1.14d background shows no shadow either).
 
 ### F3.1 Character-create screen build (`0x00435580`)
 
