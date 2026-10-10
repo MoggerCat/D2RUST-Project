@@ -39,7 +39,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj", "quest"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -265,6 +265,45 @@ def fam_mon(ctx):
         # family at frame 2 / 30 (harness level, not the monster): not compared here
         c.lines = ["ignore q seed"] + c.lines
         c.extra = {"class": hc, "id": ident}
+        out.append(c)
+    return out
+
+
+# monster.quest.* ledger rows: the quest monster as a class spawn (monstats Id) or, for the
+# two superunique quest targets, the superunique creation (superuniques row number).
+QUEST_MONSTERS = [
+    ("ancients", "class", "ancientbarb1"), ("baal", "class", "baalcrab"),
+    ("blood-raven", "class", "bloodraven"), ("cain-rescue-guard", "su", 3),
+    ("countess", "su", 6), ("cow-king", "class", "hellbovine"),
+    ("griswold", "class", "griswold"), ("hellforge-hephasto", "class", "hephasto"),
+    ("izual", "class", "izual"), ("nihlathak", "class", "nihlathakboss"),
+    ("radament", "class", "radament"), ("summoner", "class", "summoner"),
+]
+
+
+def fam_quest(ctx):
+    """One spawn check per monster.quest.* ledger row: the quest monster (or superunique)
+    created next to the player in an empty Blood Moor; what a scenario can reach of a quest
+    kill is the monster's own spawn and think frames (the quest side is the milestone-* checks)."""
+    _, mons = monster_rows(ctx)
+    by_id = {ident: hc for hc, ident, _, _, _ in mons}
+    ai_of = {ident: ai for _, ident, ai, _, _ in mons}
+    out = []
+    for slug_, kind, ref in QUEST_MONSTERS:
+        if kind == "class":
+            if ref not in by_id:
+                raise GenError(f"quest monster {slug_}: no monstats Id {ref}")
+            spawn = f"spawn {by_id[ref]} @x+5 @y-4 normal"
+            what = f"class {by_id[ref]} {ref} (AI {ai_of[ref]})"
+            extra = {"quest": slug_}
+        else:
+            spawn = f"superunique {ref} @x+4 @y+4"
+            what = f"superunique row {ref}"
+            extra = {"quest": slug_}
+        c = spawn_check(f"gen-quest-{slug_}", "quest", f"quest monster {slug_}",
+                        f"quest monster {slug_} ({what})", spawn,
+                        [f"Quest monster {slug_}: {what} created next to the player."])
+        c.extra = extra
         out.append(c)
     return out
 
@@ -634,7 +673,7 @@ def fam_obj(ctx):
     return out
 
 
-FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s,
+FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "quest": fam_quest,
              "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj}
 
 
@@ -693,6 +732,8 @@ def resolve_area(c, areas):
     elif f == "mon":
         pick = [a for a, s in areas if a.startswith("monster.")
                 and s.endswith(f"(hcIdx {x['class']})")]
+    elif f == "quest":
+        pick = [a for a, _ in areas if a == f"monster.quest.{x['quest']}"]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     if len(pick) > 1:
