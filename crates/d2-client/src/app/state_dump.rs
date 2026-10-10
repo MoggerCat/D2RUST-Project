@@ -1022,8 +1022,9 @@ mod tests {
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--every", "0"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--date", "9.10.26"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
-        // the shared input form only (scenario-diff.md §3 r8)
-        for bad in ["click 1 2", "frame 2; wait 3", "frame 2; key i", "frame 0"] {
+        // the shared input form only (scenario-diff.md §3 r8; `key` is
+        // part of it since the headless panel keys)
+        for bad in ["click 1 2", "frame 2; wait 3", "frame 0"] {
             assert!(
                 parse_args(&args(&["--ticks", "1", "--out", "o", "--input", bad])).is_err(),
                 "{bad}"
