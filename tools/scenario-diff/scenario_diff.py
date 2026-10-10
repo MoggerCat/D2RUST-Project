@@ -893,7 +893,9 @@ def selftest():
         assert len(runs) == 1                       # miss: recorded and filled
         o2 = cached(GOOD, False, os.path.join(td, "w2"))
         assert len(runs) == 1 and os.path.exists(o2)  # hit: no 1.14d run
-        cached(GOOD + "# changed\n", False, os.path.join(td, "w3"))
+        cached(GOOD + "# changed\nignore fr\n", False, os.path.join(td, "w3"))
+        assert len(runs) == 1                       # comments and ignore lines: still a hit
+        cached(GOOD + "at 2 poke warp 1\n", False, os.path.join(td, "w4"))
         assert len(runs) == 2                       # M08: a changed check misses
         ok += 1
         # draws_summary: rows aligned by position, i / at / tick never compared, '?' equal
