@@ -1,0 +1,41 @@
+{
+ "channel": "rng",
+ "check": "gen-lvl-94",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "160",
+  "--auto",
+  "ScnAm3",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "20 warp 94"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "04a14d0ba89ebf98f2ae98eae4c79df79e127e4ad600bc594891326f101ee5ac",
+   "size": 2156130
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "3ef3a98fecbb008163710f87cd88129bad6418568d383815c8736d545668f5a2",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "7a4b4198964a2bc05e0a5e49a81080707335f061078dcfdfdcfb0acdac698f1a",
+  "save": "162feeda99dba3863626f49614928844687e4b2eb2618576ec9ea3f4e1addba6"
+ }
+}
