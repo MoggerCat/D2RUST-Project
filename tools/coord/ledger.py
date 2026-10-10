@@ -379,7 +379,10 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 continue
             if r["area"] in by_area:
                 first = by_area[r["area"]]
-                if part_rank(r["_file"]) > part_rank(first["_file"]):
+                unsettled = ("NO-CHECK", "UNKNOWN")
+                if part_rank(r["_file"]) > part_rank(first["_file"]) or (
+                        part_rank(r["_file"]) == part_rank(first["_file"])
+                        and first["state"] in unsettled and r["state"] not in unsettled):
                     # a session's part (a check run) supersedes the base inventory row
                     out[out.index(first)] = r
                     by_area[r["area"]] = r
