@@ -7,7 +7,7 @@ use crate::game::Game;
 use crate::units::{UnitId, UnitType};
 
 use super::tactics::*;
-use super::{idle, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
+use super::{idle, main_search, mode, request_mode, AiHost, Ctx, ModeTarget, PortalNpc, TickParam};
 
 /// Command types of §8 used here.
 mod cmd {
@@ -85,6 +85,44 @@ pub fn good_npc_ranged<W: AiHost + ?Sized>(
                 }
             } else if cx.world.seed(u).roll(100) < 30 {
                 circle(game, cx, u, Some(s), 4, false);
+            } else {
+                idle(game, cx, u, 10);
+            }
+            return;
+        }
+    }
+    // 3.
+    if cx.chance(u, 20) {
+        wander(game, cx, u, 5);
+    } else {
+        idle(game, cx, u, 10);
+    }
+}
+
+/// §9.33 SpecialState06 `0x005E7C10` (the hirelings' state when their
+/// owner is gone, `ai-bodies-6.md` §7 step 1).
+pub fn special_state_06<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, u: UnitId) {
+    // 1.
+    if cx.world.anim_mode(u) != mode::NEUTRAL {
+        idle(game, cx, u, 5);
+        return;
+    }
+    // 2. Out of town (a unit with no room counts as out of town): the
+    // main search; the rolls happen only when it finds a target.
+    let room = game.lists.unit(u).and_then(|e| e.room());
+    let in_town = room.is_some_and(|r| cx.world.in_town(game, r));
+    if !in_town {
+        let s = main_search(game, cx, u);
+        if let Some(t) = s.target {
+            let r = cx.world.seed(u).roll(100);
+            if !s.combat {
+                if r < 30 {
+                    walk_to(game, cx, u, Some(t), 7);
+                } else {
+                    idle(game, cx, u, 10);
+                }
+            } else if r < 80 {
+                mode_at(game, cx, u, mode::ATTACK1, Some(t));
             } else {
                 idle(game, cx, u, 10);
             }

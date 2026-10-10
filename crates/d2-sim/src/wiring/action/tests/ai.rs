@@ -234,6 +234,23 @@ fn logged(fx: &Fx, p: &str, m: UnitId) -> Vec<String> {
 
 /// Type-0 events of `m` with frame codes `codes`, one per frame from 1.
 fn frame_events(fx: &mut Fx, m: UnitId, codes: &[u32]) {
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        // The frame advance `0x00623E00` reads the code from the
+        // animation record: one frame per event, the codes at frames 1…
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        for (i, &c) in codes.iter().enumerate() {
+            events[1 + i] = c as u8;
+        }
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 1 << 8,
+            byte_0f: 0,
+            events,
+        });
+        r.anim.speed = 256;
+        r.anim.frame = 0;
+        r.anim.frame_count = 1 << 16;
+    }
     for (i, &c) in codes.iter().enumerate() {
         fx.game
             .schedule_event(m, u32::from(event::MODE_CHANGE), 1 + i as i32, None, c, 0)
@@ -250,7 +267,7 @@ fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
     // `use.md` §5.2 "Monsters" `0x005A7670`: no used skill and a mode that
     // does not move (A2: class 0's monstats2 mv bits are A1 only) → the
     // strike (mode missile, else melee on the path target) on every event
-    // 0, whatever its frame code. +0x4E keeps the timer's code.
+    // 0, whatever its frame code. +0x4E is the frame advance's.
     let mut fx = Fx::new();
     let m = monster(&mut fx);
     fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK2);
@@ -259,7 +276,8 @@ fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
     assert_eq!(logged(&fx, "attack strike", m), want);
     assert!(logged(&fx, "attack skill", m).is_empty());
     assert!(logged(&fx, "sequence frame", m).is_empty());
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 4);
+    // A non-moving mode strikes with no frame advance: +0x4E is untouched.
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 0);
 }
 
 // Covers: specs/skills/use.md §5.2

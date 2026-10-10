@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–298 |
-|   2. Think dispatch `0x005B1740` | 299–438 |
-|   3. AI control and AI tables | 439–610 |
-|   4. AI parameters | 611–629 |
-|   5. Target selection | 630–966 |
-|   6. Distances and line tests | 967–982 |
-|   7. Tactics helpers | 983–1228 |
-|   8. AI commands and minions | 1229–1255 |
-|   10. The catalogue `ai-functions.tsv` | 1256–1276 |
-| Constants & data dependencies | 1277–1300 |
-| Randomness | 1301–1330 |
-| Edge cases & original bugs | 1331–1372 |
-| Test vectors | 1373–1461 |
-| Provenance | 1462–1523 |
-| Open questions | 1524–1630 |
+|   1. Think scheduling | 97–302 |
+|   2. Think dispatch `0x005B1740` | 303–442 |
+|   3. AI control and AI tables | 443–614 |
+|   4. AI parameters | 615–633 |
+|   5. Target selection | 634–970 |
+|   6. Distances and line tests | 971–986 |
+|   7. Tactics helpers | 987–1232 |
+|   8. AI commands and minions | 1233–1259 |
+|   10. The catalogue `ai-functions.tsv` | 1260–1280 |
+| Constants & data dependencies | 1281–1304 |
+| Randomness | 1305–1334 |
+| Edge cases & original bugs | 1335–1376 |
+| Test vectors | 1377–1465 |
+| Provenance | 1466–1527 |
+| Open questions | 1528–1634 |
 <!-- /index -->
 
 ## Summary
@@ -209,6 +209,10 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
   `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
   `0x005A8100`–`0x005A8140`).
+  Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
+  a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
+  also: Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107
+  (path target (0, 0)).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
@@ -518,7 +522,7 @@ name):
 | 3 | SpecialState03 | 1 | `0x005E5730` | `0x005E5870` | – |
 | 4 | Hireable | 0 | – | `0x005E52D0` | `0x005E5280` |
 | 5 | GoodNpcRanged | 0 | – | `0x005E7AC0` | – |
-| 6 | SpecialState06 | 0 | – | `0x005E7C10` | – |
+| 6 | SpecialState06 | 0 | – | `0x005E7C10` (`ai-bodies.md` §9.33) | – |
 | 7 | NecroPet | 0 | – | `0x005E4CF0` | – |
 | 8 | TownRogue | 1 | – | `0x005E7DC0` | – |
 | 9 | SpecialState09 | 1 | – | `0x005E7F80` | – |
