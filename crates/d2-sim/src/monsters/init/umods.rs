@@ -1232,5 +1232,6 @@ fn run_callback<H: InitHost + ?Sized>(
 
 /// Monster timer event type 7 (`0x005A4370` → dispatcher mode 2, §22).
 pub fn handle_event7<H: InitHost + ?Sized>(cx: &Ctx<'_>, h: &mut H, unit: UnitId) {
+    eprintln!("DBG event7 {:?} umods {:?}", unit, data(h, unit).umods);
     dispatch(cx, h, unit, None, 2);
 }
