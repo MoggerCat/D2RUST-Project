@@ -479,7 +479,11 @@ after both.
    Value = stat value of the player (`0x00625480`), base = unmodified
    value (`0x006253B0`). Stats 6–11 (life, mana, stamina, current and
    max) are shown `>> 8`; stat 6 is shown as at least 1 while the player
-   is alive. Color: 3 (blue) when value > base, 1 (red) when value <
+   is alive. **Defense (stat 31) is not the stat**: the switch case 0x1F
+   (`0x004A86BF`) shows the defense getter `0x006223F0` (`combat/hit.md` §2:
+   armorclass + dexterity/4, the armor percents, ...); an unequipped
+   level-1 Amazon (dex 25) shows 6 (`ui-draws-inv-char-ama`, REC-2960).
+   Color: 3 (blue) when value > base, 1 (red) when value <
    base, else 0, for stats 0, 2, 3, 1 (attributes), 7, 9, 11 (max
    life/mana/stamina), 12 (level), 31 (defense) and the resistances
    (§8.9); experience (13) and next-level (30) are formatted by

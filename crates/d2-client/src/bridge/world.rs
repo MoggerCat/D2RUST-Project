@@ -666,6 +666,9 @@ pub struct ClientWorld {
     /// The item tables the streams are decoded with
     /// (`bridge::item_lists`).
     pub item_tables: super::item_lists::ItemTablesRef,
+    /// The animation lookup the item tips' speed line queries
+    /// (`ui/item-tips.md` §3.2 r1); a handle like `item_tables`.
+    pub tip_anims: super::player_anim::PlayerAnimsRef,
     /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
     /// store items a trade open shows, `world/vendors.md` §4 step 3).
     pub store_serial: u32,
