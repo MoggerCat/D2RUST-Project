@@ -11,9 +11,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | chk-difficulty | 7 | 6 | 0 | 1 | 0 | 0 | 0 | 7 | 0 | 14–56 | 0 | 6 / 1 / 0 |
 | client | 4 | 3 | 0 | 0 | 0 | 1 | 0 | 2 | 1 | 12–16+ | 0 | 3 / 1 / 0 |
 | combat | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 6–24 | 0 | 0 / 0 / 3 |
-| cov-promoted | 34 | 0 | 0 | 2 | 0 | 32 | 0 | 2 | 0 | 4–16 | 0 | 34 / 0 / 0 |
+| cov-promoted | 5 | 2 | 0 | 0 | 0 | 3 | 0 | 2 | 0 | 4–16 | 0 | 5 / 0 / 0 |
 | cov-tables | 329 | 2 | 0 | 0 | 0 | 327 | 2 | 0 | 0 | 1–4 | 0 | 320 / 9 / 0 |
-| coverage | 171 | 29 | 0 | 61 | 0 | 81 | 60 | 30 | 0 | 90–360 | 0 | 152 / 11 / 8 |
+| coverage | 200 | 29 | 0 | 61 | 0 | 110 | 60 | 30 | 0 | 90–360 | 0 | 181 / 11 / 8 |
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
 | items | 721 | 43 | 0 | 46 | 0 | 632 | 25 | 64 | 0 | 140.5–562 | 65 | 652 / 0 / 69 |
@@ -30,10 +30,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 130 | 0 | 28 | 0 | 497 | 66 | 92 | 0 | 217–868 | 6 | 545 / 99 / 11 |
+| skills | 655 | 140 | 0 | 11 | 0 | 504 | 59 | 92 | 0 | 213.5–854 | 6 | 545 / 99 / 11 |
 | systems | 918 | 360 | 46 | 251 | 0 | 261 | 250 | 405 | 2 | 951–3740+ | 39 | 554 / 0 / 364 |
-| world | 826 | 41 | 0 | 77 | 0 | 708 | 10 | 103 | 5 | 251–844+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 880 | 46 | 500 | 0 | 3053 | 523 | 891 | 12 | 2139.5–8174+ | 286 | 3522 / 382 / 575 |
+| world | 826 | 50 | 0 | 55 | 0 | 721 | 10 | 90 | 5 | 225–740+ | 171 | 731 / 21 / 74 |
+| **all** | 4479 | 901 | 46 | 459 | 0 | 3073 | 516 | 878 | 12 | 2110–8056+ | 286 | 3522 / 382 / 575 |
 
 ## By family
 
@@ -47,7 +47,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `audio` | 6 | 3 | 0 | 2 | 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 |
 | `check` | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `client` | 7 | 4 | 0 | 3 | 0 | 0 | 0 | 3 | 3 | 1 | 0 | 1 |
-| `cov` | 397 | 28 | 0 | 3 | 0 | 366 | 2 | 2 | 29 | 0 | 0 | 10 |
+| `cov` | 397 | 30 | 0 | 1 | 0 | 366 | 0 | 2 | 29 | 0 | 0 | 10 |
 | `coverage` | 8 | 0 | 0 | 8 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
 | `cube` | 15 | 1 | 0 | 5 | 0 | 9 | 2 | 3 | 3 | 0 | 2 | 0 |
 | `data` | 3 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 |
@@ -666,19 +666,19 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `quest` | 53 | 12 | 0 | 32 | 0 | 9 | 0 | 4 | 35 | 5 | 27 | 14 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
-| `shrine` | 24 | 0 | 0 | 19 | 0 | 5 | 15 | 0 | 19 | 0 | 5 | 0 |
+| `shrine` | 24 | 2 | 0 | 4 | 0 | 18 | 0 | 0 | 6 | 0 | 5 | 0 |
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 16 | 0 | 0 | 0 | 14 | 0 | 0 | 16 | 0 | 0 | 0 |
-| `skill.ass` | 30 | 20 | 0 | 10 | 0 | 0 | 10 | 18 | 12 | 0 | 0 | 23 |
+| `skill.ass` | 30 | 30 | 0 | 0 | 0 | 0 | 0 | 18 | 12 | 0 | 0 | 23 |
 | `skill.bar` | 30 | 30 | 0 | 0 | 0 | 0 | 0 | 29 | 1 | 0 | 0 | 26 |
 | `skill.dru` | 31 | 16 | 0 | 0 | 0 | 15 | 0 | 4 | 12 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
 | `skill.monster` | 65 | 13 | 0 | 0 | 0 | 52 | 0 | 4 | 9 | 0 | 0 | 18 |
-| `skill.nec` | 30 | 3 | 0 | 3 | 0 | 24 | 3 | 4 | 2 | 0 | 0 | 0 |
+| `skill.nec` | 30 | 3 | 0 | 0 | 0 | 27 | 0 | 1 | 2 | 0 | 0 | 0 |
 | `skill.pal` | 30 | 21 | 0 | 0 | 0 | 9 | 0 | 0 | 21 | 0 | 0 | 0 |
 | `skill.sequences` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| `skill.sor` | 30 | 5 | 0 | 4 | 0 | 21 | 4 | 4 | 5 | 0 | 0 | 0 |
+| `skill.sor` | 30 | 5 | 0 | 0 | 0 | 25 | 0 | 0 | 5 | 0 | 0 | 0 |
 | `state` | 185 | 1 | 0 | 0 | 0 | 184 | 0 | 1 | 0 | 0 | 0 | 11 |
 | `system.act` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.audio` | 47 | 39 | 0 | 8 | 0 | 0 | 0 | 4 | 43 | 0 | 0 | 0 |
@@ -701,7 +701,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `tools` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `ui` | 21 | 16 | 0 | 4 | 0 | 1 | 0 | 11 | 7 | 2 | 0 | 0 |
 | `vendor` | 25 | 7 | 0 | 6 | 0 | 12 | 0 | 3 | 10 | 0 | 3 | 0 |
-| `waypoint` | 39 | 10 | 0 | 7 | 0 | 22 | 7 | 0 | 17 | 0 | 26 | 0 |
+| `waypoint` | 39 | 17 | 0 | 0 | 0 | 22 | 0 | 0 | 17 | 0 | 26 | 0 |
 | `world` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 |
 
 ## Not covered by any row
@@ -714,7 +714,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 ## Merge notes
 
-- Coverage rows applied to entity rows (exercised): 2739
+- Coverage rows applied to entity rows (exercised): 2661
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
 - Duplicate areas between parts: 5998
@@ -2061,13 +2061,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.31.act-1-jail-3`: rc-level-pop-2.tsv:3 kept, rc-rng-level-pop.tsv:23 dropped
   - `level.a1.33.act-1-cathedral`: rc-level-pop-2.tsv:4 kept, rc-rng-level-pop.tsv:25 dropped
   - `level.a2.55.act-2-tomb-1-a`: rc-gen-wine168.tsv:22 kept, rc-rng-level-pop.tsv:40 dropped
-  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:47 kept, rc-rng-level-pop.tsv:46 dropped
+  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:18 kept, rc-rng-level-pop.tsv:46 dropped
   - `level.a2.68.act-2-tomb-tal-3`: rc-level-pop-2.tsv:7 kept, rc-rng-level-pop.tsv:51 dropped
   - `level.a2.69.act-2-tomb-tal-4`: rc-gen-wine168.tsv:24 kept, rc-rng-level-pop.tsv:52 dropped
   - `level.a2.70.act-2-tomb-tal-5`: rc-level-pop-2.tsv:9 kept, rc-rng-level-pop.tsv:53 dropped
   - `level.a3.94.act-3-temple-1`: rc-gen-wine168.tsv:25 kept, rc-rng-level-pop.tsv:69 dropped
-  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:50 kept, rc-rng-level-pop.tsv:72 dropped
-  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:51 kept, rc-rng-level-pop.tsv:74 dropped
+  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:21 kept, rc-rng-level-pop.tsv:72 dropped
+  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:22 kept, rc-rng-level-pop.tsv:74 dropped
   - `level.a4.104.act-4-mesa-1`: rc-gen-wine168.tsv:28 kept, rc-rng-level-pop.tsv:77 dropped
   - `level.a4.106.act-4-mesa-3`: rc-gen-wine168.tsv:29 kept, rc-rng-level-pop.tsv:78 dropped
   - `level.a5.110.act-5-siege-1`: rc-gen-wine168.tsv:30 kept, rc-rng-level-pop.tsv:80 dropped
@@ -2080,19 +2080,19 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.scarab6`: rc-damage-draws.tsv:20 kept, rc-rng-player-draws.tsv:9 dropped
   - `drlg.act3-jungle1-gold-placeholder`: rc-drlg-a3.tsv:3 kept, rc-run-1.tsv:71 dropped
   - `vendor.drognan`: rc-link-2.tsv:33 kept, rc-run-1.tsv:74 dropped
-  - `vendor.elzix`: rc-promote.tsv:148 kept, rc-run-1.tsv:75 dropped
-  - `vendor.fara`: rc-promote.tsv:149 kept, rc-run-1.tsv:76 dropped
-  - `vendor.lysander`: rc-promote.tsv:150 kept, rc-run-1.tsv:77 dropped
-  - `monster.ai.corruptarcher`: rc-promote.tsv:55 kept, rc-run-1.tsv:82 dropped
-  - `monster.ai.fallenshaman`: rc-promote.tsv:58 kept, rc-run-1.tsv:85 dropped
-  - `monster.ai.goatman`: rc-promote.tsv:59 kept, rc-run-1.tsv:91 dropped
-  - `monster.ai.skeleton`: rc-promote.tsv:60 kept, rc-run-1.tsv:104 dropped
+  - `vendor.elzix`: rc-promote.tsv:76 kept, rc-run-1.tsv:75 dropped
+  - `vendor.fara`: rc-promote.tsv:77 kept, rc-run-1.tsv:76 dropped
+  - `vendor.lysander`: rc-promote.tsv:78 kept, rc-run-1.tsv:77 dropped
+  - `monster.ai.corruptarcher`: rc-promote.tsv:26 kept, rc-run-1.tsv:82 dropped
+  - `monster.ai.fallenshaman`: rc-promote.tsv:27 kept, rc-run-1.tsv:85 dropped
+  - `monster.ai.goatman`: rc-promote.tsv:28 kept, rc-run-1.tsv:91 dropped
+  - `monster.ai.skeleton`: rc-promote.tsv:29 kept, rc-run-1.tsv:104 dropped
   - `monster.boss.summoner`: rc-player-mode.tsv:3 kept, rc-run-1.tsv:116 dropped
   - `monster.population.frogdemon-water`: rc-l78-population.tsv:3 kept, rc-run-1.tsv:117 dropped
   - `monster.superunique.coldworm-the-burrower`: rc-gen-monai.tsv:27 kept, rc-run-1.tsv:119 dropped
   - `monster.superunique.fangskin`: rc-gen-monai.tsv:28 kept, rc-run-1.tsv:121 dropped
-  - `monster.vision-token`: rc-promote.tsv:61 kept, rc-run-1.tsv:124 dropped
-  - `quest.compelling-orb-spawn`: rc-promote.tsv:79 kept, rc-run-1.tsv:125 dropped
+  - `monster.vision-token`: rc-promote.tsv:30 kept, rc-run-1.tsv:124 dropped
+  - `quest.compelling-orb-spawn`: rc-promote.tsv:47 kept, rc-run-1.tsv:125 dropped
   - `skill.ama.charged-strike`: rc-packets-chan.tsv:5 kept, rc-run-1.tsv:126 dropped
   - `skill.ama.cold-arrow`: rc-packets-chan.tsv:6 kept, rc-run-1.tsv:127 dropped
   - `skill.ama.dopplezon`: rc-packets-chan.tsv:9 kept, rc-run-1.tsv:128 dropped
@@ -2117,33 +2117,33 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.slow-missiles`: rc-packets-chan.tsv:31 kept, rc-run-1.tsv:147 dropped
   - `skill.ama.strafe`: rc-packets-chan.tsv:32 kept, rc-run-1.tsv:148 dropped
   - `skill.ama.valkyrie`: rc-packets-chan.tsv:33 kept, rc-run-1.tsv:149 dropped
-  - `skill.ass.blade-fury`: rc-promote.tsv:96 kept, rc-run-1.tsv:150 dropped
+  - `skill.ass.blade-fury`: rc-promote.tsv:64 kept, rc-run-1.tsv:150 dropped
   - `skill.ass.blade-shield`: rc-packets-chan.tsv:34 kept, rc-run-1.tsv:152 dropped
   - `skill.ass.blades-of-ice`: rc-packets-chan.tsv:35 kept, rc-run-1.tsv:153 dropped
-  - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:97 kept, rc-run-1.tsv:154 dropped
+  - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:65 kept, rc-run-1.tsv:154 dropped
   - `skill.ass.claw-mastery`: rc-packets-chan.tsv:36 kept, rc-run-1.tsv:155 dropped
   - `skill.ass.claws-of-thunder`: rc-packets-chan.tsv:37 kept, rc-run-1.tsv:156 dropped
   - `skill.ass.cloak-of-shadows`: rc-packets-chan.tsv:38 kept, rc-run-1.tsv:157 dropped
   - `skill.ass.cobra-strike`: rc-packets-chan.tsv:39 kept, rc-run-1.tsv:158 dropped
-  - `skill.ass.death-sentry`: rc-promote.tsv:98 kept, rc-run-1.tsv:159 dropped
+  - `skill.ass.death-sentry`: rc-promote.tsv:66 kept, rc-run-1.tsv:159 dropped
   - `skill.ass.dragon-claw`: rc-packets-chan.tsv:40 kept, rc-run-1.tsv:160 dropped
-  - `skill.ass.dragon-flight`: rc-promote.tsv:99 kept, rc-run-1.tsv:161 dropped
+  - `skill.ass.dragon-flight`: rc-promote.tsv:67 kept, rc-run-1.tsv:161 dropped
   - `skill.ass.dragon-tail`: rc-packets-chan.tsv:41 kept, rc-run-1.tsv:162 dropped
   - `skill.ass.dragon-talon`: rc-packets-chan.tsv:42 kept, rc-run-1.tsv:163 dropped
   - `skill.ass.fade`: rc-packets-chan.tsv:43 kept, rc-run-1.tsv:164 dropped
-  - `skill.ass.fire-trauma`: rc-promote.tsv:100 kept, rc-run-1.tsv:165 dropped
+  - `skill.ass.fire-trauma`: rc-promote.tsv:68 kept, rc-run-1.tsv:165 dropped
   - `skill.ass.fists-of-fire`: rc-packets-chan.tsv:44 kept, rc-run-1.tsv:166 dropped
-  - `skill.ass.inferno-sentry`: rc-promote.tsv:101 kept, rc-run-1.tsv:167 dropped
+  - `skill.ass.inferno-sentry`: rc-promote.tsv:69 kept, rc-run-1.tsv:167 dropped
   - `skill.ass.lightning-sentry`: rc-packets-chan.tsv:45 kept, rc-run-1.tsv:168 dropped
   - `skill.ass.mind-blast`: rc-packets-chan.tsv:46 kept, rc-run-1.tsv:169 dropped
-  - `skill.ass.psychic-hammer`: rc-promote.tsv:102 kept, rc-run-1.tsv:170 dropped
+  - `skill.ass.psychic-hammer`: rc-promote.tsv:70 kept, rc-run-1.tsv:170 dropped
   - `skill.ass.quickness`: rc-packets-chan.tsv:47 kept, rc-run-1.tsv:171 dropped
   - `skill.ass.royal-strike`: rc-packets-chan.tsv:48 kept, rc-run-1.tsv:172 dropped
-  - `skill.ass.shadow-warrior`: rc-promote.tsv:103 kept, rc-run-1.tsv:174 dropped
-  - `skill.ass.shock-field`: rc-promote.tsv:104 kept, rc-run-1.tsv:175 dropped
+  - `skill.ass.shadow-warrior`: rc-promote.tsv:71 kept, rc-run-1.tsv:174 dropped
+  - `skill.ass.shock-field`: rc-promote.tsv:72 kept, rc-run-1.tsv:175 dropped
   - `skill.ass.tiger-strike`: rc-packets-chan.tsv:49 kept, rc-run-1.tsv:176 dropped
   - `skill.ass.venom`: rc-packets-chan.tsv:50 kept, rc-run-1.tsv:177 dropped
-  - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:105 kept, rc-run-1.tsv:178 dropped
+  - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:73 kept, rc-run-1.tsv:178 dropped
   - `skill.ass.weapon-block`: rc-packets-chan.tsv:51 kept, rc-run-1.tsv:179 dropped
   - `net.s2c.0x04`: rc-link-2.tsv:37 kept, rc-run-1.tsv:193 dropped
   - `net.s2c.0x05`: rc-gen-nets2c.tsv:3 kept, rc-run-1.tsv:194 dropped
@@ -2155,73 +2155,73 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x8d`: rc-link-2.tsv:41 kept, rc-run-1.tsv:234 dropped
   - `net.s2c.0xac`: rc-goto-settle.tsv:6 kept, rc-run-1.tsv:243 dropped
   - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:89 kept, rc-run-1.tsv:244 dropped
-  - `system.flows.act-change.2-same-act-travel`: rc-promote.tsv:135 kept, rc-run-1.tsv:245 dropped
+  - `system.flows.act-change.2-same-act-travel`: rc-link-2.tsv:73 kept, rc-run-1.tsv:245 dropped
   - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:91 kept, rc-run-1.tsv:246 dropped
   - `system.sim.monster.warp-placement-y`: rc-mon-y-warp.tsv:3 kept, rc-run-1.tsv:247 dropped
-  - `tools.poke.tick-end`: rc-promote.tsv:147 kept, rc-run-1.tsv:249 dropped
-  - `drlg.maze.lvlmaze`: rc-promote.tsv:37 kept, rc-run-1.tsv:250 dropped
-  - `drlg.outdoor.tilesub`: rc-promote.tsv:38 kept, rc-run-1.tsv:251 dropped
-  - `drlg.warps.vis-lvlwarp`: rc-promote.tsv:39 kept, rc-run-1.tsv:252 dropped
-  - `level.a1.29.act-1-jail-1`: rc-promote.tsv:42 kept, rc-run-1.tsv:253 dropped
-  - `level.a1.34.act-1-catacombs-1`: rc-promote.tsv:44 kept, rc-run-1.tsv:254 dropped
-  - `level.a1.8.act-1-cave-1`: rc-promote.tsv:46 kept, rc-run-1.tsv:255 dropped
+  - `tools.poke.tick-end`: rc-promote.tsv:75 kept, rc-run-1.tsv:249 dropped
+  - `drlg.maze.lvlmaze`: rc-promote.tsv:8 kept, rc-run-1.tsv:250 dropped
+  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, rc-run-1.tsv:251 dropped
+  - `drlg.warps.vis-lvlwarp`: rc-promote.tsv:10 kept, rc-run-1.tsv:252 dropped
+  - `level.a1.29.act-1-jail-1`: rc-promote.tsv:13 kept, rc-run-1.tsv:253 dropped
+  - `level.a1.34.act-1-catacombs-1`: rc-promote.tsv:15 kept, rc-run-1.tsv:254 dropped
+  - `level.a1.8.act-1-cave-1`: rc-promote.tsv:17 kept, rc-run-1.tsv:255 dropped
   - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-1.tsv:256 dropped
-  - `level.a3.75.act-3-town`: rc-promote.tsv:48 kept, rc-run-1.tsv:257 dropped
-  - `level.a3.78.act-3-jungle-3`: rc-promote.tsv:49 kept, rc-run-1.tsv:258 dropped
-  - `level.a4.103.act-4-town`: rc-promote.tsv:52 kept, rc-run-1.tsv:259 dropped
-  - `level.a5.109.act-5-town`: rc-promote.tsv:53 kept, rc-run-1.tsv:260 dropped
+  - `level.a3.75.act-3-town`: rc-promote.tsv:19 kept, rc-run-1.tsv:257 dropped
+  - `level.a3.78.act-3-jungle-3`: rc-promote.tsv:20 kept, rc-run-1.tsv:258 dropped
+  - `level.a4.103.act-4-town`: rc-promote.tsv:23 kept, rc-run-1.tsv:259 dropped
+  - `level.a5.109.act-5-town`: rc-promote.tsv:24 kept, rc-run-1.tsv:260 dropped
   - `npc.atma`: rc-pc1-audit.tsv:84 kept, rc-run-1.tsv:261 dropped
-  - `npc.cain2`: rc-promote.tsv:65 kept, rc-run-1.tsv:262 dropped
-  - `npc.cain6`: rc-promote.tsv:66 kept, rc-run-1.tsv:263 dropped
+  - `npc.cain2`: rc-promote.tsv:33 kept, rc-run-1.tsv:262 dropped
+  - `npc.cain6`: rc-promote.tsv:34 kept, rc-run-1.tsv:263 dropped
   - `npc.drognan`: rc-pc1-audit.tsv:87 kept, rc-run-1.tsv:264 dropped
-  - `npc.elzix`: rc-promote.tsv:67 kept, rc-run-1.tsv:265 dropped
-  - `npc.fara`: rc-promote.tsv:68 kept, rc-run-1.tsv:266 dropped
-  - `npc.greiz`: rc-promote.tsv:69 kept, rc-run-1.tsv:267 dropped
+  - `npc.elzix`: rc-promote.tsv:35 kept, rc-run-1.tsv:265 dropped
+  - `npc.fara`: rc-promote.tsv:36 kept, rc-run-1.tsv:266 dropped
+  - `npc.greiz`: rc-promote.tsv:37 kept, rc-run-1.tsv:267 dropped
   - `npc.jerhyn`: rc-pc1-audit.tsv:91 kept, rc-run-1.tsv:268 dropped
-  - `npc.larzuk`: rc-promote.tsv:70 kept, rc-run-1.tsv:269 dropped
-  - `npc.lysander`: rc-promote.tsv:71 kept, rc-run-1.tsv:270 dropped
-  - `npc.malah`: rc-promote.tsv:72 kept, rc-run-1.tsv:271 dropped
+  - `npc.larzuk`: rc-promote.tsv:38 kept, rc-run-1.tsv:269 dropped
+  - `npc.lysander`: rc-promote.tsv:39 kept, rc-run-1.tsv:270 dropped
+  - `npc.malah`: rc-promote.tsv:40 kept, rc-run-1.tsv:271 dropped
   - `npc.meshif1`: rc-pc1-audit.tsv:96 kept, rc-run-1.tsv:272 dropped
-  - `npc.nihlathak`: rc-promote.tsv:73 kept, rc-run-1.tsv:273 dropped
-  - `npc.qual-kehk`: rc-promote.tsv:74 kept, rc-run-1.tsv:274 dropped
-  - `npc.warriv2`: rc-promote.tsv:75 kept, rc-run-1.tsv:275 dropped
+  - `npc.nihlathak`: rc-promote.tsv:41 kept, rc-run-1.tsv:273 dropped
+  - `npc.qual-kehk`: rc-promote.tsv:42 kept, rc-run-1.tsv:274 dropped
+  - `npc.warriv2`: rc-promote.tsv:43 kept, rc-run-1.tsv:275 dropped
   - `quest.a2q1-radament-s-lair`: rc-pc1-audit.tsv:100 kept, rc-run-1.tsv:276 dropped
-  - `quest.a2q2-the-horadric-staff`: rc-promote.tsv:76 kept, rc-run-1.tsv:277 dropped
+  - `quest.a2q2-the-horadric-staff`: rc-promote.tsv:44 kept, rc-run-1.tsv:277 dropped
   - `quest.a2q3-tainted-sun`: rc-pc1-audit.tsv:102 kept, rc-run-1.tsv:278 dropped
   - `quest.a2q4-arcane-sanctuary`: rc-pc1-audit.tsv:103 kept, rc-run-1.tsv:279 dropped
   - `quest.a2q5-the-summoner`: rc-pc1-audit.tsv:104 kept, rc-run-1.tsv:280 dropped
   - `quest.a2q6-the-seven-tombs`: rc-pc1-audit.tsv:105 kept, rc-run-1.tsv:281 dropped
-  - `waypoint.31.rigid-highlands`: rc-promote.tsv:153 kept, rc-run-1.tsv:283 dropped
-  - `waypoint.32.arreat-plateau`: rc-promote.tsv:154 kept, rc-run-1.tsv:284 dropped
-  - `waypoint.33.crystalized-cavern-level-1`: rc-promote.tsv:155 kept, rc-run-1.tsv:285 dropped
-  - `waypoint.34.crystalized-cavern-level-2`: rc-promote.tsv:156 kept, rc-run-1.tsv:286 dropped
-  - `waypoint.35.halls-of-death-s-calling`: rc-promote.tsv:157 kept, rc-run-1.tsv:287 dropped
-  - `waypoint.36.tundra-wastelands`: rc-promote.tsv:158 kept, rc-run-1.tsv:288 dropped
-  - `waypoint.38.the-worldstone-keep-level-2`: rc-promote.tsv:159 kept, rc-run-1.tsv:289 dropped
+  - `waypoint.31.rigid-highlands`: rc-promote.tsv:81 kept, rc-run-1.tsv:283 dropped
+  - `waypoint.32.arreat-plateau`: rc-promote.tsv:82 kept, rc-run-1.tsv:284 dropped
+  - `waypoint.33.crystalized-cavern-level-1`: rc-promote.tsv:83 kept, rc-run-1.tsv:285 dropped
+  - `waypoint.34.crystalized-cavern-level-2`: rc-promote.tsv:84 kept, rc-run-1.tsv:286 dropped
+  - `waypoint.35.halls-of-death-s-calling`: rc-promote.tsv:85 kept, rc-run-1.tsv:287 dropped
+  - `waypoint.36.tundra-wastelands`: rc-promote.tsv:86 kept, rc-run-1.tsv:288 dropped
+  - `waypoint.38.the-worldstone-keep-level-2`: rc-promote.tsv:87 kept, rc-run-1.tsv:289 dropped
   - `vendor.drehya`: rc-packets-chan.tsv:3 kept, rc-run-2.tsv:65 dropped
   - `monster.ai.abyssknight`: rc-run-1.tsv:78 kept, rc-run-2.tsv:68 dropped
-  - `monster.ai.corruptarcher`: rc-promote.tsv:55 kept, rc-run-2.tsv:69 dropped
-  - `monster.ai.corruptlancer`: rc-promote.tsv:56 kept, rc-run-2.tsv:70 dropped
-  - `monster.ai.corruptrogue`: rc-promote.tsv:57 kept, rc-run-2.tsv:71 dropped
+  - `monster.ai.corruptarcher`: rc-promote.tsv:26 kept, rc-run-2.tsv:69 dropped
+  - `monster.ai.corruptlancer`: rc-link-2.tsv:34 kept, rc-run-2.tsv:70 dropped
+  - `monster.ai.corruptrogue`: rc-link-2.tsv:35 kept, rc-run-2.tsv:71 dropped
   - `monster.ai.fallen`: rc-run-1.tsv:84 kept, rc-run-2.tsv:72 dropped
-  - `monster.ai.fallenshaman`: rc-promote.tsv:58 kept, rc-run-2.tsv:73 dropped
+  - `monster.ai.fallenshaman`: rc-promote.tsv:27 kept, rc-run-2.tsv:73 dropped
   - `monster.ai.fingermage`: rc-run-1.tsv:89 kept, rc-run-2.tsv:74 dropped
-  - `monster.ai.goatman`: rc-promote.tsv:59 kept, rc-run-2.tsv:76 dropped
+  - `monster.ai.goatman`: rc-promote.tsv:28 kept, rc-run-2.tsv:76 dropped
   - `monster.ai.megademon`: rc-run-1.tsv:93 kept, rc-run-2.tsv:77 dropped
   - `monster.ai.quillrat`: rc-run-1.tsv:98 kept, rc-run-2.tsv:78 dropped
   - `monster.ai.regurgitator`: rc-run-1.tsv:100 kept, rc-run-2.tsv:79 dropped
-  - `monster.ai.skeleton`: rc-promote.tsv:60 kept, rc-run-2.tsv:80 dropped
+  - `monster.ai.skeleton`: rc-promote.tsv:29 kept, rc-run-2.tsv:80 dropped
   - `monster.ai.vilemother`: rc-run-1.tsv:110 kept, rc-run-2.tsv:81 dropped
   - `monster.ai.zombie`: rc-run-1.tsv:113 kept, rc-run-2.tsv:82 dropped
   - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2.tsv:89 dropped
   - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2.tsv:92 dropped
   - `level.a1.1.act-1-town`: rc-rng-level-pop.tsv:3 kept, rc-run-2.tsv:93 dropped
-  - `drlg.outdoor.tilesub`: rc-promote.tsv:38 kept, rc-run-2.tsv:94 dropped
-  - `level.a1.4.act-1-wilderness-3`: rc-promote.tsv:45 kept, rc-run-2.tsv:95 dropped
+  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, rc-run-2.tsv:94 dropped
+  - `level.a1.4.act-1-wilderness-3`: rc-promote.tsv:16 kept, rc-run-2.tsv:95 dropped
   - `quest.a4q3-hell-s-forge`: rc-pc1-audit.tsv:107 kept, rc-run-2.tsv:96 dropped
-  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:77 kept, rc-run-2.tsv:97 dropped
+  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, rc-run-2.tsv:97 dropped
   - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, rc-run-2.tsv:99 dropped
-  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:43 kept, rc-run-2.tsv:101 dropped
+  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, rc-run-2.tsv:101 dropped
   - `client.c-monsters.draw`: rc-draw-row173.tsv:188 kept, rc-run-2.tsv:102 dropped
   - `net.c2s.0x67`: rc-run-1.tsv:187 kept, rc-run-2.tsv:103 dropped
   - `drop.player-dead-body`: rc-bolt-target.tsv:3 kept, rc-run-2.tsv:109 dropped
@@ -2266,7 +2266,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.render.draw-order-2.15-sight-test-draw-order-md-5-r3`: rc-draw-row173.tsv:57 kept, rc-run-2.tsv:148 dropped
   - `system.render.draw-order-2.16-line-test-0x0064e260`: rc-draw-row173.tsv:58 kept, rc-run-2.tsv:149 dropped
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, rc-run-2.tsv:150 dropped
-  - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:40 kept, rc-run-2.tsv:151 dropped
+  - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:11 kept, rc-run-2.tsv:151 dropped
   - `client.s-monsters.path-stop`: rc-draw-row173.tsv:189 kept, rc-run-2.tsv:152 dropped
   - `system.render.draw-order.1-frame-passes`: rc-draw-row173.tsv:59 kept, rc-run-2.tsv:172 dropped
   - `system.render.draw-order.2-the-draw-cell-grid-0x004dce60-0x004ddb70`: rc-draw-row173.tsv:61 kept, rc-run-2.tsv:173 dropped
@@ -2295,11 +2295,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `vendor.ormus`: rc-run-2.tsv:61 kept, rc-run-2b.tsv:69 dropped
   - `vendor.store-gen`: rc-items-ground.tsv:3 kept, rc-run-2b.tsv:70 dropped
   - `monster.ai.abyssknight`: rc-run-1.tsv:78 kept, rc-run-2b.tsv:71 dropped
-  - `monster.ai.corruptlancer`: rc-promote.tsv:56 kept, rc-run-2b.tsv:72 dropped
-  - `monster.ai.corruptrogue`: rc-promote.tsv:57 kept, rc-run-2b.tsv:73 dropped
+  - `monster.ai.corruptlancer`: rc-link-2.tsv:34 kept, rc-run-2b.tsv:72 dropped
+  - `monster.ai.corruptrogue`: rc-link-2.tsv:35 kept, rc-run-2b.tsv:73 dropped
   - `monster.ai.doomknight`: rc-run-1.tsv:83 kept, rc-run-2b.tsv:74 dropped
   - `monster.ai.fallen`: rc-run-1.tsv:84 kept, rc-run-2b.tsv:75 dropped
-  - `monster.ai.fallenshaman`: rc-promote.tsv:58 kept, rc-run-2b.tsv:76 dropped
+  - `monster.ai.fallenshaman`: rc-promote.tsv:27 kept, rc-run-2b.tsv:76 dropped
   - `monster.ai.fingermage`: rc-run-1.tsv:89 kept, rc-run-2b.tsv:77 dropped
   - `monster.ai.megademon`: rc-run-1.tsv:93 kept, rc-run-2b.tsv:78 dropped
   - `monster.ai.putriddefiler`: rc-run-1.tsv:97 kept, rc-run-2b.tsv:79 dropped
@@ -2311,7 +2311,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.willowisp`: rc-run-1.tsv:111 kept, rc-run-2b.tsv:85 dropped
   - `monster.ai.zombie`: rc-run-1.tsv:113 kept, rc-run-2b.tsv:86 dropped
   - `item.gamble.place-mode0`: rc-pc1late-npc.tsv:4 kept, rc-run-2b.tsv:87 dropped
-  - `quest.larzuk-map-ai`: rc-promote.tsv:80 kept, rc-run-2b.tsv:88 dropped
+  - `quest.larzuk-map-ai`: rc-promote.tsv:48 kept, rc-run-2b.tsv:88 dropped
   - `hireling.skills.desert-mercenary`: rc-run-2.tsv:100 kept, rc-run-2b.tsv:96 dropped
   - `hireling.skills.rogue-scout`: rc-link-2.tsv:36 kept, rc-run-2b.tsv:97 dropped
   - `skill.nec.amplify-damage`: rc-packets-chan.tsv:94 kept, rc-run-2b.tsv:98 dropped
@@ -2414,7 +2414,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.intents-events.4-d2rs-mapping-and-scope`: rc-intents-moves.tsv:7 kept, rc-run-2b.tsv:210 dropped
   - `system.sim.intents-events.5-machine-readable-tables`: rc-intents-moves.tsv:8 kept, rc-run-2b.tsv:211 dropped
   - `system.sim.intents-events.6-exact-match-comparison`: rc-intents-moves.tsv:9 kept, rc-run-2b.tsv:212 dropped
-  - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-promote.tsv:143 kept, rc-run-2b.tsv:213 dropped
+  - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-link-2.tsv:91 kept, rc-run-2b.tsv:213 dropped
   - `system.sim.intents-events.8-single-player-session-sequence-c-s-0x67-0x6b-f`: rc-intents-moves.tsv:10 kept, rc-run-2b.tsv:214 dropped
   - `system.sim.intents-events.9-c-s-handlers-owners-and-the-small-handlers-own`: rc-intents-moves.tsv:11 kept, rc-run-2b.tsv:215 dropped
   - `system.sim.path-placement.1-coordinates`: rc-partial-promote.tsv:228 kept, rc-run-2b.tsv:216 dropped
@@ -2508,21 +2508,21 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.units.8-collision-line-between-two-units`: rc-pkt-handwritten.tsv:27 kept, rc-run-2b.tsv:304 dropped
   - `ui.frontend.charselect.dolls`: rc-dolls-check.tsv:3 kept, rc-run-2b.tsv:305 dropped
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, rc-run-2b.tsv:306 dropped
-  - `drlg.outdoor.tilesub`: rc-promote.tsv:38 kept, rc-run-2b.tsv:307 dropped
+  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, rc-run-2b.tsv:307 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:308 dropped
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, rc-run-2b.tsv:309 dropped
   - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2b.tsv:311 dropped
-  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:43 kept, rc-run-2b.tsv:312 dropped
+  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, rc-run-2b.tsv:312 dropped
   - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-2b.tsv:313 dropped
-  - `level.a3.75.act-3-town`: rc-promote.tsv:48 kept, rc-run-2b.tsv:314 dropped
-  - `level.a4.103.act-4-town`: rc-promote.tsv:52 kept, rc-run-2b.tsv:315 dropped
-  - `level.a5.109.act-5-town`: rc-promote.tsv:53 kept, rc-run-2b.tsv:316 dropped
+  - `level.a3.75.act-3-town`: rc-promote.tsv:19 kept, rc-run-2b.tsv:314 dropped
+  - `level.a4.103.act-4-town`: rc-promote.tsv:23 kept, rc-run-2b.tsv:315 dropped
+  - `level.a5.109.act-5-town`: rc-promote.tsv:24 kept, rc-run-2b.tsv:316 dropped
   - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:317 dropped
   - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:318 dropped
   - `quest.a4q3-hell-s-forge`: rc-pc1-audit.tsv:107 kept, rc-run-2b.tsv:319 dropped
   - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:320 dropped
-  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:77 kept, rc-run-2b.tsv:321 dropped
-  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:78 kept, rc-run-2b.tsv:322 dropped
+  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, rc-run-2b.tsv:321 dropped
+  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:46 kept, rc-run-2b.tsv:322 dropped
   - `system.act.travel`: rc-run-1.tsv:282 kept, rc-run-2b.tsv:323 dropped
   - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2b.tsv:324 dropped
   - `object.1-casket`: rc-partial-promote.tsv:254 kept, rc-run-3.tsv:3 dropped
@@ -3439,7 +3439,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.zombie4`: rc-gen-mon-triage.tsv:255 kept, rc-run-4.tsv:477 dropped
   - `monster.zombie5`: rc-gen-mon-triage.tsv:262 kept, rc-run-4.tsv:478 dropped
   - `sim.monster-mode-records`: rc-mon-modes.tsv:4 kept, rc-run-4.tsv:479 dropped
-  - `system.sim.units.4-1-setting-a-mode`: rc-promote.tsv:146 kept, rc-run-4.tsv:481 dropped
+  - `system.sim.units.4-1-setting-a-mode`: rc-promote.tsv:74 kept, rc-run-4.tsv:481 dropped
   - `item.0-hax`: rc-items.tsv:3 kept, rc-run-5.tsv:3 dropped
   - `item.100-9bt`: rc-items.tsv:91 kept, rc-run-5.tsv:4 dropped
   - `item.101-9ga`: rc-items.tsv:92 kept, rc-run-5.tsv:5 dropped
@@ -4216,22 +4216,22 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `missile.war-cry`: rc-link-checks.tsv:244 kept, rc-run-5.tsv:781 dropped
   - `missile.weaken`: rc-link-checks.tsv:245 kept, rc-run-5.tsv:782 dropped
   - `missile.zakarumlightning`: rc-link-checks.tsv:248 kept, rc-run-5.tsv:783 dropped
-  - `tools.poke.tick-end`: rc-promote.tsv:147 kept, rc-run-5.tsv:787 dropped
-  - `shrine.1.refill`: rc-promote.tsv:81 kept, rc-run-5.tsv:788 dropped
-  - `shrine.10.resist-lightning-boost`: rc-promote.tsv:82 kept, rc-run-5.tsv:789 dropped
-  - `shrine.11.resist-poison-boost`: rc-promote.tsv:83 kept, rc-run-5.tsv:790 dropped
-  - `shrine.12.skill-boost`: rc-promote.tsv:84 kept, rc-run-5.tsv:791 dropped
-  - `shrine.13.recharge-boost`: rc-promote.tsv:85 kept, rc-run-5.tsv:792 dropped
-  - `shrine.14.stamina-boost`: rc-promote.tsv:86 kept, rc-run-5.tsv:793 dropped
-  - `shrine.15.experience-boost`: rc-promote.tsv:87 kept, rc-run-5.tsv:794 dropped
-  - `shrine.17.portal-to-unknown`: rc-promote.tsv:88 kept, rc-run-5.tsv:795 dropped
-  - `shrine.2.health-boost`: rc-promote.tsv:89 kept, rc-run-5.tsv:798 dropped
-  - `shrine.20.warping-shrine`: rc-promote.tsv:90 kept, rc-run-5.tsv:799 dropped
-  - `shrine.3.mana-boost`: rc-promote.tsv:91 kept, rc-run-5.tsv:802 dropped
-  - `shrine.6.armor-boost`: rc-promote.tsv:92 kept, rc-run-5.tsv:803 dropped
-  - `shrine.7.combat-boost`: rc-promote.tsv:93 kept, rc-run-5.tsv:804 dropped
-  - `shrine.8.resist-fire-boost`: rc-promote.tsv:94 kept, rc-run-5.tsv:805 dropped
-  - `shrine.9.resist-cold-boost`: rc-promote.tsv:95 kept, rc-run-5.tsv:806 dropped
+  - `tools.poke.tick-end`: rc-promote.tsv:75 kept, rc-run-5.tsv:787 dropped
+  - `shrine.1.refill`: rc-promote.tsv:49 kept, rc-run-5.tsv:788 dropped
+  - `shrine.10.resist-lightning-boost`: rc-promote.tsv:50 kept, rc-run-5.tsv:789 dropped
+  - `shrine.11.resist-poison-boost`: rc-promote.tsv:51 kept, rc-run-5.tsv:790 dropped
+  - `shrine.12.skill-boost`: rc-promote.tsv:52 kept, rc-run-5.tsv:791 dropped
+  - `shrine.13.recharge-boost`: rc-promote.tsv:53 kept, rc-run-5.tsv:792 dropped
+  - `shrine.14.stamina-boost`: rc-promote.tsv:54 kept, rc-run-5.tsv:793 dropped
+  - `shrine.15.experience-boost`: rc-promote.tsv:55 kept, rc-run-5.tsv:794 dropped
+  - `shrine.17.portal-to-unknown`: rc-promote.tsv:56 kept, rc-run-5.tsv:795 dropped
+  - `shrine.2.health-boost`: rc-promote.tsv:57 kept, rc-run-5.tsv:798 dropped
+  - `shrine.20.warping-shrine`: rc-promote.tsv:58 kept, rc-run-5.tsv:799 dropped
+  - `shrine.3.mana-boost`: rc-promote.tsv:59 kept, rc-run-5.tsv:802 dropped
+  - `shrine.6.armor-boost`: rc-promote.tsv:60 kept, rc-run-5.tsv:803 dropped
+  - `shrine.7.combat-boost`: rc-promote.tsv:61 kept, rc-run-5.tsv:804 dropped
+  - `shrine.8.resist-fire-boost`: rc-promote.tsv:62 kept, rc-run-5.tsv:805 dropped
+  - `shrine.9.resist-cold-boost`: rc-promote.tsv:63 kept, rc-run-5.tsv:806 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, rc-run-5.tsv:808 dropped
   - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-run-5.tsv:817 dropped
   - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-run-5.tsv:818 dropped
@@ -4243,9 +4243,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-run-5.tsv:824 dropped
   - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-run-5.tsv:825 dropped
   - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-run-5.tsv:826 dropped
-  - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:151 kept, rc-run-5.tsv:827 dropped
+  - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:79 kept, rc-run-5.tsv:827 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-5.tsv:828 dropped
-  - `waypoint.29.river-of-flame`: rc-promote.tsv:152 kept, rc-run-5.tsv:829 dropped
+  - `waypoint.29.river-of-flame`: rc-promote.tsv:80 kept, rc-run-5.tsv:829 dropped
   - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-run-5.tsv:831 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-run-5.tsv:832 dropped
   - `net.c2s.0x16`: rc-run-2b.tsv:54 kept, rc-run-6.tsv:3 dropped
@@ -4434,7 +4434,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `state.wolverine`: rc-join-burst.tsv:185 kept, rc-run-6.tsv:202 dropped
   - `state.wolverinecontrol`: rc-join-burst.tsv:186 kept, rc-run-6.tsv:203 dropped
   - `net.s2c.0x2a`: rc-run-1.tsv:208 kept, rc-run-6.tsv:231 dropped
-  - `tools.poke.tick-end`: rc-promote.tsv:147 kept, rc-run-6.tsv:234 dropped
+  - `tools.poke.tick-end`: rc-promote.tsv:75 kept, rc-run-6.tsv:234 dropped
   - `monster.population.frogdemon-water`: rc-l78-population.tsv:3 kept, rc-run-7.tsv:3 dropped
   - `skill.ama.avoid`: rc-packets-chan.tsv:4 kept, rc-run-7.tsv:4 dropped
   - `skill.ama.dodge`: rc-packets-chan.tsv:8 kept, rc-run-7.tsv:5 dropped
@@ -4454,7 +4454,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.18.act-1-crypt-1-a`: rc-rng-level-pop.tsv:13 kept, rc-run-7.tsv:19 dropped
   - `level.a1.19.act-1-crypt-2-a`: rc-rng-level-pop.tsv:14 kept, rc-run-7.tsv:20 dropped
   - `level.a1.20.act-1-tower-2`: rc-rng-level-pop.tsv:15 kept, rc-run-7.tsv:21 dropped
-  - `level.a1.21.act-1-crypt-3-a`: rc-promote.tsv:41 kept, rc-run-7.tsv:22 dropped
+  - `level.a1.21.act-1-crypt-3-a`: rc-promote.tsv:12 kept, rc-run-7.tsv:22 dropped
   - `level.a1.22.act-1-crypt-3-b`: rc-rng-level-pop.tsv:16 kept, rc-run-7.tsv:23 dropped
   - `level.a1.23.act-1-crypt-3-c`: rc-rng-level-pop.tsv:17 kept, rc-run-7.tsv:24 dropped
   - `level.a1.24.act-1-crypt-3-d`: rc-rng-level-pop.tsv:18 kept, rc-run-7.tsv:25 dropped
@@ -4495,7 +4495,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.58.act-2-tomb-3-a`: rc-rng-level-pop.tsv:43 kept, rc-run-7.tsv:60 dropped
   - `level.a2.59.act-2-tomb-1-treasure`: rc-rng-level-pop.tsv:44 kept, rc-run-7.tsv:61 dropped
   - `level.a2.60.act-2-tomb-2-treasure`: rc-rng-level-pop.tsv:45 kept, rc-run-7.tsv:62 dropped
-  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:47 kept, rc-run-7.tsv:63 dropped
+  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:18 kept, rc-run-7.tsv:63 dropped
   - `level.a2.62.act-2-lair-1-a`: rc-gen-misc.tsv:15 kept, rc-run-7.tsv:64 dropped
   - `level.a2.63.act-2-lair-1-b`: rc-rng-level-pop.tsv:47 kept, rc-run-7.tsv:65 dropped
   - `level.a2.64.act-2-lair-1-treasure`: rc-rng-level-pop.tsv:48 kept, rc-run-7.tsv:66 dropped
@@ -4532,9 +4532,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a3.94.act-3-temple-1`: rc-gen-wine168.tsv:25 kept, rc-run-7.tsv:97 dropped
   - `level.a3.95.act-3-temple-2`: rc-rng-level-pop.tsv:70 kept, rc-run-7.tsv:98 dropped
   - `level.a3.96.act-3-temple-3`: rc-rng-level-pop.tsv:71 kept, rc-run-7.tsv:99 dropped
-  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:50 kept, rc-run-7.tsv:100 dropped
+  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:21 kept, rc-run-7.tsv:100 dropped
   - `level.a3.98.act-3-temple-5`: rc-rng-level-pop.tsv:73 kept, rc-run-7.tsv:101 dropped
-  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:51 kept, rc-run-7.tsv:102 dropped
+  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:22 kept, rc-run-7.tsv:102 dropped
   - `level.a4.104.act-4-mesa-1`: rc-gen-wine168.tsv:28 kept, rc-run-7.tsv:103 dropped
   - `level.a4.105.act-4-mesa-2`: rc-gen-misc.tsv:20 kept, rc-run-7.tsv:104 dropped
   - `level.a4.106.act-4-mesa-3`: rc-gen-wine168.tsv:29 kept, rc-run-7.tsv:105 dropped
@@ -4558,7 +4558,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.125.act-5-hell-1`: rc-rng-level-pop.tsv:89 kept, rc-run-7.tsv:123 dropped
   - `level.a5.126.act-5-hell-2`: rc-rng-level-pop.tsv:90 kept, rc-run-7.tsv:124 dropped
   - `level.a5.127.act-5-hell-3`: rc-rng-level-pop.tsv:91 kept, rc-run-7.tsv:125 dropped
-  - `level.a5.128.act-5-baal-temple-1`: rc-promote.tsv:54 kept, rc-run-7.tsv:126 dropped
+  - `level.a5.128.act-5-baal-temple-1`: rc-promote.tsv:25 kept, rc-run-7.tsv:126 dropped
   - `level.a5.129.act-5-baal-temple-2`: rc-rng-level-pop.tsv:92 kept, rc-run-7.tsv:127 dropped
   - `level.a5.130.act-5-baal-temple-3`: rc-rng-level-pop.tsv:93 kept, rc-run-7.tsv:128 dropped
   - `level.a5.131.act-5-throne-room`: rc-gen-misc.tsv:26 kept, rc-run-7.tsv:129 dropped
@@ -4641,7 +4641,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.nec.decrepify`: rc-packets-chan.tsv:104 kept, rc-run-7b.tsv:73 dropped
   - `skill.nec.dim-vision`: rc-packets-chan.tsv:105 kept, rc-run-7b.tsv:74 dropped
   - `skill.nec.firegolem`: rc-packets-chan.tsv:106 kept, rc-run-7b.tsv:75 dropped
-  - `skill.nec.golem-mastery`: rc-promote.tsv:106 kept, rc-run-7b.tsv:76 dropped
+  - `skill.nec.golem-mastery`: rc-packets-chan.tsv:107 kept, rc-run-7b.tsv:76 dropped
   - `skill.nec.iron-maiden`: rc-packets-chan.tsv:108 kept, rc-run-7b.tsv:77 dropped
   - `skill.nec.irongolem`: rc-packets-chan.tsv:109 kept, rc-run-7b.tsv:78 dropped
   - `skill.nec.life-tap`: rc-packets-chan.tsv:110 kept, rc-run-7b.tsv:79 dropped
@@ -4652,8 +4652,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.nec.raise-skeletal-mage`: rc-packets-chan.tsv:115 kept, rc-run-7b.tsv:84 dropped
   - `skill.nec.raise-skeleton`: rc-packets-chan.tsv:116 kept, rc-run-7b.tsv:85 dropped
   - `skill.nec.revive`: rc-packets-chan.tsv:117 kept, rc-run-7b.tsv:86 dropped
-  - `skill.nec.skeleton-mastery`: rc-promote.tsv:107 kept, rc-run-7b.tsv:87 dropped
-  - `skill.nec.summon-resist`: rc-promote.tsv:108 kept, rc-run-7b.tsv:88 dropped
+  - `skill.nec.skeleton-mastery`: rc-packets-chan.tsv:118 kept, rc-run-7b.tsv:87 dropped
+  - `skill.nec.summon-resist`: rc-packets-chan.tsv:119 kept, rc-run-7b.tsv:88 dropped
   - `skill.nec.teeth`: rc-packets-chan.tsv:120 kept, rc-run-7b.tsv:89 dropped
   - `skill.nec.terror`: rc-packets-chan.tsv:121 kept, rc-run-7b.tsv:90 dropped
   - `skill.nec.weaken`: rc-packets-chan.tsv:122 kept, rc-run-7b.tsv:91 dropped
@@ -4689,12 +4689,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.sor.chain-lightning`: rc-packets-chan.tsv:152 kept, rc-run-7b.tsv:121 dropped
   - `skill.sor.charged-bolt`: rc-packets-chan.tsv:153 kept, rc-run-7b.tsv:122 dropped
   - `skill.sor.chilling-armor`: rc-packets-chan.tsv:154 kept, rc-run-7b.tsv:123 dropped
-  - `skill.sor.cold-mastery`: rc-promote.tsv:109 kept, rc-run-7b.tsv:124 dropped
+  - `skill.sor.cold-mastery`: rc-packets-chan.tsv:155 kept, rc-run-7b.tsv:124 dropped
   - `skill.sor.enchant`: rc-packets-chan.tsv:156 kept, rc-run-7b.tsv:125 dropped
   - `skill.sor.energy-shield`: rc-packets-chan.tsv:157 kept, rc-run-7b.tsv:126 dropped
   - `skill.sor.fire-ball`: rc-packets-chan.tsv:158 kept, rc-run-7b.tsv:127 dropped
   - `skill.sor.fire-bolt`: rc-packets-chan.tsv:159 kept, rc-run-7b.tsv:128 dropped
-  - `skill.sor.fire-mastery`: rc-promote.tsv:110 kept, rc-run-7b.tsv:129 dropped
+  - `skill.sor.fire-mastery`: rc-packets-chan.tsv:160 kept, rc-run-7b.tsv:129 dropped
   - `skill.sor.fire-wall`: rc-packets-chan.tsv:161 kept, rc-run-7b.tsv:130 dropped
   - `skill.sor.frost-nova`: rc-packets-chan.tsv:162 kept, rc-run-7b.tsv:131 dropped
   - `skill.sor.frozen-armor`: rc-packets-chan.tsv:163 kept, rc-run-7b.tsv:132 dropped
@@ -4705,7 +4705,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.sor.ice-bolt`: rc-packets-chan.tsv:168 kept, rc-run-7b.tsv:137 dropped
   - `skill.sor.inferno`: rc-packets-chan.tsv:169 kept, rc-run-7b.tsv:138 dropped
   - `skill.sor.lightning`: rc-packets-chan.tsv:170 kept, rc-run-7b.tsv:139 dropped
-  - `skill.sor.lightning-mastery`: rc-promote.tsv:111 kept, rc-run-7b.tsv:140 dropped
+  - `skill.sor.lightning-mastery`: rc-packets-chan.tsv:171 kept, rc-run-7b.tsv:140 dropped
   - `skill.sor.meteor`: rc-packets-chan.tsv:172 kept, rc-run-7b.tsv:141 dropped
   - `skill.sor.nova`: rc-packets-chan.tsv:173 kept, rc-run-7b.tsv:142 dropped
   - `skill.sor.shiver-armor`: rc-packets-chan.tsv:174 kept, rc-run-7b.tsv:143 dropped
@@ -4713,7 +4713,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.sor.telekinesis`: rc-packets-chan.tsv:176 kept, rc-run-7b.tsv:145 dropped
   - `skill.sor.teleport`: rc-packets-chan.tsv:177 kept, rc-run-7b.tsv:146 dropped
   - `skill.sor.thunder-storm`: rc-packets-chan.tsv:178 kept, rc-run-7b.tsv:147 dropped
-  - `skill.sor.warmth`: rc-promote.tsv:112 kept, rc-run-7b.tsv:148 dropped
+  - `skill.sor.warmth`: rc-packets-chan.tsv:179 kept, rc-run-7b.tsv:148 dropped
   - `state.item.own.monster-equip`: rc-packets-chan.tsv:180 kept, rc-run-7b.tsv:149 dropped
   - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-sandmaggot.tsv:3 dropped
   - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-sandmaggot.tsv:4 dropped
@@ -4843,7 +4843,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.units.7-scheduler-inventory-unit-events-tsv`: rc-pkt-handwritten.tsv:26 kept, rc-tick-idle.tsv:21 dropped
   - `system.sim.units.8-collision-line-between-two-units`: rc-pkt-handwritten.tsv:27 kept, rc-tick-idle.tsv:22 dropped
   - `client.c-monsters.draw`: rc-draw-row173.tsv:188 kept, rc-town-arrival.tsv:3 dropped
-  - `net.c2s.0x06`: rc-promote.tsv:62 kept, rc-unit-guid-order.tsv:3 dropped
+  - `net.c2s.0x06`: rc-promote.tsv:31 kept, rc-unit-guid-order.tsv:3 dropped
   - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-vampire-hp.tsv:3 dropped
   - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-vampire-hp.tsv:4 dropped
   - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-vampire-hp.tsv:5 dropped
@@ -4909,7 +4909,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ama.lightning-strike`: rc-packets-chan.tsv:23 kept, skills.tsv:31 dropped
   - `skill.ama.lightning-fury`: rc-packets-chan.tsv:22 kept, skills.tsv:32 dropped
   - `skill.sor.fire-bolt`: rc-packets-chan.tsv:159 kept, skills.tsv:33 dropped
-  - `skill.sor.warmth`: rc-promote.tsv:112 kept, skills.tsv:34 dropped
+  - `skill.sor.warmth`: rc-packets-chan.tsv:179 kept, skills.tsv:34 dropped
   - `skill.sor.charged-bolt`: rc-packets-chan.tsv:153 kept, skills.tsv:35 dropped
   - `skill.sor.ice-bolt`: rc-packets-chan.tsv:168 kept, skills.tsv:36 dropped
   - `skill.sor.frozen-armor`: rc-packets-chan.tsv:163 kept, skills.tsv:37 dropped
@@ -4933,15 +4933,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.sor.energy-shield`: rc-packets-chan.tsv:157 kept, skills.tsv:55 dropped
   - `skill.sor.blizzard`: rc-packets-chan.tsv:151 kept, skills.tsv:56 dropped
   - `skill.sor.chilling-armor`: rc-packets-chan.tsv:154 kept, skills.tsv:57 dropped
-  - `skill.sor.fire-mastery`: rc-promote.tsv:110 kept, skills.tsv:58 dropped
+  - `skill.sor.fire-mastery`: rc-packets-chan.tsv:160 kept, skills.tsv:58 dropped
   - `skill.sor.hydra`: rc-packets-chan.tsv:166 kept, skills.tsv:59 dropped
-  - `skill.sor.lightning-mastery`: rc-promote.tsv:111 kept, skills.tsv:60 dropped
+  - `skill.sor.lightning-mastery`: rc-packets-chan.tsv:171 kept, skills.tsv:60 dropped
   - `skill.sor.frozen-orb`: rc-packets-chan.tsv:164 kept, skills.tsv:61 dropped
-  - `skill.sor.cold-mastery`: rc-promote.tsv:109 kept, skills.tsv:62 dropped
+  - `skill.sor.cold-mastery`: rc-packets-chan.tsv:155 kept, skills.tsv:62 dropped
   - `skill.nec.amplify-damage`: rc-packets-chan.tsv:94 kept, skills.tsv:63 dropped
   - `skill.nec.teeth`: rc-packets-chan.tsv:120 kept, skills.tsv:64 dropped
   - `skill.nec.bone-armor`: rc-packets-chan.tsv:97 kept, skills.tsv:65 dropped
-  - `skill.nec.skeleton-mastery`: rc-promote.tsv:107 kept, skills.tsv:66 dropped
+  - `skill.nec.skeleton-mastery`: rc-packets-chan.tsv:118 kept, skills.tsv:66 dropped
   - `skill.nec.raise-skeleton`: rc-packets-chan.tsv:116 kept, skills.tsv:67 dropped
   - `skill.nec.dim-vision`: rc-packets-chan.tsv:105 kept, skills.tsv:68 dropped
   - `skill.nec.weaken`: rc-packets-chan.tsv:122 kept, skills.tsv:69 dropped
@@ -4951,7 +4951,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.nec.iron-maiden`: rc-packets-chan.tsv:108 kept, skills.tsv:73 dropped
   - `skill.nec.terror`: rc-packets-chan.tsv:121 kept, skills.tsv:74 dropped
   - `skill.nec.bone-wall`: rc-packets-chan.tsv:100 kept, skills.tsv:75 dropped
-  - `skill.nec.golem-mastery`: rc-promote.tsv:106 kept, skills.tsv:76 dropped
+  - `skill.nec.golem-mastery`: rc-packets-chan.tsv:107 kept, skills.tsv:76 dropped
   - `skill.nec.raise-skeletal-mage`: rc-packets-chan.tsv:115 kept, skills.tsv:77 dropped
   - `skill.nec.confuse`: rc-packets-chan.tsv:102 kept, skills.tsv:78 dropped
   - `skill.nec.life-tap`: rc-packets-chan.tsv:110 kept, skills.tsv:79 dropped
@@ -4961,7 +4961,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.nec.attract`: rc-packets-chan.tsv:95 kept, skills.tsv:83 dropped
   - `skill.nec.decrepify`: rc-packets-chan.tsv:104 kept, skills.tsv:84 dropped
   - `skill.nec.bone-prison`: rc-packets-chan.tsv:98 kept, skills.tsv:85 dropped
-  - `skill.nec.summon-resist`: rc-promote.tsv:108 kept, skills.tsv:86 dropped
+  - `skill.nec.summon-resist`: rc-packets-chan.tsv:119 kept, skills.tsv:86 dropped
   - `skill.nec.irongolem`: rc-packets-chan.tsv:109 kept, skills.tsv:87 dropped
   - `skill.nec.lower-resist`: rc-packets-chan.tsv:111 kept, skills.tsv:88 dropped
   - `skill.nec.poison-nova`: rc-packets-chan.tsv:114 kept, skills.tsv:89 dropped
@@ -5058,32 +5058,32 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.dru.fury`: rc-packets-chan.tsv:84 kept, skills.tsv:180 dropped
   - `skill.dru.armageddon`: q-chk-skills-bda.tsv:61 kept, skills.tsv:181 dropped
   - `skill.dru.hurricane`: rc-packets-chan.tsv:86 kept, skills.tsv:182 dropped
-  - `skill.ass.fire-trauma`: rc-promote.tsv:100 kept, skills.tsv:183 dropped
+  - `skill.ass.fire-trauma`: rc-promote.tsv:68 kept, skills.tsv:183 dropped
   - `skill.ass.claw-mastery`: rc-packets-chan.tsv:36 kept, skills.tsv:184 dropped
-  - `skill.ass.psychic-hammer`: rc-promote.tsv:102 kept, skills.tsv:185 dropped
+  - `skill.ass.psychic-hammer`: rc-promote.tsv:70 kept, skills.tsv:185 dropped
   - `skill.ass.tiger-strike`: rc-packets-chan.tsv:49 kept, skills.tsv:186 dropped
   - `skill.ass.dragon-talon`: rc-packets-chan.tsv:42 kept, skills.tsv:187 dropped
-  - `skill.ass.shock-field`: rc-promote.tsv:104 kept, skills.tsv:188 dropped
+  - `skill.ass.shock-field`: rc-promote.tsv:72 kept, skills.tsv:188 dropped
   - `skill.ass.blade-sentinel`: rc-run-1.tsv:151 kept, skills.tsv:189 dropped
   - `skill.ass.quickness`: rc-packets-chan.tsv:47 kept, skills.tsv:190 dropped
   - `skill.ass.fists-of-fire`: rc-packets-chan.tsv:44 kept, skills.tsv:191 dropped
   - `skill.ass.dragon-claw`: rc-packets-chan.tsv:40 kept, skills.tsv:192 dropped
-  - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:97 kept, skills.tsv:193 dropped
-  - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:105 kept, skills.tsv:194 dropped
+  - `skill.ass.charged-bolt-sentry`: rc-promote.tsv:65 kept, skills.tsv:193 dropped
+  - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:73 kept, skills.tsv:194 dropped
   - `skill.ass.weapon-block`: rc-packets-chan.tsv:51 kept, skills.tsv:195 dropped
   - `skill.ass.cloak-of-shadows`: rc-packets-chan.tsv:38 kept, skills.tsv:196 dropped
   - `skill.ass.cobra-strike`: rc-packets-chan.tsv:39 kept, skills.tsv:197 dropped
-  - `skill.ass.blade-fury`: rc-promote.tsv:96 kept, skills.tsv:198 dropped
+  - `skill.ass.blade-fury`: rc-promote.tsv:64 kept, skills.tsv:198 dropped
   - `skill.ass.fade`: rc-packets-chan.tsv:43 kept, skills.tsv:199 dropped
-  - `skill.ass.shadow-warrior`: rc-promote.tsv:103 kept, skills.tsv:200 dropped
+  - `skill.ass.shadow-warrior`: rc-promote.tsv:71 kept, skills.tsv:200 dropped
   - `skill.ass.claws-of-thunder`: rc-packets-chan.tsv:37 kept, skills.tsv:201 dropped
   - `skill.ass.dragon-tail`: rc-packets-chan.tsv:41 kept, skills.tsv:202 dropped
   - `skill.ass.lightning-sentry`: rc-packets-chan.tsv:45 kept, skills.tsv:203 dropped
-  - `skill.ass.inferno-sentry`: rc-promote.tsv:101 kept, skills.tsv:204 dropped
+  - `skill.ass.inferno-sentry`: rc-promote.tsv:69 kept, skills.tsv:204 dropped
   - `skill.ass.mind-blast`: rc-packets-chan.tsv:46 kept, skills.tsv:205 dropped
   - `skill.ass.blades-of-ice`: rc-packets-chan.tsv:35 kept, skills.tsv:206 dropped
-  - `skill.ass.dragon-flight`: rc-promote.tsv:99 kept, skills.tsv:207 dropped
-  - `skill.ass.death-sentry`: rc-promote.tsv:98 kept, skills.tsv:208 dropped
+  - `skill.ass.dragon-flight`: rc-promote.tsv:67 kept, skills.tsv:207 dropped
+  - `skill.ass.death-sentry`: rc-promote.tsv:66 kept, skills.tsv:208 dropped
   - `skill.ass.blade-shield`: rc-packets-chan.tsv:34 kept, skills.tsv:209 dropped
   - `skill.ass.venom`: rc-packets-chan.tsv:50 kept, skills.tsv:210 dropped
   - `skill.ass.shadow-master`: rc-run-1.tsv:173 kept, skills.tsv:211 dropped
@@ -5462,7 +5462,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x03`: q-run-net.tsv:34 kept, systems.tsv:6 dropped
   - `net.c2s.0x04`: rc-run-6.tsv:205 kept, systems.tsv:7 dropped
   - `net.c2s.0x05`: rc-run-6.tsv:206 kept, systems.tsv:8 dropped
-  - `net.c2s.0x06`: rc-promote.tsv:62 kept, systems.tsv:9 dropped
+  - `net.c2s.0x06`: rc-promote.tsv:31 kept, systems.tsv:9 dropped
   - `net.c2s.0x07`: rc-run-6.tsv:207 kept, systems.tsv:10 dropped
   - `net.c2s.0x08`: rc-run-6.tsv:208 kept, systems.tsv:11 dropped
   - `net.c2s.0x09`: rc-run-6.tsv:209 kept, systems.tsv:12 dropped
@@ -5593,7 +5593,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x15`: rc-goto-settle.tsv:4 kept, systems.tsv:137 dropped
   - `net.s2c.0x16`: q-run-net.tsv:138 kept, systems.tsv:138 dropped
   - `net.s2c.0x17`: q-run-net.tsv:139 kept, systems.tsv:139 dropped
-  - `net.s2c.0x18`: rc-promote.tsv:63 kept, systems.tsv:140 dropped
+  - `net.s2c.0x18`: rc-promote.tsv:32 kept, systems.tsv:140 dropped
   - `net.s2c.0x19`: rc-run-2b.tsv:184 kept, systems.tsv:141 dropped
   - `net.s2c.0x1a`: q-run-net.tsv:142 kept, systems.tsv:142 dropped
   - `net.s2c.0x1b`: rc-run-2b.tsv:185 kept, systems.tsv:143 dropped
@@ -5632,7 +5632,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x3c`: q-run-net.tsv:176 kept, systems.tsv:176 dropped
   - `net.s2c.0x3d`: q-run-net.tsv:177 kept, systems.tsv:177 dropped
   - `net.s2c.0x3e`: q-run-net.tsv:178 kept, systems.tsv:178 dropped
-  - `net.s2c.0x3f`: rc-promote.tsv:64 kept, systems.tsv:179 dropped
+  - `net.s2c.0x3f`: q-run-net.tsv:179 kept, systems.tsv:179 dropped
   - `net.s2c.0x40`: q-run-net.tsv:180 kept, systems.tsv:180 dropped
   - `net.s2c.0x41`: q-run-net.tsv:181 kept, systems.tsv:181 dropped
   - `net.s2c.0x42`: q-run-net.tsv:182 kept, systems.tsv:182 dropped
@@ -5756,7 +5756,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.sim.intents-events.4-d2rs-mapping-and-scope`: rc-intents-moves.tsv:7 kept, systems.tsv:300 dropped
   - `system.sim.intents-events.5-machine-readable-tables`: rc-intents-moves.tsv:8 kept, systems.tsv:301 dropped
   - `system.sim.intents-events.6-exact-match-comparison`: rc-intents-moves.tsv:9 kept, systems.tsv:302 dropped
-  - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-promote.tsv:143 kept, systems.tsv:303 dropped
+  - `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean`: rc-link-2.tsv:91 kept, systems.tsv:303 dropped
   - `system.sim.intents-events.8-single-player-session-sequence-c-s-0x67-0x6b-f`: rc-intents-moves.tsv:10 kept, systems.tsv:304 dropped
   - `system.sim.intents-events.9-c-s-handlers-owners-and-the-small-handlers-own`: rc-intents-moves.tsv:11 kept, systems.tsv:305 dropped
   - `system.sim.path-placement.1-coordinates`: rc-partial-promote.tsv:228 kept, systems.tsv:306 dropped
@@ -5875,10 +5875,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.combat.vitals.4-experience`: rc-gen-misc.tsv:62 kept, systems.tsv:419 dropped
   - `system.combat.vitals.5-client-vitals-sync-0x00548760`: rc-gen-misc.tsv:63 kept, systems.tsv:420 dropped
   - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:89 kept, systems.tsv:421 dropped
-  - `system.flows.act-change.2-same-act-travel`: rc-promote.tsv:135 kept, systems.tsv:422 dropped
+  - `system.flows.act-change.2-same-act-travel`: rc-link-2.tsv:73 kept, systems.tsv:422 dropped
   - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:91 kept, systems.tsv:423 dropped
-  - `system.flows.client-frame.1-loop-pass-order-1-14d`: rc-promote.tsv:136 kept, systems.tsv:424 dropped
-  - `system.flows.client-frame.2-prediction-correction-interpolation`: rc-promote.tsv:137 kept, systems.tsv:425 dropped
+  - `system.flows.client-frame.1-loop-pass-order-1-14d`: rc-link-2.tsv:74 kept, systems.tsv:424 dropped
+  - `system.flows.client-frame.2-prediction-correction-interpolation`: rc-link-2.tsv:75 kept, systems.tsv:425 dropped
   - `system.flows.client-frame.3-d2rs-mapping-one-bevy-frame`: rc-gen-client.tsv:94 kept, systems.tsv:426 dropped
   - `system.flows.save-exit.1-client-save-and-exit-game`: rc-run-2b.tsv:195 kept, systems.tsv:431 dropped
   - `system.flows.save-exit.2-server-leave-c-s-0x69-in-the-drain`: rc-run-2b.tsv:196 kept, systems.tsv:432 dropped
@@ -5889,14 +5889,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.flows.server-tick.2-tick-steps-in-order`: rc-pkt-handwritten.tsv:9 kept, systems.tsv:437 dropped
   - `system.flows.server-tick.3-timer-queue-within-step-4`: rc-pkt-handwritten.tsv:10 kept, systems.tsv:438 dropped
   - `system.flows.server-tick.4-client-pass-within-step-5`: rc-pkt-handwritten.tsv:11 kept, systems.tsv:439 dropped
-  - `system.seams.bridge-app.1-frame-order-one-bevy-frame`: rc-promote.tsv:138 kept, systems.tsv:440 dropped
-  - `system.seams.bridge-app.2-contract`: rc-promote.tsv:139 kept, systems.tsv:441 dropped
-  - `system.seams.drlg-coords.1-coordinate-spaces`: rc-promote.tsv:140 kept, systems.tsv:442 dropped
-  - `system.seams.item-grids`: rc-promote.tsv:141 kept, systems.tsv:443 dropped
+  - `system.seams.bridge-app.1-frame-order-one-bevy-frame`: rc-link-2.tsv:86 kept, systems.tsv:440 dropped
+  - `system.seams.bridge-app.2-contract`: rc-link-2.tsv:87 kept, systems.tsv:441 dropped
+  - `system.seams.drlg-coords.1-coordinate-spaces`: rc-link-2.tsv:88 kept, systems.tsv:442 dropped
+  - `system.seams.item-grids`: rc-link-2.tsv:89 kept, systems.tsv:443 dropped
   - `system.seams.messages.1-contract-table-per-message-family`: rc-intents-moves.tsv:3 kept, systems.tsv:444 dropped
   - `system.seams.movement-prediction.1-units-and-spaces-used-below`: rc-partial-promote.tsv:226 kept, systems.tsv:445 dropped
   - `system.seams.movement-prediction.2-contract`: rc-partial-promote.tsv:227 kept, systems.tsv:446 dropped
-  - `system.seams.sim-server.1-what-crosses`: rc-promote.tsv:142 kept, systems.tsv:447 dropped
+  - `system.seams.sim-server.1-what-crosses`: rc-link-2.tsv:90 kept, systems.tsv:447 dropped
   - `system.seams.world-screen.1-units-and-spaces`: rc-gen-client.tsv:105 kept, systems.tsv:448 dropped
   - `system.seams.world-screen.2-contract`: rc-gen-client.tsv:106 kept, systems.tsv:449 dropped
   - `system.client.assets.a-d2rs-design-ours`: rc-gen-client.tsv:3 kept, systems.tsv:450 dropped
@@ -5904,11 +5904,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.client.audio.a-d2rs-design-ours`: rc-gen-client.tsv:5 kept, systems.tsv:452 dropped
   - `system.client.audio.b-original-behavior-to-reproduce-owners`: rc-gen-client.tsv:6 kept, systems.tsv:453 dropped
   - `system.client.bridge.1-boundary`: rc-gen-client.tsv:7 kept, systems.tsv:454 dropped
-  - `system.client.bridge.2-receive-path`: rc-promote.tsv:113 kept, systems.tsv:455 dropped
+  - `system.client.bridge.2-receive-path`: rc-link-2.tsv:51 kept, systems.tsv:455 dropped
   - `system.client.bridge.3-server-link`: rc-gen-client.tsv:10 kept, systems.tsv:456 dropped
-  - `system.client.bridge.4-send-path-intents`: rc-promote.tsv:114 kept, systems.tsv:457 dropped
-  - `system.client.bridge.5-client-world-model`: rc-promote.tsv:115 kept, systems.tsv:458 dropped
-  - `system.client.bridge.6-dispatch-table`: rc-promote.tsv:116 kept, systems.tsv:459 dropped
+  - `system.client.bridge.4-send-path-intents`: rc-link-2.tsv:52 kept, systems.tsv:457 dropped
+  - `system.client.bridge.5-client-world-model`: rc-link-2.tsv:53 kept, systems.tsv:458 dropped
+  - `system.client.bridge.6-dispatch-table`: rc-link-2.tsv:54 kept, systems.tsv:459 dropped
   - `system.client.bridge.7-bevy-mirror`: rc-gen-client.tsv:14 kept, systems.tsv:460 dropped
   - `system.client.bridge.8-frame-pacing`: rc-gen-client.tsv:15 kept, systems.tsv:461 dropped
   - `system.client.bridge.9-versioning`: rc-gen-client.tsv:16 kept, systems.tsv:462 dropped
@@ -5932,43 +5932,43 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.client.model.17-model-writes-made-by-1-14d-ui-code`: rc-00-local-pc1-today.tsv:188 kept, systems.tsv:480 dropped
   - `system.client.model.18-audio-driver-inputs-and-the-client-object-fun`: rc-00-local-pc1-today.tsv:189 kept, systems.tsv:481 dropped
   - `system.client.model.19-monster-mode-machine-0x004aff60-and-client-mo`: rc-00-local-pc1-today.tsv:190 kept, systems.tsv:482 dropped
-  - `system.client.msg-skills.1-the-client-skill-list-unit-0xa8`: rc-promote.tsv:117 kept, systems.tsv:483 dropped
-  - `system.client.msg-skills.2-shared-skill-list-operations`: rc-promote.tsv:119 kept, systems.tsv:484 dropped
-  - `system.client.msg-skills.3-0x94-baseskilllevels-0x0045dd60`: rc-promote.tsv:120 kept, systems.tsv:485 dropped
-  - `system.client.msg-skills.4-0x21-updateitemoskill-0x0045dcd0`: rc-promote.tsv:121 kept, systems.tsv:486 dropped
-  - `system.client.msg-skills.5-0x22-updateitemskill-0x0045ddb0`: rc-promote.tsv:122 kept, systems.tsv:487 dropped
-  - `system.client.msg-skills.6-0x23-setskill-0x0045de10`: rc-promote.tsv:123 kept, systems.tsv:488 dropped
-  - `system.client.msg-skills.7-0x99-0x9a-skill-events-0x0045de80-0x0045dec0-0`: rc-promote.tsv:124 kept, systems.tsv:489 dropped
-  - `system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0`: rc-promote.tsv:125 kept, systems.tsv:490 dropped
-  - `system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1`: rc-promote.tsv:126 kept, systems.tsv:491 dropped
-  - `system.client.msg-skills.10-0xa5-skill-end-on-a-unit-0x0045d6a0`: rc-promote.tsv:118 kept, systems.tsv:492 dropped
+  - `system.client.msg-skills.1-the-client-skill-list-unit-0xa8`: rc-link-2.tsv:55 kept, systems.tsv:483 dropped
+  - `system.client.msg-skills.2-shared-skill-list-operations`: rc-link-2.tsv:57 kept, systems.tsv:484 dropped
+  - `system.client.msg-skills.3-0x94-baseskilllevels-0x0045dd60`: rc-link-2.tsv:58 kept, systems.tsv:485 dropped
+  - `system.client.msg-skills.4-0x21-updateitemoskill-0x0045dcd0`: rc-link-2.tsv:59 kept, systems.tsv:486 dropped
+  - `system.client.msg-skills.5-0x22-updateitemskill-0x0045ddb0`: rc-link-2.tsv:60 kept, systems.tsv:487 dropped
+  - `system.client.msg-skills.6-0x23-setskill-0x0045de10`: rc-link-2.tsv:61 kept, systems.tsv:488 dropped
+  - `system.client.msg-skills.7-0x99-0x9a-skill-events-0x0045de80-0x0045dec0-0`: rc-link-2.tsv:62 kept, systems.tsv:489 dropped
+  - `system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0`: rc-link-2.tsv:63 kept, systems.tsv:490 dropped
+  - `system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1`: rc-link-2.tsv:64 kept, systems.tsv:491 dropped
+  - `system.client.msg-skills.10-0xa5-skill-end-on-a-unit-0x0045d6a0`: rc-link-2.tsv:56 kept, systems.tsv:492 dropped
   - `system.client.msg-stats-items.1-local-player-stats-0x19-0x1f-0x0045d780`: rc-00-local-pc1-today.tsv:199 kept, systems.tsv:493 dropped
   - `system.client.msg-stats-items.2-item-actions-0x9c-itemactionworld-0x0045eb10-0`: rc-00-local-pc1-today.tsv:200 kept, systems.tsv:494 dropped
   - `system.client.msg-stats-items.3-other-item-messages`: rc-00-local-pc1-today.tsv:201 kept, systems.tsv:495 dropped
   - `system.client.msg-stats-items.4-hireling-stats-0x9e-0xa2-0x0045d540`: rc-00-local-pc1-today.tsv:202 kept, systems.tsv:496 dropped
   - `system.client.msg-stats-items.5-item-state-messages-0x3e-0x40-0x7c-0x7d-0x92-0`: rc-00-local-pc1-today.tsv:203 kept, systems.tsv:497 dropped
-  - `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0`: rc-promote.tsv:127 kept, systems.tsv:498 dropped
+  - `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0`: rc-link-2.tsv:65 kept, systems.tsv:498 dropped
   - `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90`: rc-gen-client.tsv:62 kept, systems.tsv:499 dropped
-  - `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0`: rc-promote.tsv:133 kept, systems.tsv:500 dropped
+  - `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0`: rc-link-2.tsv:71 kept, systems.tsv:500 dropped
   - `system.client.msg-ui.4-0x26-chat-and-overhead-text-0x0045dfc0-0x0049f`: rc-gen-client.tsv:67 kept, systems.tsv:501 dropped
   - `system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600`: rc-gen-client.tsv:68 kept, systems.tsv:502 dropped
   - `system.client.msg-ui.6-0x4e-hire-offer-and-0x4f-hire-list-reset`: rc-gen-client.tsv:69 kept, systems.tsv:503 dropped
   - `system.client.msg-ui.7-0x50-quest-special-0x0045e370-0x004b9210`: rc-gen-client.tsv:70 kept, systems.tsv:504 dropped
-  - `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550`: rc-promote.tsv:134 kept, systems.tsv:505 dropped
+  - `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550`: rc-link-2.tsv:72 kept, systems.tsv:505 dropped
   - `system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33`: rc-gen-client.tsv:72 kept, systems.tsv:506 dropped
   - `system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510`: rc-gen-client.tsv:52 kept, systems.tsv:507 dropped
   - `system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010`: rc-gen-client.tsv:53 kept, systems.tsv:508 dropped
-  - `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620`: rc-promote.tsv:128 kept, systems.tsv:509 dropped
-  - `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0`: rc-promote.tsv:129 kept, systems.tsv:510 dropped
-  - `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004`: rc-promote.tsv:130 kept, systems.tsv:511 dropped
+  - `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620`: rc-link-2.tsv:66 kept, systems.tsv:509 dropped
+  - `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0`: rc-link-2.tsv:67 kept, systems.tsv:510 dropped
+  - `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004`: rc-link-2.tsv:68 kept, systems.tsv:511 dropped
   - `system.client.msg-ui.15-0x9b-hireling-revive-state-0x0045eac0-0x004b6`: rc-gen-client.tsv:57 kept, systems.tsv:512 dropped
   - `system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d`: rc-gen-client.tsv:58 kept, systems.tsv:513 dropped
   - `system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320`: rc-gen-client.tsv:59 kept, systems.tsv:514 dropped
   - `system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390`: rc-gen-client.tsv:60 kept, systems.tsv:515 dropped
   - `system.client.msg-ui.19-0x5a-event-text-0x0045e070-0x0049eb10`: rc-gen-client.tsv:61 kept, systems.tsv:516 dropped
   - `system.client.msg-ui.20-0x61-act-video-0x0045e660`: rc-gen-client.tsv:63 kept, systems.tsv:517 dropped
-  - `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0`: rc-promote.tsv:131 kept, systems.tsv:518 dropped
-  - `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0`: rc-promote.tsv:132 kept, systems.tsv:519 dropped
+  - `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0`: rc-link-2.tsv:69 kept, systems.tsv:518 dropped
+  - `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0`: rc-link-2.tsv:70 kept, systems.tsv:519 dropped
   - `system.client.msg-units.1-unit-add`: rc-00-local-pc1-today.tsv:204 kept, systems.tsv:520 dropped
   - `system.client.msg-units.2-0x0a-removeunit-0x0045cc10`: rc-00-local-pc1-today.tsv:205 kept, systems.tsv:521 dropped
   - `system.client.msg-units.3-0x15-reassignplayer-0x0045d160`: rc-00-local-pc1-today.tsv:206 kept, systems.tsv:522 dropped
@@ -6374,13 +6374,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.wav.4-format-checks-by-the-game`: rc-gen-formats.tsv:56 kept, systems.tsv:934 dropped
   - `system.formats.wav.5-decoder-hook-d2rs`: rc-gen-formats.tsv:57 kept, systems.tsv:935 dropped
   - `level.a1.1.act-1-town`: rc-rng-level-pop.tsv:3 kept, world.tsv:3 dropped
-  - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:40 kept, world.tsv:4 dropped
-  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:43 kept, world.tsv:5 dropped
-  - `level.a1.4.act-1-wilderness-3`: rc-promote.tsv:45 kept, world.tsv:6 dropped
+  - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:11 kept, world.tsv:4 dropped
+  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, world.tsv:5 dropped
+  - `level.a1.4.act-1-wilderness-3`: rc-promote.tsv:16 kept, world.tsv:6 dropped
   - `level.a1.5.act-1-wilderness-4`: rc-rng-level-pop.tsv:4 kept, world.tsv:7 dropped
   - `level.a1.6.act-1-wilderness-5`: rc-rng-level-pop.tsv:5 kept, world.tsv:8 dropped
   - `level.a1.7.act-1-wilderness-6`: rc-rng-level-pop.tsv:6 kept, world.tsv:9 dropped
-  - `level.a1.8.act-1-cave-1`: rc-promote.tsv:46 kept, world.tsv:10 dropped
+  - `level.a1.8.act-1-cave-1`: rc-promote.tsv:17 kept, world.tsv:10 dropped
   - `level.a1.9.act-1-cave-2`: rc-gen-misc.tsv:13 kept, world.tsv:11 dropped
   - `level.a1.10.act-1-cave-3`: rc-rng-level-pop.tsv:7 kept, world.tsv:12 dropped
   - `level.a1.11.act-1-cave-4`: rc-rng-level-pop.tsv:8 kept, world.tsv:13 dropped
@@ -6393,7 +6393,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.18.act-1-crypt-1-a`: rc-rng-level-pop.tsv:13 kept, world.tsv:20 dropped
   - `level.a1.19.act-1-crypt-2-a`: rc-rng-level-pop.tsv:14 kept, world.tsv:21 dropped
   - `level.a1.20.act-1-tower-2`: rc-rng-level-pop.tsv:15 kept, world.tsv:22 dropped
-  - `level.a1.21.act-1-crypt-3-a`: rc-promote.tsv:41 kept, world.tsv:23 dropped
+  - `level.a1.21.act-1-crypt-3-a`: rc-promote.tsv:12 kept, world.tsv:23 dropped
   - `level.a1.22.act-1-crypt-3-b`: rc-rng-level-pop.tsv:16 kept, world.tsv:24 dropped
   - `level.a1.23.act-1-crypt-3-c`: rc-rng-level-pop.tsv:17 kept, world.tsv:25 dropped
   - `level.a1.24.act-1-crypt-3-d`: rc-rng-level-pop.tsv:18 kept, world.tsv:26 dropped
@@ -6401,12 +6401,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a1.26.act-1-monastery`: rc-rng-level-pop.tsv:19 kept, world.tsv:28 dropped
   - `level.a1.27.act-1-courtyard-1`: rc-rng-level-pop.tsv:20 kept, world.tsv:29 dropped
   - `level.a1.28.act-1-barracks`: rc-rng-level-pop.tsv:21 kept, world.tsv:30 dropped
-  - `level.a1.29.act-1-jail-1`: rc-promote.tsv:42 kept, world.tsv:31 dropped
+  - `level.a1.29.act-1-jail-1`: rc-promote.tsv:13 kept, world.tsv:31 dropped
   - `level.a1.30.act-1-jail-2`: rc-rng-level-pop.tsv:22 kept, world.tsv:32 dropped
   - `level.a1.31.act-1-jail-3`: rc-level-pop-2.tsv:3 kept, world.tsv:33 dropped
   - `level.a1.32.act-1-courtyard-2`: rc-rng-level-pop.tsv:24 kept, world.tsv:34 dropped
   - `level.a1.33.act-1-cathedral`: rc-level-pop-2.tsv:4 kept, world.tsv:35 dropped
-  - `level.a1.34.act-1-catacombs-1`: rc-promote.tsv:44 kept, world.tsv:36 dropped
+  - `level.a1.34.act-1-catacombs-1`: rc-promote.tsv:15 kept, world.tsv:36 dropped
   - `level.a1.35.act-1-catacombs-2`: rc-rng-level-pop.tsv:26 kept, world.tsv:37 dropped
   - `level.a1.36.act-1-catacombs-3`: rc-rng-level-pop.tsv:27 kept, world.tsv:38 dropped
   - `level.a1.37.act-1-catacombs-4`: rc-rng-level-pop.tsv:28 kept, world.tsv:39 dropped
@@ -6433,7 +6433,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.58.act-2-tomb-3-a`: rc-rng-level-pop.tsv:43 kept, world.tsv:60 dropped
   - `level.a2.59.act-2-tomb-1-treasure`: rc-rng-level-pop.tsv:44 kept, world.tsv:61 dropped
   - `level.a2.60.act-2-tomb-2-treasure`: rc-rng-level-pop.tsv:45 kept, world.tsv:62 dropped
-  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:47 kept, world.tsv:63 dropped
+  - `level.a2.61.act-2-tomb-3-treasure`: rc-promote.tsv:18 kept, world.tsv:63 dropped
   - `level.a2.62.act-2-lair-1-a`: rc-gen-misc.tsv:15 kept, world.tsv:64 dropped
   - `level.a2.63.act-2-lair-1-b`: rc-rng-level-pop.tsv:47 kept, world.tsv:65 dropped
   - `level.a2.64.act-2-lair-1-treasure`: rc-rng-level-pop.tsv:48 kept, world.tsv:66 dropped
@@ -6447,10 +6447,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a2.72.act-2-tomb-tal-7`: rc-rng-level-pop.tsv:55 kept, world.tsv:74 dropped
   - `level.a2.73.act-2-duriel-s-lair`: rc-rng-level-pop.tsv:56 kept, world.tsv:75 dropped
   - `level.a2.74.act-2-arcane`: rc-gen-misc.tsv:17 kept, world.tsv:76 dropped
-  - `level.a3.75.act-3-town`: rc-promote.tsv:48 kept, world.tsv:77 dropped
+  - `level.a3.75.act-3-town`: rc-promote.tsv:19 kept, world.tsv:77 dropped
   - `level.a3.76.act-3-jungle-1`: rc-level-population.tsv:10 kept, world.tsv:78 dropped
   - `level.a3.77.act-3-jungle-2`: rc-rng-level-pop.tsv:57 kept, world.tsv:79 dropped
-  - `level.a3.78.act-3-jungle-3`: rc-promote.tsv:49 kept, world.tsv:80 dropped
+  - `level.a3.78.act-3-jungle-3`: rc-promote.tsv:20 kept, world.tsv:80 dropped
   - `level.a3.79.act-3-kurast-1`: rc-rng-level-pop.tsv:58 kept, world.tsv:81 dropped
   - `level.a3.80.act-3-kurast-2`: rc-rng-level-pop.tsv:59 kept, world.tsv:82 dropped
   - `level.a3.81.act-3-kurast-3`: rc-rng-level-pop.tsv:60 kept, world.tsv:83 dropped
@@ -6469,19 +6469,19 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a3.94.act-3-temple-1`: rc-gen-wine168.tsv:25 kept, world.tsv:96 dropped
   - `level.a3.95.act-3-temple-2`: rc-rng-level-pop.tsv:70 kept, world.tsv:97 dropped
   - `level.a3.96.act-3-temple-3`: rc-rng-level-pop.tsv:71 kept, world.tsv:98 dropped
-  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:50 kept, world.tsv:99 dropped
+  - `level.a3.97.act-3-temple-4`: rc-promote.tsv:21 kept, world.tsv:99 dropped
   - `level.a3.98.act-3-temple-5`: rc-rng-level-pop.tsv:73 kept, world.tsv:100 dropped
-  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:51 kept, world.tsv:101 dropped
+  - `level.a3.99.act-3-temple-6`: rc-promote.tsv:22 kept, world.tsv:101 dropped
   - `level.a3.100.act-3-mephisto-1`: rc-gen-misc.tsv:18 kept, world.tsv:102 dropped
   - `level.a3.101.act-3-mephisto-2`: rc-rng-level-pop.tsv:75 kept, world.tsv:103 dropped
   - `level.a3.102.act-3-mephisto-3`: rc-rng-level-pop.tsv:76 kept, world.tsv:104 dropped
-  - `level.a4.103.act-4-town`: rc-promote.tsv:52 kept, world.tsv:105 dropped
+  - `level.a4.103.act-4-town`: rc-promote.tsv:23 kept, world.tsv:105 dropped
   - `level.a4.104.act-4-mesa-1`: rc-gen-wine168.tsv:28 kept, world.tsv:106 dropped
   - `level.a4.105.act-4-mesa-2`: rc-gen-misc.tsv:20 kept, world.tsv:107 dropped
   - `level.a4.106.act-4-mesa-3`: rc-gen-wine168.tsv:29 kept, world.tsv:108 dropped
   - `level.a4.107.act-4-lava-1`: rc-gen-misc.tsv:21 kept, world.tsv:109 dropped
   - `level.a4.108.act-4-diablo-1`: rc-rng-level-pop.tsv:79 kept, world.tsv:110 dropped
-  - `level.a5.109.act-5-town`: rc-promote.tsv:53 kept, world.tsv:111 dropped
+  - `level.a5.109.act-5-town`: rc-promote.tsv:24 kept, world.tsv:111 dropped
   - `level.a5.110.act-5-siege-1`: rc-gen-wine168.tsv:30 kept, world.tsv:112 dropped
   - `level.a5.111.act-5-barricade-1`: rc-rng-level-pop.tsv:81 kept, world.tsv:113 dropped
   - `level.a5.112.act-5-barricade-2`: rc-rng-level-pop.tsv:82 kept, world.tsv:114 dropped
@@ -6500,15 +6500,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.125.act-5-hell-1`: rc-rng-level-pop.tsv:89 kept, world.tsv:127 dropped
   - `level.a5.126.act-5-hell-2`: rc-rng-level-pop.tsv:90 kept, world.tsv:128 dropped
   - `level.a5.127.act-5-hell-3`: rc-rng-level-pop.tsv:91 kept, world.tsv:129 dropped
-  - `level.a5.128.act-5-baal-temple-1`: rc-promote.tsv:54 kept, world.tsv:130 dropped
+  - `level.a5.128.act-5-baal-temple-1`: rc-promote.tsv:25 kept, world.tsv:130 dropped
   - `level.a5.129.act-5-baal-temple-2`: rc-rng-level-pop.tsv:92 kept, world.tsv:131 dropped
   - `level.a5.130.act-5-baal-temple-3`: rc-rng-level-pop.tsv:93 kept, world.tsv:132 dropped
   - `level.a5.131.act-5-throne-room`: rc-gen-misc.tsv:26 kept, world.tsv:133 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, world.tsv:134 dropped
-  - `drlg.maze.lvlmaze`: rc-promote.tsv:37 kept, world.tsv:136 dropped
-  - `drlg.outdoor.tilesub`: rc-promote.tsv:38 kept, world.tsv:137 dropped
+  - `drlg.maze.lvlmaze`: rc-promote.tsv:8 kept, world.tsv:136 dropped
+  - `drlg.outdoor.tilesub`: rc-promote.tsv:9 kept, world.tsv:137 dropped
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, world.tsv:139 dropped
-  - `drlg.warps.vis-lvlwarp`: rc-promote.tsv:39 kept, world.tsv:140 dropped
+  - `drlg.warps.vis-lvlwarp`: rc-promote.tsv:10 kept, world.tsv:140 dropped
   - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, world.tsv:141 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, world.tsv:142 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, world.tsv:143 dropped
@@ -6536,18 +6536,18 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, world.tsv:165 dropped
   - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, world.tsv:166 dropped
   - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, world.tsv:167 dropped
-  - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:151 kept, world.tsv:168 dropped
+  - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:79 kept, world.tsv:168 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, world.tsv:169 dropped
-  - `waypoint.29.river-of-flame`: rc-promote.tsv:152 kept, world.tsv:170 dropped
+  - `waypoint.29.river-of-flame`: rc-promote.tsv:80 kept, world.tsv:170 dropped
   - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, world.tsv:171 dropped
-  - `waypoint.31.rigid-highlands`: rc-promote.tsv:153 kept, world.tsv:172 dropped
-  - `waypoint.32.arreat-plateau`: rc-promote.tsv:154 kept, world.tsv:173 dropped
-  - `waypoint.33.crystalized-cavern-level-1`: rc-promote.tsv:155 kept, world.tsv:174 dropped
-  - `waypoint.34.crystalized-cavern-level-2`: rc-promote.tsv:156 kept, world.tsv:175 dropped
-  - `waypoint.35.halls-of-death-s-calling`: rc-promote.tsv:157 kept, world.tsv:176 dropped
-  - `waypoint.36.tundra-wastelands`: rc-promote.tsv:158 kept, world.tsv:177 dropped
+  - `waypoint.31.rigid-highlands`: rc-promote.tsv:81 kept, world.tsv:172 dropped
+  - `waypoint.32.arreat-plateau`: rc-promote.tsv:82 kept, world.tsv:173 dropped
+  - `waypoint.33.crystalized-cavern-level-1`: rc-promote.tsv:83 kept, world.tsv:174 dropped
+  - `waypoint.34.crystalized-cavern-level-2`: rc-promote.tsv:84 kept, world.tsv:175 dropped
+  - `waypoint.35.halls-of-death-s-calling`: rc-promote.tsv:85 kept, world.tsv:176 dropped
+  - `waypoint.36.tundra-wastelands`: rc-promote.tsv:86 kept, world.tsv:177 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, world.tsv:178 dropped
-  - `waypoint.38.the-worldstone-keep-level-2`: rc-promote.tsv:159 kept, world.tsv:179 dropped
+  - `waypoint.38.the-worldstone-keep-level-2`: rc-promote.tsv:87 kept, world.tsv:179 dropped
   - `object.operate.1.casket`: rc-link-checks.tsv:536 kept, world.tsv:180 dropped
   - `object.operate.2.shrine`: rc-link-checks.tsv:541 kept, world.tsv:181 dropped
   - `object.operate.3.urn`: rc-link-2.tsv:12 kept, world.tsv:182 dropped
@@ -6631,26 +6631,26 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `object.populate.9.trappedsoul`: q-run-objects.tsv:495 kept, world.tsv:261 dropped
   - `object.init.functions`: rc-gen-obj-six.tsv:3 kept, world.tsv:271 dropped
   - `shrine.0.none`: q-run-gen-wp-shrine.tsv:20 kept, world.tsv:272 dropped
-  - `shrine.1.refill`: rc-promote.tsv:81 kept, world.tsv:273 dropped
-  - `shrine.2.health-boost`: rc-promote.tsv:89 kept, world.tsv:274 dropped
-  - `shrine.3.mana-boost`: rc-promote.tsv:91 kept, world.tsv:275 dropped
+  - `shrine.1.refill`: rc-promote.tsv:49 kept, world.tsv:273 dropped
+  - `shrine.2.health-boost`: rc-promote.tsv:57 kept, world.tsv:274 dropped
+  - `shrine.3.mana-boost`: rc-promote.tsv:59 kept, world.tsv:275 dropped
   - `shrine.4.health-exchange`: q-run-gen-wp-shrine.tsv:37 kept, world.tsv:276 dropped
   - `shrine.5.mana-exchange`: q-run-gen-wp-shrine.tsv:38 kept, world.tsv:277 dropped
-  - `shrine.6.armor-boost`: rc-promote.tsv:92 kept, world.tsv:278 dropped
-  - `shrine.7.combat-boost`: rc-promote.tsv:93 kept, world.tsv:279 dropped
-  - `shrine.8.resist-fire-boost`: rc-promote.tsv:94 kept, world.tsv:280 dropped
-  - `shrine.9.resist-cold-boost`: rc-promote.tsv:95 kept, world.tsv:281 dropped
-  - `shrine.10.resist-lightning-boost`: rc-promote.tsv:82 kept, world.tsv:282 dropped
-  - `shrine.11.resist-poison-boost`: rc-promote.tsv:83 kept, world.tsv:283 dropped
-  - `shrine.12.skill-boost`: rc-promote.tsv:84 kept, world.tsv:284 dropped
-  - `shrine.13.recharge-boost`: rc-promote.tsv:85 kept, world.tsv:285 dropped
-  - `shrine.14.stamina-boost`: rc-promote.tsv:86 kept, world.tsv:286 dropped
-  - `shrine.15.experience-boost`: rc-promote.tsv:87 kept, world.tsv:287 dropped
+  - `shrine.6.armor-boost`: rc-promote.tsv:60 kept, world.tsv:278 dropped
+  - `shrine.7.combat-boost`: rc-promote.tsv:61 kept, world.tsv:279 dropped
+  - `shrine.8.resist-fire-boost`: rc-promote.tsv:62 kept, world.tsv:280 dropped
+  - `shrine.9.resist-cold-boost`: rc-promote.tsv:63 kept, world.tsv:281 dropped
+  - `shrine.10.resist-lightning-boost`: rc-promote.tsv:50 kept, world.tsv:282 dropped
+  - `shrine.11.resist-poison-boost`: rc-promote.tsv:51 kept, world.tsv:283 dropped
+  - `shrine.12.skill-boost`: rc-promote.tsv:52 kept, world.tsv:284 dropped
+  - `shrine.13.recharge-boost`: rc-promote.tsv:53 kept, world.tsv:285 dropped
+  - `shrine.14.stamina-boost`: rc-promote.tsv:54 kept, world.tsv:286 dropped
+  - `shrine.15.experience-boost`: rc-promote.tsv:55 kept, world.tsv:287 dropped
   - `shrine.16.shrine-of-enirhs`: q-run-gen-wp-shrine.tsv:28 kept, world.tsv:288 dropped
-  - `shrine.17.portal-to-unknown`: rc-promote.tsv:88 kept, world.tsv:289 dropped
+  - `shrine.17.portal-to-unknown`: rc-promote.tsv:56 kept, world.tsv:289 dropped
   - `shrine.18.gem-upgrade`: rc-run-5.tsv:796 kept, world.tsv:290 dropped
   - `shrine.19.storm-shrine`: rc-run-5.tsv:797 kept, world.tsv:291 dropped
-  - `shrine.20.warping-shrine`: rc-promote.tsv:90 kept, world.tsv:292 dropped
+  - `shrine.20.warping-shrine`: rc-promote.tsv:58 kept, world.tsv:292 dropped
   - `shrine.21.exploding-shrine`: rc-run-5.tsv:800 kept, world.tsv:293 dropped
   - `shrine.22.poison-shrine`: rc-run-5.tsv:801 kept, world.tsv:294 dropped
   - `npc.cain1`: rc-link-2.tsv:99 kept, world.tsv:295 dropped
@@ -6659,17 +6659,17 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `npc.kashya`: rc-pc1-audit.tsv:92 kept, world.tsv:298 dropped
   - `npc.charsi`: rc-link-2.tsv:102 kept, world.tsv:299 dropped
   - `npc.warriv1`: rc-link-2.tsv:114 kept, world.tsv:300 dropped
-  - `npc.warriv2`: rc-promote.tsv:75 kept, world.tsv:301 dropped
+  - `npc.warriv2`: rc-promote.tsv:43 kept, world.tsv:301 dropped
   - `npc.atma`: rc-pc1-audit.tsv:84 kept, world.tsv:302 dropped
   - `npc.drognan`: rc-pc1-audit.tsv:87 kept, world.tsv:303 dropped
-  - `npc.fara`: rc-promote.tsv:68 kept, world.tsv:304 dropped
-  - `npc.greiz`: rc-promote.tsv:69 kept, world.tsv:305 dropped
-  - `npc.elzix`: rc-promote.tsv:67 kept, world.tsv:306 dropped
+  - `npc.fara`: rc-promote.tsv:36 kept, world.tsv:304 dropped
+  - `npc.greiz`: rc-promote.tsv:37 kept, world.tsv:305 dropped
+  - `npc.elzix`: rc-promote.tsv:35 kept, world.tsv:306 dropped
   - `npc.geglash`: rc-link-2.tsv:103 kept, world.tsv:307 dropped
   - `npc.jerhyn`: rc-pc1-audit.tsv:91 kept, world.tsv:308 dropped
-  - `npc.lysander`: rc-promote.tsv:71 kept, world.tsv:309 dropped
+  - `npc.lysander`: rc-promote.tsv:39 kept, world.tsv:309 dropped
   - `npc.meshif1`: rc-pc1-audit.tsv:96 kept, world.tsv:310 dropped
-  - `npc.cain2`: rc-promote.tsv:65 kept, world.tsv:311 dropped
+  - `npc.cain2`: rc-promote.tsv:33 kept, world.tsv:311 dropped
   - `npc.cain3`: rc-link-2.tsv:100 kept, world.tsv:312 dropped
   - `npc.cain4`: rc-link-2.tsv:101 kept, world.tsv:313 dropped
   - `npc.tyrael1`: rc-gen-wine168.tsv:52 kept, world.tsv:314 dropped
@@ -6688,16 +6688,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `npc.jamella`: rc-link-2.tsv:108 kept, world.tsv:328 dropped
   - `npc.izualghost`: rc-link-2.tsv:107 kept, world.tsv:329 dropped
   - `npc.malachai`: rc-link-2.tsv:109 kept, world.tsv:330 dropped
-  - `npc.larzuk`: rc-promote.tsv:70 kept, world.tsv:331 dropped
+  - `npc.larzuk`: rc-promote.tsv:38 kept, world.tsv:331 dropped
   - `npc.drehya`: rc-gen-wine168.tsv:40 kept, world.tsv:332 dropped
-  - `npc.malah`: rc-promote.tsv:72 kept, world.tsv:333 dropped
-  - `npc.nihlathak`: rc-promote.tsv:73 kept, world.tsv:334 dropped
-  - `npc.qual-kehk`: rc-promote.tsv:74 kept, world.tsv:335 dropped
-  - `npc.cain6`: rc-promote.tsv:66 kept, world.tsv:336 dropped
+  - `npc.malah`: rc-promote.tsv:40 kept, world.tsv:333 dropped
+  - `npc.nihlathak`: rc-promote.tsv:41 kept, world.tsv:334 dropped
+  - `npc.qual-kehk`: rc-promote.tsv:42 kept, world.tsv:335 dropped
+  - `npc.cain6`: rc-promote.tsv:34 kept, world.tsv:336 dropped
   - `npc.tyrael3`: rc-gen-wine168.tsv:54 kept, world.tsv:337 dropped
   - `quest.a1q0-warriv-gossip`: rc-link-2.tsv:115 kept, world.tsv:338 dropped
   - `quest.a2q1-radament-s-lair`: rc-pc1-audit.tsv:100 kept, world.tsv:347 dropped
-  - `quest.a2q2-the-horadric-staff`: rc-promote.tsv:76 kept, world.tsv:348 dropped
+  - `quest.a2q2-the-horadric-staff`: rc-promote.tsv:44 kept, world.tsv:348 dropped
   - `quest.a2q3-tainted-sun`: rc-pc1-audit.tsv:102 kept, world.tsv:349 dropped
   - `quest.a2q4-arcane-sanctuary`: rc-pc1-audit.tsv:103 kept, world.tsv:350 dropped
   - `quest.a2q5-the-summoner`: rc-pc1-audit.tsv:104 kept, world.tsv:351 dropped
@@ -6707,8 +6707,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, world.tsv:365 dropped
   - `quest.a4q3-hell-s-forge`: rc-pc1-audit.tsv:107 kept, world.tsv:366 dropped
   - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, world.tsv:369 dropped
-  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:77 kept, world.tsv:372 dropped
-  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:78 kept, world.tsv:374 dropped
+  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:45 kept, world.tsv:372 dropped
+  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:46 kept, world.tsv:374 dropped
   - `system.act.travel`: rc-run-1.tsv:282 kept, world.tsv:379 dropped
   - `system.death.corpse`: rc-run-2.tsv:182 kept, world.tsv:381 dropped
   - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, world.tsv:383 dropped
@@ -6716,7 +6716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:310 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1814
+- Rows whose state disagrees with their checks: 1834
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6777,7 +6777,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1754 more (rerun with the tsv to list them)
+  - … and 1774 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -6812,40 +6812,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `cov.missile.385` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-fire-blast: check has input/send and packets is not a channel |
-| `cov.missile.386` | system | NO-CHECK | M | PARTIAL | yes | 0 | n | - | - | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-fire-blast: check has input/send and packets is not a channel |
-| `cov.missile.0` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-arrow-quillrat (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.missile.12` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-arrow-kill (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.missile.22` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-monster-missiles (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.missile.58` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-champion-pack,combat-kill-fallen,combat-random-boss,combat-unique-pack,poke-firebolt (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.missile.7` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-arrow-kill,combat-arrow-quillrat,combat-monster-missiles,combat-random-boss (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `cov.missile.385` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-promote 2026-10-10 fresh run: ass-fire-blast: channel packets DIVERGED |
+| `cov.missile.386` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-promote 2026-10-10 fresh run: ass-fire-blast: channel packets DIVERGED |
 | `cov.monster.0` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-warp-cave-ama,combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.147` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a1-warp-tower-cellar-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.15` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.150` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a1-warp-tower-cellar-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.152` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a1-warp-tower-cellar-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.154` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a1-warp-tower-cellar-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.155` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-town-arrival-ama,a1-warp-catacombs-ama,a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a1-warp-tower-cellar-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.165` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-pop-cold-plains,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.20` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.246` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a4-fortress-arrival-ama,a4-start-noquest-sor,a4-warp-plains-ama,a4-warp-river-ama,milestone-act4-entry,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.253` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a3-start-noquest-sor,a3-warp-durance-ama,a3-warp-flayer-dungeon-ama,a3-warp-kurast-sewers-ama,milestone-act3-entry,milestone-act4-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.257` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a4-fortress-arrival-ama,a4-start-noquest-sor,a4-warp-plains-ama,a4-warp-river-ama,milestone-act4-entry,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.264` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a3-start-noquest-sor,a3-warp-durance-ama,a3-warp-flayer-dungeon-ama,a3-warp-kurast-sewers-ama,milestone-act3-entry,milestone-act4-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `cov.monster.28` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-warp-den-ama,combat-pop-cold-plains,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.294` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a3-start-noquest-sor,a3-warp-durance-ama,a3-warp-flayer-dungeon-ama,a3-warp-kurast-sewers-ama,milestone-act3-entry,milestone-act4-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.367` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a4-fortress-arrival-ama,a4-start-noquest-sor,a4-warp-plains-ama,a4-warp-river-ama,milestone-act4-entry,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.405` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a4-fortress-arrival-ama,a4-start-noquest-sor,a4-warp-plains-ama,a4-warp-river-ama,milestone-act4-entry,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.43` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-pop-cold-plains,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `cov.monster.5` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a1-warp-den-ama,combat-arrow-kill,combat-arrow-quillrat,combat-champion-pack,combat-elements,combat-fallen-hits-player (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.511` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a5-harrogath-arrival-ama,a5-town-arrival-bar,a5-warp-crystalized-ama,a5-warp-halls-anguish-ama,a5-warp-wsk-ama,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.513` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a5-harrogath-arrival-ama,a5-town-arrival-bar,a5-warp-crystalized-ama,a5-warp-halls-anguish-ama,a5-warp-wsk-ama,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.567` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a5-harrogath-arrival-ama,a5-town-arrival-bar,a5-warp-crystalized-ama,a5-warp-halls-anguish-ama,a5-warp-wsk-ama,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.568` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a5-harrogath-arrival-ama,a5-town-arrival-bar,a5-warp-crystalized-ama,a5-warp-halls-anguish-ama,a5-warp-wsk-ama,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.569` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | a5-harrogath-arrival-ama,a5-town-arrival-bar,a5-warp-crystalized-ama,a5-warp-halls-anguish-ama,a5-warp-wsk-ama,milestone-act5-entry (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.58` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-monster-missiles,combat-pop-cold-plains,combat-pop-stony-field,combat-unique-pack,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.monster.63` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-arrow-kill,combat-arrow-quillrat,combat-champion-pack,combat-elements,combat-fallen-hits-player,combat-kill-fallen (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `cov.skill.160` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | combat-monster-missiles (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 
 ## cov-tables
 
@@ -7275,12 +7246,41 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.done4-search-for-cain` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `quest.done5-the-forgotten-tower` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
 | `quest.done6-sisters-to-the-slaughter` | entity | NO-CHECK | S | - | no | 0 | n | - | - | never exercised by act1+act2+classes playthrough (7 classes, normal), run a1a2; needs a scenario that reaches it and a 1.14d comparison |
+| `cov.missile.0` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-arrow-quillrat |
+| `cov.missile.12` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-arrow-kill |
 | `cov.missile.120` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-rogue-cow |
+| `cov.missile.22` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-monster-missiles |
 | `cov.missile.478` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-tornado) |
+| `cov.missile.58` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `cov.missile.7` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-arrow-kill,combat-arrow-quillrat,combat-monster-missiles,combat-random-boss |
+| `cov.monster.147` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.15` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-pop-stony-field |
+| `cov.monster.150` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.152` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.154` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.155` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.165` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `cov.monster.20` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-pop-stony-field |
+| `cov.monster.246` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.253` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.257` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.264` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `cov.monster.271` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `cov.monster.294` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `cov.monster.338` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-desert-cow |
 | `cov.monster.359` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-sorc-cow |
+| `cov.monster.367` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.405` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 4 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.43` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `cov.monster.511` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 5 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.513` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 5 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `cov.monster.561` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-barb-cow |
+| `cov.monster.567` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 5 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.568` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 5 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.569` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 5 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `cov.monster.58` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `cov.monster.63` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-arrow-kill,combat-arrow-quillrat,combat-champion-pack,combat-elements,combat-fallen-hits-player,combat-kill-fallen |
+| `cov.skill.160` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-monster-missiles |
 | `cov.skill.336` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-rogue-cow |
 | `missile.ancient-throwing-axe` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-missile-525: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `missile.bighead1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-missile-2: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8313,8 +8313,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.catapultspotter` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-catapultspotter: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.clawviperex` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-clawviperex: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.corruptarcher` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | a1-warp-cave-ama,a1-warp-tower-cellar-ama,combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `monster.ai.corruptlancer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | combat-pop-cold-plains,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `monster.ai.corruptrogue` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | combat-pop-cold-plains,warp-cold-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `monster.ai.corruptlancer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `monster.ai.corruptrogue` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `monster.ai.cycleoflife` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-cycleoflife: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.darkwanderer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-darkwanderer: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.deathsentry` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-deathsentry: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8993,25 +8993,35 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ama.poison-javelin` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/functions.tsv | ama-poison-javelin packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.strafe` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ama-strafe packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.ama.valkyrie` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/functions.tsv,specs/skills/bodies-2.md | ama-valkyrie packets: frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) |
+| `skill.ass.blade-fury` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-blade-fury: channel packets DIVERGED |
 | `skill.ass.blade-sentinel` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-1 ass-blade-sentinel: state: frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] (1/1 of its a* checks diverge) |
 | `skill.ass.blade-shield` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ass-blade-shield packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.blades-of-ice` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-blades-of-ice packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.charged-bolt-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-charged-bolt-sentry: channel packets DIVERGED |
 | `skill.ass.claw-mastery` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | ass-passives packets: frame 2 stream s2c #72 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.claws-of-thunder` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-claws-of-thunder packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.cloak-of-shadows` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | ass-cloak-of-shadows packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.cobra-strike` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-cobra-strike packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.death-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-death-sentry: channel packets DIVERGED |
 | `skill.ass.dragon-claw` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ass-dragon-claw packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.dragon-flight` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-dragon-flight: channel packets DIVERGED |
 | `skill.ass.dragon-tail` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ass-dragon-tail packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.dragon-talon` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | ass-dragon-talon packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.fade` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | ass-fade packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.fire-trauma` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: ass-fire-blast: channel packets DIVERGED |
 | `skill.ass.fists-of-fire` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-fists-of-fire packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.inferno-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-inferno-sentry: channel packets DIVERGED |
 | `skill.ass.lightning-sentry` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | ass-lightning-sentry packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.mind-blast` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | ass-mind-blast packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.psychic-hammer` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-psychic-hammer: channel packets DIVERGED |
 | `skill.ass.quickness` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | ass-burst-of-speed packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.royal-strike` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-royal-strike packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.shadow-master` | entity | DIVERGED | M | DIVERGED@48 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
+| `skill.ass.shadow-warrior` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-shadow-warrior: channel packets DIVERGED |
+| `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-shock-field: channel packets DIVERGED |
 | `skill.ass.tiger-strike` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | ass-tiger-strike packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.ass.venom` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | ass-venom packets: frame 2 stream s2c #73 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
+| `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-wake-of-fire-sentry: channel packets DIVERGED |
 | `skill.ass.weapon-block` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | ass-passives packets: frame 2 stream s2c #72 bytes[9]: 1.14d 135 vs d2rs 1 (id 0xa8) |
 | `skill.bar.axe-mastery` | entity | DIVERGED | S | DIVERGED@2 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | bar-passives packets: frame 2 stream s2c #71 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) |
 | `skill.bar.bash` | entity | DIVERGED | S | DIVERGED@2 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | bar-bash packets: frame 2 stream s2c #72 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) |
@@ -9106,26 +9116,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `hireling.skills.barbarian` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
 | `hireling.skills.eastern-sorceror` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
 | `net.s2c.0x4c-0x4d.own-client` | message | NO-CHECK | S | PARTIAL | yes | 1 | n | claude/rc-cast-mode | specs/sim/pathing.md,specs/skills/sequences.md | skill message to the caster own client only with E flags bit 0x4 (pathing.md 10 r2); d2rs sent it every cast (2nd mode request, level 20). Unit test a_cast_skips_the_casters_own_client_unless_e_flag_4; gen-skill-* state channel unchanged (150 PARTIAL / 60 DIVERGED before and after: it compares server state, not messages). Size S: a 1.14d message-channel recording of one cast |
-| `skill.ass.blade-fury` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-blade-fury: check has input/send and packets is not a channel |
-| `skill.ass.charged-bolt-sentry` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-charged-bolt-sentry: check has input/send and packets is not a channel |
-| `skill.ass.death-sentry` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-death-sentry: check has input/send and packets is not a channel |
-| `skill.ass.dragon-flight` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-dragon-flight: check has input/send and packets is not a channel |
-| `skill.ass.fire-trauma` | entity | NO-CHECK | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-fire-blast: check has input/send and packets is not a channel |
-| `skill.ass.inferno-sentry` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-inferno-sentry: check has input/send and packets is not a channel |
-| `skill.ass.psychic-hammer` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-psychic-hammer: check has input/send and packets is not a channel |
-| `skill.ass.shadow-warrior` | entity | NO-CHECK | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-shadow-warrior: check has input/send and packets is not a channel |
-| `skill.ass.shock-field` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-shock-field: check has input/send and packets is not a channel |
-| `skill.ass.wake-of-fire-sentry` | entity | NO-CHECK | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: ass-wake-of-fire-sentry: check has input/send and packets is not a channel |
 | `skill.item.charges` | system | NO-CHECK | M | - | ? | 0 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/levels.md,specs/skills/use.md | charged-skill use path; no check exercises charges (a Windows recording of a staff/wand would settle it) |
 | `skill.item.oskill` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/levels.md | stat_cb (levels.md §7) implemented but not wired into stats::lists::server_callback (cov-skills-3.md); no check compares it |
 | `skill.item.scroll-book` | entity | NO-CHECK | S | - | ? | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-4.md | grouped: 4 skills share the item-skill path |
-| `skill.nec.golem-mastery` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-nec-79: check has input/send and packets is not a channel |
-| `skill.nec.skeleton-mastery` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-nec-69: check has input/send and packets is not a channel |
-| `skill.nec.summon-resist` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-nec-89: check has input/send and packets is not a channel |
-| `skill.sor.cold-mastery` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-sor-65: check has input/send and packets is not a channel |
-| `skill.sor.fire-mastery` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-sor-61: check has input/send and packets is not a channel |
-| `skill.sor.lightning-mastery` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-sor-63: check has input/send and packets is not a channel |
-| `skill.sor.warmth` | entity | NO-CHECK | S | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-skill-sor-37: check has input/send and packets is not a channel |
 | `system.missiles.core` | system | NO-CHECK | M | - | ? | 14 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/missiles/missiles.md,specs/missiles/damage.md | msg 0x73 not implemented (layout open); provisional = provisional-index.tsv rows whose location names missile; M: wiring + a recording-backed check |
 | `system.skills.descriptions` | system | NO-CHECK | M | - | ? | 21 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/descriptions.md | 32 of 78 rules covered; rest need unit-state access; provisional = provisional-index.tsv rows whose location names skill; M: wiring + a recording-backed check |
 | `system.skills.levels` | system | NO-CHECK | M | - | ? | 21 | y | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/levels.md | stat_cb not wired into the server stat callback; provisional = provisional-index.tsv rows whose location names skill; M: wiring + a recording-backed check |
@@ -9401,6 +9394,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.nec.decrepify` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-decrepify,gen-skill-nec-87 |
 | `skill.nec.dim-vision` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-dim-vision,gen-skill-nec-71 |
 | `skill.nec.firegolem` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-firegolem,gen-skill-nec-94 |
+| `skill.nec.golem-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-nec-79 |
 | `skill.nec.iron-maiden` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-iron-maiden,gen-skill-nec-76 |
 | `skill.nec.irongolem` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in nec-irongolem,gen-skill-nec-90 |
 | `skill.nec.life-tap` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-life-tap,gen-skill-nec-82 |
@@ -9411,6 +9405,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.nec.raise-skeletal-mage` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-raise-skeletal-mage,gen-skill-nec-80 |
 | `skill.nec.raise-skeleton` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-raise-skeleton,gen-skill-nec-70 |
 | `skill.nec.revive` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in nec-revive,gen-skill-nec-95 |
+| `skill.nec.skeleton-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-nec-69 |
+| `skill.nec.summon-resist` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-nec-89 |
 | `skill.nec.teeth` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-teeth,gen-skill-nec-67 |
 | `skill.nec.terror` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-terror,gen-skill-nec-77 |
 | `skill.nec.weaken` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in nec-weaken,gen-skill-nec-72 |
@@ -9427,10 +9423,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.sor.chain-lightning` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-chain-lightning,gen-skill-sor-53 |
 | `skill.sor.charged-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-charged-bolt,gen-skill-sor-38 |
 | `skill.sor.chilling-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-chilling-armor,gen-skill-sor-60 |
+| `skill.sor.cold-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-sor-65 |
 | `skill.sor.enchant` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-enchant,gen-skill-sor-52 |
 | `skill.sor.energy-shield` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-energy-shield,gen-skill-sor-58 |
 | `skill.sor.fire-ball` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-fire-ball,gen-skill-sor-47 |
 | `skill.sor.fire-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-fire-bolt,gen-skill-sor-36 |
+| `skill.sor.fire-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-sor-61 |
 | `skill.sor.frost-nova` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-frost-nova,gen-skill-sor-44 |
 | `skill.sor.frozen-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-frozen-armor,gen-skill-sor-40 |
 | `skill.sor.glacial-spike` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-glacial-spike,gen-skill-sor-55 |
@@ -9438,12 +9436,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.sor.ice-bolt` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-ice-bolt,gen-skill-sor-39 |
 | `skill.sor.inferno` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-inferno,gen-skill-sor-41 |
 | `skill.sor.lightning` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in sor-lightning,gen-skill-sor-49 |
+| `skill.sor.lightning-mastery` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-sor-63 |
 | `skill.sor.nova` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-nova,gen-skill-sor-48 |
 | `skill.sor.shiver-armor` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in sor-shiver-armor,gen-skill-sor-50 |
 | `skill.sor.static-field` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-static-field,gen-skill-sor-42 |
 | `skill.sor.telekinesis` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/bodies.md,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-telekinesis,gen-skill-sor-43 |
 | `skill.sor.teleport` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-teleport,gen-skill-sor-54 |
 | `skill.sor.thunder-storm` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in sor-thunder-storm,gen-skill-sor-57 |
+| `skill.sor.warmth` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-npc-interact | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in gen-skill-sor-37 |
 | `state.alignment` | content | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | gen-state-105 (rc-join-burst, 2026-10-10, 1.14d re-recorded): every channel equal on every frame, packets MATCH from frame 1 (join burst equal), every state field of both sides compared, no ignore line; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS) (PROVISIONAL REC-2055) |
 | `state.amplifydamage` | content | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | gen-state-9 (rc-join-burst, 2026-10-10, 1.14d re-recorded): every channel equal on every frame, packets MATCH from frame 1 (join burst equal), every state field of both sides compared, no ignore line; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS) (PROVISIONAL REC-2055) |
 | `state.antidote` | content | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/sim/stats.md,specs/skills/bodies-2.md | gen-state-178 (rc-join-burst, 2026-10-10, 1.14d re-recorded): every channel equal on every frame, packets MATCH from frame 1 (join burst equal), every state field of both sides compared, no ignore line; state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS) (PROVISIONAL REC-2055) |
@@ -9656,7 +9656,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x20` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): items-drops-cha-01 items DIVERGED (checks-status.md) |
 | `net.s2c.0x22` | message | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: all checks MATCH or PARTIAL under DECIDED REC-2055/2056 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `net.s2c.0x27` | message | DIVERGED | M | PARTIAL | ? | 1 | n | claude/q-fix-d7d8-items-net | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `net.s2c.0x3f` | message | DIVERGED | S | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-promote 2026-10-10 fresh run: combat-potion-midfight: channel packets DIVERGED; cube-000-staff-of-kings-viper-amulet-ho: channel packets DIVERGED; cube-001-khalim-flail-khalim-heart-khal: channel packets DIVERGED; cube-002-1-wirt-s-leg-1-town-portal-boo: channel packets DIVERGED; cube-003-3-health-potions-3-mana-potion: channel packets DIVERGED; cube-005-3-small-rejuvs-one-large: channel packets DIVERGED |
+| `net.s2c.0x3f` | message | DIVERGED | S | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged cube-000-staff-of-kings-viper-amulet-ho@4 id (1.14d 3f vs d2rs 47); 2 equal pair(s) |
 | `net.s2c.0x42` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-items-kashya@34 missing in d2rs; 0 equal pair(s) |
 | `net.s2c.0x4d` | message | DIVERGED | S | DIVERGED@48 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/2 of its a* checks diverge) |
 | `net.s2c.0x5d` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
@@ -10398,28 +10398,28 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0xa8` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0xaa` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0xac` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-replay-hooks | specs/sim/server-messages.tsv | rc-goto-settle: poke.py _goto settles once; 1.14d re-recorded, the landing 0x07/0x15 now equal in these 5 checks (packets channel 100%) |
-| `system.client.bridge.2-receive-path` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | gen-sysc-client-bridge-2-receive-path (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.bridge.4-send-path-intents` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | gen-sysc-client-bridge-4-send-path-intents (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.bridge.5-client-world-model` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | gen-sysc-client-bridge-5-client-world-model (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.bridge.6-dispatch-table` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | gen-sysc-client-bridge-6-dispatch-table (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.1-the-client-skill-list-unit-0xa8` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-1-the-client-skill-list-unit-0xa8 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.10-0xa5-skill-end-on-a-unit-0x0045d6a0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-10-0xa5-skill-end-on-a-unit-0x0045d6a0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.2-shared-skill-list-operations` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-2-shared-skill-list-operations (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.3-0x94-baseskilllevels-0x0045dd60` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-3-0x94-baseskilllevels-0x0045dd60 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.4-0x21-updateitemoskill-0x0045dcd0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-4-0x21-updateitemoskill-0x0045dcd0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.5-0x22-updateitemskill-0x0045ddb0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-5-0x22-updateitemskill-0x0045ddb0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.6-0x23-setskill-0x0045de10` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-6-0x23-setskill-0x0045de10 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.7-0x99-0x9a-skill-events-0x0045de80-0x0045dec0-0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-7-0x99-0x9a-skill-events-0x0045de80-0x0045 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-8-0xa3-skill-do-0x0045d5e0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | gen-sysc-client-msg-skills-9-0x93-skill-bonus-by-element-and-page-0x0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-12-0x29-game-quest-flags-0x0045d3a0-0x004b2620 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-13-0x52-quest-log-status-0x0045cc00-0x004a40d0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-21-0x76-overhead-clear-0x0045e050-0x0049f8c0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-3-0x77-ui-action-0x0045e800-0x004b8cf0 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | gen-sysc-client-msg-ui-8-0x58-ui-open-0x0045e490-0x004c0550 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.client.bridge.2-receive-path` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.bridge.4-send-path-intents` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.bridge.5-client-world-model` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.bridge.6-dispatch-table` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/bridge.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.1-the-client-skill-list-unit-0xa8` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.10-0xa5-skill-end-on-a-unit-0x0045d6a0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.2-shared-skill-list-operations` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.3-0x94-baseskilllevels-0x0045dd60` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.4-0x21-updateitemoskill-0x0045dcd0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.5-0x22-updateitemskill-0x0045ddb0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.6-0x23-setskill-0x0045de10` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.7-0x99-0x9a-skill-events-0x0045de80-0x0045dec0-0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.combat.damage.0-shared-integer-helpers` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
 | `system.combat.damage.1-damage-record` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
 | `system.combat.damage.10-monster-melee-on-a-player-end-to-end` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
@@ -10446,9 +10446,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.combat.vitals.3-level-up-0x00570880-d2moo-playerstats-levelup` | system | EQUAL | - | PARTIAL | yes | 1 | n | claude/q-fix-npc-interact | specs/combat/vitals.md | sys-statpoints 70/70, vitals-create-bar/sor 220/220, levelup-state 110/110, corpse-state 220/220 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
 | `system.combat.vitals.4-experience` | system | EQUAL | - | PARTIAL | yes | 1 | n | claude/q-fix-npc-interact | specs/combat/vitals.md | sys-statpoints 70/70, vitals-create-bar/sor 220/220, levelup-state 110/110, corpse-state 220/220 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
 | `system.combat.vitals.5-client-vitals-sync-0x00548760` | system | EQUAL | - | PARTIAL | yes | 1 | n | claude/q-fix-npc-interact | specs/combat/vitals.md | sys-statpoints 70/70, vitals-create-bar/sor 220/220, levelup-state 110/110, corpse-state 220/220 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
-| `system.flows.act-change.2-same-act-travel` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/act-change.md | gen-sysc-flows-act-change-2-same-act-travel (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.flows.client-frame.1-loop-pass-order-1-14d` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | gen-sysc-flows-client-frame-1-loop-pass-order-1-14d (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.flows.client-frame.2-prediction-correction-interpolation` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | gen-sysc-flows-client-frame-2-prediction-correction-interpolation (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.flows.act-change.2-same-act-travel` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/act-change.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.flows.client-frame.1-loop-pass-order-1-14d` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.flows.client-frame.2-prediction-correction-interpolation` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/flows/client-frame.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.flows.save-exit.5-load` | system | EQUAL | - | MATCH | yes | 0 | n | rc-gen-client | specs/flows/save-exit.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.flows.server-tick.1-server-frame-host-side` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
 | `system.flows.server-tick.2-tick-steps-in-order` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/flows/server-tick.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (sys-tick-idle-a2,sys-tick-idle-a5) |
@@ -10463,21 +10463,21 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.d2s-load.8-player-record-values-sent-at-the-join-sim-inte` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/d2s-load.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.formats.d2s.1-file-layout-and-framing` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/d2s.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.formats.d2s.9-load-sequence-0x0056b180` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/formats/d2s.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
-| `system.seams.bridge-app.1-frame-order-one-bevy-frame` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/bridge-app.md | gen-sysc-seams-bridge-app-1-frame-order-one-bevy-frame (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.seams.bridge-app.2-contract` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/bridge-app.md | gen-sysc-seams-bridge-app-2-contract (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.seams.drlg-coords.1-coordinate-spaces` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/drlg-coords.md | gen-sysc-seams-drlg-coords-1-coordinate-spaces (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
-| `system.seams.item-grids` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/item-grids.md | gen-sysc-seams-item-grids (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.seams.bridge-app.1-frame-order-one-bevy-frame` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/bridge-app.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.seams.bridge-app.2-contract` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/bridge-app.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.seams.drlg-coords.1-coordinate-spaces` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/drlg-coords.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.seams.item-grids` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/item-grids.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.seams.messages.1-contract-table-per-message-family` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-join-items | specs/seams/messages.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.seams.movement-prediction.1-units-and-spaces-used-below` | system | EQUAL | - | PARTIAL | ? | 0 | n | claude/q-scenes-compare | specs/seams/movement-prediction.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.seams.movement-prediction.2-contract` | system | EQUAL | - | PARTIAL | ? | 0 | n | claude/q-scenes-compare | specs/seams/movement-prediction.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
-| `system.seams.sim-server.1-what-crosses` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/sim-server.md | gen-sysc-seams-sim-server-1-what-crosses (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.seams.sim-server.1-what-crosses` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/seams/sim-server.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.sim.intents-events.1-loop-order-single-player` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.2-client-server` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.3-server-client` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.4-d2rs-mapping-and-scope` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.5-machine-readable-tables` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.6-exact-match-comparison` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
-| `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean` | system | EQUAL | - | PARTIAL | yes | 3 | y | rc-gen-client | specs/sim/intents-events.md | gen-sysc-sim-intents-events-7-unit-update-messages-0x0053a500-and-roo (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean` | system | EQUAL | - | PARTIAL | yes | 3 | y | rc-gen-client | specs/sim/intents-events.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.sim.intents-events.8-single-player-session-sequence-c-s-0x67-0x6b-f` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.intents-events.9-c-s-handlers-owners-and-the-small-handlers-own` | system | EQUAL | - | PARTIAL | yes | 3 | y | claude/q-fix-join-items | specs/sim/intents-events.md | rc-intents-moves: traces/checks/sys-intents-moves.check packets MATCH 140/140 (was DIVERGED@68): monster NPC greeting 0x2C queued (LocalSeams::play_sound), vitals sync moved into the flush, stat refresh 0x0064C040 queues the unit; state channel PARTIAL as before |
 | `system.sim.monster.warp-placement-y` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-mon-y-warp | specs/sim/pathing.md | r19 re-measure: state 160/160 equal on both, rng 133/133 MATCH; y divergence fixed upstream (staging-7 + integ-r19), no code change |
@@ -10502,12 +10502,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.sim.pathing.2-path-types` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.3-path-compute-0x00649970-path-unit-town-access` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.4-target-preparation-flag-0x1000-0x00648120` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
-| `system.sim.pathing.4-target-preparation-torch` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/sim/pathing.md | gen-sysc-sim-pathing-4-target-preparation-torch (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.sim.pathing.4-target-preparation-torch` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/sim/pathing.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.sim.pathing.5-toward-type-2-0x00679c80` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.6-straight-type-7-0x00679ed0` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.7-a-type-1-0x0067b850` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.8-velocity-direction-vector-facing` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
-| `system.sim.pathing.9-8-room-change-messages` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/sim/pathing.md | gen-sysc-sim-pathing-9-8-room-change-messages (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `system.sim.pathing.9-8-room-change-messages` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/sim/pathing.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.sim.pathing.9-per-tick-movement` | system | EQUAL | - | PARTIAL | ? | 2 | y | claude/q-scenes-compare | specs/sim/pathing.md | walk-town-ama (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the check's click does not trigger: packets (C->S included) MATCH (PROVISIONAL REC-2055) |
 | `system.sim.pathing.click-walk-player-y` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-walk-y1 | specs/sim/pathing.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `system.sim.stat-lists.1-records` | system | EQUAL | - | PARTIAL | yes | 1 | n | claude/q-fix-npc-interact | specs/sim/stat-lists.md | sys-stats-base 80/80, sys-stats-clamp 80/80, sys-states 100/100 (rc-gen-misc, 2026-10-10, 1.14d re-recorded, 'ignore q' removed): state all/all frames equal with every field of both sides compared, rng MATCH; state reads PARTIAL only for the d2rs client gap (REC-2055/2056 DECIDED) |
@@ -10586,6 +10586,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a4q2-terror-s-end` | entity | DIVERGED | M | DIVERGED@28 | yes | 36 | n | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-izual=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quest.a4q3-hell-s-forge` | entity | DIVERGED | M | PARTIAL | no | 37 | n | claude/q-fix-d3-player-mode | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-hephasto=PARTIAL,milestone-hellforge=DIVERGED \| player mode fixed (REC-1385, was DIVERGED@61 m 5 vs 1); first difference now monster 1:20 class 311 field fr (1.14d 150 vs d2rs 16384, frame 83) in the River of Flame: monster animation owner; the quest state machine itself is still unchecked |
 | `quest.a5q1-siege-on-harrogath` | entity | DIVERGED | M | DIVERGED@30 | no | 36 | n | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: milestone-nihlathak=DIVERGED \| state machine (init/status/callbacks); quest-state milestone check partial; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
+| `shrine.17.portal-to-unknown` | entity | DIVERGED | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: gen-shrine-17: channel packets DIVERGED |
+| `shrine.7.combat-boost` | entity | DIVERGED | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: gen-shrine-7: channel packets DIVERGED |
 | `system.act.travel` | system | DIVERGED | M | DIVERGED@10 | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/1 of its a* checks diverge) |
 | `waypoint.18.kurast-docktown` | entity | DIVERGED | M | DIVERGED@434 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-18 state: frame 434: monster 1:10 class 254, field tx: 1.14d 0 vs d2rs 5085 (was DIVERGED@37, class 359 seed; SpecialState06 `0x005E7C10` implemented, ai-bodies.md section 9.33) |
 | `waypoint.19.spider-forest` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-19 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
@@ -10597,6 +10599,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `waypoint.25.travincal` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-25 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
 | `waypoint.26.durance-of-hate-level-2` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-26 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
 | `waypoint.28.city-of-the-damned` | entity | DIVERGED | M | DIVERGED | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/monsters/population.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: gen-wp-28=DIVERGED \| frame 401 monster 1:29 class 403 vs 308: 1.14d takes 2 more game-seed density steps (0x54ed96) in the last populated room (same cause as gen-lvl-106 frame 21) |
+| `waypoint.31.rigid-highlands` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-31-lv111: channel packets DIVERGED |
+| `waypoint.32.arreat-plateau` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-32-lv112: channel packets DIVERGED |
+| `waypoint.33.crystalized-cavern-level-1` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-33-lv113: channel packets DIVERGED |
+| `waypoint.34.crystalized-cavern-level-2` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-34-lv115: channel packets DIVERGED |
+| `waypoint.35.halls-of-death-s-calling` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-35-lv123: channel packets DIVERGED |
+| `waypoint.36.tundra-wastelands` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-36-lv117: channel packets DIVERGED |
+| `waypoint.38.the-worldstone-keep-level-2` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-38-lv129: channel packets DIVERGED |
 | `drlg.preset.lvlprest` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/preset.md,specs/drlg/preset-tables.tsv | all preset levels share one code path; DS1 pick and preset-unit lists not compared per level; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `drlg.wall-remap` | system | NO-CHECK | M | - | ? | 13 | y | claude/q-prov-recording | specs/drlg/wall-remap.md | wall remap table; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `hirelings.quest-merc-init.team-ai-alignment` | system | NO-CHECK | S | - | yes | 0 | n | claude/rc-blade-hostcalls | specs/world/hirelings.md | merc init providers read from the 1.14d asm and wired in d2-sim (join team, alignment state list, umod 19 + monster data components 0,1,5,6,7 := 0); only the self-play app_play_act3 blade test runs them, no 1.14d recording of a hire/quest merc |
@@ -10647,33 +10656,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.respec-akara-a1q7-handlers` | entity | NO-CHECK | M | - | ? | 36 | y | claude/q-fix-pc1-day3-a-r2 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act1.md,specs/world/quest-messages.tsv | state machine (init/status/callbacks); no check compares quest flags/states; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `quests.sound-event.queue` | system | NO-CHECK | S | - | yes | 0 | n | claude/rc-blade-hostcalls | specs/world/quests.md,specs/audio/triggers-2.md | quest/NPC sounds now queue the game's sound slot (flushed as S->C 0x2C) instead of a rest log; no 1.14d trace of the 0x2C after a quest pick-up |
 | `shrine.0.none` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
-| `shrine.1.refill` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-1: check has input/send and packets is not a channel |
-| `shrine.10.resist-lightning-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-10: check has input/send and packets is not a channel |
-| `shrine.11.resist-poison-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-11: check has input/send and packets is not a channel |
-| `shrine.12.skill-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-12: check has input/send and packets is not a channel |
-| `shrine.13.recharge-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-13: check has input/send and packets is not a channel |
-| `shrine.14.stamina-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-14: check has input/send and packets is not a channel |
-| `shrine.15.experience-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-15: check has input/send and packets is not a channel |
 | `shrine.16.shrine-of-enirhs` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
-| `shrine.17.portal-to-unknown` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-17: check has input/send and packets is not a channel |
-| `shrine.2.health-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-2: check has input/send and packets is not a channel |
-| `shrine.20.warping-shrine` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-20: check has input/send and packets is not a channel |
-| `shrine.3.mana-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-3: check has input/send and packets is not a channel |
 | `shrine.4.health-exchange` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
 | `shrine.5.mana-exchange` | entity | NO-CHECK | M | - | ? | 15 | y | claude/q-fix-replay-hooks | specs/world/objects.md | no check possible: shrine row never picked by the object init (world/objects.md 5.1 rule 4); needs preset objects 574-579, which poke cannot create (tool feature: poke preset objects) |
-| `shrine.6.armor-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-6: check has input/send and packets is not a channel |
-| `shrine.7.combat-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-7: check has input/send and packets is not a channel |
-| `shrine.8.resist-fire-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-8: check has input/send and packets is not a channel |
-| `shrine.9.resist-cold-boost` | entity | NO-CHECK | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: gen-shrine-9: check has input/send and packets is not a channel |
 | `system.difficulty.progression` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/save-exit.md,specs/world/quests-act5.md | difficulty unlock after Baal and monster scaling not compared; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
 | `system.townportal` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md,specs/world/objects.md | portal object operate (object.operate); no check; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |
-| `waypoint.31.rigid-highlands` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-31-lv111: check has input/send and packets is not a channel |
-| `waypoint.32.arreat-plateau` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-32-lv112: check has input/send and packets is not a channel |
-| `waypoint.33.crystalized-cavern-level-1` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-33-lv113: check has input/send and packets is not a channel |
-| `waypoint.34.crystalized-cavern-level-2` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-34-lv115: check has input/send and packets is not a channel |
-| `waypoint.35.halls-of-death-s-calling` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-35-lv123: check has input/send and packets is not a channel |
-| `waypoint.36.tundra-wastelands` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-36-lv117: check has input/send and packets is not a channel |
-| `waypoint.38.the-worldstone-keep-level-2` | entity | NO-CHECK | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: PARTIAL, not promoted by the REC-2055/2056 rule: a5-wp-38-lv129: check has input/send and packets is not a channel |
 | `drlg.maze.lvlmaze` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/maze.md,specs/drlg/maze-specials.tsv | a1-warp-tower-cellar-ama,a2-warp-maggot-lair-ama,a2-warp-sewers-ama,a2-warp-tal-rasha-tomb-ama,a3-warp-kurast-sewers-ama,a3-warp-durance-ama,a5-warp-halls-anguish-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `drlg.outdoor.tilesub` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/outdoor.md,specs/drlg/outdoor-tilesub.md,specs/drlg/outdoor-act3-act5.md | warp-cold-plains-ama,combat-pop-blood-moor,a4-warp-plains-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `drlg.warps.vis-lvlwarp` | system | EQUAL | - | PARTIAL | ? | 13 | n | claude/q-prov-recording | specs/drlg/levels.md | a1-warp-cave-ama,a1-warp-den-ama,a1-warp-jail-ama,a2-warp-sewers-ama,a3-warp-flayer-dungeon-ama,a4-warp-river-ama,a5-warp-crystalized-ama (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
@@ -11354,10 +11341,23 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `quest.a4q0-tyrael-gossip` | entity | EQUAL | - | PARTIAL | yes | 36 | n | claude/q-prov-data | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act4.md,specs/world/quest-messages.tsv | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `quest.a5q4-betrayal-of-harrogath` | entity | EQUAL | - | PARTIAL | yes | 37 | n | claude/q-fix-d3-player-mode | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | milestone-anya (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `quest.a5q6-eve-of-destruction` | entity | EQUAL | - | PARTIAL | yes | 36 | n | claude/q-play-act5 | specs/world/quests.md,specs/world/quests-status.md,specs/world/quests-act5.md,specs/world/quest-messages.tsv | milestone-baal-chamber (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.1.refill` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-1 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.10.resist-lightning-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-10 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.11.resist-poison-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-11 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.12.skill-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-12 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.13.recharge-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-13 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.14.stamina-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-14 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.15.experience-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-15 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `shrine.18.gem-upgrade` | entity | EQUAL | - | PARTIAL | ? | 15 | y | claude/rc-shrine-m | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-18..) |
 | `shrine.19.storm-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-19..) |
+| `shrine.2.health-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-2 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.20.warping-shrine` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-20 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `shrine.21.exploding-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-21..) |
 | `shrine.22.poison-shrine` | entity | EQUAL | - | PARTIAL | yes | 0 | n | rc-shrine-rest | specs/world/objects.md | rc-run-5: 1 checks EQUAL (gen-shrine-22..) |
+| `shrine.3.mana-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-3 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.6.armor-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-6 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.8.resist-fire-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-8 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
+| `shrine.9.resist-cold-boost` | entity | EQUAL | - | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | gen-shrine-9 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `system.death.corpse` | system | EQUAL | - | PARTIAL | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/save-exit.md,specs/sim/stats.md | rc-run-2: death-town-ama |
 | `system.hireling.hire-follow-level` | system | EQUAL | - | PARTIAL | yes | 4 | n | claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `waypoint.0.rogue-encampment` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-0..) |
