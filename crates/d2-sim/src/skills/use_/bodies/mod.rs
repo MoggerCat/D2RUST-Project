@@ -113,6 +113,9 @@ pub fn start(index: u16) -> Option<i32> {
 pub mod callback {
     /// Default `0x0056E900`.
     pub const DEFAULT: u32 = 0x0056_E900;
+    /// Cold `0x0057AD80` (`combat/damage.md` §5.6): state off; a living
+    /// unit also has shatter (107) off; then the anim refresh.
+    pub const COLD: u32 = 0x0057_AD80;
     /// Self aura `0x005CEC50`.
     pub const SELF_AURA: u32 = 0x005C_EC50;
     /// Buff `0x005C9420`.

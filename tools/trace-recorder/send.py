@@ -29,9 +29,9 @@ OR-ed into the u32 at the offset (bitN at bit N), uncovered bytes 0.
 Values: numbers (decimal or 0x hex) or references (§3 rule 3) resolved on
 the live unit lists at the injection (poke.py's readers: the hash lists of
 original-hooks.md §4 rule 1, the path position of original-hooks-spawn.md
-§2 rule 3): @player, @x, @y, @x+N, @y-N, @<type>[:<class>][#n]. `@wp`
-needs the objects table's operate function, which no spec gives a 1.14d
-address for: such a send is written as `gap`.
+§2 rule 3): @player, @x, @y, @x+N, @y-N, @<type>[:<class>][#n], and
+`@wp[#n]` = the GUID of the n-th object of the 16 waypoint classes (the
+same list poke.py's `@wp` uses).
 
 Each result is a record {"k": "send", "f", "frame", "i", "r", "bytes",
 "eax", "note", "src"} in the recorder's output (r: ok = EAX 1, dropped =
@@ -322,7 +322,12 @@ def resolver(mem, game):
     lists and the player's path position, read through poke.py's readers."""
     def resolve(r):
         if r.kind == "wp":
-            raise Gap("@wp needs the objects table's operate function (no 1.14d address in a spec)")
+            # the n-th object of the 16 waypoint classes, as poke.py resolves `@wp` (poke.md §1):
+            # the 0x49 field is that object's GUID, so no operate address is needed
+            us = [g for g, c, _ in poke.units_of(mem, game, poke.OBJECT_TYPE) if c in poke.WP_CLASSES]
+            if r.n >= len(us):
+                raise Unresolved(r.text(), f"{r.text()}: no waypoint object")
+            return us[r.n]
         if r.kind in ("player", "x", "y"):
             pl = poke.player_of(mem, game)
             if not pl:
@@ -648,11 +653,17 @@ def selftest():
         mem.u32(u + poke.U_TYPE, 1)
         mem.u32(u + poke.U_CLASS, cls)
         mem.u32(u + poke.U_GUID, g)
+    wp = 0x5200  # one waypoint object (class 119, GUID 9): `@wp` resolves to its GUID
+    mem.u32(game + poke.HASH_BASE + poke.HASH_OFFSETS[poke.OBJECT_TYPE] + 4 * 9, wp)
+    mem.u32(wp + poke.U_TYPE, poke.OBJECT_TYPE)
+    mem.u32(wp + poke.U_CLASS, 119)
+    mem.u32(wp + poke.U_GUID, 9)
     mem.emitted = []
     mem.emit = mem.emitted.append
     layer = SendLayer([parse_send_option(x, i, tbl) for i, x in enumerate((
         "5 Walk x=@x+2 y=@y", "5 InteractWithEntity type=1 id=@1:148",
         "5 InteractWithEntity type=1 id=@1:148#1", "5 InteractWithEntity type=2 id=@wp",
+        "5 InteractWithEntity type=2 id=@wp#1",
         "6 hex 2f 00 00 00 00 07 00 00 00"))])
     calls = []
 
@@ -672,11 +683,13 @@ def selftest():
     mem.write(game + poke.G_FRAME, struct.pack("<i", 4))
     layer.on_tick_return(mem, game)
     rs = layer.inject(mem, 0, Saved, layer.due())
-    assert [r["r"] for r in rs] == ["ok", "ok", "unresolved", "gap"], rs
+    assert [r["r"] for r in rs] == ["ok", "ok", "unresolved", "ok", "unresolved"], rs
+    assert rs[3]["bytes"] == "130200000009000000", rs[3]
+    assert rs[4]["note"] == "@wp#1: no waypoint object", rs[4]
     assert rs[0]["bytes"] == "0112138610", rs[0]           # 4882 = 0x1312, 4230 = 0x1086
     assert rs[1]["bytes"] == "130100000007000000" and rs[1]["eax"] == 1, rs[1]
     assert rs[2]["note"] == "@1:148#1: no such unit", rs[2]
-    assert [c[0] for c in calls] == [TRANSPORT_SEND] * 2
+    assert [c[0] for c in calls] == [TRANSPORT_SEND] * 3
     assert struct.unpack("<4I", calls[1][1]) == (0x00A00000, 9, 1, 0x00A00010)
     assert calls[1][2] == bytes.fromhex("130100000007000000")
     assert (rs[0]["f"], rs[0]["frame"], rs[0]["i"], rs[3]["i"]) == (5, 4, 0, 3)
@@ -684,7 +697,7 @@ def selftest():
     layer.on_tick_return(mem, game)
     rs = layer.inject(mem, 0, Saved, layer.due())
     assert rs[0]["r"] == "dropped" and rs[0]["eax"] == 0, rs  # EAX 0: not queued
-    assert not layer.pending() and len(mem.emitted) == 5
+    assert not layer.pending() and len(mem.emitted) == 6
     # the gate (§1 rule 5): client not in state 4 -> unresolved, nothing called
     mem.u32(client + poke.C_STATE, 2)
     layer2 = SendLayer([parse_send_option("6 Walk x=1 y=2", 0, tbl)])

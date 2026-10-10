@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–511 |
-|   8. Chests and breakables | 512–647 |
-|   9. Shrines | 648–770 |
-|   10. Doors, operate 8 (`0x00581D40`) | 771–794 |
-|   11. Wells, operate 22 (`0x005858A0`) | 795–826 |
-|   12. Portals, operate 15 (`0x00584870`) | 827–897 |
-|   13. Torch, operate 11 (`0x005843D0`) | 898–902 |
-|   14. Client messages | 903–930 |
-|   15. Not covered yet | 931–945 |
-|   16.–18. Moved | 946–952 |
-| Constants & data dependencies | 953–999 |
-| Randomness | 1000–1046 |
-| Edge cases & original bugs | 1047–1113 |
-| Test vectors | 1114–1152 |
-| Provenance | 1153–1219 |
-| Open questions | 1220–1284 |
+|   7. Operate dispatch | 324–517 |
+|   8. Chests and breakables | 518–653 |
+|   9. Shrines | 654–776 |
+|   10. Doors, operate 8 (`0x00581D40`) | 777–800 |
+|   11. Wells, operate 22 (`0x005858A0`) | 801–832 |
+|   12. Portals, operate 15 (`0x00584870`) | 833–903 |
+|   13. Torch, operate 11 (`0x005843D0`) | 904–908 |
+|   14. Client messages | 909–936 |
+|   15. Not covered yet | 937–951 |
+|   16.–18. Moved | 952–958 |
+| Constants & data dependencies | 959–1005 |
+| Randomness | 1006–1052 |
+| Edge cases & original bugs | 1053–1119 |
+| Test vectors | 1120–1158 |
+| Provenance | 1159–1225 |
+| Open questions | 1226–1290 |
 <!-- /index -->
 
 ## Summary
@@ -437,7 +437,13 @@ The handler's result (`sim/intents-events.md`), in order:
    4. On that stop (step result 2 in `0x00580C20`, `sim/pathing.md`
       §9.2 step 6): neutral start (`0x0057F020`), then this handler's
       `0x00548B00(P, type 2, GUID, flag = (+0x154 = −2), game)` again,
-      then +0x150 := 0. With the player now in interact range and the
+      then +0x150 := 0. The step result stays 2, so the ENDANIM handler
+      (`sim/units.md` §4.5) neutral-starts again at once: a run the retry
+      just started (compute included) is ended in the same frame, mode 5,
+      and nothing is queued any more (1.14d `gen-obj-78` frame 33: the
+      retry computes 4 points, the player is neutral, and stays so;
+      `gen-obj-39` frame 37; the call chain `0x00580E78` ← `0x00548BD1` ←
+      `0x00548A62` ← `0x00580B63` ← `0x0057F11C` -> `0x00649970`). With the player now in interact range and the
       line clear, rule 5 runs **in the stop frame**. Still out of range
       (or the line blocked) → rule 4 again: a new run and a new queued
       interaction. Distance > 50 or mode ≥ 8 by then → its code, no

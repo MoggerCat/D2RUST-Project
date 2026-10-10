@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/pc1today/opt-a.jsonl --scene a1-menu-sound --frame 70 --out facts/render --images game/captures/pc1today/opt-a --tile-light unknown; game: 1.14d
+key	value
+seq	70
+tick	61
+w	800
+h	600
+act	0
+level	1
+player_x	10320
+player_y	72816
+tile_origin_x	9920
+tile_origin_y	72536
+unit_origin_x	9920
+unit_origin_y	72532
+open_mode	0
+shift_x	0
+light_quality	2
+rain	1
+snow	0
+draws	290
+index_sha256	1ea0a021b753251f4a55ee931d21770a08a1966531fefd02d51d43566f3a0589
+palette_sha256	ba83219e51249002d7125a1a5a701d6abea94f04f44d6cfaa42becdfcff23337

@@ -2636,3 +2636,481 @@ object.preset.579.presetshrine	objects.txt preset fn 579 @0x0054F0D0 (- rows)
 object.preset.580.specialchest	objects.txt preset fn 580 @0x0054F370 (- rows)
 object.preset.581.presetchest	objects.txt preset fn 581 @0x0054F180 (- rows)
 object.preset.582.arcanesymbol	objects.txt preset fn 582 @0x0054F430 (- rows)
+system.client.assets.a-d2rs-design-ours	specs/client/assets.md §A. d2rs design (ours)
+system.client.assets.b-original-behavior-to-reproduce-not-specified-h	specs/client/assets.md §B. Original behavior to reproduce (not specified here)
+system.client.audio.a-d2rs-design-ours	specs/client/audio.md §A. d2rs design (ours)
+system.client.audio.b-original-behavior-to-reproduce-owners	specs/client/audio.md §B. Original behavior to reproduce (owners)
+system.client.bridge.1-boundary	specs/client/bridge.md §1. Boundary
+system.client.bridge.10-client-outputs-bridge-ui-and-audio	specs/client/bridge.md §10. Client outputs (bridge → UI and audio)
+system.client.bridge.2-receive-path	specs/client/bridge.md §2. Receive path
+system.client.bridge.3-server-link	specs/client/bridge.md §3. Server link
+system.client.bridge.4-send-path-intents	specs/client/bridge.md §4. Send path (intents)
+system.client.bridge.5-client-world-model	specs/client/bridge.md §5. Client world model
+system.client.bridge.6-dispatch-table	specs/client/bridge.md §6. Dispatch table
+system.client.bridge.7-bevy-mirror	specs/client/bridge.md §7. Bevy mirror
+system.client.bridge.8-frame-pacing	specs/client/bridge.md §8. Frame pacing
+system.client.bridge.9-versioning	specs/client/bridge.md §9. Versioning
+system.client.model.1-model-contents	specs/client/model.md §1. Model contents
+system.client.model.10-bit-reader	specs/client/model.md §10. Bit reader
+system.client.model.11-current-act-and-level-join-and-later	specs/client/model.md §11. Current act and level (join and later)
+system.client.model.12-client-drlg-and-the-room-of-a-point	specs/client/model.md §12. Client DRLG and the room of a point
+system.client.model.13-visibility-predicate-0x004dbf20	specs/client/model.md §13. Visibility predicate (`0x004DBF20`)
+system.client.model.14-pet-list-and-the-hireling-guid	specs/client/model.md §14. Pet list and the hireling GUID
+system.client.model.15-object-mode-requests-in-detail-codes-3-and-0x	specs/client/model.md §15. Object mode requests in detail (codes 3 and 0x15; shrines)
+system.client.model.16-c-s-0x4b-after-a-teleport-the-hireling-case	specs/client/model.md §16. C→S 0x4B after a teleport (the hireling case)
+system.client.model.17-model-writes-made-by-1-14d-ui-code	specs/client/model.md §17. Model writes made by 1.14d UI code
+system.client.model.18-audio-driver-inputs-and-the-client-object-fun	specs/client/model.md §18. Audio driver inputs and the client object functions
+system.client.model.19-monster-mode-machine-0x004aff60-and-client-mo	specs/client/model.md §19. Monster mode machine (`0x004AFF60`) and client mode steps
+system.client.model.2-unit-table	specs/client/model.md §2. Unit table
+system.client.model.3-local-player	specs/client/model.md §3. Local player
+system.client.model.4-receive-and-the-unit-message-queue	specs/client/model.md §4. Receive and the unit message queue
+system.client.model.5-client-update-pass	specs/client/model.md §5. Client update pass
+system.client.model.6-position-check-0x004804e0	specs/client/model.md §6. Position check (`0x004804E0`)
+system.client.model.7-session-messages	specs/client/model.md §7. Session messages
+system.client.model.8-mode-requests	specs/client/model.md §8. Mode requests
+system.client.model.9-room-in-sight-messages	specs/client/model.md §9. Room-in-sight messages
+system.client.msg-skills.1-the-client-skill-list-unit-0xa8	specs/client/msg-skills.md §1. The client skill list (unit +0xA8)
+system.client.msg-skills.10-0xa5-skill-end-on-a-unit-0x0045d6a0	specs/client/msg-skills.md §10. 0xA5 skill end on a unit (`0x0045D6A0`)
+system.client.msg-skills.2-shared-skill-list-operations	specs/client/msg-skills.md §2. Shared skill-list operations
+system.client.msg-skills.3-0x94-baseskilllevels-0x0045dd60	specs/client/msg-skills.md §3. 0x94 BaseSkillLevels (`0x0045DD60`)
+system.client.msg-skills.4-0x21-updateitemoskill-0x0045dcd0	specs/client/msg-skills.md §4. 0x21 UpdateItemOSkill (`0x0045DCD0`)
+system.client.msg-skills.5-0x22-updateitemskill-0x0045ddb0	specs/client/msg-skills.md §5. 0x22 UpdateItemSkill (`0x0045DDB0`)
+system.client.msg-skills.6-0x23-setskill-0x0045de10	specs/client/msg-skills.md §6. 0x23 SetSkill (`0x0045DE10`)
+system.client.msg-skills.7-0x99-0x9a-skill-events-0x0045de80-0x0045dec0-0	specs/client/msg-skills.md §7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`)
+system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0	specs/client/msg-skills.md §8. 0xA3 skill do (`0x0045D5E0`)
+system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1	specs/client/msg-skills.md §9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`)
+system.client.msg-stats-items.1-local-player-stats-0x19-0x1f-0x0045d780	specs/client/msg-stats-items.md §1. Local player stats: 0x19–0x1F (`0x0045D780`)
+system.client.msg-stats-items.2-item-actions-0x9c-itemactionworld-0x0045eb10-0	specs/client/msg-stats-items.md §2. Item actions: 0x9C ItemActionWorld (`0x0045EB10`), 0x9D ItemActionOwned (`0x0045EC70`)
+system.client.msg-stats-items.3-other-item-messages	specs/client/msg-stats-items.md §3. Other item messages
+system.client.msg-stats-items.4-hireling-stats-0x9e-0xa2-0x0045d540	specs/client/msg-stats-items.md §4. Hireling stats: 0x9E–0xA2 (`0x0045D540`)
+system.client.msg-stats-items.5-item-state-messages-0x3e-0x40-0x7c-0x7d-0x92-0	specs/client/msg-stats-items.md §5. Item state messages: 0x3E, 0x40, 0x7C, 0x7D, 0x92, 0x97, 0xA6
+system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0	specs/client/msg-ui.md §1. 0x5D quest status (`0x0045E540` → `0x004A2CB0`)
+system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510	specs/client/msg-ui.md §10. 0x91 NPC intros (`0x0045E580` → `0x004B3510`)
+system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010	specs/client/msg-ui.md §11. 0x78 trade partner (`0x0045E810` → `0x004B9010`)
+system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620	specs/client/msg-ui.md §12. 0x29 game quest flags (`0x0045D3A0` → `0x004B2620`)
+system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0	specs/client/msg-ui.md §13. 0x52 quest log status (`0x0045CC00` → `0x004A40D0`)
+system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004	specs/client/msg-ui.md §14. 0x5E game quest availability (`0x0045E570` → `0x004B92B0`)
+system.client.msg-ui.15-0x9b-hireling-revive-state-0x0045eac0-0x004b6	specs/client/msg-ui.md §15. 0x9B hireling revive state (`0x0045EAC0` → `0x004B6980`)
+system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d	specs/client/msg-ui.md §16. 0x28 NPC dialog start and quest flags (`0x0045D370` → `0x004B6DD0`)
+system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320	specs/client/msg-ui.md §17. 0x62 NPC dialog end (`0x0045D390` → `0x004B5320`)
+system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390	specs/client/msg-ui.md §18. 0x2A NPC transaction (`0x0045E0D0` → `0x004B6390`)
+system.client.msg-ui.19-0x5a-event-text-0x0045e070-0x0049eb10	specs/client/msg-ui.md §19. 0x5A event text (`0x0045E070` → `0x0049EB10`)
+system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90	specs/client/msg-ui.md §2. 0x63 waypoint menu (`0x0045E670` → `0x0049CF90`)
+system.client.msg-ui.20-0x61-act-video-0x0045e660	specs/client/msg-ui.md §20. 0x61 act video (`0x0045E660`)
+system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0	specs/client/msg-ui.md §21. 0x76 overhead clear (`0x0045E050` → `0x0049F8C0`)
+system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0	specs/client/msg-ui.md §22. 0x7B skill hotkey (`0x0045E8D0` → `0x004AA0C0`)
+system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0	specs/client/msg-ui.md §3. 0x77 UI action (`0x0045E800` → `0x004B8CF0`)
+system.client.msg-ui.4-0x26-chat-and-overhead-text-0x0045dfc0-0x0049f	specs/client/msg-ui.md §4. 0x26 chat and overhead text (`0x0045DFC0` → `0x0049F490`)
+system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600	specs/client/msg-ui.md §5. 0x27 NPC text (`0x0045E0A0` → `0x004A1600`)
+system.client.msg-ui.6-0x4e-hire-offer-and-0x4f-hire-list-reset	specs/client/msg-ui.md §6. 0x4E hire offer and 0x4F hire list reset
+system.client.msg-ui.7-0x50-quest-special-0x0045e370-0x004b9210	specs/client/msg-ui.md §7. 0x50 quest special (`0x0045E370` → `0x004B9210`)
+system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550	specs/client/msg-ui.md §8. 0x58 UI open (`0x0045E490` → `0x004C0550`)
+system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33	specs/client/msg-ui.md §9. 0x8A NPC wants to interact (`0x0045EA40` → `0x004B3380`)
+system.client.msg-units.1-unit-add	specs/client/msg-units.md §1. Unit add
+system.client.msg-units.2-0x0a-removeunit-0x0045cc10	specs/client/msg-units.md §2. 0x0A RemoveUnit (`0x0045CC10`)
+system.client.msg-units.3-0x15-reassignplayer-0x0045d160	specs/client/msg-units.md §3. 0x15 ReassignPlayer (`0x0045D160`)
+system.client.msg-units.4-queued-movement-and-action-messages	specs/client/msg-units.md §4. Queued movement and action messages
+system.client.msg-units.5-local-player-vitals-0x18-0x95-0x96	specs/client/msg-units.md §5. Local player vitals: 0x18, 0x95, 0x96
+system.client.msg-units.6-unit-states-0xa7-0xa8-0xa9-0xaa	specs/client/msg-units.md §6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA
+system.client.msg-units.7-other-unit-messages-general-handlers-act-at-re	specs/client/msg-units.md §7. Other unit messages (general handlers, act at receive)
+system.client.msg-units.8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x8e-li	specs/client/msg-units.md §8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB)
+system.client.render-pipeline.a-d2rs-design-ours	specs/client/render-pipeline.md §A. d2rs design (ours)
+system.client.render-pipeline.b-original-behavior-to-reproduce-not-specified-h	specs/client/render-pipeline.md §B. Original behavior to reproduce (not specified here)
+system.client.stat-lists.1-the-list-of-a-client-unit	specs/client/stat-lists.md §1. The list of a client unit
+system.client.stat-lists.2-items	specs/client/stat-lists.md §2. Items
+system.client.stat-lists.3-states-s-c-0xa7-0xa8-0xa9	specs/client/stat-lists.md §3. States (S→C 0xA7, 0xA8, 0xA9)
+system.client.stat-lists.4-skills	specs/client/stat-lists.md §4. Skills
+system.client.ui.a-d2rs-design-ours	specs/client/ui.md §A. d2rs design (ours)
+system.client.ui.b-original-behavior-to-reproduce-owned-by-the-sp	specs/client/ui.md §B. Original behavior to reproduce (owned by the specs named)
+system.flows.act-change.1-act-change-0x0053acc0	specs/flows/act-change.md §1. Act change (`0x0053ACC0`)
+system.flows.act-change.2-same-act-travel	specs/flows/act-change.md §2. Same-act travel
+system.flows.act-change.3-client-side	specs/flows/act-change.md §3. Client side
+system.flows.client-frame.1-loop-pass-order-1-14d	specs/flows/client-frame.md §1. Loop pass order (1.14d)
+system.flows.client-frame.2-prediction-correction-interpolation	specs/flows/client-frame.md §2. Prediction, correction, interpolation
+system.flows.client-frame.3-d2rs-mapping-one-bevy-frame	specs/flows/client-frame.md §3. d2rs mapping (one Bevy frame)
+system.flows.save-exit.1-client-save-and-exit-game	specs/flows/save-exit.md §1. Client: Save and Exit Game
+system.flows.save-exit.2-server-leave-c-s-0x69-in-the-drain	specs/flows/save-exit.md §2. Server: leave (C→S 0x69, in the drain)
+system.flows.save-exit.3-server-periodic-save	specs/flows/save-exit.md §3. Server: periodic save
+system.flows.save-exit.4-client-end-of-game	specs/flows/save-exit.md §4. Client: end of game
+system.flows.save-exit.5-load	specs/flows/save-exit.md §5. Load
+system.flows.server-tick.1-server-frame-host-side	specs/flows/server-tick.md §1. Server frame (host side)
+system.flows.server-tick.2-tick-steps-in-order	specs/flows/server-tick.md §2. Tick steps in order
+system.flows.server-tick.3-timer-queue-within-step-4	specs/flows/server-tick.md §3. Timer queue within step 4
+system.flows.server-tick.4-client-pass-within-step-5	specs/flows/server-tick.md §4. Client pass within step 5
+system.seams.bridge-app.1-frame-order-one-bevy-frame	specs/seams/bridge-app.md §1. Frame order (one Bevy frame)
+system.seams.bridge-app.2-contract	specs/seams/bridge-app.md §2. Contract
+system.seams.drlg-coords.1-coordinate-spaces	specs/seams/drlg-coords.md §1. Coordinate spaces
+system.seams.item-grids	specs/seams/item-grids.md whole
+system.seams.messages.1-contract-table-per-message-family	specs/seams/messages.md §1. Contract table (per message family)
+system.seams.sim-server.1-what-crosses	specs/seams/sim-server.md §1. What crosses
+system.seams.world-screen.1-units-and-spaces	specs/seams/world-screen.md §1. Units and spaces
+system.seams.world-screen.2-contract	specs/seams/world-screen.md §2. Contract
+system.sim.intents-events.1-loop-order-single-player	specs/sim/intents-events.md §1. Loop order (single player)
+system.sim.intents-events.2-client-server	specs/sim/intents-events.md §2. Client → server
+system.sim.intents-events.3-server-client	specs/sim/intents-events.md §3. Server → client
+system.sim.intents-events.4-d2rs-mapping-and-scope	specs/sim/intents-events.md §4. d2rs mapping and scope
+system.sim.intents-events.5-machine-readable-tables	specs/sim/intents-events.md §5. Machine-readable tables
+system.sim.intents-events.6-exact-match-comparison	specs/sim/intents-events.md §6. Exact-match comparison
+system.sim.intents-events.7-unit-update-messages-0x0053a500-and-room-clean	specs/sim/intents-events.md §7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`)
+system.sim.intents-events.8-single-player-session-sequence-c-s-0x67-0x6b-f	specs/sim/intents-events.md §8. Single-player session sequence (C→S 0x67 → 0x6B → first tick)
+system.sim.intents-events.9-c-s-handlers-owners-and-the-small-handlers-own	specs/sim/intents-events.md §9. C→S handlers: owners, and the small handlers owned here
+system.sim.pathing.4-target-preparation-torch	0x00648120 (probe steps back off a colliding target)
+system.sim.pathing.9-8-room-change-messages	0x00554670 (merge of the old and new room client arrays: 0x00571600 removal, 0x00571F90 add)
+system.sim.pets.1-data	specs/sim/pets.md §1. Data
+system.sim.pets.10-creation-free-and-maximum-resync	specs/sim/pets.md §10. Creation, free and maximum resync
+system.sim.pets.2-add-0x00575d90-game-player-pet-t-max	specs/sim/pets.md §2. Add `0x00575D90(game, player, pet, t, max)`
+system.sim.pets.3-group-eviction-0x00575720-t-player-in-edi	specs/sim/pets.md §3. Group eviction `0x00575720(t)` (player in EDI)
+system.sim.pets.4-set-the-maximum-0x00575850-game-player-t-max	specs/sim/pets.md §4. Set the maximum `0x00575850(game, player, t, max)`
+system.sim.pets.5-append-0x00575c70-pet-extra-e-in-esi-game-in-e	specs/sim/pets.md §5. Append `0x00575C70(pet, extra)` (E in ESI, game in EAX)
+system.sim.pets.6-remove-0x005750e0-game-player-guid-kill-and-un	specs/sim/pets.md §6. Remove `0x005750E0(game, player, GUID, kill)` and unlink `0x00574850`
+system.sim.pets.7-dismiss-0x00574450-guid-in-ebx-game-in-edi	specs/sim/pets.md §7. Dismiss `0x00574450` (GUID in EBX, game in EDI)
+system.sim.pets.8-broadcast-and-message-0x7a	specs/sim/pets.md §8. Broadcast and message 0x7A
+system.sim.pets.9-lookup-0x00574a20-player-guid	specs/sim/pets.md §9. Lookup `0x00574A20(player, GUID)`
+system.sim.stat-lists.1-records	specs/sim/stat-lists.md §1. Records
+system.sim.stat-lists.10-timer-event-handlers	specs/sim/stat-lists.md §10. Timer event handlers
+system.sim.stat-lists.11-mod-array-and-stat-messages	specs/sim/stat-lists.md §11. Mod array and stat messages
+system.sim.stat-lists.2-flags-0x10	specs/sim/stat-lists.md §2. Flags (+0x10)
+system.sim.stat-lists.3-stat-arrays	specs/sim/stat-lists.md §3. Stat arrays
+system.sim.stat-lists.4-allocation-and-ownership	specs/sim/stat-lists.md §4. Allocation and ownership
+system.sim.stat-lists.5-base-writes	specs/sim/stat-lists.md §5. Base writes
+system.sim.stat-lists.6-full-values	specs/sim/stat-lists.md §6. Full values
+system.sim.stat-lists.7-value-change-notification	specs/sim/stat-lists.md §7. Value-change notification
+system.sim.stat-lists.8-chain-operations	specs/sim/stat-lists.md §8. Chain operations
+system.sim.stat-lists.9-states	specs/sim/stat-lists.md §9. States
+system.sim.stats.1-identity	specs/sim/stats.md §1. Identity
+system.sim.stats.2-values	specs/sim/stats.md §2. Values
+system.sim.stats.3-itemstatcost-columns-read-by-the-simulation	specs/sim/stats.md §3. itemstatcost columns read by the simulation
+system.sim.stats.4-reading-a-stat	specs/sim/stats.md §4. Reading a stat
+system.sim.stats.5-muldiv-0x00483360	specs/sim/stats.md §5. MulDiv (`0x00483360`)
+system.sim.stats.6-evaluation-the-value-a-full-entry-is-set-to	specs/sim/stats.md §6. Evaluation (the value a full entry is set to)
+system.sim.stats.7-where-evaluation-happens	specs/sim/stats.md §7. Where evaluation happens
+system.sim.stats.8-by-time-adjustment-0x0065ca30	specs/sim/stats.md §8. By-time adjustment (`0x0065CA30`)
+system.sim.stats.9-derived-stats-and-clamps	specs/sim/stats.md §9. Derived stats and clamps
+system.sim.tick.1-tick-rate-and-host-schedule	specs/sim/tick.md §1. Tick rate and host schedule
+system.sim.tick.2-frame-counter	specs/sim/tick.md §2. Frame counter
+system.sim.tick.3-tick-steps-in-order	specs/sim/tick.md §3. Tick steps in order
+system.sim.tick.4-room-pass-step-3	specs/sim/tick.md §4. Room pass (step 3)
+system.sim.tick.5-timer-events-step-4	specs/sim/tick.md §5. Timer events (step 4)
+system.sim.tick.6-client-pass-step-5	specs/sim/tick.md §6. Client pass (step 5)
+system.sim.tick.7-periodic-steps-summary	specs/sim/tick.md §7. Periodic steps, summary
+system.sim.tick.8-wall-clock-and-host-only-parts	specs/sim/tick.md §8. Wall-clock and host-only parts
+system.sim.units.1-unit-kinds	specs/sim/units.md §1. Unit kinds
+system.sim.units.2-unit-record	specs/sim/units.md §2. Unit record
+system.sim.units.3-lifecycle	specs/sim/units.md §3. Lifecycle
+system.sim.units.4-modes-and-mode-schedules	specs/sim/units.md §4. Modes and mode schedules
+system.sim.units.5-event-dispatch	specs/sim/units.md §5. Event dispatch
+system.sim.units.6-events-per-kind	specs/sim/units.md §6. Events per kind
+system.sim.units.7-scheduler-inventory-unit-events-tsv	specs/sim/units.md §7. Scheduler inventory (`unit-events.tsv`)
+system.sim.units.8-collision-line-between-two-units	specs/sim/units.md §8. Collision line between two units
+system.ui.automap.1-cell-store	specs/ui/automap.md §1. Cell store
+system.ui.automap.10-cell-draw-pass	specs/ui/automap.md §10. Cell draw pass
+system.ui.automap.11-unit-markers-0x0045ac90-0x0045a860	specs/ui/automap.md §11. Unit markers (`0x0045AC90` → `0x0045A860`)
+system.ui.automap.12-party-roster-markers-0x0045ab60	specs/ui/automap.md §12. Party roster markers (`0x0045AB60`)
+system.ui.automap.13-header-text	specs/ui/automap.md §13. Header text
+system.ui.automap.14-lifetime	specs/ui/automap.md §14. Lifetime
+system.ui.automap.2-cell-picker-0x0061fff0	specs/ui/automap.md §2. Cell picker (`0x0061FFF0`)
+system.ui.automap.3-adding-a-tile-record-0x00457cf0-room-r-record-	specs/ui/automap.md §3. Adding a tile record (`0x00457CF0`, room R, record T)
+system.ui.automap.4-adding-units-0x00458dc0-room-r	specs/ui/automap.md §4. Adding units (`0x00458DC0`, room R)
+system.ui.automap.5-reveal	specs/ui/automap.md §5. Reveal
+system.ui.automap.6-town-art-0x004591a0-drlg-callback-0x488	specs/ui/automap.md §6. Town art (`0x004591A0`, DRLG callback +0x488)
+system.ui.automap.7-persistence-map-ma0-ma3	specs/ui/automap.md §7. Persistence (`.map`, `.ma0`–`.ma3`)
+system.ui.automap.8-state-keys-and-options	specs/ui/automap.md §8. State, keys and options
+system.ui.automap.9-view-geometry	specs/ui/automap.md §9. View geometry
+system.ui.control-panel.1-draw-order-0x00499450	specs/ui/control-panel.md §1. Draw order (`0x00499450`)
+system.ui.control-panel.10-control-panel-mouse-input	specs/ui/control-panel.md §10. Control panel mouse input
+system.ui.control-panel.11-help-button-state-0x22-ui-helpbutton	specs/ui/control-panel.md §11. Help button (state 0x22, `UI_HELPBUTTON`)
+system.ui.control-panel.2-art-files	specs/ui/control-panel.md §2. Art files
+system.ui.control-panel.3-life-and-mana-globes	specs/ui/control-panel.md §3. Life and mana globes
+system.ui.control-panel.4-experience-and-stamina-bars	specs/ui/control-panel.md §4. Experience and stamina bars
+system.ui.control-panel.5-belt	specs/ui/control-panel.md §5. Belt
+system.ui.control-panel.6-run-walk-and-menu-buttons	specs/ui/control-panel.md §6. Run / walk and menu buttons
+system.ui.control-panel.7-skill-buttons	specs/ui/control-panel.md §7. Skill buttons
+system.ui.control-panel.8-new-stats-and-new-skills-buttons	specs/ui/control-panel.md §8. New-stats and new-skills buttons
+system.ui.control-panel.9-mini-panel-state-0x15	specs/ui/control-panel.md §9. Mini panel (state 0x15)
+system.ui.controls.1-binding-table	specs/ui/controls.md §1. Binding table
+system.ui.controls.2-key-files	specs/ui/controls.md §2. Key files
+system.ui.controls.3-commands-and-default-keys	specs/ui/controls.md §3. Commands and default keys
+system.ui.controls.4-dispatch	specs/ui/controls.md §4. Dispatch
+system.ui.controls.5-key-config-screen-assignment	specs/ui/controls.md §5. Key-config screen assignment
+system.ui.controls.6-world-clicks-left-right-button-answers-oq-2-in	specs/ui/controls.md §6. World clicks (left / right button; answers OQ 2 in part)
+system.ui.controls.7-gates-and-belt-use-answers-oq-3-oq-4-oq-5	specs/ui/controls.md §7. Gates and belt use (answers OQ 3, OQ 4, OQ 5)
+system.ui.controls.b4-original-defaults-check-client-ui-md-b4	specs/ui/controls.md §B4. Original-defaults check (`client/ui.md` §B4)
+system.ui.frontend-credits.c0-front-end-tick	specs/ui/frontend-credits.md §C0 Front-end tick
+system.ui.frontend-credits.c1-startup-sequence-0x004359d0-0x00435230	specs/ui/frontend-credits.md §C1 Startup sequence (`0x004359D0` → `0x00435230`)
+system.ui.frontend-credits.c10-640-480	specs/ui/frontend-credits.md §C10 640 × 480
+system.ui.frontend-credits.c2-trademark-screen-input-adds-to-ui-frontend-me	specs/ui/frontend-credits.md §C2 Trademark screen input (adds to `ui/frontend-menus.md` §F1.3)
+system.ui.frontend-credits.c3-credits-screen-0x004312c0	specs/ui/frontend-credits.md §C3 Credits screen (`0x004312C0`)
+system.ui.frontend-credits.c4-credits-text-file-and-parsing-0x00430cd0-0x00	specs/ui/frontend-credits.md §C4 Credits text file and parsing (`0x00430CD0`, `0x00431050`, `0x00430EF0`, `0x00430C80`)
+system.ui.frontend-credits.c5-video-hook-all-videos-stub-in-d2rs	specs/ui/frontend-credits.md §C5 Video hook (all videos; stub in d2rs)
+system.ui.frontend-credits.c6-cinematics-progress-byte-n	specs/ui/frontend-credits.md §C6 Cinematics progress byte N
+system.ui.frontend-credits.c7-palette	specs/ui/frontend-credits.md §C7 Palette
+system.ui.frontend-credits.c8-cinematics-menu-0x00431600	specs/ui/frontend-credits.md §C8 Cinematics menu (`0x00431600`)
+system.ui.frontend-credits.c9-sounds-deferred-owner-client-audio-md	specs/ui/frontend-credits.md §C9 Sounds (deferred; owner `client/audio.md`)
+system.ui.frontend-loading.l1-save-fields-the-front-end-reads-0x00439840-0x	specs/ui/frontend-loading.md §L1 Save fields the front end reads (`0x00439840`, `0x00439780`)
+system.ui.frontend-loading.l10-act-start-cinematics-hooks-only	specs/ui/frontend-loading.md §L10 Act-start cinematics (hooks only)
+system.ui.frontend-loading.l11-sounds-deferred	specs/ui/frontend-loading.md §L11 Sounds (deferred)
+system.ui.frontend-loading.l2-enable-rules	specs/ui/frontend-loading.md §L2 Enable rules
+system.ui.frontend-loading.l3-art-and-palette-0x00456550	specs/ui/frontend-loading.md §L3 Art and palette (`0x00456550`)
+system.ui.frontend-loading.l4-one-loading-draw-0x004565e0-step	specs/ui/frontend-loading.md §L4 One loading draw (`0x004565E0(step)`)
+system.ui.frontend-loading.l5-when-loading-draws-happen-single-player	specs/ui/frontend-loading.md §L5 When loading draws happen (single player)
+system.ui.frontend-loading.l6-between-draws	specs/ui/frontend-loading.md §L6 Between draws
+system.ui.frontend-loading.l7-end-the-first-game-frame-0x0044c990-0x004547b	specs/ui/frontend-loading.md §L7 End: the first game frame (`0x0044C990` → `0x004547B0`)
+system.ui.frontend-loading.l8-input-during-loading	specs/ui/frontend-loading.md §L8 Input during loading
+system.ui.frontend-loading.l9-act-change-s-c-0x05-0x03-0x04	specs/ui/frontend-loading.md §L9 Act change (S→C 0x05, 0x03, …, 0x04)
+system.ui.frontend-menus.f1-1-control-descriptors-the-data-every-front-en	specs/ui/frontend-menus.md §F1.1 Control descriptors (the data every front-end screen is built from)
+system.ui.frontend-menus.f1-2-art-preload	specs/ui/frontend-menus.md §F1.2 Art preload
+system.ui.frontend-menus.f1-3-screen-flow-single-player	specs/ui/frontend-menus.md §F1.3 Screen flow (single player)
+system.ui.frontend-menus.f1-4-main-menu-0x004336c0	specs/ui/frontend-menus.md §F1.4 Main menu (`0x004336C0`)
+system.ui.frontend-menus.f1-5-title-animation-logo-fire	specs/ui/frontend-menus.md §F1.5 Title animation (logo fire)
+system.ui.frontend-menus.f1-6-palette-and-sounds	specs/ui/frontend-menus.md §F1.6 Palette and sounds
+system.ui.frontend-menus.f2-1-save-folder-0x00407050	specs/ui/frontend-menus.md §F2.1 Save folder (`0x00407050`)
+system.ui.frontend-menus.f2-2-scan-and-entry-filter-0x00438f70-0x0043c8a0	specs/ui/frontend-menus.md §F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`)
+system.ui.frontend-menus.f2-3-sort-order-0x00438ad0	specs/ui/frontend-menus.md §F2.3 Sort order (`0x00438AD0`)
+system.ui.frontend-menus.f2-4-layout-0x0043ae30-draw-0x004380f0	specs/ui/frontend-menus.md §F2.4 Layout (`0x0043AE30`, draw `0x004380F0`)
+system.ui.frontend-menus.f2-5-selection-scrolling-and-keys	specs/ui/frontend-menus.md §F2.5 Selection, scrolling and keys
+system.ui.frontend-menus.f2-6-ok-enter-0x00439840	specs/ui/frontend-menus.md §F2.6 OK / Enter (`0x00439840`)
+system.ui.frontend-menus.f2-7-other-buttons	specs/ui/frontend-menus.md §F2.7 Other buttons
+system.ui.frontend-menus.f2-8-difficulty-box-0x00439780	specs/ui/frontend-menus.md §F2.8 Difficulty box (`0x00439780`)
+system.ui.frontend-menus.f2-9-control-records-and-art	specs/ui/frontend-menus.md §F2.9 Control records and art
+system.ui.frontend-menus.f3-1-character-create-screen-build-0x00435580	specs/ui/frontend-menus.md §F3.1 Character-create screen build (`0x00435580`)
+system.ui.frontend-menus.f3-2-class-line-up-positions-creation-order	specs/ui/frontend-menus.md §F3.2 Class line-up (positions, creation order)
+system.ui.frontend-menus.f3-3-class-animation-state-machine-d2win-anim-co	specs/ui/frontend-menus.md §F3.3 Class animation state machine (D2Win anim control `0x00500850`)
+system.ui.frontend-menus.f3-4-name-entry-edit-box-descriptor-204	specs/ui/frontend-menus.md §F3.4 Name entry (edit box, descriptor 204)
+system.ui.frontend-menus.f3-5-check-boxes-hardcore-expansion-ladder-named	specs/ui/frontend-menus.md §F3.5 Check boxes (hardcore, expansion; ladder named only)
+system.ui.frontend-menus.f3-6-ok-cancel-behaviour-and-the-new-save	specs/ui/frontend-menus.md §F3.6 OK / Cancel behaviour and the new save
+system.ui.frontend-menus.f3-7-sounds-deferred	specs/ui/frontend-menus.md §F3.7 Sounds (deferred)
+system.ui.frontend-menus.f3-8-art-0x004326f0-all-data-global-ui-frontend-	specs/ui/frontend-menus.md §F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction)
+system.ui.frontend-options.o1-where-options-live-opening-and-closing-the-ga	specs/ui/frontend-options.md §O1. Where options live; opening and closing the game menu
+system.ui.frontend-options.o2-menu-records-and-the-tree	specs/ui/frontend-options.md §O2. Menu records and the tree
+system.ui.frontend-options.o3-save-and-exit-game-0x0047f2d0	specs/ui/frontend-options.md §O3. Save and Exit Game (`0x0047F2D0`)
+system.ui.frontend-options.o4-draw-0x0047e3d0-while-ui-9-is-open-from-the-u	specs/ui/frontend-options.md §O4. Draw (`0x0047E3D0`, while ui 9 is open, from the UI draw `0x00456F46`)
+system.ui.frontend-options.o5-input-handler-table-0x006d6030-7-entries-regi	specs/ui/frontend-options.md §O5. Input (handler table `0x006D6030`, 7 entries, registered while ui 9 is open)
+system.ui.frontend-options.o6-row-effects-apply-0x114-init-0x118-registry-w	specs/ui/frontend-options.md §O6. Row effects (apply = +0x114, init = +0x118; registry writes are REG_DWORD)
+system.ui.frontend-options.o7-settings-storage-and-the-d2rs-config-mapping	specs/ui/frontend-options.md §O7. Settings storage and the d2rs config mapping
+system.ui.frontend-options.o8-d2rs-stubs-rows-drawn-and-navigated-like-the-	specs/ui/frontend-options.md §O8. d2rs stubs (rows drawn and navigated like the original, value kept in `settings.toml`, no effect)
+system.ui.frontend-options.o9-configure-controls-ui-11-ui-config	specs/ui/frontend-options.md §O9. Configure Controls (ui 11, `UI_CONFIG`)
+system.ui.inventory.1-grid-geometry	specs/ui/inventory.md §1. Grid geometry
+system.ui.inventory.10-grid-click-c-s-message-0x0048ffe0	specs/ui/inventory.md §10. Grid click → C→S message (`0x0048FFE0`)
+system.ui.inventory.11-gold-amount-dialog-0x00454150	specs/ui/inventory.md §11. Gold amount dialog (`0x00454150`)
+system.ui.inventory.2-tint-colours	specs/ui/inventory.md §2. Tint colours
+system.ui.inventory.3-grid-items-0x00483ff0	specs/ui/inventory.md §3. Grid items (`0x00483FF0`)
+system.ui.inventory.4-placement-tint-cursor-item-over-a-grid	specs/ui/inventory.md §4. Placement tint (cursor item over a grid)
+system.ui.inventory.5-hover-state-0x00487000	specs/ui/inventory.md §5. Hover state (`0x00487000`)
+system.ui.inventory.6-equipment-boxes-0x004845a0	specs/ui/inventory.md §6. Equipment boxes (`0x004845A0`)
+system.ui.inventory.7-not-drawn-here	specs/ui/inventory.md §7. Not drawn here
+system.ui.inventory.8-item-graphic-0x0046ee80-item-x-top-answers-oq-	specs/ui/inventory.md §8. Item graphic (`0x0046EE80(item, x, top)`; answers OQ 2)
+system.ui.inventory.9-item-checks-used-by-the-tints-answers-oq-6	specs/ui/inventory.md §9. Item checks used by the tints (answers OQ 6)
+system.ui.inventory.b5-cellgrid-answers-client-ui-md-b5	specs/ui/inventory.md §B5. `CellGrid` answers (`client/ui.md` §B5)
+system.ui.item-tips.1-entry-and-dispatch-0x0048dd90	specs/ui/item-tips.md §1. Entry and dispatch (`0x0048DD90`)
+system.ui.item-tips.10-other-tips	specs/ui/item-tips.md §10. Other tips
+system.ui.item-tips.11-store-lines-0x0048cea0-0x004b2ad0	specs/ui/item-tips.md §11. Store lines (`0x0048CEA0`, `0x004B2AD0`)
+system.ui.item-tips.2-main-builder-blocks	specs/ui/item-tips.md §2. Main builder: blocks
+system.ui.item-tips.3-main-builder-line-shapes	specs/ui/item-tips.md §3. Main builder: line shapes
+system.ui.item-tips.4-name-colour	specs/ui/item-tips.md §4. Name colour
+system.ui.item-tips.5-item-name-0x0048c060-i-buffer-max	specs/ui/item-tips.md §5. Item name (`0x0048C060(I, buffer, max)`)
+system.ui.item-tips.6-property-lines-0x004e6410-0x004e60a0	specs/ui/item-tips.md §6. Property lines (`0x004E6410` → `0x004E60A0`)
+system.ui.item-tips.7-one-stat-line-0x004e4d80	specs/ui/item-tips.md §7. One stat line (`0x004E4D80`)
+system.ui.item-tips.8-damage-groups-0x004e49c0-0x004e5a20	specs/ui/item-tips.md §8. Damage groups (`0x004E49C0`, `0x004E5A20`)
+system.ui.item-tips.9-set-item-tip-0x0048d1d0	specs/ui/item-tips.md §9. Set item tip (`0x0048D1D0`)
+system.ui.menus.1-waypoint-menu-input-ui-0x14	specs/ui/menus.md §1. Waypoint menu input (ui 0x14)
+system.ui.menus.2-npc-menu-box	specs/ui/menus.md §2. NPC menu box
+system.ui.menus.3-hire-list-0x004b5c60-npc-option-hire	specs/ui/menus.md §3. Hire list (`0x004B5C60`, NPC option "hire")
+system.ui.menus.4-shop-transactions	specs/ui/menus.md §4. Shop transactions
+system.ui.messages.1-entry-points	specs/ui/messages.md §1. Entry points
+system.ui.messages.10-other-0x50-codes-ui-effects	specs/ui/messages.md §10. Other 0x50 codes (UI effects)
+system.ui.messages.11-item-socket-dialog-ui-state-0x0e-0x58-codes	specs/ui/messages.md §11. Item-socket dialog (UI state 0x0E, 0x58 codes)
+system.ui.messages.12-npc-alert-0x8a-client-msg-ui-md-9-r3	specs/ui/messages.md §12. NPC alert (0x8A, `client/msg-ui.md` §9 r3)
+system.ui.messages.13-npc-intro-table-0x00726850-0x91	specs/ui/messages.md §13. NPC intro table `0x00726850` (0x91)
+system.ui.messages.14-interact-npc-0x007c0d25-0x007c0d29-answers-cl	specs/ui/messages.md §14. Interact NPC `[0x007C0D25]` / `[0x007C0D29]` (answers `client/msg-ui.md` OQ7, writer part)
+system.ui.messages.2-screen-message-list-0x0049e3a0-text-color	specs/ui/messages.md §2. Screen message list (`0x0049E3A0(text, color)`)
+system.ui.messages.3-chat-line-formats-0x26-client-msg-ui-md-4-r3	specs/ui/messages.md §3. Chat line formats (0x26, `client/msg-ui.md` §4 r3)
+system.ui.messages.4-recipe-scroll-text-0x26-type-7	specs/ui/messages.md §4. Recipe scroll text (0x26 type 7)
+system.ui.messages.5-overhead-text	specs/ui/messages.md §5. Overhead text
+system.ui.messages.6-npc-text-list-0x007bf250-0x27-type-1	specs/ui/messages.md §6. NPC text list `[0x007BF250]` (0x27 type 1)
+system.ui.messages.7-dialog-panel-0x004a1320-0x004a10e0	specs/ui/messages.md §7. Dialog panel (`0x004A1320`, `0x004A10E0`)
+system.ui.messages.8-timed-text-box-0x004a1510-id-0x27-type-2-kind-	specs/ui/messages.md §8. Timed text box (`0x004A1510(id)`, 0x27 type 2 kind 3)
+system.ui.messages.9-hire-offers-and-the-hire-popup-0x4e-0x4f-0x50-	specs/ui/messages.md §9. Hire offers and the hire popup (0x4E, 0x4F, 0x50 code 2)
+system.ui.panels-2.14-npc-menu-ui-8-and-npc-shop-ui-0x0c	specs/ui/panels-2.md §14. NPC menu (ui 8) and NPC shop (ui 0x0C)
+system.ui.panels-2.17-character-panel-details-panels-md-8-answers-u	specs/ui/panels-2.md §17. Character panel details (`panels.md` §8; answers UP-6)
+system.ui.panels-2.18-inventory-close-button-and-click-area-panels-	specs/ui/panels-2.md §18. Inventory close button and click area (`panels.md` §9; answers UP-7, UP-8)
+system.ui.panels-2.19-skill-tree-input-and-draw-order-panels-md-10-	specs/ui/panels-2.md §19. Skill tree input and draw order (`panels.md` §10; answers UP-21, UP-22, UP-23)
+system.ui.panels-2.20-stash-and-cube-buttons-panels-md-11-12-answer	specs/ui/panels-2.md §20. Stash and cube buttons (`panels.md` §11, §12; answers UP-10, `panels.md` OQ 13)
+system.ui.panels-2.21-gold-amounts-gold-buttons-and-the-gold-dialog	specs/ui/panels-2.md §21. Gold amounts, gold buttons and the gold dialog (`panels.md` §9 r6, §11 r6; answers `panels.md` OQ 5)
+system.ui.panels-2.22-d2rs-widget-answers-client-ui-md-b1-b2-code-t	specs/ui/panels-2.md §22. d2rs widget answers (`client/ui.md` §B1, §B2; code `TODO(spec: ui/panels.md …)`)
+system.ui.panels-3.23-mouse-cursor-client-ui-md-b6-takes-the-rule-o	specs/ui/panels-3.md §23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3)
+system.ui.panels-3.24-character-panel-inputs-panels-md-8-7-8-9-the-	specs/ui/panels-3.md §24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values)
+system.ui.panels-3.25-skill-tree-inputs-panels-md-10-3-10-5-the-pen	specs/ui/panels-3.md §25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels)
+system.ui.panels-3.26-waypoint-rows-panels-md-13-r2-r7-the-pending-	specs/ui/panels-3.md §26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel)
+system.ui.panels-3.27-scroll-and-other-panels-panels-md-oq-9	specs/ui/panels-3.md §27. Scroll and other panels (`panels.md` OQ 9)
+system.ui.panels-3.28-gold-dialog-box-and-controls-panels-2-md-21-r	specs/ui/panels-3.md §28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6)
+system.ui.panels-3.29-inventory-body-location-clicks-panels-md-15-r	specs/ui/panels-3.md §29. Inventory body-location clicks (`panels.md` §15, row "body location click")
+system.ui.panels-3.30-hireling-item-checks-and-clicks-world-hirelin	specs/ui/panels-3.md §30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary")
+system.ui.panels.1-screen-layout-model	specs/ui/panels.md §1. Screen layout model
+system.ui.panels.10-skill-tree-ui-4-right-0x004ac690	specs/ui/panels.md §10. Skill tree (ui 4, right; `0x004AC690`)
+system.ui.panels.11-stash-ui-0x19-full-inventory-modes-0x0c-0x0d	specs/ui/panels.md §11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D)
+system.ui.panels.12-horadric-cube-ui-0x1a-full-inventory-mode-0x0	specs/ui/panels.md §12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E)
+system.ui.panels.13-waypoint-menu-ui-0x14-left-0x0049c9c0	specs/ui/panels.md §13. Waypoint menu (ui 0x14, left; `0x0049C9C0`)
+system.ui.panels.14-npc-menu-ui-8-and-npc-shop-ui-0x0c	specs/ui/panels.md §14. NPC menu (ui 8) and NPC shop (ui 0x0C)
+system.ui.panels.15-event-intent-summary	specs/ui/panels.md §15. Event → intent summary
+system.ui.panels.16-machine-tables	specs/ui/panels.md §16. Machine tables
+system.ui.panels.2-ui-states-and-the-open-close-call	specs/ui/panels.md §2. UI states and the open/close call
+system.ui.panels.3-the-conflict-gate-0x00453910	specs/ui/panels.md §3. The conflict gate (`0x00453910`)
+system.ui.panels.4-slots-open-mode-and-the-view-shift	specs/ui/panels.md §4. Slots, open mode and the view shift
+system.ui.panels.5-ui-pass-order-0x00456ee0	specs/ui/panels.md §5. UI pass order (`0x00456EE0`)
+system.ui.panels.6-800-600-border-and-control-panel-art-0x0049945	specs/ui/panels.md §6. 800 × 600 border and control panel art (`0x00499450`)
+system.ui.panels.7-shared-panel-parts	specs/ui/panels.md §7. Shared panel parts
+system.ui.panels.8-character-panel-ui-2-left-0x004a7d00	specs/ui/panels.md §8. Character panel (ui 2, left; `0x004A7D00`)
+system.ui.panels.9-inventory-panel-family-0x0048edf0	specs/ui/panels.md §9. Inventory panel family (`0x0048EDF0`)
+system.ui.text.1-fonts-and-locale	specs/ui/text.md §1. Fonts and locale
+system.ui.text.10-word-wrap	specs/ui/text.md §10. Word wrap
+system.ui.text.11-alignment	specs/ui/text.md §11. Alignment
+system.ui.text.12-clipping-decision-cg2	specs/ui/text.md §12. Clipping (decision CG2)
+system.ui.text.13-d2rs-answers-hooks-in-d2-client	specs/ui/text.md §13. d2rs answers (hooks in `d2-client`)
+system.ui.text.14-wide-formatter-0x005269d0-added-2026-10-07	specs/ui/text.md §14. Wide formatter `0x005269D0` (added 2026-10-07)
+system.ui.text.15-edit-box-caret-and-selection-0x004ff620-added	specs/ui/text.md §15. Edit box caret and selection (`0x004FF620`, added 2026-10-08)
+system.ui.text.2-strings-decoding-and-lookup-by-id	specs/ui/text.md §2. Strings: decoding and lookup by id
+system.ui.text.3-glyph-lookup	specs/ui/text.md §3. Glyph lookup
+system.ui.text.4-glyph-pixels	specs/ui/text.md §4. Glyph pixels
+system.ui.text.5-color-codes	specs/ui/text.md §5. Color codes
+system.ui.text.6-measuring	specs/ui/text.md §6. Measuring
+system.ui.text.7-the-draw-call	specs/ui/text.md §7. The draw call
+system.ui.text.8-framed-text-hover-boxes	specs/ui/text.md §8. Framed text (hover boxes)
+system.ui.text.9-variants-of-the-draw-call	specs/ui/text.md §9. Variants of the draw call
+system.formats.d2s.2-header-335-bytes	specs/formats/d2s.md §2. Header (335 bytes)
+system.formats.d2s.3-checksum-0x00411130	specs/formats/d2s.md §3. Checksum (`0x00411130`)
+system.formats.d2s.4-quest-section-298-bytes-at-0x14f	specs/formats/d2s.md §4. Quest section (298 bytes at 0x14F)
+system.formats.d2s.5-waypoint-section-80-bytes-at-0x279	specs/formats/d2s.md §5. Waypoint section (80 bytes at 0x279)
+system.formats.d2s.6-npc-flag-section-52-bytes-at-0x2c9	specs/formats/d2s.md §6. NPC flag section (52 bytes at 0x2C9)
+system.formats.d2s.7-stats-and-skills	specs/formats/d2s.md §7. Stats and skills
+system.formats.d2s.8-item-sections	specs/formats/d2s.md §8. Item sections
+system.formats.animdata.1-source-file	specs/formats/animdata.md §1. Source file
+system.formats.animdata.2-layout	specs/formats/animdata.md §2. Layout
+system.formats.animdata.3-default-record	specs/formats/animdata.md §3. Default record
+system.formats.animdata.4-name-lookup-0x0066a8f0	specs/formats/animdata.md §4. Name lookup (`0x0066A8F0`)
+system.formats.animdata.5-record-by-unit-class-and-mode-0x0066a9b0	specs/formats/animdata.md §5. Record by unit, class and mode (`0x0066A9B0`)
+system.formats.animdata.6-info-query-0x0066aa80	specs/formats/animdata.md §6. Info query (`0x0066AA80`)
+system.formats.animdata.7-speed-setter-debug	specs/formats/animdata.md §7. Speed setter (debug)
+system.formats.cof.frame-events-and-draw-order	specs/formats/cof.md §Frame events and draw order
+system.formats.cof.header-28-bytes	specs/formats/cof.md §Header (28 bytes)
+system.formats.cof.layer-records-l-9-bytes	specs/formats/cof.md §Layer records (`L` × 9 bytes)
+system.formats.d2s-appearance.1-the-token-table-0x0063d710-built-on-first-use	specs/formats/d2s-appearance.md §1. The token table (`0x0063D710`, built on first use)
+system.formats.d2s-appearance.2-token-lookup-0x0063d900	specs/formats/d2s-appearance.md §2. Token lookup (`0x0063D900`)
+system.formats.d2s-appearance.3-the-fill-0x0063e510-player-components-colours	specs/formats/d2s-appearance.md §3. The fill (`0x0063E510`(player, components, colours))
+system.formats.d2s-appearance.4-helm-and-hand-items-0x0063da70	specs/formats/d2s-appearance.md §4. Helm and hand items (`0x0063DA70`)
+system.formats.d2s-appearance.5-body-armour-composite-branch-of-0x0063e510	specs/formats/d2s-appearance.md §5. Body armour (composite branch of `0x0063E510`)
+system.formats.d2s-appearance.6-colour-byte-0x0062c100-player-item-byte-0	specs/formats/d2s-appearance.md §6. Colour byte (`0x0062C100`(player, item, &byte, 0))
+system.formats.d2s-legacy.1-dispatch-and-order-0x00534330-0x00534020	specs/formats/d2s-legacy.md §1. Dispatch and order (`0x00534330`, `0x00534020`)
+system.formats.d2s-legacy.10-hireling-0x00533c70	specs/formats/d2s-legacy.md §10. Hireling (`0x00533C70`)
+system.formats.d2s-legacy.11-trailing-block-0x00533f70	specs/formats/d2s-legacy.md §11. Trailing block (`0x00533F70`)
+system.formats.d2s-legacy.12-post-load-0x00534020-tail	specs/formats/d2s-legacy.md §12. Post-load (`0x00534020` tail)
+system.formats.d2s-legacy.2-header-130-bytes-0x00532690	specs/formats/d2s-legacy.md §2. Header (130 bytes, `0x00532690`)
+system.formats.d2s-legacy.3-quests-0x00532be0	specs/formats/d2s-legacy.md §3. Quests (`0x00532BE0`)
+system.formats.d2s-legacy.4-waypoints-0x00532c70	specs/formats/d2s-legacy.md §4. Waypoints (`0x00532C70`)
+system.formats.d2s-legacy.5-npc-flags-0x00532d00	specs/formats/d2s-legacy.md §5. NPC flags (`0x00532D00`)
+system.formats.d2s-legacy.6-stats-0x00532da0	specs/formats/d2s-legacy.md §6. Stats (`0x00532DA0`)
+system.formats.d2s-legacy.7-skills-0x00532e90	specs/formats/d2s-legacy.md §7. Skills (`0x00532E90`)
+system.formats.d2s-legacy.8-player-items-0x005337f0	specs/formats/d2s-legacy.md §8. Player items (`0x005337F0`)
+system.formats.d2s-legacy.9-corpses-0x005339a0	specs/formats/d2s-legacy.md §9. Corpses (`0x005339A0`)
+system.formats.d2s-load.1-new-character-start-0x00569f80	specs/formats/d2s-load.md §1. New-character start (`0x00569F80`)
+system.formats.d2s-load.2-load-effects-0x0056b180	specs/formats/d2s-load.md §2. Load effects (`0x0056B180`)
+system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005	specs/formats/d2s-load.md §3. Join after the load: Iron Golem re-summon (`0x005394A0`)
+system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re	specs/formats/d2s-load.md §4. Hotkey and mouse-skill item indices after a reload
+system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show	specs/formats/d2s-load.md §5. Load failure: result codes and the message shown
+system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470	specs/formats/d2s-load.md §6. Runeword items that no longer match (`0x00563470`)
+system.formats.d2s-load.7-map-seed-restore-in-single-player	specs/formats/d2s-load.md §7. Map seed restore in single player
+system.formats.d2s-load.8-player-record-values-sent-at-the-join-sim-inte	specs/formats/d2s-load.md §8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3)
+system.formats.d2s.1-file-layout-and-framing	specs/formats/d2s.md §1. File layout and framing
+system.formats.d2s.10-errors	specs/formats/d2s.md §10. Errors
+system.formats.d2s.9-load-sequence-0x0056b180	specs/formats/d2s.md §9. Load sequence (`0x0056B180`)
+system.formats.dc6.file-header-24-bytes	specs/formats/dc6.md §File header (24 bytes)
+system.formats.dc6.frame	specs/formats/dc6.md §Frame
+system.formats.dc6.pixel-decoding	specs/formats/dc6.md §Pixel decoding
+system.formats.dc6.placement-informational	specs/formats/dc6.md §Placement (informational)
+system.formats.dcc.bit-reading	specs/formats/dcc.md §Bit reading
+system.formats.dcc.boxes	specs/formats/dcc.md §Boxes
+system.formats.dcc.cells	specs/formats/dcc.md §Cells
+system.formats.dcc.coded-bytes	specs/formats/dcc.md §Coded bytes
+system.formats.dcc.direction-header-bits	specs/formats/dcc.md §Direction header (bits)
+system.formats.dcc.end-checks	specs/formats/dcc.md §End checks
+system.formats.dcc.file-header-little-endian-bytes	specs/formats/dcc.md §File header (little-endian bytes)
+system.formats.dcc.frame-size-limit	specs/formats/dcc.md §Frame size limit
+system.formats.dcc.stage-1-cell-colors-all-frames-in-order	specs/formats/dcc.md §Stage 1: cell colors (all frames, in order)
+system.formats.dcc.stage-2-building-frames-all-frames-in-order-afte	specs/formats/dcc.md §Stage 2: building frames (all frames, in order, after stage 1)
+system.formats.dt1.block-header-20-bytes-each-at-the-tile-s-block-h	specs/formats/dt1.md §Block header (20 bytes each, at the tile's block headers offset)
+system.formats.dt1.block-pixels	specs/formats/dt1.md §Block pixels
+system.formats.dt1.file-header-276-bytes	specs/formats/dt1.md §File header (276 bytes)
+system.formats.dt1.tile-header-96-bytes-each-consecutive	specs/formats/dt1.md §Tile header (96 bytes each, consecutive)
+system.formats.dt1.unknown-and-runtime-fields	specs/formats/dt1.md §Unknown and runtime fields
+system.formats.font-tbl.glyph-records-14-bytes-each	specs/formats/font-tbl.md §Glyph records (14 bytes each)
+system.formats.font-tbl.header-12-bytes	specs/formats/font-tbl.md §Header (12 bytes)
+system.formats.palette.dat-palette	specs/formats/palette.md §.dat palette
+system.formats.palette.pl2-palette-transform	specs/formats/palette.md §.pl2 palette transform
+system.formats.wav.1-header	specs/formats/wav.md §1. Header
+system.formats.wav.2-chunk-walk-no-pad-bytes	specs/formats/wav.md §2. Chunk walk (no pad bytes)
+system.formats.wav.3-samples	specs/formats/wav.md §3. Samples
+system.formats.wav.4-format-checks-by-the-game	specs/formats/wav.md §4. Format checks by the game
+system.formats.wav.5-decoder-hook-d2rs	specs/formats/wav.md §5. Decoder hook (d2rs)
+skill.monster.baal-taunt	skills.txt Baal Taunt (284) monster
+skill.monster.bestow	skills.txt Bestow (182) monster
+skill.monster.blood-mana	skills.txt Blood Mana (310) monster
+skill.monster.bloodlordfrenzy	skills.txt BloodLordFrenzy (328) monster
+skill.monster.countessfirewall	skills.txt CountessFirewall (321) monster
+skill.monster.cry-help	skills.txt Cry Help (290) monster
+skill.monster.deathmaul	skills.txt DeathMaul (308) monster
+skill.monster.defense-curse	skills.txt Defense Curse (309) monster
+skill.monster.doomknightmissile	skills.txt DoomKnightMissile (335) monster
+skill.monster.emerge	skills.txt Emerge (180) monster
+skill.monster.fetishaura	skills.txt FetishAura (177) monster
+skill.monster.fetishinferno	skills.txt FetishInferno (178) monster
+skill.monster.fingermagespider	skills.txt FingerMageSpider (196) monster
+skill.monster.fire-hit	skills.txt Fire Hit (156) monster
+skill.monster.healing-vortex	skills.txt Healing Vortex (291) monster
+skill.monster.horror-arctic-blast	skills.txt Horror Arctic Blast (323) monster
+skill.monster.imp-fire-missile	skills.txt Imp Fire Missile (299) monster
+skill.monster.imp-fire-missile-ex	skills.txt Imp Fire Missile Ex (356) monster
+skill.monster.imp-fireball	skills.txt Imp Fireball (283) monster
+skill.monster.imp-inferno	skills.txt Imp Inferno (282) monster
+skill.monster.imp-teleport	skills.txt Imp Teleport (330) monster
+skill.monster.impbolt	skills.txt ImpBolt (322) monster
+skill.monster.impregnate	skills.txt Impregnate (300) monster
+skill.monster.maggotegg	skills.txt MaggotEgg (159) monster
+skill.monster.magottdown	skills.txt MagottDown (162) monster
+skill.monster.magottlay	skills.txt MagottLay (163) monster
+skill.monster.magottup	skills.txt MagottUp (161) monster
+skill.monster.megademoninferno	skills.txt MegademonInferno (319) monster
+skill.monster.monblizzard	skills.txt MonBlizzard (205) monster
+skill.monster.monbonearmor	skills.txt MonBoneArmor (210) monster
+skill.monster.monbonespirit	skills.txt MonBoneSpirit (211) monster
+skill.monster.monbow	skills.txt MonBow (339) monster
+skill.monster.moncoldarrow	skills.txt MonColdArrow (341) monster
+skill.monster.moncursecast	skills.txt MonCurseCast (212) monster
+skill.monster.monexplodingarrow	skills.txt MonExplodingArrow (342) monster
+skill.monster.monfirearrow	skills.txt MonFireArrow (340) monster
+skill.monster.monfreezingarrow	skills.txt MonFreezingArrow (343) monster
+skill.monster.monfrenzy	skills.txt MonFrenzy (215) monster
+skill.monster.monicespear	skills.txt MonIceSpear (347) monster
+skill.monster.monpowerstrike	skills.txt MonPowerStrike (344) monster
+skill.monster.monteleport	skills.txt MonTeleport (184) monster
+skill.monster.mosquito	skills.txt Mosquito (206) monster
+skill.monster.nest	skills.txt Nest (167) monster
+skill.monster.overseer-whip	skills.txt Overseer Whip (295) monster
+skill.monster.regurgitatoreat	skills.txt RegurgitatorEat (214) monster
+skill.monster.resurrect	skills.txt Resurrect (181) monster
+skill.monster.resurrect2	skills.txt Resurrect2 (327) monster
+skill.monster.self-resurrect	skills.txt Self-resurrect (293) monster
+skill.monster.serpentcharge	skills.txt SerpentCharge (352) monster
+skill.monster.shamanfireex	skills.txt ShamanFireEx (355) monster
+skill.monster.shamanice	skills.txt ShamanIce (348) monster
+skill.monster.siege-beast-stomp	skills.txt Siege Beast Stomp (301) monster
+skill.monster.skeletonraise	skills.txt SkeletonRaise (158) monster
+skill.monster.spiderlay	skills.txt SpiderLay (173) monster
+skill.monster.submerge	skills.txt Submerge (176) monster
+skill.monster.succubusbolt	skills.txt SuccubusBolt (345) monster
+skill.monster.swarm-move	skills.txt Swarm Move (166) monster
+skill.monster.unholybolt	skills.txt UnHolyBolt (157) monster
+skill.monster.unholyboltex	skills.txt UnHolyBoltEx (354) monster
+skill.monster.vampirefireball	skills.txt VampireFireball (169) monster
+skill.monster.vampiremeteor	skills.txt VampireMeteor (171) monster
+skill.monster.vampiremissile	skills.txt VampireMissile (333) monster
+skill.monster.zakarumheal	skills.txt ZakarumHeal (179) monster
+skill.monster.zakarumlightning	skills.txt ZakarumLightning (332) monster

@@ -1,0 +1,48 @@
+# pc1-charselect-dolls 1
+# tool: tools/trace-recorder/record_frames.py --front-end (compfile records of the character-select screen) + the appearance bytes (file offsets 0x88-0xA7) of saves built by d2s-tool and then saved once by 1.14d (record_state.py --write-save, Save and Exit at frame 21); 1.14d Game.exe, Windows, 2026-10-10
+# section saves: name, class, equipment given to d2s-tool, 16 component bytes, 16 colour bytes (hex)
+save	DollBow	ama	sbw body 4	ffffffffffff29ffffffffffffffffff	ffffffffffffffffffffffffffffffff
+save	DollTwo	bar	ssd body 4 + ssd body 5	ffffffffff1111ffffffffffffffffff	ffffffffffffffffffffffffffffffff
+save	DollShd	pal	ssd body 4 + buc body 5	ffffffffff11ff4fffffffffffffffff	ffffffffffffffffffffffffffffffff
+save	DollCol	sor	unique qui (Greyform) body 3 + unique cap (War Bonnet) body 1	3901010101ffffff0202ffffffffffff	53e2e2e2e2ffffffe2e2ffffffffffff
+save	DollDead	nec	none; hardcore, status bit 0x08 (dead) set by hand	ffffffffffffffffffffffffffffffff	ffffffffffffffffffffffffffffffff
+# section compfile: every component file the screen loaded (all listed saves plus ScnAma / ScnSo4 / ScnSo5 defaults were on screen), path under DATA/GLOBAL
+compfile	CHARS/AM/HD/AMHDLITTN1HT.DCC
+compfile	CHARS/AM/LA/AMLALITTN1HT.DCC
+compfile	CHARS/AM/LG/AMLGLITTN1HT.DCC
+compfile	CHARS/AM/LH/AMLHSBWTNBOW.DCC
+compfile	CHARS/AM/RA/AMRALITTNHTH.DCC
+compfile	CHARS/AM/S1/AMS1LITTN1HT.DCC
+compfile	CHARS/AM/S2/AMS2LITTN1HT.DCC
+compfile	CHARS/AM/SH/AMSHLITTN1HT.DCC
+compfile	CHARS/AM/TR/AMTRLITTN1HT.DCC
+compfile	CHARS/BA/HD/BAHDLITTNHTH.DCC
+compfile	CHARS/BA/LA/BALALITTN1SS.DCC
+compfile	CHARS/BA/LG/BALGLITTNHTH.DCC
+compfile	CHARS/BA/LH/BALHSSDTN1SS.DCC
+compfile	CHARS/BA/RA/BARALITTN1HS.DCC
+compfile	CHARS/BA/RH/BARHSSDTN1HS.DCC
+compfile	CHARS/BA/S1/BAS1LITTNHTH.DCC
+compfile	CHARS/BA/S2/BAS2LITTNHTH.DCC
+compfile	CHARS/BA/TR/BATRLITTNHTH.DCC
+compfile	CHARS/PA/HD/PAHDLITTN1HS.DCC
+compfile	CHARS/PA/LA/PALALITTN1HS.DCC
+compfile	CHARS/PA/LG/PALGLITTN1HS.DCC
+compfile	CHARS/PA/RA/PARALITTN1HS.DCC
+compfile	CHARS/PA/RH/PARHSSDTN1HS.DCC
+compfile	CHARS/PA/S1/PAS1LITTN1HS.DCC
+compfile	CHARS/PA/S2/PAS2LITTN1HS.DCC
+compfile	CHARS/PA/SH/PASHBUCTN1HS.DCC
+compfile	CHARS/PA/TR/PATRLITTN1HS.DCC
+compfile	CHARS/SO/HD/SOHDCAPTNHTH.DCC
+compfile	CHARS/SO/HD/SOHDLITTNHTH.DCC
+compfile	CHARS/SO/LA/SOLALITTNHTH.DCC
+compfile	CHARS/SO/LG/SOLGLITTNHTH.DCC
+compfile	CHARS/SO/RA/SORALITTNHTH.DCC
+compfile	CHARS/SO/S1/SOS1LITTNHTH.DCC
+compfile	CHARS/SO/S1/SOS1MEDTNHTH.DCC
+compfile	CHARS/SO/S2/SOS2LITTNHTH.DCC
+compfile	CHARS/SO/S2/SOS2MEDTNHTH.DCC
+compfile	CHARS/SO/SH/SOSHLITTNHTH.DCC
+compfile	CHARS/SO/TR/SOTRLITTNHTH.DCC
+compfile	MONSTERS/RH/TR/RHTRLITTNHTH.DCC

@@ -1,0 +1,43 @@
+{
+ "channel": "draws",
+ "check": "ui-draws-msglog-ama",
+ "command": [
+  "tools/trace-recorder/record_frames.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "600",
+  "--ticks",
+  "76",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.frames.jsonl",
+  "--every",
+  "1",
+  "--draws-every",
+  "1",
+  "--no-save",
+  "--input",
+  "frame 38; move 790 10; frame 40; key M"
+ ],
+ "files": {
+  "orig.frames.jsonl": {
+   "sha256": "005f38bee258673f08615612fe582fcf9edbd0c8a8efa4a2fbc2da3737a227d3",
+   "size": 7859654
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "e262ee57fc8b7b14ab7ee98ba4469f693a7c8636e5a20df62cd3223ca6b1cb80",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "6acab5c77636638a790840c542c51dd7472887044888df9f164764661dcb9c53",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

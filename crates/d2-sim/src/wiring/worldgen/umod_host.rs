@@ -174,7 +174,14 @@ impl<X: WorldPending> WorldHost<'_, X> {
             return false;
         };
         let to = self.v.h.path_position(unit);
-        !self.v.h.x.body_line_blocked(room, from, to, AREA_LINE_MASK)
+        !crate::path::line::line_test(
+            &self.v.h.drlg,
+            Some(room),
+            crate::path::Point::new(from.0, from.1),
+            crate::path::Point::new(to.0, to.1),
+            AREA_LINE_MASK as u16,
+        )
+        .blocked()
     }
 
     /// `0x005AD730(game, src, V, rec)` (`missiles.md` §R6.1): nothing

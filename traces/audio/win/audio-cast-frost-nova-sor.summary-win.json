@@ -1,0 +1,41 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 10,
+  "d2rs": 12,
+  "matched": 10,
+  "differences": 2,
+  "first": {
+   "tick": 0,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0; 1.14d starts no voice with these samples"
+  },
+  "by_kind": {
+   "voice": 2
+  },
+  "partial": [
+   "DATA\\GLOBAL\\SFX\\ambient\\scene\\wilderness day 2.wav at T 0: partial: the capture holds 524288 of 671432 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\object\\fire4.wav at T 0: partial: the capture holds 131072 of 222494 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 99,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "audio-cast-frost-nova-sor",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 77,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\MUSIC\\act1\\wild.wav at T 77; 1.14d starts no voice with these samples"
+  }
+ ]
+}
