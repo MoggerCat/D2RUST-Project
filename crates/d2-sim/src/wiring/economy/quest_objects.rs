@@ -117,6 +117,10 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         }
     }
 
+    fn act_loaded(&mut self, game: &mut Game, v: &mut View<'_, X>, act: u8) {
+        self.on_world(game, v, LoanCall::ActLoaded { act });
+    }
+
     fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
         self.on_world(game, v, LoanCall::TownLeave { player, to });
         // `0x00537340` queues the quest messages at once (`0x0053D710`), so
@@ -258,6 +262,8 @@ enum LoanCall<'c> {
     ChangedLevel { player: UnitId, from: u32, to: u32 },
     /// The quest part of the town-leave refresh `0x00537340`.
     TownLeave { player: UnitId, to: u32 },
+    /// The act-load hook `0x0059AC40`.
+    ActLoaded { act: u8 },
     /// The quest active test (`world/quests.md` §6.4).
     NpcWantsInteract {
         player: UnitId,
@@ -313,6 +319,10 @@ fn on_host<'e, X: Pending, R: QuestRest>(
                 461 => act5::q3::map_ai_store(quests, &mut w, h, true),
                 _ => {}
             }
+            LoanOut::Run(QuestObjectRun::Ran)
+        }
+        LoanCall::ActLoaded { act } => {
+            quests.act_load(&mut w, act);
             LoanOut::Run(QuestObjectRun::Ran)
         }
         LoanCall::TownLeave { player, to } => {

@@ -395,8 +395,25 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     fn game_type(&self) -> u8 {
         self.econ.fields.game_type
     }
+    /// `0x005382B0`: the act of the player's client; d2rs keeps no client
+    /// act of its own, so the act of the client's room (`path-placement.md`
+    /// §13: equal to it except during an act change).
+    fn client_in_act(&mut self, player: UnitId, act: u8) -> bool {
+        let lists = &self.econ.game.lists;
+        lists
+            .clients()
+            .into_iter()
+            .filter_map(|c| lists.client(c))
+            .find(|c| c.player == Some(player))
+            .and_then(|c| c.room)
+            .and_then(|r| lists.room(r))
+            .is_some_and(|r| r.act == act)
+    }
+
+    /// Game +0xC0 (`0x0053AC70` stores the act pointer when Act II is
+    /// built): the act's record in the lists, or the rest's answer.
     fn has_act2(&self) -> bool {
-        self.rest.has_act2()
+        self.econ.game.lists.act(1).is_some_and(|a| a.built) || self.rest.has_act2()
     }
 
     /// [`quest_players`] on the game's lists and stat lists.

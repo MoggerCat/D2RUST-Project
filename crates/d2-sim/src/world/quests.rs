@@ -1794,6 +1794,15 @@ impl QuestControl {
         self.dispatch_list(w, event::PLAYER_LEAVES_GAME, args, false, None);
     }
 
+    /// The act-load hook `0x0059AC40` (from `0x0053AC70`, after the act is
+    /// built): Act II (act index 1) first built starts the Tainted Sun
+    /// when it is pending (`quests-act2.md` §5.3).
+    pub fn act_load<W: QuestWorld>(&mut self, w: &mut W, act: u8) {
+        if act == 1 {
+            act2::q3::act_load(self, w, 1, 1);
+        }
+    }
+
     /// `0x00543B90`: level change (event 3, (1, 0)).
     pub fn changed_level<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, old: u32, new: u32) {
         let args = EventArgs {

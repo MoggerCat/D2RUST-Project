@@ -114,6 +114,11 @@ pub trait QuestObjectHost<X> {
     ) {
         let _ = (game, v, player, from, to);
     }
+    /// The quest act-load hook `0x0059AC40` after an act's first build
+    /// (`0x0053AC70`, `world/quests-act2.md` §5.3). Default: nothing.
+    fn act_loaded(&mut self, game: &mut Game, v: &mut View<'_, X>, act: u8) {
+        let _ = (game, v, act);
+    }
     /// The quest part of the town-leave refresh `0x00537340(game, player,
     /// from, to)` (`world/quests.md` §6.7, §8.1), run by the level warp
     /// before the act change `0x0053ACC0`. Default: nothing.

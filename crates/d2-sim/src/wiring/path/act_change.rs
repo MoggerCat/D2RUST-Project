@@ -233,12 +233,27 @@ pub fn run<X: Pending>(mut c: PathCtx<'_, X>, player: UnitId, level: u32, tile_i
         .x
         .send(player, &load_act(act, init_seed, town as u16, obj_seed));
     let env = c.game.lists.act_mut(act).map(|r| {
-        if !r.built {
+        let first = !r.built;
+        if first {
             r.built = true;
             r.environment = crate::world::environment::Environment::CREATED;
         }
-        r.environment
+        (r.environment, first)
     });
+    // The act-load quest hook `0x0059AC40` runs inside the act's creation
+    // (`0x0053AC70`), before the 0x53 reads the environment: Act II's
+    // pending Tainted Sun starts there (`quests-act2.md` §5.3).
+    let env = match env {
+        Some((env, true)) => {
+            if let Some(mut host) = c.v.h.quest_host.take() {
+                host.act_loaded(c.game, &mut c.v, act);
+                c.v.h.quest_host = Some(host);
+            }
+            c.game.lists.act(act).map(|r| r.environment).or(Some(env))
+        }
+        Some((env, false)) => Some(env),
+        None => None,
+    };
     if let Some(env) = env {
         c.v.h.x.send(player, &env.message());
     }
