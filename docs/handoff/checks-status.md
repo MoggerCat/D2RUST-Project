@@ -2348,7 +2348,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-mon-686 | state | PARTIAL | 150/150 | - | - |
 | gen-mon-687 | rng | MATCH | 133/133 | - | - |
 | gen-mon-687 | state | PARTIAL | 150/150 | - | - |
-| gen-mon-688 | rng | ERROR | 0/0 | - | unrouted |
+| gen-mon-688 | rng | MATCH | 133/133 | - | - |
 | gen-mon-688 | state | PARTIAL | 150/150 | - | - |
 | gen-mon-689 | rng | MATCH | 133/133 | - | - |
 | gen-mon-689 | state | PARTIAL | 150/150 | - | - |
