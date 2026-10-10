@@ -35,7 +35,7 @@
 | Edge cases & original bugs | 1057–1096 |
 | Test vectors | 1097–1111 |
 | Provenance | 1112–1134 |
-| Open questions | 1135–1164 |
+| Open questions | 1135–1170 |
 <!-- /index -->
 
 ## Summary
@@ -1161,3 +1161,9 @@ steps call them (`bodies.md` Randomness).
    the casting unit's room. "E flags bit 2" in §5.16 / §5.30 is mask 2,
    the move-ended flag owned by `use.md` §5.2 rule 2 (`test al, 2` at
    `0x005CBCC8`, `0x005CD3D2`).
+
+Note (rc-extra-missile): the Frames helper's "total frames := n, frames
+left := n" must reach the missile in the server's missile store, or the
+missile lives its full `Range` (fetishinferno1: 30 frames instead of
+`Param2` + L − 1 = 14 at skill level 8). Checked by gen-mon-279 and ten
+sibling Fetish Shaman / Megademon / fallen shaman checks (state 150/150).
