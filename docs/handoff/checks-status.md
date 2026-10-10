@@ -1548,26 +1548,26 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-wp-29 | state | PARTIAL | 460/460 | - | - |
 | hire-asheara | packets | MATCH | 90/90 | - | - |
 | hire-asheara | state | PARTIAL | 90/90 | - | - |
-| hire-follow-warp-kashya | packets | DIVERGED | 199/200 | frame 39 stream s2c #1 missing in d2rs (id 0x0a) | q-fix-join-items |
+| hire-follow-warp-kashya | packets | DIVERGED | 199/200 | frame 39 stream s2c #1 missing in d2rs (id 0x0a) | - |
 | hire-follow-warp-kashya | state | PARTIAL | 200/200 | - | - |
-| hire-follow-waypoint-kashya | packets | DIVERGED | 313/330 | frame 30 stream s2c #0 extra (d2rs only) (id 0x15) | q-fix-join-items |
-| hire-follow-waypoint-kashya | state | DIVERGED | 305/330 | frame 268 missile 3:1 class 12/120, field cl: 1.14d 12 vs d2rs 120 | unrouted |
+| hire-follow-waypoint-kashya | packets | DIVERGED | 317/330 | frame 251 stream s2c #0 missing in d2rs (id 0x7f) | - |
+| hire-follow-waypoint-kashya | state | DIVERGED | 305/330 | frame 268 missile 3:1 class 12/120, field cl: 1.14d 12 vs d2rs 120 | - |
 | hire-greiz | packets | MATCH | 90/90 | - | - |
 | hire-greiz | state | PARTIAL | 90/90 | - | - |
-| hire-items-kashya | packets | DIVERGED | 88/90 | frame 34 stream s2c #0 missing in d2rs (id 0x42) | q-fix-join-items |
-| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306, field x: 1.14d 0 vs d2rs (absent) | coord-resume-3 |
+| hire-items-kashya | packets | DIVERGED | 88/90 | frame 34 stream s2c #0 missing in d2rs (id 0x42) | - |
+| hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306, field x: 1.14d 0 vs d2rs (absent) | - |
 | hire-kashya | packets | MATCH | 90/90 | - | - |
 | hire-kashya | state | PARTIAL | 90/90 | - | - |
 | hire-qual-kehk | packets | MATCH | 90/90 | - | - |
 | hire-qual-kehk | state | PARTIAL | 90/90 | - | - |
-| hire-resurrect-asheara | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-asheara | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/359, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
-| hire-resurrect-greiz | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-greiz | state | DIVERGED | 85/130 | frame 86 monster 1:22 class -/338, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
-| hire-resurrect-kashya | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-kashya | state | DIVERGED | 85/130 | frame 86 monster 1:13 class -/271, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
-| hire-resurrect-qual-kehk | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-qual-kehk | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/561, field (unit): 1.14d absent vs d2rs extra | q-fix-monster-ai-2 |
+| hire-resurrect-asheara | packets | MATCH | 130/130 | - | - |
+| hire-resurrect-asheara | state | PARTIAL | 130/130 | - | - |
+| hire-resurrect-greiz | packets | MATCH | 130/130 | - | - |
+| hire-resurrect-greiz | state | PARTIAL | 130/130 | - | - |
+| hire-resurrect-kashya | packets | MATCH | 130/130 | - | - |
+| hire-resurrect-kashya | state | PARTIAL | 130/130 | - | - |
+| hire-resurrect-qual-kehk | packets | MATCH | 130/130 | - | - |
+| hire-resurrect-qual-kehk | state | PARTIAL | 130/130 | - | - |
 | interact-talk-akara | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | unrouted |
 | interact-talk-akara | state | PARTIAL | 30/30 | - | - |
 | inv-pick-belt | items | MATCH | 1/1 | - | - |

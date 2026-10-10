@@ -272,8 +272,21 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
         e.hooks.assign_umod(&mut sim, merc, UMOD_HIREABLE);
         e.hooks.clear_hireling_components(merc);
     }
+    /// `0x0061A270` + `0x00555600`: the room's removal notice, then the
+    /// unit record freed (the rest's part first).
     fn free_unit(&mut self, unit: UnitId) {
         self.desk.rest.free_unit(unit);
+        let e = &mut *self.desk.econ;
+        if let Some((ty, guid)) = e.units.get(unit).map(|r| (r.ty as u8, r.guid)) {
+            e.hooks.queue_removal_notice(ty, guid);
+        }
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        let _ = crate::units::lifecycle::remove(&mut sim, &mut *e.hooks, unit);
     }
     fn queue_room_removal(&mut self, unit: UnitId) {
         self.desk.rest.queue_room_removal(unit);

@@ -125,6 +125,12 @@ pub trait LifecycleHooks: UnitHooks {
     /// store; the default does nothing.
     fn set_ai_owner(&mut self, unit: UnitId, owner_type: u8, owner_guid: u32) {}
 
+    /// `0x0061A270(room, type, GUID)` of a unit freed by the host's NPC
+    /// calls (the hireling revive of `world/hirelings.md` §9 rule 3): the
+    /// room's removal notice, sent to the clients in the next per-client
+    /// update (`tick.md` §6 rule 5, `0x0053A770`). Default: nothing.
+    fn queue_removal_notice(&mut self, unit_type: u8, guid: u32) {}
+
     /// `0x005718C0(unit, stat, value)`: a stat record on the unit's message
     /// list (+0xEC), flushed to each updating client by `0x00571CD0`
     /// (`world/hirelings.md` §13 rule 4). Provider: the host with the unit
