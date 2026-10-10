@@ -182,6 +182,30 @@ wait. A variant is a patch stack (rule 9): commit the `.d2stack` /
 
 ## Step 4 — binary reads and one recording only PC 1 can do (queued by the coordinator, 2026-10-08)
 
+**Truly Windows-only rows for PC 1 (rc-pc1-wine, 2026-10-10; ranked by row count).** Of the 175 NO-CHECK
+ledger rows that were marked Windows-only / needs 1.14d facts, the cloud now settles what Wine, the
+recorded clock / frame schedule / `-ns` / registry replay, the Ghidra exports or a fresh data test can
+(done in cloud: rc-pc1-wine). What is left for PC 1:
+
+1. **Audio, 10 rows** (`system.audio.sound-table-2` 4, `environment` 3, `triggers` 1, `audio.npc-speech` 1
+   + `client.weather` is cloud): the Wine start-up differs from Windows (rc-audio-fmt-div, measured
+   2026-10-10 on `audio-town-ambi...`): voice lists and start-up-tick audio need the real Windows run.
+   Digests only, no blobs; see the `[rc-audio-fmt-div]` item below.
+2. **Cinematic video hook, 1 row** (`system.ui.frontend-credits.c5-video-hook-all-videos-stub-in-d2rs`):
+   windowed 1.14d returns from Bink at once (pc1-day3-c); needs a full-screen run on PC 1 with the owner's OK.
+3. Nothing else is Windows-only. The rest of the 175 are cloud work, not PC 1: the 54 `system.ui.frontend-*`
+   rows have their 1.14d facts (`facts/render/scenes/frontend-*`, two runs equal) and wait for the d2rs draw-list
+   comparison (claim C009, rc-c009-scenes); the 56 item / cube / drop / inventory / vendor / skill rows
+   (`needs_pc1 = y`) need new check families (Wine can record them: `poke item`, `d2s-tool --item`, the
+   items / draws / cstate channels), not Windows.
+
+Settled in the cloud by rc-pc1-wine (done in cloud: rc-pc1-wine): `system.client.*` (the client unit sets S / C:
+new `cstate` channel, `d2-client state-dump --client-out`, 17 `*-cs` checks; the 1.14d recording was re-made
+under Wine and equals the PC 1 one in every field but the local player's client seed), `object.preset.574-579`
+(NOT-APPLICABLE: no DS1 file names those classes, fresh data test), `system.formats.d2s-appearance.4/5`
+(draws checks with equipped items, both DIVERGED: the play preview gives the local player no equipment
+components), `item.affix.automagic` / `charm` (itemq items channel, 24 of 24 MATCH, fresh run).
+
 Cloud sessions now record 1.14d themselves under Wine (REC-290 RNG half
 equal to PC 1's traces; `tools/cloud-game/`), so PC 1 keeps only what
 needs `re/` or a real Windows run. Each answer goes into its owner spec

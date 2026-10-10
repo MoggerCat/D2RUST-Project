@@ -1519,28 +1519,28 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-ai-suicideminion | state | PARTIAL | 150/150 | - | - |
 | gen-ai-summoner | state | PARTIAL | 150/150 | - | - |
 | gen-fmt-draws-town | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 282 | unrouted |
-| gen-itemq-crafted-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 25, after the head (bit 95 past bit 109): 1.14d 9922504010 vs d2rs 9922504000 | unrouted |
-| gen-itemq-crafted-1 | items | DIVERGED | 19/20 | item #6 (7gd) stream length: 1.14d 25 vs d2rs 24 | unrouted |
+| gen-itemq-crafted-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-crafted-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-crafted-2 | items | MATCH | 20/20 | - | - |
 | gen-itemq-low-0 | items | MATCH | 20/20 | - | - |
 | gen-itemq-low-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-low-2 | items | MATCH | 20/20 | - | - |
 | gen-itemq-magic-0 | items | MATCH | 20/20 | - | - |
-| gen-itemq-magic-1 | items | DIVERGED | 19/20 | item #18 (9kr) stream byte 17, after the head (bit 33 past bit 109): 1.14d 045502e3c100 vs d2rs 045502e301 | unrouted |
+| gen-itemq-magic-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-magic-2 | items | MATCH | 20/20 | - | - |
 | gen-itemq-normal-0 | items | MATCH | 20/20 | - | - |
 | gen-itemq-normal-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-normal-2 | items | MATCH | 20/20 | - | - |
-| gen-itemq-rare-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 26, after the head (bit 105 past bit 109): 1.14d c92481024200 vs d2rs c924810202 | unrouted |
-| gen-itemq-rare-1 | items | DIVERGED | 19/20 | item #6 (7gd) stream byte 26, after the head (bit 105 past bit 109): 1.14d 690246264500 vs d2rs 6902462605 | unrouted |
+| gen-itemq-rare-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-rare-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-rare-2 | items | MATCH | 20/20 | - | - |
-| gen-itemq-set-0 | items | DIVERGED | 19/20 | item #15 (ucl) stream byte 19, after the head (bit 44 past bit 109): 1.14d 4233241202 vs d2rs 4233241200 | unrouted |
-| gen-itemq-set-1 | items | DIVERGED | 18/20 | item #15 (ucl) stream byte 19, after the head (bit 45 past bit 109): 1.14d 423f241204 vs d2rs 423f241200 | unrouted |
-| gen-itemq-set-2 | items | DIVERGED | 19/20 | item #15 (ucl) stream byte 19, after the head (bit 44 past bit 109): 1.14d 6239241c06 vs d2rs 6239241c00 | unrouted |
+| gen-itemq-set-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-set-1 | items | MATCH | 20/20 | - | - |
+| gen-itemq-set-2 | items | MATCH | 20/20 | - | - |
 | gen-itemq-superior-0 | items | MATCH | 20/20 | - | - |
 | gen-itemq-superior-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-superior-2 | items | MATCH | 20/20 | - | - |
-| gen-itemq-unique-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 26, after the head (bit 105 past bit 109): 1.14d c92481074600 vs d2rs c924810706 | unrouted |
+| gen-itemq-unique-0 | items | MATCH | 20/20 | - | - |
 | gen-itemq-unique-1 | items | MATCH | 20/20 | - | - |
 | gen-itemq-unique-2 | items | MATCH | 20/20 | - | - |
 | gen-lvl-104 | rng | DIVERGED | 158/159 | frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:193 | unrouted |
@@ -3682,3 +3682,5 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | bar-taunt | state | PARTIAL | 70/70 | - | - |
 | bar-taunt | packets | MATCH | 70/70 | - | - |
 | ui-frontend-screens | frontend | DIVERGED | 0/15 | charselect: 3970 stable pixels differ, first at [37, 86] | unrouted |
+| draws-equip-armour-ama | draws | DIVERGED | 226/259 | draws.tsv first difference: equipped component file (1.14d med vs d2rs lit) | unrouted |
+| draws-equip-helm-hands-ama | draws | DIVERGED | 229/259 | draws.tsv first difference: equipped component file (1.14d cap vs d2rs lit) | unrouted |

@@ -1,0 +1,10 @@
+check 1
+# Equipped items on the paper doll in the Rogue Encampment (rc-pc1-wine, specs/formats/d2s-appearance.md §4 helm and hand items): ScnAma with --item cap/body=1 --item lgl/body=10, -seed 1234, idle arrival; the draws channel compares the player's composite (component files per layer).
+# Spec: specs/tools/scenario-diff.md.
+name draws-equip-helm-hands-ama
+save EqAma --class ama --expansion --item cap/body=1 --item lgl/body=10
+seed 1234
+ticks 76
+seconds 600
+channels draws
+draws-at 73
