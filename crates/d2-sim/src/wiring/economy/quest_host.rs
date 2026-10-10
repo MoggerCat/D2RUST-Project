@@ -1308,6 +1308,15 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     // -- The helpers' narrow seams (`quests-helpers.md`) on the action
     // wiring.
 
+    /// The object control's seed (`0x00546FA0`) of the lent object state.
+    fn object_seed(&mut self) -> Option<&mut Seed> {
+        self.inner
+            .econ
+            .hooks
+            .objects
+            .as_mut()
+            .map(|s| &mut s.control.seed)
+    }
     /// `0x00619730`: the DRLG room's sub-tile box.
     fn room_box(&mut self, room: RoomId) -> Option<TileRect> {
         let e = &*self.inner.econ;

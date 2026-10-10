@@ -549,7 +549,7 @@ pub fn init_route(n: u8) -> Route {
         0 | 35 | 36 | 40 => Route::Null,
         1 | 2 | 3 | 5 | 11 | 12 | 16 | 57 => Route::Here,
         17 => Route::Waypoint,
-        8 | 10 | 13 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => Route::Here,
+        8 | 10 | 14 | 22 | 24 | 26 | 27 | 28 | 34 | 51 | 58 => Route::Here,
         n if n < INIT_FN_BOUND => Route::Quest,
         _ => Route::Null,
     }

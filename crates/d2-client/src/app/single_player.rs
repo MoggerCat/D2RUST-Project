@@ -732,7 +732,9 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
     let mut units = BTreeMap::new();
-    for ty in [UnitType::Player, UnitType::Monster] {
+    // Objects too: the quest object events read the object's act and room
+    // level (`quests.md` §9.5, class 189: "room level in Act I").
+    for ty in [UnitType::Player, UnitType::Monster, UnitType::Object] {
         for u in game.lists.units_of_type(ty) {
             let Some(e) = game.lists.unit(u) else {
                 continue;
