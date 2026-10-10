@@ -382,6 +382,10 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
+    /// Mercenaries linked to their player ([`LifecycleHooks::set_ai_owner`]
+    /// with a player owner, called only by the hireling init): the units whose
+    /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
+    pub hireling_units: std::collections::BTreeSet<UnitId>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -532,6 +536,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
+            hireling_units: std::collections::BTreeSet::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),

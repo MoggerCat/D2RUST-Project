@@ -7,7 +7,8 @@ E0=$(eq)
 chk() { E1=$(eq); [ "$E1" -lt "$E0" ] && echo "$b WARN: EQUAL $E0 -> $E1 (check the part for stale rows)"; }
 git merge --no-ff --no-edit origin/claude/$b >/dev/null 2>&1 && { python3 tools/coord/ledger.py >/dev/null; git add docs; git commit -q -m "Ledger: regenerate after $b" 2>/dev/null; echo "$b clean"; chk; exit 0; }
 U=$(git diff --name-only --diff-filter=U)
-O=$(echo "$U" | grep -v 'fidelity-ledger' | grep -v '^specs/')
+echo "$U" | grep -q 'checks-status.md' && python3 $S/statusres.py && git add docs/handoff/checks-status.md
+O=$(echo "$U" | grep -v 'fidelity-ledger' | grep -v '^specs/' | grep -v 'checks-status.md')
 [ -n "$O" ] && { echo "$b STOP code: $O"; exit 2; }
 SP=$(echo "$U" | grep '^specs/')
 [ -n "$SP" ] && { python3 $S/idxres.py $SP || { echo "$b STOP spec body"; exit 2; }; }
