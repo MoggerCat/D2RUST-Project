@@ -30,6 +30,7 @@
 |   1. Scope and order | 103–139 |
 |   2. Minion (116) `0x005E1B60` | 140–156 |
 |   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–189 |
+<<<<<<< HEAD
 |   4. Succubus (118) `0x005E1E00` | 190–216 |
 |   5. BloodLord (125) `0x005E36F0` | 217–227 |
 |   6. SuccubusWitch (119) `0x005E2120` | 228–252 |
@@ -56,6 +57,34 @@
 | Test vectors | 779–793 |
 | Provenance | 794–819 |
 | Open questions | 820–858 |
+=======
+|   4. Succubus (118) `0x005E1E00` | 190–217 |
+|   5. BloodLord (125) `0x005E36F0` | 218–228 |
+|   6. SuccubusWitch (119) `0x005E2120` | 229–253 |
+|   7. Overseer (120) `0x005E27A0` | 254–289 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 290–307 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 308–325 |
+|   10. DeathMauler (130) `0x005EE260` | 326–336 |
+|   11. PutridDefiler (137) `0x005EFA90` | 337–361 |
+|   12. Ancient (133) `0x005EF1A0` | 362–416 |
+|   13. AncientStatue (132) `0x005EEAA0` | 417–424 |
+|   14. FrozenHorror (124) `0x005E3530` | 425–439 |
+|   15. SiegeBeast (115) `0x005E1900` | 440–467 |
+|   16. SuicideMinion (117) `0x005E1D30` | 468–479 |
+|   17. BaalMinion (141) `0x005EF910` | 480–491 |
+|   18. BaalTaunt (136) `0x005EF710` | 492–508 |
+|   19. BaalToStairs (138) `0x005EF620` | 509–524 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 525–569 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 570–681 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 682–698 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 699–736 |
+| Constants & data dependencies | 737–755 |
+| Randomness | 756–764 |
+| Edge cases & original bugs | 765–779 |
+| Test vectors | 780–794 |
+| Provenance | 795–820 |
+| Open questions | 821–859 |
+>>>>>>> origin/claude/rc-vile-crow
 <!-- /index -->
 
 ## Summary
@@ -193,6 +222,14 @@ Brackets: succubus1 [90, 50, 50, 15, 15, 15, 3, 0]; `Skill1` Defense
 Curse, `Skill2` Blood Mana, `Skill3` SuccubusBolt. Skill tests here are
 **> 0**. "Cursed" = T has an active stat list with list flag 0x20
 (`0x00625760(T, 0x20)`, `sim/stat-lists.md` §9; D2MOO `STATLIST_CURSE`).
+`0x00625760(unit, f)` answers 0 unless the unit's own list is extended
+(bit 0x80000000); then `0x006256E0` returns the first list of the active
+chain whose flags share a bit with f. The skill-3 test reads max life
+(`0x00625D10`, stat 7) and max mana (`0x00625D60`, stat 9) of T: cast when
+max mana < max life, T is absent or T is not a player. Both reads are
+real stat reads in the wiring (a stub of 0 / false made a monster cast a
+curse again on an already cursed player; gen-su-54, first difference
+frame 41 -> 68).
 
 1. T not cursed, D < aip4 [15] and P(aip3) [50]:
    1. `Skill1` > 0 and T's life percent ≥ aip7 [3] → `Skill1` at T. End.
