@@ -170,7 +170,10 @@ None of its own: the owner specs' state changes, as listed per rule.
 4. A player mode request that sets a non-walking mode (every code but
    0x00, 0x01, 0x02, 0x17, 0x18: hit, death, a skill) ends the
    prediction's walk, as the server's mode change ends its walk
-   (`client/model.md` §8 r4, PROVISIONAL REC-1250).
+   (`client/model.md` §8 r4, read from 1.14d 2026-10-10, REC-1250:
+   true for the codes that set a mode; code 0x13 and a 0x12 that sets
+   no mode keep the walk, and in single player the server copy of
+   `client/model.md` §5 r7 overrides the prediction every update).
 5. The prediction's path sees the same blockers as the server's: the
    client DRLG's grids, the living monsters (`client/msg-units.md` §3
    r2) and the objects whose footprint the 0x51 init stamped and no
