@@ -1079,7 +1079,7 @@ where
         self.start_item_walk(game, events, walk);
     }
     fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {
-        self.start_object_walk(game, events, walk);
+        self.start_object_walk(game, events, walk, false);
     }
 
     /// The tick with this world's quest parts lent to the action hooks
