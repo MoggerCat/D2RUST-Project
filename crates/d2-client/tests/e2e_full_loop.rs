@@ -2287,8 +2287,11 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let n = w.len();
     assert!(w[..n - 1].iter().all(|f| f.2 == 3));
-    assert_eq!(w[n - 1], (centre(NPC_AT.0), centre(NPC_AT.1), 1));
-    assert_eq!(fx.pos(player), NPC_AT);
+    // The run now stops at distance 0 beside her (Δ=(1,1)), not on her
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
+    let stop = (NPC_AT.0 + 1, NPC_AT.1 + 1);
+    assert_eq!(w[n - 1], (centre(stop.0), centre(stop.1), 1));
+    assert_eq!(fx.pos(player), stop);
     walks.push(w);
 
     // 10. Talk (C→S 0x13, `npc.md` §2): S→C 0x27, 0x29, 0x28 in order
@@ -2420,9 +2423,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap, bought]);
 
-    // 14. Walk to the waypoint object (C→S 0x02, type 2): objects have
-    // no footprint here (`wiring::path::units` TODO: no objects.txt), so
-    // the walk ends on the object's sub-tile.
+    // 14. Walk to the waypoint object (C→S 0x02, type 2): the walk ends
+    // beside the object at distance 0 (Δ=(0,1) here), not on its
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
     let og = fx.guid(fx.wp_unit);
     let w = walk(
         &mut fx,
@@ -2432,7 +2435,7 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let n = w.len();
     assert!(w[..n - 1].iter().all(|f| f.2 == 2));
-    assert_eq!(w[n - 1], (centre(WP_AT.0), centre(WP_AT.1), 1));
+    assert_eq!(w[n - 1], (centre(WP_AT.0), centre(WP_AT.1 + 1), 1));
     walks.push(w);
 
     // 15. Waypoint travel to the GATE level (C→S 0x49, `waypoints.md`
@@ -2659,12 +2662,14 @@ fn run_with(game_seed: u32) -> Transcript {
 #[test]
 fn full_single_player_loop() {
     let t = run();
-    // Frames per walk / run: 20, 33 and 16 (the runs move at the run
-    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 8; 98
-    // recorded frames, one tick each.
+    // Frames per walk / run: 20, 33 and 14 (the runs move at the run
+    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 6; the
+    // run to Akara and the walk to the waypoint each stop 2 frames short
+    // of the target's sub-tile (rc-object-approach); 94 recorded frames,
+    // one tick each.
     let lens: Vec<usize> = t.walks.iter().map(Vec::len).collect();
-    assert_eq!(lens, [20, 33, 16, 8]);
-    assert_eq!(t.frames.len(), 98);
+    assert_eq!(lens, [20, 33, 14, 6]);
+    assert_eq!(t.frames.len(), 94);
     assert_eq!(t.frames.len() as i32, t.game_frame);
     // The kill: 100 experience, one drop (the gold, picked up).
     assert_eq!((t.player_exp, t.drops.len()), (100, 1));
