@@ -14,8 +14,24 @@ by q-fix-client-realdata (merged through staging) and pass here.
 | `play_smoke the_live_run` (dropped 0x6D) | Gheed (class 147, guid 4): 0x0A when the player's room switched 3 → 9; he then walked from room 8 into room 10 (adjacent to 9) and was never re-announced: `PathCtx` left `send_unit_add` / `send_unit_removal` as the seam's no-op defaults, so the §9.8 room-change merge sent nothing; his 0x6D at tick 76 was dropped | `PathCtx` sends 0x0A (`0x00571600`) and the add messages (`0x00571F90`, `View::add_messages`) | 78e380c2 |
 | `play_smoke the_live_run` (gold) | the drop was a lone scroll (`tsc `); the test asserted gold for any drop | the gold check runs when gold was dropped | 8c3ea02c |
 
+## Result (merged tree d17bb455)
+`play_smoke`: 11 of 12 pass; act 1 playthrough 17/17 (`playthrough.py traces/playthrough/act1.play --build`); `game_town_run` 2/2, `seam_drlg_coords` 2/2,
+`app_cain_quest` 1/1; d2-sim, d2-server, d2-client lib tests pass.
+
 ## Open
-- `the_live_run` after the pickup: see "Last run" below.
+- `play_smoke the_live_run` now runs to its end (Blood Moor kills, pickup,
+  level 2) and fails only on its findings: 2 "run leg" divergences
+  (leg to (5083, 4360): drawn (5094, 4352), server (5095, 4348); then
+  (5070, 4373)). First divergence, before those legs: after `kill()`'s
+  C→S 0x06 (left skill Attack on a monster unit) the server player has
+  walked into melee range at (5108, 4335) while the client prediction
+  stays at (5111, 4336). From starts 3 apart the same path code (the
+  client grid equals the server's there: 0x11 walls at x ≤ 5094) gives
+  the server no path (toward blocked SW / S / W, A* 0) and the client 4
+  sub-tiles. Cause: the client does not predict the skill-on-unit
+  approach walk (or snap to it). Owner: cast / attack client action
+  state (`crates/d2-client/src/bridge/click.rs`, `predict.rs`,
+  q-fix-input-lock); routed, not edited.
 - No 1.14d scenario check yet for §9.8 (a monster crossing into the
   client's rooms) or for the client object footprints. A packets check
   with a town walk would compare the 0xAC / 0x0A, but d2rs's game seed
