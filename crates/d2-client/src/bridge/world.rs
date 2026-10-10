@@ -1194,6 +1194,16 @@ impl ClientWorld {
         Some(std::borrow::Cow::Owned(u))
     }
 
+    /// The path direction (+0x64) a view unit draws with, when the model
+    /// holds its path: the C monsters' ([`super::critter_path`]).
+    pub fn view_direction(&self, key: &UnitKey) -> Option<u8> {
+        if key.guid & VIEW_CLIENT_BIT == 0 {
+            return None;
+        }
+        let real = UnitKey::new(key.unit_type, key.guid & !VIEW_CLIENT_BIT);
+        super::critter_path::direction(self, real)
+    }
+
     /// Every unit the view draws: set S in key order, then the
     /// client-made monsters of set C ([`Self::view_unit`]).
     pub fn view_units(&self) -> Vec<std::borrow::Cow<'_, ClientUnit>> {
@@ -1332,6 +1342,12 @@ pub struct MonsterClass {
     /// group size (`monsters/population.md` §11.7 r2).
     pub min_grp: u8,
     pub max_grp: u8,
+    /// `monstats2` mode bits (+0xF0, bit m = the class has mode m;
+    /// `0x0046C140(class, m)`, `mDT`…).
+    pub modes: u16,
+    /// `monstats2` +0x0E: the creator's path byte (`0x00649070`, the stop
+    /// distance; `msg-units.md` §1.2 r2).
+    pub path_byte: u8,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up
@@ -1445,6 +1461,8 @@ impl MonsterClass {
             npc,
             interact,
             size_x: *monstats2.get(0x08)? as i8,
+            modes: u16::from_le_bytes([*monstats2.get(0xF0)?, *monstats2.get(0xF1)?]),
+            path_byte: *monstats2.get(0x0E)?,
             setup: None,
             ..MonsterClass::default()
         })
