@@ -565,7 +565,7 @@ mod corpse_tests {
     fn corpse_assign_bytes() {
         assert_eq!(
             super::corpse_assign(0x0102_0304, 0x0506_0708),
-            [0x74, 1, 4, 3, 2, 1, 4, 3, 2, 1]
+            [0x74, 1, 4, 3, 2, 1, 8, 7, 6, 5]
         );
     }
 }
