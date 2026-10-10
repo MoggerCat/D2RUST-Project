@@ -950,9 +950,9 @@ impl Screen for CharSelect {
         None
     }
 
-    fn loads_sky_palette(&self) -> bool {
-        false
-    }
+    // `0x0043AE30` ends with the palette loader `0x0042F2E0` on the sky
+    // paths `[0x006D3A08]` / `[0x006D3A0C]` (REC-1906): re-entering after
+    // the create screen (fechar) restores them.
 }
 
 /// Register the screen with no save folder (an empty list). The host
