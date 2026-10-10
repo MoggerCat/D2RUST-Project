@@ -67,3 +67,33 @@ Running: every check behind a needs_pc1 ledger row (143) plus the UI checks,
 both sides on Windows, about 2 h. Ledger part
 `docs/handoff/ledger/local-pc1-today.tsv` follows with that batch.
 Rows so far: 21 `q-fix-pc1today-*`.
+
+## Push 3 (14:30) — the audit's Windows list (217 rows), UI family first
+
+Merged `claude/specs-staging-7` and `claude/integ-r23`. The batch over the
+other needs_pc1 checks was stopped when the audit moved them off this list
+(102 checks had run; their 1.14d sides are in `traces/orig-cache`).
+
+**Ledger part: `docs/handoff/ledger/rc-00-local-pc1-today.tsv`** (177 rows). It
+is named `rc-00-…` and not `local-pc1-today.tsv` because `ledger.py` keeps the
+first `rc-*` part by name for an area, and `rc-gen-ui` / `-render` / `-audio`
+own these areas: under the plain name only 3 rows took effect.
+needs_pc1 = y and not EQUAL: 383 → 235. NO-CHECK 1480 → 1444.
+
+| Family | Rows | Done | State now |
+|---|---|---|---|
+| ui: inventory, control-panel, panels-2, panels-3, controls, text, messages | 73 | 25 `ui-draws-*-ama` checks, both sides on Windows, 1.14d side recorded twice (five of them a third time) | DIVERGED, needs_pc1 n; row `ui-draws` |
+| ui: frontend-options | 9 | facts scenes `a1-menu-options / -sound / -video / -automap` (two runs, stable) and `-controls` (one run) | NO-CHECK (no d2rs comparison yet), needs_pc1 n |
+| ui: frontend-menus | 23 | `frontend-trademark` scene (two runs); dolls trace; day-4 scenes | NO-CHECK, needs_pc1 n |
+| ui: frontend-loading | 11 | day-4 scene stands | NO-CHECK, needs_pc1 n |
+| ui: frontend-credits | 11 | trademark only | **still needs PC 1**: Credits / Cinematics (and Delete Character) do not react to posted clicks on Windows |
+| audio: sound-table, triggers-2 | 22 | four audio checks on Windows, client seed recorded | DIVERGED, needs_pc1 n |
+| render: camera | 10 | `camera-0001`, `placement-0001` recorded; values in `traces/pc1/*.tsv` | NO-CHECK, needs_pc1 n; row `capture-case-format` |
+| render: unit-composite, sprite-placement | 18 | real-GPU `verify`: 11 pass (Intel HD 630, Vulkan); frames in the private repo | **still open** (no pixel comparison run) |
+| client: model, msg-units, msg-stats-items, stat-lists; seams | 38 | not started | still needs PC 1 |
+
+Not stable on the 1.14d side (re-record before trusting): `ui-draws-questlog`,
+`-left-skill-pick`; `-belt`, `-party`, `-automap` differ by a 6-glyph transient
+text in one of three runs.
+Private repo: `recordings/pc1-2026-10-10/frames` (d313e3ac).
+Rows so far: 23 `q-fix-pc1today-*`.
