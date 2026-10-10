@@ -253,7 +253,10 @@ returned at the collision test).
 Columns `TreasureClass1..4` for the game difficulty (monstats +0x86 +
 8 × difficulty + 2 × column):
 
-1. Superunique (hcIdx ≠ −1, `0x005A03A0`): its `TC` for the difficulty
+1. Superunique (hcIdx ≠ −1, `0x005A03A0`: a monster unit whose monster
+   data has type flag 0x02 gives the signed 16-bit hcIdx at data +0x26,
+   anything else −1; a monster spawned by any path, the superunique poke
+   included, carries it): its `TC` for the difficulty
    (superuniques +0x2C + 2 × difficulty); if the record is missing,
    column 3.
 2. Else champion (type flag 4, `0x005A0180`): column 2.

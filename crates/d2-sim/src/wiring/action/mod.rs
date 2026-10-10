@@ -382,8 +382,9 @@ pub struct ActionHooks<X> {
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The entries monster init step 14 gives a monster (`Skill<i>` at
     /// `Sk<i>lvl` + the monster skill bonus, `monsters/init.md` §6):
-    /// skill id → base level. Read for the level only
-    /// ([`Pending::ai_skill_level`] is asked for a unit without one).
+    /// skill id → base level. Read for the level
+    /// ([`Pending::ai_skill_level`] is asked for a unit without one) and
+    /// by the entry lookup [`ActionHooks::monster_entry_of`].
     pub natural_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// A unit's source unit (+0x94 / +0x98, set by `link_source`
     /// `0x00621C30`, `skills/bodies-4.md` §1); read by `0x00552FD0` when
@@ -449,6 +450,27 @@ impl<X: Pending> ActionHooks<X> {
                 Some(e)
             }
         }
+    }
+
+    /// `0x006439F0(unit, skill)` for a unit without a skill list: the
+    /// monster's entry of `skill` (owner −1) from its summon entries
+    /// ([`ActionHooks::monster_skills`]), else its init entries
+    /// ([`ActionHooks::natural_skills`], `monsters/init.md` §14); none
+    /// when it has no such entry.
+    pub fn monster_entry_of(&self, unit: UnitId, skill: i32) -> Option<crate::skills::SkillEntry> {
+        let base = self
+            .monster_skills
+            .get(&unit)
+            .and_then(|m| m.get(&skill))
+            .or_else(|| self.natural_skills.get(&unit).and_then(|m| m.get(&skill)))?;
+        Some(crate::skills::SkillEntry {
+            skill,
+            base: *base,
+            level_bonus: 0,
+            owner_guid: -1,
+            charges: 0,
+            has_charges: false,
+        })
     }
 
     /// The E-flags word (`0x006446A0`, entry +0x0C) of entry `e`: the

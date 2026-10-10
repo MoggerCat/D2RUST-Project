@@ -397,6 +397,9 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     (`0x006439B0` + `0x006442A0`, owner −1 adds no bonus on a monster):
     `ActionHooks::natural_skills` keeps skill → level per unit, Megademon's
     range (`Skill1` level) needs it. A monster without an entry reads 1.
+    The entry lookup `0x006439F0` finds these entries too (rc-c011-gameseed:
+    Armageddon's state function, `skills/bodies-4.md` §4.9, reads the
+    entry's param 1 every period; Diablo clone 333 fires it).
     The used skill entry (`0x00620250`, list +0x10) is one of these
     entries, so a skill the monster casts runs at this level, and so does
     the missile it creates (stat 12, `missiles/damage.md` §4): vampire2
