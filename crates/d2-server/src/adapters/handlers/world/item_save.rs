@@ -116,6 +116,25 @@ impl<R, S> WiredWorld<R, S> {
     ) -> LoadedItems {
         let mut r = LoadedItems::default();
         if entries.is_empty() {
+            // A player is allocated with an inventory (`0x0063ABD0`,
+            // `inventory.md` §1.3), also with nothing saved: ground pickups
+            // and quest items need it (REC-1555).
+            if let Some(mut inv) = self.inventory.take() {
+                self.with_economy(game, events, |econ, _| {
+                    if let Some((UnitType::Player, class, guid)) =
+                        econ.units.get(player).map(|u| (u.ty, u.class, u.guid))
+                    {
+                        if !corpse && !inv.state.inventories.contains_key(&player) {
+                            inv.state.add_inventory(
+                                player,
+                                UnitKind::Player { class: class as u8 },
+                                guid,
+                            );
+                        }
+                    }
+                });
+                self.inventory = Some(inv);
+            }
             return r;
         }
         let Some(mut inv) = self.inventory.take() else {

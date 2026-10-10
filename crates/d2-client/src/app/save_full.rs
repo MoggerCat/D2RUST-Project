@@ -143,9 +143,8 @@ pub fn join_items(s: &mut Sim, player: UnitId, save: &D2s) -> bool {
 }
 
 fn join_player_items(s: &mut Sim, player: UnitId, items: &[ItemEntry]) -> bool {
-    if items.is_empty() {
-        return true;
-    }
+    // Also with no saved item: the player still gets its inventory
+    // (`load_items`; REC-1555).
     let loaded = s
         .world
         .load_items(&mut s.game, &mut s.events, player, items);

@@ -198,6 +198,9 @@ pub struct EconomyQuests<'e, 'a, H, R> {
     /// sends that follow a reward in the call; `None`:
     /// [`QuestRest::mercenary_reward`].
     pub deferred: Option<&'e mut Vec<QuestDeferred>>,
+    /// The cursor item and item list of the host's inventory model, for
+    /// the held-item tests ([`Self::find_item`]); `None`: the rest's.
+    pub held: Option<(Option<UnitId>, Vec<UnitId>)>,
 }
 
 /// A quest-call effect the caller runs after the call, in list order
@@ -255,6 +258,7 @@ impl<'e, 'a, H, R> EconomyQuests<'e, 'a, H, R> {
             econ,
             rest,
             deferred: None,
+            held: None,
         }
     }
 
@@ -287,6 +291,9 @@ impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
     /// `questdiffcheck` is 0, or its stat 356 (`questitemdifficulty`,
     /// total value) ≥ the game difficulty.
     pub fn find_item(&self, player: UnitId, code: [u8; 4]) -> Option<UnitId> {
+        if let Some((cursor, list)) = &self.held {
+            return self.find_item_in(*cursor, list.clone(), code);
+        }
         self.find_item_in(
             self.rest.quest_cursor_item(player),
             self.rest.inventory(player),

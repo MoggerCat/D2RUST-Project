@@ -33,6 +33,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// tick on the quest control.
     pub(super) fn run_quest_events<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         let mut queued = events.action().sys.hooks.x.take_quest_events();
+        let picks = std::mem::take(&mut self.item_picks);
         // The cube's `hst ` hook (`0x0059E5C0`), recorded by its pending.
         if let Some(cube) = self.cube.as_mut() {
             for (player, code) in cube.pending.take_quest_items() {
@@ -92,6 +93,33 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     if let QuestEvent::Link { unit, chain } = *e {
                         q.add_link(w, unit, chain, None);
                     }
+                }
+                // Hook ITEMPICKEDUP `0x00543D80`: event 4 to the item's chain.
+                for &(player, item) in &picks {
+                    // Item creation `0x00555D20` links an item with `quest` ≠ 0
+                    // to chain `quest` − 1 (`quests-act3.md` §10); linked here
+                    // at its first pick-up (PROVISIONAL, REC-1556: the item
+                    // creation hook is not wired).
+                    let quest = w
+                        .inner
+                        .econ
+                        .items
+                        .get(item)
+                        .and_then(|i| w.inner.econ.tables.item(i.record))
+                        .map_or(0, |r| u32::from(r.quest));
+                    if quest != 0 && w.quest_chain(item).is_none_or(|c| c.0.is_empty()) {
+                        q.add_link(w, item, (quest - 1) as u8, None);
+                    }
+                    q.dispatch_chain(
+                        w,
+                        d2_sim::world::quests::event::ITEM_PICKED_UP,
+                        d2_sim::world::quests::EventArgs {
+                            player: Some(player),
+                            target: Some(item),
+                            ..Default::default()
+                        },
+                        false,
+                    );
                 }
                 for e in &queued {
                     match *e {
