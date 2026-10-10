@@ -891,3 +891,6 @@ Then the rest:
 - **Withdrawn:** `q-fix-shop-gamble-flag-dead`.
 
 - [q-fix-d9-arcane] Quest A2Q4 event 3 (`0x0059F0C0`): is the old-level-40 handling (start-Jerhyn removal, quick remove) skipped when the new level is 74? Recording `a2-warp-arcane-ama` keeps Jerhyn (class 201, 1:1) alive to frame 143 on 1.14d, every other warp from Lut Gholein removes him at the warp frame. d2rs skips the whole `a == 40` block for `b == 74` (REC-1405, PROVISIONAL); read the branch structure and fix `specs/world/quests-act2.md` §6.6 / `quests-act2-2.md` §2 item 3.
+
+- [rc-town-npc-state] SpecialState06 think `0x005E7C10` (AI table row 6; installed on an unowned act3hire, class 359, by Hireable step 1, `ai-bodies-6.md` §7): 1.14d draws the unit seed once at frame 37 and walks at frame 57 (`gen-wp-18..26`, Kurast); d2rs logs it Unhandled and draws nothing. Read the body and write its spec (draws, idle, walk), then implement it.
+- [rc-town-npc-state] Poke `@wp` on the 1.14d side: `tools/trace-recorder/poke.py` raises Gap ("@wp needs the objects table's operate function"), so `gen-wp-1..8,17,28..38` never travel on 1.14d and the frame-400 `game.seed` difference is a tool gap, not a sim bug. Needs the objects-table operate address (`0x00584540`) wired into poke.py; then re-record those checks.
