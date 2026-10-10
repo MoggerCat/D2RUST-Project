@@ -26,3 +26,5 @@ C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-thro
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
 C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open
+C014v	rc-vendor-pkts	18:40	vendor.akara-buy s2c 07 vs 15 frame 4	open
+C058v	rc-vendor-pkts	18:40	vendor charsi/gheed x3 extra 0x15 frame 4	open
