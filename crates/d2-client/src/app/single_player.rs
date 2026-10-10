@@ -544,6 +544,9 @@ pub struct LocalSeams {
     /// The Arreat Summit warp check's answer (`Pending::set_summit_open`,
     /// q-act3-act5-gaps); the exits stay closed while it is `true`.
     pub summit_closed: bool,
+    /// The Ancients' fight is armed (`Pending::set_ancients_armed`); the
+    /// Ancients' AI gate `0x0058CF90` answers "not activatable" while not.
+    pub ancients_armed: bool,
     /// The quest records' not-intro bytes by chain, published by the quest
     /// control once per tick (`Pending::publish_not_intro`): the not-intro
     /// test `0x005444B0` of population and the missile bodies.
@@ -762,10 +765,13 @@ impl Pending for LocalSeams {
             QuestCall::Shenk => self.quest_events.push(QuestEvent::ShenkActivated { unit }),
             QuestCall::Nihlathak => self.quest_events.push(QuestEvent::NihlathakActivated),
             QuestCall::BaalToStairs => self.quest_events.push(QuestEvent::BaalToStairs),
-            QuestCall::AncientsNotActivatable => {
-                self.quest_events.push(QuestEvent::AncientsDisarm);
-                return false;
-            }
+            // PROVISIONAL (REC-1561, d2rs-own, unverified): the gate
+            // `0x0058CF90` answers "not armed" and changes nothing (its
+            // name, the AI's use as an idle test and the kill rule that
+            // needs the armed byte all agree; `quests-act5-2.md` §7.9
+            // reads it as "armed := 0", under which no Ancient death
+            // counts). PC 1: confirm the instruction.
+            QuestCall::AncientsNotActivatable => return !self.ancients_armed,
             _ => return false,
         }
         true
@@ -801,6 +807,9 @@ impl Pending for LocalSeams {
                 // for the Compelling Orb, except from Durance 2.
                 || (level == DURANCE_1 && source != DURANCE_2 && self.durance_closed),
         )
+    }
+    fn set_ancients_armed(&mut self, armed: bool) {
+        self.ancients_armed = armed;
     }
     fn set_summit_open(&mut self, open: bool) {
         self.summit_closed = !open;
