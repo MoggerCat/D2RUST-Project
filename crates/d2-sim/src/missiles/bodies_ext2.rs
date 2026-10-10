@@ -656,6 +656,37 @@ pub fn unit_find<W: MissileWorld + ?Sized>(
     room: Option<crate::units::RoomId>,
     a: &FindFilter,
 ) -> Vec<UnitId> {
+    let mut accepted = 0;
+    unit_find_by(game, cx, room, a.at, a.r, a.room_flags, |game, cx, u| {
+        default_filter(game, cx, u, a, &mut accepted)
+    })
+}
+
+/// The finder `0x0065AC70` with a caller filter (record field +0x0C): the
+/// room selection of [`unit_find`] (centre `at`, radius `r`, finder flags
+/// `room_flags`), each unit of the chosen rooms kept when `keep` accepts
+/// it. A custom filter does no distance test of its own, so the radius
+/// only chooses the rooms (objects.md §9.3, storm `0x00582DA0`).
+pub fn unit_find_by<W, F>(
+    game: &mut Game,
+    cx: &mut Ctx<'_, W>,
+    room: Option<crate::units::RoomId>,
+    at: (i32, i32),
+    r: i32,
+    room_flags: u32,
+    mut keep: F,
+) -> Vec<UnitId>
+where
+    W: MissileWorld + ?Sized,
+    F: FnMut(&mut Game, &mut Ctx<'_, W>, UnitId) -> bool,
+{
+    let a = FindFilter {
+        flags: 0,
+        room_flags,
+        source: None,
+        at,
+        r,
+    };
     let Some(room) = room else {
         return Vec::new();
     };
@@ -678,7 +709,6 @@ pub fn unit_find<W: MissileWorld + ?Sized>(
             .map(|e| e.adjacent.clone())
             .unwrap_or_default()
     };
-    let mut accepted = 0;
     let mut found = Vec::new();
     for rm in rooms {
         // Step 3: town rooms skipped under 0x2000; the overlap test
@@ -697,7 +727,7 @@ pub fn unit_find<W: MissileWorld + ?Sized>(
             }
         }
         for u in game.lists.room_units(rm) {
-            if default_filter(game, cx, u, a, &mut accepted) {
+            if keep(game, cx, u) {
                 found.push(u);
             }
         }

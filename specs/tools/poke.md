@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–354 |
-|   5. The d2rs side (`d2-sim::poke`) | 355–418 |
-|   6. `goto`: walking to a target | 419–498 |
-| Constants & data dependencies | 499–514 |
-| Randomness | 515–521 |
-| Edge cases & original bugs | 522–549 |
-| Test vectors | 550–577 |
-| Provenance | 578–588 |
-| Open questions | 589–596 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–421 |
+|   6. `goto`: walking to a target | 422–501 |
+| Constants & data dependencies | 502–517 |
+| Randomness | 518–524 |
+| Edge cases & original bugs | 525–552 |
+| Test vectors | 553–580 |
+| Provenance | 581–591 |
+| Open questions | 592–599 |
 <!-- /index -->
 
 ## Summary
@@ -399,7 +399,7 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    leave in the same frame's buffer (first run: `interact-talk-akara`,
    0x27 / 0x29 / 0x28 flushed in frame 15 on 1.14d, 16 on d2rs between
    frames). `state-dump` therefore runs every poke of a frame that
-   holds an `operate`, a `talk` or a `goto` at the same point: a
+   holds an `operate`, a `talk`, a `goto` or a `warp` at the same point: a
    tick-end hook of the link (`Host::frame_with`, after the tick, before
    the flush), in file order, after taking that frame's snapshot there
    (as `record_state.py` snapshots before its pokes, §5 rule 2). A
@@ -409,7 +409,10 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    the client's buffer right after them (`Host::queue_now`), so it
    leaves in that frame's flush, as on 1.14d (first run:
    `a2-npc-atma-talk`, the walk's 0x07 in frames 3–12 on 1.14d, one
-   frame later on d2rs before; rc-net-s2c). Other frames keep the
+   frame later on d2rs before; rc-net-s2c). A `warp` joins them
+   (`0x0053AEC0` queues the destination room's 0x07 at once;
+   `combat-melee-fallen`, `a2-wp-42`: frame 3 on 1.14d, 4 on d2rs
+   before; 2026-10-10). Other frames keep the
    between-frames point; a directive there whose path queues an S→C
    message at once would show the same one-frame shift in the packets
    channel. `play --poke` runs every poke between frames: its

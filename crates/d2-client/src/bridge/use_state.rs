@@ -14,6 +14,7 @@ use super::world::{ClientWorld, ModelInputs, SkillRow, UnitKey, ITEM, MONSTER};
 pub mod code {
     pub const USABLE: u32 = 0;
     pub const NO_MANA: u32 = 1;
+    pub const SHAPE: u32 = 4;
     pub const DISABLED: u32 = 3;
     pub const PASSIVE: u32 = 5;
     pub const AURA: u32 = 6;
@@ -35,8 +36,8 @@ const FLAG_EX_SHAPESHIFT: u32 = 0x8;
 /// `key`'s entry `e`: (1) no record or `InGame` clear → 3; (2) level 0
 /// → 7; (3) `aura` → 6; (4) `passive` → 5; (6) `can_afford` fails → 1
 /// (`skills/levels.md` §4).
-// PROVISIONAL (skills/use.md §2 tests 5, 7-10; REC-1640): the skill item
-// test, shape, start stat, charges and cooldown tests (and the local
+// PROVISIONAL (skills/use.md §2 tests 5, 8-10; REC-1640): the skill item
+// test, start stat, charges and cooldown tests (and the local
 // player's code 8 of `ui/controls.md` §6 r9.1) read as passing: the model
 // holds no client cooldown or item-skill facts yet; settled by a 1.14d
 // check casting a skill on cooldown or without its item.
@@ -61,7 +62,40 @@ pub fn use_state(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey, e: &SkillE
     if !can_afford(w, key, r, e, level) {
         return code::NO_MANA;
     }
+    if !shape_ok(w, inputs, key, r) {
+        return code::SHAPE;
+    }
     code::USABLE
+}
+
+/// The shape test `0x00644060` (`skills/use.md` §2 test 7): `restrict` 0
+/// passes only outside a shapeshift form (no state with the `states.txt`
+/// `restrict` flag, `0x0063A510`), 1 always, 2 only in a form that has
+/// one of the row's `State1`…`State3` (a negative id ends the list).
+fn shape_ok(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey, r: &SkillRow) -> bool {
+    let Some(u) = w.units.get(&key) else {
+        return false;
+    };
+    let in_form = || {
+        u.states.iter().any(|&s| {
+            inputs
+                .tables
+                .states
+                .get(usize::from(s))
+                .is_some_and(|row| row.restrict)
+        })
+    };
+    match r.restrict {
+        0 => !in_form(),
+        2 => {
+            in_form()
+                && r.shape_states
+                    .iter()
+                    .take_while(|&&s| s >= 0)
+                    .any(|&s| u.states.contains(&(s as u8)))
+        }
+        _ => true,
+    }
 }
 
 /// `can_afford(unit, skill)` `0x00647540` (`skills/levels.md` §4): a
@@ -207,5 +241,30 @@ mod tests {
         assert!(client_start_passes(&w, &i, PLAYER_KEY, 70, Some(m)));
         // A function without a rule passes.
         assert!(client_start_passes(&w, &i, PLAYER_KEY, 85, None));
+    }
+
+    // Covers: specs/skills/use.md §2
+    /// gen-skill-dru-243 (1.14d): Shock Wave (`restrict` 2, `State1`
+    /// bear) is refused outside bear form; `restrict` 0 refuses in a form.
+    #[test]
+    fn shape_restriction_is_use_state_4() {
+        let (mut w, mut i, k) = world(100_000);
+        i.tables.states = vec![Default::default(); 150];
+        i.tables.states[140].restrict = true; // a form
+        i.tables.states[141].restrict = true; // the bear
+        i.tables.skills[85].restrict = 2;
+        i.tables.skills[85].shape_states = [141, -1, 0];
+        i.tables.skills[70].restrict = 0;
+        assert_eq!(use_state(&w, &i, k, &entry(85, 20)), code::SHAPE);
+        assert_eq!(use_state(&w, &i, k, &entry(70, 20)), code::USABLE);
+        // In another form: still refused; the list stops at a negative id.
+        w.units.get_mut(&k).expect("p").states.insert(140);
+        assert_eq!(use_state(&w, &i, k, &entry(85, 20)), code::SHAPE);
+        assert_eq!(use_state(&w, &i, k, &entry(70, 20)), code::SHAPE);
+        w.units.get_mut(&k).expect("p").states.insert(141);
+        assert_eq!(use_state(&w, &i, k, &entry(85, 20)), code::USABLE);
+        // `restrict` 1: any form.
+        i.tables.skills[85].restrict = 1;
+        assert_eq!(use_state(&w, &i, k, &entry(85, 20)), code::USABLE);
     }
 }

@@ -14,39 +14,40 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 52–60 |
-| Inputs | 61–71 |
-| Outputs / state changes | 72–81 |
-| Rules | 82–83 |
-|   F1.1 Control descriptors (the data every front-end screen is built from) | 84–179 |
-|   F1.2 Art preload | 180–207 |
-|   F1.3 Screen flow (single player) | 208–239 |
-|   F1.4 Main menu (`0x004336C0`) | 240–268 |
-|   F1.5 Title animation (logo fire) | 269–300 |
-|   F1.6 Palette and sounds | 301–328 |
-|   F2.1 Save folder (`0x00407050`) | 329–353 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 354–380 |
-|   F2.3 Sort order (`0x00438AD0`) | 381–386 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 387–412 |
-|   F2.5 Selection, scrolling and keys | 413–457 |
-|   F2.6 OK / Enter (`0x00439840`) | 458–470 |
-|   F2.7 Other buttons | 471–495 |
-|   F2.8 Difficulty box (`0x00439780`) | 496–515 |
-|   F2.9 Control records and art | 516–552 |
-|   F3.1 Character-create screen build (`0x00435580`) | 553–588 |
-|   F3.2 Class line-up (positions, creation order) | 589–604 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 605–665 |
-|   F3.4 Name entry (edit box, descriptor 204) | 666–680 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 681–704 |
-|   F3.6 OK / Cancel behaviour and the new save | 705–739 |
-|   F3.7 Sounds (deferred) | 740–744 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 745–775 |
-| Constants & data dependencies | 776–812 |
-| Randomness | 813–816 |
-| Edge cases & original bugs | 817–848 |
-| Test vectors | 849–882 |
-| Provenance | 883–928 |
-| Open questions | 929–973 |
+| Summary | 53–61 |
+| Inputs | 62–72 |
+| Outputs / state changes | 73–82 |
+| Rules | 83–84 |
+|   F1.1 Control descriptors (the data every front-end screen is built from) | 85–180 |
+|   F1.2 Art preload | 181–208 |
+|   F1.3 Screen flow (single player) | 209–240 |
+|   F1.4 Main menu (`0x004336C0`) | 241–269 |
+|   F1.5 Title animation (logo fire) | 270–301 |
+|   F1.6 Palette and sounds | 302–329 |
+|   F2.1 Save folder (`0x00407050`) | 330–354 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 355–381 |
+|   F2.3 Sort order (`0x00438AD0`) | 382–387 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 388–413 |
+|   F2.5 Selection, scrolling and keys | 414–458 |
+|   F2.6 OK / Enter (`0x00439840`) | 459–471 |
+|   F2.7 Other buttons | 472–496 |
+|   F2.8 Difficulty box (`0x00439780`) | 497–516 |
+|   F2.9 Control records and art | 517–553 |
+|   F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184) | 554–594 |
+|   F3.1 Character-create screen build (`0x00435580`) | 595–630 |
+|   F3.2 Class line-up (positions, creation order) | 631–646 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 647–707 |
+|   F3.4 Name entry (edit box, descriptor 204) | 708–722 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 723–746 |
+|   F3.6 OK / Cancel behaviour and the new save | 747–781 |
+|   F3.7 Sounds (deferred) | 782–786 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 787–817 |
+| Constants & data dependencies | 818–854 |
+| Randomness | 855–858 |
+| Edge cases & original bugs | 859–890 |
+| Test vectors | 891–924 |
+| Provenance | 925–970 |
+| Open questions | 971–1015 |
 <!-- /index -->
 
 ## Summary
@@ -549,6 +550,47 @@ For an **animated image** (type 3, factory `0x00500850`) the fields differ from 
 frame-speed unit (0 = no animation), [6] = base draw mode (0 → 5 normal), [8] = click callback, [9] =
 anim table (0 = single cel at [7]), [10] = hover callback. Draw modes: `render/blend-modes.md` §1
 (3 modulate, 5 normal).
+
+### F2.10 Paper dolls (`0x005066C0`, draw `0x00503A50` / `0x00503BA0`; REC-1907, REC-2180..2184)
+
+The doll is a D2Win-side sprite object (0xC70 bytes, list head `[0x0087E838]`), one per entry, built when the
+list is scanned. It is not a unit: no inventory, no light, no direction other than 0.
+
+1. Build (`0x005066C0(class', mode, components, colours)`): class' ≥ 7 → weapon class 1 (`hth`); class' < 7 →
+   weapon class from `0x00504AF0`, 0 = build fails (caller retries class' 7 / mode 5, §F2.2 r6). Class' ≥ 25,
+   mode ≥ 20 or weapon class ≥ 15 → (7, 5, 1) (`0x00504040`); a COF that does not load → (7, 5, 1) again.
+   Stored colour per component = save colour − 1, 0xFF stays (a save colour of 0 therefore draws no map).
+   Component byte 0, 0xFF or ≥ 0xFF → armour class `lit`; else the token table's code (`d2s-appearance.md`
+   §1: the front end rebuilds the same table in `0x00506000`; slot placement taken as equal, PROVISIONAL
+   REC-2181). The slot fix-ups of `0x00504D60` (armour of the wrong type in a body slot) are not implemented:
+   PROVISIONAL REC-2181 (saves with equipped items: unverified; the capture saves are all unequipped).
+2. Weapon class (`0x00504AF0`): from the right (5) and left (6) hand tokens: a hit class per hand (item `wclass`
+   column; the `2handedwclass` column when both hands hold items, or when the shield hand (7) is empty and the
+   column differs); `ht1` / `ht2` (13 / 14) only for class' 6; an armour-type item gives the static 1.00 table's
+   class (taken as none, PROVISIONAL REC-2181). Pair rule: none/none → `hth`; right none → left; bow/bow and
+   xbow/xbow keep; staff (8) as right keeps 8; left none → right; `1hs`+`1hs` → `1ss`… (full table in
+   `ui::front_end::doll::combine`). Numbers index `hth 1ht 2ht 1hs 2hs bow xbw stf 1js 1jt 1ss 1st ht1 ht2`.
+3. Files (`0x00503740`): COF `data\global\chars\<T>\cof\<T><M><W>.cof` (T = class token `AM SO NE PA BA DZ AI RO RH RH`,
+   M = mode token, W = weapon class name). Direction 0 → file direction `file_direction(cof directions, 0)`.
+   Per COF slot (`cof.component_at(0, frame, slot)`): component DCC
+   `data\global\chars\<T>\<C>\<T><C><armour><M><layer W>.dcc` (W from the COF layer record of that component;
+   the doll's own class when the layer is missing). Cel = frame `frame` of that direction, placed as any DCC cel
+   (`render/sprite-placement.md` §8) at the anchor. Draw mode 5; mode 1 (alpha) for a dead hardcore character
+   (`0x00503BA0`: draw flags 0x20 and 0x10). Colour maps: stored colour c → file by `c >> 5` (0 and 8:
+   `invgreybrown`, 1 `grey`, 2 `grey2`, 3 and 4: no map, 5 `greybrown`, 6 `invgrey`, 7 `invgrey2`; > 8: none),
+   map `c & 0x1F` (< 21) of `Data\Global\Items\Palette\<name>.dat` (`0x00505470`, `shading.md` §6 r4).
+4. Animation: frame f = phase >> 8, phase starts at 0 when the screen is built; each draw adds the COF rate
+   (header +0x18, `0x005042F0`); after the add, phase >> 8 ≥ frames − 1 → phase 0 (the last frame is never
+   shown). Measured 2026-10-10 (12 captures, 1.14d under Wine, 100 % of figure pixels equal at the matching
+   frame): TN sorceress 16 frames, rate 0x50 → 3 frames per 0.4 s = one add per 40 ms tick. Check
+   `ui-charselect-dolls` (scenario-diff.md §3 r16): all 12 timed shots match a d2rs frame, so the rate and the loop
+   are settled (REC-2182 settled for them); only the build instant relative to the capture stays PROVISIONAL
+   REC-2182 (not tick-anchored, input is wall-clock).
+5. Placement: anchor (column x + 30, row bottom − 13) (§F2.4 r3). The 1.14d capture draws every figure one row
+   above `anchor.y + y_min` (best match of offsets −4…4, all three slots): settled REC-2183 (check `ui-charselect-dolls`: offset 0 differs 0 px, ±1 row 430+ px, ±2 650+, all slots), d2rs applies
+   −1 in the doll draw (`DOLL_DY`); cause not read.
+6. Shadows: `0x00503A50` calls the D2GFX shadow vtable entry (+0x90) for each slot before the cels; d2rs draws
+   none (REC-2184 settled by the capture: the feet band is not darker than the rest, 1.14d minus d2rs +0.4..+1.3 on a channel sum against -0.1..+0.2 elsewhere, so the 1.14d background shows no shadow either).
 
 ### F3.1 Character-create screen build (`0x00435580`)
 

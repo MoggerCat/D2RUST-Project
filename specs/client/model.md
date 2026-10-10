@@ -32,28 +32,28 @@
 |   2. Unit table | 140–189 |
 |   3. Local player | 190–212 |
 |   4. Receive and the unit message queue | 213–250 |
-|   5. Client update pass | 251–494 |
-|   6. Position check (`0x004804E0`) | 495–538 |
-|   7. Session messages | 539–736 |
-|   8. Mode requests | 737–837 |
-|   9. Room-in-sight messages | 838–872 |
-|   10. Bit reader | 873–887 |
-|   11. Current act and level (join and later) | 888–933 |
-|   12. Client DRLG and the room of a point | 934–975 |
-|   13. Visibility predicate (`0x004DBF20`) | 976–1027 |
-|   14. Pet list and the hireling GUID | 1028–1092 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1093–1182 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1183–1217 |
-|   17. Model writes made by 1.14d UI code | 1218–1423 |
-|   18. Audio driver inputs and the client object functions | 1424–1454 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1455–1704 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1705–1865 |
-| Constants & data dependencies | 1866–1878 |
-| Randomness | 1879–1894 |
-| Edge cases & original bugs | 1895–1919 |
-| Test vectors | 1920–1977 |
-| Provenance | 1978–2083 |
-| Open questions | 2084–2298 |
+|   5. Client update pass | 251–515 |
+|   6. Position check (`0x004804E0`) | 516–559 |
+|   7. Session messages | 560–757 |
+|   8. Mode requests | 758–858 |
+|   9. Room-in-sight messages | 859–893 |
+|   10. Bit reader | 894–908 |
+|   11. Current act and level (join and later) | 909–954 |
+|   12. Client DRLG and the room of a point | 955–996 |
+|   13. Visibility predicate (`0x004DBF20`) | 997–1048 |
+|   14. Pet list and the hireling GUID | 1049–1113 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1114–1203 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1204–1238 |
+|   17. Model writes made by 1.14d UI code | 1239–1444 |
+|   18. Audio driver inputs and the client object functions | 1445–1475 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1476–1725 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1726–1886 |
+| Constants & data dependencies | 1887–1899 |
+| Randomness | 1900–1915 |
+| Edge cases & original bugs | 1916–1940 |
+| Test vectors | 1941–1998 |
+| Provenance | 1999–2104 |
+| Open questions | 2105–2319 |
 <!-- /index -->
 
 ## Summary
@@ -449,14 +449,38 @@ position check of the local player.
       No 1.14d critter class (Levels `cmon`: bat, bug, bunny, chicken,
       larva, minispider, parrot, rat, scorpion, snake) has `zoo`, so
       the zoo body runs only for a zoo-class client preset.
-      PROVISIONAL (REC-742): a C monster's client path (§19 r4 with the
-      path helpers of a set-C unit) is not specified; d2rs draws the
-      step's two seed values, sets the mode the code sets (1 → 2 WL,
-      0x0C → 8 S1, code 7 at the own position → the neutral fallback)
-      and keeps the unit in its cell. Needed: the C monster's path record
-      and its walk end (positions of the recorded chickens from tick 8).
-      The 0xAC set-up of a critter (r6.3: `0x004AE8D0`, the first frame,
-      the light) is not run on set C either (same REC).
+      **Client path of a C monster** (read 2026-10-10 from the 1.14d
+      exports, rc-town-arrival; settles the path half of REC-742). The
+      creator `0x00466360` runs the 0xAC set-up `0x004AE8D0` on a critter
+      as on a server monster (`msg-units.md` §1.2 r6): stats, the dynamic
+      path at its cell (`0x00649D00`, footprint stamped, velocity :=
+      `Velocity` << 8), mode 1, the first frame from the unit seed (r6.5),
+      then the direction draw (r6.9: not `npc`, class with mode 2 → one
+      step of the unit seed, low 6 bits; snapped `0x006488A0`), then
+      the stop distance from `monstats2` +0x0E (`0x00649070`). So each
+      critter draws its unit seed twice before its first think. A walk
+      request (code 0x01, `step` `0x0046C960`: the point is U's path
+      cell ± d, the record's path type and path byte are U's own) runs
+      the §19 r4 body: target point `0x00648AD0`, compute
+      `0x00649970(path, U, unit flag 0x200000)` (set on every
+      client-only unit, so town access 1), no point → F, else mode set
+      2 (the rate's velocity half sets the path velocity). Each update
+      (`0x00463CC0`: per unit, the unit update `0x00480810` then the
+      critter AI) the monster update (§19 r8) of WL takes path kind 1:
+      the movement `0x00650840(U, 0x400)` (`0x004807C0`; base
+      `[0x007A04C4]` is 0), the anim advance, the turn `0x00648640`,
+      and, when the movement ended, the mode end of a client-only unit:
+      mode set 1 with a restart. The AI of the same update can then ask
+      for the next walk (a mode-2 unit with frame 0 on the target cell).
+      Checked: `draws-town-arrival-ama` tick 73, both arrival chickens
+      equal (93 WL direction 40 frame 1 at (80, 416); 94 stopped one
+      cell short, NU direction 32 frame 1 at (48, 516)), and the 1.14d
+      per-update unit records of the same recording (`orig.frames.jsonl`
+      `unit` rows: directions 14 → 15, 15 → 0 by −4, 0 → 32 by −8).
+      PROVISIONAL (REC-742): code 0x0C (the flee) sets mode 8 with the
+      tail but runs neither its face `0x00621C00` nor its `S1mv` path,
+      and modes other than NU / WL / RN take anim kind 0 with no end
+      (as §19 r8's d2rs note); no arrival critter flees.
       *Recorded, REC-742 (2026-10-09, PC 1, Windows; scratch poll probe of
       set C `0x007A5270`, no breakpoints, ScnAma `-seed 1234`, 25 s after
       arrival):* 15 chickens (class 149: GUIDs 2–7, 90–95, 122–124), all
@@ -486,11 +510,8 @@ position check of the local player.
       1), so d2rs keys a set C monster in the room lists and the view by
       GUID | 0x8000_0000 (`ClientWorld::view_key`); the model's own set
       C keys are unchanged. Checked 2026-10-09 against the committed
-      scene at tick 73: rows 1–110 equal; the chickens' position and
-      cel frame are not (1.14d: walk frame 40 at (80, 416), neutral
-      frame 32 at (48, 516); d2rs: frame 0 at the creation cell), which
-      is REC-742's open point: no 1.14d per-tick track of a critter
-      exists.
+      scene at tick 73: rows 1–110 equal; with the client path above
+      (2026-10-10) rows 1–171 equal, the chickens included.
 
 ### 6. Position check (`0x004804E0`)
 
@@ -1494,7 +1515,7 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    > 0x1D → "unknown"). "W(f)" = walk flag: flags-ex bit 0x2000 := f and
    path +0x38 := 0 (`0x006491B0`; fatal 0x9A2 without a path). "F" =
    the **neutral fallback** `0x004AE1D0`: U a monster with mode 1…15,
-   ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490`), mode set 1;
+   ≠ 12 → `0x00465BF0(U, 0)`, path stop (`0x00480490` -> `0x00650590`: the path's precise position becomes the centre of the cell it is in, `(p & 0xFFFF0000) + 0x8000` per axis; Warriv's draw on `draws-town-arrival-ama` tick 72 moves from the walk's rest point 376 short of the centre to the centre), mode set 1;
    any other mode → nothing. "NPC busy" = monster data +0x28 bit 0
    (`0x004AE080(U, 1)`; set only by the NPC hold §17 r7, cleared by
    §17 r1.7 and at creation / set-up / re-init). Missing record where a row says

@@ -183,9 +183,11 @@ pub trait ShrineWorld: ObjectWorld {
     /// poison shrines; items spec).
     fn drop_potion_near_player(&mut self, player: UnitId, code: [u8; 4], quantity: i32) {}
 
-    /// Every player and monster not dead within `range` of `center`, in
-    /// the original's walk order (units / path spec).
-    fn units_in_range(&self, center: UnitId, range: i32) -> Vec<UnitId> {
+    /// Storm (`0x00582DA0`): the players and monsters the unit finder
+    /// `0x0065A950` / `0x0065AC70` returns around `center` with filter
+    /// `0x00582710`, those not dead (`0x005541B0`), in the finder's order
+    /// (objects.md §9.3).
+    fn units_in_range(&mut self, center: UnitId, range: i32) -> Vec<UnitId> {
         Vec::new()
     }
     /// Create a missile (missiles spec).

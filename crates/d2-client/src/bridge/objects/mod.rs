@@ -250,6 +250,8 @@ pub struct ClientObjects {
     /// read them (`super::client_missiles::stamp_unit_footprints`), by
     /// room.
     pub unit_grids: BTreeMap<d2_sim::units::RoomId, d2_sim::drlg::CollisionGrid>,
+    /// The dynamic path records of the C monsters (`super::critter_path`).
+    pub c_paths: BTreeMap<UnitKey, d2_sim::path::record::DynamicPath>,
     /// The client missiles' sound calls not yet handed out
     /// (`super::output::Output::MissileSound`).
     pub missile_sounds: Vec<super::client_missiles::MissileSound>,
@@ -271,6 +273,7 @@ impl Default for ClientObjects {
             missiles: Default::default(),
             just_hit: BTreeMap::new(),
             unit_grids: BTreeMap::new(),
+            c_paths: BTreeMap::new(),
             missile_sounds: Vec::new(),
             multishot_guard: Default::default(),
             selectable: Vec::new(),
@@ -837,6 +840,7 @@ pub fn create_client_unit(
 /// (a): every unit free, set C too).
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
     let u = w.objclient.set_c.remove(&key)?;
+    w.objclient.c_paths.remove(&key);
     w.objclient.missiles.remove(&key);
     w.room_units.leave(super::world::view_key(key));
     w.freed.push((key, true));

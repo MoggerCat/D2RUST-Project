@@ -84,6 +84,10 @@ pub struct UnitLooks {
     pub object_blocks_light: BTreeMap<u32, [u8; 8]>,
     /// The shape states' draw identity (`unit-composite.md` §1.1).
     pub shapes: super::disguise::Disguise,
+    /// By `monstats` row: bit v set when choice v of the `SH` component
+    /// (slot 7) is a usable shield (`combat/hit.md` §5: not `tch `, and
+    /// its items record has type 2; `0x006225F0`).
+    pub shield_choices: BTreeMap<u32, u16>,
 }
 
 fn read_table<T: Record>(source: &dyn FileSource) -> Result<Vec<T>, String> {
@@ -120,6 +124,69 @@ fn code4(c: [u8; 4]) -> Code {
     // (`0x004DA720`).
     let n = c.iter().position(|&b| b == 0).unwrap_or(4);
     code(&c[..n])
+}
+
+/// `SH` choice bits by `monstats` row (see [`UnitLooks::shield_choices`]):
+/// choice byte v at record offset 38 + 12·7 + v of the `monstats2` row
+/// indexes `compcode`; the code is looked up in the item tables
+/// (`0x00633640`) and its `type` read.
+fn shield_choices(
+    source: &dyn FileSource,
+    monstats2: &[Monstats2],
+) -> Result<BTreeMap<u32, u16>, String> {
+    let file = excel_path("monstats2.bin");
+    let bytes = source
+        .read_file(&file)
+        .ok_or_else(|| format!("{file}: in no archive"))??;
+    let raw = BinTable::parse("monstats2", "archive", &file, &bytes, Monstats2::SIZE)
+        .map_err(|e| e.to_string())?;
+    let comp: Vec<[u8; 4]> = read_table::<d2_data::tables::Compcode>(source)?
+        .iter()
+        .map(|r| r.code)
+        .collect();
+    let mut shield_codes: Vec<[u8; 4]> = Vec::new();
+    for (code, ty) in read_table::<d2_data::tables::Armor>(source)?
+        .iter()
+        .map(|r| (r.code, r.type_))
+        .chain(
+            read_table::<d2_data::tables::Weapons>(source)?
+                .iter()
+                .map(|r| (r.code, r.type_)),
+        )
+        .chain(
+            read_table::<d2_data::tables::Misc>(source)?
+                .iter()
+                .map(|r| (r.code, r.type_)),
+        )
+    {
+        if ty == 2 {
+            shield_codes.push(code);
+        }
+    }
+    let mut out = BTreeMap::new();
+    for (i, m) in read_table::<Monstats>(source)?.iter().enumerate() {
+        let row = usize::from(m.monstatsex);
+        if row >= monstats2.len() || row >= raw.count {
+            continue;
+        }
+        let rec = raw.record(row);
+        let mut mask = 0u16;
+        for v in 0..12 {
+            let c = usize::from(rec[38 + 12 * 7 + v]);
+            let Some(code) = comp.get(c) else { continue };
+            // Table 0x00744580 holds one code, `tch `.
+            if code == b"tch\0" || code == b"tch " {
+                continue;
+            }
+            if shield_codes.contains(code) {
+                mask |= 1 << v;
+            }
+        }
+        if mask != 0 {
+            out.insert(i as u32, mask);
+        }
+    }
+    Ok(out)
 }
 
 impl UnitLooks {
@@ -176,6 +243,7 @@ impl UnitLooks {
                 )
             })
             .collect();
+        let shield_choices = shield_choices(source, &monstats2)?;
         Ok(UnitLooks {
             player_tokens: read_table::<Plrtype>(source)?
                 .iter()
@@ -201,6 +269,7 @@ impl UnitLooks {
             objects,
             object_blocks_light,
             shapes,
+            shield_choices,
         })
     }
 
@@ -437,7 +506,8 @@ impl UnitArt {
 
 impl UnitArt {
     /// Updates [`Self::facing`] from the model (module doc; d2rs-own,
-    /// unverified): toward a player's walk target when it has one and is
+    /// unverified): a C monster's path direction (`ClientWorld::view_direction`,
+    /// the 1.14d unit's own); else toward a player's walk target when it has one and is
     /// not on it, else toward the last position change; otherwise the
     /// facing stays. Units no longer in the model are dropped.
     pub fn observe_facing(&mut self, world: &ClientWorld) {
@@ -448,8 +518,9 @@ impl UnitArt {
             let Some(pos) = unit.position else { continue };
             let old = self.facing.get(&unit.key).copied();
             let toward = |to: (u16, u16)| facing(cell_centre(pos), cell_centre(to));
-            let dir = request_target(world, unit)
-                .and_then(toward)
+            let dir = world
+                .view_direction(&unit.key)
+                .or_else(|| request_target(world, unit).and_then(toward))
                 .or_else(|| old.and_then(|f| facing(cell_centre(f.at), cell_centre(pos))))
                 .or(old.map(|f| f.dir64))
                 .unwrap_or(0);

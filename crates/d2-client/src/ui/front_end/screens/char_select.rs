@@ -23,7 +23,8 @@ use d2_formats::d2s::{checksum, status, HEADER_SIZE, MAGIC, MAX_FILE, VERSION, V
 use crate::ui::front_end::control::{vk, Action, Control, ControlKind, TextRow};
 use crate::ui::front_end::flow::Trigger;
 use crate::ui::front_end::screen::{FrontCtx, Screen};
-use crate::ui::front_end::{Registry, SaveFolder, CHAR_SELECT};
+use crate::ui::front_end::{DrawItem, Registry, SaveFolder, CHAR_SELECT};
+use crate::ui::geom::Point;
 
 /// Visible slots: 2 columns × 4 rows (§F2.4 r1).
 pub const SLOTS: usize = 8;
@@ -634,6 +635,10 @@ pub type SelectionHandle = Arc<Mutex<Option<Selection>>>;
 
 /// The screen.
 pub struct CharSelect {
+    /// `ctx.now_ms` when the controls were last built (the dolls start
+    /// their animation then, §F2.10).
+    built_ms: u64,
+    expansion: bool,
     dir: Option<PathBuf>,
     model: Option<Model>,
     refresh: bool,
@@ -643,6 +648,8 @@ pub struct CharSelect {
 impl CharSelect {
     pub fn new(dir: Option<PathBuf>, handle: SelectionHandle) -> Self {
         Self {
+            built_ms: 0,
+            expansion: false,
             dir,
             model: None,
             refresh: false,
@@ -726,6 +733,8 @@ impl Screen for CharSelect {
             self.model = Some(Model::new(dir, ctx.expansion));
         }
         self.refresh = false;
+        self.built_ms = ctx.now_ms;
+        self.expansion = ctx.expansion;
         let m = self.model.as_ref().expect("model set above");
         let b = m.buttons();
         let mut v = Vec::new();
@@ -885,6 +894,36 @@ impl Screen for CharSelect {
             }
         }
         v
+    }
+
+    /// The paper dolls (§F2.7): entry k = `first` + i in slot i (§F2.4 r2),
+    /// anchored at (column x + 30, row bottom − 13).
+    fn overlay(&mut self, now_ms: u64, _adv: &dyn Fn(u16, &[u16]) -> i32) -> Vec<DrawItem> {
+        let Some(m) = self.model.as_ref() else {
+            return Vec::new();
+        };
+        let ticks = (now_ms.saturating_sub(self.built_ms) / 40) as u32;
+        (0..SLOTS)
+            .filter_map(|i| {
+                let e = m.slot(i)?;
+                let (class, mode) = e.paper_doll(self.expansion);
+                let mut components = [0xFFu8; 16];
+                let mut colours = [0xFFu8; 16];
+                components[..11].copy_from_slice(&e.components);
+                colours[..11].copy_from_slice(&e.colours);
+                Some(DrawItem::Doll {
+                    class,
+                    mode,
+                    components,
+                    colours,
+                    at: Point::new(slot_x(i) + 30, slot_y(i) - 13),
+                    draw_mode: if e.dead() { 1 } else { 5 },
+                    key: (m.first + i) as u32,
+                    epoch: self.built_ms,
+                    ticks,
+                })
+            })
+            .collect()
     }
 
     fn action(&mut self, ctx: &mut FrontCtx, id: u32) -> Option<Trigger> {
