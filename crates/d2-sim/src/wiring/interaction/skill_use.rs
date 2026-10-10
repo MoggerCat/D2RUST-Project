@@ -1207,6 +1207,26 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         // delete the thinks and schedule one at frame + N; the mode is
         // not changed. A fresh spawn has no uninterruptable state to clear.
         if let bodies::BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30` / `0x00621CE0`: the record carries the link
+            // (+0x94 / +0x98) with +0xC8 bit 0x400, which `0x00552FD0`
+            // reads (`sim/units.md` §2 "Owner links" rule 2).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                match link {
+                    Some(l) => {
+                        r.source = l;
+                        r.flags2 |= 0x400;
+                    }
+                    None => {
+                        r.source = (0, 0);
+                        r.flags2 &= !0x400;
+                    }
+                }
+            }
             match owner {
                 Some(o) => self.cv.v.h.unit_source.insert(m, o),
                 None => self.cv.v.h.unit_source.remove(&m),
