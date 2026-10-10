@@ -640,7 +640,8 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
     let (mut units_drawn, mut units_hidden) = (0, 0);
     let mut unit_dirs = BTreeMap::new();
     let mut unit_calls = Vec::new();
-    for unit in world.units.values() {
+    for unit in world.view_units() {
+        let unit = &*unit;
         let Some(pose) = rules.unit_pose(world, unit)? else {
             units_hidden += 1;
             continue;

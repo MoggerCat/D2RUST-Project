@@ -260,7 +260,7 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 3. Else type 4 (`gold`): 1 bit (total 14 ≥ 0x1000), then total 14 in 32
    or 12 bits.
 4. Items `stackable` ≠ 0: 9 bits total 70 (quantity).
-5. F & 0x800 (socketed; already cleared by §2 rule 2 when not shown):
+5. Item flag 0x800 (socketed), read from the item's own flags, **not** F: the §2 rule 2 clearing applies to the header word only (recorded 2026-10-09: `gen-item-05` `9cl`, `gen-item-10` `7yw`, unidentified magic, 1.14d writes the 4-bit count 2 with 0x800 absent from the header):
    base 194 (`item_numsockets`) clamped to `Save Bits`(194), **no**
    `Save Add`.
 6. Not shown (network, not identified): the record **ends** here.
