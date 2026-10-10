@@ -319,7 +319,7 @@ Attacker and defender present and different; first match wins:
 
 | Defender | Attacker | Percent |
 |---|---|---|
-| player | player, hireling, or unit flag 0x80000000 (revived, `0x00451F30`) | 17 |
+| player | player, hireling, or unit flag 0x80000000 (revived, `0x00451F30`; the summon finish sets it on every pet, `skills/bodies.md` §6.2, so a Council Hydra's missile hits a player for 17 %: `gen-su-26`, 2026-10-10, REC-3180) | 17 |
 | hireling | hireling | 25 |
 | boss (`0x0063E9F0`) | hireling | `HireableBossDamagePercent` (100/… : Normal 50, Nightmare 35, Hell 25) |
 | revived (flag 0x80000000) | prime evil (`0x0063EDC0`) | 200 if the defender is a hireling, else 400 |
