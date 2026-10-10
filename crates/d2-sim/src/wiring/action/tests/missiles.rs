@@ -23,9 +23,8 @@ struct Shot {
 
 /// A monster owner at (10, 10) (AR 300, level 10) and a player at
 /// (13, 10) (defense 100, level 8, life 100): to-hit chance 83
-/// (`hit.md` vector). The player's flags 2 and 3 (`missiles.md` §R4.2)
-/// and its collision bit are what the unwritten kind init and movement
-/// specs will set.
+/// (`hit.md` vector). The player's collision bit is what the movement
+/// spec will set.
 fn shot() -> Shot {
     let mut fx = Fx::new();
     let owner = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
@@ -40,8 +39,8 @@ fn shot() -> Shot {
             (st::HITPOINTS, 25600),
         ],
     );
-    fx.sim.sys.units.get_mut(target).unwrap().flags |=
-        unit_flag::IS_VALID_TARGET | unit_flag::CAN_BE_ATTACKED;
+    // Flags 1-3 come from the player type init `0x005348C0`.
+    assert_eq!(fx.sim.sys.units.get(target).unwrap().flags & 0x0E, 0x0E);
     fx.mark(target, bits::PLAYER);
     Shot { fx, owner, target }
 }
@@ -204,6 +203,41 @@ fn missile_expires_after_range_runs() {
     s.fx.assert_clean();
 }
 
+/// The event log of one hit (to-hit 10 < 83) by a missile with data
+/// flags `data` (+0x14).
+fn hit_log(data: u32) -> Vec<String> {
+    let mut s = shot();
+    s.fx.seed(s.owner, seed_giving(10));
+    let m = s.fire(13);
+    let store = s.fx.sim.hooks().missiles.as_mut().expect("not lent out");
+    store.get_mut(m).unwrap().flags |= data;
+    for _ in 0..3 {
+        s.fx.frame();
+    }
+    assert!(!s.alive(m));
+    assert_eq!(s.fx.stat(s.target, st::HITPOINTS), 25600 - 2560);
+    s.fx.assert_clean();
+    std::mem::take(&mut s.fx.sim.hooks().x.log)
+}
+
+// Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text
+#[test]
+fn missile_data_flags_set_the_domissiledamage_hit_flags() {
+    let s = shot();
+    let (o, t) = (s.owner.0, s.target.0);
+    let ev = |n: u8| format!("event {n} Some({t})");
+    // Flag 1 → hit flag 0x20: the owner's `domissiledamage` (6) runs
+    // before the target's `damagedbymissile` (2).
+    let l = hit_log(1);
+    assert_eq!(l[..4], [ev(0), ev(11), format!("event 6 Some({o})"), ev(2)]);
+    // Flag 2 → 0x80 suppresses it, with or without flag 1 (M08: flags 0
+    // and 2 alone give the same log as 3).
+    for data in [0, 2, 3] {
+        let l = hit_log(data);
+        assert_eq!(l[..3], [ev(0), ev(11), ev(2)], "data flags {data}");
+    }
+}
+
 // Covers: specs/missiles/missiles.md §r6-1-order-1-14d-0x005adf10-step-7 text, §r6-3-server-damage-functions-psrvdmgfunc-1-14d-confirmed-2026-10-08
 #[test]
 fn missile_hit_class_merges_the_element_nibble() {
@@ -258,4 +292,64 @@ fn allocation_steps_game_seed_guid_and_init() {
     let f = s.fx.sim.sys.units.get(m).unwrap().flags;
     assert_eq!(f & (unit_flag::BIT1 | unit_flag::IS_VALID_TARGET), 0);
     assert_eq!(s.fx.timers(m), [(0, -1)]);
+}
+
+/// `missiles.md` §R4 step 9 / `path-placement.md` §4 rule 6: the unit
+/// search takes the unit's size (path shape) against the missile's: a
+/// unit one sub-tile beside the line is hit when the shapes overlap, two
+/// away it is not, and a dead one (player mode 0) on the line is
+/// skipped. Recorded: `check-combat-champion-pack` f58, the fire bolt
+/// kills the fallen at (5145, 4264) from its path cell (5144, 4264).
+// Covers: specs/sim/path-placement.md §4 r6
+#[test]
+fn missile_unit_search_uses_the_shapes_and_skips_the_dead() {
+    let probe = |dy: i32, dead: bool| {
+        let mut s = shot();
+        // The shot's own target leaves the line.
+        let t = s.target;
+        s.fx.sim.sys.units.get_mut(t).unwrap().mode = 0;
+        let victim = s.fx.spawn(UnitType::Player, 0, s.fx.a, 13, 10 + dy);
+        s.fx.stats(
+            victim,
+            &[
+                (ARMORCLASS, 100),
+                (LEVEL_STAT, 8),
+                (st::MAXHP, 25600),
+                (st::HITPOINTS, 25600),
+            ],
+        );
+        // A player's shape is size 2 (`path-placement.md` §3).
+        s.fx.sim.hooks().x.sizes.insert(victim, 2);
+        if dead {
+            s.fx.sim.sys.units.get_mut(victim).unwrap().mode = 0;
+        }
+        let size = s.fx.sim.with(&mut s.fx.game, |_, v| v.path_size(victim));
+        // The line's cell carries the player bit, as the victim's plus
+        // footprint stamps it (also with the victim on the cell).
+        let room = s.fx.a;
+        let game = &s.fx.game;
+        *s.fx
+            .sim
+            .sys
+            .hooks
+            .drlg
+            .collision_mut(game, room, 13, 10)
+            .unwrap() |= bits::PLAYER;
+        s.fx.seed(s.owner, seed_giving(10));
+        let m = s.fire(16);
+        for _ in 0..3 {
+            s.fx.frame();
+        }
+        (size, s.alive(m), s.fx.stat(victim, st::HITPOINTS))
+    };
+    let (size, alive, hp) = probe(1, false);
+    assert_eq!(size, 2);
+    assert!(!alive);
+    assert_eq!(hp, 25600 - 2560);
+    let (_, alive, hp) = probe(2, false);
+    assert!(alive);
+    assert_eq!(hp, 25600);
+    let (_, alive, hp) = probe(0, true);
+    assert!(alive);
+    assert_eq!(hp, 25600);
 }

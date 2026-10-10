@@ -1,0 +1,18 @@
+check 1
+# Area B (q-diff-combat-a1): a unique fallen shaman (monstats 58, umods 5
+# 7) with its minions poked in the Blood Moor (warp 2 at frame 4; town allows no combat); one minion is
+# killed by a Fire Bolt so the shaman's resurrect AI acts on the corpse;
+# then the boss takes hits. Spec: specs/tools/scenario-diff.md.
+name combat-unique-pack
+save ScnAma --class ama --expansion
+seed 1234
+ticks 226
+seconds 420
+channels state
+at 4 poke warp 2
+at 30 poke seed-game 0x00001234 666
+at 30 poke seed-unit @player 0x00000055 666
+at 30 poke spawn 58 @x+5 @y+5 unique umod 5 7
+at 46 poke missile 58 @x @y @x+4 @y+4 skill 36 20
+at 86 poke missile 58 @x @y @x+5 @y+5 skill 36 3
+at 116 poke missile 58 @x @y @x+5 @y+5 skill 36 3

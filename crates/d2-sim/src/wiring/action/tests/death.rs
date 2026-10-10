@@ -103,12 +103,17 @@ fn a_name_not_in_the_file_gets_the_default_record() {
         .names
         .insert((UnitType::Player, 7), *b"SOA1HTH\0");
     let p = fx.spawn(UnitType::Player, 1, fx.a, 10, 10);
+    // A loaded player's attack rate (`d2s-load.md` §2 post-load: stat 68
+    // = 100; `units.md` §4.7 step 8 reads it in mode 7).
+    fx.stats(p, &[(68, 100)]);
     animate(&mut fx, p, 7);
-    // §3: frames 2048, speed 256, no events → only the end, at
-    // f + 2048.
+    // §3: frames 2048, speed 256, no events → only the end. The
+    // Sorceress's A1 without a weapon has frame bonus 1 (§4.7 "Frame
+    // bonus": table `0x006E8E60`, type class 0), so the schedule starts
+    // at index 1 and ends at f + 2047 (§4.2).
     let r = fx.sim.sys.units.get(p).unwrap();
     assert_eq!(r.anim.record.unwrap().frames, 2048);
-    assert_eq!(fx.timers(p), [(event::END_ANIM, 2048)]);
+    assert_eq!(fx.timers(p), [(event::END_ANIM, 2047)]);
     fx.assert_clean();
 }
 
@@ -228,6 +233,183 @@ fn a_killing_missile_runs_the_kill_and_gives_experience() {
     assert_eq!(fx.timers(m), [(event::END_ANIM, f + 4)]);
     assert_eq!(fx.sim.hooks().mode_target, None);
     assert_eq!(fx.stat(p, EXPERIENCE), 100);
+    fx.assert_clean();
+}
+
+/// `units.md` §4.6 rule 1.2 ("What keeps a dead monster dead"): the
+/// death clean-up's `0x005738D0` cancels the monster's pending think
+/// (type 2) and regeneration (type 3) events, so a think scheduled
+/// before the kill never runs on the dead unit (the playthrough's
+/// "killed monsters stand back up").
+// Covers: specs/sim/units.md §4.6 r1
+#[test]
+fn the_death_start_cancels_the_pending_think_and_regeneration() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    let f0 = fx.game.frame;
+    for ev in [event::AI_THINK, event::STAT_REGEN] {
+        fx.game
+            .schedule_event(m, u32::from(ev), f0 + 15, None, 0, 0)
+            .unwrap();
+    }
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    let f = fx.game.frame;
+    assert_eq!(fx.timers(m), [(event::END_ANIM, f + 4)]);
+}
+
+/// The kill of a monster with a think pending at f + 15
+/// (`units.md` §4.6 "What keeps a dead monster dead"): no think runs
+/// (without the AI store a think would log a re-entrance error), the
+/// death ends in mode 12 and the monster is still in mode 12 a hundred
+/// frames later. The clean-up's fields (rule 1.2): the overhead freed
+/// (flag 0x100), flags 0x800C cleared, +0xD0 = 11 and the node gone from
+/// its target-node list (`0x005B1A90`); the room's dead-GUID
+/// ring holds the monster (rule 3.1).
+// Covers: specs/sim/units.md §4.6 r1, §4.6 r3
+#[test]
+fn a_killed_monster_with_a_pending_think_stays_dead() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        r.hover = Some(1000);
+        r.flags |= 0x8000;
+        r.node_index = 8;
+    }
+    fx.game.target_nodes.push_front(8, m);
+    let f0 = fx.game.frame;
+    fx.game
+        .schedule_event(m, u32::from(event::AI_THINK), f0 + 15, None, 0, 0)
+        .unwrap();
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    let r = fx.sim.sys.units.get(m).unwrap();
+    assert_eq!(r.hover, None);
+    assert_ne!(r.flags & crate::units::record::flags::HOVER_FREED, 0);
+    assert_eq!(r.flags & 0x800C, 0);
+    assert_eq!(r.node_index, 11);
+    assert!(fx.game.target_nodes.slot(8).is_empty());
+    let guid = fx.game.lists.unit(m).unwrap().guid;
+    let room = fx.game.lists.room(fx.a).unwrap();
+    assert_eq!((room.dead_guids[0], room.dead_next), (guid, 1));
+    for _ in 0..100 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DD);
+    assert_eq!(fx.stat(m, st::HITPOINTS), 0);
+    assert!(fx.timers(m).is_empty());
+    fx.assert_clean();
+}
+
+/// A monster killed while frozen (`units.md` §4.6 rule 1.2): the
+/// stat-list death `0x00627540` frees the freeze list (state 1 is not
+/// `monstaydeath`), the keep mask clears the state bit, and the dead
+/// monster stays in mode 12 past the frame the freeze would have ended.
+// Covers: specs/sim/units.md §4.6 r1; specs/sim/stat-lists.md §8.8 r1
+#[test]
+fn a_monster_killed_while_frozen_stays_dead() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    use crate::combat::CombatWorld;
+    let freeze = crate::stats::states::state::FREEZE as u16;
+    let f0 = fx.game.frame;
+    fx.sim.combat(&mut fx.game, |w, _| {
+        w.create_state_list(m, freeze, p, f0 + 20);
+        w.set_state(m, freeze, true);
+        w.schedule_timer(m, event::REMOVE_STATE, f0 + 20);
+    });
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    assert!(!fx.sim.sys.stats.has_state(m, u32::from(freeze)));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        assert_eq!(w.state_list_expiry(m, freeze), None);
+    });
+    for _ in 0..100 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DD);
+    fx.assert_clean();
+}
+
+/// The keep mask of `0x00639FB0` (`units.md` §4.6 rule 3.1): a
+/// non-boss monster keeps its `monstaydeath` states (60 in the fixture's
+/// states table) and loses the others, `bossstaydeath` (61) included;
+/// the cleared bit is marked changed.
+// Covers: specs/sim/units.md §4.6 r3
+#[test]
+fn the_death_keeps_only_the_stay_on_death_states() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    for s in [60u32, 61] {
+        fx.sim.sys.stats.toggle_state(m, s, true);
+    }
+    fx.sim.sys.stats.clear_states_changed(m);
+    fire(&mut fx, p, 13);
+    for _ in 0..3 {
+        fx.frame();
+    }
+    let stats = &fx.sim.sys.stats;
+    assert!(stats.has_state(m, 60));
+    assert!(!stats.has_state(m, 61));
+    let (_, changed) = stats.state_bits(m).unwrap();
+    assert_ne!(changed[1] & 1 << (61 - 32), 0);
+    assert_eq!(changed[1] & 1 << (60 - 32), 0);
+    fx.assert_clean();
+}
+
+/// 1.14d has no dead guard in the mode set (`units.md` §4.6 "A mode
+/// request to a dead monster"): a mode-1 request on a dead monster runs
+/// the neutral start, mode 1 with hp 0 and a think scheduled. A request
+/// for mode 12 on a live monster runs the DD start (rule 4): the
+/// clean-up (its think cancelled), then mode 12.
+// Covers: specs/sim/units.md §4.6 r4
+#[test]
+fn mode_requests_on_a_dead_monster_follow_the_starts() {
+    let mut fx = Fx::new();
+    let (p, m) = kill_setup(&mut fx);
+    fx.seed(p, seed_giving(10));
+    fire(&mut fx, p, 13);
+    for _ in 0..10 {
+        fx.frame();
+    }
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DD);
+    let request = |fx: &mut Fx, u: UnitId, mode: u32| {
+        let s = &mut fx.sim.sys;
+        let mut sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        modes::monster_set_mode(&mut sim, &mut s.hooks, u, mode).unwrap();
+    };
+    request(&mut fx, m, monster_mode::NU);
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::NU);
+    assert_eq!(fx.stat(m, st::HITPOINTS), 0);
+    assert_eq!(fx.timers(m).first().map(|t| t.0), Some(event::AI_THINK));
+
+    let live = fx.spawn(UnitType::Monster, 0, fx.a, 14, 12);
+    let f = fx.game.frame;
+    fx.game
+        .schedule_event(live, u32::from(event::AI_THINK), f + 15, None, 0, 0)
+        .unwrap();
+    request(&mut fx, live, monster_mode::DD);
+    assert_eq!(fx.sim.sys.units.get(live).unwrap().mode, monster_mode::DD);
+    assert!(fx.timers(live).is_empty());
     fx.assert_clean();
 }
 
@@ -1073,4 +1255,78 @@ fn a_player_is_knocked_back_or_gets_hit() {
     let r = fx.sim.sys.units.get(p).unwrap();
     assert_eq!(r.mode, 1);
     assert_ne!(r.flags & 0x8000, 0, "soft hit");
+}
+
+/// `damage.md` §7.2 step 3 / `units.md` §4.6 rule 1.2: the DT start
+/// snaps the monster's path direction toward the killer (recorded:
+/// `check-combat-arrow-kill`, the quill rat killed by an arrow from
+/// (−4, −4) faces 32).
+// Covers: specs/combat/damage.md §7.2 r3
+#[test]
+fn death_start_faces_the_killer() {
+    let mut fx = Fx::new();
+    fx.sim.hooks().enable_paths().expect("embedded tables");
+    let (_, m) = kill_setup(&mut fx);
+    let k = fx.spawn(UnitType::Player, 1, fx.a, 9, 6);
+    let dir = |fx: &mut Fx| {
+        let p = fx.sim.hooks().paths.as_ref().unwrap().dynamic(m).unwrap();
+        (p.direction, p.new_direction)
+    };
+    assert_eq!(dir(&mut fx), (0, 0));
+    fx.sim.combat(&mut fx.game, |w, _| {
+        crate::wiring::action::reaction::kill(w, m, k);
+    });
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().mode, monster_mode::DT);
+    assert_eq!(dir(&mut fx), (32, 32));
+}
+
+/// `treasure.md` §3.2 rule 2: a champion (monster data type flag 4,
+/// `0x005A0180`) drops from column 2. The flag is read from the monster
+/// data in the lent world (recorded: `check-combat-champion-pack` f85,
+/// the champion fallen's drop takes 10 draws on its seed and makes three
+/// items). M08: without the flag, column 1 (the empty TC) drops nothing.
+// Covers: specs/items/treasure.md §3.2 r2
+#[test]
+fn a_champion_drops_from_column_2_by_its_monster_data() {
+    let run = |champion: bool| {
+        let mut fx = Fx::new();
+        let (mut d, p, mon) = drop_setup(&mut fx);
+        let mut t = (*fx.sim.hooks().tables).clone();
+        t.combat.monstats[0].treasureclass1 = 0;
+        t.combat.monstats[0].treasureclass2 = 1;
+        fx.sim.hooks().tables = Arc::new(t);
+        let data = crate::monsters::init::MonsterData {
+            type_flags: if champion { 4 } else { 0 },
+            ..Default::default()
+        };
+        let world = super::sound::DataOnly([(mon, data)].into_iter().collect());
+        fx.sim.sys.hooks.monster_world = Some(Box::new(world));
+        run_drop(&mut fx, &mut d, mon, p).len()
+    };
+    assert_eq!(run(true), 1);
+    assert_eq!(run(false), 0);
+}
+
+/// `units.md` §4.7 "Frame bonus" on the mode start (§4.1: +0x44 := bonus
+/// · 256): A1 without a weapon gives 1 for the Amazon and Sorceress
+/// (type class 0), 0 for the Barbarian; mode 1 gives 0. Recorded:
+/// `check-combat-melee-fallen-msg` f34, the Amazon's A1 at +0x44 = 256.
+// Covers: specs/sim/units.md §4.7 text
+#[test]
+fn player_attack_starts_at_the_frame_bonus() {
+    for (class, mode, frame) in [(0, 7, 256), (1, 8, 256), (4, 7, 0), (0, 1, 0)] {
+        let mut fx = Fx::new();
+        with_anim(&mut fx);
+        let p = fx.spawn(UnitType::Player, class, fx.a, 10, 10);
+        let s = &mut fx.sim.sys;
+        let mut sim = Sim {
+            game: &mut fx.game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        modes::set_mode(&mut sim, &mut s.hooks, p, mode).unwrap();
+        let f = fx.sim.sys.units.get(p).unwrap().anim.frame;
+        assert_eq!(f, frame, "class {class} mode {mode}");
+    }
 }

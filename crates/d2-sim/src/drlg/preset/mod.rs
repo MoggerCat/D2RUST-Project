@@ -253,8 +253,27 @@ impl Presets {
         self.rooms.get_mut(&room)?.units.get_mut(index)?.path.take()
     }
 
+    /// The path of the room's preset unit `index`, kept (a copy, as
+    /// `0x006660B0` makes for the quest map-AI stores).
+    pub fn unit_path(&self, room: DrlgRoomId, index: usize) -> Option<Vec<PathPoint>> {
+        self.rooms.get(&room)?.units.get(index)?.path.clone()
+    }
+
     pub fn room_units(&self, room: DrlgRoomId) -> &[PresetUnit] {
         self.rooms.get(&room).map_or(&[], |r| r.units.as_slice())
+    }
+
+    /// `0x0066BF30`: prepends a unit to a preset room's list (the warp
+    /// tile preset, `sim/path-placement.md` §12.1 rule 3). `false`: not a
+    /// preset room of this act.
+    pub fn prepend_room_unit(&mut self, room: DrlgRoomId, unit: PresetUnit) -> bool {
+        match self.rooms.get_mut(&room) {
+            Some(r) => {
+                r.units.insert(0, unit);
+                true
+            }
+            None => false,
+        }
     }
 
     /// [`super::LevelTypes::preset_units`]: the seam view of the room's

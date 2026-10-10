@@ -485,6 +485,7 @@ fn action_tables() -> ActionTables {
         levels: Vec::new(),
         skill_modes: Vec::new(),
         overlay_count: 0,
+        monequip: Vec::new(),
     }
 }
 
@@ -781,6 +782,18 @@ impl T {
         v
     }
 
+    /// [`Self::pass`] after a pick-up: the pickup sound on the player
+    /// (S→C 0x2C, event 1; REC-1404) closes the tick's messages.
+    fn pass_pick(&mut self, items: &[Vec<u8>]) -> Vec<Vec<u8>> {
+        let mut v = self.pass(items);
+        let g = self.pguid();
+        let mut m = vec![0x2C, 0];
+        m.extend_from_slice(&g.to_le_bytes());
+        m.extend_from_slice(&1u16.to_le_bytes());
+        v.push(m);
+        v
+    }
+
     /// 0x9D for an item the player owns (§11: owner type 0).
     fn owned(&mut self, action: u8, item: Guid) -> Vec<u8> {
         let p = self.pguid();
@@ -924,7 +937,7 @@ fn pick_item_to_the_cursor() {
     let u = t.unit(k);
     assert_eq!(t.inventory().cursor(), u);
     assert!(!t.in_room(k));
-    assert_eq!(bytes, t.pass(&[x9c(0x01, k)]));
+    assert_eq!(bytes, t.pass_pick(&[x9c(0x01, k)]));
     assert_eq!(t.data(k).cmd_flags, 0, "clean-up");
     let p = t.player;
     // The reset clears +0xC8 bit 0; bit 1 ("save pending") stays (IS1).
@@ -983,7 +996,7 @@ fn pick_item_auto_and_refusals() {
     assert_eq!(t.mode(k), 0);
     let d = t.data(k);
     assert_eq!((d.page, d.x, d.y), (0, 9, 3));
-    assert_eq!(bytes, t.pass(&[x9c(0x04, k)]));
+    assert_eq!(bytes, t.pass_pick(&[x9c(0x04, k)]));
 }
 
 /// 0x17 (§7.2, §9.1): the cursor item dropped at the free spot: mode 3,
@@ -1271,7 +1284,7 @@ fn belt_moves() {
     let (code, bytes) = t.frame(&pick(a, 0));
     assert_eq!(code, Done);
     assert_eq!(t.mode(a), 2);
-    assert_eq!(bytes, t.pass(&[x9c(0x0E, a)]));
+    assert_eq!(bytes, t.pass_pick(&[x9c(0x0E, a)]));
     let b = t.cursor_item(HP1);
     let (code, bytes) = t.frame(&msg(0x23, &[b, 4]));
     assert_eq!(code, Done);

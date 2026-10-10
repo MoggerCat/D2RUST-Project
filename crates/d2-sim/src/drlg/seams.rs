@@ -73,6 +73,17 @@ pub trait LevelTypes {
         Vec::new()
     }
 
+    /// The path of the room's preset unit `index` (`preset.md` §5.2 step
+    /// 10), as (action, x, y) points in level sub-tiles, if it has one.
+    fn unit_path(
+        &self,
+        _drlg: &Drlg,
+        _room: DrlgRoomId,
+        _index: usize,
+    ) -> Option<Vec<(u32, i32, i32)>> {
+        None
+    }
+
     /// The client presets of a room (`client/model.md` §5 r6.2,
     /// `0x00466820`): its preset units whose flag word (+0x1C) has bit 0
     /// set, in list order, room-relative.
@@ -126,20 +137,25 @@ pub trait LevelTypes {
         false
     }
 
-    /// A hidden exit cell's warp unit (`0x0066E1C0`, `rooms.md` §9.5.1
-    /// step 3; wall warp tiles for sub 0 or 4). `t` is the cell's exit
-    /// type (10 left, 11 right: `sim/path-placement.md` §12.1 rule 1).
+    /// An exit cell's warp tile preset (`0x0066E1C0`,
+    /// `sim/path-placement.md` §12.1; `rooms.md` §9.5.1 step 3 for a
+    /// hidden cell, the wall warp tiles for sub 0 or 4): world tile
+    /// (`wx`, `wy`), packed `cell`, cell type `orientation` (10 or 11).
+    /// `Ok(true)`: a type-5 preset unit was prepended to the room's list;
+    /// `Ok(false)`: none (far edge, or a provider with no warp tiles);
+    /// `Err`: no lvlwarp record (fatal in the original).
     #[allow(clippy::too_many_arguments)]
     fn warp_unit(
         &mut self,
         drlg: &mut Drlg,
         data: &DrlgData,
         room: DrlgRoomId,
-        t: u32,
         wx: i32,
         wy: i32,
         cell: u32,
-    ) {
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        Ok(false)
     }
 }
 

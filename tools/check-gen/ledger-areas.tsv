@@ -1,0 +1,2115 @@
+#ledger-areas 1
+# area ids of the fidelity ledger (origin/claude/q-fidelity-ledger:docs/handoff/fidelity-ledger.tsv, generated 2026-10-09 by tools/coord/ledger.py) and their source_1.14d column; the join key of the check headers.
+area	source_1.14d
+monster.ai-bodies	monster AI think functions (Game.exe, monai)
+monster.poke-spawn-town	poke spawn of a fallen in town (spawn path)
+monster.umod-life	monster umod life bonus (umods)
+skill.sequences	skill animation sequences (Game.exe sequence tables) and the bodies-2b group
+monster.ai.7tillusion	AI func 88 think 0x005EA080 (AITHINK_Fn088_7TIllusion); monstats AI=7TIllusion; classes 1: 355 seventombs
+monster.ai.abyssknight	AI func 73 think 0x005FAB80 (AITHINK_Fn073_AbyssKnight); monstats AI=AbyssKnight; classes 1: 311 doomknight2
+monster.ai.ancient	AI func 133 think 0x005EF1A0 (AITHINK_Fn133_Ancient); monstats AI=Ancient; classes 3: 540 ancientbarb1 541 ancientbarb2 542 ancientbarb3
+monster.ai.ancientstatue	AI func 132 think 0x005EEAA0 (AITHINK_Fn132_AncientStatue); monstats AI=AncientStatue; classes 3: 537 ancientstatue1 538 ancientstatue2 539 ancientstatue3
+monster.ai.andariel	AI func 34 think 0x005F5830 (AITHINK_Fn034_Andariel); monstats AI=Andariel; classes 2: 156 andariel 707 uberandariel
+monster.ai.arach	AI func 26 think 0x005F4510 (AITHINK_Fn026_Arach); monstats AI=Arach; classes 7: 122 arach1 123 arach2 124 arach3
+monster.ai.arcanetower	AI func 93 think 0x005E0F60 (AITHINK_Fn093_ArcaneTower); monstats AI=ArcaneTower; classes 1: 371 lightningspire
+monster.ai.assassinsentry	AI func 101 think 0x005EA3D0 (AITHINK_Fn101_AssassinSentry); monstats AI=AssassinSentry; classes 4: 410 wakeofdestruction 411 chargeboltsentry 412 lightningsentry
+monster.ai.baalcrab	AI func 135 think 0x005FCFE0 (AITHINK_Fn135_BaalCrab); monstats AI=BaalCrab; classes 1: 544 baalcrab
+monster.ai.baalcrabclone	AI func 140 think 0x005FD210 (AITHINK_Fn140_BaalCrabClone); monstats AI=BaalCrabClone; classes 1: 570 baalclone
+monster.ai.baalminion	AI func 141 think 0x005EF910 (AITHINK_Fn141_BaalMinion); monstats AI=BaalMinion; classes 3: 571 baalminion1 572 baalminion2 573 baalminion3
+monster.ai.baaltaunt	AI func 136 think 0x005EF710 (AITHINK_Fn136_BaalTaunt); monstats AI=BaalTaunt; classes 1: 545 baaltaunt
+monster.ai.baaltentacle	AI func 139 think 0x005EF820 (AITHINK_Fn139_BaalTentacle); monstats AI=BaalTentacle; classes 5: 562 baaltentacle1 563 baaltentacle2 564 baaltentacle3
+monster.ai.baalthrone	AI func 134 think 0x005EF320 (AITHINK_Fn134_BaalThrone); monstats AI=BaalThrone; classes 1: 543 baalthrone
+monster.ai.baaltostairs	AI func 138 think 0x005EF620 (AITHINK_Fn138_BaalToStairs); monstats AI=BaalToStairs; classes 1: 559 baalcrabstairs
+monster.ai.baboon	AI func 11 think 0x005F0CD0 (AITHINK_Fn011_Baboon); monstats AI=Baboon; classes 8: 48 baboon1 49 baboon2 50 baboon3
+monster.ai.batdemon	AI func 29 think 0x005F5040 (AITHINK_Fn029_BatDemon); monstats AI=BatDemon; classes 7: 136 batdemon1 137 batdemon2 138 batdemon3
+monster.ai.bighead	AI func 4 think 0x005EFF50 (AITHINK_Fn004_Bighead); monstats AI=Bighead; classes 10: 10 bighead1 11 bighead2 12 bighead3
+monster.ai.bladecreeper	AI func 102 think 0x005EA540 (AITHINK_Fn102_BladeCreeper); monstats AI=BladeCreeper; classes 1: 413 bladecreeper
+monster.ai.bloodhawk	AI func 5 think 0x005F00E0 (AITHINK_Fn005_BloodHawk); monstats AI=BloodHawk; classes 8: 15 foulcrow1 16 foulcrow2 17 foulcrow3
+monster.ai.bloodlord	AI func 125 think 0x005E36F0 (AITHINK_Fn125_BloodLord); monstats AI=BloodLord; classes 7: 506 bloodlord1 507 bloodlord2 508 bloodlord3
+monster.ai.bloodraven	AI func 59 think 0x005E6320 (AITHINK_Fn059_BloodRaven); monstats AI=BloodRaven; classes 1: 267 bloodraven
+monster.ai.bonewall	AI func 84 think 0x005E0400 (AITHINK_Fn084_BoneWall); monstats AI=BoneWall; classes 1: 344 bonewall
+monster.ai.brute	AI func 7 think 0x005EFB80 (AITHINK_Fn007_Brute); monstats AI=Brute; classes 9: 24 brute2 25 brute3 26 brute4
+monster.ai.buffy	AI func 100 think 0x005E7F50 (AITHINK_Fn001_100_Idle_Buffy); monstats AI=Buffy; classes 1: 408 malachai
+monster.ai.catapult	AI func 123 think 0x005E34C0 (AITHINK_Fn123_Catapult); monstats AI=Catapult; classes 4: 497 catapult1 498 catapult2 499 catapult3
+monster.ai.catapultspotter	AI func 126 think 0x005EE040 (AITHINK_Fn126_CatapultSpotter); monstats AI=CatapultSpotter; classes 4: 516 catapultspotter1 517 catapultspotter2 518 catapultspotter3
+monster.ai.clawviper	AI func 16 think 0x005F1B60 (AITHINK_Fn016_ClawViper); monstats AI=ClawViper; classes 5: 73 clawviper1 74 clawviper2 75 clawviper3
+monster.ai.clawviperex	AI func 142 think 0x005F1DE0 (AITHINK_Fn142_ClawViperEx); monstats AI=ClawViperEx; classes 5: 594 clawviper6 595 clawviper7 596 clawviper8
+monster.ai.corruptarcher	AI func 35 think 0x005F5A20 (AITHINK_Fn035_CorruptArcher); monstats AI=CorruptArcher; classes 8: 160 cr_archer1 161 cr_archer2 162 cr_archer3
+monster.ai.corruptlancer	AI func 36 think 0x005F5D50 (AITHINK_Fn036_CorruptLancer); monstats AI=CorruptLancer; classes 9: 165 cr_lancer1 166 cr_lancer2 167 cr_lancer3
+monster.ai.corruptrogue	AI func 10 think 0x005F0B00 (AITHINK_Fn010_CorruptRogue); monstats AI=CorruptRogue; classes 6: 43 corruptrogue1 44 corruptrogue2 45 corruptrogue3
+monster.ai.cycleoflife	AI func 111 think 0x005EC8C0 (AITHINK_Fn111_CycleOfLife); monstats AI=CycleOfLife; classes 2: 426 cycleoflife 427 vinecreature
+monster.ai.darkwanderer	AI func 91 think 0x005EA130 (AITHINK_Fn091_DarkWanderer); monstats AI=DarkWanderer; classes 1: 368 darkwanderer
+monster.ai.deathmauler	AI func 130 think 0x005EE260 (AITHINK_Fn130_DeathMauler); monstats AI=DeathMauler; classes 6: 529 deathmauler1 530 deathmauler2 531 deathmauler3
+monster.ai.deathsentry	AI func 104 think 0x005EA980 (AITHINK_Fn104_DeathSentry); monstats AI=DeathSentry; classes 1: 416 deathsentry
+monster.ai.desertturret	AI func 94 think 0x005E0980 (AITHINK_Fn094_DesertTurret); monstats AI=DesertTurret; classes 4: 348 turret1 349 turret2 350 turret3
+monster.ai.diablo	AI func 51 think 0x005E9170 (AITHINK_Fn051_Diablo); monstats AI=Diablo; classes 2: 243 diablo 333 diabloclone
+monster.ai.doomknight	AI func 72 think 0x005FAA90 (AITHINK_Fn072_DoomKnight); monstats AI=DoomKnight; classes 3: 310 doomknight1 699 dkfig1 700 dkfig2
+monster.ai.druidbear	AI func 112 think 0x005ED730 (AITHINK_Fn112_DruidBear); monstats AI=DruidBear; classes 1: 428 druidbear
+monster.ai.druidwolf	AI func 108 think 0x005ED710 (AITHINK_Fn108_DruidWolf); monstats AI=DruidWolf; classes 2: 420 spiritwolf 421 fenris
+monster.ai.duriel	AI func 44 think 0x005F67B0 (AITHINK_Fn044_Duriel); monstats AI=Duriel; classes 2: 211 duriel 708 uberduriel
+monster.ai.elementalbeast	AI func 46 think 0x005F6B70 (AITHINK_Fn046_ElementalBeast); monstats AI=ElementalBeast; classes 4: 230 firebeast 231 iceglobe 232 lightningbeast
+monster.ai.evilhole	AI func 76 think 0x005FB410 (AITHINK_Fn076_EvilHole); monstats AI=EvilHole; classes 6: 321 evilhole1 322 evilhole2 323 evilhole3
+monster.ai.fallen	AI func 6 think 0x005F02C0 (AITHINK_Fn006_Fallen); monstats AI=Fallen; classes 8: 19 fallen1 20 fallen2 21 fallen3
+monster.ai.fallenshaman	AI func 13 think 0x005F1440 (AITHINK_Fn013_FallenShaman); monstats AI=FallenShaman; classes 8: 58 fallenshaman1 59 fallenshaman2 60 fallenshaman3
+monster.ai.fetish	AI func 30 think 0x005F53E0 (AITHINK_Fn030_Fetish); monstats AI=Fetish; classes 16: 141 fetish1 142 fetish2 143 fetish3
+monster.ai.fetishblowgun	AI func 96 think 0x005E1250 (AITHINK_Fn096_FetishBlowgun); monstats AI=FetishBlowgun; classes 8: 396 fetishblow1 397 fetishblow2 398 fetishblow3
+monster.ai.fetishshaman	AI func 65 think 0x005F9A80 (AITHINK_Fn065_FetishShaman); monstats AI=FetishShaman; classes 8: 278 fetishshaman1 279 fetishshaman2 280 fetishshaman3
+monster.ai.fingermage	AI func 70 think 0x005FA380 (AITHINK_Fn070_FingerMage); monstats AI=FingerMage; classes 5: 304 fingermage1 305 fingermage2 306 fingermage3
+monster.ai.flyingscimitar	AI func 47 think 0x005F6CA0 (AITHINK_Fn047_FlyingScimitar); monstats AI=FlyingScimitar; classes 1: 234 flyingscimitar
+monster.ai.foulcrownest	AI func 43 think 0x005F6650 (AITHINK_Fn043_FoulCrowNest); monstats AI=FoulCrowNest; classes 4: 206 crownest1 207 crownest2 208 crownest3
+monster.ai.frogdemon	AI func 52 think 0x005F8260 (AITHINK_Fn052_FrogDemon); monstats AI=FrogDemon; classes 3: 247 frogdemon1 248 frogdemon2 249 frogdemon3
+monster.ai.frozenhorror	AI func 124 think 0x005E3530 (AITHINK_Fn124_FrozenHorror); monstats AI=FrozenHorror; classes 5: 501 frozenhorror1 502 frozenhorror2 503 frozenhorror3
+monster.ai.gargoyletrap	AI func 63 think 0x005F9490 (AITHINK_Fn063_GargoyleTrap); monstats AI=GargoyleTrap; classes 1: 273 gargoyletrap
+monster.ai.genericspawner	AI func 129 think 0x005E61B0 (AITHINK_Fn129_GenericSpawner); monstats AI=GenericSpawner; classes 1: 528 evilhut
+monster.ai.goatman	AI func 12 think 0x005F12A0 (AITHINK_Fn012_019_Goatman_Swarm); monstats AI=Goatman; classes 10: 53 goatman1 54 goatman2 55 goatman3
+monster.ai.goodnpcranged	AI func 60 think 0x005E7AC0 (AITHINK_Fn060_GoodNpcRanged); monstats AI=GoodNpcRanged; classes 1: 270 rogue2
+monster.ai.greatermummy	AI func 22 think 0x005F2B10 (AITHINK_Fn022_GreaterMummy); monstats AI=GreaterMummy; classes 10: 101 unraveler1 102 unraveler2 103 unraveler3
+monster.ai.griswold	AI func 90 think 0x005E5AC0 (AITHINK_Fn090_Griswold); monstats AI=Griswold; classes 1: 365 griswold
+monster.ai.hellmeteor	AI func 33 think 0x005F56D0 (AITHINK_Fn033_HellMeteor); monstats AI=HellMeteor; classes 1: 153 hellmeteor
+monster.ai.highpriest	AI func 85 think 0x005E0490 (AITHINK_Fn085_HighPriest); monstats AI=HighPriest; classes 4: 345 councilmember1 346 councilmember2 347 councilmember3
+monster.ai.hireable	AI func 61 think 0x005E52D0 (AITHINK_Fn061_Hireable); monstats AI=Hireable; classes 5: 271 roguehire 338 act2hire 359 act3hire
+monster.ai.hydra	AI func 86 think 0x005E9E60 (AITHINK_Fn086_Hydra); monstats AI=Hydra; classes 3: 351 hydra1 352 hydra2 353 hydra3
+monster.ai.idle	AI func 1 think 0x005B0CD0 (AITHINK_Fn001_100_Idle_Buffy); monstats AI=Idle; classes 61: 34 gorgon1 35 gorgon2 36 gorgon3
+monster.ai.imp	AI func 122 think 0x005E2FF0 (AITHINK_Fn122_Imp); monstats AI=Imp; classes 8: 492 imp1 493 imp2 494 imp3
+monster.ai.invisopet	AI func 103 think 0x005EA7A0 (AITHINK_Fn103_InvisoPet); monstats AI=InvisoPet; classes 1: 414 invisopet
+monster.ai.invisospawner	AI func 82 think 0x005E0160 (AITHINK_Fn082_InvisoSpawner); monstats AI=InvisoSpawner; classes 1: 332 invisospawner
+monster.ai.izual	AI func 55 think 0x005F89B0 (AITHINK_Fn055_Izual); monstats AI=Izual; classes 1: 256 izual
+monster.ai.jarjar	AI func 81 think 0x005E7590 (AITHINK_Fn081_JarJar); monstats AI=JarJar; classes 1: 331 act2guard2
+monster.ai.maggotegg	AI func 40 think 0x005F6530 (AITHINK_Fn040_MaggotEgg); monstats AI=MaggotEgg; classes 6: 190 maggotegg1 191 maggotegg2 192 maggotegg3
+monster.ai.maggotlarva	AI func 38 think 0x005F6220 (AITHINK_Fn038_MaggotLarva); monstats AI=MaggotLarva; classes 6: 180 maggotbaby1 181 maggotbaby2 182 maggotbaby3
+monster.ai.megademon	AI func 89 think 0x005E0C80 (AITHINK_Fn089_Megademon); monstats AI=Megademon; classes 7: 360 megademon1 361 megademon2 362 megademon3
+monster.ai.mephisto	AI func 50 think 0x005F78B0 (AITHINK_Fn050_Mephisto); monstats AI=Mephisto; classes 1: 242 mephisto
+monster.ai.minion	AI func 116 think 0x005E1B60 (AITHINK_Fn116_Minion); monstats AI=Minion; classes 11: 453 minion1 454 minion2 455 minion3
+monster.ai.minionspawner	AI func 121 think 0x005E2BD0 (AITHINK_Fn121_MinionSpawner); monstats AI=MinionSpawner; classes 9: 484 minionspawner1 485 minionspawner2 486 minionspawner3
+monster.ai.mosquito	AI func 24 think 0x005F3730 (AITHINK_Fn024_Mosquito); monstats AI=Mosquito; classes 4: 114 mosquito1 115 mosquito2 116 mosquito3
+monster.ai.mosquitonest	AI func 83 think 0x005E0260 (AITHINK_Fn083_MosquitoNest); monstats AI=MosquitoNest; classes 4: 334 suckernest1 335 suckernest2 336 suckernest3
+monster.ai.mummy	AI func 21 think 0x005F2850 (AITHINK_Fn021_Mummy); monstats AI=Mummy; classes 6: 96 mummy1 97 mummy2 98 mummy3
+monster.ai.navi	AI func 58 think 0x005E7E20 (AITHINK_Fn058_Navi); monstats AI=Navi; classes 1: 266 navi
+monster.ai.necropet	AI func 67 think 0x005E4CF0 (AITHINK_Fn067_NecroPet); monstats AI=NecroPet; classes 9: 289 claygolem 290 bloodgolem 291 irongolem
+monster.ai.nihlathak	AI func 128 think 0x005EE5D0 (AITHINK_Fn128_Nihlathak); monstats AI=Nihlathak; classes 1: 526 nihlathakboss
+monster.ai.none	AI func 0 think 0x005B0CC0 (AITHINK_Fn000); monstats AI=None; classes 0
+monster.ai.npc	AI func 32 think 0x005E7130 (AITHINK_Fn032_Npc); monstats AI=Npc; classes 35: 147 gheed 148 akara 150 kashya
+monster.ai.npcbarb	AI func 127 think 0x005EDC50 (AITHINK_Fn127_NpcBarb); monstats AI=NpcBarb; classes 2: 522 act5barb1 523 act5barb2
+monster.ai.npcoutoftown	AI func 31 think 0x005E7880 (AITHINK_Fn031_NpcOutOfTown); monstats AI=NpcOutOfTown; classes 2: 146 cain1 527 drehyaiced
+monster.ai.npcstationary	AI func 54 think 0x005E73A0 (AITHINK_Fn054_NpcStationary); monstats AI=NpcStationary; classes 4: 251 tyrael1 367 tyrael2 406 izualghost
+monster.ai.oblivionknight	AI func 74 think 0x005FAF00 (AITHINK_Fn074_OblivionKnight); monstats AI=OblivionKnight; classes 4: 312 doomknight3 701 dkmag1 702 dkmag2
+monster.ai.overseer	AI func 120 think 0x005E27A0 (AITHINK_Fn120_Overseer); monstats AI=Overseer; classes 6: 479 overseer1 480 overseer2 481 overseer3
+monster.ai.pantherjavelin	AI func 95 think 0x005E1080 (AITHINK_Fn095_PantherJavelin); monstats AI=PantherJavelin; classes 9: 373 slinger1 374 slinger2 375 slinger3
+monster.ai.pantherwoman	AI func 18 think 0x005F22B0 (AITHINK_Fn018_PantherWoman); monstats AI=PantherWoman; classes 6: 83 pantherwoman1 84 pantherwoman2 85 pantherwoman3
+monster.ai.pinhead	AI func 39 think 0x005F6340 (AITHINK_Fn039_PinHead); monstats AI=PinHead; classes 6: 186 blunderbore1 187 blunderbore2 188 blunderbore3
+monster.ai.provisional-points	ai/bodies4.rs:931, bodies7.rs:1675/1933/2014, forced.rs:86, tactics.rs:494 (REC-80, REC-82, REC-501)
+monster.ai.putriddefiler	AI func 137 think 0x005EFA90 (AITHINK_Fn137_PutridDefiler); monstats AI=PutridDefiler; classes 5: 546 putriddefiler1 547 putriddefiler2 548 putriddefiler3
+monster.ai.quillmother	AI func 75 think 0x005FB2A0 (AITHINK_Fn075_QuillMother); monstats AI=QuillMother; classes 5: 313 quillbear1 314 quillbear2 315 quillbear3
+monster.ai.quillrat	AI func 14 think 0x005F1140 (AITHINK_Fn014_QuillRat); monstats AI=QuillRat; classes 8: 63 quillrat1 64 quillrat2 65 quillrat3
+monster.ai.raven	AI func 107 think 0x005ECC10 (AITHINK_Fn107_Raven); monstats AI=Raven; classes 1: 419 druidhawk
+monster.ai.reanimatedhorde	AI func 114 think 0x005E1540 (AITHINK_Fn114_ReanimatedHorde); monstats AI=ReanimatedHorde; classes 6: 436 reanimatedhorde1 437 reanimatedhorde2 438 reanimatedhorde3
+monster.ai.regurgitator	AI func 71 think 0x005FA710 (AITHINK_Fn071_Regurgitator); monstats AI=Regurgitator; classes 4: 307 regurgitator1 308 regurgitator2 309 regurgitator3
+monster.ai.sandleaper	AI func 17 think 0x005F20A0 (AITHINK_Fn017_SandLeaper); monstats AI=SandLeaper; classes 7: 78 sandleaper1 79 sandleaper2 80 sandleaper3
+monster.ai.sandmaggot	AI func 15 think 0x005F1800 (AITHINK_Fn015_SandMaggot); monstats AI=SandMaggot; classes 7: 68 sandmaggot1 69 sandmaggot2 70 sandmaggot3
+monster.ai.sandmaggotqueen	AI func 66 think 0x005F9CF0 (AITHINK_Fn066_SandMaggotQueen); monstats AI=SandMaggotQueen; classes 5: 284 maggotqueen1 285 maggotqueen2 286 maggotqueen3
+monster.ai.sandraider	AI func 8 think 0x005F0700 (AITHINK_Fn008_SandRaider); monstats AI=SandRaider; classes 10: 29 sandraider1 30 sandraider2 31 sandraider3
+monster.ai.sarcophagus	AI func 45 think 0x005F6A10 (AITHINK_Fn045_Sarcophagus); monstats AI=Sarcophagus; classes 1: 228 sarcophagus
+monster.ai.scarab	AI func 20 think 0x005F2540 (AITHINK_Fn020_Scarab); monstats AI=Scarab; classes 8: 91 scarab1 92 scarab2 93 scarab3
+monster.ai.shadowmaster	AI func 106 think 0x005EB970 (AITHINK_Fn106_143_ShadowMaster); monstats AI=ShadowMaster; classes 1: 418 shadowmaster
+monster.ai.shadowmasternoinit	AI func 143 think 0x005EB970 (AITHINK_Fn106_143_ShadowMaster); monstats AI=ShadowMasterNoInit; classes 0
+monster.ai.shadowwarrior	AI func 105 think 0x005EAFA0 (AITHINK_Fn105_ShadowWarrior); monstats AI=ShadowWarrior; classes 1: 417 shadowwarrior
+monster.ai.siegebeast	AI func 115 think 0x005E1900 (AITHINK_Fn115_SiegeBeast); monstats AI=SiegeBeast; classes 5: 441 siegebeast1 442 siegebeast2 443 siegebeast3
+monster.ai.siegetower	AI func 113 think 0x005E1860 (AITHINK_Fn113_SiegeTower); monstats AI=SiegeTower; classes 1: 435 barricadetower
+monster.ai.skeleton	AI func 2 think 0x005EFCF0 (AITHINK_Fn002_Skeleton); monstats AI=Skeleton; classes 9: 0 skeleton1 1 skeleton2 2 skeleton3
+monster.ai.skeletonbow	AI func 37 think 0x005F6070 (AITHINK_Fn037_SkeletonBow); monstats AI=SkeletonBow; classes 11: 170 sk_archer1 171 sk_archer2 172 sk_archer3
+monster.ai.skeletonmage	AI func 64 think 0x005F96C0 (AITHINK_Fn064_SkeletonMage); monstats AI=SkeletonMage; classes 27: 274 skmage_pois1 275 skmage_pois2 276 skmage_pois3
+monster.ai.smith	AI func 98 think 0x005E3890 (AITHINK_Fn098_Smith); monstats AI=Smith; classes 2: 402 smith 409 hephasto
+monster.ai.spirit	AI func 97 think 0x005E3840 (AITHINK_Fn097_Spirit); monstats AI=Spirit; classes 1: 401 mephistospirit
+monster.ai.succubus	AI func 118 think 0x005E1E00 (AITHINK_Fn118_Succubus); monstats AI=Succubus; classes 8: 469 succubus1 470 succubus2 471 succubus3
+monster.ai.succubuswitch	AI func 119 think 0x005E2120 (AITHINK_Fn119_SuccubusWitch); monstats AI=SuccubusWitch; classes 9: 474 succubuswitch1 475 succubuswitch2 476 succubuswitch3
+monster.ai.suicideminion	AI func 117 think 0x005E1D30 (AITHINK_Fn117_SuicideMinion); monstats AI=SuicideMinion; classes 8: 461 suicideminion1 462 suicideminion2 463 suicideminion3
+monster.ai.summoner	AI func 53 think 0x005F85C0 (AITHINK_Fn053_Summoner); monstats AI=Summoner; classes 1: 250 summoner
+monster.ai.swarm	AI func 19 think 0x005F2460 (AITHINK_Fn012_019_Goatman_Swarm); monstats AI=Swarm; classes 5: 87 swarm1 88 swarm2 89 swarm3
+monster.ai.tentacle	AI func 56 think 0x005F8F80 (AITHINK_Fn056_Tentacle); monstats AI=Tentacle; classes 3: 258 tentacle1 259 tentacle2 260 tentacle3
+monster.ai.tentaclehead	AI func 57 think 0x005F9270 (AITHINK_Fn057_TentacleHead); monstats AI=TentacleHead; classes 3: 261 tentaclehead1 262 tentaclehead2 263 tentaclehead3
+monster.ai.thornhulk	AI func 27 think 0x005F4850 (AITHINK_Fn027_ThornHulk); monstats AI=ThornHulk; classes 5: 127 thornhulk1 128 thornhulk2 129 thornhulk3
+monster.ai.totem	AI func 109 think 0x005ED9E0 (AITHINK_Fn109_Totem); monstats AI=Totem; classes 3: 422 spiritofbarbs 423 heartofwolverine 424 oaksage
+monster.ai.towner	AI func 41 think 0x005E7540 (AITHINK_Fn041_Towner); monstats AI=Towner; classes 6: 195 act2male 196 act2female 197 act2child
+monster.ai.townrogue	AI func 62 think 0x005E7D60 (AITHINK_Fn062_TownRogue); monstats AI=TownRogue; classes 1: 272 rogue3
+monster.ai.trap-leftarrow	AI func 79 think 0x005FB7E0 (AITHINK_Fn079_TrapLeftArrow); monstats AI=Trap-LeftArrow; classes 1: 328 trap-vertmissile
+monster.ai.trap-melee	AI func 87 think 0x005FBA60 (AITHINK_Fn087_TrapMelee); monstats AI=Trap-Melee; classes 1: 354 trap-melee
+monster.ai.trap-missile	AI func 77 think 0x005FB5B0 (AITHINK_Fn077_TrapMissile); monstats AI=Trap-Missile; classes 2: 326 trap-firebolt 330 trap-lightning
+monster.ai.trap-nova	AI func 92 think 0x005FB9B0 (AITHINK_Fn080_092_TrapPoison_TrapNova); monstats AI=Trap-Nova; classes 1: 369 trap-nova
+monster.ai.trap-poison	AI func 80 think 0x005FB900 (AITHINK_Fn080_092_TrapPoison_TrapNova); monstats AI=Trap-Poison; classes 1: 329 trap-poisoncloud
+monster.ai.trap-rightarrow	AI func 78 think 0x005FB6C0 (AITHINK_Fn078_TrapRightArrow); monstats AI=Trap-RightArrow; classes 1: 327 trap-horzmissile
+monster.ai.trappedsoul	AI func 99 think 0x005E9F10 (AITHINK_Fn099_TrappedSoul); monstats AI=TrappedSoul; classes 2: 403 trappedsoul1 404 trappedsoul2
+monster.ai.uberbaal	AI func 145 think 0x005FD200 (AITHINK_Fn145_UberBaal); monstats AI=UberBaal; classes 1: 709 uberbaal
+monster.ai.uberdiablo	AI func 147 think 0x005E9DF0 (AITHINK_Fn147_UberDiablo); monstats AI=UberDiablo; classes 1: 705 uberdiablo
+monster.ai.uberizual	AI func 144 think 0x005F8C80 (AITHINK_Fn144_UberIzual); monstats AI=UberIzual; classes 1: 706 uberizual
+monster.ai.ubermephisto	AI func 146 think 0x005F81C0 (AITHINK_Fn146_UberMephisto); monstats AI=UberMephisto; classes 1: 704 ubermephisto
+monster.ai.vampire	AI func 28 think 0x005F4A70 (AITHINK_Fn028_Vampire); monstats AI=Vampire; classes 9: 131 vampire1 132 vampire2 133 vampire3
+monster.ai.vendor	AI func 42 think 0x005E9E00 (AITHINK_Fn042_Vendor); monstats AI=Vendor; classes 2: 204 act2vendor1 205 act2vendor2
+monster.ai.viledog	AI func 69 think 0x005FA280 (AITHINK_Fn069_VileDog); monstats AI=VileDog; classes 10: 301 vilechild1 302 vilechild2 303 vilechild3
+monster.ai.vilemother	AI func 68 think 0x005FA010 (AITHINK_Fn068_VileMother); monstats AI=VileMother; classes 5: 298 vilemother1 299 vilemother2 300 vilemother3
+monster.ai.vines	AI func 110 think 0x005EC6C0 (AITHINK_Fn110_Vines); monstats AI=Vines; classes 1: 425 plaguepoppy
+monster.ai.vulture	AI func 23 think 0x005F3170 (AITHINK_Fn023_Vulture); monstats AI=Vulture; classes 5: 110 vulture1 111 vulture2 112 vulture3
+monster.ai.willowisp	AI func 25 think 0x005F39B0 (AITHINK_Fn025_Willowisp); monstats AI=WillOWisp; classes 8: 118 willowisp1 119 willowisp2 120 willowisp3
+monster.ai.wraith	AI func 9 think 0x005F0A20 (AITHINK_Fn009_Wraith); monstats AI=Wraith; classes 9: 38 wraith1 39 wraith2 40 wraith3
+monster.ai.wussie	AI func 131 think 0x005EE3C0 (AITHINK_Fn131_Wussie); monstats AI=Wussie; classes 1: 534 act5pow
+monster.ai.zakarumpriest	AI func 49 think 0x005F72D0 (AITHINK_Fn049_ZakarumPriest); monstats AI=ZakarumPriest; classes 6: 238 cantor1 239 cantor2 240 cantor3
+monster.ai.zakarumzealot	AI func 48 think 0x005F6E60 (AITHINK_Fn048_ZakarumZealot); monstats AI=ZakarumZealot; classes 5: 235 zealot1 236 zealot2 237 zealot3
+monster.ai.zombie	AI func 3 think 0x005EFE20 (AITHINK_Fn003_Zombie); monstats AI=Zombie; classes 5: 5 zombie1 6 zombie2 7 zombie3
+monster.boss.andariel	monstats.txt andariel (156) boss=1, AI Andariel; act/quest boss
+monster.boss.baalclone	monstats.txt baalclone (570) boss=1, AI BaalCrabClone; act/quest boss
+monster.boss.baalcrab	monstats.txt baalcrab (544) boss=1, AI BaalCrab; act/quest boss
+monster.boss.baalcrabstairs	monstats.txt baalcrabstairs (559) boss=1, AI BaalToStairs; act/quest boss
+monster.boss.bloodraven	monstats.txt bloodraven (267) boss=1, AI BloodRaven; act/quest boss
+monster.boss.diablo	monstats.txt diablo (243) boss=1, AI Diablo; act/quest boss
+monster.boss.diabloclone	monstats.txt diabloclone (333) boss=1, AI Diablo; act/quest boss
+monster.boss.duriel	monstats.txt duriel (211) boss=1, AI Duriel; act/quest boss
+monster.boss.griswold	monstats.txt griswold (365) boss=1, AI Griswold; act/quest boss
+monster.boss.izual	monstats.txt izual (256) boss=1, AI Izual; act/quest boss
+monster.boss.mephisto	monstats.txt mephisto (242) boss=1, AI Mephisto; act/quest boss
+monster.boss.nihlathakboss	monstats.txt nihlathakboss (526) boss=1, AI Nihlathak; act/quest boss
+monster.boss.putriddefiler1	monstats.txt putriddefiler1 (546) boss=1, AI PutridDefiler; act/quest boss
+monster.boss.putriddefiler2	monstats.txt putriddefiler2 (547) boss=1, AI PutridDefiler; act/quest boss
+monster.boss.putriddefiler3	monstats.txt putriddefiler3 (548) boss=1, AI PutridDefiler; act/quest boss
+monster.boss.putriddefiler4	monstats.txt putriddefiler4 (549) boss=1, AI PutridDefiler; act/quest boss
+monster.boss.putriddefiler5	monstats.txt putriddefiler5 (550) boss=1, AI PutridDefiler; act/quest boss
+monster.boss.radament	monstats.txt radament (229) boss=1, AI GreaterMummy; act/quest boss
+monster.boss.summoner	monstats.txt summoner (250) boss=1, AI Summoner; act/quest boss
+monster.boss.uberandariel	monstats.txt uberandariel (707) boss=1, AI Andariel; act/quest boss
+monster.boss.uberbaal	monstats.txt uberbaal (709) boss=1, AI UberBaal; act/quest boss
+monster.boss.uberdiablo	monstats.txt uberdiablo (705) boss=1, AI UberDiablo; act/quest boss
+monster.boss.uberduriel	monstats.txt uberduriel (708) boss=1, AI Duriel; act/quest boss
+monster.boss.uberizual	monstats.txt uberizual (706) boss=1, AI UberIzual; act/quest boss
+monster.boss.ubermephisto	monstats.txt ubermephisto (704) boss=1, AI UberMephisto; act/quest boss
+monster.corpse-death	specs/combat/vitals.md death handling
+monster.init	init.md: monster create / unit-seed order, e.g. 0x00573F8F
+monster.minions	population.md minion groups
+monster.missiles.by-ai	monmissile / missiles.txt used by monster AI skills
+monster.population	Game.exe population routines (population.md)
+monster.population.champions-uniques	population.md 6.4 / 11.5
+monster.population.presets	preset-monsters.tsv (20 rows) 0x0054E600
+monster.quest.ancients	quest monster: Ancient barbarians (3)
+monster.quest.baal	quest monster: Baal and waves (Baal subjects)
+monster.quest.blood-raven	quest monster: Blood Raven
+monster.quest.cain-rescue-guard	quest monster: Cain rescue Rakanishu/Treehead
+monster.quest.countess	quest monster: Countess (superunique 6)
+monster.quest.cow-king	quest monster: Cow King (hellbovine)
+monster.quest.griswold	quest monster: Griswold
+monster.quest.hellforge-hephasto	quest monster: Hephasto
+monster.quest.izual	quest monster: Izual
+monster.quest.nihlathak	quest monster: Nihlathak
+monster.quest.radament	quest monster: Radament skeleton
+monster.quest.summoner	quest monster: Summoner/bossArch
+monster.superunique.ancient-barbarian-1	SuperUniques.txt Ancient Barbarian 1 (hcIdx 43, class ancientbarb1)
+monster.superunique.ancient-barbarian-2	SuperUniques.txt Ancient Barbarian 2 (hcIdx 44, class ancientbarb2)
+monster.superunique.ancient-barbarian-3	SuperUniques.txt Ancient Barbarian 3 (hcIdx 45, class ancientbarb3)
+monster.superunique.ancient-kaa-the-soulless	SuperUniques.txt Ancient Kaa the Soulless (hcIdx 19, class unraveler3)
+monster.superunique.anodized-elite	SuperUniques.txt Anodized Elite (hcIdx 54, class succubus4)
+monster.superunique.axe-dweller	SuperUniques.txt Axe Dweller (hcIdx 46, class bloodlord3)
+monster.superunique.baal-subject-1	SuperUniques.txt Baal Subject 1 (hcIdx 61, class fallenshaman5)
+monster.superunique.baal-subject-2	SuperUniques.txt Baal Subject 2 (hcIdx 62, class unraveler5)
+monster.superunique.baal-subject-3	SuperUniques.txt Baal Subject 3 (hcIdx 63, class baalhighpriest)
+monster.superunique.baal-subject-4	SuperUniques.txt Baal Subject 4 (hcIdx 64, class venomlord)
+monster.superunique.baal-subject-5	SuperUniques.txt Baal Subject 5 (hcIdx 65, class baalminion1)
+monster.superunique.beetleburst	SuperUniques.txt Beetleburst (hcIdx 13, class scarab2)
+monster.superunique.bishibosh	SuperUniques.txt Bishibosh (hcIdx 0, class fallenshaman1)
+monster.superunique.blaze-ripper	SuperUniques.txt Blaze Ripper (hcIdx 58, class deathmauler5)
+monster.superunique.bloodwitch-the-wild	SuperUniques.txt Bloodwitch the Wild (hcIdx 11, class pantherwoman1)
+monster.superunique.boneash	SuperUniques.txt Boneash (hcIdx 9, class skmage_pois3)
+monster.superunique.bonebreak	SuperUniques.txt Bonebreak (hcIdx 1, class skeleton1)
+monster.superunique.bonesaw-breaker	SuperUniques.txt Bonesaw Breaker (hcIdx 47, class reanimatedhorde2)
+monster.superunique.bremm-sparkfist	SuperUniques.txt Bremm Sparkfist (hcIdx 28, class councilmember3)
+monster.superunique.coldcrow	SuperUniques.txt Coldcrow (hcIdx 2, class cr_archer1)
+monster.superunique.coldworm-the-burrower	SuperUniques.txt Coldworm the Burrower (hcIdx 15, class maggotqueen1)
+monster.superunique.corpsefire	SuperUniques.txt Corpsefire (hcIdx 40, class zombie1)
+monster.superunique.dac-farren	SuperUniques.txt Dac Farren (hcIdx 48, class imp3)
+monster.superunique.dark-elder	SuperUniques.txt Dark Elder (hcIdx 17, class zombie5)
+monster.superunique.eyeback-unleashed	SuperUniques.txt Eyeback Unleashed (hcIdx 50, class deathmauler1)
+monster.superunique.fangskin	SuperUniques.txt Fangskin (hcIdx 12, class clawviper3)
+monster.superunique.fire-eye	SuperUniques.txt Fire Eye (hcIdx 16, class sandraider3)
+monster.superunique.flamespike-the-crawler	SuperUniques.txt Flamespike the Crawler (hcIdx 8, class quillrat4)
+monster.superunique.frozenstein	SuperUniques.txt Frozenstein (hcIdx 59, class snowyeti4)
+monster.superunique.geleb-flamefinger	SuperUniques.txt Geleb Flamefinger (hcIdx 27, class councilmember2)
+monster.superunique.grand-vizier-of-chaos	SuperUniques.txt Grand Vizier of Chaos (hcIdx 38, class fingermage3)
+monster.superunique.griswold	SuperUniques.txt Griswold (hcIdx 5, class griswold)
+monster.superunique.icehawk-riftwing	SuperUniques.txt Icehawk Riftwing (hcIdx 25, class batdemon3)
+monster.superunique.infector-of-souls	SuperUniques.txt Infector of Souls (hcIdx 36, class megademon3)
+monster.superunique.ismail-vilehand	SuperUniques.txt Ismail Vilehand (hcIdx 26, class councilmember1)
+monster.superunique.leatherarm	SuperUniques.txt Leatherarm (hcIdx 14, class mummy2)
+monster.superunique.lord-de-seis	SuperUniques.txt Lord De Seis (hcIdx 37, class doomknight3)
+monster.superunique.maffer-dragonhand	SuperUniques.txt Maffer Dragonhand (hcIdx 31, class councilmember3)
+monster.superunique.magma-torquer	SuperUniques.txt Magma Torquer (hcIdx 57, class imp5)
+monster.superunique.megaflow-rectifier	SuperUniques.txt Megaflow Rectifier (hcIdx 49, class minion1)
+monster.superunique.nihlathak-boss	SuperUniques.txt Nihlathak Boss (hcIdx 60, class nihlathakboss)
+monster.superunique.pindleskin	SuperUniques.txt Pindleskin (hcIdx 52, class reanimatedhorde5)
+monster.superunique.pitspawn-fouldog	SuperUniques.txt Pitspawn Fouldog (hcIdx 7, class bighead2)
+monster.superunique.radament	SuperUniques.txt Radament (hcIdx 10, class radament)
+monster.superunique.rakanishu	SuperUniques.txt Rakanishu (hcIdx 3, class fallen2)
+monster.superunique.riftwraith-the-cannibal	SuperUniques.txt Riftwraith the Cannibal (hcIdx 35, class regurgitator2)
+monster.superunique.sarina-the-battlemaid	SuperUniques.txt Sarina the Battlemaid (hcIdx 24, class corruptrogue5)
+monster.superunique.sharp-tooth-sayer	SuperUniques.txt Sharp Tooth Sayer (hcIdx 56, class overseer3)
+monster.superunique.siege-boss	SuperUniques.txt Siege Boss (hcIdx 42, class overseer1)
+monster.superunique.snapchip-shatter	SuperUniques.txt Snapchip Shatter (hcIdx 53, class frozenhorror1)
+monster.superunique.stormtree	SuperUniques.txt Stormtree (hcIdx 23, class thornhulk3)
+monster.superunique.taintbreeder	SuperUniques.txt Taintbreeder (hcIdx 34, class vilemother2)
+monster.superunique.the-countess	SuperUniques.txt The Countess (hcIdx 6, class corruptrogue3)
+monster.superunique.the-cow-king	SuperUniques.txt The Cow King (hcIdx 39, class hellbovine)
+monster.superunique.the-feature-creep	SuperUniques.txt The Feature Creep (hcIdx 41, class hephasto)
+monster.superunique.the-smith	SuperUniques.txt The Smith (hcIdx 20, class smith)
+monster.superunique.the-summoner	SuperUniques.txt The Summoner (hcIdx 18, class summoner)
+monster.superunique.the-tormentor	SuperUniques.txt The Tormentor (hcIdx 33, class willowisp3)
+monster.superunique.threash-socket	SuperUniques.txt Threash Socket (hcIdx 51, class siegebeast3)
+monster.superunique.toorc-icefist	SuperUniques.txt Toorc Icefist (hcIdx 29, class councilmember1)
+monster.superunique.treehead-woodfist	SuperUniques.txt Treehead WoodFist (hcIdx 4, class brute2)
+monster.superunique.vinvear-molech	SuperUniques.txt Vinvear Molech (hcIdx 55, class succubuswitch2)
+monster.superunique.web-mage-the-burning	SuperUniques.txt Web Mage the Burning (hcIdx 21, class arach4)
+monster.superunique.winged-death	SuperUniques.txt Winged Death (hcIdx 32, class megademon3)
+monster.superunique.witch-doctor-endugu	SuperUniques.txt Witch Doctor Endugu (hcIdx 22, class fetishshaman4)
+monster.superunique.wyand-voidfinger	SuperUniques.txt Wyand Voidfinger (hcIdx 30, class councilmember2)
+monster.umod.0-none	umod 0 uniquemod none init -
+monster.umod.1-rndname	umod 1 uniquemod rndname init 0x005A0CE0
+monster.umod.10-poisondead	umod 10 uniquemod poisondead init -
+monster.umod.11-durieldead	umod 11 uniquemod durieldead init -
+monster.umod.12-bloodraven	umod 12 uniquemod bloodraven init -
+monster.umod.13-rage	umod 13 uniquemod rage init -
+monster.umod.14-spcdamage	umod 14 uniquemod spcdamage init -
+monster.umod.15-partydead	umod 15 uniquemod partydead init -
+monster.umod.16-champion	umod 16 uniquemod champion init 0x005A0E80
+monster.umod.17-lightning	umod 17 uniquemod lightning init 0x005A1B00
+monster.umod.18-cold	umod 18 uniquemod cold init 0x005A1C70
+monster.umod.19-hireable	umod 19 uniquemod hireable init -
+monster.umod.2-hpmultiply	umod 2 uniquemod hpmultiply init 0x005A0DC0
+monster.umod.20-scarab	umod 20 uniquemod scarab init -
+monster.umod.21-killself	umod 21 uniquemod killself init -
+monster.umod.22-questcomplete	umod 22 uniquemod questcomplete init -
+monster.umod.23-poisonhit	umod 23 uniquemod poisonhit init 0x005A1E00
+monster.umod.24-thief	umod 24 uniquemod thief init -
+monster.umod.25-manahit	umod 25 uniquemod manahit init 0x005A1F90
+monster.umod.26-teleport	umod 26 uniquemod teleport init 0x005A1600
+monster.umod.27-spectralhit	umod 27 uniquemod spectralhit init 0x005A1370
+monster.umod.28-stoneskin	umod 28 uniquemod stoneskin init 0x005A1370
+monster.umod.29-multishot	umod 29 uniquemod multishot init -
+monster.umod.3-light	umod 3 uniquemod light init -
+monster.umod.30-aura	umod 30 uniquemod aura init 0x005A1650
+monster.umod.31-goboom	umod 31 uniquemod goboom init -
+monster.umod.32-firespike-explode	umod 32 uniquemod firespike_explode init -
+monster.umod.33-suicideminion-explode	umod 33 uniquemod suicideminion_explode init -
+monster.umod.34-ai-after-death	umod 34 uniquemod ai_after_death init -
+monster.umod.35-shatter-on-death	umod 35 uniquemod shatter_on_death init -
+monster.umod.36-ghostly	umod 36 uniquemod ghostly init 0x005A1080
+monster.umod.37-fanatic	umod 37 uniquemod fanatic init 0x005A11F0
+monster.umod.38-possessed	umod 38 uniquemod possessed init 0x005A1230
+monster.umod.39-berserk	umod 39 uniquemod berserk init 0x005A1280
+monster.umod.4-leveladd	umod 4 uniquemod leveladd init 0x005A0E40
+monster.umod.40-worms-on-death	umod 40 uniquemod worms_on_death init -
+monster.umod.41-always-run-ai	umod 41 uniquemod always_run_ai init 0x005A1330
+monster.umod.42-lightningdeath	umod 42 uniquemod lightningdeath init -
+monster.umod.5-strong	umod 5 uniquemod strong init 0x005A17E0
+monster.umod.6-fast	umod 6 uniquemod fast init 0x005A1910
+monster.umod.7-curse	umod 7 uniquemod curse init -
+monster.umod.8-resist	umod 8 uniquemod resist init 0x005A1370
+monster.umod.9-fire	umod 9 uniquemod fire init 0x005A1990
+skill.ama.avoid	skills.txt Avoid (18) charclass=ama
+skill.ama.charged-strike	skills.txt Charged Strike (24) charclass=ama
+skill.ama.cold-arrow	skills.txt Cold Arrow (11) charclass=ama
+skill.ama.critical-strike	skills.txt Critical Strike (9) charclass=ama
+skill.ama.dodge	skills.txt Dodge (13) charclass=ama
+skill.ama.dopplezon	skills.txt Dopplezon (28) charclass=ama
+skill.ama.evade	skills.txt Evade (29) charclass=ama
+skill.ama.exploding-arrow	skills.txt Exploding Arrow (16) charclass=ama
+skill.ama.fend	skills.txt Fend (30) charclass=ama
+skill.ama.fire-arrow	skills.txt Fire Arrow (7) charclass=ama
+skill.ama.freezing-arrow	skills.txt Freezing Arrow (31) charclass=ama
+skill.ama.guided-arrow	skills.txt Guided Arrow (22) charclass=ama
+skill.ama.ice-arrow	skills.txt Ice Arrow (21) charclass=ama
+skill.ama.immolation-arrow	skills.txt Immolation Arrow (27) charclass=ama
+skill.ama.impale	skills.txt Impale (19) charclass=ama
+skill.ama.inner-sight	skills.txt Inner Sight (8) charclass=ama
+skill.ama.jab	skills.txt Jab (10) charclass=ama
+skill.ama.lightning-bolt	skills.txt Lightning Bolt (20) charclass=ama
+skill.ama.lightning-fury	skills.txt Lightning Fury (35) charclass=ama
+skill.ama.lightning-strike	skills.txt Lightning Strike (34) charclass=ama
+skill.ama.magic-arrow	skills.txt Magic Arrow (6) charclass=ama
+skill.ama.multiple-shot	skills.txt Multiple Shot (12) charclass=ama
+skill.ama.penetrate	skills.txt Penetrate (23) charclass=ama
+skill.ama.pierce	skills.txt Pierce (33) charclass=ama
+skill.ama.plague-javelin	skills.txt Plague Javelin (25) charclass=ama
+skill.ama.poison-javelin	skills.txt Poison Javelin (15) charclass=ama
+skill.ama.power-strike	skills.txt Power Strike (14) charclass=ama
+skill.ama.slow-missiles	skills.txt Slow Missiles (17) charclass=ama
+skill.ama.strafe	skills.txt Strafe (26) charclass=ama
+skill.ama.valkyrie	skills.txt Valkyrie (32) charclass=ama
+skill.ass.blade-fury	skills.txt Blade Fury (266) charclass=ass
+skill.ass.blade-sentinel	skills.txt Blade Sentinel (257) charclass=ass
+skill.ass.blade-shield	skills.txt Blade Shield (277) charclass=ass
+skill.ass.blades-of-ice	skills.txt Blades of Ice (274) charclass=ass
+skill.ass.charged-bolt-sentry	skills.txt Charged Bolt Sentry (261) charclass=ass
+skill.ass.claw-mastery	skills.txt Claw Mastery (252) charclass=ass
+skill.ass.claws-of-thunder	skills.txt Claws of Thunder (269) charclass=ass
+skill.ass.cloak-of-shadows	skills.txt Cloak of Shadows (264) charclass=ass
+skill.ass.cobra-strike	skills.txt Cobra Strike (265) charclass=ass
+skill.ass.death-sentry	skills.txt Death Sentry (276) charclass=ass
+skill.ass.dragon-claw	skills.txt Dragon Claw (260) charclass=ass
+skill.ass.dragon-flight	skills.txt Dragon Flight (275) charclass=ass
+skill.ass.dragon-tail	skills.txt Dragon Tail (270) charclass=ass
+skill.ass.dragon-talon	skills.txt Dragon Talon (255) charclass=ass
+skill.ass.fade	skills.txt Fade (267) charclass=ass
+skill.ass.fire-trauma	skills.txt Fire Trauma (251) charclass=ass
+skill.ass.fists-of-fire	skills.txt Fists of Fire (259) charclass=ass
+skill.ass.inferno-sentry	skills.txt Inferno Sentry (272) charclass=ass
+skill.ass.lightning-sentry	skills.txt Lightning Sentry (271) charclass=ass
+skill.ass.mind-blast	skills.txt Mind Blast (273) charclass=ass
+skill.ass.psychic-hammer	skills.txt Psychic Hammer (253) charclass=ass
+skill.ass.quickness	skills.txt Quickness (258) charclass=ass
+skill.ass.royal-strike	skills.txt Royal Strike (280) charclass=ass
+skill.ass.shadow-master	skills.txt Shadow Master (279) charclass=ass
+skill.ass.shadow-warrior	skills.txt Shadow Warrior (268) charclass=ass
+skill.ass.shock-field	skills.txt Shock Field (256) charclass=ass
+skill.ass.tiger-strike	skills.txt Tiger Strike (254) charclass=ass
+skill.ass.venom	skills.txt Venom (278) charclass=ass
+skill.ass.wake-of-fire-sentry	skills.txt Wake of Fire Sentry (262) charclass=ass
+skill.ass.weapon-block	skills.txt Weapon Block (263) charclass=ass
+skill.bar.axe-mastery	skills.txt Axe Mastery (128) charclass=bar
+skill.bar.bash	skills.txt Bash (126) charclass=bar
+skill.bar.battle-command	skills.txt Battle Command (155) charclass=bar
+skill.bar.battle-cry	skills.txt Battle Cry (146) charclass=bar
+skill.bar.battle-orders	skills.txt Battle Orders (149) charclass=bar
+skill.bar.berserk	skills.txt Berserk (152) charclass=bar
+skill.bar.concentrate	skills.txt Concentrate (144) charclass=bar
+skill.bar.double-swing	skills.txt Double Swing (133) charclass=bar
+skill.bar.double-throw	skills.txt Double Throw (140) charclass=bar
+skill.bar.find-item	skills.txt Find Item (142) charclass=bar
+skill.bar.find-potion	skills.txt Find Potion (131) charclass=bar
+skill.bar.frenzy	skills.txt Frenzy (147) charclass=bar
+skill.bar.grim-ward	skills.txt Grim Ward (150) charclass=bar
+skill.bar.howl	skills.txt Howl (130) charclass=bar
+skill.bar.increased-speed	skills.txt Increased Speed (148) charclass=bar
+skill.bar.increased-stamina	skills.txt Increased Stamina (141) charclass=bar
+skill.bar.iron-skin	skills.txt Iron Skin (145) charclass=bar
+skill.bar.leap	skills.txt Leap (132) charclass=bar
+skill.bar.leap-attack	skills.txt Leap Attack (143) charclass=bar
+skill.bar.mace-mastery	skills.txt Mace Mastery (129) charclass=bar
+skill.bar.natural-resistance	skills.txt Natural Resistance (153) charclass=bar
+skill.bar.pole-arm-mastery	skills.txt Pole Arm Mastery (134) charclass=bar
+skill.bar.shout	skills.txt Shout (138) charclass=bar
+skill.bar.spear-mastery	skills.txt Spear Mastery (136) charclass=bar
+skill.bar.stun	skills.txt Stun (139) charclass=bar
+skill.bar.sword-mastery	skills.txt Sword Mastery (127) charclass=bar
+skill.bar.taunt	skills.txt Taunt (137) charclass=bar
+skill.bar.throwing-mastery	skills.txt Throwing Mastery (135) charclass=bar
+skill.bar.war-cry	skills.txt War Cry (154) charclass=bar
+skill.bar.whirlwind	skills.txt Whirlwind (151) charclass=bar
+skill.dru.arctic-blast	skills.txt Arctic Blast (230) charclass=dru
+skill.dru.armageddon	skills.txt Armageddon (249) charclass=dru
+skill.dru.cycle-of-life	skills.txt Cycle of Life (231) charclass=dru
+skill.dru.cyclone-armor	skills.txt Cyclone Armor (235) charclass=dru
+skill.dru.eruption	skills.txt Eruption (234) charclass=dru
+skill.dru.feral-rage	skills.txt Feral Rage (232) charclass=dru
+skill.dru.fire-claws	skills.txt Fire Claws (239) charclass=dru
+skill.dru.firestorm	skills.txt Firestorm (225) charclass=dru
+skill.dru.fury	skills.txt Fury (248) charclass=dru
+skill.dru.heart-of-wolverine	skills.txt Heart of Wolverine (236) charclass=dru
+skill.dru.hunger	skills.txt Hunger (242) charclass=dru
+skill.dru.hurricane	skills.txt Hurricane (250) charclass=dru
+skill.dru.maul	skills.txt Maul (233) charclass=dru
+skill.dru.molten-boulder	skills.txt Molten Boulder (229) charclass=dru
+skill.dru.oak-sage	skills.txt Oak Sage (226) charclass=dru
+skill.dru.plague-poppy	skills.txt Plague Poppy (222) charclass=dru
+skill.dru.rabies	skills.txt Rabies (238) charclass=dru
+skill.dru.raven	skills.txt Raven (221) charclass=dru
+skill.dru.shape-shifting	skills.txt Shape Shifting (224) charclass=dru
+skill.dru.shock-wave	skills.txt Shock Wave (243) charclass=dru
+skill.dru.spirit-of-barbs	skills.txt Spirit of Barbs (246) charclass=dru
+skill.dru.summon-fenris	skills.txt Summon Fenris (237) charclass=dru
+skill.dru.summon-grizzly	skills.txt Summon Grizzly (247) charclass=dru
+skill.dru.summon-spirit-wolf	skills.txt Summon Spirit Wolf (227) charclass=dru
+skill.dru.tornado	skills.txt Tornado (245) charclass=dru
+skill.dru.twister	skills.txt Twister (240) charclass=dru
+skill.dru.vines	skills.txt Vines (241) charclass=dru
+skill.dru.volcano	skills.txt Volcano (244) charclass=dru
+skill.dru.wearbear	skills.txt Wearbear (228) charclass=dru
+skill.dru.wearwolf	skills.txt Wearwolf (223) charclass=dru
+skill.generic.attack-kick-throw	skills.txt Attack(0) Kick(1) Throw(2) Unsummon(3) Left Hand Throw(4) Left Hand Swing(5)
+skill.item.charges	itemstatcost.txt item_charged_skill; skills.txt ItemTarget/ItemCheckStart
+skill.item.oskill	itemstatcost.txt item_skillonattack/hit/levelup/die/kill, item_singleskill, item_nonclassskill, item_addclassskills; skills.txt ItemEffect/ItemCltEffect cols
+skill.item.scroll-book	skills.txt Scroll/Book of Identify (217,218), Townportal (219,220)
+skill.monster.table	skills.txt rows 156-216,281-356 (charclass blank, monster/NPC skills)
+skill.nec.amplify-damage	skills.txt Amplify Damage (66) charclass=nec
+skill.nec.attract	skills.txt Attract (86) charclass=nec
+skill.nec.bloodgolem	skills.txt BloodGolem (85) charclass=nec
+skill.nec.bone-armor	skills.txt Bone Armor (68) charclass=nec
+skill.nec.bone-prison	skills.txt Bone Prison (88) charclass=nec
+skill.nec.bone-spear	skills.txt Bone Spear (84) charclass=nec
+skill.nec.bone-spirit	skills.txt Bone Spirit (93) charclass=nec
+skill.nec.bone-wall	skills.txt Bone Wall (78) charclass=nec
+skill.nec.clay-golem	skills.txt Clay Golem (75) charclass=nec
+skill.nec.confuse	skills.txt Confuse (81) charclass=nec
+skill.nec.corpse-explosion	skills.txt Corpse Explosion (74) charclass=nec
+skill.nec.decrepify	skills.txt Decrepify (87) charclass=nec
+skill.nec.dim-vision	skills.txt Dim Vision (71) charclass=nec
+skill.nec.firegolem	skills.txt FireGolem (94) charclass=nec
+skill.nec.golem-mastery	skills.txt Golem Mastery (79) charclass=nec
+skill.nec.iron-maiden	skills.txt Iron Maiden (76) charclass=nec
+skill.nec.irongolem	skills.txt IronGolem (90) charclass=nec
+skill.nec.life-tap	skills.txt Life Tap (82) charclass=nec
+skill.nec.lower-resist	skills.txt Lower Resist (91) charclass=nec
+skill.nec.poison-dagger	skills.txt Poison Dagger (73) charclass=nec
+skill.nec.poison-explosion	skills.txt Poison Explosion (83) charclass=nec
+skill.nec.poison-nova	skills.txt Poison Nova (92) charclass=nec
+skill.nec.raise-skeletal-mage	skills.txt Raise Skeletal Mage (80) charclass=nec
+skill.nec.raise-skeleton	skills.txt Raise Skeleton (70) charclass=nec
+skill.nec.revive	skills.txt Revive (95) charclass=nec
+skill.nec.skeleton-mastery	skills.txt Skeleton Mastery (69) charclass=nec
+skill.nec.summon-resist	skills.txt Summon Resist (89) charclass=nec
+skill.nec.teeth	skills.txt Teeth (67) charclass=nec
+skill.nec.terror	skills.txt Terror (77) charclass=nec
+skill.nec.weaken	skills.txt Weaken (72) charclass=nec
+skill.pal.blessed-aim	skills.txt Blessed Aim (108) charclass=pal
+skill.pal.blessed-hammer	skills.txt Blessed Hammer (112) charclass=pal
+skill.pal.charge	skills.txt Charge (107) charclass=pal
+skill.pal.cleansing	skills.txt Cleansing (109) charclass=pal
+skill.pal.concentration	skills.txt Concentration (113) charclass=pal
+skill.pal.conversion	skills.txt Conversion (116) charclass=pal
+skill.pal.conviction	skills.txt Conviction (123) charclass=pal
+skill.pal.defiance	skills.txt Defiance (104) charclass=pal
+skill.pal.fanaticism	skills.txt Fanaticism (122) charclass=pal
+skill.pal.fist-of-the-heavens	skills.txt Fist of the Heavens (121) charclass=pal
+skill.pal.holy-bolt	skills.txt Holy Bolt (101) charclass=pal
+skill.pal.holy-fire	skills.txt Holy Fire (102) charclass=pal
+skill.pal.holy-freeze	skills.txt Holy Freeze (114) charclass=pal
+skill.pal.holy-shield	skills.txt Holy Shield (117) charclass=pal
+skill.pal.holy-shock	skills.txt Holy Shock (118) charclass=pal
+skill.pal.meditation	skills.txt Meditation (120) charclass=pal
+skill.pal.might	skills.txt Might (98) charclass=pal
+skill.pal.prayer	skills.txt Prayer (99) charclass=pal
+skill.pal.redemption	skills.txt Redemption (124) charclass=pal
+skill.pal.resist-cold	skills.txt Resist Cold (105) charclass=pal
+skill.pal.resist-fire	skills.txt Resist Fire (100) charclass=pal
+skill.pal.resist-lightning	skills.txt Resist Lightning (110) charclass=pal
+skill.pal.sacrifice	skills.txt Sacrifice (96) charclass=pal
+skill.pal.salvation	skills.txt Salvation (125) charclass=pal
+skill.pal.sanctuary	skills.txt Sanctuary (119) charclass=pal
+skill.pal.smite	skills.txt Smite (97) charclass=pal
+skill.pal.thorns	skills.txt Thorns (103) charclass=pal
+skill.pal.vengeance	skills.txt Vengeance (111) charclass=pal
+skill.pal.vigor	skills.txt Vigor (115) charclass=pal
+skill.pal.zeal	skills.txt Zeal (106) charclass=pal
+skill.sor.blaze	skills.txt Blaze (46) charclass=sor
+skill.sor.blizzard	skills.txt Blizzard (59) charclass=sor
+skill.sor.chain-lightning	skills.txt Chain Lightning (53) charclass=sor
+skill.sor.charged-bolt	skills.txt Charged Bolt (38) charclass=sor
+skill.sor.chilling-armor	skills.txt Chilling Armor (60) charclass=sor
+skill.sor.cold-mastery	skills.txt Cold Mastery (65) charclass=sor
+skill.sor.enchant	skills.txt Enchant (52) charclass=sor
+skill.sor.energy-shield	skills.txt Energy Shield (58) charclass=sor
+skill.sor.fire-ball	skills.txt Fire Ball (47) charclass=sor
+skill.sor.fire-bolt	skills.txt Fire Bolt (36) charclass=sor
+skill.sor.fire-mastery	skills.txt Fire Mastery (61) charclass=sor
+skill.sor.fire-wall	skills.txt Fire Wall (51) charclass=sor
+skill.sor.frost-nova	skills.txt Frost Nova (44) charclass=sor
+skill.sor.frozen-armor	skills.txt Frozen Armor (40) charclass=sor
+skill.sor.frozen-orb	skills.txt Frozen Orb (64) charclass=sor
+skill.sor.glacial-spike	skills.txt Glacial Spike (55) charclass=sor
+skill.sor.hydra	skills.txt Hydra (62) charclass=sor
+skill.sor.ice-blast	skills.txt Ice Blast (45) charclass=sor
+skill.sor.ice-bolt	skills.txt Ice Bolt (39) charclass=sor
+skill.sor.inferno	skills.txt Inferno (41) charclass=sor
+skill.sor.lightning	skills.txt Lightning (49) charclass=sor
+skill.sor.lightning-mastery	skills.txt Lightning Mastery (63) charclass=sor
+skill.sor.meteor	skills.txt Meteor (56) charclass=sor
+skill.sor.nova	skills.txt Nova (48) charclass=sor
+skill.sor.shiver-armor	skills.txt Shiver Armor (50) charclass=sor
+skill.sor.static-field	skills.txt Static Field (42) charclass=sor
+skill.sor.telekinesis	skills.txt Telekinesis (43) charclass=sor
+skill.sor.teleport	skills.txt Teleport (54) charclass=sor
+skill.sor.thunder-storm	skills.txt Thunder Storm (57) charclass=sor
+skill.sor.warmth	skills.txt Warmth (37) charclass=sor
+level.a1.1.act-1-town	Levels.txt Act 1 - Town (1) DrlgType=preset
+level.a1.10.act-1-cave-3	Levels.txt Act 1 - Cave 3 (10) DrlgType=maze
+level.a1.11.act-1-cave-4	Levels.txt Act 1 - Cave 4 (11) DrlgType=maze
+level.a1.12.act-1-cave-5	Levels.txt Act 1 - Cave 5 (12) DrlgType=maze
+level.a1.13.act-1-cave-2-treasure	Levels.txt Act 1 - Cave 2 Treasure (13) DrlgType=preset
+level.a1.14.act-1-cave-3-treasure	Levels.txt Act 1 - Cave 3 Treasure (14) DrlgType=preset
+level.a1.15.act-1-cave-4-treasure	Levels.txt Act 1 - Cave 4 Treasure (15) DrlgType=preset
+level.a1.16.act-1-cave-5-treasure	Levels.txt Act 1 - Cave 5 Treasure (16) DrlgType=preset
+level.a1.17.act-1-graveyard	Levels.txt Act 1 - Graveyard (17) DrlgType=outdoor
+level.a1.18.act-1-crypt-1-a	Levels.txt Act 1 - Crypt 1 A (18) DrlgType=maze
+level.a1.19.act-1-crypt-2-a	Levels.txt Act 1 - Crypt 2 A (19) DrlgType=maze
+level.a1.2.act-1-wilderness-1	Levels.txt Act 1 - Wilderness 1 (2) DrlgType=outdoor
+level.a1.20.act-1-tower-2	Levels.txt Act 1 - Tower 2 (20) DrlgType=preset
+level.a1.21.act-1-crypt-3-a	Levels.txt Act 1 - Crypt 3 A (21) DrlgType=maze
+level.a1.22.act-1-crypt-3-b	Levels.txt Act 1 - Crypt 3 B (22) DrlgType=maze
+level.a1.23.act-1-crypt-3-c	Levels.txt Act 1 - Crypt 3 C (23) DrlgType=maze
+level.a1.24.act-1-crypt-3-d	Levels.txt Act 1 - Crypt 3 D (24) DrlgType=maze
+level.a1.25.act-1-crypt-3-e	Levels.txt Act 1 - Crypt 3 E (25) DrlgType=preset
+level.a1.26.act-1-monastery	Levels.txt Act 1 - Monastery (26) DrlgType=preset
+level.a1.27.act-1-courtyard-1	Levels.txt Act 1 - Courtyard 1 (27) DrlgType=preset
+level.a1.28.act-1-barracks	Levels.txt Act 1 - Barracks (28) DrlgType=maze
+level.a1.29.act-1-jail-1	Levels.txt Act 1 - Jail 1 (29) DrlgType=maze
+level.a1.3.act-1-wilderness-2	Levels.txt Act 1 - Wilderness 2 (3) DrlgType=outdoor
+level.a1.30.act-1-jail-2	Levels.txt Act 1 - Jail 2 (30) DrlgType=maze
+level.a1.31.act-1-jail-3	Levels.txt Act 1 - Jail 3 (31) DrlgType=maze
+level.a1.32.act-1-courtyard-2	Levels.txt Act 1 - Courtyard 2 (32) DrlgType=preset
+level.a1.33.act-1-cathedral	Levels.txt Act 1 - Cathedral (33) DrlgType=preset
+level.a1.34.act-1-catacombs-1	Levels.txt Act 1 - Catacombs 1 (34) DrlgType=maze
+level.a1.35.act-1-catacombs-2	Levels.txt Act 1 - Catacombs 2 (35) DrlgType=maze
+level.a1.36.act-1-catacombs-3	Levels.txt Act 1 - Catacombs 3 (36) DrlgType=maze
+level.a1.37.act-1-catacombs-4	Levels.txt Act 1 - Catacombs 4 (37) DrlgType=preset
+level.a1.38.act-1-tristram	Levels.txt Act 1 - Tristram (38) DrlgType=preset
+level.a1.39.act-1-moo-moo-farm	Levels.txt Act 1 - Moo Moo Farm (39) DrlgType=outdoor
+level.a1.4.act-1-wilderness-3	Levels.txt Act 1 - Wilderness 3 (4) DrlgType=outdoor
+level.a1.5.act-1-wilderness-4	Levels.txt Act 1 - Wilderness 4 (5) DrlgType=outdoor
+level.a1.6.act-1-wilderness-5	Levels.txt Act 1 - Wilderness 5 (6) DrlgType=outdoor
+level.a1.7.act-1-wilderness-6	Levels.txt Act 1 - Wilderness 6 (7) DrlgType=outdoor
+level.a1.8.act-1-cave-1	Levels.txt Act 1 - Cave 1 (8) DrlgType=maze
+level.a1.9.act-1-cave-2	Levels.txt Act 1 - Cave 2 (9) DrlgType=maze
+level.a2.40.act-2-town	Levels.txt Act 2 - Town (40) DrlgType=preset
+level.a2.41.act-2-desert-1	Levels.txt Act 2 - Desert 1 (41) DrlgType=outdoor
+level.a2.42.act-2-desert-2	Levels.txt Act 2 - Desert 2 (42) DrlgType=outdoor
+level.a2.43.act-2-desert-3	Levels.txt Act 2 - Desert 3 (43) DrlgType=outdoor
+level.a2.44.act-2-desert-4	Levels.txt Act 2 - Desert 4 (44) DrlgType=outdoor
+level.a2.45.act-2-desert-5	Levels.txt Act 2 - Desert 5 (45) DrlgType=outdoor
+level.a2.46.act-2-valley-of-the-kings	Levels.txt Act 2 - Valley of the Kings (46) DrlgType=outdoor
+level.a2.47.act-2-sewer-1-a	Levels.txt Act 2 - Sewer 1 A (47) DrlgType=maze
+level.a2.48.act-2-sewer-1-b	Levels.txt Act 2 - Sewer 1 B (48) DrlgType=maze
+level.a2.49.act-2-sewer-1-c	Levels.txt Act 2 - Sewer 1 C (49) DrlgType=maze
+level.a2.50.act-2-harem	Levels.txt Act 2 - Harem (50) DrlgType=preset
+level.a2.51.act-2-corrupt-harem-1	Levels.txt Act 2 - Corrupt Harem 1 (51) DrlgType=maze
+level.a2.52.act-2-basement-1	Levels.txt Act 2 - Basement 1 (52) DrlgType=maze
+level.a2.53.act-2-basement-2	Levels.txt Act 2 - Basement 2 (53) DrlgType=maze
+level.a2.54.act-2-basement-3	Levels.txt Act 2 - Basement 3 (54) DrlgType=maze
+level.a2.55.act-2-tomb-1-a	Levels.txt Act 2 - Tomb 1 A (55) DrlgType=maze
+level.a2.56.act-2-tomb-2-a	Levels.txt Act 2 - Tomb 2 A (56) DrlgType=maze
+level.a2.57.act-2-tomb-2-b	Levels.txt Act 2 - Tomb 2 B (57) DrlgType=maze
+level.a2.58.act-2-tomb-3-a	Levels.txt Act 2 - Tomb 3 A (58) DrlgType=maze
+level.a2.59.act-2-tomb-1-treasure	Levels.txt Act 2 - Tomb 1 Treasure (59) DrlgType=maze
+level.a2.60.act-2-tomb-2-treasure	Levels.txt Act 2 - Tomb 2 Treasure (60) DrlgType=maze
+level.a2.61.act-2-tomb-3-treasure	Levels.txt Act 2 - Tomb 3 Treasure (61) DrlgType=maze
+level.a2.62.act-2-lair-1-a	Levels.txt Act 2 - Lair 1 A (62) DrlgType=maze
+level.a2.63.act-2-lair-1-b	Levels.txt Act 2 - Lair 1 B (63) DrlgType=maze
+level.a2.64.act-2-lair-1-treasure	Levels.txt Act 2 - Lair 1 Treasure (64) DrlgType=maze
+level.a2.65.act-2-sewer-2-a	Levels.txt Act 2 - Sewer 2 A (65) DrlgType=maze
+level.a2.66.act-2-tomb-tal-1	Levels.txt Act 2 - Tomb Tal 1 (66) DrlgType=maze
+level.a2.67.act-2-tomb-tal-2	Levels.txt Act 2 - Tomb Tal 2 (67) DrlgType=maze
+level.a2.68.act-2-tomb-tal-3	Levels.txt Act 2 - Tomb Tal 3 (68) DrlgType=maze
+level.a2.69.act-2-tomb-tal-4	Levels.txt Act 2 - Tomb Tal 4 (69) DrlgType=maze
+level.a2.70.act-2-tomb-tal-5	Levels.txt Act 2 - Tomb Tal 5 (70) DrlgType=maze
+level.a2.71.act-2-tomb-tal-6	Levels.txt Act 2 - Tomb Tal 6 (71) DrlgType=maze
+level.a2.72.act-2-tomb-tal-7	Levels.txt Act 2 - Tomb Tal 7 (72) DrlgType=maze
+level.a2.73.act-2-duriel-s-lair	Levels.txt Act 2 - Duriel's Lair (73) DrlgType=preset
+level.a2.74.act-2-arcane	Levels.txt Act 2 - Arcane (74) DrlgType=maze
+level.a3.100.act-3-mephisto-1	Levels.txt Act 3 - Mephisto 1 (100) DrlgType=maze
+level.a3.101.act-3-mephisto-2	Levels.txt Act 3 - Mephisto 2 (101) DrlgType=maze
+level.a3.102.act-3-mephisto-3	Levels.txt Act 3 - Mephisto 3 (102) DrlgType=preset
+level.a3.75.act-3-town	Levels.txt Act 3 - Town (75) DrlgType=preset
+level.a3.76.act-3-jungle-1	Levels.txt Act 3 - Jungle 1 (76) DrlgType=outdoor
+level.a3.77.act-3-jungle-2	Levels.txt Act 3 - Jungle 2 (77) DrlgType=outdoor
+level.a3.78.act-3-jungle-3	Levels.txt Act 3 - Jungle 3 (78) DrlgType=outdoor
+level.a3.79.act-3-kurast-1	Levels.txt Act 3 - Kurast 1 (79) DrlgType=outdoor
+level.a3.80.act-3-kurast-2	Levels.txt Act 3 - Kurast 2 (80) DrlgType=outdoor
+level.a3.81.act-3-kurast-3	Levels.txt Act 3 - Kurast 3 (81) DrlgType=outdoor
+level.a3.82.act-3-kurast-4	Levels.txt Act 3 - Kurast 4 (82) DrlgType=outdoor
+level.a3.83.act-3-travincal	Levels.txt Act 3 - Travincal (83) DrlgType=outdoor
+level.a3.84.act-3-spider-1	Levels.txt Act 3 - Spider 1 (84) DrlgType=maze
+level.a3.85.act-3-spider-2	Levels.txt Act 3 - Spider 2 (85) DrlgType=maze
+level.a3.86.act-3-dungeon-1-a	Levels.txt Act 3 - Dungeon 1 A (86) DrlgType=maze
+level.a3.87.act-3-dungeon-1-b	Levels.txt Act 3 - Dungeon 1 B (87) DrlgType=maze
+level.a3.88.act-3-dungeon-2-a	Levels.txt Act 3 - Dungeon 2 A (88) DrlgType=maze
+level.a3.89.act-3-dungeon-2-b	Levels.txt Act 3 - Dungeon 2 B (89) DrlgType=maze
+level.a3.90.act-3-dungeon-1-treasure	Levels.txt Act 3 - Dungeon 1 Treasure (90) DrlgType=preset
+level.a3.91.act-3-dungeon-2-treasure	Levels.txt Act 3 - Dungeon 2 Treasure (91) DrlgType=preset
+level.a3.92.act-3-sewer-1	Levels.txt Act 3 - Sewer 1 (92) DrlgType=maze
+level.a3.93.act-3-sewer-2	Levels.txt Act 3 - Sewer 2 (93) DrlgType=preset
+level.a3.94.act-3-temple-1	Levels.txt Act 3 - Temple 1 (94) DrlgType=preset
+level.a3.95.act-3-temple-2	Levels.txt Act 3 - Temple 2 (95) DrlgType=preset
+level.a3.96.act-3-temple-3	Levels.txt Act 3 - Temple 3 (96) DrlgType=preset
+level.a3.97.act-3-temple-4	Levels.txt Act 3 - Temple 4 (97) DrlgType=preset
+level.a3.98.act-3-temple-5	Levels.txt Act 3 - Temple 5 (98) DrlgType=preset
+level.a3.99.act-3-temple-6	Levels.txt Act 3 - Temple 6 (99) DrlgType=preset
+level.a4.103.act-4-town	Levels.txt Act 4 - Town (103) DrlgType=preset
+level.a4.104.act-4-mesa-1	Levels.txt Act 4 - Mesa 1 (104) DrlgType=outdoor
+level.a4.105.act-4-mesa-2	Levels.txt Act 4 - Mesa 2 (105) DrlgType=outdoor
+level.a4.106.act-4-mesa-3	Levels.txt Act 4 - Mesa 3 (106) DrlgType=outdoor
+level.a4.107.act-4-lava-1	Levels.txt Act 4 - Lava 1 (107) DrlgType=maze
+level.a4.108.act-4-diablo-1	Levels.txt Act 4 - Diablo 1 (108) DrlgType=outdoor
+level.a5.109.act-5-town	Levels.txt Act 5 - Town (109) DrlgType=preset
+level.a5.110.act-5-siege-1	Levels.txt Act 5 - Siege 1 (110) DrlgType=outdoor
+level.a5.111.act-5-barricade-1	Levels.txt Act 5 - Barricade 1 (111) DrlgType=outdoor
+level.a5.112.act-5-barricade-2	Levels.txt Act 5 - Barricade 2 (112) DrlgType=outdoor
+level.a5.113.act-5-ice-cave-1	Levels.txt Act 5 - Ice Cave 1 (113) DrlgType=maze
+level.a5.114.act-5-ice-cave-1a	Levels.txt Act 5 - Ice Cave 1A (114) DrlgType=maze
+level.a5.115.act-5-ice-cave-2	Levels.txt Act 5 - Ice Cave 2 (115) DrlgType=maze
+level.a5.116.act-5-ice-cave-2a	Levels.txt Act 5 - Ice Cave 2A (116) DrlgType=maze
+level.a5.117.act-5-barricade-snow	Levels.txt Act 5 - Barricade Snow (117) DrlgType=outdoor
+level.a5.118.act-5-ice-cave-3	Levels.txt Act 5 - Ice Cave 3 (118) DrlgType=maze
+level.a5.119.act-5-ice-cave-3a	Levels.txt Act 5 - Ice Cave 3A (119) DrlgType=maze
+level.a5.120.act-5-mountain-top	Levels.txt Act 5 - Mountain Top (120) DrlgType=preset
+level.a5.121.act-5-temple-entrance	Levels.txt Act 5 - Temple Entrance (121) DrlgType=preset
+level.a5.122.act-5-temple-1	Levels.txt Act 5 - Temple 1 (122) DrlgType=maze
+level.a5.123.act-5-temple-2	Levels.txt Act 5 - Temple 2 (123) DrlgType=maze
+level.a5.124.act-5-temple-boss	Levels.txt Act 5 - Temple Boss (124) DrlgType=preset
+level.a5.125.act-5-hell-1	Levels.txt Act 5 - Hell 1 (125) DrlgType=maze
+level.a5.126.act-5-hell-2	Levels.txt Act 5 - Hell 2 (126) DrlgType=maze
+level.a5.127.act-5-hell-3	Levels.txt Act 5 - Hell 3 (127) DrlgType=maze
+level.a5.128.act-5-baal-temple-1	Levels.txt Act 5 - Baal Temple 1 (128) DrlgType=maze
+level.a5.129.act-5-baal-temple-2	Levels.txt Act 5 - Baal Temple 2 (129) DrlgType=maze
+level.a5.130.act-5-baal-temple-3	Levels.txt Act 5 - Baal Temple 3 (130) DrlgType=maze
+level.a5.131.act-5-throne-room	Levels.txt Act 5 - Throne Room (131) DrlgType=preset
+level.a5.132.act-5-world-stone	Levels.txt Act 5 - World Stone (132) DrlgType=preset
+shrine.0.none	shrines.txt row 0 None (None)
+shrine.1.refill	shrines.txt row 1 Refill (Recharge)
+shrine.10.resist-lightning-boost	shrines.txt row 10 Resist Lightning Boost (Booster)
+shrine.11.resist-poison-boost	shrines.txt row 11 Resist Poison Boost (Booster)
+shrine.12.skill-boost	shrines.txt row 12 Skill Boost (Booster)
+shrine.13.recharge-boost	shrines.txt row 13 Recharge Boost (Booster)
+shrine.14.stamina-boost	shrines.txt row 14 Stamina Boost (Booster)
+shrine.15.experience-boost	shrines.txt row 15 Experience Boost (Booster)
+shrine.16.shrine-of-enirhs	shrines.txt row 16 Shrine of Enirhs (Magic)
+shrine.17.portal-to-unknown	shrines.txt row 17 Portal to unknown (Magic)
+shrine.18.gem-upgrade	shrines.txt row 18 Gem Upgrade (Magic)
+shrine.19.storm-shrine	shrines.txt row 19 Storm Shrine (Magic)
+shrine.2.health-boost	shrines.txt row 2 Health Boost (Recharge)
+shrine.20.warping-shrine	shrines.txt row 20 Warping Shrine (Magic)
+shrine.21.exploding-shrine	shrines.txt row 21 Exploding Shrine (Magic)
+shrine.22.poison-shrine	shrines.txt row 22 Poison Shrine (Magic)
+shrine.3.mana-boost	shrines.txt row 3 Mana Boost (Recharge)
+shrine.4.health-exchange	shrines.txt row 4 Health Exchange (Recharge)
+shrine.5.mana-exchange	shrines.txt row 5 Mana Exchange (Recharge)
+shrine.6.armor-boost	shrines.txt row 6 Armor Boost (Booster)
+shrine.7.combat-boost	shrines.txt row 7 Combat Boost (Booster)
+shrine.8.resist-fire-boost	shrines.txt row 8 Resist Fire Boost (Booster)
+shrine.9.resist-cold-boost	shrines.txt row 9 Resist Cold Boost (Booster)
+waypoint.0.rogue-encampment	waypoints.tsv wp 0 level 1 act 1
+waypoint.1.cold-plains	waypoints.tsv wp 1 level 3 act 1
+waypoint.10.sewers-level-2	waypoints.tsv wp 10 level 48 act 2
+waypoint.11.dry-hills	waypoints.tsv wp 11 level 42 act 2
+waypoint.12.halls-of-the-dead-level-2	waypoints.tsv wp 12 level 57 act 2
+waypoint.13.far-oasis	waypoints.tsv wp 13 level 43 act 2
+waypoint.14.lost-city	waypoints.tsv wp 14 level 44 act 2
+waypoint.15.palace-cellar-level-1	waypoints.tsv wp 15 level 52 act 2
+waypoint.16.arcane-sanctuary	waypoints.tsv wp 16 level 74 act 2
+waypoint.17.canyon-of-the-magi	waypoints.tsv wp 17 level 46 act 2
+waypoint.18.kurast-docktown	waypoints.tsv wp 18 level 75 act 3
+waypoint.19.spider-forest	waypoints.tsv wp 19 level 76 act 3
+waypoint.2.stony-field	waypoints.tsv wp 2 level 4 act 1
+waypoint.20.great-marsh	waypoints.tsv wp 20 level 77 act 3
+waypoint.21.flayer-jungle	waypoints.tsv wp 21 level 78 act 3
+waypoint.22.lower-kurast	waypoints.tsv wp 22 level 79 act 3
+waypoint.23.kurast-bazaar	waypoints.tsv wp 23 level 80 act 3
+waypoint.24.upper-kurast	waypoints.tsv wp 24 level 81 act 3
+waypoint.25.travincal	waypoints.tsv wp 25 level 83 act 3
+waypoint.26.durance-of-hate-level-2	waypoints.tsv wp 26 level 101 act 3
+waypoint.27.the-pandemonium-fortress	waypoints.tsv wp 27 level 103 act 4
+waypoint.28.city-of-the-damned	waypoints.tsv wp 28 level 106 act 4
+waypoint.29.river-of-flame	waypoints.tsv wp 29 level 107 act 4
+waypoint.3.dark-wood	waypoints.tsv wp 3 level 5 act 1
+waypoint.30.harrogath	waypoints.tsv wp 30 level 109 act 5
+waypoint.31.rigid-highlands	waypoints.tsv wp 31 level 111 act 5
+waypoint.32.arreat-plateau	waypoints.tsv wp 32 level 112 act 5
+waypoint.33.crystalized-cavern-level-1	waypoints.tsv wp 33 level 113 act 5
+waypoint.34.crystalized-cavern-level-2	waypoints.tsv wp 34 level 115 act 5
+waypoint.35.halls-of-death-s-calling	waypoints.tsv wp 35 level 123 act 5
+waypoint.36.tundra-wastelands	waypoints.tsv wp 36 level 117 act 5
+waypoint.37.glacial-caves-level-1	waypoints.tsv wp 37 level 118 act 5
+waypoint.38.the-worldstone-keep-level-2	waypoints.tsv wp 38 level 129 act 5
+waypoint.4.black-marsh	waypoints.tsv wp 4 level 6 act 1
+waypoint.5.outer-cloister	waypoints.tsv wp 5 level 27 act 1
+waypoint.6.jail-level-1	waypoints.tsv wp 6 level 29 act 1
+waypoint.7.inner-cloister	waypoints.tsv wp 7 level 32 act 1
+waypoint.8.catacombs-level-2	waypoints.tsv wp 8 level 35 act 1
+waypoint.9.lut-gholein	waypoints.tsv wp 9 level 40 act 2
+item.0-hax	item base Hand Axe (hax, id 0)
+item.100-9bt	item base Tabar (9bt, id 100)
+item.101-9ga	item base Gothic Axe (9ga, id 101)
+item.102-9gi	item base Ancient Axe (9gi, id 102)
+item.103-9wn	item base Burnt Wand (9wn, id 103)
+item.104-9yw	item base Petrified Wand (9yw, id 104)
+item.105-9bw	item base Tomb Wand (9bw, id 105)
+item.106-9gw	item base Grave Wand (9gw, id 106)
+item.107-9cl	item base Cudgel (9cl, id 107)
+item.108-9sc	item base Rune Scepter (9sc, id 108)
+item.109-9qs	item base Holy Water Sprinkler (9qs, id 109)
+item.11-ywn	item base Yew Wand (ywn, id 11)
+item.110-9ws	item base Divine Scepter (9ws, id 110)
+item.111-9sp	item base Barbed Club (9sp, id 111)
+item.112-9ma	item base Flanged Mace (9ma, id 112)
+item.113-9mt	item base Jagged Star (9mt, id 113)
+item.114-9fl	item base Knout (9fl, id 114)
+item.115-9wh	item base Battle Hammer (9wh, id 115)
+item.116-9m9	item base War Club (9m9, id 116)
+item.117-9gm	item base Martel de Fer (9gm, id 117)
+item.118-9ss	item base Gladius (9ss, id 118)
+item.119-9sm	item base Cutlass (9sm, id 119)
+item.12-bwn	item base Bone Wand (bwn, id 12)
+item.120-9sb	item base Shamshir (9sb, id 120)
+item.121-9fc	item base Tulwar (9fc, id 121)
+item.122-9cr	item base Dimensional Blade (9cr, id 122)
+item.123-9bs	item base Battle Sword (9bs, id 123)
+item.124-9ls	item base Rune Sword (9ls, id 124)
+item.125-9wd	item base Ancient Sword (9wd, id 125)
+item.126-92h	item base Espadon (92h, id 126)
+item.127-9cm	item base Dacian Falx (9cm, id 127)
+item.128-9gs	item base Tusk Sword (9gs, id 128)
+item.129-9b9	item base Gothic Sword (9b9, id 129)
+item.13-gwn	item base Grim Wand (gwn, id 13)
+item.130-9fb	item base Zweihander (9fb, id 130)
+item.131-9gd	item base Executioner Sword (9gd, id 131)
+item.132-9dg	item base Poignard (9dg, id 132)
+item.133-9di	item base Rondel (9di, id 133)
+item.134-9kr	item base Cinquedeas (9kr, id 134)
+item.135-9bl	item base Stilleto (9bl, id 135)
+item.136-9tk	item base Battle Dart (9tk, id 136)
+item.137-9ta	item base Francisca (9ta, id 137)
+item.138-9bk	item base War Dart (9bk, id 138)
+item.139-9b8	item base Hurlbat (9b8, id 139)
+item.140-9ja	item base War Javelin (9ja, id 140)
+item.141-9pi	item base Great Pilum (9pi, id 141)
+item.142-9s9	item base Simbilan (9s9, id 142)
+item.143-9gl	item base Spiculum (9gl, id 143)
+item.144-9ts	item base Harpoon (9ts, id 144)
+item.145-9sr	item base War Spear (9sr, id 145)
+item.146-9tr	item base Fuscina (9tr, id 146)
+item.147-9br	item base War Fork (9br, id 147)
+item.148-9st	item base Yari (9st, id 148)
+item.149-9p9	item base Lance (9p9, id 149)
+item.150-9b7	item base Lochaber Axe (9b7, id 150)
+item.151-9vo	item base Bill (9vo, id 151)
+item.152-9s8	item base Battle Scythe (9s8, id 152)
+item.153-9pa	item base Partizan (9pa, id 153)
+item.154-9h9	item base Bec-de-Corbin (9h9, id 154)
+item.155-9wc	item base Grim Scythe (9wc, id 155)
+item.156-8ss	item base Jo Staff (8ss, id 156)
+item.157-8ls	item base Quarterstaff (8ls, id 157)
+item.158-8cs	item base Cedar Staff (8cs, id 158)
+item.159-8bs	item base Gothic Staff (8bs, id 159)
+item.16-gsc	item base Grand Scepter (gsc, id 16)
+item.160-8ws	item base Rune Staff (8ws, id 160)
+item.161-8sb	item base Edge Bow (8sb, id 161)
+item.162-8hb	item base Razor Bow (8hb, id 162)
+item.163-8lb	item base Cedar Bow (8lb, id 163)
+item.164-8cb	item base Double Bow (8cb, id 164)
+item.165-8s8	item base Short Siege Bow (8s8, id 165)
+item.166-8l8	item base Long Siege Bow (8l8, id 166)
+item.167-8sw	item base Rune Bow (8sw, id 167)
+item.168-8lw	item base Gothic Bow (8lw, id 168)
+item.169-8lx	item base Arbalest (8lx, id 169)
+item.17-wsp	item base War Scepter (wsp, id 17)
+item.170-8mx	item base Siege Crossbow (8mx, id 170)
+item.171-8hx	item base Balista (8hx, id 171)
+item.172-8rx	item base Chu-Ko-Nu (8rx, id 172)
+item.173-qf1	item base KhalimFlail (qf1, id 173)
+item.174-qf2	item base SuperKhalimFlail (qf2, id 174)
+item.176-wrb	item base Wrist Blade (wrb, id 176)
+item.177-axf	item base Hatchet Hands (axf, id 177)
+item.178-ces	item base Cestus (ces, id 178)
+item.179-clw	item base Claws (clw, id 179)
+item.18-spc	item base Spiked Club (spc, id 18)
+item.180-btl	item base Blade Talons (btl, id 180)
+item.181-skr	item base Scissors Katar (skr, id 181)
+item.182-9ar	item base Quhab (9ar, id 182)
+item.183-9wb	item base Wrist Spike (9wb, id 183)
+item.184-9xf	item base Fascia (9xf, id 184)
+item.185-9cs	item base Hand Scythe (9cs, id 185)
+item.186-9lw	item base Greater Claws (9lw, id 186)
+item.187-9tw	item base Greater Talons (9tw, id 187)
+item.188-9qr	item base Scissors Quhab (9qr, id 188)
+item.189-7ar	item base Suwayyah (7ar, id 189)
+item.190-7wb	item base Wrist Sword (7wb, id 190)
+item.191-7xf	item base War Fist (7xf, id 191)
+item.192-7cs	item base Battle Cestus (7cs, id 192)
+item.193-7lw	item base Feral Claws (7lw, id 193)
+item.194-7tw	item base Runic Talons (7tw, id 194)
+item.195-7qr	item base Scissors Suwayyah (7qr, id 195)
+item.196-7ha	item base Tomahawk (7ha, id 196)
+item.197-7ax	item base Small Crescent (7ax, id 197)
+item.198-72a	item base Ettin Axe (72a, id 198)
+item.199-7mp	item base War Spike (7mp, id 199)
+item.2-2ax	item base Double Axe (2ax, id 2)
+item.20-mst	item base Morning Star (mst, id 20)
+item.200-7wa	item base Berserker Axe (7wa, id 200)
+item.201-7la	item base Feral Axe (7la, id 201)
+item.202-7ba	item base Silver Edged Axe (7ba, id 202)
+item.203-7bt	item base Decapitator (7bt, id 203)
+item.204-7ga	item base Champion Axe (7ga, id 204)
+item.205-7gi	item base Glorious Axe (7gi, id 205)
+item.206-7wn	item base Polished Wand (7wn, id 206)
+item.207-7yw	item base Ghost Wand (7yw, id 207)
+item.208-7bw	item base Lich Wand (7bw, id 208)
+item.209-7gw	item base Unearthed Wand (7gw, id 209)
+item.21-fla	item base Flail (fla, id 21)
+item.210-7cl	item base Truncheon (7cl, id 210)
+item.211-7sc	item base Mighty Scepter (7sc, id 211)
+item.212-7qs	item base Seraph Rod (7qs, id 212)
+item.213-7ws	item base Caduceus (7ws, id 213)
+item.214-7sp	item base Tyrant Club (7sp, id 214)
+item.215-7ma	item base Reinforced Mace (7ma, id 215)
+item.216-7mt	item base Devil Star (7mt, id 216)
+item.217-7fl	item base Scourge (7fl, id 217)
+item.218-7wh	item base Legendary Mallet (7wh, id 218)
+item.219-7m7	item base Ogre Maul (7m7, id 219)
+item.22-whm	item base War Hammer (whm, id 22)
+item.220-7gm	item base Thunder Maul (7gm, id 220)
+item.221-7ss	item base Falcata (7ss, id 221)
+item.222-7sm	item base Ataghan (7sm, id 222)
+item.223-7sb	item base Elegant Blade (7sb, id 223)
+item.224-7fc	item base Hydra Edge (7fc, id 224)
+item.225-7cr	item base Phase Blade (7cr, id 225)
+item.226-7bs	item base Conquest Sword (7bs, id 226)
+item.227-7ls	item base Cryptic Sword (7ls, id 227)
+item.228-7wd	item base Mythical Sword (7wd, id 228)
+item.229-72h	item base Legend Sword (72h, id 229)
+item.23-mau	item base Maul (mau, id 23)
+item.230-7cm	item base Highland Blade (7cm, id 230)
+item.231-7gs	item base Balrog Blade (7gs, id 231)
+item.232-7b7	item base Champion Sword (7b7, id 232)
+item.233-7fb	item base Colossal Sword (7fb, id 233)
+item.234-7gd	item base Colossus Blade (7gd, id 234)
+item.235-7dg	item base Bone Knife (7dg, id 235)
+item.236-7di	item base Mithral Point (7di, id 236)
+item.237-7kr	item base Fanged Knife (7kr, id 237)
+item.238-7bl	item base Legend Spike (7bl, id 238)
+item.239-7tk	item base Flying Knife (7tk, id 239)
+item.24-gma	item base Great Maul (gma, id 24)
+item.240-7ta	item base Flying Axe (7ta, id 240)
+item.241-7bk	item base Winged Knife (7bk, id 241)
+item.242-7b8	item base Winged Axe (7b8, id 242)
+item.243-7ja	item base Hyperion Javelin (7ja, id 243)
+item.244-7pi	item base Stygian Pilum (7pi, id 244)
+item.245-7s7	item base Balrog Spear (7s7, id 245)
+item.246-7gl	item base Ghost Glaive (7gl, id 246)
+item.247-7ts	item base Winged Harpoon (7ts, id 247)
+item.248-7sr	item base Hyperion Spear (7sr, id 248)
+item.249-7tr	item base Stygian Pike (7tr, id 249)
+item.25-ssd	item base Short Sword (ssd, id 25)
+item.250-7br	item base Mancatcher (7br, id 250)
+item.251-7st	item base Ghost Spear (7st, id 251)
+item.252-7p7	item base War Pike (7p7, id 252)
+item.253-7o7	item base Ogre Axe (7o7, id 253)
+item.254-7vo	item base Colossus Voulge (7vo, id 254)
+item.255-7s8	item base Thresher (7s8, id 255)
+item.256-7pa	item base Cryptic Axe (7pa, id 256)
+item.257-7h7	item base Great Poleaxe (7h7, id 257)
+item.258-7wc	item base Giant Thresher (7wc, id 258)
+item.259-6ss	item base Walking Stick (6ss, id 259)
+item.26-scm	item base Scimitar (scm, id 26)
+item.260-6ls	item base Stalagmite (6ls, id 260)
+item.261-6cs	item base Elder Staff (6cs, id 261)
+item.262-6bs	item base Shillelah (6bs, id 262)
+item.263-6ws	item base Archon Staff (6ws, id 263)
+item.264-6sb	item base Spider Bow (6sb, id 264)
+item.265-6hb	item base Blade Bow (6hb, id 265)
+item.266-6lb	item base Shadow Bow (6lb, id 266)
+item.267-6cb	item base Great Bow (6cb, id 267)
+item.268-6s7	item base Diamond Bow (6s7, id 268)
+item.269-6l7	item base Crusader Bow (6l7, id 269)
+item.270-6sw	item base Ward Bow (6sw, id 270)
+item.271-6lw	item base Hydra Bow (6lw, id 271)
+item.272-6lx	item base Pellet Bow (6lx, id 272)
+item.273-6mx	item base Gorgon Crossbow (6mx, id 273)
+item.274-6hx	item base Colossus Crossbow (6hx, id 274)
+item.275-6rx	item base Demon Crossbow (6rx, id 275)
+item.276-ob1	item base Eagle Orb (ob1, id 276)
+item.277-ob2	item base Sacred Globe (ob2, id 277)
+item.278-ob3	item base Smoked Sphere (ob3, id 278)
+item.279-ob4	item base Clasped Orb (ob4, id 279)
+item.28-flc	item base Falchion (flc, id 28)
+item.280-ob5	item base Dragon Stone (ob5, id 280)
+item.281-am1	item base Stag Bow (am1, id 281)
+item.282-am2	item base Reflex Bow (am2, id 282)
+item.283-am3	item base Maiden Spear (am3, id 283)
+item.284-am4	item base Maiden Pike (am4, id 284)
+item.285-am5	item base Maiden Javelin (am5, id 285)
+item.286-ob6	item base Glowing Orb (ob6, id 286)
+item.287-ob7	item base Crystalline Globe (ob7, id 287)
+item.288-ob8	item base Cloudy Sphere (ob8, id 288)
+item.289-ob9	item base Sparkling Ball (ob9, id 289)
+item.29-crs	item base Crystal Sword (crs, id 29)
+item.290-oba	item base Swirling Crystal (oba, id 290)
+item.291-am6	item base Ashwood Bow (am6, id 291)
+item.292-am7	item base Ceremonial Bow (am7, id 292)
+item.293-am8	item base Ceremonial Spear (am8, id 293)
+item.294-am9	item base Ceremonial Pike (am9, id 294)
+item.295-ama	item base Ceremonial Javelin (ama, id 295)
+item.296-obb	item base Heavenly Stone (obb, id 296)
+item.297-obc	item base Eldritch Orb (obc, id 297)
+item.298-obd	item base Demon Heart (obd, id 298)
+item.299-obe	item base Vortex Orb (obe, id 299)
+item.30-bsd	item base Broad Sword (bsd, id 30)
+item.300-obf	item base Dimensional Shard (obf, id 300)
+item.301-amb	item base Matriarchal Bow (amb, id 301)
+item.302-amc	item base Grand Matron Bow (amc, id 302)
+item.303-amd	item base Matriarchal Spear (amd, id 303)
+item.304-ame	item base Matriarchal Pike (ame, id 304)
+item.305-amf	item base MatriarchalJavelin (amf, id 305)
+item.306-cap	item base Cap/hat (cap, id 306)
+item.307-skp	item base Skull Cap (skp, id 307)
+item.308-hlm	item base Helm (hlm, id 308)
+item.309-fhl	item base Full Helm (fhl, id 309)
+item.31-lsd	item base Long Sword  (lsd, id 31)
+item.310-ghm	item base Great Helm (ghm, id 310)
+item.311-crn	item base Crown (crn, id 311)
+item.312-msk	item base Mask (msk, id 312)
+item.314-lea	item base Leather Armor (lea, id 314)
+item.315-hla	item base Hard Leather Armor (hla, id 315)
+item.316-stu	item base Studded Leather  (stu, id 316)
+item.317-rng	item base Ring Mail (rng, id 317)
+item.318-scl	item base Scale Mail (scl, id 318)
+item.32-wsd	item base War Sword (wsd, id 32)
+item.320-brs	item base Breast Plate (brs, id 320)
+item.321-spl	item base Splint Mail (spl, id 321)
+item.322-plt	item base Plate Mail (plt, id 322)
+item.323-fld	item base Field Plate (fld, id 323)
+item.324-gth	item base Gothic Plate (gth, id 324)
+item.325-ful	item base Full Plate Mail (ful, id 325)
+item.326-aar	item base Ancient Armor (aar, id 326)
+item.327-ltp	item base Light Plate (ltp, id 327)
+item.328-buc	item base Buckler (buc, id 328)
+item.329-sml	item base Small Shield (sml, id 329)
+item.33-2hs	item base Two-Handed Sword (2hs, id 33)
+item.330-lrg	item base Large Shield (lrg, id 330)
+item.332-tow	item base Tower Shield (tow, id 332)
+item.333-gts	item base Gothic Shield (gts, id 333)
+item.334-lgl	item base Gloves(L) (lgl, id 334)
+item.335-vgl	item base Heavy Gloves (vgl, id 335)
+item.336-mgl	item base Bracers(M) (mgl, id 336)
+item.337-tgl	item base Light Gauntlets (tgl, id 337)
+item.338-hgl	item base Gaunlets(H) (hgl, id 338)
+item.339-lbt	item base Leather Boots (lbt, id 339)
+item.34-clm	item base Claymore (clm, id 34)
+item.340-vbt	item base Heavy Boots (vbt, id 340)
+item.341-mbt	item base Chain Boots (mbt, id 341)
+item.342-tbt	item base Light Plate Boots (tbt, id 342)
+item.343-hbt	item base Plate Boots (hbt, id 343)
+item.344-lbl	item base Sash(L) (lbl, id 344)
+item.345-vbl	item base Light Belt (vbl, id 345)
+item.346-mbl	item base Belt(M) (mbl, id 346)
+item.347-tbl	item base Heavy Belt (tbl, id 347)
+item.348-hbl	item base Girdle(H) (hbl, id 348)
+item.349-bhm	item base Bone Helm (bhm, id 349)
+item.35-gis	item base Giant Sword (gis, id 35)
+item.350-bsh	item base Bone Shield (bsh, id 350)
+item.351-spk	item base Spiked Shield (spk, id 351)
+item.352-xap	item base War Hat (xap, id 352)
+item.353-xkp	item base Sallet (xkp, id 353)
+item.354-xlm	item base Casque (xlm, id 354)
+item.355-xhl	item base Basinet (xhl, id 355)
+item.356-xhm	item base Winged Helm (xhm, id 356)
+item.357-xrn	item base Grand Crown (xrn, id 357)
+item.358-xsk	item base Death Mask (xsk, id 358)
+item.359-xui	item base Ghost Armor (xui, id 359)
+item.36-bsw	item base Bastard Sword (bsw, id 36)
+item.360-xea	item base Serpentskin Armor (xea, id 360)
+item.361-xla	item base Demonhide Armor (xla, id 361)
+item.362-xtu	item base Trellised Armor (xtu, id 362)
+item.363-xng	item base Linked Mail (xng, id 363)
+item.364-xcl	item base Tigulated Mail (xcl, id 364)
+item.365-xhn	item base Mesh Armor (xhn, id 365)
+item.366-xrs	item base Cuirass (xrs, id 366)
+item.367-xpl	item base Russet Armor (xpl, id 367)
+item.368-xlt	item base Templar Coat (xlt, id 368)
+item.369-xld	item base Sharktooth Armor (xld, id 369)
+item.37-flb	item base Flamberge (flb, id 37)
+item.370-xth	item base Embossed Plate (xth, id 370)
+item.371-xul	item base Chaos Armor (xul, id 371)
+item.372-xar	item base Ornate Armor (xar, id 372)
+item.373-xtp	item base Mage Plate (xtp, id 373)
+item.374-xuc	item base Defender (xuc, id 374)
+item.375-xml	item base Round Shield (xml, id 375)
+item.376-xrg	item base Scutum (xrg, id 376)
+item.377-xit	item base Dragon Shield (xit, id 377)
+item.378-xow	item base Pavise (xow, id 378)
+item.379-xts	item base Ancient Shield (xts, id 379)
+item.38-gsd	item base Great Sword (gsd, id 38)
+item.380-xlg	item base Demonhide Gloves (xlg, id 380)
+item.381-xvg	item base Sharkskin Gloves (xvg, id 381)
+item.382-xmg	item base Heavy Bracers (xmg, id 382)
+item.383-xtg	item base Battle Gauntlets (xtg, id 383)
+item.384-xhg	item base War Gauntlets (xhg, id 384)
+item.385-xlb	item base Demonhide Boots (xlb, id 385)
+item.386-xvb	item base Sharkskin Boots (xvb, id 386)
+item.387-xmb	item base Mesh Boots (xmb, id 387)
+item.388-xtb	item base Battle Boots (xtb, id 388)
+item.389-xhb	item base War Boots (xhb, id 389)
+item.390-zlb	item base Demonhide Sash (zlb, id 390)
+item.391-zvb	item base Sharkskin Belt (zvb, id 391)
+item.392-zmb	item base Mesh Belt (zmb, id 392)
+item.393-ztb	item base Battle Belt (ztb, id 393)
+item.394-zhb	item base War Belt (zhb, id 394)
+item.395-xh9	item base Grim Helm (xh9, id 395)
+item.396-xsh	item base Grim Shield (xsh, id 396)
+item.397-xpk	item base Barbed Shield (xpk, id 397)
+item.399-dr2	item base Hawk Helm (dr2, id 399)
+item.4-wax	item base War Axe (wax, id 4)
+item.40-dir	item base Dirk (dir, id 40)
+item.400-dr3	item base Antlers (dr3, id 400)
+item.401-dr4	item base Falcon Mask (dr4, id 401)
+item.402-dr5	item base Spirit Mask (dr5, id 402)
+item.404-ba2	item base Fanged Helm (ba2, id 404)
+item.405-ba3	item base Horned Helm (ba3, id 405)
+item.406-ba4	item base Assault Helmet (ba4, id 406)
+item.407-ba5	item base Avenger Guard (ba5, id 407)
+item.408-pa1	item base Targe (pa1, id 408)
+item.409-pa2	item base Rondache (pa2, id 409)
+item.41-kri	item base Kriss (kri, id 41)
+item.410-pa3	item base Heraldic Shield (pa3, id 410)
+item.411-pa4	item base Aerin Shield (pa4, id 411)
+item.412-pa5	item base Crown Shield (pa5, id 412)
+item.414-ne2	item base Zombie Head (ne2, id 414)
+item.415-ne3	item base Unraveller Head (ne3, id 415)
+item.416-ne4	item base Gargoyle Head (ne4, id 416)
+item.417-ne5	item base Demon Head (ne5, id 417)
+item.418-ci0	item base Circlet (ci0, id 418)
+item.419-ci1	item base Coronet (ci1, id 419)
+item.42-bld	item base Blade (bld, id 42)
+item.420-ci2	item base Tiara (ci2, id 420)
+item.421-ci3	item base Diadem (ci3, id 421)
+item.422-uap	item base Shako (uap, id 422)
+item.423-ukp	item base Hydraskull (ukp, id 423)
+item.424-ulm	item base Armet (ulm, id 424)
+item.425-uhl	item base Giant Conch (uhl, id 425)
+item.426-uhm	item base Spired Helm (uhm, id 426)
+item.427-urn	item base Corona (urn, id 427)
+item.428-usk	item base Demonhead (usk, id 428)
+item.429-uui	item base Dusk Shroud (uui, id 429)
+item.43-tkf	item base Throwing Knife (tkf, id 43)
+item.430-uea	item base Wyrmhide (uea, id 430)
+item.431-ula	item base Scarab Husk (ula, id 431)
+item.432-utu	item base Wire Fleece (utu, id 432)
+item.433-ung	item base Diamond Mail (ung, id 433)
+item.434-ucl	item base Loricated Mail (ucl, id 434)
+item.435-uhn	item base Boneweave (uhn, id 435)
+item.436-urs	item base Great Hauberk (urs, id 436)
+item.437-upl	item base Balrog Skin (upl, id 437)
+item.438-ult	item base Hellforged Plate (ult, id 438)
+item.439-uld	item base Kraken Shell (uld, id 439)
+item.44-tax	item base Throwing Axe (tax, id 44)
+item.440-uth	item base Lacquered Plate (uth, id 440)
+item.441-uul	item base Shadow Plate (uul, id 441)
+item.442-uar	item base Sacred Armor (uar, id 442)
+item.443-utp	item base Archon Plate (utp, id 443)
+item.444-uuc	item base Heater (uuc, id 444)
+item.445-uml	item base Luna (uml, id 445)
+item.446-urg	item base Hyperion (urg, id 446)
+item.447-uit	item base Monarch (uit, id 447)
+item.448-uow	item base Aegis (uow, id 448)
+item.449-uts	item base Ward (uts, id 449)
+item.45-bkf	item base Balanced Knife (bkf, id 45)
+item.450-ulg	item base Bramble Mitts (ulg, id 450)
+item.451-uvg	item base Vampirebone Gloves (uvg, id 451)
+item.452-umg	item base Vambraces (umg, id 452)
+item.453-utg	item base Crusader Gauntlets (utg, id 453)
+item.454-uhg	item base Ogre Gauntlets (uhg, id 454)
+item.455-ulb	item base Wyrmhide Boots (ulb, id 455)
+item.456-uvb	item base Scarabshell Boots (uvb, id 456)
+item.457-umb	item base Boneweave Boots (umb, id 457)
+item.458-utb	item base Mirrored Boots (utb, id 458)
+item.459-uhb	item base Myrmidon Greaves (uhb, id 459)
+item.46-bal	item base Balanced Axe (bal, id 46)
+item.460-ulc	item base Spiderweb Sash (ulc, id 460)
+item.461-uvc	item base Vampirefang Belt (uvc, id 461)
+item.462-umc	item base Mithril Coil (umc, id 462)
+item.463-utc	item base Troll Belt (utc, id 463)
+item.464-uhc	item base Colossus Girdle (uhc, id 464)
+item.465-uh9	item base Bone Visage (uh9, id 465)
+item.466-ush	item base Troll Nest (ush, id 466)
+item.467-upk	item base Blade Barrier (upk, id 467)
+item.468-dr6	item base Alpha Helm (dr6, id 468)
+item.469-dr7	item base Griffon Headress (dr7, id 469)
+item.47-jav	item base Javelin (jav, id 47)
+item.470-dr8	item base Hunter's Guise (dr8, id 470)
+item.471-dr9	item base Sacred Feathers (dr9, id 471)
+item.472-dra	item base Totemic Mask (dra, id 472)
+item.473-ba6	item base Jawbone Visor (ba6, id 473)
+item.474-ba7	item base Lion Helm (ba7, id 474)
+item.475-ba8	item base Rage Mask (ba8, id 475)
+item.476-ba9	item base Savage Helmet (ba9, id 476)
+item.477-baa	item base Slayer Guard (baa, id 477)
+item.478-pa6	item base Akaran Targe (pa6, id 478)
+item.479-pa7	item base Akaran Rondache (pa7, id 479)
+item.48-pil	item base Pilum (pil, id 48)
+item.480-pa8	item base Protector Shield (pa8, id 480)
+item.481-pa9	item base Guilded Shield (pa9, id 481)
+item.482-paa	item base Royal Shield (paa, id 482)
+item.483-ne6	item base Mummified Trophy (ne6, id 483)
+item.484-ne7	item base Fetish Trophy (ne7, id 484)
+item.485-ne8	item base Sexton Trophy (ne8, id 485)
+item.486-ne9	item base Cantor Trophy (ne9, id 486)
+item.487-nea	item base Heirophant Trophy (nea, id 487)
+item.488-drb	item base Blood Spirt (drb, id 488)
+item.489-drc	item base Sun Spirit (drc, id 489)
+item.49-ssp	item base Short Spear (ssp, id 49)
+item.490-drd	item base Earth Spirit (drd, id 490)
+item.491-dre	item base Sky Spirit (dre, id 491)
+item.492-drf	item base Dream Spirit (drf, id 492)
+item.493-bab	item base Carnage Helm (bab, id 493)
+item.494-bac	item base Fury Visor (bac, id 494)
+item.495-bad	item base Destroyer Helm (bad, id 495)
+item.496-bae	item base Conquerer Crown (bae, id 496)
+item.497-baf	item base Guardian Crown (baf, id 497)
+item.498-pab	item base Sacred Targe (pab, id 498)
+item.499-pac	item base Sacred Rondache (pac, id 499)
+item.5-lax	item base Large Axe (lax, id 5)
+item.50-glv	item base Glaive (glv, id 50)
+item.500-pad	item base Ancient Shield (pad, id 500)
+item.501-pae	item base Zakarum Shield (pae, id 501)
+item.502-paf	item base Vortex Shield (paf, id 502)
+item.503-neb	item base Minion Skull (neb, id 503)
+item.504-neg	item base Hellspawn Skull (neg, id 504)
+item.505-ned	item base Overseer Skull (ned, id 505)
+item.506-nee	item base Succubae Skull (nee, id 506)
+item.507-nef	item base Bloodlord Skull (nef, id 507)
+item.508-elx	item base elixir (elx, id 508)
+item.51-tsp	item base Throwing Spear (tsp, id 51)
+item.513-vps	item base Stamina Potion (vps, id 513)
+item.514-yps	item base Antidote Potion (yps, id 514)
+item.517-wms	item base Thawing Potion (wms, id 517)
+item.518-tbk	item base Town Portal Book (tbk, id 518)
+item.519-ibk	item base Identify Book (ibk, id 519)
+item.52-spr	item base Spear (spr, id 52)
+item.520-amu	item base amulet (amu, id 520)
+item.522-rin	item base ring (rin, id 522)
+item.53-tri	item base Trident (tri, id 53)
+item.530-isc	item base Identify Scroll (isc, id 530)
+item.54-brn	item base Brandistock (brn, id 54)
+item.543-key	item base Skeleton Key (key, id 543)
+item.55-spt	item base Spetum (spt, id 55)
+item.557-gcv	item base Chipped Amethyst (gcv, id 557)
+item.558-gfv	item base Flawed Amethyst (gfv, id 558)
+item.559-gsv	item base Amethyst (gsv, id 559)
+item.56-pik	item base Pike (pik, id 56)
+item.560-gzv	item base Flawless Amethyst (gzv, id 560)
+item.561-gpv	item base Perfect Amethyst (gpv, id 561)
+item.562-gcy	item base Chipped Topaz (gcy, id 562)
+item.563-gfy	item base Flawed Topaz (gfy, id 563)
+item.564-gsy	item base Topaz (gsy, id 564)
+item.565-gly	item base Flawless Topaz (gly, id 565)
+item.566-gpy	item base Perfect Topaz (gpy, id 566)
+item.567-gcb	item base Chipped Saphire (gcb, id 567)
+item.568-gfb	item base Flawed Saphire (gfb, id 568)
+item.569-gsb	item base Saphire (gsb, id 569)
+item.57-bar	item base Bardiche (bar, id 57)
+item.570-glb	item base Flawless Saphire (glb, id 570)
+item.571-gpb	item base Perfect Saphire (gpb, id 571)
+item.572-gcg	item base Chipped Emerald (gcg, id 572)
+item.573-gfg	item base Flawed Emerald (gfg, id 573)
+item.574-gsg	item base Emerald (gsg, id 574)
+item.575-glg	item base Flawless Emerald (glg, id 575)
+item.576-gpg	item base Perfect Emerald (gpg, id 576)
+item.578-gfr	item base Flawed Ruby (gfr, id 578)
+item.579-gsr	item base Ruby (gsr, id 579)
+item.58-vou	item base Voulge (vou, id 58)
+item.580-glr	item base Flawless Ruby (glr, id 580)
+item.581-gpr	item base Perfect Ruby (gpr, id 581)
+item.582-gcw	item base Chipped Diamond (gcw, id 582)
+item.583-gfw	item base Flawed Diamond (gfw, id 583)
+item.584-gsw	item base Diamond (gsw, id 584)
+item.585-glw	item base Flawless Diamond (glw, id 585)
+item.586-gpw	item base Perfect Diamond (gpw, id 586)
+item.587-hp1	item base Lesser Healing Potion (hp1, id 587)
+item.588-hp2	item base Light Healing Potion (hp2, id 588)
+item.589-hp3	item base Healing Potion (hp3, id 589)
+item.59-scy	item base Scythe (scy, id 59)
+item.590-hp4	item base Strong Healing Potion (hp4, id 590)
+item.591-hp5	item base Greater Healing Potion (hp5, id 591)
+item.592-mp1	item base Lesser Mana Potion (mp1, id 592)
+item.593-mp2	item base Light Mana Potion (mp2, id 593)
+item.594-mp3	item base Mana Potion (mp3, id 594)
+item.595-mp4	item base Strong Mana Potion (mp4, id 595)
+item.596-mp5	item base Greater Mana Potion (mp5, id 596)
+item.597-skc	item base Chipped Skull (skc, id 597)
+item.598-skf	item base Flawed Skull (skf, id 598)
+item.599-sku	item base Skull (sku, id 599)
+item.6-bax	item base Broad Axe  (bax, id 6)
+item.60-pax	item base Poleaxe (pax, id 60)
+item.600-skl	item base Flawless Skull (skl, id 600)
+item.601-skz	item base Perfect Skull (skz, id 601)
+item.603-cm1	item base Charm Small (cm1, id 603)
+item.604-cm2	item base Charm Medium (cm2, id 604)
+item.605-cm3	item base Charm Large (cm3, id 605)
+item.61-hal	item base Halberd (hal, id 61)
+item.610-r01	item base El Rune (r01, id 610)
+item.611-r02	item base Eld Rune (r02, id 611)
+item.612-r03	item base Tir Rune (r03, id 612)
+item.613-r04	item base Nef Rune (r04, id 613)
+item.615-r06	item base Ith Rune (r06, id 615)
+item.616-r07	item base Tal Rune (r07, id 616)
+item.617-r08	item base Ral Rune (r08, id 617)
+item.618-r09	item base Ort Rune (r09, id 618)
+item.619-r10	item base Thul Rune (r10, id 619)
+item.62-wsc	item base War Scythe (wsc, id 62)
+item.620-r11	item base Amn Rune (r11, id 620)
+item.621-r12	item base Sol Rune (r12, id 621)
+item.622-r13	item base Shael Rune (r13, id 622)
+item.623-r14	item base Dol Rune (r14, id 623)
+item.624-r15	item base Hel Rune (r15, id 624)
+item.625-r16	item base Io Rune (r16, id 625)
+item.626-r17	item base Lum Rune (r17, id 626)
+item.627-r18	item base Ko Rune (r18, id 627)
+item.628-r19	item base Fal Rune (r19, id 628)
+item.629-r20	item base Lem Rune (r20, id 629)
+item.63-sst	item base Short Staff (sst, id 63)
+item.630-r21	item base Pul Rune (r21, id 630)
+item.631-r22	item base Um Rune (r22, id 631)
+item.632-r23	item base Mal Rune (r23, id 632)
+item.633-r24	item base Ist Rune (r24, id 633)
+item.634-r25	item base Gul Rune (r25, id 634)
+item.635-r26	item base Vex Rune (r26, id 635)
+item.636-r27	item base Ohm Rune (r27, id 636)
+item.637-r28	item base Lo Rune (r28, id 637)
+item.638-r29	item base Sur Rune (r29, id 638)
+item.639-r30	item base Ber Rune (r30, id 639)
+item.640-r31	item base Jah Rune (r31, id 640)
+item.641-r32	item base Cham Rune (r32, id 641)
+item.642-r33	item base Zod Rune (r33, id 642)
+item.643-jew	item base Jewel (jew, id 643)
+item.645-0sc	item base Scroll (0sc, id 645)
+item.65-cst	item base Gnarled Staff (cst, id 65)
+item.658-std	item base Standard (std, id 658)
+item.66-bst	item base Battle Staff (bst, id 66)
+item.67-wst	item base War Staff (wst, id 67)
+item.68-sbw	item base Short Bow (sbw, id 68)
+item.69-hbw	item base Hunter's Bow (hbw, id 69)
+item.71-cbw	item base Composite Bow (cbw, id 71)
+item.72-sbb	item base Short Battle Bow (sbb, id 72)
+item.73-lbb	item base Long Battle Bow (lbb, id 73)
+item.74-swb	item base Short War Bow (swb, id 74)
+item.75-lwb	item base Long War Bow (lwb, id 75)
+item.77-mxb	item base Crossbow (mxb, id 77)
+item.78-hxb	item base Heavy Crossbow (hxb, id 78)
+item.79-rxb	item base Repeating Crossbow (rxb, id 79)
+item.8-gax	item base Great Axe (gax, id 8)
+item.80-gps	item base Rancid Gas Potion (gps, id 80)
+item.81-ops	item base Oil Potion (ops, id 81)
+item.82-gpm	item base Choking Gas Potion (gpm, id 82)
+item.83-opm	item base Exploding Potion (opm, id 83)
+item.84-gpl	item base Strangling Gas Potion (gpl, id 84)
+item.85-opl	item base Fulminating Potion (opl, id 85)
+item.86-d33	item base decoy dagger (d33, id 86)
+item.87-g33	item base Gidbinn (g33, id 87)
+item.88-leg	item base Wirt's Leg (leg, id 88)
+item.89-hdm	item base Horadric Malus (hdm, id 89)
+item.9-gix	item base Giant Axe (gix, id 9)
+item.90-hfh	item base Hellforge Hammer (hfh, id 90)
+item.91-hst	item base Horadric Staff (hst, id 91)
+item.92-msf	item base Staff of the Kings (msf, id 92)
+item.93-9ha	item base Hatchet (9ha, id 93)
+item.94-9ax	item base Cleaver (9ax, id 94)
+item.95-92a	item base Twin Axe (92a, id 95)
+item.96-9mp	item base Crowbill (9mp, id 96)
+item.97-9wa	item base Naga (9wa, id 97)
+item.98-9la	item base Military Axe (9la, id 98)
+item.99-9ba	item base Bearded Axe  (9ba, id 99)
+missile.amplify-damage	Missiles.txt rows curseamplifydamage,cursecast (made by skills.txt Amplify Damage 66)
+missile.ancient-throwing-axe	missiles.txt ancient throwing axe (525)
+missile.andrialspray	Missiles.txt rows andarielspray (made by skills.txt AndrialSpray 164)
+missile.andypoisonbolt	Missiles.txt rows andypoisonbolt (made by skills.txt AndyPoisonBolt 201)
+missile.arcanetower	Missiles.txt rows lightningtowernova (made by skills.txt ArcaneTower 204)
+missile.arctic-blast	Missiles.txt rows arcticblast1,arcticblast2 (made by skills.txt Arctic Blast 230)
+missile.arcticblast1	missiles.txt arcticblast1 (459)
+missile.armageddon	Missiles.txt rows armageddoncontrol,armageddontail,armageddonrock (made by skills.txt Armageddon 249)
+missile.armageddoncontrol	missiles.txt armageddoncontrol (577)
+missile.attract	Missiles.txt rows curseattract,cursecast (made by skills.txt Attract 86)
+missile.baal-clone-teleport	Missiles.txt rows baalclonedeath,baalteleport (made by skills.txt Baal Clone Teleport 331)
+missile.baal-cold-missiles	Missiles.txt rows baal cold maker (made by skills.txt Baal Cold Missiles 318)
+missile.baal-inferno	Missiles.txt rows baal inferno (made by skills.txt Baal Inferno 317)
+missile.baal-monster-spawn	Missiles.txt rows baal spawn monsters (made by skills.txt Baal Monster Spawn 286)
+missile.baal-nova	Missiles.txt rows baal nova (made by skills.txt Baal Nova 316)
+missile.baal-taunt	Missiles.txt rows baal taunt control (made by skills.txt Baal Taunt 284)
+missile.baal-taunt-control	missiles.txt baal taunt control (546)
+missile.baal-teleport	Missiles.txt rows baalteleport (made by skills.txt Baal Teleport 329)
+missile.battle-command	Missiles.txt rows battlecommand (made by skills.txt Battle Command 155)
+missile.battle-cry	Missiles.txt rows battlecry (made by skills.txt Battle Cry 146)
+missile.battle-orders	Missiles.txt rows battleorders (made by skills.txt Battle Orders 149)
+missile.bighead1	missiles.txt bighead1 (2)
+missile.bighead2	missiles.txt bighead2 (3)
+missile.bighead3	missiles.txt bighead3 (4)
+missile.bighead4	missiles.txt bighead4 (5)
+missile.bighead5	missiles.txt bighead5 (6)
+missile.bighead6	missiles.txt bighead6 (647)
+missile.blade-creeper	missiles.txt blade creeper (392)
+missile.blade-fury	Missiles.txt rows bladefragment1,bladefragment2 (made by skills.txt Blade Fury 266)
+missile.blade-sentinel	Missiles.txt rows blade creeper (made by skills.txt Blade Sentinel 257)
+missile.blade-shield	Missiles.txt rows blade shield attachment (made by skills.txt Blade Shield 277)
+missile.blade-shield-attachment	missiles.txt blade shield attachment (553)
+missile.bladefragment1	missiles.txt bladefragment1 (506)
+missile.blades-of-ice	Missiles.txt rows bladesoficecubes,bladesoficeexplode (made by skills.txt Blades of Ice 274)
+missile.bladesoficecubes	missiles.txt bladesoficecubes (561)
+missile.blaze	Missiles.txt rows blaze,firewall,firesmall,firemedium (made by skills.txt Blaze 46)
+missile.blessed-hammer	Missiles.txt rows blessedhammer (made by skills.txt Blessed Hammer 112)
+missile.blizzard	Missiles.txt rows blizzardcenter (made by skills.txt Blizzard 59)
+missile.blizzardcenter	missiles.txt blizzardcenter (158)
+missile.blood-mana	Missiles.txt rows curseeffectred,cursecast (made by skills.txt Blood Mana 310)
+missile.blowgun	missiles.txt blowgun (266)
+missile.boltsentry	Missiles.txt rows sentrychargedbolt (made by skills.txt BoltSentry 306)
+missile.bomb-in-air	missiles.txt bomb in air (385)
+missile.bone-spear	Missiles.txt rows bonespear,bonecast (made by skills.txt Bone Spear 84)
+missile.bone-spirit	Missiles.txt rows bonespirit (made by skills.txt Bone Spirit 93)
+missile.bone-wall	Missiles.txt rows bonewallmaker (made by skills.txt Bone Wall 78)
+missile.bonewallmaker	missiles.txt bonewallmaker (207)
+missile.catapult-charged-ball	Missiles.txt rows catapultchargedball (made by skills.txt Catapult Charged Ball 287)
+missile.catapult-spike-ball	Missiles.txt rows catapult spike ball (made by skills.txt Catapult Spike Ball 288)
+missile.catapultblizzard	Missiles.txt rows catapult cold ball (made by skills.txt CatapultBlizzard 303)
+missile.catapultmeteor	Missiles.txt rows catapult meteor ball (made by skills.txt CatapultMeteor 305)
+missile.catapultplague	Missiles.txt rows catapult plague ball (made by skills.txt CatapultPlague 304)
+missile.chain-lightning	Missiles.txt rows chainlightning (made by skills.txt Chain Lightning 53)
+missile.charged-bolt	Missiles.txt rows chargedbolt (made by skills.txt Charged Bolt 38)
+missile.charged-strike	Missiles.txt rows chargedstrikebolt (made by skills.txt Charged Strike 24)
+missile.chargedstrikebolt	missiles.txt chargedstrikebolt (215)
+missile.chilling-armor	Missiles.txt rows chillingarmorbolt (made by skills.txt Chilling Armor 60)
+missile.chillingarmorbolt	missiles.txt chillingarmorbolt (264)
+missile.claws-of-thunder	Missiles.txt rows clawsofthundernova,clawsofthunderbolt (made by skills.txt Claws of Thunder 269)
+missile.clawsofthunderbolt	missiles.txt clawsofthunderbolt (558)
+missile.clawsofthundernova	missiles.txt clawsofthundernova (559)
+missile.cold-arrow	Missiles.txt rows coldarrow (made by skills.txt Cold Arrow 11)
+missile.confuse	Missiles.txt rows curseconfuse,cursecast (made by skills.txt Confuse 81)
+missile.corpse-explosion	Missiles.txt rows corpseexplosion,explodingarrowexp,redlightmissile (made by skills.txt Corpse Explosion 74)
+missile.corpsecycler	Missiles.txt rows recycler delay,vine beast attack (made by skills.txt CorpseCycler 307)
+missile.countessfirewall	Missiles.txt rows countessfirewallmaker,countessfirewall (made by skills.txt CountessFirewall 321)
+missile.countessfirewallmaker	missiles.txt countessfirewallmaker (653)
+missile.cr-arrow1	missiles.txt cr_arrow1 (13)
+missile.cr-arrow2	missiles.txt cr_arrow2 (14)
+missile.cr-arrow3	missiles.txt cr_arrow3 (15)
+missile.cr-arrow4	missiles.txt cr_arrow4 (16)
+missile.cr-arrow5	missiles.txt cr_arrow5 (17)
+missile.cr-arrow6	missiles.txt cr_arrow6 (660)
+missile.cursedballtrapleft	Missiles.txt rows trap cursed skull left (made by skills.txt CursedBallTrapLeft 208)
+missile.cursedballtrapright	Missiles.txt rows trap cursed skull right (made by skills.txt CursedBallTrapRight 207)
+missile.death-mauler	missiles.txt death mauler (502)
+missile.death-sentry-ltng	Missiles.txt rows sentrylightningbolt2 (made by skills.txt death sentry ltng 324)
+missile.deathmaul	Missiles.txt rows death mauler,death mauler trail (made by skills.txt DeathMaul 308)
+missile.decrepify	Missiles.txt rows cursedecrepify,cursecast (made by skills.txt Decrepify 87)
+missile.defense-curse	Missiles.txt rows curseeffectred,cursecast (made by skills.txt Defense Curse 309)
+missile.desertturret	Missiles.txt rows desertfireball (made by skills.txt DesertTurret 203)
+missile.diabfire	Missiles.txt rows diabfire (made by skills.txt DiabFire 195)
+missile.diablight	Missiles.txt rows diablight (made by skills.txt DiabLight 193)
+missile.diablogeddon	Missiles.txt rows diablogeddoncontrol,diablogeddontail,diablogeddonrock (made by skills.txt Diablogeddon 349)
+missile.diabwall	Missiles.txt rows diabwallmaker (made by skills.txt DiabWall 197)
+missile.dim-vision	Missiles.txt rows cursedimvision,cursecast (made by skills.txt Dim Vision 71)
+missile.doomknightmissile	Missiles.txt rows undeadmissile1 (made by skills.txt DoomKnightMissile 335)
+missile.dragon-tail	Missiles.txt rows dragontail missile (made by skills.txt Dragon Tail 270)
+missile.dragontail-missile	missiles.txt dragontail missile (533)
+missile.erruption-center	missiles.txt erruption center (461)
+missile.eruption	Missiles.txt rows erruption center (made by skills.txt Eruption 234)
+missile.exploding-arrow	Missiles.txt rows explodingarrow (made by skills.txt Exploding Arrow 16)
+missile.fenris-rage	Missiles.txt rows corpseexplosion (made by skills.txt fenris rage 314)
+missile.fetishaura	Missiles.txt rows curseeffectred (made by skills.txt FetishAura 177)
+missile.fetishinferno	Missiles.txt rows fetishinferno1,fetishinferno2 (made by skills.txt FetishInferno 178)
+missile.fetishinferno1	missiles.txt fetishinferno1 (144)
+missile.fingermagespider	Missiles.txt rows fingermagespider (made by skills.txt FingerMageSpider 196)
+missile.fire-arrow	Missiles.txt rows firearrow (made by skills.txt Fire Arrow 7)
+missile.fire-ball	Missiles.txt rows fireball (made by skills.txt Fire Ball 47)
+missile.fire-bolt	Missiles.txt rows firebolt (made by skills.txt Fire Bolt 36)
+missile.fire-trauma	Missiles.txt rows bomb in air (made by skills.txt Fire Trauma 251)
+missile.fire-wall	Missiles.txt rows firewallmaker,firewall (made by skills.txt Fire Wall 51)
+missile.firehead	missiles.txt firehead (277)
+missile.firestorm	Missiles.txt rows firestormmaker (made by skills.txt Firestorm 225)
+missile.firewallmaker	missiles.txt firewallmaker (68)
+missile.fist-of-the-heavens	Missiles.txt rows fistoftheheavensdelay (made by skills.txt Fist of the Heavens 121)
+missile.fistoftheheavensdelay	missiles.txt fistoftheheavensdelay (233)
+missile.fists-of-fire	Missiles.txt rows fistsoffirefirewall,fistsoffireexplode (made by skills.txt Fists of Fire 259)
+missile.fistsoffirefirewall	missiles.txt fistsoffirefirewall (557)
+missile.freezing-arrow	Missiles.txt rows freezingarrow (made by skills.txt Freezing Arrow 31)
+missile.frogfire	missiles.txt frogfire (280)
+missile.frogpois	missiles.txt frogpois (282)
+missile.frost-nova	Missiles.txt rows frostnova (made by skills.txt Frost Nova 44)
+missile.frozen-orb	Missiles.txt rows frozenorb (made by skills.txt Frozen Orb 64)
+missile.frozenhorror-arcticblast1	missiles.txt frozenhorror arcticblast1 (493)
+missile.gargoyletrap	Missiles.txt rows shafire3 (made by skills.txt GargoyleTrap 172)
+missile.glacial-spike	Missiles.txt rows glacialspike (made by skills.txt Glacial Spike 55)
+missile.goospit1	missiles.txt goospit1 (70)
+missile.goospit2	missiles.txt goospit2 (71)
+missile.goospit3	missiles.txt goospit3 (72)
+missile.goospit4	missiles.txt goospit4 (73)
+missile.goospit5	missiles.txt goospit5 (74)
+missile.goospitex	missiles.txt goospitex (668)
+missile.grim-ward	Missiles.txt rows grimwardmediumstart,grimwardsmallstart,grimwardlargestart (made by skills.txt Grim Ward 150)
+missile.grimwardlargestart	missiles.txt grimwardlargestart (255)
+missile.grimwardmediumstart	missiles.txt grimwardmediumstart (252)
+missile.grimwardsmallstart	missiles.txt grimwardsmallstart (249)
+missile.guided-arrow	Missiles.txt rows guidedarrow (made by skills.txt Guided Arrow 22)
+missile.healing-vortex	Missiles.txt rows healing vortex (made by skills.txt Healing Vortex 291)
+missile.hellmeteor	Missiles.txt rows hellmeteordown (made by skills.txt HellMeteor 213)
+missile.holy-bolt	Missiles.txt rows holybolt (made by skills.txt Holy Bolt 101)
+missile.horror-arctic-blast	Missiles.txt rows frozenhorror arcticblast1 (made by skills.txt Horror Arctic Blast 323)
+missile.howl	Missiles.txt rows howl (made by skills.txt Howl 130)
+missile.hurricane	Missiles.txt rows hurricaneswoosh,hurricanerock,hurricanetree (made by skills.txt Hurricane 250)
+missile.hydramissile	Missiles.txt rows hydra (made by skills.txt HydraMissile 337)
+missile.ice-arrow	Missiles.txt rows icearrow (made by skills.txt Ice Arrow 21)
+missile.ice-blast	Missiles.txt rows iceblast (made by skills.txt Ice Blast 45)
+missile.ice-bolt	Missiles.txt rows icebolt (made by skills.txt Ice Bolt 39)
+missile.immolation-arrow	Missiles.txt rows immolationarrow (made by skills.txt Immolation Arrow 27)
+missile.imp-charged-bolt	missiles.txt imp charged bolt (450)
+missile.imp-fire-missile	Missiles.txt rows impmiss21 (made by skills.txt Imp Fire Missile 299)
+missile.imp-fire-missile-ex	Missiles.txt rows impmiss21 (made by skills.txt Imp Fire Missile Ex 356)
+missile.imp-fireball	Missiles.txt rows impfireball (made by skills.txt Imp Fireball 283)
+missile.imp-inferno	Missiles.txt rows impinfernoflame1,impinfernoflame2 (made by skills.txt Imp Inferno 282)
+missile.imp-teleport	Missiles.txt rows imp teleport (made by skills.txt Imp Teleport 330)
+missile.impbolt	Missiles.txt rows imp charged bolt (made by skills.txt ImpBolt 322)
+missile.impinfernoflame1	missiles.txt impinfernoflame1 (398)
+missile.impmiss21	missiles.txt impmiss21 (592)
+missile.impmiss22	missiles.txt impmiss22 (593)
+missile.impmiss23	missiles.txt impmiss23 (594)
+missile.impmiss24	missiles.txt impmiss24 (595)
+missile.impmiss25	missiles.txt impmiss25 (596)
+missile.impmissex	missiles.txt impmissex (669)
+missile.inferno	Missiles.txt rows infernoflame1,infernoflame2 (made by skills.txt Inferno 41)
+missile.infernoflame1	missiles.txt infernoflame1 (60)
+missile.iron-maiden	Missiles.txt rows curseironmaiden,cursecast (made by skills.txt Iron Maiden 76)
+missile.leap	Missiles.txt rows leapknockback (made by skills.txt Leap 132)
+missile.leapknockback	missiles.txt leapknockback (346)
+missile.life-tap	Missiles.txt rows cursereversevampire,cursecast (made by skills.txt Life Tap 82)
+missile.lightning	Missiles.txt rows lightningbolt (made by skills.txt Lightning 49)
+missile.lightning-bolt	Missiles.txt rows lightningjavelin (made by skills.txt Lightning Bolt 20)
+missile.lightning-fury	Missiles.txt rows lightningfury (made by skills.txt Lightning Fury 35)
+missile.lightning-strike	Missiles.txt rows lightningstrike (made by skills.txt Lightning Strike 34)
+missile.lightningjavelin	missiles.txt lightningjavelin (205)
+missile.lower-resist	Missiles.txt rows curselowerresist,cursecast (made by skills.txt Lower Resist 91)
+missile.magic-arrow	Missiles.txt rows magicarrow (made by skills.txt Magic Arrow 6)
+missile.magottup	Missiles.txt rows dirt pile,sand pile (made by skills.txt MagottUp 161)
+missile.megademoninferno	Missiles.txt rows megademoninferno,fetishinferno1,fetishinferno2 (made by skills.txt MegademonInferno 319)
+missile.mephfrostnova	Missiles.txt rows mephfrostnova,frostnova (made by skills.txt MephFrostNova 346)
+missile.mephistomissile	Missiles.txt rows mephisto (made by skills.txt MephistoMissile 334)
+missile.meteor	Missiles.txt rows meteorcenter (made by skills.txt Meteor 56)
+missile.meteorcenter	missiles.txt meteorcenter (101)
+missile.mind-blast	Missiles.txt rows mindblast center,mindblast hit (made by skills.txt Mind Blast 273)
+missile.molten-boulder	Missiles.txt rows moltenboulderemerge (made by skills.txt Molten Boulder 229)
+missile.moltenboulderemerge	missiles.txt moltenboulderemerge (453)
+missile.mon-death-sentry	Missiles.txt rows corpseexplosion,deathsentryexplode (made by skills.txt mon death sentry 312)
+missile.mon-inferno-sentry	Missiles.txt rows inferno sentry 1,inferno sentry 2 (made by skills.txt mon inferno sentry 311)
+missile.monblizcenter	missiles.txt monblizcenter (106)
+missile.monblizzard	Missiles.txt rows monblizcenter (made by skills.txt MonBlizzard 205)
+missile.monbonespirit	Missiles.txt rows monbonespirit (made by skills.txt MonBoneSpirit 211)
+missile.monbow	Missiles.txt rows cr_arrow6 (made by skills.txt MonBow 339)
+missile.moncoldarrow	Missiles.txt rows coldarrow (made by skills.txt MonColdArrow 341)
+missile.moncursecast	Missiles.txt rows curseeffectred,cursecast (made by skills.txt MonCurseCast 212)
+missile.monexplodingarrow	Missiles.txt rows explodingarrow (made by skills.txt MonExplodingArrow 342)
+missile.monfirearrow	Missiles.txt rows firearrow (made by skills.txt MonFireArrow 340)
+missile.monfreezingarrow	Missiles.txt rows freezingarrow (made by skills.txt MonFreezingArrow 343)
+missile.monsterlight	missiles.txt monsterlight (170)
+missile.multiple-shot	Missiles.txt rows multipleshotarrow,multipleshotbolt (made by skills.txt Multiple Shot 12)
+missile.multipleshotbolt	missiles.txt multipleshotbolt (214)
+missile.mummy1	missiles.txt mummy1 (63)
+missile.mummy2	missiles.txt mummy2 (64)
+missile.mummy3	missiles.txt mummy3 (65)
+missile.mummy4	missiles.txt mummy4 (66)
+missile.mummyex	missiles.txt mummyex (667)
+missile.necromagemissile	Missiles.txt rows necromage1 (made by skills.txt NecromageMissile 338)
+missile.nihlathakcorpseexplosion	Missiles.txt rows corpseexplosion,explodingarrowexp,redlightmissile (made by skills.txt NihlathakCorpseExplosion 351)
+missile.nova	Missiles.txt rows nova (made by skills.txt Nova 48)
+missile.pantherjav1	missiles.txt pantherjav1 (226)
+missile.pantherjav2	missiles.txt pantherjav2 (227)
+missile.pantherjav4	missiles.txt pantherjav4 (229)
+missile.pantherjav5	missiles.txt pantherjav5 (658)
+missile.pantherpotgreen	missiles.txt pantherpotgreen (239)
+missile.pantherpotorange	missiles.txt pantherpotorange (238)
+missile.plague-javelin	Missiles.txt rows plaguejavelin (made by skills.txt Plague Javelin 25)
+missile.poison-explosion	Missiles.txt rows poisonexplosioncloud,poisoncorpseexplosion,greenlightmissile (made by skills.txt Poison Explosion 83)
+missile.poison-javelin	Missiles.txt rows poisonjav (made by skills.txt Poison Javelin 15)
+missile.poison-nova	Missiles.txt rows poisonnova (made by skills.txt Poison Nova 92)
+missile.poisonballtrap	Missiles.txt rows trap poison ball left (made by skills.txt PoisonBallTrap 200)
+missile.poisonexplosioncloud	missiles.txt poisonexplosioncloud (217)
+missile.poisonjav	missiles.txt poisonjav (38)
+missile.primeblaze	Missiles.txt rows blaze (made by skills.txt PrimeBlaze 187)
+missile.primebolt	Missiles.txt rows chargedstrikebolt,chargedbolt (made by skills.txt PrimeBolt 186)
+missile.primefirewall	Missiles.txt rows vampirefirewallmaker,vampirefirewall (made by skills.txt PrimeFirewall 188)
+missile.primeicenova	Missiles.txt rows frostnova (made by skills.txt PrimeIceNova 190)
+missile.primelightning	Missiles.txt rows monsterlight (made by skills.txt PrimeLightning 185)
+missile.primepoisonball	Missiles.txt rows poisonball (made by skills.txt PrimePoisonball 191)
+missile.primepoisonnova	Missiles.txt rows primepoisoncloud (made by skills.txt PrimePoisonNova 192)
+missile.primespike	Missiles.txt rows monglacialspike (made by skills.txt PrimeSpike 189)
+missile.quick-strike	Missiles.txt rows raven1 (made by skills.txt Quick Strike 168)
+missile.rabies	Missiles.txt rows rabiesplague (made by skills.txt Rabies 238)
+missile.rabiesplague	missiles.txt rabiesplague (515)
+missile.raise-skeletal-mage	Missiles.txt rows corpseexplosion (made by skills.txt Raise Skeletal Mage 80)
+missile.raise-skeleton	Missiles.txt rows corpseexplosion (made by skills.txt Raise Skeleton 70)
+missile.redemption	Missiles.txt rows redemption (made by skills.txt Redemption 124)
+missile.regurgitatorcorpse	missiles.txt regurgitatorcorpse (341)
+missile.regurgitatoreat	Missiles.txt rows corpseexplosion,bigblood1 (made by skills.txt RegurgitatorEat 214)
+missile.revive	Missiles.txt rows revivemedium,revivesmall,revivelarge (made by skills.txt Revive 95)
+missile.roguemissile	Missiles.txt rows rogue1 (made by skills.txt RogueMissile 336)
+missile.royal-strike	Missiles.txt rows royalstrikemeteorcenter,royalstrikechainlightning,royalstrikechaosice (made by skills.txt Royal Strike 280)
+missile.royalstrikechainlightning	missiles.txt royalstrikechainlightning (568)
+missile.royalstrikechaosice	missiles.txt royalstrikechaosice (569)
+missile.royalstrikemeteorcenter	missiles.txt royalstrikemeteorcenter (564)
+missile.sacrifice	Missiles.txt rows blood1 (made by skills.txt Sacrifice 96)
+missile.sanctuary	Missiles.txt rows sanctuarybolt (made by skills.txt Sanctuary 119)
+missile.sentry-lightning	Missiles.txt rows sentrylightningbolt (made by skills.txt sentry lightning 313)
+missile.shamanfire	Missiles.txt rows shafire1 (made by skills.txt ShamanFire 160)
+missile.shamanfireex	Missiles.txt rows shafire1 (made by skills.txt ShamanFireEx 355)
+missile.shamanice	Missiles.txt rows glacialspike (made by skills.txt ShamanIce 348)
+missile.shiver-armor	Missiles.txt rows sparkle (made by skills.txt Shiver Armor 50)
+missile.shock-field	Missiles.txt rows shock field in air (made by skills.txt Shock Field 256)
+missile.shock-field-in-air	missiles.txt shock field in air (388)
+missile.shock-wave	Missiles.txt rows shockwave (made by skills.txt Shock Wave 243)
+missile.shout	Missiles.txt rows shout (made by skills.txt Shout 138)
+missile.skbowarrow1	missiles.txt skbowarrow1 (196)
+missile.skbowarrow2	missiles.txt skbowarrow2 (197)
+missile.skbowarrow3	missiles.txt skbowarrow3 (198)
+missile.skbowarrow4	missiles.txt skbowarrow4 (199)
+missile.skbowarrow5	missiles.txt skbowarrow5 (200)
+missile.skbowarrow6	missiles.txt skbowarrow6 (644)
+missile.skbowarrow7	missiles.txt skbowarrow7 (645)
+missile.skbowarrow8	missiles.txt skbowarrow8 (646)
+missile.skmage1	missiles.txt skmage1 (125)
+missile.skmage2	missiles.txt skmage2 (126)
+missile.skmage3	missiles.txt skmage3 (127)
+missile.skmage4	missiles.txt skmage4 (128)
+missile.skmagecold	missiles.txt skmagecold (662)
+missile.skmagefire	missiles.txt skmagefire (663)
+missile.skmageltng	missiles.txt skmageltng (664)
+missile.skmagepois	missiles.txt skmagepois (661)
+missile.spike2	missiles.txt spike2 (8)
+missile.spike3	missiles.txt spike3 (9)
+missile.spike4	missiles.txt spike4 (10)
+missile.spike6	missiles.txt spike6 (659)
+missile.strafe	Missiles.txt rows strafearrow,strafebolt,multipleshotarrow,multipleshotbolt (made by skills.txt Strafe 26)
+missile.strafearrow	missiles.txt strafearrow (682)
+missile.strafebolt	missiles.txt strafebolt (683)
+missile.succubusbolt	Missiles.txt rows succubusmiss (made by skills.txt SuccubusBolt 345)
+missile.succubusmiss	missiles.txt succubusmiss (665)
+missile.teeth	Missiles.txt rows teeth,bonecast (made by skills.txt Teeth 67)
+missile.terror	Missiles.txt rows curseterror,cursecast (made by skills.txt Terror 77)
+missile.thunder-storm	Missiles.txt rows thunderstorm1 (made by skills.txt Thunder Storm 57)
+missile.thunderstorm1	missiles.txt thunderstorm1 (166)
+missile.tornado	Missiles.txt rows tornado (made by skills.txt Tornado 245)
+missile.trap-nova	Missiles.txt rows trapnova (made by skills.txt Trap Nova 353)
+missile.twister	Missiles.txt rows twister (made by skills.txt Twister 240)
+missile.undeadmissile1	missiles.txt undeadmissile1 (323)
+missile.unholybolt	Missiles.txt rows unholybolt1 (made by skills.txt UnHolyBolt 157)
+missile.unholybolt1	missiles.txt unholybolt1 (77)
+missile.unholyboltex	Missiles.txt rows unholybolt1 (made by skills.txt UnHolyBoltEx 354)
+missile.vampirefireball	Missiles.txt rows vampirefireball (made by skills.txt VampireFireball 169)
+missile.vampirefirewall	Missiles.txt rows vampirefirewallmaker,vampirefirewall (made by skills.txt VampireFirewall 170)
+missile.vampirefirewallmaker	missiles.txt vampirefirewallmaker (130)
+missile.vampiremeteor	Missiles.txt rows vampiremeteorcenter (made by skills.txt VampireMeteor 171)
+missile.vampiremeteorcenter	missiles.txt vampiremeteorcenter (133)
+missile.vampiremissile	Missiles.txt rows firehead (made by skills.txt VampireMissile 333)
+missile.vine-attack	Missiles.txt rows plague vines,vine beast attack,vines,vine beast walk 1,vine beast neutral (made by skills.txt Vine Attack 294)
+missile.vinecycler	Missiles.txt rows vine recycler delay,vine beast attack,recycler delay (made by skills.txt VineCycler 325)
+missile.viper-bonespear	missiles.txt viper_bonespear (652)
+missile.viper-fire	missiles.txt viper_fire (650)
+missile.viper-poisjav	missiles.txt viper_poisjav (648)
+missile.volcano	Missiles.txt rows volcano,volcano overlay fire (made by skills.txt Volcano 244)
+missile.wake-of-destruction-sentry	Missiles.txt rows wake of destruction maker (made by skills.txt Wake Of Destruction Sentry 281)
+missile.war-cry	Missiles.txt rows warcry (made by skills.txt War Cry 154)
+missile.weaken	Missiles.txt rows curseweaken,cursecast (made by skills.txt Weaken 72)
+missile.willowisplightningbolt	missiles.txt willowisplightningbolt (320)
+missile.willowisplightningbolt2	missiles.txt willowisplightningbolt2 (666)
+missile.zakarumlightning	Missiles.txt rows monsterlight (made by skills.txt ZakarumLightning 332)
+state.alignment	states.txt alignment (105) flags: -
+state.amplifydamage	states.txt amplifydamage (9) flags: curse,curable
+state.antidote	states.txt antidote (178) flags: -
+state.armageddon	states.txt armageddon (145) flags: -
+state.attached	states.txt attached (143) flags: active,udead
+state.attract	states.txt attract (57) flags: curse,curable
+state.avoid	states.txt avoid (66) flags: -
+state.axemastery	states.txt axemastery (75) flags: -
+state.barbs	states.txt barbs (147) flags: aura
+state.barbscontrol	states.txt barbscontrol (163) flags: aura
+state.battlecommand	states.txt battlecommand (51) flags: aura
+state.battlecry	states.txt battlecry (89) flags: curse
+state.battleorders	states.txt battleorders (32) flags: aura
+state.bear	states.txt bear (140) flags: transform
+state.berserk	states.txt berserk (95) flags: -
+state.bladeshield	states.txt bladeshield (158) flags: -
+state.blaze	states.txt blaze (13) flags: -
+state.blessedaim	states.txt blessedaim (40) flags: aura,immed
+state.blood-mana	states.txt blood_mana (114) flags: curse,curable
+state.bloodlust	states.txt bloodlust (141) flags: curse
+state.blue	states.txt blue (90) flags: -
+state.bonearmor	states.txt bonearmor (14) flags: -
+state.burning	states.txt burning (115) flags: -
+state.changeclass	states.txt changeclass (142) flags: -
+state.chillingarmor	states.txt chillingarmor (20) flags: -
+state.clawmastery	states.txt clawmastery (152) flags: -
+state.cleansing	states.txt cleansing (45) flags: aura
+state.cloak-of-shadows	states.txt cloak_of_shadows (153) flags: remhit
+state.cloaked	states.txt cloaked (156) flags: curse
+state.cold	states.txt cold (11) flags: -
+state.coldmastery	states.txt coldmastery (73) flags: -
+state.concentrate	states.txt concentrate (15) flags: -
+state.concentration	states.txt concentration (42) flags: aura,immed
+state.confuse	states.txt confuse (59) flags: curse,curable
+state.conversion	states.txt conversion (53) flags: -
+state.conversion-save	states.txt conversion_save (109) flags: -
+state.convicted	states.txt convicted (29) flags: aura
+state.conviction	states.txt conviction (28) flags: aura
+state.corpse-nodraw	states.txt corpse_nodraw (104) flags: hide,udead
+state.corpse-noselect	states.txt corpse_noselect (118) flags: udead
+state.corpseexp	states.txt corpseexp (173) flags: hide,udead
+state.criticalstrike	states.txt criticalstrike (64) flags: -
+state.cyclonearmor	states.txt cyclonearmor (151) flags: -
+state.death-delay	states.txt death_delay (92) flags: -
+state.debugcontrol	states.txt debugcontrol (164) flags: -
+state.decrepify	states.txt decrepify (60) flags: curse,curable
+state.defense-curse	states.txt defense_curse (113) flags: curse,curable
+state.defiance	states.txt defiance (37) flags: aura,immed
+state.delerium	states.txt delerium (177) flags: transform
+state.dimvision	states.txt dimvision (23) flags: curse,curable
+state.dodge	states.txt dodge (65) flags: -
+state.dopplezon	states.txt dopplezon (63) flags: transform,hide,udead
+state.dragonflight	states.txt dragonflight (116) flags: -
+state.enchant	states.txt enchant (16) flags: -
+state.energyshield	states.txt energyshield (30) flags: -
+state.evade	states.txt evade (68) flags: -
+state.fade	states.txt fade (159) flags: -
+state.fanaticism	states.txt fanaticism (49) flags: aura,immed
+state.fenris-rage	states.txt fenris_rage (138) flags: -
+state.feralrage	states.txt feralrage (120) flags: -
+state.fetishaura	states.txt fetishaura (25) flags: -
+state.fingermagecurse	states.txt fingermagecurse (84) flags: -
+state.firemastery	states.txt firemastery (71) flags: -
+state.freeze	states.txt freeze (1) flags: hide,shatter,udead
+state.frenzy	states.txt frenzy (94) flags: -
+state.frozenarmor	states.txt frozenarmor (10) flags: -
+state.fullsetgeneric	states.txt fullsetgeneric (175) flags: -
+state.golem-mastery	states.txt golem_mastery (111) flags: -
+state.healthpot	states.txt healthpot (100) flags: -
+state.holyfire	states.txt holyfire (35) flags: aura
+state.holyshield	states.txt holyshield (101) flags: transform
+state.holyshock	states.txt holyshock (46) flags: aura
+state.holywind	states.txt holywind (43) flags: aura
+state.holywindcold	states.txt holywindcold (44) flags: aura
+state.hurricane	states.txt hurricane (144) flags: active
+state.increasedspeed	states.txt increasedspeed (82) flags: -
+state.increasedstamina	states.txt increasedstamina (80) flags: -
+state.inferno	states.txt inferno (12) flags: -
+state.innersight	states.txt innersight (17) flags: -
+state.invis	states.txt invis (146) flags: -
+state.ironmaiden	states.txt ironmaiden (55) flags: curse,curable
+state.ironskin	states.txt ironskin (81) flags: -
+state.itemset1	states.txt itemset1 (165) flags: -
+state.itemset2	states.txt itemset2 (166) flags: -
+state.itemset3	states.txt itemset3 (167) flags: -
+state.itemset4	states.txt itemset4 (168) flags: -
+state.itemset5	states.txt itemset5 (169) flags: -
+state.itemset6	states.txt itemset6 (170) flags: -
+state.just-portaled	states.txt just_portaled (102) flags: -
+state.justhit	states.txt justhit (86) flags: -
+state.lifetap	states.txt lifetap (58) flags: curse,curable
+state.lightningbolt	states.txt lightningbolt (39) flags: -
+state.lightningmastery	states.txt lightningmastery (72) flags: -
+state.lowerresist	states.txt lowerresist (61) flags: curse,curable
+state.macemastery	states.txt macemastery (76) flags: -
+state.manapot	states.txt manapot (106) flags: -
+state.maul	states.txt maul (117) flags: -
+state.meditation	states.txt meditation (48) flags: aura,immed
+state.might	states.txt might (33) flags: aura,immed
+state.monfrenzy	states.txt monfrenzy (103) flags: -
+state.monsterset	states.txt monsterset (176) flags: transform
+state.naturalresistance	states.txt naturalresistance (83) flags: -
+state.nomanaregen	states.txt nomanaregen (85) flags: -
+state.oaksage	states.txt oaksage (149) flags: aura
+state.oaksagecontrol	states.txt oaksagecontrol (161) flags: aura
+state.openwounds	states.txt openwounds (62) flags: active,life
+state.passive-resistcold	states.txt passive_resistcold (182) flags: -
+state.passive-resistfire	states.txt passive_resistfire (181) flags: -
+state.passive-resistltng	states.txt passive_resistltng (183) flags: -
+state.penetrate	states.txt penetrate (67) flags: -
+state.pierce	states.txt pierce (69) flags: -
+state.playerbody	states.txt playerbody (7) flags: -
+state.poison	states.txt poison (2) flags: life
+state.polearmmastery	states.txt polearmmastery (77) flags: -
+state.prayer	states.txt prayer (34) flags: aura
+state.pregnant	states.txt pregnant (110) flags: -
+state.preventheal	states.txt preventheal (52) flags: immed,life
+state.progressive-cold	states.txt progressive_cold (126) flags: -
+state.progressive-damage	states.txt progressive_damage (122) flags: -
+state.progressive-fire	states.txt progressive_fire (125) flags: -
+state.progressive-lightning	states.txt progressive_lightning (127) flags: -
+state.progressive-other	states.txt progressive_other (124) flags: -
+state.progressive-steal	states.txt progressive_steal (123) flags: -
+state.quickness	states.txt quickness (157) flags: aura
+state.rabies	states.txt rabies (112) flags: -
+state.recycled	states.txt recycled (154) flags: hide,udead
+state.red	states.txt red (91) flags: -
+state.redeemed	states.txt redeemed (99) flags: hide,udead
+state.redemption	states.txt redemption (50) flags: aura
+state.resistall	states.txt resistall (8) flags: aura,immed
+state.resistcold	states.txt resistcold (4) flags: aura,immed
+state.resistfire	states.txt resistfire (3) flags: aura,immed
+state.resistlight	states.txt resistlight (5) flags: aura,immed
+state.resistmagic	states.txt resistmagic (6) flags: -
+state.restinpeace	states.txt restinpeace (172) flags: udead
+state.revive	states.txt revive (96) flags: udead
+state.runeword	states.txt runeword (171) flags: -
+state.sanctuary	states.txt sanctuary (47) flags: aura,active
+state.shadowwarrior	states.txt shadowwarrior (119) flags: transform,hide,udead
+state.shatter	states.txt shatter (107) flags: hide,shatter,udead
+state.shiverarmor	states.txt shiverarmor (88) flags: active
+state.shout	states.txt shout (26) flags: aura
+state.shrine-armor	states.txt shrine_armor (128) flags: curse
+state.shrine-combat	states.txt shrine_combat (129) flags: curse
+state.shrine-experience	states.txt shrine_experience (137) flags: curse
+state.shrine-mana-regen	states.txt shrine_mana_regen (135) flags: curse
+state.shrine-resist-cold	states.txt shrine_resist_cold (132) flags: curse
+state.shrine-resist-fire	states.txt shrine_resist_fire (131) flags: curse
+state.shrine-resist-lightning	states.txt shrine_resist_lightning (130) flags: curse
+state.shrine-resist-poison	states.txt shrine_resist_poison (133) flags: curse
+state.shrine-skill	states.txt shrine_skill (134) flags: curse
+state.shrine-stamina	states.txt shrine_stamina (136) flags: curse
+state.skel-mastery	states.txt skel_mastery (97) flags: -
+state.skill-move	states.txt skill_move (18) flags: -
+state.skilldelay	states.txt skilldelay (121) flags: -
+state.slowed	states.txt slowed (24) flags: -
+state.slowmissiles	states.txt slowmissiles (87) flags: -
+state.sourceunit	states.txt sourceunit (98) flags: -
+state.spearmastery	states.txt spearmastery (79) flags: -
+state.spiderlay	states.txt spiderlay (22) flags: -
+state.stamina	states.txt stamina (41) flags: aura,immed
+state.staminapot	states.txt staminapot (180) flags: -
+state.stunned	states.txt stunned (21) flags: -
+state.summonresist	states.txt summonresist (160) flags: -
+state.swordmastery	states.txt swordmastery (74) flags: -
+state.sync-warped	states.txt sync_warped (108) flags: -
+state.taunt	states.txt taunt (27) flags: curse,curable
+state.terror	states.txt terror (56) flags: curse,curable
+state.thawing	states.txt thawing (179) flags: -
+state.thorns	states.txt thorns (36) flags: aura
+state.throwingmastery	states.txt throwingmastery (78) flags: -
+state.thunderstorm	states.txt thunderstorm (38) flags: -
+state.uberminion	states.txt uberminion (184) flags: hide,shatter,udead
+state.uninterruptable	states.txt uninterruptable (54) flags: -
+state.valkyrie	states.txt valkyrie (93) flags: transform
+state.venomclaws	states.txt venomclaws (31) flags: -
+state.vine-beast	states.txt vine_beast (150) flags: active
+state.warmth	states.txt warmth (70) flags: -
+state.weaken	states.txt weaken (19) flags: curse,curable
+state.weaponblock	states.txt weaponblock (155) flags: -
+state.whirlwind	states.txt whirlwind (174) flags: -
+state.wolf	states.txt wolf (139) flags: transform
+state.wolverine	states.txt wolverine (148) flags: aura
+state.wolverinecontrol	states.txt wolverinecontrol (162) flags: aura
+monster.ancientbarb1	monstats.txt ancientbarb1 (hcIdx 540)
+monster.ancientbarb2	monstats.txt ancientbarb2 (hcIdx 541)
+monster.ancientbarb3	monstats.txt ancientbarb3 (hcIdx 542)
+monster.arach1	monstats.txt arach1 (hcIdx 122)
+monster.arach3	monstats.txt arach3 (hcIdx 124)
+monster.arach4	monstats.txt arach4 (hcIdx 125)
+monster.arach5	monstats.txt arach5 (hcIdx 126)
+monster.arach6	monstats.txt arach6 (hcIdx 685)
+monster.arach7	monstats.txt arach7 (hcIdx 717)
+monster.baaltaunt	monstats.txt baaltaunt (hcIdx 545)
+monster.baboon1	monstats.txt baboon1 (hcIdx 48)
+monster.baboon3	monstats.txt baboon3 (hcIdx 50)
+monster.baboon4	monstats.txt baboon4 (hcIdx 51)
+monster.baboon5	monstats.txt baboon5 (hcIdx 52)
+monster.baboon6	monstats.txt baboon6 (hcIdx 295)
+monster.baboon7	monstats.txt baboon7 (hcIdx 665)
+monster.baboon8	monstats.txt baboon8 (hcIdx 666)
+monster.batdemon1	monstats.txt batdemon1 (hcIdx 136)
+monster.batdemon2	monstats.txt batdemon2 (hcIdx 137)
+monster.batdemon3	monstats.txt batdemon3 (hcIdx 138)
+monster.batdemon4	monstats.txt batdemon4 (hcIdx 139)
+monster.batdemon5	monstats.txt batdemon5 (hcIdx 140)
+monster.batdemon6	monstats.txt batdemon6 (hcIdx 650)
+monster.batdemon7	monstats.txt batdemon7 (hcIdx 651)
+monster.bighead2	monstats.txt bighead2 (hcIdx 11)
+monster.bighead3	monstats.txt bighead3 (hcIdx 12)
+monster.bighead4	monstats.txt bighead4 (hcIdx 13)
+monster.bighead5	monstats.txt bighead5 (hcIdx 14)
+monster.bighead6	monstats.txt bighead6 (hcIdx 580)
+monster.bloodlord1	monstats.txt bloodlord1 (hcIdx 506)
+monster.bloodlord2	monstats.txt bloodlord2 (hcIdx 507)
+monster.bloodlord3	monstats.txt bloodlord3 (hcIdx 508)
+monster.bloodlord4	monstats.txt bloodlord4 (hcIdx 509)
+monster.bloodlord5	monstats.txt bloodlord5 (hcIdx 510)
+monster.bloodlord6	monstats.txt bloodlord6 (hcIdx 652)
+monster.bloodlord7	monstats.txt bloodlord7 (hcIdx 653)
+monster.blunderbore1	monstats.txt blunderbore1 (hcIdx 186)
+monster.blunderbore3	monstats.txt blunderbore3 (hcIdx 188)
+monster.blunderbore4	monstats.txt blunderbore4 (hcIdx 189)
+monster.blunderbore5	monstats.txt blunderbore5 (hcIdx 618)
+monster.blunderbore6	monstats.txt blunderbore6 (hcIdx 619)
+monster.bonefetish3	monstats.txt bonefetish3 (hcIdx 214)
+monster.bonefetish4	monstats.txt bonefetish4 (hcIdx 215)
+monster.bonefetish5	monstats.txt bonefetish5 (hcIdx 216)
+monster.bonefetish6	monstats.txt bonefetish6 (hcIdx 690)
+monster.bonefetish7	monstats.txt bonefetish7 (hcIdx 691)
+monster.brute2	monstats.txt brute2 (hcIdx 24)
+monster.brute3	monstats.txt brute3 (hcIdx 25)
+monster.brute4	monstats.txt brute4 (hcIdx 26)
+monster.brute5	monstats.txt brute5 (hcIdx 27)
+monster.cantor1	monstats.txt cantor1 (hcIdx 238)
+monster.cantor2	monstats.txt cantor2 (hcIdx 239)
+monster.cantor3	monstats.txt cantor3 (hcIdx 240)
+monster.cantor5	monstats.txt cantor5 (hcIdx 673)
+monster.cantor6	monstats.txt cantor6 (hcIdx 674)
+monster.clawviper10	monstats.txt clawviper10 (hcIdx 598)
+monster.clawviper5	monstats.txt clawviper5 (hcIdx 77)
+monster.clawviper6	monstats.txt clawviper6 (hcIdx 594)
+monster.clawviper7	monstats.txt clawviper7 (hcIdx 595)
+monster.clawviper8	monstats.txt clawviper8 (hcIdx 596)
+monster.clawviper9	monstats.txt clawviper9 (hcIdx 597)
+monster.corruptrogue1	monstats.txt corruptrogue1 (hcIdx 43)
+monster.corruptrogue2	monstats.txt corruptrogue2 (hcIdx 44)
+monster.corruptrogue4	monstats.txt corruptrogue4 (hcIdx 46)
+monster.corruptrogue5	monstats.txt corruptrogue5 (hcIdx 47)
+monster.corruptrogue6	monstats.txt corruptrogue6 (hcIdx 721)
+monster.cr-archer2	monstats.txt cr_archer2 (hcIdx 161)
+monster.cr-archer4	monstats.txt cr_archer4 (hcIdx 163)
+monster.cr-archer5	monstats.txt cr_archer5 (hcIdx 164)
+monster.cr-archer6	monstats.txt cr_archer6 (hcIdx 613)
+monster.cr-archer7	monstats.txt cr_archer7 (hcIdx 614)
+monster.cr-archer8	monstats.txt cr_archer8 (hcIdx 722)
+monster.cr-lancer2	monstats.txt cr_lancer2 (hcIdx 166)
+monster.cr-lancer3	monstats.txt cr_lancer3 (hcIdx 167)
+monster.cr-lancer6	monstats.txt cr_lancer6 (hcIdx 615)
+monster.cr-lancer7	monstats.txt cr_lancer7 (hcIdx 616)
+monster.cr-lancer8	monstats.txt cr_lancer8 (hcIdx 723)
+monster.crownest1	monstats.txt crownest1 (hcIdx 206)
+monster.crownest2	monstats.txt crownest2 (hcIdx 207)
+monster.deathmauler1	monstats.txt deathmauler1 (hcIdx 529)
+monster.deathmauler2	monstats.txt deathmauler2 (hcIdx 530)
+monster.deathmauler3	monstats.txt deathmauler3 (hcIdx 531)
+monster.deathmauler4	monstats.txt deathmauler4 (hcIdx 532)
+monster.deathmauler5	monstats.txt deathmauler5 (hcIdx 533)
+monster.dkfig1	monstats.txt dkfig1 (hcIdx 699)
+monster.dkfig2	monstats.txt dkfig2 (hcIdx 700)
+monster.dkmag1	monstats.txt dkmag1 (hcIdx 701)
+monster.dkmag2	monstats.txt dkmag2 (hcIdx 702)
+monster.dkmag3	monstats.txt dkmag3 (hcIdx 713)
+monster.doomknight1	monstats.txt doomknight1 (hcIdx 310)
+monster.doomknight2	monstats.txt doomknight2 (hcIdx 311)
+monster.doomknight3	monstats.txt doomknight3 (hcIdx 312)
+monster.fallen3	monstats.txt fallen3 (hcIdx 21)
+monster.fallen6	monstats.txt fallen6 (hcIdx 642)
+monster.fallen7	monstats.txt fallen7 (hcIdx 643)
+monster.fallen8	monstats.txt fallen8 (hcIdx 644)
+monster.fallenshaman3	monstats.txt fallenshaman3 (hcIdx 60)
+monster.fallenshaman6	monstats.txt fallenshaman6 (hcIdx 645)
+monster.fallenshaman7	monstats.txt fallenshaman7 (hcIdx 646)
+monster.fallenshaman8	monstats.txt fallenshaman8 (hcIdx 647)
+monster.fetish1	monstats.txt fetish1 (hcIdx 141)
+monster.fetish2	monstats.txt fetish2 (hcIdx 142)
+monster.fetish3	monstats.txt fetish3 (hcIdx 143)
+monster.fetish4	monstats.txt fetish4 (hcIdx 144)
+monster.fetish6	monstats.txt fetish6 (hcIdx 656)
+monster.fetish8	monstats.txt fetish8 (hcIdx 658)
+monster.fetishblow2	monstats.txt fetishblow2 (hcIdx 397)
+monster.fetishblow3	monstats.txt fetishblow3 (hcIdx 398)
+monster.fetishblow4	monstats.txt fetishblow4 (hcIdx 399)
+monster.fetishblow6	monstats.txt fetishblow6 (hcIdx 659)
+monster.fetishblow7	monstats.txt fetishblow7 (hcIdx 660)
+monster.fetishblow8	monstats.txt fetishblow8 (hcIdx 661)
+monster.fetishshaman2	monstats.txt fetishshaman2 (hcIdx 279)
+monster.fetishshaman3	monstats.txt fetishshaman3 (hcIdx 280)
+monster.fetishshaman4	monstats.txt fetishshaman4 (hcIdx 281)
+monster.fetishshaman6	monstats.txt fetishshaman6 (hcIdx 662)
+monster.fetishshaman8	monstats.txt fetishshaman8 (hcIdx 664)
+monster.fingermage1	monstats.txt fingermage1 (hcIdx 304)
+monster.fingermage2	monstats.txt fingermage2 (hcIdx 305)
+monster.fingermage3	monstats.txt fingermage3 (hcIdx 306)
+monster.fingermage4	monstats.txt fingermage4 (hcIdx 692)
+monster.fingermage5	monstats.txt fingermage5 (hcIdx 693)
+monster.foulcrow1	monstats.txt foulcrow1 (hcIdx 15)
+monster.foulcrow2	monstats.txt foulcrow2 (hcIdx 16)
+monster.foulcrow4	monstats.txt foulcrow4 (hcIdx 18)
+monster.foulcrow5	monstats.txt foulcrow5 (hcIdx 590)
+monster.frogdemon1	monstats.txt frogdemon1 (hcIdx 247)
+monster.frogdemon2	monstats.txt frogdemon2 (hcIdx 248)
+monster.frogdemon3	monstats.txt frogdemon3 (hcIdx 249)
+monster.frozenhorror1	monstats.txt frozenhorror1 (hcIdx 501)
+monster.frozenhorror2	monstats.txt frozenhorror2 (hcIdx 502)
+monster.frozenhorror3	monstats.txt frozenhorror3 (hcIdx 503)
+monster.goatman10	monstats.txt goatman10 (hcIdx 589)
+monster.goatman5	monstats.txt goatman5 (hcIdx 57)
+monster.goatman7	monstats.txt goatman7 (hcIdx 586)
+monster.goatman8	monstats.txt goatman8 (hcIdx 587)
+monster.goatman9	monstats.txt goatman9 (hcIdx 588)
+monster.hellbovine	monstats.txt hellbovine (hcIdx 391)
+monster.imp1	monstats.txt imp1 (hcIdx 492)
+monster.imp2	monstats.txt imp2 (hcIdx 493)
+monster.imp3	monstats.txt imp3 (hcIdx 494)
+monster.imp4	monstats.txt imp4 (hcIdx 495)
+monster.imp5	monstats.txt imp5 (hcIdx 496)
+monster.imp6	monstats.txt imp6 (hcIdx 688)
+monster.imp7	monstats.txt imp7 (hcIdx 689)
+monster.imp8	monstats.txt imp8 (hcIdx 714)
+monster.maggotbaby1	monstats.txt maggotbaby1 (hcIdx 180)
+monster.maggotbaby2	monstats.txt maggotbaby2 (hcIdx 181)
+monster.maggotbaby3	monstats.txt maggotbaby3 (hcIdx 182)
+monster.maggotbaby4	monstats.txt maggotbaby4 (hcIdx 183)
+monster.maggotbaby5	monstats.txt maggotbaby5 (hcIdx 184)
+monster.maggotbaby6	monstats.txt maggotbaby6 (hcIdx 680)
+monster.maggotegg1	monstats.txt maggotegg1 (hcIdx 190)
+monster.maggotegg2	monstats.txt maggotegg2 (hcIdx 191)
+monster.maggotegg3	monstats.txt maggotegg3 (hcIdx 192)
+monster.maggotegg4	monstats.txt maggotegg4 (hcIdx 193)
+monster.maggotegg5	monstats.txt maggotegg5 (hcIdx 194)
+monster.maggotegg6	monstats.txt maggotegg6 (hcIdx 681)
+monster.megademon1	monstats.txt megademon1 (hcIdx 360)
+monster.megademon2	monstats.txt megademon2 (hcIdx 361)
+monster.megademon3	monstats.txt megademon3 (hcIdx 362)
+monster.megademon4	monstats.txt megademon4 (hcIdx 686)
+monster.megademon5	monstats.txt megademon5 (hcIdx 687)
+monster.megademon6	monstats.txt megademon6 (hcIdx 712)
+monster.minion1	monstats.txt minion1 (hcIdx 453)
+monster.minion10	monstats.txt minion10 (hcIdx 683)
+monster.minion11	monstats.txt minion11 (hcIdx 684)
+monster.minion2	monstats.txt minion2 (hcIdx 454)
+monster.minion3	monstats.txt minion3 (hcIdx 455)
+monster.minion4	monstats.txt minion4 (hcIdx 456)
+monster.minion5	monstats.txt minion5 (hcIdx 457)
+monster.minion6	monstats.txt minion6 (hcIdx 458)
+monster.minion7	monstats.txt minion7 (hcIdx 459)
+monster.minion9	monstats.txt minion9 (hcIdx 682)
+monster.mosquito1	monstats.txt mosquito1 (hcIdx 114)
+monster.mosquito2	monstats.txt mosquito2 (hcIdx 115)
+monster.mosquito4	monstats.txt mosquito4 (hcIdx 117)
+monster.mummy2	monstats.txt mummy2 (hcIdx 97)
+monster.mummy4	monstats.txt mummy4 (hcIdx 99)
+monster.mummy5	monstats.txt mummy5 (hcIdx 100)
+monster.mummy6	monstats.txt mummy6 (hcIdx 703)
+monster.overseer1	monstats.txt overseer1 (hcIdx 479)
+monster.overseer2	monstats.txt overseer2 (hcIdx 480)
+monster.overseer3	monstats.txt overseer3 (hcIdx 481)
+monster.overseer4	monstats.txt overseer4 (hcIdx 482)
+monster.overseer5	monstats.txt overseer5 (hcIdx 483)
+monster.overseer6	monstats.txt overseer6 (hcIdx 724)
+monster.pantherwoman3	monstats.txt pantherwoman3 (hcIdx 85)
+monster.pantherwoman4	monstats.txt pantherwoman4 (hcIdx 86)
+monster.pantherwoman6	monstats.txt pantherwoman6 (hcIdx 628)
+monster.putriddefiler1	monstats.txt putriddefiler1 (hcIdx 546)
+monster.putriddefiler2	monstats.txt putriddefiler2 (hcIdx 547)
+monster.putriddefiler3	monstats.txt putriddefiler3 (hcIdx 548)
+monster.putriddefiler4	monstats.txt putriddefiler4 (hcIdx 549)
+monster.quillrat2	monstats.txt quillrat2 (hcIdx 64)
+monster.quillrat3	monstats.txt quillrat3 (hcIdx 65)
+monster.quillrat4	monstats.txt quillrat4 (hcIdx 66)
+monster.quillrat6	monstats.txt quillrat6 (hcIdx 605)
+monster.quillrat7	monstats.txt quillrat7 (hcIdx 606)
+monster.quillrat8	monstats.txt quillrat8 (hcIdx 607)
+monster.reanimatedhorde1	monstats.txt reanimatedhorde1 (hcIdx 436)
+monster.reanimatedhorde2	monstats.txt reanimatedhorde2 (hcIdx 437)
+monster.reanimatedhorde3	monstats.txt reanimatedhorde3 (hcIdx 438)
+monster.reanimatedhorde4	monstats.txt reanimatedhorde4 (hcIdx 439)
+monster.reanimatedhorde5	monstats.txt reanimatedhorde5 (hcIdx 440)
+monster.reanimatedhorde6	monstats.txt reanimatedhorde6 (hcIdx 698)
+monster.regurgitator1	monstats.txt regurgitator1 (hcIdx 307)
+monster.regurgitator2	monstats.txt regurgitator2 (hcIdx 308)
+monster.regurgitator3	monstats.txt regurgitator3 (hcIdx 309)
+monster.regurgitator4	monstats.txt regurgitator4 (hcIdx 694)
+monster.sandleaper3	monstats.txt sandleaper3 (hcIdx 80)
+monster.sandleaper4	monstats.txt sandleaper4 (hcIdx 81)
+monster.sandleaper5	monstats.txt sandleaper5 (hcIdx 82)
+monster.sandleaper6	monstats.txt sandleaper6 (hcIdx 629)
+monster.sandleaper7	monstats.txt sandleaper7 (hcIdx 630)
+monster.sandmaggot2	monstats.txt sandmaggot2 (hcIdx 69)
+monster.sandmaggot3	monstats.txt sandmaggot3 (hcIdx 70)
+monster.sandmaggot4	monstats.txt sandmaggot4 (hcIdx 71)
+monster.sandmaggot5	monstats.txt sandmaggot5 (hcIdx 72)
+monster.sandmaggot6	monstats.txt sandmaggot6 (hcIdx 679)
+monster.sandmaggot7	monstats.txt sandmaggot7 (hcIdx 716)
+monster.sandraider1	monstats.txt sandraider1 (hcIdx 29)
+monster.sandraider10	monstats.txt sandraider10 (hcIdx 603)
+monster.sandraider2	monstats.txt sandraider2 (hcIdx 30)
+monster.sandraider3	monstats.txt sandraider3 (hcIdx 31)
+monster.sandraider4	monstats.txt sandraider4 (hcIdx 32)
+monster.sandraider7	monstats.txt sandraider7 (hcIdx 600)
+monster.sandraider9	monstats.txt sandraider9 (hcIdx 602)
+monster.scarab3	monstats.txt scarab3 (hcIdx 93)
+monster.scarab5	monstats.txt scarab5 (hcIdx 95)
+monster.scarab6	monstats.txt scarab6 (hcIdx 654)
+monster.scarab7	monstats.txt scarab7 (hcIdx 655)
+monster.scarab8	monstats.txt scarab8 (hcIdx 718)
+monster.siegebeast1	monstats.txt siegebeast1 (hcIdx 441)
+monster.siegebeast2	monstats.txt siegebeast2 (hcIdx 442)
+monster.siegebeast3	monstats.txt siegebeast3 (hcIdx 443)
+monster.sk-archer10	monstats.txt sk_archer10 (hcIdx 579)
+monster.sk-archer2	monstats.txt sk_archer2 (hcIdx 171)
+monster.sk-archer4	monstats.txt sk_archer4 (hcIdx 173)
+monster.sk-archer5	monstats.txt sk_archer5 (hcIdx 174)
+monster.sk-archer6	monstats.txt sk_archer6 (hcIdx 575)
+monster.sk-archer7	monstats.txt sk_archer7 (hcIdx 576)
+monster.sk-archer9	monstats.txt sk_archer9 (hcIdx 578)
+monster.skeleton3	monstats.txt skeleton3 (hcIdx 2)
+monster.skeleton6	monstats.txt skeleton6 (hcIdx 648)
+monster.skeleton7	monstats.txt skeleton7 (hcIdx 649)
+monster.skmage-cold5	monstats.txt skmage_cold5 (hcIdx 624)
+monster.skmage-fire1	monstats.txt skmage_fire1 (hcIdx 383)
+monster.skmage-fire4	monstats.txt skmage_fire4 (hcIdx 386)
+monster.skmage-fire5	monstats.txt skmage_fire5 (hcIdx 620)
+monster.skmage-fire6	monstats.txt skmage_fire6 (hcIdx 621)
+monster.skmage-ltng1	monstats.txt skmage_ltng1 (hcIdx 387)
+monster.skmage-ltng2	monstats.txt skmage_ltng2 (hcIdx 388)
+monster.skmage-ltng4	monstats.txt skmage_ltng4 (hcIdx 390)
+monster.skmage-ltng5	monstats.txt skmage_ltng5 (hcIdx 622)
+monster.skmage-ltng6	monstats.txt skmage_ltng6 (hcIdx 623)
+monster.skmage-pois4	monstats.txt skmage_pois4 (hcIdx 277)
+monster.skmage-pois5	monstats.txt skmage_pois5 (hcIdx 625)
+monster.skmage-pois6	monstats.txt skmage_pois6 (hcIdx 626)
+monster.slinger4	monstats.txt slinger4 (hcIdx 376)
+monster.slinger6	monstats.txt slinger6 (hcIdx 395)
+monster.slinger7	monstats.txt slinger7 (hcIdx 610)
+monster.slinger8	monstats.txt slinger8 (hcIdx 611)
+monster.slinger9	monstats.txt slinger9 (hcIdx 612)
+monster.snowyeti1	monstats.txt snowyeti1 (hcIdx 446)
+monster.snowyeti2	monstats.txt snowyeti2 (hcIdx 447)
+monster.snowyeti4	monstats.txt snowyeti4 (hcIdx 449)
+monster.succubus1	monstats.txt succubus1 (hcIdx 469)
+monster.succubus2	monstats.txt succubus2 (hcIdx 470)
+monster.succubus3	monstats.txt succubus3 (hcIdx 471)
+monster.succubus4	monstats.txt succubus4 (hcIdx 472)
+monster.succubus5	monstats.txt succubus5 (hcIdx 473)
+monster.succubus6	monstats.txt succubus6 (hcIdx 634)
+monster.succubus7	monstats.txt succubus7 (hcIdx 635)
+monster.succubus8	monstats.txt succubus8 (hcIdx 719)
+monster.succubuswitch2	monstats.txt succubuswitch2 (hcIdx 475)
+monster.succubuswitch3	monstats.txt succubuswitch3 (hcIdx 476)
+monster.succubuswitch5	monstats.txt succubuswitch5 (hcIdx 478)
+monster.succubuswitch6	monstats.txt succubuswitch6 (hcIdx 636)
+monster.succubuswitch7	monstats.txt succubuswitch7 (hcIdx 637)
+monster.succubuswitch8	monstats.txt succubuswitch8 (hcIdx 638)
+monster.succubuswitch9	monstats.txt succubuswitch9 (hcIdx 720)
+monster.suicideminion6	monstats.txt suicideminion6 (hcIdx 466)
+monster.swarm2	monstats.txt swarm2 (hcIdx 88)
+monster.swarm4	monstats.txt swarm4 (hcIdx 90)
+monster.swarm5	monstats.txt swarm5 (hcIdx 715)
+monster.thornhulk1	monstats.txt thornhulk1 (hcIdx 127)
+monster.thornhulk2	monstats.txt thornhulk2 (hcIdx 128)
+monster.thornhulk3	monstats.txt thornhulk3 (hcIdx 129)
+monster.thornhulk5	monstats.txt thornhulk5 (hcIdx 609)
+monster.unraveler2	monstats.txt unraveler2 (hcIdx 102)
+monster.unraveler4	monstats.txt unraveler4 (hcIdx 104)
+monster.unraveler6	monstats.txt unraveler6 (hcIdx 667)
+monster.unraveler7	monstats.txt unraveler7 (hcIdx 668)
+monster.unraveler8	monstats.txt unraveler8 (hcIdx 669)
+monster.unraveler9	monstats.txt unraveler9 (hcIdx 670)
+monster.vampire2	monstats.txt vampire2 (hcIdx 132)
+monster.vampire3	monstats.txt vampire3 (hcIdx 133)
+monster.vampire4	monstats.txt vampire4 (hcIdx 134)
+monster.vampire5	monstats.txt vampire5 (hcIdx 135)
+monster.vampire6	monstats.txt vampire6 (hcIdx 695)
+monster.vampire7	monstats.txt vampire7 (hcIdx 696)
+monster.vampire8	monstats.txt vampire8 (hcIdx 697)
+monster.vilechild1	monstats.txt vilechild1 (hcIdx 301)
+monster.vilechild2	monstats.txt vilechild2 (hcIdx 302)
+monster.vilechild3	monstats.txt vilechild3 (hcIdx 303)
+monster.vilechild4	monstats.txt vilechild4 (hcIdx 677)
+monster.vilechild5	monstats.txt vilechild5 (hcIdx 678)
+monster.vilemother1	monstats.txt vilemother1 (hcIdx 298)
+monster.vilemother2	monstats.txt vilemother2 (hcIdx 299)
+monster.vilemother3	monstats.txt vilemother3 (hcIdx 300)
+monster.vilemother4	monstats.txt vilemother4 (hcIdx 675)
+monster.vilemother5	monstats.txt vilemother5 (hcIdx 676)
+monster.vulture1	monstats.txt vulture1 (hcIdx 110)
+monster.vulture3	monstats.txt vulture3 (hcIdx 112)
+monster.vulture4	monstats.txt vulture4 (hcIdx 113)
+monster.vulture5	monstats.txt vulture5 (hcIdx 608)
+monster.willowisp1	monstats.txt willowisp1 (hcIdx 118)
+monster.willowisp3	monstats.txt willowisp3 (hcIdx 120)
+monster.willowisp5	monstats.txt willowisp5 (hcIdx 639)
+monster.willowisp6	monstats.txt willowisp6 (hcIdx 640)
+monster.willowisp7	monstats.txt willowisp7 (hcIdx 641)
+monster.wraith2	monstats.txt wraith2 (hcIdx 39)
+monster.wraith4	monstats.txt wraith4 (hcIdx 41)
+monster.wraith5	monstats.txt wraith5 (hcIdx 42)
+monster.wraith6	monstats.txt wraith6 (hcIdx 631)
+monster.wraith7	monstats.txt wraith7 (hcIdx 632)
+monster.wraith8	monstats.txt wraith8 (hcIdx 633)
+monster.zealot1	monstats.txt zealot1 (hcIdx 235)
+monster.zealot2	monstats.txt zealot2 (hcIdx 236)
+monster.zealot3	monstats.txt zealot3 (hcIdx 237)
+monster.zealot4	monstats.txt zealot4 (hcIdx 671)
+monster.zealot5	monstats.txt zealot5 (hcIdx 672)
+monster.zombie4	monstats.txt zombie4 (hcIdx 8)
+monster.zombie5	monstats.txt zombie5 (hcIdx 9)

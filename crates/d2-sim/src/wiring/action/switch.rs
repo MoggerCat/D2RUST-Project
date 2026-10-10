@@ -169,6 +169,11 @@ impl<X: Pending> View<'_, X> {
             // `0x005738D0`: its type-2 (think) and type-3 events cancelled
             // (`sim/units.md` §4.6). Recorded `act-travel-lut-ama.check`:
             // the act-1 town NPCs never think again after the act change.
+            // Same rule: the room has no client left → every monster in
+            // it gets `0x005738D0`, which cancels its AI think (type 2)
+            // and stat regeneration (type 3) events, any argument
+            // (`world/hirelings-2.md` §16 rule 6): town NPCs stop when the
+            // player warps out.
             if r.clients == 0 {
                 for u in game.lists.room_units(r.room) {
                     if game
@@ -477,9 +482,8 @@ impl<X: Pending> View<'_, X> {
                 .portal_owner(unit)
                 .or_else(|| self.portal_owner_from_links(game, unit))
             {
-                // u32@21 is this portal's GUID and u32@25 its pair's (−1:
-                // none), as the client handler reads them (`client/msg-
-                // units.md` rule 7; intents-events.md §7.2, §6 rule 6).
+                // `objects-2.md` §27.5 rule 2: u32@1 the owner, the name,
+                // u32@21 this portal's GUID, u32@25 its partner's (−1: none).
                 // Recorded (REC-117): the field portal's 0x82 carries
                 // (0x22, 0x23), the town portal's (0x23, 0x22)
                 // (`facts/items/a1-town-portal-cold-plains.tsv`).
@@ -489,11 +493,11 @@ impl<X: Pending> View<'_, X> {
         }
     }
 
-    /// S→C 0x82's owner GUID, owner name and pair GUID from the portal
-    /// links and the object's owner (`msg-units.md` §8 rule 7: the client
-    /// stores the name on the portal object). d2rs-own, unverified
-    /// (REC-243): the original's `0x0053DB90` source of the name is
-    /// unwritten; the owner player's join name stands in.
+    /// S→C 0x82's fields (`objects-2.md` §27.5 rule 2, `0x0053DB90`):
+    /// o := the portal's owner GUID (`0x00552B10`); the player with GUID
+    /// o (`0x00552F60`; none, o = −1 or gone → no 0x82); its name (player
+    /// data +0x00, the join name); the partner's GUID (`0x00553720`,
+    /// [`View::portal_partner`]; −1 without one).
     fn portal_owner_from_links(&self, game: &Game, portal: UnitId) -> Option<(u32, Vec<u8>, u32)> {
         let owner = self.h.objects.as_ref()?.control.data.get(&portal)?.owner?;
         let owner = owner as u32;
@@ -502,12 +506,16 @@ impl<X: Pending> View<'_, X> {
             .units_of_type(UnitType::Player)
             .into_iter()
             .find(|p| game.lists.unit(*p).is_some_and(|e| e.guid == owner))?;
-        let raw = self.h.session.names.get(&player)?;
+        let raw = self
+            .h
+            .session
+            .names
+            .get(&player)
+            .copied()
+            .unwrap_or_default();
         let len = raw.iter().position(|b| *b == 0).unwrap_or(raw.len());
         let pair = self
-            .h
-            .portals
-            .partner(portal)
+            .portal_partner(game, portal)
             .and_then(|p| game.lists.unit(p))
             .map_or(0xFFFF_FFFF, |e| e.guid);
         Some((owner, raw[..len].to_vec(), pair))

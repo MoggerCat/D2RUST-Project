@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–141 |
-|   4. Comparison | 142–168 |
-| Constants & data dependencies | 169–172 |
-| Randomness | 173–176 |
-| Edge cases & original bugs | 177–195 |
-| Test vectors | 196–205 |
-| Provenance | 206–210 |
-| Open questions | 211–216 |
+|   3. Snapshot point and frame | 128–164 |
+|   4. Comparison | 165–191 |
+| Constants & data dependencies | 192–195 |
+| Randomness | 196–199 |
+| Edge cases & original bugs | 200–218 |
+| Test vectors | 219–228 |
+| Provenance | 229–233 |
+| Open questions | 234–239 |
 <!-- /index -->
 
 ## Summary
@@ -111,7 +111,7 @@ Unit = the unit record; path = unit +0x2C.
 | `hp`, `hpx`, `mp`, `mpx`, `st`, `stx` | stats 6, 7, 8, 9, 10, 11 layer 0, raw (8.8) | full array of the extended list at unit +0x5C (`tools/original-hooks.md` §4 r3); absent key → 0; no list → field absent | `sim/stat-lists.md` §1, `sim/stats.md` §2 |
 | `str`, `ene`, `dex`, `vit`, `lvl` | stats 0, 1, 2, 3, 12 layer 0 | base array of the list at unit +0x5C (`tools/original-hooks.md` §4 r5); absent key → 0; no list → absent | `sim/stat-lists.md` §1 |
 | `own` | owner GUID | type 1 (pet, summon, minion, hireling): AI control (monster data +0x28; 0 → absent) with u32 control +0x28 ≠ 0 → u32 control +0x2C (absent when 0xFFFFFFFF, a released pack); type 3: u32 unit +0x98 when u32 unit +0xC8 bit 0x400, else absent; type 4: item data +0x5C inventory → u32 inventory +0x08 owner unit → u32 +0x0C (absent when either is 0, e.g. on the ground); types 0, 2, 5: absent | `sim/units.md` §2 (owner links), `monsters/ai.md` §3.1, `skills/bodies.md` §6.20, `items/inventory.md` §1.1 |
-| `q` | the player's quest flag record of the game's difficulty: `[slot, word]` for each slot 0–41 whose u16 word is non-zero, slots ascending (bit b of the word = bit b of the slot) | type 0: the record pointer at player data (`0x006221A0(player)`) +0x10 + 4·d, d = u8 game +0x6D; the u16 at record + 2·slot. Other types: absent. Written by d2rs only (from the host's per-player quest records, `HOST_FIELDS`); the 1.14d recorder does not read it yet, so the comparator reports it as not compared | `world/quests.md` §1.1, §1.4 |
+| `q` | the player's quest flag record of the game's difficulty: `[slot, word]` for each slot 0–41 whose u16 word is non-zero, slots ascending (bit b of the word = bit b of the slot) | type 0: the record pointer at player data (`0x006221A0(player)`) +0x10 + 4·d, d = u8 game +0x6D, points to the record's bit-buffer header (u32 buffer pointer @+0, u32 bit count @+4 = 0x300, measured: `join-act2-quests-ama` under Wine, REC-1685); the u16 at buffer + 2·slot. Other types: absent. Both sides write it (d2rs from the host's per-player quest records, `HOST_FIELDS`; `record_state.py` from the record above, `[]` when every word is 0, absent when a link is 0 or the difficulty byte is above 2); the 1.14d read is selftested by perturbation of every source byte | `world/quests.md` §1.1, §1.4 |
 | `iq`, `if`, `fi`, `il` | item quality, item flags, file index (unique / set / superior index, i32), item level (items only) | u32 item data +0x00, +0x18, i32 +0x28, u32 +0x2C (item data = unit +0x14; absent when the pointer is 0) | `items/bitstream.md` Inputs (item data), `items/generation.md` Outputs |
 | `aa`, `pf`, `sf`, `rp`, `rs` | auto affix, magic prefix ids ×3, magic suffix ids ×3, rare prefix, rare suffix (items only) | u16 item data +0x36, 3 × u16 +0x38, 3 × u16 +0x3E, u16 +0x32, u16 +0x34 (the rare pair is D2MOO's `D2ItemDataStrc`; no d2rs-side spec names the offsets: the first check that shows a rare item equal on both sides confirms them) | `items/bitstream.md` Inputs, `items/affixes.md` |
 | `ik`, `ss` | item seed `[lo, hi]`, start seed (items only) | u32 × 2 item data +0x04, u32 +0x10 | `items/generation.md` §2 |
@@ -138,6 +138,29 @@ Unit = the unit record; path = unit +0x2C.
    frame) for runs whose game starts differ.
 3. A writer may snapshot every frame or every n-th; it records only the
    first game that ticks (single player).
+4. **The d2rs client part in a run.** The 1.14d client part runs in the
+   same process; its local player stands at the server player's point
+   at every position check of the run, whether the server moved it by a
+   walk the client asked for or by a `pos` poke (`poke.md` §1), so the
+   check after the vitals messages 0x95 / 0x96 finds no difference and
+   no C→S 0x5F follows. Measured (REC-1385, 2026-10-09, cloud under
+   Wine, the client unit's path read at every tick end and the check
+   `0x004804E0`'s arguments logged): `milestone-anya` (client player
+   at the poked point from the poke's tick on; the first check at the
+   0x96 of tick 66 has the same point, no 0x5F in 111 ticks) and
+   `combat-cold-plains-wp` (the client runs from tick 11, mode 3, and
+   stops at tick 34 where the server player stops; the 0x96 at tick 92
+   finds no difference). The d2rs writer therefore runs the play
+   preview's walk prediction and its room recache without an input
+   script (`Headless::sync_local`), so the position check takes the
+   server's point instead of sending 0x5F that would walk the player
+   back (before: the d2rs player turned from mode 5 to 1 (`milestone-*`)
+   or from 5 to 6 (`combat-cold-plains-wp`) at the first 0x96 after a
+   server-side move; first divergences D3 of the ledger). PROVISIONAL
+   (REC-1385): the 1.14d code that moves the client player after a
+   `pos` poke is not found (no S→C message, no call of `0x00650BE0`,
+   `0x00650910` or `0x004654C0` in that window); the model reproduces
+   the observed positions, not the mechanism.
 
 ### 4. Comparison
 

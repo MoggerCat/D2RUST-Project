@@ -34,6 +34,7 @@ pub mod acts;
 pub mod grid;
 pub mod jungle;
 pub mod kurast;
+pub mod path_floor;
 pub mod place;
 pub mod rooms;
 pub mod tilesub;
@@ -649,11 +650,12 @@ impl LevelTypes for OutdoorTypes<'_> {
         drlg: &mut Drlg,
         data: &DrlgData,
         room: DrlgRoomId,
-        t: u32,
         wx: i32,
         wy: i32,
         cell: u32,
-    ) {
-        self.others.warp_unit(drlg, data, room, t, wx, wy, cell);
+        orientation: u32,
+    ) -> Result<bool, DrlgError> {
+        self.others
+            .warp_unit(drlg, data, room, wx, wy, cell, orientation)
     }
 }

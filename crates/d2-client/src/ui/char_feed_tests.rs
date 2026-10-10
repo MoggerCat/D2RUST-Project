@@ -216,7 +216,9 @@ fn the_damage_block_prints_name_damage_and_attack_rating() {
     assert_eq!((dmg.1, dmg.2, dmg.3), (sx + 263 + 7, base + 98 - 1, 6));
     // e3: the label split at its LF; e5: `attack_rating` = 100 + 5 × (0 −
     // 7) + 0 = 65, + 10 % = 71, Font16.
-    assert_eq!(find(&t, "Bash").map(|x| x.2), Some(base + 160 - 4));
+    // (the label is formatted with the upper-cased name, like e0.)
+    let first = t.iter().find(|x| x.0 == "BASH" && x.2 == base + 160 - 4);
+    assert!(first.is_some());
     assert_eq!(find(&t, "Attack Rating").map(|x| x.2), Some(base + 160 + 4));
     let ar = find(&t, "71").expect("attack rating");
     assert_eq!((ar.2, ar.3, ar.4), (base + 160, 1, 0));
@@ -316,4 +318,24 @@ fn body_stream(loc: u8, code: &[u8; 4]) -> Vec<u8> {
         out.push(acc as u8);
     }
     out
+}
+
+// Covers: specs/ui/panels-2.md §17 r5
+// (a1-panel-character: 1.14d draws "ATTACK" / "Rating")
+#[test]
+fn the_attack_skill_label_uses_the_no_record_string_upper_cased() {
+    let strings = Strs::new(&[
+        (5000, "Attack"),
+        (4063, "%s\nAttack Rating"),
+        (4065, "%s\nRating"),
+    ]);
+    let row = DescRow {
+        name_id: 5000,
+        descatt: 1,
+        ..Default::default()
+    };
+    let h = crate::ui::char_feed::hand(0, &row, &strings, &|_| 0, 0);
+    assert_eq!(h.attack_label, "ATTACK\nRating");
+    let h = crate::ui::char_feed::hand(3, &row, &strings, &|_| 0, 0);
+    assert_eq!(h.attack_label, "ATTACK\nAttack Rating");
 }

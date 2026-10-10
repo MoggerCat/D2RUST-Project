@@ -453,6 +453,7 @@ impl Fx {
             levels: vec![blank::<Levels>(); 150],
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let hooks = ActionHooks::new(
             Arc::new(tables),
@@ -717,5 +718,31 @@ fn use_line_clear_sees_a_wall_on_the_rooms_once_paths_are_on() {
         .sim
         .skill_use(&mut fx.game, |w| w.line_clear(player, (16, 10), 0x805));
     assert!(!blocked, "the wall between the two");
+    fx.assert_clean();
+}
+
+// Covers: specs/skills/bodies-2b.md §7.18 r6; specs/missiles/bodies.md §2 r4
+#[test]
+fn missile_data_words_reach_the_missile_store() {
+    use crate::skills::use_::bodies::{BodyEffect, BodyWorld, MissileRequest};
+    // Volcano writes its seed word to the new missile's data +0x28
+    // (`0x0064A710`); server-do 28 re-seeds from it. +0x2C likewise
+    // (`0x0064A760`).
+    let mut fx = Fx::new();
+    let player = fx.spawn(UnitType::Player, 10, 10);
+    let m = fx.sim.skill_use(&mut fx.game, |w| {
+        let m = w.spawn_missile(MissileRequest {
+            flags: 1,
+            x: 12,
+            y: 10,
+            ..MissileRequest::new(player, 0)
+        })?;
+        w.effect(BodyEffect::MissileData28 { missile: m, v: 174 });
+        w.effect(BodyEffect::MissileData2C { missile: m, v: -3 });
+        Some(m)
+    });
+    let m = m.expect("created");
+    let data = fx.sim.hooks().missile_store().get(m).unwrap().clone();
+    assert_eq!(data.target, (174, -3));
     fx.assert_clean();
 }

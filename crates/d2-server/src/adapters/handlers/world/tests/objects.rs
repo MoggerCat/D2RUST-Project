@@ -89,6 +89,7 @@ fn fixture(objects: bool) -> Fx {
         levels: Vec::new(),
         skill_modes: Vec::new(),
         overlay_count: 0,
+        monequip: Vec::new(),
     };
     let pending = TestPending {
         in_range: true,

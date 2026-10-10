@@ -1,0 +1,13 @@
+check 1
+# Area B (q-diff-combat-a1): the Stony Field (level 4) by warp at frame 4
+# (poke.md `warp`): the level's own population around the arrival
+# point (spawn, populate, packs), then its monsters' approach, melee and
+# missile attacks on an idle level 1 amazon, hit reactions and possibly
+# the player's death; no input. Spec: specs/tools/scenario-diff.md.
+name combat-pop-stony-field
+save ScnAma --class ama --expansion
+seed 1234
+ticks 400
+seconds 900
+channels state
+at 4 poke warp 4

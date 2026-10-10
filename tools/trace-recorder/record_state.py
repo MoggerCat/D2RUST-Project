@@ -73,6 +73,9 @@ MIS_OWNED = 0x400         # unit +0xC8 bit: the missile has an owner at +0x98
 MD_CONTROL, CTL_GAME, CTL_OWNER = 0x28, 0x28, 0x2C   # monster data -> AI control
 ID_INV, INV_OWNER = 0x5C, 0x08                       # item data -> inventory -> owner unit
 NO_OWNER = 0xFFFFFFFF
+# `q` (state-snapshot.md §2; world/quests.md §1.1, §1.4): unit +0x14 = player data, +0x10 + 4*d =
+# the quest flag record of difficulty d (game +0x6D, u8), 42 u16 words
+G_DIFFICULTY, PD_QUESTS, Q_SLOTS = 0x6D, 0x10, 42
 # item data (items/bitstream.md Inputs: quality +0x00, item seed +0x04, start seed +0x10, flags
 # +0x18, file index +0x28, item level +0x2C, auto affix +0x36, magic prefixes +0x38, suffixes
 # +0x3E; rare prefix / suffix +0x32 / +0x34: D2MOO's D2ItemDataStrc, unconfirmed until a
@@ -100,7 +103,7 @@ BASE_STATS = (("str", 0), ("ene", 1), ("dex", 2), ("vit", 3), ("lvl", 12))
 # state-snapshot.md §2 table order
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp", "s",
           "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl",
-          "own", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is"]
+          "own", "q", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is"]
 ITEM_KEYS = ("iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is")
 GAPS = []
 
@@ -117,6 +120,7 @@ class StateReader:
         self.track = track
         self.src = {}
         self.notes = {}     # note text -> count (footer)
+        self.game = None
         self.levels = {}    # active room -> level id or None (per snapshot cache)
 
     def note(self, text):
@@ -199,6 +203,8 @@ class StateReader:
             if lv is not None:
                 self.put(rec, ua, "lv", lv[0], *lv[1])
         self.owner(rec, ua, ut, g32)
+        if ut == 0 and self.game is not None:
+            self.quests(rec, ua, g32)
         if ut == 4:
             self.item(rec, ua, g32)
         sl = g32(U_LIST)
@@ -253,6 +259,28 @@ class StateReader:
         self.put(rec, ua, "ik", [u32(ID_SEED), u32(ID_SEED + 4)], a, (data + ID_SEED, 8))
         self.put(rec, ua, "ss", u32(ID_START), a, (data + ID_START, 4))
 
+    def quests(self, rec, ua, g32):
+        """`q` (state-snapshot.md §2): the player's quest flag record of the game's
+        difficulty as [slot, word] for every non-zero word; absent when a link is 0."""
+        try:
+            data = g32(U_DATA)
+            d = self.read(self.game + G_DIFFICULTY, 1)[0]
+            if not data or d > 2:
+                return
+            pa = (data + PD_QUESTS + 4 * d, 4)
+            recp = self.u32(pa[0])
+            if not recp:
+                return
+            bufp = self.u32(recp)
+            if not bufp:
+                return
+            words = struct.unpack("<%dH" % Q_SLOTS, self.read(bufp, 2 * Q_SLOTS))
+            self.put(rec, ua, "q", [[i, w] for i, w in enumerate(words) if w],
+                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (recp, 4),
+                     (bufp, 2 * Q_SLOTS))
+        except OSError:
+            self.note("q absent: unreadable quest record link")
+
     def owner(self, rec, ua, ut, g32):
         """`own` (state-snapshot.md §2): a monster's AI-control owner, a
         missile's owner, an item's inventory owner; absent otherwise."""
@@ -299,6 +327,7 @@ class StateReader:
     def snapshot(self, game):
         """{"seed": [lo, hi], "units": [...] sorted by (ut, g)}, and the unit addresses."""
         self.levels = {}
+        self.game = game
         seed = list(struct.unpack("<II", self.read(game + G_SEED, 8)))
         recs = []
         for t, ua in self.units_of(game):
@@ -321,6 +350,7 @@ def make_recorder(rt):
             self.every, self.command = max(1, every), command
             self.snaps = 0
             self.reader_notes = {}
+            self.save_watch = None   # --save-watch FILE: stop once the game rewrote it
 
         def handle(self, addr, ctx):
             if addr == rt.TICK:
@@ -357,6 +387,8 @@ def make_recorder(rt):
                 raise rr.winerr("CreateProcessW")
             self.h_process = pi.hProcess
             rr.DebugSetProcessKillOnExit(True)
+            if self.save_watch:
+                watch_save(self)
             os.makedirs(os.path.dirname(self.out_path), exist_ok=True)
             self.out = open(self.out_path, "w", encoding="utf-8", newline="\n")
             self.out.write(json.dumps(header(self.command, self.sha, self.args, self.every),
@@ -372,6 +404,31 @@ def make_recorder(rt):
                 self.out.close()
 
     return StateRecorder
+
+
+def watch_save(rec, grace=2.0):
+    """--save-watch: a thread that ends the recording `grace` seconds after the
+    game rewrote the file (a Save and Exit ends the game's ticks, so no tick
+    limit may follow; the `.d2s` is written with fopen / fwrite, `flows/save-exit.md`)."""
+    import threading
+
+    def stamp():
+        try:
+            st = os.stat(rec.save_watch)
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+    before = stamp()
+
+    def poll():
+        while not rec.done:
+            time.sleep(0.2)
+            if stamp() != before:
+                time.sleep(grace)
+                rec.notes.append(f"save written: {rec.save_watch}")
+                rec.done = True
+                return
+    threading.Thread(target=poll, daemon=True).start()
 
 
 def header(command, sha, args, every):
@@ -474,6 +531,20 @@ def build_world():
          [(6, 0, 50 << 8), (7, 0, 50 << 8), (8, 0, 15 << 8), (9, 0, 15 << 8), (10, 0, 84 << 8),
           (11, 0, 84 << 8), (6, 1, 7), (12, 0, 1)])
     link(hb(0, 1), P)
+    # quest records: player data -> three difficulty bit-buffer headers (buffer pointer, bit
+    # count 0x300) -> their 96-byte buffers (differ), game difficulty 1
+    m.put(P + U_DATA, "<I", 0x3A0000)
+    m.put(game + G_DIFFICULTY, "<B", 1)
+    for dd in range(3):
+        m.put(0x3A0000 + PD_QUESTS + 4 * dd, "<I", 0x3B0000 + 0x100 * dd)
+        m.put(0x3B0000 + 0x100 * dd, "<II", 0x3C0000 + 0x100 * dd, 0x300)
+        for i in range(Q_SLOTS):
+            m.put(0x3C0000 + 0x100 * dd + 2 * i, "<H", 0)
+    m.put(0x3C0100, "<H", 0x2001)
+    m.put(0x3C0100 + 2 * 7, "<H", 1)
+    m.put(0x3C0100 + 2 * 41, "<H", 0x8000)
+    m.put(0x3C0000 + 2 * 3, "<H", 5)
+    m.put(0x3C0200 + 2 * 9, "<H", 6)
     # monsters: bucket 3 holds GUID 9 then GUID 4 (walk order != sort order)
     M1, M2 = 0x330000, 0x340000
     unit(M1, 1, 9, 5, 2, 0, (3, 4), (0, 13 * 256, 0x100))
@@ -536,7 +607,8 @@ def build_world():
 EXPECTED = [
     {"ut": 0, "g": 1, "cl": 1, "m": 1, "x": 5800, "y": 5600, "xf": 0x8000, "yf": 0x4000, "tx": 5810,
      "ty": 5605, "d": 33, "fr": 1280, "fc": 2048, "sp": 256, "s": [0x11111111, 0x22222222], "act": 0,
-     "lv": 1, "str": 20, "ene": 25, "dex": 20, "vit": 25, "lvl": 1, "hp": 12800, "hpx": 12800,
+     "lv": 1, "q": [[0, 0x2001], [7, 1], [41, 0x8000]], "str": 20, "ene": 25, "dex": 20, "vit": 25,
+     "lvl": 1, "hp": 12800, "hpx": 12800,
      "mp": 3840, "mpx": 3840, "st": 21504, "stx": 21504},
     {"ut": 1, "g": 4, "cl": 5, "m": 12, "x": 5901, "y": 5701, "xf": 1, "yf": 2, "tx": 3, "ty": 4,
      "d": 60, "fr": -1, "fc": 0, "sp": -3, "s": [5, 6], "act": 0},
@@ -593,6 +665,8 @@ def selftest():
             want = want | {(tu[0], k) for k in POS_KEYS if k in base[tu[0]]}
         if tu and "own" in base[tu[0]]:  # the owner link read depends on the unit type
             want = want | {(tu[0], "own")}
+        if tu and "q" in base[tu[0]]:  # q exists only for unit type 0
+            want = want | {(tu[0], "q")}
         if tu:  # the item keys exist only for unit type 4
             want = want | {(tu[0], k) for k in ITEM_KEYS if k in base[tu[0]]}
         if tu and a == tu[0] + U_TYPE and flip == 4 and struct.unpack(
@@ -645,7 +719,13 @@ def selftest_poke_options(ap):
     assert [(s.f, s.text()) for s in sends.steps] == [
         (7, "InteractWithEntity type=1 id=@1:148"), (8, "hex 2f 00 00 00 00 09 00 00 00")]
     assert send.SendLayer.from_args(ap.parse_args([])) is None
-    print("selftest ok: --poke lines make a poke layer, --send lines a send layer")
+    a = ap.parse_args(["--auto", "X", "--write-save", "--save-watch", "/s/X.d2s"])
+    assert a.write_save and a.save_watch == "/s/X.d2s"
+    assert [g for g in autostart.setup(a, ["-w", "-ns"])[0] if g != "-nosave"] == [
+        "-w", "-ns", "-name", "X"]
+    assert not ap.parse_args([]).write_save
+    print("selftest ok: --poke lines make a poke layer, --send lines a send layer, "
+          "--write-save drops -nosave")
 
 
 # --- main ---------------------------------------------------------------------
@@ -660,6 +740,11 @@ def main():
     ap.add_argument("--snap-every", type=int, default=1,
                     help="snapshot the first recorded tick and every N-th frame (default 1)")
     ap.add_argument("--out", default=None, help="output file (default traces/raw/<time>-state.jsonl)")
+    ap.add_argument("--write-save", action="store_true",
+                    help="without -nosave: the game writes the character's .d2s (the save channel, "
+                         "specs/tools/scenario-diff.md §3 rule 13); needs a Save and Exit --send")
+    ap.add_argument("--save-watch", default=None, metavar="FILE",
+                    help="end the recording shortly after the game rewrote FILE")
     ap.add_argument("--selftest", action="store_true", help="check the snapshot reader on a synthetic game, exit")
     ap.add_argument("game_args", nargs="*", default=["-w", "-ns"], help="Game.exe arguments (default: -w -ns)")
     autostart.add_options(ap)
@@ -673,6 +758,8 @@ def main():
     layer = poke.PokeLayer.from_args(a)
     sends = send.SendLayer.from_args(a)
     gargs, auto = autostart.setup(a, a.game_args or ["-w", "-ns"])
+    if a.write_save:
+        gargs = [g for g in gargs if g != "-nosave"]
     import record_tick as rt  # noqa: E402  (the shared tick recorder; Windows only; not modified)
     out = a.out or os.path.join(
         repo, "traces", "raw", datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-state.jsonl")
@@ -682,7 +769,8 @@ def main():
     r = make_recorder(rt)(os.path.abspath(a.game), gargs, out, a.seconds, a.ticks,
                           a.snap_every, " ".join(sys.argv))
     r.auto = auto
-    if auto and auto.has_frames():
+    r.save_watch = a.save_watch
+    if auto and (auto.has_frames() or auto.difficulty is not None):
         auto.attach(r)  # `frame F` input steps at the tick-return stop of F - 1 (after the snapshot)
     if layer:
         layer.attach(r, before=False)  # snapshot of frame f - 1 first, then the pokes of f

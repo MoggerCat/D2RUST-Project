@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-117-2-rune-27-1-standard-diamond-r",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "425f4ff5305dcd3ca5eba018e19c0066063f58adaa3f10668293e5ccac2f8246",
+   "size": 47093
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "1bcae1b40967196e598d12a13ca49166f8139895ab4f4ca49bd3c30d611daeaa",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "5fd500aa2342c53a26cf2a14a11cf0e070a212269f0a9b22c7c9d78ba1f8e063"
+ }
+}

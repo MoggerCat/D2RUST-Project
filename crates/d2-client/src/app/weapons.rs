@@ -133,6 +133,12 @@ impl Weapons {
         self.items.get(&l)?.shield.then_some(l)
     }
 
+    /// The type class `0x00629FE0` of `item` (0 for an item the copy
+    /// does not hold).
+    pub fn type_class(&self, item: UnitId) -> u32 {
+        self.items.get(&item).map_or(0, |f| type_class(f) as u32)
+    }
+
     pub fn facts(&self, item: UnitId) -> ItemFacts {
         self.items.get(&item).cloned().unwrap_or_default()
     }
@@ -165,7 +171,7 @@ fn is_any(t: &InvTables, record: usize, rows: &[i16]) -> bool {
 
 /// The facts of an item of items-row `record`.
 // d2rs-own, unverified (REC-150): see the module docs.
-fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
+pub(crate) fn facts_of(t: &InvTables, record: usize) -> ItemFacts {
     let bow = type_rows(t, &[b"bow"]);
     let xbow = type_rows(t, &[b"xbow"]);
     let jave = type_rows(t, &[b"jave", b"ajav"]);
@@ -267,6 +273,32 @@ fn cof_class(hands: &Hands, items: &BTreeMap<UnitId, ItemFacts>, class: u32) -> 
     } else {
         class_index(&h.wclass)
     }
+}
+
+/// [`cof_class`] of a player of `class` holding `right` (body location
+/// 4) and `left` (5), the weapon in use being the right-hand item with a
+/// hand class: the client model's reading of the same items
+/// ([`super::anim_names::ClientPlayerAnims`]).
+pub(crate) fn cof_class_of(right: Option<ItemFacts>, left: Option<ItemFacts>, class: u32) -> i32 {
+    let (r, l) = (UnitId(0), UnitId(1));
+    let mut items = BTreeMap::new();
+    let weapon = right
+        .as_ref()
+        .filter(|f| f.class != class::HAND_TO_HAND)
+        .map(|_| r);
+    let hands = Hands {
+        right: right.map(|f| {
+            items.insert(r, f);
+            r
+        }),
+        left: left.map(|f| {
+            items.insert(l, f);
+            l
+        }),
+        weapon,
+        cof: 0,
+    };
+    cof_class(&hands, &items, class)
 }
 
 /// The play host's world sync ([`d2_server::adapters::SimGame::set_world_sync`]):

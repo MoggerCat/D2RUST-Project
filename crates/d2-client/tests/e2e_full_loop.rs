@@ -1165,6 +1165,7 @@ impl Fx {
             levels: levels(),
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1983,8 +1984,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // The death animation: 4 frames → event 1 four frames on. Tick 1's
     // room switch woke the monster created by that tick's room pass
     // (`intents-events.md` §7.8 rule 2.3, `0x00573780`: think at frame
-    // 1 + 2; Idle → the next think at 203), which is still pending.
-    assert_eq!(fx.timers(monster), [(1, f_hit + 4), (2, 203)]);
+    // 1 + 2; Idle → the next think at 203); the death clean-up's
+    // `0x005738D0` cancelled that think (`units.md` §4.6 rule 1.2).
+    assert_eq!(fx.timers(monster), [(1, f_hit + 4)]);
     // The drop (`treasure.md` §3): TC 1 picks gold on the monster's
     // seed; the item is created on the game seed (`generation.md` §3),
     // placed at the start spot (x + 2, y + 3, §7 step 2) in mode 3, its
@@ -2075,7 +2077,15 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
     let mut removal = vec![0x0A, 4];
     removal.extend_from_slice(&gold_guid.to_le_bytes());
-    assert_eq!(streams(&fx, &frames.last().unwrap().2), vec![removal]);
+    // Then the pick-up sound S→C 0x2C on the player (recorded 1.14d,
+    // REC-1402..1404: items-pickup-ama packets MATCH).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&fx.guid(player).to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    assert_eq!(
+        streams(&fx, &frames.last().unwrap().2),
+        vec![removal, sound]
+    );
     assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
     let gold_picked = PLAYER_GOLD + amount;
     assert_eq!(fx.stat(player, GOLD), gold_picked);
@@ -2183,7 +2193,14 @@ fn run_with(game_seed: u32) -> Transcript {
         })],
     );
     assert_eq!(frames.last().unwrap().1.codes, [(0x16, done)]);
-    assert_eq!(streams(&fx, &frames.last().unwrap().2), pass(x9c(0x01, cg)));
+    // The pick-up also sends the sound S→C 0x2C on the player (recorded
+    // 1.14d, REC-1402..1404: items-pickup-ama packets MATCH).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&pg.to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    let mut picked = pass(x9c(0x01, cg));
+    picked.push(sound);
+    assert_eq!(streams(&fx, &frames.last().unwrap().2), picked);
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.room(cap), None);
     // Placed at (8, 0) of page 0 (C→S 0x18, §7.3 → §2.4): 0x9C action 4.
@@ -2565,7 +2582,8 @@ fn run_with(game_seed: u32) -> Transcript {
     assert!(log.unowned.is_empty(), "{:?}", log.unowned);
     // + the trade open's 0x9C action 11, one per store item.
     // + the picked gold pile's removal 0x0A (REC-281).
-    assert_eq!(log.handled, 26 + store.len() as u64);
+    // + the two pick-up sounds 0x2C (gold, cap; REC-1402..1404).
+    assert_eq!(log.handled, 28 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // + the player's own 0x4D echo (REC-95), dropped like 0x0D.

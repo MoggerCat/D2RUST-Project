@@ -519,6 +519,20 @@ pub trait QuestWorld {
     ) -> Option<(i32, i32)>;
     /// `0x0056D130`: a portal object of `class` to `level` at (x, y).
     fn create_portal(&mut self, player: UnitId, x: i32, y: i32, class: u16, level: u32) -> bool;
+    /// Tyrael's `0x0056D130` call (`quests-act2.md` §8.11): the same
+    /// with chain 13's +0x3C = 1 during the call, so the arrival hook
+    /// `0x0059DFD0` places the far end (`world/objects-2.md` §25 rule 11).
+    /// Default: [`QuestWorld::create_portal`].
+    fn create_tyrael_portal(
+        &mut self,
+        player: UnitId,
+        x: i32,
+        y: i32,
+        class: u16,
+        level: u32,
+    ) -> bool {
+        self.create_portal(player, x, y, class, level)
+    }
     /// Schedule object timer event 7 (QUESTFN) at `frame` (tick).
     fn schedule_quest_event(&mut self, object: UnitId, frame: i32);
     /// An object's mode (+0x10); 0 when there is no object (§10.5).
@@ -675,11 +689,17 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x005A_43E0);
         None
     }
-    /// `0x005B3090`: spawn a monster at a unit in `mode`.
+    /// `0x005B3090(game, room, x, y, class, mode, flags)` at a unit's
+    /// room and position: `0x005B2F20` with spread −1 (`monsters/init.md`
+    /// §1) through [`Self::spawn_monster_flags`]. A unit without a room:
+    /// nothing.
+    ///
+    /// PROVISIONAL (`quests-act3.md` §7.7; REC-1696): the flags argument
+    /// is 0, as the same wrapper's palace Kaelan call (`quests-act2-2.md`
+    /// init 19); the orb's own flags are a PC 1 question.
     fn spawn_monster_at_unit(&mut self, unit: UnitId, class: u16, mode: u8) -> Option<UnitId> {
-        let _ = (unit, class, mode);
-        self.unhandled(0xFF, 0x005B_3090);
-        None
+        let (x, y, room) = self.unit_position(unit)?;
+        self.spawn_monster_flags(room, x, y, class, mode, -1, 0)
     }
     /// `0x005DDFC0(game, monster, mode, x, y)`: the AI mode request at a
     /// point (`monsters/ai.md` §7.1; the orb kill of `quests-act3.md` §6

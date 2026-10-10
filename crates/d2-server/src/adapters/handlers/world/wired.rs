@@ -408,6 +408,8 @@ fn flush_taken<X: Pending, R: TradeRest>(
     inv: Option<&mut InvParts>,
 ) -> Vec<(UnitId, Vec<u8>)> {
     let taken = std::mem::take(&mut desk.state.taken);
+    // A freed unit is no longer shown in the store.
+    desk.state.shown.retain(|u| !taken.contains(u));
     let (Some(parts), Some(player)) = (inv, desk.state.shown_player) else {
         return Vec::new();
     };
@@ -647,8 +649,12 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
     /// change, `flows/act-change.md` §1, `world/npc.md` §8.3), the pet
     /// follows. In 1.14d these run inside the handler itself.
     /// An approach arrival's own 0x13 starts no new approach
-    /// ([`WiredWorld::arrivals`]).
-    pub(super) fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+    /// ([`WiredWorld::arrivals`]). A poke directive (`tools/poke.md`
+    /// §2 rule 6: the debugger calls the 1.14d function, which runs its
+    /// unit work inline) runs it when the directive returns, so a
+    /// `warp`'s pet follow (`path-placement.md` §10 rule 6) lands before
+    /// the next tick's movement, as in 1.14d.
+    pub fn handler_work<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
         self.pet_deaths(game, events);
         if self.arriving {
             self.state.approaches.clear();
@@ -1036,11 +1042,6 @@ where
     /// The run to a ground item (§7.1 step 2, REC-281).
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {
         self.start_item_walk(game, events, walk);
-    }
-
-    /// The Town Portal pair on the action wiring (REC-117).
-    fn town_portal(&mut self, game: &mut Game, events: &mut D, player: UnitId) -> bool {
-        WorldHost::<D>::town_portal(&mut self.action, game, events, player)
     }
 
     /// The tick with this world's quest parts lent to the action hooks

@@ -18,7 +18,7 @@ use crate::rng::Seed;
 use crate::stats::stat;
 use crate::units::hooks::Sim;
 use crate::units::record::flags;
-use crate::units::{RoomId, UnitId};
+use crate::units::{RoomId, UnitId, UnitType};
 
 use super::objects::ObjectRoute;
 use super::units::clear_uninterruptable;
@@ -137,7 +137,10 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.set_base(unit, stat::HITPOINTS, life);
     }
     fn ai_state(&self, unit: UnitId) -> u32 {
-        self.h.x.ai_state(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m.ai_state,
+            None => self.h.x.ai_state(unit),
+        }
     }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
@@ -153,11 +156,30 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn is_boss(&self, unit: UnitId) -> bool {
         self.h.x.is_boss(unit)
     }
+    /// Monster data +0x50 (the coordinate record of `population.md`
+    /// §9.6 step 3) and its +0x24 word: a monster of the lent monster
+    /// world reads [`super::ActionHooks::vision_seen`]; other units ask
+    /// [`Pending`].
     fn vision_seen(&self, unit: UnitId) -> Option<u32> {
-        self.h.x.vision_seen(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m
+                .vision
+                .map(|r| self.h.vision_seen.get(&r).copied().unwrap_or(0)),
+            None => self.h.x.vision_seen(unit),
+        }
     }
+    /// §5.2 step 7 on the record: +0x24 := 1.
+    ///
+    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
+    /// REC-1698): the word is set to 1 and never cleared.
     fn mark_seen(&mut self, unit: UnitId) {
-        self.h.x.mark_seen(unit);
+        match self.h.monster_data(unit).map(|m| m.vision) {
+            Some(Some(r)) => {
+                self.h.vision_seen.insert(r, 1);
+            }
+            Some(None) => {}
+            None => self.h.x.mark_seen(unit),
+        }
     }
     fn ai_reset(&mut self, unit: UnitId) {
         self.h.x.ai_reset(unit);
@@ -411,8 +433,11 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.units_line_blocked(game, a, b, LINE_MASK_AI)
             .unwrap_or_else(|| self.h.x.line_blocked(game, a, b))
     }
-    fn in_melee_range(&self, _: &Game, a: UnitId, b: UnitId) -> bool {
-        self.h.x.in_melee_range(a, b, 0)
+    fn in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
+        match self.monster_in_melee_range(game, a, b) {
+            Some(r) => r,
+            None => self.h.x.in_melee_range(a, b, 0),
+        }
     }
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
         self.h.x.can_reach_directly(game, unit, target)
@@ -420,8 +445,13 @@ impl<X: Pending> AiWorld for View<'_, X> {
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)
     }
+    /// Room +0x38..+0x44 (`0x0061AFA0`'s ring, [`super::monster_death`]):
+    /// each slot's GUID as a monster.
     fn last_dead(&self, game: &Game, room: RoomId) -> [Option<UnitId>; 4] {
-        self.h.x.last_dead(game, room)
+        game.lists.room(room).map_or([None; 4], |r| {
+            r.dead_guids
+                .map(|g| game.lists.find_unit(crate::units::UnitType::Monster, g))
+        })
     }
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
         self.h.x.footprint_ok(game, class, room, x, y)
@@ -429,8 +459,14 @@ impl<X: Pending> AiWorld for View<'_, X> {
 }
 
 impl<X: Pending> AiTargets for View<'_, X> {
+    /// The host's lists (slot heads) followed by the nodes inserted
+    /// through `0x005B1990` / `0x005B1900` ([`Game::target_nodes`]).
     fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
-        self.h.x.target_nodes(game)
+        let mut nodes = self.h.x.target_nodes(game);
+        for (slot, list) in nodes.iter_mut().enumerate() {
+            list.extend(game.target_nodes.slot(slot).iter().copied());
+        }
+        nodes
     }
     fn forced_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.forced_target(game, unit)
@@ -452,8 +488,9 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
+    /// `0x005DDC30` on the wired units ([`super::ai_scan`]).
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        self.h.x.secondary_target(game, unit)
+        self.secondary_search(game, unit)
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
@@ -972,6 +1009,18 @@ impl<X: Pending> AiSummons for View<'_, X> {
     fn target_slot(&self, unit: UnitId) -> i32 {
         self.units.get(unit).map_or(11, |r| r.node_index as i32)
     }
+    /// `0x005B1990(game, unit, 0, slot)`: the node at the head of list
+    /// `slot`; unit +0xD0 := slot (`ai.md` §5.2).
+    fn register_target_node(&mut self, game: &mut Game, unit: UnitId, slot: i32) {
+        let Some(r) = self.units.get_mut(unit) else {
+            return;
+        };
+        let Ok(index) = u8::try_from(slot) else {
+            return;
+        };
+        r.node_index = index.into();
+        game.target_nodes.push_front(slot, unit);
+    }
     /// `0x00574BD0` from the published hireling facts: the `Id` of the
     /// unit's node when `owner` holds it.
     fn hireling_id(&self, _game: &Game, owner: UnitId, unit: UnitId) -> Option<i32> {
@@ -986,5 +1035,64 @@ impl<X: Pending> AiSummons for View<'_, X> {
         let rows = self.h.hireling_ai.rows.as_ref()?;
         let i = rows.row_at(self.data.expansion, u32::try_from(id).ok()?, level)?;
         rows.rows.get(i).map(|r| r.ai_row())
+    }
+}
+
+impl<X: Pending> View<'_, X> {
+    /// `0x00622C40(a, b, 0)` (`combat/hit.md` §7.2) for a monster `a`
+    /// with the path provider and a monstats2 row: reach `MeleeRng` + 1
+    /// against the unit distance `0x00641530` (`pathing.md` §9.5), then
+    /// the collision line (mask 0x804). `None`: not answerable here (the
+    /// host answers).
+    ///
+    /// PROVISIONAL (hit.md §7.3 step 3, REC-1110): `MeleeRng` 255 reads
+    /// the unit's weapon class in its current mode; monsters carry no
+    /// weapon here, so it is reach 0.
+    fn monster_in_melee_range(&self, game: &Game, a: UnitId, b: UnitId) -> Option<bool> {
+        let paths = self.h.paths.as_ref()?;
+        let t = &self.h.tables.combat;
+        let class = self
+            .units
+            .get(a)
+            .filter(|r| r.ty == UnitType::Monster)?
+            .class;
+        let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
+        let rng = t.monstats2.get(usize::from(ex))?.meleerng;
+        let reach = if rng == 255 { 0 } else { i32::from(rng) };
+        let dist = |a: UnitId, b: UnitId| {
+            let pt = |u: UnitId| {
+                let (x, y) = self.h.path_position(u);
+                crate::path::Point { x, y }
+            };
+            crate::path::walk::geom::unit_distance(
+                &paths.tables,
+                pt(a),
+                self.path_size(a),
+                pt(b),
+                self.path_size(b),
+            )
+        };
+        // Step 2: the tentacle classes.
+        let tentacle = self
+            .units
+            .get(b)
+            .filter(|r| r.ty == UnitType::Monster)
+            .and_then(|r| {
+                t.monstats
+                    .get(usize::try_from(r.class).ok()?)
+                    .map(|m| m.baseid)
+            });
+        if matches!(tentacle, Some(258 | 261)) && reach + 8 > dist(a, b) {
+            return Some(true);
+        }
+        // Step 3.
+        let d = dist(a, b);
+        if d <= 0 {
+            return Some(true);
+        }
+        if reach + 1 < d {
+            return Some(false);
+        }
+        Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))
     }
 }

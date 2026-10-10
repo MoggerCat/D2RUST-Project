@@ -534,3 +534,4 @@
   "setup": {"character": "ScnAma (d2s-tool new --class ama --expansion, level 1)", "input": "wait 2; key R; hold 790 300 10; wait 2; hold 10 300 10; wait 2; hold 400 590 10; wait 2; hold 400 20 10; wait 2; key R; hold 790 590 10; wait 2; click 30 30; wait 6; end", "level": 1, "seed": 1234},
   "spec": "specs/client/model.md",
   "summary": {"frame_pos_diff": 0, "frames": 1923, "same_unit": 0, "tick_pos_diff": 0, "ticks": 1721}
+}

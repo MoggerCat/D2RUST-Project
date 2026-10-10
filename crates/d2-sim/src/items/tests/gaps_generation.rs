@@ -434,7 +434,7 @@ fn not_forced_skips_forced_steps() {
         0,
     )
     .unwrap();
-    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE);
+    assert_eq!(c.item.flags, flag::INIT | flag::INSTORE | flag::IDENTIFIED);
     assert_eq!(c.item.stats.base(stat::QUANTITY, 0), 0);
     assert_eq!((rq.min_dur, rq.max_dur), (300, 400));
     assert!(c.item.stats.base(stat::DURABILITY, 0) <= 12);

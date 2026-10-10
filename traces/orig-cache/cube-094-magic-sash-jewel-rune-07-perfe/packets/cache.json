@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-094-magic-sash-jewel-rune-07-perfe",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "acdd319d9caa83684dcd3574b967150606be992526c8882201e0aff6fc243257",
+   "size": 49344
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "77a0256831bab1d618c2ef3d9e60956318307cfe14b23f4ccd885be79bf89782",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "125439ae1b25de41eae7d37962317a902a570d04345745eca0d40664a9af12cc"
+ }
+}

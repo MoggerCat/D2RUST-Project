@@ -1,0 +1,10 @@
+check 1
+# Gold pickup: a gold pile made next to the player (poke item gld), picked up with 0x13 type 4 at frame 12; packets compares S->C 0x19 SmallGoldPickup and the stat updates (q-run-net, REC-1752).
+name net-s2c-gold-pickup
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels packets
+at 4 poke item gld @x+1 @y
+at 12 send InteractWithEntity type=4 id=@4

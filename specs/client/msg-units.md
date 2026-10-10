@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–260 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 261–270 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 271–313 |
-|   4. Queued movement and action messages | 314–401 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 402–432 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 433–463 |
-|   7. Other unit messages (general handlers, act at receive) | 464–599 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 600–750 |
-| Constants & data dependencies | 751–762 |
-| Randomness | 763–770 |
-| Edge cases & original bugs | 771–793 |
-| Test vectors | 794–844 |
-| Provenance | 845–896 |
-| Open questions | 897–942 |
+|   1. Unit add | 77–269 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 270–279 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 280–322 |
+|   4. Queued movement and action messages | 323–410 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 411–441 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 442–472 |
+|   7. Other unit messages (general handlers, act at receive) | 473–608 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 609–759 |
+| Constants & data dependencies | 760–771 |
+| Randomness | 772–779 |
+| Edge cases & original bugs | 780–802 |
+| Test vectors | 803–853 |
+| Provenance | 854–905 |
+| Open questions | 906–951 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -250,6 +250,15 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    function is set.
 4. Model: `class`, `position` (x, y), `mode` (mode byte), kind data
    {interact}.
+   PROVISIONAL: the object init `0x004BC720` stamps the object's
+   footprint on the client grid as the server's add does
+   (`sim/path-placement.md` §2.5: when `HasCollision[mode]` ≠ 0, box
+   `SizeX` × `SizeY`, §3 mask), and the client's own frees
+   (`world/objects-client.md` §25 r9, `0x00623830`) keep it exactly while
+   `HasCollision[mode]` ≠ 0; d2rs stamps it on the client path's grids
+   (because the client frees object footprints, so it holds them, and
+   the server player stops at a colliding object a footprint-less
+   client path walks through); settled by REC-1251.
 5. **Types 0, 3, 4, 5 are never sent.** The only 1.14d builder of 0x51,
    `0x0053BD10`, has one caller (`0x00572067` in the add messages,
    `sim/intents-events.md` §7.2), which passes type 2; all 206 recorded

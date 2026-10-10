@@ -1,0 +1,17 @@
+check 1
+# Zeal (skill 106) past the cow: ScnPal (expansion, level 30, every skill at 20, right skill 106),
+# -seed 1234; warp to the Blood Moor (level 2; variant blood-moor-empty), a cow (class 179, AI Idle) 4 sub-tiles
+# away along +x before frame 10, then one right click at client pixel (544, 336) before frame 20's drain.
+# Compares the cast (mode, states, stats), its missiles' or summons' effects and the draws.
+# Pattern of dru-tornado / bar-leap-attack. Authored by q-chk-skills-4cls.
+# Spec: specs/tools/scenario-diff.md.
+name pal-zeal
+save ScnPal --class pal --expansion --level 30 --all-skills 20 --right-skill 106
+seed 1234
+ticks 70
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+4 @y normal
+input frame 20; rclick 544 336

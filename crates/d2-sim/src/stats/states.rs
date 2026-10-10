@@ -30,6 +30,12 @@ pub mod group {
     pub const HIDE: usize = 2;
     /// `disguise`.
     pub const DISGUISE: usize = 16;
+    /// `plrstaydeath` (states flag bit 13; data tables +0x100).
+    pub const PLR_STAY_DEATH: usize = 13;
+    /// `monstaydeath` (bit 14; +0x104).
+    pub const MON_STAY_DEATH: usize = 14;
+    /// `bossstaydeath` (bit 15; +0x108).
+    pub const BOSS_STAY_DEATH: usize = 15;
     /// `life` (`0x0063A750`).
     pub const LIFE: usize = 32;
 }
@@ -43,6 +49,10 @@ pub struct StateTable {
     bitsets: Vec<u32>,
     /// `srvactivefunc` (u16 +0x36) by state.
     srvactivefunc: Vec<u16>,
+    /// (state, `gfxtype` +0x2D, `gfxclass` +0x2E) of the states whose
+    /// `gfxtype` is 1 or 2, ascending: the draw identity's list
+    /// (`render/unit-composite.md` §1.1).
+    gfx: Vec<(u32, u8, u16)>,
 }
 
 impl StateTable {
@@ -55,6 +65,12 @@ impl StateTable {
             words: maps.words,
             bitsets: maps.bitsets.clone(),
             srvactivefunc: rows.iter().map(|r| r.srvactivefunc).collect(),
+            gfx: rows
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| matches!(r.gfxtype, 1 | 2))
+                .map(|(s, r)| (s as u32, r.gfxtype, r.gfxclass))
+                .collect(),
         })
     }
 
@@ -76,6 +92,17 @@ impl StateTable {
 
     fn bitset(&self, g: usize) -> &[u32] {
         &self.bitsets[g * self.words..(g + 1) * self.words]
+    }
+
+    /// The states of the draw identity substitution `0x00645270`
+    /// (`render/unit-composite.md` §1.1): (state, `gfxtype`, `gfxclass`)
+    /// for `gfxtype` 1 or 2.
+    // PROVISIONAL (unit-composite.md §1.1, REC-155): the load-time list
+    // (data tables +0x17C) is read in ascending state id; 1.14d's order
+    // is not stated (only 139 `wolf` and 140 `bear` can be on together
+    // with another, and the two exclude each other).
+    pub fn gfx_states(&self) -> &[(u32, u8, u16)] {
+        &self.gfx
     }
 
     /// `srvactivefunc` of a state.
@@ -178,6 +205,25 @@ impl StatLists {
         }
     }
 
+    /// `0x00639FB0`(unit, boss)'s bit walk (`units.md` §4.6 rule 3.1):
+    /// every set state bit outside flag group `keep` is cleared and marked
+    /// in the changed half. The state lists are not touched; units without
+    /// an extended list have no states.
+    pub fn clear_states_except(&mut self, unit: UnitId, keep: usize) {
+        let words = self.data().states.words();
+        let mask: Vec<u32> = (0..words)
+            .map(|i| self.data().states.bitset(keep).get(i).copied().unwrap_or(0))
+            .collect();
+        let Some(w) = self.unit_list(unit).and_then(|r| self.state_words_mut(r)) else {
+            return;
+        };
+        for (i, m) in mask.iter().enumerate() {
+            let gone = w[i] & !m;
+            w[i] &= !gone;
+            w[words + i] |= gone;
+        }
+    }
+
     /// `0x00639EE0`: zeroes all the unit's state-changed bits.
     pub fn clear_states_changed(&mut self, unit: UnitId) {
         let words = self.data().states.words();
@@ -211,6 +257,7 @@ impl StateTable {
             words,
             bitsets,
             srvactivefunc: vec![0; count],
+            gfx: Vec::new(),
         }
     }
 

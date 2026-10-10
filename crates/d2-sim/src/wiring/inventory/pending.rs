@@ -172,6 +172,10 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn open_cube(&mut self, player: Owner, cube: Guid) -> bool {
         self.open_cube_desk(player, cube)
     }
+    /// `0x0055E000` (§7.11 step 3, §7.18 step 9): the removal message
+    /// (flag 0x20), then the item leaves its inventory and is freed
+    /// ([`InvDesk::remove_used_item`]); an item without a unit: the
+    /// rest's.
     fn consume_item(&mut self, player: Owner, item: Guid) {
         // A used identify scroll leaves the grid; a used Town Portal
         // scroll too (`items/use.md` §4: the caller's consumption,
@@ -430,7 +434,17 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> MovePending for InvDesk<'_, '_, H, 
     fn sound(&mut self, u: Owner, id: u32) {
         self.rest.sound(u, id)
     }
+    /// The sound event on the player (`0x00553380`, `inventory-moves.md`
+    /// §8.1 step 3): queued in the player's sound slot, sent as S→C 0x2C in
+    /// the tick's client pass. PROVISIONAL (REC-1404): event 1, the value of
+    /// the one recording (`items-pickup-ama`, a healing potion); what picks
+    /// the event is not written.
     fn pickup_sound(&mut self, player: Owner, item: Guid) {
+        if let Some(u) = self.unit_of(player) {
+            if let Err(e) = crate::units::sound::queue_sound(self.econ.game, u, 1, None) {
+                self.note_list(Err(e));
+            }
+        }
         self.rest.pickup_sound(player, item)
     }
     fn requirement_sound(&mut self, player: Owner) {

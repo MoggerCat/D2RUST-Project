@@ -28,7 +28,7 @@ use crate::rules::camera::{Camera, ClientPos, FrameSize, OpenMode};
 
 use super::dispatch::HandlerError;
 use super::objects::interact;
-use super::output::Output;
+use super::output::{Output, Outputs};
 use super::world::{ClientWorld, ModelInputs, UnitKey, PLAYER};
 
 /// The frame's view facts the dispatcher reads (§6 r1, r2, r7).
@@ -341,8 +341,35 @@ impl ClickWorld for ModelClick<'_> {
             .get(&u)
             .is_some_and(|u| (u.class as usize) < self.inputs.tables.objects.len())
     }
+    /// `0x00641530(P, U)` (`sim/pathing.md` §9.5, the server's own
+    /// function: the item, NPC and player decisions of §6 r9.2 and the
+    /// server's walk-or-act test of the same message agree on it), from
+    /// the local player's own cell; sizes `sim/path-placement.md` §3 (a
+    /// monster's `monstats2` `SizeX`).
     fn distance(&self, u: UnitKey) -> i32 {
-        self.path_distance(u)
+        let size = |c: &super::world::ClientUnit| match c.key.unit_type {
+            super::world::MONSTER => self
+                .inputs
+                .tables
+                .monsters
+                .get(c.class as usize)
+                .and_then(|r| r.as_ref())
+                .map_or(0, |r| i32::from(r.size_x)),
+            _ => super::objects::unit_size(c, &self.inputs.objclient.rows),
+        };
+        match (
+            self.world.units.get(&u),
+            self.world.local(),
+            self.own_position(),
+        ) {
+            (Some(u), Some(p), Some((x, y))) => super::objects::unit_distance_at(
+                u.cell(),
+                size(u),
+                ((x >> 16) as u16, (y >> 16) as u16),
+                size(p),
+            ),
+            _ => i32::MAX,
+        }
     }
     fn path_distance(&self, u: UnitKey) -> i32 {
         let rows = &self.inputs.objclient.rows;
@@ -433,11 +460,17 @@ impl ClickWorld for ModelClick<'_> {
 
 /// Applies the dispatcher's outputs in order: codes 1–0x11 become their
 /// C→S message on `outgoing` (§6 r7), code 0x13 the interact sender
-/// (`client/model.md` §8 rule 7), [`ClickOut::Send`] its bytes. The
-/// client mode request of a code (`0x00480C10` inside `0x00481030`) is
-/// not applied: PROVISIONAL (ui/controls.md §6 r7; REC-51): which mode
-/// request code `0x00481030` passes for a click code is not stated, so
-/// the local player's mode follows the server's echo of the message.
+/// (`client/model.md` §8 rule 7), [`ClickOut::Send`] its bytes. A skill
+/// code first runs the local player's mode request (`0x00481030` →
+/// `0x00480C10(0x15 | 0x16, P, record, 0)`, [`skill_request`]): the
+/// attack or cast mode starts at the click, and the client player update
+/// ends it ([`super::player_anim`]). The walk codes' mode requests are
+/// not applied (the walk prediction moves the player).
+/// PROVISIONAL (skills/sequences.md local player rule 1; REC-1002): the
+/// gate `0x00480BA0` (current skill without `interrupt` and mode not 1 /
+/// 5 → no request, no send) is not run; the dispatcher's
+/// [`can_act`] refuses the attack and cast modes before it; settled by a
+/// 1.14d click log while walking with a non-interrupt skill selected.
 /// Sounds, hover calls and the pending record are returned to the
 /// caller (the UI layer).
 pub fn apply(
@@ -455,6 +488,11 @@ pub fn apply(
                 b,
             } => outputs.extend(interact::send(world, inputs, a as u16, b)?),
             ClickOut::Code { code, a, b } => {
+                if let Some((p, req, record)) = skill_request(world, code, a, b) {
+                    let sink = Outputs::default();
+                    super::modes::mode_request(world, inputs, p, req, record, &sink)?;
+                    outputs.extend(sink.take());
+                }
                 if let Some(m) = click::code_bytes(code, a, b) {
                     world.outgoing.push(m);
                 }
@@ -464,6 +502,39 @@ pub fn apply(
         }
     }
     Ok((rest, outputs))
+}
+
+/// The local player's mode request of a skill code
+/// (`skills/sequences.md` local player rule 1, `0x00481030`): point codes
+/// 5, 8, 0xC, 0xF → 0x15; unit codes 6, 7, 9, 0xA, 0xD, 0xE, 0x10, 0x11
+/// → 0x16; record r0 := the side's skill (left for codes below 0xC),
+/// r1 := its owner, r2 / r3 := a / b. `None`: another code, or no local
+/// player or skill on that side.
+pub fn skill_request(
+    world: &ClientWorld,
+    code: u8,
+    a: u32,
+    b: u32,
+) -> Option<(UnitKey, u8, [i32; 7])> {
+    let req = match code {
+        5 | 8 | 0xC | 0xF => 0x15,
+        6 | 7 | 9 | 0xA | 0xD | 0xE | 0x10 | 0x11 => 0x16,
+        _ => return None,
+    };
+    let p = world.local()?;
+    let list = p.skills.as_ref()?;
+    let side = if code < 0xC { list.left } else { list.right };
+    let e = list.entries.get(side?)?;
+    let record = [
+        i32::from(e.skill),
+        e.owner as i32,
+        a as i32,
+        b as i32,
+        0,
+        0,
+        0,
+    ];
+    Some((p.key, req, record))
 }
 
 /// One world click against the model (§6 r1–r2 and [`apply`]).
@@ -563,6 +634,7 @@ mod tests {
     }
     use crate::bridge::predict::{walk_of, Walk, WalkTo};
     use crate::bridge::skills::{SkillEntry, SkillList};
+    use crate::bridge::update::update_pass;
     use crate::bridge::world::ClientUnit;
 
     // Synthetic fixture: in game, the local player in town mode 1 at
@@ -833,6 +905,91 @@ mod tests {
         assert_eq!(w.outgoing[0].len(), 5);
     }
 
+    /// A synthetic animation lookup: every player mode 4 frames at
+    /// speed 256.
+    #[derive(Debug)]
+    struct Four;
+    impl crate::bridge::player_anim::PlayerAnims for Four {
+        fn anim(
+            &self,
+            _: &ClientWorld,
+            _: UnitKey,
+            _: u32,
+        ) -> Option<crate::bridge::player_anim::PlayerAnim> {
+            Some(crate::bridge::player_anim::PlayerAnim {
+                frames: 4,
+                speed: 256,
+                weapon: 0,
+            })
+        }
+    }
+
+    // The local player rules and the client mode machine (REC-1000,
+    // q-fix-pt-cast-input-lock).
+    // Covers: specs/skills/sequences.md §3
+    #[test]
+    fn a_cast_ends_in_neutral_and_the_next_right_click_casts_again() {
+        use crate::bridge::dispatch::Dispatch;
+        use crate::bridge::receive::ReceiveLog;
+        use crate::bridge::world::SkillRow;
+        let key = UnitKey::new(PLAYER, 1);
+        let mut w = world();
+        if let Some(list) = w.units.get_mut(&key).and_then(|e| e.skills.as_mut()) {
+            list.entries.push(SkillEntry {
+                skill: 3,
+                mode: 10,
+                ..SkillEntry::default()
+            });
+            list.right = Some(1);
+        }
+        let mut inputs = ModelInputs::default();
+        inputs.tables.skills = vec![
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow::default(),
+            SkillRow {
+                anim: 10,
+                range: 2,
+                ..SkillRow::default()
+            },
+        ];
+        inputs.player_anims = Some(std::sync::Arc::new(Four));
+        let dispatch = Dispatch::from_spec().unwrap();
+        let mut st = ClickState::default();
+        let at = (500, 200);
+        let click = |w: &mut ClientWorld, st: &mut ClickState| {
+            w.outgoing.clear();
+            world_click(w, &inputs, st, view(at), Kind::RightDown, Some(at), 0).unwrap();
+            world_click(w, &inputs, st, view(at), Kind::RightUp, Some(at), 0).unwrap();
+            // One loop pass per click (the per-pass latch, §6 r2).
+            st.end_pass();
+            w.outgoing.iter().filter(|m| m[0] == 0x0C).count()
+        };
+        let update = |w: &mut ClientWorld| {
+            let (mut log, mut out) = (ReceiveLog::default(), Vec::new());
+            update_pass(w, &inputs, &dispatch, &mut log, &mut out);
+            assert!(log.rejected.is_empty(), "{:?}", log.rejected);
+            w.units[&key].mode
+        };
+        assert_eq!(click(&mut w, &mut st), 1, "the first cast");
+        // The click starts the cast mode SC locally (frame 0 of 4).
+        assert_eq!(w.units[&key].mode, 10);
+        // While it runs, a right click sends nothing (`can_act`).
+        assert_eq!(click(&mut w, &mut st), 0);
+        // Updates 1–2 advance to frame 2; after update 3's advance frame
+        // 3 + speed 1 reaches 4: neutral on update 3 (mode 1: the player
+        // is in no town room).
+        assert_eq!(update(&mut w), 10);
+        assert_eq!(update(&mut w), 10);
+        assert_eq!(update(&mut w), 1);
+        assert_eq!(
+            click(&mut w, &mut st),
+            1,
+            "the second cast after the first ended"
+        );
+        assert_eq!(w.units[&key].mode, 10);
+    }
+
     #[test]
     fn ground_click_reads_the_predicted_position() {
         let at = (500, 200);
@@ -895,5 +1052,40 @@ mod tests {
         hold.extend_from_slice(&122u32.to_le_bytes());
         hold.extend_from_slice(&100u32.to_le_bytes());
         assert_eq!(w.outgoing, vec![hold], "no walk to the NPC");
+    }
+
+    // Covers: specs/ui/controls.md §6 r9; specs/sim/pathing.md §9.5
+    #[test]
+    fn the_interact_distance_is_the_unit_distance() {
+        use crate::bridge::world::ITEM;
+        // The player at (100, 100), a ground item at (101, 105): the
+        // size-reduced 0x006416D0 reads 4 (an at-once pick-up), the unit
+        // distance 0x00641530 of the decision reads more than 4, so the
+        // client walks to the item first, as the server's 0x16 test
+        // (`items/inventory-moves.md` §7.1 r2) would walk the player.
+        let mut w = world();
+        let item = UnitKey::new(ITEM, 6);
+        let mut u = ClientUnit::new(item);
+        u.position = Some((101, 105));
+        u.mode = 3;
+        w.units.insert(item, u);
+        let inputs = ModelInputs::default();
+        let c = ModelClick {
+            world: &w,
+            inputs: &inputs,
+            view: view((0, 0)),
+            local_at: None,
+        };
+        assert_eq!(c.path_distance(item), 4);
+        let t = super::super::predict::path_tables().unwrap();
+        let d = d2_sim::path::walk::geom::unit_distance(
+            t,
+            d2_sim::path::coords::Point::new(101, 105),
+            1,
+            d2_sim::path::coords::Point::new(100, 100),
+            2,
+        );
+        assert_eq!(c.distance(item), d);
+        assert!(d > 4, "{d}");
     }
 }

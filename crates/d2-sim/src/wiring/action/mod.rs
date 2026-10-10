@@ -21,6 +21,7 @@
 //! an adapter only maps one seam call to the provider's call.
 
 pub mod ai;
+pub mod ai_scan;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
@@ -30,6 +31,7 @@ pub mod hirelings;
 pub mod inactive;
 pub mod missiles;
 pub mod monster_add;
+pub mod monster_death;
 pub mod monsters;
 pub mod objects;
 pub mod pending;
@@ -92,6 +94,9 @@ pub struct ActionTables {
     /// `overlay` record count (data tables +0xBC0): the bound of the
     /// 0x11 overlay id (`intents-events.md` §7.3 r2 step 9, inclusive).
     pub overlay_count: i32,
+    /// `monequip.bin` rows (summon equipment `0x005D6B60`,
+    /// `skills/bodies.md` §6.5 step 9).
+    pub monequip: Vec<d2_data::tables::Monequip>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -138,6 +143,14 @@ pub enum WiringError {
         skill: i32,
         step: i32,
     },
+    /// An act change fatal assert of 1.14d, by its line code
+    /// (`world/waypoints.md` §11: 0x19F the destination is in the
+    /// client's act, 0x1AF no player, 0x1D1 / 0x1D6 a failed teleport).
+    ActChange(u32),
+    /// A portal pair creation fatal assert of 1.14d, by its line code
+    /// (`world/objects-2.md` §25: 0xE42 null room, 0xE5C a destination in
+    /// another act, 0xE2B a source level above 255).
+    Portal(u32),
 }
 
 /// What the Hireable AI reads of the hireling lists and table
@@ -160,6 +173,10 @@ pub struct ActionHooks<X> {
     pub missiles: Option<MissileStore>,
     /// Lent to the AI code during a think (`None` then).
     pub ai: Option<AiStore>,
+    /// The +0x24 word of the coordinate records monsters hold as their
+    /// vision record (monster data +0x50, `monsters/ai.md` §5.2 steps 2
+    /// and 7), by record identity; absent = 0.
+    pub vision_seen: BTreeMap<crate::monsters::init::VisionRecord, u32>,
     /// Game fields the AI reads (game +0x6A, +0x74, +0x6D).
     pub ai_info: GameInfo,
     /// Combat lists (unit +0xAC, `damage.md` §3 step 3), first = newest.
@@ -197,8 +214,15 @@ pub struct ActionHooks<X> {
     pub objects: Option<ObjectState>,
     /// The object state is lent out for a call.
     objects_out: bool,
-    /// The town portal pairs ([`town_portal`], REC-117).
+    /// The portal pairs' links and the players' portal GUIDs
+    /// ([`town_portal`], `world/objects-2.md` §25, §27).
     pub portals: town_portal::PortalLinks,
+    /// The rooms' delete lists (room +0x18, `0x0061A270`): {type, GUID}
+    /// records, newest first; turned into S→C 0x0A by the per-client
+    /// update (`0x0053A770`, [`View::send_room_deletes`]) and freed by
+    /// tick step 7 (`0x0061A2C0`). Only the portal removals
+    /// (`world/objects-2.md` §27.4) write here so far.
+    pub room_deletes: BTreeMap<crate::units::RoomId, Vec<(u8, u32)>>,
     /// The drop state of the object code's chest drop `D(Q)`
     /// (`treasure.md` §4, [`crate::wiring::economy::object_chest_drop`];
     /// the `levels` rows are the object tables'). `None` (the default):
@@ -259,6 +283,9 @@ pub struct ActionHooks<X> {
     /// player's DT start (`0x00580A70`'s unit target, [`death`]): the
     /// host that starts it sets it.
     pub mode_target: Option<UnitId>,
+    /// The unit whose death clean-up ran in the DT start running now
+    /// ([`monster_death::death_cleanup`]).
+    pub death_cleaned: Option<UnitId>,
     /// The mode of the monster mode change running now (the record's
     /// mode, `units.md` §4.6), for the start functions that read it (the
     /// attack / skill start `0x005A75C0`, rule 7).
@@ -280,6 +307,9 @@ pub struct ActionHooks<X> {
     /// The quest host is running a route: routes it raises are queued and
     /// run right after it.
     quest_host_out: bool,
+    /// The preset paths the quest map-AI stores keep (`quests-act5.md`
+    /// §5.8 "Map-AI stores"); a handle is the index + 1.
+    pub map_ai_paths: Vec<Vec<crate::monsters::ai::MapNode>>,
     /// Objects allocated by [`View::allocate`] whose per-kind init waits
     /// for the allocation's game-seed step to be written back (`None`
     /// outside such an allocation).
@@ -333,10 +363,21 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A monster's equipped items by body location (its inventory's
+    /// body slots, `monsters/init.md` §12): d2rs-own record of the
+    /// holdings `has_item_at` reads (no monster inventory model here).
+    pub monster_equip: BTreeMap<UnitId, BTreeMap<u8, UnitId>>,
     /// The inactive-unit store (game +0xD8, `units.md` §3.4;
     /// [`inactive`]). `None` (the default): tick step 9 compresses
     /// nothing and the restore is the host's, as before.
     pub inactive: Option<crate::units::inactive::InactiveStore>,
+    /// The warp tiles' records while [`Self::inactive`] is off: tick step
+    /// 9 stores and frees each tile of a deactivated room here, and the
+    /// room's restore re-creates them after the host's restore (in the
+    /// store's order, `rooms.md` §8 rule 6). PROVISIONAL (REC-230): the
+    /// tile part of the store without the rest of it. d2rs-own,
+    /// unverified.
+    pub fallback_tiles: crate::units::inactive::InactiveStore,
     /// Seams with no provider yet.
     pub x: X,
     /// Scratch seed handed out for a unit without a record (an error is
@@ -391,6 +432,7 @@ impl<X> ActionHooks<X> {
             objects: None,
             objects_out: false,
             portals: Default::default(),
+            room_deletes: BTreeMap::new(),
             object_drops: None,
             pet_follows: None,
             hireling_ai: HirelingAiFacts::default(),
@@ -403,11 +445,14 @@ impl<X> ActionHooks<X> {
             monster_sequences: None,
             vitals: None,
             mode_target: None,
+            death_cleaned: None,
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            vision_seen: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
+            map_ai_paths: Vec::new(),
             deferred_inits: None,
             alloc_rooms: Vec::new(),
             paths: None,
@@ -420,7 +465,9 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            monster_equip: BTreeMap::new(),
             inactive: None,
+            fallback_tiles: crate::units::inactive::InactiveStore::default(),
             x,
             orphan_seed: Seed::init(),
             removed_lists: Vec::new(),

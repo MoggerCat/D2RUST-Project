@@ -13,6 +13,7 @@
 //! | [`apply`], [`apply_op`], [`apply_line`] | resolve the references on the current state and run the directive on a [`WorldSim`] game (§5) |
 //! | [`spawn_monster`] | the call sequences of a `spawn` step (`scenario.md` §3.1 rule 2) |
 //! | [`GotoTarget`], [`GotoWalk`], [`goto_step`] | the `goto` walk, one step per tick (§6) |
+//! | [`msg_values`] | `msg`: its values with the references resolved (§5 rule 3; the bytes are the host side's, `d2-client::app::poke`) |
 //!
 //! References (`scenario.md` §3 rule 3, §1 rule 1 here) are resolved by
 //! [`apply`] on the state it is called on: the callers call it between
@@ -71,6 +72,16 @@ pub enum UnitArg {
     Guid { ty: u8, guid: u32 },
 }
 
+/// A value of `msg` (§1 `msg`): a number, the player's position ± N, or
+/// a unit (its GUID).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MsgArg {
+    Num(u32),
+    /// `@x±N` / `@y±N` (never [`Coord::Num`]).
+    Pos(Coord),
+    Unit(UnitArg),
+}
+
 /// One directive (§1 rule 2 table; optional arguments `None` when not
 /// written).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -109,10 +120,13 @@ pub enum Directive {
         period: u32,
         ticks: u32,
     },
+    /// `free`: land on the nearest free, missile-passable cell
+    /// (`poke.md` §1 `pos`, [`LAND_MASK`]) instead of the raw point.
     Pos {
         unit: UnitArg,
         x: Coord,
         y: Coord,
+        free: bool,
     },
     /// d2rs-own test aid (`poke.md` §1 `hop`): one move of at most
     /// [`HOP`] sub-tiles per axis toward (x, y), the first free spot of
@@ -150,6 +164,82 @@ pub enum Directive {
         seconds: u32,
     },
     Goto(GotoTarget),
+    /// One C→S game message through the local client's sender (§1 `msg`):
+    /// the id's fields in layout order.
+    Msg {
+        id: u8,
+        args: Vec<MsgArg>,
+    },
+    /// Interact with a unit (§1 `operate`): C→S 0x13 with its type and
+    /// GUID, run by the server's dispatcher now.
+    Operate {
+        unit: UnitArg,
+    },
+    /// Talk to an NPC (§1 `talk`): C→S 0x13 and 0x2F, then one message
+    /// per choice, each run by the server's dispatcher now, in order.
+    Talk {
+        npc: UnitArg,
+        choices: Vec<TalkChoice>,
+    },
+}
+
+/// One menu choice of `talk` (§1 `talk`): the C→S message it sends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TalkChoice {
+    /// `trade`: 0x38 action 1.
+    Trade,
+    /// `gamble`: 0x38 action 2.
+    Gamble,
+    /// `hire`: 0x38 action 3, item field the player's GUID (`npc.md` §4).
+    Hire,
+    /// `action:<n>`: 0x38 action n, item field 0.
+    Action(u32),
+    /// `quest:<n>`: 0x31 with message n.
+    Quest(u16),
+    /// `close`: 0x30.
+    Close,
+}
+
+impl TalkChoice {
+    fn parse(t: &str) -> Result<Self, String> {
+        Ok(match t {
+            "trade" => Self::Trade,
+            "gamble" => Self::Gamble,
+            "hire" => Self::Hire,
+            "close" => Self::Close,
+            _ => match t.split_once(':') {
+                Some(("action", n)) => Self::Action(num(n)?),
+                Some(("quest", n)) => Self::Quest(ranged(n, 0, 0xFFFF, "quest message")? as u16),
+                _ => {
+                    return Err(format!(
+                        "talk choice {t:?}: trade, gamble, hire, action:<n>, quest:<n> or close"
+                    ))
+                }
+            },
+        })
+    }
+}
+
+impl fmt::Display for TalkChoice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Trade => write!(f, "trade"),
+            Self::Gamble => write!(f, "gamble"),
+            Self::Hire => write!(f, "hire"),
+            Self::Action(n) => write!(f, "action:{n}"),
+            Self::Quest(n) => write!(f, "quest:{n}"),
+            Self::Close => write!(f, "close"),
+        }
+    }
+}
+
+/// One server handler call of `operate` / `talk` (§1, §5 rule 4): a C→S
+/// id and its field values in the order of its `layout` column
+/// (`sim/client-messages.tsv`); the host side builds the bytes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HandlerCall {
+    pub id: u8,
+    pub values: Vec<u32>,
 }
 
 /// The target of a `goto` (§6 rule 1).
@@ -182,7 +272,7 @@ pub struct GotoWalk {
 }
 
 /// The directive keywords, in the §1 table order.
-pub const KEYWORDS: [&str; 14] = [
+pub const KEYWORDS: [&str; 17] = [
     "object",
     "superunique",
     "missile",
@@ -197,6 +287,9 @@ pub const KEYWORDS: [&str; 14] = [
     "state",
     "freeze",
     "goto",
+    "msg",
+    "operate",
+    "talk",
 ];
 
 impl Directive {
@@ -217,6 +310,9 @@ impl Directive {
             Self::State { .. } => "state",
             Self::Freeze { .. } => "freeze",
             Self::Goto(_) => "goto",
+            Self::Msg { .. } => "msg",
+            Self::Operate { .. } => "operate",
+            Self::Talk { .. } => "talk",
         }
     }
 }
@@ -418,6 +514,29 @@ impl fmt::Display for UnitArg {
     }
 }
 
+impl fmt::Display for MsgArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Num(v) => write!(f, "{v}"),
+            Self::Pos(c) => c.fmt(f),
+            Self::Unit(u) => u.fmt(f),
+        }
+    }
+}
+
+/// One `msg` value token: `@x±N` / `@y±N`, a unit reference, or a
+/// number (u32). Which values the id takes is the host side's check
+/// (§5 rule 3: the layouts are transport knowledge, not the sim's).
+fn msg_arg(t: &str) -> Result<MsgArg, String> {
+    if t.starts_with("@x") || t.starts_with("@y") {
+        return coord(t).map(MsgArg::Pos);
+    }
+    if t.starts_with('@') || t.contains('/') {
+        return unit_arg(t).map(MsgArg::Unit);
+    }
+    num(t).map(MsgArg::Num)
+}
+
 // ---- directives -----------------------------------------------------------
 
 /// Parses one directive from its tokens (keyword first; §1). Errors name
@@ -532,11 +651,18 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
             }
         }
         "pos" => {
-            let a = exact(3, "<ref> <x> <y>")?;
+            let usage = "<ref> <x> <y> [free]";
+            let (a, rest) = fixed(3, usage)?;
+            let free = match rest {
+                [] => false,
+                ["free"] => true,
+                _ => return Err(format!("`pos {usage}`")),
+            };
             Directive::Pos {
                 unit: unit_arg(a[0])?,
                 x: coord(a[1])?,
                 y: coord(a[2])?,
+                free,
             }
         }
         "hop" => {
@@ -642,6 +768,32 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
                 class: ranged(class, 0, 0xFFFF, "class")?,
             })
         }
+        "msg" => {
+            let Some((id, vals)) = args.split_first() else {
+                return Err("`msg` needs an id: `msg <id> <value>...`".into());
+            };
+            let id = ranged(id, 1, 0x70, "msg id")? as u8;
+            let args = vals
+                .iter()
+                .map(|t| msg_arg(t))
+                .collect::<Result<Vec<_>, _>>()?;
+            Directive::Msg { id, args }
+        }
+        "operate" => Directive::Operate {
+            unit: unit_arg(exact(1, "<ref>")?[0])?,
+        },
+        "talk" => {
+            let Some((npc, choices)) = args.split_first() else {
+                return Err("`talk` needs an NPC: `talk <ref> [<choice>...]`".into());
+            };
+            Directive::Talk {
+                npc: unit_arg(npc)?,
+                choices: choices
+                    .iter()
+                    .map(|t| TalkChoice::parse(t))
+                    .collect::<Result<_, _>>()?,
+            }
+        }
         k => {
             return Err(format!(
                 "unknown directive {k:?}: one of {}",
@@ -692,7 +844,13 @@ impl fmt::Display for Directive {
             Self::SeedGame { lo, hi } => write!(f, " {lo} {hi}")?,
             Self::SeedUnit { unit, lo, hi } => write!(f, " {unit} {lo} {hi}")?,
             Self::Time { period, ticks } => write!(f, " {period} {ticks}")?,
-            Self::Pos { unit, x, y } | Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
+            Self::Pos { unit, x, y, free } => {
+                write!(f, " {unit} {x} {y}")?;
+                if *free {
+                    write!(f, " free")?;
+                }
+            }
+            Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
             Self::Warp { level, tile } => {
                 write!(f, " {level}")?;
                 if let Some(t) = tile {
@@ -728,6 +886,19 @@ impl fmt::Display for Directive {
                 Some(l) => write!(f, " preset {l} {}:{}", t.ty, t.class)?,
                 None => write!(f, " unit {}:{}", t.ty, t.class)?,
             },
+            Self::Msg { id, args } => {
+                write!(f, " {id}")?;
+                for a in args {
+                    write!(f, " {a}")?;
+                }
+            }
+            Self::Operate { unit } => write!(f, " {unit}")?,
+            Self::Talk { npc, choices } => {
+                write!(f, " {npc}")?;
+                for c in choices {
+                    write!(f, " {c}")?;
+                }
+            }
         }
         Ok(())
     }
@@ -878,6 +1049,9 @@ pub enum PokeResult {
     Ok(Option<u32>),
     /// The game's own function refused (placement, class check, no room).
     Failed,
+    /// `failed` with why (the record's `note`), e.g. `msg` dropped by the
+    /// client sender's duplicate filter.
+    FailedWith(String),
     /// A reference matched no unit: the reference as written.
     Unresolved(String),
     /// This side cannot run the directive: why.
@@ -892,7 +1066,7 @@ impl PokeResult {
     pub fn code(&self) -> &'static str {
         match self {
             Self::Ok(_) => "ok",
-            Self::Failed => "failed",
+            Self::Failed | Self::FailedWith(_) => "failed",
             Self::Unresolved(_) => "unresolved",
             Self::Gap(_) => "gap",
             Self::Pending => "pending",
@@ -998,6 +1172,41 @@ pub fn resolve_unit<X: WorldPending>(
 /// Largest move of a `hop` per axis (sub-tiles): a `pos` reaches only the
 /// unit's room and its neighbours (`poke.md` §1 `hop`).
 pub const HOP: i32 = 16;
+
+/// The mask a landing cell of `pos … free`, `hop` and `goto` must not
+/// have (`poke.md` §1 `pos`): the player's move bits 0x1C09 and the
+/// missile-blocking bit 0x4.
+pub const LAND_MASK: u16 = crate::path::collision::masks::PLAYER_MOVE | 0x4;
+
+/// The cell of an active room with no `LAND_MASK` bit nearest (tx, ty)
+/// (squared distance; row by row from the top-left of the room's
+/// sub-tile rectangle, the first found on a tie).
+fn nearest_free(a: &crate::drlg::ActiveRoom, tx: i32, ty: i32) -> Option<(i32, i32)> {
+    let r = a.subtiles;
+    let mut best: Option<(i64, i32, i32)> = None;
+    for y in r.y..r.y + r.h {
+        for x in r.x..r.x + r.w {
+            let free = a.collision.get(x, y).is_some_and(|m| m & LAND_MASK == 0);
+            let d2 = i64::from(x - tx).pow(2) + i64::from(y - ty).pow(2);
+            if free && best.is_none_or(|(b, _, _)| d2 < b) {
+                best = Some((d2, x, y));
+            }
+        }
+    }
+    best.map(|(_, x, y)| (x, y))
+}
+
+/// [`nearest_free`] in the active room `room`.
+fn room_free_cell<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    room: RoomId,
+    tx: i32,
+    ty: i32,
+) -> Option<(i32, i32)> {
+    let (d, r) = sim.action.sys.hooks.drlg.drlg_room(game, room)?;
+    nearest_free(d.room(r).active()?, tx, ty)
+}
 
 /// The spots a `hop` from `from` by `step` tries, best first: rings of
 /// radius 0, 2, 4, 7 around the full step, then around the half step, then
@@ -1109,6 +1318,94 @@ pub fn apply_line<X: WorldPending>(
     let toks: Vec<&str> = line.split_ascii_whitespace().collect();
     let op = parse_op(&toks)?;
     Ok(apply_op(game, sim, env, &op))
+}
+
+/// The `gap` note of `msg` where the runner has no host (§5 rule 3).
+pub const MSG_GAP: &str = "msg needs the host's client queue";
+
+/// The values of a `msg` directive with its references resolved on the
+/// current state (§5 rule 3): positions from the player's path, units
+/// as their GUID. `Err`: the reference that matched no unit.
+pub fn msg_values<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    env: &Env<'_>,
+    args: &[MsgArg],
+) -> Result<Vec<i64>, String> {
+    msg_values_with(args, |a| match a {
+        MsgArg::Num(v) => Ok(i64::from(v)),
+        MsgArg::Pos(c) => resolve_coord(c, sim, env).map(i64::from),
+        MsgArg::Unit(u) => {
+            let id = resolve_unit(u, game, sim, env)?;
+            guid_of(game, id)
+                .map(i64::from)
+                .ok_or_else(|| u.to_string())
+        }
+    })
+}
+
+/// [`msg_values`] with the references resolved by `resolve` (a position
+/// to its sub-tile, a unit to its GUID; `Err` the reference).
+pub fn msg_values_with(
+    args: &[MsgArg],
+    resolve: impl FnMut(MsgArg) -> Result<i64, String>,
+) -> Result<Vec<i64>, String> {
+    args.iter().copied().map(resolve).collect()
+}
+
+/// The `gap` note of `operate` / `talk` where the runner has no host (§5
+/// rule 4).
+pub const INTERACT_GAP: &str = "operate / talk need the host's dispatcher";
+
+/// The handler calls of `operate` / `talk` (§1, §5 rule 4) with the
+/// references resolved on the current state; `None` for another
+/// directive. `Err`: the reference that matched no unit.
+pub fn interact_calls<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    env: &Env<'_>,
+    d: &Directive,
+) -> Option<Result<(u32, Vec<HandlerCall>), String>> {
+    let unit = match d {
+        Directive::Operate { unit } => *unit,
+        Directive::Talk { npc, .. } => *npc,
+        _ => return None,
+    };
+    let target = |u: UnitArg| -> Result<(u32, u32), String> {
+        let id = resolve_unit(u, game, sim, env)?;
+        let e = game.lists.unit(id).ok_or_else(|| u.to_string())?;
+        Ok((e.ty as u32, e.guid))
+    };
+    Some((|| {
+        let (ty, guid) = target(unit)?;
+        let player = guid_of(game, env.player).ok_or_else(|| "@player".to_string())?;
+        Ok((guid, interact_calls_with(d, ty, guid, player)))
+    })())
+}
+
+/// [`interact_calls`] with the target (unit type, GUID) and the player's
+/// GUID resolved: the messages of §1 `operate` / `talk`, in order.
+pub fn interact_calls_with(d: &Directive, ty: u32, guid: u32, player: u32) -> Vec<HandlerCall> {
+    let call = |id: u8, values: &[u32]| HandlerCall {
+        id,
+        values: values.to_vec(),
+    };
+    match d {
+        Directive::Operate { .. } => vec![call(0x13, &[ty, guid])],
+        Directive::Talk { choices, .. } => {
+            let mut v = vec![call(0x13, &[ty, guid]), call(0x2F, &[guid])];
+            v.extend(choices.iter().map(|c| match *c {
+                TalkChoice::Trade => call(0x38, &[1, guid, 0]),
+                TalkChoice::Gamble => call(0x38, &[2, guid, 0]),
+                TalkChoice::Hire => call(0x38, &[3, guid, player]),
+                TalkChoice::Action(n) => call(0x38, &[n, guid, 0]),
+                TalkChoice::Quest(m) => call(0x31, &[guid, u32::from(m)]),
+                TalkChoice::Close => call(0x30, &[guid]),
+            }));
+            v
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn run<X: WorldPending>(
@@ -1232,15 +1529,22 @@ fn run<X: WorldPending>(
                 None => PokeResult::Failed,
             }
         }
-        Directive::Pos { unit, x, y } => {
+        Directive::Pos { unit, x, y, free } => {
             let u = resolve_unit(*unit, game, sim, env)?;
-            let (x, y) = (c(*x, sim)?, c(*y, sim)?);
+            let (mut x, mut y) = (c(*x, sim)?, c(*y, sim)?);
             if !sim.action.sys.hooks.path_has(u) {
                 return Ok(PokeResult::Failed);
             }
             let Some(room) = room_near(game, sim, u, x, y) else {
                 return Ok(PokeResult::Failed);
             };
+            if *free {
+                // The nearest free, missile-passable cell of that room.
+                match room_free_cell(game, sim, room, x, y) {
+                    Some(cell) => (x, y) = cell,
+                    None => return Ok(PokeResult::Failed),
+                }
+            }
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
             PokeResult::Ok(None)
         }
@@ -1260,6 +1564,17 @@ fn run<X: WorldPending>(
                 let Some(room) = room_near(game, sim, u, cx, cy) else {
                     continue;
                 };
+                // Only a free, missile-passable cell (`LAND_MASK`).
+                if sim
+                    .action
+                    .sys
+                    .hooks
+                    .drlg
+                    .collision(game, room, cx, cy)
+                    .is_none_or(|m| m & LAND_MASK != 0)
+                {
+                    continue;
+                }
                 let errors = sim.action.sys.hooks.errors.len();
                 sim.lend(|a| {
                     a.with(game, |g, v| {
@@ -1354,6 +1669,11 @@ fn run<X: WorldPending>(
         }
         Directive::Freeze { .. } => PokeResult::Ok(None),
         Directive::Goto(t) => goto_step(game, sim, env, t, &mut GotoWalk::default()),
+        // §5 rule 3: the message goes through the host's client sender;
+        // a runner without one cannot run it.
+        Directive::Msg { .. } => PokeResult::Gap(MSG_GAP.into()),
+        // §5 rule 4: the handlers are the host's dispatcher.
+        Directive::Operate { .. } | Directive::Talk { .. } => PokeResult::Gap(INTERACT_GAP.into()),
     })
 }
 
@@ -1367,6 +1687,32 @@ fn unit_level<X: WorldPending>(game: &Game, sim: &WorldSim<X>, u: UnitId) -> Opt
 /// found and the player placed next to it (`Ok` with the target's GUID)
 /// or the walk ends `Failed`. `walk` is the state the runner keeps
 /// between steps (a fresh one for a new `goto`).
+/// After a placement: when the player's cell has a `LAND_MASK` bit,
+/// place again, exact, on the nearest cell of its room without one.
+fn settle_landing<X: WorldPending>(game: &mut Game, sim: &mut WorldSim<X>, player: UnitId) {
+    let Some(room) = game.lists.unit(player).and_then(|e| e.room()) else {
+        return;
+    };
+    let (x, y) = sim.action.sys.hooks.path_position(player);
+    if sim
+        .action
+        .sys
+        .hooks
+        .drlg
+        .collision(game, room, x, y)
+        .is_none_or(|m| m & LAND_MASK == 0)
+    {
+        return;
+    }
+    if let Some((nx, ny)) = room_free_cell(game, sim, room, x, y) {
+        sim.lend(|a| {
+            a.with(game, |g, v| {
+                place_unit(PathCtx::of(v, g), player, Some(room), nx, ny, true, false)
+            })
+        });
+    }
+}
+
 pub fn goto_step<X: WorldPending>(
     game: &mut Game,
     sim: &mut WorldSim<X>,
@@ -1422,6 +1768,10 @@ pub fn goto_step<X: WorldPending>(
                 place_unit(PathCtx::of(v, g), player, Some(room), x, y, false, false)
             })
         });
+        // Settle on a missile-passable cell (`poke.md` §6 rule 3.2).
+        if placed {
+            settle_landing(game, sim, player);
+        }
         return if placed {
             PokeResult::Ok(Some(guid))
         } else {
@@ -1478,23 +1828,10 @@ pub fn goto_step<X: WorldPending>(
         let Some(a) = d.room(h).active() else {
             return PokeResult::Failed;
         };
-        // The free cell of H nearest its centre (first found on a tie).
+        // The free, missile-passable cell of H nearest its centre.
         let r = a.subtiles;
-        let (cx, cy) = (r.x + r.w / 2, r.y + r.h / 2);
-        let mut best: Option<(i64, i32, i32)> = None;
-        for y in r.y..r.y + r.h {
-            for x in r.x..r.x + r.w {
-                let free = a
-                    .collision
-                    .get(x, y)
-                    .is_some_and(|m| m & crate::path::collision::masks::PLAYER_MOVE == 0);
-                let d2 = i64::from(x - cx).pow(2) + i64::from(y - cy).pow(2);
-                if free && best.is_none_or(|(b, _, _)| d2 < b) {
-                    best = Some((d2, x, y));
-                }
-            }
-        }
-        (key(h), a.id, best.map(|(_, x, y)| (x, y)))
+        let cell = nearest_free(a, r.x + r.w / 2, r.y + r.h / 2);
+        (key(h), a.id, cell)
     };
     let (hkey, hroom, cell) = hop;
     let Some((x, y)) = cell else {
@@ -1662,6 +1999,7 @@ mod tests {
         "seed-unit @wp#1 1 2",
         "time 5 1024",
         "pos @player @x+3 @y",
+        "pos @player 100 200 free",
         "hop @player 5100 @y-40",
         "warp 3",
         "warp 3 tile 2",
@@ -1672,6 +2010,15 @@ mod tests {
         "state @player 1 on",
         "state 1/9 2 off",
         "freeze 3",
+        "msg 1 @x+2 @y",
+        "msg 6 1 @1",
+        "msg 60 36 1 4294967295",
+        "msg 96",
+        "operate @wp",
+        "operate @2:267",
+        "talk @1:148",
+        "talk 1/12 trade close",
+        "talk @1:148 gamble hire action:7 quest:92 close",
     ];
 
     // Covers: specs/tools/poke.md §1 r1, §1 r2, §3 r2
@@ -1756,6 +2103,19 @@ mod tests {
             ("goto preset 2", "goto unit"),
             ("goto here 5", "goto unit"),
             ("goto unit 1:x", "bad number"),
+            ("msg", "needs an id"),
+            ("msg 0 1", "msg id 0"),
+            ("msg 0x71", "msg id 113"),
+            ("msg 0x01 @z 1", "a unit is"),
+            ("msg 0x01 -1 2", "bad number"),
+            ("msg 0x01 @x+0 2", "zero offset"),
+            ("operate", "takes 1"),
+            ("operate @wp 1", "takes 1"),
+            ("operate @x", "a unit is"),
+            ("talk", "needs an NPC"),
+            ("talk @1:148 sell", "talk choice"),
+            ("talk @1:148 quest:65536", "quest message 65536"),
+            ("talk @1:148 action:x", "bad number"),
             ("", "empty"),
         ] {
             let e = parse_directive_text(line).unwrap_err();
@@ -1801,11 +2161,82 @@ mod tests {
         }
     }
 
+    // Covers: specs/tools/poke.md §1 r2, §5 r4
+    #[test]
+    fn operate_and_talk_are_the_handler_calls_in_order() {
+        let calls = |line: &str, ty, guid| {
+            let d = parse_directive_text(line).unwrap();
+            interact_calls_with(&d, ty, guid, 1)
+                .into_iter()
+                .map(|c| (c.id, c.values))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(calls("operate @wp", 2, 18), [(0x13, vec![2, 18])]);
+        assert_eq!(
+            calls("talk @1:148", 1, 12),
+            [(0x13, vec![1, 12]), (0x2F, vec![12])]
+        );
+        assert_eq!(
+            calls(
+                "talk @1:148 trade gamble hire action:7 quest:92 close",
+                1,
+                12
+            ),
+            [
+                (0x13, vec![1, 12]),
+                (0x2F, vec![12]),
+                (0x38, vec![1, 12, 0]),
+                (0x38, vec![2, 12, 0]),
+                (0x38, vec![3, 12, 1]),
+                (0x38, vec![7, 12, 0]),
+                (0x31, vec![12, 92]),
+                (0x30, vec![12]),
+            ]
+        );
+        assert!(calls("freeze 1", 1, 12).is_empty());
+    }
+
+    // Covers: specs/tools/poke.md §5 r3
+    #[test]
+    fn msg_references_resolve_to_positions_and_guids() {
+        // Player at (100, 200); `@1` (the first monster) has GUID 42.
+        let resolve = |a: MsgArg| match a {
+            MsgArg::Num(v) => Ok(i64::from(v)),
+            MsgArg::Pos(Coord::X(d)) => Ok(100 + i64::from(d)),
+            MsgArg::Pos(Coord::Y(d)) => Ok(200 + i64::from(d)),
+            MsgArg::Pos(Coord::Num(_)) => unreachable!(),
+            MsgArg::Unit(UnitArg::Nth { ty: 1, .. }) => Ok(42),
+            MsgArg::Unit(u) => Err(u.to_string()),
+        };
+        let values = |line: &str| {
+            let Directive::Msg { args, .. } = parse_directive_text(line).unwrap() else {
+                panic!("{line}");
+            };
+            msg_values_with(&args, resolve)
+        };
+        assert_eq!(values("msg 0x01 @x+2 @y-201").unwrap(), [102, -1]);
+        assert_eq!(values("msg 0x06 0x1 @1").unwrap(), [1, 42]);
+        assert_eq!(values("msg 0x60").unwrap(), [] as [i64; 0]);
+        assert_eq!(values("msg 0x06 1 @3").unwrap_err(), "@3");
+        // The token decides the kind: position, unit, number.
+        assert_eq!(
+            parse_directive_text("msg 2 1 1/77 ").unwrap(),
+            Directive::Msg {
+                id: 2,
+                args: vec![
+                    MsgArg::Num(1),
+                    MsgArg::Unit(UnitArg::Guid { ty: 1, guid: 77 })
+                ],
+            }
+        );
+    }
+
     #[test]
     fn results_name_their_code() {
         assert_eq!(PokeResult::Ok(Some(3)).code(), "ok");
         assert_eq!(PokeResult::Ok(Some(3)).guid(), Some(3));
         assert_eq!(PokeResult::Failed.code(), "failed");
+        assert_eq!(PokeResult::FailedWith("x".into()).code(), "failed");
         assert_eq!(PokeResult::Unresolved("@1".into()).code(), "unresolved");
         assert_eq!(PokeResult::Gap("x".into()).guid(), None);
     }

@@ -576,6 +576,7 @@ impl Fx {
             levels: levels(),
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
+            monequip: Vec::new(),
         };
         let book = Book::default();
         let gold_tables = gold_item_tables();
@@ -608,7 +609,14 @@ impl Fx {
         }));
         hooks.vitals = Some(Arc::new(vitals()));
         let wt = WorldTables {
-            pop: PopTables::from_records(&levels(), &[monster_class()], &monstats2(), &[]),
+            // Class 1 (the mercenary) too: its creation is `0x005B23C0`'s
+            // placement (`population.md` §9), which needs both rows.
+            pop: PopTables::from_records(
+                &levels(),
+                &[monster_class(), monster_class()],
+                &monstats2(),
+                &[],
+            ),
             monstats: vec![monster_class()],
             monstats2: monstats2(),
             monlvl: vec![blank::<Monlvl>(); 10],
@@ -1289,17 +1297,19 @@ fn a_population_monster_killed_with_a_missile() {
     // runs nothing there (`UnitHooks::monster_mode_function` default), so
     // the monster stays in mode 0 instead of reaching DD (12).
     // The AI think the client's room join scheduled
-    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`; Idle → 203) is
-    // still pending beside it.
+    // (`intents-events.md` §7.8 rule 2.3, `0x00573780`; Idle → 203) was
+    // cancelled by the death clean-up's `0x005738D0` (`units.md` §4.6
+    // rule 1.2).
     let timers = fx.timers(monster);
-    assert_eq!(timers.len(), 2, "{timers:?}");
-    assert_eq!(timers[1], (2, 203));
+    assert_eq!(timers.len(), 1, "{timers:?}");
     let (ev, end) = timers[0];
     assert_eq!(ev, 1);
     while fx.host.game.game.frame < end + 2 {
         transcript.extend(fx.step(&[]).1);
     }
-    assert_eq!(fx.timers(monster), [(2, 203)]);
+    // Nothing is left pending on the dead monster (`units.md` §4.6
+    // "What keeps a dead monster dead").
+    assert_eq!(fx.timers(monster), []);
     // `impl-monster-death`: DT event 1 (`0x005A72B0`) now sets mode 12 (DD).
     assert_eq!(fx.mode(monster), 12, "the DT end sets DD");
     // `intents-events.md` §7.4 rule 7 states the death messages (0x69

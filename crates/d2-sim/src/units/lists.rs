@@ -226,9 +226,22 @@ pub struct RoomEntry {
     /// Update queue head (+0x1C).
     update_head: Option<UnitId>,
     allied_count: u32,
+    /// Room +0x38..+0x44: the GUIDs of the room's last four dead units
+    /// (`0x0061AFA0`, `units.md` §4.6 rule 1.3), slot order; 0 before a
+    /// slot is written (the room record is zeroed).
+    pub dead_guids: [u32; 4],
+    /// Room byte +0x14: the next slot of [`Self::dead_guids`] (0–3).
+    pub dead_next: u8,
 }
 
 impl RoomEntry {
+    /// `0x0061AFA0(room, GUID)` (`units.md` §4.6 rule 3.1): the GUID goes
+    /// to slot byte +0x14, which then advances modulo 4.
+    pub fn record_dead(&mut self, guid: u32) {
+        self.dead_guids[usize::from(self.dead_next & 3)] = guid;
+        self.dead_next = (self.dead_next + 1) & 3;
+    }
+
     /// Whether the room is in its act's room list.
     pub fn is_active(&self) -> bool {
         self.active
@@ -636,6 +649,8 @@ impl UnitLists {
             units_head: None,
             update_head: None,
             allied_count: 0,
+            dead_guids: [0; 4],
+            dead_next: 0,
         })))
     }
 

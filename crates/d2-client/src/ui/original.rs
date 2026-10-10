@@ -199,6 +199,9 @@ struct Facts {
     /// The local player has a hireling (`0x00478F20(P, 7)` ≠ −1), for the
     /// hireling key (`ui/controls.md` §3 cmd 54).
     has_hireling: bool,
+    /// An item worn at body location 8 (a belt, item type 0x13), for the
+    /// belt key (`ui/controls.md` §3 cmd 22).
+    has_belt: bool,
 }
 
 impl Facts {
@@ -216,6 +219,9 @@ impl Facts {
             local: local.map(|u| u.key),
             player_room: local.is_some_and(|u| u.position.is_some()),
             has_hireling: local.is_some_and(|u| world.hireling_guid(Some(u.key)) != u32::MAX),
+            has_belt: crate::bridge::items::local_items(world)
+                .iter()
+                .any(|i| i.mode == crate::bridge::items::mode::BODY && i.body == 8),
         }
     }
 }
@@ -421,6 +427,7 @@ impl OriginalUi {
                 local: None,
                 player_room: false,
                 has_hireling: false,
+                has_belt: false,
             },
             mouse: Point::new(0, 0),
             outputs: Vec::new(),
@@ -485,6 +492,7 @@ impl OriginalUi {
         root.add(Box::new(quest_log_ui::QuestLogUi {
             sh: sh.clone(),
             log: Default::default(),
+            shown: Default::default(),
         }))?;
         root.add(Box::new(InventoryUi {
             sh: sh.clone(),
@@ -841,6 +849,12 @@ impl OriginalUi {
                 };
                 if ok {
                     self.set_ui(u32::from(super::states::id::MERC_INV), 2, true)?;
+                }
+            } else if a == ActionId(Action::ToggleBelt.index() as u16) {
+                // Command 22 (`0x00468F00`): a worn belt, then
+                // SetUIState(0x1F, toggle, 0) (`ui/controls.md` §3).
+                if self.shared.borrow().facts.has_belt {
+                    self.set_ui(0x1F, 2, false)?;
                 }
             } else if let Some(ui) = hotkey_state(a) {
                 // §4.3: the Character, Inventory, Party, Skill Tree and
@@ -1342,7 +1356,8 @@ impl Panel for InventoryUi {
                 sh.outputs.extend(out);
             }
             None => {
-                // Right press: use the item under the mouse (REC-117).
+                // Right press: use the item under the mouse (`0x00487740`,
+                // `items/use.md` Inputs).
                 if let UiEvent::Press {
                     button: PointerButton::Right,
                     at,
@@ -1767,28 +1782,40 @@ impl CharacterUi {
             experience: &sh.hud.tables.experience,
         };
         let env = sh.env();
-        self.panel
-            .draw(&sh.tables, &env, &view, fonts, ctx.strings, out);
-        super::char_feed::damage_block(
-            ctx.world,
-            key,
-            &sh.char_tables,
-            ctx.strings,
-            &env.screen,
+        // 1.14d order (`panels/character.rs` `draw_staged`): labels, the skill
+        // damage blocks, the close button, the class and name lines, values.
+        self.panel.draw_staged(
+            &sh.tables,
+            &env,
+            &view,
             fonts,
+            ctx.strings,
             out,
+            &mut |stage, out| match stage {
+                character::Stage::Labels => super::char_feed::damage_block(
+                    ctx.world,
+                    key,
+                    &sh.char_tables,
+                    ctx.strings,
+                    &env.screen,
+                    fonts,
+                    out,
+                ),
+                character::Stage::Close => {
+                    if let Some(u) = ctx.world.units.get(&key) {
+                        super::char_feed::class_line(
+                            u.class,
+                            &sh.char_tables,
+                            ctx.strings,
+                            &env.screen,
+                            fonts,
+                            out,
+                        );
+                    }
+                    name_line(name, &env.screen, fonts, out);
+                }
+            },
         );
-        if let Some(u) = ctx.world.units.get(&key) {
-            super::char_feed::class_line(
-                u.class,
-                &sh.char_tables,
-                ctx.strings,
-                &env.screen,
-                fonts,
-                out,
-            );
-        }
-        name_line(name, &env.screen, fonts, out);
     }
 
     fn draw_static(&self, sh: &Shared, out: &mut dyn UiDrawSink) {

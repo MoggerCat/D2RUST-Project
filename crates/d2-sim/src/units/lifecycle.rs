@@ -79,17 +79,38 @@ pub trait LifecycleHooks: UnitHooks {
         None
     }
 
+    /// The Town Portal cast `0x005BE290(game, player; item, …)`
+    /// (`world/objects-2.md` §27.1), word 1 of item-use entry 2
+    /// (`items/use.md` §4), asked by the item use of a call that holds
+    /// the units and the game seed (`seed`: the call's game seed, drawn by
+    /// the portal objects' allocation, `rng.md` §5.3): the result (1 made,
+    /// 0 not) and whether the cast's own S→C 0x7C for the item is due
+    /// (step 9). Provider: the host that owns the objects and the path
+    /// code; `None` (the default): no such host (the desk then records a
+    /// request, `wiring/inventory/town_portal.rs`).
+    fn town_portal_cast(
+        &mut self,
+        sim: &mut Sim<'_>,
+        seed: &mut Seed,
+        player: UnitId,
+    ) -> Option<(u32, bool)> {
+        None
+    }
+
     /// The free routine's other calls (§1 table) and `0x005C0A90`,
     /// `0x00571F40` at removal. Provider: the kind's spec.
     fn free_kind(&mut self, sim: &mut Sim<'_>, unit: UnitId) {}
 
-    /// The monster of `class` allocated beside `near` in its room
-    /// (`npc.md` §7.3 step 7, `hirelings.md` §3.1: the mercenary's
-    /// creation). Provider: the host that owns the path code; `None`
-    /// (the default) leaves the creation to the NPC rest.
+    /// The monster of `class` created near `near`
+    /// (`0x005B23C0(game, near, class, mode, 4, 0)`, `npc.md` §7.3 step
+    /// 7, `hirelings.md` §3.1: the mercenary's creation), its allocation
+    /// drawing `seed` (the game seed, `rng.md` §5.3). Provider: the host
+    /// that owns the path code; `None` (the default) leaves the creation
+    /// to the NPC rest.
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
+        seed: &mut Seed,
         near: UnitId,
         class: u32,
         mode: u8,

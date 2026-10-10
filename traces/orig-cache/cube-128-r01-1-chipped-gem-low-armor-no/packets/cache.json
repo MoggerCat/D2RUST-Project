@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-128-r01-1-chipped-gem-low-armor-no",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "decb48c9608cf5839b0fe19b3b42c9c0d93ecb4698f40ce17b1c8dfd7657d113",
+   "size": 46421
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "4c40c39e56ec4e4ef5e9613330a18883b8eb0450c33fcec8202220dd0d3e1eff",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "3e83d1438480ba75771b03396e3f292e34bf77d55c5bd31dba5cad19d97e06a6"
+ }
+}

@@ -258,7 +258,7 @@ pub const CREATE_FLAGS_CLASSIC: u32 = 0x4;
 /// The local client's C→S 0x67 for `character` (`client/model.md` §7
 /// rule 9): game name empty (byte 1 = 0), game type 3 (client type 0),
 /// the character's class and name ([`Character::Save`]: the save's
-/// class +0x28 and name +0x14), template 0, the game's difficulty,
+/// name +0x14; class byte 0, REC-1130), template 0, the game's difficulty,
 /// u16@0x25 = 0, the flags of an expansion or a classic character (save
 /// status bit 5), @0x2B = @0x2C = 0, language id 0. Bytes after a name's
 /// NUL are zero.
@@ -266,8 +266,14 @@ pub fn create_request_for(character: &Character) -> CreateGame {
     let (class, name, expansion) = match character {
         Character::New => (PLAYER_CLASS as u8, PLAYER_NAME, GAME_SETUP.expansion),
         Character::Named(c) => (c.class, c.name(), GAME_SETUP.expansion),
+        // PROVISIONAL (REC-1130): an existing character picked from the
+        // menu leaves the builder's class byte `[0x007A0522]` at 0 (the
+        // create screen and `-bar` style switches set it); recorded in
+        // 1.14d, checks combat-melee-fallen / combat-potion-midfight
+        // (packets, frame 1: byte 18 = 0 for a level-3 Barbarian). The
+        // server takes the class from the save (`d2s.md` header +0x28).
         Character::Save(save, _) => (
-            save.header.class,
+            0,
             save.header.name_bytes(),
             save.header.status & d2_formats::d2s::status::EXPANSION != 0,
         ),
@@ -504,6 +510,11 @@ pub struct LocalSeams {
     /// The players and monsters of [`Self::sides`] that are dying or dead
     /// (player modes 0 / 17, monster modes 0 / 12), for the target search.
     pub down: std::collections::BTreeSet<UnitId>,
+    /// The players and monsters of [`Self::sides`] without unit flag 0x4
+    /// (+0xC4: monstats2 `isAtt` for a monster, `monsters/init.md` "Outputs";
+    /// set for every player, `sim/units.md` §1), which the scan 6 filter
+    /// `0x005DC970` skips (`ai.md` §5.3 scan 6 rule 1).
+    pub not_att: std::collections::BTreeSet<UnitId>,
     /// The unit size (`0x00620510`, the path record's) of the units of
     /// [`Self::sides`], for the full-size distance of the target search.
     pub sizes: BTreeMap<UnitId, i32>,
@@ -590,6 +601,17 @@ impl LocalSeams {
     /// classes, the line test (mask 4) and `0x005DD510` are not applied
     /// here, nor the scan 5 callback `0x005DCA70`.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
+        self.nearest_foe_where(unit, range, full_size, |_| true)
+    }
+
+    /// [`Self::nearest_foe`] among the candidates `keep` accepts.
+    fn nearest_foe_where(
+        &self,
+        unit: UnitId,
+        range: i32,
+        full_size: bool,
+        keep: impl Fn(UnitId) -> bool,
+    ) -> Option<(UnitId, i32)> {
         let &(_, _, at) = self.sides.get(&unit)?;
         let side = self.player_side(unit)?;
         let size = self.sizes.get(&unit).copied().unwrap_or(0);
@@ -600,6 +622,7 @@ impl LocalSeams {
                     && ty == UnitType::Monster
                     && self.player_side(u) != Some(side)
                     && !self.down.contains(&u)
+                    && keep(u)
             })
             .map(|(&u, &(_, _, p))| {
                 let d = if full_size {
@@ -648,8 +671,20 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             })
         })
         .collect();
+    let not_att = classes
+        .keys()
+        .copied()
+        .filter(|&u| {
+            sim.action
+                .sys
+                .units
+                .get(u)
+                .is_some_and(|r| r.flags & d2_sim::monsters::init::unit_flag::IS_ATT == 0)
+        })
+        .collect();
     let hooks = &mut sim.action.sys.hooks;
     hooks.x.down = down;
+    hooks.x.not_att = not_att;
     // d2rs-own, unverified (q-assassin-gaps, REC-233): a listed pet is on the
     // player side (the summon's alignment effect, `0x005543B0`, is not wired).
     let pets: std::collections::BTreeSet<u32> = hooks
@@ -674,6 +709,8 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
+    let levels = hooks.monster_skills.clone();
+    hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
     let mut units = BTreeMap::new();
@@ -1015,6 +1052,9 @@ impl Pending for LocalSeams {
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
     }
+    fn item_type_class(&self, item: UnitId) -> u32 {
+        self.weapons.type_class(item)
+    }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
     }
@@ -1094,13 +1134,37 @@ impl Pending for LocalSeams {
         self.nearest_foe(unit, GOOD_SEARCH_RANGE, false)
     }
     /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
-    /// < 49 (`ai.md` §5.3 scan 6), with the preview's melee flag; none:
-    /// distance 0x7FFFFFFF.
+    /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
+    /// 0x4 (scan 6 rule 1, `0x00451F30(C, 4)`), with the preview's melee
+    /// flag; none: distance 0x7FFFFFFF.
     fn secondary_target(&mut self, _: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        match self.nearest_foe(unit, SECONDARY_SEARCH_RANGE, true) {
+        let found = self.nearest_foe_where(unit, SECONDARY_SEARCH_RANGE, true, |u| {
+            !self.not_att.contains(&u)
+        });
+        match found {
             Some((t, d)) => (Some(t), d, self.in_melee_range(unit, t, 0)),
             None => (None, 0x7FFF_FFFF, false),
         }
+    }
+    /// The live foes of `unit` with unit flag 0x4 in unit-key order (the
+    /// scan 6 candidates, filter `0x005DC970`'s `0x00451F30(C, 4)`,
+    /// `ai.md` §5.3 scan 6 rule 1; the distance, threat class and line
+    /// gates run in the sim's `secondary_target`).
+    fn secondary_candidates(&mut self, _: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        let side = self.player_side(unit)?;
+        Some(
+            self.sides
+                .iter()
+                .filter(|&(&u, &(ty, ..))| {
+                    u != unit
+                        && ty == UnitType::Monster
+                        && self.player_side(u) != Some(side)
+                        && !self.down.contains(&u)
+                        && !self.not_att.contains(&u)
+                })
+                .map(|(&u, _)| u)
+                .collect(),
+        )
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, u: UnitId) -> i32 {
@@ -1723,6 +1787,24 @@ pub fn client_skill_rows(archives: &dyn TableFiles) -> Result<Vec<SkillRow>, Bui
     Ok(rows.iter().map(super::skill_rest::skill_row).collect())
 }
 
+/// The client player update's animation lookup
+/// ([`super::anim_names::ClientPlayerAnims`]): the user's `AnimData.d2`,
+/// the art's token tables and the items tables.
+pub fn client_player_anims(
+    data: &GameData,
+) -> Result<super::anim_names::ClientPlayerAnims, BuildError> {
+    let GameData::Live(d) = data;
+    let looks = crate::world_view::unit_assets::UnitLooks::live(d.archives.as_ref())
+        .map_err(BuildError::Tables)?;
+    let inv = InvTables::from_fixed(&d.tables.fixed)
+        .map_err(|e| BuildError::Tables(format!("inventory tables: {e}")))?;
+    Ok(super::anim_names::ClientPlayerAnims::new(
+        Arc::new(looks),
+        Arc::new(d.tables.anim.clone()),
+        &inv,
+    ))
+}
+
 /// Each class's `charstats` `Skill 1`…`Skill 10` (`client/msg-skills.md`
 /// §2 rule 8), one entry per `charstats` row, from the user's table.
 pub fn client_class_skills(archives: &dyn TableFiles) -> Result<Vec<[u16; 10]>, BuildError> {
@@ -2313,9 +2395,15 @@ fn loader(
     cold_plains_wp: Option<u8>,
 ) -> CharacterLoader<WorldSim<LocalSeams>, World> {
     Box::new(move |s: &mut Sim, _: ClientId, r: &CreateGame| {
+        // A save's own class allocates the player: the request's class
+        // byte is 0 for an existing character (REC-1130, `create_request_for`).
+        let class = match &character {
+            Character::Save(save, _) => save.header.class,
+            _ => r.class,
+        };
         let req = AllocRequest {
             ty: UnitType::Player,
-            class: u32::from(r.class),
+            class: u32::from(class),
             room: None,
             add: true,
             fixed_guid: None,
@@ -2340,7 +2428,7 @@ fn loader(
                 .hooks()
                 .x
                 .log
-                .push(format!("join: allocating player class {} failed", r.class));
+                .push(format!("join: allocating player class {class} failed"));
             return Err(LOAD_FAILED);
         };
         if let Some(u) = s.events.action.sys.units.get_mut(player) {
@@ -2744,6 +2832,27 @@ mod target_search_tests {
             Some(UnitId(2))
         );
         assert_eq!(seams(152, 3).secondary_target(&mut g, UnitId(1)).0, None);
+    }
+
+    // Covers: specs/monsters/ai.md §5.3 r1
+    #[test]
+    fn the_secondary_search_skips_a_unit_without_flag_4() {
+        // 1.14d `merc-rogue-cow`: the cow (monstats2 `isAtt` 0) is never
+        // the hireling's target; the window and the other unit stay.
+        let mut g = Game::default();
+        let mut s = seams(110, 0);
+        s.not_att.insert(UnitId(2));
+        assert_eq!(
+            s.secondary_target(&mut g, UnitId(1)),
+            (None, 0x7FFF_FFFF, false)
+        );
+        s.sides
+            .insert(UnitId(3), (UnitType::Monster, false, (120, 100)));
+        assert_eq!(s.secondary_target(&mut g, UnitId(1)).0, Some(UnitId(3)));
+        assert_eq!(
+            s.secondary_candidates(&mut g, UnitId(1)),
+            Some(vec![UnitId(3)])
+        );
     }
 
     // Covers: specs/monsters/ai.md §5.2 r4

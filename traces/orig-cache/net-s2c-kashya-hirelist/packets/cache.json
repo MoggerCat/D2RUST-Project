@@ -1,0 +1,44 @@
+{
+ "channel": "packets",
+ "check": "net-s2c-kashya-hirelist",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "50",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 goto unit 1:150",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:150",
+  "--send",
+  "16 InitEntityChat id=@1:150",
+  "--send",
+  "18 EntityAction action=3 npc=@1:150 item=0",
+  "--send",
+  "21 TerminateEntityChat id=@1:150"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "2dba97be8593829563144100f9d5791affa19d27781ebb89f2cad799095317ec",
+   "size": 79900
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "06777143bab51f1dd1a96cd6371fbe8ed5c6487b7a869d151b190fd9c0972680",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "48f993bd2c8feebb14fb828f7490eb0c77584320d516f56af3cf852c09a0085e"
+ }
+}

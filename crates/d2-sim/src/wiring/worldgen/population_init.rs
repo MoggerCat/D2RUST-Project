@@ -71,6 +71,19 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         x: i32,
         y: i32,
     ) {
+        // PROVISIONAL (`monsters/ai.md` §5.2, `population.md` §9.6 step 3;
+        // REC-1698): the record is kept by identity (act, rect, index);
+        // a given record `rect` is the caller's, else the one at (x, y).
+        let act = self.game.lists.room(room).map(|r| r.act);
+        let rec =
+            rect.or_else(|| crate::monsters::population::PopWorld::coord_at(self, room, x, y));
+        if let (Some(act), Some(m)) = (act, self.w.monsters.get_mut(unit)) {
+            m.vision = rec.map(|c| crate::monsters::init::VisionRecord {
+                act,
+                rect: c.rect,
+                index: c.index,
+            });
+        }
         self.v.h.x.set_coord_record(unit, rect, room, x, y);
     }
 
@@ -155,11 +168,15 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
     /// Both keys name the unit's GUID (`0x00451F50`: unit +0x0C,
     /// `population.md` §10.2 step 3).
     ///
-    /// PROVISIONAL (umod-callbacks.md §1 r5, REC-892): what the restart
-    /// `0x005DD230` does for f1 / f2 ≠ 0 is not stated; nothing is done
-    /// for them here.
+    /// f2 ≠ 0 → control flags |= 0x2, f1 ≠ 0 → |= 0x1 (`0x005DD230(C,
+    /// bit, 1)`: a zero flag leaves its bit as it was; no AI restart),
+    /// whether or not the owner lookup succeeds (`umod-callbacks.md` §1
+    /// rule 5).
     fn set_owner_data(&mut self, unit: UnitId, owner: OwnerKey, a: i32, b: i32, c: i32) {
         let (OwnerKey::Guid(o) | OwnerKey::DataOf(o)) = owner;
+        if let Some(ctl) = self.v.h.ai.as_mut().and_then(|s| s.control_mut(unit)) {
+            ctl.flags |= (if c != 0 { 0x2 } else { 0 }) | (if b != 0 { 0x1 } else { 0 });
+        }
         let guid = self.game.lists.unit(o).map(|e| e.guid);
         let ty = u8::try_from(a)
             .ok()

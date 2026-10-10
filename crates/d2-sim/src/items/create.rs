@@ -76,7 +76,9 @@ pub fn create_item<S: ItemStats>(
     item.init_seed = item.unit_seed.lo;
     item.start_seed = game.seed().step();
     item.item_seed = Seed::init_low(item.start_seed);
-    item.flags |= flag::INIT;
+    // §1.4: the item kind's init sets 0x10 at allocation; only a successful
+    // quality routine clears it.
+    item.flags |= flag::INIT | flag::IDENTIFIED;
     if use_seed || rq.force {
         item.unit_seed = Seed::init_low(rq.seed);
         item.init_seed = rq.seed;
