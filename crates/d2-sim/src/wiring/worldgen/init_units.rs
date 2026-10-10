@@ -332,14 +332,29 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn hostile(&self, a: UnitId, b: UnitId) -> bool {
         self.v.h.x.may_attack(a, b)
     }
-    fn target(&self, unit: UnitId) -> Option<UnitId> {
-        self.v.h.x.umod_target(unit)
+    /// `0x00553540` (`skills/bodies.md` §2.1) on the path provider;
+    /// without it the host's answer.
+    fn target(&mut self, unit: UnitId) -> Option<UnitId> {
+        if self.v.h.paths.is_none() {
+            return self.v.h.x.umod_target(unit);
+        }
+        self.v.path_target_checked(self.game, unit)
     }
-    fn target_position(&self, unit: UnitId) -> Option<(i32, i32)> {
-        self.v.h.x.umod_target_position(unit)
+    /// `0x0056D2C0` (`skills/bodies.md` §2.4) on the path provider;
+    /// without it the host's answer.
+    fn target_position(&mut self, unit: UnitId) -> Option<(i32, i32)> {
+        match self.v.path_target_position(self.game, unit) {
+            Some(p) => p,
+            None => self.v.h.x.umod_target_position(unit),
+        }
     }
+    /// The missile path's target point (`0x00648A00` / `0x00648A10`,
+    /// multishot `umod-callbacks.md` §19 step 3) with the path provider;
+    /// without it the host's answer.
     fn path_target_point(&self, missile: UnitId) -> (i32, i32) {
-        self.v.h.x.path_target_point(missile)
+        self.v
+            .path_target_xy(missile)
+            .unwrap_or_else(|| self.v.h.x.path_target_point(missile))
     }
     fn create_missile(
         &mut self,

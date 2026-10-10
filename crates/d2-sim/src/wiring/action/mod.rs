@@ -76,7 +76,8 @@ pub use dispatch::{ActionSim, INVENTORY_REFRESH_EX};
 pub use hirelings::HirelingCall;
 pub use monsters::MonsterWorld;
 pub use objects::{
-    ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView, QuestObjectCall, QuestObjectHost,
+    CainPortal, CainPortalOut, ObjectCase, ObjectReach, ObjectRoute, ObjectState, ObjectView,
+    QuestObjectCall, QuestObjectHost,
 };
 pub use pending::{KillStep, NoPending, Pending, QuestEvent, SkillEvent};
 

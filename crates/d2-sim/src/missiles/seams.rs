@@ -165,7 +165,15 @@ pub trait MissileHooks {
     /// The parameter record's init callback (§R2.3 step 21).
     fn init_callback(&mut self, game: &mut Game, missile: UnitId, callback: u32, arg: u32);
     /// Unique-mod hook `0x005A43B0` for a monster owner (§R2.3 step 28).
-    fn unique_mod_missile(&mut self, game: &mut Game, owner: UnitId, missile: UnitId);
+    /// `store` is the creation's store: the hook's own creations
+    /// (multishot, `umod-callbacks.md` §19) are made in it.
+    fn unique_mod_missile(
+        &mut self,
+        game: &mut Game,
+        store: &mut super::MissileStore,
+        owner: UnitId,
+        missile: UnitId,
+    );
 }
 
 /// The skills formula a server body evaluates (`skills/levels.md`

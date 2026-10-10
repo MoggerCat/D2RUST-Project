@@ -108,6 +108,12 @@ impl<X: WorldPending> WorldHost<'_, X> {
             return None;
         };
         let t = self.v.h.tables.clone();
+        // The creation runs the owner's mode-5 umods (`0x005A43B0`,
+        // multishot §19): the world goes back to the hooks for it, as
+        // for a mode set.
+        let placeholder = self.w.placeholder();
+        let real = std::mem::replace(&mut *self.w, placeholder);
+        let lent = self.v.h.relend_monster_world(Box::new(real));
         let made = {
             let mut cx = missiles::Ctx {
                 tables: &t.missiles,
@@ -116,6 +122,15 @@ impl<X: WorldPending> WorldHost<'_, X> {
             };
             missiles::create_missile(self.game, &mut cx, &p)
         };
+        match self.v.h.take_relent_monster_world(lent) {
+            Some(w) => *self.w = w,
+            None => self
+                .w
+                .errors
+                .push(WorldgenError::Wiring(WiringError::Reentrant(
+                    "umod missile creation",
+                ))),
+        }
         self.v.h.missiles = Some(store);
         made
     }

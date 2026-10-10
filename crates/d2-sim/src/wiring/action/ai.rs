@@ -20,7 +20,7 @@ use crate::units::hooks::Sim;
 use crate::units::record::flags;
 use crate::units::{RoomId, UnitId, UnitType};
 
-use super::objects::ObjectRoute;
+use super::objects::{CainPortal, CainPortalOut, ObjectRoute};
 use super::units::clear_uninterruptable;
 use super::{Pending, View, WiringError};
 use crate::world::objects::Dispatch;
@@ -638,15 +638,49 @@ impl<X: Pending> AiSkills for View<'_, X> {
     }
 }
 
+impl<X: Pending> View<'_, X> {
+    /// A cain1 portal call on the lent quest control; `None` for
+    /// drehyaiced or without one.
+    fn cain_portal(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        npc: PortalNpc,
+        call: CainPortal,
+    ) -> Option<CainPortalOut> {
+        if npc != PortalNpc::Cain {
+            return None;
+        }
+        let mut host = self.h.quest_host.take()?;
+        let r = host.cain_portal(game, self, unit, call);
+        self.h.quest_host = Some(host);
+        r
+    }
+}
+
 impl<X: Pending> AiQuests for View<'_, X> {
+    /// cain1: the lent quest control's A1Q4 calls
+    /// (`world/quests-act1-rest.md` §3); drehyaiced, or a host without
+    /// quests: [`Pending`]'s.
     fn portal_setup(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
-        self.h.x.portal_setup(game, unit, npc)
+        match self.cain_portal(game, unit, npc, CainPortal::Setup) {
+            Some(CainPortalOut::Done(b)) => b,
+            _ => self.h.x.portal_setup(game, unit, npc),
+        }
     }
     fn spawn_town_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) {
-        self.h.x.spawn_town_portal(game, unit, npc);
+        if self
+            .cain_portal(game, unit, npc, CainPortal::SpawnTown)
+            .is_none()
+        {
+            self.h.x.spawn_town_portal(game, unit, npc);
+        }
     }
     fn spawn_outside_portal(&mut self, game: &mut Game, unit: UnitId, npc: PortalNpc) -> bool {
-        self.h.x.spawn_outside_portal(game, unit, npc)
+        match self.cain_portal(game, unit, npc, CainPortal::SpawnOutside) {
+            Some(CainPortalOut::Done(b)) => b,
+            _ => self.h.x.spawn_outside_portal(game, unit, npc),
+        }
     }
     fn portal_coords(
         &mut self,
@@ -654,7 +688,10 @@ impl<X: Pending> AiQuests for View<'_, X> {
         unit: UnitId,
         npc: PortalNpc,
     ) -> Option<(i32, i32)> {
-        self.h.x.portal_coords(game, unit, npc)
+        match self.cain_portal(game, unit, npc, CainPortal::Point) {
+            Some(CainPortalOut::Point(p)) => p,
+            _ => self.h.x.portal_coords(game, unit, npc),
+        }
     }
     fn drehya_update(&mut self, game: &mut Game) {
         self.h.x.drehya_update(game);
@@ -942,8 +979,15 @@ impl<X: Pending> AiActs for View<'_, X> {
     ) -> Option<(i32, i32)> {
         self.h.x.ai_free_spot_for(game, unit, class, x, y)
     }
+    /// `0x00463740` from the unit's room: the room holding (x, y) among
+    /// it and its adjacent rooms (the spawners of `ai-bodies-2.md` §13,
+    /// §13.1). Without the path provider the host's answer.
     fn room_at(&self, game: &Game, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
-        self.h.x.ai_room_at(game, unit, x, y)
+        if self.h.paths.is_none() {
+            return self.h.x.ai_room_at(game, unit, x, y);
+        }
+        let from = game.lists.unit(unit).and_then(|e| e.room())?;
+        self.h.drlg.find_room(game, from, x, y)
     }
     fn move_in_radius(
         &mut self,
@@ -983,6 +1027,28 @@ impl<X: Pending> AiActs for View<'_, X> {
         spread: i32,
         flags: u32,
     ) -> Option<UnitId> {
+        // `0x005B2F20` through population's placement search and creation
+        // (`population.md` §9) on the lent monster world, as the summon
+        // path; `Some(None)` = nothing placed. Without the world: the
+        // host's answer.
+        if self.h.monster_world.is_some() {
+            let mut sim = Sim {
+                game,
+                units: &mut *self.units,
+                stats: &mut *self.stats,
+                data: self.data,
+            };
+            let f = u16::try_from(flags).unwrap_or(0);
+            let placed = self
+                .h
+                .with_monster_world(|w, h| {
+                    w.spawn_at(&mut sim, h, room, x, y, class, mode, spread, f)
+                })
+                .flatten();
+            if let Some(r) = placed {
+                return r;
+            }
+        }
         self.h
             .x
             .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)

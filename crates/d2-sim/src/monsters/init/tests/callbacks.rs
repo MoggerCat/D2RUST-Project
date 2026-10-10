@@ -243,10 +243,10 @@ impl InitHost for Cb {
     fn hostile(&self, _: UnitId, _: UnitId) -> bool {
         self.hostile
     }
-    fn target(&self, unit: UnitId) -> Option<UnitId> {
+    fn target(&mut self, unit: UnitId) -> Option<UnitId> {
         self.targets.get(&unit).copied()
     }
-    fn target_position(&self, _: UnitId) -> Option<(i32, i32)> {
+    fn target_position(&mut self, _: UnitId) -> Option<(i32, i32)> {
         self.target_pos
     }
     fn path_target_point(&self, _: UnitId) -> (i32, i32) {

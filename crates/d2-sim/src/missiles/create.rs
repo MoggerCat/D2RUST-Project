@@ -288,7 +288,7 @@ pub fn create_missile<W: MissileWorld + ?Sized>(
     }
     // Step 28.
     if owner_ty == UnitType::Monster {
-        cx.world.unique_mod_missile(game, owner, m);
+        cx.world.unique_mod_missile(game, cx.store, owner, m);
     }
     // Step 29.
     cx.world

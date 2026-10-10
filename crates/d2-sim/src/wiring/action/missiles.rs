@@ -12,7 +12,7 @@ use crate::combat::{self, result, DamageRecord};
 use crate::game::Game;
 use crate::missiles::{
     result_flag, stat, Damage, MissileCombat, MissileData, MissileHooks, MissilePath, MissileRooms,
-    MissileUnits,
+    MissileStore, MissileUnits,
 };
 use crate::rng::Seed;
 use crate::tick::events::event;
@@ -558,7 +558,32 @@ impl<X: Pending> MissileHooks for View<'_, X> {
     /// umod dispatcher in mode 5 (`init.md` §22, the callbacks get the
     /// missile) on the lent monster world; without one,
     /// [`Pending::unique_mod_missile`].
-    fn unique_mod_missile(&mut self, game: &mut Game, owner: UnitId, missile: UnitId) {
+    fn unique_mod_missile(
+        &mut self,
+        game: &mut Game,
+        store: &mut MissileStore,
+        owner: UnitId,
+        missile: UnitId,
+    ) {
+        // The callbacks create missiles (multishot, `umod-callbacks.md`
+        // §19) in the creation's own store: it is lent back for the call.
+        let lent = self.h.missiles.is_none();
+        if lent {
+            self.h.missiles = Some(std::mem::take(store));
+        }
+        self.unique_mod_missile_lent(game, owner, missile);
+        if lent {
+            match self.h.missiles.take() {
+                Some(s) => *store = s,
+                None => self.h.errors.push(WiringError::Reentrant("missiles")),
+            }
+        }
+    }
+}
+
+impl<X: Pending> View<'_, X> {
+    /// [`MissileHooks::unique_mod_missile`] with the store in the hooks.
+    fn unique_mod_missile_lent(&mut self, game: &mut Game, owner: UnitId, missile: UnitId) {
         let mut sim = Sim {
             game: &mut *game,
             units: &mut *self.units,

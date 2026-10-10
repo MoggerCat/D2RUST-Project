@@ -41,6 +41,29 @@ use crate::world::objects::{
 };
 use crate::world::quests::act2::q4::JerhynStep;
 
+/// Cain's NpcOutOfTown portal calls (`ai-bodies.md` §9.32 table, cain1
+/// column; `world/quests-act1-rest.md` §3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CainPortal {
+    /// Set up the portal point `0x005944B0`.
+    Setup,
+    /// Spawn the town portal (Cain leaves Tristram) `0x005944F0`.
+    SpawnTown,
+    /// Spawn the portal out of town `0x005943B0`.
+    SpawnOutside,
+    /// The portal point `0x00594450`.
+    Point,
+}
+
+/// What a [`CainPortal`] call gave back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CainPortalOut {
+    /// The call's 0 / 1 result (none for the town spawn: always true).
+    Done(bool),
+    /// The portal point (`None`: none).
+    Point(Option<(i32, i32)>),
+}
+
 use super::{Pending, View, WiringError};
 use crate::path::record::ObjectShape;
 use crate::wiring::economy::drop_helpers;
@@ -176,6 +199,19 @@ pub trait QuestObjectHost<X> {
     }
     fn palace_guard_aside(&mut self) -> bool {
         false
+    }
+    /// Cain's portal calls of the NpcOutOfTown AI (`ai-bodies.md` §9.32,
+    /// `world/quests-act1-rest.md` §3) for the AI unit `unit`. `None`:
+    /// no quest state (the caller asks [`Pending`]). Default: none.
+    fn cain_portal(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        unit: UnitId,
+        call: CainPortal,
+    ) -> Option<CainPortalOut> {
+        let _ = (game, v, unit, call);
+        None
     }
     /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8), called from
     /// the preset object placement after the object of `class` (459, 461

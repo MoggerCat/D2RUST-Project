@@ -24,7 +24,9 @@
 use crate::game::Game;
 use crate::items::ItemTables;
 use crate::units::UnitId;
-use crate::wiring::action::{ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View};
+use crate::wiring::action::{
+    CainPortal, CainPortalOut, ObjectRoute, Pending, QuestObjectCall, QuestObjectHost, View,
+};
 use crate::wiring::interaction::NpcRest;
 
 use super::quest_reward::QuestInventory;
@@ -167,6 +169,19 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         q4::guard_at_end(&self.quests)
     }
 
+    fn cain_portal(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        unit: UnitId,
+        call: CainPortal,
+    ) -> Option<CainPortalOut> {
+        match self.on_world(game, v, LoanCall::CainPortal { unit, call }) {
+            LoanOut::Cain(out) => Some(out),
+            _ => None,
+        }
+    }
+
     fn palace_guard_aside(&mut self) -> bool {
         q4::blocker_open(&self.quests)
     }
@@ -252,6 +267,8 @@ enum LoanCall<'c> {
     JerhynState { at: (i32, i32) },
     /// Object init 13: `0x005436B0` for `chain` (`world/quests.md` §4.6).
     ObjectLink { object: UnitId, chain: u8 },
+    /// Cain's NpcOutOfTown portal calls (`world/quests-act1-rest.md` §3).
+    CainPortal { unit: UnitId, call: CainPortal },
 }
 
 /// What a [`LoanCall`] gave back.
@@ -262,6 +279,8 @@ enum LoanOut {
     Active(bool),
     /// `0x0059F580`'s outputs.
     Jerhyn(JerhynStep),
+    /// A Cain portal call's result.
+    Cain(CainPortalOut),
 }
 
 /// `call` on [`HostQuests`] over `econ` and `rest`, with the host's
@@ -319,6 +338,21 @@ fn on_host<'e, X: Pending, R: QuestRest>(
             quests.add_link(&mut w, object, chain, special);
             LoanOut::Active(quests.find(chain).is_some())
         }
+        LoanCall::CainPortal { unit, call } => LoanOut::Cain(match call {
+            CainPortal::Setup => {
+                CainPortalOut::Done(act1::q4::cain_portal_setup(quests, &mut w, unit))
+            }
+            CainPortal::SpawnTown => {
+                act1::q4::cain_leaves_tristram(quests, &mut w);
+                CainPortalOut::Done(true)
+            }
+            CainPortal::SpawnOutside => {
+                CainPortalOut::Done(act1::q4::cain_spawn_outside_portal(quests, &mut w, unit))
+            }
+            CainPortal::Point => {
+                CainPortalOut::Point(act1::q4::cain_portal_point(quests, &mut w, unit))
+            }
+        }),
     }
 }
 

@@ -351,7 +351,7 @@ impl MissileHooks for Fake {
     fn init_callback(&mut self, _: &mut Game, _: UnitId, cb: u32, arg: u32) {
         self.calls.push(format!("init {cb} {arg}"));
     }
-    fn unique_mod_missile(&mut self, _: &mut Game, _: UnitId, _: UnitId) {
+    fn unique_mod_missile(&mut self, _: &mut Game, _: &mut MissileStore, _: UnitId, _: UnitId) {
         self.log.push("umod".into());
     }
 }

@@ -124,6 +124,13 @@ pub struct Extra4 {
     /// +0x96, +0xA4: the Cain portal object and its GUID.
     pub cain_portal: bool,
     pub cain_portal_guid: u32,
+    /// +0x67, +0x9C, +0xA0: the out-of-town Cain portal point is set
+    /// (`0x005944B0`) and the point; +0x95, +0x98: that portal object
+    /// and its GUID (`0x005943B0`, `quests-act1-rest.md` §3).
+    pub out_point_set: bool,
+    pub out_point: (i32, i32),
+    pub out_cain_portal: bool,
+    pub out_cain_portal_guid: u32,
     /// +0x78.
     pub b78: bool,
     /// +0x7C: `bks ` / `bkd ` items in the game.
@@ -1241,6 +1248,73 @@ pub fn cain_leaves_tristram<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W) {
         x.cain_portal = true;
         x.cain_portal_guid = g;
     }
+}
+
+/// Cain's out-of-town portal point `0x005944B0(game, unit)`, the "set up
+/// portal coordinates" call of `cain1`'s NpcOutOfTown AI
+/// (`quests-act1-rest.md` §3): no chain 4 record, or the point already
+/// set → false; else the point := the unit's position, set → true.
+pub fn cain_portal_setup<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, unit: UnitId) -> bool {
+    let Some(i) = ctl.find(CHAIN) else {
+        return false;
+    };
+    if x4(ctl, i).out_point_set {
+        return false;
+    }
+    let at = w.unit_xy(unit).unwrap_or((0, 0));
+    let x = x4(ctl, i);
+    x.out_point = at;
+    x.out_point_set = true;
+    true
+}
+
+/// Cain's portal out of town `0x005943B0(game, unit)` (§3): with the
+/// chain 4 record and no portal yet, the room holding the point from
+/// the unit's room; none → the point moves by (+3, +3); else object 189
+/// at the point, mode 1, and on success the portal and its GUID are
+/// kept. Always true.
+pub fn cain_spawn_outside_portal<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    unit: UnitId,
+) -> bool {
+    let Some(i) = ctl.find(CHAIN) else {
+        return true;
+    };
+    if x4(ctl, i).out_cain_portal {
+        return true;
+    }
+    let (px, py) = x4(ctl, i).out_point;
+    let room = w
+        .unit_position(unit)
+        .and_then(|(_, _, r)| w.room_at(r, px, py));
+    let Some(room) = room else {
+        x4(ctl, i).out_point = (px.wrapping_add(3), py.wrapping_add(3));
+        return true;
+    };
+    if let Some(o) = w.spawn_object(room, px, py, CAIN_PORTAL, 1) {
+        let g = w.guid(o);
+        let x = x4(ctl, i);
+        x.out_cain_portal = true;
+        x.out_cain_portal_guid = g;
+    }
+    true
+}
+
+/// Cain's portal point `0x00594450(game, unit, &out)` (§3): no chain 4
+/// record → none; no out-of-town portal yet → the unit's position; else
+/// the stored point.
+pub fn cain_portal_point<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    unit: UnitId,
+) -> Option<(i32, i32)> {
+    let i = ctl.find(CHAIN)?;
+    let x = x4(ctl, i);
+    if x.out_cain_portal {
+        return Some(x.out_point);
+    }
+    Some(w.unit_xy(unit).unwrap_or((0, 0)))
 }
 
 /// Gibbet init `0x00544990` → `0x00594060` (object 26, `InitFn` 7;

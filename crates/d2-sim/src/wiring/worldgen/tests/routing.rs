@@ -232,14 +232,15 @@ fn missile_hook_runs_umod_mode_5_on_the_missile() {
     let mut want = seed(&mut fx, missile);
     want.step();
     let owner_seed = seed(&mut fx, owner);
-    fx.sim
-        .with(&mut fx.game, |g, v| v.unique_mod_missile(g, owner, missile));
+    fx.sim.with(&mut fx.game, |g, v| {
+        v.unique_mod_missile(g, &mut Default::default(), owner, missile)
+    });
     assert_eq!(seed(&mut fx, missile), want);
     assert_eq!(seed(&mut fx, owner), owner_seed);
     let before = seed(&mut fx, missile);
-    fx.sim
-        .action
-        .with(&mut fx.game, |g, v| v.unique_mod_missile(g, owner, missile));
+    fx.sim.action.with(&mut fx.game, |g, v| {
+        v.unique_mod_missile(g, &mut Default::default(), owner, missile)
+    });
     assert_eq!(seed(&mut fx, missile), before);
     fx.assert_clean();
 }

@@ -23,21 +23,21 @@
 | Inputs | 54–64 |
 | Outputs / state changes | 65–72 |
 | Rules | 73–74 |
-|   1. A1Q4 gibbet (Cain's cage, object class 26) | 75–147 |
-|   2. Cairn stones (object classes 17–21) | 148–195 |
-|   3. Town-Cain marker (object class 385, `InitFn` 54) | 196–222 |
-|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 223–261 |
-|   5. Character progression (`0x00538680(client, step, difficulty)`) | 262–326 |
-|   6. Party list as read by the quest code | 327–352 |
-|   7. Cairn stone-order 0x50: bytes 13–14 | 353–362 |
-|   8. Act I clarifications (implementation questions, 2026-10-06) | 363–433 |
-|   9. Implementation and wiring questions (2026-10-07) | 434–593 |
-| Constants & data dependencies | 594–609 |
-| Randomness | 610–616 |
-| Edge cases & original bugs | 617–640 |
-| Test vectors | 641–672 |
-| Provenance | 673–706 |
-| Open questions | 707–743 |
+|   1. A1Q4 gibbet (Cain's cage, object class 26) | 75–151 |
+|   2. Cairn stones (object classes 17–21) | 152–199 |
+|   3. Town-Cain marker (object class 385, `InitFn` 54) | 200–245 |
+|   4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`) | 246–284 |
+|   5. Character progression (`0x00538680(client, step, difficulty)`) | 285–349 |
+|   6. Party list as read by the quest code | 350–375 |
+|   7. Cairn stone-order 0x50: bytes 13–14 | 376–385 |
+|   8. Act I clarifications (implementation questions, 2026-10-06) | 386–456 |
+|   9. Implementation and wiring questions (2026-10-07) | 457–616 |
+| Constants & data dependencies | 617–632 |
+| Randomness | 633–639 |
+| Edge cases & original bugs | 640–663 |
+| Test vectors | 664–695 |
+| Provenance | 696–729 |
+| Open questions | 730–766 |
 <!-- /index -->
 
 ## Summary
@@ -89,11 +89,15 @@ New chain 4 extra fields (the rest are in `quests-act1.md` §10.6):
 | +0x5C–+0x60 | u8 × 5 | per-stone reset bytes, index = stone class − 17 (§2; zeroed by the init, never set) |
 | +0x62 | u8 | Cain could not be spawned in Tristram |
 | +0x66 | u8 | town portal out of Tristram created by §1.2 |
+| +0x67 | u8 | Cain's out-of-town portal point set by `0x005944B0` (§3) |
 | +0x74 | u32 | scratch: player unit found in Tristram (§1.2 step 4) |
 | +0x80 | u32 | cain portal event-7 count in the Rogue Encampment (§9 item 10) |
 | +0x84, +0x88 | i32 × 2 | position of the town-Cain marker object (§3) |
 | +0x91 | u8 | set to 1 by `0x005944F0` (§3); read by the cain portal's event 7 (§9 item 10) |
 | +0x92 | u8 | the town cain portal may advance to mode 3 (§9 item 10) |
+| +0x95 | u8 | Cain portal object created out of town by `0x005943B0` (§3) |
+| +0x98 | u32 | GUID of that portal object (§3) |
+| +0x9C, +0xA0 | i32 × 2 | Cain's out-of-town portal point (§3) |
 | +0x96 | u8 | Cain portal object created by `0x005944F0` (§3) |
 | +0xA4 | u32 | GUID of that portal object (§3) |
 
@@ -219,6 +223,25 @@ the code pointers at `0x005E77F3` and `0x005E7943` select it by class):
    (cell lookup `0x00463740` from its room), object 189 `cain portal` is
    allocated (`0x00555230(type 2, class 189, …, mode 1)`); on success X
    +0x96 := 1 and X +0xA4 := the object's GUID.
+
+**Cain's portal out of town** (the other three cain1 calls of the
+NpcOutOfTown AI, `monsters/ai-bodies.md` §9.32; rc-c011-gameseed,
+read from the 1.14d functions). No draws.
+
+- **Set up the point** `0x005944B0(game, unit)`: chain 4's record
+  missing → 0. X +0x67 ≠ 0 → 0. Else X +0x9C, +0xA0 := the unit's
+  position (`0x00620870`), X +0x67 := 1; return 1. So only the first
+  call succeeds; the AI's next one "leaves".
+- **Spawn the portal** `0x005943B0(game, unit)`: with chain 4's record
+  and X +0x95 = 0: the room holding (X +0x9C, X +0xA0) from the unit's
+  room (`0x00620BB0`, cell lookup `0x00463740`); none → X +0x9C += 3,
+  X +0xA0 += 3; found → object 189 `cain portal` at the point
+  (`0x00555230(type 2, class 0xBD, x, y, game, room, mode 1, 1, 0)`),
+  on success X +0x95 := 1 and X +0x98 := its GUID. Returns 1 on every
+  path (the AI's "0 = failed" branch is never taken for cain1).
+- **The point** `0x00594450(game, unit, &out)`: chain 4's record
+  missing → 0. X +0x95 = 0 → out := the unit's position; else out :=
+  (X +0x9C, X +0xA0). Return 1.
 
 ### 4. A1Q5 Countess chest trap (`0x005954F0(record, extra)`)
 

@@ -278,11 +278,11 @@ pub trait InitHost {
         false
     }
     /// Target `skills/bodies.md` §2.1 (the unit's target unit).
-    fn target(&self, unit: UnitId) -> Option<UnitId> {
+    fn target(&mut self, unit: UnitId) -> Option<UnitId> {
         None
     }
     /// Target position `0x0056D2C0` (`skills/bodies.md` §2.4).
-    fn target_position(&self, unit: UnitId) -> Option<(i32, i32)> {
+    fn target_position(&mut self, unit: UnitId) -> Option<(i32, i32)> {
         None
     }
     /// The target point of a missile's path (`0x00648A00` /
