@@ -389,3 +389,46 @@ errors.
 
 Open in Step 4: nothing. Waiting on the owner / coordinator: whether to
 refresh the 2,045 stale cache entries (about 50 hours).
+
+## Push 17 (20:45) — merge 5567801d3; Step 4 [rc-sysrender-div] answered; player light regression
+
+New brief from the owner (99 % EQUAL, no deadline; REC ids 3200..3249).
+Ledger after the merge: EQUAL 3465 of 4479, DIVERGED 653, NO-CHECK 278,
+check 0 errors. No ledger row is flagged `needs_pc1` now.
+
+- **Draws re-run** (38 checks, build = integ-r23 4e573a7c5,
+  `traces/pc1/draws-first-diff.tsv`): all still DIVERGED. First difference
+  moved in 6: blood-moor 98:file → 137:x (rain line), cave 65:file →
+  108:frame (menu button frame 0 against 2), fire-bolt and frost-nova
+  98:dir → 106:frame (shadow frame of the cast), inventory and skilltree
+  195:x → 172:frame (the NPC balloon frame, not a function of the tick).
+- **Camera** (`traces/pc1/camera-compare.tsv`, now 38 checks): no value
+  changed; only walk / run differ, as before.
+- **Pixels round 3** (`traces/pc1/pixel-compare-r3.tsv`; pairs in the
+  private repo, `recordings/pc1-2026-10-10/pixel-compare-r3`, 4b292c4b+1):
+  the 25 scenes that show the world fell 13–27 points (town arrival
+  97.78 → 75.83). d2rs no longer draws the lit area around the local
+  player. Read on PC 1: `remove_unit_light` removes the unit's own light,
+  where 1.14d's `0x00461250` removes only the cast light of the skill list
+  (`0x00643A00(U, 0)` → `0x004743D0`, `client/model.md` §8 r4); commit
+  1bc2ef0c2 put that call on the join placement. Row
+  `q-fix-pc1today-cast-light`. Panels that cover the world rose a little
+  (char-skill 99.01 → 99.87, inv-char-tip 97.06 → 99.85).
+- Also seen in the d2rs frame of town arrival: the mini panel and the Help
+  button are drawn (1.14d on PC 1 has both off through the registry) and
+  the cursor sits elsewhere. The recorder on integ does not yet write the
+  registry values (Mini Panel, Help Menu) into its header; the per-frame
+  clock (`cursor.last_step`) and `-ns` are in every capture of this round.
+- **Draws recorder gap** (`?` cells): they come from `facts_render.py`, not
+  from the capture: mode / light / pal of every cel wrapper but `CelDraw`
+  ("argument positions not specified"), the file of text glyphs
+  (`CelDrawColor` from 0x501BC0) and of the balloon (`CelDraw` from
+  0x46E539), and the box of `CelDrawClipped` (automap, 747 rows) and
+  `CelDrawEx`. The cloud holds the claim (C-ui-draws-q); re-recording
+  changes nothing until that lands.
+- **Audio**: all 14 audio checks have Windows voice lists
+  (`traces/audio/win/`, push 16); no new audio check came with this merge.
+- Merge conflicts: the cloud re-recorded 14 `ui-draws-*` cache entries
+  under Wine at the same time; the Windows entries of this round were kept.
+
+Open in Step 4: nothing new for PC 1.
