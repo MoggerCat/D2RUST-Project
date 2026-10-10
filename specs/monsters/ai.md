@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 294–433 |
 |   3. AI control and AI tables | 434–605 |
 |   4. AI parameters | 606–624 |
-|   5. Target selection | 625–963 |
-|   6. Distances and line tests | 964–978 |
-|   7. Tactics helpers | 979–1218 |
-|   8. AI commands and minions | 1219–1245 |
-|   10. The catalogue `ai-functions.tsv` | 1246–1266 |
-| Constants & data dependencies | 1267–1290 |
-| Randomness | 1291–1320 |
-| Edge cases & original bugs | 1321–1362 |
-| Test vectors | 1363–1451 |
-| Provenance | 1452–1512 |
-| Open questions | 1513–1619 |
+|   5. Target selection | 625–961 |
+|   6. Distances and line tests | 962–976 |
+|   7. Tactics helpers | 977–1216 |
+|   8. AI commands and minions | 1217–1243 |
+|   10. The catalogue `ai-functions.tsv` | 1244–1264 |
+| Constants & data dependencies | 1265–1288 |
+| Randomness | 1289–1318 |
+| Edge cases & original bugs | 1319–1360 |
+| Test vectors | 1361–1449 |
+| Provenance | 1450–1510 |
+| Open questions | 1511–1617 |
 <!-- /index -->
 
 ## Summary
@@ -884,9 +884,7 @@ cells tested differ from those at 2. Whether that cell carries
 collision bit 4, or the refusal lies after the scan (the think's
 `0x005DEAD0` / the skill), needs the recorded dx, dy and the collision
 grid at both points (open, REC-1270 follow-up).
-   not below that slot's distance → skip.
-4. Line test `0x00622AA0(scanner, C, 4)` blocked → skip; else the slot
-   := (C, d). The callback always returns 0 (whole scan).
+
 PROVISIONAL (REC-1270): rule 1's "monster C in melee range → skip" holds
 for every monster C, not only one with state 146 (as d2rs reads it: C in
 the scanner's melee range, `0x00622C40` step 3 without the line, d ≤ 0 or
