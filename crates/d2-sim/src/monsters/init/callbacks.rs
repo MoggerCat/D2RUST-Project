@@ -318,7 +318,6 @@ pub fn purge<H: InitHost + ?Sized>(
     assert!(max != 0, "minion purge: max 0 (fatal 0x20)");
     assert!(max > min, "minion purge: max ≤ min (fatal 0x21)");
     let (x, y) = h.position(b);
-    eprintln!("DBG purge boss {:?} at {:?}", b, (x, y));
     let found = h.find_units(
         b,
         FindQuery {
@@ -330,9 +329,7 @@ pub fn purge<H: InitHost + ?Sized>(
             ..FindQuery::default()
         },
     );
-    eprintln!("DBG found {}", found.len());
     for m in found {
-        eprintln!("DBG cand {:?} ty {:?} al {} und {} cl {}", m, type_of(h, m), h.alignment(m), h.is_undead(m), class_of(h, m));
         if type_of(h, m) != Some(UnitType::Monster)
             || h.alignment(m) != 0
             || (undead && !h.is_undead(m))
@@ -752,7 +749,6 @@ pub fn run<H: InitHost + ?Sized>(
         }
         addr::KILL_SELF => kill_self(h, u),
         addr::QUEST_COMPLETE => {
-            eprintln!("DBG questcomplete cb unit {:?} mode {:?}", u, mode_of(h, u));
             if mode_of(h, u) == mode::DEATH {
                 if let Some(call) = quest_death_call(class_of(h, u)) {
                     quest_death(cx, h, u, call);
@@ -1153,7 +1149,6 @@ fn hireable_missile<H: InitHost + ?Sized>(h: &mut H, m: UnitId) {
 
 /// §14 umod 21, mode 2.
 fn kill_self<H: InitHost + ?Sized>(h: &mut H, u: UnitId) {
-    eprintln!("DBG kill_self {:?} dead={} f={}", u, h.units().is_dead(u), h.game().frame);
     if h.units().is_dead(u) {
         return;
     }
