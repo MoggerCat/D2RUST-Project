@@ -36,4 +36,5 @@ traces/orig-cache` (no 1.14d timeouts); no check went EQUAL -> DIVERGED.
   player sp 64 vs 128: 7 (S); the rest ≤ 6 each (causes file).
 - `fr` (3) belongs to rc-mon-fr; monster item `own` (3) to rc-seed-order.
 - Pre-existing on r16, not mine: `tools/coverage.py --check` flags
-  `crates/d2-sim/src/debug/state/tests.rs:409` (malformed rule `§2 \`own\``).
+  `crates/d2-sim/src/debug/state/tests.rs:409` (malformed rule `§2 \`own\``); `d2-client --test e2e_full_loop`
+  (3) panics at `e2e_full_loop.rs:2362` (0x9C slice of 4) with or without this fix.
