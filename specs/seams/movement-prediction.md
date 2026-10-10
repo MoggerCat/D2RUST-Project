@@ -173,8 +173,8 @@ None of its own: the owner specs' state changes, as listed per rule.
    (`client/model.md` §8 r4, PROVISIONAL REC-1250).
 5. The prediction's path sees the same blockers as the server's: the
    client DRLG's grids, the living monsters (`client/msg-units.md` §3
-   r2) and the objects whose mode has collision (§1.3 r2, PROVISIONAL
-   REC-1251).
+   r2) and the objects whose footprint the 0x51 init stamped and no
+   `0x00623830` freed (§1.3 r2, read of `0x004BC720`).
 6. The click decisions that act on a unit at once or walk to it first
    (`ui/controls.md` §6 r9.2) measure with the unit distance
    `0x00641530` (`sim/pathing.md` §9.5), the server's test for the same

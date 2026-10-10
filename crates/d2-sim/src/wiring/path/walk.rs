@@ -807,6 +807,23 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     fn client_player(&self, client: ClientId) -> Option<UnitId> {
         self.game.lists.client(client)?.player
     }
+    /// §9.8: S→C 0x0A (`0x00571600`) to the client's player.
+    fn send_unit_removal(&mut self, client: ClientId, unit: UnitId) {
+        let (Some(receiver), Some(e)) = (self.client_player(client), self.game.lists.unit(unit))
+        else {
+            return;
+        };
+        let m = crate::units::messages::remove_unit(e.ty as u8, e.guid);
+        self.v.h.x.send(receiver, &m);
+    }
+    /// §9.8: the add messages `0x00571F90` (`intents-events.md` §7.2) to
+    /// the client's player.
+    fn send_unit_add(&mut self, client: ClientId, unit: UnitId) {
+        let Some(receiver) = self.client_player(client) else {
+            return;
+        };
+        self.v.add_messages(self.game, receiver, unit);
+    }
     /// [`crate::wiring::path::PathState::history`] (players only).
     fn position_history(&mut self, unit: UnitId) -> Option<&mut PositionHistory> {
         if self.unit_type(unit) != UnitType::Player {
