@@ -29,5 +29,4 @@ Open:
   frame 3 (not the melee path; belongs to the map/level owner), ~8 frames.
 - tools/coverage.py --check fails on crates/d2-sim/src/debug/state/tests.rs:409
   ('§2 `own`' malformed rule): present on the base, not mine.
-- Full d2-client nextest not confirmed (disk limit hit mid-session); d2-sim
-  combat tests 215/215 pass, clippy -D warnings clean.
+- d2-client lib nextest 2297 passed; d2-sim combat tests 215 passed; clippy -D warnings clean.
