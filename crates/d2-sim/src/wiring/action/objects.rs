@@ -1510,7 +1510,44 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     fn player_level(&self, player: UnitId) -> i32 {
         self.v.stat(player, STAT_LEVEL)
     }
+    fn drop_near_player(&mut self, player: UnitId, code: [u8; 4]) {
+        self.shrine_item_near(player, code);
+    }
+    fn drop_potion_near_player(&mut self, player: UnitId, code: [u8; 4], _quantity: i32) {
+        self.shrine_item_near(player, code);
+    }
 }
+
+impl<X: Pending> ObjectView<'_, X> {
+    /// `0x00582AC0` and the inline potion drop of `0x005830E0` /
+    /// `0x00583410` (`objects.md` §9.3): the floor search from P's
+    /// position, an item of `code` at P's level, then quantity (stat 70)
+    /// := 1.
+    // PROVISIONAL (REC-2095; objects.md §9.3): the item flag bit 0 at
+    // record +0xC4 and the client item message of `0x00582AC0` are not
+    // wired; the creation and its draws are the code drop's.
+    fn shrine_item_near(&mut self, player: UnitId, code: [u8; 4]) {
+        let made = self
+            .with_drops(|h, sim, d, levels, spots| {
+                drop_helpers::near_player_drop(
+                    h,
+                    sim,
+                    d,
+                    levels,
+                    spots,
+                    player,
+                    u32::from_le_bytes(code),
+                )
+            })
+            .flatten();
+        if let Some(item) = made {
+            self.v.set_base(item, STAT_QUANTITY, 1);
+        }
+    }
+}
+
+/// Stat 70 `quantity` (`sim/stats.md`).
+const STAT_QUANTITY: u16 = 70;
 
 /// Stat 12 `level` (`sim/stats.md`).
 const STAT_LEVEL: u16 = 12;
