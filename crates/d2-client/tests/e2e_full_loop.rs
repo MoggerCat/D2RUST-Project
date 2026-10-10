@@ -2586,8 +2586,11 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(log.handled, 28 + store.len() as u64);
     assert_eq!(
         log.dropped,
-        // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
-        BTreeMap::from([(0x0D, 1), (0x4D, 1), (0x69, 2), (0x6D, 1)])
+        // The player's own 0x4D echo (REC-95) is gone: the caster's own
+        // client gets the skill-mode message only for a used skill with
+        // E flag 0x4 (`sim/pathing.md` §10 rule 2, `skills/sequences.md`
+        // local player rule 3; rc-cast-mode).
+        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
     );
     assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");

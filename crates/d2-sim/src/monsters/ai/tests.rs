@@ -1437,11 +1437,19 @@ fn mode_end_inline_think() {
     w.fake.states.insert((mon, state::FREEZE));
     w.with(|g, cx| mode_end(g, cx, mon, mode::RUN));
     assert!(w.thinks().is_empty());
-    // An attack end requests neutral.
+    // An attack end requests neutral (`0x005A8030`'s record): with a path
+    // target unit the record targets it; without one the point (0, 0).
     let mut w = World::new(monstats(1, [0; 5], 15));
     let mon = w.mon;
+    let pl = w.player;
+    w.fake.path_target = Some(pl);
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
-    assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
+    assert_eq!(last_mode(&w), format!("mode 1 Unit({pl:?})"));
+    let mut w = World::new(monstats(1, [0; 5], 15));
+    let mon = w.mon;
+    w.fake.path_target = None;
+    w.with(|g, cx| mode_end(g, cx, mon, 8));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
 }
 
 // Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1
@@ -1870,10 +1878,16 @@ fn walk_in_radius_points_follow_the_recorded_walks() {
     // Warriv's three walks at the Rogue Encampment arrival (1.14d under
     // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
     let p = (4873, 4228);
-    assert_eq!(radius_point((4866, 4235), p, 3, 2), Some((4868, 4233)));
-    assert_eq!(radius_point((4868, 4233), p, 2, 2), Some((4869, 4232)));
-    assert_eq!(radius_point((4869, 4232), p, 1, 2), Some((4870, 4231)));
-    // Already within b, or on the target: no point.
-    assert_eq!(radius_point((4872, 4229), p, 3, 2), None);
-    assert_eq!(radius_point(p, p, 3, 0), None);
+    assert_eq!(radius_point((4866, 4235), 2, p, 3, 2), (4868, 4233));
+    assert_eq!(radius_point((4868, 4233), 2, p, 2, 2), (4869, 4232));
+    assert_eq!(radius_point((4869, 4232), 2, p, 1, 2), (4870, 4231));
+    // Jerhyn's second walk (`gen-shrine-*`, frame 50): the fix-up grows both.
+    assert_eq!(
+        radius_point((5149, 5196), 2, (5153, 5203), 3, 2),
+        (5151, 5198)
+    );
+    // Closer than b: away from the target (s = −1). On the target with
+    // k = 0: the unit's own position.
+    assert_eq!(radius_point((4872, 4229), 2, p, 3, 2), (4871, 4230));
+    assert_eq!(radius_point(p, 2, p, 3, 0), p);
 }

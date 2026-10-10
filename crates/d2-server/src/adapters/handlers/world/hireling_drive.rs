@@ -134,7 +134,17 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 })
                 .collect()
         });
-        mercs.extend(pets.into_iter().filter(|(m, _)| !traps.contains(m)));
+        // A summon gets the owner link at its spawn (`skills/bodies.md`
+        // §6.2 step 6, `0x0058F030`): like a linked hireling it is left to
+        // its own monstats AI (NecroPet, Hydra, Idle, ...), first run by
+        // the spawn's think at F + 25 (§6.2 step 8; q-fix-skills-4cls:
+        // 1.14d keeps a Clay Golem in its `summode` S1 until then).
+        let ai = events.action().sys.hooks.ai.as_ref();
+        let pets: Vec<(UnitId, u32)> = pets
+            .into_iter()
+            .filter(|&(m, _)| !traps.contains(&m) && stand_in_drives(ai.and_then(|s| s.control(m))))
+            .collect();
+        mercs.extend(pets);
         let frame = game.frame;
         if mercs.is_empty() {
             return;

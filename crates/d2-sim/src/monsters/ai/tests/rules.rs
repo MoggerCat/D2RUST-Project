@@ -161,8 +161,11 @@ fn think_rhythm_table() {
     w.run(true, 1);
     assert_eq!(last_mode(&w), at_unit(mode::ATTACK2, w.player));
     assert!(w.thinks().is_empty());
+    // The attack's path target unit is the player: the mode-end request
+    // (`0x005A8030`) targets it.
+    w.fake.path_target = Some(w.player);
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK2));
-    assert_eq!(last_mode(&w), at_unit(mode::NEUTRAL, mon));
+    assert_eq!(last_mode(&w), at_unit(mode::NEUTRAL, w.player));
     w.with(|g, cx| neutral_mode_start(g, cx, mon));
     assert_eq!(w.thinks(), [115]);
     // A walk end thinks inline (Idle: +200 from this frame); AI Idle →
