@@ -650,6 +650,9 @@ fn menu_once(o: &Options, out: &std::path::Path) -> Result<()> {
             art = art
                 .with_strings(move |id| u16::try_from(id).map(|i| t.by_id(i)).unwrap_or_default());
         }
+        if let Ok(app) = d2_client::app::save::appearance_tables(&d.tables.fixed) {
+            art = art.with_dolls(d2_client::ui::front_end::doll::DollTables::new(app));
+        }
         (Some(art), d.archives.lod())
     };
     let saves = o
