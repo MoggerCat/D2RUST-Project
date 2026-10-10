@@ -25,10 +25,12 @@
   distance, line test and arrival (1.14d `0x00620510`).
 - `unit_distance` (`path/walk/geom.rs`): a negative `dist8_unit` entry returns 0 at once, no `+1` for size < 2 (spec §9.5; the
   stash run stops at Δ=(2,0), as recorded).
+- `test-fixtures` `e2e_night_flows`: `Fx::object` stands the player beside the object (the real reach test would walk it).
+- `d2-server` walk test `walk_and_run_to_a_unit_send_0x10`: the run to a unit now stops at distance 0 (cell 29), not on the object.
 - `d2-server`: `WorldHost::object_walk`, `object_approach.rs` (run to the object via `approach_unit`, queued; the 0x13 object
   case repeats when the run ends; a new walk request drops it), cloned from the NPC / item approaches.
-- `radius_point` (`monsters/ai/tactics.rs`) = `0x005DE4E0` as in the spec (needs the NPC's size); test with the 3 + 1 recorded
-  walks. Affects every monster AI that walks in radius.
+- `radius_point` = `0x005DE4E0` as in the spec: another session landed the same function on specs-staging-7 at the same time;
+  the merge took that version (identical algorithm), verified by the three checks after the merge.
 - Spec: `world/objects.md` §7.3 range test and the recorded stash walk.
 
 ## Open
