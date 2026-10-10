@@ -25,16 +25,16 @@
 | Outputs / state changes | 55–60 |
 | Rules | 61–62 |
 |   1. Conventions | 63–74 |
-|   2. Shared helpers, batch 3 | 75–733 |
-|   3. Bodies, required level 1 | 734–918 |
-|   4. Bodies, required level 6 | 919–1130 |
-|   5. Bodies, required level 12 | 1131–1309 |
-| Constants & data dependencies | 1310–1344 |
-| Randomness | 1345–1383 |
-| Edge cases & original bugs | 1384–1453 |
-| Test vectors | 1454–1491 |
-| Provenance | 1492–1511 |
-| Open questions | 1512–1550 |
+|   2. Shared helpers, batch 3 | 75–738 |
+|   3. Bodies, required level 1 | 739–923 |
+|   4. Bodies, required level 6 | 924–1135 |
+|   5. Bodies, required level 12 | 1136–1314 |
+| Constants & data dependencies | 1315–1349 |
+| Randomness | 1350–1388 |
+| Edge cases & original bugs | 1389–1458 |
+| Test vectors | 1459–1496 |
+| Provenance | 1497–1516 |
+| Open questions | 1517–1555 |
 <!-- /index -->
 
 ## Summary
@@ -539,6 +539,11 @@ draw on the unit's seed; none when mx − mn < 1).
   (u16), +0x10 / +0x14 the unit's type / GUID (6 / −1 without one),
   +0x18 / +0x1C T's type / GUID (GUID −1 without T), +0x20 x, +0x24 y
   (S→C 0xA3, `sim/server-messages.tsv`).
+
+  d2rs: every body that calls it (Volcano §7.18, Thunder Storm, the
+  progressive finisher, ...) reaches the unit's pending event records
+  (`sim/intents-events.md` §7.9 rule 2) as an 0xA3 with v, skill, L, the
+  unit's and T's type / GUID and x, y; recorded: `dru-volcano` frame 29.
 
 #### 2.22 Pack and alignment helpers
 
