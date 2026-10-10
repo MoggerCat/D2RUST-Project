@@ -540,6 +540,11 @@ draw on the unit's seed; none when mx − mn < 1).
   +0x18 / +0x1C T's type / GUID (GUID −1 without T), +0x20 x, +0x24 y
   (S→C 0xA3, `sim/server-messages.tsv`).
 
+  d2rs: every body that calls it (Volcano §7.18, Thunder Storm, the
+  progressive finisher, ...) reaches the unit's pending event records
+  (`sim/intents-events.md` §7.9 rule 2) as an 0xA3 with v, skill, L, the
+  unit's and T's type / GUID and x, y; recorded: `dru-volcano` frame 29.
+
 #### 2.22 Pack and alignment helpers
 
 - **Leave pack** `0x0056E580(T)`: T's minion owner (`0x0058F0D0`) is a
