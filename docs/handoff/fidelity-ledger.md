@@ -32,9 +32,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 68 | 0 | 10 | 0 | 577 | 10 | 68 | 0 | 141–564 | 6 | 551 / 93 / 11 |
-| systems | 918 | 324 | 46 | 254 | 0 | 294 | 235 | 387 | 2 | 907.5–3566+ | 39 | 571 / 0 / 347 |
+| systems | 918 | 329 | 46 | 249 | 0 | 294 | 235 | 387 | 2 | 907.5–3566+ | 39 | 576 / 0 / 342 |
 | world | 826 | 38 | 0 | 55 | 0 | 733 | 11 | 77 | 5 | 199.5–638+ | 171 | 742 / 20 / 64 |
-| **all** | 4479 | 747 | 46 | 416 | 0 | 3270 | 406 | 791 | 12 | 1881–7140+ | 286 | 3561 / 375 / 543 |
+| **all** | 4479 | 752 | 46 | 411 | 0 | 3270 | 406 | 791 | 12 | 1881–7140+ | 286 | 3566 / 375 / 538 |
 
 ## By family
 
@@ -688,7 +688,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `system.death` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.difficulty` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.flows` | 19 | 2 | 4 | 1 | 0 | 12 | 0 | 0 | 7 | 0 | 0 | 0 |
-| `system.formats` | 74 | 38 | 12 | 18 | 0 | 6 | 3 | 0 | 68 | 0 | 12 | 0 |
+| `system.formats` | 74 | 43 | 12 | 13 | 0 | 6 | 3 | 0 | 68 | 0 | 12 | 0 |
 | `system.hireling` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.missiles` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
 | `system.perf` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6233
+- Duplicate areas between parts: 6238
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1313,6 +1313,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.dt1.unknown-and-runtime-fields`: rc-draw-row173.tsv:31 kept, rc-gen-formats.tsv:48 dropped
   - `system.formats.palette.dat-palette`: rc-draw-row173.tsv:32 kept, rc-gen-formats.tsv:51 dropped
   - `system.formats.palette.pl2-palette-transform`: rc-draw-row173.tsv:33 kept, rc-gen-formats.tsv:52 dropped
+  - `system.formats.wav.1-header`: rc-audio-fmt-div.tsv:4 kept, rc-gen-formats.tsv:53 dropped
+  - `system.formats.wav.2-chunk-walk-no-pad-bytes`: rc-audio-fmt-div.tsv:5 kept, rc-gen-formats.tsv:54 dropped
+  - `system.formats.wav.3-samples`: rc-audio-fmt-div.tsv:6 kept, rc-gen-formats.tsv:55 dropped
+  - `system.formats.wav.4-format-checks-by-the-game`: rc-audio-fmt-div.tsv:7 kept, rc-gen-formats.tsv:56 dropped
+  - `system.formats.wav.5-decoder-hook-d2rs`: rc-audio-fmt-div.tsv:8 kept, rc-gen-formats.tsv:57 dropped
   - `monster.unraveler2`: rc-damage-draws.tsv:3 kept, rc-gen-mon-triage.tsv:4 dropped
   - `monster.unraveler4`: rc-damage-draws.tsv:4 kept, rc-gen-mon-triage.tsv:5 dropped
   - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-gen-mon-triage.tsv:21 dropped
@@ -6603,11 +6608,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.dt1.block-header-20-bytes-each-at-the-tile-s-block-h`: rc-draw-row173.tsv:27 kept, systems.tsv:928 dropped
   - `system.formats.dt1.block-pixels`: rc-draw-row173.tsv:28 kept, systems.tsv:929 dropped
   - `system.formats.dt1.unknown-and-runtime-fields`: rc-draw-row173.tsv:31 kept, systems.tsv:930 dropped
-  - `system.formats.wav.1-header`: rc-gen-formats.tsv:53 kept, systems.tsv:931 dropped
-  - `system.formats.wav.2-chunk-walk-no-pad-bytes`: rc-gen-formats.tsv:54 kept, systems.tsv:932 dropped
-  - `system.formats.wav.3-samples`: rc-gen-formats.tsv:55 kept, systems.tsv:933 dropped
-  - `system.formats.wav.4-format-checks-by-the-game`: rc-gen-formats.tsv:56 kept, systems.tsv:934 dropped
-  - `system.formats.wav.5-decoder-hook-d2rs`: rc-gen-formats.tsv:57 kept, systems.tsv:935 dropped
+  - `system.formats.wav.1-header`: rc-audio-fmt-div.tsv:4 kept, systems.tsv:931 dropped
+  - `system.formats.wav.2-chunk-walk-no-pad-bytes`: rc-audio-fmt-div.tsv:5 kept, systems.tsv:932 dropped
+  - `system.formats.wav.3-samples`: rc-audio-fmt-div.tsv:6 kept, systems.tsv:933 dropped
+  - `system.formats.wav.4-format-checks-by-the-game`: rc-audio-fmt-div.tsv:7 kept, systems.tsv:934 dropped
+  - `system.formats.wav.5-decoder-hook-d2rs`: rc-audio-fmt-div.tsv:8 kept, systems.tsv:935 dropped
   - `level.a1.1.act-1-town`: rc-rng-level-pop.tsv:3 kept, world.tsv:3 dropped
   - `level.a1.2.act-1-wilderness-1`: rc-promote.tsv:11 kept, world.tsv:4 dropped
   - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:14 kept, world.tsv:5 dropped
@@ -10002,6 +10007,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.dt1.unknown-and-runtime-fields` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/dt1.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.palette.dat-palette` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/palette.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
 | `system.formats.palette.pl2-palette-transform` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-draw-row173 | specs/formats/palette.md | rc-draw-row173 rain: gen-fmt-draws-town DIVERGED: tick 72 draw row 198 (DrawLine) column x: 1.14d 513 vs d2rs 331 (rows 173-194 equal; rain replayed from the recorded frame schedule and clock, lines equal while the client seed agrees; next: an extra footstep 2768 variant roll on the client seed, d2rs T 22 vs 1.14d T 27, rc-audio-fmt-div) |
+| `system.formats.wav.1-header` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
+| `system.formats.wav.2-chunk-walk-no-pad-bytes` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
+| `system.formats.wav.3-samples` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
+| `system.formats.wav.4-format-checks-by-the-game` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
+| `system.formats.wav.5-decoder-hook-d2rs` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/formats/wav.md | audio-diff traces/audio/gen/gen-aud-town-idle.check (rc-audio-fmt-div): the wav reader is exercised by every voice; paired voices have identical decoded samples (Wine capture 11 paired, Windows digests: footsteps and windowopen match); the check is DIVERGED for other reasons (walker NPC, see docs/handoff/pc1-data.md rc-audio-fmt-div) |
 | `system.render.blend-modes.1-draw-modes` | system | DIVERGED | M | DIVERGED@22 | yes | 0 | n | claude/rc-draw-row173 | specs/render/blend-modes.md | rc-draw-row173 rain: gen-render-firebolt DIVERGED: tick 21 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1… |
 | `system.render.blend-modes.2-blend-table-orientation-per-drawer` | system | DIVERGED | M | DIVERGED@22 | yes | 0 | n | claude/rc-draw-row173 | specs/render/blend-modes.md | rc-draw-row173 rain: gen-render-firebolt DIVERGED: tick 21 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1… |
 | `system.render.blend-modes.3-draw-mode-of-a-composite-unit-component` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/rc-draw-row173 | specs/render/blend-modes.md | rc-draw-row173 rain: gen-render-frozen DIVERGED: tick 27 draw row 108 (CelDrawShadow) column dir: 1.14d 46 vs d2rs 0 |
@@ -10399,11 +10409,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.d2s.10-errors` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s.md | NO-CHECK: needs a corrupt save file; checks cannot supply one |
 | `system.formats.font-tbl.glyph-records-14-bytes-each` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/font-tbl.md | NO-CHECK: no channel compares text glyph draws |
 | `system.formats.font-tbl.header-12-bytes` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/font-tbl.md | NO-CHECK: no channel compares text glyph draws |
-| `system.formats.wav.1-header` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/wav.md | NO-CHECK: no audio channel in scenario-diff; no scenario can compare decoded samples |
-| `system.formats.wav.2-chunk-walk-no-pad-bytes` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/wav.md | NO-CHECK: no audio channel in scenario-diff; no scenario can compare decoded samples |
-| `system.formats.wav.3-samples` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/wav.md | NO-CHECK: no audio channel in scenario-diff; no scenario can compare decoded samples |
-| `system.formats.wav.4-format-checks-by-the-game` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/wav.md | NO-CHECK: no audio channel in scenario-diff; no scenario can compare decoded samples |
-| `system.formats.wav.5-decoder-hook-d2rs` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/wav.md | NO-CHECK: no audio channel in scenario-diff; no scenario can compare decoded samples |
 | `system.perf.budget` | system | NO-CHECK | S | - | ? | 0 | n | - | - | bench baselines exist (docs/handoff/bench-baselines.md); no 1.14d-side budget to compare, original timing is tick-based (tick.md) |
 | `system.render.blend-modes.8-lines-and-rectangles-gdi` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/blend-modes.md | no check: no generated scene reaches it by pokes |
 | `system.render.capture.1-configuration` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/capture.md | no check: tooling row (1.14d capture hooks); no scenario reaches it |
