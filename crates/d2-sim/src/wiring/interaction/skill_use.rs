@@ -831,9 +831,12 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.cv.v.set_state(u, s, on);
         BodyWorld::queue_update(self, u);
     }
+    /// `0x00639E30(unit, s, 1)`: the changed bit, then the unit is queued
+    /// for update (`0x0064C040`), so the next update sends the state.
     fn mark_state_changed(&mut self, u: UnitId, s: i32) {
         if let Ok(s) = u32::try_from(s) {
             self.cv.v.stats.set_state_changed(u, s, true);
+            BodyWorld::queue_update(self, u);
         }
     }
     fn clear_group_states(&mut self, u: UnitId, g: usize) {
