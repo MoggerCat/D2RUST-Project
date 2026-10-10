@@ -179,7 +179,8 @@ pub const IMPLEMENTED: [(u32, u8); 148] = [
 /// `ai-bodies-2.md` §16 terror; `ai-bodies-5.md` §3, §20, §23;
 /// `ai-bodies-6.md` §14, §25, §26; `ai-bodies-7.md` §9, §15, §18, §19,
 /// §23, §27).
-pub const INIT_IMPLEMENTED: [u32; 16] = [
+pub const INIT_IMPLEMENTED: [u32; 17] = [
+    0x005E_2CD0,
     0x005F_6630,
     0x005E_6300,
     0x005E_80E0,
@@ -205,6 +206,7 @@ pub fn run_init<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, addr: 
         0x005F_6630 => bodies::nest_init(game, cx, u),
         0x005E_6300 => bodies::blood_raven_init(cx, u),
         0x005E_80E0 => bodies2::terror_init(game, cx, u),
+        0x005E_2CD0 => bodies2::possess_init(cx, u),
         0x005E_2FD0 => bodies5::imp_init(cx, u),
         0x005E_F310 => bodies5::baal_throne_init(),
         0x005E_E5C0 => bodies5::nihlathak_init(),
@@ -295,6 +297,7 @@ pub fn run_function<W: AiHost + ?Sized>(
         0x005E_8020 => bodies2::dim_vision(game, cx, u, p),
         0x005E_8140 => bodies2::terror(game, cx, u, p),
         0x005E_8340 => bodies2::taunted(game, cx, u, p),
+        0x005E_2D80 => bodies2::possessed_imp(game, cx, u, p),
         // Act III (`ai-bodies-3.md`).
         0x005F_3730 => bodies3::mosquito(game, cx, u, p),
         0x005F_4850 => bodies3::thorn_hulk(game, cx, u, p),

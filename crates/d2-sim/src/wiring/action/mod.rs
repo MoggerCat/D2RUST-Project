@@ -363,6 +363,10 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A unit's source unit (+0x94 / +0x98, set by `link_source`
+    /// `0x00621C30`, `skills/bodies-4.md` §1); read by `0x00552FD0` when
+    /// unit +0xC8 has bit 0x400.
+    pub unit_source: BTreeMap<UnitId, UnitId>,
     /// A monster's equipped items by body location (its inventory's
     /// body slots, `monsters/init.md` §12): d2rs-own record of the
     /// holdings `has_item_at` reads (no monster inventory model here).
@@ -465,6 +469,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            unit_source: BTreeMap::new(),
             monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),
