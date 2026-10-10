@@ -37,3 +37,21 @@ written as `cov-promoted` (ledger.py merges group coverage as "exercised" only).
   DIVERGED by the fresh verdict, not promoted. Part regenerated against the ledger without rc-promote
   (265 checks): 62 rows EQUAL, 23 DIVERGED. Ledger EQUAL 3073 (integ-r23 + this), 0 errors.
 - C002/C028 (causes-99): not started; need the packets C->S divergences and the one-sided field list per check.
+
+## Round 3 (packets DIVERGED groups, fixed by count)
+- Stale binary: the 36 `ass-*` / `gen-skill-*` packets DIVERGED were a suite-bin built before the post-load 0x23 fix
+  (a62bc1547) merged; rebuilt -> MATCH (check `target/suite-bin` age when a first divergence is a known fixed one).
+- `pos` / `hop` pokes: d2rs queued its own S->C 0x15 (play aid); `state-dump` now queues none (`poke::Env::reassign`,
+  `app::poke::set_compare_run`); 8 gen-sysc-client-msg-ui + interact-* + a2-npc-* first divergence moved frame 4 -> 16.
+- Store-item recharge (`0x0055FE80`, `properties.md` §5 r9; pc1-data.md item 27): `vendor_world.rs` recharge now sets
+  stat-204 charges to max (was a log-only stub); Akara guid 8 charges 67/67. ~30 NPC talk/trade checks packets MATCH.
+- Ledger EQUAL 3134 (incl. integ-r23), 0 errors; part 54 rows against the ledger without rc-promote.
+## Open (first divergences, by count)
+- 0x5D QuestItemState, 13 checks: (a) 1.14d sends `5d 04 00 0c 00 00` (chain 4) in the frame of a `warp 40` poke from a
+  fresh ScnBuy-like save (drognan/lysander stock, act-change x3, ...): d2rs sends none; `send_status` (quests.rs:1979)
+  needs the player's room act = record act (0), as 0x00544190, so the sender in 1.14d is not L1 at tick time (caller
+  0x53d72c is the 0x0053D710 builder); owner to read the 1.14d sender. (b) d2rs sends extra `5d 1f/20/21 00 01 ..` (act 5
+  chains 31-33) on a5 warps that 1.14d does not (a5-wp-31..38 x7, drehya stock).
+- 0x9c vendor stock (halbu): frame 66 0x9c vs 0x67 MonsterMove ordering; cube-000..005: 1.14d `0x3f` (targeting reset)
+  where d2rs sends `0x47`/`0x48`; assassin sentries (7): 0xA7/0xAC/0x21 summon messages; gen-shrine-7 (0xA8 size),
+  -17 (0x2C vs 0x0E); act-video x3.
