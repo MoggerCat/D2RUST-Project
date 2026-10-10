@@ -39,13 +39,13 @@
 |   10. Scripted ambient overrides (`0x0046BDD0`) | 592–667 |
 |   11. Light values handed to the draws | 668–707 |
 |   12. Captures (answers `capture.md` Open question 5) | 708–745 |
-|   13. d2rs answers | 746–761 |
-| Constants & data dependencies | 762–773 |
-| Randomness | 774–780 |
-| Edge cases & original bugs | 781–797 |
-| Test vectors | 798–831 |
-| Provenance | 832–891 |
-| Open questions | 892–1000 |
+|   13. d2rs answers | 746–762 |
+| Constants & data dependencies | 763–774 |
+| Randomness | 775–781 |
+| Edge cases & original bugs | 782–798 |
+| Test vectors | 799–832 |
+| Provenance | 833–892 |
+| Open questions | 893–1001 |
 <!-- /index -->
 
 ## Summary

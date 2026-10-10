@@ -551,11 +551,10 @@ fn a_player_mode_request_removes_the_cast_light_not_the_player_light() {
     // `0x00461250` detaches the stat list's cast light only: none here.
     super::super::modes::remove_unit_light(&mut m.w, P1);
     assert_eq!(m.w.lights.len(), 1, "the player light stays");
-    let cast = m
-        .w
-        .lights
-        .create(None, (0, 0), LightKind::Plain, 1, 255, 255, 255, 255)
-        .unwrap();
+    let cast =
+        m.w.lights
+            .create(None, (0, 0), LightKind::Plain, 1, 255, 255, 255, 255)
+            .unwrap();
     m.w.cast_lights.insert(P1, cast);
     super::super::modes::remove_unit_light(&mut m.w, P1);
     assert_eq!(m.w.lights.len(), 1);
