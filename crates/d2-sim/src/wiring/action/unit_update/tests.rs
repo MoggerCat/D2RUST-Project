@@ -140,7 +140,10 @@ fn kill_sends_code_8_then_the_death_end_code_9() {
     // d: the death clean-up snapped the path direction (0x38 before) to
     // the kill's direction toward the killer (`units.md` §4.6 rule 1.2,
     // `0x006488A0`; `damage.md` §7.2 rule 3): from (13, 10) to (10, 10).
-    want.extend([0x08, 0x95, 0x12, 0x55, 0x15, 0x17, 0x00]);
+    // (a, b): the path end, (0, 0) for a path with no points; never the
+    // target +0x10 / +0x12 set above (`intents-events.md` §7.7, REC-594;
+    // recorded `items-drops-cha-00` frame 37).
+    want.extend([0x08, 0x00, 0x00, 0x00, 0x00, 0x17, 0x00]);
     assert_eq!(sent(&mut fx), vec![(p, want)]);
     assert_eq!(
         fx.sim.sys.units.get(m).unwrap().flags & (flags::CHANGED | flags::MODE_CHANGING),

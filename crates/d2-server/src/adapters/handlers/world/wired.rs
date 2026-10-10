@@ -1118,6 +1118,10 @@ where
         });
     }
 
+    fn flush_player_tail(&mut self, events: &mut D) {
+        events.action().flush_player_tail();
+    }
+
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
         // Each step's sends join the outbox before the next step runs
         // (production order, `seams/sim-server.md` §2.2).
@@ -1398,6 +1402,7 @@ where
         events.action().route_quest_objects();
         let h = &mut events.action().sys.hooks;
         h.pet_follows.get_or_insert_with(Vec::new);
+        h.defer_player_tail = true;
         h.pet_deaths.get_or_insert_with(Vec::new);
         h.owner_deaths.get_or_insert_with(Vec::new);
         h.hireling_calls.get_or_insert_with(Vec::new);

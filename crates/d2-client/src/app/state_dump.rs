@@ -827,6 +827,7 @@ struct ClientData {
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
     player_anims: super::anim_names::ClientPlayerAnims,
+    item_tables: Arc<d2_sim::items::ItemTables>,
 }
 
 impl ClientData {
@@ -846,6 +847,8 @@ impl ClientData {
                 u
             },
             player_anims: single_player::client_player_anims(data)?,
+            // The item type test of the use state (`bridge::use_state`).
+            item_tables: Arc::new(d.tables.item_tables().map_err(|e| anyhow::anyhow!("{e}"))?),
         })
     }
 
@@ -858,6 +861,7 @@ impl ClientData {
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
         b.set_player_anims(Arc::new(self.player_anims));
+        b.set_item_tables(Arc::new(super::items::TableDecoder(self.item_tables)));
         b.set_high_light_quality(true);
     }
 }
