@@ -497,6 +497,46 @@ pub fn missile_summon_class<X: Pending + UseRest>(
     crate::skills::use_::bodies::summon_class(&w, &t.skills, &ct, owner, skill)
 }
 
+/// The missile area bodies' scan (`missiles.md` §R9.6): the units
+/// `scan_unit(game, owner, x, y, r, f, …, noaura 0)` (`0x0056B7E0`,
+/// `skills/bodies.md` §2.12) accepts, in scan order, for the per-unit
+/// area hit (`0x0056B9C0`) the missile body then runs on each.
+/// PROVISIONAL (REC-2660): the units are gathered before the first hit
+/// is applied; the original hits each in the scan callback.
+pub fn missile_area_units<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    owner: UnitId,
+    at: (i32, i32),
+    r: i32,
+    f: u32,
+) -> Vec<UnitId> {
+    let t = h.tables.clone();
+    let ct = h.tables.combat.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let mut out = Vec::new();
+    crate::skills::use_::bodies::scan_unit(
+        &mut w,
+        &t.skills,
+        &ct,
+        owner,
+        at,
+        r,
+        f,
+        false,
+        &mut |_, u| {
+            out.push(u);
+            1
+        },
+    );
+    out
+}
+
 /// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`
 /// (`skills/bodies.md` §6.2) with flags 0xD, AI special state 0, pet max 0.
 #[allow(clippy::too_many_arguments)]

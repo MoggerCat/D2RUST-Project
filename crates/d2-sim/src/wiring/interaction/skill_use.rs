@@ -1389,6 +1389,16 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.xm().keep_target(u, t);
             return;
         }
+        // Alignment `0x005543B0(u, a, v)` (`skills/bodies-2.md` §2.22): the
+        // unit's alignment stat list, e.g. a monster's Hydra takes its
+        // owner's alignment (`skills/bodies-2b.md` Hydra).
+        if let bodies::BodyEffect::Alignment { u, a, .. } = e {
+            if let Ok(a) = u8::try_from(a) {
+                let cv = &mut self.cv;
+                cv.v.set_alignment(&mut *cv.game, u, a);
+            }
+            return;
+        }
         if let Some(e) = self.pet_effect(e) {
             self.xm().body_effect(e);
         }

@@ -274,7 +274,7 @@ pub trait MissileBodies {
     /// (`skills/bodies.md` §2.12) hands its callback, in order.
     fn area_units(
         &mut self,
-        game: &Game,
+        game: &mut Game,
         owner: UnitId,
         at: (i32, i32),
         r: i32,
@@ -304,7 +304,7 @@ pub trait MissileBodies {
     /// default has no scan for `noaura` 1).
     fn scan_units(
         &mut self,
-        game: &Game,
+        game: &mut Game,
         owner: UnitId,
         at: (i32, i32),
         r: i32,

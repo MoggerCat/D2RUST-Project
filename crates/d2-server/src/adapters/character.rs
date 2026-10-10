@@ -272,6 +272,11 @@ pub struct LoadReport {
     pub unapplied: Vec<Unapplied>,
     /// Load §1: the right skill selected (`StartSkill`), if any.
     pub right_skill: Option<u16>,
+    /// A full save: the left and right class skills the post-load
+    /// selection (`0x0056AF80`, `formats/d2s.md` §2.4 rule 6.2-6.3) sends
+    /// S→C 0x23 for (owner −1: no item; an item-owned selection needs the
+    /// item list, which the provider lacks).
+    pub mouse_selected: [Option<u16>; 2],
 }
 
 fn note(r: &mut LoadReport, res: Result<(), Unapplied>) {
@@ -297,6 +302,10 @@ pub fn load(
     note(&mut r, w.player_skills());
     let h = header_load(&save.header, ctx);
     r.act = h.act;
+    // Rule 6.2: left (+0x74) first, then right (+0x70); skill 0 (Attack) is
+    // never selected there. A decoded "no item" (-1) is a class entry.
+    r.mouse_selected =
+        [h.mouse[0], h.mouse[1]].map(|m| (m.skill > 0 && m.item == -1).then_some(m.skill as u16));
     note(&mut r, w.apply_header(&h));
     let quests = body.quests.records.map(|q| normalise_quests(&q));
     note(&mut r, w.set_quests(&quests));

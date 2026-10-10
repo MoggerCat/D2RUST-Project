@@ -154,6 +154,14 @@ impl<R: ViewRules> ViewRules for PanelArtRules<R> {
         self.rules.unit_shadow_key(unit)
     }
 
+    fn unit_draws_body(&self, unit: &ClientUnit) -> bool {
+        self.rules.unit_draws_body(unit)
+    }
+
+    fn unit_listed_key(&self, unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
+        self.rules.unit_listed_key(unit)
+    }
+
     fn component_frame(
         &self,
         unit: &ClientUnit,

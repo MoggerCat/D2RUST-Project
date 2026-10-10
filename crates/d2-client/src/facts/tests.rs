@@ -927,3 +927,34 @@ fn dump_dirs_per_tick() {
         (Path::new("d/tick-2").into(), Path::new("d/tick-73").into())
     );
 }
+
+// Covers: specs/tools/facts-render.md §5 r1
+/// §5 r1: one unit draw is one draw-order slot, so two units sharing a
+/// GUID (monster 1:3, object 2:3) in adjacent slots are two runs, each
+/// with its `unit` row (`gen-ui-hud` rows 174–178).
+#[test]
+fn a_guid_shared_by_two_slots_starts_two_unit_runs() {
+    use crate::scene::order::pass;
+    use crate::scene::FrameId;
+    let s = store();
+    let mut first = DrawItem::new(FrameId(1), 50, 60);
+    first.key = DrawKey::new(pass::WALLS_UNITS, 0, 0, 0).unwrap();
+    first.tag = ItemTag::Unit(3);
+    let mut second = first;
+    second.key = DrawKey::new(pass::WALLS_UNITS, 0, 1, 0).unwrap();
+    second.x = 70;
+    let unit_type = |_: u32| None;
+    let cx = ExportContext {
+        frames: &s,
+        view_left: Some(0),
+        unit_type: &unit_type,
+        sky: &[],
+        unit_dirs: &std::collections::BTreeMap::new(),
+        unit_calls: &[],
+        color_rows: None,
+        ui_calls: &[],
+    };
+    let rows = draw_rows(&[first, second], &cx).unwrap();
+    let ops: Vec<&str> = rows.draws.iter().map(|r| r[1].as_str()).collect();
+    assert_eq!(ops, ["unit", "CelDraw", "unit", "CelDraw"]);
+}

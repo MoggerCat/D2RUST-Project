@@ -25,14 +25,14 @@
 | Rules | 67–68 |
 |   1. Format `state-1` (JSON lines, key `k`) | 69–87 |
 |   2. Unit fields | 88–127 |
-|   3. Snapshot point and frame | 128–167 |
-|   4. Comparison | 168–194 |
-| Constants & data dependencies | 195–198 |
-| Randomness | 199–202 |
-| Edge cases & original bugs | 203–221 |
-| Test vectors | 222–231 |
-| Provenance | 232–236 |
-| Open questions | 237–242 |
+|   3. Snapshot point and frame | 128–199 |
+|   4. Comparison | 200–226 |
+| Constants & data dependencies | 227–230 |
+| Randomness | 231–234 |
+| Edge cases & original bugs | 235–253 |
+| Test vectors | 254–263 |
+| Provenance | 264–268 |
+| Open questions | 269–274 |
 <!-- /index -->
 
 ## Summary
@@ -164,6 +164,38 @@ Unit = the unit record; path = unit +0x2C.
    no S→C message and no call of `0x00650BE0`, `0x00650910` or
    `0x004654C0`). The d2rs writer still reproduces the positions by
    prediction, not by that copy (PROVISIONAL REC-2416 there).
+
+5. **The 1.14d client's own units** (`record_state.py --client-out FILE`
+   or the environment variable `D2_CLIENT_OUT`; added 2026-10-10, PC 1
+   today, for the `system.client.*` ledger rows). At every snapshot the
+   recorder also walks the client's two unit hash sets (`client/model.md`
+   §2 r1: set S `0x007A5E70`, the units the server announced, and set C
+   `0x007A5270`, the client-only units; 6 types × 128 list heads of 4
+   bytes, 0x200 bytes per type, chain link unit +0xE4) and writes them to
+   FILE in format `state-1` with header `side` = `orig-client`: one
+   `snap` record per frame, `f` = the server frame whose tick just ended
+   (the same point as rule 1: the client state is the one left by the
+   client update before that tick end), `units` = every client unit read
+   with the unit reader of §2 (a client unit is the same record) plus
+   `set` = `S` or `C`, sorted by (`set`, `ut`, `g`). No `seed` key (the
+   game seed is the server's). GUIDs of set C are the client's own
+   counter (`[0x00711F30]`), so a set C unit pairs with a d2rs unit by
+   class and cell, not by GUID. Measured (ScnAma, `-seed 1234`, frames
+   5–30): set S = 1 player, 7 monsters, 17 objects (the server's 25
+   units); set C = 15 monsters (class 149, the chickens) and 190 objects.
+   Recordings: `traces/pc1/client-state/<check>.cstate.jsonl` (the 1.14d
+   side of the check of that name, same save / seed / pokes / input).
+   Two runs of one check (`a1-town-arrival-ama` 40 frames,
+   `combat-melee-fallen` 150, `sor-fire-bolt` 70; recorded twice
+   2026-10-10) give the same records in every frame except one field:
+   `s` of the local player in set S, the client seed, which the cursor
+   and weather step once per drawn frame (`client/model.md` Randomness
+   r4), so it follows the wall clock. A comparison ignores that field.
+   17 checks are recorded (town arrival, cave warp, melee and kill,
+   Magic Arrow, Fire Bolt, Frost Nova, Raise Skeleton, ground items,
+   inventory picks, loaded items, level up, stats, states, corpse,
+   hire). The d2rs side (a dump of `d2-client`'s `ClientWorld` in the
+   same format) and the comparison are not written yet.
 
 ### 4. Comparison
 

@@ -140,6 +140,16 @@ impl<'a, X: Pending> PathCtx<'a, X> {
         }
     }
 
+    /// The player's neutral start `0x0057F020` (`units.md` §4.5): the
+    /// ENDANIM handler that runs after a step result 2, even when the
+    /// queued interaction of `0x00580C20` started a new run in between
+    /// (`objects.md` §7.3 rule 4.4).
+    pub fn neutral_start(&mut self, unit: UnitId) {
+        if let Some(path) = self.load_path(unit) {
+            crate::path::walk::request::neutral_start(self, unit, &path);
+        }
+    }
+
     /// Teleport `0x00650910(path, room, x, y)` (`path-placement.md` §6
     /// rule 4) of a unit with a dynamic path; a static path is set
     /// (`0x00620AE0`) with its footprint moved.
