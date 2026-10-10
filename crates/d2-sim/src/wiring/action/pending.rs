@@ -1572,13 +1572,17 @@ pub trait Pending {
     /// view (`UseView`, which needs `UseRest`); the action view has no
     /// provider. Default: none.
     fn missile_area_units(
-        &mut self,
-        game: &Game,
+        v: &mut super::View<'_, Self>,
+        game: &mut Game,
         owner: UnitId,
         at: (i32, i32),
         r: i32,
         f: u32,
-    ) -> Vec<UnitId> {
+        noaura: bool,
+    ) -> Vec<UnitId>
+    where
+        Self: Sized,
+    {
         Vec::new()
     }
 

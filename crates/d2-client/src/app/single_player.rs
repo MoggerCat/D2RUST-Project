@@ -1008,6 +1008,17 @@ impl Pending for LocalSeams {
     ) -> u32 {
         skill_events::action_frame(h, sim, unit, a1, a2)
     }
+    fn missile_area_units(
+        v: &mut d2_sim::wiring::action::View<'_, Self>,
+        game: &mut d2_sim::game::Game,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+        noaura: bool,
+    ) -> Vec<UnitId> {
+        skill_events::missile_area_units(v, game, owner, at, r, f, noaura)
+    }
     fn monster_skill_start(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) -> i32 {
         skill_events::monster_skill_start(h, sim, unit)
     }

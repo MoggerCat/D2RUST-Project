@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 578–722 |
 |   R7. Lifetime and expiry | 723–776 |
 |   R8. Pierce | 777–803 |
-|   R9. Server-do and server-hit catalogues | 804–1034 |
-|   R10. Behaviour of the recorded missiles | 1035–1069 |
-|   R11. `missiles.txt` columns and their server use | 1070–1117 |
-| Constants & data dependencies | 1118–1144 |
-| Randomness | 1145–1183 |
-| Edge cases & original bugs | 1184–1210 |
-| Test vectors | 1211–1293 |
-| Provenance | 1294–1346 |
-| Open questions | 1347–1428 |
+|   R9. Server-do and server-hit catalogues | 804–1041 |
+|   R10. Behaviour of the recorded missiles | 1042–1076 |
+|   R11. `missiles.txt` columns and their server use | 1077–1124 |
+| Constants & data dependencies | 1125–1151 |
+| Randomness | 1152–1190 |
+| Edge cases & original bugs | 1191–1217 |
+| Test vectors | 1218–1300 |
+| Provenance | 1301–1353 |
+| Open questions | 1354–1435 |
 <!-- /index -->
 
 ## Summary
@@ -984,6 +984,13 @@ result bits per §R5. Helpers:
   `0x0057CEE0` (§7.1). b = 8 (evade) and any other bit outside 1, 2,
   4, 0x10 adds no result bit; only the "b ≠ 0 → clear 1" applies
   (asm of `0x0056B9C0`).
+
+The area scan of `area_damage`, `next_unit` and the other area bodies
+is the real `scan_unit` of `skills/bodies.md` §2.12 (acceptance tests of
+the skill use pipeline, default filter 0x8583 for f = 0), run on the
+skill use view; with no scan the fireball of a vampire (class 129)
+exploded on the player without damaging it (gen-mon-135 frame 135:
+1.14d player life 11623 → 10214, get-hit mode 4, draw at `0x0057CB00`).
 
 Bodies:
 

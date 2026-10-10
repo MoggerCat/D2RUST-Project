@@ -762,13 +762,24 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     }
     fn area_units(
         &mut self,
-        game: &Game,
+        game: &mut Game,
         owner: UnitId,
         at: (i32, i32),
         r: i32,
         f: u32,
     ) -> Vec<UnitId> {
-        self.h.x.missile_area_units(game, owner, at, r, f)
+        X::missile_area_units(self, game, owner, at, r, f, false)
+    }
+    fn scan_units(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        at: (i32, i32),
+        r: i32,
+        f: u32,
+        noaura: bool,
+    ) -> Vec<UnitId> {
+        X::missile_area_units(self, game, owner, at, r, f, noaura)
     }
     /// `0x0056B9C0` on the combat view.
     fn area_hit(&mut self, game: &mut Game, owner: UnitId, unit: UnitId, record: &DamageRecord) {

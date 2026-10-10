@@ -24,6 +24,7 @@
 //! is never scheduled in 1.14d and its body is not specified.
 
 use crate::combat::apply_melee;
+use crate::game::Game;
 use crate::skills::levels::skill_level;
 use crate::skills::use_::bodies::b4_mon::monster_mode_missile;
 use crate::skills::use_::bodies::{melee_setup, mode_damage, BodyWorld};
@@ -114,6 +115,40 @@ pub fn monster_skill_start<X: Pending + UseRest>(
         },
     };
     start(&mut w, &t.skills, unit)
+}
+
+/// The units `scan_unit(game, owner, x, y, r, f, …, noaura)` (`0x0056B7E0`,
+/// `skills/bodies.md` §2.12) accepts, in callback order, for the missile
+/// area bodies (`missiles/missiles.md` §R9.6 `area_damage`, `next_unit`,
+/// the `scan_unit` of the area bodies): the scan runs on the skill use
+/// view because the acceptance tests are the use pipeline's.
+pub fn missile_area_units<X: Pending + UseRest>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    owner: UnitId,
+    at: (i32, i32),
+    r: i32,
+    f: u32,
+    noaura: bool,
+) -> Vec<UnitId> {
+    let t = v.h.tables.clone();
+    let mut w = UseView { cv: v.combat(game) };
+    let mut out = Vec::new();
+    crate::skills::use_::bodies::scan_unit(
+        &mut w,
+        &t.skills,
+        &t.combat,
+        owner,
+        at,
+        r,
+        f,
+        noaura,
+        &mut |_, u| {
+            out.push(u);
+            1
+        },
+    );
+    out
 }
 
 /// A monster's aura as its right skill (`monsters/init.md` §19.5 umod 30
