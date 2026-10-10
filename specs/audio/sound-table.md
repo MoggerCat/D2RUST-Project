@@ -36,20 +36,20 @@
 |   3. File path | 174–190 |
 |   4. Groups and variants | 191–233 |
 |   5. Requests | 234–310 |
-|   6. Sound tick | 311–567 |
-|   7. Starting on a channel | 568–650 |
-|   8. Volume and pan | 651–786 |
-|   9. Settings | 787–806 |
-|   10. Sample cache | 807–855 |
-|   11. Live data (1.14d) | 856–872 |
-|   12. Edge cases kept | 873–888 |
-|   13. d2rs mapping | 889–899 |
-| Constants & data dependencies | 900–907 |
-| Randomness | 908–918 |
-| Edge cases & original bugs | 919–923 |
-| Test vectors | 924–968 |
-| Provenance | 969–1014 |
-| Open questions | 1015–1102 |
+|   6. Sound tick | 311–579 |
+|   7. Starting on a channel | 580–662 |
+|   8. Volume and pan | 663–800 |
+|   9. Settings | 801–820 |
+|   10. Sample cache | 821–869 |
+|   11. Live data (1.14d) | 870–886 |
+|   12. Edge cases kept | 887–902 |
+|   13. d2rs mapping | 903–913 |
+| Constants & data dependencies | 914–921 |
+| Randomness | 922–932 |
+| Edge cases & original bugs | 933–937 |
+| Test vectors | 938–982 |
+| Provenance | 983–1028 |
+| Open questions | 1029–1116 |
 <!-- /index -->
 
 ## Summary
@@ -325,6 +325,18 @@ T): nothing unless the channels are up (`0x004DF870`); ambience
 `0x004E42E0(T)`, music `0x004DCAA0(T)` (`audio/environment.md`),
 preload `0x00482B40(T)` (§10 r3), request update `0x004BA020(T)`,
 channel upkeep `0x004DF890` (§6.6), T += 1, `Sleep(0)`.
+
+**Recorded start of a game** (q-fix-audio, `audio-diff` captures under
+Wine, REC-1684): the first sound tick (T 0) runs in the second frame of
+the game: frame 1 has no client update (C stays 0) and no sound tick;
+frame f ≥ 2 runs the client update (C = f − 1 after it) and then the
+sound tick, whose requests carry T = f − 2. Requests made while a
+frame's packets are handled (unit creation, server sounds) read C = f − 2
+(before the update), and so do the unit pass's footsteps and voices of
+that frame's update; the environment and music machines of the tick read
+C = f − 1. The voices of that tick (T 0) start at `SetCurrentPosition`
+with T 0. d2rs: the first server tick runs no sound tick; presented tick
+= the last sound tick that ran.
 
 The second call site (`0x0044F01D`, answers open question 4) is the
 **paused** path of the client loop: single player (game type
@@ -668,7 +680,9 @@ At the end of the update, if the tick advanced:
    unit's client **pixel point** (the same values `client/model.md` §8
    rule 6 calls U's client pixel point), so x, y are world pixels and
    the doubling undoes the 2:1 isometric y.
-   **River** (2599, answers open question 8): with P = (a, b) and U =
+   **River** (2599, answers open question 8; the river objects are
+   client-only units of set C, whose GUIDs can equal a server object's:
+   d2rs asks set C first for this sound, REC-1680): with P = (a, b) and U =
    (c, e) as integers, t = f32((b − 2a − c/2 − e) / −2.5) (x87, `−2.0`
    at `0x006DA688`, `0.5` at `0x006CEF10`, `−2.5` at `0x006DA680`);
    U' = (trunc(t), trunc(f32(b − 2·(a − t)))) (`0x00682FD0`), then x,

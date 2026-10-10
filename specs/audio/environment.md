@@ -23,19 +23,19 @@
 |   1. Sound environment | 78–128 |
 |   2. Music (`0x004DCAA0(T)`) | 129–184 |
 |   3. Quest stingers (`0x004DCD40(M, dM, H, k, S, dS, play)`) | 185–244 |
-|   4. Level-entry lines (`0x004CC270`) | 245–293 |
-|   5. Ambience loop (`0x004E42E0(T)`, first part) | 294–315 |
-|   6. Rain (`0x004E42E0`, second part) | 316–346 |
-|   7. Event cues (`0x004E42E0`, third part) | 347–371 |
-|   8. Sample pins on level change (`0x004E42E0`, last part) | 372–379 |
-|   9. Front-end music (`Options Music`; answers open question 5) | 380–429 |
-| Constants & data dependencies | 430–439 |
-| Randomness | 440–448 |
-| Edge cases & original bugs | 449–458 |
-| Test vectors | 459–485 |
-|   Checks (hook addresses for `record_sound.py`) | 486–495 |
-| Provenance | 496–519 |
-| Open questions | 520–557 |
+|   4. Level-entry lines (`0x004CC270`) | 245–297 |
+|   5. Ambience loop (`0x004E42E0(T)`, first part) | 298–319 |
+|   6. Rain (`0x004E42E0`, second part) | 320–350 |
+|   7. Event cues (`0x004E42E0`, third part) | 351–375 |
+|   8. Sample pins on level change (`0x004E42E0`, last part) | 376–383 |
+|   9. Front-end music (`Options Music`; answers open question 5) | 384–433 |
+| Constants & data dependencies | 434–443 |
+| Randomness | 444–452 |
+| Edge cases & original bugs | 453–462 |
+| Test vectors | 463–489 |
+|   Checks (hook addresses for `record_sound.py`) | 490–499 |
+| Provenance | 500–523 |
+| Open questions | 524–561 |
 <!-- /index -->
 
 ## Summary
@@ -279,6 +279,10 @@ Table `0x0072A2C4`: 14 records of (10 level ids, quest q, event e):
    q 12 / 13 read the byte of chain 11 / 12), and C − P+0x7C > 62, and `any_speech` is false:
    player event e on P (`audio/triggers.md` §3 r4: the class line base
    + e − 33, delay per that rule).
+   d2rs: the check reads the bridge's copies of the 0x5E bytes, the
+   0x28 type 6 / 0x29 records and the 0x52 list (`world/quests-status.md`
+   §12; `audio/quest_check.rs`). Recorded: the Blood Moor entry line
+   (`<class>_act1_entry_wilderness.wav`) is requested at T 64.
 3. The flags are set even when r2 plays nothing, so a line skipped
    because the hero spoke within 62 updates is lost for that game
    (flags cleared: r4).

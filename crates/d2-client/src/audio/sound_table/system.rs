@@ -83,6 +83,14 @@ pub trait SoundWorld {
     /// +0x0C for unit types 0, 1, 3; static path +0x04 / +0x08 for types
     /// 2, 4, 5 (`client/model.md` §8 rule 6).
     fn position(&self, unit: UnitKey) -> Option<(i32, i32)>;
+    /// The position of the client-only unit (set C, `client/model.md` §2
+    /// r1) with this key: a client-only object can share its GUID with a
+    /// server object, and the sound layer's [`UnitKey`] cannot tell them
+    /// apart. PROVISIONAL (REC-1680): `object_river` (2599) is asked of
+    /// set C first.
+    fn client_only_position(&self, _unit: UnitKey) -> Option<(i32, i32)> {
+        None
+    }
     /// `0x00622AA0(player, unit, 2) ≠ 0` (§6.4 r2).
     fn blocked(&self, unit: UnitKey) -> bool;
     /// `Indoors` of the current sound environment (§6.4 r2).
@@ -462,7 +470,12 @@ impl SoundSystem {
     /// id is `id` (2599 `object_river` uses the projected point).
     fn unit_position(world: &dyn SoundWorld, unit: UnitKey, id: i32) -> Option<([f32; 3], f32)> {
         let (a, b) = world.position(world.local_player()?)?;
-        let (mut c, mut e) = world.position(unit)?;
+        let (mut c, mut e) = match id {
+            RIVER => world
+                .client_only_position(unit)
+                .or_else(|| world.position(unit))?,
+            _ => world.position(unit)?,
+        };
         if id == RIVER {
             (c, e) = river_point((a, b), (c, e));
         }

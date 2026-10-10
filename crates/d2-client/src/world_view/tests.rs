@@ -1122,3 +1122,17 @@ fn outputs_reach_the_ui_and_the_sound_requests_in_order() {
         .0
         .is_empty());
 }
+
+// Covers: specs/ui/messages.md §2 r3; specs/client/msg-ui.md §19 r3
+#[test]
+fn event_text_codes_that_end_in_a_screen_message_request_sound_6() {
+    use super::present::event_text_adds_line;
+    // REC-1681: the local player's own join (code 2) adds the empty line.
+    assert!(event_text_adds_line(2));
+    assert!((0..=5).all(event_text_adds_line));
+    assert!(event_text_adds_line(0xD));
+    // 7 (other functions), 0xC, 0xE and above 0x11 add none.
+    assert!(![7, 0xC, 0xE, 0x12, 0x13, 0xFF]
+        .into_iter()
+        .any(event_text_adds_line));
+}
