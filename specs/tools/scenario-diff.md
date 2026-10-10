@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–549 |
-|   4. Suite | 550–677 |
-| Constants & data dependencies | 678–681 |
-| Randomness | 682–685 |
-| Edge cases & original bugs | 686–721 |
-| Test vectors | 722–744 |
-| Provenance | 745–748 |
-| Open questions | 749–811 |
+|   3. Run | 145–558 |
+|   4. Suite | 559–686 |
+| Constants & data dependencies | 687–690 |
+| Randomness | 691–694 |
+| Edge cases & original bugs | 695–730 |
+| Test vectors | 731–753 |
+| Provenance | 754–757 |
+| Open questions | 758–820 |
 <!-- /index -->
 
 ## Summary
@@ -248,7 +248,16 @@ state first. It is the default way to compare a behaviour with 1.14d.
       `ClickView::pick` the window sets: the unit — monster, NPC,
       object or ground item, never a player — whose feet are nearest
       the click inside a box standing on them; d2rs-own, unverified,
-      the original hit-tests the drawn sprites `0x00467A10`), so a click
+      the original hit-tests the drawn sprites `0x00467A10`; measured
+      2026-10-10 (rc-render-effect): the effect scenes' first left click after
+      the waypoint, spell on the left button, walks in 1.14d (a left click
+      on the ground without Stand Still is a walk, controls.md §6 r7) because
+      nothing is hovered at the previous cursor (207,176), where d2rs's feet
+      box (±24 wide, 96 above) picks a Fallen above its head; the hover
+      candidate loop `0x00467AC0` tests each unit of the player's rooms with
+      `0x00466870`, whose monster / object test `0x00470860` is the unit's
+      drawn frame rectangle widened by 16 px on each side, not its feet
+      box), so a click
       on a monster sends the skill on the unit (`ui/controls.md` §6 r8: C→S 0x06
       for a left click), on
       an NPC or object the walk to the unit, then on arrival the
