@@ -718,12 +718,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2981
 - Rows set exercised = yes from the coverage reports' seen lists: 14
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6451
-  - `hireling.rogue-scout.act1`: q-chk-hirelings.tsv:4 kept, q-chk-hirelings.tsv:6 dropped
-  - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:12 dropped
-  - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:15 dropped
-  - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:18 dropped
-  - `system.hireling.hire-follow-level`: q-chk-hirelings.tsv:16 kept, q-chk-hirelings.tsv:19 dropped
+- Duplicate areas between parts: 6447
+  - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
+  - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
   - `vendor.fara`: q-chk-act2.tsv:15 kept, q-chk-items-drops.tsv:13 dropped
   - `vendor.elzix`: q-chk-act2.tsv:14 kept, q-chk-items-drops.tsv:14 dropped
@@ -733,11 +730,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `vendor.gheed`: q-chk-items-drops.tsv:9 kept, q-chk-items-vendors.tsv:4 dropped
   - `vendor.gamble`: q-chk-items-drops.tsv:26 kept, q-chk-items-vendors.tsv:5 dropped
   - `vendor.akara`: q-chk-items-drops.tsv:10 kept, q-chk-items-vendors.tsv:6 dropped
-  - `system.hireling.hire-follow-level`: q-chk-hirelings.tsv:16 kept, q-fix-d4-placement.tsv:3 dropped
-  - `hireling.rogue-scout.act1`: q-chk-hirelings.tsv:4 kept, q-fix-d4-placement.tsv:4 dropped
-  - `hireling.desert-mercenary.act2`: q-chk-hirelings.tsv:8 kept, q-fix-d4-placement.tsv:5 dropped
-  - `hireling.barbarian.act5`: q-chk-hirelings.tsv:10 kept, q-fix-d4-placement.tsv:6 dropped
-  - `hireling.eastern-sorceror.act3`: q-chk-hirelings.tsv:9 kept, q-fix-d4-placement.tsv:7 dropped
+  - `system.hireling.hire-follow-level`: q-chk-hirelings.tsv:11 kept, q-fix-d4-placement.tsv:3 dropped
+  - `hireling.rogue-scout.act1`: q-chk-hirelings.tsv:3 kept, q-fix-d4-placement.tsv:4 dropped
+  - `hireling.desert-mercenary.act2`: q-chk-hirelings.tsv:4 kept, q-fix-d4-placement.tsv:5 dropped
+  - `hireling.barbarian.act5`: q-chk-hirelings.tsv:6 kept, q-fix-d4-placement.tsv:6 dropped
+  - `hireling.eastern-sorceror.act3`: q-chk-hirelings.tsv:5 kept, q-fix-d4-placement.tsv:7 dropped
   - `skill.dru.tornado`: q-chk-skills-bda.tsv:57 kept, q-fix-d4-placement.tsv:11 dropped
   - `check.a2-warp-arcane`: integrator.tsv:28 kept, q-fix-d9-arcane.tsv:3 dropped
   - `monster.boss.duriel`: q-chk-act2.tsv:40 kept, q-run-gen-bosses.tsv:4 dropped
@@ -844,9 +841,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `cube.recipe.socket`: q-chk-items-cube.tsv:13 kept, q-run-items.tsv:600 dropped
   - `cube.recipe.upgrade-gems`: q-chk-items-cube.tsv:11 kept, q-run-items.tsv:601 dropped
   - `missile.tornado`: q-fix-d4-placement.tsv:10 kept, q-run-missiles-states.tsv:275 dropped
-  - `net.c2s.0x61`: q-chk-hirelings.tsv:24 kept, q-run-net.tsv:29 dropped
-  - `net.c2s.0x36`: q-chk-hirelings.tsv:22 kept, q-run-net.tsv:62 dropped
-  - `net.c2s.0x62`: q-chk-hirelings.tsv:23 kept, q-run-net.tsv:102 dropped
+  - `net.c2s.0x61`: q-chk-hirelings.tsv:15 kept, q-run-net.tsv:29 dropped
+  - `net.c2s.0x36`: q-chk-hirelings.tsv:13 kept, q-run-net.tsv:62 dropped
+  - `net.c2s.0x62`: q-chk-hirelings.tsv:14 kept, q-run-net.tsv:102 dropped
   - `net.s2c.0x27`: q-fix-d7d8-items-net.tsv:4 kept, q-run-net.tsv:155 dropped
   - `object.operate.32.bank`: merge-npc-interact.tsv:3 kept, q-run-objects.tsv:440 dropped
   - `object.operate.23.waypoint`: q-run-objects.tsv:430 kept, q-tool-interact-pokes.tsv:3 dropped
@@ -888,7 +885,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x37`: q-run-net.tsv:26 kept, q-tool-packet-census.tsv:26 dropped
   - `net.c2s.0x4f`: q-run-net.tsv:27 kept, q-tool-packet-census.tsv:27 dropped
   - `net.c2s.0x50`: q-run-net.tsv:28 kept, q-tool-packet-census.tsv:28 dropped
-  - `net.c2s.0x61`: q-chk-hirelings.tsv:24 kept, q-tool-packet-census.tsv:29 dropped
+  - `net.c2s.0x61`: q-chk-hirelings.tsv:15 kept, q-tool-packet-census.tsv:29 dropped
   - `net.c2s.0x63`: q-run-net.tsv:30 kept, q-tool-packet-census.tsv:30 dropped
   - `net.c2s.0x00`: q-run-net.tsv:31 kept, q-tool-packet-census.tsv:31 dropped
   - `net.c2s.0x01`: q-run-net.tsv:32 kept, q-tool-packet-census.tsv:32 dropped
@@ -921,7 +918,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x30`: q-run-net.tsv:59 kept, q-tool-packet-census.tsv:59 dropped
   - `net.c2s.0x31`: q-run-net.tsv:60 kept, q-tool-packet-census.tsv:60 dropped
   - `net.c2s.0x34`: q-run-net.tsv:61 kept, q-tool-packet-census.tsv:61 dropped
-  - `net.c2s.0x36`: q-chk-hirelings.tsv:22 kept, q-tool-packet-census.tsv:62 dropped
+  - `net.c2s.0x36`: q-chk-hirelings.tsv:13 kept, q-tool-packet-census.tsv:62 dropped
   - `net.c2s.0x38`: q-run-net.tsv:63 kept, q-tool-packet-census.tsv:63 dropped
   - `net.c2s.0x39`: q-run-net.tsv:64 kept, q-tool-packet-census.tsv:64 dropped
   - `net.c2s.0x3a`: q-run-net.tsv:65 kept, q-tool-packet-census.tsv:65 dropped
@@ -961,7 +958,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x5e`: q-run-net.tsv:99 kept, q-tool-packet-census.tsv:99 dropped
   - `net.c2s.0x5f`: q-run-net.tsv:100 kept, q-tool-packet-census.tsv:100 dropped
   - `net.c2s.0x60`: q-run-net.tsv:101 kept, q-tool-packet-census.tsv:101 dropped
-  - `net.c2s.0x62`: q-chk-hirelings.tsv:23 kept, q-tool-packet-census.tsv:102 dropped
+  - `net.c2s.0x62`: q-chk-hirelings.tsv:14 kept, q-tool-packet-census.tsv:102 dropped
   - `net.c2s.0x64`: q-run-net.tsv:103 kept, q-tool-packet-census.tsv:103 dropped
   - `net.c2s.0x65`: q-run-net.tsv:104 kept, q-tool-packet-census.tsv:104 dropped
   - `net.c2s.0x66`: q-run-net.tsv:105 kept, q-tool-packet-census.tsv:105 dropped
@@ -2713,23 +2710,22 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `ui.frontend.charselect.dolls`: rc-dolls-check.tsv:3 kept, rc-run-2b.tsv:258 dropped
   - `drlg.level-seed`: rc-link-2.tsv:167 kept, rc-run-2b.tsv:259 dropped
   - `drlg.outdoor.tilesub`: rc-promote.tsv:7 kept, rc-run-2b.tsv:260 dropped
-  - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:262 dropped
-  - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:264 dropped
-  - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, rc-run-2b.tsv:266 dropped
-  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2b.tsv:268 dropped
-  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:12 kept, rc-run-2b.tsv:269 dropped
-  - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-2b.tsv:270 dropped
-  - `level.a3.75.act-3-town`: rc-promote.tsv:17 kept, rc-run-2b.tsv:271 dropped
-  - `level.a4.103.act-4-town`: rc-promote.tsv:21 kept, rc-run-2b.tsv:272 dropped
-  - `level.a5.109.act-5-town`: rc-promote.tsv:22 kept, rc-run-2b.tsv:273 dropped
-  - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:274 dropped
-  - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:275 dropped
-  - `quest.a4q3-hell-s-forge`: rc-link-2.tsv:168 kept, rc-run-2b.tsv:276 dropped
-  - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:277 dropped
-  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:46 kept, rc-run-2b.tsv:278 dropped
-  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:47 kept, rc-run-2b.tsv:279 dropped
-  - `system.act.travel`: rc-run-1.tsv:282 kept, rc-run-2b.tsv:280 dropped
-  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2b.tsv:281 dropped
+  - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, rc-run-2b.tsv:261 dropped
+  - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, rc-run-2b.tsv:262 dropped
+  - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, rc-run-2b.tsv:264 dropped
+  - `level.a1.3.act-1-wilderness-2`: rc-promote.tsv:12 kept, rc-run-2b.tsv:265 dropped
+  - `level.a2.40.act-2-town`: rc-pc1-audit.tsv:62 kept, rc-run-2b.tsv:266 dropped
+  - `level.a3.75.act-3-town`: rc-promote.tsv:17 kept, rc-run-2b.tsv:267 dropped
+  - `level.a4.103.act-4-town`: rc-promote.tsv:21 kept, rc-run-2b.tsv:268 dropped
+  - `level.a5.109.act-5-town`: rc-promote.tsv:22 kept, rc-run-2b.tsv:269 dropped
+  - `npc.akara`: rc-pc1-audit.tsv:82 kept, rc-run-2b.tsv:270 dropped
+  - `quest.a4q2-terror-s-end`: rc-pc1-audit.tsv:106 kept, rc-run-2b.tsv:271 dropped
+  - `quest.a4q3-hell-s-forge`: rc-link-2.tsv:168 kept, rc-run-2b.tsv:272 dropped
+  - `quest.a5q1-siege-on-harrogath`: rc-pc1-audit.tsv:108 kept, rc-run-2b.tsv:273 dropped
+  - `quest.a5q4-betrayal-of-harrogath`: rc-promote.tsv:46 kept, rc-run-2b.tsv:274 dropped
+  - `quest.a5q6-eve-of-destruction`: rc-promote.tsv:47 kept, rc-run-2b.tsv:275 dropped
+  - `system.act.travel`: rc-run-1.tsv:282 kept, rc-run-2b.tsv:276 dropped
+  - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, rc-run-2b.tsv:277 dropped
   - `object.1-casket`: rc-partial-promote.tsv:254 kept, rc-run-3.tsv:3 dropped
   - `object.100-duriel-s-lair`: rc-link-checks.tsv:363 kept, rc-run-3.tsv:4 dropped
   - `object.101-dummy`: rc-partial-promote.tsv:255 kept, rc-run-3.tsv:5 dropped
@@ -7168,7 +7164,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.hireling.hire-follow-level`: rc-link-2.tsv:43 kept, world.tsv:383 dropped
   - `hireling.rogue-scout.act1`: rc-link-2.tsv:42 kept, world.tsv:384 dropped
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
-  - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:267 kept, world.tsv:386 dropped
+  - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
 - Rows whose state disagrees with their checks: 2066
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
