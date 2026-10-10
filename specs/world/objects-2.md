@@ -218,6 +218,13 @@ step & 3; room lookup from the init room at (L.x + dx, L.y + dy)
 P, and if the point query at P with mask 0x3F11 is free
 (`0x0064D800(room, P, 1, 1)`): gold drop at P (`0x00559300`, §20.3).
 
+The drop needs the combined items array's pick columns (the `gld `
+lookup of §20.3) on the host's drop state; a host that builds the state
+without them creates no gold and the game seed then misses the item-seed
+and gold-amount draws of every pile (seen as the 4 piles of level 76 at
+frame 21, check `a3-warp-l76-jungle-1-ama`, equal since the client sets the
+picks).
+
 ### 18. Object events 0, 3, 8, 9, 10
 
 Handlers (game, O) as `sim/units.md` §6.4. **Burn** (`0x00581680`): for
