@@ -562,9 +562,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         self.x().state_mask(u, mask)
     }
     /// `0x00622C40(a, d, 0x00622870(a))` (the action wiring's seams).
+    /// `0x00622C40(unit, target, moving)` (`skills/use.md` §3 step 6): the
+    /// third argument is `0x00622DC0(target)`, whether the target is in a
+    /// moving mode (`0x00622D00`), 0 or 1.
     fn in_melee_range(&self, u: UnitId, target: UnitId) -> bool {
-        let x = self.x();
-        x.in_melee_range(u, target, x.melee_range(u))
+        use crate::combat::CombatWorld;
+        let moving = i32::from(self.cv.moving_mode(target));
+        self.cv.in_melee_range(u, target, moving)
     }
 
     /// Unit +0x10.
