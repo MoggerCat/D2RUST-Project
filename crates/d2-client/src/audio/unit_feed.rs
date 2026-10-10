@@ -541,18 +541,7 @@ impl UnitFeed {
                 local_dist,
                 record: None,
                 item: None,
-                skill_request: (t.mode_requests != u.mode_requests)
-                    .then_some(u.last_mode_request)
-                    .flatten()
-                    .filter(|r| matches!(r.code, 0x15 | 0x16))
-                    // The local player's start takes its own level
-                    // (`msg-skills.md` §7 r4.3 (b)); the server's message
-                    // for it carries level 0 and the recorded game plays
-                    // one start sound, at the request that has the level
-                    // (REC-1683: the first of the two d2rs requests of a
-                    // cast, level 0, plays nothing).
-                    .filter(|r| !is_local || r.record[4] != 0)
-                    .and_then(|r| u16::try_from(r.record[0]).ok()),
+                skill_request: skill_start_request(t.mode_requests, u),
             };
             match key.unit_type {
                 MONSTER => {
@@ -796,6 +785,20 @@ fn item_sound(cx: &mut Ctx, p: &Planned) {
     }
 }
 
+/// The skill whose start sounds a unit's new mode request plays
+/// (REC-1683, `triggers.md` §8 r1): the last request when the count moved
+/// and its code is 0x15 / 0x16, record entry 0 the skill. The local
+/// player's own click request (level 0) is the one the original starts
+/// from (`skills/sequences.md` local player rules 1-2); the server sends
+/// the own client no second request (rule 3), so no request is skipped.
+fn skill_start_request(seen: u32, u: &ClientUnit) -> Option<u16> {
+    (seen != u.mode_requests)
+        .then_some(u.last_mode_request)
+        .flatten()
+        .filter(|r| matches!(r.code, 0x15 | 0x16))
+        .and_then(|r| u16::try_from(r.record[0]).ok())
+}
+
 #[cfg(test)]
 mod explicit_tests {
     use super::*;
@@ -854,5 +857,24 @@ mod rate_tests {
         assert_eq!(&seen[9..], &[1917, 82]);
         u.mode = 5;
         assert_eq!(player_rate(&w, key, &u, 80), 80);
+    }
+}
+
+#[cfg(test)]
+mod skill_start_tests {
+    use super::*;
+    use crate::bridge::world::ModeRequest;
+
+    // Covers: specs/skills/sequences.md §3
+    #[test]
+    fn the_local_players_click_request_at_level_0_plays_its_start() {
+        let mut u = ClientUnit::new(UnitKey::new(PLAYER, 1));
+        u.mode_requests = 1;
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x15,
+            record: [44, 1, 5, 5, 0, 0, 0],
+        });
+        assert_eq!(skill_start_request(0, &u), Some(44));
+        assert_eq!(skill_start_request(1, &u), None);
     }
 }
