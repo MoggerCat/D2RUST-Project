@@ -540,3 +540,24 @@ fn skill_message_edge_cases() {
     assert_eq!(m.w, before, "the unread bytes change nothing");
     // A monster's add may exceed max_level (checked on the list: skills.rs).
 }
+
+// Covers: specs/client/model.md §8 r4; specs/render/lighting.md §8
+#[test]
+fn a_player_mode_request_removes_the_cast_light_not_the_player_light() {
+    use crate::rules::lighting::records::LightKind;
+    let mut m = with_player(1);
+    // Player init: the player light (unit `+0x64`).
+    assert_eq!(m.w.lights.len(), 1);
+    // `0x00461250` detaches the stat list's cast light only: none here.
+    super::super::modes::remove_unit_light(&mut m.w, P1);
+    assert_eq!(m.w.lights.len(), 1, "the player light stays");
+    let cast = m
+        .w
+        .lights
+        .create(None, (0, 0), LightKind::Plain, 1, 255, 255, 255, 255)
+        .unwrap();
+    m.w.cast_lights.insert(P1, cast);
+    super::super::modes::remove_unit_light(&mut m.w, P1);
+    assert_eq!(m.w.lights.len(), 1);
+    assert!(m.w.lights.get(cast).is_none() && m.w.cast_lights.is_empty());
+}

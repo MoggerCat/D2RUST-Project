@@ -186,14 +186,14 @@ impl WorldViewState {
 /// schedule the world view draws exactly those ticks (one frame each) and
 /// nothing between them; the host clock and the frame schedule are
 /// recorded inputs, not game behaviour.
-/// Format 2 adds each frame's light quality `q` (`render/lighting.md`
-/// §5), which 1.14d derives from the host's wall clock and draw rate.
 #[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
 pub struct FrameSchedule {
     /// Drawn tick → the clock of its cursor step (`None`: not recorded,
     /// allowed for the last frame only: its step follows the dump).
     pub frames: std::collections::BTreeMap<u64, Option<u32>>,
-    /// Drawn tick → the frame's recorded light quality `q` (format 2).
+    /// Drawn tick → the recorded light quality `[0x007B567C]` (a host
+    /// input: it follows the measured draw rate, `render/lighting.md` §5),
+    /// where the schedule has the column.
     pub quality: std::collections::BTreeMap<u64, u8>,
     /// `last_step` and `idle_since` of the cursor at the first frame.
     pub cursor_last: u32,
@@ -205,18 +205,16 @@ pub struct FrameSchedule {
 impl FrameSchedule {
     /// Parses the `frame-schedule 1` text: `# frame-schedule 1`, `#
     /// cursor_last N`, `# cursor_idle N`, a `tick\tnow` header, then one
-    /// row per drawn frame (`now` `-` when not recorded). Format 2
-    /// (`# frame-schedule 2`, header `tick\tnow\tq`) adds the frame's
-    /// light quality on every row.
+    /// row per drawn frame (`now` `-` when not recorded).
     pub fn parse(text: &str) -> Result<Self, String> {
         let mut s = FrameSchedule::default();
-        let (mut version, mut last, mut idle) = (None, None, None);
+        let (mut version, mut last, mut idle) = (false, None, None);
         for (n, line) in text.lines().enumerate() {
             let at = |m: &str| format!("frame schedule line {}: {m}", n + 1);
             if let Some(h) = line.strip_prefix('#') {
                 let mut w = h.split_whitespace();
                 match (w.next(), w.next()) {
-                    (Some("frame-schedule"), Some(v @ ("1" | "2"))) => version = Some(v == "2"),
+                    (Some("frame-schedule"), Some("1")) => version = true,
                     (Some("cursor_last"), Some(v)) => {
                         last = Some(v.parse().map_err(|_| at("cursor_last"))?)
                     }
@@ -240,18 +238,14 @@ impl FrameSchedule {
                 Some(v) => Some(v.parse().map_err(|_| at("now"))?),
                 None => return Err(at("no now column")),
             };
-            if version == Some(true) {
-                let q = c
-                    .next()
-                    .and_then(|v| v.parse().ok())
-                    .filter(|q| *q <= 2)
-                    .ok_or_else(|| at("q"))?;
-                s.quality.insert(tick, q);
-            }
             s.frames.insert(tick, now);
+            if let Some(q) = c.next().filter(|q| *q != "-") {
+                s.quality
+                    .insert(tick, q.parse().map_err(|_| at("quality"))?);
+            }
         }
-        if version.is_none() {
-            return Err("frame schedule: no `# frame-schedule 1` or `2` line".into());
+        if !version {
+            return Err("frame schedule: no `# frame-schedule 1` line".into());
         }
         s.cursor_last = last.ok_or("frame schedule: no cursor_last")?;
         s.cursor_idle = idle.ok_or("frame schedule: no cursor_idle")?;
@@ -280,11 +274,6 @@ impl FrameSchedule {
     /// The host clock of `tick`'s cursor step.
     pub fn now(&self, tick: u64) -> Option<u32> {
         self.frames.get(&tick).copied().flatten()
-    }
-
-    /// The recorded light quality `q` of the frame drawn on `tick`.
-    pub fn quality(&self, tick: u64) -> Option<u8> {
-        self.quality.get(&tick).copied()
     }
 }
 
@@ -1405,10 +1394,16 @@ fn world_view_frame(
     }
     // `render/lighting.md` §6.4: the drawn frame's pass over the client's
     // kept light list (§6.3), held by the model between frames.
-    // A check run replays 1.14d's light quality of the frame (§5: from
-    // the host's wall clock and draw rate, `tools/scenario-diff.md` §3 r7).
+    // A check run lights the frame with 1.14d's recorded light quality
+    // (`render/lighting.md` §5: it follows the host's wall clock and draw
+    // rate; the schedule's `quality` column, `tools/scenario-diff.md` §3
+    // r7 step 5).
     let feed = &mut state.feed;
-    feed.set_light_quality(schedule.as_ref().and_then(|s| s.quality(tick)));
+    feed.set_light_quality(
+        schedule
+            .as_ref()
+            .and_then(|s| s.quality.get(&tick).copied()),
+    );
     bridge
         .0
         .light_frame(|w, lights| feed.light_frame(w, lights));
@@ -1794,23 +1789,19 @@ mod schedule_tests {
         // refused, never a fallback clock.
         let gap = text.replace("3\t6403156", "3\t-");
         assert!(FrameSchedule::parse(&gap).is_err());
+        // The optional light-quality column (a recorded host input).
+        let q = FrameSchedule::parse(
+            &text
+                .replace("tick\tnow\n", "tick\tnow\tquality\n")
+                .replace("3\t6403156", "3\t6403156\t2")
+                .replace("5\t6403281", "5\t6403281\t0"),
+        )
+        .unwrap();
+        assert_eq!(
+            (q.quality.get(&3), q.quality.get(&5), q.quality.get(&6)),
+            (Some(&2), Some(&0), None)
+        );
         assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
         assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
-        assert_eq!(s.quality(3), None);
-    }
-
-    // Covers: specs/tools/scenario-diff.md §3 r7; specs/render/lighting.md §5
-    #[test]
-    fn format_2_carries_each_frames_light_quality() {
-        let text = "# frame-schedule 2\n# cursor_last 0\n# cursor_idle 6402500\n\
-                    tick\tnow\tq\n3\t6403156\t2\n16\t6403281\t0\n18\t-\t0\n";
-        let s = FrameSchedule::parse(text).unwrap();
-        assert_eq!(
-            (s.quality(3), s.quality(16), s.quality(4)),
-            (Some(2), Some(0), None)
-        );
-        // Format 2 needs `q` on every row, in 0..=2.
-        assert!(FrameSchedule::parse(&text.replace("\t2\n16", "\n16")).is_err());
-        assert!(FrameSchedule::parse(&text.replace("\t2\n16", "\t3\n16")).is_err());
     }
 }

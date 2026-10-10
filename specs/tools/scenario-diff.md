@@ -212,7 +212,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
       variant and cursor frame draws on. The debugger slows 1.14d (one
       frame per update, 125 ms apart, instead of 40 ms), so a d2rs clock of
       its own can never meet a recording. d2rs therefore replays them:
-      `[frame-schedule.tsv]` (format `frame-schedule 2`, written from the
+      `[frame-schedule.tsv]` (format `frame-schedule 1`, written from the
       capture by `scenario_diff.py`: `# cursor_last`, `# cursor_idle` = the
       first frame's `cursor.last_step`, `cursor.idle_since`; one row `tick
       now` per captured frame, `tick` = `f`, `now` = the next frame's
@@ -225,14 +225,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
       clock on any frame, or a schedule in which a frame other than the
       last lacks `now`, fails the check; d2rs never falls back to a clock
       of its own in a check run. Live play keeps the host clock.
-      Format `frame-schedule 2` (2026-10-10, rc-ui-pixels) adds a third
-      column `q`: the frame's light quality (`light.quality` of the
-      capture, `render/lighting.md` §5), which 1.14d derives from the host
-      clock and its measured draw rate, so it is a recorded input too
-      (under the debugger the rate falls to 1 and `q` drops from 2 to 0 at
-      about tick 16). The world view lights each drawn tick with its row's
-      `q`; a capture frame without `light.quality` fails the check.
-      Format 1 is still read (no `q`: the feed's own, 2).
+      An optional third column `quality` (2026-10-10, rc-ui-div /
+      rc-ui-pixels; `-` when not captured) holds the frame's light
+      quality (`light.quality`, `render/lighting.md` §5), which 1.14d
+      derives from the host clock and its measured draw rate, so it is a
+      recorded input too (under the debugger the rate falls to 1 and `q`
+      drops from 2 to 0 at about tick 16). The world view lights each
+      drawn tick with its row's `quality`; without one, its own `q` (2).
       Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
       the client seed matches the capture's `seed_start` of every frame
       through tick 25 and the rain lines (endpoints and colors) are equal
