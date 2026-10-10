@@ -765,8 +765,13 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn portal_guid(&self, player: UnitId) -> Option<u32> {
         self.h.x.ai_portal_guid(player)
     }
+    /// Monster data `nComponent[i]` from the lent monster world;
+    /// [`Pending::ai_component`] without one.
     fn component(&self, unit: UnitId, i: usize) -> u8 {
-        self.h.x.ai_component(unit, i)
+        match self.h.monster_data(unit) {
+            Some(d) => d.components.get(i).copied().unwrap_or(0),
+            None => self.h.x.ai_component(unit, i),
+        }
     }
     fn target_unit(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.ai_target_unit(game, unit)
@@ -775,7 +780,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.h.x.ai_set_target_override(unit, kind, guid);
     }
     fn chain_index(&self, class: i32) -> i32 {
-        self.h.x.ai_chain_index(class)
+        self.h.monster_chain_position(class)
     }
     fn class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
         self.h.x.ai_class_for_level(game, room, class)
@@ -974,8 +979,13 @@ impl<X: Pending> AiActs for View<'_, X> {
             .x
             .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)
     }
+    /// `0x0057CCB0(game, unit, killer, 1)`: the kill of `damage.md` §7.2
+    /// on this view's parts (the Baal clone with a missing owner,
+    /// `ai-bodies-5.md` §22 step 2: the death mode on its first think).
+    // Spec: specs/combat/damage.md §7.2, specs/monsters/ai-bodies-5.md §22.
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
-        self.h.x.ai_kill(game, unit, killer);
+        let mut cv = self.combat(game);
+        super::reaction::kill_by(&mut cv, unit, killer);
     }
     /// The unit leaves its room and is removed (`0x00555600`, `units.md`
     /// §3.2: the caged barbarians at their portal, Baal at the stairs);
