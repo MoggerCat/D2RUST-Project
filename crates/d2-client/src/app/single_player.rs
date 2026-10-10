@@ -520,6 +520,9 @@ pub struct LocalSeams {
     /// The unit size (`0x00620510`, the path record's) of the units of
     /// [`Self::sides`], for the full-size distance of the target search.
     pub sizes: BTreeMap<UnitId, i32>,
+    /// The monsters carrying a usable shield (`0x006225F0`; the `SH`
+    /// component choice), set by [`super::weapons::sync`].
+    pub shielded: std::collections::BTreeSet<UnitId>,
     /// The skill pipeline's per-unit fields and preview fills (`UseRest`,
     /// `LearnRest`: [`super::skill_rest`]).
     pub skills: SkillStore,
@@ -1115,6 +1118,20 @@ impl Pending for LocalSeams {
     }
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
+    }
+    // Spec: specs/combat/hit.md §5 (monster block chance, `0x006225F0`).
+    fn composit_shield(&self, unit: UnitId) -> bool {
+        self.shielded.contains(&unit)
+    }
+    // Spec: specs/combat/damage.md §3.2 (StrBonus / DexBonus), §9.
+    fn str_dex_bonus(&self, item: UnitId) -> (i32, i32) {
+        let f = self.weapons.facts(item);
+        (f.str_bonus, f.dex_bonus)
+    }
+    // PROVISIONAL (REC-2140): the row test of `0x00629930` only; the max
+    // durability and indestructible stats are not read.
+    fn item_has_durability(&self, item: UnitId) -> bool {
+        self.weapons.facts(item).breakable
     }
     fn item_type_class(&self, item: UnitId) -> u32 {
         self.weapons.type_class(item)
