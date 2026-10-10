@@ -591,8 +591,18 @@ fn fill_monster_drains_and_crit() {
     };
     fill(&mut f, &s, &c, a, d, &mut rec, false, 64);
     assert_eq!(rec.life_leech, 10 + 133);
-    // Monster crit 100: everything doubled, overlay 54, hit class 0x10.
+    // Monster crit 100: everything doubled, hit class 0x10, no overlay
+    // (the nibble was free).
     assert_eq!(rec.hit_class, 0x10);
+    assert!(!f.log.iter().any(|l| l.starts_with("overlay")));
+    // A taken high nibble stays; overlay 54 instead (`0x005A5636`).
+    let mut rec = DamageRecord {
+        hit_class: 0x20,
+        result: hit::result::NO_EVENTS,
+        ..DamageRecord::default()
+    };
+    fill(&mut f, &s, &c, a, d, &mut rec, false, 64);
+    assert_eq!(rec.hit_class, 0x20);
     assert!(f.log.contains(&"overlay 1 54".to_string()));
     // Monsters raise no event 3.
     assert!(!f.log.iter().any(|l| l.starts_with("event")));

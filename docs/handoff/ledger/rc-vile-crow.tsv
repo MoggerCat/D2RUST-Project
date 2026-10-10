@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+monster.ai.succubus-curse-gate	system	rc-vile-crow	AITHINK_Fn118_Succubus 0x005E1E00, 0x00625760, 0x00625D60	specs/monsters/ai-bodies-5.md#4	done	gen-su-54	DIVERGED	yes	0	n	rc-vile-crow	DIVERGED	M	curse-list test and max mana were host stubs; first difference frame 41 -> 68 (fr/seed layer next)

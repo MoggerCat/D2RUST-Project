@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+system.sim.pathing.click-walk-player-y	system	systems	click-walk first step y rounding	specs/sim/pathing.md	draft	a1-quest-andariel-reward,a1-quest-den-reward	PARTIAL	yes	0	n	claude/rc-walk-y1	EQUAL	-	r18 re-measure: no player/hireling y difference in a1-quest-* and a1-warp-* (36 PARTIAL are other fields); rc-queue row stale

@@ -1207,6 +1207,26 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         // delete the thinks and schedule one at frame + N; the mode is
         // not changed. A fresh spawn has no uninterruptable state to clear.
         if let bodies::BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30` / `0x00621CE0`: the record carries the link
+            // (+0x94 / +0x98) with +0xC8 bit 0x400, which `0x00552FD0`
+            // reads (`sim/units.md` §2 "Owner links" rule 2).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                match link {
+                    Some(l) => {
+                        r.source = l;
+                        r.flags2 |= 0x400;
+                    }
+                    None => {
+                        r.source = (0, 0);
+                        r.flags2 &= !0x400;
+                    }
+                }
+            }
             match owner {
                 Some(o) => self.cv.v.h.unit_source.insert(m, o),
                 None => self.cv.v.h.unit_source.remove(&m),
@@ -1718,7 +1738,12 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     // ---- batch 4
 
     fn dir64(&self, u: UnitId, at: (i32, i32)) -> i32 {
-        self.x().body_dir64(u, at)
+        // `0x00621DC0` through the path provider; the host's answer
+        // only without one (MagottLay egg side, `gen-mon-72`).
+        self.cv
+            .v
+            .path_dir64(u, at)
+            .unwrap_or_else(|| self.x().body_dir64(u, at))
     }
     /// Unit +0x4E.
     fn action_frame(&self, u: UnitId) -> i32 {
@@ -1767,20 +1792,14 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             None => self.x().body_missile_frames(m),
         }
     }
-    /// `0x0064A2B0` (+0x0E total) and `0x0064A330` (+0x10 current), each
-    /// clamped to −0x8000…0x7FFF, on the real missile store. Without this
-    /// the Inferno-type bodies left every missile at its `Range`
-    /// (`skills/bodies-3.md` §4.2).
+    /// Total frames and frames left of a missile in the store
+    /// (`0x0064A2B0`, `0x0064A330`; `specs/skills/bodies-3.md` §3.2).
     fn set_missile_frames(&mut self, m: UnitId, total: i32, left: i32) {
-        match self.cv.v.h.missiles.as_mut() {
-            Some(s) => {
-                if let Some(d) = s.get_mut(m) {
-                    d.total = missiles::clamp_frame(total);
-                    d.current = missiles::clamp_frame(left);
-                }
-            }
-            None => self.xm().body_set_missile_frames(m, total, left),
+        if let Some(d) = self.cv.v.h.missiles.as_mut().and_then(|s| s.get_mut(m)) {
+            d.total = missiles::clamp_frame(total);
+            d.current = missiles::clamp_frame(left);
         }
+        self.xm().body_set_missile_frames(m, total, left);
     }
     /// Unit +0x30 → +0x34.
     fn sequence_frames(&self, u: UnitId) -> Option<i32> {

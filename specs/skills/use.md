@@ -26,19 +26,19 @@
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–218 |
-|   4. Mode change gates | 219–276 |
-|   5. Start and do | 277–471 |
-|   6. Cooldown | 472–485 |
-|   7. Periodic skills and auras | 486–535 |
-|   8. Function tables | 536–555 |
-| Constants & data dependencies | 556–576 |
-| Randomness | 577–586 |
-| Edge cases & original bugs | 587–608 |
-| Test vectors | 609–629 |
-| Provenance | 630–649 |
-| Open questions | 650–702 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–203 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 204–230 |
+|   4. Mode change gates | 231–288 |
+|   5. Start and do | 289–483 |
+|   6. Cooldown | 484–497 |
+|   7. Periodic skills and auras | 498–547 |
+|   8. Function tables | 548–567 |
+| Constants & data dependencies | 568–588 |
+| Randomness | 589–598 |
+| Edge cases & original bugs | 599–620 |
+| Test vectors | 621–641 |
+| Provenance | 642–661 |
+| Open questions | 662–714 |
 <!-- /index -->
 
 ## Summary
@@ -140,6 +140,18 @@ at the first failure (entry null → fatal assert):
 | 8 | start stat `0x006440F0` | 1 |
 | 9 | charges `0x00647840` | 2 |
 | 10 | cooldown `0x006478F0` (§6) returns 0 | 8 |
+
+**Shape test** `0x00644060` (test 7; ECX-free: EAX the skill record,
+EBX the unit; no record or unit → fail; read 2026-10-10). "In a form"
+= `0x0063A510(unit)` = the unit has a state whose `states.txt` row sets
+`restrict` (state-mask group +0x110, flag bit 17; the shapeshift
+forms). By the skill's `restrict` byte (+0x228): 0 → pass only when not
+in a form; 1 or any value but 0 and 2 → pass; 2 → pass only when in a
+form **and** the unit has one of `State1`…`State3` (i16 at +0x22A, +0x22C,
++0x22E; a negative id ends the list). So Shock Wave (`restrict` 2,
+`State1` bear) is refused with code 4 outside bear form, and the client
+click (`ui/controls.md` §6 r9.1) sends nothing (1.14d
+`gen-skill-dru-243`: the player stays in mode 5, no mana spent).
 
 Else 0. So `InGame` is read on the server, inside `use_state` (no
 message handler reads it). The step 4 fallback looks Attack up with

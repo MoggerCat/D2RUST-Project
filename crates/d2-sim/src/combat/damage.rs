@@ -588,10 +588,12 @@ pub fn monster_crit<W: CombatWorld>(
             ] {
                 *f = f.wrapping_mul(2);
             }
-            // `0x00554650(record, 0x10)`: `(+0x60 & 0xF0) ≠ 0` writes
-            // nothing (§3.1 step 13).
+            // `0x00554650(record, 0x10)` sets the hit class when its high
+            // nibble is free; overlay 54 only when it was taken (the call
+            // returned 0: `0x005A5636 jne`, §3.1 step 13).
             if rec.hit_class & 0xF0 == 0 {
                 rec.hit_class |= 0x10;
+            } else {
                 w.overlay(d, OVERLAY_MONSTER_CRIT);
             }
         }

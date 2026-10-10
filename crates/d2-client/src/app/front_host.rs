@@ -421,7 +421,7 @@ fn draw_item(frame: &mut IndexFrame, a: &mut FrontArt, pl2: Option<&Pl2>, it: &D
     }
 }
 
-/// PROVISIONAL (REC-2183): the 1.14d capture draws every doll one row above
+/// Settled by check `ui-charselect-dolls` (REC-2183): the 1.14d capture draws every doll one row above
 /// `at.y + y_min` (all three visible slots, best pixel match at dy = -1 of
 /// -4..4); the cause (cel placement of `D2GFX_DrawCelContext`) is not read.
 const DOLL_DY: i32 = -1;

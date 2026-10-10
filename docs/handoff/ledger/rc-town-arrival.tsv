@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+client.c-monsters.draw	system	world	client-made critters (set C monsters) in the draw list: 0x0046C1A0 / 0x00466730, unit draw 0x004DC7B0	specs/client/model.md,specs/render/draw-order.md	draft	draws-town-arrival-ama	DIVERGED@73	?	1	y	claude/rc-town-arrival	DIVERGED	S	critters walk on the client path (set-up direction/frame draws, code-1 walk, movement, turn, mode end): draws-town-arrival-ama rows 113/115/181/186 equal (chickens WL dir 40 f1, NU dir 32 f1, positions equal); first difference now row 172 (Warriv cel x/y off by 1: S-monster track, not set C); REC-742 left: flee 0x0C face/S1mv

@@ -254,9 +254,9 @@ Fastcall ECX game, EDX attacker; stack defender, record, `SrcDam`.
 13. Monster critical hit `0x005A5560`: attacker is a monster whose
     `monstats.Crit` (+166, u8) ≠ 0: draw (attacker seed, inline `lo′
     mod 100`); `r < Crit` → physical, fire, lightning, magic, cold and
-    poison × 2; then if the defender exists and the hit class high
-    nibble is free (`0x00554650(record, 0x10)` sets it), overlay 54 on
-    the defender. `0x00554650(record, h)`: `(+0x60 & 0xF0) ≠ 0` → return
+    poison × 2; then if the defender exists, `0x00554650(record, 0x10)`;
+    only when it returns 0 (high nibble already taken, nothing written)
+    overlay 54 on the defender (`0x005A5636 jne` skips the overlay on 1). `0x00554650(record, h)`: `(+0x60 & 0xF0) ≠ 0` → return
     0, nothing written; else `+0x60 |= h`, return 1 (1.14d-confirmed).
 14. `0x00535E20(attacker, offhand)` restores step 1.
 

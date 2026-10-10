@@ -427,14 +427,6 @@ pub trait Pending {
     // ---- the Act II–V AI bodies (`monsters/ai-bodies-2.md`..`-5.md`;
     // [`crate::monsters::ai::AiActs`]) -------------------------------------
 
-    /// Max mana `0x00625D60`.
-    fn ai_max_mana(&self, unit: UnitId) -> i32 {
-        0
-    }
-    /// `0x00625760(unit, flags)`: an active stat list with the flags.
-    fn ai_has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
-        false
-    }
     /// `0x00554200(game, a, b)`: b hostile to a (`combat/hit.md`).
     fn ai_hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         false
@@ -1718,6 +1710,15 @@ pub trait Pending {
     /// by a [`crate::wiring::interaction::UseRest`] value. Default:
     /// nothing.
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The passive states' unit bits, turned on at the end of the join
+    /// (PROVISIONAL REC-2105; routed to
+    /// [`crate::wiring::interaction::skill_events::passive_states_on`]).
+    /// Default: nothing.
+    fn passive_states_on(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
     where
         Self: Sized,
     {

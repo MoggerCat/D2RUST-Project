@@ -1075,6 +1075,9 @@ impl Pending for LocalSeams {
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);
     }
+    fn passive_states_on(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
+        skill_events::passive_states_on(h, sim, unit);
+    }
     fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::assign_right_aura(h, sim, unit);
     }
@@ -2135,6 +2138,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             colorshift: s.colorshift,
             light_rgb: (s.light_r, s.light_g, s.light_b),
             meleeonly: s.meleeonly,
+            restrict: s.restrict,
         })
         .collect();
     Ok(UnitRows {
