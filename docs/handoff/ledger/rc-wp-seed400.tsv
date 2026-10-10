@@ -1,0 +1,4 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+waypoint.21.flayer-jungle	entity	world	waypoints.tsv wp 21 level 78 act 3	specs/world/waypoints.md	draft	gen-wp-21	PARTIAL	yes	3	y	claude/rc-wp-seed400	NO-CHECK	M	state 460/460 equal, rng game seed equal after the Slime Prince water point (was DIVERGED@400 game seed) [ledger.py: its checks are PARTIAL]
+waypoint.30.harrogath	entity	world	waypoints.tsv wp 30 level 109 act 5	specs/world/waypoints.md	draft	gen-wp-30	PARTIAL	yes	3	y	claude/rc-wp-seed400	NO-CHECK	M	state 460/460 equal (was DIVERGED@430 Malah path target after S1 end) [ledger.py: its checks are PARTIAL]

@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–302 |
-|   2. Think dispatch `0x005B1740` | 303–449 |
-|   3. AI control and AI tables | 450–638 |
-|   4. AI parameters | 639–657 |
-|   5. Target selection | 658–994 |
-|   6. Distances and line tests | 995–1010 |
-|   7. Tactics helpers | 1011–1256 |
-|   8. AI commands and minions | 1257–1283 |
-|   10. The catalogue `ai-functions.tsv` | 1284–1304 |
-| Constants & data dependencies | 1305–1328 |
-| Randomness | 1329–1358 |
-| Edge cases & original bugs | 1359–1400 |
-| Test vectors | 1401–1489 |
-| Provenance | 1490–1551 |
-| Open questions | 1552–1658 |
+|   1. Think scheduling | 97–304 |
+|   2. Think dispatch `0x005B1740` | 305–451 |
+|   3. AI control and AI tables | 452–640 |
+|   4. AI parameters | 641–659 |
+|   5. Target selection | 660–996 |
+|   6. Distances and line tests | 997–1012 |
+|   7. Tactics helpers | 1013–1258 |
+|   8. AI commands and minions | 1259–1285 |
+|   10. The catalogue `ai-functions.tsv` | 1286–1306 |
+| Constants & data dependencies | 1307–1330 |
+| Randomness | 1331–1360 |
+| Edge cases & original bugs | 1361–1402 |
+| Test vectors | 1403–1491 |
+| Provenance | 1492–1553 |
+| Open questions | 1554–1660 |
 <!-- /index -->
 
 ## Summary
@@ -207,7 +207,9 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   (`0x00553540`: none when it is the unit itself), so a unit without one
   (the Hydras, whose path never had a target unit) makes the request
   point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
-  `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
+  `sor-hydra`, frame 42; a town NPC after a self-targeted S1/S2, e.g.
+  Malah in `gen-wp-30` frame 430: `0x00553540` returns 0 when the looked-up
+  target is the unit itself, read 2026-10-10). 1.14d-confirmed (`0x005A8030` at
   `0x005A8100`–`0x005A8140`).
   Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
   a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
