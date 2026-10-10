@@ -852,7 +852,6 @@ impl ClientData {
 /// `$D2_GAME_DIR`), resolves the game as `play`, runs the dump into
 /// `--out`. `command`: the argv, joined.
 pub fn run(args: &DumpArgs, command: &str) -> Result<DumpReport> {
-    pokes::set_compare_run();
     let dir = args
         .game_dir
         .clone()

@@ -412,23 +412,11 @@ fn signed(t: &str) -> Result<i32, String> {
     }
 }
 
-/// d2rs-own: a poked position reaches the client like a placement does
+/// d2rs-own (`hop` only): a poked position reaches the client like a placement does
 /// (queued for update with flag-ex 0x10000: the S→C 0x15 at its next update,
 /// `sim/path-placement.md` §6 rule 4), so a client model and its pick
 /// see the unit where the poke put it.
-///
-/// Off for a comparison run ([`Env::reassign`]): 1.14d's poke moves the unit
-/// without the message (`tools/poke.md` §5 rule 5, Open), so a packets
-/// channel would see it as d2rs only.
-fn mark_reassign<X: WorldPending>(
-    game: &mut Game,
-    sim: &mut WorldSim<X>,
-    env: &Env<'_>,
-    u: UnitId,
-) {
-    if !env.reassign {
-        return;
-    }
+fn mark_reassign<X: WorldPending>(game: &mut Game, sim: &mut WorldSim<X>, u: UnitId) {
     let _ = game.lists.queue_update(u);
     if let Some(r) = sim.action.sys.units.get_mut(u) {
         r.flags2 |= 0x1_0000;
@@ -1118,10 +1106,6 @@ pub struct Env<'a> {
     pub waypoint_classes: &'a BTreeSet<u32>,
     /// The item tables `item` creates from; `None`: `item` is a gap.
     pub items: Option<&'a ItemTables>,
-    /// d2rs-own: a `pos` / `hop` poke queues the unit's S→C 0x15 so a client
-    /// model sees it where the poke put it (play). False in a comparison run
-    /// (state-dump), where 1.14d sends nothing.
-    pub reassign: bool,
 }
 
 impl<'a> Env<'a> {
@@ -1131,7 +1115,6 @@ impl<'a> Env<'a> {
             player,
             waypoint_classes: &NO_WAYPOINTS,
             items: None,
-            reassign: true,
         }
     }
 }
@@ -1573,8 +1556,10 @@ fn run<X: WorldPending>(
                     None => return Ok(PokeResult::Failed),
                 }
             }
+            // 1.14d's `pos` poke sends no S->C 0x15 (REC-2900,
+            // `gen-sysc-client-msg-ui-2`: frame 4 has none): no reassign
+            // mark here, unlike `hop`.
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
-            mark_reassign(game, sim, env, u);
             PokeResult::Ok(None)
         }
         Directive::Hop { unit, x, y } => {
@@ -1611,7 +1596,7 @@ fn run<X: WorldPending>(
                     })
                 });
                 if sim.action.sys.hooks.path_position(u) != from {
-                    mark_reassign(game, sim, env, u);
+                    mark_reassign(game, sim, u);
                     return Ok(PokeResult::Ok(None));
                 }
                 // a refused spot (blocked): try the next; the refusal is the probe's
