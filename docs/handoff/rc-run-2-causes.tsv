@@ -1,0 +1,8 @@
+cause	checks	examples	crate_spec	size
+state: frame N monster N:N class N, field m: N.Nd N vs dNrs N	8	diff-a3-hell-champion,diff-a3-hell-normal-bm,diff-a4-hell-champion-bm	specs/monsters/init.md	M
+state: state PARTIAL outside REC-N/N (input/send in check without packets MATCH)	2	combat-melee-fallen,combat-potion-midfight	-	M
+items: item #N (mpN) frame: N.Nd N vs dNrs N	1	items-drops-nor-04	specs/items/treasure.md	M
+state: frame N monster N:N class N, field s: N.Nd [N, N] vs dNrs [N, N]	1	diff-a3-nm-normal-bm	specs/monsters/init.md	M
+draws: tick N draw row N (CelDraw) column op: N.Nd CelDraw vs dNrs unit	1	draws-town-arrival-ama	specs/drlg/levels.md	M
+items: item #N (Nxf) stream byte N, x (bit N of N): N.Nd NcN vs dNrs NcN	1	items-drops-nig-06	specs/items/treasure.md	M
+items: item #N (tsc) frame: N.Nd N vs dNrs N	1	items-drops-hel-00	specs/items/treasure.md	M
