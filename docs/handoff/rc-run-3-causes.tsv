@@ -1,0 +1,4 @@
+#causes 1
+cause	checks	examples	likely_crate_or_spec	size
+1.14d recording ends at frame 20 while d2rs runs to 80, so items channel is PARTIAL although the 1 item created matches on both sides (0 differences); outside DECIDED REC-2056	9	gen-obj-256,gen-obj-257,gen-obj-258	tools/scenario-diff recorder (1.14d stops after the item-creating operate) / specs/tools/scenario-diff.md rule 13	S
+record_state.py wrote no orig.state.jsonl on the first run of gen-obj-346 (transient 1.14d recorder failure; the re-run was clean: every channel equal)	1	gen-obj-346	tools/trace-recorder (Wine start-up flake)	S

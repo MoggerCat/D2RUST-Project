@@ -1,0 +1,27 @@
+cause	checks	examples	crate_spec	size
+state: frame N monster N:N class N, field m: N.Nd N vs dNrs N	23	diff-a3-hell-champion,diff-a3-hell-normal,diff-a3-hell-normal-bm	specs/tools/scenario-diff.md	M
+state: state PARTIAL outside REC-N/N (ignore line)	8	sys-gold-pickup,sys-intents-moves,sys-pets-skeletons	-	M
+state: state PARTIAL outside REC-N/N (input/send in check without packets MATCH)	7	combat-melee-fallen,combat-potion-midfight,hire-follow-warp-kashya	-	M
+items: item #N (hpN) frame: N.Nd N vs dNrs N	5	items-drops-cha-01,items-drops-cha-03,items-drops-rbo-01	-	M
+state: frame N monster N:N class -/N, field (unit): N.Nd absent vs dNrs extra	4	hire-resurrect-asheara,hire-resurrect-greiz,hire-resurrect-kashya	-	M
+items: item #N (mpN) frame: N.Nd N vs dNrs N	3	items-drops-nor-04,items-drops-rbo-02,items-drops-uni-03	specs/items/treasure.md	M
+state: frame N player N:N class N, field fr: N.Nd N vs dNrs N	1	bar-whirlwind-unit	-	M
+state: frame N monster N:N class N, field s: N.Nd [N, N] vs dNrs [N, N]	1	diff-a3-nm-normal-bm	specs/monsters/init.md	M
+draws: tick N draw row N (CelDraw) column op: N.Nd CelDraw vs dNrs unit	1	draws-town-arrival-ama	specs/drlg/levels.md	M
+state: frame N missile N:N class N/N, field cl: N.Nd N vs dNrs N	1	hire-follow-waypoint-kashya	-	M
+items: item #N (hpN) stream byte N, code (bit N of N): N.Nd NdNeN vs dNrs NdNeN	1	items-drops-cha-04	-	M
+items: item #N (rvs) frame: N.Nd N vs dNrs N	1	items-drops-cha-05	-	M
+items: item #N (tsc) frame: N.Nd N vs dNrs N	1	items-drops-hel-00	specs/items/treasure.md	M
+items: item #N (gps) stream byte N, x (bit N of N): N.Nd NcNcNeN vs dNrs NacNcNeN	1	items-drops-hel-04	specs/items/treasure.md	M
+items: item #N (hpN) missing in dNrs	1	items-drops-hel-05	specs/items/treasure.md	M
+items: item #N (isc) missing in N.Nd	1	items-drops-hel-06	specs/items/treasure.md	M
+items: item #N (Nxf) stream byte N, x (bit N of N): N.Nd NcN vs dNrs NcN	1	items-drops-nig-06	specs/items/treasure.md	M
+items: item #N (xui) missing in N.Nd	1	items-drops-nig-08	specs/items/treasure.md	M
+items: item #N (scl) stream byte N, x (bit N of N): N.Nd NcN vs dNrs NcN	1	items-drops-nig-12	specs/items/treasure.md	M
+items: item #N (gsv) stream byte N, y (bit N of N): N.Nd NcNeNcce vs dNrs NcNeNcce	1	items-drops-nor-07	specs/items/treasure.md	M
+items: item #N (gld) missing in dNrs	1	items-drops-nor-10	specs/items/treasure.md	M
+items: item #N (aqv) stream byte N, after the head (bit N past bit N): N.Nd ceNeNfcNeNf vs dNrs ceNeNfNceNf	1	items-drops-rbo-00	-	M
+items: item #N (mac) stream byte N, flags (bit N of N): N.Nd NcN vs dNrs NcNcN	1	items-drops-rbo-04	-	M
+items: item #N (gld) frame: N.Nd N vs dNrs N	1	items-drops-uni-05	-	M
+packets: frame N stream sNc #N id: N.Nd N vs dNrs Ne (id NxN)	1	rng-town-idle-sor	specs/sim/client-messages.tsv	S
+save: byte NxN (stats +NxN): N.Nd Ne Na N N vs dNrs ff N N N; N of N bytes differ; sizes N vs N	1	save-items-ama	-	M

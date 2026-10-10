@@ -717,30 +717,30 @@ gen-item-29	item	items 580-599 (combined index)	item.580-glr,item.581-gpr,item.5
 gen-item-30	item	items 600-619 (combined index)	item.600-skl,item.601-skz,item.603-cm1,item.604-cm2,item.605-cm3,item.610-r01,item.611-r02,item.612-r03,item.613-r04,item.615-r06,item.616-r07,item.617-r08,item.618-r09,item.619-r10	base items skl .. r10 (20 items)
 gen-item-31	item	items 620-639 (combined index)	item.620-r11,item.621-r12,item.622-r13,item.623-r14,item.624-r15,item.625-r16,item.626-r17,item.627-r18,item.628-r19,item.629-r20,item.630-r21,item.631-r22,item.632-r23,item.633-r24,item.634-r25,item.635-r26,item.636-r27,item.637-r28,item.638-r29,item.639-r30	base items r11 .. r30 (20 items)
 gen-item-32	item	items 640-658 (combined index)	item.640-r31,item.641-r32,item.642-r33,item.643-jew,item.645-0sc,item.658-std	base items r31 .. std (19 items)
-gen-itemq-low-0	itemq	quality 1 low, seed set 0	-	20 items at quality low (game seed 0x1234 666)
-gen-itemq-low-1	itemq	quality 1 low, seed set 1	-	20 items at quality low (game seed 0x2222 77)
-gen-itemq-low-2	itemq	quality 1 low, seed set 2	-	20 items at quality low (game seed 0x5A5A 4242)
-gen-itemq-normal-0	itemq	quality 2 normal, seed set 0	-	20 items at quality normal (game seed 0x1234 666)
-gen-itemq-normal-1	itemq	quality 2 normal, seed set 1	-	20 items at quality normal (game seed 0x2222 77)
-gen-itemq-normal-2	itemq	quality 2 normal, seed set 2	-	20 items at quality normal (game seed 0x5A5A 4242)
-gen-itemq-superior-0	itemq	quality 3 superior, seed set 0	-	20 items at quality superior (game seed 0x1234 666)
-gen-itemq-superior-1	itemq	quality 3 superior, seed set 1	-	20 items at quality superior (game seed 0x2222 77)
-gen-itemq-superior-2	itemq	quality 3 superior, seed set 2	-	20 items at quality superior (game seed 0x5A5A 4242)
-gen-itemq-magic-0	itemq	quality 4 magic, seed set 0	-	20 items at quality magic (game seed 0x1234 666)
-gen-itemq-magic-1	itemq	quality 4 magic, seed set 1	-	20 items at quality magic (game seed 0x2222 77)
-gen-itemq-magic-2	itemq	quality 4 magic, seed set 2	-	20 items at quality magic (game seed 0x5A5A 4242)
-gen-itemq-set-0	itemq	quality 5 set, seed set 0	-	20 items at quality set (game seed 0x1234 666)
-gen-itemq-set-1	itemq	quality 5 set, seed set 1	-	20 items at quality set (game seed 0x2222 77)
-gen-itemq-set-2	itemq	quality 5 set, seed set 2	-	20 items at quality set (game seed 0x5A5A 4242)
-gen-itemq-rare-0	itemq	quality 6 rare, seed set 0	-	20 items at quality rare (game seed 0x1234 666)
-gen-itemq-rare-1	itemq	quality 6 rare, seed set 1	-	20 items at quality rare (game seed 0x2222 77)
-gen-itemq-rare-2	itemq	quality 6 rare, seed set 2	-	20 items at quality rare (game seed 0x5A5A 4242)
-gen-itemq-unique-0	itemq	quality 7 unique, seed set 0	-	20 items at quality unique (game seed 0x1234 666)
-gen-itemq-unique-1	itemq	quality 7 unique, seed set 1	-	20 items at quality unique (game seed 0x2222 77)
-gen-itemq-unique-2	itemq	quality 7 unique, seed set 2	-	20 items at quality unique (game seed 0x5A5A 4242)
-gen-itemq-crafted-0	itemq	quality 8 crafted, seed set 0	-	20 items at quality crafted (game seed 0x1234 666)
-gen-itemq-crafted-1	itemq	quality 8 crafted, seed set 1	-	20 items at quality crafted (game seed 0x2222 77)
-gen-itemq-crafted-2	itemq	quality 8 crafted, seed set 2	-	20 items at quality crafted (game seed 0x5A5A 4242)
+gen-itemq-low-0	itemq	quality 1 low, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.low,item.quality.dispatch	20 items at quality low (game seed 0x1234 666)
+gen-itemq-low-1	itemq	quality 1 low, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.low,item.quality.dispatch	20 items at quality low (game seed 0x2222 77)
+gen-itemq-low-2	itemq	quality 1 low, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.low,item.quality.dispatch	20 items at quality low (game seed 0x5A5A 4242)
+gen-itemq-normal-0	itemq	quality 2 normal, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.dispatch	20 items at quality normal (game seed 0x1234 666)
+gen-itemq-normal-1	itemq	quality 2 normal, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.dispatch	20 items at quality normal (game seed 0x2222 77)
+gen-itemq-normal-2	itemq	quality 2 normal, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.dispatch	20 items at quality normal (game seed 0x5A5A 4242)
+gen-itemq-superior-0	itemq	quality 3 superior, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.superior,item.quality.dispatch	20 items at quality superior (game seed 0x1234 666)
+gen-itemq-superior-1	itemq	quality 3 superior, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.superior,item.quality.dispatch	20 items at quality superior (game seed 0x2222 77)
+gen-itemq-superior-2	itemq	quality 3 superior, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.superior,item.quality.dispatch	20 items at quality superior (game seed 0x5A5A 4242)
+gen-itemq-magic-0	itemq	quality 4 magic, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.magic,item.affix.magic-roller,item.quality.dispatch	20 items at quality magic (game seed 0x1234 666)
+gen-itemq-magic-1	itemq	quality 4 magic, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.magic,item.affix.magic-roller,item.quality.dispatch	20 items at quality magic (game seed 0x2222 77)
+gen-itemq-magic-2	itemq	quality 4 magic, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.magic,item.affix.magic-roller,item.quality.dispatch	20 items at quality magic (game seed 0x5A5A 4242)
+gen-itemq-set-0	itemq	quality 5 set, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.set,item.set-item,item.quality.dispatch	20 items at quality set (game seed 0x1234 666)
+gen-itemq-set-1	itemq	quality 5 set, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.set,item.set-item,item.quality.dispatch	20 items at quality set (game seed 0x2222 77)
+gen-itemq-set-2	itemq	quality 5 set, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.set,item.set-item,item.quality.dispatch	20 items at quality set (game seed 0x5A5A 4242)
+gen-itemq-rare-0	itemq	quality 6 rare, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.rare,item.affix.rare-name,item.quality.dispatch	20 items at quality rare (game seed 0x1234 666)
+gen-itemq-rare-1	itemq	quality 6 rare, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.rare,item.affix.rare-name,item.quality.dispatch	20 items at quality rare (game seed 0x2222 77)
+gen-itemq-rare-2	itemq	quality 6 rare, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.rare,item.affix.rare-name,item.quality.dispatch	20 items at quality rare (game seed 0x5A5A 4242)
+gen-itemq-unique-0	itemq	quality 7 unique, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.unique,item.unique,item.quality.dispatch	20 items at quality unique (game seed 0x1234 666)
+gen-itemq-unique-1	itemq	quality 7 unique, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.unique,item.unique,item.quality.dispatch	20 items at quality unique (game seed 0x2222 77)
+gen-itemq-unique-2	itemq	quality 7 unique, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.quality.unique,item.unique,item.quality.dispatch	20 items at quality unique (game seed 0x5A5A 4242)
+gen-itemq-crafted-0	itemq	quality 8 crafted, seed set 0	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.crafted,item.props.craft,item.quality.dispatch	20 items at quality crafted (game seed 0x1234 666)
+gen-itemq-crafted-1	itemq	quality 8 crafted, seed set 1	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.crafted,item.props.craft,item.quality.dispatch	20 items at quality crafted (game seed 0x2222 77)
+gen-itemq-crafted-2	itemq	quality 8 crafted, seed set 2	item.gen.create-wrapper,item.gen.sockets,item.gen.ethereal,item.affix.ids-slots,item.affix.fit-tests,item.affix.alvl,item.affix.crafted,item.props.craft,item.quality.dispatch	20 items at quality crafted (game seed 0x5A5A 4242)
 gen-nets2c-arrival	nets2c	net.s2c 0x5b 0x65 0x8d	-	S2C 0x5B 0x65 0x8D
 gen-nets2c-warp	nets2c	net.s2c 0x04 0x05	-	S2C 0x04 0x05
 gen-nets2c-ping	nets2c	net.s2c 0x8f	-	S2C 0x8F
@@ -2114,6 +2114,19 @@ gen-render-den-of-evil	render	scene den-of-evil	system.render.blend-modes.6-tran
 gen-render-firebolt	render	scene firebolt	system.render.blend-modes.1-draw-modes,system.render.blend-modes.2-blend-table-orientation-per-drawer,system.render.blend-modes.4-single-cel-units-and-overlays,system.render.blend-modes.5-shadows-the-darkening-blend,system.render.blend-modes.7-d2rs-answers,system.render.overlay.1-the-record-0xa8-bytes-fog-allocclientmemory-ze,system.render.overlay.2-create-0x00470390-ecx-u-edx-id-stack-kind-a-a-,system.render.overlay.3-per-update-advance-0x00470c30,system.render.overlay.4-randomness,system.render.overlay.5-create-call-sites-1-14d,system.render.sprite-placement.4-orientation-bit-set-top-down-cels,system.render.unit-composite.9-single-cel-units-missiles-items	Fire Bolt in flight (missile light, overlay, blend mode)
 gen-render-frozen	render	scene frozen	system.render.blend-modes.3-draw-mode-of-a-composite-unit-component,system.render.shading.6-remap-tables-p,system.render.shading.7-mapped-index-0,system.render.unit-composite.1-which-draw-path,system.render.unit-composite.2-cof-file,system.render.unit-composite.3-direction-and-frame,system.render.unit-composite.4-pre-test-cof-box-culling,system.render.unit-composite.5-the-slot-loop-0x00470ec0,system.render.unit-composite.6-component-file-and-cel,system.render.unit-composite.7-colormap-source-per-component,system.render.unit-composite.8-extra-offsets-0x004da0b0-0x004da0d0-0x004da0f0	Frozen player and a cow beside (colormap remap)
 gen-render-kurast-rain	render	scene kurast-rain	system.render.camera.8-screen-shake,system.render.shading.8-tables-loaded-but-not-drawn-by-gdi	Kurast Docks (weather passes)
+gen-ui-inv	ui	ui scenario inv	system.ui.controls.1-binding-table,system.ui.controls.3-commands-and-default-keys,system.ui.controls.4-dispatch,system.ui.controls.b4-original-defaults-check-client-ui-md-b4,system.ui.inventory.1-grid-geometry,system.ui.inventory.6-equipment-boxes-0x004845a0,system.ui.inventory.7-not-drawn-here,system.ui.inventory.b5-cellgrid-answers-client-ui-md-b5,system.ui.panels-2.18-inventory-close-button-and-click-area-panels-,system.ui.panels.1-screen-layout-model,system.ui.panels.4-slots-open-mode-and-the-view-shift,system.ui.panels.7-shared-panel-parts,system.ui.panels.9-inventory-panel-family-0x0048edf0,system.ui.text.1-fonts-and-locale,system.ui.text.11-alignment,system.ui.text.2-strings-decoding-and-lookup-by-id,system.ui.text.3-glyph-lookup,system.ui.text.4-glyph-pixels,system.ui.text.5-color-codes,system.ui.text.6-measuring,system.ui.text.7-the-draw-call	inventory panel (key I) open, empty
+gen-ui-inv-item	ui	ui scenario inv-item	system.ui.inventory.2-tint-colours,system.ui.inventory.3-grid-items-0x00483ff0,system.ui.inventory.4-placement-tint-cursor-item-over-a-grid,system.ui.inventory.5-hover-state-0x00487000,system.ui.inventory.8-item-graphic-0x0046ee80-item-x-top-answers-oq-,system.ui.inventory.9-item-checks-used-by-the-tints-answers-oq-6,system.ui.item-tips.1-entry-and-dispatch-0x0048dd90,system.ui.item-tips.10-other-tips,system.ui.item-tips.2-main-builder-blocks,system.ui.item-tips.3-main-builder-line-shapes,system.ui.item-tips.4-name-colour,system.ui.item-tips.5-item-name-0x0048c060-i-buffer-max,system.ui.item-tips.6-property-lines-0x004e6410-0x004e60a0,system.ui.item-tips.7-one-stat-line-0x004e4d80,system.ui.item-tips.8-damage-groups-0x004e49c0-0x004e5a20,system.ui.panels-3.23-mouse-cursor-client-ui-md-b6-takes-the-rule-o,system.ui.text.8-framed-text-hover-boxes	inventory panel with one potion, cursor over it (tip)
+gen-ui-beltuse	ui	ui scenario beltuse	system.ui.controls.7-gates-and-belt-use-answers-oq-3-oq-4-oq-5	potion in the belt used with key 1
+gen-ui-walkclick	ui	ui scenario walkclick	system.ui.controls.6-world-clicks-left-right-button-answers-oq-2-in	left click and right click on the ground (walk, cast)
+gen-ui-stash	ui	ui scenario stash	system.ui.panels-2.20-stash-and-cube-buttons-panels-md-11-12-answer,system.ui.panels.11-stash-ui-0x19-full-inventory-modes-0x0c-0x0d	stash opened by clicking the chest
+gen-ui-npc	ui	ui scenario npc	system.ui.menus.2-npc-menu-box,system.ui.messages.13-npc-intro-table-0x00726850-0x91,system.ui.messages.14-interact-npc-0x007c0d25-0x007c0d29-answers-cl,system.ui.messages.6-npc-text-list-0x007bf250-0x27-type-1,system.ui.messages.7-dialog-panel-0x004a1320-0x004a10e0,system.ui.panels-2.14-npc-menu-ui-8-and-npc-shop-ui-0x0c,system.ui.panels.14-npc-menu-ui-8-and-npc-shop-ui-0x0c,system.ui.text.10-word-wrap	Akara's menu and intro text (click her)
+gen-ui-char	ui	ui scenario char	system.ui.controls.3-commands-and-default-keys,system.ui.panels-2.17-character-panel-details-panels-md-8-answers-u,system.ui.panels.8-character-panel-ui-2-left-0x004a7d00	character panel (key C)
+gen-ui-skill	ui	ui scenario skill	system.ui.controls.3-commands-and-default-keys,system.ui.panels-2.19-skill-tree-input-and-draw-order-panels-md-10-,system.ui.panels.10-skill-tree-ui-4-right-0x004ac690	skill tree (key T)
+gen-ui-automap	ui	ui scenario automap	system.ui.automap.1-cell-store,system.ui.automap.10-cell-draw-pass,system.ui.automap.11-unit-markers-0x0045ac90-0x0045a860,system.ui.automap.13-header-text,system.ui.automap.14-lifetime,system.ui.automap.2-cell-picker-0x0061fff0,system.ui.automap.3-adding-a-tile-record-0x00457cf0-room-r-record-,system.ui.automap.4-adding-units-0x00458dc0-room-r,system.ui.automap.5-reveal,system.ui.automap.6-town-art-0x004591a0-drlg-callback-0x488,system.ui.automap.8-state-keys-and-options,system.ui.automap.9-view-geometry,system.ui.controls.3-commands-and-default-keys	automap (key TAB) in the Rogue Encampment
+gen-ui-belt	ui	ui scenario belt	system.ui.control-panel.5-belt,system.ui.control-panel.9-mini-panel-state-0x15,system.ui.controls.3-commands-and-default-keys	belt rows opened (key `)
+gen-ui-cube	ui	ui scenario cube	system.ui.panels-2.20-stash-and-cube-buttons-panels-md-11-12-answer,system.ui.panels.12-horadric-cube-ui-0x1a-full-inventory-mode-0x0	Horadric Cube opened (right click on the inventory cube)
+gen-ui-hud	ui	ui scenario hud	system.ui.control-panel.1-draw-order-0x00499450,system.ui.control-panel.2-art-files,system.ui.control-panel.3-life-and-mana-globes,system.ui.control-panel.4-experience-and-stamina-bars,system.ui.control-panel.6-run-walk-and-menu-buttons,system.ui.control-panel.7-skill-buttons,system.ui.panels.6-800-600-border-and-control-panel-art-0x0049945	control panel at rest in town
+gen-ui-wp	ui	ui scenario wp	system.ui.menus.1-waypoint-menu-input-ui-0x14,system.ui.panels-3.26-waypoint-rows-panels-md-13-r2-r7-the-pending-,system.ui.panels.13-waypoint-menu-ui-0x14-left-0x0049c9c0	waypoint menu (walk to the Act I waypoint and click it)
 gen-monskill-156	monskill	skills.txt Id 156	skill.monster.fire-hit	monster skill Fire Hit (156), class 29 sandraider1
 gen-monskill-157	monskill	skills.txt Id 157	skill.monster.unholybolt	monster skill UnHolyBolt (157), class 101 unraveler1
 gen-monskill-158	monskill	skills.txt Id 158	skill.monster.skeletonraise	monster skill SkeletonRaise (158), class 0 skeleton1
@@ -2178,3 +2191,39 @@ gen-monskill-352	monskill	skills.txt Id 352	skill.monster.serpentcharge	monster 
 gen-monskill-354	monskill	skills.txt Id 354	skill.monster.unholyboltex	monster skill UnHolyBoltEx (354), class 667 unraveler6
 gen-monskill-355	monskill	skills.txt Id 355	skill.monster.shamanfireex	monster skill ShamanFireEx (355), class 646 fallenshaman7
 gen-monskill-356	monskill	skills.txt Id 356	skill.monster.imp-fire-missile-ex	monster skill Imp Fire Missile Ex (356), class 688 imp6
+gen-qkill-ancients	qkill	quest monster ancients	monster.quest.ancients	quest monster ancients spawned and killed
+gen-qkill-baal	qkill	quest monster baal	monster.quest.baal	quest monster baal spawned and killed
+gen-qkill-blood-raven	qkill	quest monster blood-raven	monster.quest.blood-raven	quest monster blood-raven spawned and killed
+gen-qkill-cain-rescue-guard	qkill	quest monster cain-rescue-guard	monster.quest.cain-rescue-guard	quest monster cain-rescue-guard spawned and killed
+gen-qkill-countess	qkill	quest monster countess	monster.quest.countess	quest monster countess spawned and killed
+gen-qkill-cow-king	qkill	quest monster cow-king	monster.quest.cow-king	quest monster cow-king spawned and killed
+gen-qkill-griswold	qkill	quest monster griswold	monster.quest.griswold	quest monster griswold spawned and killed
+gen-qkill-hellforge-hephasto	qkill	quest monster hellforge-hephasto	monster.quest.hellforge-hephasto	quest monster hellforge-hephasto spawned and killed
+gen-qkill-izual	qkill	quest monster izual	monster.quest.izual	quest monster izual spawned and killed
+gen-qkill-nihlathak	qkill	quest monster nihlathak	monster.quest.nihlathak	quest monster nihlathak spawned and killed
+gen-qkill-radament	qkill	quest monster radament	monster.quest.radament	quest monster radament spawned and killed
+gen-qkill-summoner	qkill	quest monster summoner	monster.quest.summoner	quest monster summoner spawned and killed
+gen-npc-warriv1	npc	npc warriv1 (155)	npc.warriv1,quest.a1q0-warriv-gossip	talk to warriv1 (monstats 155, act 1)
+gen-npc-charsi	npc	npc charsi (154)	npc.charsi	talk to charsi (monstats 154, act 1)
+gen-npc-gheed	npc	npc gheed (147)	npc.gheed	talk to gheed (monstats 147, act 1)
+gen-npc-cain1	npc	npc cain1 (146)	npc.cain1	talk to cain1 (monstats 146, act 1)
+gen-npc-navi	npc	npc navi (266)	npc.navi	talk to navi (monstats 266, act 1)
+gen-npc-geglash	npc	npc geglash (200)	npc.geglash	talk to geglash (monstats 200, act 2)
+gen-npc-act2guard2	npc	npc act2guard2 (331)	npc.act2guard2	talk to act2guard2 (monstats 331, act 2)
+gen-npc-act2guard4	npc	npc act2guard4 (377)	npc.act2guard4	talk to act2guard4 (monstats 377, act 2)
+gen-npc-act2guard5	npc	npc act2guard5 (378)	npc.act2guard5	talk to act2guard5 (monstats 378, act 2)
+gen-npc-alkor	npc	npc alkor (254)	npc.alkor	talk to alkor (monstats 254, act 3)
+gen-npc-hratli	npc	npc hratli (253)	npc.hratli,quest.a3q0-hratli-gossip	talk to hratli (monstats 253, act 3)
+gen-npc-ormus	npc	npc ormus (255)	npc.ormus	talk to ormus (monstats 255, act 3)
+gen-npc-natalya	npc	npc natalya (297)	npc.natalya	talk to natalya (monstats 297, act 3)
+gen-npc-meshif2	npc	npc meshif2 (264)	npc.meshif2	talk to meshif2 (monstats 264, act 3)
+gen-npc-cain3	npc	npc cain3 (245)	npc.cain3	talk to cain3 (monstats 245, act 3)
+gen-npc-tyrael1	npc	npc tyrael1 (251)	npc.tyrael1	talk to tyrael1 (monstats 251, act 3)
+gen-npc-halbu	npc	npc halbu (257)	npc.halbu	talk to halbu (monstats 257, act 4)
+gen-npc-jamella	npc	npc jamella (405)	npc.jamella	talk to jamella (monstats 405, act 4)
+gen-npc-izualghost	npc	npc izualghost (406)	npc.izualghost	talk to izualghost (monstats 406, act 4)
+gen-npc-malachai	npc	npc malachai (408)	npc.malachai	talk to malachai (monstats 408, act 4)
+gen-npc-tyrael2	npc	npc tyrael2 (367)	npc.tyrael2,quest.a4q0-tyrael-gossip	talk to tyrael2 (monstats 367, act 4)
+gen-npc-cain4	npc	npc cain4 (246)	npc.cain4	talk to cain4 (monstats 246, act 4)
+gen-npc-drehya	npc	npc drehya (512)	npc.drehya	talk to drehya (monstats 512, act 5)
+gen-npc-tyrael3	npc	npc tyrael3 (521)	npc.tyrael3	talk to tyrael3 (monstats 521, act 5)

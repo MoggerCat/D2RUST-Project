@@ -65,7 +65,7 @@ pub mod skip {
     pub const NPC_TEXT_SHOW: &str =
         "0x27: the overhead text, list start 0x006616E0, box 0x004A1510 and panel 0x004A1320 (msg-ui §5 r2; ui/*)";
     pub const NPC_DIALOG_UI: &str =
-        "0x28: overlay 72 off, 0x004B2250, 0x0044DA40 and the chosen case's UI calls (msg-ui §16 r4.1–r4.3; ui/*)";
+        "0x28: 0x004B2250, 0x0044DA40 and the chosen case's UI calls (msg-ui §16 r4.2–r4.3; ui/*)";
     pub const NPC_DIALOG_M: &str =
         "0x28: m = 0x00661400(txt, 0) of this NPC text list is not specified (msg-ui §16 r4.3, OQ 10): no case handed back, no C→S 0x31";
 }
@@ -340,6 +340,14 @@ impl OriginalUi {
     /// §16 r4 at delivery: the UI-only calls are skipped; the branch case
     /// is chosen and kept for the bridge.
     fn npc_dialog(&mut self, d: &NpcDialog, world: &ClientWorld) -> Result<(), OriginalUiError> {
+        // r4.1: overlay 72 off on each captured `npc` monster.
+        for &unit in &d.npc_monsters {
+            self.more.overlays.push(OverlayCall {
+                unit,
+                id: more::OVERLAY_NPC_WANTS,
+                on: false,
+            });
+        }
         // r4.2: `[0x007C0D43]` := Q (§16 r7).
         self.more.client_quest = d.quest_flags;
         self.skip(skip::NPC_DIALOG_UI);
@@ -600,7 +608,7 @@ pub const WAYPOINT_TABS: u32 = 5;
 
 #[path = "msg_ui_more.rs"]
 mod more;
-pub use more::{ChatAction, IntroEntry, MsgUiMore, OverheadText};
+pub use more::{ChatAction, IntroEntry, MsgUiMore, OverheadText, OverlayCall};
 
 #[cfg(test)]
 #[path = "msg_ui_tests.rs"]

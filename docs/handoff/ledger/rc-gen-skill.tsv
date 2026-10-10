@@ -1,3 +1,2 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-state.item.own.monster-equip	content	skills	state-snapshot.md §2 own (item)	specs/tools/state-snapshot.md	draft	gen-skill-ama-32,gen-skill-ass-268	PARTIAL	yes	1	n	claude/rc-gen-skill	EQUAL	-	summon equipment owner = the monster (REC-2155)
