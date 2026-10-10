@@ -728,7 +728,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.stats.max_life(unit)
     }
     fn max_mana(&self, unit: UnitId) -> i32 {
-        self.h.x.ai_max_mana(unit)
+        self.stats.max_mana(unit)
     }
     fn has_state_group(&self, unit: UnitId, g: u8) -> bool {
         self.stats.has_group(unit, usize::from(g))
@@ -737,7 +737,12 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.stats.data().states.count() as i32
     }
     fn has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
-        self.h.x.ai_has_list_flag(unit, flags)
+        // `0x00625760`: the unit's list must be extended; then the first
+        // list of the active (or parked) chain sharing a flag (`0x006256E0`).
+        self.stats
+            .unit_list(unit)
+            .filter(|&r| self.stats.is_extended(r))
+            .is_some_and(|r| self.stats.list_by_flags(r, flags).is_some())
     }
     fn hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         self.h.x.ai_hostile(game, a, b)

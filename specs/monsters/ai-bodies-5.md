@@ -30,32 +30,32 @@
 |   1. Scope and order | 103–139 |
 |   2. Minion (116) `0x005E1B60` | 140–156 |
 |   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–189 |
-|   4. Succubus (118) `0x005E1E00` | 190–209 |
-|   5. BloodLord (125) `0x005E36F0` | 210–220 |
-|   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
-|   7. Overseer (120) `0x005E27A0` | 246–281 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 282–299 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 300–317 |
-|   10. DeathMauler (130) `0x005EE260` | 318–328 |
-|   11. PutridDefiler (137) `0x005EFA90` | 329–353 |
-|   12. Ancient (133) `0x005EF1A0` | 354–408 |
-|   13. AncientStatue (132) `0x005EEAA0` | 409–416 |
-|   14. FrozenHorror (124) `0x005E3530` | 417–431 |
-|   15. SiegeBeast (115) `0x005E1900` | 432–459 |
-|   16. SuicideMinion (117) `0x005E1D30` | 460–471 |
-|   17. BaalMinion (141) `0x005EF910` | 472–483 |
-|   18. BaalTaunt (136) `0x005EF710` | 484–500 |
-|   19. BaalToStairs (138) `0x005EF620` | 501–516 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 517–561 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 562–673 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–684 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 685–722 |
-| Constants & data dependencies | 723–741 |
-| Randomness | 742–750 |
-| Edge cases & original bugs | 751–765 |
-| Test vectors | 766–780 |
-| Provenance | 781–806 |
-| Open questions | 807–845 |
+|   4. Succubus (118) `0x005E1E00` | 190–216 |
+|   5. BloodLord (125) `0x005E36F0` | 217–227 |
+|   6. SuccubusWitch (119) `0x005E2120` | 228–252 |
+|   7. Overseer (120) `0x005E27A0` | 253–288 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 289–306 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 307–324 |
+|   10. DeathMauler (130) `0x005EE260` | 325–335 |
+|   11. PutridDefiler (137) `0x005EFA90` | 336–360 |
+|   12. Ancient (133) `0x005EF1A0` | 361–415 |
+|   13. AncientStatue (132) `0x005EEAA0` | 416–423 |
+|   14. FrozenHorror (124) `0x005E3530` | 424–438 |
+|   15. SiegeBeast (115) `0x005E1900` | 439–466 |
+|   16. SuicideMinion (117) `0x005E1D30` | 467–478 |
+|   17. BaalMinion (141) `0x005EF910` | 479–490 |
+|   18. BaalTaunt (136) `0x005EF710` | 491–507 |
+|   19. BaalToStairs (138) `0x005EF620` | 508–523 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 524–568 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 569–680 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 681–691 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 692–729 |
+| Constants & data dependencies | 730–748 |
+| Randomness | 749–757 |
+| Edge cases & original bugs | 758–772 |
+| Test vectors | 773–787 |
+| Provenance | 788–813 |
+| Open questions | 814–852 |
 <!-- /index -->
 
 ## Summary
@@ -206,6 +206,13 @@ Curse, `Skill2` Blood Mana, `Skill3` SuccubusBolt. Skill tests here are
 4. P(aip2) [50] → walk to T with flags 0; else idle aip6 [15].
 
 1.14d-confirmed; same as D2MOO.
+
+"Cursed" is live state: a Skill1 cast sets a curse list (flag 0x20) on T,
+so the next think of the same Succubus skips step 1 **before** its
+P(aip3) draw (gen-mon-469 frame 46 cast, frame 69 only the step-4 draw
+at `0x005E20AC`). The test is `0x00625760` (T's list must be extended)
+then the active chain of `0x006256E0`; d2rs reads it from the stat
+lists (`wiring/action/ai.rs`), as it reads T's max mana (REC-2240).
 
 ### 5. BloodLord (125) `0x005E36F0`
 
