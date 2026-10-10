@@ -525,6 +525,9 @@ pub fn enter_game<D: ActionEvents, W>(
     if let Err(e) = joined {
         return Err(JoinError::Entry(format!("{e:?}")));
     }
+    // PROVISIONAL (REC-2105): the passive states' unit bits go on after
+    // the join messages (`skill_events::passive_states_on`).
+    s.events.action().passive_states_on(&mut s.game, player);
     // Rule 6.
     if let Some(e) = s.game.lists.client_mut(id) {
         e.state = client_state::JOINING;

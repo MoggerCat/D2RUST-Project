@@ -25,13 +25,13 @@
 |   4. Melee result flags | 195–219 |
 |   5. Block chance | 220–248 |
 |   6. Block, weapon block, dodge, avoid, evade | 249–306 |
-|   7. Hostility and melee range | 307–404 |
-| Constants & data dependencies | 405–421 |
-| Randomness | 422–450 |
-| Edge cases & original bugs | 451–471 |
-| Test vectors | 472–496 |
-| Provenance | 497–522 |
-| Open questions | 523–544 |
+|   7. Hostility and melee range | 307–411 |
+| Constants & data dependencies | 412–428 |
+| Randomness | 429–457 |
+| Edge cases & original bugs | 458–478 |
+| Test vectors | 479–503 |
+| Provenance | 504–529 |
+| Open questions | 530–551 |
 <!-- /index -->
 
 ## Summary
@@ -350,7 +350,14 @@ fatal; for any v when U's class is 351–353, or v ≠ 0, or `0x00451F30`
 1)`) and state 105 on (`0x00639DB0`, which also sets the changed bit);
 else stat 172 cleared in it (`0x00625D00`); then stat 172 := v
 (`0x00627150`); the "resend" `0x00639E30(U, 0x69, 1)` (changed bit,
-unit queued); then `0x00554340(f)`. The changed bit is cleared only by
+unit queued); then `0x00554340(f)` with old = the cleared stat 172
+(`0x00625D00`'s return), or 4 when the list was new (`[ebp−4]` := 4
+at `0x005543BD`), and new = v. `0x00554340`: U a monster with a game;
+f ≠ 0 → the region count `0x00547DD0(regions, U, old, new)`; old ≠ new
+and U in a room (`0x00620BB0`) → new = 2: the room's allied count +1
+(`0x00619EE0`, room +0x28), else old = 2: −1 (`0x00619F20`, fatal
+below 1); then, U's mode not 0 or 12 (`0x0063EA40`), the path reset
+`0x00649CA0` (`sim/path-placement.md` §5.3 rule 5). The changed bit is cleared only by
 the room clean-up `0x00553220` after a tick's sends
 (`sim/intents-events.md` §3.5 rule 6); the loaded player is in no room
 until game entry, so the bit survives to the first tick with the player

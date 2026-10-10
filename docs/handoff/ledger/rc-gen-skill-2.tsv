@@ -1,0 +1,4 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+skill.dru.shock-wave	entity	skills	skills.txt Shock Wave (243) charclass=dru; use_state test 7 0x00644060	specs/skills/use.md,specs/ui/controls.md	draft	gen-skill-dru-243	PARTIAL	yes	0	n	claude/rc-gen-skill-2	EQUAL	-	use_state shape test (restrict 2 + State1 bear) refuses outside bear form; click sends nothing
+skill.dru.vines-wander	entity	skills	AITHINK_Fn110_Vines 0x005EC6C0 / pet_move k5 0x005E3EA0	specs/monsters/ai-bodies-6.md	draft	gen-skill-dru-222,gen-skill-dru-231,gen-skill-dru-241	DIVERGED@67	yes	0	n	claude/rc-gen-skill-2	DIVERGED	S	vine walk after k5 wander: path target and anim speed differ (1.14d (5143,4264) sp 302 vs d2rs (5144,4266) sp 192) at f67

@@ -332,7 +332,12 @@ fn client_world_holds_only_stated_fields() {
         speed,
         // `ui/controls.md` §6 r4 (+0x38 >> 8).
         event_index,
+        // `client/msg-skills.md` §11 (+0xC4 bit 0x40, +0x4E, AnimData).
+        flag_40,
+        action_frame,
+        anim_events,
     } = ClientUnit::new(key);
+    assert_eq!((flag_40, action_frame, anim_events), (false, 0, None));
     assert_eq!((interact_ms, frame, flag_ex, flag_4), (0, 0, 0, false));
     assert_eq!(frame_count, 0);
     assert_eq!(precise, None);

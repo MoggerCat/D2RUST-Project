@@ -95,6 +95,19 @@ impl<X: Pending> ActionSim<X> {
         X::passive_refresh_all(&mut s.hooks, &mut sim, unit)
     }
 
+    /// The passive states' unit bits at the end of the join
+    /// ([`Pending::passive_states_on`]).
+    pub fn passive_states_on(&mut self, game: &mut Game, unit: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::passive_states_on(&mut s.hooks, &mut sim, unit)
+    }
+
     /// The pet follow of the summoned pet types
     /// ([`Pending::summon_follow`]).
     pub fn summon_follow(&mut self, game: &mut Game, player: UnitId) {

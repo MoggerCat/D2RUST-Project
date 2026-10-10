@@ -510,9 +510,9 @@ check reads it.
       Measured (q-fix-skills-4cls, 1.14d under Wine 2026-10-09,
       `nec-bloodgolem.check` / `nec-firegolem.check`): a level-20 Blood
       Golem (cost (25 + 4·19) << 8 = 25856) or Fire Golem with 21248
-      mana sends nothing at the click. PROVISIONAL: d2rs runs tests 1–4
-      and 6 (mana, `skills/levels.md` §4) of the use state on the
-      model and reads tests 5, 7–10 and the code 8 delay as passing
+      mana sends nothing at the click. PROVISIONAL: d2rs runs tests 1–4,
+      6 (mana, `skills/levels.md` §4) and 7 (shape, `skills/use.md` §2)
+      of the use state on the model and reads tests 5, 8–10 and the code 8 delay as passing
       (because the model holds no client cooldown or item-skill facts
       yet); settled by REC-1640 (a 1.14d check casting a skill on
       cooldown and one without its item).

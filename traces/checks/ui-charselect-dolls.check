@@ -1,0 +1,12 @@
+check 1
+# Character select, 3 saves: paper dolls of the slot figures. 1.14d under Wine
+# (12 timed shots) against d2rs (70 dense shots), per slot the figure pixels
+# at the best-matching animation frame (tools/frontend-sbs/dolls_check.py).
+# Needs the three saves of tools/cloud-game/prepare_saves.sh (TestSor, ScnSor, ScnAma).
+# Spec: specs/ui/frontend-menus.md §F2.10, specs/tools/scenario-diff.md §3 rule 13.
+name ui-charselect-dolls
+save TestSor --class sor --expansion
+seed 1234
+ticks 1
+seconds 120
+channels frontend

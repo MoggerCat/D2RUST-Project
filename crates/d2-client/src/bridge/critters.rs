@@ -21,8 +21,6 @@ use super::world::{
 
 /// The size-query mask of the critter placement (§11.7 r3).
 const PLACE_MASK: u16 = 0x3F11;
-/// The footprint mask of a monster (`sim/path-placement.md` §3).
-const MONSTER_FOOTPRINT: u16 = 0x100;
 
 /// The room pass `0x0044C750` (`model.md` §5 r6). No client DRLG:
 /// nothing.
@@ -122,17 +120,13 @@ fn place_critter(w: &mut ClientWorld, inputs: &ModelInputs, room: DrlgRoomId, cl
         let Some(key) = create_client_unit(w, MONSTER, class as u32, x as u16, y as u16) else {
             return;
         };
-        // The 0xAC create of r6.3: mode 1 (NU).
-        if let Some(u) = w.objclient.set_c.get_mut(&key) {
-            u.mode = 1;
-        }
         // The create links the unit into its room's list (the recache
         // `0x0064FAD0`, `sim/unit-order.md` §5 r6): the draw order files
         // it from there.
         w.room_units.place(super::world::view_key(key), Some(room));
-        let town = (row.npc || row.in_town) && !row.interact;
-        let pattern = super::client_missiles::footprint_pattern(size, town);
-        super::client_missiles::stamp_footprint(w, x, y, pattern, MONSTER_FOOTPRINT);
+        // The 0xAC create of r6.3: the monster set-up (path, footprint,
+        // mode 1 NU, first frame, direction).
+        super::critter_path::setup(w, inputs, key, id, x, y);
         return;
     }
 }
@@ -164,6 +158,11 @@ fn presets(w: &mut ClientWorld, room: DrlgRoomId) {
 /// still in set C runs the critter AI `0x0046D780` (r6.4).
 pub fn c_monsters(w: &mut ClientWorld, inputs: &ModelInputs) {
     for key in super::objects::c_order(w, MONSTER) {
+        // `0x00463CC0`: the unit update (`0x00480810` → the monster
+        // update `0x004B13A0`), then the critter AI.
+        if w.objclient.set_c.contains_key(&key) {
+            super::critter_path::update(w, inputs, key);
+        }
         if w.objclient.set_c.contains_key(&key) {
             critter_ai(w, inputs, key);
         }
@@ -236,14 +235,14 @@ fn critter_ai(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
         Some(dist) => dist,
         None if w.local().is_none() => {
             set_think(w, key, 25);
-            request(w, key, Request::Idle);
+            request(w, inputs, key, Request::Idle);
             return;
         }
         None => i32::MAX,
     };
     if dist > 30 {
         set_think(w, key, (dist - 15).min(200));
-        request(w, key, Request::Idle);
+        request(w, inputs, key, Request::Idle);
         return;
     }
     match class {
@@ -252,7 +251,7 @@ fn critter_ai(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
         // (`monstats` flag 22, `0x0046D660`) and the other class bodies
         // are not modelled; they run nothing.
         151 | 269 | 283 | 339 | 157 | 158 | 319 | 159 | 227 | 318 | 556 | 574 | 278..=282 => {}
-        _ => request(w, key, Request::Idle),
+        _ => request(w, inputs, key, Request::Idle),
     }
 }
 
@@ -267,41 +266,41 @@ fn set_think(w: &mut ClientWorld, key: UnitKey, t: i32) {
 
 /// A critter's mode request (`model.md` §19 r4).
 enum Request {
-    /// Code 7 at U's own position (`0x0046CB40`): the neutral fallback.
+    /// Code 7 at U's own position (`0x0046CB40`).
     Idle,
-    /// Code 1 (walk to a point, mode 2) or 0x0C (mode 8 S1); the point
-    /// is the path's, not modelled (REC-742).
-    To { code: u8 },
+    /// Code 1 (walk to a point, mode 2) or 0x0C (mode 8 S1) at (x, y)
+    /// with the record's r4.
+    To { code: u8, x: i32, y: i32, r4: i32 },
 }
 
-/// The request on a C monster. PROVISIONAL (client/model.md §5 r6,
-/// §19; REC-742): the client path of a C monster is not modelled; the
-/// request sets the mode its code sets (code 1 → 2 WL, 0x0C → 8 S1; code
-/// 7 at the own position: modes 1…15 other than 12 → 1) and the unit
-/// keeps its cell.
-fn request(w: &mut ClientWorld, key: UnitKey, r: Request) {
-    let Some(u) = w.objclient.set_c.get_mut(&key) else {
-        return;
-    };
+/// The request on a C monster ([`super::critter_path`]): code 7 at the
+/// own position, code 1 to the point (the client path). Code 0x0C (a
+/// point-group code): W(0) and mode set 8 with the tail.
+/// PROVISIONAL (client/model.md §19 r4; REC-742): code 0x0C's face
+/// (`0x00621C00`) and its move-bit path (`S1mv`) are not run; no
+/// critter of the arrival flees.
+fn request(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, r: Request) {
     match r {
-        Request::Idle => {
-            if (1..=15).contains(&u.mode) && u.mode != 12 {
-                u.mode = 1;
-            }
-        }
-        Request::To { code, .. } => {
-            u.mode = if code == 1 { 2 } else { 8 };
-        }
+        Request::Idle => super::critter_path::idle(w, inputs, key),
+        Request::To { code: 1, x, y, r4 } => super::critter_path::walk_to(w, inputs, key, x, y, r4),
+        Request::To { r4, .. } => super::critter_path::point_mode(w, inputs, key, 8, r4),
     }
 }
 
-/// `step(d, code, r4)` `0x0046C960`: two draws of U's seed (x ± d by
-/// bit 0 of the first, y ± d by the second), then the request; the
-/// point goes to the path, which is not modelled (REC-742).
-fn step(w: &mut ClientWorld, key: UnitKey, code: u8) {
-    unit_step(w, key);
-    unit_step(w, key);
-    request(w, key, Request::To { code });
+/// `step(d, code, r4)` `0x0046C960`: from U's path cell, x ± d by bit 0
+/// of one step of U's seed, then y ± d by bit 0 of the next, then the
+/// request.
+fn step(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, d: i32, code: u8, r4: i32) {
+    let (x, y) = super::critter_path::cell(w, key).unwrap_or_else(|| {
+        w.objclient
+            .set_c
+            .get(&key)
+            .map_or((0, 0), |u| cell_i32(u.cell()))
+    });
+    let sx = if unit_step(w, key) & 1 != 0 { -d } else { d };
+    let sy = if unit_step(w, key) & 1 != 0 { -d } else { d };
+    let (x, y) = (x + sx, y + sy);
+    request(w, inputs, key, Request::To { code, x, y, r4 });
 }
 
 /// `chicken_ai(U)` `0x0046CCD0` (`model.md` §5 r6).
@@ -328,13 +327,24 @@ fn chicken_ai(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
         });
         // Free: to U + 4s; else step(4, 0x0C, 120).
         if free {
-            request(w, key, Request::To { code: 0x0C });
+            let (x, y) = (ux + 4 * s.0, uy + 4 * s.1);
+            request(
+                w,
+                inputs,
+                key,
+                Request::To {
+                    code: 0x0C,
+                    x,
+                    y,
+                    r4: 120,
+                },
+            );
         } else {
-            step(w, key, 0x0C);
+            step(w, inputs, key, 4, 0x0C, 120);
         }
     } else if unit_step(w, key) % 100 < 30 {
         // step(2, 1, 0): walk.
-        step(w, key, 1);
+        step(w, inputs, key, 2, 1, 0);
     } else {
         set_think(w, key, 5);
     }

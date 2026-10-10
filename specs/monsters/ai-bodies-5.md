@@ -30,32 +30,32 @@
 |   1. Scope and order | 103–139 |
 |   2. Minion (116) `0x005E1B60` | 140–156 |
 |   3. Imp (122) `0x005E2FF0`, init `0x005E2FD0` | 157–189 |
-|   4. Succubus (118) `0x005E1E00` | 190–209 |
-|   5. BloodLord (125) `0x005E36F0` | 210–220 |
-|   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
-|   7. Overseer (120) `0x005E27A0` | 246–281 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 282–299 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 300–317 |
-|   10. DeathMauler (130) `0x005EE260` | 318–328 |
-|   11. PutridDefiler (137) `0x005EFA90` | 329–353 |
-|   12. Ancient (133) `0x005EF1A0` | 354–408 |
-|   13. AncientStatue (132) `0x005EEAA0` | 409–416 |
-|   14. FrozenHorror (124) `0x005E3530` | 417–431 |
-|   15. SiegeBeast (115) `0x005E1900` | 432–459 |
-|   16. SuicideMinion (117) `0x005E1D30` | 460–471 |
-|   17. BaalMinion (141) `0x005EF910` | 472–483 |
-|   18. BaalTaunt (136) `0x005EF710` | 484–500 |
-|   19. BaalToStairs (138) `0x005EF620` | 501–516 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 517–561 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 562–673 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 674–690 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 691–728 |
-| Constants & data dependencies | 729–747 |
-| Randomness | 748–756 |
-| Edge cases & original bugs | 757–771 |
-| Test vectors | 772–786 |
-| Provenance | 787–812 |
-| Open questions | 813–851 |
+|   4. Succubus (118) `0x005E1E00` | 190–224 |
+|   5. BloodLord (125) `0x005E36F0` | 225–235 |
+|   6. SuccubusWitch (119) `0x005E2120` | 236–260 |
+|   7. Overseer (120) `0x005E27A0` | 261–296 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 297–314 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 315–332 |
+|   10. DeathMauler (130) `0x005EE260` | 333–343 |
+|   11. PutridDefiler (137) `0x005EFA90` | 344–368 |
+|   12. Ancient (133) `0x005EF1A0` | 369–423 |
+|   13. AncientStatue (132) `0x005EEAA0` | 424–431 |
+|   14. FrozenHorror (124) `0x005E3530` | 432–446 |
+|   15. SiegeBeast (115) `0x005E1900` | 447–474 |
+|   16. SuicideMinion (117) `0x005E1D30` | 475–486 |
+|   17. BaalMinion (141) `0x005EF910` | 487–498 |
+|   18. BaalTaunt (136) `0x005EF710` | 499–515 |
+|   19. BaalToStairs (138) `0x005EF620` | 516–531 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 532–576 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 577–688 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 689–705 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 706–743 |
+| Constants & data dependencies | 744–762 |
+| Randomness | 763–771 |
+| Edge cases & original bugs | 772–786 |
+| Test vectors | 787–801 |
+| Provenance | 802–827 |
+| Open questions | 828–866 |
 <!-- /index -->
 
 ## Summary
@@ -193,6 +193,14 @@ Brackets: succubus1 [90, 50, 50, 15, 15, 15, 3, 0]; `Skill1` Defense
 Curse, `Skill2` Blood Mana, `Skill3` SuccubusBolt. Skill tests here are
 **> 0**. "Cursed" = T has an active stat list with list flag 0x20
 (`0x00625760(T, 0x20)`, `sim/stat-lists.md` §9; D2MOO `STATLIST_CURSE`).
+`0x00625760(unit, f)` answers 0 unless the unit's own list is extended
+(bit 0x80000000); then `0x006256E0` returns the first list of the active
+chain whose flags share a bit with f. The skill-3 test reads max life
+(`0x00625D10`, stat 7) and max mana (`0x00625D60`, stat 9) of T: cast when
+max mana < max life, T is absent or T is not a player. Both reads are
+real stat reads in the wiring (a stub of 0 / false made a monster cast a
+curse again on an already cursed player; gen-su-54, first difference
+frame 41 -> 68).
 
 1. T not cursed, D < aip4 [15] and P(aip3) [50]:
    1. `Skill1` > 0 and T's life percent ≥ aip7 [3] → `Skill1` at T. End.
@@ -206,6 +214,13 @@ Curse, `Skill2` Blood Mana, `Skill3` SuccubusBolt. Skill tests here are
 4. P(aip2) [50] → walk to T with flags 0; else idle aip6 [15].
 
 1.14d-confirmed; same as D2MOO.
+
+"Cursed" is live state: a Skill1 cast sets a curse list (flag 0x20) on T,
+so the next think of the same Succubus skips step 1 **before** its
+P(aip3) draw (gen-mon-469 frame 46 cast, frame 69 only the step-4 draw
+at `0x005E20AC`). The test is `0x00625760` (T's list must be extended)
+then the active chain of `0x006256E0`; d2rs reads it from the stat
+lists (`wiring/action/ai.rs`), as it reads T's max mana (REC-2240).
 
 ### 5. BloodLord (125) `0x005E36F0`
 

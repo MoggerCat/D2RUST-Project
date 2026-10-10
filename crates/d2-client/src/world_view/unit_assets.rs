@@ -506,7 +506,8 @@ impl UnitArt {
 
 impl UnitArt {
     /// Updates [`Self::facing`] from the model (module doc; d2rs-own,
-    /// unverified): toward a player's walk target when it has one and is
+    /// unverified): a C monster's path direction (`ClientWorld::view_direction`,
+    /// the 1.14d unit's own); else toward a player's walk target when it has one and is
     /// not on it, else toward the last position change; otherwise the
     /// facing stays. Units no longer in the model are dropped.
     pub fn observe_facing(&mut self, world: &ClientWorld) {
@@ -517,8 +518,9 @@ impl UnitArt {
             let Some(pos) = unit.position else { continue };
             let old = self.facing.get(&unit.key).copied();
             let toward = |to: (u16, u16)| facing(cell_centre(pos), cell_centre(to));
-            let dir = request_target(world, unit)
-                .and_then(toward)
+            let dir = world
+                .view_direction(&unit.key)
+                .or_else(|| request_target(world, unit).and_then(toward))
                 .or_else(|| old.and_then(|f| facing(cell_centre(f.at), cell_centre(pos))))
                 .or(old.map(|f| f.dir64))
                 .unwrap_or(0);
