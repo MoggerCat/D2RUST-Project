@@ -1,0 +1,44 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 13,
+  "d2rs": 12,
+  "matched": 12,
+  "differences": 2,
+  "first": {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  "by_kind": {
+   "dev_vol": 1,
+   "voice": 1
+  },
+  "partial": [
+   "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: partial: the capture holds 557056 of 21805636 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\ambient\\scene\\wilderness day 2.wav at T 0: partial: the capture holds 524288 of 671432 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\object\\fire4.wav at T 0: partial: the capture holds 131072 of 222494 bytes (equal so far)",
+   "DATA\\GLOBAL\\MUSIC\\act1\\wild.wav at T 77: partial: the capture holds 294912 of 42270464 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 99,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "audio-cast-frost-nova-sor",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  {
+   "tick": 75,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 17102 bytes before the zero tail, sha256 539dc85afefcdab1) at T 75 (buffer 21); d2rs starts nothing like it"
+  }
+ ]
+}

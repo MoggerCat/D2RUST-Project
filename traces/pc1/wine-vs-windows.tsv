@@ -1,0 +1,13 @@
+# pc1-wine-vs-windows 1
+# tool: d2rs-probes/wine_vs_win.py + wvw_cmp: a random sample (seed 7, ticks <= 500) of traces/orig-cache entries recorded under Wine by cloud sessions, re-recorded on real Windows 10 with `scenario_diff.py <check> --orig-only --cache-no-read` (recorders at claude/local-pc1-today, 2026-10-10) and compared record by record on every field both files have, without the header, `ms` and the player's `q` (its encoding changed in record_state.py between the two recordings)
+check	channel	wine_date	snapshots	unit_records	result
+ass-fade	state	2026-10-09	70	2190	equal
+gen-lvl-104	state	2026-10-09	160	8920	equal
+gen-lvl-121	state	2026-10-09	160	8041	equal
+gen-lvl-38	state	2026-10-09	160	10288	equal
+gen-lvl-68	state	2026-10-09	160	10141	equal
+gen-lvl-80	state	2026-10-09	160	10423	equal
+gen-skill-ass-278	state	2026-10-09	70	2190	equal
+gen-skill-sor-49	state	2026-10-09	70	2215	equal
+gen-skill-sor-64	state	2026-10-09	70	3101	equal
+nec-bone-spirit	state	2026-10-09	70	2295	line 12 (poke, frame 10) /eax: wine 0x3384100 windows 0x4b14100

@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–407 |
-|   12. Level backgrounds (pass 1) | 408–461 |
-|   13. Pass 8 (`0x00475B20`) | 462–470 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 471–496 |
-|   15. Sight test (`draw-order.md` §5 r3) | 497–543 |
-|   16. Line test (`0x0064E260`) | 544–573 |
-| Constants & data dependencies | 574–584 |
-| Randomness | 585–596 |
-| Edge cases & original bugs | 597–613 |
-| Test vectors | 614–635 |
-| Provenance | 636–669 |
-| Open questions | 670–745 |
+|   11. Weather (passes 4 and 9; water floors) | 68–415 |
+|   12. Level backgrounds (pass 1) | 416–469 |
+|   13. Pass 8 (`0x00475B20`) | 470–478 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 479–504 |
+|   15. Sight test (`draw-order.md` §5 r3) | 505–551 |
+|   16. Line test (`0x0064E260`) | 552–581 |
+| Constants & data dependencies | 582–592 |
+| Randomness | 593–604 |
+| Edge cases & original bugs | 605–621 |
+| Test vectors | 622–643 |
+| Provenance | 644–677 |
+| Open questions | 678–753 |
 <!-- /index -->
 
 ## Summary
@@ -244,6 +244,14 @@ by frame, within one first-update value.
    | `[0x007A89A4]` (rain, `p` 2) | `v` = 25 − 2`i`: (`v`, `v` + 5, `v`) |
    | `[0x007A898C]` (snow `S`) | `v` = 120 + `q`: (`v`, `v`, `v`) |
    | `[0x007A89EC]` (snow `S'`) | `v` = 170 + `q`: (`v`, `v`, `v`) |
+
+   Recorded (Windows, 2026-10-10, REC-2447,
+   `traces/pc1/rain-color-tables.tsv`): the live tables in the Rogue
+   Encampment are `[0x007A8980]` = 206 27 200 25 198 22 192 188 185 115
+   115 231, `[0x007A894C]` = 183 19 19 242 180 179 114 114 237 236 226
+   226, `[0x007A89A4]` = 17 177 237 176 236 175 175 174 15 173 235 172,
+   and every rain line of the first 75 ticks of a fresh town start
+   carries a `[0x007A8980]` entry: the day period there is 0.
 
 #### 11.5 Water floors: splashes and bubbles (`0x004DE410`, `0x00472DA0`, `0x00472EC0`)
 

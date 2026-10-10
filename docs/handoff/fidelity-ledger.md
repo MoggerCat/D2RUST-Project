@@ -32,8 +32,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
 | systems | 918 | 359 | 46 | 251 | 0 | 262 | 250 | 404 | 2 | 949–3732+ | 39 | 554 / 0 / 364 |
-| world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 858 | 46 | 459 | 0 | 3116 | 475 | 876 | 12 | 2085.5–7958+ | 286 | 3522 / 382 / 575 |
+| world | 826 | 41 | 0 | 55 | 0 | 730 | 11 | 80 | 5 | 205.5–662+ | 162 | 740 / 21 / 65 |
+| **all** | 4479 | 849 | 46 | 459 | 0 | 3125 | 475 | 867 | 12 | 2067.5–7886+ | 277 | 3531 / 382 / 566 |
 
 ## By family
 
@@ -701,7 +701,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `tools` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `ui` | 21 | 16 | 0 | 4 | 0 | 1 | 0 | 11 | 7 | 2 | 0 | 0 |
 | `vendor` | 25 | 7 | 0 | 6 | 0 | 12 | 0 | 3 | 10 | 0 | 3 | 0 |
-| `waypoint` | 39 | 17 | 0 | 0 | 0 | 22 | 0 | 0 | 17 | 0 | 26 | 0 |
+| `waypoint` | 39 | 8 | 0 | 0 | 0 | 31 | 0 | 0 | 8 | 0 | 17 | 0 |
 | `world` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 |
 
 ## Not covered by any row
@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2661
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6166
+- Duplicate areas between parts: 6175
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1125,6 +1125,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x16`: q-run-net.tsv:3 kept, q-tool-replay-diff.tsv:3 dropped
   - `net.c2s.0x01`: q-run-net.tsv:32 kept, q-tool-replay-diff.tsv:4 dropped
   - `net.c2s.0x03`: q-run-net.tsv:34 kept, q-tool-replay-diff.tsv:5 dropped
+  - `waypoint.18.kurast-docktown`: rc-00-local-pc1-today.tsv:218 kept, rc-ai-special.tsv:4 dropped
+  - `waypoint.19.spider-forest`: rc-00-local-pc1-today.tsv:219 kept, rc-ai-special.tsv:5 dropped
+  - `waypoint.20.great-marsh`: rc-00-local-pc1-today.tsv:220 kept, rc-ai-special.tsv:6 dropped
+  - `waypoint.21.flayer-jungle`: rc-00-local-pc1-today.tsv:221 kept, rc-ai-special.tsv:7 dropped
+  - `waypoint.22.lower-kurast`: rc-00-local-pc1-today.tsv:222 kept, rc-ai-special.tsv:8 dropped
+  - `waypoint.23.kurast-bazaar`: rc-00-local-pc1-today.tsv:223 kept, rc-ai-special.tsv:9 dropped
+  - `waypoint.24.upper-kurast`: rc-00-local-pc1-today.tsv:224 kept, rc-ai-special.tsv:10 dropped
+  - `waypoint.25.travincal`: rc-00-local-pc1-today.tsv:225 kept, rc-ai-special.tsv:11 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-00-local-pc1-today.tsv:226 kept, rc-ai-special.tsv:12 dropped
   - `audio.cast-frost-nova-sor.novaice`: rc-audio-rain2.tsv:3 kept, rc-client-skill-do.tsv:3 dropped
   - `system.render.camera.1-frame-size-and-play-area`: rc-00-local-pc1-today.tsv:25 kept, rc-draw-row173.tsv:41 dropped
   - `system.render.camera.2-world-coordinates-client-pixels`: rc-00-local-pc1-today.tsv:27 kept, rc-draw-row173.tsv:42 dropped
@@ -2140,16 +2149,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.124.act-5-temple-boss`: rc-gen-misc.tsv:25 kept, rc-pc1-audit.tsv:78 dropped
   - `level.a5.131.act-5-throne-room`: rc-gen-misc.tsv:26 kept, rc-pc1-audit.tsv:80 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-pc1-audit.tsv:81 dropped
-  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-pc1-audit.tsv:126 dropped
-  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-pc1-audit.tsv:127 dropped
+  - `waypoint.18.kurast-docktown`: rc-00-local-pc1-today.tsv:218 kept, rc-pc1-audit.tsv:126 dropped
+  - `waypoint.19.spider-forest`: rc-00-local-pc1-today.tsv:219 kept, rc-pc1-audit.tsv:127 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-pc1-audit.tsv:128 dropped
-  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, rc-pc1-audit.tsv:129 dropped
-  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-pc1-audit.tsv:130 dropped
-  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, rc-pc1-audit.tsv:131 dropped
-  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, rc-pc1-audit.tsv:132 dropped
-  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-pc1-audit.tsv:133 dropped
-  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-pc1-audit.tsv:134 dropped
-  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-pc1-audit.tsv:135 dropped
+  - `waypoint.20.great-marsh`: rc-00-local-pc1-today.tsv:220 kept, rc-pc1-audit.tsv:129 dropped
+  - `waypoint.21.flayer-jungle`: rc-00-local-pc1-today.tsv:221 kept, rc-pc1-audit.tsv:130 dropped
+  - `waypoint.22.lower-kurast`: rc-00-local-pc1-today.tsv:222 kept, rc-pc1-audit.tsv:131 dropped
+  - `waypoint.23.kurast-bazaar`: rc-00-local-pc1-today.tsv:223 kept, rc-pc1-audit.tsv:132 dropped
+  - `waypoint.24.upper-kurast`: rc-00-local-pc1-today.tsv:224 kept, rc-pc1-audit.tsv:133 dropped
+  - `waypoint.25.travincal`: rc-00-local-pc1-today.tsv:225 kept, rc-pc1-audit.tsv:134 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-00-local-pc1-today.tsv:226 kept, rc-pc1-audit.tsv:135 dropped
   - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-pc1-audit.tsv:139 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-pc1-audit.tsv:146 dropped
   - `system.sim.pets.1-data`: rc-packets-chan.tsv:181 kept, rc-pets.tsv:11 dropped
@@ -4338,16 +4347,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `shrine.8.resist-fire-boost`: rc-promote.tsv:62 kept, rc-run-5.tsv:805 dropped
   - `shrine.9.resist-cold-boost`: rc-promote.tsv:63 kept, rc-run-5.tsv:806 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, rc-run-5.tsv:808 dropped
-  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-run-5.tsv:817 dropped
-  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-run-5.tsv:818 dropped
+  - `waypoint.18.kurast-docktown`: rc-00-local-pc1-today.tsv:218 kept, rc-run-5.tsv:817 dropped
+  - `waypoint.19.spider-forest`: rc-00-local-pc1-today.tsv:219 kept, rc-run-5.tsv:818 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-run-5.tsv:819 dropped
-  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, rc-run-5.tsv:820 dropped
-  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-run-5.tsv:821 dropped
-  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, rc-run-5.tsv:822 dropped
-  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, rc-run-5.tsv:823 dropped
-  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-run-5.tsv:824 dropped
-  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-run-5.tsv:825 dropped
-  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-run-5.tsv:826 dropped
+  - `waypoint.20.great-marsh`: rc-00-local-pc1-today.tsv:220 kept, rc-run-5.tsv:820 dropped
+  - `waypoint.21.flayer-jungle`: rc-00-local-pc1-today.tsv:221 kept, rc-run-5.tsv:821 dropped
+  - `waypoint.22.lower-kurast`: rc-00-local-pc1-today.tsv:222 kept, rc-run-5.tsv:822 dropped
+  - `waypoint.23.kurast-bazaar`: rc-00-local-pc1-today.tsv:223 kept, rc-run-5.tsv:823 dropped
+  - `waypoint.24.upper-kurast`: rc-00-local-pc1-today.tsv:224 kept, rc-run-5.tsv:824 dropped
+  - `waypoint.25.travincal`: rc-00-local-pc1-today.tsv:225 kept, rc-run-5.tsv:825 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-00-local-pc1-today.tsv:226 kept, rc-run-5.tsv:826 dropped
   - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:79 kept, rc-run-5.tsv:827 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-5.tsv:828 dropped
   - `waypoint.29.river-of-flame`: rc-promote.tsv:80 kept, rc-run-5.tsv:829 dropped
@@ -5041,7 +5050,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-wp-last3.tsv:3 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-wp-last3.tsv:4 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-wp-last3.tsv:5 dropped
-  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-wp-seed400.tsv:3 dropped
+  - `waypoint.21.flayer-jungle`: rc-00-local-pc1-today.tsv:221 kept, rc-wp-seed400.tsv:3 dropped
   - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-wp-seed400.tsv:4 dropped
   - `level.a3.100.act-3-mephisto-1`: rc-gen-misc.tsv:18 kept, rc-wp-walk-tx.tsv:3 dropped
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-wp-walk-tx.tsv:4 dropped
@@ -6694,15 +6703,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:814 kept, world.tsv:156 dropped
   - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:815 kept, world.tsv:157 dropped
   - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:816 kept, world.tsv:158 dropped
-  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, world.tsv:159 dropped
-  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, world.tsv:160 dropped
-  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, world.tsv:161 dropped
-  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, world.tsv:162 dropped
-  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, world.tsv:163 dropped
-  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, world.tsv:164 dropped
-  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, world.tsv:165 dropped
-  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, world.tsv:166 dropped
-  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, world.tsv:167 dropped
+  - `waypoint.18.kurast-docktown`: rc-00-local-pc1-today.tsv:218 kept, world.tsv:159 dropped
+  - `waypoint.19.spider-forest`: rc-00-local-pc1-today.tsv:219 kept, world.tsv:160 dropped
+  - `waypoint.20.great-marsh`: rc-00-local-pc1-today.tsv:220 kept, world.tsv:161 dropped
+  - `waypoint.21.flayer-jungle`: rc-00-local-pc1-today.tsv:221 kept, world.tsv:162 dropped
+  - `waypoint.22.lower-kurast`: rc-00-local-pc1-today.tsv:222 kept, world.tsv:163 dropped
+  - `waypoint.23.kurast-bazaar`: rc-00-local-pc1-today.tsv:223 kept, world.tsv:164 dropped
+  - `waypoint.24.upper-kurast`: rc-00-local-pc1-today.tsv:224 kept, world.tsv:165 dropped
+  - `waypoint.25.travincal`: rc-00-local-pc1-today.tsv:225 kept, world.tsv:166 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-00-local-pc1-today.tsv:226 kept, world.tsv:167 dropped
   - `waypoint.27.the-pandemonium-fortress`: rc-promote.tsv:79 kept, world.tsv:168 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, world.tsv:169 dropped
   - `waypoint.29.river-of-flame`: rc-promote.tsv:80 kept, world.tsv:170 dropped
@@ -6884,7 +6893,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:290 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1875
+- Rows whose state disagrees with their checks: 1884
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6945,7 +6954,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1815 more (rerun with the tsv to list them)
+  - … and 1824 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -10757,15 +10766,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `shrine.17.portal-to-unknown` | entity | DIVERGED | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: gen-shrine-17: channel packets DIVERGED |
 | `shrine.7.combat-boost` | entity | DIVERGED | M | PARTIAL | ? | 15 | n | claude/q-fix-real-unit-seed-order | specs/world/objects.md | rc-promote 2026-10-10 fresh run: gen-shrine-7: channel packets DIVERGED |
 | `system.act.travel` | system | DIVERGED | M | DIVERGED@10 | ? | 0 | n | claude/q-fix-pc1-proto-items | specs/flows/act-change.md | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/1 of its a* checks diverge) |
-| `waypoint.18.kurast-docktown` | entity | DIVERGED | M | DIVERGED@434 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-18 state: frame 434: monster 1:10 class 254, field tx: 1.14d 0 vs d2rs 5085 (was DIVERGED@37, class 359 seed; SpecialState06 `0x005E7C10` implemented, ai-bodies.md section 9.33) |
-| `waypoint.19.spider-forest` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-19 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.20.great-marsh` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-20 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.21.flayer-jungle` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-21 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.22.lower-kurast` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-22 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.23.kurast-bazaar` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-23 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.24.upper-kurast` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-24 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.25.travincal` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-25 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
-| `waypoint.26.durance-of-hate-level-2` | entity | DIVERGED | M | DIVERGED@400 | ? | 3 | y | claude/rc-ai-special | specs/world/waypoints.md | gen-wp-26 state: frame 400: game seed after waypoint travel (was DIVERGED@37 class 359 seed; SpecialState06 implemented, ai-bodies.md section 9.33) |
 | `waypoint.28.city-of-the-damned` | entity | DIVERGED | M | DIVERGED | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/monsters/population.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: gen-wp-28=DIVERGED \| frame 401 monster 1:29 class 403 vs 308: 1.14d takes 2 more game-seed density steps (0x54ed96) in the last populated room (same cause as gen-lvl-106 frame 21) |
 | `waypoint.31.rigid-highlands` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-31-lv111: channel packets DIVERGED |
 | `waypoint.32.arreat-plateau` | entity | DIVERGED | M | PARTIAL | ? | 3 | n | claude/q-fix-pc1-proto-items | specs/world/waypoints.md | rc-promote 2026-10-10 fresh run: a5-wp-32-lv112: channel packets DIVERGED |
@@ -11538,7 +11538,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `waypoint.15.palace-cellar-level-1` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-15..) |
 | `waypoint.16.arcane-sanctuary` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-16..) |
 | `waypoint.17.canyon-of-the-magi` | entity | EQUAL | - | PARTIAL | yes | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-17..) |
+| `waypoint.18.kurast-docktown` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-18 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.19.spider-forest` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-19 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
 | `waypoint.2.stony-field` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-wp-last3 | specs/world/waypoints.md,specs/drlg/levels.md | gen-wp-2 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): state 460/460 equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
+| `waypoint.20.great-marsh` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-20 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.21.flayer-jungle` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-21 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.22.lower-kurast` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-22 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.23.kurast-bazaar` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-23 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.24.upper-kurast` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-24 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.25.travincal` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-25 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
+| `waypoint.26.durance-of-hate-level-2` | entity | EQUAL | - | PARTIAL | yes | 3 | n | claude/rc-ai-special | specs/world/waypoints.md | local-pc1-today (2026-10-10, integ-r23 02516cee1 merged, both sides on Windows): gen-wp-26 state PARTIAL, 460 frames, no difference in what was compared; the only gap is the client gap (REC-2055 / REC-2056). The 1.14d side in traces/orig-cache was re-recorded: the cached one predated the `@wp` fix of send.py, so its waypoint message was never sent (poke result `gap`) and the player never left the town. |
 | `waypoint.27.the-pandemonium-fortress` | entity | EQUAL | - | PARTIAL | ? | 3 | n | claude/q-fix-real-unit-seed-order | specs/world/waypoints.md | gen-wp-27 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `waypoint.29.river-of-flame` | entity | EQUAL | - | PARTIAL | ? | 3 | n | claude/q-fix-join-items | specs/world/waypoints.md | gen-wp-29 (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `waypoint.3.dark-wood` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | rc-run-5: 1 checks EQUAL (gen-wp-3..) |

@@ -298,3 +298,39 @@ errors). Step 4: no new item. Recorders unchanged, so every 1.14d side in
 Running: a sample of cloud (Wine) 1.14d recordings re-recorded on Windows
 and compared line by line. Next: the rain colour tables read from the live
 game; the other three audio checks at Music Volume 100.
+
+## Push 14 (20:05) — 9 waypoint rows EQUAL; rain colours; Wine = Windows
+
+REC used: 2447. Ledger: EQUAL 3125 of 4479 (+9), check 0 errors.
+
+- **Waypoints 18–26 → EQUAL (9 rows).** 21 cached 1.14d sides
+  (`gen-wp-0`, `9`–`16`, `18`–`27` and two more) were recorded before the
+  `@wp` fix of `send.py`: their waypoint message was never sent (poke
+  result `gap`) and the player never left town. Re-recorded on Windows into
+  `traces/orig-cache`; all 21 now give state PARTIAL with the client gap
+  only (460 frames, about 26,000 unit records each). Rows in
+  `rc-00-local-pc1-today.tsv`.
+- **Rain colours: d2rs's tables are right, its day period is wrong.** Live
+  tables read from 1.14d (`traces/pc1/rain-color-tables.tsv`,
+  `draw-order-2.md` §11.4): every rain line of a fresh town start uses the
+  day-period-0 table; d2rs's lines use the period-1/3 table. Row
+  `q-fix-pc1today-rain-colors` rewritten with the values. This and
+  `rain-phase` are what 16 draws checks now wait on.
+- **Wine recordings equal Windows recordings.** Ten cloud-recorded cache
+  entries re-recorded here and compared record by record
+  (`traces/pc1/wine-vs-windows.tsv`): every snapshot equal; the one
+  difference is a pointer in a poke result (`eax`). So the cloud's 1.14d
+  sides can be trusted as ground truth for state.
+- **Cache staleness (item d):** 2,045 of 2,157 cached checks carry an older
+  recorder hash (recorder edits of 2026-10-10: `send.py`, `record_state.py`),
+  339 of them behind DIVERGED / NO-CHECK rows. The sample says their content
+  is unchanged but for the player's `q` field encoding and the waypoint
+  message above, so I re-recorded only the 21 whose content was wrong. A
+  full refresh is about 50 hours of game runs on this PC: say if you want it.
+- **Audio at Music Volume 100** (all four checks,
+  `traces/audio/win/*.summary-win-music100.json`): the song pairs in each;
+  frost nova is down to 2 differences (song device volume −730 against
+  −1348; one mono 1.14d voice at T 75 d2rs does not start).
+
+Open: nothing in Step 4. Still DIVERGED on Windows: all 38 draws checks
+(16 at the first rain line), the four audio checks.
