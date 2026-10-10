@@ -348,6 +348,8 @@ pub fn init_fn(n: u8) -> Option<u32> {
     Some(match n {
         // TowerTome (`quests-act1.md` §10.7).
         4 => 0x0059_5A00,
+        // InvisibleObject: the chain 4 link or mode 2 (`objects-2.md` §17).
+        13 => 0x0059_4020,
         // CairnStone, objects 17–21 (`quests-act1-rest.md` §2.2).
         6 => 0x0059_35E0,
         // CainGibbet → `0x00594060` (`quests-act1-rest.md` §9 item 8).
@@ -501,6 +503,14 @@ fn init<W: QuestWorld>(
     w.set_init_point(c.room.map(|room| (object, c.x, c.y, room)));
     match n {
         4 => act1::q5::object_init(ctl, w, object),
+        // `0x00594020`: chain 4's record exists → link the object to it
+        // (`0x005436B0`, special case `0x00592F80`); else mode 2 unless
+        // it is already in mode 2.
+        13 => {
+            if !ctl.add_link(w, object, 4, Some(0x0059_2F80)) && w.object_mode(object) != 2 {
+                w.set_object_mode(object, 2);
+            }
+        }
         23 => act3::tome_init(ctl, w, object),
         25 => {
             if let Some(at) = at {
