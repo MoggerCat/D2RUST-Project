@@ -700,6 +700,7 @@ fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
     let mut s = state::snapshot_world(&sim.game, &sim.events);
     if let Some(inv) = sim.world.inventory.as_ref() {
         overlay_item_places(&mut s, &inv.state);
+        overlay_item_owners(&mut s, &inv.state, &sim.game.lists);
     }
     let d = usize::from(state::difficulty_world(&sim.events)).min(2);
     for (id, q) in &sim.world.rest.quests {
@@ -744,6 +745,27 @@ fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::in
             // The static path's room is 0: no `lv` (state-snapshot.md §6 r1).
             u.lv = None;
         }
+    }
+}
+
+/// `own` of an item (`state-snapshot.md` §2): the holder of the inventory
+/// the item is linked into (item data +0x5C -> inventory +0x08 owner
+/// unit); absent on the ground (no inventory) or with a 0 GUID. d2rs
+/// keeps the link in the inventory model.
+fn overlay_item_owners(
+    snap: &mut state::StateSnapshot,
+    inv: &d2_sim::wiring::inventory::InvState,
+    lists: &d2_sim::units::UnitLists,
+) {
+    for u in snap.units.iter_mut().filter(|u| u.ut == 4) {
+        let holder = inv
+            .items
+            .values()
+            .find(|d| d.guid == u.g)
+            .and_then(|d| d.inv)
+            .and_then(|o| lists.unit(o))
+            .map(|e| e.guid);
+        u.own = holder.filter(|&g| g != 0);
     }
 }
 
