@@ -1629,7 +1629,7 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
     /// a monster not in mode 0 or 12; any other type refused; no distance
     /// test), then the `0x005541B0` dead test.
     fn units_in_range(&mut self, center: UnitId, range: i32) -> Vec<UnitId> {
-        use crate::missiles::{self, bodies_ext2::unit_find_by, seams::MissileBodies};
+        use crate::missiles::{self, bodies_ext2::unit_find_by};
         use crate::units::UnitType;
         let room = self.room(center);
         let at = self.v.h.path_position(center);
@@ -1648,7 +1648,7 @@ impl<X: Pending> ShrineWorld for ObjectView<'_, X> {
                 let Some(ty) = g.lists.unit(u).map(|e| e.ty) else {
                     return false;
                 };
-                let mode = cx.world.unit_mode(u);
+                let mode = cx.world.units.get(u).map_or(0, |r| r.mode as i32);
                 match ty {
                     UnitType::Player => mode != 0 && mode != 17,
                     UnitType::Monster => mode != 0 && mode != 12,
