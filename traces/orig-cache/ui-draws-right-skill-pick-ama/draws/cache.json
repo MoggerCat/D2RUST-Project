@@ -23,17 +23,17 @@
   "1",
   "--no-save",
   "--input",
-  "frame 40; click 660 570"
+  "frame 40; hold 660 570 2"
  ],
  "files": {
   "orig.frames.jsonl": {
-   "sha256": "bb64d5c8ed8910c6e27e729280cc94a72300e60e579e18acc203fb6faf75749b",
-   "size": 4837597
+   "sha256": "0a8aabbf56f41d906d45d7b79df8dd2077363a4f6c37b469d3136c26feb077d6",
+   "size": 5210915
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "6b7abd0c3ccabbff6da2627766dfa8e6d18208ac80d7e9f383faa637aa71fa24",
+  "check": "9b4708db70a7cccfeb77bd9cf5b0a9f203697c0bac9315198c70e33313e1a790",
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",

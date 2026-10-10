@@ -32,7 +32,7 @@
 | Edge cases & original bugs | 252–263 |
 | Test vectors | 264–272 |
 | Provenance | 273–281 |
-| Open questions | 282–320 |
+| Open questions | 282–336 |
 <!-- /index -->
 
 ## Summary
@@ -314,6 +314,22 @@ for this spec.
    four DIVERGED (town ambience and walk: footstep variant, tick,
    volume and pan differences from T 27–41 on; monster hit: variant
    picks from T 75).
+   **Settled (2026-10-10, PC 1, REC-2446): it is a setting, not
+   DirectSound.** PC 1's registry held `Music Volume` = 0
+   (`HKCU\Software\Blizzard Entertainment\Diablo II`), and at 0 1.14d
+   starts no song (`audio/environment.md` §2 r4): the Windows captures
+   had no music voice at all. Their two stereo stream voices are the
+   ambience bed `wilderness day 2.wav` (T 0) and the rain loop
+   `rain2.wav` (T 3), and both hold d2rs's decoded samples byte for byte
+   through every refill (loop wraps included). With `Music Volume` set
+   to 100 for one run (restored after), the same check captures 23
+   voices as under Wine and `town1.wav` pairs by samples at T 0
+   (`traces/audio/win/audio-town-ambience-ama.summary-win-music100.json`;
+   9 voices paired against 6). What is left for the song is the device
+   volume: 1.14d −730 at Music Volume 100, d2rs −1348. So stream voices
+   are not implementation-dependent; an audio check must fix the
+   machine's Master / Music Volume on both sides (row
+   `q-fix-pc1today-audio-settings`).
 2. Stream voices (music) start on the stream thread: their `Play` `T` may
    lag the main thread's by one; the start tick uses the main-thread
    `SetCurrentPosition` (REC-1360).

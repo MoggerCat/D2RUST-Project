@@ -1,0 +1,42 @@
+# pc1-draws-first-diff 1
+# tool: tools/scenario-diff/scenario_diff.py <check> --orig-cache --fill-cache, both sides on real Windows 10 (PC 1); this table lists each run's verdict and first difference so later rounds can report what moved
+# round 2026-10-10 17:20 local, d2rs at claude/local-pc1-today with origin/claude/integ-r23 174dbce3d merged
+check	verdict	file	row	column	tick	orig_draws	orig_site
+draws-a2-town-ama	DIVERGED	draws.tsv	115	file	73	269	0x4719fe
+draws-a3-town-ama	DIVERGED	draws.tsv	97	frame	73	289	0x473bd0
+draws-a4-town-ama	DIVERGED	draws.tsv	255	frame	73	274	0x4978bc
+draws-a5-town-ama	DIVERGED	draws.tsv	76	frame	73	244	0x4719fe
+draws-blood-moor-ama	DIVERGED	draws.tsv	98	file	73	197	0x4719fe
+draws-cave-ama	DIVERGED	draws.tsv	65	file	73	127	0x4719fe
+draws-fire-bolt-sor	DIVERGED	draws.tsv	98	dir	30	181	0x4719fe
+draws-frost-nova-sor	DIVERGED	draws.tsv	98	dir	27	304	0x4719fe
+draws-melee-bar	DIVERGED	draws.tsv	98	file	46	216	0x4719fe
+draws-run-ama	DIVERGED	frame.tsv	8	tile_origin_x	60	240	-
+draws-town-arrival-ama	DIVERGED	draws.tsv	191	op	73	272	0x4dc952
+draws-town-rain-ama	DIVERGED	draws.tsv	191	op	73	264	0x4dc952
+draws-walk-ama	DIVERGED	frame.tsv	9	tile_origin_y	60	263	-
+ui-draws-automap-ama	DIVERGED	draws.tsv	173	frame	72	1126	0x46e539
+ui-draws-belt-ama	DIVERGED	draws.tsv	191	op	73	265	0x4dc952
+ui-draws-char-skill-ama	DIVERGED	draws.tsv	9	op	72	394	0x501bc0
+ui-draws-character-ama	DIVERGED	draws.tsv	171	frame	72	490	0x46e539
+ui-draws-help-ama	DIVERGED	draws.tsv	173	frame	72	876	0x46e539
+ui-draws-hover-life-ama	DIVERGED	draws.tsv	191	op	73	264	0x4dc952
+ui-draws-hover-mana-ama	DIVERGED	draws.tsv	173	frame	72	276	0x46e539
+ui-draws-hover-npc-ama	DIVERGED	draws.tsv	191	op	72	263	0x4dc952
+ui-draws-hover-stamina-ama	DIVERGED	draws.tsv	191	op	73	282	0x4dc952
+ui-draws-hover-xp-ama	DIVERGED	draws.tsv	191	op	73	265	0x4dc952
+ui-draws-inv-char-ama	DIVERGED	draws.tsv	243	frame	73	305	0x501bc0
+ui-draws-inv-char-l5-ama	DIVERGED	draws.tsv	22	op	73	343	0x4a7e9d
+ui-draws-inv-char-tip-ama	DIVERGED	draws.tsv	249	frame	72	397	0x501bc0
+ui-draws-inventory-ama	DIVERGED	draws.tsv	188	op	73	264	0x4dc952
+ui-draws-item-tip-ama	DIVERGED	draws.tsv	172	frame	73	359	0x46e539
+ui-draws-left-skill-pick-ama	DIVERGED	draws.tsv	191	op	73	287	0x4dc952
+ui-draws-minipanel-ama	DIVERGED	draws.tsv	173	frame	73	263	0x46e539
+ui-draws-msglog-ama	DIVERGED	draws.tsv	173	frame	73	709	0x46e539
+ui-draws-party-ama	DIVERGED	draws.tsv	191	op	72	262	0x4dc952
+ui-draws-quest-inv-ama	DIVERGED	draws.tsv	59	frame	73	78	0x4978bc
+ui-draws-quest-skill-ama	DIVERGED	draws.tsv	28	op	73	167	0x501bc0
+ui-draws-questlog-ama	DIVERGED	draws.tsv	188	op	73	268	0x4dc952
+ui-draws-right-skill-pick-ama	DIVERGED	draws.tsv	191	op	73	287	0x4dc952
+ui-draws-skillbar-ama	DIVERGED	draws.tsv	191	op	73	267	0x4dc952
+ui-draws-skilltree-ama	DIVERGED	draws.tsv	188	op	72	352	0x4dc952

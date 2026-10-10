@@ -235,3 +235,39 @@ names the groups of equal runs.
 
 Open: re-run of the 35 scenes and the draws checks on this merge (next
 round); music-stream pairing; the 117 rows still marked needs_pc1.
+
+## Push 12 (17:30) — music pairing solved; draws checks re-run
+
+REC used: 2446.
+
+- **Music-stream pairing (`tools/audio-diff.md` OQ1): solved, it was a
+  setting.** PC 1's registry had `Music Volume` = 0, and at 0 1.14d starts no
+  song, so the Windows captures never held a music voice. The two stereo
+  streams they do hold are `wilderness day 2.wav` (T 0) and `rain2.wav` (T 3),
+  equal to d2rs's samples byte for byte through every refill. With Music
+  Volume 100 for one run (set back to 0 after): 23 voices as under Wine,
+  `town1.wav` pairs at T 0, 9 voices paired against 6
+  (`traces/audio/win/audio-town-ambience-ama.summary-win-music100.json`).
+  Left for the song: device volume 1.14d −730, d2rs −1348. Row
+  `q-fix-pc1today-audio-settings` (checks must pin the volume settings on
+  both sides).
+- **All 38 draws checks re-run on this merge** (both sides, Windows): all
+  still DIVERGED. `traces/pc1/draws-first-diff.tsv` is the baseline of
+  verdict and first difference per check, so later rounds report what moved.
+  Where they stop now:
+  - 14 checks at one row: 1.14d's `unit` row for object 2:5 (site
+    `0x004DC952`, no cel), which d2rs does not emit (row `unit-row-object`).
+  - 5 at the NPC speech balloon's frame (row 173, 1.14d 2 against 3). Over
+    23 recordings of the same start that frame is 2..6 at the same tick, so
+    it follows neither the tick nor the client update count (row
+    `balloon-frame`).
+  - `draws-a3-town-ama` at a splash cel (row 97, site `0x00473BD0`): the
+    update-count phase of the rain finding.
+  - the rest at the player's composite (shadow / file / dir, row 98, as
+    before) and camera origin while moving (walk, run).
+- The 1.14d side draws 60–72 frames by tick 73 under the draw-logging
+  recorder, depending on the open panel; whatever is keyed by drawn frames
+  moves with it.
+
+Running: pixel comparison of the 35 scenes on this merge. Open: the other
+three audio checks at Music Volume 100; the 117 needs_pc1 rows.
