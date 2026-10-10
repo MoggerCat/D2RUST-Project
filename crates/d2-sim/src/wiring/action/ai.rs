@@ -10,6 +10,7 @@
 //! ([`super::monsters`]) does not answer go to [`Pending`].
 
 use crate::game::Game;
+use crate::monsters::ai::skill_check::SkillCheckWorld;
 use crate::monsters::ai::{
     AiActs, AiModes, AiQuests, AiSkills, AiSummons, AiTargets, AiUnits, AiWorld, HireRow,
     ModeTarget, PortalNpc, QuestCall,
@@ -741,7 +742,22 @@ impl<X: Pending> AiActs for View<'_, X> {
         x: i32,
         y: i32,
     ) -> bool {
-        self.h.x.ai_skill_check(game, unit, skill, target, x, y)
+        // Spec: specs/monsters/ai.md §7.4. With the path provider the
+        // check runs on the rooms; without it the seam answers.
+        if self.h.paths.is_none() {
+            return self.h.x.ai_skill_check(game, unit, skill, target, x, y);
+        }
+        let t = self.h.tables.clone();
+        let w = SkillCheckView { v: &*self, game };
+        crate::monsters::ai::skill_check::skill_check(
+            &w,
+            &t.skills.skills,
+            unit,
+            skill,
+            target,
+            x,
+            y,
+        )
     }
     fn corpse_search(
         &mut self,
@@ -1140,5 +1156,70 @@ impl<X: Pending> View<'_, X> {
             return Some(false);
         }
         Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))
+    }
+}
+
+/// [`SkillCheckWorld`] over the rooms (`ai.md` §7.4). The placement tests
+/// of rules 4 and 5 (free point, DiabPrison) have no provider yet and
+/// answer "no", as the seam default does.
+struct SkillCheckView<'a, 'b, X: Pending> {
+    v: &'a View<'b, X>,
+    game: &'a Game,
+}
+
+impl<X: Pending> SkillCheckWorld for SkillCheckView<'_, '_, X> {
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.v.h.path_position(unit)
+    }
+    fn room(&self, unit: UnitId) -> Option<RoomId> {
+        self.game.lists.unit(unit).and_then(|e| e.room())
+    }
+    fn has_unit_flag(&self, unit: UnitId, bit: u32) -> bool {
+        self.v
+            .units
+            .get(unit)
+            .is_some_and(|r| r.flags & (1 << bit) != 0)
+    }
+    fn dead_or_dying(&self, unit: UnitId) -> bool {
+        self.v.units.is_dead(unit)
+    }
+    fn in_town(&self, room: RoomId) -> bool {
+        self.v.h.drlg.in_town(self.game, room)
+    }
+    fn pattern_free(&self, room: Option<RoomId>, unit: UnitId, x: i32, y: i32, mask: u16) -> bool {
+        let pattern = self
+            .v
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .map_or(0, |d| d.pattern);
+        !crate::path::collision::pattern_collides(&self.v.h.drlg, room, x, y, pattern, mask)
+    }
+    fn free_point_room(
+        &self,
+        _room: Option<RoomId>,
+        _unit: UnitId,
+        _p: (i32, i32),
+        _mask: u16,
+    ) -> Option<RoomId> {
+        None
+    }
+    fn line_clear(&self, from: (i32, i32), to: (i32, i32), room: RoomId, mask: u16) -> bool {
+        !crate::path::line::line_test(
+            &self.v.h.drlg,
+            Some(room),
+            crate::path::Point::new(from.0, from.1),
+            crate::path::Point::new(to.0, to.1),
+            mask,
+        )
+        .blocked()
+    }
+    fn room_at(&self, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
+        let near = self.room(unit)?;
+        self.v.h.drlg.find_room(self.game, near, x, y)
+    }
+    fn diab_prison_ok(&self, _room: Option<RoomId>, _target: Option<UnitId>) -> bool {
+        false
     }
 }

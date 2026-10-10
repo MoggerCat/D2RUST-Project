@@ -264,7 +264,17 @@ impl UseRest for LocalSeams {
     fn owns_skill(&self, _: UnitId, _: i32) -> bool {
         false
     }
-    fn set_used_skill(&mut self, _: UnitId, _: Option<SkillEntry>) {}
+    // Spec: specs/skills/use.md §5.3 (Charge start clears the used entry
+    // before a monster's attack mode request, `0x005CF6B0`): a monster's
+    // used skill is the AI's current skill.
+    fn set_used_skill(&mut self, u: UnitId, e: Option<SkillEntry>) {
+        match e {
+            None => self.monsters.clear_current(u),
+            Some(e) => {
+                self.monsters.set_current(u, e.skill);
+            }
+        }
+    }
     fn used_skill_flags(&self, u: UnitId) -> u32 {
         self.skills.unit(u).map_or(0, |s| s.used_flags)
     }
