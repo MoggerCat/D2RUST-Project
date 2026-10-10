@@ -1548,31 +1548,6 @@ impl Run {
             for _ in 0..200 {
                 self.step(1);
                 let m = self.mode();
-                if std::env::var_os("SMOKE_TRACE").is_some() {
-                    let g = key.guid;
-                    let sm = app_support::with(&self.server, move |l| {
-                        let h = &mut l.host_mut().game;
-                        let u = h
-                            .game
-                            .lists
-                            .find_unit(d2_sim::units::UnitType::Monster, g)?;
-                        Some(h.events.action.hooks().path_position(u))
-                    });
-                    let cm = self
-                        .app
-                        .world()
-                        .resource::<BridgeResource>()
-                        .0
-                        .world()
-                        .units
-                        .get(&key)
-                        .and_then(|u| u.position);
-                    eprintln!(
-                        "T mode {m} drawn {:?} server {:?} mon server {sm:?} model {cm:?}",
-                        self.drawn(),
-                        self.pos()
-                    );
-                }
                 if seen.last() != Some(&m) {
                     seen.push(m);
                 }
@@ -1605,7 +1580,6 @@ impl Run {
                     let r = sim.events.action.sys.units.get(m)?;
                     Some((r.class, r.mode, r.flags))
                 });
-                eprintln!("drawn {:?} server {:?}", self.drawn(), self.pos());
                 eprintln!(
                     "attack {:?} {mmode:?}: modes {seen:?}, life {:?}, player {:?}, monster {mp:?}, log {log:?} errors {errs}",
                     key.guid,
