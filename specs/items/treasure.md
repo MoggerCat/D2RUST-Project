@@ -33,19 +33,19 @@
 | Rules | 86–87 |
 |   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–355 |
-|   4. Chest drop (`0x00585B90`) | 356–382 |
-|   5. The TC walk (`0x0055A6D0`) | 383–489 |
-|   6. Drop quality (`0x00558640`) | 490–521 |
-|   7. Creation inputs and placement (`0x0055A550`) | 522–558 |
-|   8. Gold amount | 559–574 |
-|   9. Quest drop helper (`0x00559A30`) | 575–660 |
-| Constants & data dependencies | 661–690 |
-| Randomness | 691–712 |
-| Edge cases & original bugs | 713–736 |
-| Test vectors | 737–766 |
-| Provenance | 767–791 |
-| Open questions | 792–969 |
+|   3. Monster drop | 224–358 |
+|   4. Chest drop (`0x00585B90`) | 359–385 |
+|   5. The TC walk (`0x0055A6D0`) | 386–492 |
+|   6. Drop quality (`0x00558640`) | 493–524 |
+|   7. Creation inputs and placement (`0x0055A550`) | 525–561 |
+|   8. Gold amount | 562–577 |
+|   9. Quest drop helper (`0x00559A30`) | 578–663 |
+| Constants & data dependencies | 664–693 |
+| Randomness | 694–715 |
+| Edge cases & original bugs | 716–739 |
+| Test vectors | 740–769 |
+| Provenance | 770–794 |
+| Open questions | 795–972 |
 <!-- /index -->
 
 ## Summary

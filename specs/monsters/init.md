@@ -31,37 +31,37 @@
 |   3. Placement | 165–173 |
 |   4. Creation sequence after placement (`0x005B2A00`) | 174–329 |
 |   5. Monster type init (`0x00574250`) | 330–347 |
-|   6. Stats and skills (`0x00573CB0`) | 348–411 |
-|   7. Monster level | 412–427 |
-|   8. Base values from monlvl | 428–462 |
-|   9. Player-count bonus (`0x00573930`) | 463–474 |
-|   10. Components (`0x005739D0`) | 475–485 |
-|   11. monprop (`monprop.txt`) | 486–494 |
-|   12. monequip (`0x005D6B60`) | 495–511 |
-|   13. Classic scaling (`0x0063EEF0`) | 512–519 |
-|   14. Normal mods and boss mods | 520–621 |
-|   15. Party minions | 622–626 |
-|   16. Boss spawns | 627–662 |
-|   17. Choosing umods (`0x005A0760`) | 663–706 |
-|   18. Boss minions and umod init (`0x005A2120`) | 707–724 |
-|   19. Umod init functions | 725–817 |
-|   20. Superuniques (`0x005A49B0`) | 818–866 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 867–881 |
-|   22. Umod callbacks and the type-7 event | 882–933 |
-|   23. Unique names (client) | 934–943 |
-|   24. Monster assign message | 944–1000 |
-|   25. Calling the spawn functions outside population (tools) | 1001–1091 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1092–1151 |
-|   27. Class reinit (`0x00574370`) | 1152–1197 |
-| Constants & data dependencies | 1198–1219 |
-| Randomness | 1220–1264 |
-| Edge cases & original bugs | 1265–1296 |
-| Test vectors | 1297–1298 |
-|   Synthetic (CI-safe) | 1299–1321 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1322–1352 |
-|   Recorded checks (monster assign 0xAC) | 1353–1365 |
-| Provenance | 1366–1455 |
-| Open questions | 1456–1536 |
+|   6. Stats and skills (`0x00573CB0`) | 348–414 |
+|   7. Monster level | 415–430 |
+|   8. Base values from monlvl | 431–465 |
+|   9. Player-count bonus (`0x00573930`) | 466–477 |
+|   10. Components (`0x005739D0`) | 478–488 |
+|   11. monprop (`monprop.txt`) | 489–497 |
+|   12. monequip (`0x005D6B60`) | 498–514 |
+|   13. Classic scaling (`0x0063EEF0`) | 515–522 |
+|   14. Normal mods and boss mods | 523–624 |
+|   15. Party minions | 625–629 |
+|   16. Boss spawns | 630–665 |
+|   17. Choosing umods (`0x005A0760`) | 666–709 |
+|   18. Boss minions and umod init (`0x005A2120`) | 710–727 |
+|   19. Umod init functions | 728–820 |
+|   20. Superuniques (`0x005A49B0`) | 821–869 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 870–884 |
+|   22. Umod callbacks and the type-7 event | 885–936 |
+|   23. Unique names (client) | 937–946 |
+|   24. Monster assign message | 947–1003 |
+|   25. Calling the spawn functions outside population (tools) | 1004–1094 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1095–1154 |
+|   27. Class reinit (`0x00574370`) | 1155–1200 |
+| Constants & data dependencies | 1201–1222 |
+| Randomness | 1223–1267 |
+| Edge cases & original bugs | 1268–1299 |
+| Test vectors | 1300–1301 |
+|   Synthetic (CI-safe) | 1302–1324 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1325–1355 |
+|   Recorded checks (monster assign 0xAC) | 1356–1368 |
+| Provenance | 1369–1458 |
+| Open questions | 1459–1539 |
 <!-- /index -->
 
 ## Summary
