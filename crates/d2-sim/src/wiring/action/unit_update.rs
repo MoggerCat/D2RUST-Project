@@ -381,9 +381,20 @@ pub fn anim_complete(a: &Anim) -> bool {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// The frame advance `0x00623E00` of a monster (frame bonus 0:
+    /// `0x00623B10` is non-zero only for some player modes): the
+    /// sequence branch, else the plain one (`units.md` §4.2).
+    pub fn refresh_animation(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        if let Some(r) = sim.units.get_mut(unit) {
+            if !crate::units::anim::advance_sequence(&mut r.anim) {
+                crate::units::anim::advance_plain(&mut r.anim, 0);
+            }
+        }
+    }
+
     /// Mode DT's event-0 function `0x005A7350` (§7.7 rule 3): a monster
     /// of `monstats` base id 78 takes a path step (`0x00554CA0`),
-    /// refreshes its animation (`0x00623E00`, [`Pending::refresh_animation`])
+    /// refreshes its animation (`0x00623E00`, [`ActionHooks::refresh_animation`])
     /// and sets mode 12 only once its animation is complete
     /// ([`anim_complete`]); every other monster sets mode 12 at once.
     pub fn death_event0(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
@@ -404,7 +415,7 @@ impl<X: Pending> ActionHooks<X> {
                     v.h.x.step(sim.game, unit);
                 }
             }
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_animation(sim, unit);
             if !sim.units.get(unit).is_some_and(|r| anim_complete(&r.anim)) {
                 return;
             }

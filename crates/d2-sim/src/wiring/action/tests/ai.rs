@@ -273,6 +273,16 @@ fn attack_event0_of_a_moving_mode_strikes_only_at_its_trigger_frame() {
         let r = fx.sim.sys.units.get_mut(m).unwrap();
         r.mode = u32::from(mode::ATTACK1);
         r.anim.frame_count = 1 << 16;
+        // The refresh reads +0x4E from the AnimData bytes it crosses: one
+        // frame per event, bytes 2, 1, 3 at frames 1, 2, 3.
+        r.anim.speed = 256;
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        events[1..4].copy_from_slice(&[2, 1, 3]);
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 256,
+            byte_0f: 0,
+            events,
+        });
     }
     let x0 = fx.sim.sys.hooks.x.position(m).0;
     frame_events(&mut fx, m, &[2, 1, 3]);

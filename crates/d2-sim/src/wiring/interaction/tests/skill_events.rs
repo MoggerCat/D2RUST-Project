@@ -232,6 +232,7 @@ fn monster_attack_event0_runs_the_used_skills_do_on_every_event() {
         fx.frame();
     }
     assert_eq!(srvdo_count(&fx, AURA_DO), 3);
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 2);
+    // The frame advance after each do clears +0x4E (no record: no byte).
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 0);
     fx.assert_clean();
 }

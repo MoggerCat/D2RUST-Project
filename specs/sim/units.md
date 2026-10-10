@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1036 |
-|   5. Event dispatch | 1037–1051 |
-|   6. Events per kind | 1052–1174 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1175–1196 |
-|   8. Collision line between two units | 1197–1201 |
-| Constants & data dependencies | 1202–1218 |
-| Randomness | 1219–1226 |
-| Edge cases & original bugs | 1227–1247 |
-| Test vectors | 1248–1307 |
-| Provenance | 1308–1399 |
-| Open questions | 1400–1479 |
+|   4. Modes and mode schedules | 454–1046 |
+|   5. Event dispatch | 1047–1061 |
+|   6. Events per kind | 1062–1184 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1185–1206 |
+|   8. Collision line between two units | 1207–1211 |
+| Constants & data dependencies | 1212–1228 |
+| Randomness | 1229–1236 |
+| Edge cases & original bugs | 1237–1257 |
+| Test vectors | 1258–1317 |
+| Provenance | 1318–1409 |
+| Open questions | 1410–1489 |
 <!-- /index -->
 
 ## Summary
@@ -542,6 +542,16 @@ and nothing on the timer run writes +0x4E. Rule:
    (wrapping at +0x34); +0x48 −= +0x3C; `0x00621210(old pos)` reads the
    sequence frame: +0x44 := frame·256, +0x40 := mode, +0x4E := its
    event byte; mode changed → +0xC4 |= 0x4000.
+
+Callers that advance (rc-mon-fr, REC-2065, read 2026-10-10): the
+attack-family event 0 `0x005A7670` runs the advance only after a used
+skill's do (and never on the no-skill melee path of a non-moving mode,
+which only strikes); S3 `0x005A74A0`, KB `0x005A8630`, SQ `0x005A8670` and the
+stepping death run it after their step. The frame is not reset on the
+first event: a monster that enters A2 with +0x44 left past the count
+(1.14d `gen-mon-507`, 7936 against a count of 5120) wraps at the first
+advance (7936 + 208 − 5120 = 3024) and then moves only at event 0
+frames. d2rs: `units::anim::advance_plain`, frame bonus 0 for monsters.
 
 `0x006218D0(U, i)` (set +0x4E from E[i] when 1–4) has no callers.
 

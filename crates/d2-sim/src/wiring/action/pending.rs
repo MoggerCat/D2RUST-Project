@@ -1239,9 +1239,6 @@ pub trait Pending {
     fn monster_flag_100(&self, unit: UnitId) -> bool {
         false
     }
-    /// The animation refresh `0x00623E00` of the stepping death (§7.7
-    /// rule 3, base id 78; not specified).
-    fn refresh_animation(&mut self, game: &mut Game, unit: UnitId) {}
     /// The `monstats` `SplEndDeath` action of the death end (§7.7 rule
     /// 3): 1 → `0x00574370(game, unit, minion, 1)` then `0x00573780`; 2 →
     /// the kill `0x0057CCB0` of `0x00552FD0(unit)`. Neither callee is

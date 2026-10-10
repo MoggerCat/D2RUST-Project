@@ -4,7 +4,7 @@
 //! `0x00553DC0`) as a pure function of its inputs, and its application
 //! to the timer queue; the every-tick movement event (§4.4); the
 //! sequence branch of the frame advance `0x00623E00`
-//! ([`advance_sequence`]).
+//! ([`advance_sequence`]) and its plain branch ([`advance_plain`]).
 
 use thiserror::Error;
 
@@ -331,4 +331,90 @@ pub fn advance_sequence(anim: &mut Anim) -> bool {
         (b + 1..=a).rev().map(byte).find(|&e| e != 0).unwrap_or(0)
     };
     true
+}
+
+/// The plain branch of the frame advance `0x00623E00` (`units.md` §4.2
+/// "Frame advance and +0x4E", rule 2; REC-2065): +0x4E := 0; j = the
+/// current frame >> 8 (+ 1 when the speed is at least 256); the frame
+/// grows by the speed; while it is at or past the count F, the action
+/// bytes of the frames j .. F >> 8 are crossed (the last byte 1–4 wins),
+/// F is subtracted, j := 0 and the frame bonus b · 256 is added; then
+/// the bytes of j ..= frame >> 8 are crossed. Bytes past the 144 the
+/// record holds are not read. False (nothing done) with a sequence.
+pub fn advance_plain(anim: &mut Anim, bonus: i32) -> bool {
+    if anim.sequence.is_some() {
+        return false;
+    }
+    anim.action_frame = 0;
+    let events: &[u8] = anim.record.as_ref().map_or(&[], |r| &r.events[..]);
+    let mut seen = 0u8;
+    let mut cross = |from: i32, to_excl: i32| {
+        let mut j = from.max(0);
+        while j < to_excl && (j as usize) < ANIM_EVENTS {
+            if let Some(&e) = events.get(j as usize) {
+                if (1..=4).contains(&e) {
+                    seen = e;
+                }
+            }
+            j += 1;
+        }
+    };
+    let speed = i32::from(anim.speed);
+    let mut j = (anim.frame >> 8) + i32::from(speed >= 256);
+    let mut cur = anim.frame.wrapping_add(speed);
+    let count = anim.frame_count;
+    while cur >= count {
+        cross(j, count >> 8);
+        cur = cur.wrapping_sub(count);
+        j = 0;
+        cur = cur.wrapping_add(bonus << 8);
+        if count <= 0 {
+            break;
+        }
+    }
+    cross(j, (cur >> 8) + 1);
+    anim.frame = cur;
+    anim.action_frame = seen;
+    true
+}
+
+#[cfg(test)]
+mod plain_advance_tests {
+    use super::*;
+    use crate::units::record::AnimRecord;
+
+    fn anim(frame: i32, count: i32, speed: i16, events: &[(usize, u8)]) -> Anim {
+        let mut ev = [0u8; ANIM_EVENTS];
+        for &(i, e) in events {
+            ev[i] = e;
+        }
+        Anim {
+            frame,
+            frame_count: count,
+            speed,
+            record: Some(AnimRecord {
+                frames: (count >> 8) as u32,
+                byte_0f: 0,
+                events: ev,
+            }),
+            ..Anim::default()
+        }
+    }
+
+    // 1.14d gen-mon-507 (bloodlord2 A2): 7936 + 208 wraps over 5120 to 3024.
+    #[test]
+    fn wraps_past_the_count() {
+        let mut a = anim(7936, 5120, 208, &[(15, 1)]);
+        assert!(advance_plain(&mut a, 0));
+        assert_eq!(a.frame, 3024);
+        assert_eq!(a.action_frame, 0);
+    }
+
+    #[test]
+    fn last_action_byte_crossed_wins() {
+        let mut a = anim(256 * 5, 5120, 256 * 3, &[(6, 1), (7, 2), (9, 4)]);
+        assert!(advance_plain(&mut a, 0));
+        assert_eq!(a.frame, 256 * 8);
+        assert_eq!(a.action_frame, 2);
+    }
 }
