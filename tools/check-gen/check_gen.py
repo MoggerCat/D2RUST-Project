@@ -780,6 +780,9 @@ UI_SCENARIOS = [
 ]
 
 
+# Rows of other systems a UI scene reaches: the character panel draws text, so every
+# font glyph cel (CelDrawColor, facts-render.md r18) goes through the font.tbl reader.
+UI_EXTRA_ROWS = {"char": "system.formats.font-tbl."}
 UI_CHANNELS = {"beltuse": "packets", "walkclick": "packets"}
 UI_SAVE = {}
 
@@ -788,6 +791,9 @@ def ui_rows(ledger):
     """ledger areas system.ui.* -> {scenario name: [areas]}"""
     rows = {}
     for a, _ in ledger:
+        for name, prefix in UI_EXTRA_ROWS.items():
+            if a.startswith(prefix):
+                rows.setdefault(name, []).append(a)
         if not a.startswith("system.ui."):
             continue
         tail = a[len("system.ui."):]
@@ -811,7 +817,7 @@ def fam_ui(ctx):
                   (["draws-at %d" % at] if chans == "draws" else []) + lines,
                   comment=[f"UI scenario {name}: {title}; input `{inp or '(none)'}`. Compared: the "
                            "channel(s) named above (draws: the draw list of the last drawn tick <= draws-at). Ledger rows exercised: "
-                           + (", ".join(a[len("system.ui."):] for a in rows.get(name, [])) or "(none)") + "."])
+                           + (", ".join(a.replace("system.ui.", "", 1) for a in rows.get(name, [])) or "(none)") + "."])
         c.extra = {"scenario": name, "rows": rows.get(name, [])}
         out.append(c)
     return out
