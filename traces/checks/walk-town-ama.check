@@ -10,9 +10,8 @@ save ScnAma --class ama --expansion
 seed 1234
 ticks 80
 seconds 240
-channels state
+channels state packets
 input frame 10; click 600 300
-# known differences unrelated to the walk: the game seed order from frame 2
-# (seed, s, and the monsters' seed-driven tx/ty/hp), the player's fc / sp
-# not written by d2rs. The walk itself: state_diff.py ... --types 0.
-ignore seed s fc sp
+# Every field compared (rc-walk-town: equal on integ-r16 without the old
+# `ignore seed s fc sp`); packets compared too, so the C->S of the click
+# is checked against the d2rs client gap (scenario-diff.md open question 6).

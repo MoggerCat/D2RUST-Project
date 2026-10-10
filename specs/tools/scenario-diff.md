@@ -756,10 +756,10 @@ d2rs-own tool; no 1.14d fact.
    every channel of its checks is MATCH except a state channel whose
    only PARTIAL cause is the d2rs header's client gap (`state_dump.rs`
    `RUN_GAPS`: the headless bridge's C→S set), with every unit field of
-   both sides compared (no `ignore` line, nothing one-sided) and no
-   `input` or `send` line in the check (pokes only: the gap's condition,
-   a 1.14d client sending another message, would itself show as a
-   difference). The comparator's verdict stays PARTIAL (`state-
+   both sides compared (no `ignore` line, nothing one-sided), and either
+   no `input` or `send` line in the check (pokes only) or a packets
+   channel that MATCHes (its C→S stream equal: the gap's condition, a
+   1.14d client sending another message, did not occur). The comparator's verdict stays PARTIAL (`state-
    snapshot.md` §1 rule 1, §4 rule 5); settled by the coordinator's
    ledger rule, or by the bridge covering the 1.14d client's C→S set
    (the gap removed).
