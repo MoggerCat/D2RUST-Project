@@ -333,6 +333,10 @@ pub struct ActionHooks<X> {
     pub monster_world: Option<Box<dyn MonsterWorld<X>>>,
     /// The monster world is taken out for a call.
     monster_world_out: bool,
+    /// Mode-3 umod dispatches (`init.md` §22) asked while the monster world
+    /// was out (a umod callback's own damage): run when the outer dispatch
+    /// ends ([`ActionHooks::run_umods`]).
+    pub(super) deferred_umod_hits: Vec<UnitId>,
     /// The quest control lent by the host that holds it
     /// ([`objects::QuestObjectHost`]): a quest init, operate or object
     /// event 7 the object module hands back runs on it at once, inside the
@@ -396,6 +400,10 @@ pub struct ActionHooks<X> {
     /// with a player owner, called only by the hireling init): the units whose
     /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
     pub hireling_units: std::collections::BTreeSet<UnitId>,
+    /// The removal notices (type, GUID) of units freed outside the tick's
+    /// steps ([`LifecycleHooks::queue_removal_notice`]), sent by the next
+    /// per-client update.
+    pub removal_notices: Vec<(u8, u32)>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -557,6 +565,7 @@ impl<X> ActionHooks<X> {
             monster_request: 0,
             monster_world: None,
             monster_world_out: false,
+            deferred_umod_hits: Vec::new(),
             vision_seen: BTreeMap::new(),
             quest_host: None,
             quest_host_out: false,
@@ -573,6 +582,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             hireling_units: std::collections::BTreeSet::new(),
+            removal_notices: Vec::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),

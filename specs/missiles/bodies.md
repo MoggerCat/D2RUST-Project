@@ -37,30 +37,30 @@
 |   10. Server-hit 36 missile in air `0x005ABF70` | 338–354 |
 |   11. Server-hit 10 Guided Arrow, Bone Spirit `0x005AA650` | 355–397 |
 |   12. Server-hit 16 Spider goo, vines trail, vines wither `0x005AAE10` | 398–426 |
-|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 427–446 |
-|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 447–461 |
-|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 462–481 |
-|   16. Server-hit 52 Blade Fury `0x005AC940` | 482–500 |
-|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 501–529 |
-|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 530–546 |
-|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 547–603 |
-|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 604–616 |
-|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 617–627 |
-|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 628–647 |
-|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 648–664 |
-|   24. Server-hit 8 Blaze `0x005AA180` | 665–676 |
-|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 677–714 |
-|   26. Server-do 9 bat lightning bolt `0x005AE940` | 715–726 |
-|   27. Server-hit 15 spider goo lay `0x005AAD40` | 727–736 |
-|   28. Server-hit 17 Howl `0x005AAFB0` | 737–753 |
-|   29. Server-do 11 finger mage spider `0x005AEB60` | 754–773 |
-|   30. Server-hit 19 finger mage spider `0x005AB110` | 774–784 |
-| Constants & data dependencies | 785–829 |
-| Randomness | 830–848 |
-| Edge cases & original bugs | 849–878 |
-| Test vectors | 879–907 |
-| Provenance | 908–938 |
-| Open questions | 939–959 |
+|   13. Server-hit 18 Shout, Battle Command, Battle Orders `0x005AB0B0` | 427–444 |
+|   14. Server-hit 26 Grim Ward start `0x005AB8D0` | 445–459 |
+|   15. Server-do 14 Grim Ward `0x005AEF70`, server-hit 27 `0x005ABA00` | 460–479 |
+|   16. Server-hit 52 Blade Fury `0x005AC940` | 480–498 |
+|   17. Server-hit 7 Holy Bolt, Fist of the Heavens bolt `0x005A9FB0` | 499–527 |
+|   18. Server-do 22 lightning trailing javelin `0x005AF620` | 528–544 |
+|   19. Server-hit 45 lightning trailing javelin `0x005AC480`, server-hit 38 catapult charged ball `0x005AC0A0` | 545–601 |
+|   20. Server-do 23 / 24 Succubus fireball, firestorm maker `0x005AF790` | 602–614 |
+|   21. Server-do 26 Vines, Plague Vines `0x005AF980` | 615–625 |
+|   22. Server-do 31 Wake of Destruction maker, Baal cold maker `0x005B01F0` | 626–645 |
+|   23. Server-hit 56 Armageddon / Diablogeddon control `0x005ACC50` | 646–662 |
+|   24. Server-hit 8 Blaze `0x005AA180` | 663–674 |
+|   25. Server-hit 9 Immolation Arrow `0x005AA250` | 675–712 |
+|   26. Server-do 9 bat lightning bolt `0x005AE940` | 713–724 |
+|   27. Server-hit 15 spider goo lay `0x005AAD40` | 725–734 |
+|   28. Server-hit 17 Howl `0x005AAFB0` | 735–751 |
+|   29. Server-do 11 finger mage spider `0x005AEB60` | 752–771 |
+|   30. Server-hit 19 finger mage spider `0x005AB110` | 772–782 |
+| Constants & data dependencies | 783–827 |
+| Randomness | 828–846 |
+| Edge cases & original bugs | 847–876 |
+| Test vectors | 877–905 |
+| Provenance | 906–936 |
+| Open questions | 937–957 |
 <!-- /index -->
 
 ## Summary
@@ -429,15 +429,13 @@ a later contact, finding the list, fills them and pushes the expiry.
 Rows: shout (149), battlecommand (236), battleorders (237).
 
 1. O = owner; none → return 1.
-2. Unit given and the ally test `0x00554DE0(game, O, unit)` passes
+2. Unit given and the ally test `0x00554DE0(game, O, unit)` passes (a
+   monster stands for its minion owner `0x0058F0D0` first; the same unit
+   after that is an ally, so the Shout / Battle Orders / Battle Command
+   ring also hits the caster, 1.14d `bar-shout` frame 29)
    (`skills/bodies.md` §2.11 flag 0x10000) → `shout_state(game, unit, O,
    skill, level)` (`0x005D8290`, `skills/bodies.md` §6.8).
 3. Return 0.
-
-1.14d `bar-shout` frame 29: the 64 ring missiles meet the caster itself
-(shout has no `LastCollide`; the ally test passes for the same unit), so
-`shout_state` runs on the caster a second time and the update after the
-cast sends 0xA8 of the shout state again (same bytes as frame 28).
 
 Result 0: the missile flies on through every unit (`CollideFriend` 1 on
 all three). shout has no `LastCollide`, so a unit standing in its path

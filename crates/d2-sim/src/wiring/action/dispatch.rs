@@ -610,6 +610,14 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             return;
         };
         let (guid, refresh) = (r.guid, r.flags2 & INVENTORY_REFRESH_EX != 0);
+        // The removal notices of the units the host freed (`0x0053A770`;
+        // PROVISIONAL REC-3374: sent here, to every player, once).
+        for (ty, g) in std::mem::take(&mut self.sys.hooks.removal_notices) {
+            let m = crate::units::messages::remove_unit(ty, g);
+            for q in game.lists.units_of_type(UnitType::Player) {
+                self.sys.hooks.x.send(q, &m);
+            }
+        }
         let msgs = vitals_sync::mod_stat_messages(&self.sys.stats.mod_values(p));
         for m in &msgs {
             self.send_after_items(p, m);

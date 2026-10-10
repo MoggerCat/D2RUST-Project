@@ -358,6 +358,35 @@ pub fn sync<R, S>(_: &Game, sim: &mut WorldSim<LocalSeams>, world: &mut WiredWor
             w.hands.insert(owner, hands);
         }
     }
+    // A monster's equipment (`monsters/init.md` §12): its hands, so the
+    // missile damage set-up finds the weapon the monster wields
+    // (`missiles/damage.md` §1 step 6, `0x00622830`: gen-boss-267, Blood
+    // Raven's bow: base damage from stats 23 / 24 for a grip of 2).
+    // PROVISIONAL (REC-3270; d2rs-own, unverified): the weapon pick
+    // `0x0063C9B0` read as the right-hand item with a hand class.
+    for (&owner, held) in &sim.action.sys.hooks.monster_equip {
+        let mut hands = Hands::default();
+        for (&loc, &item) in held {
+            let slot = match loc {
+                body::RIGHT_HAND => &mut hands.right,
+                body::LEFT_HAND => &mut hands.left,
+                _ => continue,
+            };
+            let Some(record) = sim.action.sys.units.get(item).map(|u| u.class as usize) else {
+                continue;
+            };
+            *slot = Some(item);
+            w.items.insert(item, facts_of(&inv.tables, record));
+        }
+        hands.weapon = hands.right.filter(|r| {
+            w.items
+                .get(r)
+                .is_some_and(|f| f.class != class::HAND_TO_HAND)
+        });
+        if hands.right.is_some() || hands.left.is_some() {
+            w.hands.insert(owner, hands);
+        }
+    }
     // Monsters with a usable shield (`0x006225F0`, `combat/hit.md` §5).
     let mut shielded = std::collections::BTreeSet::new();
     if let Some(looks) = sim.action.sys.hooks.x.looks.clone() {

@@ -41,7 +41,10 @@ pub struct ExportContext<'a> {
     /// minus this (§5 r16).
     pub color_rows: Option<MapId>,
     /// `WorldFrame::ui_calls`: a UI cel's op (§5 r18).
-    pub ui_calls: &'a [crate::ui::draw::CelCall],
+    pub ui_calls: &'a [crate::ui::draw::UiCelInfo],
+    /// The act's text-colour maps (`ViewAssets::text_colors`): a glyph's
+    /// colour index `k` is the position + 1 of its shade map.
+    pub text_maps: &'a [MapId],
 }
 
 /// The frame-set path prefix of the UI rectangles
@@ -160,6 +163,45 @@ fn unit_row(
         }
     }
     *last_run = Some((tag, shadow, slot));
+}
+
+/// §5 r18 / `facts-render.md` §2 r3: the `mode light pal` cells (12–14)
+/// of a UI cel by its wrapper's arguments: `CelDraw` and `CelDrawColor`
+/// (X, Y, light 0xFF, mode, palette / colour index), `CelDrawEx` (X, Y,
+/// skip, lines, mode) and `CelDrawClipped` (X, Y, clip, mode) carry no
+/// light and no palette (`-`).
+fn ui_cells(
+    info: &crate::ui::draw::UiCelInfo,
+    item: &DrawItem,
+    text: &[MapId],
+    row: &mut [String],
+) {
+    use crate::ui::draw::CelCall;
+    let k = if info.text {
+        // The glyph's colour: its text map's position + 1, else 0.
+        Some(
+            item.shade
+                .maps()
+                .iter()
+                .find_map(|m| text.iter().position(|t| t == m))
+                .map_or(0, |p| p as i32 + 1),
+        )
+    } else {
+        info.pal
+    };
+    let pal = k.map_or_else(|| UNKNOWN.to_owned(), |k| k.to_string());
+    match info.call {
+        CelCall::Draw | CelCall::Color => {
+            row[12] = info.mode.to_string();
+            row[13] = "0xffffffff".into();
+            row[14] = pal;
+        }
+        CelCall::Ex | CelCall::Clipped => {
+            row[12] = info.mode.to_string();
+            row[13] = NA.into();
+            row[14] = NA.into();
+        }
+    }
 }
 
 /// §5 r15: a cel call without pixels (a component file in no archive):
@@ -293,7 +335,7 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                     ItemTag::Ui(i) => cx
                         .ui_calls
                         .get(i as usize)
-                        .map_or(op(false, item), |c| c.op()),
+                        .map_or(op(false, item), |c| c.call.op()),
                     _ => op(false, item),
                 }
                 .into();
@@ -337,6 +379,11 @@ pub fn draw_rows(items: &[DrawItem], cx: &ExportContext<'_>) -> Result<Rows, Fac
                 row[8..12].clone_from_slice(&size);
                 for cell in &mut row[12..15] {
                     *cell = UNKNOWN.into();
+                }
+                if let ItemTag::Ui(i) = item.tag {
+                    if let Some(info) = cx.ui_calls.get(i as usize) {
+                        ui_cells(info, item, cx.text_maps, &mut row);
+                    }
                 }
                 sprites.insert((row[2].clone(), u32::from(d), index), size);
             }
@@ -395,6 +442,16 @@ pub fn add_cycle_rows(rows: &mut Rows, blank_screen: bool, clear_after: bool) {
     }
 }
 
+/// The `frame.tsv` input cells d2rs has: the player's client position
+/// (the camera anchor), the light quality replayed from the frame schedule
+/// (a host input), the level's `Rain` / `Mud` flags.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FrameInputs {
+    pub player: Option<(i32, i32)>,
+    pub light_quality: Option<u8>,
+    pub weather: Option<(bool, bool)>,
+}
+
 /// The `frame.tsv` values d2rs knows (§5 r7–r8).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrameState {
@@ -406,6 +463,9 @@ pub struct FrameState {
     pub level: Option<u16>,
     pub camera: Option<Camera>,
     pub open_mode: Option<u8>,
+    /// The inputs of the frame d2rs runs on (`frame.tsv` `player_x`,
+    /// `player_y`, `light_quality`, `rain`, `snow`).
+    pub inputs: FrameInputs,
     pub draws: usize,
     pub index_sha256: Option<String>,
     pub palette_sha256: String,
@@ -429,6 +489,11 @@ pub fn frame_rows(s: &FrameState) -> Vec<Vec<String>> {
             "unit_origin_y" => opt(cam.map(|c| i64::from(c.unit.y))),
             "open_mode" => opt(s.open_mode.map(i64::from)),
             "shift_x" => opt(cam.map(|c| i64::from(c.view.shift_x))),
+            "player_x" => opt(s.inputs.player.map(|p| i64::from(p.0))),
+            "player_y" => opt(s.inputs.player.map(|p| i64::from(p.1))),
+            "light_quality" => opt(s.inputs.light_quality.map(i64::from)),
+            "rain" => opt(s.inputs.weather.map(|w| i64::from(w.0))),
+            "snow" => opt(s.inputs.weather.map(|w| i64::from(w.1))),
             "draws" => s.draws.to_string(),
             "index_sha256" => s.index_sha256.clone().unwrap_or_else(|| UNKNOWN.into()),
             "palette_sha256" => s.palette_sha256.clone(),
@@ -498,6 +563,7 @@ pub struct DumpFrame<'a> {
     pub blank_screen: bool,
     pub open_mode: Option<u8>,
     pub seq: u64,
+    pub inputs: FrameInputs,
 }
 
 /// Writes the three files of `d` (and with `req.image` the frame's
@@ -519,6 +585,11 @@ pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), Fact
         unit_calls: &d.frame.unit_calls,
         color_rows: d.assets.color_rows,
         ui_calls: &d.frame.ui_calls,
+        text_maps: d
+            .assets
+            .text_colors
+            .as_ref()
+            .map_or(&[][..], |t| &t.maps[..]),
     };
     // §5 r12: the drawer calls without pixels join the items by key.
     let mut all = d.frame.items.clone();
@@ -559,6 +630,7 @@ pub fn dump(req: &DumpRequest, dir: &Path, d: &DumpFrame<'_>) -> Result<(), Fact
         level: d.world.local_room().map(|r| r.level),
         camera: d.frame.camera,
         open_mode: d.open_mode,
+        inputs: d.inputs,
         draws: rows.draws.len(),
         index_sha256: Some(index),
         palette_sha256: sha256_hex(&palette),

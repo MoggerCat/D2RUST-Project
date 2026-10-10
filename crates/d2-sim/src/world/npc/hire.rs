@@ -409,15 +409,14 @@ impl NpcControl {
             send_code(w, player, code::REFUSED, u32::MAX);
             return 0;
         };
-        // Step 2, d2rs policy (edge case 11; `hirelings.md` §9 rule 3,
-        // edge case 5): 1.14d does not test the dead bit and revives (and
-        // frees) a living hireling; a living node is answered like a
-        // missing one, before the cost. The `(7, 1)` node is living
-        // exactly when `(7, 0)` returns the same unit.
-        if w.pet(player, PET_HIRELING, 0) == Some(merc) {
-            send_code(w, player, code::REFUSED, u32::MAX);
-            return 0;
-        }
+        // Step 2: 1.14d does not test the dead bit (edge case 11): a living
+        // hireling is revived (and freed) too, as the 1.14d recordings of
+        // `traces/checks/hire-resurrect-*.check` show (the unit removal, the
+        // pet removal records and 0x9B at frame 86 of a hireling whose life
+        // was poked to 0).
+        // A living hireling is the node `(7, 0)` that revive's rule 3 frees,
+        // so the tail reads its GUID from the freed record (−1).
+        let freed = w.pet(player, PET_HIRELING, 0) == Some(merc);
         let cost = resurrect_cost(w.stat(merc, stat::LEVEL));
         if !w.pay(player, cost) {
             send_code(w, player, code::NO_GOLD, u32::MAX);
@@ -429,7 +428,7 @@ impl NpcControl {
         w.set_stat(merc, stat::LIFE, max);
         w.revive_mercenary(player, merc);
         w.send(player, &resurrect_message());
-        let mg = w.guid(merc);
+        let mg = if freed { u32::MAX } else { w.guid(merc) };
         send_code(w, player, code::MERC, mg);
         0
     }

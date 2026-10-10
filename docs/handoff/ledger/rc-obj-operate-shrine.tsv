@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+shrine.17.portal-to-unknown	entity	world	shrines.txt row 17 Portal to unknown (Magic)	specs/world/objects.md	draft	gen-shrine-17	PARTIAL	yes	15	n	-	EQUAL	-	rc-obj-operate: gen-shrine-17 packets MATCH, state PARTIAL only by the RUN_GAPS client gap (DECIDED REC-2055/2056); fixed: portal creation in a town room is refused with sound 0x18 on the player (0x0056D130) and the real host now has the free-spot seam (0x0064E7B0)
