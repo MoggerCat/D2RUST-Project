@@ -1033,13 +1033,13 @@ def fam_qkill(ctx):
         for r in dict.fromkeys(refs):
             lines.append(f"at 50 poke stat @1:{r} 6 0 256")
         for i in range(len(parts)):
-            lines.append(f"at 54 poke missile 58 @x @y @x+{4 + 3 * i} @y+4")
+            lines.append(f"at 54 poke missile 36 @x @y @x+{4 + 3 * i} @y+4 skill 36 30")
         c = Check(f"gen-qkill-{slug_}", "qkill", "quest monster " + slug_,
                   f"quest monster {slug_} spawned and killed", "ScnAma --class ama --expansion",
                   180, 360, "state", BM + SEEDS + lines, variant="blood-moor-empty",
                   comment=[f"Quest monster {slug_} ({', '.join(f'{k} {n}' for k, n in parts)}) "
                            "spawned next to the player in the empty Blood Moor, life set to 1 "
-                           "at frame 50, hit by a missile at frame 54; the state channel compares "
+                           "at frame 50, hit by a Fire Bolt missile (skill 36, level 30) at frame 54; the state channel compares "
                            "death, corpse, drops and quest-record effects frame by frame."])
         c.extra = {"area": f"monster.quest.{slug_}"}
         out.append(c)
