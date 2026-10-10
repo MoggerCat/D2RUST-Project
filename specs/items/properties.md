@@ -26,22 +26,22 @@
 |   2. Modes (`0x0065FEC0`, D2MOO `ITEMMODS_AssignProperty`) | 84–117 |
 |   3. Dispatcher (`0x0065FD70`; wrapper `0x0065FE10` for format ≥ 1) | 118–127 |
 |   4. Shared helpers | 128–181 |
-|   5. Property functions | 182–253 |
-|   6. Superior (mode 1) and affixes (mode 0) | 254–258 |
-|   7. Uniques (mode 3) | 259–262 |
-|   8. Set items | 263–273 |
-|   9. Socket fillers (`0x0055C2C0`) | 274–293 |
-|   10. Runewords | 294–352 |
-|   11. Set bonuses (`0x00660120`) | 353–365 |
-|   12. Craft property lists (`0x00660240`) | 366–372 |
-|   13. Set-item state update (`0x00663CC0`) | 373–435 |
-|   14. Format-0 property functions (legacy table `0x00745B58`) | 436–503 |
-| Constants & data dependencies | 504–513 |
-| Randomness | 514–519 |
-| Edge cases & original bugs | 520–529 |
-| Test vectors | 530–548 |
-| Provenance | 549–568 |
-| Open questions | 569–658 |
+|   5. Property functions | 182–255 |
+|   6. Superior (mode 1) and affixes (mode 0) | 256–260 |
+|   7. Uniques (mode 3) | 261–264 |
+|   8. Set items | 265–275 |
+|   9. Socket fillers (`0x0055C2C0`) | 276–295 |
+|   10. Runewords | 296–354 |
+|   11. Set bonuses (`0x00660120`) | 355–367 |
+|   12. Craft property lists (`0x00660240`) | 368–374 |
+|   13. Set-item state update (`0x00663CC0`) | 375–437 |
+|   14. Format-0 property functions (legacy table `0x00745B58`) | 438–505 |
+| Constants & data dependencies | 506–515 |
+| Randomness | 516–521 |
+| Edge cases & original bugs | 522–531 |
+| Test vectors | 532–550 |
+| Provenance | 551–570 |
+| Open questions | 571–660 |
 <!-- /index -->
 
 ## Summary

@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–354 |
-|   5. The d2rs side (`d2-sim::poke`) | 355–426 |
-|   6. `goto`: walking to a target | 427–506 |
-| Constants & data dependencies | 507–522 |
-| Randomness | 523–529 |
-| Edge cases & original bugs | 530–557 |
-| Test vectors | 558–585 |
-| Provenance | 586–596 |
-| Open questions | 597–604 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–424 |
+|   6. `goto`: walking to a target | 425–504 |
+| Constants & data dependencies | 505–520 |
+| Randomness | 521–527 |
+| Edge cases & original bugs | 528–555 |
+| Test vectors | 556–583 |
+| Provenance | 584–594 |
+| Open questions | 595–602 |
 <!-- /index -->
 
 ## Summary
