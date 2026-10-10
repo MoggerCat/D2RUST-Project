@@ -179,6 +179,96 @@ impl WorldViewState {
     }
 }
 
+/// A check run's recorded frame schedule (`play --frame-schedule`,
+/// `specs/tools/scenario-diff.md` §3 r7.5): the client updates on which
+/// 1.14d drew a frame, each with the host clock (`GetTickCount()`) of the
+/// frame's cursor step, and the cursor timers at the first frame. With a
+/// schedule the world view draws exactly those ticks (one frame each) and
+/// nothing between them; the host clock and the frame schedule are
+/// recorded inputs, not game behaviour.
+#[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
+pub struct FrameSchedule {
+    /// Drawn tick → the clock of its cursor step (`None`: not recorded,
+    /// allowed for the last frame only: its step follows the dump).
+    pub frames: std::collections::BTreeMap<u64, Option<u32>>,
+    /// `last_step` and `idle_since` of the cursor at the first frame.
+    pub cursor_last: u32,
+    pub cursor_idle: u32,
+    /// The schedule was applied (cursor timers, weather replay off).
+    pub started: bool,
+}
+
+impl FrameSchedule {
+    /// Parses the `frame-schedule 1` text: `# frame-schedule 1`, `#
+    /// cursor_last N`, `# cursor_idle N`, a `tick\tnow` header, then one
+    /// row per drawn frame (`now` `-` when not recorded).
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let mut s = FrameSchedule::default();
+        let (mut version, mut last, mut idle) = (false, None, None);
+        for (n, line) in text.lines().enumerate() {
+            let at = |m: &str| format!("frame schedule line {}: {m}", n + 1);
+            if let Some(h) = line.strip_prefix('#') {
+                let mut w = h.split_whitespace();
+                match (w.next(), w.next()) {
+                    (Some("frame-schedule"), Some("1")) => version = true,
+                    (Some("cursor_last"), Some(v)) => {
+                        last = Some(v.parse().map_err(|_| at("cursor_last"))?)
+                    }
+                    (Some("cursor_idle"), Some(v)) => {
+                        idle = Some(v.parse().map_err(|_| at("cursor_idle"))?)
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+            if line.trim().is_empty() || line.starts_with("tick") {
+                continue;
+            }
+            let mut c = line.split('\t');
+            let tick: u64 = c
+                .next()
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| at("tick"))?;
+            let now = match c.next() {
+                Some("-") => None,
+                Some(v) => Some(v.parse().map_err(|_| at("now"))?),
+                None => return Err(at("no now column")),
+            };
+            s.frames.insert(tick, now);
+        }
+        if !version {
+            return Err("frame schedule: no `# frame-schedule 1` line".into());
+        }
+        s.cursor_last = last.ok_or("frame schedule: no cursor_last")?;
+        s.cursor_idle = idle.ok_or("frame schedule: no cursor_idle")?;
+        let last_tick = s.frames.keys().next_back().copied();
+        if let Some(t) = s
+            .frames
+            .iter()
+            .find(|(t, now)| now.is_none() && Some(**t) != last_tick)
+            .map(|(t, _)| *t)
+        {
+            return Err(format!(
+                "frame schedule: drawn tick {t} has no recorded host clock (only the last frame may lack it)"
+            ));
+        }
+        if s.frames.is_empty() {
+            return Err("frame schedule: no drawn frame".into());
+        }
+        Ok(s)
+    }
+
+    /// Whether 1.14d drew a frame on `tick`.
+    pub fn drawn(&self, tick: u64) -> bool {
+        self.frames.contains_key(&tick)
+    }
+
+    /// The host clock of `tick`'s cursor step.
+    pub fn now(&self, tick: u64) -> Option<u32> {
+        self.frames.get(&tick).copied().flatten()
+    }
+}
+
 /// `play --dump-draws` (`specs/tools/facts-render.md` §5): the facts of
 /// the first drawn frame at or after the requested server tick, then the
 /// app exits. Reads the built frame only.
@@ -450,7 +540,8 @@ pub fn deliver_outputs(
     if let (Some(ui), Some(mut s)) = (original, state) {
         let calls = ui.take_overlay_calls();
         if !calls.is_empty() {
-            s.missiles.overlay_calls(calls);
+            let tick = bridge.0.world().server_ticks;
+            s.missiles.overlay_calls(tick, calls);
         }
     }
     if let Some(mut s) = sounds {
@@ -941,10 +1032,33 @@ fn world_view_frame(
     mut dump: Option<ResMut<DrawDump>>,
     mut drawn: Option<ResMut<crate::bridge::mirror::DrawnTick>>,
     mut exit: MessageWriter<AppExit>,
+    mut schedule: Option<ResMut<FrameSchedule>>,
 ) -> Result {
     let tick = bridge.0.world().server_ticks;
     if tick == 0 {
         return Ok(());
+    }
+    // A check run's recorded frame schedule (`tools/scenario-diff.md` §3
+    // r7.5): a tick 1.14d drew no frame on is a client update without a
+    // frame here too: no draw, no weather update, no cursor step.
+    let mut ui = ui;
+    if let Some(s) = schedule.as_deref_mut() {
+        if !s.started {
+            s.started = true;
+            state.feed.follow_frame_schedule();
+            if let Some(o) = ui.as_mut().and_then(|u| u.original.as_mut()) {
+                o.set_cursor_timers(s.cursor_last, s.cursor_idle);
+            }
+        }
+        if let Some(o) = ui.as_mut().and_then(|u| u.original.as_mut()) {
+            o.set_host_now(s.now(tick));
+        }
+        if !s.drawn(tick) {
+            if let Some(d) = drawn.as_deref_mut() {
+                d.0 = tick;
+            }
+            return Ok(());
+        }
     }
     // A new server tick is drawn; the previous GPU frame is the base of
     // this one: commit its indices first, or draw on a later pass.
@@ -975,9 +1089,9 @@ fn world_view_frame(
     // The frame's one camera, once the UI has set this frame's open mode.
     let mut placed = None;
     let mut hover_mouse: Option<(i32, i32)> = None;
-    let ui_frame = match ui {
-        Some(mut ui) => {
-            let ui = &mut *ui;
+    let ui_frame = match ui.as_mut() {
+        Some(ui) => {
+            let ui = &mut **ui;
             if let Some(o) = ui.original.as_mut() {
                 o.set_frame_anchor(anchor);
                 o.set_palette(&state.assets.palette);
@@ -1255,6 +1369,21 @@ fn world_view_frame(
     }
     let draws = ui_frame.as_ref().map_or(&[][..], |f| &f.draws[..]);
     state.feed.prepare(bridge.0.world(), &mut state.assets)?;
+    // `client/model.md` Randomness r4: the frame's cursor step draws on
+    // the client seed after its weather update (`ui/panels-3.md` §23 r8).
+    // With a schedule, a drawn frame without a recorded clock is the last
+    // one only (`FrameSchedule::parse`): its step follows the dump.
+    let step_now = schedule.as_ref().map(|s| s.now(tick));
+    if !matches!(step_now, Some(None)) {
+        if let Some(o) = ui.as_mut().and_then(|u| u.original.as_mut()) {
+            o.cursor_step(bridge.0.world())
+                .map_err(|e| super::ViewError::Unresolved {
+                    what: "cursor step",
+                    spec: "ui/panels-3.md",
+                    message: e.to_string(),
+                })?;
+        }
+    }
     // `render/lighting.md` §6.4: the drawn frame's pass over the client's
     // kept light list (§6.3), held by the model between frames.
     let feed = &mut state.feed;
@@ -1620,5 +1749,30 @@ mod click_sound_tests {
             ]
         );
         assert!(click_sounds(None, &outs).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod schedule_tests {
+    use super::FrameSchedule;
+
+    // Covers: specs/tools/scenario-diff.md §3 r7
+    #[test]
+    fn a_recorded_schedule_parses_and_a_missing_clock_fails_loudly() {
+        let text = "# frame-schedule 1\n# cursor_last 0\n# cursor_idle 6402500\n\
+                    tick\tnow\n3\t6403156\n5\t6403281\n6\t-\n";
+        let s = FrameSchedule::parse(text).unwrap();
+        assert_eq!((s.cursor_last, s.cursor_idle), (0, 6_402_500));
+        assert!(s.drawn(3) && !s.drawn(4) && s.drawn(5) && s.drawn(6));
+        assert_eq!(
+            (s.now(3), s.now(5), s.now(6)),
+            (Some(6_403_156), Some(6_403_281), None)
+        );
+        // Only the last frame may lack its clock; no version, no timers:
+        // refused, never a fallback clock.
+        let gap = text.replace("3\t6403156", "3\t-");
+        assert!(FrameSchedule::parse(&gap).is_err());
+        assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
+        assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
     }
 }

@@ -323,6 +323,9 @@ pub struct PlayConfig {
     /// `--sound-log FILE` (`specs/tools/facts-render.md` §5 r20): every
     /// sound request call written to FILE.
     pub sound_log: Option<std::path::PathBuf>,
+    /// `--frame-schedule FILE` (`specs/tools/scenario-diff.md` §3 r7.5): the
+    /// recorded frame schedule and host clock a check run follows.
+    pub frame_schedule: Option<crate::world_view::present::FrameSchedule>,
     /// `--audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md`
     /// §3): the audio engine runs without a device, driven tick by tick by
     /// the dump; exit once the server tick reaches N.
@@ -707,6 +710,9 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
     if let Some(request) = config.dump {
         app.insert_resource(crate::world_view::present::DrawDump::new(request))
             .insert_resource(crate::bridge::mirror::DrawnTick::default());
+    }
+    if let Some(s) = config.frame_schedule {
+        app.insert_resource(s);
     }
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))
