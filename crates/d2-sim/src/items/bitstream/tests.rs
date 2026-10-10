@@ -468,8 +468,8 @@ fn unidentified_record_ends_after_type_values() {
     i.main = Some(vec![e(19, 0, 1)]);
     let mut w = BitWriter::new(BUFFER);
     write_into(&mut w, &i, &t);
-    // Not shown: no lists; the socket count (4 bits) stays (recorded).
-    assert_eq!(w.bit_len(), 108 + 8 + 9 + 4);
+    // Socketed cleared (not shown): no sockets, no lists.
+    assert_eq!(w.bit_len(), 108 + 8 + 9);
 }
 
 /// Edge case 5: stat 326 writes only its 9-bit id (no param, no value),
