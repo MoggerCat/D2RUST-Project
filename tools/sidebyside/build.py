@@ -704,7 +704,8 @@ def main():
         stop = os.environ.get("SBS_STOP_MARK")  # slow host: record only up to this mark
         if stop and f"mark {stop};" in g["script"]:
             g = dict(g, script=g["script"].split(f"mark {stop};")[0] + f"mark {stop}; waitticks 5; end")
-        scenes = [s for s in g["scenes"] if not only or s in only]
+        scenes = [s for s in g["scenes"] if (not only or s in only)
+                  and (not stop or f"mark {g['scenes'][s][0]};" in g["script"])]
         if not scenes:
             continue
         cap = record_orig(name, g, os.path.join(out, "orig", name), a.reuse)
