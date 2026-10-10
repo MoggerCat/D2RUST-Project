@@ -608,6 +608,9 @@ impl Predict {
             self.path.stamp_others(t, drlg, &self.others, &self.objects);
             if !self.path.request(t, drlg, speeds, own, to, walk.run) {
                 // No path: the server's request stands still too.
+                if std::env::var_os("SMOKE_TRACE").is_some() {
+                    eprintln!("DBG no path {walk:?} from {cell:?} target {target:?}");
+                }
                 self.walk = None;
                 self.path_for = None;
                 return true;
@@ -625,6 +628,9 @@ impl Predict {
         if moving {
             self.path_for = self.at.map(|a| (walk, a));
         } else {
+            if std::env::var_os("SMOKE_TRACE").is_some() {
+                eprintln!("DBG path done {walk:?} at {:?} target {target:?}", self.at);
+            }
             self.walk = None;
             self.path_for = None;
         }
