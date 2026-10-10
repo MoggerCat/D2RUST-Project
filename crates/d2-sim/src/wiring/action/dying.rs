@@ -71,10 +71,20 @@ impl<X: Pending> super::ActionHooks<X> {
         // before its mode and state; a player allocation draws none
         // (`units.md` §3.1 r4.1).
         v.init_player_seed(c);
-        v.set_state(c, STATE_PLAYERBODY as u16, true);
-        if let Some(r) = v.units.get_mut(c) {
-            r.mode = DD;
+        // The mode set `0x00624690(C, 17)` (`units.md` §4.1): a player's
+        // allocation leaves mode 0, so 17 is a new mode and re-initialises
+        // the animation fields (frame count +0x48, rate +0x4C). Recorded
+        // 1.14d corpse: fc 256, sp 256 (gen-boss-708, frame 83).
+        {
+            let mut usim = crate::units::hooks::Sim {
+                game: &mut *sim.game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let _ = crate::units::modes::write_mode(&mut usim, &mut *v.h, c, DD);
         }
+        v.set_state(c, STATE_PLAYERBODY as u16, true);
         self.death.owners.insert(c, guid);
         Some(c)
     }

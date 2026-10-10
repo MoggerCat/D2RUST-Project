@@ -697,6 +697,16 @@ fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
             s.set_quests(e.guid, state::quest_words(&q.flags[d]));
         }
     }
+    // PROVISIONAL (state-snapshot.md `q`, REC-1960): a player corpse
+    // (mode 17) holds an all-zero quest record on 1.14d (recorded
+    // `gen-boss-708`, frame 83: `q: []`); d2rs keeps no record for it.
+    // Settled by reading the corpse's player-data init in 1.14d.
+    for u in &mut s.units {
+        if u.ut == d2_sim::units::lists::UnitType::Player as u8 && u.m == Some(17) && u.q.is_none()
+        {
+            u.q = Some(Vec::new());
+        }
+    }
     s
 }
 
