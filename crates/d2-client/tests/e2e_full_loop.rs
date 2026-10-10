@@ -2017,7 +2017,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // §7.4 rule 7): S→C 0x69 code 8 at the path target (the spawn
     // point the creation's mode request wrote, `monsters/init.md` §4.1
     // step 1.1; PROVISIONAL, REC-594), d = the path direction, e =
-    // unit +0xB0 (`Pending::unit_b0`'s default 0). No other S→C so far
+    // unit +0xB0, the killing hit's class (`damage.md` §7.1 step 2: the
+    // missile record has no class, so §6.1 gives 13 `over`). No other S→C so far
     // but the join's 0x07s (frame 2): the unit-add / ground messages of
     // the missile and the drop belong to the per-unit update
     // `0x0053A500`, which the tick wiring does not run for them yet
@@ -2029,11 +2030,11 @@ fn run_with(game_seed: u32) -> Transcript {
     code8.push(8);
     code8.extend(md.target_x.to_le_bytes());
     code8.extend(md.target_y.to_le_bytes());
-    code8.extend([md.direction, 0]);
+    code8.extend([md.direction, 13]);
     let (sx, sy) = (mpos.0 as u16, mpos.1 as u16);
     let [sx0, sx1] = sx.to_le_bytes();
     let [sy0, sy1] = sy.to_le_bytes();
-    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 0]);
+    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 13]);
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
@@ -2586,8 +2587,11 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(log.handled, 28 + store.len() as u64);
     assert_eq!(
         log.dropped,
-        // + the player's own 0x4D echo (REC-95), dropped like 0x0D.
-        BTreeMap::from([(0x0D, 1), (0x4D, 1), (0x69, 2), (0x6D, 1)])
+        // The player's own 0x4D echo (REC-95) is gone: the caster's own
+        // client gets the skill-mode message only for a used skill with
+        // E flag 0x4 (`sim/pathing.md` §10 rule 2, `skills/sequences.md`
+        // local player rule 3; rc-cast-mode).
+        BTreeMap::from([(0x0D, 1), (0x69, 2), (0x6D, 1)])
     );
     assert_eq!((log.queued, log.drained), (1, 0));
     assert_eq!(fx.due, None, "the death end's 0x69 code 9 arrived");

@@ -14,6 +14,7 @@ const SEEDS: [u32; 4] = [1, 12345, 3_735_928_559, 4_014_346_870];
 
 #[derive(Default)]
 struct Fake {
+    marks: Vec<u32>,
     seeds: BTreeMap<UnitId, Seed>,
     class: BTreeMap<UnitId, i32>,
     anim: BTreeMap<UnitId, u8>,
@@ -242,7 +243,9 @@ impl AiUnits for Fake {
     fn vision_seen(&self, _: UnitId) -> Option<u32> {
         self.vision
     }
-    fn mark_seen(&mut self, _: UnitId) {}
+    fn mark_seen(&mut self, _: UnitId, v: u32) {
+        self.marks.push(v);
+    }
     fn ai_reset(&mut self, unit: UnitId) {
         self.log.push(format!("reset {}", unit.0));
     }
@@ -1434,11 +1437,19 @@ fn mode_end_inline_think() {
     w.fake.states.insert((mon, state::FREEZE));
     w.with(|g, cx| mode_end(g, cx, mon, mode::RUN));
     assert!(w.thinks().is_empty());
-    // An attack end requests neutral.
+    // An attack end requests neutral (`0x005A8030`'s record): with a path
+    // target unit the record targets it; without one the point (0, 0).
     let mut w = World::new(monstats(1, [0; 5], 15));
     let mon = w.mon;
+    let pl = w.player;
+    w.fake.path_target = Some(pl);
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
-    assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
+    assert_eq!(last_mode(&w), format!("mode 1 Unit({pl:?})"));
+    let mut w = World::new(monstats(1, [0; 5], 15));
+    let mon = w.mon;
+    w.fake.path_target = None;
+    w.with(|g, cx| mode_end(g, cx, mon, 8));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
 }
 
 // Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1
@@ -1864,44 +1875,19 @@ mod skill_check;
 // Covers: specs/monsters/ai.md §7.2
 #[test]
 fn walk_in_radius_points_follow_the_recorded_walks() {
-    // Warriv's walks at the Rogue Encampment arrival (1.14d under Wine,
-    // `-seed 1234`, player at (4873, 4228)), REC-501.
+    // Warriv's three walks at the Rogue Encampment arrival (1.14d under
+    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
     let p = (4873, 4228);
-    assert_eq!(radius_point((4866, 4235), 0, p, 3, 2), (4868, 4233));
-    assert_eq!(radius_point((4868, 4233), 0, p, 2, 2), (4869, 4232));
-    assert_eq!(radius_point((4869, 4232), 0, p, 1, 2), (4870, 4231));
-    // `town-ama-10k` frame 287: n = 19, (0, 2) fixed up to (1, 3).
+    assert_eq!(radius_point((4866, 4235), 2, p, 3, 2), (4868, 4233));
+    assert_eq!(radius_point((4868, 4233), 2, p, 2, 2), (4869, 4232));
+    assert_eq!(radius_point((4869, 4232), 2, p, 1, 2), (4870, 4231));
+    // Jerhyn's second walk (`gen-shrine-*`, frame 50): the fix-up grows both.
     assert_eq!(
-        radius_point((4870, 4231), 0, (4876, 4218), 3, 2),
-        (4871, 4228)
+        radius_point((5149, 5196), 2, (5153, 5203), 3, 2),
+        (5151, 5198)
     );
-    // A target on the unit: the unit's own cell.
-    assert_eq!(radius_point(p, 0, p, 3, 0), p);
-    // Superunique minion (`gen-su-47`, frame 31): size 2, d = 3, k = 3.
-    assert_eq!(
-        radius_point((5144, 4268), 2, (5143, 4263), 4, 0),
-        (5143, 4265)
-    );
-}
-
-// Covers: specs/monsters/ai.md §6
-#[test]
-fn reach_directly_probes_follow_the_distance_table() {
-    // gen-su-47 frame 31: minion at (5149, 4270), player at (5143, 4263).
-    let (u, t) = ((5149, 4270), (5143, 4263));
-    // d = 10 → k = 3, sign(6, 7) = (1, 1): (sx, sy) = (3, 3).
-    assert_eq!(
-        reach_directly_probes(u, t, 10),
-        [t, (5140, 4266), (5146, 4260)]
-    );
-    // k by distance: 2 below 3, 3 for 3–10, 4 for 11–24, else 3.
-    let k = |d| reach_directly_probes((10, 0), (0, 0), d)[1];
-    assert_eq!(k(2), (0, 2));
-    assert_eq!(k(3), (0, 3));
-    assert_eq!(k(10), (0, 3));
-    assert_eq!(k(11), (0, 4));
-    assert_eq!(k(24), (0, 4));
-    assert_eq!(k(25), (0, 3));
-    // An equal axis gives sign 0.
-    assert_eq!(reach_directly_probes((0, 5), (0, 0), 5)[1], (-3, 0));
+    // Closer than b: away from the target (s = −1). On the target with
+    // k = 0: the unit's own position.
+    assert_eq!(radius_point((4872, 4229), 2, p, 3, 2), (4871, 4230));
+    assert_eq!(radius_point(p, 2, p, 3, 0), p);
 }

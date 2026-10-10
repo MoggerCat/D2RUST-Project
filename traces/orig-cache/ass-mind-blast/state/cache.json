@@ -26,7 +26,7 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "c0734492a845e330fe4e27fe9ab14c3419981a09c3eed3dacd4c9cfc6ec44670",
+   "sha256": "7d1e4eca452413b75610236b8216d876ccbd30b0bde9edde8fa61960ae5cc3aa",
    "size": 352153
   }
  },
@@ -36,7 +36,7 @@
   "format": "orig-cache-key-1",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
   "save": "12d13682aabc89a40c9137df655d38061b558a869606fcc54be450a8122d02a3"
  }
 }

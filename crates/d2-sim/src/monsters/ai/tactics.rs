@@ -37,28 +37,6 @@ pub fn unit_distance<W: AiHost + ?Sized>(cx: &Ctx<'_, W>, a: UnitId, b: UnitId) 
     distance_full_size(cx.world.position(a), cx.world.size(a), cx.world.position(b))
 }
 
-/// The three probe points of "can reach directly" `0x005DC640`
-/// (`specs/monsters/ai.md` §6): the target, then the target moved by
-/// ±(sy, −sx) where (sx, sy) is the sign of unit − target scaled by k,
-/// k from the full-size distance `d` (2 below 3, 3 below 11, 4 below 25,
-/// else 3). The call is reachable when any probe's collision line
-/// (`0x006229F0`, mask 0x805) is clear.
-pub fn reach_directly_probes(unit: (i32, i32), target: (i32, i32), d: i32) -> [(i32, i32); 3] {
-    let k = match d {
-        i32::MIN..=2 => 2,
-        3..=10 => 3,
-        11..=24 => 4,
-        _ => 3,
-    };
-    let sx = (unit.0 - target.0).signum() * k;
-    let sy = (unit.1 - target.1).signum() * k;
-    [
-        target,
-        (target.0 - sy, target.1 + sx),
-        (target.0 + sy, target.1 - sx),
-    ]
-}
-
 /// `0x005DE190` `AITACTICS_SetVelocity` (§7.3): asserts −126 ≤ speed ≤
 /// 126, maps method 1 to 7, and overwrites each nonzero field; steps
 /// capped at 77.
@@ -509,27 +487,28 @@ pub fn walk_in_radius<W: AiHost + ?Sized>(
     ok
 }
 
-/// The point `0x005DE4E0` walks to (`specs/monsters/ai.md` §7.2;
-/// 1.14d-read, REC-501): d := the full-size distance `0x005DC380` from
-/// the unit (of size `size`) at `u` to `t`; s := −1 when d < b, else +1;
-/// k := min(|d − b|, a). With ax, ay the axis distances and n :=
-/// max(ax + ay, k): kx := ax·k / n and ky := ay·k / n (truncated), then
-/// while kx + ky < k both grow by 1. The point is u + sign(t − u)·k_axis·s
-/// per axis. There is no early exit: k = 0 or t on u gives u itself.
+/// The point `0x005DE4E0` walks to (`ai.md` §7.2, 1.14d-confirmed, settles
+/// REC-501): d := full-size distance from the unit (size `size`) to `t`;
+/// s := −1 when d < b, else +1; k := min(|d − b|, a); with ax, ay the
+/// absolute axis distances and n := max(ax + ay, k), n > 0: kx := ax·k / n,
+/// ky := ay·k / n (truncated), then while kx + ky < k both grow by 1. The
+/// point is the unit's position plus sign(Δ)·kx·s and sign(Δ)·ky·s per
+/// axis. No early exit: k = 0, or `t` on the unit, gives its own position.
+/// Checked against Warriv's three recorded arrival walks (`-seed 1234`,
+/// player at (4873, 4228)) and Jerhyn's (`gen-shrine-*`, frame 50).
 pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> (i32, i32) {
     let d = distance_full_size(u, size, t);
     let s = if d < b { -1 } else { 1 };
     let k = (d - b).abs().min(a);
     let (ax, ay) = ((t.0 - u.0).abs(), (t.1 - u.1).abs());
     let n = (ax + ay).max(k);
-    let (mut kx, mut ky) = (0, 0);
-    if n > 0 {
-        kx = ax * k / n;
-        ky = ay * k / n;
-        while kx + ky < k {
-            kx += 1;
-            ky += 1;
-        }
+    if n <= 0 {
+        return u;
+    }
+    let (mut kx, mut ky) = (ax * k / n, ay * k / n);
+    while kx + ky < k {
+        kx += 1;
+        ky += 1;
     }
     (
         u.0 + (t.0 - u.0).signum() * kx * s,

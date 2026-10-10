@@ -243,7 +243,12 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
         let rx = to_fp16_center(p.x).wrapping_sub(path.precise_x) as i32;
         let ry = to_fp16_center(p.y).wrapping_sub(path.precise_y) as i32;
         let m = dx.abs().max(dy.abs());
-        if rx.abs() <= m && ry.abs() <= m {
+        // Path type 4 (every missile aimed at a point, `missiles.md` §R4.3
+        // step 5) never snaps: it keeps its direction past the target until
+        // its frames run out or it hits (check `diff-a4-nm-unique`, the
+        // Gloam's bolt, class 320: 1.14d flies on past the aim point).
+        let snaps = !(ty == UnitType::Missile && path.path_type == path_types::MISSILE);
+        if snaps && rx.abs() <= m && ry.abs() <= m {
             dx = rx;
             dy = ry;
             reaches = true;

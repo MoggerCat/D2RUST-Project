@@ -1124,6 +1124,7 @@ mod tests {
             b.set_skill_rows(vec![SkillRow {
                 anim: 7,
                 range: 1,
+                ingame: true,
                 ..SkillRow::default()
             }]);
             let w = b.world_mut();
@@ -1137,6 +1138,8 @@ mod tests {
                 entries: vec![SkillEntry {
                     skill: crate::controls::click::ATTACK,
                     mode: 7,
+                    base: 1,
+                    owner: crate::bridge::skills::NATIVE,
                     ..SkillEntry::default()
                 }],
                 left: Some(0),

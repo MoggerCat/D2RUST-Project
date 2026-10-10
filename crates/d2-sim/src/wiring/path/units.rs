@@ -485,6 +485,46 @@ impl<X: Pending> View<'_, X> {
             .map_or((0, false), |m| (i32::from(m.velocity), m.npc))
     }
 
+    /// The velocity base `0x00621360(type, class)` (`pathing.md` §8.1
+    /// rule 2) of the unit's draw identity `0x00645270` (`units.md` §4.7):
+    /// with flag-ex disguise and a gfx state on, that state's `gfxtype`
+    /// (1: a monster, 2: a player) and `gfxclass`; else the unit's own
+    /// type and class. A player identity reads charstats `WalkVelocity`,
+    /// a monster one monstats `Velocity` (1.14d: the Shadow Warrior,
+    /// monstats `Velocity` 0, walks on the assassin's 6; a shapeshifted
+    /// Druid on its wolf or bear row).
+    pub fn velocity_base(&self, unit: UnitId) -> i32 {
+        let Some(r) = self.units.get(unit) else {
+            return 0;
+        };
+        let (mut player, mut class) = (r.ty == UnitType::Player, r.class as usize);
+        if r.flags2 & crate::units::record::flags2::DISGUISE != 0 {
+            let states = &self.stats.data().states;
+            let shown = states
+                .gfx_states()
+                .iter()
+                .find(|&&(s, ..)| self.stats.has_state(unit, s))
+                .copied();
+            match shown {
+                Some((_, 1, c)) => (player, class) = (false, usize::from(c)),
+                Some((_, 2, c)) => (player, class) = (true, usize::from(c)),
+                _ => {}
+            }
+        }
+        let combat = &self.h.tables.combat;
+        if player {
+            combat
+                .charstats
+                .get(class)
+                .map_or(0, |c| i32::from(c.walkvelocity))
+        } else {
+            combat
+                .monstats
+                .get(class)
+                .map_or(0, |m| i32::from(m.velocity))
+        }
+    }
+
     /// charstats `WalkVelocity`, `RunVelocity`, `RunDrain` of a player.
     pub fn charstats_velocity(&self, unit: UnitId) -> (i32, i32, i32) {
         self.units
@@ -497,42 +537,6 @@ impl<X: Pending> View<'_, X> {
                     i32::from(c.rundrain),
                 )
             })
-    }
-}
-
-impl<X: Pending> View<'_, X> {
-    /// `0x006229F0(unit, x, y, mask)` (`monsters/ai.md` §6 "can reach
-    /// directly"): the unit's collision line to the point, blocked
-    /// (true) or clear. It is `0x00622AA0` with the point as the second
-    /// end, of size 2 (`edx = 2` at `0x00622A80`), and answers clear for
-    /// a unit without a room. `None` without the path provider.
-    pub fn unit_point_line_blocked(
-        &self,
-        game: &Game,
-        unit: UnitId,
-        at: (i32, i32),
-        mask: u16,
-    ) -> Option<bool> {
-        self.h.paths.as_ref()?;
-        let (x, y) = self.h.path_position(unit);
-        let a = crate::path::line::LineUnit {
-            room: game.lists.unit(unit).and_then(|e| e.room()),
-            x,
-            y,
-            size: self.path_size(unit),
-        };
-        let b = crate::path::line::LineUnit {
-            room: None,
-            x: at.0,
-            y: at.1,
-            size: 2,
-        };
-        Some(crate::path::line::units_line_blocked(
-            &self.h.drlg,
-            &a,
-            &b,
-            mask,
-        ))
     }
 }
 

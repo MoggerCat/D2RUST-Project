@@ -34,28 +34,28 @@
 |   5. BloodLord (125) `0x005E36F0` | 210–220 |
 |   6. SuccubusWitch (119) `0x005E2120` | 221–245 |
 |   7. Overseer (120) `0x005E27A0` | 246–281 |
-|   8. ReanimatedHorde (114) `0x005E1540` | 282–295 |
-|   9. ClawViperEx (142) `0x005F1DE0` | 296–313 |
-|   10. DeathMauler (130) `0x005EE260` | 314–324 |
-|   11. PutridDefiler (137) `0x005EFA90` | 325–342 |
-|   12. Ancient (133) `0x005EF1A0` | 343–397 |
-|   13. AncientStatue (132) `0x005EEAA0` | 398–405 |
-|   14. FrozenHorror (124) `0x005E3530` | 406–420 |
-|   15. SiegeBeast (115) `0x005E1900` | 421–448 |
-|   16. SuicideMinion (117) `0x005E1D30` | 449–460 |
-|   17. BaalMinion (141) `0x005EF910` | 461–472 |
-|   18. BaalTaunt (136) `0x005EF710` | 473–489 |
-|   19. BaalToStairs (138) `0x005EF620` | 490–505 |
-|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 506–550 |
-|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 551–662 |
-|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 663–673 |
-|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 674–711 |
-| Constants & data dependencies | 712–730 |
-| Randomness | 731–739 |
-| Edge cases & original bugs | 740–754 |
-| Test vectors | 755–769 |
-| Provenance | 770–795 |
-| Open questions | 796–834 |
+|   8. ReanimatedHorde (114) `0x005E1540` | 282–299 |
+|   9. ClawViperEx (142) `0x005F1DE0` | 300–317 |
+|   10. DeathMauler (130) `0x005EE260` | 318–328 |
+|   11. PutridDefiler (137) `0x005EFA90` | 329–346 |
+|   12. Ancient (133) `0x005EF1A0` | 347–401 |
+|   13. AncientStatue (132) `0x005EEAA0` | 402–409 |
+|   14. FrozenHorror (124) `0x005E3530` | 410–424 |
+|   15. SiegeBeast (115) `0x005E1900` | 425–452 |
+|   16. SuicideMinion (117) `0x005E1D30` | 453–464 |
+|   17. BaalMinion (141) `0x005EF910` | 465–476 |
+|   18. BaalTaunt (136) `0x005EF710` | 477–493 |
+|   19. BaalToStairs (138) `0x005EF620` | 494–509 |
+|   20. BaalThrone (134) `0x005EF320`, init `0x005EF310` | 510–554 |
+|   21. BaalCrab (135) `0x005FCFE0`, alternate `0x005FCF30` | 555–666 |
+|   22. BaalCrabClone (140) `0x005FD210`, alternate `0x005FCF30` | 667–677 |
+|   23. Nihlathak (128) `0x005EE5D0`, init `0x005EE5C0`, alternate `0x005E5280` | 678–715 |
+| Constants & data dependencies | 716–734 |
+| Randomness | 735–743 |
+| Edge cases & original bugs | 744–758 |
+| Test vectors | 759–773 |
+| Provenance | 774–799 |
+| Open questions | 800–838 |
 <!-- /index -->
 
 ## Summary
@@ -287,7 +287,11 @@ Charge (`Skill1` Self-resurrect is not used here).
 1. Unit flags +0xC4 |= 0x0E (every think).
 2. C: P(aip1) [30] → A1 at T; else idle aip2 [20]. End.
 3. `Skill2` ≥ 0, direct line to T (`0x005DC640(unit, T)`, `ai.md` §6),
-   5 < D < aip3 [12] and draw < aip4 [20] → `Skill2` at T. End.
+   D < aip3 [12], 5 < D (tested in this order) and U `roll(100)` (the
+   helper, `0x005E161A`; the other draws of this function are inline
+   steps) < aip4 [20] → `Skill2` at T. End. Recorded
+   (`gen-mon-436`, frame 31: D 7, direct line clear, roll 42 then the
+   two step-4 draws, idle).
 4. Draw < aip5 [20] → walk to T with flags 0. End. Draw < aip6 [65] →
    walk in radius of T (`0x005DE6D0(T, 4, 0)`). End. Idle aip7 [25].
 

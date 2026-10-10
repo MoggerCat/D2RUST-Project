@@ -43,7 +43,7 @@ fn expansion_layout_matches_table() {
             // draws them enabled), with no action (Phase 7+).
             (5106, 264, 324, 272, 35, true),
             (5107, 264, 366, 272, 35, true),
-            (0, 264, 391, 272, 25, true),
+            (11049, 264, 391, 272, 25, true),
             (5108, 264, 433, 272, 35, true),
             (5110, 264, 528, 135, 25, true),
             (5111, 402, 528, 135, 25, true),

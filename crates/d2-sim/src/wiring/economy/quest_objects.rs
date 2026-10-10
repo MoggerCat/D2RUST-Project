@@ -585,6 +585,15 @@ fn operate<W: QuestWorld>(
         }
         // Only the `0x0059BAF0(level)` call is stated; the rest of the
         // operate (the object spec's) is handed back.
+        // Mode 0 (`0x005846B0`): mode 1 and the open event one frame
+        // after the animation (no quest call); an open portal runs the
+        // level-dependent call below.
+        34 if w.object_mode(o) == 0 => {
+            w.set_object_mode(o, 1);
+            let at = w.frame() + (w.object_anim_length(o) >> 8) + 1;
+            w.schedule_object_event(o, 1, at);
+            return QuestObjectRun::Ran;
+        }
         34 => {
             if let Some(level) = w.unit_level(o) {
                 act2::q4::portal_operate(ctl, w, level);

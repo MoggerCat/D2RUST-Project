@@ -1,43 +1,41 @@
 # rc-mon-walk-target — hand-back
 
-Task as briefed: "d2rs sets a walking monster's target to the last A* path
-point while 1.14d keeps the requested point". **That premise is wrong**:
-`0x00649970` step 10 does overwrite path +0x10/+0x12 with the last point
-(flag 0x10 clear, no target unit), as `sim/pathing.md` §3 says; units 11/12
-of gen-su-47 show both sides doing it. The tx differences were two
-upstream causes, found by hooking 1.14d (scratch debugger on `0x005A62F5`
-dumping the path after the mode-request compute).
+Brief: "d2rs sets a walking monster's target to the last A* path point while
+1.14d keeps the requested point". **That premise is wrong.** `0x00649970`
+step 10 does overwrite path +0x10/+0x12 with the last point (flag 0x10
+clear, no target unit), as `sim/pathing.md` §3 says; gen-su-47 units 11/12
+show both sides doing it. The tx differences came from two causes upstream
+of the path, found by hooking 1.14d (scratch debugger break at `0x005A62F5`,
+after the mode-request compute, dumping the path record).
 
 ## Checks (`--filter 'gen-su-*,gen-boss-*'`, 91 checks, state channel)
-- before: EQUAL 0, DIVERGED 78, PARTIAL 13
-- after:  EQUAL 0, DIVERGED 77, PARTIAL 14; no check moved earlier
-- moved: gen-su-47 first divergence 31 -> 128; gen-su-52 31 -> 83;
-  gen-su-51 51 -> all 150 frames equal (PARTIAL).
-  The new first divergences in 47/52 are player 0:2 field `fc` (dead player
-  frame count 256 vs 0), not minion walks.
+- before (staging aa5de032): EQUAL 0, DIVERGED 78, PARTIAL 13
+- with my fixes alone: DIVERGED 77, PARTIAL 14 (gen-su-47 31 -> 128,
+  gen-su-52 31 -> 83, gen-su-51 51 -> 150 frames equal; none earlier)
+- after merging staging f6fc17e3 (which already carries the same two
+  fixes, landed independently, plus the player-`fc` fix): DIVERGED 58,
+  PARTIAL 33. gen-su-47/51/52 are PARTIAL (150/150 frames).
+  EQUAL stays 0 only because the state channel reports PARTIAL for these
+  checks (unchecked fields), not because of a difference.
 
-## What changed (d2-sim)
-1. **`0x005DC640` "can reach directly"** was a `Pending` stub returning
-   false. ReanimatedHorde (`0x005E1540`) gates its Skill2 on it and the gate
-   consumes one RNG draw, so with false d2rs took "walk in radius" where
-   1.14d took "walk to target unit" (target unit set, so tx = player pos).
-   Implemented (`monsters/ai/tactics.rs reach_directly_probes`,
-   `wiring/action/ai.rs`, `wiring/path/units.rs unit_point_line_blocked`):
-   three probes, `0x006229F0` mask 0x805, point size 2. Spec: `ai.md` §6.
-2. **Walk-in-radius geometry `0x005DE4E0`** still had the old PROVISIONAL
-   rounded no-size reading although `ai.md` §7.2 documents the 1.14d one
-   (full-size distance, truncate then fix-up, sign s, no early exit).
-   `radius_point` now takes the unit size and always returns a point.
-   Tests: Warriv's 4 recorded walks, plus gen-su-47 unit 10 (size 2).
+## What was the cause (both already on staging; my duplicates dropped)
+1. `0x005DC640` "can reach directly" was a stub returning false.
+   ReanimatedHorde `0x005E1540` gates Skill2 on it and the gate consumes
+   one RNG draw: false -> "walk in radius", true -> "walk to target unit"
+   (target unit set, tx = player position). Seeds stayed equal because both
+   paths draw twice, which is why only tx differed.
+2. `0x005DE4E0` walk-in-radius geometry: full-size distance, truncate then
+   fix-up (`ai.md` §7.2), instead of the provisional rounded reading.
+Spec text for both is on staging (`ai.md` §6, §7.2).
 
 ## Open (sizes)
-- gen-su-12, gen-su-48: tx differs with equal seeds and positions after
-  other causes (toward path point count, 1 vs 3 points at frame 31 in
-  gen-su-12 style cases) — M.
-- gen-su-47/52: dead-player `fc` 256 vs 0 (frame 128 / 83) — S.
-- Remaining first divergences over the cluster, by field: fr 22, fc 19,
-  m 13, s 9, seed 5, other 8 — each its own cause, none a path-target rule.
-- gen-boss-526 "tx" at 69 is an RNG divergence (seeds differ), not pathing.
-- Tooling note: running the suite with the default worker count raced the
-  `blood-moor-empty` variant build ("hash table extends past end of file");
-  build the variant once, then `--workers 3`.
+- gen-su-12, gen-su-48: tx differs with equal seeds/positions (toward
+  path point count: 1 point in 1.14d vs 3 in d2rs at the first compute,
+  `info.target` after target preparation, `0x00679C80` step 1-2) — M.
+  Method: break `0x005A62F5`, dump path +0x10..0x28 and points from +0x9C.
+- Remaining first divergences by field: fr 22, m 13, s 9, seed 5, cl 2,
+  x 1, ty 1 — separate causes, none a path-target rule.
+- gen-boss-526 "tx" at frame 69 is an RNG divergence (seeds differ).
+- Suite tip: the default worker count raced the `blood-moor-empty` variant
+  build ("hash table extends past end of file"); build it once, then
+  `--workers 3`.
