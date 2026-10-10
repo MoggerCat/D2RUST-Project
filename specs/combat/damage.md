@@ -36,14 +36,14 @@
 |   6. Hit class and hit recovery | 606–636 |
 |   7. Reaction and death trigger | 637–742 |
 |   8. Event functions (table `0x007325B0`, 32 entries) | 743–806 |
-|   9. Durability `0x0057D3D0` | 807–828 |
-|   10. Monster melee on a player, end to end | 829–921 |
-| Constants & data dependencies | 922–943 |
-| Randomness | 944–976 |
-| Edge cases & original bugs | 977–1011 |
-| Test vectors | 1012–1094 |
-| Provenance | 1095–1120 |
-| Open questions | 1121–1170 |
+|   9. Durability `0x0057D3D0` | 807–834 |
+|   10. Monster melee on a player, end to end | 835–927 |
+| Constants & data dependencies | 928–949 |
+| Randomness | 950–982 |
+| Edge cases & original bugs | 983–1017 |
+| Test vectors | 1018–1100 |
+| Provenance | 1101–1126 |
+| Open questions | 1127–1176 |
 <!-- /index -->
 
 ## Summary
@@ -818,6 +818,12 @@ frames, skill 0, level 1, owner attacker.
    roll(W)` (defender seed). Loop: if slot `i` is kept: `w < weight` →
    `durability_hit(game, defender, item)` and stop; else `w −=
    weight`. `i = (i + 1) mod 7`; continue while `w ≥ 0`.
+
+Checked on `combat-melee-fallen` (rng channel, 2026-10-10): a short
+sword hit by a level-3 Barbarian draws physical (range 1664 = 6.5 ×
+256 with StrBonus), the burn quirk, then this durability draw on the
+attacker's seed (4 draws in all); the breakable test is the weapon row's
+`durability` > 0 and `nodurability` = 0 (`0x00629930`).
 
 `durability_hit(game, owner, item)` = `0x00559E30`: items of type 50
 (armor) or 45 (weapon) with durability (`0x00629930`); chance 10 % for
