@@ -109,6 +109,20 @@ impl PlayerAnims for ClientPlayerAnims {
             events: Some(r.events),
         })
     }
+
+    fn attack1(&self, class: u32, weapon: [u8; 4]) -> Option<(i32, i32)> {
+        let w = std::str::from_utf8(&weapon).ok()?.trim_end();
+        let idx = CLASSES.iter().position(|c| *c == w)?;
+        let name = anim_key(
+            &self.looks,
+            UnitType::Player,
+            class,
+            7,
+            i32::try_from(idx).ok()?,
+        )?;
+        let r = self.anim.record(&name).ok()?;
+        Some((i32::try_from(r.frames).ok()?, i32::from(r.speed as i16)))
+    }
 }
 
 #[cfg(test)]

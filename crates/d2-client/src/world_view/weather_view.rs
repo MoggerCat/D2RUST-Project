@@ -18,8 +18,9 @@
 //!   (`draw-order-2.md` §11.8; PROVISIONAL, REC-1901: the draws sit in the
 //!   receive of the original, here at the next weather step);
 //! - the camera delta is the change of the camera's unit origin between
-//!   frames; the day period is 1 and the video mode 1 (colors of the
-//!   rain / snow tables); the frame rate is 25 (≥ 10: the flash draws);
+//!   frames; the video mode 1 (colors of the snow tables); the frame rate
+//!   is 25 (≥ 10: the flash draws). The day period is the client
+//!   environment record's (`render/lighting.md` §9.3 r4);
 //! - a level change calls the level entry `0x004726F0(0)`;
 //! - lightning is never started: its only caller is `draw-order-2.md`
 //!   open question 4.
@@ -62,8 +63,14 @@ const PASS_SKY: u32 = crate::scene::order::pass::UNIDENTIFIED_9;
 /// The frame set of the 1×1 pixel (index 1) every line pixel draws.
 const PIXEL_PATH: &str = "d2rs/weather/pixel";
 
-/// `d2rs-own, unverified`: the act's day period (`0x0061C100`).
-const DAY_PERIOD: u8 = 1;
+/// The act's day period `0x0061C100` (`render/lighting.md` §9.3 r4):
+/// the client environment record's period type (+0x04), 0 without a
+/// record.
+fn day_period(world: &ClientWorld) -> u8 {
+    world
+        .environment
+        .map_or(0, |e| u8::try_from(e.kind).unwrap_or(0))
+}
 /// `d2rs-own, unverified`: the video mode (`0x004F5140`).
 const VIDEO_MODE: u32 = 1;
 /// `d2rs-own, unverified`: frames counted in the last second.
@@ -125,6 +132,11 @@ pub struct WeatherView {
     shared: Arc<Mutex<ClientSeed>>,
     level: Option<LevelWeather>,
     update_count: u32,
+    /// Whether a client update with no drawn frame is replayed at the
+    /// next frame (REC-1900); off when a check run follows the recorded
+    /// frame schedule, where 1.14d's weather ran only in drawn frames
+    /// (`render/draw-order-2.md` §11.2 r3).
+    replay_skipped: bool,
     /// How many of `ClientWorld::local_places` were replayed.
     places_seen: usize,
     origin: Option<(i32, i32)>,
@@ -157,12 +169,19 @@ impl WeatherView {
             shared: Arc::default(),
             level: None,
             update_count: 0,
+            replay_skipped: true,
             places_seen: 0,
             origin: None,
             color_maps: None,
             failure: None,
             thunder: None,
         }
+    }
+
+    /// Follows a recorded frame schedule: no replay of client updates
+    /// without a drawn frame (`tools/scenario-diff.md`).
+    pub fn follow_frame_schedule(&mut self) {
+        self.replay_skipped = false;
     }
 
     /// The sound layer for the thunder step's request of sound 202.
@@ -316,7 +335,7 @@ impl WeatherView {
         // (REC-1900, PROVISIONAL: the original draws every pass).
         let now = world.server_ticks as u32;
         let first = match previous {
-            Some(_) if self.update_count < now => self.update_count + 1,
+            Some(_) if self.replay_skipped && self.update_count < now => self.update_count + 1,
             _ => now,
         };
         self.update_count = now;
@@ -326,7 +345,7 @@ impl WeatherView {
                 update_count: c,
                 frame: FrameSize::play(),
                 camera_delta: if c == now { delta } else { (0, 0) },
-                day_period: DAY_PERIOD,
+                day_period: day_period(world),
                 video_mode: VIDEO_MODE,
             };
             let player = LocalPlayer {

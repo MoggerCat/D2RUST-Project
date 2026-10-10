@@ -44,21 +44,21 @@
 | Outputs / state changes | 90–95 |
 | Rules | 96–97 |
 |   1. File layout and framing | 98–143 |
-|   2. Header (335 bytes) | 144–455 |
-|   3. Checksum (`0x00411130`) | 456–466 |
-|   4. Quest section (298 bytes at 0x14F) | 467–487 |
-|   5. Waypoint section (80 bytes at 0x279) | 488–493 |
-|   6. NPC flag section (52 bytes at 0x2C9) | 494–550 |
-|   7. Stats and skills | 551–643 |
-|   8. Item sections | 644–846 |
-|   9. Load sequence (`0x0056B180`) | 847–871 |
-|   10. Errors | 872–918 |
-| Constants & data dependencies | 919–938 |
-| Randomness | 939–943 |
-| Edge cases & original bugs | 944–1010 |
-| Test vectors | 1011–1052 |
-| Provenance | 1053–1146 |
-| Open questions | 1147–1286 |
+|   2. Header (335 bytes) | 144–476 |
+|   3. Checksum (`0x00411130`) | 477–487 |
+|   4. Quest section (298 bytes at 0x14F) | 488–508 |
+|   5. Waypoint section (80 bytes at 0x279) | 509–514 |
+|   6. NPC flag section (52 bytes at 0x2C9) | 515–571 |
+|   7. Stats and skills | 572–664 |
+|   8. Item sections | 665–867 |
+|   9. Load sequence (`0x0056B180`) | 868–892 |
+|   10. Errors | 893–939 |
+| Constants & data dependencies | 940–959 |
+| Randomness | 960–964 |
+| Edge cases & original bugs | 965–1031 |
+| Test vectors | 1032–1073 |
+| Provenance | 1074–1167 |
+| Open questions | 1168–1307 |
 <!-- /index -->
 
 ## Summary
@@ -337,7 +337,28 @@ as loaded or created.
       right hand the previous right skill's state and the new one's
       state skill start follow (`0x0056FF10`). There is no level test:
       an entry with base level 0 and no bonus is selected like any
-      other.
+      other. The start (`0x0056FF10(game, skill)`, unit in EDI): an
+      aura skill (flag `aura`) whose `aurastate` is in range and whose
+      level (`0x006442A0(unit, entry, 1)`) is ≥ 1: without the
+      `immediate` flag, the state goes on (`0x00639DB0(unit, s, 1)`)
+      and the state's list (found, or made: flags 0, expire 0, the
+      unit as owner) gets state, skill and level and is attached
+      (`0x00626E10(unit, list, 1)`), holding only stat 350 := skill and
+      351 := level; with `immediate`, the skill's do runs
+      (`0x0056F7F0(game, unit, skill, L, 1, 0, 0)`, `skills/use.md`
+      §5.4). Then the periodic run is scheduled (`0x0056CDA0(skill, L,
+      1)`). This is step (d) of the join (`sim/intents-events.md` §8.2
+      rule 3.1), after part B's 0xAA: the join's 0xAA never lists the
+      aura's states, which the first player update sends as 0xA8
+      (1.14d `gen-skill-pal-99`: state 34 with 350 = 99 and 351 = L).
+      The aura's stats are in effect for the join's later messages
+      (1.14d `gen-skill-pal-115`: Vigor's stamina in the first 0x95).
+      PROVISIONAL (REC-3410): d2rs sends part B at game entry, after the
+      load, so it runs the start at the load, then switches the aura
+      state's unit bit off (list and changed bit kept) and back on right
+      after the join messages, with the passive states (REC-2105);
+      settled by a recording of the join with a breakpoint on
+      `0x0056FF10` against the 0xAA send.
    4. An item-granted entry (oskill, `skills/levels.md` §7.1; charges,
       §7.6) exists at this point only if placing its item in §9 rule 3
       linked its stats (equipped and usable, `items/inventory.md` §5).

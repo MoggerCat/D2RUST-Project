@@ -527,6 +527,7 @@ impl<L: ServerLink> Bridge<L> {
     /// The players' animation lookup of the client player update
     /// ([`player_anim`]).
     pub fn set_player_anims(&mut self, anims: std::sync::Arc<dyn player_anim::PlayerAnims>) {
+        self.world.tip_anims = player_anim::PlayerAnimsRef(Some(anims.clone()));
         self.inputs.player_anims = Some(anims);
     }
 

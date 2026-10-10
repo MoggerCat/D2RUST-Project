@@ -215,12 +215,6 @@ pub(crate) fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
 /// `@wp` and `item` use the game's own tables. No local player yet:
 /// `unresolved @player`.
 pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
-    apply_now_with(s, op, true)
-}
-
-/// [`apply_now`]; `reassign` false: a `pos` poke queues no S→C 0x15 (a
-/// comparison run, as 1.14d's teleport sends none).
-fn apply_now_with(s: &mut Sim, op: &PokeOp, reassign: bool) -> poke::PokeResult {
     let Some((player, _)) = local_player(s) else {
         return poke::PokeResult::Unresolved("@player".into());
     };
@@ -231,7 +225,6 @@ fn apply_now_with(s: &mut Sim, op: &PokeOp, reassign: bool) -> poke::PokeResult 
         player,
         waypoint_classes: &waypoints,
         items: Some(&tables),
-        reassign,
     };
     // The quest parts are lent as in the tick and the 0x13 / waypoint
     // handlers, so a quest object a directive creates (a `warp` that
@@ -304,7 +297,7 @@ pub fn apply_on_host<C: d2_server::seams::Clock>(
         return interact_on_host(h, d);
     }
     let PokeOp::Directive(poke::Directive::Msg { id, args }) = op else {
-        return apply_now_with(&mut h.game, op, false);
+        return apply_now(&mut h.game, op);
     };
     let bytes = {
         let s = &h.game;
@@ -316,7 +309,6 @@ pub fn apply_on_host<C: d2_server::seams::Clock>(
             player,
             waypoint_classes: &waypoints,
             items: Some(&s.world.tables),
-            reassign: false,
         };
         match poke::msg_values(&s.game, &s.events, &env, args)
             .and_then(|v| msg_bytes(*id, args, &v))
@@ -351,7 +343,6 @@ pub fn interact_on_host<C: d2_server::seams::Clock>(
             player,
             waypoint_classes: &waypoints,
             items: Some(&s.world.tables),
-            reassign: false,
         };
         match poke::interact_calls(&s.game, &s.events, &env, d) {
             Some(Ok(c)) => c,
