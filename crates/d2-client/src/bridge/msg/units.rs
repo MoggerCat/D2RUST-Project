@@ -315,11 +315,10 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
             // mode's count, the rate), then the first frame drawn from the
             // unit seed.
             super::super::monster_anim::mode_set(w, msg.inputs, key, mode);
-            super::super::monster_anim::first_frame(w, key);
-            // Rule 6.9: the initial path direction.
             if let Some(row) = &class_row {
                 super::super::monster_anim::first_direction(w, key, row.npc, row.modes);
             }
+            super::super::monster_anim::first_frame(w, key);
             // The monster init's light (`0x004AE210`, `render/lighting.md`
             // §8 monster row), in the monster's room.
             if let Some(row) = &class_row {
