@@ -900,7 +900,7 @@ impl DialogUi {
             screen: crate::ui::layout::Screen::play(),
             expansion_installed: true,
         };
-        let mut ui = crate::ui::original::OriginalUi::new(config, None)
+        let ui = crate::ui::original::OriginalUi::new(config, None)
             .map_err(|e| anyhow::anyhow!("original UI: {e:?}"))?;
         let mut root = crate::ui::root::UiRoot::new(Box::new(crate::ui::NoPanelRules));
         ui.install(&mut root)
