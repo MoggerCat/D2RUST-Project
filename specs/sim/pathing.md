@@ -115,7 +115,11 @@ Both return 0 to the dispatcher whether or not the mode starts.
    target (`0x00648AD0`: target x, y; target unit := none); unit form
    `0x0057F190` sets the target unit (`0x00648B90`: unit, its type and
    GUID), except that a knockback request on a unit already in mode 19
-   does nothing. Both then run §1.5.
+   does nothing: the test reads the **requested unit's own** mode (unit
+   +0x10 of `0x0057F190`'s second argument), not the target unit's
+   (read 2026-10-10, REC-2790; `gen-su-65`: two smites on one frame, the
+   second one's knockback is ignored, so the path target stays the first
+   attacker's). Both then run §1.5.
 
 d2rs wiring without its path provider (a d2rs host setup, no 1.14d
 counterpart) runs no mode request: design choice, no fidelity rule.
