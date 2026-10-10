@@ -13,6 +13,8 @@
   "ScnAma",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.packets.jsonl",
   "--poke",
@@ -22,17 +24,17 @@
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "d64c77c3b8386532e116d89efa5231c2e97e8cb0af49ab956ab53a55dcc30aab",
-   "size": 69021
+   "sha256": "4d5951e93a740ad48ed26e9f1c6b99852d17ddc34b5b8233aba8ec23684d45b2",
+   "size": 59980
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "ab571adf12e5b16ac9cb2a0fbc32c12828557915c5234b1da0a38702674cc171",
+  "check": "86a32e798be3e005c4cbac3b8a8fb207722bbd92035254f7db94270cb5760c4a",
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
   "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
  }
 }
