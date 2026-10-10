@@ -59,6 +59,13 @@ FORMAT = "audio-raw-1"
 IAT_DSOUND_CREATE = 0x6CC088      # DSOUND.dll ordinal 1 (import table of the 1.14d Game.exe)
 SOUND_REQUEST = 0x4B9A00          # audio/triggers.md §1 r1 (record_frames.py SOUND_REQUEST)
 SOUND_REQUEST_BYTES = b"\x55\x8B\xEC\x83\xEC\x18"
+SOUND_ROLL = 0x4E40A0             # roll(n) on the local player's client seed (audio/sound-table.md §4 r5)
+SOUND_ROLL_BYTES = b"\x56\x8B\xF1\xE8"
+ROLL_GENERIC = 0x45C3E0           # roll(seed in ECX, n in EDX), sim/rng.md §3
+ROLL_GENERIC_BYTES = b"\x56\x8B\xF2\x85"
+ROLL_RANGE = 0x472280             # roll_range(seed in ECX, lo in EDX, n on the stack)
+ROLL_RANGE_BYTES = b"\x55\x8B\xEC\x8B"
+PLAYER_PTR = 0x7A6A70             # local player unit; seed {lo, hi} at +0x20, +0x24
 SOUND_TICK = 0x7BC9BC             # T (audio/sound-table.md §6.1)
 CLIENT_UPDATES = 0x7A0498         # C (record_frames.py CLIENT_UPDATES)
 
@@ -372,7 +379,24 @@ def make_recorder(rt):
                        "unit": [self.u32(unit), self.u32(unit + 0xC)] if unit else None,
                        "delay": self.u32(ctx.Esp + 4), "flags": self.u32(ctx.Esp + 8),
                        "offset": self.u32(ctx.Esp + 12), "ret": f"{self.u32(ctx.Esp):#x}"}
+                p = self.u32(PLAYER_PTR)
+                if p:
+                    rec["seed"] = [self.u32(p + 0x20), self.u32(p + 0x24)]
                 self.emit(self.core.stamped(rec))
+                return
+            if addr == SOUND_ROLL:
+                p = self.u32(PLAYER_PTR)
+                rec = {"k": "roll", "n": signed(ctx.Ecx), "ret": f"{self.u32(ctx.Esp):#x}",
+                       "seed": [self.u32(p + 0x20), self.u32(p + 0x24)] if p else None}
+                self.emit(self.core.stamped(rec))
+                return
+            if addr in (ROLL_GENERIC, ROLL_RANGE):
+                p = self.u32(PLAYER_PTR)
+                if p and ctx.Ecx == p + 0x20:
+                    n = signed(ctx.Edx) if addr == ROLL_GENERIC else signed(self.u32(ctx.Esp + 4))
+                    rec = {"k": "roll", "src": f"{addr:#x}", "n": n, "ret": f"{self.u32(ctx.Esp):#x}",
+                           "seed": [self.u32(p + 0x20), self.u32(p + 0x24)]}
+                    self.emit(self.core.stamped(rec))
                 return
             super().handle(addr, ctx)
 
@@ -504,7 +528,9 @@ def main():
     blob_dir = None if a.no_blobs else (a.blob_dir or os.path.join(REPO, "game", "captures", "audio-" + stamp))
     exe = os.path.abspath(a.game)
     ep, ep_bytes = entry_point(open(exe, "rb").read())
-    rt.EXPECT = {rt.TICK: rt.EXPECT[rt.TICK], SOUND_REQUEST: SOUND_REQUEST_BYTES, ep: ep_bytes}
+    rt.EXPECT = {rt.TICK: rt.EXPECT[rt.TICK], SOUND_REQUEST: SOUND_REQUEST_BYTES,
+                SOUND_ROLL: SOUND_ROLL_BYTES, ROLL_GENERIC: ROLL_GENERIC_BYTES,
+                ROLL_RANGE: ROLL_RANGE_BYTES, ep: ep_bytes}
     rt.FORMAT, rt.TOOL = FORMAT, TOOL
     r = make_recorder(rt)(exe, gargs, out, a.seconds, a.ticks, blob_dir)
     r.entry_addr = ep
