@@ -15,7 +15,8 @@ const STATE_CHARGE: u32 = 4;
 fn state_off_after_expiry(cb: u32, state: u32) {
     let mut fx = Fx::new();
     let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
-    fx.sim.with(&mut fx.game, |_, v| v.set_state(m, state as u16, true));
+    fx.sim
+        .with(&mut fx.game, |_, v| v.set_state(m, state as u16, true));
     assert!(fx.sim.sys.stats.has_state(m, state));
     fx.sim.with(&mut fx.game, |g, v| {
         let mut sim = Sim {
@@ -31,7 +32,7 @@ fn state_off_after_expiry(cb: u32, state: u32) {
     assert!(!fx.sim.sys.stats.has_state(m, state));
 }
 
-// Covers: specs/missiles/missiles.md R5 step 6.1
+// Covers: specs/missiles/missiles.md §r5-hit-handler-0x005adf10-d2moo-missmode-srvdmghithandler
 #[test]
 fn the_justhit_callback_turns_state_86_off() {
     state_off_after_expiry(callback::JUSTHIT, STATE_JUSTHIT);

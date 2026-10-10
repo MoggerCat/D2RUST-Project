@@ -23,9 +23,9 @@ mod missiles;
 mod objects;
 #[cfg(test)]
 mod player_death;
-mod remove_callbacks;
 #[cfg(test)]
 mod proto_msgs;
+mod remove_callbacks;
 #[cfg(test)]
 mod rooms;
 #[cfg(test)]
