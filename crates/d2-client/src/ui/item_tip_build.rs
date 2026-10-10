@@ -400,9 +400,11 @@ impl<'a> Build<'a> {
         self.idx.and_then(|i| self.t.lookup.itype_of(i))
     }
 
-    /// Item class `0x0062C0B0` (itemtypes `class`; 7 none).
+    /// Item class `0x0062C0B0`: the itemtypes `class` byte when it is
+    /// below 7, else 7 (none; an empty cell is 0xFF).
     fn item_class(&self) -> u8 {
-        self.itype().map_or(7, |t| t.class)
+        self.itype()
+            .map_or(7, |t| if t.class < 7 { t.class } else { 7 })
     }
 
     fn throwable(&self) -> bool {

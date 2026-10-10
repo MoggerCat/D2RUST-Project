@@ -2425,7 +2425,13 @@ pub fn build_with(
     // (q-fixture-migrate: a second, fresh state left every town without
     // its preset NPCs and objects on the user's files).
     let state = WorldState::new(shared_types, Arc::new(parts.world), info);
-    let mut sim = WorldSim::new(Arc::new(parts.stats), parts.units, hooks, state);
+    // The game's difficulty and the neutral delay's column
+    // (`ai.md` §1.3 rule 1: game +0x6A is 3 in single player, so the
+    // difficulty's `aidel` column; recorded Hell first think at f + 13).
+    let mut unit_data = parts.units;
+    unit_data.difficulty = character.difficulty();
+    unit_data.aidel_by_difficulty = GAME_TYPE != 0 || GAME_SETUP.ladder;
+    let mut sim = WorldSim::new(Arc::new(parts.stats), unit_data, hooks, state);
     // Game creation (`rng.md` §5.2): the creation fields to their home,
     // then the four seeded controls in order, before any unit.
     let fields = GameFields {
