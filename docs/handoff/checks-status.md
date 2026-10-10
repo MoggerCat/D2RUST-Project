@@ -1821,11 +1821,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-su-12 | state | DIVERGED | 53/150 | frame 54 player 0:1 class 0, field m: 1.14d 19 vs d2rs 5 | unrouted |
 | gen-su-15 | state | DIVERGED | 42/150 | frame 43 game, field seed: 1.14d [3692043304, 618654564] vs d2rs [1483255534, 419929858] | unrouted |
 | gen-su-18 | state | PARTIAL | 150/150 | - | - |
-| gen-su-26 | state | DIVERGED | 67/150 | frame 68 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-26 | state | PARTIAL | 150/150 | - | - |
 | gen-su-27 | state | PARTIAL | 150/150 | - | - |
-| gen-su-28 | state | DIVERGED | 68/150 | frame 69 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
-| gen-su-29 | state | DIVERGED | 91/150 | frame 92 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] | unrouted |
-| gen-su-30 | state | DIVERGED | 105/150 | frame 106 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-28 | state | PARTIAL | 150/150 | - | - |
+| gen-su-29 | state | PARTIAL | 150/150 | - | - |
+| gen-su-30 | state | PARTIAL | 150/150 | - | - |
 | gen-su-31 | state | PARTIAL | 150/150 | - | - |
 | gen-su-34 | state | DIVERGED | 72/150 | frame 73 monster 1:10 class 299, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | gen-su-37 | state | DIVERGED | 65/150 | frame 66 game, field seed: 1.14d [1996604610, 653070085] vs d2rs [1565768481, 650785885] | unrouted |
