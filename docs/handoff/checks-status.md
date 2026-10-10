@@ -1857,3 +1857,5 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-wp-25 | state | PARTIAL | 460/460 | - | - |
 | gen-wp-26 | state | PARTIAL | 460/460 | - | - |
 | gen-wp-28 | state | DIVERGED | 400/460 | frame 401 monster 1:29 class 403/308, field cl: 1.14d 403 vs d2rs 308 | unrouted |
+| gen-netc2s-5f | packets | MATCH | 40/40 | - | - |
+| gen-netc2s-60 | packets | DIVERGED | 39/40 | frame 20 stream s2c #1 id: 1.14d 23 vs d2rs 47 (id 0x23) | unrouted |

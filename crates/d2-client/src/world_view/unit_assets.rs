@@ -498,6 +498,19 @@ fn request_target(world: &ClientWorld, unit: &ClientUnit) -> Option<(u16, u16)> 
             let key = UnitKey::new(u8::try_from(r.record[0]).ok()?, r.record[1] as u32);
             world.units.get(&key)?.position
         }
+        // The client skill start (`0x004C6F40`: `0x00621C00(unit, x, y)`
+        // faces the cast point; a unit target is faced the same way,
+        // `0x004C6EB0`). PROVISIONAL (REC-3570): the turn is taken whole
+        // (1.14d turns by steps; measured `draws-frost-nova-sor` tick 27:
+        // dir 54 after 56 at tick 21).
+        0x15 => Some((
+            u16::try_from(r.record[2]).ok()?,
+            u16::try_from(r.record[3]).ok()?,
+        )),
+        0x16 => {
+            let key = UnitKey::new(u8::try_from(r.record[2]).ok()?, r.record[3] as u32);
+            world.units.get(&key)?.position
+        }
         _ => None,
     }
 }

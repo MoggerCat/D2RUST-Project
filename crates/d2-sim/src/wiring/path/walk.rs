@@ -599,13 +599,8 @@ fn stop_row_messages<X: Pending>(
             return;
         }
     };
-    // The death announcer (`wiring::action::dying`) already tells the
-    // clients of a DT / DD it started, and owns the corpse's.
-    let announced = v.h.death.announced.contains_key(&unit);
-    if !(matches!(row, StopRow::Death) || code == 9) || !announced {
-        v.h.x
-            .send(receiver, &player_stop(ty, guid, code, x, y, b, life));
-    }
+    v.h.x
+        .send(receiver, &player_stop(ty, guid, code, x, y, b, life));
     if row == StopRow::Death && own {
         let g = v.stats.unit_total(unit, 175, 0);
         if let Some(m) = crate::wiring::action::vitals_sync::stat_message(175, g) {
