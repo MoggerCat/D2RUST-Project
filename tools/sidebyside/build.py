@@ -150,7 +150,7 @@ def record_orig(name, g, out, reuse):
     # Wine runs about 1.1 server ticks per second with a PNG per frame: a long group (an outdoor
     # level by the town waypoint, ~500 ticks) needs more than the fixed 420 s (q-chk-render-world)
     total = sum(int(m) for m in re.findall(r"waitticks (\d+)", g["script"]))
-    secs = max(420, int(total * 1.2) + 90)
+    secs = max(420, int(total * float(os.environ.get("SBS_SLOW", "1.2"))) + 90)
     code = run(["tools/cloud-game/run.sh", "--python", "--seconds", str(secs + 60), "--out", os.path.join(out, "run"),
                 "--", "tools/trace-recorder/record_frames.py", "--game", os.path.join(GAME, "Game.exe"),
                 "--seconds", str(secs), "--every", "1", "--draws-every", "1", "--sounds", "--img-dir", img,
@@ -701,7 +701,11 @@ def main():
     jobs = []
     for name in a.groups.split(","):
         g = GROUPS[name]
-        scenes = [s for s in g["scenes"] if not only or s in only]
+        stop = os.environ.get("SBS_STOP_MARK")  # slow host: record only up to this mark
+        if stop and f"mark {stop};" in g["script"]:
+            g = dict(g, script=g["script"].split(f"mark {stop};")[0] + f"mark {stop}; waitticks 5; end")
+        scenes = [s for s in g["scenes"] if (not only or s in only)
+                  and (not stop or f"mark {g['scenes'][s][0]};" in g["script"])]
         if not scenes:
             continue
         cap = record_orig(name, g, os.path.join(out, "orig", name), a.reuse)

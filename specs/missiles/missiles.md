@@ -36,15 +36,15 @@
 |   R6. Damage stage (missile-owned part) | 578–722 |
 |   R7. Lifetime and expiry | 723–776 |
 |   R8. Pierce | 777–803 |
-|   R9. Server-do and server-hit catalogues | 804–1034 |
-|   R10. Behaviour of the recorded missiles | 1035–1069 |
-|   R11. `missiles.txt` columns and their server use | 1070–1117 |
-| Constants & data dependencies | 1118–1144 |
-| Randomness | 1145–1183 |
-| Edge cases & original bugs | 1184–1210 |
-| Test vectors | 1211–1293 |
-| Provenance | 1294–1346 |
-| Open questions | 1347–1437 |
+|   R9. Server-do and server-hit catalogues | 804–1040 |
+|   R10. Behaviour of the recorded missiles | 1041–1075 |
+|   R11. `missiles.txt` columns and their server use | 1076–1123 |
+| Constants & data dependencies | 1124–1150 |
+| Randomness | 1151–1189 |
+| Edge cases & original bugs | 1190–1216 |
+| Test vectors | 1217–1299 |
+| Provenance | 1300–1352 |
+| Open questions | 1353–1443 |
 <!-- /index -->
 
 ## Summary
@@ -984,6 +984,12 @@ result bits per §R5. Helpers:
   `0x0057CEE0` (§7.1). b = 8 (evade) and any other bit outside 1, 2,
   4, 0x10 adds no result bit; only the "b ≠ 0 → clear 1" applies
   (asm of `0x0056B9C0`).
+  Wiring (rc-player-mode, 2026-10-10): the scan runs on the live skill
+  pipeline (`Pending::missile_area_units` -> `skill_events::missile_area_units`
+  on `UseView`, REC-2660). Without it every area body hit nobody: a
+  monster's glacial spike never hurt the player, so 1.14d's player death
+  or get-hit (gen-boss-250 frame 66: life 12800 -> 0, shatter draw on the
+  player's seed, site `0x0057B0FD`) was missing in d2rs.
 
 Bodies:
 
