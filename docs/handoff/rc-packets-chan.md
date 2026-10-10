@@ -1,5 +1,5 @@
 # rc-packets-chan hand-back
-EQUAL 2023 -> 2026 (87 rows promoted under REC-2055: state equal, every channel incl. packets MATCH).
+EQUAL 2023 -> 2026 merged; my part has 86 rows EQUAL under REC-2055 (state equal, every channel incl. packets MATCH). Only 14 win the merge: 163 skill rows lose to rc-gen-skills.tsv (same rank 2, name order first). To land them: drop those skill.* rows from rc-gen-skills.tsv or rename my part to sort first.
 Changes: check-gen adds `packets` to gen-skill (210) and gen-obj (571, not yet run); packets added to 164 hand-written
 input checks behind PARTIAL rows (traces/checks/*.check); d2-server: a full-save join now sends the post-load
 0x23 selections (left hand 1, then right hand 0, owner -1) right after 0x94 (d2s.md §2.4 rule 6.2-6.3).
