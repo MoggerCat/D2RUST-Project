@@ -173,7 +173,7 @@ fn ends_are_pulled_toward_each_other() {
     assert!(!units_line_blocked(&w, &unit(8, 2, 1), &unit(2, 2, 0), 2));
 }
 
-// Covers: specs/monsters/ai.md §6 (`0x005DC640` offset table)
+// Covers: specs/monsters/ai.md §6
 #[test]
 fn reach_offset_table() {
     let want = [
@@ -186,7 +186,7 @@ fn reach_offset_table() {
     assert_eq!(reach_offset(400), 3);
 }
 
-// Covers: specs/monsters/ai.md §6 (`0x005DC640` probes, `0x006229F0`)
+// Covers: specs/monsters/ai.md §6
 #[test]
 fn can_reach_directly_probes_target_then_both_sides() {
     // a (2, 5) size 0, b (14, 5): d 12 → k 4; sx = −4, sy = 0; probes
