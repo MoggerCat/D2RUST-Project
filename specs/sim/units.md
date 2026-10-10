@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1004 |
-|   5. Event dispatch | 1005–1019 |
-|   6. Events per kind | 1020–1142 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1143–1164 |
-|   8. Collision line between two units | 1165–1169 |
-| Constants & data dependencies | 1170–1186 |
-| Randomness | 1187–1194 |
-| Edge cases & original bugs | 1195–1215 |
-| Test vectors | 1216–1275 |
-| Provenance | 1276–1362 |
-| Open questions | 1363–1442 |
+|   4. Modes and mode schedules | 454–1011 |
+|   5. Event dispatch | 1012–1026 |
+|   6. Events per kind | 1027–1149 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1150–1171 |
+|   8. Collision line between two units | 1172–1176 |
+| Constants & data dependencies | 1177–1193 |
+| Randomness | 1194–1201 |
+| Edge cases & original bugs | 1202–1222 |
+| Test vectors | 1223–1282 |
+| Provenance | 1283–1369 |
+| Open questions | 1370–1449 |
 <!-- /index -->
 
 ## Summary
@@ -483,6 +483,13 @@ start run: REC-590 `poke-fallen-town` state diff); settled by REC-592
 (record_state.py `fr`, `fc`, `sp` across a mode change without an
 animated start: join in town, walk start, a monster's NU after a
 think).
+
+Death corpse (`0x0057F700`, 2026-10-10, rc-player-fc): a player-type
+allocation leaves mode 0 (§3.1 step 7), so the corpse's `0x00624690(C, 17)`
+is a new mode and runs the re-init `0x00624390`: the corpse reads
+fc = 256, sp = 256 (recorded `gen-boss-708`, frame 83, with the player
+dead). It also holds an all-zero quest record (`q: []`); PROVISIONAL
+(REC-1960): the record's allocator is not read.
 
 #### 4.2 Animation schedule (events 0 and 1)
 

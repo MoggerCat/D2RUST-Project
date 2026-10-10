@@ -71,6 +71,13 @@ pub enum ModeMessageError {
 }
 
 impl<X: Pending> View<'_, X> {
+    /// Unit +0xB0 (`combat/damage.md` §7.1 step 2), as the messages send
+    /// it (u8): e of a monster mode-0 / mode-3 message, f of a mode-13
+    /// one (§7.4 rule 5), b of 0x0C / 0x0D.
+    pub fn unit_b0(&self, unit: UnitId) -> u8 {
+        self.units.get(unit).map_or(0, |r| r.hit_class as u8)
+    }
+
     /// The monster update `0x00598220` (§7.3 rule 2) for the client
     /// `client`, its messages sent to the client's player
     /// ([`Pending::send`]); a client without a player gets nothing. Needs
@@ -245,7 +252,7 @@ impl<X: Pending> View<'_, X> {
             path_90: path.dist_budget,
             max_distance: path.max_distance,
             stop_distance: path.stop_distance,
-            unit_b0: self.h.x.unit_b0(unit),
+            unit_b0: self.unit_b0(unit),
             life: life as u8,
             flag_100: self.h.x.monster_flag_100(unit),
             velocity: self.stats.unit_total(unit, STAT_VELOCITY, 0),

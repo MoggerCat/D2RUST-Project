@@ -181,7 +181,7 @@ impl<X: Pending> View<'_, X> {
             .unit_set(&mut *self.h, unit, STAT_LAST_SENT_HP, p, 0);
         let m = monster_hit(
             guid,
-            self.h.x.unit_b0(unit),
+            self.unit_b0(unit),
             p as u8,
             self.h.x.monster_flag_100(unit),
         );
