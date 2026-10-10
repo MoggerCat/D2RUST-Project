@@ -16,6 +16,7 @@ pub mod code {
     pub const NO_MANA: u32 = 1;
     pub const SHAPE: u32 = 4;
     pub const DISABLED: u32 = 3;
+    pub const NO_ITEM: u32 = 2;
     pub const PASSIVE: u32 = 5;
     pub const AURA: u32 = 6;
     pub const NO_LEVEL: u32 = 7;
@@ -59,6 +60,9 @@ pub fn use_state(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey, e: &SkillE
     if r.flags & crate::controls::click::skill_flag::PASSIVE != 0 {
         return code::PASSIVE;
     }
+    if !item_type_test(w, key, r) {
+        return code::NO_ITEM;
+    }
     if !can_afford(w, key, r, e, level) {
         return code::NO_MANA;
     }
@@ -66,6 +70,58 @@ pub fn use_state(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey, e: &SkillE
         return code::SHAPE;
     }
     code::USABLE
+}
+
+/// The item type test `0x00643F80` (`skills/use.md` §2 "Item type
+/// test", test 5): the skill's sets a / b against the items worn at body
+/// locations 4 (A) and 5 (B) of the local player's inventory.
+// PROVISIONAL (skills/use.md §2 test 5; REC-2900): the matched-item rules
+// (item flags 0x4000 / 0x100, the `shoots` ammo test) and the weapon in
+// use of Left Hand Throw / Swing are not applied: the model holds no
+// item flag, `shoots` or weapon-in-use facts for them; settled by a 1.14d
+// check of a bow skill with a bow and no quiver. Without the item tables
+// the test passes.
+fn item_type_test(w: &ClientWorld, key: UnitKey, r: &SkillRow) -> bool {
+    let Some(tables) = w.item_tables.0.clone() else {
+        return true;
+    };
+    let [ia, ib] = r.itypes;
+    let [ea, eb] = r.etypes;
+    // Rule 1.
+    if ea[0] <= 0 && ia[0] <= 0 {
+        return true;
+    }
+    let worn = |loc: u8| {
+        super::items::local_items(w)
+            .into_iter()
+            .find(|i| i.mode == super::items::mode::BODY && i.body == loc && i.owner == Some(key))
+            .and_then(|i| i.code)
+    };
+    let (ha, hb) = (worn(4), worn(5));
+    let listed = |t: &[i16]| t.iter().copied().take_while(|&t| t > 0).collect::<Vec<_>>();
+    let item_is = |c: [u8; 4], t: i16| tables.item_is_type(c, t);
+    // `hand(s, X, Y)` `0x00643D90`.
+    let hand = |it: &[i16], et: &[i16], x: Option<[u8; 4]>, y: Option<[u8; 4]>| match x {
+        None => {
+            if et[0] <= 0 && it[0] <= 0 {
+                return true;
+            }
+            [45, 46, 67].contains(&ia[0]) && ib[0] <= 0 && !y.is_some_and(|y| item_is(y, 45))
+        }
+        Some(x) => {
+            if listed(et).into_iter().any(|t| item_is(x, t)) {
+                return false;
+            }
+            let want = listed(it);
+            want.is_empty() || want.into_iter().any(|t| item_is(x, t))
+        }
+    };
+    // Rule 4.
+    if hand(&ia, &ea, ha, hb) {
+        hand(&ib, &eb, hb, ha)
+    } else {
+        hand(&ib, &eb, ha, hb) && hand(&ia, &ea, hb, ha)
+    }
 }
 
 /// The shape test `0x00644060` (`skills/use.md` §2 test 7): `restrict` 0
