@@ -31,13 +31,13 @@
 |   2. Spending stat points (message 0x3A) | 104–159 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 160–181 |
 |   4. Experience | 182–488 |
-|   5. Client vitals sync (`0x00548760`) | 489–630 |
-| Constants & data dependencies | 631–647 |
-| Randomness | 648–651 |
-| Edge cases & original bugs | 652–663 |
-| Test vectors | 664–684 |
-| Provenance | 685–720 |
-| Open questions | 721–757 |
+|   5. Client vitals sync (`0x00548760`) | 489–632 |
+| Constants & data dependencies | 633–649 |
+| Randomness | 650–653 |
+| Edge cases & original bugs | 654–665 |
+| Test vectors | 666–686 |
+| Provenance | 687–722 |
+| Open questions | 723–759 |
 <!-- /index -->
 
 ## Summary
@@ -501,6 +501,8 @@ link here.
    player: once after each tick that ran, `sim/intents-events.md` §1
    rule 1), before the client's buffers are sent, so these messages end
    the tick's batch. The leave flush `0x005303D0` passes 0 (no sync).
+   Recorded (`a2-npc-fara-heal` frame 15): the 0x95 is queued after the
+   recorder's `flush` record (caller `0x0053C3D3`), not in the tick.
    d2rs runs it inside the host flush (`Tick::flush_sync`, after the flush
    is announced), so the recorder tags its messages with the flush phase
    like 1.14d's (`sys-intents-moves`: `96` at frame 68, phase flush).

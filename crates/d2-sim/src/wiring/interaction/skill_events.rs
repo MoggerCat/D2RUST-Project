@@ -33,7 +33,7 @@ use crate::skills::use_::{
 };
 use crate::skills::SkillUnits;
 use crate::units::hooks::Sim;
-use crate::units::UnitId;
+use crate::units::{UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionHooks, Pending, SkillEvent, View};
 
@@ -114,6 +114,37 @@ pub fn monster_skill_start<X: Pending + UseRest>(
         },
     };
     start(&mut w, &t.skills, unit)
+}
+
+/// A monster's aura as its right skill (`monsters/init.md` §19.5 umod 30
+/// `0x005A1650`, `monsters/ai-bodies-2.md` §14 Duriel `0x005F67B0`):
+/// `0x0056DEB0` gives the skill at `level` (the entry's base level), then
+/// `0x005701B0(m, 0, skill, −1)` assigns it to the right hand: the aura
+/// state or the immediate do, and the type-8 aura timer whose do rolls
+/// the aura's damage on the monster's seed every `perdelay` frames
+/// (1.14d: Duriel's Holy Freeze `0x0056E0C0` at frames 51, 101, 151 of
+/// gen-lvl-73).
+pub fn monster_right_aura<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    if sim.units.get(unit).map(|r| r.ty) != Some(UnitType::Monster) {
+        return;
+    }
+    h.monster_skills
+        .entry(unit)
+        .or_default()
+        .insert(skill, level);
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    w.monster_aura_select(unit, skill);
 }
 
 /// The right skill's aura part of the save load's assign (`0x005701B0`,
