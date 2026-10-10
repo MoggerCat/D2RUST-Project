@@ -289,11 +289,13 @@ where
         else {
             return self.inner.place_in_gamble(npc_class, player, item);
         };
-        self.with_desk(|d| d.store_place(npc, item))
+        self.with_desk(|d| d.gamble_place(npc, player, item))
             .unwrap_or(false)
     }
     fn remove_gamble_item(&mut self, npc_class: u16, player: u32, item: UnitId) {
-        self.with_desk(|d| d.store_unlink(item));
+        if let Some(npc) = self.inner.record_npc(npc_class) {
+            self.with_desk(|d| d.gamble_unlink(npc, player, item));
+        }
         self.inner.remove_gamble_item(npc_class, player, item)
     }
     fn refresh_npc_inventory(&mut self, npc: UnitId) {
