@@ -115,7 +115,7 @@ Rows so far: 23 `q-fix-pc1today-*`.
 - needs_pc1 = y and not EQUAL: 235 → 179 (of the audit's 217 only
   `ui/frontend-credits`, 11 rows, is left: Credits / Cinematics do not take
   posted clicks on Windows).
-Rows so far: 25 `q-fix-pc1today-*`.
+Rows so far: 22 `q-fix-pc1today-*`.
 
 ## Push 5 (15:02) — credits, more world scenes
 
@@ -131,4 +131,4 @@ Rows so far: 25 `q-fix-pc1today-*`.
 - Private repo f47bdb6f: `recordings/pc1-2026-10-10/pixel-compare` (the 32
   1.14d / d2rs frame pairs), credits frame.
 - needs_pc1 = y and not EQUAL: 171. Of the audit's 217 rows, 3 are left.
-Rows so far: 26 `q-fix-pc1today-*`.
+Rows so far: 23 `q-fix-pc1today-*`.

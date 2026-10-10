@@ -1,0 +1,13 @@
+cause	checks	examples	likely_crate_spec	size	first_difference_example
+check has input/send lines but no packets channel (cannot settle EQUAL per REC-2055); state itself 0 differences	62	a5-wp-30-harrogath,a5-wp-31-lv111,a5-wp-32-lv112	check files (add packets channel)	S	state PARTIAL, input/send without a MATCHing packets channel
+state: monster field tx (target x) 1.14d 4324 vs d2rs 4321 on class 522 (ancient) at frame 7: spawn/aggro target position off by 3	20	a5-su-ancient1,a5-su-ancient2,a5-su-ancient3	d2-sim monsters/ai, specs/monsters	S	state: frame 7 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321
+packets: stream s2c id differs	17	a2-quest-radament,a2-quest-taintedsun,a2-quest-tombs	d2-server/d2-sim	M	packets: frame 61 stream s2c #36 id: 1.14d 9c vs d2rs 51 (id 0x9c)
+state field m differs at first difference	6	a3-warp-l94-temple-1-ama,a4-deseis-seal-early,a4-deseis-seal-loaded	d2-sim	M	state: frame 43 monster 1:10 class 47, field m: 1.14d 1 vs d2rs 15
+rng: n draw differs (site/extra mismatch)	2	a2-warp-l55-tomb-1-a-ama,a2-warp-l61-tomb-3-treasure-ama	d2-sim	M	rng: frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178
+rng: extra draw differs (site/extra mismatch)	2	a3-warp-l99-temple-6-ama,a4-warp-l104-mesa-1-ama	d2-sim	M	rng: frame 89, unit 1:5, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/combat/damage.rs:319
+packets: stream s2c bytes[6] differs	1	a2-quest-arcane	d2-server/d2-sim	M	packets: frame 84 stream s2c #0 bytes[6]: 1.14d 103 vs d2rs 114 (id 0x67)
+packets: stream s2c size differs	1	a2-quest-summoner	d2-server/d2-sim	M	packets: frame 16 stream s2c #22 size: 1.14d 16 vs d2rs 10 (id 0xaa)
+rng: before draw differs (site/extra mismatch)	1	a2-warp-l69-tomb-tal-4-ama	d2-sim	M	rng: frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256
+rng: missing draw differs (site/extra mismatch)	1	a4-warp-l106-mesa-3-ama	d2-sim	M	rng: frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None
+state field q differs at first difference	1	act-travel-lut-ama	d2-sim	M	state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs []
+state field seed differs at first difference	1	ass-blade-sentinel	d2-sim	M	state: frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640]

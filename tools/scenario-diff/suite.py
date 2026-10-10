@@ -311,7 +311,7 @@ def run_check(job, k, opts, game_sha, log):
         if res.get("error"):
             rec["error"] = res["error"]
         if not opts.dry_run and key is not None and any(
-                os.path.exists(os.path.join(work, ORIG_OUTPUTS[ch][0])) for ch in c["channels"]):
+                os.path.exists(os.path.join(work, ORIG_OUTPUTS[ch][0])) for ch in c["channels"] if ch in ORIG_OUTPUTS):
             with open(os.path.join(work, "suite.key"), "w", encoding="utf-8") as f:
                 json.dump(key, f, indent=1)
     except (SuiteError, OSError, subprocess.TimeoutExpired, sd.CheckError) as e:

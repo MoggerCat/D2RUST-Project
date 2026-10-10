@@ -1434,6 +1434,17 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().frame_event_index(u)
     }
     fn set_frame_event_index(&mut self, u: UnitId, i: i32) {
+        // `0x006212C0` stores into unit +0x38, which for a unit in a sequence is the
+        // sequence position (`sim/units.md` §4.2 rule 3): the Mosquito bite rewinds it.
+        if let Some(seq) = self
+            .cv
+            .v
+            .units
+            .get_mut(u)
+            .and_then(|r| r.anim.sequence.as_mut())
+        {
+            seq.pos = (seq.pos & 0xFF).wrapping_add(i.wrapping_mul(0x100));
+        }
         self.xm().set_frame_event_index(u, i);
     }
     /// Unit +0x48.
