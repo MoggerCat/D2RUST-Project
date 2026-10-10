@@ -364,6 +364,8 @@ def part_rank(path):
     b = os.path.basename(path)
     if b in BASE_PARTS:
         return 0
+    if b == "rc-promote.tsv":
+        return 3   # fresh-run promotion of PARTIAL rows (tools/coord/promote.py) wins over older rc-* states
     return 2 if b.startswith("rc-") else 1
 
 
