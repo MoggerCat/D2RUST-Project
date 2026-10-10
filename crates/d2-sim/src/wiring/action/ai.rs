@@ -168,17 +168,15 @@ impl<X: Pending> AiUnits for View<'_, X> {
             None => self.h.x.vision_seen(unit),
         }
     }
-    /// §5.2 step 7 on the record: +0x24 := 1.
-    ///
-    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
-    /// REC-1698): the word is set to 1 and never cleared.
-    fn mark_seen(&mut self, unit: UnitId) {
+    /// §5.2 step 7 on the record: +0x24 := `value` (S == 0), written
+    /// only when step 2 loaded the record (`0x005DDBE6`).
+    fn mark_seen(&mut self, unit: UnitId, value: u32) {
         match self.h.monster_data(unit).map(|m| m.vision) {
             Some(Some(r)) => {
-                self.h.vision_seen.insert(r, 1);
+                self.h.vision_seen.insert(r, value);
             }
             Some(None) => {}
-            None => self.h.x.mark_seen(unit),
+            None => self.h.x.mark_seen(unit, value),
         }
     }
     fn ai_reset(&mut self, unit: UnitId) {

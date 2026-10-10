@@ -14,6 +14,7 @@ const SEEDS: [u32; 4] = [1, 12345, 3_735_928_559, 4_014_346_870];
 
 #[derive(Default)]
 struct Fake {
+    marks: Vec<u32>,
     seeds: BTreeMap<UnitId, Seed>,
     class: BTreeMap<UnitId, i32>,
     anim: BTreeMap<UnitId, u8>,
@@ -242,7 +243,9 @@ impl AiUnits for Fake {
     fn vision_seen(&self, _: UnitId) -> Option<u32> {
         self.vision
     }
-    fn mark_seen(&mut self, _: UnitId) {}
+    fn mark_seen(&mut self, _: UnitId, v: u32) {
+        self.marks.push(v);
+    }
     fn ai_reset(&mut self, unit: UnitId) {
         self.log.push(format!("reset {}", unit.0));
     }
