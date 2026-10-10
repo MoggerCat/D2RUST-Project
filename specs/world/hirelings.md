@@ -44,14 +44,14 @@
 |   10. Restoring from a save | 684–729 |
 |   11. Items (expansion) | 730–799 |
 |   12. Services (links) | 800–803 |
-|   13. Messages | 804–870 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 871–877 |
-| Constants & data dependencies | 878–901 |
-| Randomness | 902–912 |
-| Edge cases & original bugs | 913–964 |
-| Test vectors | 965–1027 |
-| Provenance | 1028–1084 |
-| Open questions | 1085–1177 |
+|   13. Messages | 804–875 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 876–882 |
+| Constants & data dependencies | 883–906 |
+| Randomness | 907–917 |
+| Edge cases & original bugs | 918–969 |
+| Test vectors | 970–1032 |
+| Provenance | 1033–1089 |
+| Open questions | 1090–1182 |
 <!-- /index -->
 
 ## Summary
@@ -845,6 +845,11 @@ Moved to `world/hirelings-2.md` §12 (number kept).
      in that pass. The experience delta of §7.3 rule 4 is different: it
      goes at once to the owner's client only (`0x005531C0` then
      `0x0053BFD0` at `0x0057E90B`–`0x0057E914`).
+   - Implemented (rc-pkt-handwritten, REC-3371): the queue is the unit's
+     event-record list (`EventRecord::UnitStat`, `LifecycleHooks::queue_unit_stat`),
+     so `send_event_records` (0x00571CD0) flushes it in the add and again in
+     the first monster update; hire-kashya / hire-greiz / hire-asheara /
+     hire-qual-kehk packets MATCH.
    - Recording evidence (`traces-raw-buddy/merc1-spawn-packets.jsonl`,
      `docs/handoff/local-buddy-recordings.md` Pass 2 B, hire of Diane at
      Kashya): C→S 0x36 in the input phase of frame 1730; in the tick

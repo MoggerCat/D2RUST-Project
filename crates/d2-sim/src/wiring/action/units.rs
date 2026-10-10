@@ -970,12 +970,22 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         let Some(ty) = UnitType::ALL.get(usize::from(owner_type)).copied() else {
             return;
         };
+        if ty == UnitType::Player {
+            self.hireling_units.insert(unit);
+        }
         if let Some(c) = self.ai.as_mut().and_then(|s| s.control_mut(unit)) {
             c.minion_owner = Some(ai::UnitRef {
                 ty,
                 guid: owner_guid,
             });
         }
+    }
+
+    fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
+        self.event_records.push(
+            unit,
+            super::event_records::EventRecord::UnitStat { stat, value },
+        );
     }
 
     /// On the lent monster world (none: nothing).

@@ -364,6 +364,8 @@ def part_rank(path):
     b = os.path.basename(path)
     if b in BASE_PARTS:
         return 0
+    if b == "rc-promote.tsv":
+        return 3   # fresh-run promotion of PARTIAL rows (tools/coord/promote.py) wins over older rc-* states
     return 2 if b.startswith("rc-") else 1
 
 
@@ -379,7 +381,10 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 continue
             if r["area"] in by_area:
                 first = by_area[r["area"]]
-                if part_rank(r["_file"]) > part_rank(first["_file"]):
+                unsettled = ("NO-CHECK", "UNKNOWN")
+                if part_rank(r["_file"]) > part_rank(first["_file"]) or (
+                        part_rank(r["_file"]) == part_rank(first["_file"])
+                        and first["state"] in unsettled and r["state"] not in unsettled):
                     # a session's part (a check run) supersedes the base inventory row
                     out[out.index(first)] = r
                     by_area[r["area"]] = r
