@@ -436,6 +436,15 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         // dead-body footprint `0x00649F70(P, 1)` replaces the player's
         // 0x80 footprint, so missiles no longer see the body.
         View::of(sim.units, sim.stats, sim.data, self).dead_body_footprint(unit);
+        // The dead clean-up `0x0057F330` (`vitals.md` §4.8 rule 1.5): base
+        // hitpoints := 0, the death list sweep `0x00627540`, and the
+        // states but the keep mask (`plrstaydeath`) cleared; a poisoned
+        // player is told the state ended (recorded `items-drops-hel-02`
+        // frame 38: 0xA9 state 2).
+        sim.stats.unit_set(&mut *self, unit, 6, 0, 0);
+        sim.stats.death(&mut *self, unit);
+        sim.stats
+            .clear_states_except(unit, crate::stats::states::group::PLR_STAY_DEATH);
         self.death_notice(sim, unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
