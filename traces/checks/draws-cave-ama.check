@@ -12,3 +12,4 @@ seconds 600
 channels draws
 draws-at 73
 at 20 poke warp 9
+input frame 38; move 790 10

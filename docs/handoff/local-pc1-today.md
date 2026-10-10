@@ -132,3 +132,15 @@ Rows so far: 22 `q-fix-pc1today-*`.
   1.14d / d2rs frame pairs), credits frame.
 - needs_pc1 = y and not EQUAL: 171. Of the audit's 217 rows, 3 are left.
 Rows so far: 23 `q-fix-pc1today-*`.
+
+## Push 6 (15:31) — stable UI recordings
+
+- The run-to-run instability of the UI checks is explained and fixed: 1.14d
+  reads the real pointer, so an unpinned cursor hovered Warriv in some runs
+  (six glyph rows). All key-only draws checks now pin the cursor (`frame 38;
+  move 790 10`), the skill-pick checks use `hold X Y 2`; 1.14d sides
+  re-recorded twice: equal UI rows (`specs/tools/scenario-diff.md` Edge case 2).
+  Only `ui-draws-character-ama` still varies by 6 glyph rows.
+- With the pin, the belt key and the party key add no UI row on 1.14d (empty
+  belt; single player).
+- `pc1-data.md` Step 4: the audit item is marked (214 of 217).

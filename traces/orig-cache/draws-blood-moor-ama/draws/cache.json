@@ -23,17 +23,19 @@
   "1",
   "--no-save",
   "--poke",
-  "20 warp 2"
+  "20 warp 2",
+  "--input",
+  "frame 38; move 790 10"
  ],
  "files": {
   "orig.frames.jsonl": {
-   "sha256": "734a09f0cc6ad66fb1109e5df76cc0e4c6312bd8cbc0d1552a1ac6eefe6fe4d0",
-   "size": 4017558
+   "sha256": "b7cdf14858972b0b34a5bc2c489ca4ff0e02cf1a8a65bdbf85e10c7bb98c6025",
+   "size": 4078617
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "2f9b51285dfb9309ef73776f48a1aa1fc93d8e7d8ac76dac82ca9a9f530e6ef9",
+  "check": "fec7c7d7e1970b0fb54c82de28e8dbb0d4aecc5a2239bdfcca2d757b29c69aed",
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
