@@ -8,7 +8,7 @@ save ScnNec --class nec --expansion --level 30 --skill 0=1 --right-skill 70
 seed 1234
 ticks 220
 seconds 400
-channels state rng
+channels state rng packets
 ignore q
 variant blood-moor-empty
 at 4 poke warp 2
