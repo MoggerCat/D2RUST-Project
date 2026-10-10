@@ -58,11 +58,11 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         if matches!(
             callback.0,
-            DEFAULT | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+            DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
         ) {
             self.removed_lists.push((unit, state, callback.0));
         }
@@ -367,7 +367,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     // maximum (the shrine set stamina to 2v on the list); the skill one's
     // skill refresh has nothing to refresh here (levels read the stat).
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO};
         use crate::skills::use_::bodies::helpers::FLAG_40;
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
@@ -395,7 +395,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             // (`skills/bodies.md` §2.8; `0x0056E900`, 1.14d-read): the
             // rate stats of the freed list (cold: 67-69) leave the
             // unit's speed and velocity (gen-mon-295 frame 71).
-            if matches!(cb, DEFAULT | SKILL_REMOVE | STAMINA_REMOVE) {
+            if cb == COLD
+                && sim.units.get(u).is_some_and(|r| {
+                    let dead = if r.ty == UnitType::Player { 17 } else { 12 };
+                    r.mode != 0 && r.mode != dead
+                })
+            {
+                // `0x0057AD80`: a living unit's shatter (107) goes off.
+                sim.stats.toggle_state(u, 107, false);
+            }
+            if matches!(cb, DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE) {
                 let speed = self.rate_refresh(sim, u);
                 if let (Some(s), Some(r)) = (speed, sim.units.get_mut(u)) {
                     r.anim.speed = s;
