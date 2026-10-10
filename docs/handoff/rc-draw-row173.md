@@ -8,7 +8,6 @@ Base: specs-staging-7 + integ-r23. 22 draws checks (21 gen + `draws-town-arrival
 - Row 176: a listed unit without a pose (object 78 `invisible town sound`, no COF) is the unit call alone. New hook `ViewRules::unit_listed_key`. Spec: `draw-order.md` §5 r4.
 - Row 177: the export started runs by tag (GUID only), so monster 1:3 and object 2:3 merged. A run is now one draw slot. Spec: `tools/facts-render.md` §5 r1.
 - Row 180: objects with `Draw` (+0x150) 0 (385 `cain start position`): `0x00471EC0` returns before the cel, but the shadow still draws (row 112). New hook `unit_draws_body`; `UnitLooks::object_no_draw`. Spec: `unit-composite.md` §8.
-
 - Rows 188-191: the missing unit was Gheed 1:4, not torch 2:5. The monster walk track (`bridge/motion.rs`) never ran the room recache (`0x0064FAD0`, `sim/pathing.md` §9.6 r9), so Gheed stayed in the room of tiles 960-967, which fails the draw order's room test. Spec: `sim/unit-order.md` §5 r6.
 
 ## Next causes (by ledger rows)
