@@ -143,6 +143,12 @@ impl<X: Pending> AiUnits for View<'_, X> {
             None => self.h.x.ai_state(unit),
         }
     }
+    fn source_unit(&self, unit: UnitId) -> Option<UnitId> {
+        if self.units.get(unit)?.flags2 & 0x400 == 0 {
+            return None;
+        }
+        self.h.unit_source.get(&unit).copied()
+    }
     fn alignment(&self, unit: UnitId) -> u8 {
         self.h.x.alignment(unit)
     }
