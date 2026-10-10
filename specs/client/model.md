@@ -2036,6 +2036,57 @@ skill modes itself.
    rule 9 (blood spray, attack pick, NPC turn, re-init and client
    creates, missiles, paths, overlays, sounds). Static order as stated
    there; the seed values are capture-only (open question 9, REC-51).
+4. **The local player's seed from creation to the first sound tick**
+   (1.14d-confirmed, read 2026-10-10, PC 1 today; answers open question
+   6). `step` = one step of `sim/rng.md` §2; `S[n]` = `step`ⁿ({1, 666}).
+   No site of the join re-initialises the seed after the creation (§2
+   rule 6): it starts at {1, 666} and is only stepped, so it depends on
+   neither the game seed, the GUID nor the save. A single-player join
+   steps it at these sites, in this order:
+
+   | n | Phase | Site | Draw |
+   |---|---|---|---|
+   | 1 | receive, S→C 0x59 at (0, 0) | `0x00460D16` (`0x00460BF0`; skipped by `0x00460D12` only when the unit already is the local player) | rule 2; `S[1]` = {0x6AC6935F, 0} |
+   | 2–4 | receive, S→C 0x15 with flag u8@0xA ≠ 0 (the join's 0x15 has flag 1) | `0x004654C0` → `0x00472C20(flag)` (`0x0046569F`) → `0x004726F0(flag)` → `0x00472610` | wind set-up, `render/draw-order-2.md` §11.8 r1 (outside act V) |
+   | 5–7 | first in-game frame `0x0044C990`: loading-screen close `0x004547B0` (`0x0044C999`) → act load `0x00472890` → `0x004726F0(1)` | `0x00472610` | same |
+   | 8–10 | same act load, only the first of the client process (`[0x007A8A30]` = 0) | `0x00472610` (`0x004728AC`) | same |
+   | 11–15 | same frame, weather update `0x00473F50` (`0x0044CA5E`), only when the level has `Rain` and the rain cycle's countdown is 0 | `0x00473E50`, `0x00473D00(1)` | `D`, 3 wind steps, peak (`render/draw-order-2.md` §11.3) |
+   | 16 | same frame, cursor step after the cursor draw | `0x004681C0` (from `0x00468310`) | `ui/panels-3.md` §23 r8: always taken in the first frame (last step time 0, state 1 from the init) |
+
+   No other site runs before the first sound tick of such a join: the
+   0x59 is at (0, 0) (no room seed, rule 1); 0x0B makes the unit the
+   local player before 0x15; the placements of `0x00460F10` and
+   `0x004C8B80` pass flag 0 (`0x00460FD0`, `0x004C8C44`: no weather
+   draw); no frame is drawn before the player has a room (`0x0044F280`),
+   and the loading screen makes no cursor step (recorded: last step
+   time 0 at the first frame). The loop pass of the
+   first client update (C = 1) draws that first frame and then runs the
+   first sound tick (T = 0, `audio/sound-table-2.md` §14.2), so the seed
+   **at the first sound tick** is `S[16]` = {0xE4CA4C4E, 0x3A4FDE2B} in
+   the first game of a process started in the Rogue Encampment (rows
+   8–10 drop out in a later game: `S[13]` when the cycle also draws;
+   rows 11–15 drop out where the start level has no `Rain`). `S[4]` =
+   {0xB6AAB839, 0x10B1BFE6}, `S[10]` = {0xFADF7581, 0x608BA2E9}, `S[15]`
+   = {0x8BCE50FF, 0x063C8813}. Recorded (ScnAma, `-seed 1234`):
+   `traces/orig-cache/draws-town-arrival-ama` has `seed_start` = `S[4]`
+   and `seed_end` = `S[16]` for the first drawn frame, then 6, 1, 5, 0
+   steps for the next frames (one rain spawn = 5, cursor = 1). After
+   that, per loop pass: receive and update draws (§19 rule 9 sites on
+   this unit; sound trigger draws), the frame's weather draws
+   (`render/draw-order-2.md` Randomness), one cursor step per drawn
+   frame while the cursor is in state 1 and more than 16 ms passed
+   since its last step, then the sound tick's draws
+   (`audio/sound-table-2.md` §14.1). A pass whose frame is skipped
+   (`render/camera.md` §9) makes none of the frame's draws, so a first
+   pass without a frame gives `S[4]` at the first sound tick.
+   PROVISIONAL (REC-2439): the per-site seed values of this table are
+   derived from the code and two recordings that bracket them (frame
+   start / end); settled by a hook recording of each site
+   (`audio/sound-table-2.md` §14.5). PROVISIONAL (REC-2440): d2rs steps
+   the cursor once per drawn frame for the first 5,000 ms of cursor
+   idle time (because the original's 16 ms and 5,000 ms tests are on
+   wall-clock time and a 25 Hz frame always passes the first); settled
+   by the same recording's cursor log.
 
 ## Edge cases & original bugs
 
@@ -2365,7 +2416,9 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    point, fatal asserts, free-point fallback). Open: the map-tile feed
    (RW2) from the client rooms stays with `drlg/` and the render specs.
 6. Later draws on the local player's client seed (animation, sounds)
-   before a shake reads it (`render/camera.md` OQ6).
+   before a shake reads it (`render/camera.md` OQ6). *Answered*
+   (2026-10-10, PC 1 today): Randomness rule 4 gives every draw from
+   creation to the first sound tick and the per-pass order after it.
 7. ~~The visibility predicate `0x004DBF20`~~: answered in §13. Open:
    the 0x48-byte cel context fields beyond frame, component and
    direction, and the `0x006001F0` load arguments (`render/capture.md`

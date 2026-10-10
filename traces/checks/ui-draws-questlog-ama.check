@@ -1,0 +1,14 @@
+check 1
+# UI draw list (PC 1 2026-10-10, local-pc1-today): Rogue Encampment arrival, then the quest log panel (key Q);
+# the draw list of server tick 73 on both sides (as draws-town-arrival-ama).
+# ScnAma, -seed 1234. Under the debugger 1.14d does not draw every tick: the run
+# compares its last drawn tick <= 73 on both sides.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/ui/panels-2.md, specs/world/quests-status.md.
+name ui-draws-questlog-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 76
+seconds 600
+channels draws
+draws-at 73
+input frame 40; key Q

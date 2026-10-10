@@ -153,6 +153,35 @@ Runs unless the snow lock `[0x007A8A1C]` is set and the phase is not 2
 
 Units are weather updates (one per client update with rain on).
 
+**Seed and the first cycle** (1.14d-confirmed `0x00473F50`, `0x00473E50`,
+`0x00473D00`, `0x00472610`, `0x00472890`, `0x004547B0`, read 2026-10-10,
+PC 1 today). The cycle has no seed of its own: `0x00473F50` passes the
+local player's client unit seed (unit `[0x007A6A70]` + 0x20) to every
+draw, and nothing seeds it at game or act start; its value there is the
+prefix of `client/model.md` Randomness rule 4. In the first game of a
+client process (phase 0, countdown 0, §11.1) the first weather update of
+a raining level therefore draws, in order: `D` := 250 + (step mod 250)
+(phase 0 → 1); the three steps of `0x00472610` (phase entry 1 →
+`0x004726F0(0)`, §11.8 r1); peak := 32 + (step mod 224). Five steps, no
+other draw in that update (target = ⌊peak / `D`⌋ = 0 unless peak ≥ `D`).
+Update `k` (the first is `k` = 1) then has target ⌊peak × `k` / `D`⌋,
+and the top-up spawns 5 steps per missing particle (§11.4 r5). The rain
+sound starts in the sound tick of the first update with target ≥ 2
+(`audio/environment.md` §6: trunc(target × 255 / 256) ≠ 0), i.e. `k` =
+⌈2`D` / peak⌉. A join into an act I–IV town (any game seed, any save):
+steps 11–15 of the stream of `client/model.md` Randomness rule 4 give
+`D` = 498, retarget countdown 465, lightning countdown 1,968, wind =
+goal = 147, peak = 255; target 1 at `k` = 2, 2 at `k` = 4, 3 at `k` = 6;
+rain request at `k` = 4 (these values need the first rain update in the
+join's first drawn frame, i.e. a start level with `Rain`). Recorded: `facts/client/weather/a1-town-rain-start.tsv`
+(targets), `traces/audio/win/audio-town-ambience-ama.orig-win.jsonl`
+(request 64 from `0x004E448A` at T 3, C 4), and the 12 steps of the
+first drawn frame in `traces/orig-cache/draws-town-arrival-ama`
+(`seed_start` {0xB6AAB839, 0x10B1BFE6} → `seed_end` {0xE4CA4C4E,
+0x3A4FDE2B}). In a later game of the same process the cycle state
+carries over (§11.1), so the first update draws only when the old
+countdown is 0.
+
 #### 11.4 Particles: top-up, wind, lightning timer (`0x004737B0`)
 
 1. While the live particle count < target: spawn one (`0x00473090`, r5).
