@@ -13,11 +13,11 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | combat | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 6–24 | 0 | 0 / 0 / 3 |
 | cov-promoted | 5 | 2 | 0 | 0 | 0 | 3 | 0 | 2 | 0 | 4–16 | 0 | 5 / 0 / 0 |
 | cov-tables | 329 | 2 | 0 | 0 | 0 | 327 | 2 | 0 | 0 | 1–4 | 0 | 320 / 9 / 0 |
-| coverage | 200 | 29 | 0 | 61 | 0 | 110 | 60 | 30 | 0 | 90–360 | 0 | 181 / 11 / 8 |
+| coverage | 200 | 26 | 0 | 61 | 0 | 113 | 60 | 27 | 0 | 84–336 | 0 | 181 / 11 / 8 |
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 27 | 1 | 0 | 20 | 0 | 6 | 4 | 15 | 2 | 48–128+ | 0 | 3 / 0 / 24 |
 | items | 721 | 43 | 0 | 46 | 0 | 632 | 25 | 64 | 0 | 140.5–562 | 65 | 652 / 0 / 69 |
-| monsters | 660 | 152 | 0 | 10 | 0 | 498 | 15 | 147 | 0 | 301.5–1206 | 5 | 400 / 240 / 20 |
+| monsters | 660 | 67 | 0 | 10 | 0 | 583 | 1 | 76 | 0 | 152.5–610 | 5 | 400 / 240 / 20 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | q-chk-render-ui | 12 | 10 | 0 | 2 | 0 | 0 | 5 | 5 | 2 | 28.5–50+ | 0 | 10 / 0 / 2 |
 | rc-client-seed-2 | 2 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 2.5–10 | 0 | 2 / 0 / 0 |
@@ -30,10 +30,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
-| systems | 918 | 359 | 46 | 251 | 0 | 262 | 250 | 404 | 2 | 949–3732+ | 39 | 554 / 0 / 364 |
+| skills | 655 | 93 | 0 | 11 | 0 | 551 | 16 | 88 | 0 | 184–736 | 6 | 545 / 99 / 11 |
+| systems | 918 | 358 | 46 | 251 | 0 | 263 | 249 | 404 | 2 | 948.5–3730+ | 39 | 554 / 0 / 364 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 858 | 46 | 459 | 0 | 3116 | 475 | 876 | 12 | 2085.5–7958+ | 286 | 3522 / 382 / 575 |
+| **all** | 4479 | 764 | 46 | 459 | 0 | 3210 | 459 | 798 | 12 | 1921.5–7302+ | 286 | 3522 / 382 / 575 |
 
 ## By family
 
@@ -47,7 +47,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `audio` | 6 | 3 | 0 | 2 | 0 | 1 | 0 | 1 | 4 | 0 | 0 | 0 |
 | `check` | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `client` | 7 | 4 | 0 | 3 | 0 | 0 | 0 | 3 | 3 | 1 | 0 | 1 |
-| `cov` | 397 | 30 | 0 | 1 | 0 | 366 | 0 | 2 | 29 | 0 | 0 | 10 |
+| `cov` | 397 | 27 | 0 | 1 | 0 | 369 | 0 | 2 | 26 | 0 | 0 | 10 |
 | `coverage` | 8 | 0 | 0 | 8 | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
 | `cube` | 15 | 1 | 0 | 5 | 0 | 9 | 2 | 3 | 3 | 0 | 2 | 0 |
 | `data` | 3 | 0 | 0 | 2 | 0 | 1 | 0 | 1 | 1 | 0 | 0 | 0 |
@@ -658,9 +658,9 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `level` | 136 | 7 | 0 | 0 | 0 | 129 | 0 | 0 | 7 | 0 | 100 | 5 |
 | `missile` | 299 | 4 | 0 | 46 | 0 | 249 | 0 | 44 | 6 | 0 | 0 | 2 |
 | `mon` | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | 0 |
-| `monster` | 669 | 155 | 0 | 12 | 0 | 502 | 0 | 14 | 152 | 1 | 4 | 241 |
+| `monster` | 669 | 70 | 0 | 12 | 0 | 587 | 0 | 0 | 81 | 1 | 4 | 241 |
 | `net.c2s` | 113 | 11 | 9 | 14 | 0 | 79 | 0 | 27 | 7 | 0 | 26 | 0 |
-| `net.s2c` | 183 | 39 | 21 | 68 | 0 | 55 | 1 | 118 | 10 | 0 | 1 | 0 |
+| `net.s2c` | 183 | 38 | 21 | 68 | 0 | 56 | 1 | 117 | 10 | 0 | 1 | 0 |
 | `npc` | 48 | 11 | 0 | 6 | 0 | 31 | 0 | 6 | 11 | 0 | 1 | 10 |
 | `object` | 524 | 0 | 0 | 16 | 0 | 508 | 5 | 6 | 10 | 0 | 10 | 0 |
 | `quest` | 53 | 12 | 0 | 32 | 0 | 9 | 0 | 4 | 35 | 5 | 27 | 14 |
@@ -670,8 +670,8 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 16 | 0 | 0 | 0 | 14 | 0 | 0 | 16 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 12 | 0 | 0 | 0 | 18 | 0 | 0 | 12 | 0 | 0 | 23 |
-| `skill.bar` | 30 | 6 | 0 | 0 | 0 | 24 | 0 | 5 | 1 | 0 | 0 | 26 |
-| `skill.dru` | 31 | 16 | 0 | 0 | 0 | 15 | 0 | 4 | 12 | 0 | 0 | 21 |
+| `skill.bar` | 30 | 5 | 0 | 0 | 0 | 25 | 0 | 4 | 1 | 0 | 0 | 26 |
+| `skill.dru` | 31 | 12 | 0 | 0 | 0 | 19 | 0 | 4 | 8 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
 | `skill.monster` | 65 | 13 | 0 | 0 | 0 | 52 | 0 | 4 | 9 | 0 | 0 | 18 |
@@ -715,9 +715,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 ## Merge notes
 
 - Coverage rows applied to entity rows (exercised): 2661
-- Rows set exercised = yes from the coverage reports' seen lists: 19
+- Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6168
+- Duplicate areas between parts: 6265
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1289,36 +1289,72 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.fetishshaman2`: rc-extra-missile.tsv:3 kept, rc-gen-mon-triage.tsv:72 dropped
   - `monster.fetishshaman3`: rc-extra-missile.tsv:4 kept, rc-gen-mon-triage.tsv:73 dropped
   - `monster.fetishshaman4`: rc-extra-missile.tsv:5 kept, rc-gen-mon-triage.tsv:74 dropped
+  - `monster.baboon6`: rc-c011-gameseed.tsv:17 kept, rc-gen-mon-triage.tsv:76 dropped
   - `monster.megademon3`: rc-extra-missile.tsv:8 kept, rc-gen-mon-triage.tsv:90 dropped
   - `monster.reanimatedhorde1`: rc-damage-draws.tsv:7 kept, rc-gen-mon-triage.tsv:104 dropped
   - `monster.reanimatedhorde2`: rc-damage-draws.tsv:8 kept, rc-gen-mon-triage.tsv:105 dropped
   - `monster.reanimatedhorde3`: rc-damage-draws.tsv:9 kept, rc-gen-mon-triage.tsv:106 dropped
+  - `monster.siegebeast1`: rc-c011-gameseed.tsv:64 kept, rc-gen-mon-triage.tsv:108 dropped
+  - `monster.siegebeast2`: rc-c011-gameseed.tsv:65 kept, rc-gen-mon-triage.tsv:109 dropped
+  - `monster.siegebeast3`: rc-c011-gameseed.tsv:66 kept, rc-gen-mon-triage.tsv:110 dropped
   - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-gen-mon-triage.tsv:122 dropped
+  - `monster.deathmauler1`: rc-c011-gameseed.tsv:28 kept, rc-gen-mon-triage.tsv:134 dropped
+  - `monster.deathmauler2`: rc-c011-gameseed.tsv:29 kept, rc-gen-mon-triage.tsv:135 dropped
+  - `monster.deathmauler3`: rc-c011-gameseed.tsv:30 kept, rc-gen-mon-triage.tsv:136 dropped
+  - `monster.deathmauler4`: rc-c011-gameseed.tsv:31 kept, rc-gen-mon-triage.tsv:137 dropped
+  - `monster.deathmauler5`: rc-c011-gameseed.tsv:32 kept, rc-gen-mon-triage.tsv:138 dropped
   - `monster.ancientbarb1`: rc-damage-draws.tsv:11 kept, rc-gen-mon-triage.tsv:139 dropped
   - `monster.ancientbarb2`: rc-damage-draws.tsv:12 kept, rc-gen-mon-triage.tsv:140 dropped
   - `monster.ancientbarb3`: rc-damage-draws.tsv:13 kept, rc-gen-mon-triage.tsv:141 dropped
+  - `monster.sk-archer7`: rc-c011-gameseed.tsv:67 kept, rc-gen-mon-triage.tsv:149 dropped
+  - `monster.sk-archer9`: rc-c011-gameseed.tsv:68 kept, rc-gen-mon-triage.tsv:150 dropped
   - `monster.clawviper7`: rc-damage-draws.tsv:14 kept, rc-gen-mon-triage.tsv:159 dropped
   - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-gen-mon-triage.tsv:161 dropped
   - `monster.clawviper10`: rc-damage-draws.tsv:16 kept, rc-gen-mon-triage.tsv:162 dropped
   - `monster.fallenshaman3`: rc-damage-draws.tsv:17 kept, rc-gen-mon-triage.tsv:163 dropped
   - `monster.blunderbore5`: rc-damage-draws.tsv:18 kept, rc-gen-mon-triage.tsv:176 dropped
   - `monster.blunderbore6`: rc-damage-draws.tsv:19 kept, rc-gen-mon-triage.tsv:177 dropped
+  - `monster.skmage-cold5`: rc-c011-gameseed.tsv:69 kept, rc-gen-mon-triage.tsv:182 dropped
+  - `monster.sandleaper6`: rc-c011-gameseed.tsv:56 kept, rc-gen-mon-triage.tsv:186 dropped
+  - `monster.sandleaper7`: rc-c011-gameseed.tsv:57 kept, rc-gen-mon-triage.tsv:187 dropped
+  - `monster.fallenshaman6`: rc-c011-gameseed.tsv:33 kept, rc-gen-mon-triage.tsv:198 dropped
+  - `monster.bloodlord6`: rc-c011-gameseed.tsv:23 kept, rc-gen-mon-triage.tsv:206 dropped
   - `monster.scarab6`: rc-damage-draws.tsv:20 kept, rc-gen-mon-triage.tsv:207 dropped
   - `monster.scarab7`: rc-damage-draws.tsv:21 kept, rc-gen-mon-triage.tsv:208 dropped
   - `monster.fetishshaman6`: rc-extra-missile.tsv:10 kept, rc-gen-mon-triage.tsv:215 dropped
   - `monster.fetishshaman8`: rc-extra-missile.tsv:11 kept, rc-gen-mon-triage.tsv:216 dropped
   - `monster.megademon4`: rc-extra-missile.tsv:12 kept, rc-gen-mon-triage.tsv:236 dropped
   - `monster.megademon5`: rc-extra-missile.tsv:13 kept, rc-gen-mon-triage.tsv:237 dropped
+  - `monster.sandmaggot2`: rc-c011-gameseed.tsv:58 kept, rc-gen-mon-triage.tsv:238 dropped
+  - `monster.sandmaggot3`: rc-c011-gameseed.tsv:59 kept, rc-gen-mon-triage.tsv:243 dropped
+  - `monster.sandmaggot4`: rc-c011-gameseed.tsv:60 kept, rc-gen-mon-triage.tsv:246 dropped
   - `monster.megademon6`: rc-extra-missile.tsv:14 kept, rc-gen-mon-triage.tsv:247 dropped
   - `monster.scarab8`: rc-damage-draws.tsv:22 kept, rc-gen-mon-triage.tsv:250 dropped
   - `monster.clawviper5`: rc-damage-draws.tsv:23 kept, rc-gen-mon-triage.tsv:254 dropped
   - `monster.scarab3`: rc-damage-draws.tsv:24 kept, rc-gen-mon-triage.tsv:264 dropped
   - `monster.scarab5`: rc-damage-draws.tsv:25 kept, rc-gen-mon-triage.tsv:265 dropped
+  - `monster.ai.clawviper`: rc-c011-gameseed.tsv:9 kept, rc-gen-monai.tsv:5 dropped
+  - `monster.ai.highpriest`: rc-c011-gameseed.tsv:11 kept, rc-gen-monai.tsv:9 dropped
+  - `monster.ai.npcoutoftown`: rc-c011-gameseed.tsv:12 kept, rc-gen-monai.tsv:13 dropped
+  - `monster.ai.sandmaggotqueen`: rc-c011-gameseed.tsv:13 kept, rc-gen-monai.tsv:14 dropped
+  - `monster.ai.siegebeast`: rc-c011-gameseed.tsv:14 kept, rc-gen-monai.tsv:15 dropped
+  - `monster.ai.suicideminion`: rc-c011-gameseed.tsv:15 kept, rc-gen-monai.tsv:16 dropped
+  - `monster.ai.summoner`: rc-c011-gameseed.tsv:16 kept, rc-gen-monai.tsv:17 dropped
   - `monster.quest.baal`: rc-gen-misc.tsv:36 kept, rc-gen-monai.tsv:18 dropped
   - `monster.quest.blood-raven`: rc-gen-misc.tsv:37 kept, rc-gen-monai.tsv:19 dropped
   - `monster.quest.countess`: rc-gen-misc.tsv:38 kept, rc-gen-monai.tsv:20 dropped
   - `monster.quest.nihlathak`: rc-gen-misc.tsv:33 kept, rc-gen-monai.tsv:21 dropped
   - `monster.quest.summoner`: rc-gen-misc.tsv:35 kept, rc-gen-monai.tsv:22 dropped
+  - `monster.superunique.baal-subject-2`: rc-c011-gameseed.tsv:85 kept, rc-gen-monai.tsv:24 dropped
+  - `monster.superunique.baal-subject-4`: rc-c011-gameseed.tsv:86 kept, rc-gen-monai.tsv:25 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-c011-gameseed.tsv:87 kept, rc-gen-monai.tsv:26 dropped
+  - `monster.superunique.coldworm-the-burrower`: rc-c011-gameseed.tsv:88 kept, rc-gen-monai.tsv:27 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-c011-gameseed.tsv:89 kept, rc-gen-monai.tsv:31 dropped
+  - `monster.superunique.ismail-vilehand`: rc-c011-gameseed.tsv:90 kept, rc-gen-monai.tsv:32 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-c011-gameseed.tsv:91 kept, rc-gen-monai.tsv:34 dropped
+  - `monster.superunique.the-summoner`: rc-c011-gameseed.tsv:92 kept, rc-gen-monai.tsv:38 dropped
+  - `monster.superunique.toorc-icefist`: rc-c011-gameseed.tsv:93 kept, rc-gen-monai.tsv:39 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-c011-gameseed.tsv:94 kept, rc-gen-monai.tsv:41 dropped
   - `net.s2c.0x65`: rc-census-missing.tsv:3 kept, rc-gen-nets2c.tsv:7 dropped
   - `system.render.blend-modes.1-draw-modes`: rc-draw-row173.tsv:34 kept, rc-gen-render.tsv:3 dropped
   - `system.render.blend-modes.2-blend-table-orientation-per-drawer`: rc-draw-row173.tsv:35 kept, rc-gen-render.tsv:4 dropped
@@ -1569,18 +1605,18 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a5.132.act-5-world-stone`: rc-gen-misc.tsv:27 kept, rc-link-2.tsv:94 dropped
   - `monster.ai.baalcrab`: rc-gen-monai.tsv:3 kept, rc-link-checks.tsv:255 dropped
   - `monster.ai.bloodraven`: rc-gen-monai.tsv:4 kept, rc-link-checks.tsv:265 dropped
-  - `monster.ai.clawviper`: rc-gen-monai.tsv:5 kept, rc-link-checks.tsv:271 dropped
+  - `monster.ai.clawviper`: rc-c011-gameseed.tsv:9 kept, rc-link-checks.tsv:271 dropped
   - `monster.ai.desertturret`: rc-gen-monai.tsv:6 kept, rc-link-checks.tsv:276 dropped
   - `monster.ai.gargoyletrap`: rc-gen-monai.tsv:7 kept, rc-link-checks.tsv:285 dropped
   - `monster.ai.genericspawner`: rc-gen-monai.tsv:8 kept, rc-link-checks.tsv:286 dropped
   - `monster.ai.mephisto`: rc-gen-monai.tsv:10 kept, rc-link-checks.tsv:300 dropped
   - `monster.ai.navi`: rc-gen-monai.tsv:11 kept, rc-link-checks.tsv:304 dropped
   - `monster.ai.nihlathak`: rc-gen-monai.tsv:12 kept, rc-link-checks.tsv:306 dropped
-  - `monster.ai.npcoutoftown`: rc-gen-monai.tsv:13 kept, rc-link-checks.tsv:309 dropped
-  - `monster.ai.sandmaggotqueen`: rc-gen-monai.tsv:14 kept, rc-link-checks.tsv:318 dropped
-  - `monster.ai.siegebeast`: rc-gen-monai.tsv:15 kept, rc-link-checks.tsv:322 dropped
-  - `monster.ai.suicideminion`: rc-gen-monai.tsv:16 kept, rc-link-checks.tsv:327 dropped
-  - `monster.ai.summoner`: rc-gen-monai.tsv:17 kept, rc-link-checks.tsv:328 dropped
+  - `monster.ai.npcoutoftown`: rc-c011-gameseed.tsv:12 kept, rc-link-checks.tsv:309 dropped
+  - `monster.ai.sandmaggotqueen`: rc-c011-gameseed.tsv:13 kept, rc-link-checks.tsv:318 dropped
+  - `monster.ai.siegebeast`: rc-c011-gameseed.tsv:14 kept, rc-link-checks.tsv:322 dropped
+  - `monster.ai.suicideminion`: rc-c011-gameseed.tsv:15 kept, rc-link-checks.tsv:327 dropped
+  - `monster.ai.summoner`: rc-c011-gameseed.tsv:16 kept, rc-link-checks.tsv:328 dropped
   - `monster.boss.baalcrabstairs`: rc-gen-misc.tsv:9 kept, rc-link-checks.tsv:353 dropped
   - `monster.boss.uberbaal`: rc-gen-misc.tsv:10 kept, rc-link-checks.tsv:354 dropped
   - `monster.boss.uberdiablo`: rc-gen-misc.tsv:11 kept, rc-link-checks.tsv:355 dropped
@@ -1591,29 +1627,75 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.griswold`: rc-gen-misc.tsv:6 kept, rc-link-checks.tsv:360 dropped
   - `monster.superunique.the-smith`: rc-gen-misc.tsv:7 kept, rc-link-checks.tsv:361 dropped
   - `monster.superunique.web-mage-the-burning`: rc-gen-misc.tsv:8 kept, rc-link-checks.tsv:362 dropped
+  - `monster.sandmaggot5`: rc-c011-gameseed.tsv:61 kept, rc-maggot-seed.tsv:9 dropped
+  - `monster.sandmaggot6`: rc-c011-gameseed.tsv:62 kept, rc-maggot-seed.tsv:10 dropped
+  - `monster.sandmaggot7`: rc-c011-gameseed.tsv:63 kept, rc-maggot-seed.tsv:11 dropped
   - `monster.fallenshaman3`: rc-damage-draws.tsv:17 kept, rc-missile-class-off.tsv:3 dropped
   - `monster.unraveler2`: rc-damage-draws.tsv:3 kept, rc-missile-class-off.tsv:4 dropped
   - `monster.unraveler4`: rc-damage-draws.tsv:4 kept, rc-missile-class-off.tsv:5 dropped
   - `missile.diablight`: rc-link-2.tsv:44 kept, rc-missile-missing.tsv:3 dropped
   - `missile.megademoninferno`: rc-link-2.tsv:45 kept, rc-missile-missing.tsv:4 dropped
-  - `monster.ai.highpriest`: rc-gen-monai.tsv:9 kept, rc-missile-missing.tsv:7 dropped
+  - `monster.ai.deathmauler`: rc-c011-gameseed.tsv:10 kept, rc-missile-missing.tsv:5 dropped
+  - `monster.ai.andariel`: rc-c011-gameseed.tsv:8 kept, rc-missile-missing.tsv:6 dropped
+  - `monster.ai.highpriest`: rc-c011-gameseed.tsv:11 kept, rc-missile-missing.tsv:7 dropped
+  - `monster.bloodlord1`: rc-c011-gameseed.tsv:18 kept, rc-mon-fr.tsv:3 dropped
+  - `monster.bloodlord2`: rc-c011-gameseed.tsv:19 kept, rc-mon-fr.tsv:4 dropped
+  - `monster.bloodlord3`: rc-c011-gameseed.tsv:20 kept, rc-mon-fr.tsv:5 dropped
+  - `monster.bloodlord4`: rc-c011-gameseed.tsv:21 kept, rc-mon-fr.tsv:6 dropped
+  - `monster.bloodlord5`: rc-c011-gameseed.tsv:22 kept, rc-mon-fr.tsv:7 dropped
+  - `monster.bloodlord7`: rc-c011-gameseed.tsv:24 kept, rc-mon-fr.tsv:8 dropped
   - `monster.boss.diabloclone`: rc-c011-gameseed.tsv:3 kept, rc-mon-fr.tsv:11 dropped
+  - `monster.cr-archer6`: rc-c011-gameseed.tsv:25 kept, rc-mon-fr.tsv:14 dropped
+  - `monster.cr-archer7`: rc-c011-gameseed.tsv:26 kept, rc-mon-fr.tsv:15 dropped
+  - `monster.cr-archer8`: rc-c011-gameseed.tsv:27 kept, rc-mon-fr.tsv:16 dropped
   - `monster.dkmag1`: rc-missile-class-off.tsv:8 kept, rc-mon-fr.tsv:17 dropped
   - `monster.dkmag2`: rc-missile-class-off.tsv:9 kept, rc-mon-fr.tsv:18 dropped
   - `monster.dkmag3`: rc-missile-class-off.tsv:10 kept, rc-mon-fr.tsv:19 dropped
   - `monster.doomknight2`: rc-missile-class-off.tsv:6 kept, rc-mon-fr.tsv:20 dropped
   - `monster.doomknight3`: rc-missile-class-off.tsv:7 kept, rc-mon-fr.tsv:21 dropped
+  - `monster.fingermage1`: rc-c011-gameseed.tsv:34 kept, rc-mon-fr.tsv:22 dropped
+  - `monster.fingermage2`: rc-c011-gameseed.tsv:35 kept, rc-mon-fr.tsv:23 dropped
+  - `monster.fingermage3`: rc-c011-gameseed.tsv:36 kept, rc-mon-fr.tsv:24 dropped
+  - `monster.fingermage4`: rc-c011-gameseed.tsv:37 kept, rc-mon-fr.tsv:25 dropped
+  - `monster.fingermage5`: rc-c011-gameseed.tsv:38 kept, rc-mon-fr.tsv:26 dropped
   - `monster.megademon1`: rc-extra-missile.tsv:6 kept, rc-mon-fr.tsv:27 dropped
   - `monster.megademon2`: rc-extra-missile.tsv:7 kept, rc-mon-fr.tsv:28 dropped
-  - `monster.superunique.baal-subject-2`: rc-gen-monai.tsv:24 kept, rc-mon-fr.tsv:48 dropped
-  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-mon-fr.tsv:49 dropped
-  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-mon-fr.tsv:50 dropped
-  - `monster.superunique.ismail-vilehand`: rc-gen-monai.tsv:32 kept, rc-mon-fr.tsv:52 dropped
-  - `monster.superunique.maffer-dragonhand`: rc-gen-monai.tsv:34 kept, rc-mon-fr.tsv:53 dropped
-  - `monster.superunique.the-summoner`: rc-gen-monai.tsv:38 kept, rc-mon-fr.tsv:55 dropped
-  - `monster.superunique.toorc-icefist`: rc-gen-monai.tsv:39 kept, rc-mon-fr.tsv:56 dropped
+  - `monster.mosquito4`: rc-c011-gameseed.tsv:53 kept, rc-mon-fr.tsv:29 dropped
+  - `monster.overseer3`: rc-c011-gameseed.tsv:54 kept, rc-mon-fr.tsv:30 dropped
+  - `monster.overseer4`: rc-c011-gameseed.tsv:55 kept, rc-mon-fr.tsv:31 dropped
+  - `monster.succubus1`: rc-c011-gameseed.tsv:70 kept, rc-mon-fr.tsv:32 dropped
+  - `monster.succubus2`: rc-c011-gameseed.tsv:71 kept, rc-mon-fr.tsv:33 dropped
+  - `monster.succubus3`: rc-c011-gameseed.tsv:72 kept, rc-mon-fr.tsv:34 dropped
+  - `monster.succubus4`: rc-c011-gameseed.tsv:73 kept, rc-mon-fr.tsv:35 dropped
+  - `monster.succubus5`: rc-c011-gameseed.tsv:74 kept, rc-mon-fr.tsv:36 dropped
+  - `monster.succubus6`: rc-c011-gameseed.tsv:75 kept, rc-mon-fr.tsv:37 dropped
+  - `monster.succubus7`: rc-c011-gameseed.tsv:76 kept, rc-mon-fr.tsv:38 dropped
+  - `monster.succubus8`: rc-c011-gameseed.tsv:77 kept, rc-mon-fr.tsv:39 dropped
+  - `monster.succubuswitch2`: rc-c011-gameseed.tsv:78 kept, rc-mon-fr.tsv:40 dropped
+  - `monster.succubuswitch3`: rc-c011-gameseed.tsv:79 kept, rc-mon-fr.tsv:41 dropped
+  - `monster.succubuswitch5`: rc-c011-gameseed.tsv:80 kept, rc-mon-fr.tsv:42 dropped
+  - `monster.succubuswitch6`: rc-c011-gameseed.tsv:81 kept, rc-mon-fr.tsv:43 dropped
+  - `monster.succubuswitch7`: rc-c011-gameseed.tsv:82 kept, rc-mon-fr.tsv:44 dropped
+  - `monster.succubuswitch8`: rc-c011-gameseed.tsv:83 kept, rc-mon-fr.tsv:45 dropped
+  - `monster.succubuswitch9`: rc-c011-gameseed.tsv:84 kept, rc-mon-fr.tsv:46 dropped
+  - `monster.superunique.baal-subject-2`: rc-c011-gameseed.tsv:85 kept, rc-mon-fr.tsv:48 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-c011-gameseed.tsv:87 kept, rc-mon-fr.tsv:49 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-c011-gameseed.tsv:89 kept, rc-mon-fr.tsv:50 dropped
+  - `monster.superunique.ismail-vilehand`: rc-c011-gameseed.tsv:90 kept, rc-mon-fr.tsv:52 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-c011-gameseed.tsv:91 kept, rc-mon-fr.tsv:53 dropped
+  - `monster.superunique.the-summoner`: rc-c011-gameseed.tsv:92 kept, rc-mon-fr.tsv:55 dropped
+  - `monster.superunique.toorc-icefist`: rc-c011-gameseed.tsv:93 kept, rc-mon-fr.tsv:56 dropped
   - `monster.superunique.vinvear-molech`: rc-gen-monai.tsv:40 kept, rc-mon-fr.tsv:57 dropped
-  - `monster.superunique.wyand-voidfinger`: rc-gen-monai.tsv:41 kept, rc-mon-fr.tsv:58 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-c011-gameseed.tsv:94 kept, rc-mon-fr.tsv:58 dropped
+  - `monster.thornhulk2`: rc-c011-gameseed.tsv:95 kept, rc-mon-fr.tsv:59 dropped
+  - `monster.thornhulk3`: rc-c011-gameseed.tsv:96 kept, rc-mon-fr.tsv:60 dropped
+  - `monster.thornhulk5`: rc-c011-gameseed.tsv:97 kept, rc-mon-fr.tsv:61 dropped
+  - `monster.vampire3`: rc-c011-gameseed.tsv:98 kept, rc-mon-fr.tsv:62 dropped
+  - `monster.vampire4`: rc-c011-gameseed.tsv:99 kept, rc-mon-fr.tsv:63 dropped
+  - `monster.vampire5`: rc-c011-gameseed.tsv:100 kept, rc-mon-fr.tsv:64 dropped
+  - `monster.vampire6`: rc-c011-gameseed.tsv:101 kept, rc-mon-fr.tsv:65 dropped
+  - `monster.vampire7`: rc-c011-gameseed.tsv:102 kept, rc-mon-fr.tsv:66 dropped
+  - `monster.vampire8`: rc-c011-gameseed.tsv:103 kept, rc-mon-fr.tsv:67 dropped
   - `monster.megademon3`: rc-extra-missile.tsv:8 kept, rc-mon-frame31.tsv:3 dropped
   - `monster.megademon4`: rc-extra-missile.tsv:12 kept, rc-mon-frame31.tsv:4 dropped
   - `monster.putriddefiler1`: rc-gen-mon-triage.tsv:143 kept, rc-mon-frame31.tsv:5 dropped
@@ -1621,26 +1703,40 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.vilemother1`: rc-gen-mon-triage.tsv:77 kept, rc-mon-frame31.tsv:7 dropped
   - `monster.vilemother2`: rc-gen-mon-triage.tsv:78 kept, rc-mon-frame31.tsv:8 dropped
   - `monster.clawviper5`: rc-damage-draws.tsv:23 kept, rc-mon-frame31.tsv:9 dropped
-  - `monster.baboon6`: rc-gen-mon-triage.tsv:76 kept, rc-mon-hit-after.tsv:3 dropped
+  - `monster.baboon6`: rc-c011-gameseed.tsv:17 kept, rc-mon-hit-after.tsv:3 dropped
+  - `monster.mon-lvl-304`: rc-c011-gameseed.tsv:41 kept, rc-mon-lvl.tsv:3 dropped
+  - `monster.mon-lvl-305`: rc-c011-gameseed.tsv:42 kept, rc-mon-lvl.tsv:4 dropped
+  - `monster.mon-lvl-306`: rc-c011-gameseed.tsv:43 kept, rc-mon-lvl.tsv:5 dropped
+  - `monster.mon-lvl-692`: rc-c011-gameseed.tsv:49 kept, rc-mon-lvl.tsv:6 dropped
+  - `monster.mon-lvl-693`: rc-c011-gameseed.tsv:50 kept, rc-mon-lvl.tsv:7 dropped
+  - `monster.mon-lvl-636`: rc-c011-gameseed.tsv:46 kept, rc-mon-lvl.tsv:8 dropped
+  - `monster.mon-lvl-637`: rc-c011-gameseed.tsv:47 kept, rc-mon-lvl.tsv:9 dropped
+  - `monster.mon-lvl-638`: rc-c011-gameseed.tsv:48 kept, rc-mon-lvl.tsv:10 dropped
+  - `monster.mon-lvl-720`: rc-c011-gameseed.tsv:51 kept, rc-mon-lvl.tsv:11 dropped
+  - `monster.mon-lvl-133`: rc-c011-gameseed.tsv:39 kept, rc-mon-lvl.tsv:12 dropped
+  - `monster.mon-lvl-134`: rc-c011-gameseed.tsv:40 kept, rc-mon-lvl.tsv:13 dropped
+  - `monster.mon-lvl-613`: rc-c011-gameseed.tsv:44 kept, rc-mon-lvl.tsv:14 dropped
+  - `monster.mon-lvl-614`: rc-c011-gameseed.tsv:45 kept, rc-mon-lvl.tsv:15 dropped
+  - `monster.mon-lvl-722`: rc-c011-gameseed.tsv:52 kept, rc-mon-lvl.tsv:16 dropped
   - `monster.fetishshaman2`: rc-extra-missile.tsv:3 kept, rc-mon-missile144.tsv:3 dropped
   - `monster.boss.diabloclone`: rc-c011-gameseed.tsv:3 kept, rc-mon-modes.tsv:3 dropped
   - `sim.monster-mode-records`: rc-c011-gameseed.tsv:4 kept, rc-mon-modes.tsv:4 dropped
-  - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-mon-s.tsv:3 dropped
-  - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-mon-s.tsv:4 dropped
-  - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-mon-s.tsv:5 dropped
-  - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-mon-s.tsv:6 dropped
-  - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-mon-s.tsv:7 dropped
-  - `monster.succubus6`: rc-mon-fr.tsv:37 kept, rc-mon-s.tsv:8 dropped
-  - `monster.succubus7`: rc-mon-fr.tsv:38 kept, rc-mon-s.tsv:9 dropped
-  - `monster.succubus8`: rc-mon-fr.tsv:39 kept, rc-mon-s.tsv:10 dropped
-  - `monster.sandmaggot2`: rc-gen-mon-triage.tsv:238 kept, rc-mon-spawn-think.tsv:3 dropped
-  - `monster.sandmaggot3`: rc-gen-mon-triage.tsv:243 kept, rc-mon-spawn-think.tsv:4 dropped
-  - `monster.sandmaggot4`: rc-gen-mon-triage.tsv:246 kept, rc-mon-spawn-think.tsv:5 dropped
-  - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-mon-spawn-think.tsv:6 dropped
+  - `monster.succubus1`: rc-c011-gameseed.tsv:70 kept, rc-mon-s.tsv:3 dropped
+  - `monster.succubus2`: rc-c011-gameseed.tsv:71 kept, rc-mon-s.tsv:4 dropped
+  - `monster.succubus3`: rc-c011-gameseed.tsv:72 kept, rc-mon-s.tsv:5 dropped
+  - `monster.succubus4`: rc-c011-gameseed.tsv:73 kept, rc-mon-s.tsv:6 dropped
+  - `monster.succubus5`: rc-c011-gameseed.tsv:74 kept, rc-mon-s.tsv:7 dropped
+  - `monster.succubus6`: rc-c011-gameseed.tsv:75 kept, rc-mon-s.tsv:8 dropped
+  - `monster.succubus7`: rc-c011-gameseed.tsv:76 kept, rc-mon-s.tsv:9 dropped
+  - `monster.succubus8`: rc-c011-gameseed.tsv:77 kept, rc-mon-s.tsv:10 dropped
+  - `monster.sandmaggot2`: rc-c011-gameseed.tsv:58 kept, rc-mon-spawn-think.tsv:3 dropped
+  - `monster.sandmaggot3`: rc-c011-gameseed.tsv:59 kept, rc-mon-spawn-think.tsv:4 dropped
+  - `monster.sandmaggot4`: rc-c011-gameseed.tsv:60 kept, rc-mon-spawn-think.tsv:5 dropped
+  - `monster.sandmaggot5`: rc-c011-gameseed.tsv:61 kept, rc-mon-spawn-think.tsv:6 dropped
   - `monster.clawviper5`: rc-damage-draws.tsv:23 kept, rc-mon-spawn-think.tsv:7 dropped
-  - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-mon-spawn-think.tsv:8 dropped
-  - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-mon-spawn-think.tsv:9 dropped
-  - `monster.vampire5`: rc-mon-fr.tsv:64 kept, rc-mon-spawn-think.tsv:10 dropped
+  - `monster.vampire3`: rc-c011-gameseed.tsv:98 kept, rc-mon-spawn-think.tsv:8 dropped
+  - `monster.vampire4`: rc-c011-gameseed.tsv:99 kept, rc-mon-spawn-think.tsv:9 dropped
+  - `monster.vampire5`: rc-c011-gameseed.tsv:100 kept, rc-mon-spawn-think.tsv:10 dropped
   - `monster.cr-archer2`: rc-gen-mon-triage.tsv:34 kept, rc-mon-spawn-think.tsv:11 dropped
   - `monster.cr-archer4`: rc-gen-mon-triage.tsv:35 kept, rc-mon-spawn-think.tsv:12 dropped
   - `monster.cr-archer5`: rc-gen-mon-triage.tsv:36 kept, rc-mon-spawn-think.tsv:13 dropped
@@ -1667,30 +1763,30 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.reanimatedhorde1`: rc-damage-draws.tsv:7 kept, rc-mon-spawn-think.tsv:34 dropped
   - `monster.reanimatedhorde2`: rc-damage-draws.tsv:8 kept, rc-mon-spawn-think.tsv:35 dropped
   - `monster.reanimatedhorde3`: rc-damage-draws.tsv:9 kept, rc-mon-spawn-think.tsv:36 dropped
-  - `monster.succubuswitch2`: rc-mon-fr.tsv:40 kept, rc-mon-spawn-think.tsv:37 dropped
-  - `monster.succubuswitch3`: rc-mon-fr.tsv:41 kept, rc-mon-spawn-think.tsv:38 dropped
-  - `monster.succubuswitch5`: rc-mon-fr.tsv:42 kept, rc-mon-spawn-think.tsv:39 dropped
+  - `monster.succubuswitch2`: rc-c011-gameseed.tsv:78 kept, rc-mon-spawn-think.tsv:37 dropped
+  - `monster.succubuswitch3`: rc-c011-gameseed.tsv:79 kept, rc-mon-spawn-think.tsv:38 dropped
+  - `monster.succubuswitch5`: rc-c011-gameseed.tsv:80 kept, rc-mon-spawn-think.tsv:39 dropped
   - `monster.putriddefiler1`: rc-gen-mon-triage.tsv:143 kept, rc-mon-spawn-think.tsv:40 dropped
   - `monster.putriddefiler2`: rc-gen-mon-triage.tsv:144 kept, rc-mon-spawn-think.tsv:41 dropped
   - `monster.putriddefiler3`: rc-gen-mon-triage.tsv:145 kept, rc-mon-spawn-think.tsv:42 dropped
   - `monster.putriddefiler4`: rc-gen-mon-triage.tsv:146 kept, rc-mon-spawn-think.tsv:43 dropped
   - `monster.sk-archer6`: rc-gen-mon-triage.tsv:148 kept, rc-mon-spawn-think.tsv:44 dropped
-  - `monster.sk-archer7`: rc-gen-mon-triage.tsv:149 kept, rc-mon-spawn-think.tsv:45 dropped
-  - `monster.sk-archer9`: rc-gen-mon-triage.tsv:150 kept, rc-mon-spawn-think.tsv:46 dropped
+  - `monster.sk-archer7`: rc-c011-gameseed.tsv:67 kept, rc-mon-spawn-think.tsv:45 dropped
+  - `monster.sk-archer9`: rc-c011-gameseed.tsv:68 kept, rc-mon-spawn-think.tsv:46 dropped
   - `monster.sk-archer10`: rc-gen-mon-triage.tsv:151 kept, rc-mon-spawn-think.tsv:47 dropped
   - `monster.bighead6`: rc-gen-mon-triage.tsv:152 kept, rc-mon-spawn-think.tsv:48 dropped
-  - `monster.cr-archer6`: rc-mon-fr.tsv:14 kept, rc-mon-spawn-think.tsv:49 dropped
-  - `monster.cr-archer7`: rc-mon-fr.tsv:15 kept, rc-mon-spawn-think.tsv:50 dropped
+  - `monster.cr-archer6`: rc-c011-gameseed.tsv:25 kept, rc-mon-spawn-think.tsv:49 dropped
+  - `monster.cr-archer7`: rc-c011-gameseed.tsv:26 kept, rc-mon-spawn-think.tsv:50 dropped
   - `monster.skmage-fire5`: rc-gen-mon-triage.tsv:178 kept, rc-mon-spawn-think.tsv:51 dropped
   - `monster.skmage-fire6`: rc-gen-mon-triage.tsv:179 kept, rc-mon-spawn-think.tsv:52 dropped
   - `monster.skmage-ltng5`: rc-gen-mon-triage.tsv:180 kept, rc-mon-spawn-think.tsv:53 dropped
   - `monster.skmage-ltng6`: rc-gen-mon-triage.tsv:181 kept, rc-mon-spawn-think.tsv:54 dropped
-  - `monster.skmage-cold5`: rc-gen-mon-triage.tsv:182 kept, rc-mon-spawn-think.tsv:55 dropped
+  - `monster.skmage-cold5`: rc-c011-gameseed.tsv:69 kept, rc-mon-spawn-think.tsv:55 dropped
   - `monster.skmage-pois5`: rc-gen-mon-triage.tsv:183 kept, rc-mon-spawn-think.tsv:56 dropped
   - `monster.skmage-pois6`: rc-gen-mon-triage.tsv:184 kept, rc-mon-spawn-think.tsv:57 dropped
-  - `monster.succubuswitch6`: rc-mon-fr.tsv:43 kept, rc-mon-spawn-think.tsv:58 dropped
-  - `monster.succubuswitch7`: rc-mon-fr.tsv:44 kept, rc-mon-spawn-think.tsv:59 dropped
-  - `monster.succubuswitch8`: rc-mon-fr.tsv:45 kept, rc-mon-spawn-think.tsv:60 dropped
+  - `monster.succubuswitch6`: rc-c011-gameseed.tsv:81 kept, rc-mon-spawn-think.tsv:58 dropped
+  - `monster.succubuswitch7`: rc-c011-gameseed.tsv:82 kept, rc-mon-spawn-think.tsv:59 dropped
+  - `monster.succubuswitch8`: rc-c011-gameseed.tsv:83 kept, rc-mon-spawn-think.tsv:60 dropped
   - `monster.fetishblow6`: rc-gen-mon-triage.tsv:211 kept, rc-mon-spawn-think.tsv:61 dropped
   - `monster.fetishblow7`: rc-gen-mon-triage.tsv:213 kept, rc-mon-spawn-think.tsv:62 dropped
   - `monster.fetishblow8`: rc-gen-mon-triage.tsv:214 kept, rc-mon-spawn-think.tsv:63 dropped
@@ -1702,19 +1798,19 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.unraveler9`: rc-gen-mon-triage.tsv:222 kept, rc-mon-spawn-think.tsv:69 dropped
   - `monster.vilemother4`: rc-gen-mon-triage.tsv:227 kept, rc-mon-spawn-think.tsv:70 dropped
   - `monster.vilemother5`: rc-gen-mon-triage.tsv:228 kept, rc-mon-spawn-think.tsv:71 dropped
-  - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-mon-spawn-think.tsv:72 dropped
+  - `monster.sandmaggot6`: rc-c011-gameseed.tsv:62 kept, rc-mon-spawn-think.tsv:72 dropped
   - `monster.megademon4`: rc-extra-missile.tsv:12 kept, rc-mon-spawn-think.tsv:73 dropped
   - `monster.megademon5`: rc-extra-missile.tsv:13 kept, rc-mon-spawn-think.tsv:74 dropped
-  - `monster.vampire6`: rc-mon-fr.tsv:65 kept, rc-mon-spawn-think.tsv:75 dropped
-  - `monster.vampire7`: rc-mon-fr.tsv:66 kept, rc-mon-spawn-think.tsv:76 dropped
-  - `monster.vampire8`: rc-mon-fr.tsv:67 kept, rc-mon-spawn-think.tsv:77 dropped
+  - `monster.vampire6`: rc-c011-gameseed.tsv:101 kept, rc-mon-spawn-think.tsv:75 dropped
+  - `monster.vampire7`: rc-c011-gameseed.tsv:102 kept, rc-mon-spawn-think.tsv:76 dropped
+  - `monster.vampire8`: rc-c011-gameseed.tsv:103 kept, rc-mon-spawn-think.tsv:77 dropped
   - `monster.dkmag1`: rc-missile-class-off.tsv:8 kept, rc-mon-spawn-think.tsv:78 dropped
   - `monster.dkmag2`: rc-missile-class-off.tsv:9 kept, rc-mon-spawn-think.tsv:79 dropped
   - `monster.megademon6`: rc-extra-missile.tsv:14 kept, rc-mon-spawn-think.tsv:80 dropped
   - `monster.dkmag3`: rc-missile-class-off.tsv:10 kept, rc-mon-spawn-think.tsv:81 dropped
-  - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-mon-spawn-think.tsv:82 dropped
-  - `monster.succubuswitch9`: rc-mon-fr.tsv:46 kept, rc-mon-spawn-think.tsv:83 dropped
-  - `monster.cr-archer8`: rc-mon-fr.tsv:16 kept, rc-mon-spawn-think.tsv:84 dropped
+  - `monster.sandmaggot7`: rc-c011-gameseed.tsv:63 kept, rc-mon-spawn-think.tsv:82 dropped
+  - `monster.succubuswitch9`: rc-c011-gameseed.tsv:84 kept, rc-mon-spawn-think.tsv:83 dropped
+  - `monster.cr-archer8`: rc-c011-gameseed.tsv:27 kept, rc-mon-spawn-think.tsv:84 dropped
   - `net.s2c.0x07`: rc-goto-settle.tsv:3 kept, rc-net-s2c.tsv:3 dropped
   - `net.s2c.0x15`: rc-goto-settle.tsv:4 kept, rc-net-s2c.tsv:4 dropped
   - `net.s2c.0x51`: rc-goto-settle.tsv:5 kept, rc-net-s2c.tsv:5 dropped
@@ -2173,9 +2269,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.reanimatedhorde1`: rc-damage-draws.tsv:7 kept, rc-player-mode.tsv:4 dropped
   - `monster.reanimatedhorde2`: rc-damage-draws.tsv:8 kept, rc-player-mode.tsv:5 dropped
   - `monster.reanimatedhorde3`: rc-damage-draws.tsv:9 kept, rc-player-mode.tsv:6 dropped
-  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-player-mode.tsv:7 dropped
-  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-player-mode.tsv:8 dropped
-  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-player-mode.tsv:9 dropped
+  - `monster.siegebeast1`: rc-c011-gameseed.tsv:64 kept, rc-player-mode.tsv:7 dropped
+  - `monster.siegebeast2`: rc-c011-gameseed.tsv:65 kept, rc-player-mode.tsv:8 dropped
+  - `monster.siegebeast3`: rc-c011-gameseed.tsv:66 kept, rc-player-mode.tsv:9 dropped
   - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-player-mode.tsv:10 dropped
   - `monster.clawviper7`: rc-damage-draws.tsv:14 kept, rc-player-mode.tsv:11 dropped
   - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-player-mode.tsv:12 dropped
@@ -2198,11 +2294,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `level.a4.104.act-4-mesa-1`: rc-gen-wine168.tsv:28 kept, rc-rng-level-pop.tsv:77 dropped
   - `level.a4.106.act-4-mesa-3`: rc-gen-wine168.tsv:29 kept, rc-rng-level-pop.tsv:78 dropped
   - `level.a5.110.act-5-siege-1`: rc-gen-wine168.tsv:30 kept, rc-rng-level-pop.tsv:80 dropped
-  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-rng-player-draws.tsv:3 dropped
+  - `monster.siegebeast1`: rc-c011-gameseed.tsv:64 kept, rc-rng-player-draws.tsv:3 dropped
   - `monster.blunderbore5`: rc-damage-draws.tsv:18 kept, rc-rng-player-draws.tsv:4 dropped
-  - `monster.fallenshaman6`: rc-gen-mon-triage.tsv:198 kept, rc-rng-player-draws.tsv:5 dropped
-  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-rng-player-draws.tsv:6 dropped
-  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-rng-player-draws.tsv:7 dropped
+  - `monster.fallenshaman6`: rc-c011-gameseed.tsv:33 kept, rc-rng-player-draws.tsv:5 dropped
+  - `monster.siegebeast2`: rc-c011-gameseed.tsv:65 kept, rc-rng-player-draws.tsv:6 dropped
+  - `monster.siegebeast3`: rc-c011-gameseed.tsv:66 kept, rc-rng-player-draws.tsv:7 dropped
   - `monster.blunderbore6`: rc-damage-draws.tsv:19 kept, rc-rng-player-draws.tsv:8 dropped
   - `monster.scarab6`: rc-damage-draws.tsv:20 kept, rc-rng-player-draws.tsv:9 dropped
   - `drlg.act3-jungle1-gold-placeholder`: rc-drlg-a3.tsv:3 kept, rc-run-1.tsv:71 dropped
@@ -2216,7 +2312,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.skeleton`: rc-promote.tsv:29 kept, rc-run-1.tsv:104 dropped
   - `monster.boss.summoner`: rc-player-mode.tsv:3 kept, rc-run-1.tsv:116 dropped
   - `monster.population.frogdemon-water`: rc-l78-population.tsv:3 kept, rc-run-1.tsv:117 dropped
-  - `monster.superunique.coldworm-the-burrower`: rc-gen-monai.tsv:27 kept, rc-run-1.tsv:119 dropped
+  - `monster.superunique.coldworm-the-burrower`: rc-c011-gameseed.tsv:88 kept, rc-run-1.tsv:119 dropped
   - `monster.superunique.fangskin`: rc-gen-monai.tsv:28 kept, rc-run-1.tsv:121 dropped
   - `monster.vision-token`: rc-promote.tsv:30 kept, rc-run-1.tsv:124 dropped
   - `quest.compelling-orb-spawn`: rc-promote.tsv:47 kept, rc-run-1.tsv:125 dropped
@@ -3135,7 +3231,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.baboon3`: rc-gen-mon-triage.tsv:128 kept, rc-run-4.tsv:14 dropped
   - `monster.baboon4`: rc-gen-mon-triage.tsv:132 kept, rc-run-4.tsv:15 dropped
   - `monster.baboon5`: rc-gen-mon-triage.tsv:133 kept, rc-run-4.tsv:16 dropped
-  - `monster.baboon6`: rc-gen-mon-triage.tsv:76 kept, rc-run-4.tsv:17 dropped
+  - `monster.baboon6`: rc-c011-gameseed.tsv:17 kept, rc-run-4.tsv:17 dropped
   - `monster.baboon7`: rc-gen-mon-triage.tsv:217 kept, rc-run-4.tsv:18 dropped
   - `monster.baboon8`: rc-gen-mon-triage.tsv:218 kept, rc-run-4.tsv:19 dropped
   - `monster.batdemon1`: rc-gen-mon-triage.tsv:22 kept, rc-run-4.tsv:20 dropped
@@ -3150,13 +3246,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.bighead4`: rc-gen-mon-triage.tsv:20 kept, rc-run-4.tsv:29 dropped
   - `monster.bighead5`: rc-gen-mon-triage.tsv:26 kept, rc-run-4.tsv:30 dropped
   - `monster.bighead6`: rc-gen-mon-triage.tsv:152 kept, rc-run-4.tsv:31 dropped
-  - `monster.bloodlord1`: rc-mon-fr.tsv:3 kept, rc-run-4.tsv:32 dropped
-  - `monster.bloodlord2`: rc-mon-fr.tsv:4 kept, rc-run-4.tsv:33 dropped
-  - `monster.bloodlord3`: rc-mon-fr.tsv:5 kept, rc-run-4.tsv:34 dropped
-  - `monster.bloodlord4`: rc-mon-fr.tsv:6 kept, rc-run-4.tsv:35 dropped
-  - `monster.bloodlord5`: rc-mon-fr.tsv:7 kept, rc-run-4.tsv:36 dropped
-  - `monster.bloodlord6`: rc-gen-mon-triage.tsv:206 kept, rc-run-4.tsv:37 dropped
-  - `monster.bloodlord7`: rc-mon-fr.tsv:8 kept, rc-run-4.tsv:38 dropped
+  - `monster.bloodlord1`: rc-c011-gameseed.tsv:18 kept, rc-run-4.tsv:32 dropped
+  - `monster.bloodlord2`: rc-c011-gameseed.tsv:19 kept, rc-run-4.tsv:33 dropped
+  - `monster.bloodlord3`: rc-c011-gameseed.tsv:20 kept, rc-run-4.tsv:34 dropped
+  - `monster.bloodlord4`: rc-c011-gameseed.tsv:21 kept, rc-run-4.tsv:35 dropped
+  - `monster.bloodlord5`: rc-c011-gameseed.tsv:22 kept, rc-run-4.tsv:36 dropped
+  - `monster.bloodlord6`: rc-c011-gameseed.tsv:23 kept, rc-run-4.tsv:37 dropped
+  - `monster.bloodlord7`: rc-c011-gameseed.tsv:24 kept, rc-run-4.tsv:38 dropped
   - `monster.blunderbore1`: rc-gen-mon-triage.tsv:48 kept, rc-run-4.tsv:39 dropped
   - `monster.blunderbore3`: rc-gen-mon-triage.tsv:49 kept, rc-run-4.tsv:40 dropped
   - `monster.blunderbore4`: rc-damage-draws.tsv:6 kept, rc-run-4.tsv:41 dropped
@@ -3200,9 +3296,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.cr-archer2`: rc-gen-mon-triage.tsv:34 kept, rc-run-4.tsv:91 dropped
   - `monster.cr-archer4`: rc-gen-mon-triage.tsv:35 kept, rc-run-4.tsv:92 dropped
   - `monster.cr-archer5`: rc-gen-mon-triage.tsv:36 kept, rc-run-4.tsv:93 dropped
-  - `monster.cr-archer6`: rc-mon-fr.tsv:14 kept, rc-run-4.tsv:94 dropped
-  - `monster.cr-archer7`: rc-mon-fr.tsv:15 kept, rc-run-4.tsv:95 dropped
-  - `monster.cr-archer8`: rc-mon-fr.tsv:16 kept, rc-run-4.tsv:96 dropped
+  - `monster.cr-archer6`: rc-c011-gameseed.tsv:25 kept, rc-run-4.tsv:94 dropped
+  - `monster.cr-archer7`: rc-c011-gameseed.tsv:26 kept, rc-run-4.tsv:95 dropped
+  - `monster.cr-archer8`: rc-c011-gameseed.tsv:27 kept, rc-run-4.tsv:96 dropped
   - `monster.cr-lancer2`: rc-gen-mon-triage.tsv:37 kept, rc-run-4.tsv:97 dropped
   - `monster.cr-lancer3`: rc-gen-mon-triage.tsv:38 kept, rc-run-4.tsv:98 dropped
   - `monster.cr-lancer6`: rc-gen-mon-triage.tsv:174 kept, rc-run-4.tsv:99 dropped
@@ -3210,11 +3306,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.cr-lancer8`: rc-gen-mon-triage.tsv:252 kept, rc-run-4.tsv:101 dropped
   - `monster.crownest1`: rc-gen-mon-triage.tsv:52 kept, rc-run-4.tsv:102 dropped
   - `monster.crownest2`: rc-gen-mon-triage.tsv:53 kept, rc-run-4.tsv:103 dropped
-  - `monster.deathmauler1`: rc-gen-mon-triage.tsv:134 kept, rc-run-4.tsv:104 dropped
-  - `monster.deathmauler2`: rc-gen-mon-triage.tsv:135 kept, rc-run-4.tsv:105 dropped
-  - `monster.deathmauler3`: rc-gen-mon-triage.tsv:136 kept, rc-run-4.tsv:106 dropped
-  - `monster.deathmauler4`: rc-gen-mon-triage.tsv:137 kept, rc-run-4.tsv:107 dropped
-  - `monster.deathmauler5`: rc-gen-mon-triage.tsv:138 kept, rc-run-4.tsv:108 dropped
+  - `monster.deathmauler1`: rc-c011-gameseed.tsv:28 kept, rc-run-4.tsv:104 dropped
+  - `monster.deathmauler2`: rc-c011-gameseed.tsv:29 kept, rc-run-4.tsv:105 dropped
+  - `monster.deathmauler3`: rc-c011-gameseed.tsv:30 kept, rc-run-4.tsv:106 dropped
+  - `monster.deathmauler4`: rc-c011-gameseed.tsv:31 kept, rc-run-4.tsv:107 dropped
+  - `monster.deathmauler5`: rc-c011-gameseed.tsv:32 kept, rc-run-4.tsv:108 dropped
   - `monster.dkfig1`: rc-gen-mon-triage.tsv:242 kept, rc-run-4.tsv:109 dropped
   - `monster.dkfig2`: rc-gen-mon-triage.tsv:244 kept, rc-run-4.tsv:110 dropped
   - `monster.dkmag1`: rc-missile-class-off.tsv:8 kept, rc-run-4.tsv:111 dropped
@@ -3228,7 +3324,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.fallen7`: rc-gen-mon-triage.tsv:196 kept, rc-run-4.tsv:119 dropped
   - `monster.fallen8`: rc-gen-mon-triage.tsv:197 kept, rc-run-4.tsv:120 dropped
   - `monster.fallenshaman3`: rc-damage-draws.tsv:17 kept, rc-run-4.tsv:121 dropped
-  - `monster.fallenshaman6`: rc-gen-mon-triage.tsv:198 kept, rc-run-4.tsv:122 dropped
+  - `monster.fallenshaman6`: rc-c011-gameseed.tsv:33 kept, rc-run-4.tsv:122 dropped
   - `monster.fallenshaman7`: rc-gen-mon-triage.tsv:199 kept, rc-run-4.tsv:123 dropped
   - `monster.fallenshaman8`: rc-gen-mon-triage.tsv:200 kept, rc-run-4.tsv:124 dropped
   - `monster.fetish1`: rc-gen-mon-triage.tsv:28 kept, rc-run-4.tsv:125 dropped
@@ -3248,11 +3344,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.fetishshaman4`: rc-extra-missile.tsv:5 kept, rc-run-4.tsv:139 dropped
   - `monster.fetishshaman6`: rc-extra-missile.tsv:10 kept, rc-run-4.tsv:140 dropped
   - `monster.fetishshaman8`: rc-extra-missile.tsv:11 kept, rc-run-4.tsv:141 dropped
-  - `monster.fingermage1`: rc-mon-fr.tsv:22 kept, rc-run-4.tsv:142 dropped
-  - `monster.fingermage2`: rc-mon-fr.tsv:23 kept, rc-run-4.tsv:143 dropped
-  - `monster.fingermage3`: rc-mon-fr.tsv:24 kept, rc-run-4.tsv:144 dropped
-  - `monster.fingermage4`: rc-mon-fr.tsv:25 kept, rc-run-4.tsv:145 dropped
-  - `monster.fingermage5`: rc-mon-fr.tsv:26 kept, rc-run-4.tsv:146 dropped
+  - `monster.fingermage1`: rc-c011-gameseed.tsv:34 kept, rc-run-4.tsv:142 dropped
+  - `monster.fingermage2`: rc-c011-gameseed.tsv:35 kept, rc-run-4.tsv:143 dropped
+  - `monster.fingermage3`: rc-c011-gameseed.tsv:36 kept, rc-run-4.tsv:144 dropped
+  - `monster.fingermage4`: rc-c011-gameseed.tsv:37 kept, rc-run-4.tsv:145 dropped
+  - `monster.fingermage5`: rc-c011-gameseed.tsv:38 kept, rc-run-4.tsv:146 dropped
   - `monster.foulcrow1`: rc-gen-mon-triage.tsv:32 kept, rc-run-4.tsv:147 dropped
   - `monster.foulcrow2`: rc-gen-mon-triage.tsv:33 kept, rc-run-4.tsv:148 dropped
   - `monster.foulcrow4`: rc-gen-mon-triage.tsv:42 kept, rc-run-4.tsv:149 dropped
@@ -3305,31 +3401,31 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.minion6`: rc-gen-mon-triage.tsv:119 kept, rc-run-4.tsv:196 dropped
   - `monster.minion7`: rc-gen-mon-triage.tsv:120 kept, rc-run-4.tsv:197 dropped
   - `monster.minion9`: rc-gen-mon-triage.tsv:232 kept, rc-run-4.tsv:198 dropped
-  - `monster.mon-lvl-133`: rc-mon-lvl.tsv:12 kept, rc-run-4.tsv:199 dropped
-  - `monster.mon-lvl-134`: rc-mon-lvl.tsv:13 kept, rc-run-4.tsv:200 dropped
-  - `monster.mon-lvl-304`: rc-mon-lvl.tsv:3 kept, rc-run-4.tsv:201 dropped
-  - `monster.mon-lvl-305`: rc-mon-lvl.tsv:4 kept, rc-run-4.tsv:202 dropped
-  - `monster.mon-lvl-306`: rc-mon-lvl.tsv:5 kept, rc-run-4.tsv:203 dropped
-  - `monster.mon-lvl-613`: rc-mon-lvl.tsv:14 kept, rc-run-4.tsv:204 dropped
-  - `monster.mon-lvl-614`: rc-mon-lvl.tsv:15 kept, rc-run-4.tsv:205 dropped
-  - `monster.mon-lvl-636`: rc-mon-lvl.tsv:8 kept, rc-run-4.tsv:206 dropped
-  - `monster.mon-lvl-637`: rc-mon-lvl.tsv:9 kept, rc-run-4.tsv:207 dropped
-  - `monster.mon-lvl-638`: rc-mon-lvl.tsv:10 kept, rc-run-4.tsv:208 dropped
-  - `monster.mon-lvl-692`: rc-mon-lvl.tsv:6 kept, rc-run-4.tsv:209 dropped
-  - `monster.mon-lvl-693`: rc-mon-lvl.tsv:7 kept, rc-run-4.tsv:210 dropped
-  - `monster.mon-lvl-720`: rc-mon-lvl.tsv:11 kept, rc-run-4.tsv:211 dropped
-  - `monster.mon-lvl-722`: rc-mon-lvl.tsv:16 kept, rc-run-4.tsv:212 dropped
+  - `monster.mon-lvl-133`: rc-c011-gameseed.tsv:39 kept, rc-run-4.tsv:199 dropped
+  - `monster.mon-lvl-134`: rc-c011-gameseed.tsv:40 kept, rc-run-4.tsv:200 dropped
+  - `monster.mon-lvl-304`: rc-c011-gameseed.tsv:41 kept, rc-run-4.tsv:201 dropped
+  - `monster.mon-lvl-305`: rc-c011-gameseed.tsv:42 kept, rc-run-4.tsv:202 dropped
+  - `monster.mon-lvl-306`: rc-c011-gameseed.tsv:43 kept, rc-run-4.tsv:203 dropped
+  - `monster.mon-lvl-613`: rc-c011-gameseed.tsv:44 kept, rc-run-4.tsv:204 dropped
+  - `monster.mon-lvl-614`: rc-c011-gameseed.tsv:45 kept, rc-run-4.tsv:205 dropped
+  - `monster.mon-lvl-636`: rc-c011-gameseed.tsv:46 kept, rc-run-4.tsv:206 dropped
+  - `monster.mon-lvl-637`: rc-c011-gameseed.tsv:47 kept, rc-run-4.tsv:207 dropped
+  - `monster.mon-lvl-638`: rc-c011-gameseed.tsv:48 kept, rc-run-4.tsv:208 dropped
+  - `monster.mon-lvl-692`: rc-c011-gameseed.tsv:49 kept, rc-run-4.tsv:209 dropped
+  - `monster.mon-lvl-693`: rc-c011-gameseed.tsv:50 kept, rc-run-4.tsv:210 dropped
+  - `monster.mon-lvl-720`: rc-c011-gameseed.tsv:51 kept, rc-run-4.tsv:211 dropped
+  - `monster.mon-lvl-722`: rc-c011-gameseed.tsv:52 kept, rc-run-4.tsv:212 dropped
   - `monster.mosquito1`: rc-gen-mon-triage.tsv:10 kept, rc-run-4.tsv:213 dropped
   - `monster.mosquito2`: rc-gen-mon-triage.tsv:11 kept, rc-run-4.tsv:214 dropped
-  - `monster.mosquito4`: rc-mon-fr.tsv:29 kept, rc-run-4.tsv:215 dropped
+  - `monster.mosquito4`: rc-c011-gameseed.tsv:53 kept, rc-run-4.tsv:215 dropped
   - `monster.mummy2`: rc-gen-mon-triage.tsv:266 kept, rc-run-4.tsv:216 dropped
   - `monster.mummy4`: rc-gen-mon-triage.tsv:267 kept, rc-run-4.tsv:217 dropped
   - `monster.mummy5`: rc-gen-mon-triage.tsv:3 kept, rc-run-4.tsv:218 dropped
   - `monster.mummy6`: rc-gen-mon-triage.tsv:245 kept, rc-run-4.tsv:219 dropped
   - `monster.overseer1`: rc-gen-mon-triage.tsv:124 kept, rc-run-4.tsv:220 dropped
   - `monster.overseer2`: rc-gen-mon-triage.tsv:126 kept, rc-run-4.tsv:221 dropped
-  - `monster.overseer3`: rc-mon-fr.tsv:30 kept, rc-run-4.tsv:222 dropped
-  - `monster.overseer4`: rc-mon-fr.tsv:31 kept, rc-run-4.tsv:223 dropped
+  - `monster.overseer3`: rc-c011-gameseed.tsv:54 kept, rc-run-4.tsv:222 dropped
+  - `monster.overseer4`: rc-c011-gameseed.tsv:55 kept, rc-run-4.tsv:223 dropped
   - `monster.overseer5`: rc-gen-mon-triage.tsv:127 kept, rc-run-4.tsv:224 dropped
   - `monster.overseer6`: rc-gen-mon-triage.tsv:253 kept, rc-run-4.tsv:225 dropped
   - `monster.pantherwoman3`: rc-gen-mon-triage.tsv:259 kept, rc-run-4.tsv:226 dropped
@@ -3358,14 +3454,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.sandleaper3`: rc-gen-mon-triage.tsv:256 kept, rc-run-4.tsv:249 dropped
   - `monster.sandleaper4`: rc-gen-mon-triage.tsv:257 kept, rc-run-4.tsv:250 dropped
   - `monster.sandleaper5`: rc-gen-mon-triage.tsv:258 kept, rc-run-4.tsv:251 dropped
-  - `monster.sandleaper6`: rc-gen-mon-triage.tsv:186 kept, rc-run-4.tsv:252 dropped
-  - `monster.sandleaper7`: rc-gen-mon-triage.tsv:187 kept, rc-run-4.tsv:253 dropped
-  - `monster.sandmaggot2`: rc-gen-mon-triage.tsv:238 kept, rc-run-4.tsv:254 dropped
-  - `monster.sandmaggot3`: rc-gen-mon-triage.tsv:243 kept, rc-run-4.tsv:255 dropped
-  - `monster.sandmaggot4`: rc-gen-mon-triage.tsv:246 kept, rc-run-4.tsv:256 dropped
-  - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-run-4.tsv:257 dropped
-  - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-run-4.tsv:258 dropped
-  - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-run-4.tsv:259 dropped
+  - `monster.sandleaper6`: rc-c011-gameseed.tsv:56 kept, rc-run-4.tsv:252 dropped
+  - `monster.sandleaper7`: rc-c011-gameseed.tsv:57 kept, rc-run-4.tsv:253 dropped
+  - `monster.sandmaggot2`: rc-c011-gameseed.tsv:58 kept, rc-run-4.tsv:254 dropped
+  - `monster.sandmaggot3`: rc-c011-gameseed.tsv:59 kept, rc-run-4.tsv:255 dropped
+  - `monster.sandmaggot4`: rc-c011-gameseed.tsv:60 kept, rc-run-4.tsv:256 dropped
+  - `monster.sandmaggot5`: rc-c011-gameseed.tsv:61 kept, rc-run-4.tsv:257 dropped
+  - `monster.sandmaggot6`: rc-c011-gameseed.tsv:62 kept, rc-run-4.tsv:258 dropped
+  - `monster.sandmaggot7`: rc-c011-gameseed.tsv:63 kept, rc-run-4.tsv:259 dropped
   - `monster.sandraider1`: rc-gen-mon-triage.tsv:75 kept, rc-run-4.tsv:260 dropped
   - `monster.sandraider10`: rc-gen-mon-triage.tsv:166 kept, rc-run-4.tsv:261 dropped
   - `monster.sandraider2`: rc-gen-mon-triage.tsv:79 kept, rc-run-4.tsv:262 dropped
@@ -3378,20 +3474,20 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.scarab6`: rc-damage-draws.tsv:20 kept, rc-run-4.tsv:269 dropped
   - `monster.scarab7`: rc-damage-draws.tsv:21 kept, rc-run-4.tsv:270 dropped
   - `monster.scarab8`: rc-damage-draws.tsv:22 kept, rc-run-4.tsv:271 dropped
-  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-run-4.tsv:272 dropped
-  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-run-4.tsv:273 dropped
-  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-run-4.tsv:274 dropped
+  - `monster.siegebeast1`: rc-c011-gameseed.tsv:64 kept, rc-run-4.tsv:272 dropped
+  - `monster.siegebeast2`: rc-c011-gameseed.tsv:65 kept, rc-run-4.tsv:273 dropped
+  - `monster.siegebeast3`: rc-c011-gameseed.tsv:66 kept, rc-run-4.tsv:274 dropped
   - `monster.sk-archer10`: rc-gen-mon-triage.tsv:151 kept, rc-run-4.tsv:275 dropped
   - `monster.sk-archer2`: rc-gen-mon-triage.tsv:39 kept, rc-run-4.tsv:276 dropped
   - `monster.sk-archer4`: rc-gen-mon-triage.tsv:40 kept, rc-run-4.tsv:277 dropped
   - `monster.sk-archer5`: rc-gen-mon-triage.tsv:41 kept, rc-run-4.tsv:278 dropped
   - `monster.sk-archer6`: rc-gen-mon-triage.tsv:148 kept, rc-run-4.tsv:279 dropped
-  - `monster.sk-archer7`: rc-gen-mon-triage.tsv:149 kept, rc-run-4.tsv:280 dropped
-  - `monster.sk-archer9`: rc-gen-mon-triage.tsv:150 kept, rc-run-4.tsv:281 dropped
+  - `monster.sk-archer7`: rc-c011-gameseed.tsv:67 kept, rc-run-4.tsv:280 dropped
+  - `monster.sk-archer9`: rc-c011-gameseed.tsv:68 kept, rc-run-4.tsv:281 dropped
   - `monster.skeleton3`: rc-gen-mon-triage.tsv:51 kept, rc-run-4.tsv:282 dropped
   - `monster.skeleton6`: rc-gen-mon-triage.tsv:201 kept, rc-run-4.tsv:283 dropped
   - `monster.skeleton7`: rc-gen-mon-triage.tsv:202 kept, rc-run-4.tsv:284 dropped
-  - `monster.skmage-cold5`: rc-gen-mon-triage.tsv:182 kept, rc-run-4.tsv:285 dropped
+  - `monster.skmage-cold5`: rc-c011-gameseed.tsv:69 kept, rc-run-4.tsv:285 dropped
   - `monster.skmage-fire1`: rc-gen-mon-triage.tsv:91 kept, rc-run-4.tsv:286 dropped
   - `monster.skmage-fire4`: rc-gen-mon-triage.tsv:92 kept, rc-run-4.tsv:287 dropped
   - `monster.skmage-fire5`: rc-gen-mon-triage.tsv:178 kept, rc-run-4.tsv:288 dropped
@@ -3412,55 +3508,55 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.snowyeti1`: rc-gen-mon-triage.tsv:111 kept, rc-run-4.tsv:303 dropped
   - `monster.snowyeti2`: rc-gen-mon-triage.tsv:112 kept, rc-run-4.tsv:304 dropped
   - `monster.snowyeti4`: rc-gen-mon-triage.tsv:113 kept, rc-run-4.tsv:305 dropped
-  - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-run-4.tsv:309 dropped
-  - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-run-4.tsv:310 dropped
-  - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-run-4.tsv:311 dropped
-  - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-run-4.tsv:312 dropped
-  - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-run-4.tsv:313 dropped
-  - `monster.succubus6`: rc-mon-fr.tsv:37 kept, rc-run-4.tsv:314 dropped
-  - `monster.succubus7`: rc-mon-fr.tsv:38 kept, rc-run-4.tsv:315 dropped
-  - `monster.succubus8`: rc-mon-fr.tsv:39 kept, rc-run-4.tsv:316 dropped
-  - `monster.succubuswitch2`: rc-mon-fr.tsv:40 kept, rc-run-4.tsv:317 dropped
-  - `monster.succubuswitch3`: rc-mon-fr.tsv:41 kept, rc-run-4.tsv:318 dropped
-  - `monster.succubuswitch5`: rc-mon-fr.tsv:42 kept, rc-run-4.tsv:319 dropped
-  - `monster.succubuswitch6`: rc-mon-fr.tsv:43 kept, rc-run-4.tsv:320 dropped
-  - `monster.succubuswitch7`: rc-mon-fr.tsv:44 kept, rc-run-4.tsv:321 dropped
-  - `monster.succubuswitch8`: rc-mon-fr.tsv:45 kept, rc-run-4.tsv:322 dropped
-  - `monster.succubuswitch9`: rc-mon-fr.tsv:46 kept, rc-run-4.tsv:323 dropped
+  - `monster.succubus1`: rc-c011-gameseed.tsv:70 kept, rc-run-4.tsv:309 dropped
+  - `monster.succubus2`: rc-c011-gameseed.tsv:71 kept, rc-run-4.tsv:310 dropped
+  - `monster.succubus3`: rc-c011-gameseed.tsv:72 kept, rc-run-4.tsv:311 dropped
+  - `monster.succubus4`: rc-c011-gameseed.tsv:73 kept, rc-run-4.tsv:312 dropped
+  - `monster.succubus5`: rc-c011-gameseed.tsv:74 kept, rc-run-4.tsv:313 dropped
+  - `monster.succubus6`: rc-c011-gameseed.tsv:75 kept, rc-run-4.tsv:314 dropped
+  - `monster.succubus7`: rc-c011-gameseed.tsv:76 kept, rc-run-4.tsv:315 dropped
+  - `monster.succubus8`: rc-c011-gameseed.tsv:77 kept, rc-run-4.tsv:316 dropped
+  - `monster.succubuswitch2`: rc-c011-gameseed.tsv:78 kept, rc-run-4.tsv:317 dropped
+  - `monster.succubuswitch3`: rc-c011-gameseed.tsv:79 kept, rc-run-4.tsv:318 dropped
+  - `monster.succubuswitch5`: rc-c011-gameseed.tsv:80 kept, rc-run-4.tsv:319 dropped
+  - `monster.succubuswitch6`: rc-c011-gameseed.tsv:81 kept, rc-run-4.tsv:320 dropped
+  - `monster.succubuswitch7`: rc-c011-gameseed.tsv:82 kept, rc-run-4.tsv:321 dropped
+  - `monster.succubuswitch8`: rc-c011-gameseed.tsv:83 kept, rc-run-4.tsv:322 dropped
+  - `monster.succubuswitch9`: rc-c011-gameseed.tsv:84 kept, rc-run-4.tsv:323 dropped
   - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-run-4.tsv:324 dropped
   - `monster.superunique.ancient-barbarian-2`: rc-gen-monai.tsv:23 kept, rc-run-4.tsv:326 dropped
   - `monster.superunique.ancient-barbarian-3`: rc-mon-fr.tsv:47 kept, rc-run-4.tsv:327 dropped
-  - `monster.superunique.baal-subject-2`: rc-gen-monai.tsv:24 kept, rc-run-4.tsv:332 dropped
-  - `monster.superunique.baal-subject-4`: rc-gen-monai.tsv:25 kept, rc-run-4.tsv:334 dropped
+  - `monster.superunique.baal-subject-2`: rc-c011-gameseed.tsv:85 kept, rc-run-4.tsv:332 dropped
+  - `monster.superunique.baal-subject-4`: rc-c011-gameseed.tsv:86 kept, rc-run-4.tsv:334 dropped
   - `monster.superunique.baal-subject-5`: rc-gen-misc.tsv:3 kept, rc-run-4.tsv:335 dropped
   - `monster.superunique.bonebreak`: rc-gen-misc.tsv:4 kept, rc-run-4.tsv:340 dropped
-  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-run-4.tsv:342 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-c011-gameseed.tsv:87 kept, rc-run-4.tsv:342 dropped
   - `monster.superunique.corpsefire`: rc-gen-misc.tsv:5 kept, rc-run-4.tsv:344 dropped
   - `monster.superunique.flamespike-the-crawler`: rc-gen-monai.tsv:29 kept, rc-run-4.tsv:347 dropped
   - `monster.superunique.frozenstein`: rc-gen-monai.tsv:30 kept, rc-run-4.tsv:348 dropped
-  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-run-4.tsv:349 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-c011-gameseed.tsv:89 kept, rc-run-4.tsv:349 dropped
   - `monster.superunique.grand-vizier-of-chaos`: rc-mon-fr.tsv:51 kept, rc-run-4.tsv:350 dropped
   - `monster.superunique.griswold`: rc-gen-misc.tsv:6 kept, rc-run-4.tsv:351 dropped
-  - `monster.superunique.ismail-vilehand`: rc-gen-monai.tsv:32 kept, rc-run-4.tsv:354 dropped
+  - `monster.superunique.ismail-vilehand`: rc-c011-gameseed.tsv:90 kept, rc-run-4.tsv:354 dropped
   - `monster.superunique.lord-de-seis`: rc-gen-monai.tsv:33 kept, rc-run-4.tsv:355 dropped
-  - `monster.superunique.maffer-dragonhand`: rc-gen-monai.tsv:34 kept, rc-run-4.tsv:356 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-c011-gameseed.tsv:91 kept, rc-run-4.tsv:356 dropped
   - `monster.superunique.radament`: rc-gen-monai.tsv:35 kept, rc-run-4.tsv:362 dropped
   - `monster.superunique.snapchip-shatter`: rc-mon-fr.tsv:54 kept, rc-run-4.tsv:368 dropped
   - `monster.superunique.taintbreeder`: rc-gen-monai.tsv:36 kept, rc-run-4.tsv:370 dropped
   - `monster.superunique.the-countess`: rc-gen-monai.tsv:37 kept, rc-run-4.tsv:371 dropped
   - `monster.superunique.the-smith`: rc-gen-misc.tsv:7 kept, rc-run-4.tsv:374 dropped
-  - `monster.superunique.the-summoner`: rc-gen-monai.tsv:38 kept, rc-run-4.tsv:375 dropped
-  - `monster.superunique.toorc-icefist`: rc-gen-monai.tsv:39 kept, rc-run-4.tsv:378 dropped
+  - `monster.superunique.the-summoner`: rc-c011-gameseed.tsv:92 kept, rc-run-4.tsv:375 dropped
+  - `monster.superunique.toorc-icefist`: rc-c011-gameseed.tsv:93 kept, rc-run-4.tsv:378 dropped
   - `monster.superunique.vinvear-molech`: rc-gen-monai.tsv:40 kept, rc-run-4.tsv:380 dropped
   - `monster.superunique.web-mage-the-burning`: rc-gen-misc.tsv:8 kept, rc-run-4.tsv:381 dropped
-  - `monster.superunique.wyand-voidfinger`: rc-gen-monai.tsv:41 kept, rc-run-4.tsv:384 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-c011-gameseed.tsv:94 kept, rc-run-4.tsv:384 dropped
   - `monster.swarm2`: rc-gen-mon-triage.tsv:261 kept, rc-run-4.tsv:385 dropped
   - `monster.swarm4`: rc-gen-mon-triage.tsv:263 kept, rc-run-4.tsv:386 dropped
   - `monster.swarm5`: rc-gen-mon-triage.tsv:248 kept, rc-run-4.tsv:387 dropped
   - `monster.thornhulk1`: rc-gen-mon-triage.tsv:19 kept, rc-run-4.tsv:388 dropped
-  - `monster.thornhulk2`: rc-mon-fr.tsv:59 kept, rc-run-4.tsv:389 dropped
-  - `monster.thornhulk3`: rc-mon-fr.tsv:60 kept, rc-run-4.tsv:390 dropped
-  - `monster.thornhulk5`: rc-mon-fr.tsv:61 kept, rc-run-4.tsv:391 dropped
+  - `monster.thornhulk2`: rc-c011-gameseed.tsv:95 kept, rc-run-4.tsv:389 dropped
+  - `monster.thornhulk3`: rc-c011-gameseed.tsv:96 kept, rc-run-4.tsv:390 dropped
+  - `monster.thornhulk5`: rc-c011-gameseed.tsv:97 kept, rc-run-4.tsv:391 dropped
   - `monster.umod.1-rndname`: rc-partial-promote.tsv:3 kept, rc-run-4.tsv:392 dropped
   - `monster.umod.10-poisondead`: rc-partial-promote.tsv:4 kept, rc-run-4.tsv:393 dropped
   - `monster.umod.11-durieldead`: rc-partial-promote.tsv:5 kept, rc-run-4.tsv:394 dropped
@@ -3507,12 +3603,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.unraveler8`: rc-gen-mon-triage.tsv:221 kept, rc-run-4.tsv:438 dropped
   - `monster.unraveler9`: rc-gen-mon-triage.tsv:222 kept, rc-run-4.tsv:439 dropped
   - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-run-4.tsv:440 dropped
-  - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-run-4.tsv:441 dropped
-  - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-run-4.tsv:442 dropped
-  - `monster.vampire5`: rc-mon-fr.tsv:64 kept, rc-run-4.tsv:443 dropped
-  - `monster.vampire6`: rc-mon-fr.tsv:65 kept, rc-run-4.tsv:444 dropped
-  - `monster.vampire7`: rc-mon-fr.tsv:66 kept, rc-run-4.tsv:445 dropped
-  - `monster.vampire8`: rc-mon-fr.tsv:67 kept, rc-run-4.tsv:446 dropped
+  - `monster.vampire3`: rc-c011-gameseed.tsv:98 kept, rc-run-4.tsv:441 dropped
+  - `monster.vampire4`: rc-c011-gameseed.tsv:99 kept, rc-run-4.tsv:442 dropped
+  - `monster.vampire5`: rc-c011-gameseed.tsv:100 kept, rc-run-4.tsv:443 dropped
+  - `monster.vampire6`: rc-c011-gameseed.tsv:101 kept, rc-run-4.tsv:444 dropped
+  - `monster.vampire7`: rc-c011-gameseed.tsv:102 kept, rc-run-4.tsv:445 dropped
+  - `monster.vampire8`: rc-c011-gameseed.tsv:103 kept, rc-run-4.tsv:446 dropped
   - `monster.vilechild1`: rc-gen-mon-triage.tsv:81 kept, rc-run-4.tsv:447 dropped
   - `monster.vilechild2`: rc-gen-mon-triage.tsv:82 kept, rc-run-4.tsv:448 dropped
   - `monster.vilechild3`: rc-gen-mon-triage.tsv:83 kept, rc-run-4.tsv:449 dropped
@@ -4822,9 +4918,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.sor.thunder-storm`: rc-packets-chan.tsv:178 kept, rc-run-7b.tsv:147 dropped
   - `skill.sor.warmth`: rc-a8-setstate.tsv:108 kept, rc-run-7b.tsv:148 dropped
   - `state.item.own.monster-equip`: rc-packets-chan.tsv:180 kept, rc-run-7b.tsv:149 dropped
-  - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-sandmaggot.tsv:3 dropped
-  - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-sandmaggot.tsv:4 dropped
-  - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-sandmaggot.tsv:5 dropped
+  - `monster.sandmaggot5`: rc-c011-gameseed.tsv:61 kept, rc-sandmaggot.tsv:3 dropped
+  - `monster.sandmaggot6`: rc-c011-gameseed.tsv:62 kept, rc-sandmaggot.tsv:4 dropped
+  - `monster.sandmaggot7`: rc-c011-gameseed.tsv:63 kept, rc-sandmaggot.tsv:5 dropped
   - `monster.ancientbarb1`: rc-damage-draws.tsv:11 kept, rc-seed-order.tsv:3 dropped
   - `monster.ancientbarb2`: rc-damage-draws.tsv:12 kept, rc-seed-order.tsv:4 dropped
   - `monster.ancientbarb3`: rc-damage-draws.tsv:13 kept, rc-seed-order.tsv:5 dropped
@@ -4834,9 +4930,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `shrine.19.storm-shrine`: rc-run-5.tsv:797 kept, rc-shrine-rest.tsv:3 dropped
   - `shrine.21.exploding-shrine`: rc-run-5.tsv:800 kept, rc-shrine-rest.tsv:4 dropped
   - `shrine.22.poison-shrine`: rc-run-5.tsv:801 kept, rc-shrine-rest.tsv:5 dropped
-  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-siegebeast.tsv:3 dropped
-  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-siegebeast.tsv:4 dropped
-  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-siegebeast.tsv:5 dropped
+  - `monster.siegebeast1`: rc-c011-gameseed.tsv:64 kept, rc-siegebeast.tsv:3 dropped
+  - `monster.siegebeast2`: rc-c011-gameseed.tsv:65 kept, rc-siegebeast.tsv:4 dropped
+  - `monster.siegebeast3`: rc-c011-gameseed.tsv:66 kept, rc-siegebeast.tsv:5 dropped
   - `monster.slinger7`: rc-gen-mon-triage.tsv:171 kept, rc-siegebeast.tsv:6 dropped
   - `monster.slinger8`: rc-gen-mon-triage.tsv:172 kept, rc-siegebeast.tsv:7 dropped
   - `monster.slinger9`: rc-gen-mon-triage.tsv:173 kept, rc-siegebeast.tsv:8 dropped
@@ -4912,27 +5008,27 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.anodized-elite`: rc-run-4.tsv:329 kept, rc-su-fc-tx.tsv:7 dropped
   - `monster.superunique.axe-dweller`: rc-run-4.tsv:330 kept, rc-su-fc-tx.tsv:8 dropped
   - `monster.superunique.baal-subject-1`: rc-run-4.tsv:331 kept, rc-su-fc-tx.tsv:9 dropped
-  - `monster.superunique.baal-subject-2`: rc-gen-monai.tsv:24 kept, rc-su-fc-tx.tsv:10 dropped
+  - `monster.superunique.baal-subject-2`: rc-c011-gameseed.tsv:85 kept, rc-su-fc-tx.tsv:10 dropped
   - `monster.superunique.baal-subject-3`: rc-run-4.tsv:333 kept, rc-su-fc-tx.tsv:11 dropped
-  - `monster.superunique.baal-subject-4`: rc-gen-monai.tsv:25 kept, rc-su-fc-tx.tsv:12 dropped
+  - `monster.superunique.baal-subject-4`: rc-c011-gameseed.tsv:86 kept, rc-su-fc-tx.tsv:12 dropped
   - `monster.superunique.bishibosh`: rc-run-4.tsv:336 kept, rc-su-fc-tx.tsv:13 dropped
   - `monster.superunique.blaze-ripper`: rc-run-4.tsv:337 kept, rc-su-fc-tx.tsv:14 dropped
   - `monster.superunique.bloodwitch-the-wild`: rc-run-4.tsv:338 kept, rc-su-fc-tx.tsv:15 dropped
   - `monster.superunique.boneash`: rc-run-4.tsv:339 kept, rc-su-fc-tx.tsv:16 dropped
   - `monster.superunique.bonesaw-breaker`: rc-run-4.tsv:341 kept, rc-su-fc-tx.tsv:17 dropped
-  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-su-fc-tx.tsv:18 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-c011-gameseed.tsv:87 kept, rc-su-fc-tx.tsv:18 dropped
   - `monster.superunique.coldcrow`: rc-run-4.tsv:343 kept, rc-su-fc-tx.tsv:19 dropped
   - `monster.superunique.dac-farren`: rc-run-4.tsv:345 kept, rc-su-fc-tx.tsv:20 dropped
   - `monster.superunique.eyeback-unleashed`: rc-run-4.tsv:346 kept, rc-su-fc-tx.tsv:21 dropped
   - `monster.superunique.flamespike-the-crawler`: rc-gen-monai.tsv:29 kept, rc-su-fc-tx.tsv:22 dropped
   - `monster.superunique.frozenstein`: rc-gen-monai.tsv:30 kept, rc-su-fc-tx.tsv:23 dropped
-  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-su-fc-tx.tsv:24 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-c011-gameseed.tsv:89 kept, rc-su-fc-tx.tsv:24 dropped
   - `monster.superunique.grand-vizier-of-chaos`: rc-mon-fr.tsv:51 kept, rc-su-fc-tx.tsv:25 dropped
   - `monster.superunique.icehawk-riftwing`: rc-run-4.tsv:352 kept, rc-su-fc-tx.tsv:26 dropped
   - `monster.superunique.infector-of-souls`: rc-run-4.tsv:353 kept, rc-su-fc-tx.tsv:27 dropped
-  - `monster.superunique.ismail-vilehand`: rc-gen-monai.tsv:32 kept, rc-su-fc-tx.tsv:28 dropped
+  - `monster.superunique.ismail-vilehand`: rc-c011-gameseed.tsv:90 kept, rc-su-fc-tx.tsv:28 dropped
   - `monster.superunique.lord-de-seis`: rc-gen-monai.tsv:33 kept, rc-su-fc-tx.tsv:29 dropped
-  - `monster.superunique.maffer-dragonhand`: rc-gen-monai.tsv:34 kept, rc-su-fc-tx.tsv:30 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-c011-gameseed.tsv:91 kept, rc-su-fc-tx.tsv:30 dropped
   - `monster.superunique.magma-torquer`: rc-run-4.tsv:357 kept, rc-su-fc-tx.tsv:31 dropped
   - `monster.superunique.megaflow-rectifier`: rc-run-4.tsv:358 kept, rc-su-fc-tx.tsv:32 dropped
   - `monster.superunique.nihlathak-boss`: rc-run-4.tsv:359 kept, rc-su-fc-tx.tsv:33 dropped
@@ -4950,15 +5046,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.the-countess`: rc-gen-monai.tsv:37 kept, rc-su-fc-tx.tsv:45 dropped
   - `monster.superunique.the-cow-king`: rc-run-4.tsv:372 kept, rc-su-fc-tx.tsv:46 dropped
   - `monster.superunique.the-feature-creep`: rc-run-4.tsv:373 kept, rc-su-fc-tx.tsv:47 dropped
-  - `monster.superunique.the-summoner`: rc-gen-monai.tsv:38 kept, rc-su-fc-tx.tsv:48 dropped
+  - `monster.superunique.the-summoner`: rc-c011-gameseed.tsv:92 kept, rc-su-fc-tx.tsv:48 dropped
   - `monster.superunique.the-tormentor`: rc-run-4.tsv:376 kept, rc-su-fc-tx.tsv:49 dropped
   - `monster.superunique.threash-socket`: rc-run-4.tsv:377 kept, rc-su-fc-tx.tsv:50 dropped
-  - `monster.superunique.toorc-icefist`: rc-gen-monai.tsv:39 kept, rc-su-fc-tx.tsv:51 dropped
+  - `monster.superunique.toorc-icefist`: rc-c011-gameseed.tsv:93 kept, rc-su-fc-tx.tsv:51 dropped
   - `monster.superunique.treehead-woodfist`: rc-run-4.tsv:379 kept, rc-su-fc-tx.tsv:52 dropped
   - `monster.superunique.vinvear-molech`: rc-gen-monai.tsv:40 kept, rc-su-fc-tx.tsv:53 dropped
   - `monster.superunique.winged-death`: rc-run-4.tsv:382 kept, rc-su-fc-tx.tsv:54 dropped
   - `monster.superunique.witch-doctor-endugu`: rc-run-4.tsv:383 kept, rc-su-fc-tx.tsv:55 dropped
-  - `monster.superunique.wyand-voidfinger`: rc-gen-monai.tsv:41 kept, rc-su-fc-tx.tsv:56 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-c011-gameseed.tsv:94 kept, rc-su-fc-tx.tsv:56 dropped
   - `monster.boss.baalcrab`: rc-mon-fr.tsv:9 kept, rc-su-mode.tsv:3 dropped
   - `monster.boss.bloodraven`: rc-run-4.tsv:53 kept, rc-su-mode.tsv:4 dropped
   - `monster.boss.griswold`: rc-run-4.tsv:56 kept, rc-su-mode.tsv:5 dropped
@@ -4970,24 +5066,24 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.ancient-kaa-the-soulless`: rc-run-4.tsv:328 kept, rc-su-mode.tsv:11 dropped
   - `monster.superunique.anodized-elite`: rc-run-4.tsv:329 kept, rc-su-mode.tsv:12 dropped
   - `monster.superunique.baal-subject-1`: rc-run-4.tsv:331 kept, rc-su-mode.tsv:13 dropped
-  - `monster.superunique.baal-subject-4`: rc-gen-monai.tsv:25 kept, rc-su-mode.tsv:14 dropped
+  - `monster.superunique.baal-subject-4`: rc-c011-gameseed.tsv:86 kept, rc-su-mode.tsv:14 dropped
   - `monster.superunique.blaze-ripper`: rc-run-4.tsv:337 kept, rc-su-mode.tsv:15 dropped
   - `monster.superunique.boneash`: rc-run-4.tsv:339 kept, rc-su-mode.tsv:16 dropped
   - `monster.superunique.bonesaw-breaker`: rc-run-4.tsv:341 kept, rc-su-mode.tsv:17 dropped
-  - `monster.superunique.bremm-sparkfist`: rc-gen-monai.tsv:26 kept, rc-su-mode.tsv:18 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-c011-gameseed.tsv:87 kept, rc-su-mode.tsv:18 dropped
   - `monster.superunique.coldcrow`: rc-run-4.tsv:343 kept, rc-su-mode.tsv:19 dropped
-  - `monster.superunique.geleb-flamefinger`: rc-gen-monai.tsv:31 kept, rc-su-mode.tsv:20 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-c011-gameseed.tsv:89 kept, rc-su-mode.tsv:20 dropped
   - `monster.superunique.pindleskin`: rc-run-4.tsv:360 kept, rc-su-mode.tsv:21 dropped
   - `monster.superunique.sarina-the-battlemaid`: rc-run-4.tsv:365 kept, rc-su-mode.tsv:22 dropped
   - `monster.superunique.sharp-tooth-sayer`: rc-run-4.tsv:366 kept, rc-su-mode.tsv:23 dropped
   - `monster.superunique.snapchip-shatter`: rc-mon-fr.tsv:54 kept, rc-su-mode.tsv:24 dropped
   - `monster.superunique.stormtree`: rc-run-4.tsv:369 kept, rc-su-mode.tsv:25 dropped
   - `monster.superunique.taintbreeder`: rc-gen-monai.tsv:36 kept, rc-su-mode.tsv:26 dropped
-  - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-succubus-m.tsv:3 dropped
-  - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-succubus-m.tsv:4 dropped
-  - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-succubus-m.tsv:5 dropped
-  - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-succubus-m.tsv:6 dropped
-  - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-succubus-m.tsv:7 dropped
+  - `monster.succubus1`: rc-c011-gameseed.tsv:70 kept, rc-succubus-m.tsv:3 dropped
+  - `monster.succubus2`: rc-c011-gameseed.tsv:71 kept, rc-succubus-m.tsv:4 dropped
+  - `monster.succubus3`: rc-c011-gameseed.tsv:72 kept, rc-succubus-m.tsv:5 dropped
+  - `monster.succubus4`: rc-c011-gameseed.tsv:73 kept, rc-succubus-m.tsv:6 dropped
+  - `monster.succubus5`: rc-c011-gameseed.tsv:74 kept, rc-succubus-m.tsv:7 dropped
   - `monster.succubus-634`: rc-run-4.tsv:306 kept, rc-succubus-m.tsv:8 dropped
   - `monster.succubus-635`: rc-run-4.tsv:307 kept, rc-succubus-m.tsv:9 dropped
   - `monster.succubus-719`: rc-run-4.tsv:308 kept, rc-succubus-m.tsv:10 dropped
@@ -5014,15 +5110,16 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `client.c-monsters.draw`: rc-draw-row173.tsv:188 kept, rc-town-arrival.tsv:3 dropped
   - `net.c2s.0x06`: rc-promote.tsv:31 kept, rc-unit-guid-order.tsv:3 dropped
   - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-vampire-hp.tsv:3 dropped
-  - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-vampire-hp.tsv:4 dropped
-  - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-vampire-hp.tsv:5 dropped
-  - `monster.vampire5`: rc-mon-fr.tsv:64 kept, rc-vampire-hp.tsv:6 dropped
-  - `monster.vampire7`: rc-mon-fr.tsv:66 kept, rc-vampire-hp.tsv:7 dropped
-  - `monster.vampire6`: rc-mon-fr.tsv:65 kept, rc-vampire-hp.tsv:8 dropped
-  - `monster.vampire8`: rc-mon-fr.tsv:67 kept, rc-vampire-hp.tsv:9 dropped
+  - `monster.vampire3`: rc-c011-gameseed.tsv:98 kept, rc-vampire-hp.tsv:4 dropped
+  - `monster.vampire4`: rc-c011-gameseed.tsv:99 kept, rc-vampire-hp.tsv:5 dropped
+  - `monster.vampire5`: rc-c011-gameseed.tsv:100 kept, rc-vampire-hp.tsv:6 dropped
+  - `monster.vampire7`: rc-c011-gameseed.tsv:102 kept, rc-vampire-hp.tsv:7 dropped
+  - `monster.vampire6`: rc-c011-gameseed.tsv:101 kept, rc-vampire-hp.tsv:8 dropped
+  - `monster.vampire8`: rc-c011-gameseed.tsv:103 kept, rc-vampire-hp.tsv:9 dropped
   - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
   - `client.s-monsters.path-stop`: rc-draw-row173.tsv:189 kept, rc-warriv-draw.tsv:3 dropped
+  - `skill.bar.whirlwind`: rc-c011-gameseed.tsv:105 kept, rc-whirlwind.tsv:3 dropped
   - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:3 dropped
   - `waypoint.1.cold-plains`: rc-run-2.tsv:98 kept, rc-wp-arrival-mode.tsv:4 dropped
   - `waypoint.3.dark-wood`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:5 dropped
@@ -5192,40 +5289,40 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.bar.increased-speed`: rc-a8-setstate.tsv:56 kept, skills.tsv:145 dropped
   - `skill.bar.battle-orders`: rc-a8-setstate.tsv:46 kept, skills.tsv:146 dropped
   - `skill.bar.grim-ward`: rc-a8-setstate.tsv:54 kept, skills.tsv:147 dropped
-  - `skill.bar.whirlwind`: rc-whirlwind.tsv:3 kept, skills.tsv:148 dropped
+  - `skill.bar.whirlwind`: rc-c011-gameseed.tsv:105 kept, skills.tsv:148 dropped
   - `skill.bar.berserk`: rc-a8-setstate.tsv:47 kept, skills.tsv:149 dropped
   - `skill.bar.natural-resistance`: rc-a8-setstate.tsv:62 kept, skills.tsv:150 dropped
   - `skill.bar.war-cry`: rc-a8-setstate.tsv:70 kept, skills.tsv:151 dropped
-  - `skill.bar.battle-command`: q-chk-skills-bda.tsv:32 kept, skills.tsv:152 dropped
+  - `skill.bar.battle-command`: rc-c011-gameseed.tsv:104 kept, skills.tsv:152 dropped
   - `skill.dru.raven`: q-chk-skills-bda.tsv:33 kept, skills.tsv:153 dropped
-  - `skill.dru.plague-poppy`: q-chk-skills-bda.tsv:34 kept, skills.tsv:154 dropped
+  - `skill.dru.plague-poppy`: rc-c011-gameseed.tsv:108 kept, skills.tsv:154 dropped
   - `skill.dru.wearwolf`: rc-packets-chan.tsv:93 kept, skills.tsv:155 dropped
   - `skill.dru.shape-shifting`: rc-packets-chan.tsv:90 kept, skills.tsv:156 dropped
   - `skill.dru.firestorm`: q-chk-skills-bda.tsv:37 kept, skills.tsv:157 dropped
   - `skill.dru.oak-sage`: q-chk-skills-bda.tsv:38 kept, skills.tsv:158 dropped
-  - `skill.dru.summon-spirit-wolf`: q-chk-skills-bda.tsv:39 kept, skills.tsv:159 dropped
+  - `skill.dru.summon-spirit-wolf`: rc-c011-gameseed.tsv:110 kept, skills.tsv:159 dropped
   - `skill.dru.wearbear`: rc-packets-chan.tsv:92 kept, skills.tsv:160 dropped
   - `skill.dru.molten-boulder`: rc-a8-setstate.tsv:72 kept, skills.tsv:161 dropped
   - `skill.dru.arctic-blast`: rc-pkt-handwritten.tsv:5 kept, skills.tsv:162 dropped
-  - `skill.dru.cycle-of-life`: q-chk-skills-bda.tsv:43 kept, skills.tsv:163 dropped
+  - `skill.dru.cycle-of-life`: rc-c011-gameseed.tsv:107 kept, skills.tsv:163 dropped
   - `skill.dru.feral-rage`: rc-packets-chan.tsv:82 kept, skills.tsv:164 dropped
   - `skill.dru.maul`: rc-packets-chan.tsv:87 kept, skills.tsv:165 dropped
   - `skill.dru.eruption`: rc-a8-setstate.tsv:71 kept, skills.tsv:166 dropped
   - `skill.dru.cyclone-armor`: rc-packets-chan.tsv:80 kept, skills.tsv:167 dropped
   - `skill.dru.heart-of-wolverine`: q-chk-skills-bda.tsv:48 kept, skills.tsv:168 dropped
-  - `skill.dru.summon-fenris`: q-chk-skills-bda.tsv:49 kept, skills.tsv:169 dropped
+  - `skill.dru.summon-fenris`: rc-c011-gameseed.tsv:109 kept, skills.tsv:169 dropped
   - `skill.dru.rabies`: rc-packets-chan.tsv:89 kept, skills.tsv:170 dropped
   - `skill.dru.fire-claws`: rc-packets-chan.tsv:83 kept, skills.tsv:171 dropped
   - `skill.dru.twister`: rc-pkt-handwritten.tsv:7 kept, skills.tsv:172 dropped
-  - `skill.dru.vines`: q-chk-skills-bda.tsv:53 kept, skills.tsv:173 dropped
+  - `skill.dru.vines`: rc-c011-gameseed.tsv:111 kept, skills.tsv:173 dropped
   - `skill.dru.hunger`: rc-packets-chan.tsv:85 kept, skills.tsv:174 dropped
   - `skill.dru.shock-wave`: rc-a8-setstate.tsv:73 kept, skills.tsv:175 dropped
-  - `skill.dru.volcano`: q-chk-skills-bda.tsv:56 kept, skills.tsv:176 dropped
+  - `skill.dru.volcano`: rc-c011-gameseed.tsv:112 kept, skills.tsv:176 dropped
   - `skill.dru.tornado`: rc-pkt-handwritten.tsv:6 kept, skills.tsv:177 dropped
   - `skill.dru.spirit-of-barbs`: q-chk-skills-bda.tsv:58 kept, skills.tsv:178 dropped
   - `skill.dru.summon-grizzly`: rc-a8-setstate.tsv:74 kept, skills.tsv:179 dropped
   - `skill.dru.fury`: rc-packets-chan.tsv:84 kept, skills.tsv:180 dropped
-  - `skill.dru.armageddon`: q-chk-skills-bda.tsv:61 kept, skills.tsv:181 dropped
+  - `skill.dru.armageddon`: rc-c011-gameseed.tsv:106 kept, skills.tsv:181 dropped
   - `skill.dru.hurricane`: rc-packets-chan.tsv:86 kept, skills.tsv:182 dropped
   - `skill.ass.fire-trauma`: rc-promote.tsv:68 kept, skills.tsv:183 dropped
   - `skill.ass.claw-mastery`: rc-a8-setstate.tsv:27 kept, skills.tsv:184 dropped
@@ -5901,7 +5998,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0xa0`: rc-link-2.tsv:50 kept, systems.tsv:276 dropped
   - `net.s2c.0xa1`: q-run-net.tsv:277 kept, systems.tsv:277 dropped
   - `net.s2c.0xa2`: q-run-net.tsv:278 kept, systems.tsv:278 dropped
-  - `net.s2c.0xa3`: q-run-net.tsv:279 kept, systems.tsv:279 dropped
+  - `net.s2c.0xa3`: rc-c011-gameseed.tsv:113 kept, systems.tsv:279 dropped
   - `net.s2c.0xa4`: q-run-net.tsv:280 kept, systems.tsv:280 dropped
   - `net.s2c.0xa5`: q-run-net.tsv:281 kept, systems.tsv:281 dropped
   - `net.s2c.0xa6`: q-run-net.tsv:282 kept, systems.tsv:282 dropped
@@ -6886,7 +6983,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:290 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1875
+- Rows whose state disagrees with their checks: 1968
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6905,6 +7002,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.7tillusion`: EQUAL but checks say PARTIAL
   - `monster.ai.ancient`: EQUAL but checks say PARTIAL
   - `monster.ai.ancientstatue`: EQUAL but checks say PARTIAL
+  - `monster.ai.andariel`: EQUAL but checks say PARTIAL
   - `monster.ai.arach`: EQUAL but checks say PARTIAL
   - `monster.ai.arcanetower`: EQUAL but checks say PARTIAL
   - `monster.ai.assassinsentry`: EQUAL but checks say PARTIAL
@@ -6925,12 +7023,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.buffy`: EQUAL but checks say PARTIAL
   - `monster.ai.catapult`: EQUAL but checks say PARTIAL
   - `monster.ai.catapultspotter`: EQUAL but checks say PARTIAL
+  - `monster.ai.clawviper`: EQUAL but checks say PARTIAL
   - `monster.ai.clawviperex`: EQUAL but checks say PARTIAL
   - `monster.ai.corruptarcher`: EQUAL but checks say PARTIAL
   - `monster.ai.corruptlancer`: EQUAL but checks say PARTIAL
   - `monster.ai.corruptrogue`: EQUAL but checks say PARTIAL
   - `monster.ai.cycleoflife`: EQUAL but checks say PARTIAL
   - `monster.ai.darkwanderer`: EQUAL but checks say PARTIAL
+  - `monster.ai.deathmauler`: EQUAL but checks say PARTIAL
   - `monster.ai.deathsentry`: EQUAL but checks say PARTIAL
   - `monster.ai.diablo`: EQUAL but checks say PARTIAL
   - `monster.ai.druidbear`: EQUAL but checks say PARTIAL
@@ -6944,10 +7044,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.fetishshaman`: EQUAL but checks say PARTIAL
   - `monster.ai.flyingscimitar`: EQUAL but checks say PARTIAL
   - `monster.ai.foulcrownest`: EQUAL but checks say PARTIAL
-  - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
-  - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
-  - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1815 more (rerun with the tsv to list them)
+  - … and 1908 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -7327,12 +7424,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `cov.missile.323` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-coverage-warps: re-run on integ-r16 + component/level fix: milestone-hellforge DIVERGED@145, milestone-hephasto DIVERGED@145 |
-| `cov.missile.479` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.missile.481` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 19; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.missile.483` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.148` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | rc-run-2: a check of this row diverges (see checks-status.md); exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.175` | system | DIVERGED | M | DIVERGED@10 | yes | 0 | n | - | - | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
-| `cov.monster.179` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | rc-run-1 ass-fire-blast: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
+| `cov.monster.179` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-run-1 ass-fire-blast: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
 | `cov.monster.19` | system | DIVERGED | M | DIVERGED@46 | yes | 0 | n | rc-melee-fallen | - | state 100% on 6 checks (REC-2140); combat-melee-fallen packets still DIVERGED (s2c 0x07 MapReveal frame 3) |
 | `cov.monster.195` | system | DIVERGED | M | DIVERGED@10 | yes | 0 | n | - | - | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
 | `cov.monster.196` | system | DIVERGED | M | DIVERGED@10 | yes | 0 | n | - | - | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
@@ -7421,6 +7515,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.missile.120` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: merc-rogue-cow |
 | `cov.missile.22` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-monster-missiles |
 | `cov.missile.478` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-tornado) |
+| `cov.missile.479` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: dru-volcano: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `cov.missile.481` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: dru-volcano: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `cov.missile.483` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: dru-volcano: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `cov.missile.58` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `cov.missile.7` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-2: combat-arrow-kill,combat-arrow-quillrat,combat-monster-missiles,combat-random-boss |
 | `cov.monster.147` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
@@ -8299,42 +8396,27 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `mon.missile.hit-footprint-by-mode` | system | DIVERGED | M | DIVERGED | yes | 0 | y | claude/rc-drop-nor-timing | specs/missiles/missiles.md | bolt 4 hits fallenshaman5 (1:19, in hit mode, x 5147) at 5146 in 1.14d (kill frame 54), d2rs at 5147 (55); bolt 3 on the same monster idle hit at 5147 in both; finder and size read equal, so the footprint stamped under the monster by mode is the suspect (needs a 1.14d collision-grid probe at frame 53) |
 | `mon.skill.chain-position` | system | DIVERGED | M | DIVERGED | yes | 0 | n | claude/rc-drop-nor-timing | specs/skills/bodies-3.md | fallenshaman5 (class 62) fired shafire1 (class 22) because the production chain position was a stub 0; 1.14d fires shafire5 (26). state channel of nor-04: first divergence (missile 3:5 class 26 vs 22, frame 44) gone [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.abyssknight` | system | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.andariel` | system | DIVERGED | M | DIVERGED@128 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-missile-missing (integ-r18): missile class 32 path target x 1.14d 5139 vs d2rs 5145 (aim point 6 sub-tiles off); not this cause |
 | `monster.ai.baalcrab` | system | DIVERGED | M | DIVERGED@106 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-baalcrab ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@106; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.bloodraven` | system | DIVERGED | M | DIVERGED@94 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-bloodraven ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@94; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.clawviper` | system | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-clawviper ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@36; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.deathmauler` | system | DIVERGED | M | DIVERGED@125 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/skills/bodies-3.md | rc-missile-missing (integ-r18): on the integ-r20 base f46 missile 502 present in 1.14d, missing in d2rs (DeathMaul read 0 total frames); fixed by the missile-frames getter on the store, first divergence now f125 (game seed), not further investigated |
 | `monster.ai.desertturret` | system | DIVERGED | M | DIVERGED@81 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-desertturret ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@81; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.doomknight` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.fallen` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/7 of its a* checks diverge) |
+| `monster.ai.fallen` | system | DIVERGED | M | DIVERGED@46 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/7 of its a* checks diverge) |
 | `monster.ai.fingermage` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.gargoyletrap` | system | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-gargoyletrap ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@31; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.genericspawner` | system | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-genericspawner ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@31; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.highpriest` | system | DIVERGED | M | DIVERGED@85 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-highpriest ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@85; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.highpriest` | system | DIVERGED | M | DIVERGED@86 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-highpriest: state: frame 86 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] |
 | `monster.ai.megademon` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.mephisto` | system | DIVERGED | M | DIVERGED@61 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-mephisto ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@61; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.navi` | system | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-navi ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@51; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.nihlathak` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-nihlathak ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@73; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.npcoutoftown` | system | DIVERGED | M | DIVERGED@78 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-npcoutoftown ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@78; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.putriddefiler` | system | DIVERGED | M | DIVERGED@30 | no | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.quillrat` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/6 of its a* checks diverge) |
+| `monster.ai.quillrat` | system | DIVERGED | M | DIVERGED@46 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/6 of its a* checks diverge) |
 | `monster.ai.regurgitator` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.sandmaggotqueen` | system | DIVERGED | M | DIVERGED@43 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-sandmaggotqueen ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@43; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.siegebeast` | system | DIVERGED | M | DIVERGED@90 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-siegebeast ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@90; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.ai.sandmaggotqueen` | system | DIVERGED | M | DIVERGED@74 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-sandmaggotqueen: state: frame 74 monster 1:9 class 68, field s: 1.14d [732952064, 992016024] vs d2rs [2235366260, 749242] |
 | `monster.ai.succubuswitch` | system | DIVERGED | M | DIVERGED@82 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.suicideminion` | system | DIVERGED | M | DIVERGED@59 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-suicideminion ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@59; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.ai.summoner` | system | DIVERGED | M | DIVERGED@67 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-gen-monai: generated check(s) gen-ai-summoner ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@67; AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.vilemother` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 2 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.willowisp` | system | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `monster.ai.zombie` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/8 of its a* checks diverge) |
-| `monster.baboon6` | entity | DIVERGED | M | DIVERGED@71 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 71 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.bloodlord1` | entity | DIVERGED | M | DIVERGED@127 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-506: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.bloodlord2` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-507: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.bloodlord3` | entity | DIVERGED | M | DIVERGED@41 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-508: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.bloodlord4` | entity | DIVERGED | M | DIVERGED@97 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-509: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 97 monster 1:8 class 509, field fr: 1.14d 23296 vs d2rs 3077 |
-| `monster.bloodlord5` | entity | DIVERGED | M | DIVERGED@97 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-510: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 97 monster 1:8 class 510, field fr: 1.14d 23296 vs d2rs 3077 |
-| `monster.bloodlord6` | entity | DIVERGED | M | DIVERGED@90 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 90 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.bloodlord7` | entity | DIVERGED | M | DIVERGED@99 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-653: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
+| `monster.ai.zombie` | system | DIVERGED | M | DIVERGED@46 | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1 ass-burst-of-speed: state PARTIAL, input/send without a MATCHing packets channel (6/8 of its a* checks diverge) |
 | `monster.boss.baalcrab` | entity | DIVERGED | M | DIVERGED@80 | yes | 0 | n | - | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-boss-544: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 80 player 0:1 class 0, field m: 1.14d 0 vs d2rs 1 |
 | `monster.boss.bloodraven` | entity | DIVERGED | M | DIVERGED@93 | yes | 0 | n | - | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-boss-267 state: frame 93 player 0:1 class 0, field s: 1.14d [37638007, 1705587472] vs d2rs [2032329932, 1625895153] |
 | `monster.boss.diablo` | entity | DIVERGED | M | DIVERGED@95 | yes | 0 | n | - | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-boss-243: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 95 missile 3:1 class 172, field sp: 1.14d 120 vs d2rs 128 |
@@ -8346,106 +8428,36 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.boss.radament` | entity | DIVERGED | M | DIVERGED@61 | yes | 0 | n | q-fix-real-unit-seed-order | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-quest-radament: packets: frame 61 stream s2c #36 id: 1.14d 9c vs d2rs 51 (id 0x9c) (1/1 of its a* checks diverge) |
 | `monster.boss.uberandariel` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-boss-707 state: frame 51 game, field seed: 1.14d [3707631985, 39530063] vs d2rs [1483255534, 419929858] |
 | `monster.boss.uberizual` | entity | DIVERGED | M | DIVERGED@92 | yes | 0 | n | - | specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-boss-706: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 92 missile 3:1 class 119, field lvl: 1.14d 8 vs d2rs 1 |
-| `monster.cr-archer6` | entity | DIVERGED | M | DIVERGED@75 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-613: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 75 missile 3:2 class 12, field lvl: 1.14d 9 vs d2rs 1 |
-| `monster.cr-archer7` | entity | DIVERGED | M | DIVERGED@75 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-614: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 75 missile 3:2 class 40, field lvl: 1.14d 9 vs d2rs 1 |
-| `monster.cr-archer8` | entity | DIVERGED | M | DIVERGED@75 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-722: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 75 missile 3:2 class 40, field lvl: 1.14d 9 vs d2rs 1 |
-| `monster.deathmauler1` | entity | DIVERGED | M | DIVERGED@62 | yes | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 62, unit 1:8, draw #0, field missing: 1.14d site 0x5a55ba vs d2rs site None |
-| `monster.deathmauler2` | entity | DIVERGED | M | DIVERGED@62 | no | 0 | n | claude/q-fix-join-items | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 62, unit 1:8, draw #0, field missing: 1.14d site 0x5a55ba vs d2rs site None |
-| `monster.deathmauler3` | entity | DIVERGED | M | DIVERGED@62 | no | 0 | n | claude/q-fix-join-items | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 62, unit 1:8, draw #0, field missing: 1.14d site 0x5a55ba vs d2rs site None |
-| `monster.deathmauler4` | entity | DIVERGED | M | DIVERGED@62 | no | 0 | n | claude/q-fix-join-items | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 62, unit 1:8, draw #0, field missing: 1.14d site 0x5a55ba vs d2rs site None |
-| `monster.deathmauler5` | entity | DIVERGED | M | DIVERGED@62 | no | 0 | n | claude/q-fix-join-items | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 62, unit 1:8, draw #0, field missing: 1.14d site 0x5a55ba vs d2rs site None |
-| `monster.fallenshaman6` | entity | DIVERGED | M | DIVERGED@52 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 52, unit 0:1, draw #0, field missing: 1.14d site 0x57b0fd vs d2rs site None |
-| `monster.fingermage1` | entity | DIVERGED | M | DIVERGED@80 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-304: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 80 missile 3:1 class 177, field lvl: 1.14d 3 vs d2rs 1 |
-| `monster.fingermage2` | entity | DIVERGED | M | DIVERGED@80 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-305: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 80 missile 3:1 class 177, field lvl: 1.14d 4 vs d2rs 1 |
-| `monster.fingermage3` | entity | DIVERGED | M | DIVERGED@56 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-306: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 177, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.fingermage4` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-692: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 41 missile 3:1 class 177, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.fingermage5` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-693: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 41 missile 3:1 class 177, field lvl: 1.14d 5 vs d2rs 1 |
+| `monster.deathmauler5` | entity | DIVERGED | M | DIVERGED@113 | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-533: state: frame 113 player 0:1 class 0, field m: 1.14d 0 vs d2rs 1 |
 | `monster.init` | system | DIVERGED | M | - | ? | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/init.md | unit seed draw order diverges at frame 2 (first RNG site); size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.mon-lvl-133` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-133: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-134` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-134: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-304` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-304: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-305` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-305: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-306` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-306: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-613` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-613: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-614` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-614: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-636` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-636: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-637` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-637: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-638` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-638: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-692` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-692: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-693` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-693: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-720` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-720: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mon-lvl-722` | entity | DIVERGED | S | DIVERGED | no | 0 | n | claude/rc-mon-lvl | - | rc-mon-lvl 2026-10-10 gen-mon-722: missile lvl field now equal (monster used-skill base level from natural_skills, REC-2235); first divergence moved past lvl |
-| `monster.mosquito4` | entity | DIVERGED | M | DIVERGED@100 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-117: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 100 monster 1:8 class 117, field fr: 1.14d 3328 vs d2rs 4608 |
-| `monster.overseer3` | entity | DIVERGED | M | DIVERGED@46 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-481: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.overseer4` | entity | DIVERGED | M | DIVERGED@46 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-482: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
 | `monster.quest.baal` | entity | DIVERGED | M | DIVERGED | ? | 0 | n | - | specs/world/quests.md,specs/monsters/population.md | gen-qkill-baal (rc-gen-misc, 2026-10-10): DIVERGED@57 game seed: 1.14d [1056428698, 25125209] vs d2rs [60238956, 1595794302] (a draw count differs before the kill lands; baalcrab spawn/AI draw, cause not isolated) |
 | `monster.quest.blood-raven` | entity | DIVERGED | M | DIVERGED | ? | 0 | n | - | specs/world/quests.md,specs/monsters/population.md | gen-qkill-blood-raven (rc-gen-misc, 2026-10-10): DIVERGED@64 player mode m: 1.14d 5 vs d2rs 4 (player is hit / attack-recovery mode differs, Blood Raven ranged attack timing) |
 | `monster.quest.countess` | entity | DIVERGED | M | DIVERGED | ? | 0 | n | - | specs/world/quests.md,specs/monsters/population.md | gen-qkill-countess (rc-gen-misc, 2026-10-10): DIVERGED@51 monster 1:8 class 45 seed: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] (superunique 6 member seed, first frame after the spawn) |
-| `monster.sandleaper6` | entity | DIVERGED | M | DIVERGED@97 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.sandleaper7` | entity | DIVERGED | M | DIVERGED@97 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.sandmaggot2` | entity | DIVERGED | M | DIVERGED@85 | yes | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 85 monster 1:9 class 191, field x: 1.14d 5151 vs d2rs 5147 |
-| `monster.sandmaggot3` | entity | DIVERGED | M | DIVERGED@85 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 85 monster 1:9 class 192, field x: 1.14d 5151 vs d2rs 5147 |
-| `monster.sandmaggot4` | entity | DIVERGED | M | DIVERGED@85 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 85 monster 1:9 class 193, field x: 1.14d 5151 vs d2rs 5147 |
-| `monster.sandmaggot5` | entity | DIVERGED | M | DIVERGED@135 | yes | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state frame 135 monster 1:9, field x: 1.14d 5151 vs d2rs 5147 (the laid egg's position); rng channel EQUAL after rc-maggot-seed (seed no longer diverges) |
-| `monster.sandmaggot6` | entity | DIVERGED | M | DIVERGED@135 | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state frame 135 monster 1:9, field x: 1.14d 5151 vs d2rs 5147 (the laid egg's position); rng channel EQUAL after rc-maggot-seed (seed no longer diverges) |
-| `monster.sandmaggot7` | entity | DIVERGED | M | DIVERGED@135 | no | 0 | n | claude/rc-maggot-seed | - | rc-maggot-seed 2026-10-10: state frame 135 monster 1:9, field x: 1.14d 5151 vs d2rs 5147 (the laid egg's position); rng channel EQUAL after rc-maggot-seed (seed no longer diverges) |
-| `monster.siegebeast1` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 38, unit 1:11, draw #0, field missing: 1.14d site 0x5e2cda vs d2rs site None |
-| `monster.siegebeast2` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 38, unit 1:11, draw #0, field missing: 1.14d site 0x5e2cda vs d2rs site None |
-| `monster.siegebeast3` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): rng frame 38, unit 1:11, draw #0, field missing: 1.14d site 0x5e2cda vs d2rs site None |
-| `monster.sk-archer7` | entity | DIVERGED | M | DIVERGED@78 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.sk-archer9` | entity | DIVERGED | M | DIVERGED@78 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.skmage-cold5` | entity | DIVERGED | M | DIVERGED@135 | no | 0 | n | claude/coord-resume-3 | - | rc-gen-mon-triage 2026-10-10 (r16): state frame 135 player 0:1 class 0, field sp: 1.14d 80 vs d2rs 40 |
-| `monster.succubus1` | entity | DIVERGED | M | DIVERGED@69 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-469: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 469, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus2` | entity | DIVERGED | M | DIVERGED@69 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-470: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 470, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus3` | entity | DIVERGED | M | DIVERGED@69 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-471: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 471, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus4` | entity | DIVERGED | M | DIVERGED@69 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-472: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 472, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus5` | entity | DIVERGED | M | DIVERGED@69 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-473: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 473, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus6` | entity | DIVERGED | M | DIVERGED@69 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-634: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 634, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus7` | entity | DIVERGED | M | DIVERGED@69 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-635: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 635, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubus8` | entity | DIVERGED | M | DIVERGED@69 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-719: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 69 monster 1:8 class 719, field s: 1.14d [1151986076, 1319447910] vs d2rs [4285903474, 480484601] |
-| `monster.succubuswitch2` | entity | DIVERGED | M | DIVERGED@117 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-475: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 117 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2714123707, 838425138] |
-| `monster.succubuswitch3` | entity | DIVERGED | M | DIVERGED@116 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-476: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 116 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2714123707, 838425138] |
-| `monster.succubuswitch5` | entity | DIVERGED | M | DIVERGED@114 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-478: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 114 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2714123707, 838425138] |
-| `monster.succubuswitch6` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-636: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
-| `monster.succubuswitch7` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-637: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
-| `monster.succubuswitch8` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-638: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
-| `monster.succubuswitch9` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-720: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
 | `monster.superunique.ancient-barbarian-2` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-45 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@30; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.superunique.ancient-barbarian-3` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-46: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.superunique.baal-subject-2` | entity | DIVERGED | M | DIVERGED@64 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-63 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@64; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.baal-subject-4` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-65 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@38; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.baal-subject-2` | entity | DIVERGED | M | DIVERGED@69 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-63: state: frame 69 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [85, 666] |
 | `monster.superunique.beetleburst` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-beetleburst: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
-| `monster.superunique.bremm-sparkfist` | entity | DIVERGED | M | DIVERGED@68 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-28 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@68; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.coldworm-the-burrower` | entity | DIVERGED | M | DIVERGED@43 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-15 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@43; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.bremm-sparkfist` | entity | DIVERGED | M | DIVERGED@69 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-28: state: frame 69 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 |
+| `monster.superunique.coldworm-the-burrower` | entity | DIVERGED | M | DIVERGED@74 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-15: state: frame 74 monster 1:9 class 68, field s: 1.14d [732952064, 992016024] vs d2rs [2235366260, 749242] |
 | `monster.superunique.dark-elder` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-darkelder: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
 | `monster.superunique.fangskin` | entity | DIVERGED | M | DIVERGED@54 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-12 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@54; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.superunique.fire-eye` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-fireeye: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
 | `monster.superunique.flamespike-the-crawler` | entity | DIVERGED | M | DIVERGED@80 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-8 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@80; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.superunique.frozenstein` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-60 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@51; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.geleb-flamefinger` | entity | DIVERGED | M | DIVERGED@63 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-27 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@63; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.geleb-flamefinger` | entity | DIVERGED | M | DIVERGED@70 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-27: state: frame 70 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 |
 | `monster.superunique.grand-vizier-of-chaos` | entity | DIVERGED | M | DIVERGED@56 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-38: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 177, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.superunique.ismail-vilehand` | entity | DIVERGED | M | DIVERGED@67 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-26 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@67; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.ismail-vilehand` | entity | DIVERGED | M | DIVERGED@68 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-26: state: frame 68 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 |
 | `monster.superunique.leatherarm` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-leatherarm: packets: frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) (1/1 of its a* checks diverge) |
 | `monster.superunique.lord-de-seis` | entity | DIVERGED | M | DIVERGED@66 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-37 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@66; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.maffer-dragonhand` | entity | DIVERGED | M | DIVERGED@86 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-31 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@86; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.maffer-dragonhand` | entity | DIVERGED | M | DIVERGED@87 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-31: state: frame 87 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 |
 | `monster.superunique.radament` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-10 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@30; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.superunique.snapchip-shatter` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-54: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 41 monster 1:12 class 472, field m: 1.14d 4 vs d2rs 9 |
 | `monster.superunique.taintbreeder` | entity | DIVERGED | M | DIVERGED@73 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-34 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@73; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.superunique.the-countess` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-6 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@51; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.the-summoner` | entity | DIVERGED | M | DIVERGED@103 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-18 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@103; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.toorc-icefist` | entity | DIVERGED | M | DIVERGED@91 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-29 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@91; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
+| `monster.superunique.toorc-icefist` | entity | DIVERGED | M | DIVERGED@92 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-29: state: frame 92 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] |
 | `monster.superunique.vinvear-molech` | entity | DIVERGED | M | DIVERGED@103 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-56 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@103; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.superunique.wyand-voidfinger` | entity | DIVERGED | M | DIVERGED@105 | yes | 0 | n | claude/rc-gen-monai | specs/monsters/population.md,specs/monsters/init.md | rc-gen-monai: generated check(s) gen-su-30 ran on the integ-r23+specs-staging-7 base: first divergence DIVERGED@105; superunique placement/mods via population.md; shared code path with random uniques; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
-| `monster.thornhulk2` | entity | DIVERGED | M | DIVERGED@98 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-128: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.thornhulk3` | entity | DIVERGED | M | DIVERGED@98 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-129: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.thornhulk5` | entity | DIVERGED | M | DIVERGED@85 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-609: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
+| `monster.superunique.wyand-voidfinger` | entity | DIVERGED | M | DIVERGED@106 | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-30: state: frame 106 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 |
 | `monster.umod.27-spectralhit` | content | DIVERGED | M | DIVERGED@149 | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | rc-run-4 2026-10-10: gen-umod-27 state: frame 149 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.vampire3` | entity | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-133: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 36 missile 3:1 class 277, field lvl: 1.14d 4 vs d2rs 1 |
-| `monster.vampire4` | entity | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-134: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 36 missile 3:1 class 277, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.vampire5` | entity | DIVERGED | M | DIVERGED@45 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-135: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 45 monster 1:8 class 135, field hp: 1.14d 16128 vs d2rs 0 |
-| `monster.vampire6` | entity | DIVERGED | M | DIVERGED@45 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-695: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 45 monster 1:8 class 695, field hp: 1.14d 40960 vs d2rs 0 |
-| `monster.vampire7` | entity | DIVERGED | M | DIVERGED@45 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-696: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 45 monster 1:8 class 696, field hp: 1.14d 40960 vs d2rs 0 |
-| `monster.vampire8` | entity | DIVERGED | M | DIVERGED@45 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-697: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 45 monster 1:8 class 697, field hp: 1.14d 40960 vs d2rs 0 |
 | `sim.monster-mode-records` | system | DIVERGED | S | DIVERGED@95 | yes | 0 | n | claude/rc-c011-gameseed | specs/sim/units.md | rc-c011-gameseed 2026-10-10 gen-boss-333: first divergence frame 95 monster 1:8 unit seed (was DIVERGED@71 game seed, Armageddon state entry lookup fixed) |
 | `monster.ai.none` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | AI function (spec spec'd-here); implemented in monsters/ai; one row per AI type, classes grouped; size M: no check yet or one diverges, needs a recorded 1.14d trace plus fix/compare run (2-8 h) |
 | `monster.ai.provisional-points` | system | NO-CHECK | M | - | ? | 5 | y | claude/q-fix-b-monster-combat | specs/monsters/ai-bodies-7.md,specs/monsters/ai.md | provisional choices in AI bodies (binary/recording to settle); size M: Ghidra read plus recording, 2-8 h |
@@ -8461,6 +8473,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.7tillusion` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-7tillusion: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.ancient` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-ancient: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.ancientstatue` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-ancientstatue: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.ai.andariel` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-andariel: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.arach` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-arach: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.arcanetower` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-arcanetower: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.assassinsentry` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-assassinsentry: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8481,12 +8494,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.buffy` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-buffy: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.catapult` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-catapult: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.catapultspotter` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-catapultspotter: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.ai.clawviper` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-clawviper: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.clawviperex` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-clawviperex: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.corruptarcher` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | a1-warp-cave-ama,a1-warp-tower-cellar-ama,combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `monster.ai.corruptlancer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `monster.ai.corruptrogue` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-2 (2026-10-10): every check of the row ran on integ-r23 (checks-status.md): no DIVERGED channel; checks with input/send have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `monster.ai.cycleoflife` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-cycleoflife: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.darkwanderer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-darkwanderer: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.ai.deathmauler` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/skills/bodies-3.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-deathmauler: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.deathsentry` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-deathsentry: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.diablo` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-diablo: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.druidbear` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-druidbear: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8525,6 +8540,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.necropet` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-necropet: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.npc` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-npc: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.npcbarb` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-npcbarb: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.ai.npcoutoftown` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-npcoutoftown: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.npcstationary` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-npcstationary: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.oblivionknight` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-oblivionknight: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.overseer` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-overseer: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8541,6 +8557,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.scarab` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `monster.ai.shadowmaster` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-shadowmaster: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.shadowwarrior` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-shadowwarrior: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.ai.siegebeast` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-siegebeast: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.siegetower` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-siegetower: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.skeleton` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | a1-warp-cave-ama,combat-pop-stony-field (rc-promote, 2026-10-10, fresh run): every channel MATCH except a state channel PARTIAL only for the d2rs header's client gap (RUN_GAPS); every unit field of both sides compared, no ignore line; pokes-only or packets MATCH; DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7) |
 | `monster.ai.skeletonbow` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
@@ -8548,6 +8565,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.ai.smith` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-smith: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.spirit` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-spirit: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.succubus` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `monster.ai.suicideminion` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-suicideminion: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.ai.summoner` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-c011-gameseed 2026-10-10 fresh run: gen-ai-summoner: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.ai.swarm` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `monster.ai.tentacle` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-tentacle: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
 | `monster.ai.tentaclehead` | system | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-b-monster-combat | specs/monsters/ai.md,specs/monsters/ai-bodies.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule index): gen-ai-tentaclehead: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
@@ -8589,6 +8608,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.baboon3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.baboon4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.baboon5` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.baboon6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-295: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.baboon7` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.baboon8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.batdemon1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8603,6 +8623,13 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.bighead4` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.bighead5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.bighead6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.bloodlord1` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-506: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-507: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord3` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-508: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord4` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-509: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-510: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-652: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.bloodlord7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-653: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.blunderbore1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.blunderbore3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.blunderbore4` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
@@ -8650,6 +8677,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.cr-archer2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.cr-archer4` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.cr-archer5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.cr-archer6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-613: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.cr-archer7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-614: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.cr-archer8` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-722: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.cr-lancer2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.cr-lancer3` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.cr-lancer6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH; missile lvl from monstats Sk<i>lvl (client seam mirrors natural_skills) |
@@ -8657,6 +8687,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.cr-lancer8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH; missile lvl from monstats Sk<i>lvl (client seam mirrors natural_skills) |
 | `monster.crownest1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.crownest2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.deathmauler1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-529: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.deathmauler2` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-530: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.deathmauler3` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-531: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.deathmauler4` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-532: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.dkfig1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.dkfig2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.dkmag1` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-missile-class-off | - | state 150/150, rng equal; missile class = srvmissilea + chain position (bodies-3.md 4.9, 3.25); fixed by 569af56cf |
@@ -8670,6 +8704,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.fallen7` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.fallen8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.fallenshaman3` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
+| `monster.fallenshaman6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-645: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.fallenshaman7` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.fallenshaman8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.fetish1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8689,6 +8724,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.fetishshaman4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-extra-missile | - | rc-extra-missile: state 150/150, rng MATCH; inferno channel frames set the missile total/left (0x005CC2E0) |
 | `monster.fetishshaman6` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-extra-missile | - | rc-extra-missile: state 150/150, rng MATCH; inferno channel frames set the missile total/left (0x005CC2E0) |
 | `monster.fetishshaman8` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-extra-missile | - | rc-extra-missile: state 150/150, rng MATCH; inferno channel frames set the missile total/left (0x005CC2E0) |
+| `monster.fingermage1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-304: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.fingermage2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-305: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.fingermage3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-306: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.fingermage4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-692: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.fingermage5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-693: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.foulcrow1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.foulcrow2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.foulcrow4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8741,14 +8781,31 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.minion6` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.minion7` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.minion9` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.mon-lvl-133` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-133: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-134` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-134: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-304` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-304: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-305` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-305: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-306` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-306: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-613` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-613: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-614` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-614: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-636` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-636: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-637` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-637: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-638` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-638: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-692` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-692: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-693` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-693: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-720` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-720: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.mon-lvl-722` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-722: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.mosquito1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.mosquito2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.mosquito4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-117: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.mummy2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.mummy4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.mummy5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.mummy6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.overseer1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.overseer2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.overseer3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-481: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.overseer4` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-482: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.overseer5` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.overseer6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.pantherwoman3` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8787,6 +8844,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.sandleaper3` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sandleaper4` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sandleaper5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.sandleaper6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-629: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandleaper7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-630: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-69: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot3` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-70: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot4` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-71: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-72: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-679: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sandmaggot7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-716: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.sandraider1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sandraider10` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sandraider2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8799,14 +8864,20 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.scarab6` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.scarab7` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.scarab8` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
+| `monster.siegebeast1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-441: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.siegebeast2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-442: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.siegebeast3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-443: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.sk-archer10` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sk-archer2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sk-archer4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sk-archer5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.sk-archer6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.sk-archer7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-576: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.sk-archer9` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-578: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.skeleton3` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.skeleton6` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.skeleton7` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.skmage-cold5` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-624: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.skmage-fire1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.skmage-fire4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.skmage-fire5` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -8830,6 +8901,21 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.succubus-634` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056) |
 | `monster.succubus-635` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056) |
 | `monster.succubus-719` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056) |
+| `monster.succubus1` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-469: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus2` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-470: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-471: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-472: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-473: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-634: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-635: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubus8` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-719: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-475: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-476: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch5` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-478: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-636: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-637: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch8` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-638: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.succubuswitch9` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-720: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.suicideminion6` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
 | `monster.superunique.ancient-barbarian-1` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-44 EQUAL (REC-2055/2056) |
 | `monster.superunique.ancient-kaa-the-soulless` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-19 EQUAL (REC-2055/2056) |
@@ -8837,6 +8923,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.superunique.axe-dweller` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-47 EQUAL (REC-2055/2056) |
 | `monster.superunique.baal-subject-1` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-62 EQUAL (REC-2055/2056) |
 | `monster.superunique.baal-subject-3` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-64 EQUAL (REC-2055/2056) |
+| `monster.superunique.baal-subject-4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-65: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.superunique.baal-subject-5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-66 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): 150/150 frames equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
 | `monster.superunique.bishibosh` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-0 EQUAL (REC-2055/2056) |
 | `monster.superunique.blaze-ripper` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-59 EQUAL (REC-2055/2056) |
@@ -8865,6 +8952,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.superunique.the-cow-king` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-39 EQUAL (REC-2055/2056) |
 | `monster.superunique.the-feature-creep` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-41 EQUAL (REC-2055/2056) |
 | `monster.superunique.the-smith` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-20 (rc-gen-misc, 2026-10-10, 1.14d re-recorded under Wine): 150/150 frames equal; every channel equal on every frame with every state field of both sides compared (no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which a pokes-only check does not exercise (REC-2055/2056 DECIDED) |
+| `monster.superunique.the-summoner` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/monsters/population.md,specs/monsters/init.md | rc-c011-gameseed 2026-10-10 fresh run: gen-su-18: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.superunique.the-tormentor` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-33 EQUAL (REC-2055/2056) |
 | `monster.superunique.threash-socket` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-52 EQUAL (REC-2055/2056) |
 | `monster.superunique.treehead-woodfist` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-4 EQUAL (REC-2055/2056) |
@@ -8875,6 +8963,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.swarm4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.swarm5` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.thornhulk1` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
+| `monster.thornhulk2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-128: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.thornhulk3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-129: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.thornhulk5` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-609: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.umod.1-rndname` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-1 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.10-poisondead` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-10 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.11-durieldead` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-11 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
@@ -8923,6 +9014,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.unraveler8` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.unraveler9` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.vampire2` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
+| `monster.vampire3` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-133: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.vampire4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-134: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.vampire5` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-135: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.vampire6` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-695: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.vampire7` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-696: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `monster.vampire8` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | - | rc-c011-gameseed 2026-10-10 fresh run: gen-mon-697: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `monster.vilechild1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.vilechild2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.vilechild3` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -9175,28 +9272,23 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ass.shadow-warrior` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-shadow-warrior: channel packets DIVERGED |
 | `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-promote 2026-10-10 fresh run: ass-shock-field: channel packets DIVERGED |
 | `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | PARTIAL | no | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-promote 2026-10-10 fresh run: ass-wake-of-fire-sentry: channel packets DIVERGED |
-| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@2 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | bar-battle-command: state channel first divergence: frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 (q-chk-skills-bda, Wine run 2026-10-09); |
+| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@28 | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: bar-battle-command: state: frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 |
 | `skill.bar.double-throw` | entity | DIVERGED | S | DIVERGED@20 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: bar-double-throw packets: frame 20 stream c2s #0 extra (d2rs only) (id 0x0c) |
 | `skill.bar.leap` | entity | DIVERGED | S | DIVERGED@34 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap packets: frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.leap-attack` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap-attack packets: frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.shout` | entity | DIVERGED | S | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
-| `skill.bar.whirlwind` | entity | DIVERGED | S | DIVERGED@2 | yes | 0 | n | claude/rc-whirlwind | specs/skills/bodies-2.md | bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players) |
-| `skill.dru.armageddon` | entity | DIVERGED | M | DIVERGED@37 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-armageddon: state channel first divergence: frame 37 game, field seed: 1.14d [3385903807, 408973908] vs d2rs [980535581, 1085454190] (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-cycle-of-life: state channel first divergence: frame 31 monster 1:8 class 426, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
+| `skill.dru.cycle-of-life` | entity | DIVERGED | M | DIVERGED@67 | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-cycle-of-life: state: frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 |
 | `skill.dru.eruption` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-dru-234 packets: frame 29 stream s2c #0 missing in d2rs (id 0xa7) |
 | `skill.dru.firestorm` | entity | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | dru-firestorm: state channel first divergence: frame 30 missile 3:2 class 458, field xf: 1.14d 32768 vs d2rs 25052 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.heart-of-wolverine` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-heart-of-wolverine: state channel first divergence: frame 58 monster 1:8 class 423, field m: 1.14d 2 vs d2rs 1 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.molten-boulder` | entity | DIVERGED | S | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate: gen-skill-dru-229 packets: frame 29 stream s2c #0 missing in d2rs (id 0xa7) |
 | `skill.dru.oak-sage` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-oak-sage: state channel first divergence: frame 31 player 0:1 class 5, field hp: 1.14d 56736 vs d2rs 25216 (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.dru.plague-poppy` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-plague-poppy: state channel first divergence: frame 31 monster 1:8 class 425, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
+| `skill.dru.plague-poppy` | entity | DIVERGED | M | DIVERGED@67 | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-plague-poppy: state: frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 |
 | `skill.dru.raven` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | dru-raven: state channel first divergence: frame 29 monster 1:8 class 419, field s: 1.14d [1601510352, 1471677176] vs d2rs [3528420285, 1166992223] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.spirit-of-barbs` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-spirit-of-barbs: state channel first divergence: frame 58 monster 1:8 class 422, field m: 1.14d 2 vs d2rs 1 (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.dru.summon-fenris` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-summon-fenris: state channel first divergence: frame 58 monster 1:8 class 421, field m: 1.14d 2 vs d2rs 1 (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.dru.summon-grizzly` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-dru-247 packets: frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) |
-| `skill.dru.summon-spirit-wolf` | entity | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-summon-spirit-wolf: state channel first divergence: frame 58 monster 1:8 class 420, field m: 1.14d 2 vs d2rs 1 (q-chk-skills-bda, Wine run 2026-10-09); |
-| `skill.dru.vines` | entity | DIVERGED | M | DIVERGED@29 | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | dru-vines: state channel first divergence: frame 31 monster 1:8 class 427, field tx: 1.14d 0 vs d2rs 5142 (q-chk-skills-bda, Wine run 2026-10-09); |
+| `skill.dru.vines` | entity | DIVERGED | M | DIVERGED@67 | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-vines: state: frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 |
 | `skill.dru.vines-wander` | entity | DIVERGED | S | DIVERGED@67 | yes | 0 | n | claude/rc-gen-skill-2 | specs/monsters/ai-bodies-6.md | rc-a8-setstate: gen-skill-dru-222 state: frame 67 monster 1:8 class 425, field tx: 1.14d 5143 vs d2rs 5144 |
-| `skill.dru.volcano` | entity | DIVERGED | M | DIVERGED@29 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | dru-volcano: state channel first divergence: frame 34 missile 3:1 class 479, field s: 1.14d [2238081736, 1028392181] vs d2rs [3365183618, 277] (q-chk-skills-bda, Wine run 2026-10-09); |
 | `skill.generic.attack-kick-throw` | entity | DIVERGED | M | DIVERGED@46 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | rc-run-2: combat-melee-fallen state PARTIAL first: state PARTIAL outside REC-2055/2056 (input/send in check without packets MATCH) |
 | `skill.monster.doomknightmissile` | entity | DIVERGED | S | DIVERGED@91 | yes | 0 | n | claude/rc-spec-monskill | specs/skills/monster-skills.md | frame 91 player 0:1 class 0, field sp: 1.14d 80 vs d2rs 40; player sp 80 vs 40 after a hit (known cluster 'player sp', rc-gen-mon-triage) |
 | `skill.monster.fetishaura` | entity | DIVERGED | M | DIVERGED@90 | yes | 0 | n | claude/rc-spec-monskill | specs/skills/monster-skills.md | frame 90 monster 1:9 class 141, field m: 1.14d 2 vs d2rs 4; monster AI: a fetish pack member (class 141) walks in 1.14d where d2rs attacks (frame 90) |
@@ -9486,7 +9578,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.bar.taunt` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-taunt,gen-skill-bar-137 |
 | `skill.bar.throwing-mastery` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-passives,gen-skill-bar-135 |
 | `skill.bar.war-cry` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-war-cry,gen-skill-bar-154 |
+| `skill.bar.whirlwind` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/skills/bodies-2.md | rc-c011-gameseed 2026-10-10 fresh run: bar-whirlwind: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `skill.dru.arctic-blast` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-arctic-blast) |
+| `skill.dru.armageddon` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-armageddon: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `skill.dru.cyclone-armor` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-cyclone-armor,gen-skill-dru-235 |
 | `skill.dru.feral-rage` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-feral-rage,gen-skill-dru-232 |
 | `skill.dru.fire-claws` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-fire-claws,gen-skill-dru-239 |
@@ -9497,8 +9591,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.dru.rabies` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | REC-2055: all channels MATCH (packets included) in dru-rabies,gen-skill-dru-238 |
 | `skill.dru.shape-shifting` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | REC-2055: all channels MATCH (packets included) in dru-passives,gen-skill-dru-224 |
 | `skill.dru.shock-wave` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-gen-skill-2 | specs/skills/use.md,specs/ui/controls.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in gen-skill-dru-243 |
+| `skill.dru.summon-fenris` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-summon-fenris: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
+| `skill.dru.summon-spirit-wolf` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c011-gameseed 2026-10-10 fresh run: dru-summon-spirit-wolf: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `skill.dru.tornado` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-tornado) |
 | `skill.dru.twister` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-pkt-handwritten: REC-2055: state equal (0 differences, no ignore line), every channel MATCH/PARTIAL under the client-gap rule, packets MATCH where the check has input (dru-twister) |
+| `skill.dru.volcano` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c011-gameseed | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-c011-gameseed 2026-10-10 fresh run: dru-volcano: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `skill.dru.wearbear` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-wearbear,gen-skill-dru-228 |
 | `skill.dru.wearwolf` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | REC-2055: all channels MATCH (packets included) in dru-werewolf,gen-skill-dru-223 |
 | `skill.monster.baal-taunt` | entity | EQUAL | - | PARTIAL | no | 1 | n | claude/rc-spec-monskill | specs/skills/monster-skills.md | 500 ticks equal to 1.14d (REC-2055 client-gap rule); no cast mode or missile seen in 1.14d, idle and think frames only: PROVISIONAL REC-2600 |
@@ -9846,10 +9943,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x9f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED hire-follow-warp-kashya: None |
 | `net.s2c.0xa0` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): hire-asheara state DIVERGED (checks-status.md) |
 | `net.s2c.0xa1` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-follow-waypoint-kashya@314 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0xa3` | message | DIVERGED | S | DIVERGED@29 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged dru-volcano@29 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0xa5` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-05@57 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0xa7` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
-| `net.s2c.0xa9` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-00@86 missing in d2rs; 1 equal pair(s) |
+| `net.s2c.0xa5` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-05@57 missing in d2rs; 0 equal pair(s) |
+| `net.s2c.0xa7` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
+| `net.s2c.0xa9` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-00@86 missing in d2rs; 1 equal pair(s) |
 | `net.s2c.0xab` | message | DIVERGED | S | DIVERGED@56 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-04@56 extra (d2rs only); 0 equal pair(s) |
 | `system.audio.environment.2-music-0x004dcaa0-t` | system | DIVERGED | S | - | ? | 0 | n | - | specs/audio/environment.md | audio-diff: act1 town1.wav starts T 1 in d2rs, T 0 in 1.14d (samples equal over the 3.3 MB captured); wild.wav T 78 vs T 77 (Blood Moor checks) [checks: traces/audio/audio-town-ambience-ama.check, traces/audio/audio-walk-town-ama.check, traces/audio/audio-cast-frost-nova-sor.check, traces/audio/audio-monster-hit-ama.check; DIVERGED@0] |
 | `system.audio.environment.4-level-entry-lines-0x004cc270` | system | DIVERGED | M | - | ? | 0 | n | - | specs/audio/environment.md | audio-diff: 1.14d plays the class act-1 wilderness entry line (sor_act1_entry_wilderness.wav / ama_act1_entry_wilderness.wav) at T 64 after the warp to the Blood Moor; d2rs plays none [checks: traces/audio/audio-cast-frost-nova-sor.check, traces/audio/audio-monster-hit-ama.check; DIVERGED@64] |
@@ -10565,6 +10661,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x95` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 7 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x96` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x9c` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
+| `net.s2c.0xa3` | message | EQUAL | - | MATCH | yes | 0 | n | claude/rc-c011-gameseed | specs/sim/server-messages.tsv | rc-c011-gameseed 2026-10-10 fresh run: dru-volcano: every channel MATCH or a state PARTIAL only for the client gap (DECIDED REC-2055/2056 (specs/tools/scenario-diff.md open questions 6-7)), or state PARTIAL with no difference and rng MATCH (the gen-mon standard) |
 | `net.s2c.0xa8` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0xaa` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0xac` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-replay-hooks | specs/sim/server-messages.tsv | rc-goto-settle: poke.py _goto settles once; 1.14d re-recorded, the landing 0x07/0x15 now equal in these 5 checks (packets channel 100%) |

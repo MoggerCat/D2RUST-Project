@@ -1358,6 +1358,38 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             crate::wiring::action::reaction::kill_by(&mut self.cv, u, killer);
             return;
         }
+        // `0x00571AA0` (`bodies-2.md` §2.21): the 0xA3 record {v, skill,
+        // L, the unit, T (type 0, GUID −1 without one), x, y} on `u`, the
+        // unit queued for update (Armageddon's state function, §4.9).
+        if let bodies::BodyEffect::MsgA3 {
+            u,
+            target,
+            skill,
+            lvl,
+            x,
+            y,
+            v,
+        } = e
+        {
+            use crate::wiring::action::event_records::EventRecord;
+            let units = &self.cv.v.units;
+            let of = |id: Option<UnitId>, none: u8| {
+                id.and_then(|i| units.get(i))
+                    .map_or((none, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+            };
+            let r = EventRecord::Progressive {
+                charges: v as u8,
+                skill: skill as u16,
+                level: lvl as u16,
+                unit: of(Some(u), 6),
+                target: of(target, 0),
+                x: x as u32,
+                y: y as u32,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {

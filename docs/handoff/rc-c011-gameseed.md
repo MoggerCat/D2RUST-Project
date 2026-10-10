@@ -2,32 +2,36 @@
 
 Branch `claude/rc-c011-gameseed` (from `claude/integ-r23`). REC ids
 REC-3330..3349 (none used). Ledger part `docs/handoff/ledger/rc-c011-gameseed.tsv`.
+EQUAL 3116 → 3210 (+94; 0 rows went EQUAL → DIVERGED). Sweeps (all checked
+against the ledger / checks-status, 0 worse): gen-mon-* 337, gen-boss/su/ai 237,
+the 194 class-skill checks, a5-su-*, dru/ass/milestone C011 checks.
 
-## Cause 1: three missing / misplaced game-seed draws (pushed)
+## Fixes (draw site in 1.14d → d2rs gap)
 
-| Draw site (1.14d) | d2rs gap | Fix | Checks |
-|---|---|---|---|
-| `0x005A03A0` superunique hcIdx in the drop TC choice (`treasure.md` §3.2) | `Pending::superunique` default None: every superunique dropped from monstats column 3 (Act 5 Uitem C, Rare 800) instead of its superuniques TC (Act 5 Super Cx, Rare 972): item count and quality rolls differ, so the item-seed game draws differ | `ActionHooks::superunique` reads the monster data (type flag 0x02 → +0x26) | a5-su-anodized-elite, -bonesaw-breaker, -dac-farren, -magma-torquer, -pindleskin, -vinvear-molech: frame 16 → 36 |
-| `0x005A4390` mode-3 umods from the damage apply of a umod area hit (`0x0057E090`, fire-enchanted death) | the monster world is out during the mode-2 callback: the nested dispatch fell back to the no-op seam, curse (umod 7, one unit draw) never ran | `umod_missile_hit` re-lends the world, as `umod_set_mode` does | a5-su-anodized-elite frame 20 → 36 |
-| `0x006439F0` monster skill entry in Armageddon's state function `0x005C8520` (`bodies-4.md` §4.9) | a monster has no d2-sim skill list: the lookup answered none, the state function ended, no missile, no item seed | `UseView::find_entry` falls back to `ActionHooks::monster_entry_of` (init / summon entries) | gen-boss-333 frame 71 → 95 |
+| 1.14d | d2rs gap → fix | Moved |
+|---|---|---|
+| `0x005A03A0` superunique TC (`treasure.md` §3.2) | seam always none → monster data flag 0x02 / +0x26 | a5-su-* 16 → 36 |
+| `0x005A4390` mode 3 from a umod area hit | world out → re-lent (`umod_missile_hit`) | anodized-elite |
+| `0x006439F0` monster entry, Armageddon state fn | no list → init/summon entries | gen-boss-333 71 → 95, dru-armageddon |
+| `0x005A43B0` mode 5 (multishot §19) in creation | store and world out → both lent back | gen-boss-707 EQUAL |
+| `0x00553540`, `0x0056D2C0`, path target point | umod host seams always none → path provider | multishot / curse targets |
+| `0x00463740`, `0x005B2F20` in the AI | seams none → DRLG room + `spawn_at` | maggot queen 43 → 74 |
+| A1Q4 `0x005944B0` / `0x005943B0` / `0x00594450` / `0x005944F0` | not wired → quest loan; specced `quests-act1-rest.md` §3 | gen-ai-npcoutoftown EQUAL |
+| `0x00571CD0` in the player update (`intents-events.md` §7.3 r1 step 4) + `MsgA3` | player records never sent; MsgA3 dropped | dru-volcano, dru-armageddon packets MATCH |
 
-gen-mon-475 / 476 / 478 (succubuswitch, listed DIVERGED@117/116/114 game
-seed) are already clean on this base: state 150/150 no difference, rng
-MATCH; PARTIAL only through the check's `ignore q seed` (not REC-2055
-promotable), rows set NO-CHECK with that reason.
+## Open (with sizes)
 
-EQUAL before → after: 3116 → 3116 (the moved checks now first differ on
-other causes: a5-su-* frame 36 monster 1:18 class 529 hp, gen-boss-333
-frame 95 unit seed of 1:8).
-
-## Open (next causes, sizes)
-
-- gen-ai-npcoutoftown (M): Cain's NpcOutOfTown portal quest calls
-  `0x005944B0` / `0x005943B0` / `0x00594450` (ACT1Q4, object 189 at the
-  stored portal coordinates, chain-4 extra +0x67, +0x95, +0x98, +0x9C,
-  +0xA0) are unimplemented seams (`Pending` defaults): 1.14d spawns the
-  portal object at frame 78, d2rs never.
-- gen-ai-sandmaggotqueen (S?): frame 31 d2rs draws a missile path step
-  (`path/walk/missile.rs:122`) on missile 3:1 that 1.14d does not.
-- gen-boss-707, gen-su-37, gen-lvl-55/69/104/106, dru-*, ass-blade-sentinel,
-  milestone-izual: not yet traced.
+- a5-su-* (16 checks, M): frame 36 barbarian 1:15 hits mauler 1:18, 1.14d 1:19:
+  the `ai.scan5.good-target` row (owner rc-ancient-tx).
+- gen-su-26/27/28/30/31 (M): hydra bolts (missile 247) deal fire 6377 per hit and
+  two hit in d2rs (player dies frame 68); 1.14d one hit of 2176 — missile damage.
+- gen-ai-sandmaggotqueen, gen-su-15 (S?): frame 74 the spawned sandmaggot 1:9 seed.
+- gen-boss-333 frame 95, gen-ai-mephisto/navi/nihlathak/genericspawner, gen-boss-242,
+  gen-su-6/10/60: monster unit seed (AI draw order), not traced.
+- gen-lvl-55/69/104/106 (level population at the warp, frame 21): level-pop owners.
+- ass-blade-sentinel, milestone-izual: frame 28 game seed, not traced.
+- Recorder: `record_rng.py --skip-inline` range 0x66B000–0x682000 ("DRLG only")
+  also covers the path code (charged-bolt path `0x0067A240`), so 1.14d's path
+  draws are never recorded and the rng channel reports d2rs's as extra.
+- Packets seen DIVERGED with no status line (pre-existing): ass sentries miss the
+  monster-add 0x21, sor-hydra 0xA7/0xAC order, dru-fissure missing 0xA7.
