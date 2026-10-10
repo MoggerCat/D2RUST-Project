@@ -332,6 +332,7 @@ pub fn purge<H: InitHost + ?Sized>(
     );
     eprintln!("DBG found {}", found.len());
     for m in found {
+        eprintln!("DBG cand {:?} ty {:?} al {} und {} cl {}", m, type_of(h, m), h.alignment(m), h.is_undead(m), class_of(h, m));
         if type_of(h, m) != Some(UnitType::Monster)
             || h.alignment(m) != 0
             || (undead && !h.is_undead(m))
@@ -1152,6 +1153,7 @@ fn hireable_missile<H: InitHost + ?Sized>(h: &mut H, m: UnitId) {
 
 /// §14 umod 21, mode 2.
 fn kill_self<H: InitHost + ?Sized>(h: &mut H, u: UnitId) {
+    eprintln!("DBG kill_self {:?} dead={} f={}", u, h.units().is_dead(u), h.game().frame);
     if h.units().is_dead(u) {
         return;
     }
