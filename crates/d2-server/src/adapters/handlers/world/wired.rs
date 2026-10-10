@@ -681,6 +681,7 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
         self.hireling_calls(game, events);
         self.pet_follows(game, events);
+        self.run_cube_staff(game, events);
     }
 
     /// Moves what the systems sent since the last call into the one
@@ -1162,11 +1163,14 @@ where
     /// The cube on this world's economy and inventory model.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         self.cube.as_ref()?;
-        Some(self.with_economy(game, events, |econ, p| {
+        let out = self.with_economy(game, events, |econ, p| {
             let parts = p.cube.as_deref_mut().expect("checked above");
             let inv = p.inventory.as_deref_mut();
             call.call(econ, parts, inv)
-        }))
+        });
+        // The staff hook runs inside the transmute in 1.14d.
+        self.run_cube_staff(game, events);
+        Some(out)
     }
 
     /// The item moves on this world's economy and inventory parts (lent

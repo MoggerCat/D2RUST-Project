@@ -32,3 +32,11 @@ NOT-IMPLEMENTED by feature). No code changed, no ledger rows changed.
   the ledger, are recording 1.14d now (`--fill-cache`; the cache files are not committed here).
 - Ledger after merging integ-r23: 824 DIVERGED, 414 NO-CHECK, 46 NOT-IMPLEMENTED.
 - C003 (71 rows) is free: the re-run is EQUAL under REC-2055/2056, so a ledger part settles it.
+
+## v4
+- All 796 checks behind DIVERGED/NO-CHECK rows now have fresh results: the 286 uncached
+  checks were recorded (1.14d), and the 19 draws checks were re-run on a fresh build after a
+  stale `--no-build` binary errored (`unknown option --frame-schedule`).
+- d2rs side: sim/state/packets at dc7576e57, draws at the v4 merge; orig-cache files written by
+  `--fill-cache` were not committed.
+- C001 (96 rows, 79 checks): EQUAL under REC-2055/2056 on re-run; settle in a ledger part (S).

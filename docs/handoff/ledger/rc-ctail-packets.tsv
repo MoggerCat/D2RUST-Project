@@ -1,0 +1,4 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+cube.recipe.portal	content	items	cubemain.txt 151 rows (private extracted) grouped by recipe kind	specs/world/cube.md	draft	-	MATCH	yes	0	n	rc-ctail-packets	EQUAL	-	rc-ctail-packets C039/C069: cube-000/001/002/148 packets+items MATCH on integ-r23 + REC-3860 (0x20 cube open tail 0x3F/0x7C, recount 0x0055FA40, inline hst hook 0x28, cow refusal sound 20)
+cube.recipe.quest	content	items	cubemain.txt 151 rows (private extracted) grouped by recipe kind	specs/world/cube.md	draft	-	MATCH	yes	0	n	rc-ctail-packets	EQUAL	-	rc-ctail-packets C039/C069: cube-000/001/002/148 packets+items MATCH on integ-r23 + REC-3860 (0x20 cube open tail 0x3F/0x7C, recount 0x0055FA40, inline hst hook 0x28, cow refusal sound 20)
