@@ -980,6 +980,11 @@ caller `0x005720D8`; the client reader is `client/msg-units.md` §1.2):
    bit: the minion owner (`0x0058F0D0`) is a player and its pet type of
    U's GUID (`sim/pets.md` §9) is 7 (hireable) → 1 and the owner's GUID
    in 32 bits; else 0.
+   Implemented (rc-pkt-handwritten, REC-3370): the hireling bit and its
+   owner GUID are sent for the units `set_ai_owner` linked to a player
+   (`ActionHooks::hireling_units`; the hireling init is its only caller).
+   Evidence: the 1.14d 0xAC of every hire-* check is 4 bytes longer than
+   before (bit 1 + the owner GUID, `traces/checks/hire-kashya.check`).
 5. Source link: 1 bit = flag-ex +0xC8 bit 0x400 and owner type +0x94 =
    0; set → 31 bits of +0x98 & 0x8FFFFFFF.
 6. Stats: L = U's child list with state 0 and flag 0x40 (`0x006257D0(U,

@@ -981,6 +981,13 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
+    fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
+        self.event_records.push(
+            unit,
+            super::event_records::EventRecord::UnitStat { stat, value },
+        );
+    }
+
     /// On the lent monster world (none: nothing).
     fn assign_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, umod: u8) {
         self.with_monster_world(|w, h| w.assign_umod(sim, h, unit, umod));
