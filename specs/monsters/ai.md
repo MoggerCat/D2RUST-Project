@@ -34,15 +34,15 @@
 |   4. AI parameters | 641–659 |
 |   5. Target selection | 660–996 |
 |   6. Distances and line tests | 997–1012 |
-|   7. Tactics helpers | 1013–1258 |
-|   8. AI commands and minions | 1259–1285 |
-|   10. The catalogue `ai-functions.tsv` | 1286–1306 |
-| Constants & data dependencies | 1307–1330 |
-| Randomness | 1331–1360 |
-| Edge cases & original bugs | 1361–1402 |
-| Test vectors | 1403–1491 |
-| Provenance | 1492–1553 |
-| Open questions | 1554–1660 |
+|   7. Tactics helpers | 1013–1266 |
+|   8. AI commands and minions | 1267–1293 |
+|   10. The catalogue `ai-functions.tsv` | 1294–1314 |
+| Constants & data dependencies | 1315–1338 |
+| Randomness | 1339–1368 |
+| Edge cases & original bugs | 1369–1410 |
+| Test vectors | 1411–1499 |
+| Provenance | 1500–1561 |
+| Open questions | 1562–1668 |
 <!-- /index -->
 
 ## Summary
