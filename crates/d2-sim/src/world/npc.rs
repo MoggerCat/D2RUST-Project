@@ -397,6 +397,9 @@ pub trait NpcWorld {
     fn clear_path(&mut self, unit: UnitId);
     /// `0x0058EC00(npc, …, 0x28)` (Open question 2; monster spec).
     fn npc_ai_param(&mut self, npc: UnitId, param: u32);
+    /// `0x0058EC00` for AI params 1 and 2 of the NPC (C→S 0x59,
+    /// `monsters/ai-bodies.md` §9.9). Default: not written.
+    fn npc_ai_point(&mut self, _npc: UnitId, _x: u32, _y: u32) {}
     /// Cancel the NPC's AI-think events (type 2) and schedule one at
     /// frame + 1 (`tick.md` §5.2–5.4).
     fn reschedule_ai_think(&mut self, npc: UnitId);
@@ -634,6 +637,48 @@ impl NpcControl {
         }
         w.clear_path(player);
         self.start(w, player, npc).map(Some)
+    }
+
+    /// `0x0054CA10`: C→S 0x59 MakeEntityMove (`monsters/ai-bodies.md`
+    /// §9.9; read in the 1.14d export). The size is 17, else result 3; a
+    /// unit type (u32@1) above 5 gives 2; no such unit, a distance of 51
+    /// or more (`0x00641530`), or a monster whose class lacks `npc` and
+    /// `interact` gives 1. Else the NPC's path is cleared, its AI think
+    /// rescheduled at the next frame and its AI params 0, 1 and 2 set to
+    /// 40, x (u32@9) and y (u32@13); the result is 0. Only a monster
+    /// (type 1) is looked up here; another unit type reads its class as
+    /// a monstats index in 1.14d (not specified: refused with 1).
+    pub fn make_entity_move<W: NpcWorld + NpcVendors>(
+        &mut self,
+        w: &mut W,
+        player: UnitId,
+        msg: &[u8],
+    ) -> u32 {
+        if msg.len() != 17 {
+            return 3;
+        }
+        let ty = u32_at(msg, 1);
+        if ty > 5 {
+            return 2;
+        }
+        if ty != u32::from(UNIT_MONSTER) {
+            return 1;
+        }
+        let Some(npc) = w.monster_by_guid(u32_at(msg, 5)) else {
+            return 1;
+        };
+        if w.distance(player, npc) >= 0x33 {
+            return 1;
+        }
+        let class = w.monster_class(npc).unwrap_or(0);
+        if !(self.is_npc(class) && self.interacts(class)) {
+            return 1;
+        }
+        w.clear_path(npc);
+        w.reschedule_ai_think(npc);
+        w.npc_ai_param(npc, AI_PARAM);
+        w.npc_ai_point(npc, u32_at(msg, 9), u32_at(msg, 13));
+        0
     }
 
     /// `0x00573020` → `0x00572C10`: start an interaction (§2).
