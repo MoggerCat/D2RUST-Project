@@ -61,7 +61,7 @@ def link_row(row, index, names):
     hit = [c for c in NOTE_RE.findall(row.get("note", "")) if c in names]
     if hit:
         return "note", sorted(set(hit))
-    hit = sorted(n for n, (_f, _r, a) in index.items() if a == area and n in names)
+    hit = sorted(n for n, (_f, _r, a) in index.items() if area in a.split(",") and n in names)
     if hit:
         return "index", hit
     m = re.match(r"object\.(\d+)-", area)
