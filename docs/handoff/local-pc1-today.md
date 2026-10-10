@@ -36,3 +36,34 @@ Running: 1.14d sides of gen-wp-1..8, 17, 28..38 into `traces/orig-cache`.
 Open in Step 4: client seed at the first sound tick (two items), critter walk
 (REC-742 recording), frost-nova audio check, equipped-doll captures (REC-2181).
 Ledger: no verdict rows yet (`docs/handoff/ledger/local-pc1-today.tsv` comes with the suite runs).
+
+## Push 2 (13:10) — Step 4 is empty; Windows recordings
+
+Merged `claude/specs-staging-7` (bab315e49 and later). No open item is left in
+Step 4 (the audit's regrouped list had not landed at this merge).
+
+- **Client seed** (two items): one seed, {1, 666} at start, `S[16]` =
+  {0xE4CA4C4E, 0x3A4FDE2B} at the first sound tick: derived from the binary
+  (`client/model.md` Randomness r4, `audio/sound-table-2.md` §14.5,
+  `render/draw-order-2.md` §11.3) and **confirmed on the live game**
+  (`traces/pc1/client-seed-town-ama.tsv`). Row `cursor-shared-seed`.
+- **Equipped paper dolls (REC-2181)**: five saves, saved once by 1.14d, then
+  character select captured: appearance bytes and component file names in
+  `traces/pc1/charselect-dolls.tsv`, `ui/frontend-menus.md` §F2.10 r8. A
+  d2s-tool save alone has all-0xFF appearance bytes: row `d2s-tool-appearance`.
+  Pixels vs d2rs still open (saves and frames go to the private repo).
+- **Audio on Windows**: `audio_diff.py run` now works on Windows; all four
+  `traces/audio` checks ran, all DIVERGED; effects pair by samples, the music
+  streams do not (`tools/audio-diff.md` OQ1, summaries in `traces/audio/win/`).
+  Frost nova item answered (no second `coldcast.wav`).
+- **gen-wp 1..8, 17, 28..38**: 1.14d sides re-recorded into `traces/orig-cache`
+  (every 0x49 accepted).
+- **New checks**: 20 `ui-draws-*-ama` draw-list checks (panels, hover texts,
+  skill pick lists, item tooltip), for the UI rows that had no check.
+- Variant installs on PC 1 live outside the repo (`..\variants`, linked at
+  `d2rs\variants`), so `variant` checks run here now.
+
+Running: every check behind a needs_pc1 ledger row (143) plus the UI checks,
+both sides on Windows, about 2 h. Ledger part
+`docs/handoff/ledger/local-pc1-today.tsv` follows with that batch.
+Rows so far: 21 `q-fix-pc1today-*`.
