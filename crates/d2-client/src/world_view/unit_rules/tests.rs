@@ -515,7 +515,7 @@ fn an_object_casts_its_shadow_only_where_it_blocks_light() {
     assert!(super::object_casts_shadow(&l, 7, 0));
 }
 
-// Covers: specs/render/unit-composite.md §8
+// Covers: specs/render/draw-order.md §5 r4
 #[test]
 fn an_object_whose_draw_is_0_keeps_its_pose_but_draws_no_body() {
     let (_, mut rules) = setup(MemorySource::default());
