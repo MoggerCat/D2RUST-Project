@@ -888,7 +888,10 @@ fn block_s3_and_s4_starts() {
     assert_eq!(mode(&fx, m), 10);
     assert!(!fx.timers(m).iter().any(|t| t.0 == event::MODE_CHANGE));
     let r = fx.sim.sys.units.get_mut(m).unwrap();
-    r.anim.frame = r.anim.frame_count;
+    // The event's own frame advance `0x00623E00` runs first: leave the
+    // frame two steps short of the count so it ends within one step.
+    r.anim.speed = 256;
+    r.anim.frame = r.anim.frame_count - 512;
     mode_event(&mut fx, m, false);
     assert_eq!(mode(&fx, m), 11);
     // S4: mode 11 and the think at f + 15.

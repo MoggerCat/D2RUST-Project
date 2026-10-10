@@ -1773,7 +1773,7 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
     /// [`Pending::ai_chain_index`] (`0x006510C0`).
     fn chain_position(&self, class: i32) -> i32 {
-        self.x().ai_chain_index(class)
+        self.cv.v.h.monster_chain_position(class)
     }
     /// [`Pending::ai_class_for_level`] (`0x0063EC70`).
     fn class_for_level(&self, room: Option<RoomId>, class: i32) -> i32 {

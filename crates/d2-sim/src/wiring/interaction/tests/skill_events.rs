@@ -232,6 +232,8 @@ fn monster_attack_event0_runs_the_used_skills_do_on_every_event() {
         fx.frame();
     }
     assert_eq!(srvdo_count(&fx, AURA_DO), 3);
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 2);
+    // +0x4E is written by the event's own frame advance `0x00623E00`
+    // (`units.md` §4.2): the unit has no AnimData record, so no event byte.
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 0);
     fx.assert_clean();
 }

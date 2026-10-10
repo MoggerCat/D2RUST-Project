@@ -381,6 +381,45 @@ pub fn anim_complete(a: &Anim) -> bool {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// The animation refresh `0x00623E00` of a monster's event 0: the
+    /// plain frame advance with the frame bonus `0x00623B10`
+    /// ([`crate::units::anim::advance_plain`]); a unit with a sequence is
+    /// advanced by its own caller.
+    pub(crate) fn refresh_animation(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
+        if let Some(r) = sim.units.get_mut(unit) {
+            crate::units::anim::advance_plain(&mut r.anim, bonus);
+        }
+    }
+
+    /// `0x006510C0(class, 0, 0)`: the monstats chain position (+0x4B, set
+    /// by the data fix-up `specs/data/fixups.md` §8): the number of
+    /// `NextInClass` steps from the class's `BaseId` to the class; 0 when
+    /// the walk does not reach it.
+    pub(crate) fn monster_chain_position(&self, class: i32) -> i32 {
+        let rows = &self.tables.combat.monstats;
+        let Some(mut cur) = usize::try_from(class)
+            .ok()
+            .and_then(|c| rows.get(c))
+            .map(|m| usize::from(m.baseid))
+        else {
+            return 0;
+        };
+        for steps in 0..=255 {
+            if cur as i32 == class {
+                return steps;
+            }
+            let Some(next) = rows.get(cur).map(|m| usize::from(m.nextinclass)) else {
+                break;
+            };
+            if next == cur || next >= rows.len() {
+                break;
+            }
+            cur = next;
+        }
+        0
+    }
+
     /// Mode DT's event-0 function `0x005A7350` (§7.7 rule 3): a monster
     /// of `monstats` base id 78 takes a path step (`0x00554CA0`),
     /// refreshes its animation (`0x00623E00`, [`Pending::refresh_animation`])
@@ -404,7 +443,7 @@ impl<X: Pending> ActionHooks<X> {
                     v.h.x.step(sim.game, unit);
                 }
             }
-            self.x.refresh_animation(sim.game, unit);
+            self.refresh_animation(sim, unit);
             if !sim.units.get(unit).is_some_and(|r| anim_complete(&r.anim)) {
                 return;
             }

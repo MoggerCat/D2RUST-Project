@@ -332,3 +332,108 @@ pub fn advance_sequence(anim: &mut Anim) -> bool {
     };
     true
 }
+
+/// The plain branch of the frame advance `0x00623E00`
+/// (`units.md` §4.2 "Frame advance and +0x4E"): +0x4E := 0; j = cur >> 8,
+/// plus 1 when the speed is above 255; cur += speed. While cur ≥ F every
+/// frame j below F >> 8 whose event byte is 1–4 sets +0x4E to it, then
+/// cur −= F, j := 0 and cur += 256 · bonus. Then every j ≤ cur >> 8
+/// likewise. False (nothing done) when a sequence is loaded.
+pub fn advance_plain(anim: &mut Anim, bonus: i32) -> bool {
+    if anim.sequence.is_some() {
+        return false;
+    }
+    anim.action_frame = 0;
+    let events = anim.record.map(|r| r.events);
+    let mark = |act: &mut u8, j: i32| {
+        let e = usize::try_from(j)
+            .ok()
+            .filter(|&j| j < ANIM_EVENTS)
+            .and_then(|j| events.as_ref().map(|e| e[j]));
+        if let Some(e @ 1..=4) = e {
+            *act = e;
+        }
+    };
+    let mut j = anim.frame >> 8;
+    if anim.speed > 0xff {
+        j += 1;
+    }
+    anim.frame = anim.frame.wrapping_add(i32::from(anim.speed));
+    // The original loops until the frame is below the count; a count
+    // that the bonus never lets it fall under would not end there.
+    let mut guard = 0;
+    while anim.frame_count > 0 && anim.frame >= anim.frame_count && guard < 64 {
+        guard += 1;
+        for k in j..(anim.frame_count >> 8) {
+            mark(&mut anim.action_frame, k);
+        }
+        anim.frame -= anim.frame_count;
+        j = 0;
+        anim.frame = anim.frame.wrapping_add(bonus.wrapping_mul(256));
+    }
+    for k in j..=(anim.frame >> 8) {
+        mark(&mut anim.action_frame, k);
+    }
+    true
+}
+
+#[cfg(test)]
+mod plain_tests {
+    use super::*;
+    use crate::units::record::{AnimRecord, Sequence};
+
+    fn anim(frame: i32, count: i32, speed: i16, events: &[(usize, u8)]) -> Anim {
+        let mut e = [0u8; ANIM_EVENTS];
+        for &(i, b) in events {
+            e[i] = b;
+        }
+        Anim {
+            frame,
+            frame_count: count,
+            speed,
+            record: Some(AnimRecord {
+                frames: (count >> 8) as u32,
+                byte_0f: 0,
+                events: e,
+            }),
+            ..Anim::default()
+        }
+    }
+
+    // Covers: specs/sim/units.md §4.2 text
+    #[test]
+    fn the_advance_reports_the_last_event_byte_crossed() {
+        let mut a = anim(0, 4096, 256, &[(1, 2), (2, 1)]);
+        assert!(advance_plain(&mut a, 0));
+        assert_eq!((a.frame, a.action_frame), (256, 2));
+        advance_plain(&mut a, 0);
+        assert_eq!((a.frame, a.action_frame), (512, 1));
+        advance_plain(&mut a, 0);
+        assert_eq!(a.action_frame, 0);
+    }
+
+    // Covers: specs/sim/units.md §4.2 text
+    #[test]
+    fn the_advance_wraps_at_the_count_and_rescans_from_the_start() {
+        // 7936 + 256 = 8192 ≥ 4096: two wraps with bonus 0 (the imp's
+        // teleport frame 38 on 1.14d), frames 0..15 scanned on the second.
+        let mut a = anim(7936, 4096, 256, &[(3, 4)]);
+        advance_plain(&mut a, 0);
+        assert_eq!((a.frame, a.action_frame), (0, 4));
+    }
+
+    // Covers: specs/sim/units.md §4.2 text
+    #[test]
+    fn a_sequence_is_left_to_its_own_advance() {
+        let mut a = anim(0, 4096, 256, &[]);
+        a.sequence = Some(Sequence {
+            frame_count: 256,
+            speed: 256,
+            pos: 0,
+            events: vec![],
+            drawn: vec![],
+        });
+        assert!(!advance_plain(&mut a, 0));
+        assert_eq!(a.frame, 0);
+    }
+}

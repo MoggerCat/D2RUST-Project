@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1036 |
-|   5. Event dispatch | 1037–1051 |
-|   6. Events per kind | 1052–1174 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1175–1196 |
-|   8. Collision line between two units | 1197–1201 |
-| Constants & data dependencies | 1202–1218 |
-| Randomness | 1219–1226 |
-| Edge cases & original bugs | 1227–1247 |
-| Test vectors | 1248–1307 |
-| Provenance | 1308–1399 |
-| Open questions | 1400–1479 |
+|   4. Modes and mode schedules | 454–1039 |
+|   5. Event dispatch | 1040–1054 |
+|   6. Events per kind | 1055–1177 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1178–1199 |
+|   8. Collision line between two units | 1200–1204 |
+| Constants & data dependencies | 1205–1221 |
+| Randomness | 1222–1229 |
+| Edge cases & original bugs | 1230–1250 |
+| Test vectors | 1251–1310 |
+| Provenance | 1311–1402 |
+| Open questions | 1403–1482 |
 <!-- /index -->
 
 ## Summary
@@ -538,6 +538,9 @@ and nothing on the timer run writes +0x4E. Rule:
    sets +0x4E := E[j]; cur −= F; j = 0; cur += 256·b (frame bonus).
    Then every j ≤ cur >> 8 likewise. So +0x4E ends as the last action
    byte in the frames crossed this advance, else 0.
+   Implemented as `units::anim::advance_plain`, called by every monster
+   event-0 refresh (`ActionHooks::refresh_animation`); checked on the imp
+   teleport (`gen-mon-492`: frame 38 +0x44 7936 → 0). REC-2091.
 3. Sequence (+0x30 ≠ 0): flags +0xC4 &= ~0x4000; seq pos +0x38 += +0x3C
    (wrapping at +0x34); +0x48 −= +0x3C; `0x00621210(old pos)` reads the
    sequence frame: +0x44 := frame·256, +0x40 := mode, +0x4E := its
