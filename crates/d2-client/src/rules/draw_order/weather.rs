@@ -496,6 +496,9 @@ pub struct Weather {
     /// The particle-move counter `F` (`[0x007A8A34]`, §11.9 r3): `.bss`,
     /// never reset.
     pub move_counter: u32,
+    /// `[0x007A8A30]`: the one-time wind / lightning init of the first act
+    /// load (`0x00472890`, after `0x004726F0(1)`); `.bss`, never cleared.
+    wind_ready: bool,
     resources: Option<ActResources>,
 }
 
@@ -540,6 +543,7 @@ impl Weather {
             thunder: true,
             mark: 0,
             move_counter: 0,
+            wind_ready: false,
             resources: None,
         }
     }
@@ -591,6 +595,10 @@ impl Weather {
     ) -> Result<(), WeatherError> {
         let level = player.level;
         self.level_entry(1, player.seed, &level)?;
+        if !self.wind_ready {
+            self.reset_wind_lightning(player.seed);
+            self.wind_ready = true;
+        }
         self.cycle_min = CYCLE_MIN;
         self.cycle_n = CYCLE_N;
         if level.act == 2 || level.act == 4 {

@@ -134,6 +134,9 @@ impl Pending for Open {
     fn skill_event(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, ev: SkillEvent) {
         crate::wiring::interaction::skill_events::route(h, sim, ev);
     }
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
+        crate::wiring::interaction::skill_events::assign_right_aura(h, sim, unit);
+    }
     fn monster_attack_skill(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId) {
         crate::wiring::interaction::skill_events::monster_attack_skill(h, sim, unit);
     }
@@ -463,6 +466,7 @@ impl Fx {
                 enabled: true,
                 aidel: [15, 15, 15],
                 moves: 1 << 4,
+                mode_chart: false,
             }],
             ..UnitData::default()
         };

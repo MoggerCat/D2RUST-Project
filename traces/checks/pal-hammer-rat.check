@@ -1,0 +1,17 @@
+check 1
+# The Blessed Hammer playthrough cell (classes.play main-skill-kill, Paladin) on 1.14d: ScnPal
+# (expansion Paladin, level 30, every skill at 20, right skill 112), -seed 1234; warp to the Blood
+# Moor (variant blood-moor-empty) before frame 4, a Quill Rat (class 63) 1 sub-tile along +x and +y before
+# frame 10 set to 1 hp (256 raw) at frame 31, then a right click on it at frames 40, 70, 100.
+# Compares what the three hammers do to the rat (the 3-sub-tile rat of the cell survives in 1.14d too). Area (q-fix-class-rows, q-fix-pt-blessed-hammer).
+name pal-hammer-rat
+save ScnPal --class pal --expansion --level 30 --all-skills 20 --right-skill 112
+seed 1234
+ticks 130
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 63 @x+1 @y+1 normal
+at 31 poke stat 1/8 6 0 256
+input frame 40; rclickunit 1 63; frame 70; rclickunit 1 63; frame 100; rclickunit 1 63

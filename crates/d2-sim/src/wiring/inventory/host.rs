@@ -113,6 +113,49 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.place(npc, item, (0, 0), true, false)
     }
 
+    /// Runs `f` with the (NPC, player) gamble node's inventory standing in
+    /// for the NPC's own (made on first use), then puts both back.
+    fn with_gamble<T>(&mut self, npc: UnitId, player: u32, f: impl FnOnce(&mut Self) -> T) -> T {
+        if let (Some(kind), Some(r)) = (self.kind_of(npc), self.econ.units.get(npc)) {
+            self.state.add_inventory(npc, kind, r.guid);
+        }
+        let node = match self.state.gamble.remove(&(npc, player)) {
+            Some(n) => n,
+            None => {
+                let own = self.state.inventories.get(&npc);
+                crate::items::inventory::Inventory::new(
+                    npc,
+                    own.map(|i| i.owner_kind)
+                        .unwrap_or(crate::items::inventory::UnitKind::Other),
+                    self.guid_of(npc),
+                )
+            }
+        };
+        let real = self.state.inventories.insert(npc, node);
+        let out = f(self);
+        if let Some(node) = self.state.inventories.remove(&npc) {
+            self.state.gamble.insert((npc, player), node);
+        }
+        if let Some(real) = real {
+            self.state.inventories.insert(npc, real);
+        }
+        out
+    }
+
+    /// `0x00560200` into the (NPC, player) gamble node's inventory
+    /// (`vendors.md` §5.1 step 7): mode 0 on its page-0 grid.
+    pub fn gamble_place(&mut self, npc: UnitId, player: u32, item: UnitId) -> bool {
+        self.with_gamble(npc, player, |d| d.place(npc, item, (0, 0), true, false))
+    }
+
+    /// Unlinks a gamble item from its node's inventory.
+    pub fn gamble_unlink(&mut self, npc: UnitId, player: u32, item: UnitId) -> bool {
+        if !self.state.gamble.contains_key(&(npc, player)) {
+            return false;
+        }
+        self.with_gamble(npc, player, |d| d.store_unlink(item))
+    }
+
     /// Unlinks a store item from the NPC inventory that holds it (a
     /// monster-owned inventory; `0x0063AAF0`, §1.4 rule 1), for the take
     /// of a purchase and the removal of a store clear (`vendors.md` §6

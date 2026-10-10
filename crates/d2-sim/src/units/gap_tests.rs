@@ -13,7 +13,7 @@ use crate::tick::timer::TimerClass;
 
 use super::anim;
 use super::dispatch::UnitSystem;
-use super::hooks::{Sim, UnitHooks};
+use super::hooks::{MonsterInfo, Sim, UnitHooks};
 use super::lifecycle::{allocate, remove, AllocRequest, LifecycleHooks};
 use super::modes::{
     self, monster_mode, player_mode, player_start_kind, MonsterModeRecord, Moves, UnitError,
@@ -1785,4 +1785,46 @@ fn the_mode_set_rewrites_mode_damage_after_the_bookkeeping_before_umod_0() {
             assert!(d < pos("umods 0").unwrap(), "mode {mode}: {log:?}");
         }
     }
+}
+
+/// §4.6 `0x005A78A0`: a class with `SplGetModeChart` uses its per-class
+/// record (Baal's S3 is the A-family record, ending in `0x005A8030`);
+/// without the flag, or for a mode it has no record for, the table's.
+#[test]
+fn per_class_mode_records() {
+    let mut game = Game::new();
+    let mut sys = system();
+    sys.data.monsters.resize(544, MonsterInfo::default());
+    sys.data.monsters[543] = MonsterInfo {
+        enabled: true,
+        mode_chart: true,
+        ..MonsterInfo::default()
+    };
+    let baal = spawn(&mut game, &mut sys, UnitType::Monster, 543, 1);
+    for (mode, end, want) in [
+        (10, true, 0x005A8030),
+        (10, false, 0x005A7670),
+        (11, false, 0x005A6DE0),
+    ] {
+        sys.units.get_mut(baal).expect("baal").mode = mode;
+        sys.hooks.log.clear();
+        sys.with(&mut game, |sim, h| modes::monster_event(sim, h, baal, end))
+            .expect("event");
+        assert_eq!(sys.hooks.log, [format!("mfn {want:#x}")]);
+    }
+    sys.data.monsters[543].mode_chart = false;
+    sys.units.get_mut(baal).expect("baal").mode = 10;
+    sys.hooks.log.clear();
+    sys.with(&mut game, |sim, h| modes::monster_event(sim, h, baal, true))
+        .expect("event");
+    assert_eq!(sys.hooks.log, [format!("mfn {:#x}", 0x005A74D0)]);
+    // The selector's cases.
+    let a = MONSTER_MODES[4];
+    assert_eq!(modes::class_mode_record(705, 11), Some(a));
+    assert_eq!(modes::class_mode_record(417, 10), None);
+    assert_eq!(
+        modes::class_mode_record(403, 9).map(|r| r.event1),
+        Some(modes::TRAPPED_SOUL_END_S)
+    );
+    assert_eq!(modes::class_mode_record(546, 10), None);
 }
