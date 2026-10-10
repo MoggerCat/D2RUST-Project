@@ -18,7 +18,7 @@
 | Rules | 31–32 |
 |   6. Bodies, required level 18 | 33–367 |
 |   7. Bodies, required level 24 | 368–693 |
-|   8. Bodies, required level 30 | 694–952 |
+|   8. Bodies, required level 30 | 694–962 |
 <!-- /index -->
 
 ## Summary
@@ -757,6 +757,16 @@ The unit's room none → 0. Target position fails → 0. Room at the target
 
 The three classes are consecutive `monstats` rows (hydra1–3); AI param 0
 is the hydra's expiry frame.
+
+The alignment of step 4 is what keeps a monster's Hydras on its side:
+`monstats` `Align` 1 gives a hydra class alignment 2 (good) at creation,
+and the owner's alignment (0 for a council member) replaces it right
+after. 1.14d (gen-su-26..31, council members): a heal scan
+(`0x005E0430`, HighPriest) of an evil council member then finds its own
+Hydras (alignment 0, life percent 0 for the stat-less summon) at frame
+63 and casts S1 at one; with the Hydras left good it found none. d2rs
+applies the effect (`View::set_alignment`) for every `Alignment`
+body effect.
 
 #### 8.6 srvst 21 Revive `0x005C3350`
 
