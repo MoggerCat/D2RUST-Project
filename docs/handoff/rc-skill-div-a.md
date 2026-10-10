@@ -25,8 +25,8 @@ SHARED with rc-skill-div-b (merge this branch, do not re-fix): 2, 3, 4, 5, 7, 8 
 ## Open (3 rows, sizes)
 - skill.ass.shadow-warrior (M): two S2C 0x9D action 6 (Equip) for the monster's equipment items (0x00534F80 monster inventory
   messages; `Pending::inventory_messages` has no provider; the server sends ground items through `announce_item_as`).
-- skill.ass.shadow-master (M): the same + master AI init 0x005EB490 adds the owner's class skills (`AiSummons::assign_skill` /
-  `class_skills` unprovided; 0x00647110 turns each passive state on; 0xAA lists states 152/155 with their stat lists; attack at f48).
+- skill.ass.shadow-master (M): the same + 0xAA of the master lists the passive states 152/155 with their stat lists (0x00647110 turns each passive state on when the AI init 0x005EB490
+  adds the owner's class skills); integ-r23 now gives the master its skills: first state difference f48 -> f62 (field sp 194 vs 154).
 - skill.ass.blade-sentinel (S): first walk point 5148 (1.14d) vs 5150 (d2rs) for a command point (5151,4262): path around the cow;
   stop distance 0 on both sides; suspect the class-413 footprint / move mask.
 - Disk: traces/raw/suite grows ~6 MB per check; the session filled the 252 GB allowance once (a glob `rm` was refused by the
