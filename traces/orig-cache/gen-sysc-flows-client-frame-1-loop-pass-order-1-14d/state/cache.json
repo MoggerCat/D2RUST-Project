@@ -1,0 +1,44 @@
+{
+ "channel": "state",
+ "check": "gen-sysc-flows-client-frame-1-loop-pass-order-1-14d",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "100",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--send",
+  "6 Walk x=@x+6 y=@y",
+  "--send",
+  "20 Run x=@x y=@y+5",
+  "--send",
+  "36 Walk x=@x-3 y=@y-3"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "0501ec5b0fe60e704eca0a2791c64ba08c3e56054a73759e9562f614071e4391",
+   "size": 405884
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "3939f98260130beedebb5c31802d0b2ae24fd0af9e2f94b18156210e1a81bd95",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

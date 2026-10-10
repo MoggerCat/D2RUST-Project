@@ -613,11 +613,8 @@ impl LocalSeams {
     /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
     /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
     /// scan 5 callback's reading.
-    fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
-    }
-
-    /// [`Self::nearest_foe`] among the candidates `keep` accepts.
+    ///
+    /// Only the candidates `keep` accepts are considered.
     fn nearest_foe_where(
         &self,
         unit: UnitId,
@@ -1124,6 +1121,11 @@ impl Pending for LocalSeams {
     fn weapon(&self, unit: UnitId) -> Option<UnitId> {
         self.weapons.weapon(unit)
     }
+    // `0x00623C20` for a player (damage.md §5.1 step 4.4): the weapon's
+    // item hit class, 1 without one.
+    fn weapon_hit_class(&self, unit: UnitId) -> u32 {
+        self.weapons.weapon_hit_class(unit)
+    }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)
     }
@@ -1243,12 +1245,31 @@ impl Pending for LocalSeams {
     fn set_entry_flags(&mut self, unit: UnitId, _: &d2_sim::skills::SkillEntry, f: u32) {
         d2_sim::wiring::interaction::UseRest::set_used_skill_flags(self, unit, f);
     }
-    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
+    /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe_where`]
     /// within 35 (`ai.md` §5.2 step 4), no-size distance.
     fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe(unit, GOOD_SEARCH_RANGE, false)
+        // Scan 5 callback `0x005DCA70` rule 2 (`ai.md` §5.4): the full-size
+        // distance `0x005DC380` with the CANDIDATE's size subtracted
+        // (a = C), and d > 35 skips (35 is in).
+        let &(_, _, at) = self.sides.get(&unit)?;
+        let side = self.player_side(unit)?;
+        self.sides
+            .iter()
+            .filter(|&(&u, &(ty, ..))| {
+                u != unit
+                    && ty == UnitType::Monster
+                    && self.player_side(u) != Some(side)
+                    && !self.down.contains(&u)
+                    && !self.not_att.contains(&u)
+            })
+            .map(|(&u, &(_, _, p))| {
+                let size = self.sizes.get(&u).copied().unwrap_or(0);
+                (u, d2_sim::monsters::ai::distance_full_size(p, size, at))
+            })
+            .filter(|&(_, d)| d <= GOOD_SEARCH_RANGE)
+            .min_by_key(|&(u, d)| (d, u))
     }
-    /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
+    /// `0x005DDC30`: [`LocalSeams::nearest_foe_where`] at full-size distance
     /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
     /// 0x4 (scan 6 rule 1, `0x00451F30(C, 4)`), with the preview's melee
     /// flag; none: distance 0x7FFFFFFF.
@@ -2513,6 +2534,8 @@ pub fn build_with(
     // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
+    s.events.action.hooks().item_marks = true;
+    s.events.action.hooks().arena = Some(Default::default());
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's
@@ -3001,11 +3024,11 @@ mod target_search_tests {
     fn the_good_main_search_stays_within_35() {
         let mut g = Game::default();
         assert_eq!(
-            seams(134, 0).good_target_search(&mut g, UnitId(1), false),
-            Some((UnitId(2), 34))
+            seams(135, 0).good_target_search(&mut g, UnitId(1), false),
+            Some((UnitId(2), 35))
         );
         assert_eq!(
-            seams(135, 0).good_target_search(&mut g, UnitId(1), false),
+            seams(136, 0).good_target_search(&mut g, UnitId(1), false),
             None
         );
     }

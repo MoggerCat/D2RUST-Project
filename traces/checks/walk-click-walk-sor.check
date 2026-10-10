@@ -12,7 +12,6 @@ save ScnSor --class sor --expansion
 seed 1234
 ticks 110
 seconds 300
-channels state
+channels state packets
 input frame 22; click 400 184; frame 36; click 400 384; frame 50; click 541 213; frame 64; click 259 355
 # as walk-town-ama: the game seed order and fc / sp are not the walk's
-ignore seed s fc sp

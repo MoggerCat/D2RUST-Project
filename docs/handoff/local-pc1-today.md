@@ -115,4 +115,63 @@ Rows so far: 23 `q-fix-pc1today-*`.
 - needs_pc1 = y and not EQUAL: 235 → 179 (of the audit's 217 only
   `ui/frontend-credits`, 11 rows, is left: Credits / Cinematics do not take
   posted clicks on Windows).
+Rows so far: 22 `q-fix-pc1today-*`.
+
+## Push 5 (15:02) — credits, more world scenes
+
+- **frontend-credits**: the Credits button does open (wait 14 s for the menu,
+  then one plain click); scene `facts/render/scenes/frontend-credits` recorded
+  twice (122 UI rows, 0 differing). 8 rows → needs_pc1 n. The **Cinematics
+  button and Delete Character** still do not open by posted clicks in this
+  windowed game: 3 cinematics rows stay needs_pc1 y.
+- **Six more world draw-list checks** (`draws-a2-town`, `-a3-town`, `-a4-town`,
+  `-a5-town`, `-blood-moor`, `-cave`), both sides plus pixels: 97.3–98.5 %
+  equal, all DIVERGED; row `world-draws` (after a warp d2rs draws the player
+  in town-neutral mode; mini-panel button frame 0 vs 2).
+- Private repo f47bdb6f: `recordings/pc1-2026-10-10/pixel-compare` (the 32
+  1.14d / d2rs frame pairs), credits frame.
+- needs_pc1 = y and not EQUAL: 171. Of the audit's 217 rows, 3 are left.
+Rows so far: 23 `q-fix-pc1today-*`.
+
+## Push 6 (15:31) — stable UI recordings
+
+- The run-to-run instability of the UI checks is explained and fixed: 1.14d
+  reads the real pointer, so an unpinned cursor hovered Warriv in some runs
+  (six glyph rows). All key-only draws checks now pin the cursor (`frame 38;
+  move 790 10`), the skill-pick checks use `hold X Y 2`; 1.14d sides
+  re-recorded twice: equal UI rows (`specs/tools/scenario-diff.md` Edge case 2).
+  Only `ui-draws-character-ama` still varies by 6 glyph rows.
+- With the pin, the belt key and the party key add no UI row on 1.14d (empty
+  belt; single player).
+- `pc1-data.md` Step 4: the audit item is marked (214 of 217).
+
+## Push 7 (15:47) — cinematics, camera while moving
+
+- **Cinematics menu**: opens with sound on (`-w`); with `-ns` (the recorders'
+  default) the click enters `0x00431600` but the menu does not stay
+  (`ui/frontend-credits.md` §C8 recorded, REC-2444). Scene
+  `frontend-cinematics`, two runs, stable. Left needing PC 1 of the audit's
+  217: one row (playing a cinematic: full-screen, owner's OK).
+- **Camera rows (10) now have a verdict**: camera values of both sides over
+  34 draws checks (`traces/pc1/camera-compare.tsv`): equal standing, DIVERGED
+  while walking / running (new checks `draws-walk-ama`, `draws-run-ama`); row
+  `camera-moving`.
+- Row `frontend-draw-dump`: d2rs needs a draw-list dump for front-end screens
+  and paused menus before the 13 front-end / menu scenes can be compared.
 Rows so far: 25 `q-fix-pc1today-*`.
+
+## Push 8 (15:57, before the 14:30Z ledger freeze)
+
+Merged `claude/integ-r23` and `claude/specs-staging-7`; `ledger.py --check`
+0 errors (the part's `last_verdict` cells were re-fixed with `--fix` after
+each merge, since the coordinator's fix pass and this part touch the same
+lines).
+- Three **action scenes** on Windows, draws + pixels: `draws-melee-bar`,
+  `draws-frost-nova-sor`, `draws-fire-bolt-sor`: about 84.5 % of pixels equal
+  (light ring around the player, the Help button / mini panel shown only by
+  d2rs, the player's composite); row `action-scenes`.
+- Private repo 0592b709: the frame pairs of all 35 compared scenes.
+- Totals of this session: Step 4 empty; audit list 216 of 217 rows recorded
+  (left: playing a cinematic); 26 `q-fix-pc1today-*` rows; 36 new checks
+  (`ui-draws-*` 25, `draws-*` 11); facts scenes: 5 option menus, trademark,
+  credits, cinematics; 17 client-state recordings.

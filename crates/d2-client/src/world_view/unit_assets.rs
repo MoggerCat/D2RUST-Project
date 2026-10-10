@@ -82,6 +82,10 @@ pub struct UnitLooks {
     /// shadow only in a mode whose value is ≠ 0 (`blend-modes.md` §5 r3
     /// revision, REC-518). A row not here casts it.
     pub object_blocks_light: BTreeMap<u32, [u8; 8]>,
+    /// The `objects` rows whose `Draw` (`+0x150`) is 0: the unit draw
+    /// `0x00471EC0` returns before any cel or shadow (`unit-composite.md`
+    /// §8).
+    pub object_no_draw: std::collections::BTreeSet<u32>,
     /// The shape states' draw identity (`unit-composite.md` §1.1).
     pub shapes: super::disguise::Disguise,
     /// By `monstats` row: bit v set when choice v of the `SH` component
@@ -243,6 +247,12 @@ impl UnitLooks {
                 )
             })
             .collect();
+        let object_no_draw = object_rows
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| o.draw == 0)
+            .map(|(i, _)| i as u32)
+            .collect();
         let shield_choices = shield_choices(source, &monstats2)?;
         Ok(UnitLooks {
             player_tokens: read_table::<Plrtype>(source)?
@@ -268,6 +278,7 @@ impl UnitLooks {
             monsters,
             objects,
             object_blocks_light,
+            object_no_draw,
             shapes,
             shield_choices,
         })

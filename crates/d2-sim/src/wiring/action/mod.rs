@@ -22,6 +22,7 @@
 
 pub mod ai;
 pub mod ai_scan;
+pub mod arena;
 pub mod combat;
 pub mod death;
 pub mod dispatch;
@@ -97,6 +98,8 @@ pub struct ActionTables {
     /// `monequip.bin` rows (summon equipment `0x005D6B60`,
     /// `skills/bodies.md` §6.5 step 9).
     pub monequip: Vec<d2_data::tables::Monequip>,
+    /// `arena.bin` rows; row 0 is the game's arena type ([`arena`]).
+    pub arena: Vec<d2_data::tables::Arena>,
 }
 
 /// The DRLG side of a game: the acts' DRLGs and their services.
@@ -164,6 +167,12 @@ pub struct HirelingAiFacts {
     pub rows: Option<Arc<crate::world::hirelings::HirelingRows>>,
 }
 
+/// First byte of the host-only mark the client pass sends for a queued
+/// item when [`ActionHooks::item_marks`] is on: `[MARK, guid LE u32]`. Not
+/// a game message (no S→C id uses 0xFF); the host replaces it with the
+/// item's announcement.
+pub const GROUND_ITEM_MARK: u8 = 0xFF;
+
 /// The [`crate::units::hooks::UnitHooks`] of [`ActionSim`]'s unit system
 /// and the state every action adapter shares.
 pub struct ActionHooks<X> {
@@ -229,6 +238,14 @@ pub struct ActionHooks<X> {
     /// no drop (`ChestWorld::chest_drop` answers none, as before the
     /// provider).
     pub object_drops: Option<Box<crate::wiring::economy::DeathDrops>>,
+    /// The arena state (kill event and 0x65, [`arena`]); `None`: the host
+    /// does not model it.
+    pub arena: Option<arena::ArenaState>,
+    /// Whether the client pass marks each queued ground item at its place
+    /// in the walk ([`GROUND_ITEM_MARK`]) for the host to announce there
+    /// (`inventory-moves.md` §6.3 part 1, `0x00571F90` inside the unit
+    /// update). Off by default: no mark is sent.
+    pub item_marks: bool,
     /// Players whose pets follow them after a placement
     /// (`path-placement.md` §10 rule 6, `0x005754B0`), for the host that
     /// holds the pet lists (`hirelings.md` §6 rule 1). `None` (the
@@ -244,6 +261,15 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// The host runs the item update pass after the tick and wants a
+    /// player's own state / stat sends after it (`intents-events.md` §7.3
+    /// rule 1: the item messages of step 2 precede step 5 and step 7). On,
+    /// [`View::player_tail`] holds them until [`ActionSim::flush_player_tail`].
+    pub defer_player_tail: bool,
+    /// Set around a player's step 5 / 7 sends while [`Self::defer_player_tail`].
+    pub capture_tail: bool,
+    /// The held sends: (receiving player, bytes).
+    pub player_tail: Vec<(UnitId, Vec<u8>)>,
     /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
     /// creation), for the host that holds the hireling lists:
     /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
@@ -356,6 +382,10 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
+    /// Mercenaries linked to their player ([`LifecycleHooks::set_ai_owner`]
+    /// with a player owner, called only by the hireling init): the units whose
+    /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
+    pub hireling_units: std::collections::BTreeSet<UnitId>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -471,9 +501,14 @@ impl<X> ActionHooks<X> {
             portals: Default::default(),
             room_deletes: BTreeMap::new(),
             object_drops: None,
+            item_marks: false,
+            arena: None,
             pet_follows: None,
             hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
+            defer_player_tail: false,
+            capture_tail: false,
+            player_tail: Vec::new(),
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
@@ -501,6 +536,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
+            hireling_units: std::collections::BTreeSet::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),

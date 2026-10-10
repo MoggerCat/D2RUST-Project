@@ -188,6 +188,14 @@ impl<R: ViewRules> ViewRules for UnitRules<R> {
         })
     }
 
+    /// `unit-composite.md` §8: the body is skipped for an object whose
+    /// `Draw` is 0 (the call alone, `draw-order.md` §5 r4); its shadow
+    /// still draws (`gen-ui-hud` row 112, object 385 `cain start
+    /// position`).
+    fn unit_draws_body(&self, unit: &ClientUnit) -> bool {
+        !(unit.key.unit_type == OBJECT && self.looks.object_no_draw.contains(&unit.class))
+    }
+
     /// The shadows of the composite just built (`unit_shadow`).
     fn unit_shadows(
         &self,

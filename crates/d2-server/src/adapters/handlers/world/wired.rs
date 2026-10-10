@@ -1079,7 +1079,7 @@ where
         self.start_item_walk(game, events, walk);
     }
     fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {
-        self.start_object_walk(game, events, walk);
+        self.start_object_walk(game, events, walk, false);
     }
 
     /// The tick with this world's quest parts lent to the action hooks
@@ -1116,6 +1116,10 @@ where
             self.pet_follows(game, a);
             self.collect_sent(a);
         });
+    }
+
+    fn flush_player_tail(&mut self, events: &mut D) {
+        events.action().flush_player_tail();
     }
 
     fn after_tick(&mut self, game: &mut Game, events: &mut D) {
@@ -1398,6 +1402,7 @@ where
         events.action().route_quest_objects();
         let h = &mut events.action().sys.hooks;
         h.pet_follows.get_or_insert_with(Vec::new);
+        h.defer_player_tail = true;
         h.pet_deaths.get_or_insert_with(Vec::new);
         h.owner_deaths.get_or_insert_with(Vec::new);
         h.hireling_calls.get_or_insert_with(Vec::new);

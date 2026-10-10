@@ -13,7 +13,7 @@ save ScnHi3 --class bar --expansion --level 30 --gold 100000 --act 2
 seed 1234
 ticks 90
 seconds 400
-channels state
+channels state packets
 at 4 poke goto unit 1:252
 at 14 send InteractWithEntity type=1 id=@1:252
 at 16 send InitEntityChat id=@1:252

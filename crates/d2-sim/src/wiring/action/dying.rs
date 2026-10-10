@@ -21,7 +21,8 @@ use crate::units::modes::player_start;
 use crate::units::{UnitId, UnitType};
 
 use super::death::STATE_PLAYERBODY;
-use super::{ActionSim, Pending, View};
+use super::{ActionHooks, ActionSim, Pending, View};
+use crate::units::hooks::Sim;
 
 /// Player modes 0 (DT) and 17 (DD).
 const DT: u32 = 0;
@@ -281,5 +282,48 @@ impl<X: Pending> View<'_, X> {
             self.h.errors.push(super::WiringError::Unit(e));
         }
         self.h.mode_target = None;
+    }
+}
+
+impl<X: Pending> ActionHooks<X> {
+    /// `0x00580EC0` after the ear drop, with a killer K (the mode
+    /// change's target): the death notice `0x0054D8A0` to every client and
+    /// the arena kill event `0x0053F720` (`intents-events.md` §7.6 rule 6;
+    /// 1.14d does not gate them on the ear drop).
+    // PROVISIONAL (REC-2811): a minion killer is not resolved to its
+    // player owner (`0x0058F0D0`); the record is a plain monster's.
+    pub(super) fn death_notice(&mut self, sim: &mut Sim<'_>, victim: UnitId) {
+        let Some(k) = self.mode_target else {
+            return;
+        };
+        let (Some(kr), Some(vr)) = (sim.units.get(k), sim.units.get(victim)) else {
+            return;
+        };
+        let (kty, kguid, vty) = (kr.ty, kr.guid, vr.ty);
+        let name_of = |h: &Self, u: UnitId| h.session.names.get(&u).copied().unwrap_or([0; 16]);
+        let boss = (kty == UnitType::Monster)
+            .then(|| self.monster_data(k))
+            .flatten()
+            .map(|d| (d.type_flags, d.boss_hc_idx));
+        let mut killer_name = [0u8; 16];
+        if kty == UnitType::Player {
+            killer_name = name_of(self, k);
+        }
+        let m = crate::units::messages::death_notice(
+            kguid,
+            kty as u8,
+            &name_of(self, victim),
+            &killer_name,
+            boss.filter(|b| b.0 & 2 != 0).map(|b| b.1),
+        );
+        for to in super::dying::client_players(sim.game) {
+            self.x.send(to, &m);
+        }
+        if let (Some(row), Some(st)) = (
+            self.tables.arena.first().map(super::arena::ArenaRow::from),
+            self.arena.as_mut(),
+        ) {
+            st.kill_event(&row, sim.game, (k, kty), (victim, vty));
+        }
     }
 }
