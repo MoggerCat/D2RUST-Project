@@ -1897,3 +1897,42 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-obj-60 | packets | PARTIAL | 18/18 | - | - |
 | gen-obj-60 | rng | MATCH | 20/20 | - | - |
 | gen-obj-60 | state | PARTIAL | 19/19 | - | - |
+| gen-item-00 | items | MATCH | 20/20 | - | - |
+| gen-item-01 | items | MATCH | 20/20 | - | - |
+| gen-item-02 | items | MATCH | 20/20 | - | - |
+| gen-item-03 | items | MATCH | 20/20 | - | - |
+| gen-item-04 | items | MATCH | 20/20 | - | - |
+| gen-item-05 | items | DIVERGED | 19/20 | item #6 (9cl) stream byte 17, after the head (bit 34 past bit 109): 1.14d 040102a38100 vs d2rs 040102a301 | unrouted |
+| gen-item-06 | items | MATCH | 20/20 | - | - |
+| gen-item-07 | items | MATCH | 20/20 | - | - |
+| gen-item-08 | items | MATCH | 20/20 | - | - |
+| gen-item-09 | items | MATCH | 20/20 | - | - |
+| gen-item-10 | items | DIVERGED | 19/20 | item #6 (7yw) stream byte 17, after the head (bit 34 past bit 109): 1.14d 0401c2818100 vs d2rs 0401c28101 | unrouted |
+| gen-item-11 | items | MATCH | 20/20 | - | - |
+| gen-item-12 | items | MATCH | 20/20 | - | - |
+| gen-item-13 | items | MATCH | 20/20 | - | - |
+| gen-item-14 | items | MATCH | 20/20 | - | - |
+| gen-item-15 | items | MATCH | 20/20 | - | - |
+| gen-item-16 | items | MATCH | 20/20 | - | - |
+| gen-item-17 | items | MATCH | 20/20 | - | - |
+| gen-item-18 | items | MATCH | 20/20 | - | - |
+| gen-item-19 | items | MATCH | 20/20 | - | - |
+| gen-item-20 | items | MATCH | 20/20 | - | - |
+| gen-item-21 | items | MATCH | 20/20 | - | - |
+| gen-item-22 | items | MATCH | 20/20 | - | - |
+| gen-item-23 | items | MATCH | 20/20 | - | - |
+| gen-item-24 | items | MATCH | 20/20 | - | - |
+| gen-item-25 | items | MATCH | 20/20 | - | - |
+| gen-item-26 | items | MATCH | 20/20 | - | - |
+| gen-item-27 | items | MATCH | 19/19 | - | - |
+| gen-item-28 | items | MATCH | 20/20 | - | - |
+| gen-item-29 | items | MATCH | 20/20 | - | - |
+| gen-item-30 | items | MATCH | 20/20 | - | - |
+| gen-item-31 | items | MATCH | 20/20 | - | - |
+| gen-item-32 | items | MATCH | 19/19 | - | - |
+| gen-qflow-a1q2-sisters | packets | DIVERGED | 54/60 | frame 18 stream s2c #22 id: 1.14d 6d vs d2rs 6b (id 0x6d) | unrouted |
+| gen-qflow-a1q2-sisters | state | DIVERGED | 17/60 | frame 18 monster 1:13 class 271, field m: 1.14d 1 vs d2rs 4 | unrouted |
+| gen-qflow-a1q3-tools | packets | MATCH | 60/60 | - | - |
+| gen-qflow-a1q3-tools | state | PARTIAL | 60/60 | - | - |
+| gen-qflow-a1q4-cain | packets | MATCH | 60/60 | - | - |
+| gen-qflow-a1q4-cain | state | PARTIAL | 60/60 | - | - |
