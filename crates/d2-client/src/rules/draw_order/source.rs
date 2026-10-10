@@ -247,7 +247,7 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
     };
     let mut positions: BTreeMap<UnitKey, ClientPos> = BTreeMap::new();
     for (room, key) in keys {
-        let unit = world.units.get(&key).ok_or_else(|| {
+        let unit = world.view_unit(&key).ok_or_else(|| {
             open(
                 "draw order",
                 format!(
@@ -257,7 +257,7 @@ pub fn ordered_source<'a, F: ViewFeed + ?Sized>(
             )
         })?;
         let at = feed
-            .unit_position(unit)
+            .unit_position(&unit)
             .map_err(|m| ViewError::Unresolved {
                 what: "unit position",
                 spec: "render/camera.md",

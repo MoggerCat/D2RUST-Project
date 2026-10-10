@@ -828,6 +828,7 @@ pub fn create_client_unit(
 pub fn remove_client_unit(w: &mut ClientWorld, key: UnitKey) -> Option<ClientUnit> {
     let u = w.objclient.set_c.remove(&key)?;
     w.objclient.missiles.remove(&key);
+    w.room_units.leave(super::world::view_key(key));
     w.freed.push((key, true));
     Some(u)
 }

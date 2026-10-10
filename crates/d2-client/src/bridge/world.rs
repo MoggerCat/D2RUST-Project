@@ -43,6 +43,15 @@ impl UnitKey {
     }
 }
 
+/// Bit 31 of a GUID in a view key: the unit is a client-made monster of
+/// set C, not of set S (server GUIDs stay below it).
+pub const VIEW_CLIENT_BIT: u32 = 0x8000_0000;
+
+/// The key the view knows a set C unit by.
+pub fn view_key(key: UnitKey) -> UnitKey {
+    UnitKey::new(key.unit_type, key.guid | VIEW_CLIENT_BIT)
+}
+
 /// A mode request handed to the unit-type mode machines (§8): `code` and
 /// the 7-value record; entries 1.14d leaves unset are 0 (§8 rule 3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1155,6 +1164,42 @@ impl LightRooms for ClientWorld {
 }
 
 impl ClientWorld {
+    /// A unit the view draws: set S, else a client-made monster of set C
+    /// under its view key ([`view_key`]; `client/model.md` §5 r6: the
+    /// critters draw like any monster, through their room's unit list).
+    /// The two sets number their GUIDs apart (set C starts at 2, set S
+    /// monsters at 1), so the view tells them apart by the key.
+    pub fn view_unit(&self, key: &UnitKey) -> Option<std::borrow::Cow<'_, ClientUnit>> {
+        if key.guid & VIEW_CLIENT_BIT == 0 {
+            return self.units.get(key).map(std::borrow::Cow::Borrowed);
+        }
+        let real = UnitKey::new(key.unit_type, key.guid & !VIEW_CLIENT_BIT);
+        let mut u = self
+            .objclient
+            .set_c
+            .get(&real)
+            .filter(|u| u.key.unit_type == MONSTER)?
+            .clone();
+        u.key = *key;
+        Some(std::borrow::Cow::Owned(u))
+    }
+
+    /// Every unit the view draws: set S in key order, then the
+    /// client-made monsters of set C ([`Self::view_unit`]).
+    pub fn view_units(&self) -> Vec<std::borrow::Cow<'_, ClientUnit>> {
+        let c = self
+            .objclient
+            .set_c
+            .keys()
+            .filter(|k| k.unit_type == MONSTER)
+            .filter_map(|k| self.view_unit(&view_key(*k)));
+        self.units
+            .values()
+            .map(std::borrow::Cow::Borrowed)
+            .chain(c)
+            .collect()
+    }
+
     /// The owner lookup of `render/lighting.md` §6.4 rule 1: set C when
     /// the record's lookup flag is set, else set S.
     pub fn light_owner(&self, owner: &Owner) -> Option<&ClientUnit> {
