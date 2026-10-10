@@ -271,7 +271,12 @@ impl Owners {
             // A unit freed in this drain (a missile that expired) is not in
             // `end`; its seed, set in place before the draws, is found by
             // the address it had at the previous drain.
+            // Unit records move (a freed unit's slot is reused), so the
+            // address counts only when no live unit sits there now.
             let gone = || {
+                if end.iter().any(|e| e.addr == d.addr) {
+                    return None;
+                }
                 self.prev
                     .iter()
                     .find(|k| k.addr == d.addr && end.iter().all(|e| e.owner != k.owner))
