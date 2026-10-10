@@ -177,6 +177,29 @@ def fnmatch_name(pattern, name):
 
 # ---------------------------------------------------------------- verdicts
 
+MARKER_RE = re.compile(r"^(<<<<<<<|=======|>>>>>>>)(\s|$)")
+
+
+def marker_errors(text, label):
+    """One error per merge-conflict marker line in a file's text."""
+    return [f"{label}:{n}: merge-conflict marker `{l[:12].rstrip()}`"
+            for n, l in enumerate(text.splitlines(), 1) if MARKER_RE.match(l)]
+
+
+def status_errors(text, label):
+    """Conflict markers and duplicate check+channel keys in checks-status.md text."""
+    errs, seen = marker_errors(text, label), {}
+    for n, l in enumerate(text.splitlines(), 1):
+        c = [x.strip() for x in l.strip().strip("|").split("|")]
+        if not l.startswith("| ") or len(c) != 6 or c[0] in ("check", "") or c[0].startswith("-"):
+            continue
+        if (c[0], c[1]) in seen:
+            errs.append(f"{label}:{n}: duplicate check+channel {c[0]} / {c[1]} (first at line {seen[(c[0], c[1])]})")
+        else:
+            seen[(c[0], c[1])] = n
+    return errs
+
+
 def load_status(root, path=None):
     """{check: [(channel, verdict, first_frame or None)]} and a source label."""
     text, label = None, None
@@ -629,6 +652,17 @@ def run(root, parts_dir, out_tsv, out_md, status_path, check, fix=False):
     status, label = load_status(root, status_path)
     files = sorted(glob.glob(os.path.join(parts_dir, "*.tsv")))
     errs, parts = [], []
+    sp = status_path or os.path.join(root, STATUS_PATH)
+    if os.path.exists(sp):
+        with open(sp, encoding="utf-8") as fh:
+            errs += status_errors(fh.read(), os.path.relpath(sp, root).replace(os.sep, "/"))
+    for f in files:
+        with open(f, encoding="utf-8") as fh:
+            errs += marker_errors(fh.read(), os.path.relpath(f, root).replace(os.sep, "/"))
+    if fix and errs:
+        print("\n".join(errs[:20]), file=sys.stderr)
+        print("ledger: --fix refused: fix the conflict markers / duplicate keys first", file=sys.stderr)
+        return 1
     for f in files:
         rows, e = read_part(f)
         if fix and status and not e:
@@ -681,6 +715,24 @@ def run(root, parts_dir, out_tsv, out_md, status_path, check, fix=False):
 
 
 def selftest():
+    good = "| a | state | PARTIAL | 1/1 | - | - |\n| a | packets | MATCH | 1/1 | - | - |\n"
+    assert status_errors(good, "s") == []
+    assert len(status_errors(good + "| a | state | DIVERGED | 0/1 | frame 1 x | - |\n", "s")) == 1
+    bad = good + "<<<<<<< HEAD\n=======\n>>>>>>> origin/x\n"
+    assert len(status_errors(bad, "s")) == 3 and len(marker_errors("a\t=======b\n", "p")) == 0
+    with tempfile.TemporaryDirectory() as r0:
+        os.makedirs(os.path.join(r0, "parts"))
+        sp = os.path.join(r0, "s.md")
+        for txt, want in ((good, 0), (bad, 1)):
+            with open(sp, "w") as fh:
+                fh.write(txt)
+            import contextlib
+            import io
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                assert run(r0, os.path.join(r0, "parts"), os.path.join(r0, "o.tsv"),
+                           os.path.join(r0, "o.md"), sp, True) == want
+                assert run(r0, os.path.join(r0, "parts"), os.path.join(r0, "o.tsv"),
+                           os.path.join(r0, "o.md"), sp, False, fix=True) == want
     hdr = PART_MAGIC + "\n" + "\t".join(COLS) + "\n"
 
     def row(**kw):
