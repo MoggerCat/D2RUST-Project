@@ -766,6 +766,14 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
 }
 
 impl Pending for LocalSeams {
+    /// The monster AI's sound request, `0x00553380(unit, event, target)`
+    /// (Spec: specs/audio/triggers-2.md §14 rule 1; NPC greeting, event 18,
+    /// `0x005E73A0`): the unit's sound slot, then queued for update so the
+    /// monster update's S→C 0x2C (`0x00571740`) goes out.
+    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        let _ = d2_sim::units::sound::queue_sound(game, unit, sound as u16, to);
+    }
+
     fn frame_event_index(&self, unit: UnitId) -> i32 {
         LocalSeams::frame_event_index(self, unit)
     }
