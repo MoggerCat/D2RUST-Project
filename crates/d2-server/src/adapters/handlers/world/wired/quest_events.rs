@@ -29,6 +29,33 @@ const MEPHISTO: u16 = d2_sim::world::quests::act3::npc::MEPHISTO;
 const DIABLO: u16 = 243;
 const HEPHASTO: u16 = d2_sim::world::quests::act4::q3::HEPHASTO_BASE;
 impl<R: TradeRest, S> WiredWorld<R, S> {
+    /// The cube's `hst ` hook `0x0059E5C0` (`quests-act2.md` §4.9), run
+    /// when the 0x4F handler returns: 1.14d calls it inside the
+    /// transmute, so its S→C 0x28 follows the removal messages of the
+    /// same handler, ahead of the next tick's item pass.
+    pub(super) fn run_cube_staff<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
+        let Some(cube) = self.cube.as_mut() else {
+            return;
+        };
+        let players: Vec<_> = cube
+            .pending
+            .take_quest_items()
+            .into_iter()
+            .filter(|(_, code)| *code == *b"hst ")
+            .map(|(player, _)| player)
+            .collect();
+        if players.is_empty() {
+            return;
+        }
+        self.desk(game, events, |desk, ctl, inv| {
+            let ((), _) = quest_call(desk, ctl, inv, |q, w| {
+                for &player in &players {
+                    act2::q2::staff_assembled(q, w, player);
+                }
+            });
+        });
+    }
+
     /// Runs the queued quest events and the level changes since the last
     /// tick on the quest control.
     pub(super) fn run_quest_events<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D) {
