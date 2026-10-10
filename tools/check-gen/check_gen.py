@@ -39,7 +39,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "missile", "state", "mon", "obj", "render"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -634,8 +634,68 @@ def fam_obj(ctx):
     return out
 
 
+# Scenes of the render family: (slug, title, warp level or None, pokes
+# (frame, text), ledger area prefixes of system.render.* the scene reaches).
+RENDER_SCENES = [
+    ("town-dawn", "Rogue Encampment at dawn", None, [(4, "time 0 600")],
+     ["lighting.1-", "lighting.2-", "lighting.3-", "lighting.9-", "lighting.11-", "shading.1-", "shading.2-", "shading.3-", "shading.9-", "composition.3-", "composition.4-", "composition.5-"]),
+    ("town-night", "Rogue Encampment at night", None, [(4, "time 3 600")],
+     ["lighting.5-", "lighting.6-", "lighting.7-", "lighting.10-", "shading.4-"]),
+    ("blood-moor", "Blood Moor by day (tiles, walls, view culling)", 2, [],
+     ["camera.1-", "camera.2-", "camera.3-", "camera.4-", "camera.5-", "camera.6-", "camera.7-", "camera.9-",
+      "sprite-placement.1-", "sprite-placement.2-", "sprite-placement.3-", "sprite-placement.5-", "sprite-placement.6-", "sprite-placement.7-"]),
+    ("den-of-evil", "Den of Evil (dark cave: blocks-light flags, light radius, translucent walls)", 8, [],
+     ["lighting.4-", "lighting.8-", "blend-modes.6-"]),
+    ("firebolt", "Fire Bolt in flight (missile light, overlay, blend mode)", 2,
+     [(8, "spawn 179 @x+6 @y normal"), (12, "missile 58 @x @y @x+6 @y skill 36 1")],
+     ["blend-modes.1-", "blend-modes.2-", "blend-modes.4-", "blend-modes.5-", "blend-modes.7-", "overlay.1-", "overlay.2-", "overlay.3-", "overlay.4-", "overlay.5-",
+      "unit-composite.9-", "sprite-placement.4-"]),
+    ("frozen", "Frozen player and a cow beside (colormap remap)", None,
+     [(6, "spawn 179 @x+3 @y normal"), (8, "state @player 1 on")],
+     ["unit-composite.1-", "unit-composite.2-", "unit-composite.3-", "unit-composite.4-", "unit-composite.5-", "unit-composite.6-", "unit-composite.7-", "unit-composite.8-",
+      "blend-modes.3-", "shading.6-", "shading.7-"]),
+    ("kurast-rain", "Kurast Docks (weather passes)", 75, [],
+     ["camera.8-", "shading.8-"]),
+]
+
+
+def render_areas(prefixes):
+    """The system.render.* ledger rows whose id starts with one of the prefixes."""
+    import glob as _g
+    ids = set()
+    for fn in sorted(_g.glob(os.path.join(ROOT, "docs", "handoff", "ledger", "*.tsv"))):
+        with open(fn, encoding="utf-8") as f:
+            for line in f:
+                a = line.split("\t", 1)[0]
+                if a.startswith("system.render."):
+                    ids.add(a)
+    return sorted(a for a in ids if any(a.startswith("system.render." + p) for p in prefixes))
+
+
+def fam_render(ctx):
+    """Draw-list scenes for the system.render rows: the same pokes on both sides,
+    the draws channel compared at the last ticks (the draw list: files, frames,
+    positions, draw modes, palettes). One check covers the rows it names."""
+    out = []
+    for slug_, title, level, pokes, prefixes in RENDER_SCENES:
+        lines = []
+        if level is not None:
+            lines.append(f"at 4 poke warp {level}")
+        lines += [f"at {f} poke {t}" for f, t in pokes]
+        ticks = {"firebolt": 24, "frozen": 30}.get(slug_, 60 if level is not None else 40)
+        save = ACT_SAVE[2] if slug_ == "kurast-rain" else ACT_SAVE[0]
+        c = Check(f"gen-render-{slug_}", "render", f"scene {slug_}", title,
+                  save, ticks, 600, "draws",
+                  lines + [f"draws-at {ticks - 2}"],
+                  comment=[f"Render scene {slug_}: {title}. The draw list of tick {ticks - 2} "
+                           "(files, frames, positions, draw modes, palettes) on both sides."])
+        c.extra = {"areas": render_areas(prefixes), "scene": slug_}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "render": fam_render}
 
 
 # ----------------------------------------------------------- ledger join
@@ -695,6 +755,9 @@ def resolve_area(c, areas):
                 and s.endswith(f"(hcIdx {x['class']})")]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
+    elif f == "render":
+        c.area = ",".join(x["areas"]) or "-"
+        return
     if len(pick) > 1:
         raise GenError(f"{c.name}: {len(pick)} ledger areas {pick}")
     c.area = pick[0] if pick else "-"
