@@ -537,6 +537,42 @@ pub fn missile_area_units<X: Pending + UseRest>(
     out
 }
 
+/// The ally test `0x00554DE0` for the missile bodies.
+pub fn missile_ally_test<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    a: UnitId,
+    b: UnitId,
+) -> bool {
+    let w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    BodyWorld::allied(&w, a, b)
+}
+
+/// The shout missile's hit (`missiles/bodies.md` §13 step 2): `shout_state`
+/// (`0x005D8290`, `skills/bodies.md` §6.8) on `unit` from `owner`.
+pub fn missile_shout_state<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    owner: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    let t = h.tables.clone();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    crate::skills::use_::bodies::shout_state(&mut w, &t.skills, unit, owner, skill, level);
+}
+
 /// The Bone Wall maker's summon spawn (§33 step 7): `summon_spawn`
 /// (`skills/bodies.md` §6.2) with flags 0xD, AI special state 0, pet max 0.
 #[allow(clippy::too_many_arguments)]

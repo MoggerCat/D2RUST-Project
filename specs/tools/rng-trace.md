@@ -112,8 +112,9 @@ and exit code (§5). Neither game changes (§3 rule 2).
    the game seed's address: d2rs takes a draw for `game` only at the
    game seed's address (it never moves); 1.14d takes a helper or setter
    at game +0xD0, and never an inline draw in the DRLG code
-   (`0x642000`–`0x643000`, `0x66B000`–`0x682000`, the `sim/rng.md` §7
-   DRLG rows), which is `other:drlg`.
+   (`0x642000`–`0x643000`, `0x66B000`–`0x682000` without `0x67A240`–`0x67A390`, the
+   charged-bolt path compute `FUN_0067a240`, whose inline draws step a missile's unit
+   seed (REC-3120); the `sim/rng.md` §7 DRLG rows), which is `other:drlg`.
 6. A 1.14d helper or setter whose seed address minus 0x20 reads as a
    server unit (type ≤ 5, unit +0xC8 bit 0x04000000) at the time of the
    draw names that unit, if a tick record lists the unit. An owner not
