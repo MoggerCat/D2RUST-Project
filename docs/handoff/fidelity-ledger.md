@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6240
+- Duplicate areas between parts: 6242
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1292,6 +1292,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s-appearance.2-token-lookup-0x0063d900`: rc-draw-row173.tsv:10 kept, rc-gen-formats.tsv:14 dropped
   - `system.formats.d2s-appearance.3-the-fill-0x0063e510-player-components-colours`: rc-draw-row173.tsv:11 kept, rc-gen-formats.tsv:15 dropped
   - `system.formats.d2s-appearance.6-colour-byte-0x0062c100-player-item-byte-0`: rc-draw-row173.tsv:12 kept, rc-gen-formats.tsv:18 dropped
+  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-audio-fmt-div.tsv:11 kept, rc-gen-formats.tsv:23 dropped
+  - `system.formats.d2s.10-errors`: rc-audio-fmt-div.tsv:12 kept, rc-gen-formats.tsv:28 dropped
   - `system.formats.dc6.file-header-24-bytes`: rc-draw-row173.tsv:13 kept, rc-gen-formats.tsv:30 dropped
   - `system.formats.dc6.frame`: rc-draw-row173.tsv:14 kept, rc-gen-formats.tsv:31 dropped
   - `system.formats.dc6.pixel-decoding`: rc-draw-row173.tsv:15 kept, rc-gen-formats.tsv:32 dropped
@@ -6563,7 +6565,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s-load.2-load-effects-0x0056b180`: rc-link-2.tsv:78 kept, systems.tsv:881 dropped
   - `system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005`: rc-gen-formats.tsv:21 kept, systems.tsv:882 dropped
   - `system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re`: rc-gen-formats.tsv:22 kept, systems.tsv:883 dropped
-  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-gen-formats.tsv:23 kept, systems.tsv:884 dropped
+  - `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show`: rc-audio-fmt-div.tsv:11 kept, systems.tsv:884 dropped
   - `system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470`: rc-gen-formats.tsv:24 kept, systems.tsv:885 dropped
   - `system.formats.d2s-load.7-map-seed-restore-in-single-player`: rc-link-2.tsv:79 kept, systems.tsv:886 dropped
   - `system.formats.d2s-load.8-player-record-values-sent-at-the-join-sim-inte`: rc-link-2.tsv:80 kept, systems.tsv:887 dropped
@@ -6576,7 +6578,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.formats.d2s.7-stats-and-skills`: rc-run-2b.tsv:94 kept, systems.tsv:894 dropped
   - `system.formats.d2s.8-item-sections`: rc-run-2b.tsv:95 kept, systems.tsv:895 dropped
   - `system.formats.d2s.9-load-sequence-0x0056b180`: rc-link-2.tsv:82 kept, systems.tsv:896 dropped
-  - `system.formats.d2s.10-errors`: rc-gen-formats.tsv:28 kept, systems.tsv:897 dropped
+  - `system.formats.d2s.10-errors`: rc-audio-fmt-div.tsv:12 kept, systems.tsv:897 dropped
   - `system.formats.font-tbl.header-12-bytes`: rc-audio-fmt-div.tsv:10 kept, systems.tsv:898 dropped
   - `system.formats.font-tbl.glyph-records-14-bytes-each`: rc-audio-fmt-div.tsv:9 kept, systems.tsv:899 dropped
   - `system.formats.palette.dat-palette`: rc-draw-row173.tsv:32 kept, systems.tsv:900 dropped
@@ -10408,9 +10410,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.formats.d2s-appearance.5-body-armour-composite-branch-of-0x0063e510` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-appearance.md | NO-CHECK: needs equipped items on the character (helm/hands/armour) in a draws check |
 | `system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
 | `system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
-| `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
+| `system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: 1.14d's refused load is visible in the packets channel (S->C stream ends after the join's first four packets, d2s-load.md section 5 r2a, Nightmare-not-unlocked game measured) but d2rs refuses earlier and writes no packets file; next: state-dump emits the 0x01/0x00/0x02/0x8F packets and stops on a refused load, then a check with `difficulty nightmare` per result code (d2s-tool --allow-locked builds the town-byte variants); the message text needs the frontend channel |
 | `system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s-load.md | NO-CHECK: needs a save variant (Necromancer golem / hotkeys / runeword mismatch / corrupt file) no check can create yet |
-| `system.formats.d2s.10-errors` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s.md | NO-CHECK: needs a corrupt save file; checks cannot supply one |
+| `system.formats.d2s.10-errors` | system | NO-CHECK | M | - | ? | 0 | n | - | specs/formats/d2s.md | NO-CHECK: 1.14d's refused load is visible in the packets channel (S->C stream ends after the join's first four packets, d2s-load.md section 5 r2a, Nightmare-not-unlocked game measured) but d2rs refuses earlier and writes no packets file; next: state-dump emits the 0x01/0x00/0x02/0x8F packets and stops on a refused load, then a check with `difficulty nightmare` per result code (d2s-tool --allow-locked builds the town-byte variants); the message text needs the frontend channel |
 | `system.perf.budget` | system | NO-CHECK | S | - | ? | 0 | n | - | - | bench baselines exist (docs/handoff/bench-baselines.md); no 1.14d-side budget to compare, original timing is tick-based (tick.md) |
 | `system.render.blend-modes.8-lines-and-rectangles-gdi` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/blend-modes.md | no check: no generated scene reaches it by pokes |
 | `system.render.capture.1-configuration` | system | NO-CHECK | M | - | ? | 0 | n | claude/q-scenes-compare | specs/render/capture.md | no check: tooling row (1.14d capture hooks); no scenario reaches it |
