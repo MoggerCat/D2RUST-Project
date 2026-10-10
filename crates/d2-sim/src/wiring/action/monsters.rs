@@ -340,6 +340,19 @@ impl<X: Pending> ActionHooks<X> {
         }
     }
 
+    /// `0x005A03A0(unit)`: a monster whose data has type flag 0x02
+    /// (superunique) gives its hcIdx (+0x26), any other unit none
+    /// (`treasure.md` §3.2); a unit without monster data asks
+    /// [`Pending::superunique`].
+    pub fn superunique(&self, unit: UnitId) -> Option<u16> {
+        use crate::monsters::init::type_flag;
+        match self.monster_data(unit) {
+            Some(m) if m.type_flags & type_flag::SUPERUNIQUE != 0 => Some(m.boss_hc_idx),
+            Some(_) => None,
+            None => self.x.superunique(unit),
+        }
+    }
+
     /// The monstats row of a monster with monster data in the lent world.
     fn monstats_of(&self, unit: UnitId) -> Option<&d2_data::tables::Monstats> {
         let class = self.monster_data(unit)?.class;

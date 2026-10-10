@@ -1,0 +1,41 @@
+{
+ "channel": "draws",
+ "check": "gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp",
+ "command": [
+  "tools/trace-recorder/record_frames.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "80",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.frames.jsonl",
+  "--every",
+  "1",
+  "--draws-every",
+  "1",
+  "--no-save"
+ ],
+ "files": {
+  "orig.frames.jsonl": {
+   "sha256": "2a0f53e03429f42b79264067cff18194813df8ca8409c52b29a0ea2ba07d8903",
+   "size": 2936554
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "10d4685bc31f352185788492eb3a9e5504a1d17d789e85b05056c8b22da1641d",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6acab5c77636638a790840c542c51dd7472887044888df9f164764661dcb9c53",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

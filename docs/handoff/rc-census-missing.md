@@ -21,3 +21,16 @@ First divergence frame 37 -> 73 (then 73: killer GUID, 1.14d 10 vs d2rs 26, an A
 - Who kills the player differs (guid 10 vs 26 in cha-00): monster AI/target choice (owner: AI).
 - Ledger part `ledger/rc-census-missing.tsv`: only net.s2c.0x65 (NO-CHECK -> DIVERGED). 0x15/0x1b/0xac read DIVERGED in this subset only through cascades; left as in the base.
 - Census output is not committed; `traces/orig-cache` was refilled locally and left uncommitted.
+
+## Round 2: 0x8E CorpseAssign vs 0x0D (REC-2812)
+- DD start broadcasts 0x8E first; the corpse then goes through the normal new-unit add (0x59 with the owner's name, 0x75 after every 0x59, 0x74 flag 1 owner+corpse, 0xAA with states 7 and 105, the mode function 0x0D, 0x76) instead of the `dying.rs` 0x59 + 0x0D special case. The player's DT/DD 0x0D carries unit byte +0xB0. Corpse fill sends no 0x47/0x48 when nothing moved (PROVISIONAL, with items moved the d2rs refresh stays).
+- Result: items-drops-cha-00 matches 1.14d through frame 96 (only the 0x5A killer GUID differs, frame 73). Over the 60 drops checks the `8e vs 0d` group (~47) is gone.
+- Next first divergences (60 drops checks): `0c vs 67` MonsterHit before MonsterMove (10), `a9 vs 65` EndState before the kill count (6), `69 vs 4d` (4), then scattered "missing in d2rs" (killer attribution, AI).
+- No ledger row flipped (subset only).
+
+## Round 3 (REC-2813)
+- 0x5A death notice u32@3 is the killer's class (unit +0x04), not the GUID (that was the "killer GUID differs" group, ~35 checks).
+- monprop (`init.md` §11) is applied on monsters: `economy::monster_property` runs the property dispatcher on the unit's stat list (state 0, flags 0x40) with the unit seed; Hell Mephisto / council members now send their stats in the 0xAC.
+- The play host sets `UnitData.difficulty` and `aidel_by_difficulty` (game type 3, `ai.md` §1.3): the neutral AI delay used the base column in every difficulty (the "0x67 MonsterMove missing" group, 2-frame late first think in Hell).
+- Result over the 60 `items-drops-*` packets checks: 16 MATCH (0 at the start of the session), 44 DIVERGED.
+- Open (first divergence, 44 checks): `a9 EndState vs a8 SetState / 65` (6), `6d MonsterStop vs 0d` (6), `75 PartyInfo vs 67/69/6c` (4), AddUnit state 118 on Blood Raven in Hell/Nightmare/Normal (`knock` monprop, 4), `69 vs 4d` (3), and scattered "missing in d2rs" 0x67/0x6D (monster AI timing, ~15).

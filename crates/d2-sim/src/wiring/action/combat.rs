@@ -213,8 +213,13 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn is_prime_evil(&self, u: UnitId) -> bool {
         self.v.h.is_prime_evil(u)
     }
+    /// `0x00451F30(u, 0x80000000)`: unit flag +0xC4 bit 31 (set by the
+    /// summon finish, `skills/bodies.md` §6.2 step 4), else the host's.
     fn is_revived(&self, u: UnitId) -> bool {
-        self.v.h.x.is_revived(u)
+        match self.v.units.get(u) {
+            Some(r) => r.flags & 0x8000_0000 != 0,
+            None => self.v.h.x.is_revived(u),
+        }
     }
     fn alignment(&self, u: UnitId) -> i32 {
         i32::from(self.v.h.x.alignment(u))

@@ -478,7 +478,7 @@ target unit K (resolved by `0x00580A70`).
       `0x0054D8A0(game, K, P)` (killer resolved to its player owner when
       it is a monster with one; sent to every client `0x0054AA40`) and the
       arena kill event `0x0053F720(game, K, P)`. Notice layout: code 6,
-      u8@2 4, killer GUID u32@3 (−1 none), killer unit type u8@7 (6
+      u8@2 4, killer class u32@3 (unit +0x04, not the GUID; −1 none), killer unit type u8@7 (6
       none), victim name @8, @0x18 the killer player's name, or for a
       monster with type flag 2 its u16 `wBossHcIdx` (+0x26).
    9. End P's interaction `0x005350F0(game, P)`: unit +0x6C set and

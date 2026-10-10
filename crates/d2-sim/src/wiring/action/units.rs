@@ -436,6 +436,15 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
         // dead-body footprint `0x00649F70(P, 1)` replaces the player's
         // 0x80 footprint, so missiles no longer see the body.
         View::of(sim.units, sim.stats, sim.data, self).dead_body_footprint(unit);
+        // The dead clean-up `0x0057F330` (`vitals.md` §4.8 rule 1.5): base
+        // hitpoints := 0, the death list sweep `0x00627540`, and the
+        // states but the keep mask (`plrstaydeath`) cleared; a poisoned
+        // player is told the state ended (recorded `items-drops-hel-02`
+        // frame 38: 0xA9 state 2).
+        sim.stats.unit_set(&mut *self, unit, 6, 0, 0);
+        sim.stats.death(&mut *self, unit);
+        sim.stats
+            .clear_states_except(unit, crate::stats::states::group::PLR_STAY_DEATH);
         self.death_notice(sim, unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
@@ -447,6 +456,12 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// §2.3, `vitals.md` §4.8 rule 2).
     fn player_corpse(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.corpse_creation(sim, unit);
+        // In the original the corpse is made before the mode set
+        // `0x00553570` queues the player (`vitals.md` §4.8 rule 2), so the
+        // player's update goes out before the corpse's (recorded
+        // `items-drops-cha-00` frame 96: 0x0D of the player, then 0x59).
+        let _ = sim.game.lists.unqueue_update(unit);
+        let _ = sim.game.lists.queue_update(unit);
         if let Some(q) = self.owner_deaths.as_mut() {
             q.push(unit);
         }
@@ -970,12 +985,22 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         let Some(ty) = UnitType::ALL.get(usize::from(owner_type)).copied() else {
             return;
         };
+        if ty == UnitType::Player {
+            self.hireling_units.insert(unit);
+        }
         if let Some(c) = self.ai.as_mut().and_then(|s| s.control_mut(unit)) {
             c.minion_owner = Some(ai::UnitRef {
                 ty,
                 guid: owner_guid,
             });
         }
+    }
+
+    fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
+        self.event_records.push(
+            unit,
+            super::event_records::EventRecord::UnitStat { stat, value },
+        );
     }
 
     /// On the lent monster world (none: nothing).

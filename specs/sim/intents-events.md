@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1368 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1369–1713 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1714–1886 |
-| Constants & data dependencies | 1887–1905 |
-| Randomness | 1906–1911 |
-| Edge cases & original bugs | 1912–1957 |
-| Test vectors | 1958–2044 |
-| Provenance | 2045–2171 |
-| Open questions | 2172–2324 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1376 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1377–1721 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1722–1894 |
+| Constants & data dependencies | 1895–1913 |
+| Randomness | 1914–1919 |
+| Edge cases & original bugs | 1920–1965 |
+| Test vectors | 1966–2052 |
+| Provenance | 2053–2179 |
+| Open questions | 2180–2332 |
 <!-- /index -->
 
 ## Summary
@@ -1070,7 +1070,15 @@ that drops gold:
 4. Monster and item are in the same room's update queue: whichever was
    queued last goes first (`sim/unit-order.md` §6 rule 5); the item is
    queued at its creation after the kill set the monster's mode, so the
-   item's 0x9C precedes the monster's 0x69 in that room. Confirmed
+   item's 0x9C precedes the monster's 0x69 in that room. The player's
+   corpse (REC-2812, recorded `items-drops-cha-00` frame 96): the DD start
+   `0x0057F700` broadcasts 0x8E (`0x0053DF80`: flag 1, owner GUID, corpse
+   GUID); the corpse then arrives in the client pass as a new player unit:
+   0x59 (name of the owner) + 0x75, five 0x20, 0x74 (flag 1, owner, corpse),
+   0xAA (states 7 and 105), 0x0D (the mode function `0x005484B0`, code 9),
+   0x76, then the update pass's 0x0D, 0xA7, 0xA8. 0x59 is always followed
+   by 0x75 (`0x0053E8F0` → `0x0053DA90`: party 0xFFFF, level, 0, 0). The
+   corpse fill sends nothing to the player. Confirmed
    2026-10-10 (`items-drops-cha-00` frame 37, REC-2810): three 0x9C, then
    the dead champion's 0x69 code 8 (a = b = 0, the path end of rule 7.7),
    then 0x65. d2rs announces the ground item at its queue position: the

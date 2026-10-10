@@ -28,3 +28,41 @@ written as `cov-promoted` (ledger.py merges group coverage as "exercised" only).
 - 39 checks with input/send and no packets channel: add `packets` to the check (then they qualify).
 - 1 ignore line check; 22 DIVERGED are real divergences (packets 18, draws 4).
 - orig-cache entries refreshed by --fill-cache are left uncommitted (rule).
+
+## Round 2 (after the coordinator's no-deadline note)
+- integ-r23 had added `packets` to the hand-written input checks; re-run of the 40 still PARTIAL: a5-wp (7) and
+  gen-skill (7) now show real packets DIVERGED; added `packets` to 10 ass-*, 4+15 gen-shrine-* (check_gen shrine
+  family too), 2 ass-lightning-sentry-*; removed `ignore q` from sys-intents-moves (EQUAL now).
+- Result: 25 of those checks now run packets; most diverge in C->S (the gap's condition occurred), so their rows are
+  DIVERGED by the fresh verdict, not promoted. Part regenerated against the ledger without rc-promote
+  (265 checks): 62 rows EQUAL, 23 DIVERGED. Ledger EQUAL 3073 (integ-r23 + this), 0 errors.
+- C002/C028 (causes-99): not started; need the packets C->S divergences and the one-sided field list per check.
+
+## Round 3 (packets DIVERGED groups, fixed by count)
+- Stale binary: the 36 `ass-*` / `gen-skill-*` packets DIVERGED were a suite-bin built before the post-load 0x23 fix
+  (a62bc1547) merged; rebuilt -> MATCH (check `target/suite-bin` age when a first divergence is a known fixed one).
+- `pos` / `hop` pokes: d2rs queued its own S->C 0x15 (play aid); `state-dump` now queues none (`poke::Env::reassign`,
+  `app::poke::set_compare_run`); 8 gen-sysc-client-msg-ui + interact-* + a2-npc-* first divergence moved frame 4 -> 16.
+- Store-item recharge (`0x0055FE80`, `properties.md` §5 r9; pc1-data.md item 27): `vendor_world.rs` recharge now sets
+  stat-204 charges to max (was a log-only stub); Akara guid 8 charges 67/67. ~30 NPC talk/trade checks packets MATCH.
+- Ledger EQUAL 3134 (incl. integ-r23), 0 errors; part 54 rows against the ledger without rc-promote.
+## Open (first divergences, by count)
+- 0x5D QuestItemState, 13 checks: (a) 1.14d sends `5d 04 00 0c 00 00` (chain 4) in the frame of a `warp 40` poke from a
+  fresh ScnBuy-like save (drognan/lysander stock, act-change x3, ...): d2rs sends none; `send_status` (quests.rs:1979)
+  needs the player's room act = record act (0), as 0x00544190, so the sender in 1.14d is not L1 at tick time (caller
+  0x53d72c is the 0x0053D710 builder); owner to read the 1.14d sender. (b) d2rs sends extra `5d 1f/20/21 00 01 ..` (act 5
+  chains 31-33) on a5 warps that 1.14d does not (a5-wp-31..38 x7, drehya stock).
+- 0x9c vendor stock (halbu): frame 66 0x9c vs 0x67 MonsterMove ordering; cube-000..005: 1.14d `0x3f` (targeting reset)
+  where d2rs sends `0x47`/`0x48`; assassin sentries (7): 0xA7/0xAC/0x21 summon messages; gen-shrine-7 (0xA8 size),
+  -17 (0x2C vs 0x0E); act-video x3.
+
+## Round 4 (0x5D QuestItemState)
+- Found: 1.14d queues the quest messages of the town-leave refresh (`0x00537340`, called by `0x0053AEC0` before the act change
+  `0x0053ACC0`) at once; d2rs held them in the quest rest's outbox until the tick end, so `5d 04 00 0c` came last, not first.
+  `QuestRest::drain_sent` + the loan's `town_leave` now forward them at once. +6 checks packets MATCH (drognan/elzix/fara/
+  lysander stock, act-change-1/3, act-video). Earlier "d2rs sends none" came from a stale binary.
+- Still open (a5-wp-31..38 x7, drehya/nihlathak stock): d2rs sends `5d 1f/20/21 00 01 ..` (chains 31-33) for the event-3 branch
+  `old level == 109` (`quests-act5.md` §3.5, §4.5, §5.5) on a same-act `warp 111/115` from Harrogath; 1.14d sends none of them
+  (wp-31: only chain 32, branch `new level 111`). Hypothesis: in 1.14d the old level `a` of event 3 is not 109 for a poked
+  same-act warp (the placement `0x00554EA0` may change the client's room before `0x005380D0` reads it), so only the
+  new-level branches run. Check the client room (+0x1B4) writers on the `0x00554EA0` path.

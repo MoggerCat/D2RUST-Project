@@ -14,7 +14,7 @@ monster.baboon1	entity	monsters	monstats.txt baboon1 (hcIdx 48)	-	none	gen-mon-4
 monster.baboon3	entity	monsters	monstats.txt baboon3 (hcIdx 50)	-	none	gen-mon-50	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-50 EQUAL (REC-2055/2056)
 monster.baboon4	entity	monsters	monstats.txt baboon4 (hcIdx 51)	-	none	gen-mon-51	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-51 EQUAL (REC-2055/2056)
 monster.baboon5	entity	monsters	monstats.txt baboon5 (hcIdx 52)	-	none	gen-mon-52	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-52 EQUAL (REC-2055/2056)
-monster.baboon6	entity	monsters	monstats.txt baboon6 (hcIdx 295)	-	none	gen-mon-295	DIVERGED@71	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-295 state: frame 71 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.baboon6	entity	monsters	monstats.txt baboon6 (hcIdx 295)	-	none	gen-mon-295	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-295 state: frame 71 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
 monster.baboon7	entity	monsters	monstats.txt baboon7 (hcIdx 665)	-	none	gen-mon-665	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-665 EQUAL (REC-2055/2056)
 monster.baboon8	entity	monsters	monstats.txt baboon8 (hcIdx 666)	-	none	gen-mon-666	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-666 EQUAL (REC-2055/2056)
 monster.batdemon1	entity	monsters	monstats.txt batdemon1 (hcIdx 136)	-	none	gen-mon-136	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-136 EQUAL (REC-2055/2056)
@@ -29,13 +29,13 @@ monster.bighead3	entity	monsters	monstats.txt bighead3 (hcIdx 12)	-	none	gen-mon
 monster.bighead4	entity	monsters	monstats.txt bighead4 (hcIdx 13)	-	none	gen-mon-13	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-13 EQUAL (REC-2055/2056)
 monster.bighead5	entity	monsters	monstats.txt bighead5 (hcIdx 14)	-	none	gen-mon-14	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-14 EQUAL (REC-2055/2056)
 monster.bighead6	entity	monsters	monstats.txt bighead6 (hcIdx 580)	-	none	gen-mon-580	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-580 EQUAL (REC-2055/2056)
-monster.bloodlord1	entity	monsters	monstats.txt bloodlord1 (hcIdx 506)	-	none	gen-mon-506	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-506 EQUAL (REC-2055/2056)
-monster.bloodlord2	entity	monsters	monstats.txt bloodlord2 (hcIdx 507)	-	none	gen-mon-507	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-507 EQUAL (REC-2055/2056)
-monster.bloodlord3	entity	monsters	monstats.txt bloodlord3 (hcIdx 508)	-	none	gen-mon-508	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-508 EQUAL (REC-2055/2056)
-monster.bloodlord4	entity	monsters	monstats.txt bloodlord4 (hcIdx 509)	-	none	gen-mon-509	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-509 EQUAL (REC-2055/2056)
-monster.bloodlord5	entity	monsters	monstats.txt bloodlord5 (hcIdx 510)	-	none	gen-mon-510	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-510 EQUAL (REC-2055/2056)
-monster.bloodlord6	entity	monsters	monstats.txt bloodlord6 (hcIdx 652)	-	none	gen-mon-652	DIVERGED@90	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-652 state: frame 90 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
-monster.bloodlord7	entity	monsters	monstats.txt bloodlord7 (hcIdx 653)	-	none	gen-mon-653	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-653 EQUAL (REC-2055/2056)
+monster.bloodlord1	entity	monsters	monstats.txt bloodlord1 (hcIdx 506)	-	none	gen-mon-506	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-506 EQUAL (REC-2055/2056)
+monster.bloodlord2	entity	monsters	monstats.txt bloodlord2 (hcIdx 507)	-	none	gen-mon-507	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-507 EQUAL (REC-2055/2056)
+monster.bloodlord3	entity	monsters	monstats.txt bloodlord3 (hcIdx 508)	-	none	gen-mon-508	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-508 EQUAL (REC-2055/2056)
+monster.bloodlord4	entity	monsters	monstats.txt bloodlord4 (hcIdx 509)	-	none	gen-mon-509	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-509 EQUAL (REC-2055/2056)
+monster.bloodlord5	entity	monsters	monstats.txt bloodlord5 (hcIdx 510)	-	none	gen-mon-510	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-510 EQUAL (REC-2055/2056)
+monster.bloodlord6	entity	monsters	monstats.txt bloodlord6 (hcIdx 652)	-	none	gen-mon-652	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-652 state: frame 90 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.bloodlord7	entity	monsters	monstats.txt bloodlord7 (hcIdx 653)	-	none	gen-mon-653	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-653 EQUAL (REC-2055/2056)
 monster.blunderbore1	entity	monsters	monstats.txt blunderbore1 (hcIdx 186)	-	none	gen-mon-186	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-186 EQUAL (REC-2055/2056)
 monster.blunderbore3	entity	monsters	monstats.txt blunderbore3 (hcIdx 188)	-	none	gen-mon-188	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-188 EQUAL (REC-2055/2056)
 monster.blunderbore4	entity	monsters	monstats.txt blunderbore4 (hcIdx 189)	-	none	gen-mon-189	MATCH	no	0	n	claude/rc-damage-draws	EQUAL	-	rc-run-4 2026-10-10: gen-mon-189 EQUAL (REC-2055/2056)
@@ -52,7 +52,7 @@ monster.boss.baalcrab	entity	monsters	monstats.txt baalcrab (544) boss=1, AI Baa
 monster.boss.baalcrabstairs	entity	monsters	monstats.txt baalcrabstairs (559) boss=1, AI BaalToStairs; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	gen-boss-559	MATCH	yes	0	n	claude/q-fix-b-monster-combat	EQUAL	-	rc-run-4 2026-10-10: gen-boss-559 EQUAL (REC-2055/2056)
 monster.boss.bloodraven	entity	monsters	monstats.txt bloodraven (267) boss=1, AI BloodRaven; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	-	DIVERGED@93	yes	0	n	-	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-267 state: frame 93 player 0:1 class 0, field s: 1.14d [37638007, 1705587472] vs d2rs [2032329932, 1625895153]
 monster.boss.diablo	entity	monsters	monstats.txt diablo (243) boss=1, AI Diablo; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-boss-243 EQUAL (REC-2055/2056)
-monster.boss.diabloclone	entity	monsters	monstats.txt diabloclone (333) boss=1, AI Diablo; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	gen-boss-333	DIVERGED@71	yes	0	n	claude/rc-mon-modes	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-333 state: frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943]
+monster.boss.diabloclone	entity	monsters	monstats.txt diabloclone (333) boss=1, AI Diablo; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	gen-boss-333	DIVERGED@95	yes	0	n	claude/rc-mon-modes	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-333 state: frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943]
 monster.boss.griswold	entity	monsters	monstats.txt griswold (365) boss=1, AI Griswold; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-boss-365 EQUAL (REC-2055/2056)
 monster.boss.izual	entity	monsters	monstats.txt izual (256) boss=1, AI Izual; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-boss-256 EQUAL (REC-2055/2056)
 monster.boss.mephisto	entity	monsters	monstats.txt mephisto (242) boss=1, AI Mephisto; act/quest boss	specs/monsters/ai-bodies.md,specs/monsters/population.md,specs/monsters/init.md	draft	-	DIVERGED@59	yes	0	n	claude/q-fix-seed-order	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-242 state: frame 59 monster 1:8 class 242, field s: 1.14d [4285903474, 480484601] vs d2rs [1151986076, 1319447910]
@@ -91,9 +91,9 @@ monster.corruptrogue6	entity	monsters	monstats.txt corruptrogue6 (hcIdx 721)	-	n
 monster.cr-archer2	entity	monsters	monstats.txt cr_archer2 (hcIdx 161)	-	none	gen-mon-161	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-161 EQUAL (REC-2055/2056)
 monster.cr-archer4	entity	monsters	monstats.txt cr_archer4 (hcIdx 163)	-	none	gen-mon-163	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-163 EQUAL (REC-2055/2056)
 monster.cr-archer5	entity	monsters	monstats.txt cr_archer5 (hcIdx 164)	-	none	gen-mon-164	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-164 EQUAL (REC-2055/2056)
-monster.cr-archer6	entity	monsters	monstats.txt cr_archer6 (hcIdx 613)	-	none	gen-mon-613	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-613 EQUAL (REC-2055/2056)
-monster.cr-archer7	entity	monsters	monstats.txt cr_archer7 (hcIdx 614)	-	none	gen-mon-614	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-614 EQUAL (REC-2055/2056)
-monster.cr-archer8	entity	monsters	monstats.txt cr_archer8 (hcIdx 722)	-	none	gen-mon-722	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-722 EQUAL (REC-2055/2056)
+monster.cr-archer6	entity	monsters	monstats.txt cr_archer6 (hcIdx 613)	-	none	gen-mon-613	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-613 EQUAL (REC-2055/2056)
+monster.cr-archer7	entity	monsters	monstats.txt cr_archer7 (hcIdx 614)	-	none	gen-mon-614	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-614 EQUAL (REC-2055/2056)
+monster.cr-archer8	entity	monsters	monstats.txt cr_archer8 (hcIdx 722)	-	none	gen-mon-722	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-722 EQUAL (REC-2055/2056)
 monster.cr-lancer2	entity	monsters	monstats.txt cr_lancer2 (hcIdx 166)	-	none	gen-mon-166	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-166 EQUAL (REC-2055/2056)
 monster.cr-lancer3	entity	monsters	monstats.txt cr_lancer3 (hcIdx 167)	-	none	gen-mon-167	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-167 EQUAL (REC-2055/2056)
 monster.cr-lancer6	entity	monsters	monstats.txt cr_lancer6 (hcIdx 615)	-	none	gen-mon-615	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-615 EQUAL (REC-2055/2056)
@@ -101,11 +101,11 @@ monster.cr-lancer7	entity	monsters	monstats.txt cr_lancer7 (hcIdx 616)	-	none	ge
 monster.cr-lancer8	entity	monsters	monstats.txt cr_lancer8 (hcIdx 723)	-	none	gen-mon-723	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-723 EQUAL (REC-2055/2056)
 monster.crownest1	entity	monsters	monstats.txt crownest1 (hcIdx 206)	-	none	gen-mon-206	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-206 EQUAL (REC-2055/2056)
 monster.crownest2	entity	monsters	monstats.txt crownest2 (hcIdx 207)	-	none	gen-mon-207	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-207 EQUAL (REC-2055/2056)
-monster.deathmauler1	entity	monsters	monstats.txt deathmauler1 (hcIdx 529)	-	none	gen-mon-529	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-529 EQUAL (REC-2055/2056)
-monster.deathmauler2	entity	monsters	monstats.txt deathmauler2 (hcIdx 530)	-	none	gen-mon-530	MATCH	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-530 EQUAL (REC-2055/2056)
-monster.deathmauler3	entity	monsters	monstats.txt deathmauler3 (hcIdx 531)	-	none	gen-mon-531	MATCH	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-531 EQUAL (REC-2055/2056)
-monster.deathmauler4	entity	monsters	monstats.txt deathmauler4 (hcIdx 532)	-	none	gen-mon-532	MATCH	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-532 EQUAL (REC-2055/2056)
-monster.deathmauler5	entity	monsters	monstats.txt deathmauler5 (hcIdx 533)	-	none	gen-mon-533	DIVERGED@113	no	0	n	claude/q-fix-join-items	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-533 state: frame 113 player 0:1 class 0, field m: 1.14d 0 vs d2rs 1
+monster.deathmauler1	entity	monsters	monstats.txt deathmauler1 (hcIdx 529)	-	none	gen-mon-529	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-529 EQUAL (REC-2055/2056)
+monster.deathmauler2	entity	monsters	monstats.txt deathmauler2 (hcIdx 530)	-	none	gen-mon-530	PARTIAL	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-530 EQUAL (REC-2055/2056)
+monster.deathmauler3	entity	monsters	monstats.txt deathmauler3 (hcIdx 531)	-	none	gen-mon-531	PARTIAL	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-531 EQUAL (REC-2055/2056)
+monster.deathmauler4	entity	monsters	monstats.txt deathmauler4 (hcIdx 532)	-	none	gen-mon-532	PARTIAL	no	0	n	claude/q-fix-join-items	EQUAL	-	rc-run-4 2026-10-10: gen-mon-532 EQUAL (REC-2055/2056)
+monster.deathmauler5	entity	monsters	monstats.txt deathmauler5 (hcIdx 533)	-	none	gen-mon-533	PARTIAL	no	0	n	claude/q-fix-join-items	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-533 state: frame 113 player 0:1 class 0, field m: 1.14d 0 vs d2rs 1
 monster.dkfig1	entity	monsters	monstats.txt dkfig1 (hcIdx 699)	-	none	gen-mon-699	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-699 EQUAL (REC-2055/2056)
 monster.dkfig2	entity	monsters	monstats.txt dkfig2 (hcIdx 700)	-	none	gen-mon-700	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-700 EQUAL (REC-2055/2056)
 monster.dkmag1	entity	monsters	monstats.txt dkmag1 (hcIdx 702)	-	none	gen-mon-702	MATCH	no	0	n	claude/rc-missile-class-off	EQUAL	-	rc-run-4 2026-10-10: gen-mon-702 EQUAL (REC-2055/2056)
@@ -119,7 +119,7 @@ monster.fallen6	entity	monsters	monstats.txt fallen6 (hcIdx 642)	-	none	gen-mon-
 monster.fallen7	entity	monsters	monstats.txt fallen7 (hcIdx 643)	-	none	gen-mon-643	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-643 EQUAL (REC-2055/2056)
 monster.fallen8	entity	monsters	monstats.txt fallen8 (hcIdx 644)	-	none	gen-mon-644	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-644 EQUAL (REC-2055/2056)
 monster.fallenshaman3	entity	monsters	monstats.txt fallenshaman3 (hcIdx 60)	-	none	gen-mon-60	MATCH	no	0	n	claude/rc-damage-draws	EQUAL	-	rc-run-4 2026-10-10: gen-mon-60 EQUAL (REC-2055/2056)
-monster.fallenshaman6	entity	monsters	monstats.txt fallenshaman6 (hcIdx 645)	-	none	gen-mon-645	DIVERGED@52	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-645 state: frame 52 player 0:1 class 0, field m: 1.14d 0 vs d2rs 4
+monster.fallenshaman6	entity	monsters	monstats.txt fallenshaman6 (hcIdx 645)	-	none	gen-mon-645	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-645 state: frame 52 player 0:1 class 0, field m: 1.14d 0 vs d2rs 4
 monster.fallenshaman7	entity	monsters	monstats.txt fallenshaman7 (hcIdx 646)	-	none	gen-mon-646	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-646 EQUAL (REC-2055/2056)
 monster.fallenshaman8	entity	monsters	monstats.txt fallenshaman8 (hcIdx 647)	-	none	gen-mon-647	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-647 EQUAL (REC-2055/2056)
 monster.fetish1	entity	monsters	monstats.txt fetish1 (hcIdx 141)	-	none	gen-mon-141	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-141 EQUAL (REC-2055/2056)
@@ -139,11 +139,11 @@ monster.fetishshaman3	entity	monsters	monstats.txt fetishshaman3 (hcIdx 280)	-	n
 monster.fetishshaman4	entity	monsters	monstats.txt fetishshaman4 (hcIdx 281)	-	none	gen-mon-281	MATCH	yes	0	n	claude/rc-extra-missile	EQUAL	-	rc-run-4 2026-10-10: gen-mon-281 EQUAL (REC-2055/2056)
 monster.fetishshaman6	entity	monsters	monstats.txt fetishshaman6 (hcIdx 662)	-	none	gen-mon-662	MATCH	yes	0	n	claude/rc-extra-missile	EQUAL	-	rc-run-4 2026-10-10: gen-mon-662 EQUAL (REC-2055/2056)
 monster.fetishshaman8	entity	monsters	monstats.txt fetishshaman8 (hcIdx 664)	-	none	gen-mon-664	MATCH	yes	0	n	claude/rc-extra-missile	EQUAL	-	rc-run-4 2026-10-10: gen-mon-664 EQUAL (REC-2055/2056)
-monster.fingermage1	entity	monsters	monstats.txt fingermage1 (hcIdx 304)	-	none	gen-mon-304	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-304 EQUAL (REC-2055/2056)
-monster.fingermage2	entity	monsters	monstats.txt fingermage2 (hcIdx 305)	-	none	gen-mon-305	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-305 EQUAL (REC-2055/2056)
-monster.fingermage3	entity	monsters	monstats.txt fingermage3 (hcIdx 306)	-	none	gen-mon-306	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-306 EQUAL (REC-2055/2056)
-monster.fingermage4	entity	monsters	monstats.txt fingermage4 (hcIdx 692)	-	none	gen-mon-692	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-692 EQUAL (REC-2055/2056)
-monster.fingermage5	entity	monsters	monstats.txt fingermage5 (hcIdx 693)	-	none	gen-mon-693	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-693 EQUAL (REC-2055/2056)
+monster.fingermage1	entity	monsters	monstats.txt fingermage1 (hcIdx 304)	-	none	gen-mon-304	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-304 EQUAL (REC-2055/2056)
+monster.fingermage2	entity	monsters	monstats.txt fingermage2 (hcIdx 305)	-	none	gen-mon-305	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-305 EQUAL (REC-2055/2056)
+monster.fingermage3	entity	monsters	monstats.txt fingermage3 (hcIdx 306)	-	none	gen-mon-306	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-306 EQUAL (REC-2055/2056)
+monster.fingermage4	entity	monsters	monstats.txt fingermage4 (hcIdx 692)	-	none	gen-mon-692	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-692 EQUAL (REC-2055/2056)
+monster.fingermage5	entity	monsters	monstats.txt fingermage5 (hcIdx 693)	-	none	gen-mon-693	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-693 EQUAL (REC-2055/2056)
 monster.foulcrow1	entity	monsters	monstats.txt foulcrow1 (hcIdx 15)	-	none	gen-mon-15	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-15 EQUAL (REC-2055/2056)
 monster.foulcrow2	entity	monsters	monstats.txt foulcrow2 (hcIdx 16)	-	none	gen-mon-16	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-16 EQUAL (REC-2055/2056)
 monster.foulcrow4	entity	monsters	monstats.txt foulcrow4 (hcIdx 18)	-	none	gen-mon-18	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-18 EQUAL (REC-2055/2056)
@@ -196,31 +196,31 @@ monster.minion5	entity	monsters	monstats.txt minion5 (hcIdx 457)	-	none	gen-mon-
 monster.minion6	entity	monsters	monstats.txt minion6 (hcIdx 458)	-	none	gen-mon-458	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-458 EQUAL (REC-2055/2056)
 monster.minion7	entity	monsters	monstats.txt minion7 (hcIdx 459)	-	none	gen-mon-459	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-459 EQUAL (REC-2055/2056)
 monster.minion9	entity	monsters	monstats.txt minion9 (hcIdx 682)	-	none	gen-mon-682	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-682 EQUAL (REC-2055/2056)
-monster.mon-lvl-133	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-133	DIVERGED@45	no	0	n	claude/rc-mon-lvl	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-133 state: frame 45 monster 1:8 class 133, field hp: 1.14d 43264 vs d2rs 0
-monster.mon-lvl-134	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-134	DIVERGED@45	no	0	n	claude/rc-mon-lvl	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-134 state: frame 45 monster 1:8 class 134, field hp: 1.14d 40960 vs d2rs 0
-monster.mon-lvl-304	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-304	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-304 EQUAL (REC-2055/2056)
-monster.mon-lvl-305	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-305	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-305 EQUAL (REC-2055/2056)
-monster.mon-lvl-306	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-306	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-306 EQUAL (REC-2055/2056)
-monster.mon-lvl-613	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-613	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-613 EQUAL (REC-2055/2056)
-monster.mon-lvl-614	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-614	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-614 EQUAL (REC-2055/2056)
-monster.mon-lvl-636	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-636	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-636 EQUAL (REC-2055/2056)
-monster.mon-lvl-637	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-637	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-637 EQUAL (REC-2055/2056)
-monster.mon-lvl-638	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-638	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-638 EQUAL (REC-2055/2056)
-monster.mon-lvl-692	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-692	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-692 EQUAL (REC-2055/2056)
-monster.mon-lvl-693	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-693	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-693 EQUAL (REC-2055/2056)
-monster.mon-lvl-720	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-720	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-720 EQUAL (REC-2055/2056)
-monster.mon-lvl-722	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-722	MATCH	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-722 EQUAL (REC-2055/2056)
+monster.mon-lvl-133	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-133	PARTIAL	no	0	n	claude/rc-mon-lvl	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-133 state: frame 45 monster 1:8 class 133, field hp: 1.14d 43264 vs d2rs 0
+monster.mon-lvl-134	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-134	PARTIAL	no	0	n	claude/rc-mon-lvl	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-134 state: frame 45 monster 1:8 class 134, field hp: 1.14d 40960 vs d2rs 0
+monster.mon-lvl-304	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-304	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-304 EQUAL (REC-2055/2056)
+monster.mon-lvl-305	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-305	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-305 EQUAL (REC-2055/2056)
+monster.mon-lvl-306	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-306	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-306 EQUAL (REC-2055/2056)
+monster.mon-lvl-613	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-613	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-613 EQUAL (REC-2055/2056)
+monster.mon-lvl-614	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-614	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-614 EQUAL (REC-2055/2056)
+monster.mon-lvl-636	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-636	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-636 EQUAL (REC-2055/2056)
+monster.mon-lvl-637	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-637	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-637 EQUAL (REC-2055/2056)
+monster.mon-lvl-638	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-638	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-638 EQUAL (REC-2055/2056)
+monster.mon-lvl-692	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-692	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-692 EQUAL (REC-2055/2056)
+monster.mon-lvl-693	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-693	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-693 EQUAL (REC-2055/2056)
+monster.mon-lvl-720	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-720	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-720 EQUAL (REC-2055/2056)
+monster.mon-lvl-722	entity	monsters	monstats.txt Sk<i>lvl	-	none	gen-mon-722	PARTIAL	no	0	n	claude/rc-mon-lvl	EQUAL	-	rc-run-4 2026-10-10: gen-mon-722 EQUAL (REC-2055/2056)
 monster.mosquito1	entity	monsters	monstats.txt mosquito1 (hcIdx 114)	-	none	gen-mon-114	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-114 EQUAL (REC-2055/2056)
 monster.mosquito2	entity	monsters	monstats.txt mosquito2 (hcIdx 115)	-	none	gen-mon-115	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-115 EQUAL (REC-2055/2056)
-monster.mosquito4	entity	monsters	monstats.txt mosquito4 (hcIdx 117)	-	none	gen-mon-117	DIVERGED@100	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-117 state: frame 100 monster 1:8 class 117, field fr: 1.14d 3328 vs d2rs 4608
+monster.mosquito4	entity	monsters	monstats.txt mosquito4 (hcIdx 117)	-	none	gen-mon-117	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-117 state: frame 100 monster 1:8 class 117, field fr: 1.14d 3328 vs d2rs 4608
 monster.mummy2	entity	monsters	monstats.txt mummy2 (hcIdx 97)	-	none	gen-mon-97	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-97 EQUAL (REC-2055/2056)
 monster.mummy4	entity	monsters	monstats.txt mummy4 (hcIdx 99)	-	none	gen-mon-99	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-99 EQUAL (REC-2055/2056)
 monster.mummy5	entity	monsters	monstats.txt mummy5 (hcIdx 100)	-	none	gen-mon-100	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-100 EQUAL (REC-2055/2056)
 monster.mummy6	entity	monsters	monstats.txt mummy6 (hcIdx 703)	-	none	gen-mon-703	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-703 EQUAL (REC-2055/2056)
 monster.overseer1	entity	monsters	monstats.txt overseer1 (hcIdx 479)	-	none	gen-mon-479	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-479 EQUAL (REC-2055/2056)
 monster.overseer2	entity	monsters	monstats.txt overseer2 (hcIdx 480)	-	none	gen-mon-480	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-480 EQUAL (REC-2055/2056)
-monster.overseer3	entity	monsters	monstats.txt overseer3 (hcIdx 481)	-	none	gen-mon-481	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-481 EQUAL (REC-2055/2056)
-monster.overseer4	entity	monsters	monstats.txt overseer4 (hcIdx 482)	-	none	gen-mon-482	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-482 EQUAL (REC-2055/2056)
+monster.overseer3	entity	monsters	monstats.txt overseer3 (hcIdx 481)	-	none	gen-mon-481	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-481 EQUAL (REC-2055/2056)
+monster.overseer4	entity	monsters	monstats.txt overseer4 (hcIdx 482)	-	none	gen-mon-482	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-482 EQUAL (REC-2055/2056)
 monster.overseer5	entity	monsters	monstats.txt overseer5 (hcIdx 483)	-	none	gen-mon-483	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-483 EQUAL (REC-2055/2056)
 monster.overseer6	entity	monsters	monstats.txt overseer6 (hcIdx 724)	-	none	gen-mon-724	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-724 EQUAL (REC-2055/2056)
 monster.pantherwoman3	entity	monsters	monstats.txt pantherwoman3 (hcIdx 85)	-	none	gen-mon-85	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-85 EQUAL (REC-2055/2056)
@@ -249,14 +249,14 @@ monster.regurgitator4	entity	monsters	monstats.txt regurgitator4 (hcIdx 694)	-	n
 monster.sandleaper3	entity	monsters	monstats.txt sandleaper3 (hcIdx 80)	-	none	gen-mon-80	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-80 EQUAL (REC-2055/2056)
 monster.sandleaper4	entity	monsters	monstats.txt sandleaper4 (hcIdx 81)	-	none	gen-mon-81	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-81 EQUAL (REC-2055/2056)
 monster.sandleaper5	entity	monsters	monstats.txt sandleaper5 (hcIdx 82)	-	none	gen-mon-82	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-82 EQUAL (REC-2055/2056)
-monster.sandleaper6	entity	monsters	monstats.txt sandleaper6 (hcIdx 629)	-	none	gen-mon-629	DIVERGED@97	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-629 state: frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
-monster.sandleaper7	entity	monsters	monstats.txt sandleaper7 (hcIdx 630)	-	none	gen-mon-630	DIVERGED@97	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-630 state: frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
-monster.sandmaggot2	entity	monsters	monstats.txt sandmaggot2 (hcIdx 69)	-	none	gen-mon-69	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-69 EQUAL (REC-2055/2056)
-monster.sandmaggot3	entity	monsters	monstats.txt sandmaggot3 (hcIdx 70)	-	none	gen-mon-70	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-70 EQUAL (REC-2055/2056)
-monster.sandmaggot4	entity	monsters	monstats.txt sandmaggot4 (hcIdx 71)	-	none	gen-mon-71	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-71 EQUAL (REC-2055/2056)
-monster.sandmaggot5	entity	monsters	monstats.txt sandmaggot5 (hcIdx 72)	-	none	gen-mon-72	MATCH	yes	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-72 EQUAL (REC-2055/2056)
-monster.sandmaggot6	entity	monsters	monstats.txt sandmaggot6 (hcIdx 679)	-	none	gen-mon-679	MATCH	no	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-679 EQUAL (REC-2055/2056)
-monster.sandmaggot7	entity	monsters	monstats.txt sandmaggot7 (hcIdx 716)	-	none	gen-mon-716	MATCH	no	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-716 EQUAL (REC-2055/2056)
+monster.sandleaper6	entity	monsters	monstats.txt sandleaper6 (hcIdx 629)	-	none	gen-mon-629	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-629 state: frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.sandleaper7	entity	monsters	monstats.txt sandleaper7 (hcIdx 630)	-	none	gen-mon-630	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-630 state: frame 97 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.sandmaggot2	entity	monsters	monstats.txt sandmaggot2 (hcIdx 69)	-	none	gen-mon-69	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-69 EQUAL (REC-2055/2056)
+monster.sandmaggot3	entity	monsters	monstats.txt sandmaggot3 (hcIdx 70)	-	none	gen-mon-70	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-70 EQUAL (REC-2055/2056)
+monster.sandmaggot4	entity	monsters	monstats.txt sandmaggot4 (hcIdx 71)	-	none	gen-mon-71	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-71 EQUAL (REC-2055/2056)
+monster.sandmaggot5	entity	monsters	monstats.txt sandmaggot5 (hcIdx 72)	-	none	gen-mon-72	PARTIAL	yes	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-72 EQUAL (REC-2055/2056)
+monster.sandmaggot6	entity	monsters	monstats.txt sandmaggot6 (hcIdx 679)	-	none	gen-mon-679	PARTIAL	no	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-679 EQUAL (REC-2055/2056)
+monster.sandmaggot7	entity	monsters	monstats.txt sandmaggot7 (hcIdx 716)	-	none	gen-mon-716	PARTIAL	no	0	n	claude/rc-maggot-seed	EQUAL	-	rc-run-4 2026-10-10: gen-mon-716 EQUAL (REC-2055/2056)
 monster.sandraider1	entity	monsters	monstats.txt sandraider1 (hcIdx 29)	-	none	gen-mon-29	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-29 EQUAL (REC-2055/2056)
 monster.sandraider10	entity	monsters	monstats.txt sandraider10 (hcIdx 603)	-	none	gen-mon-603	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-603 EQUAL (REC-2055/2056)
 monster.sandraider2	entity	monsters	monstats.txt sandraider2 (hcIdx 30)	-	none	gen-mon-30	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-30 EQUAL (REC-2055/2056)
@@ -269,20 +269,20 @@ monster.scarab5	entity	monsters	monstats.txt scarab5 (hcIdx 95)	-	none	gen-mon-9
 monster.scarab6	entity	monsters	monstats.txt scarab6 (hcIdx 654)	-	none	gen-mon-654	MATCH	no	0	n	claude/rc-damage-draws	EQUAL	-	rc-run-4 2026-10-10: gen-mon-654 EQUAL (REC-2055/2056)
 monster.scarab7	entity	monsters	monstats.txt scarab7 (hcIdx 655)	-	none	gen-mon-655	MATCH	no	0	n	claude/rc-damage-draws	EQUAL	-	rc-run-4 2026-10-10: gen-mon-655 EQUAL (REC-2055/2056)
 monster.scarab8	entity	monsters	monstats.txt scarab8 (hcIdx 718)	-	none	gen-mon-718	MATCH	no	0	n	claude/rc-damage-draws	EQUAL	-	rc-run-4 2026-10-10: gen-mon-718 EQUAL (REC-2055/2056)
-monster.siegebeast1	entity	monsters	monstats.txt siegebeast1 (hcIdx 441)	-	none	gen-mon-441	DIVERGED@90	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-441 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
-monster.siegebeast2	entity	monsters	monstats.txt siegebeast2 (hcIdx 442)	-	none	gen-mon-442	DIVERGED@90	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-442 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
-monster.siegebeast3	entity	monsters	monstats.txt siegebeast3 (hcIdx 443)	-	none	gen-mon-443	DIVERGED@90	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-443 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
+monster.siegebeast1	entity	monsters	monstats.txt siegebeast1 (hcIdx 441)	-	none	gen-mon-441	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-441 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
+monster.siegebeast2	entity	monsters	monstats.txt siegebeast2 (hcIdx 442)	-	none	gen-mon-442	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-442 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
+monster.siegebeast3	entity	monsters	monstats.txt siegebeast3 (hcIdx 443)	-	none	gen-mon-443	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-443 state: frame 90 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5
 monster.sk-archer10	entity	monsters	monstats.txt sk_archer10 (hcIdx 579)	-	none	gen-mon-579	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-579 EQUAL (REC-2055/2056)
 monster.sk-archer2	entity	monsters	monstats.txt sk_archer2 (hcIdx 171)	-	none	gen-mon-171	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-171 EQUAL (REC-2055/2056)
 monster.sk-archer4	entity	monsters	monstats.txt sk_archer4 (hcIdx 173)	-	none	gen-mon-173	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-173 EQUAL (REC-2055/2056)
 monster.sk-archer5	entity	monsters	monstats.txt sk_archer5 (hcIdx 174)	-	none	gen-mon-174	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-174 EQUAL (REC-2055/2056)
 monster.sk-archer6	entity	monsters	monstats.txt sk_archer6 (hcIdx 575)	-	none	gen-mon-575	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-575 EQUAL (REC-2055/2056)
-monster.sk-archer7	entity	monsters	monstats.txt sk_archer7 (hcIdx 576)	-	none	gen-mon-576	DIVERGED@78	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-576 state: frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
-monster.sk-archer9	entity	monsters	monstats.txt sk_archer9 (hcIdx 578)	-	none	gen-mon-578	DIVERGED@78	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-578 state: frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.sk-archer7	entity	monsters	monstats.txt sk_archer7 (hcIdx 576)	-	none	gen-mon-576	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-576 state: frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
+monster.sk-archer9	entity	monsters	monstats.txt sk_archer9 (hcIdx 578)	-	none	gen-mon-578	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-578 state: frame 78 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64
 monster.skeleton3	entity	monsters	monstats.txt skeleton3 (hcIdx 2)	-	none	gen-mon-2	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-2 EQUAL (REC-2055/2056)
 monster.skeleton6	entity	monsters	monstats.txt skeleton6 (hcIdx 648)	-	none	gen-mon-648	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-648 EQUAL (REC-2055/2056)
 monster.skeleton7	entity	monsters	monstats.txt skeleton7 (hcIdx 649)	-	none	gen-mon-649	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-649 EQUAL (REC-2055/2056)
-monster.skmage-cold5	entity	monsters	monstats.txt skmage_cold5 (hcIdx 624)	-	none	gen-mon-624	DIVERGED@135	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-624 state: frame 135 player 0:1 class 0, field sp: 1.14d 80 vs d2rs 40
+monster.skmage-cold5	entity	monsters	monstats.txt skmage_cold5 (hcIdx 624)	-	none	gen-mon-624	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-624 state: frame 135 player 0:1 class 0, field sp: 1.14d 80 vs d2rs 40
 monster.skmage-fire1	entity	monsters	monstats.txt skmage_fire1 (hcIdx 383)	-	none	gen-mon-383	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-383 EQUAL (REC-2055/2056)
 monster.skmage-fire4	entity	monsters	monstats.txt skmage_fire4 (hcIdx 386)	-	none	gen-mon-386	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-386 EQUAL (REC-2055/2056)
 monster.skmage-fire5	entity	monsters	monstats.txt skmage_fire5 (hcIdx 620)	-	none	gen-mon-620	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-620 EQUAL (REC-2055/2056)
@@ -303,24 +303,24 @@ monster.slinger9	entity	monsters	monstats.txt slinger9 (hcIdx 612)	-	none	gen-mo
 monster.snowyeti1	entity	monsters	monstats.txt snowyeti1 (hcIdx 446)	-	none	gen-mon-446	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-446 EQUAL (REC-2055/2056)
 monster.snowyeti2	entity	monsters	monstats.txt snowyeti2 (hcIdx 447)	-	none	gen-mon-447	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-447 EQUAL (REC-2055/2056)
 monster.snowyeti4	entity	monsters	monstats.txt snowyeti4 (hcIdx 449)	-	none	gen-mon-449	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-449 EQUAL (REC-2055/2056)
-monster.succubus-634	entity	monsters	monstats.txt class 634	specs/monsters/ai.md	draft	gen-mon-634	MATCH	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056)
-monster.succubus-635	entity	monsters	monstats.txt class 635	specs/monsters/ai.md	draft	gen-mon-635	MATCH	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056)
-monster.succubus-719	entity	monsters	monstats.txt class 719	specs/monsters/ai.md	draft	gen-mon-719	MATCH	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056)
-monster.succubus1	entity	monsters	monstats.txt succubus1 (hcIdx 469)	-	none	gen-mon-469	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-469 EQUAL (REC-2055/2056)
-monster.succubus2	entity	monsters	monstats.txt succubus2 (hcIdx 470)	-	none	gen-mon-470	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-470 EQUAL (REC-2055/2056)
-monster.succubus3	entity	monsters	monstats.txt succubus3 (hcIdx 471)	-	none	gen-mon-471	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-471 EQUAL (REC-2055/2056)
-monster.succubus4	entity	monsters	monstats.txt succubus4 (hcIdx 472)	-	none	gen-mon-472	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-472 EQUAL (REC-2055/2056)
-monster.succubus5	entity	monsters	monstats.txt succubus5 (hcIdx 473)	-	none	gen-mon-473	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-473 EQUAL (REC-2055/2056)
-monster.succubus6	entity	monsters	monstats.txt succubus6 (hcIdx 634)	-	none	gen-mon-634	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056)
-monster.succubus7	entity	monsters	monstats.txt succubus7 (hcIdx 635)	-	none	gen-mon-635	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056)
-monster.succubus8	entity	monsters	monstats.txt succubus8 (hcIdx 719)	-	none	gen-mon-719	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056)
-monster.succubuswitch2	entity	monsters	monstats.txt succubuswitch2 (hcIdx 475)	-	none	gen-mon-475	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-475 EQUAL (REC-2055/2056)
-monster.succubuswitch3	entity	monsters	monstats.txt succubuswitch3 (hcIdx 476)	-	none	gen-mon-476	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-476 EQUAL (REC-2055/2056)
-monster.succubuswitch5	entity	monsters	monstats.txt succubuswitch5 (hcIdx 478)	-	none	gen-mon-478	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-478 EQUAL (REC-2055/2056)
-monster.succubuswitch6	entity	monsters	monstats.txt succubuswitch6 (hcIdx 636)	-	none	gen-mon-636	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-636 EQUAL (REC-2055/2056)
-monster.succubuswitch7	entity	monsters	monstats.txt succubuswitch7 (hcIdx 637)	-	none	gen-mon-637	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-637 EQUAL (REC-2055/2056)
-monster.succubuswitch8	entity	monsters	monstats.txt succubuswitch8 (hcIdx 638)	-	none	gen-mon-638	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-638 EQUAL (REC-2055/2056)
-monster.succubuswitch9	entity	monsters	monstats.txt succubuswitch9 (hcIdx 720)	-	none	gen-mon-720	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-720 EQUAL (REC-2055/2056)
+monster.succubus-634	entity	monsters	monstats.txt class 634	specs/monsters/ai.md	draft	gen-mon-634	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056)
+monster.succubus-635	entity	monsters	monstats.txt class 635	specs/monsters/ai.md	draft	gen-mon-635	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056)
+monster.succubus-719	entity	monsters	monstats.txt class 719	specs/monsters/ai.md	draft	gen-mon-719	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056)
+monster.succubus1	entity	monsters	monstats.txt succubus1 (hcIdx 469)	-	none	gen-mon-469	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-469 EQUAL (REC-2055/2056)
+monster.succubus2	entity	monsters	monstats.txt succubus2 (hcIdx 470)	-	none	gen-mon-470	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-470 EQUAL (REC-2055/2056)
+monster.succubus3	entity	monsters	monstats.txt succubus3 (hcIdx 471)	-	none	gen-mon-471	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-471 EQUAL (REC-2055/2056)
+monster.succubus4	entity	monsters	monstats.txt succubus4 (hcIdx 472)	-	none	gen-mon-472	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-472 EQUAL (REC-2055/2056)
+monster.succubus5	entity	monsters	monstats.txt succubus5 (hcIdx 473)	-	none	gen-mon-473	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-473 EQUAL (REC-2055/2056)
+monster.succubus6	entity	monsters	monstats.txt succubus6 (hcIdx 634)	-	none	gen-mon-634	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056)
+monster.succubus7	entity	monsters	monstats.txt succubus7 (hcIdx 635)	-	none	gen-mon-635	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056)
+monster.succubus8	entity	monsters	monstats.txt succubus8 (hcIdx 719)	-	none	gen-mon-719	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056)
+monster.succubuswitch2	entity	monsters	monstats.txt succubuswitch2 (hcIdx 475)	-	none	gen-mon-475	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-475 EQUAL (REC-2055/2056)
+monster.succubuswitch3	entity	monsters	monstats.txt succubuswitch3 (hcIdx 476)	-	none	gen-mon-476	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-476 EQUAL (REC-2055/2056)
+monster.succubuswitch5	entity	monsters	monstats.txt succubuswitch5 (hcIdx 478)	-	none	gen-mon-478	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-478 EQUAL (REC-2055/2056)
+monster.succubuswitch6	entity	monsters	monstats.txt succubuswitch6 (hcIdx 636)	-	none	gen-mon-636	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-636 EQUAL (REC-2055/2056)
+monster.succubuswitch7	entity	monsters	monstats.txt succubuswitch7 (hcIdx 637)	-	none	gen-mon-637	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-637 EQUAL (REC-2055/2056)
+monster.succubuswitch8	entity	monsters	monstats.txt succubuswitch8 (hcIdx 638)	-	none	gen-mon-638	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-638 EQUAL (REC-2055/2056)
+monster.succubuswitch9	entity	monsters	monstats.txt succubuswitch9 (hcIdx 720)	-	none	gen-mon-720	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-720 EQUAL (REC-2055/2056)
 monster.suicideminion6	entity	monsters	monstats.txt suicideminion6 (hcIdx 466)	-	none	gen-mon-466	DIVERGED@59	no	0	n	claude/rc-damage-draws	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-466 state: frame 59 player 0:1 class 0, field m: 1.14d 0 vs d2rs 5
 monster.superunique.ancient-barbarian-1	entity	monsters	SuperUniques.txt Ancient Barbarian 1 (hcIdx 43, class ancientbarb1)	specs/monsters/population.md,specs/monsters/init.md	draft	-	MATCH	yes	0	n	claude/q-fix-seed-order	EQUAL	-	rc-run-4 2026-10-10: gen-su-44 EQUAL (REC-2055/2056)
 monster.superunique.ancient-barbarian-2	entity	monsters	SuperUniques.txt Ancient Barbarian 2 (hcIdx 44, class ancientbarb2)	specs/monsters/population.md,specs/monsters/init.md	draft	-	DIVERGED@30	yes	0	n	claude/q-fix-seed-order	DIVERGED	M	rc-run-4 2026-10-10: gen-su-45 state: frame 30 monster 1:8 class 542, field hp: 1.14d 1100800 vs d2rs 1091584
@@ -386,9 +386,9 @@ monster.swarm2	entity	monsters	monstats.txt swarm2 (hcIdx 88)	-	none	gen-mon-88	
 monster.swarm4	entity	monsters	monstats.txt swarm4 (hcIdx 90)	-	none	gen-mon-90	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-90 EQUAL (REC-2055/2056)
 monster.swarm5	entity	monsters	monstats.txt swarm5 (hcIdx 715)	-	none	gen-mon-715	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-715 EQUAL (REC-2055/2056)
 monster.thornhulk1	entity	monsters	monstats.txt thornhulk1 (hcIdx 127)	-	none	gen-mon-127	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-127 EQUAL (REC-2055/2056)
-monster.thornhulk2	entity	monsters	monstats.txt thornhulk2 (hcIdx 128)	-	none	gen-mon-128	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-128 EQUAL (REC-2055/2056)
-monster.thornhulk3	entity	monsters	monstats.txt thornhulk3 (hcIdx 129)	-	none	gen-mon-129	MATCH	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-129 EQUAL (REC-2055/2056)
-monster.thornhulk5	entity	monsters	monstats.txt thornhulk5 (hcIdx 609)	-	none	gen-mon-609	MATCH	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-609 EQUAL (REC-2055/2056)
+monster.thornhulk2	entity	monsters	monstats.txt thornhulk2 (hcIdx 128)	-	none	gen-mon-128	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-128 EQUAL (REC-2055/2056)
+monster.thornhulk3	entity	monsters	monstats.txt thornhulk3 (hcIdx 129)	-	none	gen-mon-129	PARTIAL	yes	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-129 EQUAL (REC-2055/2056)
+monster.thornhulk5	entity	monsters	monstats.txt thornhulk5 (hcIdx 609)	-	none	gen-mon-609	PARTIAL	no	0	n	claude/coord-resume-3	EQUAL	-	rc-run-4 2026-10-10: gen-mon-609 EQUAL (REC-2055/2056)
 monster.umod.1-rndname	content	monsters	umod 1 uniquemod rndname init 0x005A0CE0	specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md	1.14d-confirmed	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-umod-1 EQUAL (REC-2055/2056)
 monster.umod.10-poisondead	content	monsters	umod 10 uniquemod poisondead init -	specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md	table 1.14d-confirmed; callbacks 1.14d-confirmed (umod-callbacks.md §4, §7)	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-umod-10 EQUAL (REC-2055/2056)
 monster.umod.11-durieldead	content	monsters	umod 11 uniquemod durieldead init -	specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md	1.14d-confirmed	-	MATCH	yes	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-umod-11 EQUAL (REC-2055/2056)
@@ -438,12 +438,12 @@ monster.unraveler7	entity	monsters	monstats.txt unraveler7 (hcIdx 668)	-	none	ge
 monster.unraveler8	entity	monsters	monstats.txt unraveler8 (hcIdx 669)	-	none	gen-mon-669	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-669 EQUAL (REC-2055/2056)
 monster.unraveler9	entity	monsters	monstats.txt unraveler9 (hcIdx 670)	-	none	gen-mon-670	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-670 EQUAL (REC-2055/2056)
 monster.vampire2	entity	monsters	monstats.txt vampire2 (hcIdx 132)	-	none	gen-mon-132	DIVERGED@125	yes	0	n	claude/rc-damage-draws	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-132 state: frame 125 monster 1:8 class 132, field hp: 1.14d 35328 vs d2rs 0
-monster.vampire3	entity	monsters	monstats.txt vampire3 (hcIdx 133)	-	none	gen-mon-133	DIVERGED@45	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-133 state: frame 45 monster 1:8 class 133, field hp: 1.14d 43264 vs d2rs 0
-monster.vampire4	entity	monsters	monstats.txt vampire4 (hcIdx 134)	-	none	gen-mon-134	DIVERGED@45	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-134 state: frame 45 monster 1:8 class 134, field hp: 1.14d 40960 vs d2rs 0
-monster.vampire5	entity	monsters	monstats.txt vampire5 (hcIdx 135)	-	none	gen-mon-135	DIVERGED@45	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-135 state: frame 45 monster 1:8 class 135, field hp: 1.14d 16128 vs d2rs 0
-monster.vampire6	entity	monsters	monstats.txt vampire6 (hcIdx 695)	-	none	gen-mon-695	DIVERGED@45	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-695 state: frame 45 monster 1:8 class 695, field hp: 1.14d 40960 vs d2rs 0
-monster.vampire7	entity	monsters	monstats.txt vampire7 (hcIdx 696)	-	none	gen-mon-696	DIVERGED@45	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-696 state: frame 45 monster 1:8 class 696, field hp: 1.14d 40960 vs d2rs 0
-monster.vampire8	entity	monsters	monstats.txt vampire8 (hcIdx 697)	-	none	gen-mon-697	DIVERGED@45	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-697 state: frame 45 monster 1:8 class 697, field hp: 1.14d 40960 vs d2rs 0
+monster.vampire3	entity	monsters	monstats.txt vampire3 (hcIdx 133)	-	none	gen-mon-133	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-133 state: frame 45 monster 1:8 class 133, field hp: 1.14d 43264 vs d2rs 0
+monster.vampire4	entity	monsters	monstats.txt vampire4 (hcIdx 134)	-	none	gen-mon-134	PARTIAL	yes	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-134 state: frame 45 monster 1:8 class 134, field hp: 1.14d 40960 vs d2rs 0
+monster.vampire5	entity	monsters	monstats.txt vampire5 (hcIdx 135)	-	none	gen-mon-135	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-135 state: frame 45 monster 1:8 class 135, field hp: 1.14d 16128 vs d2rs 0
+monster.vampire6	entity	monsters	monstats.txt vampire6 (hcIdx 695)	-	none	gen-mon-695	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-695 state: frame 45 monster 1:8 class 695, field hp: 1.14d 40960 vs d2rs 0
+monster.vampire7	entity	monsters	monstats.txt vampire7 (hcIdx 696)	-	none	gen-mon-696	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-696 state: frame 45 monster 1:8 class 696, field hp: 1.14d 40960 vs d2rs 0
+monster.vampire8	entity	monsters	monstats.txt vampire8 (hcIdx 697)	-	none	gen-mon-697	PARTIAL	no	0	n	claude/coord-resume-3	DIVERGED	M	rc-run-4 2026-10-10: gen-mon-697 state: frame 45 monster 1:8 class 697, field hp: 1.14d 40960 vs d2rs 0
 monster.vilechild1	entity	monsters	monstats.txt vilechild1 (hcIdx 301)	-	none	gen-mon-301	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-301 EQUAL (REC-2055/2056)
 monster.vilechild2	entity	monsters	monstats.txt vilechild2 (hcIdx 302)	-	none	gen-mon-302	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-302 EQUAL (REC-2055/2056)
 monster.vilechild3	entity	monsters	monstats.txt vilechild3 (hcIdx 303)	-	none	gen-mon-303	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-303 EQUAL (REC-2055/2056)
@@ -476,6 +476,6 @@ monster.zealot4	entity	monsters	monstats.txt zealot4 (hcIdx 671)	-	none	gen-mon-
 monster.zealot5	entity	monsters	monstats.txt zealot5 (hcIdx 672)	-	none	gen-mon-672	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-672 EQUAL (REC-2055/2056)
 monster.zombie4	entity	monsters	monstats.txt zombie4 (hcIdx 8)	-	none	gen-mon-8	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-8 EQUAL (REC-2055/2056)
 monster.zombie5	entity	monsters	monstats.txt zombie5 (hcIdx 9)	-	none	gen-mon-9	MATCH	no	0	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-mon-9 EQUAL (REC-2055/2056)
-sim.monster-mode-records	system	monsters	Game.exe 0x005A78A0 + records 0x006E2260-0x006E23AF	specs/sim/units.md	implemented	gen-boss-333	DIVERGED@71	yes	0	n	claude/rc-mon-modes	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-333 state: frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943]
+sim.monster-mode-records	system	monsters	Game.exe 0x005A78A0 + records 0x006E2260-0x006E23AF	specs/sim/units.md	implemented	gen-boss-333	DIVERGED@95	yes	0	n	claude/rc-mon-modes	DIVERGED	M	rc-run-4 2026-10-10: gen-boss-333 state: frame 71 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943]
 monster.ai.succubus-curse-gate	system	rc-vile-crow	AITHINK_Fn118_Succubus 0x005E1E00, 0x00625760, 0x00625D60	specs/monsters/ai-bodies-5.md#4	done	gen-su-54	MATCH	yes	0	n	rc-vile-crow	EQUAL	-	rc-run-4 2026-10-10: gen-su-54 EQUAL (REC-2055/2056)
 system.sim.units.4-1-setting-a-mode	system	systems	specs/sim/units.md §4.1 Setting a mode	specs/sim/units.md	draft	gen-boss-708	PARTIAL	yes	1	n	-	EQUAL	-	rc-run-4 2026-10-10: gen-boss-708 EQUAL (REC-2055/2056)

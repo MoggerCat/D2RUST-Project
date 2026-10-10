@@ -306,13 +306,7 @@ fn drop_of<X: Pending, F: FreeSpot>(
         return Vec::new();
     };
     let t = d.tables.clone();
-    // `0x005A03A0`: the monster data's superunique row (type flag 0x02,
-    // `boss_hc_idx`); a unit without monster data asks the host.
-    let su = match h.monster_data(unit) {
-        Some(m) => (m.type_flags & 0x02 != 0).then_some(m.boss_hc_idx),
-        None => h.x.superunique(unit),
-    };
-    let rank = match su {
+    let rank = match h.superunique(unit) {
         Some(i) => MonsterRank::Superunique(t.superuniques.get(usize::from(i))),
         None if h.monster_flag(unit, FLAG_CHAMPION) => MonsterRank::Champion,
         None if h.monster_flag(unit, FLAG_UNIQUE) => MonsterRank::Unique,
