@@ -408,7 +408,7 @@ def fam_shrine(ctx):
         c = Check(
             f"gen-shrine-{n}", "shrine", f"shrines.txt row {n}",
             f"shrine {name} ({t.get(r, 'Shrine Type')})",
-            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state",
+            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state packets",
             [f"at 30 poke object {cls} @x+3 @y",
              f"at 40 send InteractWithEntity type=2 id=@2:{cls}"],
             seed=seed,

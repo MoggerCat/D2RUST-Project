@@ -8,6 +8,6 @@ save ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1
 seed 34
 ticks 120
 seconds 300
-channels state
+channels state packets
 at 30 poke object 2 @x+3 @y
 at 40 send InteractWithEntity type=2 id=@2:2
