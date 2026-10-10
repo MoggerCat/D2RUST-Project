@@ -49,11 +49,11 @@
 |   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1587–1849 |
 |   20. Player mode steps (`0x00463390`) and the local player's next action | 1850–2010 |
 | Constants & data dependencies | 2011–2023 |
-| Randomness | 2024–2092 |
-| Edge cases & original bugs | 2093–2117 |
-| Test vectors | 2118–2175 |
-| Provenance | 2176–2283 |
-| Open questions | 2284–2500 |
+| Randomness | 2024–2098 |
+| Edge cases & original bugs | 2099–2123 |
+| Test vectors | 2124–2181 |
+| Provenance | 2182–2289 |
+| Open questions | 2290–2506 |
 <!-- /index -->
 
 ## Summary
@@ -2088,7 +2088,13 @@ skill modes itself.
    the cursor once per drawn frame for the first 5,000 ms of cursor
    idle time (because the original's 16 ms and 5,000 ms tests are on
    wall-clock time and a 25 Hz frame always passes the first); settled
-   by the same recording's cursor log.
+   by the same recording's cursor log. *Revision (2026-10-10, rc-draw-row173):*
+   d2rs's cursor step draws on the shared client seed (it had a private
+   copy) as the frame's last draw, after the weather update; a check run
+   replays the recording's frame schedule and cursor clock
+   (`tools/scenario-diff.md` §3 r7 step 5), which settles REC-2440 there
+   (measured: `draws-town-arrival-ama` frame seeds equal through tick
+   25); live play keeps d2rs's 40 ms per bridge frame clock.
 
 ## Edge cases & original bugs
 

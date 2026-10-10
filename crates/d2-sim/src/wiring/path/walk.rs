@@ -393,8 +393,7 @@ pub fn update_messages<X: Pending>(
     client: ClientId,
     unit: UnitId,
 ) {
-    use crate::path::walk::messages::{mode_update, reassign_flag, reassign_player};
-    use crate::wiring::action::unit_update::skill_message::player_skill_mode;
+    use crate::path::walk::messages::{reassign_flag, reassign_player};
     let Some(receiver) = game.lists.client(client).and_then(|c| c.player) else {
         return;
     };
@@ -404,8 +403,13 @@ pub fn update_messages<X: Pending>(
     if r.ty != UnitType::Player {
         return;
     }
-    let (ty, guid, mode, flags, flags2) = (r.ty as u8, r.guid, r.mode, r.flags, r.flags2);
+    let (ty, guid, flags, flags2) = (r.ty as u8, r.guid, r.flags, r.flags2);
     let Some(path) = v.h.paths.as_ref().and_then(|p| p.dynamic(unit)).cloned() else {
+        // A unit without a path record (a corpse): only its mode's update
+        // function, from the unit's position.
+        if flags & crate::units::record::flags::CHANGED != 0 {
+            mode_update_messages(v, game, receiver, unit);
+        }
         return;
     };
     let own = receiver == unit;
@@ -413,7 +417,60 @@ pub fn update_messages<X: Pending>(
         let msg = reassign_player(ty, guid, path.x() as u16, path.y() as u16, flag);
         v.h.x.send(receiver, &msg);
     }
+    // `intents-events.md` §7.3 rule 1 step 2: the item messages come
+    // after the 0x15 and before the mode messages (step 3); the host
+    // sends them at this mark.
+    if v.h.item_marks {
+        let mut m = [crate::wiring::action::PLAYER_ITEMS_MARK; 5];
+        m[1..].copy_from_slice(&guid.to_le_bytes());
+        v.h.x.send(receiver, &m);
+    }
     if flags & crate::units::record::flags::CHANGED != 0 {
+        mode_update_messages(v, game, receiver, unit);
+    }
+    // Step 4: unit flag 0x400 → the sound (`0x00571740`), after the mode
+    // messages; sent by the host at this mark.
+    if v.h.item_marks {
+        let mut m = [crate::wiring::action::PLAYER_SOUND_MARK; 5];
+        m[1..].copy_from_slice(&guid.to_le_bytes());
+        v.h.x.send(receiver, &m);
+    }
+}
+
+/// The mode's update function of the table `0x007319E8` for `unit`, sent
+/// to `receiver` (`sim/pathing.md` §10 rule 2, `0x005484B0`): run by the
+/// per-unit update when the mode changed and, unconditionally, by the add
+/// messages of a player (`0x00571F90`, `intents-events.md` §7.2 part B).
+pub fn mode_update_messages<X: Pending>(
+    v: &mut View<'_, X>,
+    game: &Game,
+    receiver: UnitId,
+    unit: UnitId,
+) {
+    use crate::path::walk::messages::mode_update;
+    use crate::wiring::action::unit_update::skill_message::player_skill_mode;
+    let Some(r) = v.units.get(unit) else {
+        return;
+    };
+    if r.ty != UnitType::Player {
+        return;
+    }
+    let (ty, guid, mode) = (r.ty as u8, r.guid, r.mode);
+    let Some(path) = v.h.paths.as_ref().and_then(|p| p.dynamic(unit)).cloned() else {
+        // No path record (a corpse, mode DD): the stop row at the unit's
+        // position.
+        if let Some(StopRow::Stop(code)) = stop_row(mode) {
+            let (x, y) = v.h.path_position(unit);
+            let (b, life) = (v.unit_b0(unit), life_percent(v, unit));
+            let m = crate::path::walk::messages::player_stop(
+                ty, guid, code, x as u16, y as u16, b, life,
+            );
+            v.h.x.send(receiver, &m);
+        }
+        return;
+    };
+    let own = receiver == unit;
+    {
         if let Some(msg) = mode_update(mode, ty, guid, &path, own) {
             v.h.x.send(receiver, &msg);
         } else if let Some(row) = stop_row(mode) {
@@ -557,13 +614,8 @@ fn stop_row_messages<X: Pending>(
             return;
         }
     };
-    // The death announcer (`wiring::action::dying`) already tells the
-    // clients of a DT / DD it started, and owns the corpse's.
-    let announced = v.h.death.announced.contains_key(&unit) || v.h.death.owners.contains_key(&unit);
-    if !(matches!(row, StopRow::Death) || code == 9) || !announced {
-        v.h.x
-            .send(receiver, &player_stop(ty, guid, code, x, y, b, life));
-    }
+    v.h.x
+        .send(receiver, &player_stop(ty, guid, code, x, y, b, life));
     if row == StopRow::Death && own {
         let g = v.stats.unit_total(unit, 175, 0);
         if let Some(m) = crate::wiring::action::vitals_sync::stat_message(175, g) {

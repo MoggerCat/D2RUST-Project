@@ -86,6 +86,9 @@ impl<X: Pending> super::ActionHooks<X> {
             let _ = crate::units::modes::write_mode(&mut usim, &mut *v.h, c, DD);
         }
         v.set_state(c, STATE_PLAYERBODY as u16, true);
+        // A player-type unit is good (`combat/hit.md` §7.1): the recorded
+        // corpse's 0xAA names state 105 with stat 172 (REC-732).
+        v.set_alignment(sim.game, c, 2);
         self.death.owners.insert(c, guid);
         Some(c)
     }
@@ -148,6 +151,29 @@ impl<X: Pending> ActionSim<X> {
             .death
             .owners
             .retain(|c, _| units.get(*c).is_some_and(|r| r.mode == DD));
+        // The corpses made since the last pass: the creation `0x0057F700`
+        // broadcasts 0x8E (`0x0053DF80`: flag 1, the owner, the corpse) to
+        // every client before anything else of the tick is sent. The unit
+        // itself reaches the clients with its add messages in the client
+        // pass (unit flag 0x10, `intents-events.md` §7.2), as recorded
+        // (`items-drops-cha-00` frame 96).
+        for c in s_fresh(self) {
+            let s = &mut self.sys;
+            let (Some(cguid), Some(owner)) = (
+                s.units.get(c).map(|r| r.guid),
+                s.hooks.death.owners.get(&c).copied(),
+            ) else {
+                continue;
+            };
+            let mut m = [0u8; 10];
+            m[0] = 0x8E;
+            m[1] = 1;
+            m[2..6].copy_from_slice(&owner.to_le_bytes());
+            m[6..10].copy_from_slice(&cguid.to_le_bytes());
+            for &to in players {
+                s.hooks.x.send(to, &m);
+            }
+        }
         for &p in players {
             let Some(mode) = self.sys.units.get(p).map(|r| r.mode) else {
                 continue;
@@ -195,57 +221,30 @@ impl<X: Pending> ActionSim<X> {
             }
             s.hooks.death.announced.insert(p, code);
             changed.push(p);
+            // With the path provider the 0x0D of the DT / DD row goes out
+            // with the unit's update in the client pass, in queue order
+            // (`pathing.md` §10 rule 2; recorded: a monster's 0x6D queued
+            // after the death precedes it, `items-drops-nor-06` frame 50).
+            // A host without it announces here.
+            if s.hooks.paths.is_some() {
+                continue;
+            }
             let Some(guid) = s.units.get(p).map(|r| r.guid) else {
                 continue;
             };
             let (x, y) = s.hooks.path_position(p);
+            let b = s.units.get(p).map_or(0, |r| r.hit_class as u8);
             let msg = crate::path::walk::messages::player_stop(
                 UnitType::Player as u8,
                 guid,
                 code,
                 x as u16,
                 y as u16,
-                0,
+                b,
                 0,
             );
             for &to in players {
                 s.hooks.x.send(to, &msg);
-            }
-        }
-        // The corpses of this pass: 0x59 (the unit appears), then 0x0D
-        // code 9 (it lies dead).
-        let fresh = s_fresh(self);
-        for c in fresh {
-            let s = &mut self.sys;
-            let Some(r) = s.units.get(c) else { continue };
-            let (class, cguid) = (r.class as u8, r.guid);
-            let owner = s.hooks.death.owners.get(&c).copied();
-            let name = players
-                .iter()
-                .find(|&&u| s.units.get(u).map(|r| r.guid) == owner)
-                .and_then(|u| s.hooks.session.names.get(u).copied())
-                .unwrap_or_default();
-            let (x, y) = s.hooks.path_position(c);
-            let add = super::switch::assign_player(cguid, class, &name, x as u16, y as u16);
-            let dead = crate::path::walk::messages::player_stop(
-                UnitType::Player as u8,
-                cguid,
-                CODE_DD,
-                x as u16,
-                y as u16,
-                0,
-                0,
-            );
-            for &to in players {
-                s.hooks.x.send(to, &add);
-                s.hooks.x.send(to, &dead);
-            }
-            // Announced here: the client pass that follows in the same
-            // tick (this pass runs at the end of step 4) sends it no add
-            // messages of its own (unit flag 0x10, `intents-events.md`
-            // §7.1 rule 2.1), which would re-create it out of mode 17.
-            if let Some(r) = s.units.get_mut(c) {
-                r.flags &= !crate::units::record::flags::SEED_SET;
             }
         }
         changed
@@ -299,7 +298,7 @@ impl<X: Pending> ActionHooks<X> {
         let (Some(kr), Some(vr)) = (sim.units.get(k), sim.units.get(victim)) else {
             return;
         };
-        let (kty, kguid, vty) = (kr.ty, kr.guid, vr.ty);
+        let (kty, kclass, vty) = (kr.ty, kr.class, vr.ty);
         let name_of = |h: &Self, u: UnitId| h.session.names.get(&u).copied().unwrap_or([0; 16]);
         let boss = (kty == UnitType::Monster)
             .then(|| self.monster_data(k))
@@ -310,7 +309,7 @@ impl<X: Pending> ActionHooks<X> {
             killer_name = name_of(self, k);
         }
         let m = crate::units::messages::death_notice(
-            kguid,
+            kclass,
             kty as u8,
             &name_of(self, victim),
             &killer_name,

@@ -15,3 +15,28 @@ NOT-IMPLEMENTED by feature). No code changed, no ledger rows changed.
   after its verdict. v2 re-runs every check behind a DIVERGED row on this branch.
 - owner: a ledger owner without a hand-back in docs/handoff (else empty).
 - est: the rows' majority ledger size; model: opus for M/L and seed/rng causes, else sonnet.
+
+## v2
+- Re-ran on this branch at dc7576e57 (integ-r23 merged; `suite.py --orig-cache traces/orig-cache
+  --no-playthrough --workers 3`, orig-cache hits): the 190 cached gen checks behind DIVERGED /
+  NO-CHECK rows; hand checks (319 cached, 70 + 196 gen uncached with `--fill-cache`) still running.
+  A row with fresh results uses only them (its older note is ignored).
+- New cause "RE-RUN EQUAL under REC-2055/2056": every channel MATCH, or PARTIAL only from the d2rs
+  client gap / no item on either side, with packets MATCH or no input/send. Settle in a ledger part.
+- PARTIAL reasons now come from the comparator (state_diff one-sided fields and gaps, items_diff).
+- Ledger after merging integ-r23: 838 DIVERGED, 500 NO-CHECK, 46 NOT-IMPLEMENTED.
+
+## v3
+- Hand checks re-ran too (319 cached checks: MATCH 86, DIVERGED 195, PARTIAL 235 channel results).
+  511 checks have fresh results. Uncached gen (196) and hand (70) checks, plus 20 checks new in
+  the ledger, are recording 1.14d now (`--fill-cache`; the cache files are not committed here).
+- Ledger after merging integ-r23: 824 DIVERGED, 414 NO-CHECK, 46 NOT-IMPLEMENTED.
+- C003 (71 rows) is free: the re-run is EQUAL under REC-2055/2056, so a ledger part settles it.
+
+## v4
+- All 796 checks behind DIVERGED/NO-CHECK rows now have fresh results: the 286 uncached
+  checks were recorded (1.14d), and the 19 draws checks were re-run on a fresh build after a
+  stale `--no-build` binary errored (`unknown option --frame-schedule`).
+- d2rs side: sim/state/packets at dc7576e57, draws at the v4 merge; orig-cache files written by
+  `--fill-cache` were not committed.
+- C001 (96 rows, 79 checks): EQUAL under REC-2055/2056 on re-run; settle in a ledger part (S).

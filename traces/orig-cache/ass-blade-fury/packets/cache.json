@@ -1,0 +1,42 @@
+{
+ "channel": "packets",
+ "check": "ass-blade-fury",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnAss",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "4865a943720c964a2cdb2d964e06abff34bea9774cf406154b73041d48c682d9",
+   "size": 90243
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "1501e02260af4a653703ad5d88cfaf7f4e8785bcc938bf98be2b60f5d8dd192c",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
+  "save": "02a110dda3d33084ee398607fdff91d05766c651338a1a7b37efc322c3ab4e02"
+ }
+}

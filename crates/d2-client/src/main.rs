@@ -6,7 +6,7 @@
 //!   d2-client verify     [--case NAME]... [--cases DIR] [--perturb N]
 //!   d2-client verify     [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out DIR] [--perturb N]
 //!   d2-client cpu-render [--ds1 PATH] [--wall-base N] [--view L,T,W,H] [--out FILE]
-//!   d2-client play       ... --dump-draws DIR [--at-tick N[,M...]] [--dump-image] [--input SCRIPT]
+//!   d2-client play       ... --dump-draws DIR [--at-tick N[,M...]] [--dump-image] [--input SCRIPT] [--frame-schedule FILE]
 //!   d2-client play       ... [--poke "F DIRECTIVE ARGS"]... [--poke-file FILE]
 //!                        (pokes, specs/tools/poke.md §5: F is the absolute
 //!                        server frame; file ticks are relative to the join)
@@ -123,6 +123,9 @@ struct Options {
     dump_image: bool,
     /// `play --sound-log FILE`: every sound request call (§5 r20).
     sound_log: Option<PathBuf>,
+    /// `play --frame-schedule FILE`: a check run's recorded frame schedule
+    /// and host clock (`specs/tools/scenario-diff.md` §3 r7.5).
+    frame_schedule: Option<PathBuf>,
     /// `play --audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md` §3).
     audio_dump: Option<PathBuf>,
     audio_ticks: Option<u64>,
@@ -197,6 +200,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
         at_tick: None,
         dump_image: false,
         sound_log: None,
+        frame_schedule: None,
         audio_dump: None,
         audio_ticks: None,
         input: None,
@@ -227,6 +231,7 @@ fn parse_options(args: &[String]) -> Result<Options> {
             "--at-tick" => o.at_tick = Some(parse_ticks(value()?)?),
             "--dump-image" => o.dump_image = true,
             "--sound-log" => o.sound_log = Some(PathBuf::from(value()?)),
+            "--frame-schedule" => o.frame_schedule = Some(PathBuf::from(value()?)),
             "--audio-dump" => o.audio_dump = Some(PathBuf::from(value()?)),
             "--audio-ticks" => o.audio_ticks = Some(value()?.parse().context("--audio-ticks")?),
             "--input" => {
@@ -290,6 +295,9 @@ fn parse_options(args: &[String]) -> Result<Options> {
     }
     if o.at_tick.is_some() && o.dump_draws.is_none() {
         bail!("--at-tick needs --dump-draws DIR");
+    }
+    if o.frame_schedule.is_some() && o.dump_draws.is_none() {
+        bail!("--frame-schedule needs --dump-draws DIR");
     }
     if o.dump_image && o.dump_draws.is_none() {
         bail!("--dump-image needs --dump-draws DIR");
@@ -785,6 +793,16 @@ fn play_once(
         pokes: o.pokes.clone(),
         sends: o.sends.clone(),
         sound_log: o.sound_log.clone(),
+        frame_schedule: match &o.frame_schedule {
+            Some(p) => Some(
+                d2_client::world_view::present::FrameSchedule::parse(
+                    &std::fs::read_to_string(p)
+                        .with_context(|| format!("--frame-schedule {}", p.display()))?,
+                )
+                .map_err(|e| anyhow::anyhow!("--frame-schedule {}: {e}", p.display()))?,
+            ),
+            None => None,
+        },
         audio_dump: o.audio_dump.clone().map(|p| (p, o.audio_ticks)),
     })?;
     match result.exit {

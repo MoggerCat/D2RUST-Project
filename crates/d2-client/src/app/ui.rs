@@ -145,6 +145,12 @@ pub fn add_original_ui_with(
         expansion_installed: parts.expansion_installed,
     };
     let mut original = OriginalUi::new(config, parts.inv_areas)?;
+    // The cursor step draws on the client seed the weather and sound share.
+    let link = app
+        .world_mut()
+        .get_resource_or_insert_with(crate::audio::driver::SoundLink::default)
+        .clone();
+    original.set_client_seed(link.client_seed());
     if let Some(fonts) = parts.fonts {
         original.set_fonts(fonts);
     }

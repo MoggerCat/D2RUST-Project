@@ -396,6 +396,10 @@ struct Receiver {
     /// Item units of the client's rooms not yet announced to it (the
     /// ground items' part of the unit update, §6.3 part 1).
     ground: Vec<UnitId>,
+    /// Players whose item messages / sound already went out in the tick's
+    /// queue walk ([`player_marked`]).
+    items_done: Vec<UnitId>,
+    sound_done: Vec<UnitId>,
 }
 
 /// The update pass of one tick.
@@ -417,9 +421,13 @@ impl UpdateRun {
         self.receivers
             .iter()
             .flat_map(|r| {
-                r.players
-                    .iter()
-                    .map(move |&p| sound_message(game, p, r.own))
+                r.players.iter().map(move |&p| {
+                    if r.sound_done.contains(&p) {
+                        None
+                    } else {
+                        sound_message(game, p, r.own)
+                    }
+                })
             })
             .collect()
     }
@@ -458,9 +466,11 @@ impl MoveCall for UpdateRun {
             let own = d.guid_of(r.own);
             for &p in &r.players {
                 let guid = d.guid_of(p);
-                match sim_moves::player_update(&mut d, own, guid) {
-                    Ok(msgs) => sent.extend(msgs.into_iter().map(|m| (r.client, m))),
-                    Err(e) => fatal.push((r.client, e)),
+                if !r.items_done.contains(&p) {
+                    match sim_moves::player_update(&mut d, own, guid) {
+                        Ok(msgs) => sent.extend(msgs.into_iter().map(|m| (r.client, m))),
+                        Err(e) => fatal.push((r.client, e)),
+                    }
                 }
                 // `cube.md` §8 rule 3: after the item messages and 0x47 /
                 // 0x48, flag 0x400 → `0x00571740` (S→C 0x2C).
@@ -603,8 +613,22 @@ pub fn update_pass<D: EventDispatch, W: WorldHost<D>>(
             own,
             players: seen,
             ground,
+            items_done: sim
+                .walk_player_items
+                .iter()
+                .filter(|&&(cl, _)| cl == c)
+                .map(|&(_, p)| p)
+                .collect(),
+            sound_done: sim
+                .walk_player_sound
+                .iter()
+                .filter(|&&(cl, _)| cl == c)
+                .map(|&(_, p)| p)
+                .collect(),
         });
     }
+    sim.walk_player_items.clear();
+    sim.walk_player_sound.clear();
     let walked: Vec<UnitId> = std::mem::take(&mut sim.walk_announced)
         .into_iter()
         .map(|(_, u)| u)
@@ -706,4 +730,78 @@ pub fn announce_marked<D: EventDispatch, W: WorldHost<D>>(
     }
     sim.announced_ground.insert((c, item));
     sim.walk_announced.push((c, item));
+}
+
+/// One player's item messages (`0x00580860` step 2: the update-list pass,
+/// 0x47, 0x48) at the player's place in the tick's queue walk.
+struct PlayerItemsRun {
+    own: UnitId,
+    player: UnitId,
+}
+
+impl MoveCall for PlayerItemsRun {
+    type Out = Result<Vec<Vec<u8>>, MoveFatal>;
+    fn call<H: LifecycleHooks>(self, econ: &mut Economy<'_, H>, parts: &mut InvParts) -> Self::Out {
+        let mut d = parts.desk(econ);
+        let (own, guid) = (d.guid_of(self.own), d.guid_of(self.player));
+        sim_moves::player_update(&mut d, own, guid)
+    }
+}
+
+/// The host's answer to a player-update mark of the tick's client pass
+/// ([`d2_sim::wiring::action::PLAYER_ITEMS_MARK`] /
+/// [`d2_sim::wiring::action::PLAYER_SOUND_MARK`]): the item messages or the
+/// sound of the player with `guid` to the marked client now, so they stand
+/// where the queue walk put the player. The pass skips what went out here.
+pub fn player_marked<D: EventDispatch, W: WorldHost<D>>(
+    sim: &mut SimGame<D, W>,
+    out: &mut dyn MessageSink,
+    receiver: UnitId,
+    guid: u32,
+    sound: bool,
+) {
+    use d2_sim::units::UnitType;
+    let Some(c) = sim.client_of(receiver) else {
+        return;
+    };
+    let Some(player) = sim.game.lists.find_unit(UnitType::Player, guid) else {
+        return;
+    };
+    if sound {
+        if sim.walk_player_sound.contains(&(c, player)) {
+            return;
+        }
+        if let Some(m) = sound_message(&sim.game, player, receiver) {
+            if let Err(e) = out.queue(c, &m) {
+                sim.tick_faults.push((c, WorldError::from(e)));
+            }
+        }
+        sim.walk_player_sound.push((c, player));
+        return;
+    }
+    if sim.walk_player_items.contains(&(c, player)) {
+        return;
+    }
+    let (game, events) = (&mut sim.game, &mut sim.events);
+    let Some(r) = sim.world.moves(
+        game,
+        events,
+        PlayerItemsRun {
+            own: receiver,
+            player,
+        },
+    ) else {
+        return;
+    };
+    match r {
+        Ok(msgs) => {
+            for m in msgs {
+                if let Err(e) = out.queue(c, &m) {
+                    sim.tick_faults.push((c, WorldError::from(e)));
+                }
+            }
+        }
+        Err(e) => sim.tick_faults.push((c, WorldError::Move(e))),
+    }
+    sim.walk_player_items.push((c, player));
 }

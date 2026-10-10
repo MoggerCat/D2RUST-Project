@@ -26,19 +26,19 @@
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–203 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 204–230 |
-|   4. Mode change gates | 231–288 |
-|   5. Start and do | 289–483 |
-|   6. Cooldown | 484–497 |
-|   7. Periodic skills and auras | 498–547 |
-|   8. Function tables | 548–567 |
-| Constants & data dependencies | 568–588 |
-| Randomness | 589–598 |
-| Edge cases & original bugs | 599–620 |
-| Test vectors | 621–641 |
-| Provenance | 642–661 |
-| Open questions | 662–714 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–210 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 211–237 |
+|   4. Mode change gates | 238–295 |
+|   5. Start and do | 296–490 |
+|   6. Cooldown | 491–506 |
+|   7. Periodic skills and auras | 507–556 |
+|   8. Function tables | 557–576 |
+| Constants & data dependencies | 577–597 |
+| Randomness | 598–607 |
+| Edge cases & original bugs | 608–629 |
+| Test vectors | 630–650 |
+| Provenance | 651–670 |
+| Open questions | 671–723 |
 <!-- /index -->
 
 ## Summary
@@ -195,6 +195,13 @@ Type tests are `0x00629BB0` (with equivalence).
   (`item_magicarrow`) → pass; Y none or not of type s → fail; Attack
   and Y with stat 157 → pass; Y stackable (`0x006295B0` > 0) and Y's
   `quantity(70)` < 1 → fail. Pass.
+
+The client runs the same test on its own player (REC-2900, 1.14d
+`gen-skill-ama-7`..`-35`: a bow or javelin skill with no matching weapon
+worn sends no C->S 0x0C / 0x0D at the click; use state 2). d2rs
+`bridge::use_state::item_type_test` applies rules 1-4 over the worn items at
+locations 4 / 5; PROVISIONAL there: the matched-item rules and the weapon in
+use of skills 4 / 5.
 
 Item type indices are binary row indices (the `Expansion` row of
 `itemtypes.txt` takes none: 45 `weap`, 46 `mele`, 51 `shld`, 67 `h2h`).
@@ -486,7 +493,9 @@ return null. Then create (`0x0059FA30`) and return the missile.
 `set_delay(game, unit, d)` = `0x0056EF90` (players only, `d ≠ 0`): end
 `e = frame + d`. No stat list for state 121 (`skilldelay`): allocate one
 (flags 2, expire `e`, owner unit), state 121, remove callback
-`0x0056E900`, attach, switch state 121 on. Set the list's expiry to `e`.
+`0x0056E900`, attach, switch state 121 on (`0x00639DB0`, which also
+queues the unit for update: the next update sends S→C 0xA7 for state
+121). Set the list's expiry to `e`.
 Schedule a type-12 timer at `e` (another one per call).
 
 `use_state` returns 8 when a player has state 121 and the requested

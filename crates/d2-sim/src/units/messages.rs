@@ -45,6 +45,23 @@ pub fn assign_player_to_party(guid: u32, party: u16) -> [u8; 7] {
 /// 0x5B and 0x75 as 0xFFFF).
 pub const NO_PARTY: u16 = 0xFFFF;
 
+/// S→C 0x75 PlayerPartyInfo (`0x0053DA90`, 13 bytes): GUID u32@1, party
+/// u16@5 (`0x00554630`, 0xFFFF in none), level u16@7 (stat 12), u16@9 and
+/// u16@11 (`0x0055B350`, `0x0055B3F0`: 0 for a player in no party). Sent
+/// right after every 0x59 (`0x0053E8F0`; recorded `75 02000000 ffff 0000
+/// 0000 0000`, `items-drops-cha-00` frame 96).
+pub fn player_party_info(guid: u32, level: u16, own: bool) -> [u8; 13] {
+    let mut m = [0u8; 13];
+    m[0] = 0x75;
+    m[1..5].copy_from_slice(&guid.to_le_bytes());
+    m[5..7].copy_from_slice(&NO_PARTY.to_le_bytes());
+    m[7..9].copy_from_slice(&level.to_le_bytes());
+    // u16@11 `0x0055B3F0`: 1 for the receiver's own player, else its relation
+    // entry (0 with none).
+    m[11] = u8::from(own);
+    m
+}
+
 /// The 6-byte (id, unit type u8@1, GUID u32@2) layout of `0x0053B3D0`:
 /// 0x0B GameHandshake (§8.2 rule 3.2), 0x76 PlayerInProximity (§7.9
 /// rule 3).
@@ -519,18 +536,18 @@ pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
 }
 
 /// S→C 0x5A code 6 from `0x0054D8A0` (40 bytes): u8@2 4, the killer's GUID
-/// u32@3, its unit type u8@7, the victim's name @8, and @0x18 either the
+/// u32@3 (unit +0x04: the class, not the GUID), its unit type u8@7, the victim's name @8, and @0x18 either the
 /// killer player's name or, for a monster with type flag 2, its u16
 /// `boss_hc_idx` (`intents-events.md` §7.6).
 pub fn death_notice(
-    killer_guid: u32,
+    killer_class: u32,
     killer_type: u8,
     victim: &[u8; 16],
     killer_name: &[u8; 16],
     boss_hc_idx: Option<u16>,
 ) -> [u8; 40] {
     let mut m = player_event(6, victim);
-    m[3..7].copy_from_slice(&killer_guid.to_le_bytes());
+    m[3..7].copy_from_slice(&killer_class.to_le_bytes());
     m[7] = killer_type;
     m[0x18..0x28].copy_from_slice(killer_name);
     if let Some(i) = boss_hc_idx {

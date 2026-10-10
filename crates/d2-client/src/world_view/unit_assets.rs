@@ -477,6 +477,8 @@ pub struct Facing {
     pub at: (u16, u16),
     /// `dir64` (0–63).
     pub dir64: u8,
+    /// [`ClientUnit::placements`] at that observation.
+    pub placements: u32,
 }
 
 /// The cell a player's walk / run mode request goes to (`client/model.md`
@@ -494,6 +496,19 @@ fn request_target(world: &ClientWorld, unit: &ClientUnit) -> Option<(u16, u16)> 
         )),
         0x00 | 0x18 => {
             let key = UnitKey::new(u8::try_from(r.record[0]).ok()?, r.record[1] as u32);
+            world.units.get(&key)?.position
+        }
+        // The client skill start (`0x004C6F40`: `0x00621C00(unit, x, y)`
+        // faces the cast point; a unit target is faced the same way,
+        // `0x004C6EB0`). PROVISIONAL (REC-3570): the turn is taken whole
+        // (1.14d turns by steps; measured `draws-frost-nova-sor` tick 27:
+        // dir 54 after 56 at tick 21).
+        0x15 => Some((
+            u16::try_from(r.record[2]).ok()?,
+            u16::try_from(r.record[3]).ok()?,
+        )),
+        0x16 => {
+            let key = UnitKey::new(u8::try_from(r.record[2]).ok()?, r.record[3] as u32);
             world.units.get(&key)?.position
         }
         _ => None,
@@ -532,14 +547,20 @@ impl UnitArt {
             let dir = world
                 .view_direction(&unit.key)
                 .or_else(|| request_target(world, unit).and_then(toward))
-                .or_else(|| old.and_then(|f| facing(cell_centre(f.at), cell_centre(pos))))
+                // a 0x15 placement is a teleport: 1.14d turns no unit by it
+                .or_else(|| {
+                    old.filter(|f| f.placements == unit.placements)
+                        .and_then(|f| facing(cell_centre(f.at), cell_centre(pos)))
+                })
                 .or(old.map(|f| f.dir64))
+                .or(unit.path_dir)
                 .unwrap_or(0);
             self.facing.insert(
                 unit.key,
                 Facing {
                     at: pos,
                     dir64: dir,
+                    placements: unit.placements,
                 },
             );
         }
