@@ -745,7 +745,34 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         v.stats.free_state_list(&mut *v.h, u, u32::from(state));
         v.set_state(u, state, false);
     }
+    /// `0x0056FF10`, the aura select's non-immediate branch (`use.md`
+    /// §7): state on (`0x00639DB0`); the state's list (`0x006256B0`, else
+    /// a new one: flags 0, expire 0, the unit as owner) gets the state,
+    /// skill and level (`0x006252D0`, `0x006260D0`, `0x006260F0`), is
+    /// attached (`0x00626E10(unit, list, 1)`) and holds only the markers
+    /// 350 := skill, 351 := level (1.14d `gen-skill-pal-99`: the first
+    /// update's 0xA8 of state 34). Then the host's own hook.
+    // d2rs-own: an existing list is not attached a second time (1.14d
+    // calls the attach for it too; the load has no such list).
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32) {
+        if let Some((ty, guid)) = self.cv.v.units.get(u).map(|r| (r.ty, r.guid)) {
+            let v = &mut self.cv.v;
+            v.set_state(u, state, true);
+            let l = match v.state_list(u, state) {
+                Some(l) => l,
+                None => {
+                    let l = v.stats.alloc(0, 0, ty.index() as u32, guid);
+                    v.stats.set_state(l, u32::from(state));
+                    v.stats.set_skill(l, skill as u32, lvl as u32);
+                    v.stats.attach(&mut *v.h, u, l, true);
+                    l
+                }
+            };
+            v.stats.set_state(l, u32::from(state));
+            v.stats.set_skill(l, skill as u32, lvl as u32);
+            v.set_list_stat(l, bodies::passive::PASSIVE_SKILL as u16, skill);
+            v.set_list_stat(l, bodies::passive::PASSIVE_LEVEL as u16, lvl);
+        }
         self.xm().set_aura_state(u, state, skill, lvl);
     }
 }
@@ -811,9 +838,16 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.cv.v.set_state(u, s, on);
         BodyWorld::queue_update(self, u);
     }
+    /// `0x00639E30(unit, s, 1)`: the state-changed bit, then the unit
+    /// queued for update (`0x0064C040`, called by `0x00639E30` itself;
+    /// `sim/stat-lists.md` §9.2): an aura run that only changes its list's
+    /// values still sends 0xA8 (1.14d `gen-skill-pal-102` frame 51).
     fn mark_state_changed(&mut self, u: UnitId, s: i32) {
         if let Ok(s) = u32::try_from(s) {
-            self.cv.v.stats.set_state_changed(u, s, true);
+            if s < self.state_count() as u32 {
+                self.cv.v.stats.set_state_changed(u, s, true);
+                BodyWorld::queue_update(self, u);
+            }
         }
     }
     fn clear_group_states(&mut self, u: UnitId, g: usize) {

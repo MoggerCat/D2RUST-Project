@@ -2689,9 +2689,6 @@ fn loader(
                     let (game, world) = (&mut s.game, &mut s.world);
                     s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
-                    // `use.md` §7 "0x3C SelectSkill": the selected right skill, an aura,
-                    // starts (q-fix-pt-right-aura).
-                    s.events.action.assign_right_aura(&mut s.game, player);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
                     entry.hotkeys = super::save_gaps::loaded_hotkeys(

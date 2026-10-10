@@ -16,7 +16,7 @@ Rows of 192 checks (the 5 save-* checks of the half cannot run: suite.py has no 
 
 Rows of 240 checks re-run 2026-10-10 by rc-promote (`suite.py --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough --json`, the checks of the PARTIAL/DIVERGED rows plus every gen-sysc-*): rows replaced in place, the totals above are not recomputed.
 
-Rows of 16 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, passive stats on the passiveitype layer): rows replaced in place, the totals above are not recomputed.
+Rows of 44 checks re-run 2026-10-10 by rc-a8-setstate (`suite.py --filter <the 0xA8 rows' hand-written checks and pal-*> --orig-cache traces/orig-cache --fill-cache --workers 3 --no-playthrough`, passive stats on the passiveitype layer): rows replaced in place, the totals above are not recomputed.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
 First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q-scenes-compare 8, q-prov-recording-2 3, q-fix-server-store-fill 2, q-fix-b-monster-combat 1, q-fix-pc1-proto-items 1
@@ -1154,43 +1154,69 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | net-s2c-townportal | packets | MATCH | 50/50 | - | - |
 | packets-town-arrival-ama | packets | MATCH | 40/40 | - | - |
 | pal-blessed-aim | state | PARTIAL | 70/70 | - | - |
+| pal-blessed-aim | packets | MATCH | 70/70 | - | - |
 | pal-blessed-hammer | state | PARTIAL | 70/70 | - | - |
+| pal-blessed-hammer | packets | MATCH | 70/70 | - | - |
 | pal-charge | state | PARTIAL | 70/70 | - | - |
 | pal-cleansing | state | PARTIAL | 70/70 | - | - |
+| pal-cleansing | packets | MATCH | 70/70 | - | - |
 | pal-concentration | state | PARTIAL | 70/70 | - | - |
+| pal-concentration | packets | MATCH | 70/70 | - | - |
 | pal-conversion | state | PARTIAL | 70/70 | - | - |
+| pal-conversion | packets | MATCH | 70/70 | - | - |
 | pal-conviction | state | PARTIAL | 70/70 | - | - |
+| pal-conviction | packets | MATCH | 70/70 | - | - |
 | pal-defiance | state | PARTIAL | 70/70 | - | - |
+| pal-defiance | packets | MATCH | 70/70 | - | - |
 | pal-fanaticism | state | PARTIAL | 70/70 | - | - |
+| pal-fanaticism | packets | MATCH | 70/70 | - | - |
 | pal-fist-of-the-heavens | state | PARTIAL | 70/70 | - | - |
-| pal-hammer-rat | packets | DIVERGED | 129/130 | frame 50 stream s2c #0 bytes[6]: 1.14d 0 vs d2rs 24 (id 0x69) | q-fix-join-items |
+| pal-fist-of-the-heavens | packets | MATCH | 70/70 | - | - |
 | pal-hammer-rat | state | PARTIAL | 130/130 | - | - |
+| pal-hammer-rat | packets | MATCH | 130/130 | - | - |
 | pal-holy-bolt | state | PARTIAL | 70/70 | - | - |
+| pal-holy-bolt | packets | MATCH | 70/70 | - | - |
 | pal-holy-fire | state | PARTIAL | 70/70 | - | - |
+| pal-holy-fire | packets | MATCH | 70/70 | - | - |
 | pal-holy-freeze | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holy-freeze | state | PARTIAL | 70/70 | - | - |
 | pal-holy-shield | state | PARTIAL | 70/70 | - | - |
+| pal-holy-shield | packets | MATCH | 70/70 | - | - |
 | pal-holy-shock | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holy-shock | state | PARTIAL | 70/70 | - | - |
-| pal-holyfire | packets | DIVERGED | 118/120 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-holyfire | state | PARTIAL | 120/120 | - | - |
+| pal-holyfire | packets | MATCH | 120/120 | - | - |
 | pal-holyfire-noclick | state | PARTIAL | 120/120 | - | - |
 | pal-meditation | state | PARTIAL | 70/70 | - | - |
+| pal-meditation | packets | MATCH | 70/70 | - | - |
 | pal-might | state | PARTIAL | 70/70 | - | - |
+| pal-might | packets | MATCH | 70/70 | - | - |
 | pal-prayer | state | PARTIAL | 70/70 | - | - |
+| pal-prayer | packets | MATCH | 70/70 | - | - |
 | pal-redemption | state | PARTIAL | 70/70 | - | - |
+| pal-redemption | packets | MATCH | 70/70 | - | - |
 | pal-resist-cold | state | PARTIAL | 70/70 | - | - |
+| pal-resist-cold | packets | MATCH | 70/70 | - | - |
 | pal-resist-fire | state | PARTIAL | 70/70 | - | - |
+| pal-resist-fire | packets | MATCH | 70/70 | - | - |
 | pal-resist-lightning | state | PARTIAL | 70/70 | - | - |
+| pal-resist-lightning | packets | MATCH | 70/70 | - | - |
 | pal-sacrifice | state | PARTIAL | 70/70 | - | - |
+| pal-sacrifice | packets | MATCH | 70/70 | - | - |
 | pal-salvation | state | PARTIAL | 70/70 | - | - |
+| pal-salvation | packets | MATCH | 70/70 | - | - |
 | pal-sanctuary | packets | DIVERGED | 65/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | q-fix-join-items |
 | pal-sanctuary | state | PARTIAL | 70/70 | - | - |
 | pal-smite | state | PARTIAL | 70/70 | - | - |
+| pal-smite | packets | MATCH | 70/70 | - | - |
 | pal-thorns | state | PARTIAL | 70/70 | - | - |
+| pal-thorns | packets | MATCH | 70/70 | - | - |
 | pal-vengeance | state | PARTIAL | 70/70 | - | - |
+| pal-vengeance | packets | MATCH | 70/70 | - | - |
 | pal-vigor | state | PARTIAL | 70/70 | - | - |
+| pal-vigor | packets | MATCH | 70/70 | - | - |
 | pal-zeal | state | PARTIAL | 70/70 | - | - |
+| pal-zeal | packets | MATCH | 70/70 | - | - |
 | poke-fallen-town | state | PARTIAL | 54/54 | - | - |
 | poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
 | poke-firebolt | state | PARTIAL | 60/60 | - | - |
