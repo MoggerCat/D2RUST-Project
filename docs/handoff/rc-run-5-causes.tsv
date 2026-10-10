@@ -1,4 +1,2 @@
 cause	checks	examples	likely_crate_spec	size
-rng: frame N, unit N:N, draw #N, field missing: N.Nd site N vs dNrs site None	1	gen-missile-411	d2-sim missiles, specs/missiles/missiles.md	S
-packets: frame N stream sNc #N missing in dNrs (id N)	1	gen-missile-149	d2-sim missiles, specs/missiles/missiles.md	S
 rng: frame N, unit N:N, draw #N, field extra: N.Nd site None vs dNrs site SITE	1	gen-missile-407	d2-sim missiles, specs/missiles/missiles.md	S
