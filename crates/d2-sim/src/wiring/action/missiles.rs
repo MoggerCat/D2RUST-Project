@@ -839,6 +839,97 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         use crate::path::CollisionRooms;
         self.h.drlg.subtile_rect(room).map(|t| (t.x, t.y, t.w, t.h))
     }
+    /// The states count (data tables +0xC4).
+    fn states_count(&self) -> i32 {
+        i32::try_from(self.stats.data().states.count()).unwrap_or(i32::MAX)
+    }
+    /// The expiry of the unit's list of `s` (`0x006256B0`, list +0x18).
+    fn state_list_expiry(&self, unit: UnitId, s: i32) -> Option<i32> {
+        let l = self.state_list(unit, u16::try_from(s).ok()?)?;
+        Some(self.stats.expire(l))
+    }
+    /// `missiles/bodies-2.md` §12 step 6 / §30 (`0x005AB1DD`..`0x005AB234`):
+    /// a list with flags 2, expiry `expire` and `owner`'s type and GUID
+    /// (`0x006251F0`), state `s` (`0x006252D0`), remove callback
+    /// `0x0056E900` (`0x00625CE0`), attached with reset 1 (`0x00626E10`),
+    /// then state `s` on and the unit queued for update (`0x00639DB0`).
+    fn new_state_list(
+        &mut self,
+        game: &mut Game,
+        unit: UnitId,
+        s: i32,
+        expire: i32,
+        owner: UnitId,
+    ) -> bool {
+        let Ok(s) = u16::try_from(s) else {
+            return false;
+        };
+        let Some((ty, guid)) = game.lists.unit(owner).map(|e| (e.ty, e.guid)) else {
+            return false;
+        };
+        let l = self.stats.alloc(2, expire, ty.index() as u32, guid);
+        self.stats.set_state(l, u32::from(s));
+        self.stats.set_remove_callback(
+            l,
+            Some(crate::wiring::interaction::skill_use::DELAY_REMOVE_CALLBACK),
+        );
+        self.stats.attach(&mut *self.h, unit, l, true);
+        self.set_state(unit, s, true);
+        if let Err(e) = game.lists.queue_update(unit) {
+            self.unit_error(crate::game::GameError::from(e).into());
+        }
+        true
+    }
+    /// `0x005C6CC0(unit, list of s, R, skill, L)` (`skills/bodies.md`
+    /// §2.6): `aurastat1–6` evaluated on `unit` with `aurastatcalc1–6`,
+    /// each non-zero value set in the list (attack rate also as the other
+    /// anim rate), then the anim rate refreshed. Nothing without a list.
+    fn aura_fill(&mut self, game: &mut Game, unit: UnitId, s: i32, skill: i32, level: i32) {
+        use crate::combat::CombatWorld;
+        let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) else {
+            return;
+        };
+        let t = self.h.tables.clone();
+        let Some(r) = t.skills.skill(skill) else {
+            return;
+        };
+        let pairs = [
+            (r.aurastat1, r.aurastatcalc1),
+            (r.aurastat2, r.aurastatcalc2),
+            (r.aurastat3, r.aurastatcalc3),
+            (r.aurastat4, r.aurastatcalc4),
+            (r.aurastat5, r.aurastatcalc5),
+            (r.aurastat6, r.aurastatcalc6),
+        ];
+        let mut cv = self.combat(game);
+        for (st, calc) in pairs {
+            let st = i32::from(st as i16);
+            if !(0..t.skills.stat_count).contains(&st) {
+                continue;
+            }
+            let v = crate::skills::eval_skill(&mut cv, &t.skills, Some(unit), calc, skill, level);
+            if v != 0 {
+                cv.v.set_list_stat(l, st as u16, v);
+                // Stats 68 (attackrate) and 69 (other_animrate).
+                if st == 68 {
+                    cv.v.set_list_stat(l, 69, v);
+                }
+            }
+        }
+        cv.refresh_anim_rate(unit);
+    }
+    /// `0x00639E30(unit, s, 1)`: the state-changed bit.
+    fn mark_state_changed(&mut self, unit: UnitId, s: i32) {
+        if let Ok(s) = u32::try_from(s) {
+            self.stats.set_state_changed(unit, s, true);
+        }
+    }
+    /// `0x006260B0`: the expiry of the unit's list of `s`.
+    fn set_state_list_expiry(&mut self, unit: UnitId, s: i32, expire: i32) {
+        if let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) {
+            self.stats.set_expire(l, expire);
+        }
+    }
 }
 
 /// Runs `f` on the hooks and a [`crate::units::hooks::Sim`] over the
