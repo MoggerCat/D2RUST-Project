@@ -8,7 +8,7 @@ C-summon-0xac	rc-skill-div-b	16:59	0xAC AssignMonster of skill summons shorter t
 C-0x5D-p2	rc-promote	16:59	0x5D chains 31-33 on same-act warp from Harrogath (a5-wp-31..38, drehya/nihlathak stock): event-3 old-level 109 branch	open
 C-ui-draws-q	rc-ui-div	16:59	ui-draws-* unmeasured ? cells (mode/light/pal/file/w/h of CelDrawColor/Ex/Clipped, glyph files)	open
 C024	rc-promote	16:59	skill.ass 6 + shrine.17/.7: packets C->S/S->C divergence after packets channel added (ass sentry 0xA7/0xAC/0x21, shrine 0xA8/0x2C)	open
-C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	open
+C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	open batch1 merged
 fatal-exit	rc-run-3b	16:59	1.14d fatal exit(-1): gen-obj-374/385/400/403/450 (A client Mode<m>=0, done), 375 (B gfx file), 59/60/377 (C portal partner level)	open
 obj-39-78-approach	rc-run-3b	16:59	gen-obj-39/78 player m 5 vs 3 (object walk path end)	open
 C054	rc-c022-playerstate	17:05	gen-qkill-blood-raven frame 64 player m 5 vs 4 (monster missile hit damage + hit recovery on player)	open
@@ -17,3 +17,4 @@ C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed dr
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	done 8 rows EQUAL (act-travel/a2-warp/join/milestone/npc-talk: 18 checks state 100%); packets part stays rc-net-div
 C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
 C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
+C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open

@@ -1,0 +1,5 @@
+stream	id	name	state
+c2s	0x01	Walk	EQUAL
+c2s	0x02	WalkToUnit	NOT-CARRIED
+c2s	0x3A	AddStatPoint	NOT-CARRIED
+c2s	0x45	ChangeTpLocation	DIVERGED
