@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–607 |
-|   4. Suite | 608–735 |
-| Constants & data dependencies | 736–739 |
-| Randomness | 740–743 |
-| Edge cases & original bugs | 744–779 |
-| Test vectors | 780–802 |
-| Provenance | 803–806 |
-| Open questions | 807–869 |
+|   3. Run | 145–614 |
+|   4. Suite | 615–742 |
+| Constants & data dependencies | 743–746 |
+| Randomness | 747–750 |
+| Edge cases & original bugs | 751–786 |
+| Test vectors | 787–809 |
+| Provenance | 810–813 |
+| Open questions | 814–876 |
 <!-- /index -->
 
 ## Summary
@@ -604,6 +604,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
     (exit code 0xffffffff)`. All channels of one run end at that frame
     (the rng and packets dumps share the loop), so the comparison covers
     the same frames on both sides.
+
+18. **frontend screens** (REC-3760): a frontend check named `ui-frontend-screens*`
+    runs `frontend_sbs.py --script screens` and `screens_check.py` instead of the
+    paper dolls: every screen of the menu walk, per-pixel median over the shots of
+    each side, compared where stable on both sides at tolerance 0, the animated pixels
+    counted (specs/ui/frontend-menus.md §F2.11). d2rs starts its script 6 s after
+    launch (`FE_WAIT_OURS`) so the trademark screen is still up like 1.14d's.
 
 ### 4. Suite
 
