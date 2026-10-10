@@ -44,7 +44,7 @@ REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 REC = os.path.join(REPO, "tools", "trace-recorder")
 DEFAULT_CACHE = os.path.join(REPO, "traces", "orig-cache")
 FORMAT_LINE = "check 1"
-CHANNELS = ("state", "draws", "rng", "packets", "items", "save")
+CHANNELS = ("state", "draws", "rng", "packets", "items", "save", "frontend")
 WINDOWS = os.name == "nt"
 
 
@@ -893,7 +893,9 @@ def selftest():
         assert len(runs) == 1                       # miss: recorded and filled
         o2 = cached(GOOD, False, os.path.join(td, "w2"))
         assert len(runs) == 1 and os.path.exists(o2)  # hit: no 1.14d run
-        cached(GOOD + "# changed\n", False, os.path.join(td, "w3"))
+        cached(GOOD + "# changed\nignore fr\n", False, os.path.join(td, "w3"))
+        assert len(runs) == 1                       # comments and ignore lines: still a hit
+        cached(GOOD + "at 2 poke warp 1\n", False, os.path.join(td, "w4"))
         assert len(runs) == 2                       # M08: a changed check misses
         ok += 1
         # draws_summary: rows aligned by position, i / at / tick never compared, '?' equal
@@ -1023,6 +1025,9 @@ def main(argv=None):
             elif ch == "save":
                 r.shared_error = shared_script_error
                 codes[ch] = save_channel.run(r, save, sides)
+            elif ch == "frontend":
+                import frontend_channel
+                codes[ch] = frontend_channel.run(r, save, sides)
             else:
                 codes[ch] = r.not_available(ch)
     except (CheckError, OSError, subprocess.TimeoutExpired) as e:

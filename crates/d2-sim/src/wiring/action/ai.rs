@@ -342,6 +342,9 @@ impl<X: Pending> AiModes for View<'_, X> {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         self.h.x.set_current_skill(unit, skill)
     }
+    fn clear_current_skill(&mut self, unit: UnitId) {
+        self.h.x.clear_current_skill(unit);
+    }
     /// Unit flag 0x40 (`units.md` §2).
     fn set_skill_flag(&mut self, unit: UnitId) {
         if let Some(r) = self.units.get_mut(unit) {
@@ -728,7 +731,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.stats.max_life(unit)
     }
     fn max_mana(&self, unit: UnitId) -> i32 {
-        self.h.x.ai_max_mana(unit)
+        self.stats.max_mana(unit)
     }
     fn has_state_group(&self, unit: UnitId, g: u8) -> bool {
         self.stats.has_group(unit, usize::from(g))
@@ -737,7 +740,12 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.stats.data().states.count() as i32
     }
     fn has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
-        self.h.x.ai_has_list_flag(unit, flags)
+        // `0x00625760`: the unit's list must be extended; then the first
+        // list of the active (or parked) chain sharing a flag (`0x006256E0`).
+        self.stats
+            .unit_list(unit)
+            .filter(|&r| self.stats.is_extended(r))
+            .is_some_and(|r| self.stats.list_by_flags(r, flags).is_some())
     }
     fn hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         self.h.x.ai_hostile(game, a, b)
@@ -765,8 +773,13 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn portal_guid(&self, player: UnitId) -> Option<u32> {
         self.h.x.ai_portal_guid(player)
     }
+    /// Monster data `nComponent[i]` from the lent monster world;
+    /// [`Pending::ai_component`] without one.
     fn component(&self, unit: UnitId, i: usize) -> u8 {
-        self.h.x.ai_component(unit, i)
+        match self.h.monster_data(unit) {
+            Some(d) => d.components.get(i).copied().unwrap_or(0),
+            None => self.h.x.ai_component(unit, i),
+        }
     }
     fn target_unit(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.ai_target_unit(game, unit)
@@ -775,7 +788,7 @@ impl<X: Pending> AiActs for View<'_, X> {
         self.h.x.ai_set_target_override(unit, kind, guid);
     }
     fn chain_index(&self, class: i32) -> i32 {
-        self.h.x.ai_chain_index(class)
+        self.h.monster_chain_position(class)
     }
     fn class_for_level(&self, game: &Game, room: Option<RoomId>, class: i32) -> i32 {
         self.h.x.ai_class_for_level(game, room, class)
@@ -974,8 +987,13 @@ impl<X: Pending> AiActs for View<'_, X> {
             .x
             .ai_spawn_monster(game, room, x, y, class, mode, spread, flags)
     }
+    /// `0x0057CCB0(game, unit, killer, 1)`: the kill of `damage.md` §7.2
+    /// on this view's parts (the Baal clone with a missing owner,
+    /// `ai-bodies-5.md` §22 step 2: the death mode on its first think).
+    // Spec: specs/combat/damage.md §7.2, specs/monsters/ai-bodies-5.md §22.
     fn kill(&mut self, game: &mut Game, unit: UnitId, killer: Option<UnitId>) {
-        self.h.x.ai_kill(game, unit, killer);
+        let mut cv = self.combat(game);
+        super::reaction::kill_by(&mut cv, unit, killer);
     }
     /// The unit leaves its room and is removed (`0x00555600`, `units.md`
     /// §3.2: the caged barbarians at their portal, Baal at the stairs);

@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–354 |
-|   5. The d2rs side (`d2-sim::poke`) | 355–425 |
-|   6. `goto`: walking to a target | 426–505 |
-| Constants & data dependencies | 506–521 |
-| Randomness | 522–528 |
-| Edge cases & original bugs | 529–556 |
-| Test vectors | 557–584 |
-| Provenance | 585–595 |
-| Open questions | 596–603 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–426 |
+|   6. `goto`: walking to a target | 427–506 |
+| Constants & data dependencies | 507–522 |
+| Randomness | 523–529 |
+| Edge cases & original bugs | 530–557 |
+| Test vectors | 558–585 |
+| Provenance | 586–596 |
+| Open questions | 597–604 |
 <!-- /index -->
 
 ## Summary
@@ -410,8 +410,9 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    leaves in that frame's flush, as on 1.14d (first run:
    `a2-npc-atma-talk`, the walk's 0x07 in frames 3–12 on 1.14d, one
    frame later on d2rs before; rc-net-s2c; `warp`: the landing room's
-   0x07 in the poke's frame window, the neighbours' in the next tick,
-   448 generated checks with `4 warp 2`; `stat`: the stat update in the
+   0x07 in the poke's frame window (`0x0053AEC0` queues it at once), the
+   neighbours' in the next tick, 448 generated checks with `4 warp 2`,
+   `combat-melee-fallen`, `a2-wp-42` (REC-2290); `stat`: the stat update in the
    poke's frame window, `a2-npc-fara-heal` frame 7,
    `combat-potion-midfight` frame 59; rc-packets-join-order). Only a
    poke due before the first tick keeps the between-frames point. Open:

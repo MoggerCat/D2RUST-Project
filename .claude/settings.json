@@ -10,7 +10,8 @@
       "Bash(tools/cloud-game/setup_winpy.sh:*)",
       "Bash(tools/cloud-game/prepare_saves.sh:*)",
       "Bash(git fetch:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "mcp__claude-code-remote__add_repo"
     ]
   }
 }

@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
 |   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–989 |
-| Constants & data dependencies | 990–1025 |
-| Randomness | 1026–1042 |
-| Edge cases & original bugs | 1043–1082 |
-| Test vectors | 1083–1097 |
-| Provenance | 1098–1120 |
-| Open questions | 1121–1150 |
+|   5. Bodies used by one monster skill | 545–1003 |
+| Constants & data dependencies | 1004–1039 |
+| Randomness | 1040–1056 |
+| Edge cases & original bugs | 1057–1096 |
+| Test vectors | 1097–1111 |
+| Provenance | 1112–1134 |
+| Open questions | 1135–1170 |
 <!-- /index -->
 
 ## Summary
@@ -604,6 +604,16 @@ dead-body footprint (§3.9). Return 1. Skill and L are not read.
 6. Kill the unit: `0x0057CCB0(game, unit, unit, 1)` (`combat/damage.md`
    §7.2). Return 1.
 
+rc-maggot-seed (1.14d-measured, gen-mon-190..194, 681): the spawns of step
+5 go through the full creation (`monsters/population.md` §9 placement on
+the room seed around the egg, then allocation and init draws), in order:
+placement, allocation, init of the first baby, then the same for each
+extra. The egg gave up its footprint at its start (§5.6, §3.9), so the
+first ring-0 test at the egg's own position passes. The level L is the
+monster's `Sk1lvl` plus the difficulty's `MonsterSkillBonus`
+(`monsters/init.md` §6 step 14), so maggotegg1 at level 2 hatches
+`calc1` = 2 babies (the second in mode 8, spread 1).
+
 #### 5.8 srvst 44 MagottUp `0x005CB170`
 
 1. (x, y) = the unit's position (`bodies.md` §1).
@@ -637,6 +647,10 @@ The heal is p % of the **current** life.
    (dx[e], dy[e]): k 0 (−2, −2), 1 (0, −2), 2 (2, −2), 3 (2, 0), 4 (2,
    2), 5 (0, 2), 6 (−2, 2), 7 (−2, 0).
 5. Unit action frame (+0x4E) := 0.
+   (rc-sandmaggot: `dir64` here is the real direction vector of
+   `0x00621DC0` -> `0x0064FDC0` -> `0x0064FC60` from the unit to T; the
+   host default 0 put every egg at k = 0, 4 sub-tiles off in x in
+   `gen-mon-72`/`679`/`716`.)
 6. m = `0x005B2F20(game, the unit's room, x, y, c, mode, spread −1,
    flags 0)`; none → 0. m flags |= 0x4000000. Return 1.
 
@@ -1147,3 +1161,9 @@ steps call them (`bodies.md` Randomness).
    the casting unit's room. "E flags bit 2" in §5.16 / §5.30 is mask 2,
    the move-ended flag owned by `use.md` §5.2 rule 2 (`test al, 2` at
    `0x005CBCC8`, `0x005CD3D2`).
+
+Note (rc-extra-missile): the Frames helper's "total frames := n, frames
+left := n" must reach the missile in the server's missile store, or the
+missile lives its full `Range` (fetishinferno1: 30 frames instead of
+`Param2` + L − 1 = 14 at skill level 8). Checked by gen-mon-279 and ten
+sibling Fetish Shaman / Megademon / fallen shaman checks (state 150/150).

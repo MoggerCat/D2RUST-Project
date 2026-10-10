@@ -11,10 +11,9 @@ save ScnAma --class ama --expansion
 seed 1234
 ticks 70
 seconds 240
-channels state
+channels state packets
 input frame 10; click 600 300; frame 18; click 250 420; frame 30; click 650 180
-# as walk-town-ama: the game seed order (seed, s, the monsters'
-# seed-driven tx/ty/hp) and the player's fc / sp are outside the walk.
-# The walk itself: state_diff.py ... --types 0 (Warriv's walk, class
-# 155, differs from frame 24: NPC position, not the player's walk).
-ignore seed s fc sp
+# Every field compared (rc-walk-town: 70/70 equal on integ-r16 without the
+# old `ignore seed s fc sp`); packets compared too, so the C->S of the
+# clicks is checked against the d2rs client gap (scenario-diff.md open
+# question 6).

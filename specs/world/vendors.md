@@ -33,18 +33,18 @@
 |   1. Vendor columns and per-NPC store lists | 87–141 |
 |   2. Store item level | 142–147 |
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
-|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–295 |
-|   5. Gambling | 296–397 |
-|   6. Refresh | 398–429 |
-|   7. Buying and selling | 430–623 |
-|   8. Repair | 624–678 |
-|   9. Prices | 679–878 |
-| Constants & data dependencies | 879–898 |
-| Randomness | 899–917 |
-| Edge cases & original bugs | 918–957 |
-| Test vectors | 958–980 |
-| Provenance | 981–1019 |
-| Open questions | 1020–1103 |
+|   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–303 |
+|   5. Gambling | 304–405 |
+|   6. Refresh | 406–437 |
+|   7. Buying and selling | 438–631 |
+|   8. Repair | 632–686 |
+|   9. Prices | 687–886 |
+| Constants & data dependencies | 887–906 |
+| Randomness | 907–925 |
+| Edge cases & original bugs | 926–965 |
+| Test vectors | 966–988 |
+| Provenance | 989–1027 |
+| Open questions | 1028–1111 |
 <!-- /index -->
 
 ## Summary
@@ -289,6 +289,14 @@ From `npc.md` §4 (actions 1, 2):
      (`items/inventory.md` §1.4 rule 1): items in the order they were
      placed, a sold copy appended when §7.2 rule 8 places it, a bought
      item unlinked by §7.1 rule 12.
+
+Store items carry no owner in the state snapshot: recorded
+`items-vendor-akara-buy` (2026-10-10), the 41 store items of Akara read
+`own` absent on 1.14d at frames 20-40 (`tools/state-snapshot.md` §2,
+item data +0x5C -> inventory +0x08 owner = null), while the bought
+copy in the player's inventory reads the player's GUID. d2rs reports
+`own` absent for every item with the vendor flag (unit +0xC8 bit 2)
+(`d2-client state-dump`, `overlay_item_owners`).
 
 D2MOO 1.10f inverts the class test of step 3 (only kashya / greiz /
 qual-kehk continue); 1.14d excludes them.

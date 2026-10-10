@@ -1542,7 +1542,8 @@ impl CollisionRooms for FootRooms<'_> {
 /// 2, others → 1; a monster that can be in town (`npc` or `inTown`)
 /// without `interact` 1 → 3, 2 → 4; players size 2, monsters `monstats2`
 /// `SizeX`) and footprint mask (player 0x80, monster 0x100; a dying or
-/// dead monster none, `client/msg-units.md` §3 r2), stamped
+/// dead monster none, `client/msg-units.md` §3 r2), set S then the C
+/// monsters, stamped
 /// (`0x0064EA90`, §5.1) on copies of the rooms' grids.
 ///
 /// PROVISIONAL (REC-546): the 1.14d client stamps these on its grids as
@@ -1559,7 +1560,14 @@ pub fn stamp_unit_footprints(w: &mut ClientWorld, monsters: &[Option<super::worl
         drlg: &d.drlg,
         grids: BTreeMap::new(),
     };
-    for (k, u) in &w.units {
+    // The C monsters stand on the same grids as set S (`model.md` §5
+    // r6.3: the 0xAC create's path and footprint).
+    let set_c = w
+        .objclient
+        .set_c
+        .iter()
+        .filter(|(k, _)| k.unit_type == MONSTER);
+    for (k, u) in w.units.iter().chain(set_c) {
         if u.is_dead() {
             continue;
         }

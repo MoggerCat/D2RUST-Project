@@ -60,17 +60,17 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "71f88fda866b4f8e10327d70d3b1c497028c1846abb51b0cf14523623e0b52c6",
-   "size": 3021449
+   "sha256": "94d6fe5e57d7cd90ef8ba606f761e4403b61d7438ec319a52a3395449fc6039f",
+   "size": 3021453
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "e2e0108e45e82c74f136e9f423b19d8858cc2d7bfc1656810f775e0d2680d344",
-  "format": "orig-cache-key-1",
+  "check": "16695cc86dacdef147ad8975217aeb5a88f31672f2b18c1771b839bcda203702",
+  "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d8d197602a9398d0743bfbbd70ed286cbdd245ddb62a78563a954c894f4e2b82",
+  "recorder": "df69ba64e12f7b8afcc32432f067e74fccc4a8061357c49dcf15c6e251137f65",
   "save": "261b1a27649554647a3bfc871bfa968adbd5eb3ff042a05703f482af3f42f61d"
  }
 }

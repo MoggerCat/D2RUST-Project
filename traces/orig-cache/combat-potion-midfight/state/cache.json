@@ -13,6 +13,8 @@
   "CmbPot",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -32,17 +34,17 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "96d138f060bba794860a9f81917802d57ddc91f202fc1a0185ec5ee7646812ef",
-   "size": 1283199
+   "sha256": "d93c297fadb494456fe807a324a59bc51bef19205ba6ef0de5d12e8f4e01ca9a",
+   "size": 1283340
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "e05b4bd465114952a2ac1f4500e4a03740b7dc1d4d8ce63f99f72debff8363d5",
-  "format": "orig-cache-key-1",
+  "check": "33fc9b02c34d7e57e14d41e1587c74a5a4512718a03df170e3503404551248e2",
+  "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "recorder": "df69ba64e12f7b8afcc32432f067e74fccc4a8061357c49dcf15c6e251137f65",
   "save": "80314faee415f7bcae2d995ffd7bd78086178f65e4ff22808d70ee05c5d5da71"
  }
 }

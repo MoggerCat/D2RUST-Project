@@ -7,7 +7,8 @@ use crate::drlg::collision::bits;
 use crate::units::RoomId;
 
 use super::collision::{box_apply, find_room, pattern_value, size_value, CollisionRooms, PLUS};
-use super::record::{flags, DynamicPath, ObjectShape, PathPoint};
+use super::record::{flags, pattern_of_size, DynamicPath, ObjectShape, PathPoint, UnitShape};
+use super::tables::PathTables;
 use super::PathError;
 
 /// Cells of a pattern (§3): 0 the cell; 1, 3, 5 plus; 2, 4 3×3 box.
@@ -280,6 +281,27 @@ pub fn set_foot_mask<R: CollisionRooms + ?Sized>(
 /// Pattern set `0x00649190` (§5.3 rule 2): writes +0x48, no restamp.
 pub fn set_pattern(path: &mut DynamicPath, pattern: u32) {
     path.pattern = pattern;
+}
+
+/// Path reset `0x00649CA0(unit)` (§5.3 rule 5): the pattern recomputed
+/// from the stored size (`0x00648580`, so a wraith's pattern 5 becomes
+/// the size pattern); with a room, the old footprint is removed (forced)
+/// first and the new one stamped with the path's footprint mask.
+pub fn reset_pattern<R: CollisionRooms + ?Sized>(
+    rooms: &mut R,
+    tables: &PathTables,
+    path: &mut DynamicPath,
+    shape: &UnitShape,
+) {
+    let pattern = pattern_of_size(tables, path.unit_size, shape);
+    if path.room.is_none() {
+        path.pattern = pattern;
+        return;
+    }
+    let (x, y) = (path.x(), path.y());
+    clear_pattern(rooms, path.room, x, y, path.pattern, path.foot_mask);
+    path.pattern = pattern;
+    stamp_pattern(rooms, path.room, x, y, pattern, path.foot_mask);
 }
 
 /// Dead-body footprint (§5.3 rule 3): remove (force), pattern := 5, mask

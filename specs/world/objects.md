@@ -46,20 +46,20 @@
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
 |   7. Operate dispatch | 324–511 |
 |   8. Chests and breakables | 512–647 |
-|   9. Shrines | 648–769 |
-|   10. Doors, operate 8 (`0x00581D40`) | 770–793 |
-|   11. Wells, operate 22 (`0x005858A0`) | 794–825 |
-|   12. Portals, operate 15 (`0x00584870`) | 826–896 |
-|   13. Torch, operate 11 (`0x005843D0`) | 897–901 |
-|   14. Client messages | 902–929 |
-|   15. Not covered yet | 930–944 |
-|   16.–18. Moved | 945–951 |
-| Constants & data dependencies | 952–998 |
-| Randomness | 999–1045 |
-| Edge cases & original bugs | 1046–1112 |
-| Test vectors | 1113–1151 |
-| Provenance | 1152–1218 |
-| Open questions | 1219–1272 |
+|   9. Shrines | 648–770 |
+|   10. Doors, operate 8 (`0x00581D40`) | 771–794 |
+|   11. Wells, operate 22 (`0x005858A0`) | 795–826 |
+|   12. Portals, operate 15 (`0x00584870`) | 827–897 |
+|   13. Torch, operate 11 (`0x005843D0`) | 898–902 |
+|   14. Client messages | 903–930 |
+|   15. Not covered yet | 931–945 |
+|   16.–18. Moved | 946–952 |
+| Constants & data dependencies | 953–999 |
+| Randomness | 1000–1046 |
+| Edge cases & original bugs | 1047–1113 |
+| Test vectors | 1114–1152 |
+| Provenance | 1153–1219 |
+| Open questions | 1220–1284 |
 <!-- /index -->
 
 ## Summary
@@ -745,7 +745,7 @@ stat 162 is "other" → a · stat162(P) / 100.
 - **Storm, read in 1.14d** (`0x00582DA0`): targets come from the unit
   finder (`0x0065A950` / `0x0065AC70`, `missiles/bodies-2.md`) around
   the shrine's position with radius `Arg1` and filter `0x00582710`
-  (players not in mode 0 or 17; monsters with `0x0063EA40` = 0). Each
+  (players not in mode 0 or 17; monsters not in mode 0 or 12; any other type refused). The filter has no distance test, so the radius `Arg1` only chooses the rooms (the shrine's room alone when the square lies strictly inside its sub-tile rectangle, else its adjacency array): every such unit of those rooms is found (`gen-shrine-19`). Each
   found player or monster not dead (`0x005541B0` = 0) gets a base-stat
   add (`0x006272B0`) on stat 6 of −trunc((life >> 8) · `Arg0` / 100) ·
   256 (signed division toward 0, life = unit total). Missiles: i outer,
@@ -764,8 +764,9 @@ stat 162 is "other" → a · stat162(P) / 100.
   index `0x00633680('opm ' / 'gpm ')` (−1 → fatal); per potion a free
   item spot next to P (`0x00555DA0`); none → that potion is skipped but
   counted; else a zeroed 0x84-byte item record is filled (code index,
-  spot, P's item level `0x00558200`) and created by `0x00558D90` (items
-  spec), quantity (stat 70) := 1 (`0x00627260`), queued with flag 0x1.
+  spot, P's item level `0x00558200`; quality word +0x30 stays 0, so the
+  quality is rolled on the item seed, unlike the gem drop's 2) and created by
+  `0x00558D90` (items spec; verified `gen-shrine-21`, `-22`), quantity (stat 70) := 1 (`0x00627260`), queued with flag 0x1.
 
 ### 10. Doors, operate 8 (`0x00581D40`)
 
@@ -1269,3 +1270,14 @@ lists of §2 from the live `shrines.txt`.
 16. `0x0061B060(…, 3)` (portal arrival point without a partner, §12
     rule 8): the DRLG spec owns which point kind 3 is. **Answered**:
     3 is the free-point size (§12 rule 8, `0x00584A59`).
+
+#### 9.3a Shrine missile creation (`0x0059FA30`)
+
+The storm and potion shrines call the missile creator with the parameter
+record of `missiles/missiles.md` §R2.1. Storm: flags 3, start = the shrine's
+path position, target = offset (relative). Potions (`0x005830E0`,
+`0x00583410`): flags 0x520 (absolute target 0x20, frames-from-distance
+0x400); start = the shrine's position, target = shrine position + offset.
+Owner P, class 62 / 45 / 48, skill level clamp(P level / 5, 1, 8); the
+gfx word (+0x24) is 1 and unread. Wired in `ObjectView::create_missile`
+(rc-shrine-missile).

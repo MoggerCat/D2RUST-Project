@@ -13,6 +13,8 @@
   "SavAma",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.rng.jsonl",
   "--frames",
@@ -39,17 +41,17 @@
  ],
  "files": {
   "orig.rng.jsonl": {
-   "sha256": "abb58b9cb69d4ff90d0e26edb7e55ffb7affb063241dd0963a8ffd2abf1a963d",
-   "size": 1974360
+   "sha256": "19cc26280bccac1e9c2a485d4970d37120cf8c08cfe9d885a0107db0d698a765",
+   "size": 1982302
   }
  },
  "format": "orig-cache-1",
  "key": {
-  "check": "f3ee6c0ac1efc2f2feb71fe491e9371dd0d86920f2459bc5072fe92008101c53",
-  "format": "orig-cache-key-1",
+  "check": "fab639ae7595389a7ff2c86662764728e0c6e33b6a6d6ceaad11e2118fb90ebe",
+  "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "163279ff197d8ac1c0fb5ea9daedfb396a382280151c03826e560666747f2efd",
+  "recorder": "d39e731a8f5e83081b8c5d63a2093478c99ea523fbab1db77d342b7c75ff97ce",
   "save": "529cd1a5c7f50ec39518283c8c65761f258a76038f9ba8b4a94ed19fa57ad633"
  }
 }

@@ -5,8 +5,33 @@ through `d2-client state-dump --packets`, compared by packets_diff.py.
 Our own code. Standard library only.
 """
 
+import json
 import os
 import sys
+
+
+def recorded_pings(orig):
+    """`--send` values replaying the 1.14d client's pings (C->S 0x6D, system
+    queue): the server answers each with S->C 0x8F. The ping is the client's
+    wall-clock behaviour; its bytes and frame come from the recording, the
+    answer is the server's (scenario-diff.md §3 rule 12). A record at frame f
+    (input phase) is read by the server before tick f + 1."""
+    out = []
+    try:
+        lines = open(orig, encoding="utf-8")
+    except OSError:
+        return out
+    with lines:
+        for line in lines:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            b = d.get("bytes") or ""
+            if d.get("type") == "c2s_sys" and b.startswith("6d") and d.get("frame"):
+                out += ["--send", f"{d['frame'] + 1} hex " + " ".join(
+                    b[i:i + 2] for i in range(0, len(b), 2))]
+    return out
 
 
 def run(r, save, sides, shared_script_error):
@@ -42,7 +67,7 @@ def record(r, save, sides, shared_script_error):
     if "d2rs" in sides and not (r.reuse and os.path.exists(d2rs)):
         args = ["state-dump"] + r.d2rs_common(save) + [
             "--ticks", str(c["ticks"]), "--out", r.path("d2rs.packets-state.jsonl"),
-            "--packets", d2rs]
+            "--packets", d2rs] + recorded_pings(orig)
         if r.d2rs_input() and not shared_script_error(r.d2rs_input()):
             args += ["--input", r.d2rs_input()]
         r.cargo("d2-client", args)

@@ -116,7 +116,7 @@ pub fn neutral_walk(w: &ClientWorld, key: UnitKey) -> (u32, u32) {
 /// `0x00643A00(U, 0)` then `0x004743D0`: the unit's light (a cast light
 /// of the client skill start, `render/lighting.md` §8 r3) is detached
 /// and removed; a unit without one: nothing.
-fn remove_unit_light(w: &mut ClientWorld, key: UnitKey) {
+pub(super) fn remove_unit_light(w: &mut ClientWorld, key: UnitKey) {
     let owner = Owner {
         unit_type: u32::from(key.unit_type),
         guid: key.guid,
@@ -244,6 +244,16 @@ fn player(
         // target fix-up: render/lighting.md §8 r3 (cast light); the
         // skill's mode is the client animation's (open question 1).
         0x15 | 0x16 => {
+            // The used skill of the start `0x004C6140` (`0x00620210`): the
+            // entry of skill r0 and owner r1 (`0x006439B0`), read by the
+            // client do (`client/msg-skills.md` §11 r1). PROVISIONAL
+            // (REC-2206): a skill the list does not hold leaves it
+            // unchanged (1.14d adds the skill first, `0x00647110`).
+            if let Some(l) = w.units.get_mut(&key).and_then(|u| u.skills.as_mut()) {
+                if let Some(i) = l.find(r[0] as u16, r[1] as u32) {
+                    l.current = Some(i);
+                }
+            }
             if let Some(m) = skill_mode(inputs, r[0], PLAYER) {
                 set(w, m);
             }
@@ -387,10 +397,20 @@ pub fn monster_table_mode(code: u8) -> Option<u32> {
 }
 
 /// The neutral fallback "F" `0x004AE1D0` (§19 r4): a monster in mode
-/// 1…15 other than 12 is set to mode 1; any other mode: nothing.
+/// 1…15 other than 12 gets the path stop (precise position to its cell's
+/// centre) and is set to mode 1; any other mode: nothing.
 fn neutral_fallback(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey) {
     let mode = w.units.get(&key).expect("checked by the caller").mode;
     if (1..=15).contains(&mode) && mode != monster_mode::DEAD {
+        // The path stop `0x00480490` -> `0x00650590`: the path's precise
+        // position becomes the centre of the cell it is in (`(p &
+        // 0xFFFF0000) + 0x8000` per axis), so a walker that ended short
+        // of its goal's centre is drawn at the centre from here on.
+        if let Some(u) = w.units.get_mut(&key) {
+            if let Some((px, py)) = u.precise {
+                u.precise = Some(((px & 0xFFFF_0000) | 0x8000, (py & 0xFFFF_0000) | 0x8000));
+            }
+        }
         super::monster_anim::mode_set(w, inputs, key, monster_mode::NEUTRAL);
     }
 }

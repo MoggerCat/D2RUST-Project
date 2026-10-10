@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–531 |
-|   4. Suite | 532–647 |
-| Constants & data dependencies | 648–651 |
-| Randomness | 652–655 |
-| Edge cases & original bugs | 656–679 |
-| Test vectors | 680–702 |
-| Provenance | 703–706 |
-| Open questions | 707–755 |
+|   3. Run | 145–549 |
+|   4. Suite | 550–677 |
+| Constants & data dependencies | 678–681 |
+| Randomness | 682–685 |
+| Edge cases & original bugs | 686–709 |
+| Test vectors | 710–732 |
+| Provenance | 733–736 |
+| Open questions | 737–799 |
 <!-- /index -->
 
 ## Summary
@@ -86,7 +86,7 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `ticks <n>` | yes | snapshots / ticks recorded on both sides |
 | `seconds <n>` | no (300) | 1.14d wall-clock limit per recorder run |
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
-| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save` |
+| `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
@@ -529,6 +529,24 @@ state first. It is the default way to compare a behaviour with 1.14d.
     at frame 10, d2rs 0x5F `5f 09 13 84 10` at frame 86, none on 1.14d);
     `--no-own-c2s 0x5F` removes it. Default: nothing dropped.
 
+16. **frontend** (`channels frontend`; `tools/scenario-diff/frontend_channel.py`;
+    `tools/frontend-sbs/frontend_sbs.py --script dolls`, `dolls_check.py`;
+    REC-2295): front-end screens by X input on both sides (1.14d on
+    `D2_DISPLAY`, d2rs on `D2_DRAWS_DISPLAY`), not ticks; the `save` line only
+    names the character (the charselect lists every save of the folder, the
+    three of `prepare_saves.sh`). 1.14d: 12 shots 0.37 s apart after
+    charselect; d2rs: 70 back-to-back shots (all animation phases). Per slot
+    figure rectangle: the doll mask is every pixel where a d2rs frame departs
+    from the per-pixel median of the 70 (sum of channels > 30); each 1.14d
+    shot takes the d2rs frame with the fewest differing mask pixels (phase is
+    not tick-anchored, REC-2182); a pixel differs above 16 per channel (the
+    screen-level brightness offset of REC-1550 is up to 8, dark noise 16);
+    the slot is EQUAL when every shot differs in at most 1 % of its mask. The
+    channel is MATCH when all three slots are EQUAL. Also reported: the dy
+    probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
+    (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
+    most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
 ### 4. Suite
 
 `tools/scenario-diff/suite.py`: every check (or `--filter GLOB` on the
@@ -555,9 +573,14 @@ playthrough's playability next to it.
 3. Per check: work dir `traces/raw/suite/<name>/`, `scenario_diff.py
    <check> --work <dir> --json <dir>/result.json --next 5`, its output in
    `suite.log`. **Reuse of 1.14d**: the key (`suite.key`, format
-   `suite-key-1`) is the sha256 of the check file, of the save that
+   `suite-key-2`) is the sha256 of the check file, of the save that
    `d2s-tool` makes from the check's `save` line with `--time 1` (d2s-tool
-   otherwise stamps the current time), and of `Game.exe`. Same key and
+   otherwise stamps the current time), of `Game.exe`, and of the recorders:
+   the scripts (with the same-folder modules they import) of the check's
+   channels plus `autostart.py`, hashed as in the orig-cache key (`items`
+   uses packets'). A changed recorder therefore never reuses `orig.*` (a
+   stale raw recording gave verdicts against outdated 1.14d output; found
+   by rc-rerun-r10). Same key and
    no `--fresh`: `scenario_diff.py --reuse-orig` (keeps `orig.*`
    recordings, re-runs d2rs and the comparators); otherwise the 1.14d
    outputs and the key are removed and recorded again. The key is written
@@ -571,8 +594,11 @@ playthrough's playability next to it.
    text output (state `orig.state.jsonl`, draws `orig.frames.jsonl`, rng
    `orig.rng.jsonl`, packets `orig.packets.jsonl`; the draws channel's
    `draws-orig` is derived from the frames file by `facts_render.py` and
-   is rebuilt each run). Key (format `orig-cache-key-1`): sha256 of the check
-   file, of the `--time 1` save (rule 3), of `Game.exe`, of the private
+   is rebuilt each run). Key (format `orig-cache-key-2`): sha256 of the check
+   file's recording lines (its lines without comments, blank lines and the
+   comparator-only `ignore` lines, an `input` line kept whole, each
+   stripped and ended by a newline; `orig_cache.recording_text`), of the
+   `--time 1` save (rule 3), of `Game.exe`, of the private
    repo's `install/manifest.json` (else of `Game.exe` alone, marked
    `game-exe:`), and of the channel's recorder (its script and, transitively,
    the same-folder modules it imports). A hit restores the file into the
@@ -582,6 +608,10 @@ playthrough's playability next to it.
    it with `--fill-cache`). The cache holds small text only; a file with a
    PNG signature or a NUL byte, or over 64 MiB, is not stored, and
    rendered frames go to the private repo, never here (CLAUDE.md rule 1).
+   `orig_cache.py --migrate-v1 DIR CHECKS_DIR...` rewrites each
+   `orig-cache-key-1` entry whose check hash still equals the sha256 of
+   its check file to `orig-cache-key-2` (the recorded files untouched);
+   the others stay misses.
 4. Comparator summaries: `state_diff.py`, `rng_diff.py` and
    `packets_diff.py` take `--json FILE` (format `diff-summary-1`:
    `channel`, `code`, `verdict`, `frames_compared`, `frames_equal`,
@@ -686,7 +716,7 @@ None in the tool. Both games run on `seed`.
 
 | `--selftest` (variant) | `variant only-fallen` builds `<base>/../variants/only-fallen` with `data-tool variant build traces/variants/only-fallen/only-fallen.d2stack --game <base>` and the recorder gets `--game <that dir>/Game.exe`; a name outside `[a-z0-9-]` and a repeated `variant` are rejected |
 | `--selftest` (input) | a shared `input` line reaches `record_state.py`, `state-dump`, `record_frames.py` and `play` as `--input '<script>'`; a script not starting with `frame`, with `wait` / `shot`, a frame 0 or going back, a `hold` without N or non-integer arguments, and a shared line next to `input orig` are rejected; an `input d2rs` in play's tick form goes to `play` only |
-| `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save or Game.exe; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
+| `suite.py --selftest` | discovery by glob and area, slowest first; the cache key misses on a change of the check, the save, Game.exe or a recorder script/imported module; the 1.14d outputs and key removed, d2rs' kept; a prefix copy hard-links the bulk and copies `*.reg` and saves, no lock; the rng build before the plain one; match % per channel (draws by rows), area and overall; playthrough acts from the `--all` keys or from milestones; text and Markdown tables |
 | comparators' `--selftest` (`--json`) | `state_diff`, `rng_diff`, `packets_diff`: the summary counts the frames with a difference and names the first; a match has every frame equal and no first |
 | `items_diff.py --selftest` | items in creation order from synthetic recordings (a later message of a GUID is no creation; a 0x9D filler's owner by index); GUIDs offset by 2 on one side match; every stream byte perturbed is found at its item and byte, a changed code named `code`; a changed action, frame, filler owner and a missing item are reported; fewer ticks on one side and no item at all are partial; the summary counts items |
 | `--selftest` (items) | with `packets` and `items` one 1.14d recording and one `state-dump --packets` serve both; `items` alone records them; the comparator gets both files and `--json <work>/items.summary.json` |
@@ -752,3 +782,17 @@ d2rs-own tool; no 1.14d fact.
    call (drop / store / gamble / cube / quest) directly instead of the
    message action; it needs the d2rs creation path to write the same
    record.
+6. DECIDED REC-2055 (owner, 2026-10-10: the client gap is a gap in d2rs' recording, not a
+   difference in the game): a fidelity-ledger row counts as EQUAL when
+   every channel of its checks is MATCH except a state channel whose
+   only PARTIAL cause is the d2rs header's client gap (`state_dump.rs`
+   `RUN_GAPS`: the headless bridge's C→S set), with every unit field of
+   both sides compared (no `ignore` line, nothing one-sided), and either
+   no `input` or `send` line in the check (pokes only) or a packets
+   channel that MATCHes (its C→S stream equal: the gap's condition, a
+   1.14d client sending another message, did not occur). The comparator's verdict stays PARTIAL (`state-
+   snapshot.md` §1 rule 1, §4 rule 5); the ledger rule settles the row.
+   Covering the 1.14d client's C→S set in the bridge removes the gap.
+7. DECIDED REC-2056 (owner, 2026-10-10): likewise, an items channel PARTIAL whose only
+   cause is "no item created on either side" (§3 rule 13, edge: nothing
+   compared) counts as equal for such a row (zero items on both sides).

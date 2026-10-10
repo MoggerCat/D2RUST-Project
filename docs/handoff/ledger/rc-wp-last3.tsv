@@ -1,0 +1,5 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+waypoint.2.stony-field	entity	world	waypoints.tsv wp 2 level 4 act 1	specs/world/waypoints.md,specs/drlg/levels.md	draft	gen-wp-2	PARTIAL	yes	3	y	claude/rc-wp-last3	NO-CHECK	M	state 460/460 equal after the outdoor reset clears flags 0x20/0x40 (levels.md 9.4) and object init 13 links chain 4 (was DIVERGED@400 player x)
+waypoint.37.glacial-caves-level-1	entity	world	waypoints.tsv wp 37 level 118 act 5	specs/world/waypoints.md,specs/drlg/levels.md	draft	gen-wp-37	PARTIAL	yes	3	y	claude/rc-wp-last3	NO-CHECK	M	state 460/460 equal after the same outdoor reset fix (was DIVERGED@451 unit seed)
+waypoint.28.city-of-the-damned	entity	world	waypoints.tsv wp 28 level 106 act 4	specs/world/waypoints.md,specs/monsters/population.md	draft	gen-wp-28	DIVERGED@400	yes	3	y	claude/rc-wp-last3	DIVERGED	M	frame 401 monster 1:29 class 403 vs 308: 1.14d takes 2 more game-seed density steps (0x54ed96) in the last populated room (same cause as gen-lvl-106 frame 21)

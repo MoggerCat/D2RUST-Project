@@ -955,6 +955,7 @@ mod tests {
                 frames: 4,
                 speed: 256,
                 weapon: 0,
+                events: None,
             })
         }
     }
