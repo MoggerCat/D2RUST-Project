@@ -1859,54 +1859,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-wp-28 | state | DIVERGED | 400/460 | frame 401 monster 1:29 class 403/308, field cl: 1.14d 403 vs d2rs 308 | unrouted |
 | gen-netc2s-5f | packets | MATCH | 40/40 | - | - |
 | gen-netc2s-60 | packets | DIVERGED | 39/40 | frame 20 stream s2c #1 id: 1.14d 23 vs d2rs 47 (id 0x23) | unrouted |
-| gen-render-blood-moor | draws | DIVERGED | 0/1 | tick 58 draw row 137 (DrawLine) column x: 1.14d 651 vs d2rs 518 | unrouted |
-| gen-ui-belt | draws | DIVERGED | 0/1 | tick 57 draw row 199 (DrawLine) column x: 1.14d 720 vs d2rs 586 | unrouted |
-| gen-ui-beltuse | packets | MATCH | 50/50 | - | - |
-| gen-ui-conflict | draws | DIVERGED | 0/1 | tick 77 draw row 353 (CelDraw) column file: 1.14d data/global/ui/cursor/ohand.dc6 vs d2rs data/global/ui/cursor/orotate.dc6 | unrouted |
-| gen-ui-setitem | draws | DIVERGED | 0/1 | tick 67 draw row 195 (DrawLine) column x: 1.14d 102 vs d2rs 199 | unrouted |
-| gen-ui-walkclick | packets | MATCH | 100/100 | - | - |
-| gen-umod-1 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-10 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-11 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-12 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-13 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-14 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-15 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-16 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-17 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-18 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-19 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-2 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-20 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-21 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-22 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-23 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-24 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-25 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-26 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-27 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-28 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-29 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-3 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-30 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-31 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-32 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-33 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-34 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-35 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-36 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-37 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-38 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-39 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-4 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-40 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-41 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-42 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-5 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-6 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-7 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-8 | state | PARTIAL | 150/150 | - | - |
-| gen-umod-9 | state | PARTIAL | 150/150 | - | - |
 | gen-wp-9 | state | PARTIAL | 460/460 | - | - |
 | ui-draws-char-skill-ama | packets | MATCH | 76/76 | - | - |
 | ui-draws-help-ama | packets | MATCH | 76/76 | - | - |
@@ -1998,6 +1950,55 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-missile-546 | packets | MATCH | 70/70 | - | - |
 | gen-missile-546 | rng | DIVERGED | 39/71 | frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None | unrouted |
 | gen-missile-546 | state | PARTIAL | 70/70 | - | - |
+| gen-boss-544 | state | PARTIAL | 150/150 | - | - |
+| gen-render-blood-moor | draws | DIVERGED | 0/1 | tick 58 draw row 137 (DrawLine) column x: 1.14d 651 vs d2rs 518 | unrouted |
+| gen-ui-belt | draws | DIVERGED | 0/1 | tick 57 draw row 199 (DrawLine) column x: 1.14d 720 vs d2rs 586 | unrouted |
+| gen-ui-beltuse | packets | MATCH | 50/50 | - | - |
+| gen-ui-conflict | draws | DIVERGED | 0/1 | tick 77 draw row 353 (CelDraw) column file: 1.14d data/global/ui/cursor/ohand.dc6 vs d2rs data/global/ui/cursor/orotate.dc6 | unrouted |
+| gen-ui-setitem | draws | DIVERGED | 0/1 | tick 67 draw row 195 (DrawLine) column x: 1.14d 102 vs d2rs 199 | unrouted |
+| gen-ui-walkclick | packets | MATCH | 100/100 | - | - |
+| gen-umod-1 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-10 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-11 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-12 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-13 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-14 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-15 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-16 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-17 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-18 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-19 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-2 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-20 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-21 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-22 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-23 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-24 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-25 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-26 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-27 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-28 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-29 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-3 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-30 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-31 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-32 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-33 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-34 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-35 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-36 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-37 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-38 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-39 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-4 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-40 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-41 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-42 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-5 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-6 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-7 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-8 | state | PARTIAL | 150/150 | - | - |
+| gen-umod-9 | state | PARTIAL | 150/150 | - | - |
 | ama-charged-strike | packets | MATCH | 70/70 | - | - |
 | bar-berserk | packets | MATCH | 70/70 | - | - |
 | bar-berserk | state | PARTIAL | 70/70 | - | - |
