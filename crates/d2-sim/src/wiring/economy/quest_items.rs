@@ -729,10 +729,23 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
     /// the unit's room (none for a missile), then the unit is freed
     /// (`0x00555600`).
     fn remove_unit(&mut self, unit: UnitId) {
-        let lists = &self.econ.game.lists;
-        let Some(entry) = lists.unit(unit) else {
+        let Some((ty, guid, to)) = self.removal_plan(unit) else {
             return;
         };
+        for p in to {
+            self.send(p, &crate::units::messages::remove_unit(ty as u8, guid));
+        }
+        self.free_unit(unit);
+    }
+}
+
+impl<H: LifecycleHooks, R: QuestRest> EconomyQuests<'_, '_, H, R> {
+    /// `0x0052E050`'s recipients: the type and GUID of `unit` and the
+    /// players of every in-game client whose room's adjacent-room list
+    /// (the room included) holds the unit's room (none for a missile).
+    pub(crate) fn removal_plan(&mut self, unit: UnitId) -> Option<(UnitType, u32, Vec<UnitId>)> {
+        let lists = &self.econ.game.lists;
+        let entry = lists.unit(unit)?;
         let (ty, guid, room) = (entry.ty, entry.guid, entry.room());
         let mut to = Vec::new();
         let mut missing_room = false;
@@ -761,9 +774,11 @@ impl<H: LifecycleHooks, R: QuestRest> QuestWorld for EconomyQuests<'_, '_, H, R>
         if missing_room {
             self.rest.unhandled(0xFF, 0x0052_DFB0);
         }
-        for p in to {
-            self.send(p, &crate::units::messages::remove_unit(ty as u8, guid));
-        }
+        Some((ty, guid, to))
+    }
+
+    /// `0x00555600`: the unit freed.
+    pub(crate) fn free_unit(&mut self, unit: UnitId) {
         let (mut sim, hooks) = self.econ.split();
         if crate::units::lifecycle::remove(&mut sim, hooks, unit).is_err() {
             self.rest.unhandled(0xFF, 0x0055_5600);
