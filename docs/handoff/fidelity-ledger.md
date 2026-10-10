@@ -30,8 +30,8 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | shrine | 1 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | skills | 591 | 55 | 0 | 534 | 0 | 2 | 437 | 152 | 0 | 522.5–2090 | 6 | 496 / 83 / 12 |
 | systems | 915 | 170 | 46 | 579 | 0 | 120 | 205 | 587 | 3 | 1300.5–5106+ | 285 | 265 / 0 / 650 |
-| world | 824 | 105 | 0 | 601 | 0 | 118 | 531 | 171 | 5 | 647.5–2430+ | 299 | 700 / 46 / 78 |
-| **all** | 4455 | 851 | 46 | 2247 | 269 | 1042 | 1506 | 1894 | 14 | 4653–18164+ | 684 | 3072 / 454 / 929 |
+| world | 824 | 105 | 0 | 601 | 0 | 118 | 531 | 170 | 5 | 645.5–2422+ | 299 | 700 / 46 / 78 |
+| **all** | 4455 | 851 | 46 | 2247 | 269 | 1042 | 1506 | 1893 | 14 | 4651–18156+ | 684 | 3072 / 454 / 929 |
 
 ## By family
 
@@ -659,7 +659,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `net.c2s` | 113 | 12 | 9 | 14 | 0 | 78 | 0 | 31 | 4 | 0 | 27 | 0 |
 | `net.s2c` | 183 | 53 | 21 | 82 | 0 | 27 | 1 | 154 | 2 | 0 | 1 | 0 |
 | `npc` | 48 | 18 | 0 | 30 | 0 | 0 | 0 | 9 | 39 | 0 | 43 | 34 |
-| `object` | 523 | 3 | 0 | 519 | 0 | 1 | 508 | 510 | 13 | 0 | 10 | 0 |
+| `object` | 523 | 3 | 0 | 519 | 0 | 1 | 508 | 510 | 12 | 0 | 10 | 0 |
 | `quest` | 53 | 14 | 0 | 39 | 0 | 0 | 0 | 8 | 40 | 5 | 41 | 19 |
 | `quests` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 |
 | `render` | 91 | 90 | 0 | 1 | 0 | 0 | 0 | 84 | 7 | 0 | 0 | 0 |
@@ -7255,7 +7255,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a5.134.act-5-pandemonium-2` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-134 (traces/checks/gen): state and rng equal over 160 ticks after rc-level-population (object drop picks wired in the single-player host; levels 133-136 preset object skips of 0x005559A0) |
 | `level.a5.135.act-5-pandemonium-3` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-135 (traces/checks/gen): state and rng equal over 160 ticks (rc-rng-level-pop re-run; the old 'rng: frame 2 ... create.rs:265' row was stale) |
 | `level.a5.136.act-5-pandemonium-finale` | entity | EQUAL | - | MATCH | yes | 13 | y | - | specs/drlg/levels.md,specs/drlg/maze.md,specs/drlg/rooms.md | gen-lvl-136 (traces/checks/gen): state and rng equal over 160 ticks after rc-level-population (object drop picks wired in the single-player host; levels 133-136 preset object skips of 0x005559A0) |
-| `object.init.functions` | entity | EQUAL | M | PARTIAL | yes | 20 | n | claude/rc-gen-obj-six | specs/world/objects.md,specs/world/objects-2.md | gen-obj-61, -189, -369 (the three init rows) now equal where compared (rng MATCH): init 13 quest-routed, snapshot holds objects (cain portal event), init 46 trapped soul placeholder; rc-gen-obj-six |
+| `object.init.functions` | entity | EQUAL | - | PARTIAL | yes | 20 | n | claude/rc-gen-obj-six | specs/world/objects.md,specs/world/objects-2.md | gen-obj-61, -189, -369 (the three init rows) now equal where compared (rng MATCH): init 13 quest-routed, snapshot holds objects (cain portal event), init 46 trapped soul placeholder; rc-gen-obj-six |
 | `shrine.18.gem-upgrade` | entity | EQUAL | - | PARTIAL | ? | 15 | y | claude/rc-shrine-m | specs/world/objects.md | gen-shrine-18 state: all 120 ticks equal |
 | `waypoint.0.rogue-encampment` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
 | `waypoint.1.cold-plains` | entity | EQUAL | - | PARTIAL | ? | 3 | y | claude/rc-wp-arrival-mode | specs/world/waypoints.md | state 460/460 ticks equal: init 17 reads the fixed FrameCnt1 (x256), ENDANIM at frame+15 as 1.14d 0x00547210 (REC-1970) |
