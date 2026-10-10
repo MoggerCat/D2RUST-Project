@@ -322,7 +322,14 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     }
     fn quest_text_list(&mut self, player: UnitId, npc: UnitId) -> TextList {
         let mut list = TextList::new();
+        // The chat's held-item tests read the host's inventory model
+        // (REC-1555); the rest has no item list.
+        let held = self
+            .inv
+            .as_deref()
+            .map(|i| (i.cursor_item(player), i.items_of(player)));
         let (ctl, mut w) = self.quest_world();
+        w.held = held;
         ctl.npc_activate(&mut w, player, npc, &mut list);
         list
     }

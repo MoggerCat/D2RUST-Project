@@ -1307,6 +1307,46 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.cv.v.h.event_records.push(u, r);
             let _ = self.cv.game.lists.queue_update(u);
         }
+        // Swing (`bodies-2.md` §2.15): the player's mode request, unit
+        // form `0x00580A70` with the entry of skill 0, mode 7, re-entry 1
+        // (`pathing.md` §1.2): the used skill, the mode start (the path
+        // code's, which reaches the unit records) and then the unit form's
+        // target (`use.md` §4 "Where the target goes").
+        if let bodies::BodyEffect::UnitModeRequest {
+            u,
+            skill,
+            mode,
+            target,
+        } = e
+        {
+            let Some(entry) = crate::skills::use_::UseWorld::find_entry(self, u, skill) else {
+                return;
+            };
+            self.set_used_skill(u, Some(entry));
+            let cv = &mut self.cv;
+            let Some((ty, guid)) = cv.v.units.get(target).map(|r| (r.ty, r.guid)) else {
+                return;
+            };
+            let wt = crate::path::walk::request::WalkTarget::Unit { ty, guid };
+            if cv.v.h.paths.is_some() {
+                crate::wiring::path::walk::player_request_reentry(
+                    &mut cv.v,
+                    &mut *cv.game,
+                    u,
+                    None,
+                    mode as u32,
+                    wt,
+                );
+            } else {
+                cv.v.h
+                    .x
+                    .player_mode_request(&mut *cv.game, u, Some(skill as u16), mode as u32, wt);
+            }
+            let t = ModeTarget::Unit(target);
+            crate::wiring::interaction::body_path::point_target(&mut cv.v, u, t);
+            self.xm().keep_target(u, t);
+            return;
+        }
         if let Some(e) = self.pet_effect(e) {
             self.xm().body_effect(e);
         }

@@ -172,6 +172,12 @@ pub struct ObjectData {
     /// (`msg-units.md` §1.3 r3, `0x004BD6B0`: the shrines record of
     /// index interact).
     pub shrine: Option<u8>,
+    /// The object's footprint is on the client grid: stamped by the
+    /// object init `0x004BC720` (`0x00620A70`, when objects
+    /// `HasCollision[mode]` +0x120 + mode ≠ 0, `msg-units.md` §1.3 r2),
+    /// freed by `0x00623830` (`world/objects-client.md` §25 r9). The
+    /// client path stamps it ([`crate::world_view::walk::other_objects`]).
+    pub footprint: bool,
 }
 
 /// The per-kind data at unit +0x14 (model §1 rule 2).
@@ -651,6 +657,10 @@ pub struct ClientWorld {
     pub store_serial: u32,
     /// Bridge frames whose pump ran a server tick (`bridge.md` §5 rule 3).
     pub server_ticks: u64,
+    /// The flag byte of every 0x15 that placed the local player, in order
+    /// (`msg-units.md` §3 rule 4.6: each runs `0x00472C20(flag)`, whose
+    /// weather side the weather view replays on the shared client seed).
+    pub local_places: Vec<u8>,
     /// Set S: the units the server announced, in key order (§2 rule 8).
     pub units: BTreeMap<UnitKey, ClientUnit>,
     /// `[0x007A6A70]` (§3).

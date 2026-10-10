@@ -729,8 +729,13 @@ fn snapshot_host<C: Clock>(h: &pokes::ServerHost<C>) -> state::StateSnapshot {
 fn overlay_item_places(snap: &mut state::StateSnapshot, inv: &d2_sim::wiring::inventory::InvState) {
     use d2_sim::items::moves::mode;
     for u in snap.units.iter_mut().filter(|u| u.ut == 4) {
+        // Only a player's items: a monster's equipment (owner none) has
+        // its body location in its own static path, which the snapshot
+        // already carries.
         let placed = inv.items.values().find(|d| {
-            d.guid == u.g && matches!(d.mode, mode::STORED | mode::EQUIPPED | mode::BELT)
+            d.guid == u.g
+                && d.owner_guid != d2_sim::items::inventory::NO_GUID
+                && matches!(d.mode, mode::STORED | mode::EQUIPPED | mode::BELT)
         });
         if let Some(d) = placed {
             u.x = u32::try_from(d.x).ok();

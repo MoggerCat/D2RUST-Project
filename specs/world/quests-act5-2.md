@@ -29,16 +29,16 @@
 | Rules | 74–75 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
 |   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–370 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–500 |
-|   9. Act V intro (chain 40, slot 42) | 501–527 |
-|   10. Hooks called from other systems | 528–550 |
-|   11. NPC services and game completion | 551–564 |
-| Constants & data dependencies | 565–584 |
-| Randomness | 585–596 |
-| Edge cases & original bugs | 597–632 |
-| Test vectors | 633–647 |
-| Provenance | 648–670 |
-| Open questions | 671–751 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–504 |
+|   9. Act V intro (chain 40, slot 42) | 505–531 |
+|   10. Hooks called from other systems | 532–554 |
+|   11. NPC services and game completion | 555–568 |
+| Constants & data dependencies | 569–588 |
+| Randomness | 589–600 |
+| Edge cases & original bugs | 601–636 |
+| Test vectors | 637–651 |
+| Provenance | 652–674 |
+| Open questions | 675–755 |
 <!-- /index -->
 
 ## Summary

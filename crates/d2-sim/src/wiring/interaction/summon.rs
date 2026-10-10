@@ -395,3 +395,29 @@ impl<X: Pending> View<'_, X> {
         }
     }
 }
+
+/// Pet follow `0x005754B0` for the summoned pet types
+/// (`world/hirelings.md` §6 rule 1; [`ActionHooks::summon_follow`]): the
+/// `warp` types moved to `player`, the `range` types beyond 1600 removed
+/// with kill (`sim/pets.md` §6). Called from the host's pet follows
+/// ([`crate::wiring::action::Pending::summon_follow`]).
+pub fn summon_follow<X: Pending + UseRest>(
+    h: &mut crate::wiring::action::ActionHooks<X>,
+    sim: &mut crate::units::hooks::Sim<'_>,
+    player: UnitId,
+) {
+    let far = h.summon_follow(sim, player);
+    if far.is_empty() {
+        return;
+    }
+    let mut w = UseView {
+        cv: crate::wiring::action::combat::CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    let mut pv = PetView { u: &mut w };
+    for guid in far {
+        let _ = pets::remove(&mut pv, player, guid, true);
+    }
+}

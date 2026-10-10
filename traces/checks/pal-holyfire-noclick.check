@@ -1,0 +1,15 @@
+check 1
+# Holy Fire as the saved right skill: ScnPal (expansion Paladin, level 30, every skill at 20, right
+# skill 102), -seed 1234; warp to the Blood Moor (level 2; variant blood-moor-empty) before frame 4,
+# a Fallen (class 19) 2 sub-tiles away along +x before frame 10, then one right click at client pixel
+# (448, 324) at frame 20. Compares the aura's start (states, stats) and its periodic fire damage on
+# the Fallen over 120 frames. Area (q-fix-class-rows, q-fix-pt-right-aura). Spec: specs/tools/scenario-diff.md.
+name pal-holyfire-noclick
+save ScnPal --class pal --expansion --level 30 --all-skills 20 --right-skill 102
+seed 1234
+ticks 120
+seconds 300
+channels state
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 19 @x+2 @y normal
