@@ -34,17 +34,17 @@
 |   2. Store item level | 142–147 |
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–292 |
-|   5. Gambling | 293–360 |
-|   6. Refresh | 361–392 |
-|   7. Buying and selling | 393–586 |
-|   8. Repair | 587–641 |
-|   9. Prices | 642–841 |
-| Constants & data dependencies | 842–861 |
-| Randomness | 862–880 |
-| Edge cases & original bugs | 881–920 |
-| Test vectors | 921–943 |
-| Provenance | 944–982 |
-| Open questions | 983–1066 |
+|   5. Gambling | 293–385 |
+|   6. Refresh | 386–417 |
+|   7. Buying and selling | 418–611 |
+|   8. Repair | 612–666 |
+|   9. Prices | 667–866 |
+| Constants & data dependencies | 867–886 |
+| Randomness | 887–905 |
+| Edge cases & original bugs | 906–945 |
+| Test vectors | 946–968 |
+| Provenance | 969–1007 |
+| Open questions | 1008–1091 |
 <!-- /index -->
 
 ## Summary
@@ -322,6 +322,31 @@ list (+0x08). L_p = player level. c := 0. Loop:
    `0x005789F9`). If created: inventory page 0, repair (§8.2), flag 0x10 cleared
    (unidentified), place in the node's inventory; no room → destroy and
    stop.
+   Exact (1.14d-confirmed `0x00578A08`–`0x00578AAA`, read 2026-10-09,
+   PC 1 late): page := 0 (`0x00628280(item, 0)`, item data +0x45),
+   repair `0x005761C0`, item flag 0x10 cleared (`0x006280D0(item, 0x10,
+   0)`), then the placement wrapper `0x00560200(game, NPC, item GUID, x,
+   y, find free 1, send 0, inventory = the node's)` (x, y = the item's
+   static path +0x0C / +0x10, ignored with find free 1). In
+   `0x00560200`: the item must be in mode 4 (else it returns 0, and
+   §5.1 destroys the item and stops); the grid is the NPC's page-0 grid (`0x00621050(NPC, page,
+   game +0x70)`); the free-position search `0x0063B950` →
+   `0x0063B850` (`items/inventory.md` §2.3; the owner is not a player,
+   so an h = 1 item takes the first fit with x from width − 1 down,
+   e.g. a ring at x 9, y 0), link `0x0063B210`, then **mode := 0**
+   (stored, `0x00624690(item, 0)` at `0x00560364`). So every gamble-list
+   item is mode 0, page 0, at a grid cell of the node's inventory, flags
+   without 0x10. On the wire (the trade open of §4 rule 3, S→C 0x9C
+   action 0x0B with alt-code, `items/bitstream.md` §4.1 rule 4) the
+   stream's 3-bit mode (bits 42–44, stream byte 5) is 0, then body
+   location 0, the grid x and y (4 bits each), page + 1 = 1. Recorded
+   1.14d first gamble item, stream bytes 5–6: `00 12` (mode 0, x 9,
+   y 0); `q-chk-items-drops` hand-back, 2026-10-09.
+   d2rs differs: `world/vendors/gamble.rs` calls `place_in_gamble`, which
+   every host forwards to a no-op (`d2-client/src/app/rest.rs:345`
+   returns true; `vendor_inv.rs:282`, `vendor_world.rs:458` pass it
+   through), so the item keeps its creation mode 4 and position (0, 0)
+   and the stream shows `10 00` (mode 4, x 0, y 0).
 8. Stop after c reaches 14.
 
 Exact (handoff `impl-vendors` V9, `0x00578790`): the gamble index

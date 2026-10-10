@@ -27,11 +27,11 @@
 |   6. Block, weapon block, dodge, avoid, evade | 243–300 |
 |   7. Hostility and melee range | 301–398 |
 | Constants & data dependencies | 399–415 |
-| Randomness | 416–427 |
-| Edge cases & original bugs | 428–448 |
-| Test vectors | 449–473 |
-| Provenance | 474–499 |
-| Open questions | 500–521 |
+| Randomness | 416–444 |
+| Edge cases & original bugs | 445–465 |
+| Test vectors | 466–490 |
+| Provenance | 491–516 |
+| Open questions | 517–538 |
 <!-- /index -->
 
 ## Summary
@@ -424,6 +424,23 @@ Melee (`melee_result`), in order; a draw that is not reached is skipped:
 | 3a | defender | inline `lo′ mod 100` | 0–99 | evade | no block; defender moving; `passive_evade > 0` |
 | 3b | defender | `roll(100)` | 0–99 | weapon block | no block; not moving; weapon block > 0; class `ht2` |
 | 3c | defender | `roll(100)` | 0–99 | dodge (melee) or avoid (missile) | no block or weapon block; not moving; stat > 0 |
+
+Game seed: the hit, damage, hit recovery and death code steps it
+nowhere (static, 2026-10-09, `sim/rng.md` §5.6). During a hit on a
+monster it moves only through unit allocations, one step each (two per
+item), in the order they happen:
+
+1. Missiles `0x0059FA30`: the attack's own (skill `srvdofunc`), the
+   sub-missiles and hit missiles of `missiles/srvdo.tsv` /
+   `missiles/srvhit.tsv` (`0x0056EDE0`, `0x0056D4E0`, `0x005A9370`),
+   umod callbacks (`monsters/umod-callbacks.md` §6.2, §10.2, §11, §13.2,
+   §16, §15 Mephisto `0x005DFDB0`), monster skills.
+2. Drops of a kill: each item and gold pile of the TC drop
+   (`items/treasure.md` §7, `0x00558D90`): two steps.
+3. Units spawned by quest, umod or AI code (`sim/units.md` §3.1 r4.2).
+4. Room population when the fight moves the player into new rooms
+   (`monsters/population.md` §3: density and sparse draws, then the
+   spawned units).
 
 ## Edge cases & original bugs
 
