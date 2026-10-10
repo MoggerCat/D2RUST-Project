@@ -34,17 +34,17 @@
 | Inputs | 62–73 |
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
-|   25. Client object function dispatch | 84–239 |
-|   26. The client object functions | 240–438 |
-|   27. Client latches of the zoo and the preloads | 439–449 |
-|   28. What d2rs must model for §25–§27 | 450–462 |
-|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 463–541 |
-| Constants & data dependencies | 542–563 |
-| Randomness | 564–577 |
-| Edge cases & original bugs | 578–595 |
-| Test vectors | 596–630 |
-| Provenance | 631–664 |
-| Open questions | 665–680 |
+|   25. Client object function dispatch | 84–249 |
+|   26. The client object functions | 250–448 |
+|   27. Client latches of the zoo and the preloads | 449–459 |
+|   28. What d2rs must model for §25–§27 | 460–472 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 473–551 |
+| Constants & data dependencies | 552–573 |
+| Randomness | 574–587 |
+| Edge cases & original bugs | 588–605 |
+| Test vectors | 606–640 |
+| Provenance | 641–674 |
+| Open questions | 675–690 |
 <!-- /index -->
 
 ## Summary
@@ -151,7 +151,17 @@ server state changes; no S→C message is read here.
    flag 1 set, temporary stat lists dropped, then the animation re-init
    `0x00624390` — frame event +0x4E := 0, frame := frame bonus × 256,
    which is 0 for objects; the same mode only sets flag 1).
-   `refresh(U)` = the graphics refresh `0x00470610(U, 0)`. `reinit(U)` =
+   `refresh(U)` = the graphics refresh `0x00470610(U, 0)`, which for an
+   object (unit type 2) runs `0x0046E980` in U's mode m: the class's
+   `Mode<m>` flag (objects.txt `Mode0`–`Mode7`, row +0x13F + m) must be
+   1, else fatal 0x4DC (`Gfx.cpp`, the game ends with exit code
+   0xFFFFFFFF through `0x00681E09`; REC-3160). With the flag set and
+   the graphics for (token, mode) not loadable it is fatal 0x4D4 (the
+   file lookup `0x0046E740` returns 0). Reached in the checks
+   `gen-obj-374`, `-385`, `-400`, `-403`, `-450` (`Mode1` = 0; the
+   operate sets mode 1 and the next generic step refreshes) and
+   `gen-obj-375` (0x4D4 at the creation, call chain `0x00466300` →
+   `0x00470610`, mode 0). `reinit(U)` =
    `0x00624390(U)` alone. "write mode m" = U+0x10 := m without
    `set_mode`. `End(m)` = `FrameCnt[m]` (already × 256 in the binary
    row, `data/fixups.md` §13) − 256, the last frame. `sound(U)` = the

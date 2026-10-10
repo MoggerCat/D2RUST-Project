@@ -1,0 +1,56 @@
+{
+ "channel": "state",
+ "check": "hire-resurrect-greiz",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "500",
+  "--ticks",
+  "130",
+  "--auto",
+  "ScnHr2",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto unit 1:198",
+  "--poke",
+  "40 stat @1:338 6 0 0",
+  "--poke",
+  "70 goto unit 1:198",
+  "--send",
+  "8 InteractWithEntity type=1 id=@1:198",
+  "--send",
+  "10 InitEntityChat id=@1:198",
+  "--send",
+  "14 HireMerc npc=@1:198 merc=1019",
+  "--send",
+  "80 InteractWithEntity type=1 id=@1:198",
+  "--send",
+  "82 InitEntityChat id=@1:198",
+  "--send",
+  "86 ResurrectMerc npc=@1:198"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "5925d8237f74f0384568fa0d14c5bf2e94b94203a0d196b84e0e439aae9e7f10",
+   "size": 1274254
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "895bbf8551e9aa5eec9cc8a16c30e00de760351abb7b6e38845a0b743e09a9aa",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "5dd135d744ce1c88ffa34b91925f353ef8c2bfb14d0463a616fd34fa62844213"
+ }
+}
