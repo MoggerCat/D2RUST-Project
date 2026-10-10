@@ -19,7 +19,7 @@ three separate message-order causes, each the first difference in turn.
    at the end of the sim tick; 1.14d runs it inside the flush before the
    buffers go. New `Tick::flush_sync` (default no-op), called by
    `Host::flush_inner`; `SimGame` runs `vitals_sync` there.
-   Walk-test fixture calls it after `tick`.
+   (Landed identically on staging-7 meanwhile; merged, theirs kept.)
 3. Frame 70, `1d 02 1b` once instead of twice: AddStatPoint's refresh
    `0x0064C040` did not queue the unit for the update pass, so step 7's
    single stat send (dex) was missing before the mod flush. `CombatView::
@@ -30,3 +30,5 @@ Specs: vitals.md §2 and §5.1, triggers-2.md §14 table note.
 - State channel stays PARTIAL (unrelated to intents; not investigated).
 - Only the 0x2C of NPC greeting was exercised; other monster
   `play_sound` callers (event 16 in bodies5) now also queue: unverified.
+- `coverage.py --check` has 1 error not from this branch: debug/state/tests.rs:409 malformed rule.
+- d2-client tests not run (disk allowance); clippy -D warnings clean.
