@@ -485,7 +485,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
         match self.list(u) {
             Some(l) => l.view().into_iter().find(|e| e.skill == skill),
-            None => self.x().find_entry(u, skill),
+            None => self
+                .x()
+                .find_entry(u, skill)
+                .or_else(|| self.cv.v.h.monster_entry_of(u, skill)),
         }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {
@@ -907,6 +910,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn list_set(&mut self, l: ListId, s: i32, v: i32) {
         if let Ok(s) = u16::try_from(s) {
             self.cv.v.set_list_stat(l, s, v);
+        }
+    }
+    fn list_set_layer(&mut self, l: ListId, s: i32, v: i32, layer: u16) {
+        if let Ok(s) = u16::try_from(s) {
+            self.cv.v.stats.set(&mut *self.cv.v.h, l, s, v, layer, None);
         }
     }
     fn attach(&mut self, u: UnitId, l: ListId) {

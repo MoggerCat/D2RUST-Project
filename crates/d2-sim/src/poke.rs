@@ -412,7 +412,7 @@ fn signed(t: &str) -> Result<i32, String> {
     }
 }
 
-/// d2rs-own: a poked position reaches the client like a placement does
+/// d2rs-own (`hop` only): a poked position reaches the client like a placement does
 /// (queued for update with flag-ex 0x10000: the S→C 0x15 at its next update,
 /// `sim/path-placement.md` §6 rule 4), so a client model and its pick
 /// see the unit where the poke put it.
@@ -1556,8 +1556,10 @@ fn run<X: WorldPending>(
                     None => return Ok(PokeResult::Failed),
                 }
             }
+            // 1.14d's `pos` poke sends no S->C 0x15 (REC-2900,
+            // `gen-sysc-client-msg-ui-2`: frame 4 has none): no reassign
+            // mark here, unlike `hop`.
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
-            mark_reassign(game, sim, u);
             PokeResult::Ok(None)
         }
         Directive::Hop { unit, x, y } => {

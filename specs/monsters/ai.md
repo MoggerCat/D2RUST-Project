@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 305–451 |
 |   3. AI control and AI tables | 452–640 |
 |   4. AI parameters | 641–659 |
-|   5. Target selection | 660–1087 |
-|   6. Distances and line tests | 1088–1103 |
-|   7. Tactics helpers | 1104–1383 |
-|   8. AI commands and minions | 1384–1410 |
-|   10. The catalogue `ai-functions.tsv` | 1411–1431 |
-| Constants & data dependencies | 1432–1455 |
-| Randomness | 1456–1485 |
-| Edge cases & original bugs | 1486–1527 |
-| Test vectors | 1528–1616 |
-| Provenance | 1617–1678 |
-| Open questions | 1679–1785 |
+|   5. Target selection | 660–1094 |
+|   6. Distances and line tests | 1095–1110 |
+|   7. Tactics helpers | 1111–1390 |
+|   8. AI commands and minions | 1391–1417 |
+|   10. The catalogue `ai-functions.tsv` | 1418–1438 |
+| Constants & data dependencies | 1439–1462 |
+| Randomness | 1463–1492 |
+| Edge cases & original bugs | 1493–1534 |
+| Test vectors | 1535–1623 |
+| Provenance | 1624–1685 |
+| Open questions | 1686–1796 |
 <!-- /index -->
 
 ## Summary
@@ -1085,6 +1085,13 @@ not the no-size one: `a5-warp-l110-siege-1-ama` frame 23, Barbarian
 (4324,5089), the position of 1:19 (the no-size distances 8, 9, 7, 7
 would tie 1:18 and 1:19). L is 0 there (LOS-draw true, §5.2).
 
+Implemented for the live host (`d2-client` `LocalSeams::good_target_search`,
+REC-2860): d is the full-size distance with the **candidate's** size
+subtracted, and d ≤ 35 is in (35 included). `a5-su-ancient1..3` and the
+other level-110 checks had the barbarian run to 1:18 (4321,5095) with the
+no-size distance; 1.14d's target (4324,5089) is 1:19. Still open: the
+`threat` main / alt class split (rule 3) and the walk-order tie-break.
+
 ### 6. Distances and line tests
 
 All distances are in tiles (subtile coordinates of `sim/units.md`):
@@ -1687,8 +1694,12 @@ Other recorded checks:
    of the single-player packet recordings (`sim/intents-events.md`
    §Provenance, `-015956`); +0x74 is the ladder flag (game creation
    flags bit 21, `0x00530D59`). +0x6A ≠ 0 in single player, so §1.3
-   rule 1 takes `aidel(N)` / `aidel(H)` by difficulty there. Confirm
-   with a Nightmare recording (PC 2 list).
+   rule 1 takes `aidel(N)` / `aidel(H)` by difficulty there.
+   Confirmed 2026-10-10 (rc-c008-monmode): `diff-a3-hell-normal-bm`,
+   Hell baboon3: the attack1 ends at frame 51 and the next walk starts
+   at 64 (+13 = `aidel(H)`), not 66 (+15). d2rs had read the Normal
+   column at every difficulty (`UnitData::aidel_by_difficulty` was never
+   set); it is now `game_type != 0 || ladder` at game creation.
 3. The `0x005A8520` knockback-end branches have no recorded instance:
    record a knockback (e.g. a player skill with knockback on fallen and
    on a sand leaper) and check +1 / +15 / gethit.

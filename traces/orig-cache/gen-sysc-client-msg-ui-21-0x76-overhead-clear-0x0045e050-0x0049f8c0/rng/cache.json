@@ -1,0 +1,39 @@
+{
+ "channel": "rng",
+ "check": "gen-sysc-client-msg-ui-21-0x76-overhead-clear-0x0045e050-0x0049f8c0",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "60",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "133226ffad09ec3fbd5b11b74d9e4673ff44a3ce30d1501146f575ccb2bf5366",
+   "size": 1234203
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "6b89c0ec294e63b4ddf222819b1b94c0e380e888aab2457929f30aa9fc00a9d8",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "7a4b4198964a2bc05e0a5e49a81080707335f061078dcfdfdcfb0acdac698f1a",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

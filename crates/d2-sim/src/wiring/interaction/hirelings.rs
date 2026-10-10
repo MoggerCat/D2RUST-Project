@@ -121,6 +121,9 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
             .entry(unit)
             .or_default()
             .push((stat, value));
+        // The unit's message list, flushed by the client pass (§13 rule 4).
+        self.desk.econ.hooks.queue_unit_stat(unit, stat, value);
+        let _ = self.desk.econ.game.lists.queue_update(unit);
     }
     fn guid(&self, unit: UnitId) -> u32 {
         self.desk.econ.units.get(unit).map_or(u32::MAX, |r| r.guid)

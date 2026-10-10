@@ -1,0 +1,46 @@
+{
+ "channel": "state",
+ "check": "gen-npc-tyrael2",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "50",
+  "--auto",
+  "ScnAm4",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto unit 1:367",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:367",
+  "--send",
+  "16 InitEntityChat id=@1:367",
+  "--send",
+  "18 TerminateEntityChat id=@1:367"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "0185ad5309542fde5822785953659eb34f33120251c7ac658d3efeac35e06d30",
+   "size": 252628
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "60059e81555d880bd3c223ccfb0afc92f0bc4604824911dbfa81c30650cb53b1",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "6d51f05d37e6af92824615e7812e8a3e93e5526447cf353a5a941f9ed38cab47"
+ }
+}

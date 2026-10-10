@@ -180,16 +180,14 @@ fn a_player_with_no_life_dies_and_leaves_a_corpse() {
     assert_eq!(changed, [p]);
     assert_eq!(stops(&mut fx, 9), 2);
     let (&c, &owner) = fx.sim.hooks().death.owners.iter().next().expect("a corpse");
-    // The corpse appears (0x59) and lies dead (0x0D code 9), to both.
+    // The creation broadcasts 0x8E (flag 1, owner, corpse) to both; the
+    // corpse itself arrives with its add messages in the client pass.
     let cguid = fx.sim.sys.units.get(c).unwrap().guid;
     let sent = fx.sim.hooks().x.sent.clone();
-    assert_eq!(sent.iter().filter(|(_, m)| m[0] == 0x59).count(), 2);
-    assert_eq!(
-        sent.iter()
-            .filter(|(_, m)| m[0] == 0x0D && m[6] == 9 && m[2..6] == cguid.to_le_bytes())
-            .count(),
-        2
-    );
+    let mut want = vec![0x8E, 1];
+    want.extend(guid.to_le_bytes());
+    want.extend(cguid.to_le_bytes());
+    assert_eq!(sent.iter().filter(|(_, m)| *m == want).count(), 2);
     assert_eq!(owner, guid);
     assert!(fx.sim.sys.stats.has_state(c, STATE_PLAYERBODY));
     assert_eq!(fx.sim.sys.units.get(c).unwrap().mode, 17);

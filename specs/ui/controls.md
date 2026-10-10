@@ -27,15 +27,15 @@
 |   3. Commands and default keys | 124–231 |
 |   4. Dispatch | 232–301 |
 |   5. Key-config screen assignment | 302–317 |
-|   6. World clicks (left / right button; answers OQ 2 in part) | 318–720 |
-|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 721–762 |
-|   B4. Original-defaults check (`client/ui.md` §B4) | 763–788 |
-| Constants & data dependencies | 789–795 |
-| Randomness | 796–799 |
-| Edge cases & original bugs | 800–812 |
-| Test vectors | 813–840 |
-| Provenance | 841–859 |
-| Open questions | 860–907 |
+|   6. World clicks (left / right button; answers OQ 2 in part) | 318–727 |
+|   7. Gates and belt use (answers OQ 3, OQ 4, OQ 5) | 728–769 |
+|   B4. Original-defaults check (`client/ui.md` §B4) | 770–795 |
+| Constants & data dependencies | 796–802 |
+| Randomness | 803–806 |
+| Edge cases & original bugs | 807–819 |
+| Test vectors | 820–847 |
+| Provenance | 848–866 |
+| Open questions | 867–914 |
 <!-- /index -->
 
 ## Summary
@@ -534,9 +534,16 @@ check reads it.
       (:= 0, `client/stat-lists.md` §3 r6.5–r6.6, r6.8). So the client's
       own lock lasts at most 12 client updates and covers the gap until
       the server's state 121 arrives; from then on test 10 refuses.
+      REC-2900 (1.14d recording `gen-skill-ama-7`, Fire Arrow with no
+      bow worn: 1.14d sends no C→S 0x0C at the click, d2rs did): d2rs
+      (`bridge::use_state::item_type_test`) now runs the item type test
+      `0x00643F80` of test 5 (rules 1–4 of `skills/use.md` §2 "Item type
+      test", items at body locations 4 and 5, type equivalence through
+      the item tables) → state 2. PROVISIONAL: the matched-item rules
+      (item flags, `shoots` ammo) and the weapon in use of skills 4 / 5.
       PROVISIONAL (REC-2417): d2rs (`bridge::use_state::use_state`) runs
-      tests 1–4, 6 (mana, `skills/levels.md` §4) and 7 (shape) on the
-      model and reads tests 5, 8–10 and the lock as passing (because
+      tests 1–4, 5 (type part), 6 (mana, `skills/levels.md` §4) and 7
+      (shape) on the model and reads the rest of test 5, tests 8–10 and the lock as passing (because
       the model's click path holds no lock counter and does not yet
       read the item, start-stat and charge facts for it); settled by
       build-queue proposal `q-fix-pc1today-use-state-tests` and a 1.14d

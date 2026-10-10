@@ -590,6 +590,10 @@ impl BodyWorld for BodyFake {
     fn list_set(&mut self, l: usize, s: i32, v: i32) {
         self.lists[l].stats.insert(s, v);
     }
+    /// Layer `k` > 0 is kept under the key `k << 16 | s`.
+    fn list_set_layer(&mut self, l: usize, s: i32, v: i32, layer: u16) {
+        self.lists[l].stats.insert(i32::from(layer) << 16 | s, v);
+    }
     fn attach(&mut self, u: usize, l: usize) {
         self.lists[l].unit = Some(u);
     }

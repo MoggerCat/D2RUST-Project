@@ -422,7 +422,7 @@ pub fn enter_game<D: ActionEvents, W>(
             a.sys
                 .hooks
                 .x
-                .send(player, &msg::set_skill(hand, guid, 0, skill, u32::MAX));
+                .send(player, &msg::set_skill(0, guid, hand, skill, u32::MAX));
         }
     }
     // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
@@ -596,6 +596,15 @@ pub fn load_save<D: ActionEvents, W>(
         let mut cw = ActionCharacter { v, player };
         let mut r = character::load(save, ctx, &mut cw)?;
         if !r.new_character {
+            // `0x005701B0` selects (and sends 0x23) only when the player's
+            // list holds the entry of (skill, owner -1) (`formats/d2s.md`
+            // §2.4 rule 6.3); a class skill with no entry sends nothing.
+            let list = cw.v.h.skill_lists.get(&player);
+            for sel in &mut r.mouse_selected {
+                if sel.is_some_and(|k| !list.is_some_and(|l| l.find(i32::from(k), -1).is_some())) {
+                    *sel = None;
+                }
+            }
             if let Err(u) = cw.quest_entry(0) {
                 r.unapplied.push(u);
             }

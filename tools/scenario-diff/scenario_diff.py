@@ -456,6 +456,12 @@ class Runner:
                     shutil.rmtree(scene_d)  # a stale dump never counts as this run's
                 args = [exe, "play"] + self.d2rs_common(save, play=True) + [
                     "--dump-draws", scene_d, "--at-tick", str(at)]
+                # rule 7.3: d2rs follows the recording's frame schedule and
+                # host clock (a compare needs the 1.14d capture)
+                if not self.dry and os.path.exists(raw):
+                    sched = self.path("frame-schedule.tsv")
+                    write_frame_schedule(raw, sched)
+                    args += ["--frame-schedule", sched]
                 if self.d2rs_input():
                     args += ["--input", self.d2rs_input()]
                 with self.display() as env:
@@ -626,6 +632,41 @@ def draws_summary(orig_tsv, d2rs_tsv, code, tick):
     out.update(rows_compared=max(len(ra), len(rb)), rows_equal=equal, first=first,
                rows=(len(ra), len(rb)))
     return out
+
+
+def write_frame_schedule(raw, out):
+    """Rule 7.3: the recorded frame schedule d2rs follows (`play
+    --frame-schedule`, format `frame-schedule 1`): one row per captured
+    frame (server tick `f`), with the host clock of its cursor step: the
+    cursor's `last_step` captured at the start of the next frame (the
+    capture reads the cursor at frame start, `render/capture.md` §3.3),
+    `-` for the last frame (its step follows every compared draw); the
+    cursor's `last_step` and `idle_since` at the first frame. A capture
+    without them fails the check: d2rs never falls back to its own clock."""
+    import json
+    frames = []
+    with open(raw, encoding="utf-8") as f:
+        for line in f:
+            if '"k": "frame"' not in line and '"k":"frame"' not in line:
+                continue
+            r = json.loads(line)
+            if "refused" in r:
+                continue
+            c = r.get("cursor") or {}
+            if r.get("f") is None or c.get("last_step") is None or c.get("idle_since") is None:
+                raise CheckError(f"{raw}: frame seq {r.get('seq')} has no server tick or cursor "
+                                 "clock (cursor.last_step / idle_since): no frame schedule for d2rs")
+            frames.append(r)
+    if not frames:
+        raise CheckError(f"{raw}: no captured frame: no frame schedule for d2rs")
+    c0 = frames[0]["cursor"]
+    rows = ["# frame-schedule 1", f"# cursor_last {c0['last_step']}",
+            f"# cursor_idle {c0['idle_since']}", "tick\tnow"]
+    for i, r in enumerate(frames):
+        now = frames[i + 1]["cursor"]["last_step"] if i + 1 < len(frames) else "-"
+        rows.append(f"{r['f']}\t{now}")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("\n".join(rows) + "\n")
 
 
 def frame_seq_at(raw, tick):
