@@ -886,10 +886,7 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     /// anim rate), then the anim rate refreshed. Nothing without a list.
     fn aura_fill(&mut self, game: &mut Game, unit: UnitId, s: i32, skill: i32, level: i32) {
         use crate::combat::CombatWorld;
-        let Some(l) = u16::try_from(s)
-            .ok()
-            .and_then(|s| self.state_list(unit, s))
-        else {
+        let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) else {
             return;
         };
         let t = self.h.tables.clone();
@@ -929,10 +926,7 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     }
     /// `0x006260B0`: the expiry of the unit's list of `s`.
     fn set_state_list_expiry(&mut self, unit: UnitId, s: i32, expire: i32) {
-        if let Some(l) = u16::try_from(s)
-            .ok()
-            .and_then(|s| self.state_list(unit, s))
-        {
+        if let Some(l) = u16::try_from(s).ok().and_then(|s| self.state_list(unit, s)) {
             self.stats.set_expire(l, expire);
         }
     }

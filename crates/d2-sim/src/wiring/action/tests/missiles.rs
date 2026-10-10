@@ -363,20 +363,19 @@ fn missile_state_list_seams_use_the_real_stat_lists() {
     let mut s = shot();
     let (owner, target) = (s.owner, s.target);
     let state = 1;
-    let r = s
-        .fx
-        .sim
-        .missiles(&mut s.fx.game, |g, cx| {
-            let w = &mut *cx.world;
-            assert!(w.states_count() > state);
-            assert_eq!(w.state_list_expiry(target, state), None);
-            assert!(w.new_state_list(g, target, state, 40, owner));
-            let e = w.state_list_expiry(target, state);
-            w.set_state_list_expiry(target, state, 55);
-            w.mark_state_changed(target, state);
-            (e, w.state_list_expiry(target, state))
-        })
-        .unwrap();
+    let r =
+        s.fx.sim
+            .missiles(&mut s.fx.game, |g, cx| {
+                let w = &mut *cx.world;
+                assert!(w.states_count() > state);
+                assert_eq!(w.state_list_expiry(target, state), None);
+                assert!(w.new_state_list(g, target, state, 40, owner));
+                let e = w.state_list_expiry(target, state);
+                w.set_state_list_expiry(target, state, 55);
+                w.mark_state_changed(target, state);
+                (e, w.state_list_expiry(target, state))
+            })
+            .unwrap();
     assert_eq!(r, (Some(40), Some(55)));
     let v = &s.fx.sim.sys.stats;
     assert!(v.has_state(target, state as u32));
