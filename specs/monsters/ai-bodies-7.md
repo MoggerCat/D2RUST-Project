@@ -54,13 +54,13 @@
 |   24. Wussie (131) `0x005EE3C0` | 658–685 |
 |   25. UberIzual (144) `0x005F8C80` | 686–701 |
 |   26. UberBaal (145), UberMephisto (146), UberDiablo (147) | 702–754 |
-|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 755–936 |
-| Constants & data dependencies | 937–959 |
-| Randomness | 960–967 |
-| Edge cases & original bugs | 968–984 |
-| Test vectors | 985–1005 |
-| Provenance | 1006–1037 |
-| Open questions | 1038–1049 |
+|   27. ShadowMaster (106) `0x005EB970`, init `0x005EB490`; ShadowMasterNoInit (143), init `0x005EB5C0` | 755–944 |
+| Constants & data dependencies | 945–967 |
+| Randomness | 968–975 |
+| Edge cases & original bugs | 976–992 |
+| Test vectors | 993–1013 |
+| Provenance | 1014–1045 |
+| Open questions | 1046–1057 |
 <!-- /index -->
 
 ## Summary
@@ -773,7 +773,15 @@ skill list (data tables +0xBA4 counts, +0xBAC ids by class,
 `0x00646140` / `0x006460F0`) that passes the pet test of §18
 (`0x005EAB20`): give the unit s at level clamp(v / 2 + λ / 2, 1, 24),
 v := O's base level of s (`0x006442A0(O, entry, 0)`, 1 when O lacks
-it) (`0x005EB420`). **Init 143** `0x005EB5C0`: λ := 1 / O's level of
+it) (`0x005EB420`). Implemented (rc-c008-monmode, 2026-10-10): the unit's list is its init
+entries plus the assigned ones (`ActionHooks::monster_skills`, kept in
+skill-id order: PROVISIONAL REC-3510, 1.14d's is insertion order), the
+entry mode is the skill's `monanim`, and O's levels are read from the
+player's list (`ActionHooks::skill_lists`: base + bonus, highest entry
+for λ). Settled by `ass-shadow-master` (frame 48 cast of Fade, frame 62
+neutral rate 194: the pet's skill levels come from O's, not 1; state
+70/70).
+**Init 143** `0x005EB5C0`: λ := 1 / O's level of
 K0; skill 0 ensured; left and right := 0; no class skills.
 
 **Think:**

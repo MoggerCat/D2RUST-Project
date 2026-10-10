@@ -1,6 +1,6 @@
 C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	done EQUAL +13 rows (C028,C026,C064,C065)
 C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	done ui.frontend rows linked to ui-frontend-screens; stable-px diff main 26500->918 (EQUAL 0->0)
-C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	open
+C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	done checked +2 (NO-CHECK 260 -> 258); EQUAL -7: 7 system.client rows re-measured DIVERGED by the new cstate channel (override part)
 C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	done EQUAL +3 (superunique beetleburst, dark-elder, fire-eye); coldworm+wp-42 packets MATCH
 C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
 C-skilldelay-a7	rc-skill-div-b	16:59	s2c 0xa7 state 121 missing in d2rs at cast (gen-skill-sor-51/56/59/62/64, dru-225/229/234)	open
@@ -25,10 +25,16 @@ C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
 C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
-C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open
 C068	rc-ctail-packets	18:55	s2c 0x0a missing gold pickup via 0x13	done net-s2c-gold-pickup packets MATCH
-C024	rc-net-div	18:37	a2-super-fangskin frame 5 s2c 0x53 Darkness missing (act-load quest hook 0x0059AC40 never called: Tainted Sun at Act II first build)	open
+C024	rc-net-div	18:37	a2-super-fangskin frame 5 s2c 0x53 Darkness missing (act-load quest hook 0x0059AC40 never called: Tainted Sun at Act II first build)	done +10 rows EQUAL (vendor.*, npc.akara, inv.item-use, warp-0x07-frame); fangskin f5->f46
 C067	rc-drops-order	17:39	items-drops-nor-09 category ass 16 vs 5; nor-10 gld missing (drop pick)	done EQUAL 3456 -> 3457 (nor-09/-12 order, hel-04/-05 MATCH; nor-10 is a separate cause: 3 monsters never die in d2rs, not drop picking)
 C010q	rc-drops-order	18:27	items-drops-nor-07 Andariel quest TC (TreasureClass4/TCQuestId, quest_tc_open never implemented)	open
+C012	rc-c012-a8bytes	19:06	packets s2c 0xa8 bytes[] (bar-battle-command, bar-shout, gen-missile-149)	done EQUAL +3 rows (skill.bar.battle-command, skill.bar.shout, missile.shout); stat 83/126/127/188 refresh-all + passive changed bit
 C-ui-pix	rc-ui-pixels	17:27	q-fix-pc1today-cast-light (remove_unit_light drops the player light); ui-draws rows all equal but index_sha256 differs (13 checks); skill-pick/skillbar rows 232-233 CelDrawColor vs CelDraw; help/msglog/automap rows 217-247	open
 C-mon-inv-9d	rc-skill-promote-9d	19:03	0x9D monster inventory (0x00534F80) for ass shadow-warrior/master	open
+C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	done ass-shadow-master state 61->70/70 (player skill levels for the pet); 20 checks improved, 0 worse
+C070	rc-drops-2	19:22	items-drops-nor-10 monsters 0x16/0x17/0x1b never die (1.14d frames 183/187)	open
+C-pc1-wine-2	rc-pc1-wine	19:24	object.preset 574-579 (DS1 data has none), system.formats d2s-appearance 4/5 + d2s-load variants (Wine saves), Step 4 list	open
+C-pkt-0xac-size	rc-pkt-sizes	19:27	0xAC size ass-shadow-master 23 vs 14, ama-valkyrie 18 vs 14, nec-bone-wall 19 vs 14	open
+C-pkt-0xa8-shrine7	rc-pkt-sizes	19:27	gen-shrine-7 0xA8 size 15 vs 12	open
+C-pkt-0x67-dru	rc-pkt-sizes	19:27	dru-cycle-of-life/plague-poppy/vines 0x67 byte[6] + tx 5143 vs 5144; gen-skill-ass-257/261 0x67/0x21	open

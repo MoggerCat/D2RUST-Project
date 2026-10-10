@@ -1,0 +1,9 @@
+check 1
+# Rogue Encampment arrival, idle (docs/handoff/q-cloud-game.md Step 4):
+# ScnAma, -seed 1234, no input. Spec: specs/tools/scenario-diff.md.
+name a1-town-arrival-ama-cs
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels cstate
