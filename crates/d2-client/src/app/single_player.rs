@@ -1228,7 +1228,26 @@ impl Pending for LocalSeams {
     /// `0x005DD7F0` step 4 for a good unit: [`LocalSeams::nearest_foe`]
     /// within 35 (`ai.md` §5.2 step 4), no-size distance.
     fn good_target_search(&mut self, _: &mut Game, unit: UnitId, _: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe(unit, GOOD_SEARCH_RANGE, false)
+        // Scan 5 callback `0x005DCA70` rule 2 (`ai.md` §5.4): the full-size
+        // distance `0x005DC380` with the CANDIDATE's size subtracted
+        // (a = C), and d > 35 skips (35 is in).
+        let &(_, _, at) = self.sides.get(&unit)?;
+        let side = self.player_side(unit)?;
+        self.sides
+            .iter()
+            .filter(|&(&u, &(ty, ..))| {
+                u != unit
+                    && ty == UnitType::Monster
+                    && self.player_side(u) != Some(side)
+                    && !self.down.contains(&u)
+                    && !self.not_att.contains(&u)
+            })
+            .map(|(&u, &(_, _, p))| {
+                let size = self.sizes.get(&u).copied().unwrap_or(0);
+                (u, d2_sim::monsters::ai::distance_full_size(p, size, at))
+            })
+            .filter(|&(_, d)| d <= GOOD_SEARCH_RANGE)
+            .min_by_key(|&(u, d)| (d, u))
     }
     /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
     /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
@@ -2983,11 +3002,11 @@ mod target_search_tests {
     fn the_good_main_search_stays_within_35() {
         let mut g = Game::default();
         assert_eq!(
-            seams(134, 0).good_target_search(&mut g, UnitId(1), false),
-            Some((UnitId(2), 34))
+            seams(135, 0).good_target_search(&mut g, UnitId(1), false),
+            Some((UnitId(2), 35))
         );
         assert_eq!(
-            seams(135, 0).good_target_search(&mut g, UnitId(1), false),
+            seams(136, 0).good_target_search(&mut g, UnitId(1), false),
             None
         );
     }

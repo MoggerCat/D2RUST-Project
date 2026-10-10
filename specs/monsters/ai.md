@@ -1085,6 +1085,13 @@ not the no-size one: `a5-warp-l110-siege-1-ama` frame 23, Barbarian
 (4324,5089), the position of 1:19 (the no-size distances 8, 9, 7, 7
 would tie 1:18 and 1:19). L is 0 there (LOS-draw true, §5.2).
 
+Implemented for the live host (`d2-client` `LocalSeams::good_target_search`,
+REC-2860): d is the full-size distance with the **candidate's** size
+subtracted, and d ≤ 35 is in (35 included). `a5-su-ancient1..3` and the
+other level-110 checks had the barbarian run to 1:18 (4321,5095) with the
+no-size distance; 1.14d's target (4324,5089) is 1:19. Still open: the
+`threat` main / alt class split (rule 3) and the walk-order tie-break.
+
 ### 6. Distances and line tests
 
 All distances are in tiles (subtile coordinates of `sim/units.md`):
