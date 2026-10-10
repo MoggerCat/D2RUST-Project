@@ -17,10 +17,10 @@ use super::super::check::check;
 use super::super::dispatch::{HandlerError, Message, UnitMessage};
 use super::super::drlg::DrlgRoomId;
 use super::super::modes::{mode_request, neutral_walk, player_mode, remove_unit_light};
-use super::super::player_anim;
 use super::super::objects::interact::{mode_request_code_2, CODE_INTERACT};
 use super::super::objects::FLAG_EX_EXPANSION;
 use super::super::output::{Output, ShrineFxKind};
+use super::super::player_anim;
 use super::super::skills::SkillList;
 use super::super::world::{
     ClientUnit, ClientWorld, KindData, MonsterData, MonsterSetup, ObjectData, PlayerData, UnitKey,
