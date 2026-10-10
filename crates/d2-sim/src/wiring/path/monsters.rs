@@ -762,9 +762,18 @@ pub(crate) fn stage_velocity<X: Pending>(
     }
 }
 
-/// `0x00553540`: the path target unit; `None` without one.
+/// `0x00553540`: the path target unit; `None` without one. A target that
+/// is the unit itself counts as none (the original returns 0 when the
+/// looked-up unit equals the caller), so a town NPC's mode end after a
+/// self-targeted S1 requests neutral toward point (0, 0)
+/// (`ai.md` §1.4; `gen-wp-30` frame 430, Malah).
 pub(crate) fn path_target<X: Pending>(h: &ActionHooks<X>, unit: UnitId) -> Option<UnitId> {
-    h.paths.as_ref()?.dynamic(unit)?.target_unit.map(|t| t.unit)
+    h.paths
+        .as_ref()?
+        .dynamic(unit)?
+        .target_unit
+        .map(|t| t.unit)
+        .filter(|&t| t != unit)
 }
 
 /// Path flag 0x800 (`ai.md` §2.2 rule 2: a blocked step).
