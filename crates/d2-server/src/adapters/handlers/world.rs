@@ -197,12 +197,12 @@ pub const WORLD_IDS: &[(u8, &str, Status)] = &[
         "world/quests.md §1.7",
         Status::Implemented(System::Quests),
     ),
-    // §9 rule 1 names `monsters/ai.md` §9.9; the AI params are
-    // `monsters/ai-bodies.md` §9.9's, the handler's entry is not written.
+    // §9 rule 1 names `monsters/ai.md` §9.9; the entry `0x0054CA10` is
+    // `monsters/ai-bodies.md` §9.9's (`NpcControl::make_entity_move`).
     (
         0x59,
-        "monsters/ai-bodies.md §9.9 (entry not written)",
-        Status::NoOwner,
+        "monsters/ai-bodies.md §9.9",
+        Status::Implemented(System::Npc),
     ),
     (0x62, "world/npc.md §7.4", Status::Implemented(System::Npc)),
 ];
@@ -602,6 +602,7 @@ impl NpcCall for NpcRun<'_> {
         Ok(match m[0] {
             0x13 => ctl.interact(w, p, m)?,
             0x2F => Some(ctl.chat_open(w, p, m)),
+            0x59 => Some(ctl.make_entity_move(w, p, m)),
             0x30 => Some(ctl.chat_close(w, p, m)),
             0x34 => Some(ctl.identify(w, p, m)),
             0x36 => Some(ctl.hire(w, p, m)?),

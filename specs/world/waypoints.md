@@ -45,7 +45,7 @@
 | Edge cases & original bugs | 573–624 |
 | Test vectors | 625–669 |
 | Provenance | 670–715 |
-| Open questions | 716–801 |
+| Open questions | 716–807 |
 <!-- /index -->
 
 ## Summary
