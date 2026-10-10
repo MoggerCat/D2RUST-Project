@@ -38,3 +38,4 @@ C-pc1-wine-2	rc-pc1-wine	19:24	object.preset 574-579 (DS1 data has none), system
 C-pkt-0xac-size	rc-pkt-sizes	19:27	0xAC size ass-shadow-master 23 vs 14, ama-valkyrie 18 vs 14, nec-bone-wall 19 vs 14	open
 C-pkt-0xa8-shrine7	rc-pkt-sizes	19:27	gen-shrine-7 0xA8 size 15 vs 12	open
 C-pkt-0x67-dru	rc-pkt-sizes	19:27	dru-cycle-of-life/plague-poppy/vines 0x67 byte[6] + tx 5143 vs 5144; gen-skill-ass-257/261 0x67/0x21	open
+C002	rc-c002-rain	19:28	draws DrawLine rain x (blood-moor 137:x, ui-draws 198/199, pass-9 rain); client-seed draw order footsteps/rain	open
