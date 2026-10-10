@@ -33,16 +33,16 @@
 |   3. AI control and AI tables | 423–594 |
 |   4. AI parameters | 595–613 |
 |   5. Target selection | 614–813 |
-|   6. Distances and line tests | 814–828 |
-|   7. Tactics helpers | 829–1068 |
-|   8. AI commands and minions | 1069–1095 |
-|   10. The catalogue `ai-functions.tsv` | 1096–1116 |
-| Constants & data dependencies | 1117–1140 |
-| Randomness | 1141–1162 |
-| Edge cases & original bugs | 1163–1204 |
-| Test vectors | 1205–1293 |
-| Provenance | 1294–1354 |
-| Open questions | 1355–1458 |
+|   6. Distances and line tests | 814–829 |
+|   7. Tactics helpers | 830–1069 |
+|   8. AI commands and minions | 1070–1096 |
+|   10. The catalogue `ai-functions.tsv` | 1097–1117 |
+| Constants & data dependencies | 1118–1141 |
+| Randomness | 1142–1163 |
+| Edge cases & original bugs | 1164–1205 |
+| Test vectors | 1206–1294 |
+| Provenance | 1295–1356 |
+| Open questions | 1357–1460 |
 <!-- /index -->
 
 ## Summary
@@ -822,7 +822,8 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | `0x005DC5C0` | `AIUTIL_GetDistanceToCoordinates` | same formula on the path position |
 | `0x00621F20(u)`, wrapper `0x005DD280` | `UNITS_GetCurrentLifePercentage` | life percent: (stat 6 life >> 8) × 100 / (max life (`0x00625D10`) >> 8), signed, truncating; 0 when max life >> 8 is 0 |
 | `0x005DC480(u, x, y)` | `…_HalfUnitSize` | dx = \|ux − x\|, dy = \|uy − y\| (u's position), each minus (size(u) / 2 + 1) (`0x00620510`, unsigned halving) and clamped at 0; then (2·max + min) / 2 |
-| `0x005DC640` | `sub_6FCF14D0` | "can reach directly": offset k = table by distance (2 ×3, 3 ×8, 4 ×14, else 3); tests three points (target, and target ± the perpendicular offset) for collision mask 0x1/0x4/0x400 (D2MOO wall, missile barrier, door); fails only if all three collide |
+| `0x005DC640(a, b)` | `sub_6FCF14D0` | "can reach directly": d = the full-size distance `0x005DC380(a, b)`; offset k = table by d (d 0–2: 2, 3–10: 3, 11–24: 4, ≥ 25: 3); sx = sign(a.x − b.x)·k, sy = sign(a.y − b.y)·k (0 on an equal axis), positions as `0x006488C0` / `0x00648900` (static path +0x0C / +0x10 for missiles, items, tiles). Probes, in order, stopping at the first clear one: the line from a to (b.x, b.y), to (b.x − sy, b.y + sx), to (b.x + sy, b.y − sx), each `0x006229F0(a, x, y, 0x805)`. Returns 1 when a probe is clear, 0 when all three are blocked. No draws |
+| `0x006229F0(a, x, y, mask)` | - | a without an active room (`0x00620BB0`): 0 (clear); else `0x00622920` (the end pull and line test of `render/draw-order-2.md` §15.1 rules 2–6) from a's position and size to the point (x, y) read as an end of size 2, in a's room; nonzero = blocked |
 | `0x00622AA0(a, b, 4)` | `UNITS_TestCollisionWithUnit` | blocked line between a and b with mask 4 (`render/draw-order-2.md` §15–16) |
 | `0x00622C40(a, b, 0)` | `UNITS_IsInMeleeRange` | combat flag (`sim/units.md`) |
 
@@ -1293,6 +1294,7 @@ Other recorded checks:
 
 ## Provenance
 
+- 2026-10-10 (rc-mon-spawn-think, Ghidra exports read in the cloud): `0x005DC640`, `0x006229F0`, `0x00622920` (register arguments from `all.asm`: ECX a.x, EDX 2 = the point's size, EAX x; stack a.y, size(a), y, room, mask); §6 rows. Recorded: `traces/checks/gen/gen-mon-436.check` frame 31 (ReanimatedHorde's step-3 roll needs the direct line clear).
 - 1.14d `Game.exe` (SHA-256 631066c1…adaaf): functions read from the
   Ghidra exports (`re/exports`, decompile and `all.asm` with register
   arguments checked in the assembly): `0x005B1740`, `0x005B10E0`,

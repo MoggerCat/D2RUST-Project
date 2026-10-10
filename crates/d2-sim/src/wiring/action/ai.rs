@@ -439,8 +439,24 @@ impl<X: Pending> AiWorld for View<'_, X> {
             None => self.h.x.in_melee_range(a, b, 0),
         }
     }
+    /// `0x005DC640` (`ai.md` §6) with the path provider
+    /// ([`crate::path::line::can_reach_directly`] on the path positions,
+    /// `unit`'s size and room); else [`Pending`].
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
-        self.h.x.can_reach_directly(game, unit, target)
+        if self.h.paths.is_none() {
+            return self.h.x.can_reach_directly(game, unit, target);
+        }
+        let (ax, ay) = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let b = self.h.path_position(target);
+        let d = crate::monsters::ai::distance_full_size((ax, ay), size, b);
+        let a = crate::path::line::LineUnit {
+            room: game.lists.unit(unit).and_then(|e| e.room()),
+            x: ax,
+            y: ay,
+            size,
+        };
+        crate::path::line::can_reach_directly(&self.h.drlg, &a, b, d)
     }
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)

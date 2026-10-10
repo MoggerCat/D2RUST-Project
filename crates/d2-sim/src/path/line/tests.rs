@@ -172,3 +172,49 @@ fn ends_are_pulled_toward_each_other() {
     assert!(units_line_blocked(&w, &unit(8, 2, 0), &unit(2, 2, 0), 2));
     assert!(!units_line_blocked(&w, &unit(8, 2, 1), &unit(2, 2, 0), 2));
 }
+
+// Covers: specs/monsters/ai.md §6 (`0x005DC640` offset table)
+#[test]
+fn reach_offset_table() {
+    let want = [
+        2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    ];
+    for (d, &k) in want.iter().enumerate() {
+        assert_eq!(reach_offset(d as i32), k, "d {d}");
+    }
+    assert_eq!(reach_offset(25), 3);
+    assert_eq!(reach_offset(400), 3);
+}
+
+// Covers: specs/monsters/ai.md §6 (`0x005DC640` probes, `0x006229F0`)
+#[test]
+fn can_reach_directly_probes_target_then_both_sides() {
+    // a (2, 5) size 0, b (14, 5): d 12 → k 4; sx = −4, sy = 0; probes
+    // (14, 5), (14, 1), (14, 9); the point end is size 2, so each line
+    // stops 2 short on the major axis (x 12).
+    let a = unit(2, 5, 0);
+    let w = rooms();
+    assert!(can_reach_directly(&w, &a, (14, 5), 12));
+    // Cell values outside mask 0x805 do not block.
+    let mut w = rooms();
+    for y in 0..10 {
+        w.set(6, y, 2);
+    }
+    assert!(can_reach_directly(&w, &a, (14, 5), 12));
+    // One blocked cell on the direct line: the side probe to (14, 1)
+    // passes above it.
+    let mut w = rooms();
+    w.set(6, 5, 1);
+    assert!(point_line_blocked(&w, &a, 14, 5, REACH_MASK));
+    assert!(!point_line_blocked(&w, &a, 14, 1, REACH_MASK));
+    assert!(can_reach_directly(&w, &a, (14, 5), 12));
+    // A wide wall blocks all three probes.
+    let mut w = rooms();
+    for y in 2..=8 {
+        w.set(6, y, 0x800);
+    }
+    assert!(!can_reach_directly(&w, &a, (14, 5), 12));
+    // A unit without a room: every probe is clear.
+    let roomless = LineUnit { room: None, ..a };
+    assert!(can_reach_directly(&w, &roomless, (14, 5), 12));
+}
