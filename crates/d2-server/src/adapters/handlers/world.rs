@@ -32,6 +32,7 @@ mod hireling_host;
 mod item_approach;
 mod item_save;
 mod npc_approach;
+mod object_approach;
 mod wired;
 
 #[cfg(test)]
@@ -359,6 +360,10 @@ pub trait WorldHost<D> {
     /// for (`inventory-moves.md` §7.1 step 2, `0x00548A50`; cursor flag
     /// `walk.2`), with the pick-up on arrival. Default: nothing.
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {}
+    /// The run of `walk.0` to the object `walk.1` a 0x13 asked for
+    /// (`objects.md` §7.3 rule 4, `0x00548A50`), with the 0x13 case again
+    /// on arrival. Default: nothing.
+    fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {}
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
@@ -532,6 +537,12 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {
                 ObjectCase::Code(c) => Some(Ok(Some(c))),
+                // Not in range / line blocked (`objects.md` §7.3 rule
+                // 4): the run to the object; result 0.
+                ObjectCase::Walk(object) => {
+                    sim.world.object_walk(game, events, (player, object));
+                    Some(Ok(Some(0)))
+                }
                 // Operate 23 (`waypoints.md` §5.2) on the host's
                 // waypoints; without them the id stays a stub.
                 ObjectCase::Waypoint(_) => {

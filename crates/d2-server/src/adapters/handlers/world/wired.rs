@@ -131,6 +131,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
+    /// The 0x13 object walks waiting for the run to end (player, object
+    /// GUID; [`Self::object_arrivals`], REC-1930).
+    pub(super) object_queued: Vec<(UnitId, u32)>,
     /// An approach arrival's 0x13 is running ([`WiredWorld::handler_work`]
     /// starts no approach for it).
     pub(super) arriving: bool,
@@ -206,6 +209,7 @@ impl<R, S> WiredWorld<R, S> {
             taken_sent: Vec::new(),
             outbox: Vec::new(),
             item_queued: Vec::new(),
+            object_queued: Vec::new(),
             arriving: false,
             start_extra: Vec::new(),
         }
@@ -627,6 +631,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         self.collect_sent(events);
         self.item_arrivals(game, events);
         self.collect_sent(events);
+        self.object_arrivals(game, events);
+        self.collect_sent(events);
         events.action().player_deaths(game);
         self.collect_sent(events);
         self.corpse_fill(game, events);
@@ -1038,6 +1044,9 @@ where
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {
         self.start_item_walk(game, events, walk);
     }
+    fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {
+        self.start_object_walk(game, events, walk);
+    }
 
     /// The tick with this world's quest parts lent to the action hooks
     /// ([`WiredWorld::lend_quests`]): quest object inits run inside their
@@ -1271,6 +1280,7 @@ where
     fn walk(&mut self, game: &mut Game, events: &mut D, call: WalkCall) -> Option<WalkResult> {
         self.drop_queued(call.player);
         self.item_queued.retain(|q| q.0 != call.player);
+        self.object_queued.retain(|q| q.0 != call.player);
         let out = self.lend_quests(events, |a, ev| WorldHost::<D>::walk(a, game, ev, call));
         self.pet_deaths(game, events);
         self.hireling_calls(game, events);

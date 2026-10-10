@@ -178,7 +178,7 @@ fn the_0x13_object_case_results() {
     fx.sim.hooks().x.reach = Some(ObjectReach::Walk);
     assert_eq!(
         fx.sim.operate_object_message(&mut fx.game, p, g),
-        Some(ObjectCase::Code(0))
+        Some(ObjectCase::Walk(torch))
     );
     assert!(fx.sim.hooks().x.ranged.borrow().is_empty());
     // r5: in range → the operate entry runs and the case gives 0 (the
@@ -1095,4 +1095,33 @@ fn the_stamina_shrine_callback_clamps_stamina_when_it_ends() {
     assert_eq!(fx.stat(p, 10), max, "clamped to the maximum");
     fx.sim
         .combat(&mut fx.game, |w, _| assert!(!w.has_state(p, 136), "off"));
+}
+
+// Covers: specs/world/objects.md §7.3 r4
+#[test]
+fn the_interact_range_box_of_0x00623660() {
+    use crate::wiring::action::objects::in_reach_box;
+    // The recorded stash (SizeX 1, SizeY 1) at (4866, 4229): the corner is
+    // the position (half of 1 is 0); in range 2 sub-tiles away on the axis
+    // (4868, 4229), out of range at 3 and from the player's spawn.
+    let o = (4866, 4229);
+    assert!(in_reach_box((4868, 4229), o, (1, 1), 2));
+    assert!(in_reach_box((4864, 4229), o, (1, 1), 2));
+    assert!(!in_reach_box((4863, 4229), o, (1, 1), 2));
+    assert!(!in_reach_box((4873, 4228), o, (1, 1), 2));
+    // The rows above and below the box keep x within ±1 of it.
+    assert!(in_reach_box((4867, 4227), o, (1, 1), 2));
+    assert!(in_reach_box((4868, 4227), o, (1, 1), 2));
+    assert!(!in_reach_box((4869, 4227), o, (1, 1), 2));
+    assert!(in_reach_box((4865, 4232), o, (1, 1), 2));
+    assert!(!in_reach_box((4869, 4232), o, (1, 1), 2));
+    // A player above size 2 skips the corner cut.
+    assert!(in_reach_box((4869, 4227), o, (1, 1), 3));
+    // An empty box: ±1 around the corner point.
+    assert!(in_reach_box((4867, 4230), o, (0, 0), 2));
+    assert!(!in_reach_box((4868, 4229), o, (0, 0), 2));
+    // A 6×10 stair at (4873, 4228): the corner is (4870, 4223).
+    assert!(in_reach_box((4873, 4228), (4873, 4228), (6, 10), 2));
+    assert!(in_reach_box((4876, 4233), (4873, 4228), (6, 10), 2));
+    assert!(!in_reach_box((4879, 4233), (4873, 4228), (6, 10), 2));
 }

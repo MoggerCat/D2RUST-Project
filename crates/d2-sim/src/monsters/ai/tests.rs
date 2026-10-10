@@ -1865,12 +1865,20 @@ mod skill_check;
 #[test]
 fn walk_in_radius_points_follow_the_recorded_walks() {
     // Warriv's three walks at the Rogue Encampment arrival (1.14d under
-    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
+    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501; Warriv's size
+    // is 2.
     let p = (4873, 4228);
-    assert_eq!(radius_point((4866, 4235), p, 3, 2), Some((4868, 4233)));
-    assert_eq!(radius_point((4868, 4233), p, 2, 2), Some((4869, 4232)));
-    assert_eq!(radius_point((4869, 4232), p, 1, 2), Some((4870, 4231)));
-    // Already within b, or on the target: no point.
-    assert_eq!(radius_point((4872, 4229), p, 3, 2), None);
-    assert_eq!(radius_point(p, p, 3, 0), None);
+    assert_eq!(radius_point((4866, 4235), 2, p, 3, 2), (4868, 4233));
+    assert_eq!(radius_point((4868, 4233), 2, p, 2, 2), (4869, 4232));
+    assert_eq!(radius_point((4869, 4232), 2, p, 1, 2), (4870, 4231));
+    // Second recorded case (`town-ama-10k` frame 287): n = 19, (0, 2) is
+    // fixed up to (1, 3).
+    assert_eq!(
+        radius_point((4870, 4231), 2, (4876, 4218), 3, 2),
+        (4871, 4228)
+    );
+    // Within b (d < b): k = min(a, b − d) steps away from the target;
+    // on the target with b = 0: the unit's own point.
+    assert_eq!(radius_point((4872, 4229), 2, p, 3, 2), (4871, 4230));
+    assert_eq!(radius_point(p, 2, p, 3, 0), p);
 }

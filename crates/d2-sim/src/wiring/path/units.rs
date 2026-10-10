@@ -246,7 +246,9 @@ impl<X: Pending> View<'_, X> {
             },
             UnitType::Item => UnitShape::Item,
             UnitType::Tile => UnitShape::Tile,
-            UnitType::Object => return None,
+            UnitType::Object => {
+                UnitShape::Object(self.h.object_footprint_shape(Some(r.ty), r.class)?)
+            }
         })
     }
 
