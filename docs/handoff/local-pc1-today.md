@@ -432,3 +432,19 @@ check 0 errors. No ledger row is flagged `needs_pc1` now.
   under Wine at the same time; the Windows entries of this round were kept.
 
 Open in Step 4: nothing new for PC 1.
+
+## Push 18 (21:15) — draws re-run on 5567801d3
+
+- 38 draws checks on integ-r23 5567801d3 (`traces/pc1/draws-first-diff.tsv`):
+  all DIVERGED. First difference moved in 2, both from the NPC balloon
+  frame, which is not a function of the tick (automap 173:frame → 198:x,
+  inventory 172:frame → 195:x, the rain line). Nothing else moved.
+- Pixel table not re-run: every world scene would show the missing player
+  light again (`q-fix-pc1today-cast-light`); it runs once that fix is on
+  integ.
+- For the `?` cells (claim C-ui-draws-q): the argument orders are already
+  in the specs: `CelDrawEx` (x, y, skip, lines, mode) in
+  `ui/control-panel.md` §(line 141), `CelDrawColor` (x, y, light, mode,
+  colour) same file line 507, `CelDrawClipped` (x, y, rect, mode) in
+  `ui/automap.md` §10 r4; `CelDrawShadow` takes (x, y) only, so its mode /
+  light / pal cells are `-`, not `?`.
