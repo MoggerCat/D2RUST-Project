@@ -305,9 +305,29 @@ impl MonsterMotion {
                     u.position = Some(cell);
                 }
             }
+            if cell != t.cell {
+                recache_room(world, *key, cell);
+            }
             t.cell = cell;
         }
     }
+}
+
+/// The path step's room recache (`sim/pathing.md` §9.6 r9,
+/// `0x0064FAD0`; `sim/unit-order.md` §5 r4, r6): a cell outside the
+/// unit's room moves it to the head of the room holding the cell (none:
+/// it leaves its room). Without the client DRLG nothing changes.
+fn recache_room(world: &mut ClientWorld, key: UnitKey, cell: (u16, u16)) {
+    if world.active_rooms.is_none() {
+        return;
+    }
+    let new = world
+        .room_from(world.unit_room(key), cell.0, cell.1)
+        .map(|r| r.room);
+    if new.is_some() && new == world.room_units.room_of(key) {
+        return;
+    }
+    world.room_units.place(key, new);
 }
 
 #[cfg(test)]
@@ -485,5 +505,38 @@ mod tests {
         m.frame(&mut w, &rows);
         assert_eq!(p(&w), ((4869 << 16) + 32392, (4232 << 16) + 33144));
         assert_eq!(w.units[&k].position, Some((4869, 4232)));
+    }
+
+    // Covers: specs/sim/pathing.md §9.6 r9
+    #[test]
+    fn a_step_into_another_room_moves_the_unit_to_its_head() {
+        use crate::bridge::drlg::DrlgRoomId;
+        use crate::bridge::world::ActiveRoom;
+        let room = |id, x0| ActiveRoom {
+            x0,
+            y0: 0,
+            w: 40,
+            h: 40,
+            level: 1,
+            room: DrlgRoomId(id),
+        };
+        let mut w = ClientWorld {
+            active_rooms: Some(vec![room(16, 0), room(17, 40)]),
+            ..ClientWorld::default()
+        };
+        let (k, other) = (UnitKey::new(MONSTER, 4), UnitKey::new(2, 5));
+        w.units.insert(k, ClientUnit::new(k));
+        w.room_units.place(k, Some(DrlgRoomId(16)));
+        w.room_units.place(other, Some(DrlgRoomId(17)));
+        // Inside its room: nothing.
+        recache_room(&mut w, k, (39, 10));
+        assert_eq!(w.room_units.room_of(k), Some(DrlgRoomId(16)));
+        // Across the edge: leaves room 16, at the head of room 17.
+        recache_room(&mut w, k, (40, 10));
+        assert_eq!(w.room_units.list(DrlgRoomId(17)), [k, other]);
+        assert!(w.room_units.list(DrlgRoomId(16)).is_empty());
+        // Outside every room: no room.
+        recache_room(&mut w, k, (200, 10));
+        assert_eq!(w.room_units.room_of(k), None);
     }
 }

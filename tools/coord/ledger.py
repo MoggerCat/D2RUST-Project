@@ -381,7 +381,10 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 continue
             if r["area"] in by_area:
                 first = by_area[r["area"]]
-                if part_rank(r["_file"]) > part_rank(first["_file"]):
+                unsettled = ("NO-CHECK", "UNKNOWN")
+                if part_rank(r["_file"]) > part_rank(first["_file"]) or (
+                        part_rank(r["_file"]) == part_rank(first["_file"])
+                        and first["state"] in unsettled and r["state"] not in unsettled):
                     # a session's part (a check run) supersedes the base inventory row
                     out[out.index(first)] = r
                     by_area[r["area"]] = r
@@ -408,7 +411,14 @@ def merge(parts, repo, status, coverage=(set(), set())):
             by_area[r["area"]] = r
             out.append(r)
         elif tgt["group"] == "coverage":
-            if rank[r["exercised"]] > rank[tgt["exercised"]]:
+            if part_rank(r["_file"]) > part_rank(tgt["_file"]) and r["area"] == tgt["area"]:
+                # a re-measurement (rc-* part) of a coverage row supersedes the plain coverage row
+                keep = max(r["exercised"], tgt["exercised"], key=lambda x: rank[x])
+                out[out.index(tgt)] = r
+                by_area[r["area"]] = r
+                by_canon[canon(r["area"])] = r
+                r["exercised"] = keep
+            elif rank[r["exercised"]] > rank[tgt["exercised"]]:
                 tgt["exercised"] = r["exercised"]
         else:
             if rank[r["exercised"]] > rank[tgt["exercised"]]:
