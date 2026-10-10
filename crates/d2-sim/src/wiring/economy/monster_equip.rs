@@ -19,6 +19,7 @@ use super::quest_reward::max_durability;
 use super::{DeathDrops, Economy, GameFields, ItemSpawn, UnitStats};
 use crate::items::{flag, stat, CreateError, ItemGame, ItemRequest, ItemStats};
 use crate::path::{StaticPath, UnitPath};
+use crate::treasure::runtime::ItemData;
 use crate::units::hooks::Sim;
 use crate::units::UnitId;
 use crate::wiring::action::{ActionHooks, Pending};
@@ -168,6 +169,18 @@ fn equip<X: Pending>(
     h.uniques = std::mem::take(&mut fields.uniques);
 }
 
+/// `init.md` §14.3: the code an ancient barbarian's equipment entry
+/// makes on `difficulty`: the items row of `code` (`0x00633640`, the
+/// first row with that code) gives `ubercode` on 1 and `ultracode` on 2;
+/// difficulty 0, or a code with no row, keeps `code`.
+pub fn tier_code(items: &[ItemData], code: [u8; 4], difficulty: u8) -> [u8; 4] {
+    match (items.iter().find(|r| r.code == code), difficulty) {
+        (Some(r), 1) => r.ubercode,
+        (Some(r), 2) => r.ultracode,
+        _ => code,
+    }
+}
+
 /// The item `unit` holds at body location `loc` (and still exists).
 pub fn item_at<X>(h: &ActionHooks<X>, sim: &Sim<'_>, unit: UnitId, loc: u8) -> Option<UnitId> {
     h.monster_equip
@@ -258,5 +271,39 @@ impl<X: Pending> crate::monsters::init::InitHost for SummonEquip<'_, '_, X> {
             modifier,
             level,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(code: &[u8; 4], uber: &[u8; 4], ultra: &[u8; 4]) -> ItemData {
+        ItemData {
+            code: *code,
+            ubercode: *uber,
+            ultracode: *ultra,
+            version: 0,
+            level: 0,
+            type_: 0,
+            type2: 0,
+            unique: 0,
+            quest: 0,
+            spawnable: 0,
+        }
+    }
+
+    // Covers: specs/monsters/init.md §14.3
+    #[test]
+    fn tier_code_reads_the_first_row_of_the_code() {
+        let items = [
+            row(b"bsd ", b"9bs ", b"7bs "),
+            row(b"bsd ", b"xxx ", b"yyy "),
+        ];
+        assert_eq!(tier_code(&items, *b"bsd ", 0), *b"bsd ");
+        assert_eq!(tier_code(&items, *b"bsd ", 1), *b"9bs ");
+        assert_eq!(tier_code(&items, *b"bsd ", 2), *b"7bs ");
+        // No row: the code stays on every difficulty.
+        assert_eq!(tier_code(&items, *b"zzz ", 2), *b"zzz ");
     }
 }

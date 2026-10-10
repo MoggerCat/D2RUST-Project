@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+sim.pathing.docks-wall-walk	system	pathing	0x0067B850 node cap 200; 0x00679ED0 straight; 0x00649970 step 7	specs/sim/pathing.md	draft	-	PARTIAL	yes	0	n	claude/rc-docks-walk	NO-CHECK	S	sim is as specified (A* cap 200 read in 1.14d); stall was the test route (plus clearance); real-data walk test passes, no 1.14d trace compares it

@@ -132,6 +132,19 @@ pub trait LifecycleHooks: UnitHooks {
     /// default does nothing.
     fn assign_umod(&mut self, sim: &mut Sim<'_>, unit: UnitId, umod: u8) {}
 
+    /// The monster data bytes `0x00573270` clears after the umod
+    /// (`hirelings.md` §3.2 rule 11: monster data +4, +5, +9, +10, +11,
+    /// i.e. components 0, 1, 5, 6, 7; asm `0x00573415`–`0x0057345C`).
+    /// Provider: the host that holds the monster state; the default does
+    /// nothing.
+    fn clear_hireling_components(&mut self, unit: UnitId) {}
+
+    /// `0x005543B0(unit, value, 0)`: the alignment stat in the unit's
+    /// state 105 list, created when missing (`hirelings.md` §3.2 rule 2;
+    /// `specs/skills/bodies-2.md` §2.22). Provider: the host with the
+    /// state-list view; the default does nothing.
+    fn set_alignment(&mut self, sim: &mut Sim<'_>, unit: UnitId, value: u8) {}
+
     /// Warp of one pet to its player (`hirelings.md` §6 rules 1 and 5,
     /// `0x00574D90` → `0x00574CC0`). Provider: the host that owns the
     /// path code; the default does nothing.

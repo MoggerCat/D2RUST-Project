@@ -333,107 +333,101 @@ pub fn advance_sequence(anim: &mut Anim) -> bool {
     true
 }
 
-/// The plain branch of the frame advance `0x00623E00`
-/// (`units.md` §4.2 "Frame advance and +0x4E"): +0x4E := 0; j = cur >> 8,
-/// plus 1 when the speed is above 255; cur += speed. While cur ≥ F every
-/// frame j below F >> 8 whose event byte is 1–4 sets +0x4E to it, then
-/// cur −= F, j := 0 and cur += 256 · bonus. Then every j ≤ cur >> 8
-/// likewise. False (nothing done) when a sequence is loaded.
-pub fn advance_plain(anim: &mut Anim, bonus: i32) -> bool {
-    if anim.sequence.is_some() {
-        return false;
-    }
+/// The sequence-less branch of the frame advance `0x00623E00`
+/// (`sim/units.md` §4.2 "Frame advance"): +0x4E := 0; j = cur >> 8 (+ 1
+/// when the speed is above 255); cur += speed; while cur ≥ the frame
+/// count, the action bytes of the frames j .. (count >> 8) − 1 are noted,
+/// cur −= count, j := 0 and cur += 256 · `bonus` (the frame bonus
+/// `0x00623B10`); then those of the frames j ..= cur >> 8. The last byte
+/// in 1..=4 noted wins. A frame count of zero or less never wraps (the
+/// original's loop would not end).
+pub fn advance_frame(anim: &mut Anim, bonus: i32) {
     anim.action_frame = 0;
-    let events = anim.record.map(|r| r.events);
-    let mark = |act: &mut u8, j: i32| {
-        let e = usize::try_from(j)
-            .ok()
-            .filter(|&j| j < ANIM_EVENTS)
-            .and_then(|j| events.as_ref().map(|e| e[j]));
-        if let Some(e @ 1..=4) = e {
-            *act = e;
-        }
-    };
     let mut j = anim.frame >> 8;
-    if anim.speed > 0xff {
+    if anim.speed > 255 {
         j += 1;
     }
     anim.frame = anim.frame.wrapping_add(i32::from(anim.speed));
-    // The original loops until the frame is below the count; a count
-    // that the bonus never lets it fall under would not end there.
-    let mut guard = 0;
-    while anim.frame_count > 0 && anim.frame >= anim.frame_count && guard < 64 {
-        guard += 1;
-        for k in j..(anim.frame_count >> 8) {
-            mark(&mut anim.action_frame, k);
+    let events = anim.record.as_ref().map(|r| r.events);
+    let note = |from: i32, to: i32, action: &mut u8| {
+        let Some(e) = events.as_ref() else {
+            return;
+        };
+        for i in from..to {
+            if let Some(&b) = usize::try_from(i).ok().and_then(|i| e.get(i)) {
+                if (1..=4).contains(&b) {
+                    *action = b;
+                }
+            }
         }
-        anim.frame -= anim.frame_count;
+    };
+    while anim.frame_count > 0 && anim.frame_count <= anim.frame {
+        note(j, anim.frame_count >> 8, &mut anim.action_frame);
+        anim.frame = anim.frame.wrapping_sub(anim.frame_count);
         j = 0;
         anim.frame = anim.frame.wrapping_add(bonus.wrapping_mul(256));
     }
-    for k in j..=(anim.frame >> 8) {
-        mark(&mut anim.action_frame, k);
-    }
-    true
+    note(j, (anim.frame >> 8) + 1, &mut anim.action_frame);
 }
 
 #[cfg(test)]
-mod plain_tests {
+mod advance_frame_tests {
     use super::*;
-    use crate::units::record::{AnimRecord, Sequence};
+    use crate::units::record::{Anim, AnimRecord, ANIM_EVENTS};
 
-    fn anim(frame: i32, count: i32, speed: i16, events: &[(usize, u8)]) -> Anim {
-        let mut e = [0u8; ANIM_EVENTS];
-        for &(i, b) in events {
-            e[i] = b;
-        }
-        Anim {
-            frame,
-            frame_count: count,
-            speed,
-            record: Some(AnimRecord {
-                frames: (count >> 8) as u32,
-                byte_0f: 0,
-                events: e,
-            }),
-            ..Anim::default()
-        }
-    }
-
-    // Covers: specs/sim/units.md §4.2 text
+    // Covers: specs/sim/units.md §4.2
     #[test]
-    fn the_advance_reports_the_last_event_byte_crossed() {
-        let mut a = anim(0, 4096, 256, &[(1, 2), (2, 1)]);
-        assert!(advance_plain(&mut a, 0));
-        assert_eq!((a.frame, a.action_frame), (256, 2));
-        advance_plain(&mut a, 0);
-        assert_eq!((a.frame, a.action_frame), (512, 1));
-        advance_plain(&mut a, 0);
+    fn baal_s2_frame_wraps_by_the_frame_count() {
+        // Recorded (`gen-lvl-132` frame 97): +0x44 18688 → 1184 with the
+        // speed 160 and the frame count 5888.
+        let mut a = Anim {
+            frame: 18688,
+            frame_count: 5888,
+            speed: 160,
+            ..Anim::default()
+        };
+        advance_frame(&mut a, 0);
+        assert_eq!(a.frame, 1184);
         assert_eq!(a.action_frame, 0);
     }
 
-    // Covers: specs/sim/units.md §4.2 text
+    // Covers: specs/sim/units.md §4.2
     #[test]
-    fn the_advance_wraps_at_the_count_and_rescans_from_the_start() {
-        // 7936 + 256 = 8192 ≥ 4096: two wraps with bonus 0 (the imp's
-        // teleport frame 38 on 1.14d), frames 0..15 scanned on the second.
-        let mut a = anim(7936, 4096, 256, &[(3, 4)]);
-        advance_plain(&mut a, 0);
-        assert_eq!((a.frame, a.action_frame), (0, 4));
+    fn the_last_action_byte_crossed_wins() {
+        let mut events = [0u8; ANIM_EVENTS];
+        events[1] = 2;
+        events[2] = 4;
+        let mut a = Anim {
+            frame: 256,
+            frame_count: 10 << 8,
+            speed: 512,
+            record: Some(AnimRecord {
+                frames: 10,
+                byte_0f: 0,
+                events,
+            }),
+            ..Anim::default()
+        };
+        // Speed ≥ 256 starts one frame later: frames 2 ..= 3 are noted.
+        advance_frame(&mut a, 0);
+        assert_eq!((a.frame, a.action_frame), (768, 4));
+        // A wrap adds the bonus and notes the tail frames first.
+        a.frame = 9 << 8;
+        a.action_frame = 9;
+        advance_frame(&mut a, 1);
+        assert_eq!(a.frame, (9 << 8) + 512 - (10 << 8) + 256);
     }
 
-    // Covers: specs/sim/units.md §4.2 text
+    // Covers: specs/sim/units.md §4.2
     #[test]
-    fn a_sequence_is_left_to_its_own_advance() {
-        let mut a = anim(0, 4096, 256, &[]);
-        a.sequence = Some(Sequence {
-            frame_count: 256,
+    fn a_zero_frame_count_never_wraps() {
+        let mut a = Anim {
+            frame: 0,
+            frame_count: 0,
             speed: 256,
-            pos: 0,
-            events: vec![],
-            drawn: vec![],
-        });
-        assert!(!advance_plain(&mut a, 0));
-        assert_eq!(a.frame, 0);
+            ..Anim::default()
+        };
+        advance_frame(&mut a, 3);
+        assert_eq!(a.frame, 256);
     }
 }

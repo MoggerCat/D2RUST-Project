@@ -381,14 +381,15 @@ pub fn anim_complete(a: &Anim) -> bool {
 }
 
 impl<X: Pending> ActionHooks<X> {
-    /// The animation refresh `0x00623E00` of a monster's event 0: the
-    /// plain frame advance with the frame bonus `0x00623B10`
-    /// ([`crate::units::anim::advance_plain`]); a unit with a sequence is
-    /// advanced by its own caller.
-    pub(crate) fn refresh_animation(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+    /// The frame advance `0x00623E00` (`sim/units.md` §4.2): the
+    /// sequence branch when the unit has a sequence, else the frame
+    /// advance with the frame bonus `0x00623B10`.
+    pub fn refresh_unit_animation(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
         if let Some(r) = sim.units.get_mut(unit) {
-            crate::units::anim::advance_plain(&mut r.anim, bonus);
+            if !crate::units::anim::advance_sequence(&mut r.anim) {
+                crate::units::anim::advance_frame(&mut r.anim, bonus);
+            }
         }
     }
 
@@ -443,7 +444,7 @@ impl<X: Pending> ActionHooks<X> {
                     v.h.x.step(sim.game, unit);
                 }
             }
-            self.refresh_animation(sim, unit);
+            self.refresh_unit_animation(sim, unit);
             if !sim.units.get(unit).is_some_and(|r| anim_complete(&r.anim)) {
                 return;
             }

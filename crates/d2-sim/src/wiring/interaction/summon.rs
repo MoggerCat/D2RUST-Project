@@ -246,6 +246,19 @@ impl<X: Pending + UseRest> UseView<'_, X> {
             }
             return Some(e);
         }
+        if let BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30`: +0x94 / +0x98 := the owner's type and GUID
+            // (0 / 0 for none).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                r.source = link.unwrap_or((0, 0));
+            }
+            return None;
+        }
         if let BodyEffect::SelectSkill {
             u: m,
             side: 0,

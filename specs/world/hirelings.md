@@ -34,24 +34,24 @@
 | Rules | 92–93 |
 |   1. `hireling.txt` rows | 94–176 |
 |   2. Offer values and price (`0x006637F0(expansion, player, seed, act0, diff0, out)`) | 177–217 |
-|   3. Creating the hireling | 218–325 |
-|   4. Level stats (`0x00572840(game, player, merc, level)`) | 326–367 |
-|   5. Owner link and pet list | 368–429 |
-|   6. Following the player | 430–507 |
-|   7. Experience and level-up | 508–573 |
-|   8. Death (`0x0057CCB0` → `0x005751A0`) | 574–636 |
-|   9. Revive | 637–674 |
-|   10. Restoring from a save | 675–720 |
-|   11. Items (expansion) | 721–790 |
-|   12. Services (links) | 791–794 |
-|   13. Messages | 795–861 |
-|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 862–868 |
-| Constants & data dependencies | 869–892 |
-| Randomness | 893–903 |
-| Edge cases & original bugs | 904–955 |
-| Test vectors | 956–1018 |
-| Provenance | 1019–1075 |
-| Open questions | 1076–1168 |
+|   3. Creating the hireling | 218–334 |
+|   4. Level stats (`0x00572840(game, player, merc, level)`) | 335–376 |
+|   5. Owner link and pet list | 377–438 |
+|   6. Following the player | 439–516 |
+|   7. Experience and level-up | 517–582 |
+|   8. Death (`0x0057CCB0` → `0x005751A0`) | 583–645 |
+|   9. Revive | 646–683 |
+|   10. Restoring from a save | 684–729 |
+|   11. Items (expansion) | 730–799 |
+|   12. Services (links) | 800–803 |
+|   13. Messages | 804–870 |
+|   14. Skill pick of the Hireable AI (`0x005E4D30`) | 871–877 |
+| Constants & data dependencies | 878–901 |
+| Randomness | 902–912 |
+| Edge cases & original bugs | 913–964 |
+| Test vectors | 965–1027 |
+| Provenance | 1028–1084 |
+| Open questions | 1085–1177 |
 <!-- /index -->
 
 ## Summary
@@ -318,7 +318,16 @@ player, merc and slot exist and the player is unit type 0.
 10. AI hook `0x005A4850(game, merc, 0x13, 0)`: appends 19 to the
     monster's AI hook bytes (monster data +0x1C, first free of 9) and
     calls its handler (AI spec).
-11. Monster data (+0x14) bytes +4, +5, +9, +10, +11 := 0.
+11. Monster data (+0x14) bytes +4, +5, +9, +10, +11 := 0 (asm
+    `0x00573415`–`0x0057345C`; in d2rs the monster data's components 0,
+    1, 5, 6, 7, whose block starts at +0x04).
+
+Provider notes (d2rs wiring, rc-blade-hostcalls, REC-2020..2022): rule 2
+is the shared alignment set (state 105 list, allied mark for 2); rule 3
+adds the merc right after its group's head and sets +0xD0 := group
+(`join_team`, only when +0xD0 is 11 and the group < 8); rule 10 appends
+umod 19 and rule 11 clears the components. The quest mercenary
+`0x00579180` (`npc.md` §7.5) runs the same calls.
 
 `npc.md` §7.3 step 8 sets the slot's hired word before the init, and
 resends the list afterwards.
