@@ -714,6 +714,16 @@ pub fn mode_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: 
     request_mode(game, cx, unit, mode::NEUTRAL, ModeTarget::Unit(unit));
 }
 
+/// `0x005A8330` / `0x005A83E0`, the trapped soul's A1/A2 and S1/S2 ends
+/// (per-class records, `units.md` §4.6): a mode request to S1 targeting
+/// itself, then the think unless frozen.
+pub fn trapped_soul_end<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId) {
+    request_mode(game, cx, unit, mode::SKILL1, ModeTarget::Unit(unit));
+    if !frozen(cx, unit) {
+        think(game, cx, unit);
+    }
+}
+
 /// Installing an AI `0x005B0E00` (§3.3).
 pub fn install<W: AiHost + ?Sized>(game: &mut Game, cx: &mut Ctx<'_, W>, unit: UnitId, state: u32) {
     // Step 1: fatal assert on state 54.

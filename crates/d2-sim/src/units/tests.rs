@@ -598,11 +598,13 @@ pub(super) fn data() -> UnitData {
                 enabled: true,
                 aidel: [0, 5, 7],
                 moves: 1 << 4,
+                mode_chart: false,
             },
             MonsterInfo {
                 enabled: true,
                 aidel: [9, 5, 7],
                 moves: 0,
+                mode_chart: false,
             },
             MonsterInfo::default(),
         ],
