@@ -844,7 +844,31 @@ impl<X: Pending> AiActs for View<'_, X> {
             self.h.x.ai_add_right_skill(game, unit, skill, level);
         }
     }
+    /// `0x00647280` on a monster (`ai-bodies-7.md` §27 init): the entry
+    /// goes next to the init entries ([`ActionHooks::natural_skills`]) in
+    /// the unit's list ([`ActionHooks::monster_skills`], which then
+    /// shadows them). PROVISIONAL (REC-3510): the list is kept in skill-id
+    /// order; 1.14d's is in insertion order (init entries, then Attack,
+    /// then the class skills in record order).
     fn assign_skill(&mut self, game: &mut Game, unit: UnitId, skill: i32, level: i32) {
+        if self
+            .units
+            .get(unit)
+            .is_some_and(|r| r.ty == UnitType::Monster)
+        {
+            let natural = self
+                .h
+                .natural_skills
+                .get(&unit)
+                .cloned()
+                .unwrap_or_default();
+            self.h
+                .monster_skills
+                .entry(unit)
+                .or_insert(natural)
+                .insert(skill, level);
+            return;
+        }
         self.h.x.ai_assign_skill(game, unit, skill, level);
     }
     fn set_skill_param(&mut self, unit: UnitId, skill: i32, value: i32) -> bool {
@@ -1073,6 +1097,41 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// `0x006439B0` entry +0x08 of a monster's entry: the skill's
+    /// `monanim` (fixed when the entry is created, `skills/use.md` §5.1).
+    fn entry_mode(&self, unit: UnitId, skill: i32) -> Option<u8> {
+        self.unit_skills(unit)
+            .iter()
+            .any(|&(s, _)| s == skill)
+            .then(|| self.h.tables.skills.skill(skill).map(|r| r.monanim))
+            .flatten()
+    }
+    /// `0x006442A0`: the base level of a monster's entry.
+    fn skill_base_level(&self, unit: UnitId, skill: i32) -> Option<i32> {
+        self.unit_skills(unit)
+            .iter()
+            .find(|&&(s, _)| s == skill)
+            .map(|&(_, l)| l)
+    }
+    /// The unit's list of init and summon entries, `(id, level)`.
+    fn unit_skills(&self, unit: UnitId) -> Vec<(i32, i32)> {
+        match self
+            .h
+            .monster_skills
+            .get(&unit)
+            .or_else(|| self.h.natural_skills.get(&unit))
+        {
+            Some(m) => m.iter().map(|(&s, &l)| (s, l)).collect(),
+            None => Vec::new(),
+        }
+    }
+    /// A monster with init or summon entries has a list (unit +0xA8).
+    fn has_skill_list(&self, unit: UnitId) -> bool {
+        self.h.monster_skills.contains_key(&unit) || self.h.natural_skills.contains_key(&unit)
+    }
+    fn class_skills(&self, class: i32) -> Vec<i32> {
+        crate::skills::list::class_skills(&self.h.tables.skills.skills, class)
+    }
     /// Path +0x18 / +0x1A of the unit's dynamic path (`0x00648A20` /
     /// `0x00648A30`); no dynamic path: (0, 0).
     fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
