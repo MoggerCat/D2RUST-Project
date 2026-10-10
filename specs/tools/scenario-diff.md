@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–526 |
-|   4. Suite | 527–642 |
-| Constants & data dependencies | 643–646 |
-| Randomness | 647–650 |
-| Edge cases & original bugs | 651–674 |
-| Test vectors | 675–697 |
-| Provenance | 698–701 |
-| Open questions | 702–750 |
+|   3. Run | 145–531 |
+|   4. Suite | 532–647 |
+| Constants & data dependencies | 648–651 |
+| Randomness | 652–655 |
+| Edge cases & original bugs | 656–679 |
+| Test vectors | 680–702 |
+| Provenance | 703–706 |
+| Open questions | 707–755 |
 <!-- /index -->
 
 ## Summary
@@ -239,7 +239,12 @@ state first. It is the default way to compare a behaviour with 1.14d.
       pokes, the due steps' pointer events go through the bridge's
       world-click dispatcher (`world_view::ui_bind::world_clicks`, the
       call the window path makes after the UI): no panel, no shake; the
-      hover target is `play`'s preview pick (`bridge::hover::pick`, the
+      hover target is `play`'s preview pick (`bridge::hover::pick`, taken
+      at the end of the previous pass from the cursor then, as 1.14d
+      hovers while it draws: a press posted in the pass of its `move` is a
+      point click; objects pick inside ±48 px of their feet, units ±24,
+      PROVISIONAL REC-2116: 1.14d hit-tests the sprite; the Act I waypoint
+      click path of the effect scenes is the case that needs it; the
       `ClickView::pick` the window sets: the unit — monster, NPC,
       object or ground item, never a player — whose feet are nearest
       the click inside a box standing on them; d2rs-own, unverified,
