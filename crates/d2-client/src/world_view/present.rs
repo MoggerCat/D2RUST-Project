@@ -195,6 +195,9 @@ pub struct FrameSchedule {
     /// input: it follows the measured draw rate, `render/lighting.md` §5),
     /// where the schedule has the column.
     pub quality: std::collections::BTreeMap<u64, u8>,
+    /// Drawn tick → the pointer the frame started with (frame pixels): where
+    /// the OS put it after a panel's cursor jump (`ui/panels-3.md` §4.3).
+    pub pointer: std::collections::BTreeMap<u64, (i32, i32)>,
     /// `last_step` and `idle_since` of the cursor at the first frame.
     pub cursor_last: u32,
     pub cursor_idle: u32,
@@ -242,6 +245,13 @@ impl FrameSchedule {
             if let Some(q) = c.next().filter(|q| *q != "-") {
                 s.quality
                     .insert(tick, q.parse().map_err(|_| at("quality"))?);
+            }
+            if let (Some(x), Some(y)) = (c.next(), c.next()) {
+                if x != "-" && y != "-" {
+                    let x = x.parse().map_err(|_| at("cursor_x"))?;
+                    let y = y.parse().map_err(|_| at("cursor_y"))?;
+                    s.pointer.insert(tick, (x, y));
+                }
             }
         }
         if !version {
@@ -1112,11 +1122,24 @@ fn world_view_frame(
             )?;
             if let Some(original) = ui.original.as_mut() {
                 // The cursor jump of §4.3: warp the window cursor.
-                if let (Some(at), Ok(mut window)) =
-                    (original.take_cursor_warp(), windows.single_mut())
-                {
+                let warp = original.take_cursor_warp();
+                if let (Some(at), Ok(mut window)) = (warp, windows.single_mut()) {
                     if let Ok(pos) = edge::frame_to_window(&window, at) {
                         window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                    }
+                }
+                // A check run replays the pointer the OS reported after the
+                // jump (the recorded host input) when d2rs's own jump agrees
+                // on x; a different x is left to show in the cursor row.
+                if let (Some(at), Some(s)) = (warp, schedule.as_deref()) {
+                    if let Some((_, &(x, y))) = s.pointer.range(tick + 1..).next() {
+                        if x == at.x {
+                            let p = crate::ui::Point::new(x, y);
+                            ui.queue.0.push(UiEvent::CursorMoved(p));
+                            ui.cursor = Some(FramePos::Inside(p));
+                        } else {
+                            warn!("cursor jump: d2rs x {} vs recorded {x}", at.x);
+                        }
                     }
                 }
                 let outcome = original.take_outcome();
