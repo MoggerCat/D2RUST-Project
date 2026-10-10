@@ -585,6 +585,7 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     // (`0x0064E7B0`), which needs the client's collision map.
     if let Some(u) = w.units.get_mut(&key) {
         u.position = Some((x, y));
+        u.placements = u.placements.wrapping_add(1);
     }
     // Rule 4.6: the local player's placement ends in `0x00472C20(flag)`.
     if w.local_player == Some(key) {

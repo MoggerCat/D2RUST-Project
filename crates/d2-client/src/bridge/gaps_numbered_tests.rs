@@ -299,6 +299,7 @@ fn client_world_holds_only_stated_fields() {
         last_mode_request,
         // d2rs bookkeeping of §8 rule 1 (no 1.14d field).
         mode_requests,
+        placements: _,
         // d2rs bookkeeping of the play preview's rule-8 follow (REC-277).
         follows,
         kind,
