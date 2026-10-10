@@ -89,6 +89,7 @@ fn install_fixtures(sim: &mut single_player::Sim) {
         skill_modes: vec![[0; 8]],
         overlay_count: 0,
         monequip: Vec::new(),
+        arena: Vec::new(),
     });
     s.data = UnitData {
         monsters: vec![

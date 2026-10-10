@@ -1197,6 +1197,12 @@ impl OriginalUi {
         std::mem::take(&mut self.outcome.sounds)
     }
 
+    /// The overlay calls on units since the last call, in call order
+    /// (`msg_ui::OverlayCall`), for the world view's effect layer.
+    pub fn take_overlay_calls(&mut self) -> Vec<msg_ui::OverlayCall> {
+        std::mem::take(&mut self.more_mut().overlays)
+    }
+
     /// The skipped parts since the last call (the rest of the outcome
     /// stays).
     pub fn take_skipped(&mut self) -> Vec<&'static str> {

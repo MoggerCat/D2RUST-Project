@@ -1,0 +1,15 @@
+cause	count	examples	likely_crate_spec	size
+draws: tick # draw row # (CelDraw) column op: ORIG CelDraw vs D#RS unit	19	ui-draws-automap-ama, ui-draws-belt-ama, ui-draws-character-ama	d2-client render/draws	M
+state: frame # monster #:# class #, field m: ORIG # vs D#RS #	5	milestone-baal-throne, milestone-nihlathak, milestone-worldstone-portal	d2-sim/d2-server	M
+suite.py crashes on channel save (no ORIG_OUTPUTS entry)	5	save-corpse-ama, save-fresh-ama, save-items-ama	tools/scenario-diff/suite.py	S
+packets: frame # stream s#c ## missing in D#RS (id #x#)	2	net-s2c-chat, net-s2c-gold-pickup	d2-server/d2-proto	M
+items: item ## (hp#) frame: ORIG # vs D#RS #	1	items-drops-uni-02	d2-sim items	M
+items: item ## (mp#) frame: ORIG # vs D#RS #	1	items-drops-uni-03	d2-sim items	M
+items: item ## (gld) frame: ORIG # vs D#RS #	1	items-drops-uni-05	d2-sim items	M
+packets: frame # stream s#c ## id: ORIG # vs D#RS # (id #x#)	1	items-vendor-akara-buy	d2-server/d2-proto	M
+state: frame # game, field seed: ORIG [#, #] vs D#RS [#, #]	1	milestone-izual	d2-sim/d2-server	M
+packets: frame # stream s#c ## id: ORIG # vs D#RS #e (id #x#)	1	rng-town-idle-sor	d2-server/d2-proto	M
+draws: tick # draw row # (CelDrawColor) column frame: ORIG # vs D#RS #	1	ui-draws-inv-char-ama	d2-client render/draws	M
+packets: frame # stream c#s ## bytes[#]: ORIG # vs D#RS # (id #x#)	1	walk-click-walk-town-ama	d2-server/d2-proto	M
+PARTIAL only (no difference; row not EQUAL under REC-2055: state channel with input/send lines and no MATCHing packets channel)	86	nec-amplify-damage, sys-gold-pickup, items-pickup-ama	checks (add a packets channel) + d2-client bridge C->S set (RUN_GAPS)	M
+PARTIAL only (state channel with an `ignore` line, so not every unit field compared; REC-2055 needs none)	16	sys-corpse-state, sys-gold-pickup, sys-corpse-state	d2-sim state_dump / checks (drop the ignore)	M
