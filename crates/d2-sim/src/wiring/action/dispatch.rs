@@ -445,10 +445,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         }
         if is_player {
             // §7.3 rule 1 (`0x00580860`): steps 1 and 3 (the path part),
-            // then step 5 (any state-changed bit, whether announced or
+            // step 4's soft hit, then step 5 (any state-changed bit, whether announced or
             // not) and step 7.
             if v.h.paths.is_some() {
                 crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+                // Step 4: the soft hit (0x8000 → 0x0D).
+                crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {
                 v.state_change_messages(p, unit);

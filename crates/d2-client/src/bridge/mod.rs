@@ -314,6 +314,19 @@ impl<L: ServerLink> Bridge<L> {
     /// frame).
     pub fn take_outputs(&mut self) -> Vec<Output> {
         output::move_freed(&mut self.world, &mut self.outputs);
+        // PROVISIONAL (REC-1562, d2rs-own, unverified): the UI layer's
+        // client quest record `[0x007C0D43]` that `ClientFn` 13 reads
+        // (`world/objects-client.md` §26.13 r3) is the last one a 0x28
+        // (type 6) delivered; without one the invisible Ancient's update
+        // is fatal 0x1F every frame.
+        if let Some(Output::QuestFlags { record }) = self
+            .outputs
+            .iter()
+            .rev()
+            .find(|o| matches!(o, Output::QuestFlags { .. }))
+        {
+            self.inputs.objclient.quest_flags = Some(*record);
+        }
         std::mem::take(&mut self.outputs)
     }
 

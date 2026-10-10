@@ -33,16 +33,16 @@
 |   3. AI control and AI tables | 434–605 |
 |   4. AI parameters | 606–624 |
 |   5. Target selection | 625–961 |
-|   6. Distances and line tests | 962–976 |
-|   7. Tactics helpers | 977–1216 |
-|   8. AI commands and minions | 1217–1243 |
-|   10. The catalogue `ai-functions.tsv` | 1244–1264 |
-| Constants & data dependencies | 1265–1288 |
-| Randomness | 1289–1318 |
-| Edge cases & original bugs | 1319–1360 |
-| Test vectors | 1361–1449 |
-| Provenance | 1450–1510 |
-| Open questions | 1511–1617 |
+|   6. Distances and line tests | 962–977 |
+|   7. Tactics helpers | 978–1217 |
+|   8. AI commands and minions | 1218–1244 |
+|   10. The catalogue `ai-functions.tsv` | 1245–1265 |
+| Constants & data dependencies | 1266–1289 |
+| Randomness | 1290–1319 |
+| Edge cases & original bugs | 1320–1361 |
+| Test vectors | 1362–1450 |
+| Provenance | 1451–1512 |
+| Open questions | 1513–1619 |
 <!-- /index -->
 
 ## Summary
@@ -708,15 +708,15 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    none, V +0x24 := (S = 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
-PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
-coordinate record of `population.md` §9.6 step 3 (the caller's record,
-else the one at the creation point, `0x0061AD30`), shared by identity
-(act, clipped rect, index) between the monsters that hold it; step 7
-writes 1 to its +0x24 and nothing clears it; a monster created without
-that call (no population placement) has none. Settled by: PC 1 item
-"[q-fix-seed-game] Monster "vision" record" and
-`a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
-the player once minion 1:12 has seen it).
+Implemented (`monsters/ai/target.rs`, `wiring/action/ai.rs`): the
+record is loaded on the LOS-draw-false path whatever T is; S is its
++0x24 only when flag 0x08 is clear, else 0. Step 7 writes +0x24 :=
+(S = 0) only when the record was loaded, so a find with the token at 1
+consumes it. Settled by `a1-warp-tower-cellar-ama` (frame 45, fallen3
+leader 1:10) and the unit test `vision_token_toggles_only_when_loaded`
+(the token write). PROVISIONAL (REC-1698), unchanged: the record
+is kept by identity (act, rect, index) in
+`wiring/worldgen/population_init.rs`.
 ##### 5.2.1 The vision record (monster data +0x50)
 
 V is a DRLG coordinate record (`D2RoomCoordListStrc`, the record r of
@@ -970,7 +970,8 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | `0x005DC5C0` | `AIUTIL_GetDistanceToCoordinates` | same formula on the path position |
 | `0x00621F20(u)`, wrapper `0x005DD280` | `UNITS_GetCurrentLifePercentage` | life percent: (stat 6 life >> 8) × 100 / (max life (`0x00625D10`) >> 8), signed, truncating; 0 when max life >> 8 is 0 |
 | `0x005DC480(u, x, y)` | `…_HalfUnitSize` | dx = \|ux − x\|, dy = \|uy − y\| (u's position), each minus (size(u) / 2 + 1) (`0x00620510`, unsigned halving) and clamped at 0; then (2·max + min) / 2 |
-| `0x005DC640` | `sub_6FCF14D0` | "can reach directly": offset k = table by distance (2 ×3, 3 ×8, 4 ×14, else 3); tests three points (target, and target ± the perpendicular offset) for collision mask 0x1/0x4/0x400 (D2MOO wall, missile barrier, door); fails only if all three collide |
+| `0x005DC640(a, b)` | `sub_6FCF14D0` | "can reach directly": d = the full-size distance `0x005DC380(a, b)`; offset k = table by d (d 0–2: 2, 3–10: 3, 11–24: 4, ≥ 25: 3); sx = sign(a.x − b.x)·k, sy = sign(a.y − b.y)·k (0 on an equal axis), positions as `0x006488C0` / `0x00648900` (static path +0x0C / +0x10 for missiles, items, tiles). Probes, in order, stopping at the first clear one: the line from a to (b.x, b.y), to (b.x − sy, b.y + sx), to (b.x + sy, b.y − sx), each `0x006229F0(a, x, y, 0x805)`. Returns 1 when a probe is clear, 0 when all three are blocked. No draws |
+| `0x006229F0(a, x, y, mask)` | - | a without an active room (`0x00620BB0`): 0 (clear); else `0x00622920` (the end pull and line test of `render/draw-order-2.md` §15.1 rules 2–6) from a's position and size to the point (x, y) read as an end of size 2, in a's room; nonzero = blocked |
 | `0x00622AA0(a, b, 4)` | `UNITS_TestCollisionWithUnit` | blocked line between a and b with mask 4 (`render/draw-order-2.md` §15–16) |
 | `0x00622C40(a, b, 0)` | `UNITS_IsInMeleeRange` | combat flag (`sim/units.md`) |
 
@@ -1449,6 +1450,7 @@ Other recorded checks:
 
 ## Provenance
 
+- 2026-10-10 (rc-mon-spawn-think, Ghidra exports read in the cloud): `0x005DC640`, `0x006229F0`, `0x00622920` (register arguments from `all.asm`: ECX a.x, EDX 2 = the point's size, EAX x; stack a.y, size(a), y, room, mask); §6 rows. Recorded: `traces/checks/gen/gen-mon-436.check` frame 31 (ReanimatedHorde's step-3 roll needs the direct line clear).
 - 1.14d `Game.exe` (SHA-256 631066c1…adaaf): functions read from the
   Ghidra exports (`re/exports`, decompile and `all.asm` with register
   arguments checked in the assembly): `0x005B1740`, `0x005B10E0`,

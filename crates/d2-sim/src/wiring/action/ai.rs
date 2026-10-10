@@ -168,17 +168,15 @@ impl<X: Pending> AiUnits for View<'_, X> {
             None => self.h.x.vision_seen(unit),
         }
     }
-    /// §5.2 step 7 on the record: +0x24 := 1.
-    ///
-    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
-    /// REC-1698): the word is set to 1 and never cleared.
-    fn mark_seen(&mut self, unit: UnitId) {
+    /// §5.2 step 7 on the record: +0x24 := `value` (S == 0), written
+    /// only when step 2 loaded the record (`0x005DDBE6`).
+    fn mark_seen(&mut self, unit: UnitId, value: u32) {
         match self.h.monster_data(unit).map(|m| m.vision) {
             Some(Some(r)) => {
-                self.h.vision_seen.insert(r, 1);
+                self.h.vision_seen.insert(r, value);
             }
             Some(None) => {}
-            None => self.h.x.mark_seen(unit),
+            None => self.h.x.mark_seen(unit, value),
         }
     }
     fn ai_reset(&mut self, unit: UnitId) {
@@ -440,8 +438,24 @@ impl<X: Pending> AiWorld for View<'_, X> {
             None => self.h.x.in_melee_range(a, b, 0),
         }
     }
+    /// `0x005DC640` (`ai.md` §6) with the path provider
+    /// ([`crate::path::line::can_reach_directly`] on the path positions,
+    /// `unit`'s size and room); else [`Pending`].
     fn can_reach_directly(&self, game: &Game, unit: UnitId, target: UnitId) -> bool {
-        self.h.x.can_reach_directly(game, unit, target)
+        if self.h.paths.is_none() {
+            return self.h.x.can_reach_directly(game, unit, target);
+        }
+        let (ax, ay) = self.h.path_position(unit);
+        let size = self.path_size(unit);
+        let b = self.h.path_position(target);
+        let d = crate::monsters::ai::distance_full_size((ax, ay), size, b);
+        let a = crate::path::line::LineUnit {
+            room: game.lists.unit(unit).and_then(|e| e.room()),
+            x: ax,
+            y: ay,
+            size,
+        };
+        crate::path::line::can_reach_directly(&self.h.drlg, &a, b, d)
     }
     fn find_spot(&mut self, game: &mut Game, unit: UnitId) -> Option<(i32, i32, RoomId)> {
         self.h.x.find_spot(game, unit)

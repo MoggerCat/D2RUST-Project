@@ -160,6 +160,66 @@ pub fn units_line_blocked<R: CollisionRooms + ?Sized>(
     line_test(rooms, a.room, Point::new(ax, ay), Point::new(bx, by), mask).blocked()
 }
 
+/// `0x006229F0(a, x, y, mask)` (`monsters/ai.md` §6): the collision line
+/// from unit `a` to the point (x, y), the point read as an end of size 2
+/// (`0x00622920` with the second size 2, capped as any size).
+pub fn point_line_blocked<R: CollisionRooms + ?Sized>(
+    rooms: &R,
+    a: &LineUnit,
+    x: i32,
+    y: i32,
+    mask: u16,
+) -> bool {
+    let b = LineUnit {
+        room: a.room,
+        x,
+        y,
+        size: 2,
+    };
+    units_line_blocked(rooms, a, &b, mask)
+}
+
+/// The probe mask of [`can_reach_directly`] (`0x005DC640`): 0x805.
+pub const REACH_MASK: u16 = 0x805;
+
+/// The probe offset of `0x005DC640` by the full-size distance d
+/// (`monsters/ai.md` §6): 2 for d < 3, 3 for d < 11, 4 for d < 25,
+/// else 3 (negative d never occurs: the distance is clamped at 0).
+pub fn reach_offset(d: i32) -> i32 {
+    match d {
+        i32::MIN..=2 => 2,
+        3..=10 => 3,
+        11..=24 => 4,
+        _ => 3,
+    }
+}
+
+/// `0x005DC640(a, b)` "can reach directly" (`monsters/ai.md` §6): with
+/// k = [`reach_offset`] of the full-size distance `d` from a to b,
+/// sx = sign(a.x − b.x)·k and sy = sign(a.y − b.y)·k, probe the line
+/// from a ([`point_line_blocked`], mask 0x805) to b's point, then to
+/// (b.x − sy, b.y + sx), then to (b.x + sy, b.y − sx), stopping at the
+/// first clear one. True when one is clear, false when all three are
+/// blocked.
+pub fn can_reach_directly<R: CollisionRooms + ?Sized>(
+    rooms: &R,
+    a: &LineUnit,
+    b: (i32, i32),
+    d: i32,
+) -> bool {
+    let k = reach_offset(d);
+    let sx = a.x.wrapping_sub(b.0).signum() * k;
+    let sy = a.y.wrapping_sub(b.1).signum() * k;
+    let probes = [
+        (b.0, b.1),
+        (b.0.wrapping_sub(sy), b.1.wrapping_add(sx)),
+        (b.0.wrapping_add(sy), b.1.wrapping_sub(sx)),
+    ];
+    probes
+        .iter()
+        .any(|&(x, y)| !point_line_blocked(rooms, a, x, y, REACH_MASK))
+}
+
 #[cfg(test)]
 mod tests;
 

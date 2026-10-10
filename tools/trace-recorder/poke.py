@@ -1588,8 +1588,6 @@ class PokeLayer:
                               exact=GOTO_EXACT, alt=GOTO_ALT)
             if eax:
                 self._settle(rec, tid, saved, game, pl)
-            if eax:
-                self._settle(rec, tid, saved, game, pl)
             return {"r": "ok", "guid": guid, "eax": f"{eax:#x}"} if eax else {"r": "failed", "eax": "0x0"}
         hop = goto_hop(rec, rec.read_u32(p[2] + AR_DRLG), goal, w["seen"], w.setdefault("blocked", set()))
         if hop is None:
