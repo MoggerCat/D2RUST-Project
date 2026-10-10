@@ -32,17 +32,17 @@
 |   2. Think dispatch `0x005B1740` | 305–451 |
 |   3. AI control and AI tables | 452–640 |
 |   4. AI parameters | 641–659 |
-|   5. Target selection | 660–996 |
-|   6. Distances and line tests | 997–1012 |
-|   7. Tactics helpers | 1013–1269 |
-|   8. AI commands and minions | 1270–1296 |
-|   10. The catalogue `ai-functions.tsv` | 1297–1317 |
-| Constants & data dependencies | 1318–1341 |
-| Randomness | 1342–1371 |
-| Edge cases & original bugs | 1372–1413 |
-| Test vectors | 1414–1502 |
-| Provenance | 1503–1564 |
-| Open questions | 1565–1671 |
+|   5. Target selection | 660–1087 |
+|   6. Distances and line tests | 1088–1103 |
+|   7. Tactics helpers | 1104–1383 |
+|   8. AI commands and minions | 1384–1410 |
+|   10. The catalogue `ai-functions.tsv` | 1411–1431 |
+| Constants & data dependencies | 1432–1455 |
+| Randomness | 1456–1485 |
+| Edge cases & original bugs | 1486–1527 |
+| Test vectors | 1528–1616 |
+| Provenance | 1617–1678 |
+| Open questions | 1679–1785 |
 <!-- /index -->
 
 ## Summary
