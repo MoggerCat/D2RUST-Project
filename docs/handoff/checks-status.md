@@ -1393,3 +1393,33 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a5-wp-36-lv117 | packets | DIVERGED | 539/540 | frame 4 stream s2c #42 extra (d2rs only) (id 0x5d) | unrouted |
 | a5-wp-38-lv129 | packets | DIVERGED | 539/540 | frame 4 stream s2c #34 extra (d2rs only) (id 0x5d) | unrouted |
 | items-drop-gold-potion | items | MATCH | 6/6 | - | - |
+| ama-cold-arrow | packets | MATCH | 70/70 | - | - |
+| ama-dopplezon | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 size: 1.14d 23 vs d2rs 14 (id 0xac) | unrouted |
+| ama-exploding-arrow | packets | MATCH | 70/70 | - | - |
+| ama-fire-arrow | packets | MATCH | 70/70 | - | - |
+| ama-freezing-arrow | packets | MATCH | 70/70 | - | - |
+| ama-guided-arrow | packets | MATCH | 70/70 | - | - |
+| ama-ice-arrow | packets | MATCH | 70/70 | - | - |
+| ama-immolation-arrow | packets | MATCH | 70/70 | - | - |
+| ama-lightning-bolt | packets | MATCH | 70/70 | - | - |
+| ama-lightning-fury | packets | MATCH | 70/70 | - | - |
+| ama-magic-arrow | packets | MATCH | 70/70 | - | - |
+| ama-multiple-shot | packets | MATCH | 70/70 | - | - |
+| ama-plague-javelin | packets | MATCH | 70/70 | - | - |
+| ama-poison-javelin | packets | MATCH | 70/70 | - | - |
+| ama-strafe | packets | MATCH | 70/70 | - | - |
+| ama-valkyrie | packets | DIVERGED | 69/70 | frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| ass-blade-fury | packets | MATCH | 70/70 | - | - |
+| ass-burst-of-speed | packets | MATCH | 70/70 | - | - |
+| ass-charged-bolt-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #2 id: 1.14d 21 vs d2rs aa (id 0x21) | unrouted |
+| ass-death-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| ass-dragon-flight | packets | MATCH | 70/70 | - | - |
+| ass-fade | packets | MATCH | 70/70 | - | - |
+| ass-fire-blast | packets | MATCH | 70/70 | - | - |
+| ass-inferno-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
+| ass-lightning-sentry | packets | MATCH | 70/70 | - | - |
+| ass-psychic-hammer | packets | MATCH | 70/70 | - | - |
+| ass-shadow-master | packets | DIVERGED | 66/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| ass-shadow-warrior | packets | DIVERGED | 69/70 | frame 28 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| ass-shock-field | packets | DIVERGED | 69/70 | frame 27 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| ass-wake-of-fire-sentry | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
