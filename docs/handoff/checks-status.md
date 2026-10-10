@@ -4,7 +4,7 @@ Suite run 2026-10-09 17:34 UTC at 739dd943: `suite.py --no-playthrough --workers
 
 Rows of 29 checks re-run 2026-10-10 on claude/integ-r16 + rc-coverage-warps (warps, milestones, combat-elements; `suite.py --filter … --orig-cache traces/orig-cache --no-playthrough`): rows replaced in place, the totals above are the full run's.
 88 checks, 108 channel results: DIVERGED 68, MATCH 1, PARTIAL 39.
-Rows of 81 checks re-run 2026-10-10 by rc-run-2b on claude/integ-r23 (`suite.py --filter … --orig-cache traces/orig-cache --no-playthrough`): rows replaced.
+Rows of 192 checks (the 5 save-* checks of the half cannot run: suite.py has no ORIG_OUTPUTS entry for channel save) re-run 2026-10-10 by rc-run-2b on claude/integ-r23 (`suite.py --filter … --orig-cache traces/orig-cache --no-playthrough`): rows replaced.
 PARTIAL = every compared frame equal but a part of the channel is not compared (spec scenario-diff.md §3); not a match.
 
 First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q-scenes-compare 8, q-prov-recording-2 3, q-fix-server-store-fill 2, q-fix-b-monster-combat 1, q-fix-pc1-proto-items 1
@@ -88,13 +88,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | dru-tornado | state | DIVERGED | 29/70 | frame 30 missile 3:1 class 478, field xf: 1.14d 32768 vs d2rs 57170 | q-scenes-compare |
 | dru-volcano | state | DIVERGED | 33/70 | frame 34 missile 3:1 class 479, field s: 1.14d [2238081736, 1028392181] vs d2rs [3365183618, 277] | q-fix-real-unit-seed-order |
 | dru-werewolf | state | PARTIAL | 70/70 | - | - |
-| items-ground-many | state | DIVERGED | 3/30 | frame 4 item 4:19 class 518, field if: 1.14d 524304 vs d2rs 524288 | q-fix-server-store-fill |
-| items-ground-pokes | state | DIVERGED | 3/40 | frame 4 item 4:1 class 587, field if: 1.14d 524304 vs d2rs 524288 | q-fix-server-store-fill |
-| items-load-mixed | state | PARTIAL | 60/60 | - | - |
-| items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
-| items-vendor-akara-buy | packets | DIVERGED | 35/40 | frame 16 stream s2c #0 bytes[10]: 1.14d 64 vs d2rs 11 (id 0x27) | q-fix-pc1-proto-items |
-| join-act2-quests-ama | state | DIVERGED | 23/40 | frame 24 monster 1:1 class 201, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
 | hire-kashya | state | PARTIAL | 90/90 | - | - |
 | hire-greiz | state | PARTIAL | 90/90 | - | - |
 | hire-asheara | state | DIVERGED | 23/90 | frame 24 monster 1:12 class 359 (hireling), field s: unit seed (follow AI draws; tile from frame 64) | q-diff-skills-2 |
@@ -106,19 +99,6 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | hire-follow-warp-kashya | state | DIVERGED | 53/200 | frame 54 monster 1:13 class 271 (hireling warp follow), field m: 1.14d 2 vs d2rs 4; tile (5147,4260) vs (5144,4266) | q-diff-skills-2 |
 | hire-follow-waypoint-kashya | state | DIVERGED | 92/330 | frame 93 player 0:1, field m: 1.14d 5 vs d2rs 6 (waypoint travel) | unrouted |
 | hire-items-kashya | state | DIVERGED | 29/90 | frame 30 item 4:1 class 306 (cap): 1.14d present vs d2rs absent | unrouted |
-| milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-act5-entry | state | PARTIAL | 40/40 | - | - |
-| milestone-baal-chamber | state | PARTIAL | 40/40 | - | - |
-| milestone-baal-throne | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
-| milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | q-fix-seed-order |
-| milestone-nihlathak | state | DIVERGED | 29/75 | frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 | unrouted |
-| milestone-worldstone-portal | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
-| packets-town-arrival-ama | packets | MATCH | 40/40 | - | - |
-| poke-fallen-town | state | PARTIAL | 54/54 | - | - |
-| poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
-| poke-firebolt | state | PARTIAL | 60/60 | - | - |
-| warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
 | items-drops-rbo-05 | items | MATCH | 6/6 | - | - |
 | items-drops-uni-00 | items | MATCH | 16/16 | - | - |
 | items-drops-uni-01 | items | MATCH | 17/17 | - | - |
@@ -222,3 +202,115 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | walk-click-walk-town-ama | packets | DIVERGED | 68/70 | frame 18 stream c2s #0 bytes[3]: 1.14d 142 vs d2rs 143 (id 0x01) | q-fix-skills-4cls |
 | walk-town-ama | state | PARTIAL | 80/80 | - | - |
 | walk-town-ama | packets | MATCH | 80/80 | - | - |
+| items-ground-many | state | PARTIAL | 30/30 | - | - |
+| items-ground-pokes | state | PARTIAL | 40/40 | - | - |
+| items-load-mixed | state | PARTIAL | 60/60 | - | - |
+| items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
+| items-vendor-akara-buy | packets | DIVERGED | 35/40 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| items-vendor-charsi-stock | items | MATCH | 43/43 | - | - |
+| items-vendor-gheed-gamble | items | MATCH | 14/14 | - | - |
+| items-vendor-gheed-stock | items | MATCH | 30/30 | - | - |
+| join-act2-quests-ama | state | PARTIAL | 40/40 | - | - |
+| merc-rogue-town-bar | state | PARTIAL | 80/80 | - | - |
+| milestone-act3-entry | state | PARTIAL | 40/40 | - | - |
+| milestone-act4-entry | state | PARTIAL | 40/40 | - | - |
+| milestone-act5-entry | state | PARTIAL | 40/40 | - | - |
+| milestone-baal-chamber | state | PARTIAL | 40/40 | - | - |
+| milestone-baal-throne | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
+| milestone-izual | state | DIVERGED | 27/72 | frame 28 game, field seed: 1.14d [1404398028, 410203972] vs d2rs [983484721, 7538455] | q-fix-seed-order |
+| milestone-nihlathak | state | DIVERGED | 29/75 | frame 30 monster 1:28 class 472, field m: 1.14d 2 vs d2rs 1 | unrouted |
+| milestone-worldstone-portal | state | DIVERGED | 81/87 | frame 82 monster 1:52 class 476, field m: 1.14d 2 vs d2rs 9 | unrouted |
+| nec-amplify-damage | state | PARTIAL | 70/70 | - | - |
+| nec-attract | state | PARTIAL | 70/70 | - | - |
+| nec-bloodgolem | state | PARTIAL | 70/70 | - | - |
+| nec-bone-armor | state | PARTIAL | 70/70 | - | - |
+| nec-bone-prison | state | PARTIAL | 70/70 | - | - |
+| nec-bone-spear | state | PARTIAL | 70/70 | - | - |
+| nec-bone-spirit | state | PARTIAL | 70/70 | - | - |
+| nec-bone-wall | state | PARTIAL | 70/70 | - | - |
+| nec-clay-golem | state | PARTIAL | 70/70 | - | - |
+| nec-confuse | state | PARTIAL | 70/70 | - | - |
+| nec-corpse-explosion | state | PARTIAL | 70/70 | - | - |
+| nec-decrepify | state | PARTIAL | 70/70 | - | - |
+| nec-dim-vision | state | PARTIAL | 70/70 | - | - |
+| nec-firegolem | state | PARTIAL | 70/70 | - | - |
+| nec-iron-maiden | state | PARTIAL | 70/70 | - | - |
+| nec-irongolem | state | PARTIAL | 70/70 | - | - |
+| nec-life-tap | state | PARTIAL | 70/70 | - | - |
+| nec-lower-resist | state | PARTIAL | 70/70 | - | - |
+| nec-poison-dagger | state | PARTIAL | 70/70 | - | - |
+| nec-poison-explosion | state | PARTIAL | 70/70 | - | - |
+| nec-poison-nova | state | PARTIAL | 70/70 | - | - |
+| nec-raise-skeletal-mage | state | PARTIAL | 70/70 | - | - |
+| nec-raise-skeleton | state | PARTIAL | 70/70 | - | - |
+| nec-revive | state | PARTIAL | 70/70 | - | - |
+| nec-teeth | state | PARTIAL | 70/70 | - | - |
+| nec-terror | state | PARTIAL | 70/70 | - | - |
+| nec-weaken | state | PARTIAL | 70/70 | - | - |
+| net-s2c-chat | packets | DIVERGED | 39/40 | frame 20 stream s2c #0 missing in d2rs (id 0x26) | q-fix-join-items |
+| net-s2c-gold-pickup | packets | DIVERGED | 38/40 | frame 12 stream s2c #0 missing in d2rs (id 0x0a) | q-fix-join-items |
+| net-s2c-kashya-hirelist | packets | MATCH | 50/50 | - | - |
+| net-s2c-townportal | packets | MATCH | 50/50 | - | - |
+| packets-town-arrival-ama | packets | MATCH | 40/40 | - | - |
+| pal-blessed-aim | state | PARTIAL | 70/70 | - | - |
+| pal-blessed-hammer | state | PARTIAL | 70/70 | - | - |
+| pal-charge | state | PARTIAL | 70/70 | - | - |
+| pal-cleansing | state | PARTIAL | 70/70 | - | - |
+| pal-concentration | state | PARTIAL | 70/70 | - | - |
+| pal-conversion | state | PARTIAL | 70/70 | - | - |
+| pal-conviction | state | PARTIAL | 70/70 | - | - |
+| pal-defiance | state | PARTIAL | 70/70 | - | - |
+| pal-fanaticism | state | PARTIAL | 70/70 | - | - |
+| pal-fist-of-the-heavens | state | PARTIAL | 70/70 | - | - |
+| pal-holy-bolt | state | PARTIAL | 70/70 | - | - |
+| pal-holy-fire | state | PARTIAL | 70/70 | - | - |
+| pal-holy-freeze | state | PARTIAL | 70/70 | - | - |
+| pal-holy-shield | state | PARTIAL | 70/70 | - | - |
+| pal-holy-shock | state | PARTIAL | 70/70 | - | - |
+| pal-meditation | state | PARTIAL | 70/70 | - | - |
+| pal-might | state | PARTIAL | 70/70 | - | - |
+| pal-prayer | state | PARTIAL | 70/70 | - | - |
+| pal-redemption | state | PARTIAL | 70/70 | - | - |
+| pal-resist-cold | state | PARTIAL | 70/70 | - | - |
+| pal-resist-fire | state | PARTIAL | 70/70 | - | - |
+| pal-resist-lightning | state | PARTIAL | 70/70 | - | - |
+| pal-sacrifice | state | PARTIAL | 70/70 | - | - |
+| pal-salvation | state | PARTIAL | 70/70 | - | - |
+| pal-sanctuary | state | PARTIAL | 70/70 | - | - |
+| pal-smite | state | PARTIAL | 70/70 | - | - |
+| pal-thorns | state | PARTIAL | 70/70 | - | - |
+| pal-vengeance | state | PARTIAL | 70/70 | - | - |
+| pal-vigor | state | PARTIAL | 70/70 | - | - |
+| pal-zeal | state | PARTIAL | 70/70 | - | - |
+| poke-fallen-town | state | PARTIAL | 54/54 | - | - |
+| poke-fallen-town-unpinned | state | PARTIAL | 54/54 | - | - |
+| poke-firebolt | state | PARTIAL | 60/60 | - | - |
+| sor-blaze | state | PARTIAL | 70/70 | - | - |
+| sor-blizzard | state | PARTIAL | 70/70 | - | - |
+| sor-chain-lightning | state | PARTIAL | 70/70 | - | - |
+| sor-charged-bolt | state | PARTIAL | 70/70 | - | - |
+| sor-chilling-armor | state | PARTIAL | 70/70 | - | - |
+| sor-enchant | state | PARTIAL | 70/70 | - | - |
+| sor-energy-shield | state | PARTIAL | 70/70 | - | - |
+| sor-fire-ball | state | PARTIAL | 70/70 | - | - |
+| sor-fire-bolt | state | PARTIAL | 70/70 | - | - |
+| sor-fire-wall | state | PARTIAL | 70/70 | - | - |
+| sor-frost-nova | state | PARTIAL | 70/70 | - | - |
+| sor-frost-nova-twice | state | PARTIAL | 100/100 | - | - |
+| sor-frozen-armor | state | PARTIAL | 70/70 | - | - |
+| sor-frozen-orb | state | PARTIAL | 70/70 | - | - |
+| sor-glacial-spike | state | PARTIAL | 70/70 | - | - |
+| sor-hydra | state | PARTIAL | 70/70 | - | - |
+| sor-ice-blast | state | PARTIAL | 70/70 | - | - |
+| sor-ice-bolt | state | PARTIAL | 70/70 | - | - |
+| sor-inferno | state | PARTIAL | 70/70 | - | - |
+| sor-lightning | state | PARTIAL | 70/70 | - | - |
+| sor-meteor | state | PARTIAL | 70/70 | - | - |
+| sor-nova | state | PARTIAL | 70/70 | - | - |
+| sor-shiver-armor | state | PARTIAL | 70/70 | - | - |
+| sor-static-field | state | PARTIAL | 70/70 | - | - |
+| sor-telekinesis | state | PARTIAL | 70/70 | - | - |
+| sor-teleport | state | PARTIAL | 70/70 | - | - |
+| sor-thunder-storm | state | PARTIAL | 70/70 | - | - |
+| ui-charselect-dolls | frontend | MATCH | 3/3 | - | - |
+| warp-cold-plains-ama | state | PARTIAL | 60/60 | - | - |
