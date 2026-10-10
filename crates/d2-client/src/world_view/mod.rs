@@ -397,6 +397,14 @@ pub trait ViewRules {
         None
     }
 
+    /// Whether the unit draw `0x00471EC0` reaches the body's cels:
+    /// `false` for an object whose `objects` `Draw` (`+0x150`) is 0
+    /// (`unit-composite.md` §8). The shadow pass does not read `Draw`.
+    /// The default: always.
+    fn unit_draws_body(&self, _unit: &ClientUnit) -> bool {
+        true
+    }
+
     /// The unit's slot when the frame's draw order lists it
     /// (`draw-order.md` §5 r4: the room list walk calls the unit draw
     /// `0x00471EC0` for every listed unit); `None` (the default): not
@@ -674,7 +682,7 @@ pub fn build<R: ViewRules + UiRules + ?Sized>(
             .ok_or_else(|| ViewError::CofMissing(pose.cof.clone()))?;
         // `blend-modes.md` §5 r3 revision (settled, REC-511): the
         // body's COF box pre-test does not cull the unit's shadow.
-        let body = rules.unit_box_visible(unit, &pose, cof)?;
+        let body = rules.unit_draws_body(unit) && rules.unit_box_visible(unit, &pose, cof)?;
         let shadow_ok = rules.unit_shadow_box_visible(unit, &pose, cof)?;
         let shadow_at = rules.unit_shadow_key(unit).filter(|_| shadow_ok);
         let params = rules.unit_params(world, unit, &pose)?;

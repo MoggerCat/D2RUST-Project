@@ -546,6 +546,10 @@ impl<R: ViewRules + ?Sized, S: ViewSource + ?Sized> ViewRules for OriginalView<'
         self.source.unit_shadow_slot(unit)
     }
 
+    fn unit_draws_body(&self, unit: &ClientUnit) -> bool {
+        self.rules.unit_draws_body(unit)
+    }
+
     fn unit_listed_key(&self, unit: &ClientUnit) -> Option<OrderKey> {
         match self.source.unit_slot(unit) {
             UnitSlot::Drawn(at) => Some(at),

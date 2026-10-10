@@ -173,6 +173,10 @@ impl<R: ViewRules + ?Sized, F: LookFeed + ?Sized> ViewRules for LitRules<'_, R, 
         self.rules.unit_shadow_key(unit)
     }
 
+    fn unit_draws_body(&self, unit: &ClientUnit) -> bool {
+        self.rules.unit_draws_body(unit)
+    }
+
     fn unit_listed_key(&self, unit: &ClientUnit) -> Option<crate::rules::draw_order::OrderKey> {
         self.rules.unit_listed_key(unit)
     }
