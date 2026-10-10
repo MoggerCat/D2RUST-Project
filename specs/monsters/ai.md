@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–282 |
-|   2. Think dispatch `0x005B1740` | 283–422 |
-|   3. AI control and AI tables | 423–594 |
-|   4. AI parameters | 595–613 |
-|   5. Target selection | 614–952 |
-|   6. Distances and line tests | 953–967 |
-|   7. Tactics helpers | 968–1207 |
-|   8. AI commands and minions | 1208–1234 |
-|   10. The catalogue `ai-functions.tsv` | 1235–1255 |
-| Constants & data dependencies | 1256–1279 |
-| Randomness | 1280–1309 |
-| Edge cases & original bugs | 1310–1351 |
-| Test vectors | 1352–1440 |
-| Provenance | 1441–1501 |
-| Open questions | 1502–1608 |
+|   1. Think scheduling | 97–293 |
+|   2. Think dispatch `0x005B1740` | 294–433 |
+|   3. AI control and AI tables | 434–605 |
+|   4. AI parameters | 606–624 |
+|   5. Target selection | 625–963 |
+|   6. Distances and line tests | 964–978 |
+|   7. Tactics helpers | 979–1218 |
+|   8. AI commands and minions | 1219–1245 |
+|   10. The catalogue `ai-functions.tsv` | 1246–1266 |
+| Constants & data dependencies | 1267–1290 |
+| Randomness | 1291–1320 |
+| Edge cases & original bugs | 1321–1362 |
+| Test vectors | 1363–1451 |
+| Provenance | 1452–1512 |
+| Open questions | 1513–1619 |
 <!-- /index -->
 
 ## Summary
@@ -207,6 +207,17 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
+
+The neutral request of the last case (`0x005A8030`, read 2026-10-09)
+first, when the unit has state 54, runs `0x005544B0` and stops if the
+unit is then dead (`0x005541B0`); it clears the used skill (`0x00620210(unit, 0)`), then builds the
+mode-change record {unit, target unit := the path target unit
+(`0x00553540`: none when there is none or it is the unit itself), point
+(0, 0), mode 1} and calls `0x005A7C20(game, record, 1)`. So a monster
+without a path target unit ends with path target point (0, 0) (§7.5
+rule 2): the summons that end S1 at the animation end (raven, plague
+poppy, vines, cycle of life) show it in 1.14d (REC-1651, settled by this
+read).
 
 #### 1.5 First think and player arrival
 

@@ -472,6 +472,8 @@ needs `re/` or a real Windows run. Each answer goes into its owner spec
 
 - [q-tool-audio-diff] REC-1363 **run done (pc1-late F1) → `tools/audio-diff.md` Open questions 1, capture `traces/audio/win/`; the comparison with the cloud capture is left to the cloud (its voices file is not in the repo)**: does 1.14d send the same DirectSound calls on Windows as under Wine? On PC 1 run `py tools/audio-diff/record_audio.py --auto ScnAma --seed 1234 --ticks 250 --out traces/raw/audio-town-win.jsonl --blob-dir game/captures/audio-town-win` (game with sound, no `-ns`), then `py tools/audio-diff/audio_diff.py voices traces/raw/audio-town-win.jsonl game/captures/audio-town-win game/captures/audio-town-win-v` and compare `orig.voices.jsonl` (tick, buffer, channels, dev_vol, dev_pan, sha256 of each voice's first `bytes`) with the cloud run of `traces/audio/audio-town-ambience-ama.check` (`specs/tools/audio-diff.md` Open questions 1). Expected: same voices, ticks, device integers; refill-write ticks may differ.
 
+- [q-fix-skills-bda] Shadow Master's first think (`ai-bodies-7.md` §27): at frame 48 of ass-shadow-master 1.14d starts mode 7 (SC) with path target (0, 0), d2rs idles; which skill/branch does it take with no enemy near (the poked cow is `isAtt` 0)?
+
 ## How to check a behaviour in one command
 
 A check file `traces/checks/<name>.check` (`specs/tools/scenario-diff.md`)

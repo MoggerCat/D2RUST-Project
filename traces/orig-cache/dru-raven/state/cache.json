@@ -1,0 +1,40 @@
+{
+ "channel": "state",
+ "check": "dru-raven",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnDru",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--input",
+  "frame 20; rclick 330 300"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "1e2fa88a9d71ae090fd210780866da3588e4aa58d54fc3d9c9e85a9b48dbac46",
+   "size": 347486
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "a1b1268fda67fbf03d36e673dbf03ba713514f4bbb86fb7328866ad60c155f13",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "cbb103980d71fdf823601c8a19f78a163a2e1a371472d6a6bcaf2073735b64e7",
+  "save": "3a55ca9eeec5d176da3452490a487767290429af826b1c8a763334e14b37812c"
+ }
+}

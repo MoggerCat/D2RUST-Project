@@ -1434,11 +1434,19 @@ fn mode_end_inline_think() {
     w.fake.states.insert((mon, state::FREEZE));
     w.with(|g, cx| mode_end(g, cx, mon, mode::RUN));
     assert!(w.thinks().is_empty());
-    // An attack end requests neutral.
+    // An attack end requests neutral (`0x005A8030`'s record): with a path
+    // target unit the record targets it; without one the point (0, 0).
     let mut w = World::new(monstats(1, [0; 5], 15));
     let mon = w.mon;
+    let pl = w.player;
+    w.fake.path_target = Some(pl);
     w.with(|g, cx| mode_end(g, cx, mon, mode::ATTACK1));
-    assert_eq!(last_mode(&w), format!("mode 1 Unit({mon:?})"));
+    assert_eq!(last_mode(&w), format!("mode 1 Unit({pl:?})"));
+    let mut w = World::new(monstats(1, [0; 5], 15));
+    let mon = w.mon;
+    w.fake.path_target = None;
+    w.with(|g, cx| mode_end(g, cx, mon, 8));
+    assert_eq!(last_mode(&w), "mode 1 Point(0, 0)");
 }
 
 // Covers: specs/monsters/ai.md §1.1, §1.6, §edge-cases-original-bugs r1

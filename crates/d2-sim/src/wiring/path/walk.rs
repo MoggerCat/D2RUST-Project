@@ -748,6 +748,9 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
     fn monstats_velocity(&self, unit: UnitId) -> (i32, bool) {
         self.v.monster_velocity(unit)
     }
+    fn velocity_base(&self, unit: UnitId) -> i32 {
+        self.v.velocity_base(unit)
+    }
     /// `0x0063E860` (`path-placement.md` §3).
     fn monster_can_be_in_town(&self, unit: UnitId) -> bool {
         self.v
