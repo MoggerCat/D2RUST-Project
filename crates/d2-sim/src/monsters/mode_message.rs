@@ -86,11 +86,8 @@ pub struct ModeInput {
     /// The unit's cell (`0x006488C0`, `0x00648900`; also `0x0045ADF0`,
     /// `0x0045AE20` for a monster).
     pub cell: (u16, u16),
-    /// The path target (+0x10, +0x12).
+    /// The path target (+0x10, +0x12: `0x00648A40`, `0x00648A60`).
     pub path_target: (u16, u16),
-    /// The path end (`0x00648A40`, `0x00648A60`: the last computed point,
-    /// (0, 0) without one).
-    pub path_end: (u16, u16),
     /// The path direction +0x64 (`0x006487F0`).
     pub direction: u8,
     /// The path type +0x3C (`0x00648E30`).
@@ -151,7 +148,7 @@ pub fn mode_message(i: &ModeInput) -> ModeMessage {
         t => t,
     };
     let point = if e.target_from_path {
-        i.path_end
+        i.path_target
     } else {
         i.cell
     };
@@ -188,7 +185,7 @@ pub fn mode_message(i: &ModeInput) -> ModeMessage {
             })
             .to_vec(),
             None => {
-                let (x, y) = if typed { i.path_end } else { i.cell };
+                let (x, y) = if typed { i.path_target } else { i.cell };
                 knockback(Knockback {
                     guid: i.guid,
                     code: e.code_to_point,
@@ -224,7 +221,7 @@ pub fn mode_message(i: &ModeInput) -> ModeMessage {
                 // Rule 4: without T, (a, b) := the path target when the
                 // row takes it from the path (WL, RN), else the cell; a
                 // dropped T of path type 5 / 6 takes the path target.
-                let (x, y) = if typed { i.path_end } else { point };
+                let (x, y) = if typed { i.path_target } else { point };
                 monster_move(Move {
                     guid: i.guid,
                     code: e.code_to_point,
