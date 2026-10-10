@@ -1336,6 +1336,23 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         // Dead-body footprint `0x00649F70(u, 1)` (`bodies-3.md` §3.9): the
         // egg's start gives up its monster footprint (§5.6).
+        // Class change `0x00574370(game, t, class, mode)` (`bodies-4.md`
+        // §2.6: the Overseer's whip turns a minion into its suicide
+        // minion; `monsters/init.md` §27 rebuilds the monster data).
+        if let bodies::BodyEffect::ClassChange { t, class, mode } = e {
+            let game = &mut *self.cv.game;
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let mode = u32::try_from(mode).unwrap_or(0);
+            let _ =
+                v.h.with_monster_world(|w, h| w.reinit(&mut sim, h, t, class, mode));
+            return;
+        }
         // Alignment `0x005543B0(u, a, 1)` (`bodies-3.md` §8.5: the Hydras
         // of a monster owner take the owner's alignment, so the Council's
         // stay hostile to the player instead of the class row's good).
