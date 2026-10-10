@@ -1,7 +1,7 @@
 # pc1-camera-compare 1
 # tool: scratch script over the draws checks run on Windows 2026-10-10 (traces/raw/check-<name>/draws-orig/scenes/s/frame.tsv = 1.14d facts_render, draws-d2rs/frame.tsv = d2-client play --dump-draws): the frame-level camera values of both sides at the compared tick
 check	key	v_1.14d	v_d2rs	equal
-draws-a2-town-ama	tick	73	73	1
+draws-a2-town-ama	tick	72	72	1
 draws-a2-town-ama	act	1	1	1
 draws-a2-town-ama	level	40	40	1
 draws-a2-town-ama	tile_origin_x	-1200	-1200	1
@@ -12,7 +12,7 @@ draws-a2-town-ama	open_mode	0	0	1
 draws-a2-town-ama	shift_x	0	0	1
 draws-a2-town-ama	w	800	800	1
 draws-a2-town-ama	h	600	600	1
-draws-a3-town-ama	tick	73	73	1
+draws-a3-town-ama	tick	72	72	1
 draws-a3-town-ama	act	2	2	1
 draws-a3-town-ama	level	75	75	1
 draws-a3-town-ama	tile_origin_x	-1200	-1200	1
@@ -23,7 +23,7 @@ draws-a3-town-ama	open_mode	0	0	1
 draws-a3-town-ama	shift_x	0	0	1
 draws-a3-town-ama	w	800	800	1
 draws-a3-town-ama	h	600	600	1
-draws-a4-town-ama	tick	73	73	1
+draws-a4-town-ama	tick	72	72	1
 draws-a4-town-ama	act	3	3	1
 draws-a4-town-ama	level	103	103	1
 draws-a4-town-ama	tile_origin_x	-320	-320	1
@@ -166,7 +166,7 @@ ui-draws-belt-ama	open_mode	0	0	1
 ui-draws-belt-ama	shift_x	0	0	1
 ui-draws-belt-ama	w	800	800	1
 ui-draws-belt-ama	h	600	600	1
-ui-draws-char-skill-ama	tick	73	73	1
+ui-draws-char-skill-ama	tick	72	72	1
 ui-draws-char-skill-ama	act	0	0	1
 ui-draws-char-skill-ama	level	1	1	1
 ui-draws-char-skill-ama	tile_origin_x	9920	9920	1
@@ -177,7 +177,7 @@ ui-draws-char-skill-ama	open_mode	3	3	1
 ui-draws-char-skill-ama	shift_x	0	0	1
 ui-draws-char-skill-ama	w	800	800	1
 ui-draws-char-skill-ama	h	600	600	1
-ui-draws-character-ama	tick	73	73	1
+ui-draws-character-ama	tick	72	72	1
 ui-draws-character-ama	act	0	0	1
 ui-draws-character-ama	level	1	1	1
 ui-draws-character-ama	tile_origin_x	9920	9920	1
@@ -210,7 +210,7 @@ ui-draws-hover-life-ama	open_mode	0	0	1
 ui-draws-hover-life-ama	shift_x	0	0	1
 ui-draws-hover-life-ama	w	800	800	1
 ui-draws-hover-life-ama	h	600	600	1
-ui-draws-hover-mana-ama	tick	73	73	1
+ui-draws-hover-mana-ama	tick	72	72	1
 ui-draws-hover-mana-ama	act	0	0	1
 ui-draws-hover-mana-ama	level	1	1	1
 ui-draws-hover-mana-ama	tile_origin_x	9920	9920	1
@@ -254,7 +254,7 @@ ui-draws-hover-xp-ama	open_mode	0	0	1
 ui-draws-hover-xp-ama	shift_x	0	0	1
 ui-draws-hover-xp-ama	w	800	800	1
 ui-draws-hover-xp-ama	h	600	600	1
-ui-draws-inv-char-ama	tick	72	72	1
+ui-draws-inv-char-ama	tick	73	73	1
 ui-draws-inv-char-ama	act	0	0	1
 ui-draws-inv-char-ama	level	1	1	1
 ui-draws-inv-char-ama	tile_origin_x	9920	9920	1
@@ -265,7 +265,7 @@ ui-draws-inv-char-ama	open_mode	3	3	1
 ui-draws-inv-char-ama	shift_x	0	0	1
 ui-draws-inv-char-ama	w	800	800	1
 ui-draws-inv-char-ama	h	600	600	1
-ui-draws-inv-char-l5-ama	tick	72	72	1
+ui-draws-inv-char-l5-ama	tick	73	73	1
 ui-draws-inv-char-l5-ama	act	0	0	1
 ui-draws-inv-char-l5-ama	level	1	1	1
 ui-draws-inv-char-l5-ama	tile_origin_x	9920	9920	1
@@ -276,7 +276,7 @@ ui-draws-inv-char-l5-ama	open_mode	3	3	1
 ui-draws-inv-char-l5-ama	shift_x	0	0	1
 ui-draws-inv-char-l5-ama	w	800	800	1
 ui-draws-inv-char-l5-ama	h	600	600	1
-ui-draws-inv-char-tip-ama	tick	73	73	1
+ui-draws-inv-char-tip-ama	tick	72	72	1
 ui-draws-inv-char-tip-ama	act	0	0	1
 ui-draws-inv-char-tip-ama	level	1	1	1
 ui-draws-inv-char-tip-ama	tile_origin_x	9920	9920	1
@@ -309,7 +309,7 @@ ui-draws-item-tip-ama	open_mode	1	1	1
 ui-draws-item-tip-ama	shift_x	-200	-200	1
 ui-draws-item-tip-ama	w	800	800	1
 ui-draws-item-tip-ama	h	600	600	1
-ui-draws-left-skill-pick-ama	tick	73	73	1
+ui-draws-left-skill-pick-ama	tick	72	72	1
 ui-draws-left-skill-pick-ama	act	0	0	1
 ui-draws-left-skill-pick-ama	level	1	1	1
 ui-draws-left-skill-pick-ama	tile_origin_x	9920	9920	1
@@ -331,7 +331,7 @@ ui-draws-minipanel-ama	open_mode	0	0	1
 ui-draws-minipanel-ama	shift_x	0	0	1
 ui-draws-minipanel-ama	w	800	800	1
 ui-draws-minipanel-ama	h	600	600	1
-ui-draws-msglog-ama	tick	73	73	1
+ui-draws-msglog-ama	tick	72	72	1
 ui-draws-msglog-ama	act	0	0	1
 ui-draws-msglog-ama	level	1	1	1
 ui-draws-msglog-ama	tile_origin_x	9920	9920	1
@@ -408,7 +408,7 @@ ui-draws-skillbar-ama	open_mode	0	0	1
 ui-draws-skillbar-ama	shift_x	0	0	1
 ui-draws-skillbar-ama	w	800	800	1
 ui-draws-skillbar-ama	h	600	600	1
-ui-draws-skilltree-ama	tick	72	72	1
+ui-draws-skilltree-ama	tick	73	73	1
 ui-draws-skilltree-ama	act	0	0	1
 ui-draws-skilltree-ama	level	1	1	1
 ui-draws-skilltree-ama	tile_origin_x	9920	9920	1

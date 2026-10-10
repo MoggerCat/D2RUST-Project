@@ -448,3 +448,32 @@ Open in Step 4: nothing new for PC 1.
   colour) same file line 507, `CelDrawClipped` (x, y, rect, mode) in
   `ui/automap.md` §10 r4; `CelDrawShadow` takes (x, y) only, so its mode /
   light / pal cells are `-`, not `?`.
+
+## Push 19 (23:05) — round 4 on integ-r23 77814718b (cast-light fix)
+
+Asked for as "Push 18"; that number was already used above.
+
+- **Recorder**: `record_frames` on integ is 0.3.1. Version 0.3.2 (registry
+  header) is only on `origin/claude/rc-draw-row173` (0550c52e4), which
+  conflicts with integ in `crates/d2-client/src/world_view/present.rs`
+  (cursor-jump block); not merged here. So this round has no registry
+  values in the capture header. `traces/orig-cache` was read, not written.
+- **Pixels round 4** (`traces/pc1/pixel-compare-r4.tsv`, prev = round 3;
+  pairs in the private repo, `recordings/pc1-2026-10-10/pixel-compare-r4`):
+  the player's light is back. All 25 world scenes returned to their
+  round 2 level within ±0.6 (town arrival 75.83 → 97.86, Harrogath
+  71.62 → 98.34). Above round 2: the three cast / melee scenes, which had
+  never had the light: melee-bar 84.68 → 97.60, frost-nova 84.46 → 95.99,
+  fire-bolt 84.53 → 95.82; item-tip 95.92 (r2) → 98.39; skilltree 97.80 →
+  98.62. Below round 2 by about 0.5: hover-npc, hover-stamina, hover-xp,
+  party (97.7 against 98.2–98.3). help (12.14) and msglog (24.84) are back
+  at their round 2 values; their round 3 rise was the dark frame, not a fix.
+- **Draws** (38 checks, `traces/pc1/draws-first-diff.tsv`): all DIVERGED.
+  Moved: run and walk now differ first at `player_x` / `player_y`
+  (frame.tsv rows 6 / 7: d2rs now writes the player position; 1.14d 10099
+  against d2rs 10092 in run), the same 7-unit lag as the tile origin
+  before. automap, help, right-skill-pick swapped between 173:frame (NPC
+  balloon frame) and 198:x (rain line), which is run-to-run noise.
+- **Camera** (`traces/pc1/camera-compare.tsv`): still only walk / run
+  differ (4 rows); the compared tick of some town scenes is 72 instead of
+  73 on both sides.
