@@ -33,7 +33,7 @@ use crate::wiring::action::ActionHooks;
 use crate::world::objects::{Dispatch, EventRun, Operate, Route};
 use crate::world::quests::act2::q4::{self, JerhynStep};
 use crate::world::quests::act3::{self, InitPoint, KhalimChest};
-use crate::world::quests::{self, act1, act2, act4, act5, QuestControl, QuestWorld};
+use crate::world::quests::{self, act1, act2, act4, act5, placeholders, QuestControl, QuestWorld};
 
 /// What running one queued route did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -396,6 +396,8 @@ pub fn init_fn(n: u8) -> Option<u32> {
         54 => 0x0059_40E0,
         // CainPortal (`quests-act1-rest.md` §9 item 10).
         61 => 0x0059_4290,
+        // TrappedSoulPlaceHolder (`objects-2.md` §17).
+        46 => 0x0055_06D0,
         // Act IV objects (`quests-act4.md` §1.4, q-a4-endgame).
         48 => 0x005B_5A20,
         55 => 0x005B_5590,
@@ -572,6 +574,7 @@ fn init<W: QuestWorld>(
         // The init args' room and position; a null room spawns nothing
         // (`quests-act1-rest.md` §9 item 2).
         54 => act1::q4::marker_init(ctl, w, object, c.room, c.x, c.y),
+        46 => placeholders::trapped_soul_init(w, object, at),
         61 => act1::q4::cain_portal_init(w, object),
         62 => act5::q2::cage_init(ctl, w, object),
         // The statue's class (474–476) picks its slot (part 2 §7.8).

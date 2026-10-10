@@ -209,7 +209,20 @@ sets here run before the unit is added to the world (§3).
 | 28 gold placeholder | `0x0054F8C0` | 269 | below |
 | 34 hell brazier fire | `0x005500F0` | 358, 359 | C step: lo' & 1 = 1 → mode 1 |
 | 37 | `0x0059DA50` | none | `world/quests-act2.md` §8.8 |
+| 46 trapped soul placeholder | `0x005506D0` | 369 | below (quest-routed, `world/quests/placeholders.rs`) |
 | 58 fissure | `0x0054FDB0` | 399 | C step; event 8 at f + 25 + lo' mod 250 |
+
+**Trapped soul placeholder** (init 46, `0x005506D0`; rc-gen-obj-six, REC-2332; gen-obj-369 equal). Runs only in object mode 0 (an object that
+is missing counts as mode 0); a null room has the all-zero box, so the budget is 0.
+All draws are on the object control seed C (game +0x10F0). B := the room's sub-tile box (x0, y0, w, h);
+budget := ((w · h) >> 7) · 30 >> 8. Up to 12 outer tries, while budget > 0: P := (C roll(w − 4) + x0, C roll(h − 4) + y0)
+(roll(n < 1) draws nothing). P must fit (below), else the try ends. Fit: w ≥ 5, h ≥ 5, x0 + 1 < x < x0 + w − 5, y0 + 1 < y < y0 + h − 5
+(x, y low 16 bits), the 10 × 10 box at P has no collision in mask `0x0C01`, the 3 × 3 box none in `0x3F11` (the object-population "fit A" with size 3 × 3, `0x00550220`).
+A fitting P: one soul at the object's **own** init position, then a cluster: n := 1; loop { h := n >> 1; if h > 0, C roll(h) ≠ 0 ends the cluster;
+last search failed → ends; search up to 3 · max(budget, 4) times: d := C step & 7, then two more steps s1, s2: P.x += (s1 mod 5 + 5) · DX[d] · 2,
+P.y += (s2 mod 5 + 5) · DY[d] · 2 (unsigned mods; DX = {−1, 0, 1, −1, 1, −1, 0, 1}, DY = {−1, −1, −1, 0, 0, 1, 1, 1}, tables `0x00731B7C`, `0x00731B9C`),
+stop at the first fit; found: n += 1 and a soul at P }. A soul: C step; class 403 + (lo' & 1) (`0x193`, `0x194`); the monster `0x005B2F20(room, x, y, class, mode 1, spread −1, flags 0)`;
+when it exists the object goes to mode 2 (`0x00624690`) and budget −= 1. A failed search re-enters the cluster head (its roll runs once more) and ends it.
 
 **Gold placeholder** (init 28): mode ≠ 0 → nothing. Else mode 2; n :=
 (C step, lo' mod 9) + 1; L := (x, y). n times: dx := C step & 3, dy := C
