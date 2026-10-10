@@ -417,7 +417,7 @@ pub fn enter_game<D: ActionEvents, W>(
             a.sys
                 .hooks
                 .x
-                .send(player, &msg::set_skill(hand, guid, 0, skill, u32::MAX));
+                .send(player, &msg::set_skill(0, guid, hand, skill, u32::MAX));
         }
     }
     // Rule 3.1, the stub load's right-skill selection (§8.2 rule 7).
