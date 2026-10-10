@@ -782,7 +782,8 @@ d2rs-own tool; no 1.14d fact.
    call (drop / store / gamble / cube / quest) directly instead of the
    message action; it needs the d2rs creation path to write the same
    record.
-6. PROVISIONAL REC-2055: a fidelity-ledger row counts as EQUAL when
+6. DECIDED REC-2055 (owner, 2026-10-10: the client gap is a gap in d2rs' recording, not a
+   difference in the game): a fidelity-ledger row counts as EQUAL when
    every channel of its checks is MATCH except a state channel whose
    only PARTIAL cause is the d2rs header's client gap (`state_dump.rs`
    `RUN_GAPS`: the headless bridge's C→S set), with every unit field of
@@ -790,10 +791,8 @@ d2rs-own tool; no 1.14d fact.
    no `input` or `send` line in the check (pokes only) or a packets
    channel that MATCHes (its C→S stream equal: the gap's condition, a
    1.14d client sending another message, did not occur). The comparator's verdict stays PARTIAL (`state-
-   snapshot.md` §1 rule 1, §4 rule 5); settled by the coordinator's
-   ledger rule, or by the bridge covering the 1.14d client's C→S set
-   (the gap removed).
-7. PROVISIONAL REC-2056: likewise, an items channel PARTIAL whose only
+   snapshot.md` §1 rule 1, §4 rule 5); the ledger rule settles the row.
+   Covering the 1.14d client's C→S set in the bridge removes the gap.
+7. DECIDED REC-2056 (owner, 2026-10-10): likewise, an items channel PARTIAL whose only
    cause is "no item created on either side" (§3 rule 13, edge: nothing
-   compared) counts as equal for such a row (zero items on both sides);
-   settled with REC-2055.
+   compared) counts as equal for such a row (zero items on both sides).
