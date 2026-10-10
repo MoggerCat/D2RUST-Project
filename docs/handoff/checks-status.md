@@ -1485,3 +1485,81 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ui-draws-inv-char-tip-ama | draws | DIVERGED | 0/1 | tick 72 draw row 249 (CelDrawColor) column frame: 1.14d 54 vs d2rs 48 | unrouted |
 | ui-draws-quest-inv-ama | draws | DIVERGED | 0/1 | tick 72 draw row 59 (CelDraw) column frame: 1.14d 0 vs d2rs 2 | unrouted |
 | ui-draws-quest-skill-ama | draws | DIVERGED | 0/1 | tick 72 draw row 28 (CelDrawColor) column op: 1.14d CelDrawColor vs d2rs CelDraw | unrouted |
+| gen-ai-andariel | state | PARTIAL | 150/150 | - | - |
+| gen-ai-baalcrab | state | PARTIAL | 150/150 | - | - |
+| gen-ai-bloodraven | state | DIVERGED | 93/150 | frame 94 player 0:1 class 0, field s: 1.14d [1705063323, 1170302293] vs d2rs [1068977052, 711168901] | unrouted |
+| gen-ai-clawviper | state | PARTIAL | 150/150 | - | - |
+| gen-ai-deathmauler | state | PARTIAL | 150/150 | - | - |
+| gen-ai-desertturret | state | DIVERGED | 80/150 | frame 81 monster 1:8 class 348, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-ai-gargoyletrap | state | DIVERGED | 30/150 | frame 31 monster 1:8 class 273, field d: 1.14d 49 vs d2rs 0 | unrouted |
+| gen-ai-genericspawner | state | DIVERGED | 30/150 | frame 31 monster 1:8 class 528, field s: 1.14d [2409280208, 8913528] vs d2rs [21370634, 838424606] | unrouted |
+| gen-ai-highpriest | state | DIVERGED | 85/150 | frame 86 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] | unrouted |
+| gen-ai-mephisto | state | DIVERGED | 60/150 | frame 61 monster 1:8 class 242, field s: 1.14d [4285903474, 480484601] vs d2rs [1151986076, 1319447910] | unrouted |
+| gen-ai-navi | state | DIVERGED | 50/150 | frame 51 monster 1:8 class 266, field s: 1.14d [4094205064, 1004892389] vs d2rs [2409280208, 8913528] | unrouted |
+| gen-ai-nihlathak | state | DIVERGED | 72/150 | frame 73 monster 1:8 class 526, field s: 1.14d [3163442939, 446165621] vs d2rs [4094205064, 1004892389] | unrouted |
+| gen-ai-npcoutoftown | state | DIVERGED | 77/150 | frame 78 game, field seed: 1.14d [2010166573, 1165197850] vs d2rs [2793620638, 1943] | unrouted |
+| gen-ai-sandmaggotqueen | state | DIVERGED | 42/150 | frame 43 game, field seed: 1.14d [3692043304, 618654564] vs d2rs [1483255534, 419929858] | unrouted |
+| gen-ai-siegebeast | state | PARTIAL | 150/150 | - | - |
+| gen-ai-suicideminion | state | PARTIAL | 150/150 | - | - |
+| gen-ai-summoner | state | PARTIAL | 150/150 | - | - |
+| gen-fmt-draws-town | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 282 | unrouted |
+| gen-itemq-crafted-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 25, after the head (bit 95 past bit 109): 1.14d 9922504010 vs d2rs 9922504000 | unrouted |
+| gen-itemq-crafted-1 | items | DIVERGED | 19/20 | item #6 (7gd) stream length: 1.14d 25 vs d2rs 24 | unrouted |
+| gen-itemq-crafted-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-low-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-low-1 | items | MATCH | 20/20 | - | - |
+| gen-itemq-low-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-magic-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-magic-1 | items | DIVERGED | 19/20 | item #18 (9kr) stream byte 17, after the head (bit 33 past bit 109): 1.14d 045502e3c100 vs d2rs 045502e301 | unrouted |
+| gen-itemq-magic-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-normal-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-normal-1 | items | MATCH | 20/20 | - | - |
+| gen-itemq-normal-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-rare-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 26, after the head (bit 105 past bit 109): 1.14d c92481024200 vs d2rs c924810202 | unrouted |
+| gen-itemq-rare-1 | items | DIVERGED | 19/20 | item #6 (7gd) stream byte 26, after the head (bit 105 past bit 109): 1.14d 690246264500 vs d2rs 6902462605 | unrouted |
+| gen-itemq-rare-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-set-0 | items | DIVERGED | 19/20 | item #15 (ucl) stream byte 19, after the head (bit 44 past bit 109): 1.14d 4233241202 vs d2rs 4233241200 | unrouted |
+| gen-itemq-set-1 | items | DIVERGED | 18/20 | item #15 (ucl) stream byte 19, after the head (bit 45 past bit 109): 1.14d 423f241204 vs d2rs 423f241200 | unrouted |
+| gen-itemq-set-2 | items | DIVERGED | 19/20 | item #15 (ucl) stream byte 19, after the head (bit 44 past bit 109): 1.14d 6239241c06 vs d2rs 6239241c00 | unrouted |
+| gen-itemq-superior-0 | items | MATCH | 20/20 | - | - |
+| gen-itemq-superior-1 | items | MATCH | 20/20 | - | - |
+| gen-itemq-superior-2 | items | MATCH | 20/20 | - | - |
+| gen-itemq-unique-0 | items | DIVERGED | 19/20 | item #14 (dr6) stream byte 26, after the head (bit 105 past bit 109): 1.14d c92481074600 vs d2rs c924810706 | unrouted |
+| gen-itemq-unique-1 | items | MATCH | 20/20 | - | - |
+| gen-itemq-unique-2 | items | MATCH | 20/20 | - | - |
+| gen-lvl-104 | rng | DIVERGED | 158/159 | frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:193 | unrouted |
+| gen-lvl-104 | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [3965398309, 792411527] vs d2rs [1235504095, 1059482100] | unrouted |
+| gen-lvl-106 | rng | DIVERGED | 144/145 | frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None | unrouted |
+| gen-lvl-106 | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [268807636, 1446976384] vs d2rs [3343186878, 1210264819] | unrouted |
+| gen-lvl-110 | rng | MATCH | 158/158 | - | - |
+| gen-lvl-110 | state | PARTIAL | 160/160 | - | - |
+| gen-lvl-55 | rng | DIVERGED | 21/22 | frame 21, unit 1:5, draw #1, field n: 1.14d site 0x573f8f vs d2rs site crates/d2-sim/src/monsters/init/create.rs:178 | unrouted |
+| gen-lvl-55 | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1129788252, 1067984099] vs d2rs [181230575, 1150868819] | unrouted |
+| gen-lvl-69 | rng | DIVERGED | 21/22 | frame 21, unit 1:6, draw #0, field before: 1.14d site 0x573a03 vs d2rs site crates/d2-sim/src/monsters/init/create.rs:256 | unrouted |
+| gen-lvl-69 | state | DIVERGED | 20/160 | frame 21 game, field seed: 1.14d [1868422153, 1329880817] vs d2rs [4180433140, 1076052722] | unrouted |
+| gen-lvl-94 | rng | DIVERGED | 111/157 | frame 54, unit 1:10, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:412 | unrouted |
+| gen-lvl-94 | state | DIVERGED | 42/160 | frame 43 monster 1:10 class 47, field m: 1.14d 1 vs d2rs 15 | unrouted |
+| gen-mon-117 | rng | MATCH | 143/143 | - | - |
+| gen-mon-117 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-128 | rng | MATCH | 148/148 | - | - |
+| gen-mon-128 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-129 | rng | MATCH | 148/148 | - | - |
+| gen-mon-129 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-133 | rng | MATCH | 141/141 | - | - |
+| gen-mon-133 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-134 | rng | MATCH | 133/133 | - | - |
+| gen-mon-134 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-135 | rng | MATCH | 149/149 | - | - |
+| gen-mon-135 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-295 | rng | MATCH | 133/133 | - | - |
+| gen-mon-295 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-304 | rng | MATCH | 133/133 | - | - |
+| gen-mon-304 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-305 | rng | MATCH | 133/133 | - | - |
+| gen-mon-305 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-306 | rng | MATCH | 148/148 | - | - |
+| gen-mon-306 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-441 | rng | MATCH | 151/151 | - | - |
+| gen-mon-441 | state | PARTIAL | 150/150 | - | - |
+| gen-mon-442 | rng | MATCH | 151/151 | - | - |
+| gen-mon-442 | state | PARTIAL | 150/150 | - | - |
