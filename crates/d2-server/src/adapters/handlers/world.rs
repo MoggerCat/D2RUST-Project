@@ -1101,12 +1101,27 @@ impl MovePending for PreviewMoveRest {
         }
         self.quest_writes.push((player, quest, flag, on));
     }
-    /// d2rs-own, unverified (D1): `0x00641530` is not specified; the
-    /// larger of the two sub-tile axis distances of the staged places,
-    /// out of range without both.
+    /// Unit distance `0x00641530` (`sim/pathing.md` §9.5) of the staged
+    /// places, out of range without both. The unit sizes are
+    /// `0x00620510`'s: a player 2, an item 1; any other unit type 2 (a
+    /// monster's `monstats2` size and an object's `SizeX` are not staged
+    /// here: d2rs-own, unverified).
     fn distance(&self, a: Owner, b: Owner) -> i32 {
+        use d2_sim::path::walk::geom::unit_distance;
+        use d2_sim::path::{PathTables, Point};
+        static TABLES: std::sync::OnceLock<Option<PathTables>> = std::sync::OnceLock::new();
+        let size = |o: Owner| if o.ty == Owner::ITEM { 1 } else { 2 };
         match (self.places.get(&a), self.places.get(&b)) {
-            (Some(a), Some(b)) => (a.pos.0 - b.pos.0).abs().max((a.pos.1 - b.pos.1).abs()),
+            (Some(pa), Some(pb)) => match TABLES.get_or_init(|| PathTables::spec().ok()) {
+                Some(t) => unit_distance(
+                    t,
+                    Point::new(pa.pos.0, pa.pos.1),
+                    size(a),
+                    Point::new(pb.pos.0, pb.pos.1),
+                    size(b),
+                ),
+                None => i32::MAX,
+            },
             _ => i32::MAX,
         }
     }

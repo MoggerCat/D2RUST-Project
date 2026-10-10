@@ -1319,14 +1319,21 @@ impl<X: Pending> View<'_, X> {
     ) -> Option<bool> {
         let paths = self.h.paths.as_ref()?;
         let t = &self.h.tables.combat;
-        let class = self
-            .units
-            .get(a)
-            .filter(|r| r.ty == UnitType::Monster)?
-            .class;
-        let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
-        let rng = t.monstats2.get(usize::from(ex))?.meleerng;
-        let reach = if rng == 255 { 0 } else { i32::from(rng) };
+        let ar = self.units.get(a)?;
+        let reach = if ar.ty == UnitType::Player {
+            // `0x00622870` for a player: the weapon's `rangeadder`, the
+            // host's `melee_range` (0 without one).
+            self.h.x.melee_range(a)
+        } else {
+            let class = Some(ar).filter(|r| r.ty == UnitType::Monster)?.class;
+            let ex = t.monstats.get(usize::try_from(class).ok()?)?.monstatsex;
+            let rng = t.monstats2.get(usize::from(ex))?.meleerng;
+            if rng == 255 {
+                0
+            } else {
+                i32::from(rng)
+            }
+        };
         let dist = |a: UnitId, b: UnitId| {
             let pt = |u: UnitId| {
                 let (x, y) = self.h.path_position(u);
