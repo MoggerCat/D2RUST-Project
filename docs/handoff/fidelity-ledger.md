@@ -715,7 +715,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2154
 - Rows set exercised = yes from the coverage reports' seen lists: 64
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 2064
+- Duplicate areas between parts: 2068
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1449,6 +1449,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-rng-player-draws.tsv:3 dropped
   - `monster.blunderbore5`: rc-gen-mon-triage.tsv:176 kept, rc-rng-player-draws.tsv:4 dropped
   - `monster.fallenshaman6`: rc-gen-mon-triage.tsv:198 kept, rc-rng-player-draws.tsv:5 dropped
+  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-rng-player-draws.tsv:6 dropped
+  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-rng-player-draws.tsv:7 dropped
+  - `monster.blunderbore6`: rc-gen-mon-triage.tsv:177 kept, rc-rng-player-draws.tsv:8 dropped
+  - `monster.scarab6`: rc-gen-mon-triage.tsv:207 kept, rc-rng-player-draws.tsv:9 dropped
   - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-sandmaggot.tsv:3 dropped
   - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-sandmaggot.tsv:4 dropped
   - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-sandmaggot.tsv:5 dropped

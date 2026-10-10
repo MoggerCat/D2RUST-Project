@@ -44,7 +44,7 @@
 | Edge cases & original bugs | 1184–1210 |
 | Test vectors | 1211–1293 |
 | Provenance | 1294–1346 |
-| Open questions | 1347–1428 |
+| Open questions | 1347–1437 |
 <!-- /index -->
 
 ## Summary
@@ -1425,3 +1425,12 @@ Reading:
     bypass 103 / 104 / 106 → hit flags 0x100 / 0x200 / 0x400 (§R6.2;
     `0x005A89A0`).
 15. Does the server's 75 % speed step have the same `v > 0x100000` branch as the client's (`missiles/client.md` §C2 r7)? Settle: read the server speed step (R-section for missile speed) in the asm.
+
+**d2rs note (REC-2660, rc-rng-player-draws).** The `scan_unit` of
+`area_damage` (`0x0056BAD0`) runs on the skill use view and gathers the
+accepted units before the first per-unit hit; the original hits each in
+its callback. A hit that changes a later unit's acceptance (kill, move)
+would differ: PROVISIONAL, no measured case. Without the scan no area
+body (fireball, glacial spike, ...) reached any unit: no monster crit
+(`0x005A5560`), cold (`0x0057AF80`) or get-hit (`0x0057CB00`) draws on
+the player.
