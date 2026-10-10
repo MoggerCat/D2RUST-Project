@@ -17,8 +17,10 @@ Merge: rows of the coverage parts (group `coverage`) whose area is also in an
 entity part only set that row's `exercised` (yes wins over no over ?); the
 other coverage rows are added as rows. A duplicate area between entity parts
 keeps the higher part_rank (rc-* re-measurements > other session parts >
-the base inventory, BASE_PARTS); equal ranks keep the first (name order) and
-list a conflict.
+the base inventory, BASE_PARTS). Among equal ranks the row whose state agrees
+with the fresh checks-status verdict wins (EQUAL only when its checks say MATCH,
+DIVERGED only when they say DIVERGED); on a tie the part added to git later
+wins, then the first by name; the dropped row is listed as a conflict.
 Completeness: every spec file under specs/, every traces/checks/*.check and
 every message id of specs/sim/client-messages.tsv / server-messages.tsv must
 be named by some row (specs / checks columns; area net.c2s.0xNN /
@@ -375,8 +377,41 @@ def part_rank(path):
     return 2 if b.startswith("rc-") else 1
 
 
-def merge(parts, repo, status, coverage=(set(), set())):
+def agreement(r, repo, status):
+    """How well a row's state fits the fresh checks: 1 agrees, 0 neutral, -1 contradicts.
+    EQUAL is only ever backed by MATCH (every compared field exact, as promote.py requires)."""
+    v = verdict_of(split_list(r["checks"]), repo, status, r["area"]) if status else "-"
+    if r["state"] == "EQUAL":
+        return 1 if v == "MATCH" else (-1 if v.startswith("DIVERGED") else 0)
+    if r["state"] == "DIVERGED":
+        return 1 if v.startswith("DIVERGED") else (-1 if v == "MATCH" else 0)
+    return -1 if v == "MATCH" else 0
+
+
+def part_time(root, name):
+    """Git time a ledger part was first added (0 when unknown): later --fix rewrites and merges
+    touch old parts, so the last commit time says nothing about how fresh the verdicts are."""
+    try:
+        out = subprocess.run(["git", "log", "--diff-filter=A", "--format=%ct", "-1", "--", f"docs/handoff/ledger/{name}"],
+                             cwd=root, capture_output=True, text=True).stdout.strip()
+        return int(out or 0)
+    except (OSError, ValueError):
+        return 0
+
+
+def tie_wins(r, first, repo, status, ptime):
+    """Equal-rank duplicate: does the later row r replace the kept one?"""
+    a, b = agreement(r, repo, status), agreement(first, repo, status)
+    if a != b:
+        return a > b
+    if r["state"] == "EQUAL" and first["state"] != "EQUAL" and a < 1:
+        return False    # a tie never promotes to EQUAL without MATCH checks
+    return ptime.get(r["_file"], 0) > ptime.get(first["_file"], 0)
+
+
+def merge(parts, repo, status, coverage=(set(), set()), ptime=None):
     """parts: [(name, rows)] in name order. Returns (rows, notes dict)."""
+    ptime = ptime or {}
     rank = {"yes": 2, "no": 1, "?": 0}
     out, by_area = [], {}
     conflicts, cov_rows = [], []
@@ -390,8 +425,13 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 unsettled = ("NO-CHECK", "UNKNOWN")
                 if part_rank(r["_file"]) > part_rank(first["_file"]) or (
                         part_rank(r["_file"]) == part_rank(first["_file"])
-                        and first["state"] in unsettled and r["state"] not in unsettled):
+                        and first["state"] in unsettled and r["state"] not in unsettled) or (
+                        part_rank(r["_file"]) == part_rank(first["_file"])
+                        and tie_wins(r, first, repo, status, ptime)):
                     # a session's part (a check run) supersedes the base inventory row
+                    if part_rank(r["_file"]) == part_rank(first["_file"]) and first["state"] not in unsettled:
+                        conflicts.append(f"`{r['area']}`: {r['_file']}:{r['_line']} kept, "
+                                         f"{first['_file']}:{first['_line']} dropped")
                     out[out.index(first)] = r
                     by_area[r["area"]] = r
                     continue
@@ -611,7 +651,8 @@ def run(root, parts_dir, out_tsv, out_md, status_path, check, fix=False):
                 errs.append(f"{r['_file']}:{r['_line']}: {r['area']}: duplicate area in this part")
             seen.add(r["area"])
         parts.append((os.path.basename(f), rows))
-    rows, notes = merge(parts, repo, status, load_coverage(parts_dir))
+    ptime = {n: part_time(root, n) for n, _ in parts}
+    rows, notes = merge(parts, repo, status, load_coverage(parts_dir), ptime)
     inputs = [os.path.relpath(f, root).replace(os.sep, "/") for f in files]
     tsv = render_tsv(rows, inputs, label)
     md = render_md(rows, notes, inputs, label)
@@ -671,7 +712,7 @@ def selftest():
                      + row(area="net.c2s.0x02", kind="message", checks="c-one", state="DIVERGED", size="S")
                      + row(area="level.a1.5.act-1-wilderness-4"))
         with open(os.path.join(root, "parts", "b.tsv"), "w") as fh:
-            fh.write(hdr + row(area="m.one", group="h") + row(area="m.bad", state="WRONG", size="Q"))
+            fh.write(hdr + row(area="m.one", group="h", specs="specs/sim/a.md", checks="c-one", state="DIVERGED") + row(area="m.bad", state="WRONG", size="Q"))
         with open(os.path.join(root, "parts", "c.tsv"), "w") as fh:
             fh.write(hdr + row(area="m.one", group="coverage", exercised="yes")
                      + row(area="level.5-dark-wood", group="coverage", exercised="no")
@@ -708,7 +749,7 @@ def selftest():
         assert rows["net.c2s.0x02"]["last_verdict"] == "DIVERGED@1"
         md = open(out_md).read()
         assert rows["m.one"]["state"] == "DIVERGED"
-        assert "`m.one`: a.tsv:3 kept, b.tsv:3 dropped" in md
+        assert "`m.one`: b.tsv:3 kept, a.tsv:3 dropped" in md
         assert "`specs/sim/b.md`" in md and "`orphan`" in md and "`net.c2s.0x02`" not in md.split("no `net.*` row")[1].split("\n")[0]
         assert "`specs/sim/a.md`" not in md.split("Spec files named by no row")[1].split("\n")[0]
         # bad row reported; fixed parts pass --check once the outputs are current
@@ -731,6 +772,32 @@ def selftest():
             fh.write("#ledger 2\n")
         assert read_part(os.path.join(root, "parts", "z.tsv"))[1]
         assert hours({"S": 2, "M": 1, "L": 1}) == "11–12+"
+        # equal-rank tie: the verdict that agrees with the fresh checks wins, then the newer part
+        rp, st = Repo(root), load_status(root, status)[0]
+
+        def mk(f, ln, **kw):
+            d = dict(zip(COLS, ["t", "entity", "g", "s", "-", "none", "c-two", "-", "?", "0", "n", "-",
+                                "NO-CHECK", "S", "n"]))
+            d.update(kw)
+            d["_file"], d["_line"] = f, ln
+            return d
+        eq = lambda f: mk(f, 3, state="EQUAL", size="-")
+        dv = lambda f: mk(f, 3, state="DIVERGED")
+        pick = lambda a, b, tm=None: merge([(a["_file"], [a]), (b["_file"], [b])], rp, st, ptime=tm)[0][0]["_file"]
+        # c-two is MATCH: a newer EQUAL beats an older stale DIVERGED, and so does the reverse order
+        assert pick(dv("rc-a.tsv"), eq("rc-b.tsv"), {"rc-a.tsv": 9, "rc-b.tsv": 1}) == "rc-b.tsv"
+        assert pick(eq("rc-a.tsv"), dv("rc-b.tsv"), {"rc-a.tsv": 1, "rc-b.tsv": 9}) == "rc-a.tsv"
+        # no agreement either way: the newer part wins; equal times keep the first by name
+        n1, n2 = mk("rc-a.tsv", 3, checks="-", state="DIVERGED"), mk("rc-b.tsv", 3, checks="-", state="NOT-IMPLEMENTED")
+        assert pick(n1, n2, {"rc-a.tsv": 1, "rc-b.tsv": 5}) == "rc-b.tsv"
+        assert pick(n1, n2, {"rc-a.tsv": 5, "rc-b.tsv": 1}) == "rc-a.tsv"
+        assert pick(n1, n2) == "rc-a.tsv"
+        # EQUAL never wins on a tie unless its checks say MATCH (c-one is DIVERGED)
+        e1, d1 = mk("rc-a.tsv", 3, checks="c-one", state="EQUAL", size="-"), mk("rc-b.tsv", 3, checks="c-one", state="DIVERGED")
+        assert pick(e1, d1, {"rc-a.tsv": 9, "rc-b.tsv": 1}) == "rc-b.tsv"
+        assert pick(d1, e1, {"rc-a.tsv": 1, "rc-b.tsv": 9}) == "rc-b.tsv"
+        # a higher rank still wins over agreement
+        assert pick(dv("rc-a.tsv"), eq("zz.tsv")) == "rc-a.tsv"
     print("ledger selftest: ok")
     return 0
 
