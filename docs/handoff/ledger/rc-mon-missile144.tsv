@@ -1,0 +1,2 @@
+#ledger 1
+monster.fetishshaman2	entity	monsters	monstats.txt fetishshaman2 (hcIdx 279)	-	none	gen-mon-279	PARTIAL	yes	0	n	claude/rc-mon-missile144	EQUAL	-	rc-mon-missile144: re-recorded 1.14d on staging-7+integ-r23: state 150/150, rng MATCH; no extra class 144 missile (fixed by rc-extra-missile)
