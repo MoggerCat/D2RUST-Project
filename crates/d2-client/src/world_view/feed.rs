@@ -145,6 +145,13 @@ pub trait ViewFeed: ViewSource {
     /// a tick already updated changes nothing. The default has no weather.
     fn weather_update(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) {}
 
+    /// The level's `Rain` and `Mud` flags the weather runs on (the
+    /// rendering facts' `rain` / `snow`, `render/capture.md` §3.4); `None`
+    /// without weather or a level.
+    fn level_weather(&self) -> Option<(bool, bool)> {
+        None
+    }
+
     /// A check run follows the recorded frame schedule
     /// (`tools/scenario-diff.md`): the weather runs only in drawn frames,
     /// with no replay of client updates without one. The default has no
