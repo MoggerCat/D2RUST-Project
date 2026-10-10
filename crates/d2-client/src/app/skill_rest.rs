@@ -127,6 +127,8 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         lvlmana: s.lvlmana,
         manashift: s.manashift,
         cltstfunc: s.cltstfunc,
+        restrict: s.restrict,
+        shape_states: [s.state1 as i16, s.state2 as i16, s.state3 as i16],
     }
 }
 

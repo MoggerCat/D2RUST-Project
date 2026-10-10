@@ -2105,6 +2105,7 @@ pub fn client_unit_rows(archives: &dyn TableFiles) -> Result<UnitRows, BuildErro
             colorshift: s.colorshift,
             light_rgb: (s.light_r, s.light_g, s.light_b),
             meleeonly: s.meleeonly,
+            restrict: s.restrict,
         })
         .collect();
     Ok(UnitRows {
