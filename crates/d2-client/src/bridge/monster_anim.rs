@@ -10,7 +10,7 @@
 use d2_sim::rng::Seed;
 use d2_sim::units::anim_rate::{anim_rate, mode_row, Rate, RateInput};
 
-use super::world::{ClientWorld, ModelInputs, UnitKey};
+use super::world::{ClientUnit, ClientWorld, ModelInputs, UnitKey};
 
 /// Stats of the rate (`sim/units.md` §4.7).
 const STAT_VELOCITYPERCENT: u16 = 67;
@@ -30,6 +30,13 @@ pub fn rate(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey) -> i32 {
     let Some(u) = w.units.get(&key) else {
         return 0;
     };
+    rate_of(u, inputs, |s| w.total(key, s, 0))
+}
+
+/// [`rate`] of a unit `u` whose stat totals `total` gives (set C has no
+/// state or item lists: its base stats). Without a class row 0; when the
+/// rate sets no speed, the unit's own speed.
+pub fn rate_of(u: &ClientUnit, inputs: &ModelInputs, total: impl Fn(u16) -> i32) -> i32 {
     let Some(class) = inputs
         .tables
         .monsters
@@ -56,9 +63,9 @@ pub fn rate(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey) -> i32 {
         c: u.class,
         m,
         s,
-        velocitypercent: w.total(key, STAT_VELOCITYPERCENT, 0),
-        attackrate: w.total(key, STAT_ATTACKRATE, 0),
-        other_animrate: w.total(key, STAT_OTHER_ANIMRATE, 0),
+        velocitypercent: total(STAT_VELOCITYPERCENT),
+        attackrate: total(STAT_ATTACKRATE),
+        other_animrate: total(STAT_OTHER_ANIMRATE),
         has_path: true,
         w: i32::from(if m == 15 {
             class.run_speed
@@ -70,7 +77,7 @@ pub fn rate(w: &ClientWorld, inputs: &ModelInputs, key: UnitKey) -> i32 {
     };
     match anim_rate(&i) {
         Ok(Rate::Set { speed, .. }) => speed,
-        _ => w.units.get(&key).and_then(|u| u.speed).unwrap_or(0),
+        _ => u.speed.unwrap_or(0),
     }
 }
 
