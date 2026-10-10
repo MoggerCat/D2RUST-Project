@@ -416,6 +416,10 @@ tyrael3 40.7 clear; cain6 with 40.10 clear and 40.5 clear.
   found → object 565 (type 2, flags 1, 1, 0) there; it returns 1 for the
   first player in level 132 whether or not a spot or object was made, so
   +0x98 is set and nothing retries.
+  d2rs wiring (not a 1.14d fact): the server queues the chat-close quest
+  call (`Desk::quest_chat_end`) and runs it after the NPC call on the full
+  quest world (player room, DRLG free spot, object creation); on the plain
+  economy the player has no room and the portal was never made.
 
 #### 8.5 Baal's death (event 8, `0x0058DF20`)
 

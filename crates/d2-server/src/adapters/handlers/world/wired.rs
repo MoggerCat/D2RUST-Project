@@ -929,7 +929,24 @@ where
         });
         // The call runs with the inventory lent to the desk (the item
         // services: imbue, `Desk::inv`).
-        let out = self.desk_with(game, events, true, |desk, ctl, _| call.call(ctl, desk));
+        let out = self.desk_with(game, events, true, |desk, ctl, _| {
+            desk.state.defer_chat_end = true;
+            let out = call.call(ctl, desk);
+            desk.state.defer_chat_end = false;
+            out
+        });
+        // The chat-close quest calls ran queued: now on the full quest
+        // world (a quest's chat end may place an object, e.g. Tyrael's
+        // last portal).
+        let (_, sent) = self.desk(game, events, |desk, ctl, inv| {
+            let ends = std::mem::take(&mut desk.state.chat_ends);
+            quest_call(desk, ctl, inv, |q, w| {
+                for (p, n) in ends {
+                    q.npc_deactivate(w, p, n);
+                }
+            })
+        });
+        self.inv_sent.extend(sent);
         let (_, sent) = self.desk(game, events, |desk, _, mut inv| {
             let players = desk.econ.game.lists.units_of_type(UnitType::Player);
             // Cain's identify (C→S 0x34) on the inventory model.
