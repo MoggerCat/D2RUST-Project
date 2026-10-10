@@ -318,6 +318,7 @@ pub fn purge<H: InitHost + ?Sized>(
     assert!(max != 0, "minion purge: max 0 (fatal 0x20)");
     assert!(max > min, "minion purge: max ≤ min (fatal 0x21)");
     let (x, y) = h.position(b);
+    eprintln!("DBG purge boss {:?} at {:?}", b, (x, y));
     let found = h.find_units(
         b,
         FindQuery {
@@ -329,6 +330,7 @@ pub fn purge<H: InitHost + ?Sized>(
             ..FindQuery::default()
         },
     );
+    eprintln!("DBG found {}", found.len());
     for m in found {
         if type_of(h, m) != Some(UnitType::Monster)
             || h.alignment(m) != 0
@@ -749,6 +751,7 @@ pub fn run<H: InitHost + ?Sized>(
         }
         addr::KILL_SELF => kill_self(h, u),
         addr::QUEST_COMPLETE => {
+            eprintln!("DBG questcomplete cb unit {:?} mode {:?}", u, mode_of(h, u));
             if mode_of(h, u) == mode::DEATH {
                 if let Some(call) = quest_death_call(class_of(h, u)) {
                     quest_death(cx, h, u, call);
