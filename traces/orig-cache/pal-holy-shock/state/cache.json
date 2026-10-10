@@ -1,0 +1,44 @@
+{
+ "channel": "state",
+ "check": "pal-holy-shock",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnPal",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+4 @y normal",
+  "--input",
+  "frame 20; rclick 544 336"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "39ec14a5acd682f4db9cdac3bca3fdd2543a7ce0754e5f1fcd4de796fce1ae6f",
+   "size": 352264
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "062617a97a959ecd460c38c519ee861d51d551f54c6f52b53120fcec51db431c",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "30a516c06da5c21c539d1b5fa55bbff850207c1cc0c595b9552fd5b411681cd9"
+ }
+}

@@ -149,7 +149,7 @@ impl<X: Pending> View<'_, X> {
                 continue;
             }
             // 4.
-            if self.line_blocked(game, unit, c) {
+            if self.line_blocked(game, c, unit) {
                 continue;
             }
             if main {
