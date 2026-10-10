@@ -442,8 +442,9 @@ impl UnitArt {
     /// facing stays. Units no longer in the model are dropped.
     pub fn observe_facing(&mut self, world: &ClientWorld) {
         self.local = world.local_player;
-        self.facing.retain(|k, _| world.units.contains_key(k));
-        for unit in world.units.values() {
+        self.facing.retain(|k, _| world.view_unit(k).is_some());
+        for unit in world.view_units() {
+            let unit = &*unit;
             let Some(pos) = unit.position else { continue };
             let old = self.facing.get(&unit.key).copied();
             let toward = |to: (u16, u16)| facing(cell_centre(pos), cell_centre(to));
@@ -508,7 +509,8 @@ impl UnitArtLoader {
         let mut log = Vec::new();
         let mut art = self.art.write().unwrap_or_else(|e| e.into_inner());
         art.observe_facing(world);
-        for unit in world.units.values() {
+        for unit in world.view_units() {
+            let unit = &*unit;
             let posed = art.posed(unit).into_owned();
             let unit = &*self.looks.shapes.identity(&posed);
             let Some(name) = unit_cof(&self.looks, unit) else {
