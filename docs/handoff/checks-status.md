@@ -137,9 +137,9 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-quest-radament | state | DIVERGED | 83/138 | frame 84 monster 1:106 class 229, field s: 1.14d [1664319924, 1195937719] vs d2rs [1880661819, 694175140] | q-fix-seed-order |
 | a2-quest-staff | packets | MATCH | 44/44 | - | - |
 | a2-quest-staff | state | PARTIAL | 44/44 | - | - |
-| a2-quest-summoner | packets | DIVERGED | 56/76 | frame 16 stream s2c #22 size: 1.14d 16 vs d2rs 10 (id 0xaa) | q-fix-join-items |
-| a2-quest-summoner | state | DIVERGED | 19/76 | frame 20 game, field seed: 1.14d [1037325479, 564040154] vs d2rs [123760680, 1255268544] | q-fix-seed-order |
-| a2-quest-taintedsun | packets | DIVERGED | 72/82 | frame 44 stream s2c #17 id: 1.14d 9c vs d2rs 67 (id 0x9c) | q-fix-join-items |
+| a2-quest-summoner | packets | DIVERGED | 61/76 | frame 20 stream s2c #30 bytes[2]: 1.14d 57 vs d2rs 51 (id 0x51) | unrouted |
+| a2-quest-summoner | state | DIVERGED | 19/76 | frame 20 game, field seed: 1.14d [1037325479, 564040154] vs d2rs [123760680, 1255268544] | unrouted |
+| a2-quest-taintedsun | packets | DIVERGED | 73/82 | frame 52 stream s2c #19 id: 1.14d 9c vs d2rs 07 (id 0x9c) | unrouted |
 | a2-quest-taintedsun | state | DIVERGED | 76/82 | frame 77 monster 1:162 class 9, field m: 1.14d 15 vs d2rs 1 | unrouted |
 | a2-quest-tombs | packets | DIVERGED | 132/150 | frame 32 stream s2c #1 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
 | a2-quest-tombs | state | PARTIAL | 150/150 | - | - |
@@ -153,7 +153,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | a2-super-fangskin | state | DIVERGED | 47/120 | frame 48 player 0:1 class 0, field hp: 1.14d 7459 vs d2rs 12413 | q-fix-join-items |
 | a2-super-fireeye | packets | DIVERGED | 119/120 | frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) | q-fix-join-items |
 | a2-super-fireeye | state | PARTIAL | 120/120 | - | - |
-| a2-super-leatherarm | packets | DIVERGED | 116/120 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | q-fix-join-items |
+| a2-super-leatherarm | packets | DIVERGED | 119/120 | frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) | unrouted |
 | a2-super-leatherarm | state | DIVERGED | 69/120 | frame 70 item 4:1 class 523, field fr: 1.14d 4096 vs d2rs 0 | unrouted |
 | a2-warp-arcane-ama | rng | MATCH | 22/22 | - | - |
 | a2-warp-arcane-ama | state | PARTIAL | 160/160 | - | - |
@@ -500,7 +500,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | combat-umod-life | state | PARTIAL | 24/24 | - | - |
 | combat-unique-pack | state | PARTIAL | 226/226 | - | - |
 | cube-000-staff-of-kings-viper-amulet-ho | items | MATCH | 4/4 | - | - |
-| cube-000-staff-of-kings-viper-amulet-ho | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
+| cube-000-staff-of-kings-viper-amulet-ho | packets | DIVERGED | 22/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
 | cube-000-staff-of-kings-viper-amulet-ho | state | PARTIAL | 24/24 | - | - |
 | cube-001-khalim-flail-khalim-heart-khal | items | MATCH | 6/6 | - | - |
 | cube-001-khalim-flail-khalim-heart-khal | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
@@ -592,8 +592,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | dru-arctic-blast | state | PARTIAL | 70/70 | - | - |
 | dru-armageddon | packets | DIVERGED | 62/70 | frame 37 stream s2c #0 missing in d2rs (id 0xa3) | unrouted |
 | dru-armageddon | state | PARTIAL | 70/70 | - | - |
-| dru-cycle-of-life | packets | DIVERGED | 68/70 | frame 29 stream s2c #3 bytes[6]: 1.14d 0 vs d2rs 22 (id 0x6b) | q-fix-join-items |
-| dru-cycle-of-life | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
+| dru-cycle-of-life | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
+| dru-cycle-of-life | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
 | dru-firestorm | packets | MATCH | 70/70 | - | - |
 | dru-firestorm | state | PARTIAL | 70/70 | - | - |
 | dru-fissure | state | PARTIAL | 70/70 | - | - |
@@ -783,7 +783,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | MATCH | 30/30 | - | q-fix-join-items |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | state | PARTIAL | 30/30 | - | - |
@@ -831,8 +831,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-stat-lists-4-skills | packets | MATCH | 40/40 | - | - |
 | gen-sysc-client-stat-lists-4-skills | state | PARTIAL | 40/40 | - | - |
 | gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp | - | ERROR | - | d2rs play wrote no /home/user/D2RUST-Project/traces/raw/suite/gen-sysc-client-ui-b-original-behavior-to-reproduce-owned-by-the-sp/draws-d2rs/draws.tsv (exit 1) | - |
-| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
-| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | state | DIVERGED | 9/100 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
+| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | packets | DIVERGED | 99/100 | frame 9 stream s2c #18 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
+| gen-sysc-flows-act-change-1-act-change-0x0053acc0 | state | PARTIAL | 100/100 | - | - |
 | gen-sysc-flows-act-change-2-same-act-travel | packets | MATCH | 60/60 | - | - |
 | gen-sysc-flows-act-change-2-same-act-travel | state | PARTIAL | 60/60 | - | - |
 | gen-sysc-flows-act-change-3-client-side | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
@@ -872,7 +872,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-seams-sim-server-1-what-crosses | rng | MATCH | 33/33 | - | - |
 | gen-sysc-seams-sim-server-1-what-crosses | state | PARTIAL | 60/60 | - | - |
 | gen-sysc-seams-world-screen-1-units-and-spaces | draws | DIVERGED | 0/1 | tick 72 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
-| gen-sysc-seams-world-screen-2-contract | draws | DIVERGED | 0/1 | tick 73 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
+| gen-sysc-seams-world-screen-2-contract | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 283 vs d2rs 57 | unrouted |
 | gen-sysc-sim-intents-events-1-loop-order-single-player | packets | MATCH | 60/60 | - | - |
 | gen-sysc-sim-intents-events-1-loop-order-single-player | rng | MATCH | 33/33 | - | - |
 | gen-sysc-sim-intents-events-1-loop-order-single-player | state | PARTIAL | 60/60 | - | - |
@@ -996,8 +996,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | hire-resurrect-greiz | state | DIVERGED | 85/130 | frame 86 monster 1:22 class -/338, field (unit): 1.14d absent vs d2rs extra | unrouted |
 | hire-resurrect-kashya | packets | DIVERGED | 125/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
 | hire-resurrect-kashya | state | DIVERGED | 70/130 | frame 71 monster 1:13 class 271 (hireling after 0x62), field m: 1.14d 2 vs d2rs 1; tile (4890,4222) vs (4894,4223) | q-diff-skills-2 |
-| hire-resurrect-qual-kehk | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | q-fix-join-items |
-| hire-resurrect-qual-kehk | state | DIVERGED | 28/130 | frame 29 monster 1:10 class 514, field m (as hire-qual-kehk) | unrouted |
+| hire-resurrect-qual-kehk | packets | DIVERGED | 126/130 | frame 86 stream s2c #0 id: 1.14d 7a vs d2rs 2a (id 0x7a) | unrouted |
+| hire-resurrect-qual-kehk | state | DIVERGED | 85/130 | frame 86 monster 1:15 class -/561, field (unit): 1.14d absent vs d2rs extra | unrouted |
 | inv-pick-belt | items | MATCH | 1/1 | - | - |
 | inv-pick-belt | packets | MATCH | 40/40 | - | - |
 | inv-pick-belt | state | PARTIAL | 40/40 | - | - |
@@ -1017,7 +1017,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-cha-03 | items | DIVERGED | 19/25 | item #13 (hp2) frame: 1.14d 123 vs d2rs 124 | unrouted |
 | items-drops-cha-04 | items | MATCH | 15/15 | - | - |
 | items-drops-cha-05 | items | MATCH | 6/6 | - | - |
-| items-drops-hel-00 | items | DIVERGED | 0/1 | item #0 (tsc) frame: 1.14d 124 vs d2rs 130 | unrouted |
+| items-drops-hel-00 | items | MATCH | 1/1 | - | - |
 | items-drops-hel-01 | items | PARTIAL | 0/0 | - | - |
 | items-drops-hel-02 | items | MATCH | 1/1 | - | - |
 | items-drops-hel-03 | items | PARTIAL | 0/0 | - | - |
@@ -1043,7 +1043,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-nig-09 | items | MATCH | 1/1 | - | - |
 | items-drops-nig-10 | items | PARTIAL | 0/0 | - | - |
 | items-drops-nig-11 | items | MATCH | 7/7 | - | - |
-| items-drops-nig-12 | items | DIVERGED | 0/3 | item #0 (scl) stream byte 5, x (bit 0 of 16): 1.14d 288000654c83421562 vs d2rs 288000652c83421562 | unrouted |
+| items-drops-nig-12 | items | MATCH | 3/3 | - | - |
 | items-drops-nig-13 | items | PARTIAL | 0/0 | - | - |
 | items-drops-nor-00 | items | MATCH | 2/2 | - | - |
 | items-drops-nor-01 | items | PARTIAL | 0/0 | - | - |
@@ -1054,7 +1054,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-drops-nor-06 | items | MATCH | 4/4 | - | - |
 | items-drops-nor-07 | items | DIVERGED | 0/9 | item #0 (gsv) stream byte 7, y (bit 1 of 16): 1.14d 00658c822215e26cce vs d2rs 00658c826215e26cce | unrouted |
 | items-drops-nor-08 | items | MATCH | 1/1 | - | - |
-| items-drops-nor-09 | items | MATCH | 8/8 | - | - |
+| items-drops-nor-09 | items | DIVERGED | 6/8 | item #0 (ass) category: 1.14d 16 vs d2rs 5 | unrouted |
 | items-drops-nor-10 | items | DIVERGED | 6/8 | item #6 (gld) missing in d2rs | unrouted |
 | items-drops-nor-11 | items | MATCH | 6/6 | - | - |
 | items-drops-nor-12 | items | MATCH | 8/8 | - | - |
@@ -1076,12 +1076,12 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-load-mixed | state | PARTIAL | 60/60 | - | - |
 | items-pickup-ama | packets | MATCH | 60/60 | - | - |
 | items-pickup-ama | state | PARTIAL | 60/60 | - | - |
-| items-vendor-akara-buy | packets | DIVERGED | 39/40 | frame 20 stream s2c #7 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
+| items-vendor-akara-buy | packets | MATCH | 40/40 | - | - |
 | items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | items-vendor-akara-stock | items | MATCH | 41/41 | - | - |
 | items-vendor-akara-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-alkor-stock | items | MATCH | 17/17 | - | - |
-| items-vendor-alkor-stock | packets | MATCH | 140/140 | - | - |
+| items-vendor-alkor-stock | packets | DIVERGED | 139/140 | frame 3 stream s2c #17 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
 | items-vendor-asheara-stock | items | MATCH | 3/3 | - | - |
 | items-vendor-asheara-stock | packets | MATCH | 140/140 | - | - |
 | items-vendor-charsi-stock | items | MATCH | 43/43 | - | - |
@@ -1323,27 +1323,27 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ui-draws-help-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
 | ui-draws-hover-life-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
 | ui-draws-hover-life-ama | packets | MATCH | 76/76 | - | - |
-| ui-draws-hover-mana-ama | draws | DIVERGED | 0/1 | tick 72 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
+| ui-draws-hover-mana-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
 | ui-draws-hover-mana-ama | packets | MATCH | 76/76 | - | - |
 | ui-draws-hover-npc-ama | draws | DIVERGED | 0/1 | tick 73 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
 | ui-draws-hover-npc-ama | packets | MATCH | 76/76 | - | - |
 | ui-draws-hover-stamina-ama | draws | DIVERGED | 0/1 | tick 73 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
 | ui-draws-hover-stamina-ama | packets | MATCH | 76/76 | - | - |
-| ui-draws-hover-xp-ama | draws | DIVERGED | 0/1 | tick 72 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 359 | unrouted |
+| ui-draws-hover-xp-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
 | ui-draws-hover-xp-ama | packets | MATCH | 76/76 | - | - |
-| ui-draws-inv-char-ama | draws | DIVERGED | 0/1 | tick 73 draw row 243 (CelDrawColor) column frame: 1.14d 54 vs d2rs 48 | coord-resume-3 |
-| ui-draws-inventory-ama | draws | DIVERGED | 0/1 | tick 72 draw row 172 (CelDraw) column op: 1.14d CelDraw vs d2rs unit | coord-resume-3 |
+| ui-draws-inv-char-ama | draws | DIVERGED | 0/1 | tick 72 draw row 291 (CelDraw) column x: 1.14d 590 vs d2rs 790 | unrouted |
+| ui-draws-inventory-ama | draws | DIVERGED | 0/1 | tick 72 draw row 195 (DrawLine) column x: 1.14d 256 vs d2rs 86 | unrouted |
 | ui-draws-item-tip-ama | draws | DIVERGED | 0/1 | tick 72 draw row 174 (CelDraw) column x: 1.14d 461 vs d2rs 444 | unrouted |
 | ui-draws-left-skill-pick-ama | draws | DIVERGED | 0/1 | tick 73 draw row 176 (unit) column op: 1.14d unit vs d2rs CelDraw | coord-resume-3 |
 | ui-draws-left-skill-pick-ama | packets | DIVERGED | 69/76 | frame 40 stream c2s #0 extra (d2rs only) (id 0x01) | q-fix-skills-4cls |
-| ui-draws-minipanel-ama | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 343 | unrouted |
+| ui-draws-minipanel-ama | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 98 | unrouted |
 | ui-draws-minipanel-ama | packets | DIVERGED | 68/76 | frame 40 stream c2s #0 extra (d2rs only) (id 0x01) | unrouted |
 | ui-draws-msglog-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
-| ui-draws-party-ama | draws | DIVERGED | 0/1 | tick 72 draw row 199 (DrawLine) column x: 1.14d 675 vs d2rs 546 | unrouted |
+| ui-draws-party-ama | draws | DIVERGED | 0/1 | tick 72 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 359 | unrouted |
 | ui-draws-questlog-ama | draws | DIVERGED | 0/1 | tick 73 draw row 171 (CelDraw) column op: 1.14d CelDraw vs d2rs unit | coord-resume-3 |
 | ui-draws-right-skill-pick-ama | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 787 vs d2rs 343 | unrouted |
 | ui-draws-right-skill-pick-ama | packets | DIVERGED | 67/76 | frame 40 stream c2s #0 extra (d2rs only) (id 0x01) | unrouted |
-| ui-draws-skillbar-ama | draws | DIVERGED | 0/1 | tick 73 draw row 198 (DrawLine) column x: 1.14d 283 vs d2rs 102 | unrouted |
+| ui-draws-skillbar-ama | draws | DIVERGED | 0/1 | tick 72 draw row 198 (DrawLine) column x: 1.14d 41 vs d2rs 45 | unrouted |
 | ui-draws-skilltree-ama | draws | DIVERGED | 0/1 | tick 73 draw row 195 (DrawLine) column x: 1.14d 285 vs d2rs 193 | unrouted |
 | walk-click-walk-sor | packets | DIVERGED | 108/110 | frame 22 stream c2s #0 bytes[1]: 1.14d 4 vs d2rs 3 (id 0x01) | q-fix-skills-4cls |
 | walk-click-walk-sor | state | PARTIAL | 110/110 | - | - |
@@ -1474,10 +1474,10 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | cube-007-1-ring-1-perfect-ruby-1-explod | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
 | cube-007-1-ring-1-perfect-ruby-1-explod | state | PARTIAL | 24/24 | - | - |
 | draws-a2-town-ama | draws | DIVERGED | 0/1 | tick 73 draw row 115 (CelDrawShadow) column file: 1.14d data/global/monsters/bg/tr/bgtrlitnuhth.dcc vs d2rs data/global/monsters/bg/tr/bgtrlits1hth.dcc | unrouted |
-| draws-a3-town-ama | draws | DIVERGED | 0/1 | tick 72 draw row 97 (CelDraw) column frame: 1.14d 2 vs d2rs 8 | unrouted |
+| draws-a3-town-ama | draws | DIVERGED | 0/1 | tick 72 draw row 97 (CelDraw) column op: 1.14d CelDraw vs d2rs CelDrawShadow | unrouted |
 | draws-a4-town-ama | draws | DIVERGED | 0/1 | tick 73 draw row 278 (CelDraw) column file: 1.14d data/global/ui/cursor/ohand.dc6 vs d2rs data/global/ui/cursor/protate.dc6 | unrouted |
 | draws-a5-town-ama | draws | DIVERGED | 0/1 | tick 72 draw row 76 (CelDrawShadow) column frame: 1.14d 1 vs d2rs 2 | unrouted |
-| draws-blood-moor-ama | draws | DIVERGED | 0/1 | tick 73 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
+| draws-blood-moor-ama | draws | DIVERGED | 0/1 | tick 73 draw row 137 (DrawLine) column x: 1.14d 22 vs d2rs 602 | unrouted |
 | draws-cave-ama | draws | DIVERGED | 0/1 | tick 73 draw row 65 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
 | draws-fire-bolt-sor | draws | DIVERGED | 0/1 | tick 29 draw row 98 (CelDrawShadow) column dir: 1.14d 54 vs d2rs 57 | unrouted |
 | draws-frost-nova-sor | draws | DIVERGED | 0/1 | tick 26 draw row 98 (CelDrawShadow) column frame: 1.14d 7 vs d2rs 6 | unrouted |
@@ -1497,7 +1497,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | save-fresh-ama | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | save-merc-bar | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | ui-draws-char-skill-ama | draws | PARTIAL | 0/1 | - | - |
-| ui-draws-inv-char-l5-ama | draws | DIVERGED | 0/1 | tick 72 draw row 22 (CelDraw) column op: 1.14d CelDraw vs d2rs CelDrawColor | unrouted |
+| ui-draws-inv-char-l5-ama | draws | DIVERGED | 0/1 | tick 72 draw row 329 (CelDraw) column x: 1.14d 590 vs d2rs 790 | unrouted |
 | ui-draws-inv-char-tip-ama | draws | DIVERGED | 0/1 | tick 72 draw row 249 (CelDrawColor) column frame: 1.14d 54 vs d2rs 48 | unrouted |
 | ui-draws-quest-inv-ama | draws | DIVERGED | 0/1 | tick 72 draw row 59 (CelDraw) column frame: 1.14d 0 vs d2rs 2 | unrouted |
 | ui-draws-quest-skill-ama | draws | PARTIAL | 0/1 | - | - |
@@ -1709,7 +1709,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-render-firebolt | draws | DIVERGED | 0/1 | tick 22 draw row 98 (CelDrawShadow) column file: 1.14d data/global/chars/am/lg/amlglitnu1ht.dcc vs d2rs data/global/chars/am/sh/amshlittn1ht.dcc | unrouted |
 | gen-render-frozen | draws | DIVERGED | 0/1 | tick 28 draw row 108 (CelDrawShadow) column dir: 1.14d 46 vs d2rs 0 | unrouted |
 | gen-render-kurast-rain | draws | DIVERGED | 0/1 | tick 58 draw row 97 (CelDraw) column x: 1.14d 584 vs d2rs 563 | unrouted |
-| gen-render-town-dawn | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 734 vs d2rs 237 | unrouted |
+| gen-render-town-dawn | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 734 vs d2rs 74 | unrouted |
 | gen-render-town-night | draws | DIVERGED | 0/1 | tick 38 draw row 197 (DrawLine) column x: 1.14d 49 vs d2rs 237 | unrouted |
 | gen-skill-ama-11 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ama-11 | packets | MATCH | 70/70 | - | - |
@@ -1746,7 +1746,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-ass-268 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-ass-268 | packets | DIVERGED | 69/70 | frame 28 stream s2c #2 size: 1.14d 23 vs d2rs 14 (id 0xac) | q-fix-join-items |
 | gen-skill-bar-132 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-bar-132 | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
+| gen-skill-bar-132 | packets | MATCH | 70/70 | - | - |
 | gen-skill-bar-138 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-138 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | q-fix-join-items |
 | gen-skill-bar-140 | state | PARTIAL | 70/70 | - | - |
@@ -1757,8 +1757,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-dru-222 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | q-fix-join-items |
 | gen-skill-dru-229 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-dru-229 | packets | MATCH | 70/70 | - | - |
-| gen-skill-dru-231 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
-| gen-skill-dru-231 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | q-fix-join-items |
+| gen-skill-dru-231 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 426, field tx: 1.14d 5143 vs d2rs 5144 | unrouted |
+| gen-skill-dru-231 | packets | DIVERGED | 69/70 | frame 67 stream s2c #0 bytes[6]: 1.14d 23 vs d2rs 24 (id 0x67) | unrouted |
 | gen-skill-dru-234 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-dru-234 | packets | MATCH | 70/70 | - | - |
 | gen-skill-dru-241 | state | DIVERGED | 66/70 | frame 67 monster 1:8 class 427, field tx: 1.14d 5143 vs d2rs 5144 | coord-resume-3 |
@@ -1768,7 +1768,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-nec-75 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-nec-75 | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | q-fix-join-items |
 | gen-skill-nec-78 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-nec-78 | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | q-fix-join-items |
+| gen-skill-nec-78 | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
 | gen-skill-nec-93 | state | DIVERGED | 31/70 | frame 32 missile 3:1 class 193, field ty: 1.14d 4268 vs d2rs 4269 | coord-resume-3 |
 | gen-skill-nec-93 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-100 | state | PARTIAL | 70/70 | - | - |
@@ -1782,7 +1782,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-pal-105 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-105 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-107 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-pal-107 | packets | DIVERGED | 69/70 | frame 22 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | q-fix-join-items |
+| gen-skill-pal-107 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-108 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-pal-108 | packets | MATCH | 70/70 | - | - |
 | gen-skill-pal-109 | state | PARTIAL | 70/70 | - | - |
@@ -1822,11 +1822,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-su-15 | state | DIVERGED | 42/150 | frame 43 game, field seed: 1.14d [3692043304, 618654564] vs d2rs [1483255534, 419929858] | unrouted |
 | gen-su-18 | state | PARTIAL | 150/150 | - | - |
 | gen-su-26 | state | DIVERGED | 67/150 | frame 68 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
-| gen-su-27 | state | DIVERGED | 69/150 | frame 70 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-27 | state | PARTIAL | 150/150 | - | - |
 | gen-su-28 | state | DIVERGED | 68/150 | frame 69 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
 | gen-su-29 | state | DIVERGED | 91/150 | frame 92 player 0:1 class 0, field s: 1.14d [2888746052, 817984065] vs d2rs [85, 666] | unrouted |
 | gen-su-30 | state | DIVERGED | 105/150 | frame 106 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
-| gen-su-31 | state | DIVERGED | 86/150 | frame 87 player 0:1 class 0, field m: 1.14d 4 vs d2rs 0 | unrouted |
+| gen-su-31 | state | PARTIAL | 150/150 | - | - |
 | gen-su-34 | state | DIVERGED | 72/150 | frame 73 monster 1:10 class 299, field m: 1.14d 2 vs d2rs 1 | unrouted |
 | gen-su-37 | state | DIVERGED | 65/150 | frame 66 game, field seed: 1.14d [1996604610, 653070085] vs d2rs [1565768481, 650785885] | unrouted |
 | gen-su-45 | state | DIVERGED | 29/150 | frame 30 monster 1:8 class 542, field hp: 1.14d 1100800 vs d2rs 1091584 | unrouted |
@@ -1943,3 +1943,9 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-qflow-a5q3-drehya | state | DIVERGED | 18/64 | frame 19 monster 1:20 class 522, field m: 1.14d 2 vs d2rs 4 | unrouted |
 | gen-qflow-a5q3-malah | packets | MATCH | 64/64 | - | - |
 | gen-qflow-a5q3-malah | state | PARTIAL | 64/64 | - | - |
+| ui-draws-inv-char-ama | packets | MATCH | 76/76 | - | - |
+| ui-draws-inv-char-l5-ama | packets | MATCH | 76/76 | - | - |
+| ui-draws-inventory-ama | packets | MATCH | 76/76 | - | - |
+| gen-missile-546 | packets | MATCH | 70/70 | - | - |
+| gen-missile-546 | rng | DIVERGED | 39/71 | frame 38, unit 3:1, draw #0, field missing: 1.14d site 0x5b0597 vs d2rs site None | unrouted |
+| gen-missile-546 | state | PARTIAL | 70/70 | - | - |
