@@ -68,7 +68,7 @@ use d2_data::tables::{
 use d2_formats::animdata::AnimData;
 
 use crate::audio::triggers::identity::{monsounds_row, RecordInputs};
-use crate::audio::triggers::modes::mode_set;
+use crate::audio::triggers::modes::{mode_set, mode_sound};
 use crate::audio::triggers::movement::{
     footstep, footstep_called, footstep_material, init_voice, neutral, Floor, TOWN_LEVELS,
 };
@@ -353,7 +353,8 @@ struct Track {
     frame_count: u32,
     speed: i32,
     states: BTreeSet<u8>,
-    /// `ClientUnit::mode_requests` at the last pass (REC-1683).
+    /// `ClientUnit::mode_requests` at the last pass (REC-1683; also the
+    /// explicit 0x13 sound, REC-1835).
     mode_requests: u32,
 }
 
@@ -362,6 +363,11 @@ struct Planned {
     key: UnitKey,
     first: bool,
     mode_changed: bool,
+    /// The explicit m of a new code 0x13 mode request (`client/model.md`
+    /// §8 r4 / §19 r4: `0x004CC5B0(U, m, 1)` with no mode change).
+    explicit: Option<u8>,
+    /// +0xB0, the hit class of the unit's last hit request.
+    hit_class: u8,
     states_on: Vec<u8>,
     states_off: Vec<u8>,
     is_local: bool,
@@ -495,6 +501,7 @@ impl UnitFeed {
             let t = self.tracks.entry(key).or_default();
             let mode = effective_mode(u, drawn);
             let mode_changed = !first && t.mode != mode;
+            let explicit = explicit_mode_sound(u, first, t.mode_requests);
             let states_on: Vec<u8> = u
                 .states
                 .iter()
@@ -519,6 +526,8 @@ impl UnitFeed {
                 key,
                 first,
                 mode_changed,
+                explicit,
+                hit_class: u.hit_class as u8,
                 states_on,
                 states_off,
                 is_local,
@@ -532,18 +541,7 @@ impl UnitFeed {
                 local_dist,
                 record: None,
                 item: None,
-                skill_request: (t.mode_requests != u.mode_requests)
-                    .then_some(u.last_mode_request)
-                    .flatten()
-                    .filter(|r| matches!(r.code, 0x15 | 0x16))
-                    // The local player's start takes its own level
-                    // (`msg-skills.md` §7 r4.3 (b)); the server's message
-                    // for it carries level 0 and the recorded game plays
-                    // one start sound, at the request that has the level
-                    // (REC-1683: the first of the two d2rs requests of a
-                    // cast, level 0, plays nothing).
-                    .filter(|r| !is_local || r.record[4] != 0)
-                    .and_then(|r| u16::try_from(r.record[0]).ok()),
+                skill_request: skill_start_request(t.mode_requests, u),
             };
             match key.unit_type {
                 MONSTER => {
@@ -644,6 +642,7 @@ impl UnitFeed {
             u.frame_count = t.frame_count;
             u.speed = t.speed;
             let us = unit_sounds.entry((p.key, false)).or_default();
+            us.hit_class = p.hit_class;
             cx.c = updates.first().copied().unwrap_or(c0);
             match p.key.unit_type {
                 PLAYER | MONSTER => {
@@ -655,6 +654,9 @@ impl UnitFeed {
                         mode_set(cx, &u, us, mode, start.as_ref().map(|k| (k, true)))?;
                     } else if let Some(k) = start {
                         skill_start(cx, &u, &k, true)?;
+                    }
+                    if let Some(m) = p.explicit {
+                        mode_sound(cx, &u, us, m)?;
                     }
                 }
                 MISSILE if p.first => {
@@ -719,6 +721,26 @@ impl UnitFeed {
     }
 }
 
+/// The explicit mode sound of a mode request the pass has not seen: code
+/// 0x13 (hit, no mode change) calls `0x004CC5B0(U, m, 1)` with m = 0x13
+/// for a player (`client/model.md` §8 r4; 3 in a were-form, `0x0063A400`)
+/// and 0xD for a monster (§19 r4). A unit first seen has no new request.
+///
+/// PROVISIONAL (REC-1835): the model holds no shapeshift flag (+0xC8 bit
+/// 0x8), so a player's m is always 0x13; and the pass sees only the last
+/// request of a frame, so a 0x13 followed by another request before the
+/// next audio frame makes no sound (one server tick per frame in play).
+fn explicit_mode_sound(u: &ClientUnit, first: bool, seen: u32) -> Option<u8> {
+    if first || u.mode_requests == seen {
+        return None;
+    }
+    match (u.key.unit_type, u.last_mode_request) {
+        (PLAYER, Some(r)) if r.code == 0x13 => Some(0x13),
+        (MONSTER, Some(r)) if r.code == 0x13 => Some(0x0D),
+        _ => None,
+    }
+}
+
 /// The mode the unit sounds read: the model's, except the local player's
 /// drawn mode while the preview walks it (REC-51: the client's own path
 /// code is not in the model, so the prediction's walk / run mode stands
@@ -763,6 +785,51 @@ fn item_sound(cx: &mut Ctx, p: &Planned) {
     }
 }
 
+/// The skill whose start sounds a unit's new mode request plays
+/// (REC-1683, `triggers.md` §8 r1): the last request when the count moved
+/// and its code is 0x15 / 0x16, record entry 0 the skill. The local
+/// player's own click request (level 0) is the one the original starts
+/// from (`skills/sequences.md` local player rules 1-2); the server sends
+/// the own client no second request (rule 3), so no request is skipped.
+fn skill_start_request(seen: u32, u: &ClientUnit) -> Option<u16> {
+    (seen != u.mode_requests)
+        .then_some(u.last_mode_request)
+        .flatten()
+        .filter(|r| matches!(r.code, 0x15 | 0x16))
+        .and_then(|r| u16::try_from(r.record[0]).ok())
+}
+
+#[cfg(test)]
+mod explicit_tests {
+    use super::*;
+    use crate::bridge::world::ModeRequest;
+
+    /// `client/model.md` §8 r4 / §19 r4: a new code 0x13 request is the
+    /// explicit mode sound (player m = 0x13, monster 0xD); a repeat of
+    /// the count, another code, a unit first seen: none.
+    // Covers: specs/client/model.md §8 r4
+    #[test]
+    fn a_new_hit_request_is_the_explicit_mode_sound() {
+        let mut u = ClientUnit::new(UnitKey::new(PLAYER, 1));
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x13,
+            record: [0; 7],
+        });
+        u.mode_requests = 3;
+        assert_eq!(explicit_mode_sound(&u, false, 2), Some(0x13));
+        assert_eq!(explicit_mode_sound(&u, false, 3), None);
+        assert_eq!(explicit_mode_sound(&u, true, 2), None);
+        let mut m = u.clone();
+        m.key = UnitKey::new(MONSTER, 7);
+        assert_eq!(explicit_mode_sound(&m, false, 2), Some(0x0D));
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x14,
+            record: [0; 7],
+        });
+        assert_eq!(explicit_mode_sound(&u, false, 2), None);
+    }
+}
+
 #[cfg(test)]
 mod rate_tests {
     use super::*;
@@ -790,5 +857,24 @@ mod rate_tests {
         assert_eq!(&seen[9..], &[1917, 82]);
         u.mode = 5;
         assert_eq!(player_rate(&w, key, &u, 80), 80);
+    }
+}
+
+#[cfg(test)]
+mod skill_start_tests {
+    use super::*;
+    use crate::bridge::world::ModeRequest;
+
+    // Covers: specs/skills/sequences.md §3
+    #[test]
+    fn the_local_players_click_request_at_level_0_plays_its_start() {
+        let mut u = ClientUnit::new(UnitKey::new(PLAYER, 1));
+        u.mode_requests = 1;
+        u.last_mode_request = Some(ModeRequest {
+            code: 0x15,
+            record: [44, 1, 5, 5, 0, 0, 0],
+        });
+        assert_eq!(skill_start_request(0, &u), Some(44));
+        assert_eq!(skill_start_request(1, &u), None);
     }
 }

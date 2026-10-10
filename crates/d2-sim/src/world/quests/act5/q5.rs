@@ -658,6 +658,12 @@ pub fn portal_count(ctl: &QuestControl) -> i32 {
     ctl.find(CHAIN).map_or(0, |i| xr(ctl, i).portals)
 }
 
+/// The fight's armed byte (+0x11), what the Ancients' gate `0x0058CF90`
+/// tests (REC-1561).
+pub fn armed(ctl: &QuestControl) -> bool {
+    ctl.find(CHAIN).is_some_and(|i| xr(ctl, i).armed)
+}
+
 /// `0x0058CF90` (from the Ancients' AI `0x005EEB83`, `0x005EEDB7`,
 /// `0x005EF027`): armed := 0.
 pub fn disarm(ctl: &mut QuestControl) {

@@ -580,6 +580,52 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan has no provider here ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
+    /// The `pettype.txt` row count (data tables +0xBF0).
+    fn pet_type_count(&self) -> i32 {
+        self.h.bodies.as_ref().map_or(0, |b| b.pettype_count)
+    }
+    /// `0x0056E620` on the skill pipeline ([`Pending::missile_summon_class`]).
+    fn summon_class(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> crate::missiles::SummonClass {
+        let (class, mode) = with_sim(self, game, |h, sim| {
+            X::missile_summon_class(h, sim, owner, skill, level)
+        });
+        crate::missiles::SummonClass { class, mode }
+    }
+    /// `0x0056D940` flags 0xD on the skill pipeline
+    /// ([`Pending::missile_summon_spawn`]).
+    fn summon_spawn(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        with_sim(self, game, |h, sim| {
+            X::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+        })
+    }
+    /// `missiles/bodies-2.md` §33 step 8 ([`Pending::missile_bone_wall_piece`]).
+    fn bind_bone_wall_piece(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        with_sim(self, game, |h, sim| {
+            X::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level)
+        });
+    }
     /// `0x005444B0(game, id)`: the quest control's published answer
     /// ([`Pending::quest_not_intro`]).
     fn quest_test(&self, _game: &Game, id: i32) -> bool {
@@ -793,4 +839,20 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         use crate::path::CollisionRooms;
         self.h.drlg.subtile_rect(room).map(|t| (t.x, t.y, t.w, t.h))
     }
+}
+
+/// Runs `f` on the hooks and a [`crate::units::hooks::Sim`] over the
+/// view's parts and `game`.
+fn with_sim<X: Pending, R>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    f: impl FnOnce(&mut super::ActionHooks<X>, &mut crate::units::hooks::Sim<'_>) -> R,
+) -> R {
+    let mut sim = crate::units::hooks::Sim {
+        game,
+        units: &mut *v.units,
+        stats: &mut *v.stats,
+        data: v.data,
+    };
+    f(&mut *v.h, &mut sim)
 }

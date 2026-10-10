@@ -69,9 +69,10 @@ milestone den-of-evil-done
   sweep 20 2 100 20
   find ut 1 cl 148
   poke +2 pos @1:148 @x+3 @y
-  input frame +10; click 448 324
-  note save with 1.1 (Den cleared, reward pending); talking to Akara (msg 76) sets 1.0. The click at Akara (player x+3) walks: no hover pick
-  need quest 1 1 set
+  poke +25 msg 0x30 @1:148
+  input frame +10; click 448 324; frame +40; click 448 324
+  note save with 1.1 (Den cleared, reward pending); talking to Akara (msg 76) sets 1.0. The first click picks Akara (player x+3) and plays her intro (m 0, her text list sorts string 0 first); C->S 0x30 ends the chat (the headless run has no menu to close), the second click gets the quest message
+  need ever quest 1 1 set
   need ever quest 1 0 set
 
 milestone cold-plains-wp
@@ -144,8 +145,9 @@ milestone andariel-done
   use andy
   deadline 200
   poke 5 pos @1:155 @x+3 @y
-  input frame 10; click 448 324
-  note save with 6.1 (Andariel dead, reward pending); talking to Warriv (msg 183) sets 6.0. The click at Warriv walks: no hover pick
+  poke 25 msg 0x30 @1:155
+  input frame 10; click 448 324; frame 40; click 448 324
+  note save with 6.1 (Andariel dead, reward pending); talking to Warriv (msg 183) sets 6.0. The first click picks Warriv (player x+3) and plays his intro (m 0); C->S 0x30 ends the chat, the second click gets msg 183
   need unit ut 1 cl 155 present
   need ever quest 6 0 set
 
@@ -153,8 +155,9 @@ milestone act2-open
   use east
   deadline 300
   poke 5 pos @1:155 @x+3 @y
+  poke 14 msg 0x38 0 @1:155 1
   input frame 10; click 448 324
-  note save with 6.0; Warriv's travel ("Go east", world/npc.md §8.3) moves the player to Lut Gholein (40) and sets 7.0, 7.13. Needs the NPC menu: not reachable headless yet
+  note save with 6.0; Warriv's travel ("Go east", world/npc.md §8.3) moves the player to Lut Gholein (40) and sets 7.0, 7.13. The click picks Warriv and opens the chat; the headless run has no menu, so C->S 0x38 (action 0, item 1: the menu's travel intent, ui/panels/npc.rs option_intent) stands for the menu pick
   need ever player act == 1
   need ever player lv == 40
   need ever quest 7 0 set

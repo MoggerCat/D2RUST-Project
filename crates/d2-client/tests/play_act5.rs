@@ -113,6 +113,8 @@ impl Act5 {
             self.rig.step(1);
         }
         assert_eq!(self.rig.level(), Some(level), "warped into {level}");
+        // Staging: the new level must not catch a weak player.
+        self.strengthen();
         self.rig.step(20);
     }
 
@@ -163,6 +165,9 @@ impl Act5 {
     /// `(x, y)` (poke `pos`, which reaches the player's room and its
     /// neighbours). False: none.
     fn hop(&mut self, x: i32, y: i32) -> bool {
+        // Staging: the walk through a hostile level must not kill the
+        // player (a dead player, mode 17, never attacks again).
+        self.strengthen();
         for r in [0, 2, 4, 7] {
             for (dx, dy) in [
                 (r, r),
@@ -255,7 +260,7 @@ impl Act5 {
             });
         });
         for _ in 0..40 {
-            if self.dead(m) {
+            if self.dead(m, guid) {
                 break;
             }
             let at = self
@@ -284,17 +289,21 @@ impl Act5 {
                 );
             }
         }
-        assert!(self.dead(m), "monster {guid} killed");
+        assert!(self.dead(m, guid), "monster {guid} killed");
     }
 
-    fn dead(&mut self, m: UnitId) -> bool {
+    fn dead(&mut self, m: UnitId, guid: u32) -> bool {
         self.rig.with(move |sim, _| {
             sim.events
                 .action
                 .sys
                 .units
                 .get(m)
-                .is_none_or(|u| u.mode == 0 || u.mode == 12)
+                // A dead monster's slot can be reused (a drop): same unit
+                // means same type and GUID.
+                .is_none_or(|u| {
+                    u.ty != UnitType::Monster || u.guid != guid || u.mode == 0 || u.mode == 12
+                })
                 || sim.game.lists.unit(m).is_none()
         })
     }
@@ -648,7 +657,7 @@ fn the_ancients_fall_on_arreat_summit() {
     let mut killed = 0;
     for _ in 0..30 {
         let ancients = a.units(UnitType::Monster, &[540, 541, 542]);
-        let alive: Vec<_> = ancients.into_iter().filter(|e| !a.dead(e.0)).collect();
+        let alive: Vec<_> = ancients.into_iter().filter(|e| !a.dead(e.0, e.1)).collect();
         if alive.is_empty() && killed >= 3 {
             break;
         }
@@ -685,6 +694,9 @@ fn baal_falls_and_the_game_is_finished() {
     for _ in 0..80 {
         a.strengthen();
         a.clear_around(throne, 70, &[543, 559]);
+        // Baal's room must stay active (the player walked off to the
+        // monsters it killed; a stored Baal does not think).
+        a.stand_by(throne);
         a.rig.step(50);
         let baal = a.units(UnitType::Monster, &[543, 559]);
         if baal.is_empty() {

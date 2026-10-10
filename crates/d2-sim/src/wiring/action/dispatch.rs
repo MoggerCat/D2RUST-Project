@@ -69,6 +69,19 @@ impl<X: Pending> ActionSim<X> {
         X::golem_resummon(&mut s.hooks, &mut sim, player)
     }
 
+    /// The save load's right-skill aura start of `player`
+    /// ([`Pending::right_aura_select`]).
+    pub fn right_aura_select(&mut self, game: &mut Game, player: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::right_aura_select(&mut s.hooks, &mut sim, player)
+    }
+
     /// The save load's passive states of `unit`
     /// ([`Pending::passive_refresh_all`]).
     pub fn passive_refresh_all(&mut self, game: &mut Game, unit: UnitId) {
@@ -432,10 +445,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         }
         if is_player {
             // §7.3 rule 1 (`0x00580860`): steps 1 and 3 (the path part),
-            // then step 5 (any state-changed bit, whether announced or
+            // step 4's soft hit, then step 5 (any state-changed bit, whether announced or
             // not) and step 7.
             if v.h.paths.is_some() {
                 crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
+                // Step 4: the soft hit (0x8000 → 0x0D).
+                crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {
                 v.state_change_messages(p, unit);
