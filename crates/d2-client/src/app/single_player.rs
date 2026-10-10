@@ -2385,6 +2385,7 @@ pub fn build_with(
     hooks.waypoint_init = Some(Arc::new(WaypointData::new(&wp_tables.levels, &wp_objects)));
     hooks.vitals = parts.vitals;
     hooks.bodies = parts.bodies;
+    hooks.item_tables = Some(Arc::new(parts.items.clone()));
     // The hireling calls (save restore, join follow, act change;
     // `hirelings-2.md` §19) run on the wired host, which holds the
     // hireling lists when the game has `hireling.txt`; without the queue

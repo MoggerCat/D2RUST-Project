@@ -491,6 +491,15 @@ property id < 0. If `chance<i>` (for d) is 0, apply; else one inline unit
 seed step and apply if lo' % 100 < chance. Apply = item property
 assignment on the unit (`0x0065FD70`, property spec) with `par`, `min`,
 `max`. None of the recorded Act 1 classes has a MonProp.
+Implemented (rc-pkt-handwritten, REC-3372): the record goes through the
+item property dispatcher on the unit as the item (owner none): the list
+is state 0, flags 0x40 (`items/properties.md` §4.2), rolls draw on the
+unit's seed (`WorldHost::apply_property`, `ActionHooks::item_tables`).
+Evidence: the druid raven's class (monprop row `druidhawk`, `stupidity`
+−1) sends 9 stat bits in 0xAC (list found, nothing sendable, §24 rule 6)
+in `traces/checks/dru-raven.check`, and so does every monprop class. The
+dispatcher's mode argument for this call is not read (mode 0 assumed).
+
 
 ### 12. monequip (`0x005D6B60`)
 
