@@ -315,6 +315,8 @@ fn unit_distance_table_and_formula() {
     assert_eq!(d(4, 0, 2, 2), 2);
     assert_eq!(d(3, 2, 2, 2), 2);
     assert_eq!(d(0, 0, 2, 2), 0); // negative → 0
+    assert_eq!(d(2, 0, 2, 1), 0); // negative: no +1 for a size < 2
+    assert_eq!(d(0, 0, 1, 1), 0);
     assert_eq!(d(4, 0, 3, 2), 1); // size 3: minus 1
     assert_eq!(d(4, 0, 2, 3), 1);
     assert_eq!(d(3, 0, 3, 2), 0); // not below 0
