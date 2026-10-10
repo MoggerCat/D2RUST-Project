@@ -1414,7 +1414,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-shrine-13 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-14 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-15 | packets | MATCH | 120/120 | - | - |
-| gen-shrine-17 | packets | DIVERGED | 119/120 | frame 40 stream s2c #2 id: 1.14d 2c vs d2rs 0e (id 0x2c) | unrouted |
+| gen-shrine-17 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-18 | packets | MATCH | 120/120 | - | - |
 | gen-shrine-18 | state | PARTIAL | 120/120 | - | - |
 | gen-shrine-19 | packets | MATCH | 120/120 | - | - |

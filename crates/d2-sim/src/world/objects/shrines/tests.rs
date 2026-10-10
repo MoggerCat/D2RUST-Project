@@ -625,7 +625,7 @@ fn portal_shrine_code_17() {
     assert_eq!(run(17, |_| {}), vec!["spot 20 3 0x1c09"]);
 }
 
-// Covers: specs/world/objects.md §9.2 code 17 (`0x0056D130`, Wine 1.14d gen-shrine-17)
+// Covers: specs/world/objects.md §9.2, §edge-cases-original-bugs r27
 #[test]
 fn portal_shrine_in_town_plays_the_refusal_sound() {
     let mut s = setup(17);
