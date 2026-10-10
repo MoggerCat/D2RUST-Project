@@ -10,7 +10,13 @@
 //!   sound draws (`sound-table-2.md` §14.3; the model's steps replayed
 //!   first, REC-1845); `Seed::init_low(local player guid)` only while the
 //!   model holds none (PROVISIONAL, REC-1846);
-//! - the client update count is the server tick;
+//! - the client update count is the server tick; a tick whose draw was
+//!   skipped is replayed so that every update steps the weather once
+//!   (the original draws every loop pass; PROVISIONAL, REC-1900);
+//! - the local player's 0x15 placements (`ClientWorld::local_places`) run
+//!   their level entry `0x004726F0(flag)` before the frame's act load
+//!   (`draw-order-2.md` §11.8; PROVISIONAL, REC-1901: the draws sit in the
+//!   receive of the original, here at the next weather step);
 //! - the camera delta is the change of the camera's unit origin between
 //!   frames; the day period is 1 and the video mode 1 (colors of the
 //!   rain / snow tables); the frame rate is 25 (≥ 10: the flash draws);
@@ -119,6 +125,8 @@ pub struct WeatherView {
     shared: Arc<Mutex<ClientSeed>>,
     level: Option<LevelWeather>,
     update_count: u32,
+    /// How many of `ClientWorld::local_places` were replayed.
+    places_seen: usize,
     origin: Option<(i32, i32)>,
     color_maps: Option<Vec<MapId>>,
     /// Why the weather is off (logged once by the caller).
@@ -149,6 +157,7 @@ impl WeatherView {
             shared: Arc::default(),
             level: None,
             update_count: 0,
+            places_seen: 0,
             origin: None,
             color_maps: None,
             failure: None,
@@ -282,27 +291,51 @@ impl WeatherView {
             self.seed = Seed::init_low(local.key.guid);
             self.seeded = true;
         }
+        // The local player's placements (`0x00472C20(flag)`, received
+        // before this frame's draw): the level entry of a non-zero flag.
+        while let Some(&flag) = world.local_places.get(self.places_seen) {
+            self.places_seen += 1;
+            if flag != 0 {
+                if let Err(e) = self
+                    .weather
+                    .level_entry(u32::from(flag), &mut self.seed, &level)
+                {
+                    return self.fail(e.to_string());
+                }
+            }
+        }
         let previous = self.level;
         let r = self.enter(previous, level, assets);
         if let Err(m) = r {
             return self.fail(m);
         }
         self.level = Some(level);
-        self.update_count = world.server_ticks as u32;
+        // 1.14d updates the weather once per client update, in the draw of
+        // its loop pass; a pass whose draw was skipped here (the GPU still
+        // busy) is replayed so that every client update steps it once
+        // (REC-1900, PROVISIONAL: the original draws every pass).
+        let now = world.server_ticks as u32;
+        let first = match previous {
+            Some(_) if self.update_count < now => self.update_count + 1,
+            _ => now,
+        };
+        self.update_count = now;
         let delta = self.camera_delta(local_at, mode);
-        let input = UpdateInput {
-            update_count: self.update_count,
-            frame: FrameSize::play(),
-            camera_delta: delta,
-            day_period: DAY_PERIOD,
-            video_mode: VIDEO_MODE,
-        };
-        let player = LocalPlayer {
-            seed: &mut self.seed,
-            level,
-        };
-        if let Err(e) = self.weather.update(Some(player), &input) {
-            return self.fail(e.to_string());
+        for c in first..=now {
+            let input = UpdateInput {
+                update_count: c,
+                frame: FrameSize::play(),
+                camera_delta: if c == now { delta } else { (0, 0) },
+                day_period: DAY_PERIOD,
+                video_mode: VIDEO_MODE,
+            };
+            let player = LocalPlayer {
+                seed: &mut self.seed,
+                level,
+            };
+            if let Err(e) = self.weather.update(Some(player), &input) {
+                return self.fail(e.to_string());
+            }
         }
         if let Some(l) = &self.thunder {
             let active = !self.weather.snow_mode && level.rain;

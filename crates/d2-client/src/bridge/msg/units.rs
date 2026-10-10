@@ -578,6 +578,10 @@ pub fn reassign_player(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Han
     if let Some(u) = w.units.get_mut(&key) {
         u.position = Some((x, y));
     }
+    // Rule 4.6: the local player's placement ends in `0x00472C20(flag)`.
+    if w.local_player == Some(key) {
+        w.local_places.push(b.u8(10)?);
+    }
     // The teleport's room recache (`sim/unit-order.md` §5 rule 6): leave
     // the old room's list, head of room''s.
     if w.active_rooms.is_some() {
