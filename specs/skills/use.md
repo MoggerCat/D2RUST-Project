@@ -26,19 +26,19 @@
 | Outputs / state changes | 68–74 |
 | Rules | 75–76 |
 |   1. Messages | 77–108 |
-|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–203 |
-|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 204–230 |
-|   4. Mode change gates | 231–288 |
-|   5. Start and do | 289–483 |
-|   6. Cooldown | 484–497 |
-|   7. Periodic skills and auras | 498–547 |
-|   8. Function tables | 548–567 |
-| Constants & data dependencies | 568–588 |
-| Randomness | 589–598 |
-| Edge cases & original bugs | 599–620 |
-| Test vectors | 621–641 |
-| Provenance | 642–661 |
-| Open questions | 662–714 |
+|   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–210 |
+|   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 211–237 |
+|   4. Mode change gates | 238–295 |
+|   5. Start and do | 296–490 |
+|   6. Cooldown | 491–504 |
+|   7. Periodic skills and auras | 505–554 |
+|   8. Function tables | 555–574 |
+| Constants & data dependencies | 575–595 |
+| Randomness | 596–605 |
+| Edge cases & original bugs | 606–627 |
+| Test vectors | 628–648 |
+| Provenance | 649–668 |
+| Open questions | 669–721 |
 <!-- /index -->
 
 ## Summary
@@ -195,6 +195,13 @@ Type tests are `0x00629BB0` (with equivalence).
   (`item_magicarrow`) → pass; Y none or not of type s → fail; Attack
   and Y with stat 157 → pass; Y stackable (`0x006295B0` > 0) and Y's
   `quantity(70)` < 1 → fail. Pass.
+
+The client runs the same test on its own player (REC-2900, 1.14d
+`gen-skill-ama-7`..`-35`: a bow or javelin skill with no matching weapon
+worn sends no C->S 0x0C / 0x0D at the click; use state 2). d2rs
+`bridge::use_state::item_type_test` applies rules 1-4 over the worn items at
+locations 4 / 5; PROVISIONAL there: the matched-item rules and the weapon in
+use of skills 4 / 5.
 
 Item type indices are binary row indices (the `Expansion` row of
 `itemtypes.txt` takes none: 45 `weap`, 46 `mele`, 51 `shld`, 67 `h2h`).

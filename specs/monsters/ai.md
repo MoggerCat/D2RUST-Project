@@ -42,7 +42,7 @@
 | Edge cases & original bugs | 1493–1534 |
 | Test vectors | 1535–1623 |
 | Provenance | 1624–1685 |
-| Open questions | 1686–1792 |
+| Open questions | 1686–1796 |
 <!-- /index -->
 
 ## Summary
@@ -1694,8 +1694,12 @@ Other recorded checks:
    of the single-player packet recordings (`sim/intents-events.md`
    §Provenance, `-015956`); +0x74 is the ladder flag (game creation
    flags bit 21, `0x00530D59`). +0x6A ≠ 0 in single player, so §1.3
-   rule 1 takes `aidel(N)` / `aidel(H)` by difficulty there. Confirm
-   with a Nightmare recording (PC 2 list).
+   rule 1 takes `aidel(N)` / `aidel(H)` by difficulty there.
+   Confirmed 2026-10-10 (rc-c008-monmode): `diff-a3-hell-normal-bm`,
+   Hell baboon3: the attack1 ends at frame 51 and the next walk starts
+   at 64 (+13 = `aidel(H)`), not 66 (+15). d2rs had read the Normal
+   column at every difficulty (`UnitData::aidel_by_difficulty` was never
+   set); it is now `game_type != 0 || ladder` at game creation.
 3. The `0x005A8520` knockback-end branches have no recorded instance:
    record a knockback (e.g. a player skill with knockback on fallen and
    on a sand leaper) and check +1 / +15 / gethit.

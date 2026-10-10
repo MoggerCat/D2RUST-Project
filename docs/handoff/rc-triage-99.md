@@ -15,3 +15,13 @@ NOT-IMPLEMENTED by feature). No code changed, no ledger rows changed.
   after its verdict. v2 re-runs every check behind a DIVERGED row on this branch.
 - owner: a ledger owner without a hand-back in docs/handoff (else empty).
 - est: the rows' majority ledger size; model: opus for M/L and seed/rng causes, else sonnet.
+
+## v2
+- Re-ran on this branch at dc7576e57 (integ-r23 merged; `suite.py --orig-cache traces/orig-cache
+  --no-playthrough --workers 3`, orig-cache hits): the 190 cached gen checks behind DIVERGED /
+  NO-CHECK rows; hand checks (319 cached, 70 + 196 gen uncached with `--fill-cache`) still running.
+  A row with fresh results uses only them (its older note is ignored).
+- New cause "RE-RUN EQUAL under REC-2055/2056": every channel MATCH, or PARTIAL only from the d2rs
+  client gap / no item on either side, with packets MATCH or no input/send. Settle in a ledger part.
+- PARTIAL reasons now come from the comparator (state_diff one-sided fields and gaps, items_diff).
+- Ledger after merging integ-r23: 838 DIVERGED, 500 NO-CHECK, 46 NOT-IMPLEMENTED.
