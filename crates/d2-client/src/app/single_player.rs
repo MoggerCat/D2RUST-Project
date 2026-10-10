@@ -589,11 +589,16 @@ impl LocalSeams {
     ///
     /// PROVISIONAL (REC-279 part 2; d2rs-own, unverified): the ranges are
     /// settled (`ai.md` §5.2 step 4: 35; §5.3 scan 6: full-size < 49), but
-    /// the scan 6 filter `0x005DC970`, the `nThreat` main / alternative
-    /// classes, the line test (mask 4) and `0x005DD510` are not applied
-    /// here, nor the scan 5 callback `0x005DCA70`.
+    /// of the scan 6 filter `0x005DC970` only the dead test and unit flag
+    /// 0x4 are applied, and the `nThreat` main / alternative classes, the
+    /// line test (mask 4) and `0x005DD510` are not, nor the rest of the
+    /// scan 5 callback `0x005DCA70`. PROVISIONAL (REC-1642): scan 5 skips
+    /// a monster without unit flag 0x4 like scan 6 (1.14d, q-fix-skills-4cls
+    /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
+    /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
+    /// scan 5 callback's reading.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
-        self.nearest_foe_where(unit, range, full_size, |_| true)
+        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
     }
 
     /// [`Self::nearest_foe`] among the candidates `keep` accepts.
@@ -988,6 +993,40 @@ impl Pending for LocalSeams {
     }
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
+    }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
+    }
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
+        skill_events::right_aura_select(h, sim, player);
     }
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);

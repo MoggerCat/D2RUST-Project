@@ -69,6 +69,19 @@ impl<X: Pending> ActionSim<X> {
         X::golem_resummon(&mut s.hooks, &mut sim, player)
     }
 
+    /// The save load's right-skill aura start of `player`
+    /// ([`Pending::right_aura_select`]).
+    pub fn right_aura_select(&mut self, game: &mut Game, player: UnitId) {
+        let s = &mut self.sys;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut s.units,
+            stats: &mut s.stats,
+            data: &s.data,
+        };
+        X::right_aura_select(&mut s.hooks, &mut sim, player)
+    }
+
     /// The save load's passive states of `unit`
     /// ([`Pending::passive_refresh_all`]).
     pub fn passive_refresh_all(&mut self, game: &mut Game, unit: UnitId) {
