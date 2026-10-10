@@ -1048,6 +1048,14 @@ requested mode, the current skill is cleared again. 1.14d-confirmed
 (`0x005A7E60`, `0x005A7C20`, `0x005A63F0`, `0x005A6290`,
 `0x005A6B10`).
 
+Order in the skill requests (1.14d-read 2026-10-10, `0x005DEAD0`,
+`0x005DE000`): the builder (its clear) runs **first**, then the current
+skill is set (`0x006439B0(-1)` entry, none when the unit has no such
+skill), then `0x005A7C20`. A request that sets no skill therefore leaves
+the used skill none: a monster whose sequence skill (mode 14) is over and
+that then attacks in A1 strikes with its A1 damage (REC-2355, check
+`gen-mon-189`: the Smite caster's A1 hit rolled 12, not 6, damage units).
+
 Mode numbers: 1 neutral, 2 walk, 4 attack1 (A1), 5 attack2 (A2), 8
 skill1 (S1), 9 skill2 (S2), 14 sequence, 15 run (`sim/units.md`).
 Skill modes come from monstats `Sk1mode`..`Sk3mode` (+384..+386 as read
