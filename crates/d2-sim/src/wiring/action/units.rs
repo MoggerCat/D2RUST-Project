@@ -1005,6 +1005,10 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
+    fn queue_removal_notice(&mut self, unit_type: u8, guid: u32) {
+        self.removal_notices.push((unit_type, guid));
+    }
+
     fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {
         self.event_records.push(
             unit,
