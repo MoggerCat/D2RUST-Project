@@ -436,7 +436,7 @@ gets its party (§10).
    For each minion created: transfer the boss's modifiers that have
    `xfer` (`0x005A0930`, `monsters/init.md`), set owner data
    (`0x0058F030`), add the minion to the boss's minion list
-   (`0x0058F100`), set the owner GUID and type (`0x005DD330`), and set
+   (`0x0058F100`), set the owner GUID and type (`0x005DD330`: writes the minion's AI control +0x0C := owner GUID, +0x10 := owner type, the leash owner of `ai.md` §2.2 rule 3; 1.14d-confirmed, `sys-units-census` frame 91: a pack member over 20 away wanders near its boss 19), and set
    type flag 0x10.
 
 ### 7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX)
