@@ -1,6 +1,7 @@
 # rc-a8-setstate hand-back
 Cause 1 (0xA8 byte 9): EQUAL 2759 -> 2801 on its base. Cause 2 (right aura at join): EQUAL 3195 -> 3213 on integ-r23.
-gen-skill packets MATCH 91 -> 137 -> 178 of 210 (no regressions; gen-state-1? and gen-state-2? samples clean).
+Cause 3 (0xA7 skill delay): EQUAL 3270 -> 3294 on integ-r23 (incl. ledger.py --fix of stale rows in 11 parts).
+gen-skill packets MATCH 91 -> 137 -> 178 -> 187 of 210 (no regressions; gen-state samples clean).
 
 ## Cause 1: S->C 0xA8 byte 9 at frame 2 (assassin masteries, ~60 checks)
 - 1.14d `0x005711D0` (0xA8, sender `0x0053E8D0`) writes each entry as 9-bit stat id, param (send-param bits),
@@ -25,16 +26,15 @@ gen-skill packets MATCH 91 -> 137 -> 178 of 210 (no regressions; gen-state-1? an
   (the frame-51 0xA8 of Holy Fire / Freeze / Shock ...). `sim/stat-lists.md` §9.2 corrected.
 - gen-skill-pal packets MATCH 9 -> 29/30. The 0xA8 rows' hand-written checks plus pal-* (69): packets MATCH 64.
 
-## Ledger / status
-- `ledger/rc-a8-setstate.tsv`: 100 skill rows, 83 EQUAL (REC-2055/2056: state 70/70, no ignore line, every
-  channel incl. packets MATCH) and 17 DIVERGED. A DIVERGED row is settled by one re-run check; an EQUAL row
-  needs all of its checks re-run. `last_verdict` is reconciled to ledger.py's value.
-- `checks-status.md`: 44 rows refreshed in place. Held back because the fresh rows contradict other sessions'
-  parts (net.s2c.0xa7 / 0xa9 / 0x7a and skill rows in q-run-net, q-tool-packet-census, rc-run-1, skills.tsv, ...):
-  ass-burst-of-speed, ass-fade, ass-lightning-sentry, bar-leap-attack, pal-charge, pal-holy-freeze,
-  pal-holy-shock, pal-sanctuary.
+## Cause 3: S->C 0xA7 state 121 missing at the cast (13 checks: Fire Wall, Blade Sentinel, druid summons ...)
+- `0x0056EF90` (set_delay) switches state 121 on with `0x00639DB0`, which always queues the unit; d2rs didn't queue.
+  Fixed in `UseView::create_delay_list`; `skills/use.md` §6 says so.
 
-## Open (gen-skill packets first differences, 32 checks)
-- 8 + 5: 0xA7 missing / 0xA7 vs 0xAC at frame 26+ (summons, sentries); 6: 0xAC size (frame 27+).
-- 4: 0xA5 vs 0xA9 (incl. pal-107 Charge, frame 22); 3: 0x67 bytes[6] (frame 67); 2: 0xA8 missing; 2: 0xA3 missing.
-- The missile wiring's `mark_state_changed` (`wiring/action/missiles.rs`) still doesn't queue (no game handle there).
+## Ledger / status
+- `ledger/rc-a8-setstate.tsv`: 100 skill rows, 90 EQUAL (REC-2055/2056: state 70/70, no ignore line, every channel
+  incl. packets MATCH), 10 DIVERGED. An EQUAL row needs all of its checks re-run; `last_verdict` matches ledger.py.
+- `checks-status.md`: my fresh rows replace 65 hand-written and 61 gen-skill rows in place. `ledger.py --fix` then
+  reconciled the stale verdicts this left in 11 other parts (last_verdict / state only).
+## Open (gen-skill packets first differences, 23 checks)
+- 9: 0xAC size at a summon's add (frame 27+; Valkyrie, Shadow, golems ...); 4: 0xA5 vs 0xA9 (pal-107 Charge ...).
+- 3: 0x67 bytes[6] (frame 67); 2: 0xA8 missing; 2: 0xA3 missing. The missile wiring's `mark_state_changed` doesn't queue.
