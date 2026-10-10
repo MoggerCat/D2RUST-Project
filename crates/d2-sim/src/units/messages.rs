@@ -533,18 +533,18 @@ pub fn player_event(code: u8, name: &[u8; 16]) -> [u8; 40] {
 }
 
 /// S→C 0x5A code 6 from `0x0054D8A0` (40 bytes): u8@2 4, the killer's GUID
-/// u32@3, its unit type u8@7, the victim's name @8, and @0x18 either the
+/// u32@3 (unit +0x04: the class, not the GUID), its unit type u8@7, the victim's name @8, and @0x18 either the
 /// killer player's name or, for a monster with type flag 2, its u16
 /// `boss_hc_idx` (`intents-events.md` §7.6).
 pub fn death_notice(
-    killer_guid: u32,
+    killer_class: u32,
     killer_type: u8,
     victim: &[u8; 16],
     killer_name: &[u8; 16],
     boss_hc_idx: Option<u16>,
 ) -> [u8; 40] {
     let mut m = player_event(6, victim);
-    m[3..7].copy_from_slice(&killer_guid.to_le_bytes());
+    m[3..7].copy_from_slice(&killer_class.to_le_bytes());
     m[7] = killer_type;
     m[0x18..0x28].copy_from_slice(killer_name);
     if let Some(i) = boss_hc_idx {
