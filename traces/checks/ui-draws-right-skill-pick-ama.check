@@ -11,4 +11,4 @@ ticks 76
 seconds 600
 channels draws packets
 draws-at 73
-input frame 40; click 660 570
+input frame 40; hold 660 570 2

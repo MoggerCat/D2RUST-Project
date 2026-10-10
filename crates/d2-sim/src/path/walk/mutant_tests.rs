@@ -1319,14 +1319,15 @@ fn request_clears_queued_action_only_in_unit_form() {
 }
 
 // Kills the mutants of the knockback test of §1.2 step 5: only a
-// knockback request (19) on a unit already in mode 19 does nothing.
+// knockback request (19) on a unit already in mode 19 does nothing (the
+// requested unit's mode, `0x0057F190` reads unit +0x10; not the target's).
 // Covers: specs/sim/pathing.md §1.2 r5
 #[test]
 fn request_knockback_on_knocked_back_unit() {
-    let run = |m: u32, target_mode: u32| {
+    let run = |m: u32, own_mode: u32| {
         let (t, mut c) = setup(40, 40, 10, 10);
         add(&mut c, M, UnitType::Monster, 20, 10, 0);
-        c.u.unit(M).mode = target_mode;
+        c.u.unit(P).mode = own_mode;
         let target = WalkTarget::Unit {
             ty: UnitType::Monster,
             guid: M.0,

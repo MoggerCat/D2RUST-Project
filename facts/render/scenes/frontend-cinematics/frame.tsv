@@ -1,0 +1,22 @@
+# facts v1; tool: trace-recorder facts_render 0.3.0; command: py tools/trace-recorder/facts_render.py game/captures/pc1today/fe-g.jsonl --shot cinematics --scene frontend-cinematics --out facts/render; game: 1.14d
+key	value
+seq	1
+tick	?
+w	800
+h	600
+act	-
+level	-
+player_x	-
+player_y	-
+tile_origin_x	-
+tile_origin_y	-
+unit_origin_x	-
+unit_origin_y	-
+open_mode	-
+shift_x	-
+light_quality	-
+rain	-
+snow	-
+draws	124
+index_sha256	c8e2627f61120f7bd7ef9e47b91e81659d1e39c4579df5e43941ee41c274ddf1
+palette_sha256	b96cd364750035ee2749534f68599ec895f7bed639f3e4aa25662fbe3409a523

@@ -514,3 +514,20 @@ fn an_object_casts_its_shadow_only_where_it_blocks_light() {
     // No row: as before.
     assert!(super::object_casts_shadow(&l, 7, 0));
 }
+
+// Covers: specs/render/draw-order.md §5 r4
+#[test]
+fn an_object_whose_draw_is_0_keeps_its_pose_but_draws_no_body() {
+    let (_, mut rules) = setup(MemorySource::default());
+    let o = unit(OBJECT, 9, 342, 0);
+    let m = unit(MONSTER, 9, 342, 0);
+    assert!(rules.unit_draws_body(&o));
+    let mut looks = (*rules.looks).clone();
+    looks.object_no_draw.insert(342);
+    rules.looks = Arc::new(looks);
+    assert!(
+        !rules.unit_draws_body(&o),
+        "the call alone, its shadow kept"
+    );
+    assert!(rules.unit_draws_body(&m), "objects only");
+}
