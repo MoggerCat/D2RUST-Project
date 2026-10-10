@@ -1339,3 +1339,33 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-npc-tyrael2 | state | PARTIAL | 50/50 | - | - |
 | gen-npc-warriv1 | packets | MATCH | 50/50 | - | - |
 | gen-npc-warriv1 | state | PARTIAL | 50/50 | - | - |
+| gen-shrine-1 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-10 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-11 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-12 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-13 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-14 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-15 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-17 | packets | DIVERGED | 119/120 | frame 40 stream s2c #2 id: 1.14d 2c vs d2rs 0e (id 0x2c) | unrouted |
+| gen-shrine-18 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-18 | state | PARTIAL | 120/120 | - | - |
+| gen-shrine-19 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-19 | state | PARTIAL | 120/120 | - | - |
+| gen-shrine-2 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-20 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-21 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-21 | state | PARTIAL | 120/120 | - | - |
+| gen-shrine-22 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-22 | state | PARTIAL | 120/120 | - | - |
+| gen-shrine-3 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-6 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-7 | packets | DIVERGED | 119/120 | frame 40 stream s2c #0 size: 1.14d 15 vs d2rs 12 (id 0xa8) | unrouted |
+| gen-shrine-8 | packets | MATCH | 120/120 | - | - |
+| gen-shrine-9 | packets | MATCH | 120/120 | - | - |
+| gen-skill-nec-69 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-79 | packets | MATCH | 70/70 | - | - |
+| gen-skill-nec-89 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-37 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-61 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-63 | packets | MATCH | 70/70 | - | - |
+| gen-skill-sor-65 | packets | MATCH | 70/70 | - | - |
