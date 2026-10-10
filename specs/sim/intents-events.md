@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1356 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1357–1701 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1702–1874 |
-| Constants & data dependencies | 1875–1893 |
-| Randomness | 1894–1899 |
-| Edge cases & original bugs | 1900–1945 |
-| Test vectors | 1946–2032 |
-| Provenance | 2033–2159 |
-| Open questions | 2160–2312 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1369 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1370–1714 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1715–1887 |
+| Constants & data dependencies | 1888–1906 |
+| Randomness | 1907–1912 |
+| Edge cases & original bugs | 1913–1958 |
+| Test vectors | 1959–2045 |
+| Provenance | 2046–2172 |
+| Open questions | 2173–2325 |
 <!-- /index -->
 
 ## Summary
@@ -863,6 +863,17 @@ else `0x00534F80`;
 mode message (§7.4), then `0x00534F80` when `0x00639DF0(unit, 93)` holds or the
 class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
 
+Read 2026-10-10 (rc-skill-div-a, 1.14d `ass-inferno-sentry`, `ass-shadow-warrior`):
+"the unit has that skill" for a summoned monster is the skill entry the summon
+gave it (`sumskill1..5`, base level = the formula at the caster's level, bonus
+0); the 0x21 carries (unit type 1, remove 0, GUID, skill, base, bonus).
+`0x00639DB0` (the state set) is `0x00625A70` followed by the update-queue
+insert `0x0064C040(unit)`: a cooldown state 121 set on a player queues the player,
+which is why the 0xA7 for state 121 reaches the client in the cast's frame. The
+0xAC's source-link bit reads the unit's owner fields (type +0x94, id +0x98) written
+by `0x00621C30` with flag-ex 0x400, and its type block lists the summon's
+`sumumod` (`0x005A4850(game, m, sumumod, 1)`: with "unique" 1, so type flag 8).
+
 #### 7.3 Type updates
 
 1. **Player** `0x00580860`: `sim/pathing.md` §10 rules 2–3 (0x15, 0x0F,
@@ -874,7 +885,9 @@ class is 291, 417 or 418; item → `0x0055BED0` (§7.3 rule 4); others nothing.
    2. announced = 0 and flag-ex bit 0x1 → `0x00597890(game, U, C, 0)`,
       `0x0053D370(C, U)`, `0x0053D3C0(C, U, 0)`.
    3. Unit flag 0x1 → `0x005484B0(game, U, C)` (mode messages).
-   4. `0x00571CD0(U, C)`; unit flag 0x400 → `0x00571740`; 0x100 →
+   4. `0x00571CD0(U, C)` (a player's pending event records too: the
+      landing 0xA5 of Leap / Whirlwind goes out before that frame's
+      state messages of step 5, 1.14d `bar-leap` frame 34); unit flag 0x400 → `0x00571740`; 0x100 →
       `0x00571620`; 0x8000 → `0x00547F70` (each (U, C)).
    5. Any state-changed bit (`0x00639F20`) → `0x00571580(U, C, 0)` →
       `0x005711D0(U, C)`: the 0xA7 / 0xA8 / 0xA9 state messages (§7.3

@@ -500,7 +500,12 @@ impl<X: Pending> TickHooks for ActionSim<X> {
             // not) and step 7.
             if v.h.paths.is_some() {
                 crate::wiring::path::walk::update_messages(&mut v, game, client, unit);
-                // Step 4: the soft hit (0x8000 → 0x0D).
+                // Step 4: the pending event records `0x00571CD0(U, C)`
+                // first (the landing 0xA5 of Leap / Whirlwind, 1.14d
+                // `bar-leap` frame 34), then the soft hit (0x8000 → 0x0D).
+                if let Some(p) = receiver {
+                    v.send_event_records(game, p, unit);
+                }
                 crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {

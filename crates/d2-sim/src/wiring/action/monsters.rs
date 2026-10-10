@@ -66,6 +66,20 @@ pub trait MonsterWorld<X> {
     /// `0x005A4850(game, unit, umod, 0)`: append `umod` to the unit's
     /// list and run its init (`init.md`, `assign_umod`).
     fn assign_umod(&mut self, sim: &mut Sim<'_>, h: &mut ActionHooks<X>, unit: UnitId, umod: u8);
+    /// `0x005A4850(game, unit, umod, unique)`: as [`Self::assign_umod`]
+    /// with the "unique" argument (marks the monster unique, `init.md`
+    /// §14.1). Default: the plain assign.
+    fn assign_umod_arg(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        umod: u8,
+        unique: bool,
+    ) {
+        let _ = unique;
+        self.assign_umod(sim, h, unit, umod);
+    }
     /// The monster state's part of a unit free.
     fn forget(&mut self, unit: UnitId);
     /// The monster data (unit +0x14) of `unit`, if it has one.
@@ -272,6 +286,12 @@ impl<X> ActionHooks<X> {
 }
 
 impl<X: Pending> ActionHooks<X> {
+    /// `0x005A4850(game, unit, umod, unique)` on the lent monster world
+    /// (none: nothing).
+    pub fn assign_umod_arg(&mut self, sim: &mut Sim<'_>, unit: UnitId, umod: u8, unique: bool) {
+        self.with_monster_world(|w, h| w.assign_umod_arg(sim, h, unit, umod, unique));
+    }
+
     /// `0x005734C0(unit, v)`: the monster data's `dwAiState` (+0x54,
     /// `monsters/ai.md` §3 "AI state"); a unit without monster data in
     /// the lent world asks [`Pending::set_monster_ai_state`].

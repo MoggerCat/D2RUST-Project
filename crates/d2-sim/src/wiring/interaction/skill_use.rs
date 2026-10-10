@@ -732,6 +732,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         v.stats.set_remove_callback(l, Some(DELAY_REMOVE_CALLBACK));
         v.stats.attach(&mut *v.h, u, l, true);
         v.set_state(u, STATE_SKILL_DELAY, true);
+        // The state set is `0x00639DB0`: the toggle and the unit's
+        // update-queue insert `0x0064C040` (`intents-events.md` §3.5):
+        // 1.14d sends the 0xA7 for state 121 in the same frame.
+        BodyWorld::queue_update(self, u);
     }
     fn set_state_list_expiry(&mut self, u: UnitId, state: u16, expire: i32) {
         if let Some(l) = self.cv.v.state_list(u, state) {
@@ -744,6 +748,7 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
         let v = &mut self.cv.v;
         v.stats.free_state_list(&mut *v.h, u, u32::from(state));
         v.set_state(u, state, false);
+        BodyWorld::queue_update(self, u);
     }
     fn set_aura_state(&mut self, u: UnitId, state: u16, skill: i32, lvl: i32) {
         self.xm().set_aura_state(u, state, skill, lvl);
@@ -814,6 +819,8 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn mark_state_changed(&mut self, u: UnitId, s: i32) {
         if let Ok(s) = u32::try_from(s) {
             self.cv.v.stats.set_state_changed(u, s, true);
+            // `0x00639E30` ends with the update-queue insert `0x0064C040`.
+            BodyWorld::queue_update(self, u);
         }
     }
     fn clear_group_states(&mut self, u: UnitId, g: usize) {
@@ -1116,7 +1123,20 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         self.xm().passive_refresh(u);
     }
+    /// `0x0056DE40(unit)`: the passive refresh `0x00646F20`, then for a
+    /// player the skill resync `0x00575900` (read 1.14d; shout, battle
+    /// orders and battle command re-send the passives' states, `bar-battle-command`).
     fn buff_refresh(&mut self, u: UnitId) {
+        BodyWorld::passive_refresh(self, u);
+        if self
+            .cv
+            .v
+            .units
+            .get(u)
+            .is_some_and(|r| r.ty == UnitType::Player)
+        {
+            BodyWorld::skill_resync(self, u);
+        }
         self.xm().buff_refresh(u);
     }
     fn skill_resync(&mut self, u: UnitId) {
@@ -1236,6 +1256,22 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                 Some(o) => self.cv.v.h.unit_source.insert(m, o),
                 None => self.cv.v.h.unit_source.remove(&m),
             };
+            return;
+        }
+        // `0x005A4850(game, m, umod, arg)` (`bodies.md` §6.2 step 8: the
+        // summon's `sumumod`, arg 1 = unique; `init.md` §14.1): on the
+        // lent monster world.
+        if let bodies::BodyEffect::Umod { m, umod, arg } = e {
+            if let Ok(umod) = u8::try_from(umod) {
+                let cv = &mut self.cv;
+                let mut sim = crate::units::hooks::Sim {
+                    game: &mut *cv.game,
+                    units: &mut *cv.v.units,
+                    stats: &mut *cv.v.stats,
+                    data: cv.v.data,
+                };
+                cv.v.h.assign_umod_arg(&mut sim, m, umod, arg != 0);
+            }
             return;
         }
         if let bodies::BodyEffect::WaitThink { m, frames } = e {

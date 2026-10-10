@@ -186,6 +186,42 @@ fn type_block(m: &MonsterData, unit_flags: u32, hireling_owner: Option<u32>) -> 
 }
 
 impl<X: Pending> View<'_, X> {
+    /// The skill messages 0x21 of a monster's add (`intents-events.md`
+    /// §7.2; the loop of `0x0053E0A0`'s caller at `0x005720D8`): for each
+    /// `monstats` slot i = 0..7 whose bit i of `SendSkills` (+0x16C) is
+    /// set and whose `Skill<i>` (+0x170 + 2i) is a skill the unit has:
+    /// (skill, base level, 0). The unit's skills are its summon entries
+    /// ([`ActionHooks::monster_skills`]) or its init entries
+    /// ([`ActionHooks::natural_skills`]); a monster entry has no bonus
+    /// level. 1.14d `ass-inferno-sentry`: the sentry's summoned skill.
+    fn monster_sent_skills(&self, unit: UnitId, class: u32) -> Vec<(u16, u8, u8)> {
+        let Some(row) = self.h.tables.combat.monstats.get(class as usize) else {
+            return Vec::new();
+        };
+        let slots = [
+            row.skill1, row.skill2, row.skill3, row.skill4, row.skill5, row.skill6, row.skill7,
+            row.skill8,
+        ];
+        let levels = self
+            .h
+            .monster_skills
+            .get(&unit)
+            .into_iter()
+            .chain(self.h.natural_skills.get(&unit));
+        let levels: Vec<_> = levels.collect();
+        let mut out = Vec::new();
+        for (i, &skill) in slots.iter().enumerate() {
+            if row.sendskills >> i & 1 == 0 || skill as i16 <= 0 {
+                continue;
+            }
+            let base = levels.iter().find_map(|m| m.get(&i32::from(skill)));
+            if let Some(&b) = base {
+                out.push((skill, b.clamp(0, 255) as u8, 0));
+            }
+        }
+        out
+    }
+
     /// Part A and part B of a monster's add messages to `receiver`'s
     /// client (§7.2).
     pub fn monster_add(&mut self, game: &crate::game::Game, receiver: UnitId, unit: UnitId) {
@@ -211,7 +247,11 @@ impl<X: Pending> View<'_, X> {
             // monster's add messages.
             self.h.x.send(receiver, &messages::unknown98(guid, 0));
         }
-        for (skill, base, bonus) in self.h.x.monster_add_skills(unit) {
+        let mut skills = self.h.x.monster_add_skills(unit);
+        if skills.is_empty() {
+            skills = self.monster_sent_skills(unit, class);
+        }
+        for (skill, base, bonus) in skills {
             let m =
                 messages::update_oskill(UnitType::Monster as u8, false, guid, skill, base, bonus);
             self.h.x.send(receiver, &m);
@@ -265,7 +305,15 @@ impl<X: Pending> View<'_, X> {
             .and_then(|w| w.component_counts(class))
             .unwrap_or([0; 16]);
         let source = (flags_ex & FLAG_EX_SOURCE != 0)
-            .then(|| self.h.x.unit_owner(unit))
+            .then(|| {
+                // The owner fields +0x94 / +0x98 the source link writes
+                // (`0x00621C30`, [`BodyEffect::SourceFields`]); the host's
+                // own record when it keeps one.
+                self.h
+                    .x
+                    .unit_owner(unit)
+                    .or_else(|| self.units.get(unit).map(|r| r.source))
+            })
             .flatten()
             .and_then(|(ty, g)| (ty == 0).then_some(g));
         let bodies = self.h.bodies.as_deref();

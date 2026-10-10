@@ -412,7 +412,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ama-strafe | state | PARTIAL | 70/70 | - | - |
 | ama-valkyrie | state | PARTIAL | 70/70 | - | - |
 | ass-blade-fury | state | PARTIAL | 70/70 | - | - |
-| ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | q-fix-seed-order |
+| ass-blade-sentinel | state | DIVERGED | 27/70 | frame 28 game, field seed: 1.14d [367684955, 1328293240] vs d2rs [3184650063, 1412234640] | {'area': 'act1-town, seed order, client critters, NPC tracks', 'session': 'session_01JhQc4nNShp9YNmxNXpqAdx', 'branch': 'claude/q-fix-seed-order'} |
 | ass-blade-shield | state | PARTIAL | 70/70 | - | - |
 | ass-blades-of-ice | state | PARTIAL | 70/70 | - | - |
 | ass-burst-of-speed | state | PARTIAL | 70/70 | - | - |
@@ -443,14 +443,14 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-venom | state | PARTIAL | 70/70 | - | - |
 | ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
 | autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
-| bar-battle-command | packets | DIVERGED | 67/70 | frame 2 stream s2c #72 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) | q-fix-join-items |
-| bar-battle-command | state | DIVERGED | 27/70 | frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 | q-fix-join-items |
+| bar-battle-command | packets | MATCH | 70/70 | - | - |
+| bar-battle-command | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
 | bar-war-cry | state | PARTIAL | 70/70 | - | - |
-| bar-whirlwind | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 bytes[9]: 1.14d 61 vs d2rs 1 (id 0xa8) | q-fix-join-items |
+| bar-whirlwind | packets | MATCH | 70/70 | - | - |
 | bar-whirlwind | state | PARTIAL | 70/70 | - | - |
-| bar-whirlwind-unit | packets | DIVERGED | 64/70 | frame 2 stream s2c #4 id: 1.14d 23 vs d2rs 5e (id 0x23) | q-fix-join-items |
+| bar-whirlwind-unit | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 bytes[11]: 1.14d 1 vs d2rs 13 (id 0x69) | {'area': 'progression, potions, join packets, waypoints, act travel, death/corpse', 'session': 'session_018xX7oT4tFDSXSSE6xXgiv5', 'branch': 'claude/q-fix-join-items'} |
 | bar-whirlwind-unit | state | DIVERGED | 59/70 | frame 21 player 0:1 class 4, field fr: 1.14d 0 vs d2rs 5120 | unrouted |
 | combat-arrow-kill | state | PARTIAL | 110/110 | - | - |
 | combat-arrow-quillrat | state | PARTIAL | 130/130 | - | - |
