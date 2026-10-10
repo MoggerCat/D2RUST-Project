@@ -286,8 +286,9 @@ fn run() -> Run {
     let mut code8 = vec![0x69];
     code8.extend(guid.to_le_bytes());
     code8.push(8);
-    code8.extend(p8.target_x.to_le_bytes());
-    code8.extend(p8.target_y.to_le_bytes());
+    // The path end: no computed point, so (0, 0) (REC-594).
+    assert_eq!(p8.point_count, 0);
+    code8.extend([0, 0, 0, 0]);
     code8.extend([p8.direction, B0]);
 
     let end = kill_frame + DEATH_FRAMES as i32;
@@ -351,7 +352,9 @@ fn a_kill_sends_0x69_code_8_then_code_9_at_the_death_end() {
     // `traces/checks/combat-kill-fallen.check` frame 36), e = the
     // fixture's +0xB0; code 9 at the cell (24, 20) where it was
     // allocated (the room centre + (4, 0)).
-    assert_eq!(a.code8, [0x69, 1, 0, 0, 0, 8, 24, 0, 20, 0, 0x17, B0]);
+    // Code 8 (a, b) is the path end, (0, 0) with no computed point
+    // (REC-594, recorded `items-drops-cha-00` frame 37), not that target.
+    assert_eq!(a.code8, [0x69, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0x17, B0]);
     assert_eq!(a.code9, [0x69, 1, 0, 0, 0, 9, 24, 0, 20, 0, 0x17, 0]);
     assert_eq!(a.kill_frame, BEFORE as i32);
     // Determinism: a second game is identical.
