@@ -422,12 +422,12 @@ the stat read; the 0x24 / 0x25 compares at `0x0057BE47`–`0x0057BE4F`).
    3. Overlay +0x6C > 0 → on the defender (`0x00621E40`).
    4. Hit class: if the byte +0x64 = 0 and the low nibble of +0x60 is
       0: OR in the attacker's weapon hit class (`0x00623C20`).
-      PROVISIONAL (REC-1836): for a monster attacker `0x00623C20` is
-      its monstats2 `HitClass` (+0x14, through monstats `MonStatsEx`)
-      (because the Fallen's 3 is the hit class byte of 1.14d's S→C 0x0D
-      on its soft hits, `combat-fallen-hits-player` packets frames 77,
-      98, 124, 137, 173; the function body is not read); settled by a
-      reading of `0x00623C20` (PC 1, Ghidra).
+      `0x00623C20(unit)`: a player → its weapon (`0x00623990(unit, 0)`)
+      gives the item's hit class (`0x0062A180`), no weapon → 1; a
+      monster → byte +0x14 (`HitClass`) of its monstats2 row, through
+      monstats `MonStatsEx` (`0x00451FE0`; no row → 0); any other type
+      or none → 0. Measured: the Fallen's 3 is the hit class byte of
+      1.14d's S→C 0x0D on its soft hits (`combat-fallen-hits-player`).
    5. Durability (§9).
 5. Unit event 7 (`domeleeattack`) on the attacker, then event 3
    (`attackedinmelee`) on the defender (both with the copy).

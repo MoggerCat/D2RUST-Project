@@ -237,12 +237,10 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn weapon_class(&self, u: UnitId) -> i32 {
         self.v.h.x.weapon_class(u)
     }
-    /// `0x00623C20`. PROVISIONAL (REC-1836; the function body is not
-    /// specified): a monster's is its monstats2 `HitClass` (+0x14,
-    /// through monstats `MonStatsEx`), measured: the Fallen's 3 is the
-    /// hit class of 1.14d's S→C 0x0D on its soft hits of the player
-    /// (`combat-fallen-hits-player`, frames 77, 98, 124, 137, 173); other
-    /// units: [`Pending::weapon_hit_class`].
+    /// `0x00623C20` (`damage.md` §5.1 step 4.4): a monster's is its
+    /// monstats2 `HitClass` (+0x14, through monstats `MonStatsEx`; no
+    /// row → 0); a player's (its weapon's item hit class, 1 without one)
+    /// and other types: [`Pending::weapon_hit_class`].
     fn weapon_hit_class(&self, u: UnitId) -> u32 {
         if self.ty(u) == UnitType::Monster {
             let t = &self.v.h.tables.combat;
