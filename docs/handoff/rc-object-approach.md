@@ -5,7 +5,7 @@
   on the merged tree: 267 frame 20 (player mode), 385 frame 20 (player), 194 frame 69 (NPC 1:7 class 155 mode).
 - After: all three state 80/80 (385: 47/47, the 1.14d recording ends at tick 47) equal on every compared field, rng MATCH, items
   PARTIAL (none compared). Ledger: 3 rows in `ledger/rc-object-approach.tsv` (they override the DIVERGED rows of `q-run-objects`).
-- Regression sample (the 20 rc-object-operate rows + 195 + 3): see the table at the end.
+- Regression sample (the 20 rc-object-operate rows + 195 + 3): all 22 state 80/80 equal, rng MATCH.
 
 ## Root causes (two, both read from 1.14d)
 1. 267 / 385: `poke operate @2:267` / `@2:385` resolve to the town stash (GUID 17) and the urn GUID 2, not the object the poke
@@ -37,5 +37,4 @@
 - PROVISIONAL (REC-1930): the arrival of the object walk is read from the player's mode leaving walk/run/town walk at the end
   of tick step 4 (as the NPC/item approaches), not from the step result 2 of `0x00580C20`. gen-obj-267 is frame-exact with it.
 - The walk flag (u32 @9 = -2) of the 0x13 message is not carried to the repeated case (poke / client send 0). Size S.
-- Line test with the object on the player (hand-back question): not needed here; the poke-created object was never the
-  operate target. Unresolved, no check needs it.
+- The line test with the object on the player: moot here (the poke-created object is never the operate target).
