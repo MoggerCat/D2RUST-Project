@@ -59,14 +59,14 @@
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
 |   4. The 1.14d side (`poke.py`) | 181–354 |
-|   5. The d2rs side (`d2-sim::poke`) | 355–418 |
-|   6. `goto`: walking to a target | 419–498 |
-| Constants & data dependencies | 499–514 |
-| Randomness | 515–521 |
-| Edge cases & original bugs | 522–549 |
-| Test vectors | 550–577 |
-| Provenance | 578–588 |
-| Open questions | 589–596 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–425 |
+|   6. `goto`: walking to a target | 426–505 |
+| Constants & data dependencies | 506–521 |
+| Randomness | 522–528 |
+| Edge cases & original bugs | 529–556 |
+| Test vectors | 557–584 |
+| Provenance | 585–595 |
+| Open questions | 596–603 |
 <!-- /index -->
 
 ## Summary
@@ -398,8 +398,8 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    after the tick and before that frame's flush, so a handler's replies
    leave in the same frame's buffer (first run: `interact-talk-akara`,
    0x27 / 0x29 / 0x28 flushed in frame 15 on 1.14d, 16 on d2rs between
-   frames). `state-dump` therefore runs every poke of a frame that
-   holds an `operate`, a `talk`, a `goto` or a `warp` at the same point: a
+   frames). `state-dump` therefore runs every poke due after a tick
+   (absolute frame 2 or later) at the same point: a
    tick-end hook of the link (`Host::frame_with`, after the tick, before
    the flush), in file order, after taking that frame's snapshot there
    (as `record_state.py` snapshots before its pokes, §5 rule 2). A
@@ -411,12 +411,14 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    `a2-npc-atma-talk`, the walk's 0x07 in frames 3–12 on 1.14d, one
    frame later on d2rs before; rc-net-s2c; `warp`: the landing room's
    0x07 in the poke's frame window, the neighbours' in the next tick,
-   448 generated checks with `4 warp 2`, rc-packets-join-order). Other
-   frames keep the between-frames point: at the tick end a `pos` /
-   `hop` (d2rs-own reassign request, §1) sends an S→C 0x15 in the next
-   frame that 1.14d does not send (`interact-operate-waypoint`,
-   `interact-talk-akara`, `items-vendor-akara-buy` frame 4, rc-packets-join-order; open: why
-   the between-frames point sends none is not traced).
+   448 generated checks with `4 warp 2`; `stat`: the stat update in the
+   poke's frame window, `a2-npc-fara-heal` frame 7,
+   `combat-potion-midfight` frame 59; rc-packets-join-order). Only a
+   poke due before the first tick keeps the between-frames point. Open:
+   after a `pos` poke (d2rs-own reassign request, §1) d2rs sends an S→C
+   0x15 in the next frame that 1.14d does not send, at either point
+   (`interact-operate-waypoint`, `interact-talk-akara`,
+   `items-vendor-akara-buy` frame 4).
    `play --poke` runs every poke between frames: its
    `operate` / `talk` replies reach the client one frame later than on
    1.14d (a play aid, not a comparison).
