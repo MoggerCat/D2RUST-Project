@@ -99,7 +99,9 @@ use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
-use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
+use d2_server::world_data::tables::{
+    class_picks, drop_tables, hireling_tables, LevelTables, SaveData,
+};
 use d2_server::world_data::{self, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::drlg::maze::Maze;
@@ -1361,6 +1363,8 @@ pub struct LiveData {
     pub tables: GameTables,
     /// The chest drop's tables (`ActionHooks::object_drops`).
     pub drops: Arc<DropTables>,
+    /// The item class picks of the drop helpers (`DeathDrops::with_picks`).
+    pub picks: Arc<d2_sim::treasure::class_pick::ClassPicks>,
     /// `InteractionState::hireling_tables`.
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
@@ -1398,6 +1402,7 @@ impl LiveData {
             levels,
             files,
             drops: Arc::new(drop_tables(&tables.fixed)?),
+            picks: Arc::new(class_picks(&tables.fixed)?),
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
@@ -2080,6 +2085,8 @@ struct GameParts {
     bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
+    /// The drop helpers' class picks (`DeathDrops::with_picks`).
+    picks: Option<Arc<d2_sim::treasure::class_pick::ClassPicks>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
     /// The inventory tables of the wired host's inventory model (the new
@@ -2111,6 +2118,7 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
+            picks: Some(d.picks.clone()),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
@@ -2248,11 +2256,13 @@ pub fn build_with(
     })?;
     // The chest drop's state (`treasure.md` §4): its seed, creation
     // fields and unique bits are the action wiring's.
+    let picks = parts.picks;
     sim.action.hooks().object_drops = parts.drops.map(|t| {
-        Box::new(DeathDrops::new(
-            t,
-            GameFields::new(Seed::init_low(0), false),
-        ))
+        let d = DeathDrops::new(t, GameFields::new(Seed::init_low(0), false));
+        Box::new(match picks {
+            Some(p) => d.with_picks(p),
+            None => d,
+        })
     });
     let mut game = Game::new();
     let start_levels = [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
