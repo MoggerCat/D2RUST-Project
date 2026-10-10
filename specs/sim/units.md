@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1011 |
-|   5. Event dispatch | 1012–1026 |
-|   6. Events per kind | 1027–1149 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1150–1171 |
-|   8. Collision line between two units | 1172–1176 |
-| Constants & data dependencies | 1177–1193 |
-| Randomness | 1194–1201 |
-| Edge cases & original bugs | 1202–1222 |
-| Test vectors | 1223–1282 |
-| Provenance | 1283–1369 |
-| Open questions | 1370–1449 |
+|   4. Modes and mode schedules | 454–1036 |
+|   5. Event dispatch | 1037–1051 |
+|   6. Events per kind | 1052–1174 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1175–1196 |
+|   8. Collision line between two units | 1197–1201 |
+| Constants & data dependencies | 1202–1218 |
+| Randomness | 1219–1226 |
+| Edge cases & original bugs | 1227–1247 |
+| Test vectors | 1248–1307 |
+| Provenance | 1308–1399 |
+| Open questions | 1400–1479 |
 <!-- /index -->
 
 ## Summary
@@ -615,10 +615,35 @@ sub-tile away followed, with no draw between, by the escape of
 `0x005A7C20`'s return path (REC-1390).
 
 Mode table (`0x005A78A0`): 16-byte records {start, event-0 function,
-event-1 function, schedule flag} at `0x006E2260` + 16·mode; classes
-243–418, 543 and 544–709 with a set byte +0x1A5 in their monstats row
-use per-class records (`0x006E22D0`–`0x006E23A0`; monster spec). Null
+event-1 function, schedule flag} at `0x006E2260` + 16·mode. Null
 record or function: fallback `0x005A7B30`.
+
+**Per-class records** (`0x005A78A0(unit, mode)`, read 2026-10-10):
+no record for a non-monster, a class outside monstats or a mode > 15.
+A class whose monstats byte +0x1A5 (`SplGetModeChart`) is 0 takes the
+table's record. Otherwise the class id (not `BaseId`) picks a record
+for some modes; every other mode takes the table's:
+
+| Class | Modes | Record | Contents |
+|---|---|---|---|
+| 243 diablo, 333 diabloclone, 705 uberdiablo | 11 S4 | `0x006E2360` | A-family |
+| same | 10 S3 | `0x006E2370` | A-family |
+| 403 trappedsoul1 | 4 A1, 5 A2 | `0x006E2380` | A-family, event 1 `0x005A8330` |
+| 403 | 8 S1, 9 S2 | `0x006E2390` | A-family, event 1 `0x005A83E0` |
+| 417 shadowwarrior, 418 shadowmaster | 11 S4 | `0x006E23A0` | A-family |
+| 543 baalthrone, 544 baalcrab, 570 baalclone, 709 uberbaal | 10 S3 | `0x006E22D0` (the table's mode-7 record) | A-family |
+
+"A-family" = {`0x005A75C0`, `0x005A7670`, `0x005A8030`, schedules}, the
+record of modes 4, 5, 7, 8, 9: such a mode starts, animates and ends
+(event 1 = the mode end of `monsters/ai.md` §1.4) like an attack, where
+the table's S3 / S4 records never schedule an end. Other classes with
+the byte set (404, 546–550, 559, 571–573 in 1.14d's monstats) have no
+case and take the table. The trapped soul's two ends `0x005A8330` /
+`0x005A83E0` are the same: a mode request (`0x005A7C20`, flag 1;
+`monsters/ai.md` §7.1 record) to mode 8 targeting the unit itself, path
+byte 101 when mode 8 moves for the class (monstats2 bit, as the request
+builder), else 100; then, unless the unit has state 1 and is alive, the
+AI think `0x005B1740` runs inline (the pointer at `0x006E2498`).
 
 | Mode | Start | Event 0 | Event 1 | Schedules | Moves (`0x006E23D0`) |
 |---|---|---|---|---|---|
@@ -1282,6 +1307,11 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §4.6 "Per-class records" (2026-10-10, rc-mon-modes): read from the
+  1.14d export of `0x005A78A0` (both byte-indexed switches decoded from
+  Game.exe at `0x005A79C4` / `0x005A7A80`), the 16-byte records
+  `0x006E2260`–`0x006E23AF` read from Game.exe, and `0x005A8330` /
+  `0x005A83E0` / `0x005A8030` (pointer `0x006E2498` = `0x005B1740`).
 - §3.1 r4.1 (2026-10-09, revision, q-fix-real-unit-seed-order): added
   from two Wine recordings of 1.14d (`tools/cloud-game/run.sh --python
   -- tools/trace-recorder/record_rng.py --auto ScnAma --seed 1234
