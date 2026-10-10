@@ -11,7 +11,7 @@
 
 use crate::game::Game;
 use crate::path::footprint::{
-    add_footprint, make_corpse_footprint, remove_footprint, set_foot_mask,
+    add_footprint, make_corpse_footprint, remove_footprint, reset_pattern, set_foot_mask,
 };
 use crate::path::record::{alloc_dynamic_path, TargetUnit};
 use crate::path::{
@@ -493,6 +493,23 @@ impl<X: Pending> View<'_, X> {
         if let Some(d) = self.h.paths.as_mut().and_then(|p| p.dynamic_mut(unit)) {
             d.precise_x = crate::path::coords::to_fp16_center(x);
             d.precise_y = crate::path::coords::to_fp16_center(y);
+        }
+    }
+
+    /// Path reset `0x00649CA0` (`path-placement.md` §5.3 rule 5): the
+    /// pattern recomputed from the stored size and restamped. A unit
+    /// without a dynamic path or without the provider: nothing.
+    pub fn path_reset(&mut self, unit: UnitId) {
+        let Some(shape) = self.path_shape(unit) else {
+            return;
+        };
+        let h = &mut *self.h;
+        let Some(p) = h.paths.as_mut() else {
+            return;
+        };
+        let tables = p.tables.clone();
+        if let Some(d) = p.dynamic_mut(unit) {
+            reset_pattern(&mut h.drlg, &tables, d, &shape);
         }
     }
 
