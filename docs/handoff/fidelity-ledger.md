@@ -16,7 +16,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | drlg | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | integrator | 30 | 1 | 0 | 27 | 0 | 2 | 9 | 16 | 3 | 60.5–146+ | 0 | 2 / 0 / 28 |
 | items | 721 | 34 | 0 | 60 | 0 | 627 | 28 | 66 | 0 | 146–584 | 81 | 640 / 0 / 81 |
-| monsters | 659 | 190 | 0 | 23 | 0 | 446 | 15 | 198 | 0 | 403.5–1614 | 5 | 395 / 240 / 24 |
+| monsters | 659 | 154 | 0 | 23 | 0 | 482 | 15 | 162 | 0 | 331.5–1326 | 5 | 395 / 240 / 24 |
 | pathing | 1 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 | 0.5–2 | 0 | 1 / 0 / 0 |
 | q-chk-render-ui | 12 | 10 | 0 | 2 | 0 | 0 | 5 | 5 | 2 | 28.5–50+ | 0 | 10 / 0 / 2 |
 | rc-client-seed-2 | 2 | 1 | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 2.5–10 | 0 | 2 / 0 / 0 |
@@ -24,7 +24,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | rc-pc1late-npc | 2 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0–0 | 0 | 2 / 0 / 0 |
 | rc-pc1late-world | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 6–24 | 0 | 3 / 0 / 0 |
 | rc-render-wp-click | 3 | 3 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 1.5–6 | 0 | 3 / 0 / 0 |
-| rc-vile-crow | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 2–8 | 0 | 1 / 0 / 0 |
+| rc-vile-crow | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | render-effects | 77 | 77 | 0 | 0 | 0 | 0 | 77 | 0 | 0 | 38.5–154 | 0 | 77 / 0 / 0 |
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 7 | 1 | 0 | 0 | 0 | 6 | 0 | 1 | 0 | 2–8 | 0 | 7 / 0 / 0 |
@@ -32,7 +32,7 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | skills | 655 | 69 | 0 | 176 | 0 | 410 | 85 | 160 | 0 | 362.5–1450 | 6 | 544 / 99 / 12 |
 | systems | 918 | 313 | 46 | 384 | 0 | 175 | 257 | 483 | 3 | 1118.5–4378+ | 250 | 470 / 0 / 448 |
 | world | 825 | 101 | 0 | 116 | 0 | 608 | 44 | 168 | 5 | 398–1432+ | 207 | 707 / 46 / 72 |
-| **all** | 4477 | 897 | 46 | 929 | 0 | 2605 | 669 | 1189 | 14 | 2824.5–10850+ | 549 | 3388 / 411 / 678 |
+| **all** | 4477 | 860 | 46 | 929 | 0 | 2642 | 669 | 1152 | 14 | 2750.5–10554+ | 549 | 3388 / 411 / 678 |
 
 ## By family
 
@@ -657,7 +657,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `level` | 136 | 22 | 0 | 15 | 0 | 99 | 15 | 13 | 24 | 0 | 109 | 5 |
 | `missile` | 299 | 5 | 0 | 121 | 0 | 173 | 2 | 120 | 6 | 0 | 0 | 2 |
 | `mon` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
-| `monster` | 669 | 198 | 0 | 26 | 0 | 445 | 2 | 16 | 207 | 1 | 4 | 241 |
+| `monster` | 669 | 161 | 0 | 26 | 0 | 482 | 2 | 16 | 170 | 1 | 4 | 241 |
 | `net.c2s` | 113 | 11 | 9 | 14 | 0 | 79 | 0 | 28 | 6 | 0 | 26 | 0 |
 | `net.s2c` | 183 | 33 | 21 | 79 | 0 | 50 | 5 | 130 | 3 | 0 | 1 | 0 |
 | `npc` | 48 | 18 | 0 | 30 | 0 | 0 | 0 | 9 | 39 | 0 | 25 | 34 |
@@ -716,7 +716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2631
 - Rows set exercised = yes from the coverage reports' seen lists: 22
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 3213
+- Duplicate areas between parts: 3409
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1809,225 +1809,417 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.arach3`: rc-gen-mon-triage.tsv:16 kept, rc-run-4.tsv:7 dropped
   - `monster.arach4`: rc-gen-mon-triage.tsv:17 kept, rc-run-4.tsv:8 dropped
   - `monster.arach5`: rc-gen-mon-triage.tsv:18 kept, rc-run-4.tsv:9 dropped
-  - `monster.baaltaunt`: rc-gen-mon-triage.tsv:142 kept, rc-run-4.tsv:10 dropped
-  - `monster.baboon1`: rc-gen-mon-triage.tsv:125 kept, rc-run-4.tsv:11 dropped
-  - `monster.baboon3`: rc-gen-mon-triage.tsv:128 kept, rc-run-4.tsv:12 dropped
-  - `monster.baboon4`: rc-gen-mon-triage.tsv:132 kept, rc-run-4.tsv:13 dropped
-  - `monster.baboon5`: rc-gen-mon-triage.tsv:133 kept, rc-run-4.tsv:14 dropped
-  - `monster.baboon6`: rc-gen-mon-triage.tsv:76 kept, rc-run-4.tsv:15 dropped
-  - `monster.batdemon1`: rc-gen-mon-triage.tsv:22 kept, rc-run-4.tsv:16 dropped
-  - `monster.batdemon2`: rc-gen-mon-triage.tsv:23 kept, rc-run-4.tsv:17 dropped
-  - `monster.batdemon3`: rc-gen-mon-triage.tsv:24 kept, rc-run-4.tsv:18 dropped
-  - `monster.batdemon4`: rc-gen-mon-triage.tsv:25 kept, rc-run-4.tsv:19 dropped
-  - `monster.batdemon5`: rc-gen-mon-triage.tsv:27 kept, rc-run-4.tsv:20 dropped
-  - `monster.bighead2`: rc-gen-mon-triage.tsv:6 kept, rc-run-4.tsv:21 dropped
-  - `monster.bighead3`: rc-gen-mon-triage.tsv:13 kept, rc-run-4.tsv:22 dropped
-  - `monster.bighead4`: rc-gen-mon-triage.tsv:20 kept, rc-run-4.tsv:23 dropped
-  - `monster.bighead5`: rc-gen-mon-triage.tsv:26 kept, rc-run-4.tsv:24 dropped
-  - `monster.bighead6`: rc-gen-mon-triage.tsv:152 kept, rc-run-4.tsv:25 dropped
-  - `monster.bloodlord1`: rc-mon-fr.tsv:3 kept, rc-run-4.tsv:26 dropped
-  - `monster.bloodlord2`: rc-mon-fr.tsv:4 kept, rc-run-4.tsv:27 dropped
-  - `monster.bloodlord3`: rc-mon-fr.tsv:5 kept, rc-run-4.tsv:28 dropped
-  - `monster.bloodlord4`: rc-mon-fr.tsv:6 kept, rc-run-4.tsv:29 dropped
-  - `monster.bloodlord5`: rc-mon-fr.tsv:7 kept, rc-run-4.tsv:30 dropped
-  - `monster.blunderbore1`: rc-gen-mon-triage.tsv:48 kept, rc-run-4.tsv:31 dropped
-  - `monster.blunderbore3`: rc-gen-mon-triage.tsv:49 kept, rc-run-4.tsv:32 dropped
-  - `monster.blunderbore4`: rc-damage-draws.tsv:6 kept, rc-run-4.tsv:33 dropped
-  - `monster.bonefetish3`: rc-gen-mon-triage.tsv:55 kept, rc-run-4.tsv:34 dropped
-  - `monster.bonefetish4`: rc-gen-mon-triage.tsv:56 kept, rc-run-4.tsv:35 dropped
-  - `monster.bonefetish5`: rc-gen-mon-triage.tsv:57 kept, rc-run-4.tsv:36 dropped
-  - `monster.boss.baalclone`: rc-boss-570.tsv:3 kept, rc-run-4.tsv:38 dropped
-  - `monster.boss.baalcrab`: rc-mon-fr.tsv:9 kept, rc-run-4.tsv:39 dropped
-  - `monster.boss.baalcrabstairs`: rc-link-checks.tsv:353 kept, rc-run-4.tsv:40 dropped
-  - `monster.boss.diablo`: rc-mon-fr.tsv:10 kept, rc-run-4.tsv:42 dropped
-  - `monster.boss.diabloclone`: rc-mon-fr.tsv:11 kept, rc-run-4.tsv:43 dropped
-  - `monster.boss.izual`: rc-mon-fr.tsv:12 kept, rc-run-4.tsv:45 dropped
-  - `monster.boss.uberbaal`: rc-link-checks.tsv:354 kept, rc-run-4.tsv:54 dropped
-  - `monster.boss.uberdiablo`: rc-link-checks.tsv:355 kept, rc-run-4.tsv:55 dropped
-  - `monster.boss.uberizual`: rc-mon-fr.tsv:13 kept, rc-run-4.tsv:57 dropped
-  - `monster.boss.ubermephisto`: rc-link-checks.tsv:356 kept, rc-run-4.tsv:58 dropped
-  - `monster.brute2`: rc-gen-mon-triage.tsv:63 kept, rc-run-4.tsv:59 dropped
-  - `monster.brute3`: rc-gen-mon-triage.tsv:68 kept, rc-run-4.tsv:60 dropped
-  - `monster.brute4`: rc-gen-mon-triage.tsv:69 kept, rc-run-4.tsv:61 dropped
-  - `monster.brute5`: rc-gen-mon-triage.tsv:70 kept, rc-run-4.tsv:62 dropped
-  - `monster.cantor1`: rc-gen-mon-triage.tsv:61 kept, rc-run-4.tsv:63 dropped
-  - `monster.cantor2`: rc-gen-mon-triage.tsv:62 kept, rc-run-4.tsv:64 dropped
-  - `monster.cantor3`: rc-gen-mon-triage.tsv:64 kept, rc-run-4.tsv:65 dropped
-  - `monster.clawviper10`: rc-damage-draws.tsv:16 kept, rc-run-4.tsv:66 dropped
-  - `monster.clawviper6`: rc-gen-mon-triage.tsv:158 kept, rc-run-4.tsv:67 dropped
-  - `monster.clawviper7`: rc-damage-draws.tsv:14 kept, rc-run-4.tsv:68 dropped
-  - `monster.clawviper8`: rc-gen-mon-triage.tsv:160 kept, rc-run-4.tsv:69 dropped
-  - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-run-4.tsv:70 dropped
-  - `monster.corruptrogue1`: rc-gen-mon-triage.tsv:103 kept, rc-run-4.tsv:71 dropped
-  - `monster.corruptrogue2`: rc-gen-mon-triage.tsv:107 kept, rc-run-4.tsv:72 dropped
-  - `monster.corruptrogue4`: rc-gen-mon-triage.tsv:121 kept, rc-run-4.tsv:73 dropped
-  - `monster.corruptrogue5`: rc-gen-mon-triage.tsv:123 kept, rc-run-4.tsv:74 dropped
-  - `monster.cr-archer2`: rc-gen-mon-triage.tsv:34 kept, rc-run-4.tsv:75 dropped
-  - `monster.cr-archer4`: rc-gen-mon-triage.tsv:35 kept, rc-run-4.tsv:76 dropped
-  - `monster.cr-archer5`: rc-gen-mon-triage.tsv:36 kept, rc-run-4.tsv:77 dropped
-  - `monster.cr-lancer2`: rc-gen-mon-triage.tsv:37 kept, rc-run-4.tsv:78 dropped
-  - `monster.cr-lancer3`: rc-gen-mon-triage.tsv:38 kept, rc-run-4.tsv:79 dropped
-  - `monster.crownest1`: rc-gen-mon-triage.tsv:52 kept, rc-run-4.tsv:80 dropped
-  - `monster.crownest2`: rc-gen-mon-triage.tsv:53 kept, rc-run-4.tsv:81 dropped
-  - `monster.deathmauler1`: rc-gen-mon-triage.tsv:134 kept, rc-run-4.tsv:82 dropped
-  - `monster.deathmauler2`: rc-gen-mon-triage.tsv:135 kept, rc-run-4.tsv:83 dropped
-  - `monster.deathmauler3`: rc-gen-mon-triage.tsv:136 kept, rc-run-4.tsv:84 dropped
-  - `monster.deathmauler4`: rc-gen-mon-triage.tsv:137 kept, rc-run-4.tsv:85 dropped
-  - `monster.deathmauler5`: rc-gen-mon-triage.tsv:138 kept, rc-run-4.tsv:86 dropped
-  - `monster.doomknight1`: rc-gen-mon-triage.tsv:88 kept, rc-run-4.tsv:87 dropped
-  - `monster.doomknight2`: rc-missile-class-off.tsv:6 kept, rc-run-4.tsv:88 dropped
-  - `monster.doomknight3`: rc-missile-class-off.tsv:7 kept, rc-run-4.tsv:89 dropped
-  - `monster.fallen3`: rc-gen-mon-triage.tsv:54 kept, rc-run-4.tsv:90 dropped
-  - `monster.fallenshaman3`: rc-damage-draws.tsv:17 kept, rc-run-4.tsv:91 dropped
-  - `monster.fetish1`: rc-gen-mon-triage.tsv:28 kept, rc-run-4.tsv:92 dropped
-  - `monster.fetish2`: rc-gen-mon-triage.tsv:29 kept, rc-run-4.tsv:93 dropped
-  - `monster.fetish3`: rc-gen-mon-triage.tsv:30 kept, rc-run-4.tsv:94 dropped
-  - `monster.fetish4`: rc-gen-mon-triage.tsv:31 kept, rc-run-4.tsv:95 dropped
-  - `monster.fetishblow2`: rc-gen-mon-triage.tsv:98 kept, rc-run-4.tsv:96 dropped
-  - `monster.fetishblow3`: rc-gen-mon-triage.tsv:99 kept, rc-run-4.tsv:97 dropped
-  - `monster.fetishblow4`: rc-gen-mon-triage.tsv:100 kept, rc-run-4.tsv:98 dropped
-  - `monster.fetishshaman2`: rc-extra-missile.tsv:3 kept, rc-run-4.tsv:99 dropped
-  - `monster.fetishshaman3`: rc-extra-missile.tsv:4 kept, rc-run-4.tsv:100 dropped
-  - `monster.fetishshaman4`: rc-extra-missile.tsv:5 kept, rc-run-4.tsv:101 dropped
-  - `monster.fingermage1`: rc-mon-fr.tsv:22 kept, rc-run-4.tsv:102 dropped
-  - `monster.fingermage2`: rc-mon-fr.tsv:23 kept, rc-run-4.tsv:103 dropped
-  - `monster.fingermage3`: rc-mon-fr.tsv:24 kept, rc-run-4.tsv:104 dropped
-  - `monster.foulcrow1`: rc-gen-mon-triage.tsv:32 kept, rc-run-4.tsv:105 dropped
-  - `monster.foulcrow2`: rc-gen-mon-triage.tsv:33 kept, rc-run-4.tsv:106 dropped
-  - `monster.foulcrow4`: rc-gen-mon-triage.tsv:42 kept, rc-run-4.tsv:107 dropped
-  - `monster.foulcrow5`: rc-gen-mon-triage.tsv:157 kept, rc-run-4.tsv:108 dropped
-  - `monster.frogdemon1`: rc-gen-mon-triage.tsv:65 kept, rc-run-4.tsv:109 dropped
-  - `monster.frogdemon2`: rc-gen-mon-triage.tsv:66 kept, rc-run-4.tsv:110 dropped
-  - `monster.frogdemon3`: rc-gen-mon-triage.tsv:67 kept, rc-run-4.tsv:111 dropped
-  - `monster.frozenhorror1`: rc-gen-mon-triage.tsv:129 kept, rc-run-4.tsv:112 dropped
-  - `monster.frozenhorror2`: rc-gen-mon-triage.tsv:130 kept, rc-run-4.tsv:113 dropped
-  - `monster.frozenhorror3`: rc-gen-mon-triage.tsv:131 kept, rc-run-4.tsv:114 dropped
-  - `monster.goatman10`: rc-gen-mon-triage.tsv:156 kept, rc-run-4.tsv:115 dropped
-  - `monster.goatman5`: rc-gen-mon-triage.tsv:147 kept, rc-run-4.tsv:116 dropped
-  - `monster.goatman7`: rc-gen-mon-triage.tsv:153 kept, rc-run-4.tsv:117 dropped
-  - `monster.goatman8`: rc-gen-mon-triage.tsv:154 kept, rc-run-4.tsv:118 dropped
-  - `monster.goatman9`: rc-gen-mon-triage.tsv:155 kept, rc-run-4.tsv:119 dropped
-  - `monster.hellbovine`: rc-gen-mon-triage.tsv:97 kept, rc-run-4.tsv:120 dropped
-  - `monster.imp1`: rc-pets.tsv:3 kept, rc-run-4.tsv:121 dropped
-  - `monster.imp2`: rc-pets.tsv:4 kept, rc-run-4.tsv:122 dropped
-  - `monster.imp3`: rc-pets.tsv:5 kept, rc-run-4.tsv:123 dropped
-  - `monster.imp4`: rc-pets.tsv:6 kept, rc-run-4.tsv:124 dropped
-  - `monster.imp5`: rc-pets.tsv:7 kept, rc-run-4.tsv:125 dropped
-  - `monster.maggotbaby1`: rc-gen-mon-triage.tsv:43 kept, rc-run-4.tsv:126 dropped
-  - `monster.maggotbaby2`: rc-gen-mon-triage.tsv:44 kept, rc-run-4.tsv:127 dropped
-  - `monster.maggotbaby3`: rc-gen-mon-triage.tsv:45 kept, rc-run-4.tsv:128 dropped
-  - `monster.maggotbaby4`: rc-gen-mon-triage.tsv:46 kept, rc-run-4.tsv:129 dropped
-  - `monster.maggotbaby5`: rc-gen-mon-triage.tsv:47 kept, rc-run-4.tsv:130 dropped
-  - `monster.maggotegg1`: rc-maggot-seed.tsv:3 kept, rc-run-4.tsv:131 dropped
-  - `monster.maggotegg2`: rc-maggot-seed.tsv:4 kept, rc-run-4.tsv:132 dropped
-  - `monster.maggotegg3`: rc-maggot-seed.tsv:5 kept, rc-run-4.tsv:133 dropped
-  - `monster.maggotegg4`: rc-maggot-seed.tsv:6 kept, rc-run-4.tsv:134 dropped
-  - `monster.maggotegg5`: rc-maggot-seed.tsv:7 kept, rc-run-4.tsv:135 dropped
-  - `monster.megademon1`: rc-extra-missile.tsv:6 kept, rc-run-4.tsv:136 dropped
-  - `monster.megademon2`: rc-extra-missile.tsv:7 kept, rc-run-4.tsv:137 dropped
-  - `monster.megademon3`: rc-extra-missile.tsv:8 kept, rc-run-4.tsv:138 dropped
-  - `monster.minion1`: rc-gen-mon-triage.tsv:114 kept, rc-run-4.tsv:139 dropped
-  - `monster.minion2`: rc-gen-mon-triage.tsv:115 kept, rc-run-4.tsv:140 dropped
-  - `monster.minion3`: rc-gen-mon-triage.tsv:116 kept, rc-run-4.tsv:141 dropped
-  - `monster.minion4`: rc-gen-mon-triage.tsv:117 kept, rc-run-4.tsv:142 dropped
-  - `monster.minion5`: rc-gen-mon-triage.tsv:118 kept, rc-run-4.tsv:143 dropped
-  - `monster.minion6`: rc-gen-mon-triage.tsv:119 kept, rc-run-4.tsv:144 dropped
-  - `monster.minion7`: rc-gen-mon-triage.tsv:120 kept, rc-run-4.tsv:145 dropped
-  - `monster.mon-lvl-133`: rc-mon-lvl.tsv:12 kept, rc-run-4.tsv:146 dropped
-  - `monster.mon-lvl-134`: rc-mon-lvl.tsv:13 kept, rc-run-4.tsv:147 dropped
-  - `monster.mon-lvl-304`: rc-mon-lvl.tsv:3 kept, rc-run-4.tsv:148 dropped
-  - `monster.mon-lvl-305`: rc-mon-lvl.tsv:4 kept, rc-run-4.tsv:149 dropped
-  - `monster.mon-lvl-306`: rc-mon-lvl.tsv:5 kept, rc-run-4.tsv:150 dropped
-  - `monster.mosquito1`: rc-gen-mon-triage.tsv:10 kept, rc-run-4.tsv:151 dropped
-  - `monster.mosquito2`: rc-gen-mon-triage.tsv:11 kept, rc-run-4.tsv:152 dropped
-  - `monster.mosquito4`: rc-mon-fr.tsv:29 kept, rc-run-4.tsv:153 dropped
-  - `monster.mummy5`: rc-gen-mon-triage.tsv:3 kept, rc-run-4.tsv:154 dropped
-  - `monster.overseer1`: rc-gen-mon-triage.tsv:124 kept, rc-run-4.tsv:155 dropped
-  - `monster.overseer2`: rc-gen-mon-triage.tsv:126 kept, rc-run-4.tsv:156 dropped
-  - `monster.overseer3`: rc-mon-fr.tsv:30 kept, rc-run-4.tsv:157 dropped
-  - `monster.overseer4`: rc-mon-fr.tsv:31 kept, rc-run-4.tsv:158 dropped
-  - `monster.overseer5`: rc-gen-mon-triage.tsv:127 kept, rc-run-4.tsv:159 dropped
-  - `monster.putriddefiler1`: rc-gen-mon-triage.tsv:143 kept, rc-run-4.tsv:160 dropped
-  - `monster.putriddefiler2`: rc-gen-mon-triage.tsv:144 kept, rc-run-4.tsv:161 dropped
-  - `monster.putriddefiler3`: rc-gen-mon-triage.tsv:145 kept, rc-run-4.tsv:162 dropped
-  - `monster.putriddefiler4`: rc-gen-mon-triage.tsv:146 kept, rc-run-4.tsv:163 dropped
-  - `monster.quillrat6`: rc-gen-mon-triage.tsv:167 kept, rc-run-4.tsv:164 dropped
-  - `monster.quillrat7`: rc-gen-mon-triage.tsv:168 kept, rc-run-4.tsv:165 dropped
-  - `monster.quillrat8`: rc-gen-mon-triage.tsv:169 kept, rc-run-4.tsv:166 dropped
-  - `monster.reanimatedhorde1`: rc-damage-draws.tsv:7 kept, rc-run-4.tsv:167 dropped
-  - `monster.reanimatedhorde2`: rc-damage-draws.tsv:8 kept, rc-run-4.tsv:168 dropped
-  - `monster.reanimatedhorde3`: rc-damage-draws.tsv:9 kept, rc-run-4.tsv:169 dropped
-  - `monster.reanimatedhorde4`: rc-mon-tx.tsv:3 kept, rc-run-4.tsv:170 dropped
-  - `monster.reanimatedhorde5`: rc-mon-tx.tsv:4 kept, rc-run-4.tsv:171 dropped
-  - `monster.regurgitator1`: rc-gen-mon-triage.tsv:84 kept, rc-run-4.tsv:172 dropped
-  - `monster.regurgitator2`: rc-gen-mon-triage.tsv:85 kept, rc-run-4.tsv:173 dropped
-  - `monster.regurgitator3`: rc-gen-mon-triage.tsv:86 kept, rc-run-4.tsv:174 dropped
-  - `monster.sandraider1`: rc-gen-mon-triage.tsv:75 kept, rc-run-4.tsv:175 dropped
-  - `monster.sandraider10`: rc-gen-mon-triage.tsv:166 kept, rc-run-4.tsv:176 dropped
-  - `monster.sandraider2`: rc-gen-mon-triage.tsv:79 kept, rc-run-4.tsv:177 dropped
-  - `monster.sandraider3`: rc-gen-mon-triage.tsv:87 kept, rc-run-4.tsv:178 dropped
-  - `monster.sandraider4`: rc-gen-mon-triage.tsv:89 kept, rc-run-4.tsv:179 dropped
-  - `monster.sandraider7`: rc-gen-mon-triage.tsv:164 kept, rc-run-4.tsv:180 dropped
-  - `monster.sandraider9`: rc-gen-mon-triage.tsv:165 kept, rc-run-4.tsv:181 dropped
-  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-run-4.tsv:182 dropped
-  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-run-4.tsv:183 dropped
-  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-run-4.tsv:184 dropped
-  - `monster.sk-archer10`: rc-gen-mon-triage.tsv:151 kept, rc-run-4.tsv:185 dropped
-  - `monster.sk-archer2`: rc-gen-mon-triage.tsv:39 kept, rc-run-4.tsv:186 dropped
-  - `monster.sk-archer4`: rc-gen-mon-triage.tsv:40 kept, rc-run-4.tsv:187 dropped
-  - `monster.sk-archer5`: rc-gen-mon-triage.tsv:41 kept, rc-run-4.tsv:188 dropped
-  - `monster.sk-archer6`: rc-gen-mon-triage.tsv:148 kept, rc-run-4.tsv:189 dropped
-  - `monster.sk-archer7`: rc-gen-mon-triage.tsv:149 kept, rc-run-4.tsv:190 dropped
-  - `monster.sk-archer9`: rc-gen-mon-triage.tsv:150 kept, rc-run-4.tsv:191 dropped
-  - `monster.skeleton3`: rc-gen-mon-triage.tsv:51 kept, rc-run-4.tsv:192 dropped
-  - `monster.skmage-fire1`: rc-gen-mon-triage.tsv:91 kept, rc-run-4.tsv:193 dropped
-  - `monster.skmage-fire4`: rc-gen-mon-triage.tsv:92 kept, rc-run-4.tsv:194 dropped
-  - `monster.skmage-ltng1`: rc-gen-mon-triage.tsv:93 kept, rc-run-4.tsv:195 dropped
-  - `monster.skmage-ltng2`: rc-gen-mon-triage.tsv:94 kept, rc-run-4.tsv:196 dropped
-  - `monster.skmage-ltng4`: rc-gen-mon-triage.tsv:96 kept, rc-run-4.tsv:197 dropped
-  - `monster.skmage-pois4`: rc-gen-mon-triage.tsv:71 kept, rc-run-4.tsv:198 dropped
-  - `monster.slinger4`: rc-mon-tx.tsv:6 kept, rc-run-4.tsv:199 dropped
-  - `monster.slinger6`: rc-mon-tx.tsv:7 kept, rc-run-4.tsv:200 dropped
-  - `monster.snowyeti1`: rc-gen-mon-triage.tsv:111 kept, rc-run-4.tsv:201 dropped
-  - `monster.snowyeti2`: rc-gen-mon-triage.tsv:112 kept, rc-run-4.tsv:202 dropped
-  - `monster.snowyeti4`: rc-gen-mon-triage.tsv:113 kept, rc-run-4.tsv:203 dropped
-  - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-run-4.tsv:204 dropped
-  - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-run-4.tsv:205 dropped
-  - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-run-4.tsv:206 dropped
-  - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-run-4.tsv:207 dropped
-  - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-run-4.tsv:208 dropped
-  - `monster.succubuswitch2`: rc-mon-fr.tsv:40 kept, rc-run-4.tsv:209 dropped
-  - `monster.succubuswitch3`: rc-mon-fr.tsv:41 kept, rc-run-4.tsv:210 dropped
-  - `monster.succubuswitch5`: rc-mon-fr.tsv:42 kept, rc-run-4.tsv:211 dropped
-  - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-run-4.tsv:212 dropped
-  - `monster.thornhulk1`: rc-gen-mon-triage.tsv:19 kept, rc-run-4.tsv:213 dropped
-  - `monster.thornhulk2`: rc-mon-fr.tsv:59 kept, rc-run-4.tsv:214 dropped
-  - `monster.thornhulk3`: rc-mon-fr.tsv:60 kept, rc-run-4.tsv:215 dropped
-  - `monster.unraveler2`: rc-damage-draws.tsv:3 kept, rc-run-4.tsv:216 dropped
-  - `monster.unraveler4`: rc-damage-draws.tsv:4 kept, rc-run-4.tsv:217 dropped
-  - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-run-4.tsv:218 dropped
-  - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-run-4.tsv:219 dropped
-  - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-run-4.tsv:220 dropped
-  - `monster.vampire5`: rc-mon-fr.tsv:64 kept, rc-run-4.tsv:221 dropped
-  - `monster.vilechild1`: rc-gen-mon-triage.tsv:81 kept, rc-run-4.tsv:222 dropped
-  - `monster.vilechild2`: rc-gen-mon-triage.tsv:82 kept, rc-run-4.tsv:223 dropped
-  - `monster.vilechild3`: rc-gen-mon-triage.tsv:83 kept, rc-run-4.tsv:224 dropped
-  - `monster.vilemother1`: rc-gen-mon-triage.tsv:77 kept, rc-run-4.tsv:225 dropped
-  - `monster.vilemother2`: rc-gen-mon-triage.tsv:78 kept, rc-run-4.tsv:226 dropped
-  - `monster.vilemother3`: rc-gen-mon-triage.tsv:80 kept, rc-run-4.tsv:227 dropped
-  - `monster.vulture1`: rc-gen-mon-triage.tsv:7 kept, rc-run-4.tsv:228 dropped
-  - `monster.vulture3`: rc-gen-mon-triage.tsv:8 kept, rc-run-4.tsv:229 dropped
-  - `monster.vulture4`: rc-gen-mon-triage.tsv:9 kept, rc-run-4.tsv:230 dropped
-  - `monster.willowisp1`: rc-gen-mon-triage.tsv:12 kept, rc-run-4.tsv:231 dropped
-  - `monster.willowisp3`: rc-gen-mon-triage.tsv:14 kept, rc-run-4.tsv:232 dropped
-  - `monster.wraith2`: rc-gen-mon-triage.tsv:95 kept, rc-run-4.tsv:233 dropped
-  - `monster.wraith4`: rc-gen-mon-triage.tsv:101 kept, rc-run-4.tsv:234 dropped
-  - `monster.wraith5`: rc-gen-mon-triage.tsv:102 kept, rc-run-4.tsv:235 dropped
-  - `monster.zealot1`: rc-gen-mon-triage.tsv:58 kept, rc-run-4.tsv:236 dropped
-  - `monster.zealot2`: rc-gen-mon-triage.tsv:59 kept, rc-run-4.tsv:237 dropped
-  - `monster.zealot3`: rc-gen-mon-triage.tsv:60 kept, rc-run-4.tsv:238 dropped
-  - `sim.monster-mode-records`: rc-mon-modes.tsv:4 kept, rc-run-4.tsv:239 dropped
-  - `system.sim.units.4-1-setting-a-mode`: rc-pc1-audit.tsv:48 kept, rc-run-4.tsv:240 dropped
+  - `monster.arach6`: rc-gen-mon-triage.tsv:235 kept, rc-run-4.tsv:10 dropped
+  - `monster.arach7`: rc-gen-mon-triage.tsv:249 kept, rc-run-4.tsv:11 dropped
+  - `monster.baaltaunt`: rc-gen-mon-triage.tsv:142 kept, rc-run-4.tsv:12 dropped
+  - `monster.baboon1`: rc-gen-mon-triage.tsv:125 kept, rc-run-4.tsv:13 dropped
+  - `monster.baboon3`: rc-gen-mon-triage.tsv:128 kept, rc-run-4.tsv:14 dropped
+  - `monster.baboon4`: rc-gen-mon-triage.tsv:132 kept, rc-run-4.tsv:15 dropped
+  - `monster.baboon5`: rc-gen-mon-triage.tsv:133 kept, rc-run-4.tsv:16 dropped
+  - `monster.baboon6`: rc-gen-mon-triage.tsv:76 kept, rc-run-4.tsv:17 dropped
+  - `monster.baboon7`: rc-gen-mon-triage.tsv:217 kept, rc-run-4.tsv:18 dropped
+  - `monster.baboon8`: rc-gen-mon-triage.tsv:218 kept, rc-run-4.tsv:19 dropped
+  - `monster.batdemon1`: rc-gen-mon-triage.tsv:22 kept, rc-run-4.tsv:20 dropped
+  - `monster.batdemon2`: rc-gen-mon-triage.tsv:23 kept, rc-run-4.tsv:21 dropped
+  - `monster.batdemon3`: rc-gen-mon-triage.tsv:24 kept, rc-run-4.tsv:22 dropped
+  - `monster.batdemon4`: rc-gen-mon-triage.tsv:25 kept, rc-run-4.tsv:23 dropped
+  - `monster.batdemon5`: rc-gen-mon-triage.tsv:27 kept, rc-run-4.tsv:24 dropped
+  - `monster.batdemon6`: rc-gen-mon-triage.tsv:204 kept, rc-run-4.tsv:25 dropped
+  - `monster.batdemon7`: rc-gen-mon-triage.tsv:205 kept, rc-run-4.tsv:26 dropped
+  - `monster.bighead2`: rc-gen-mon-triage.tsv:6 kept, rc-run-4.tsv:27 dropped
+  - `monster.bighead3`: rc-gen-mon-triage.tsv:13 kept, rc-run-4.tsv:28 dropped
+  - `monster.bighead4`: rc-gen-mon-triage.tsv:20 kept, rc-run-4.tsv:29 dropped
+  - `monster.bighead5`: rc-gen-mon-triage.tsv:26 kept, rc-run-4.tsv:30 dropped
+  - `monster.bighead6`: rc-gen-mon-triage.tsv:152 kept, rc-run-4.tsv:31 dropped
+  - `monster.bloodlord1`: rc-mon-fr.tsv:3 kept, rc-run-4.tsv:32 dropped
+  - `monster.bloodlord2`: rc-mon-fr.tsv:4 kept, rc-run-4.tsv:33 dropped
+  - `monster.bloodlord3`: rc-mon-fr.tsv:5 kept, rc-run-4.tsv:34 dropped
+  - `monster.bloodlord4`: rc-mon-fr.tsv:6 kept, rc-run-4.tsv:35 dropped
+  - `monster.bloodlord5`: rc-mon-fr.tsv:7 kept, rc-run-4.tsv:36 dropped
+  - `monster.bloodlord6`: rc-gen-mon-triage.tsv:206 kept, rc-run-4.tsv:37 dropped
+  - `monster.bloodlord7`: rc-mon-fr.tsv:8 kept, rc-run-4.tsv:38 dropped
+  - `monster.blunderbore1`: rc-gen-mon-triage.tsv:48 kept, rc-run-4.tsv:39 dropped
+  - `monster.blunderbore3`: rc-gen-mon-triage.tsv:49 kept, rc-run-4.tsv:40 dropped
+  - `monster.blunderbore4`: rc-damage-draws.tsv:6 kept, rc-run-4.tsv:41 dropped
+  - `monster.blunderbore5`: rc-damage-draws.tsv:18 kept, rc-run-4.tsv:42 dropped
+  - `monster.blunderbore6`: rc-damage-draws.tsv:19 kept, rc-run-4.tsv:43 dropped
+  - `monster.bonefetish3`: rc-gen-mon-triage.tsv:55 kept, rc-run-4.tsv:44 dropped
+  - `monster.bonefetish4`: rc-gen-mon-triage.tsv:56 kept, rc-run-4.tsv:45 dropped
+  - `monster.bonefetish5`: rc-gen-mon-triage.tsv:57 kept, rc-run-4.tsv:46 dropped
+  - `monster.bonefetish6`: rc-gen-mon-triage.tsv:239 kept, rc-run-4.tsv:47 dropped
+  - `monster.bonefetish7`: rc-gen-mon-triage.tsv:240 kept, rc-run-4.tsv:48 dropped
+  - `monster.boss.baalclone`: rc-boss-570.tsv:3 kept, rc-run-4.tsv:50 dropped
+  - `monster.boss.baalcrab`: rc-mon-fr.tsv:9 kept, rc-run-4.tsv:51 dropped
+  - `monster.boss.baalcrabstairs`: rc-link-checks.tsv:353 kept, rc-run-4.tsv:52 dropped
+  - `monster.boss.diablo`: rc-mon-fr.tsv:10 kept, rc-run-4.tsv:54 dropped
+  - `monster.boss.diabloclone`: rc-mon-fr.tsv:11 kept, rc-run-4.tsv:55 dropped
+  - `monster.boss.izual`: rc-mon-fr.tsv:12 kept, rc-run-4.tsv:57 dropped
+  - `monster.boss.uberbaal`: rc-link-checks.tsv:354 kept, rc-run-4.tsv:66 dropped
+  - `monster.boss.uberdiablo`: rc-link-checks.tsv:355 kept, rc-run-4.tsv:67 dropped
+  - `monster.boss.uberizual`: rc-mon-fr.tsv:13 kept, rc-run-4.tsv:69 dropped
+  - `monster.boss.ubermephisto`: rc-link-checks.tsv:356 kept, rc-run-4.tsv:70 dropped
+  - `monster.brute2`: rc-gen-mon-triage.tsv:63 kept, rc-run-4.tsv:71 dropped
+  - `monster.brute3`: rc-gen-mon-triage.tsv:68 kept, rc-run-4.tsv:72 dropped
+  - `monster.brute4`: rc-gen-mon-triage.tsv:69 kept, rc-run-4.tsv:73 dropped
+  - `monster.brute5`: rc-gen-mon-triage.tsv:70 kept, rc-run-4.tsv:74 dropped
+  - `monster.cantor1`: rc-gen-mon-triage.tsv:61 kept, rc-run-4.tsv:75 dropped
+  - `monster.cantor2`: rc-gen-mon-triage.tsv:62 kept, rc-run-4.tsv:76 dropped
+  - `monster.cantor3`: rc-gen-mon-triage.tsv:64 kept, rc-run-4.tsv:77 dropped
+  - `monster.cantor5`: rc-gen-mon-triage.tsv:225 kept, rc-run-4.tsv:78 dropped
+  - `monster.cantor6`: rc-gen-mon-triage.tsv:226 kept, rc-run-4.tsv:79 dropped
+  - `monster.clawviper10`: rc-damage-draws.tsv:16 kept, rc-run-4.tsv:80 dropped
+  - `monster.clawviper5`: rc-damage-draws.tsv:23 kept, rc-run-4.tsv:81 dropped
+  - `monster.clawviper6`: rc-gen-mon-triage.tsv:158 kept, rc-run-4.tsv:82 dropped
+  - `monster.clawviper7`: rc-damage-draws.tsv:14 kept, rc-run-4.tsv:83 dropped
+  - `monster.clawviper8`: rc-gen-mon-triage.tsv:160 kept, rc-run-4.tsv:84 dropped
+  - `monster.clawviper9`: rc-damage-draws.tsv:15 kept, rc-run-4.tsv:85 dropped
+  - `monster.corruptrogue1`: rc-gen-mon-triage.tsv:103 kept, rc-run-4.tsv:86 dropped
+  - `monster.corruptrogue2`: rc-gen-mon-triage.tsv:107 kept, rc-run-4.tsv:87 dropped
+  - `monster.corruptrogue4`: rc-gen-mon-triage.tsv:121 kept, rc-run-4.tsv:88 dropped
+  - `monster.corruptrogue5`: rc-gen-mon-triage.tsv:123 kept, rc-run-4.tsv:89 dropped
+  - `monster.corruptrogue6`: rc-gen-mon-triage.tsv:251 kept, rc-run-4.tsv:90 dropped
+  - `monster.cr-archer2`: rc-gen-mon-triage.tsv:34 kept, rc-run-4.tsv:91 dropped
+  - `monster.cr-archer4`: rc-gen-mon-triage.tsv:35 kept, rc-run-4.tsv:92 dropped
+  - `monster.cr-archer5`: rc-gen-mon-triage.tsv:36 kept, rc-run-4.tsv:93 dropped
+  - `monster.cr-archer6`: rc-mon-fr.tsv:14 kept, rc-run-4.tsv:94 dropped
+  - `monster.cr-archer7`: rc-mon-fr.tsv:15 kept, rc-run-4.tsv:95 dropped
+  - `monster.cr-archer8`: rc-mon-fr.tsv:16 kept, rc-run-4.tsv:96 dropped
+  - `monster.cr-lancer2`: rc-gen-mon-triage.tsv:37 kept, rc-run-4.tsv:97 dropped
+  - `monster.cr-lancer3`: rc-gen-mon-triage.tsv:38 kept, rc-run-4.tsv:98 dropped
+  - `monster.cr-lancer6`: rc-gen-mon-triage.tsv:174 kept, rc-run-4.tsv:99 dropped
+  - `monster.cr-lancer7`: rc-gen-mon-triage.tsv:175 kept, rc-run-4.tsv:100 dropped
+  - `monster.cr-lancer8`: rc-gen-mon-triage.tsv:252 kept, rc-run-4.tsv:101 dropped
+  - `monster.crownest1`: rc-gen-mon-triage.tsv:52 kept, rc-run-4.tsv:102 dropped
+  - `monster.crownest2`: rc-gen-mon-triage.tsv:53 kept, rc-run-4.tsv:103 dropped
+  - `monster.deathmauler1`: rc-gen-mon-triage.tsv:134 kept, rc-run-4.tsv:104 dropped
+  - `monster.deathmauler2`: rc-gen-mon-triage.tsv:135 kept, rc-run-4.tsv:105 dropped
+  - `monster.deathmauler3`: rc-gen-mon-triage.tsv:136 kept, rc-run-4.tsv:106 dropped
+  - `monster.deathmauler4`: rc-gen-mon-triage.tsv:137 kept, rc-run-4.tsv:107 dropped
+  - `monster.deathmauler5`: rc-gen-mon-triage.tsv:138 kept, rc-run-4.tsv:108 dropped
+  - `monster.dkfig1`: rc-gen-mon-triage.tsv:242 kept, rc-run-4.tsv:109 dropped
+  - `monster.dkfig2`: rc-gen-mon-triage.tsv:244 kept, rc-run-4.tsv:110 dropped
+  - `monster.dkmag1`: rc-missile-class-off.tsv:8 kept, rc-run-4.tsv:111 dropped
+  - `monster.dkmag2`: rc-missile-class-off.tsv:9 kept, rc-run-4.tsv:112 dropped
+  - `monster.dkmag3`: rc-missile-class-off.tsv:10 kept, rc-run-4.tsv:113 dropped
+  - `monster.doomknight1`: rc-gen-mon-triage.tsv:88 kept, rc-run-4.tsv:114 dropped
+  - `monster.doomknight2`: rc-missile-class-off.tsv:6 kept, rc-run-4.tsv:115 dropped
+  - `monster.doomknight3`: rc-missile-class-off.tsv:7 kept, rc-run-4.tsv:116 dropped
+  - `monster.fallen3`: rc-gen-mon-triage.tsv:54 kept, rc-run-4.tsv:117 dropped
+  - `monster.fallen6`: rc-gen-mon-triage.tsv:195 kept, rc-run-4.tsv:118 dropped
+  - `monster.fallen7`: rc-gen-mon-triage.tsv:196 kept, rc-run-4.tsv:119 dropped
+  - `monster.fallen8`: rc-gen-mon-triage.tsv:197 kept, rc-run-4.tsv:120 dropped
+  - `monster.fallenshaman3`: rc-damage-draws.tsv:17 kept, rc-run-4.tsv:121 dropped
+  - `monster.fallenshaman6`: rc-gen-mon-triage.tsv:198 kept, rc-run-4.tsv:122 dropped
+  - `monster.fallenshaman7`: rc-gen-mon-triage.tsv:199 kept, rc-run-4.tsv:123 dropped
+  - `monster.fallenshaman8`: rc-gen-mon-triage.tsv:200 kept, rc-run-4.tsv:124 dropped
+  - `monster.fetish1`: rc-gen-mon-triage.tsv:28 kept, rc-run-4.tsv:125 dropped
+  - `monster.fetish2`: rc-gen-mon-triage.tsv:29 kept, rc-run-4.tsv:126 dropped
+  - `monster.fetish3`: rc-gen-mon-triage.tsv:30 kept, rc-run-4.tsv:127 dropped
+  - `monster.fetish4`: rc-gen-mon-triage.tsv:31 kept, rc-run-4.tsv:128 dropped
+  - `monster.fetish6`: rc-gen-mon-triage.tsv:209 kept, rc-run-4.tsv:129 dropped
+  - `monster.fetish8`: rc-gen-mon-triage.tsv:210 kept, rc-run-4.tsv:130 dropped
+  - `monster.fetishblow2`: rc-gen-mon-triage.tsv:98 kept, rc-run-4.tsv:131 dropped
+  - `monster.fetishblow3`: rc-gen-mon-triage.tsv:99 kept, rc-run-4.tsv:132 dropped
+  - `monster.fetishblow4`: rc-gen-mon-triage.tsv:100 kept, rc-run-4.tsv:133 dropped
+  - `monster.fetishblow6`: rc-gen-mon-triage.tsv:211 kept, rc-run-4.tsv:134 dropped
+  - `monster.fetishblow7`: rc-gen-mon-triage.tsv:213 kept, rc-run-4.tsv:135 dropped
+  - `monster.fetishblow8`: rc-gen-mon-triage.tsv:214 kept, rc-run-4.tsv:136 dropped
+  - `monster.fetishshaman2`: rc-extra-missile.tsv:3 kept, rc-run-4.tsv:137 dropped
+  - `monster.fetishshaman3`: rc-extra-missile.tsv:4 kept, rc-run-4.tsv:138 dropped
+  - `monster.fetishshaman4`: rc-extra-missile.tsv:5 kept, rc-run-4.tsv:139 dropped
+  - `monster.fetishshaman6`: rc-extra-missile.tsv:10 kept, rc-run-4.tsv:140 dropped
+  - `monster.fetishshaman8`: rc-extra-missile.tsv:11 kept, rc-run-4.tsv:141 dropped
+  - `monster.fingermage1`: rc-mon-fr.tsv:22 kept, rc-run-4.tsv:142 dropped
+  - `monster.fingermage2`: rc-mon-fr.tsv:23 kept, rc-run-4.tsv:143 dropped
+  - `monster.fingermage3`: rc-mon-fr.tsv:24 kept, rc-run-4.tsv:144 dropped
+  - `monster.fingermage4`: rc-mon-fr.tsv:25 kept, rc-run-4.tsv:145 dropped
+  - `monster.fingermage5`: rc-mon-fr.tsv:26 kept, rc-run-4.tsv:146 dropped
+  - `monster.foulcrow1`: rc-gen-mon-triage.tsv:32 kept, rc-run-4.tsv:147 dropped
+  - `monster.foulcrow2`: rc-gen-mon-triage.tsv:33 kept, rc-run-4.tsv:148 dropped
+  - `monster.foulcrow4`: rc-gen-mon-triage.tsv:42 kept, rc-run-4.tsv:149 dropped
+  - `monster.foulcrow5`: rc-gen-mon-triage.tsv:157 kept, rc-run-4.tsv:150 dropped
+  - `monster.frogdemon1`: rc-gen-mon-triage.tsv:65 kept, rc-run-4.tsv:151 dropped
+  - `monster.frogdemon2`: rc-gen-mon-triage.tsv:66 kept, rc-run-4.tsv:152 dropped
+  - `monster.frogdemon3`: rc-gen-mon-triage.tsv:67 kept, rc-run-4.tsv:153 dropped
+  - `monster.frozenhorror1`: rc-gen-mon-triage.tsv:129 kept, rc-run-4.tsv:154 dropped
+  - `monster.frozenhorror2`: rc-gen-mon-triage.tsv:130 kept, rc-run-4.tsv:155 dropped
+  - `monster.frozenhorror3`: rc-gen-mon-triage.tsv:131 kept, rc-run-4.tsv:156 dropped
+  - `monster.goatman10`: rc-gen-mon-triage.tsv:156 kept, rc-run-4.tsv:157 dropped
+  - `monster.goatman5`: rc-gen-mon-triage.tsv:147 kept, rc-run-4.tsv:158 dropped
+  - `monster.goatman7`: rc-gen-mon-triage.tsv:153 kept, rc-run-4.tsv:159 dropped
+  - `monster.goatman8`: rc-gen-mon-triage.tsv:154 kept, rc-run-4.tsv:160 dropped
+  - `monster.goatman9`: rc-gen-mon-triage.tsv:155 kept, rc-run-4.tsv:161 dropped
+  - `monster.hellbovine`: rc-gen-mon-triage.tsv:97 kept, rc-run-4.tsv:162 dropped
+  - `monster.imp1`: rc-pets.tsv:3 kept, rc-run-4.tsv:163 dropped
+  - `monster.imp2`: rc-pets.tsv:4 kept, rc-run-4.tsv:164 dropped
+  - `monster.imp3`: rc-pets.tsv:5 kept, rc-run-4.tsv:165 dropped
+  - `monster.imp4`: rc-pets.tsv:6 kept, rc-run-4.tsv:166 dropped
+  - `monster.imp5`: rc-pets.tsv:7 kept, rc-run-4.tsv:167 dropped
+  - `monster.imp6`: rc-pets.tsv:8 kept, rc-run-4.tsv:168 dropped
+  - `monster.imp7`: rc-pets.tsv:9 kept, rc-run-4.tsv:169 dropped
+  - `monster.imp8`: rc-pets.tsv:10 kept, rc-run-4.tsv:170 dropped
+  - `monster.maggotbaby1`: rc-gen-mon-triage.tsv:43 kept, rc-run-4.tsv:171 dropped
+  - `monster.maggotbaby2`: rc-gen-mon-triage.tsv:44 kept, rc-run-4.tsv:172 dropped
+  - `monster.maggotbaby3`: rc-gen-mon-triage.tsv:45 kept, rc-run-4.tsv:173 dropped
+  - `monster.maggotbaby4`: rc-gen-mon-triage.tsv:46 kept, rc-run-4.tsv:174 dropped
+  - `monster.maggotbaby5`: rc-gen-mon-triage.tsv:47 kept, rc-run-4.tsv:175 dropped
+  - `monster.maggotbaby6`: rc-gen-mon-triage.tsv:231 kept, rc-run-4.tsv:176 dropped
+  - `monster.maggotegg1`: rc-maggot-seed.tsv:3 kept, rc-run-4.tsv:177 dropped
+  - `monster.maggotegg2`: rc-maggot-seed.tsv:4 kept, rc-run-4.tsv:178 dropped
+  - `monster.maggotegg3`: rc-maggot-seed.tsv:5 kept, rc-run-4.tsv:179 dropped
+  - `monster.maggotegg4`: rc-maggot-seed.tsv:6 kept, rc-run-4.tsv:180 dropped
+  - `monster.maggotegg5`: rc-maggot-seed.tsv:7 kept, rc-run-4.tsv:181 dropped
+  - `monster.maggotegg6`: rc-maggot-seed.tsv:8 kept, rc-run-4.tsv:182 dropped
+  - `monster.megademon1`: rc-extra-missile.tsv:6 kept, rc-run-4.tsv:183 dropped
+  - `monster.megademon2`: rc-extra-missile.tsv:7 kept, rc-run-4.tsv:184 dropped
+  - `monster.megademon3`: rc-extra-missile.tsv:8 kept, rc-run-4.tsv:185 dropped
+  - `monster.megademon4`: rc-extra-missile.tsv:12 kept, rc-run-4.tsv:186 dropped
+  - `monster.megademon5`: rc-extra-missile.tsv:13 kept, rc-run-4.tsv:187 dropped
+  - `monster.megademon6`: rc-extra-missile.tsv:14 kept, rc-run-4.tsv:188 dropped
+  - `monster.minion1`: rc-gen-mon-triage.tsv:114 kept, rc-run-4.tsv:189 dropped
+  - `monster.minion10`: rc-gen-mon-triage.tsv:233 kept, rc-run-4.tsv:190 dropped
+  - `monster.minion11`: rc-gen-mon-triage.tsv:234 kept, rc-run-4.tsv:191 dropped
+  - `monster.minion2`: rc-gen-mon-triage.tsv:115 kept, rc-run-4.tsv:192 dropped
+  - `monster.minion3`: rc-gen-mon-triage.tsv:116 kept, rc-run-4.tsv:193 dropped
+  - `monster.minion4`: rc-gen-mon-triage.tsv:117 kept, rc-run-4.tsv:194 dropped
+  - `monster.minion5`: rc-gen-mon-triage.tsv:118 kept, rc-run-4.tsv:195 dropped
+  - `monster.minion6`: rc-gen-mon-triage.tsv:119 kept, rc-run-4.tsv:196 dropped
+  - `monster.minion7`: rc-gen-mon-triage.tsv:120 kept, rc-run-4.tsv:197 dropped
+  - `monster.minion9`: rc-gen-mon-triage.tsv:232 kept, rc-run-4.tsv:198 dropped
+  - `monster.mon-lvl-133`: rc-mon-lvl.tsv:12 kept, rc-run-4.tsv:199 dropped
+  - `monster.mon-lvl-134`: rc-mon-lvl.tsv:13 kept, rc-run-4.tsv:200 dropped
+  - `monster.mon-lvl-304`: rc-mon-lvl.tsv:3 kept, rc-run-4.tsv:201 dropped
+  - `monster.mon-lvl-305`: rc-mon-lvl.tsv:4 kept, rc-run-4.tsv:202 dropped
+  - `monster.mon-lvl-306`: rc-mon-lvl.tsv:5 kept, rc-run-4.tsv:203 dropped
+  - `monster.mon-lvl-613`: rc-mon-lvl.tsv:14 kept, rc-run-4.tsv:204 dropped
+  - `monster.mon-lvl-614`: rc-mon-lvl.tsv:15 kept, rc-run-4.tsv:205 dropped
+  - `monster.mon-lvl-636`: rc-mon-lvl.tsv:8 kept, rc-run-4.tsv:206 dropped
+  - `monster.mon-lvl-637`: rc-mon-lvl.tsv:9 kept, rc-run-4.tsv:207 dropped
+  - `monster.mon-lvl-638`: rc-mon-lvl.tsv:10 kept, rc-run-4.tsv:208 dropped
+  - `monster.mon-lvl-692`: rc-mon-lvl.tsv:6 kept, rc-run-4.tsv:209 dropped
+  - `monster.mon-lvl-693`: rc-mon-lvl.tsv:7 kept, rc-run-4.tsv:210 dropped
+  - `monster.mon-lvl-720`: rc-mon-lvl.tsv:11 kept, rc-run-4.tsv:211 dropped
+  - `monster.mon-lvl-722`: rc-mon-lvl.tsv:16 kept, rc-run-4.tsv:212 dropped
+  - `monster.mosquito1`: rc-gen-mon-triage.tsv:10 kept, rc-run-4.tsv:213 dropped
+  - `monster.mosquito2`: rc-gen-mon-triage.tsv:11 kept, rc-run-4.tsv:214 dropped
+  - `monster.mosquito4`: rc-mon-fr.tsv:29 kept, rc-run-4.tsv:215 dropped
+  - `monster.mummy2`: rc-gen-mon-triage.tsv:266 kept, rc-run-4.tsv:216 dropped
+  - `monster.mummy4`: rc-gen-mon-triage.tsv:267 kept, rc-run-4.tsv:217 dropped
+  - `monster.mummy5`: rc-gen-mon-triage.tsv:3 kept, rc-run-4.tsv:218 dropped
+  - `monster.mummy6`: rc-gen-mon-triage.tsv:245 kept, rc-run-4.tsv:219 dropped
+  - `monster.overseer1`: rc-gen-mon-triage.tsv:124 kept, rc-run-4.tsv:220 dropped
+  - `monster.overseer2`: rc-gen-mon-triage.tsv:126 kept, rc-run-4.tsv:221 dropped
+  - `monster.overseer3`: rc-mon-fr.tsv:30 kept, rc-run-4.tsv:222 dropped
+  - `monster.overseer4`: rc-mon-fr.tsv:31 kept, rc-run-4.tsv:223 dropped
+  - `monster.overseer5`: rc-gen-mon-triage.tsv:127 kept, rc-run-4.tsv:224 dropped
+  - `monster.overseer6`: rc-gen-mon-triage.tsv:253 kept, rc-run-4.tsv:225 dropped
+  - `monster.pantherwoman3`: rc-gen-mon-triage.tsv:259 kept, rc-run-4.tsv:226 dropped
+  - `monster.pantherwoman4`: rc-gen-mon-triage.tsv:260 kept, rc-run-4.tsv:227 dropped
+  - `monster.pantherwoman6`: rc-gen-mon-triage.tsv:185 kept, rc-run-4.tsv:228 dropped
+  - `monster.putriddefiler1`: rc-gen-mon-triage.tsv:143 kept, rc-run-4.tsv:229 dropped
+  - `monster.putriddefiler2`: rc-gen-mon-triage.tsv:144 kept, rc-run-4.tsv:230 dropped
+  - `monster.putriddefiler3`: rc-gen-mon-triage.tsv:145 kept, rc-run-4.tsv:231 dropped
+  - `monster.putriddefiler4`: rc-gen-mon-triage.tsv:146 kept, rc-run-4.tsv:232 dropped
+  - `monster.quillrat2`: rc-gen-mon-triage.tsv:192 kept, rc-run-4.tsv:233 dropped
+  - `monster.quillrat3`: rc-gen-mon-triage.tsv:203 kept, rc-run-4.tsv:234 dropped
+  - `monster.quillrat4`: rc-gen-mon-triage.tsv:212 kept, rc-run-4.tsv:235 dropped
+  - `monster.quillrat6`: rc-gen-mon-triage.tsv:167 kept, rc-run-4.tsv:236 dropped
+  - `monster.quillrat7`: rc-gen-mon-triage.tsv:168 kept, rc-run-4.tsv:237 dropped
+  - `monster.quillrat8`: rc-gen-mon-triage.tsv:169 kept, rc-run-4.tsv:238 dropped
+  - `monster.reanimatedhorde1`: rc-damage-draws.tsv:7 kept, rc-run-4.tsv:239 dropped
+  - `monster.reanimatedhorde2`: rc-damage-draws.tsv:8 kept, rc-run-4.tsv:240 dropped
+  - `monster.reanimatedhorde3`: rc-damage-draws.tsv:9 kept, rc-run-4.tsv:241 dropped
+  - `monster.reanimatedhorde4`: rc-mon-tx.tsv:3 kept, rc-run-4.tsv:242 dropped
+  - `monster.reanimatedhorde5`: rc-mon-tx.tsv:4 kept, rc-run-4.tsv:243 dropped
+  - `monster.reanimatedhorde6`: rc-mon-tx.tsv:5 kept, rc-run-4.tsv:244 dropped
+  - `monster.regurgitator1`: rc-gen-mon-triage.tsv:84 kept, rc-run-4.tsv:245 dropped
+  - `monster.regurgitator2`: rc-gen-mon-triage.tsv:85 kept, rc-run-4.tsv:246 dropped
+  - `monster.regurgitator3`: rc-gen-mon-triage.tsv:86 kept, rc-run-4.tsv:247 dropped
+  - `monster.regurgitator4`: rc-gen-mon-triage.tsv:241 kept, rc-run-4.tsv:248 dropped
+  - `monster.sandleaper3`: rc-gen-mon-triage.tsv:256 kept, rc-run-4.tsv:249 dropped
+  - `monster.sandleaper4`: rc-gen-mon-triage.tsv:257 kept, rc-run-4.tsv:250 dropped
+  - `monster.sandleaper5`: rc-gen-mon-triage.tsv:258 kept, rc-run-4.tsv:251 dropped
+  - `monster.sandleaper6`: rc-gen-mon-triage.tsv:186 kept, rc-run-4.tsv:252 dropped
+  - `monster.sandleaper7`: rc-gen-mon-triage.tsv:187 kept, rc-run-4.tsv:253 dropped
+  - `monster.sandmaggot2`: rc-gen-mon-triage.tsv:238 kept, rc-run-4.tsv:254 dropped
+  - `monster.sandmaggot3`: rc-gen-mon-triage.tsv:243 kept, rc-run-4.tsv:255 dropped
+  - `monster.sandmaggot4`: rc-gen-mon-triage.tsv:246 kept, rc-run-4.tsv:256 dropped
+  - `monster.sandmaggot5`: rc-maggot-seed.tsv:9 kept, rc-run-4.tsv:257 dropped
+  - `monster.sandmaggot6`: rc-maggot-seed.tsv:10 kept, rc-run-4.tsv:258 dropped
+  - `monster.sandmaggot7`: rc-maggot-seed.tsv:11 kept, rc-run-4.tsv:259 dropped
+  - `monster.sandraider1`: rc-gen-mon-triage.tsv:75 kept, rc-run-4.tsv:260 dropped
+  - `monster.sandraider10`: rc-gen-mon-triage.tsv:166 kept, rc-run-4.tsv:261 dropped
+  - `monster.sandraider2`: rc-gen-mon-triage.tsv:79 kept, rc-run-4.tsv:262 dropped
+  - `monster.sandraider3`: rc-gen-mon-triage.tsv:87 kept, rc-run-4.tsv:263 dropped
+  - `monster.sandraider4`: rc-gen-mon-triage.tsv:89 kept, rc-run-4.tsv:264 dropped
+  - `monster.sandraider7`: rc-gen-mon-triage.tsv:164 kept, rc-run-4.tsv:265 dropped
+  - `monster.sandraider9`: rc-gen-mon-triage.tsv:165 kept, rc-run-4.tsv:266 dropped
+  - `monster.scarab3`: rc-damage-draws.tsv:24 kept, rc-run-4.tsv:267 dropped
+  - `monster.scarab5`: rc-damage-draws.tsv:25 kept, rc-run-4.tsv:268 dropped
+  - `monster.scarab6`: rc-damage-draws.tsv:20 kept, rc-run-4.tsv:269 dropped
+  - `monster.scarab7`: rc-damage-draws.tsv:21 kept, rc-run-4.tsv:270 dropped
+  - `monster.scarab8`: rc-damage-draws.tsv:22 kept, rc-run-4.tsv:271 dropped
+  - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-run-4.tsv:272 dropped
+  - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-run-4.tsv:273 dropped
+  - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-run-4.tsv:274 dropped
+  - `monster.sk-archer10`: rc-gen-mon-triage.tsv:151 kept, rc-run-4.tsv:275 dropped
+  - `monster.sk-archer2`: rc-gen-mon-triage.tsv:39 kept, rc-run-4.tsv:276 dropped
+  - `monster.sk-archer4`: rc-gen-mon-triage.tsv:40 kept, rc-run-4.tsv:277 dropped
+  - `monster.sk-archer5`: rc-gen-mon-triage.tsv:41 kept, rc-run-4.tsv:278 dropped
+  - `monster.sk-archer6`: rc-gen-mon-triage.tsv:148 kept, rc-run-4.tsv:279 dropped
+  - `monster.sk-archer7`: rc-gen-mon-triage.tsv:149 kept, rc-run-4.tsv:280 dropped
+  - `monster.sk-archer9`: rc-gen-mon-triage.tsv:150 kept, rc-run-4.tsv:281 dropped
+  - `monster.skeleton3`: rc-gen-mon-triage.tsv:51 kept, rc-run-4.tsv:282 dropped
+  - `monster.skeleton6`: rc-gen-mon-triage.tsv:201 kept, rc-run-4.tsv:283 dropped
+  - `monster.skeleton7`: rc-gen-mon-triage.tsv:202 kept, rc-run-4.tsv:284 dropped
+  - `monster.skmage-cold5`: rc-gen-mon-triage.tsv:182 kept, rc-run-4.tsv:285 dropped
+  - `monster.skmage-fire1`: rc-gen-mon-triage.tsv:91 kept, rc-run-4.tsv:286 dropped
+  - `monster.skmage-fire4`: rc-gen-mon-triage.tsv:92 kept, rc-run-4.tsv:287 dropped
+  - `monster.skmage-fire5`: rc-gen-mon-triage.tsv:178 kept, rc-run-4.tsv:288 dropped
+  - `monster.skmage-fire6`: rc-gen-mon-triage.tsv:179 kept, rc-run-4.tsv:289 dropped
+  - `monster.skmage-ltng1`: rc-gen-mon-triage.tsv:93 kept, rc-run-4.tsv:290 dropped
+  - `monster.skmage-ltng2`: rc-gen-mon-triage.tsv:94 kept, rc-run-4.tsv:291 dropped
+  - `monster.skmage-ltng4`: rc-gen-mon-triage.tsv:96 kept, rc-run-4.tsv:292 dropped
+  - `monster.skmage-ltng5`: rc-gen-mon-triage.tsv:180 kept, rc-run-4.tsv:293 dropped
+  - `monster.skmage-ltng6`: rc-gen-mon-triage.tsv:181 kept, rc-run-4.tsv:294 dropped
+  - `monster.skmage-pois4`: rc-gen-mon-triage.tsv:71 kept, rc-run-4.tsv:295 dropped
+  - `monster.skmage-pois5`: rc-gen-mon-triage.tsv:183 kept, rc-run-4.tsv:296 dropped
+  - `monster.skmage-pois6`: rc-gen-mon-triage.tsv:184 kept, rc-run-4.tsv:297 dropped
+  - `monster.slinger4`: rc-mon-tx.tsv:6 kept, rc-run-4.tsv:298 dropped
+  - `monster.slinger6`: rc-mon-tx.tsv:7 kept, rc-run-4.tsv:299 dropped
+  - `monster.slinger7`: rc-gen-mon-triage.tsv:171 kept, rc-run-4.tsv:300 dropped
+  - `monster.slinger8`: rc-gen-mon-triage.tsv:172 kept, rc-run-4.tsv:301 dropped
+  - `monster.slinger9`: rc-gen-mon-triage.tsv:173 kept, rc-run-4.tsv:302 dropped
+  - `monster.snowyeti1`: rc-gen-mon-triage.tsv:111 kept, rc-run-4.tsv:303 dropped
+  - `monster.snowyeti2`: rc-gen-mon-triage.tsv:112 kept, rc-run-4.tsv:304 dropped
+  - `monster.snowyeti4`: rc-gen-mon-triage.tsv:113 kept, rc-run-4.tsv:305 dropped
+  - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-run-4.tsv:309 dropped
+  - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-run-4.tsv:310 dropped
+  - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-run-4.tsv:311 dropped
+  - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-run-4.tsv:312 dropped
+  - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-run-4.tsv:313 dropped
+  - `monster.succubus6`: rc-mon-fr.tsv:37 kept, rc-run-4.tsv:314 dropped
+  - `monster.succubus7`: rc-mon-fr.tsv:38 kept, rc-run-4.tsv:315 dropped
+  - `monster.succubus8`: rc-mon-fr.tsv:39 kept, rc-run-4.tsv:316 dropped
+  - `monster.succubuswitch2`: rc-mon-fr.tsv:40 kept, rc-run-4.tsv:317 dropped
+  - `monster.succubuswitch3`: rc-mon-fr.tsv:41 kept, rc-run-4.tsv:318 dropped
+  - `monster.succubuswitch5`: rc-mon-fr.tsv:42 kept, rc-run-4.tsv:319 dropped
+  - `monster.succubuswitch6`: rc-mon-fr.tsv:43 kept, rc-run-4.tsv:320 dropped
+  - `monster.succubuswitch7`: rc-mon-fr.tsv:44 kept, rc-run-4.tsv:321 dropped
+  - `monster.succubuswitch8`: rc-mon-fr.tsv:45 kept, rc-run-4.tsv:322 dropped
+  - `monster.succubuswitch9`: rc-mon-fr.tsv:46 kept, rc-run-4.tsv:323 dropped
+  - `monster.suicideminion6`: rc-damage-draws.tsv:10 kept, rc-run-4.tsv:324 dropped
+  - `monster.superunique.ancient-barbarian-3`: rc-mon-fr.tsv:47 kept, rc-run-4.tsv:327 dropped
+  - `monster.superunique.baal-subject-2`: rc-mon-fr.tsv:48 kept, rc-run-4.tsv:332 dropped
+  - `monster.superunique.baal-subject-5`: rc-link-checks.tsv:357 kept, rc-run-4.tsv:335 dropped
+  - `monster.superunique.bonebreak`: rc-link-checks.tsv:358 kept, rc-run-4.tsv:340 dropped
+  - `monster.superunique.bremm-sparkfist`: rc-mon-fr.tsv:49 kept, rc-run-4.tsv:342 dropped
+  - `monster.superunique.corpsefire`: rc-link-checks.tsv:359 kept, rc-run-4.tsv:344 dropped
+  - `monster.superunique.geleb-flamefinger`: rc-mon-fr.tsv:50 kept, rc-run-4.tsv:349 dropped
+  - `monster.superunique.grand-vizier-of-chaos`: rc-mon-fr.tsv:51 kept, rc-run-4.tsv:350 dropped
+  - `monster.superunique.griswold`: rc-link-checks.tsv:360 kept, rc-run-4.tsv:351 dropped
+  - `monster.superunique.ismail-vilehand`: rc-mon-fr.tsv:52 kept, rc-run-4.tsv:354 dropped
+  - `monster.superunique.maffer-dragonhand`: rc-mon-fr.tsv:53 kept, rc-run-4.tsv:356 dropped
+  - `monster.superunique.snapchip-shatter`: rc-mon-fr.tsv:54 kept, rc-run-4.tsv:368 dropped
+  - `monster.superunique.the-smith`: rc-link-checks.tsv:361 kept, rc-run-4.tsv:374 dropped
+  - `monster.superunique.the-summoner`: rc-mon-fr.tsv:55 kept, rc-run-4.tsv:375 dropped
+  - `monster.superunique.toorc-icefist`: rc-mon-fr.tsv:56 kept, rc-run-4.tsv:378 dropped
+  - `monster.superunique.vinvear-molech`: rc-mon-fr.tsv:57 kept, rc-run-4.tsv:380 dropped
+  - `monster.superunique.web-mage-the-burning`: rc-link-checks.tsv:362 kept, rc-run-4.tsv:381 dropped
+  - `monster.superunique.wyand-voidfinger`: rc-mon-fr.tsv:58 kept, rc-run-4.tsv:384 dropped
+  - `monster.swarm2`: rc-gen-mon-triage.tsv:261 kept, rc-run-4.tsv:385 dropped
+  - `monster.swarm4`: rc-gen-mon-triage.tsv:263 kept, rc-run-4.tsv:386 dropped
+  - `monster.swarm5`: rc-gen-mon-triage.tsv:248 kept, rc-run-4.tsv:387 dropped
+  - `monster.thornhulk1`: rc-gen-mon-triage.tsv:19 kept, rc-run-4.tsv:388 dropped
+  - `monster.thornhulk2`: rc-mon-fr.tsv:59 kept, rc-run-4.tsv:389 dropped
+  - `monster.thornhulk3`: rc-mon-fr.tsv:60 kept, rc-run-4.tsv:390 dropped
+  - `monster.thornhulk5`: rc-mon-fr.tsv:61 kept, rc-run-4.tsv:391 dropped
+  - `monster.umod.1-rndname`: rc-partial-promote.tsv:3 kept, rc-run-4.tsv:392 dropped
+  - `monster.umod.10-poisondead`: rc-partial-promote.tsv:4 kept, rc-run-4.tsv:393 dropped
+  - `monster.umod.11-durieldead`: rc-partial-promote.tsv:5 kept, rc-run-4.tsv:394 dropped
+  - `monster.umod.12-bloodraven`: rc-partial-promote.tsv:6 kept, rc-run-4.tsv:395 dropped
+  - `monster.umod.13-rage`: rc-partial-promote.tsv:7 kept, rc-run-4.tsv:396 dropped
+  - `monster.umod.14-spcdamage`: rc-partial-promote.tsv:8 kept, rc-run-4.tsv:397 dropped
+  - `monster.umod.15-partydead`: rc-partial-promote.tsv:9 kept, rc-run-4.tsv:398 dropped
+  - `monster.umod.16-champion`: rc-partial-promote.tsv:10 kept, rc-run-4.tsv:399 dropped
+  - `monster.umod.17-lightning`: rc-partial-promote.tsv:11 kept, rc-run-4.tsv:400 dropped
+  - `monster.umod.18-cold`: rc-partial-promote.tsv:12 kept, rc-run-4.tsv:401 dropped
+  - `monster.umod.19-hireable`: rc-partial-promote.tsv:13 kept, rc-run-4.tsv:402 dropped
+  - `monster.umod.2-hpmultiply`: rc-partial-promote.tsv:14 kept, rc-run-4.tsv:403 dropped
+  - `monster.umod.20-scarab`: rc-partial-promote.tsv:15 kept, rc-run-4.tsv:404 dropped
+  - `monster.umod.21-killself`: rc-partial-promote.tsv:16 kept, rc-run-4.tsv:405 dropped
+  - `monster.umod.22-questcomplete`: rc-partial-promote.tsv:17 kept, rc-run-4.tsv:406 dropped
+  - `monster.umod.24-thief`: rc-partial-promote.tsv:18 kept, rc-run-4.tsv:408 dropped
+  - `monster.umod.25-manahit`: rc-partial-promote.tsv:19 kept, rc-run-4.tsv:409 dropped
+  - `monster.umod.26-teleport`: rc-partial-promote.tsv:20 kept, rc-run-4.tsv:410 dropped
+  - `monster.umod.28-stoneskin`: rc-partial-promote.tsv:21 kept, rc-run-4.tsv:412 dropped
+  - `monster.umod.29-multishot`: rc-partial-promote.tsv:22 kept, rc-run-4.tsv:413 dropped
+  - `monster.umod.3-light`: rc-partial-promote.tsv:23 kept, rc-run-4.tsv:414 dropped
+  - `monster.umod.31-goboom`: rc-partial-promote.tsv:24 kept, rc-run-4.tsv:416 dropped
+  - `monster.umod.32-firespike-explode`: rc-partial-promote.tsv:25 kept, rc-run-4.tsv:417 dropped
+  - `monster.umod.33-suicideminion-explode`: rc-partial-promote.tsv:26 kept, rc-run-4.tsv:418 dropped
+  - `monster.umod.34-ai-after-death`: rc-partial-promote.tsv:27 kept, rc-run-4.tsv:419 dropped
+  - `monster.umod.35-shatter-on-death`: rc-partial-promote.tsv:28 kept, rc-run-4.tsv:420 dropped
+  - `monster.umod.36-ghostly`: rc-partial-promote.tsv:29 kept, rc-run-4.tsv:421 dropped
+  - `monster.umod.37-fanatic`: rc-partial-promote.tsv:30 kept, rc-run-4.tsv:422 dropped
+  - `monster.umod.38-possessed`: rc-partial-promote.tsv:31 kept, rc-run-4.tsv:423 dropped
+  - `monster.umod.39-berserk`: rc-partial-promote.tsv:32 kept, rc-run-4.tsv:424 dropped
+  - `monster.umod.4-leveladd`: rc-partial-promote.tsv:33 kept, rc-run-4.tsv:425 dropped
+  - `monster.umod.40-worms-on-death`: rc-partial-promote.tsv:34 kept, rc-run-4.tsv:426 dropped
+  - `monster.umod.41-always-run-ai`: rc-partial-promote.tsv:35 kept, rc-run-4.tsv:427 dropped
+  - `monster.umod.42-lightningdeath`: rc-partial-promote.tsv:36 kept, rc-run-4.tsv:428 dropped
+  - `monster.umod.5-strong`: rc-partial-promote.tsv:37 kept, rc-run-4.tsv:429 dropped
+  - `monster.umod.6-fast`: rc-partial-promote.tsv:38 kept, rc-run-4.tsv:430 dropped
+  - `monster.umod.7-curse`: rc-partial-promote.tsv:39 kept, rc-run-4.tsv:431 dropped
+  - `monster.umod.8-resist`: rc-partial-promote.tsv:40 kept, rc-run-4.tsv:432 dropped
+  - `monster.umod.9-fire`: rc-partial-promote.tsv:41 kept, rc-run-4.tsv:433 dropped
+  - `monster.unraveler2`: rc-damage-draws.tsv:3 kept, rc-run-4.tsv:434 dropped
+  - `monster.unraveler4`: rc-damage-draws.tsv:4 kept, rc-run-4.tsv:435 dropped
+  - `monster.unraveler6`: rc-gen-mon-triage.tsv:219 kept, rc-run-4.tsv:436 dropped
+  - `monster.unraveler7`: rc-gen-mon-triage.tsv:220 kept, rc-run-4.tsv:437 dropped
+  - `monster.unraveler8`: rc-gen-mon-triage.tsv:221 kept, rc-run-4.tsv:438 dropped
+  - `monster.unraveler9`: rc-gen-mon-triage.tsv:222 kept, rc-run-4.tsv:439 dropped
+  - `monster.vampire2`: rc-damage-draws.tsv:5 kept, rc-run-4.tsv:440 dropped
+  - `monster.vampire3`: rc-mon-fr.tsv:62 kept, rc-run-4.tsv:441 dropped
+  - `monster.vampire4`: rc-mon-fr.tsv:63 kept, rc-run-4.tsv:442 dropped
+  - `monster.vampire5`: rc-mon-fr.tsv:64 kept, rc-run-4.tsv:443 dropped
+  - `monster.vampire6`: rc-mon-fr.tsv:65 kept, rc-run-4.tsv:444 dropped
+  - `monster.vampire7`: rc-mon-fr.tsv:66 kept, rc-run-4.tsv:445 dropped
+  - `monster.vampire8`: rc-mon-fr.tsv:67 kept, rc-run-4.tsv:446 dropped
+  - `monster.vilechild1`: rc-gen-mon-triage.tsv:81 kept, rc-run-4.tsv:447 dropped
+  - `monster.vilechild2`: rc-gen-mon-triage.tsv:82 kept, rc-run-4.tsv:448 dropped
+  - `monster.vilechild3`: rc-gen-mon-triage.tsv:83 kept, rc-run-4.tsv:449 dropped
+  - `monster.vilechild4`: rc-gen-mon-triage.tsv:229 kept, rc-run-4.tsv:450 dropped
+  - `monster.vilechild5`: rc-gen-mon-triage.tsv:230 kept, rc-run-4.tsv:451 dropped
+  - `monster.vilemother1`: rc-gen-mon-triage.tsv:77 kept, rc-run-4.tsv:452 dropped
+  - `monster.vilemother2`: rc-gen-mon-triage.tsv:78 kept, rc-run-4.tsv:453 dropped
+  - `monster.vilemother3`: rc-gen-mon-triage.tsv:80 kept, rc-run-4.tsv:454 dropped
+  - `monster.vilemother4`: rc-gen-mon-triage.tsv:227 kept, rc-run-4.tsv:455 dropped
+  - `monster.vilemother5`: rc-gen-mon-triage.tsv:228 kept, rc-run-4.tsv:456 dropped
+  - `monster.vulture1`: rc-gen-mon-triage.tsv:7 kept, rc-run-4.tsv:457 dropped
+  - `monster.vulture3`: rc-gen-mon-triage.tsv:8 kept, rc-run-4.tsv:458 dropped
+  - `monster.vulture4`: rc-gen-mon-triage.tsv:9 kept, rc-run-4.tsv:459 dropped
+  - `monster.vulture5`: rc-gen-mon-triage.tsv:170 kept, rc-run-4.tsv:460 dropped
+  - `monster.willowisp1`: rc-gen-mon-triage.tsv:12 kept, rc-run-4.tsv:461 dropped
+  - `monster.willowisp3`: rc-gen-mon-triage.tsv:14 kept, rc-run-4.tsv:462 dropped
+  - `monster.willowisp5`: rc-gen-mon-triage.tsv:191 kept, rc-run-4.tsv:463 dropped
+  - `monster.willowisp6`: rc-gen-mon-triage.tsv:193 kept, rc-run-4.tsv:464 dropped
+  - `monster.willowisp7`: rc-gen-mon-triage.tsv:194 kept, rc-run-4.tsv:465 dropped
+  - `monster.wraith2`: rc-gen-mon-triage.tsv:95 kept, rc-run-4.tsv:466 dropped
+  - `monster.wraith4`: rc-gen-mon-triage.tsv:101 kept, rc-run-4.tsv:467 dropped
+  - `monster.wraith5`: rc-gen-mon-triage.tsv:102 kept, rc-run-4.tsv:468 dropped
+  - `monster.wraith6`: rc-gen-mon-triage.tsv:188 kept, rc-run-4.tsv:469 dropped
+  - `monster.wraith7`: rc-gen-mon-triage.tsv:189 kept, rc-run-4.tsv:470 dropped
+  - `monster.wraith8`: rc-gen-mon-triage.tsv:190 kept, rc-run-4.tsv:471 dropped
+  - `monster.zealot1`: rc-gen-mon-triage.tsv:58 kept, rc-run-4.tsv:472 dropped
+  - `monster.zealot2`: rc-gen-mon-triage.tsv:59 kept, rc-run-4.tsv:473 dropped
+  - `monster.zealot3`: rc-gen-mon-triage.tsv:60 kept, rc-run-4.tsv:474 dropped
+  - `monster.zealot4`: rc-gen-mon-triage.tsv:223 kept, rc-run-4.tsv:475 dropped
+  - `monster.zealot5`: rc-gen-mon-triage.tsv:224 kept, rc-run-4.tsv:476 dropped
+  - `monster.zombie4`: rc-gen-mon-triage.tsv:255 kept, rc-run-4.tsv:477 dropped
+  - `monster.zombie5`: rc-gen-mon-triage.tsv:262 kept, rc-run-4.tsv:478 dropped
+  - `sim.monster-mode-records`: rc-mon-modes.tsv:4 kept, rc-run-4.tsv:479 dropped
+  - `system.sim.units.4-1-setting-a-mode`: rc-pc1-audit.tsv:48 kept, rc-run-4.tsv:481 dropped
   - `state.alignment`: rc-join-burst.tsv:3 kept, rc-run-6.tsv:20 dropped
   - `state.amplifydamage`: rc-join-burst.tsv:4 kept, rc-run-6.tsv:21 dropped
   - `state.antidote`: rc-join-burst.tsv:5 kept, rc-run-6.tsv:22 dropped
@@ -2235,7 +2427,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.succubus3`: rc-mon-fr.tsv:34 kept, rc-succubus-m.tsv:5 dropped
   - `monster.succubus4`: rc-mon-fr.tsv:35 kept, rc-succubus-m.tsv:6 dropped
   - `monster.succubus5`: rc-mon-fr.tsv:36 kept, rc-succubus-m.tsv:7 dropped
+  - `monster.succubus-634`: rc-run-4.tsv:306 kept, rc-succubus-m.tsv:8 dropped
+  - `monster.succubus-635`: rc-run-4.tsv:307 kept, rc-succubus-m.tsv:9 dropped
+  - `monster.succubus-719`: rc-run-4.tsv:308 kept, rc-succubus-m.tsv:10 dropped
   - `client.c-monsters.draw`: rc-pc1-audit.tsv:49 kept, rc-town-arrival.tsv:3 dropped
+  - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
   - `waypoint.2.stony-field`: rc-pc1-audit.tsv:128 kept, rc-wp-last3.tsv:3 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-pc1-audit.tsv:146 kept, rc-wp-last3.tsv:4 dropped
@@ -3930,7 +4126,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: q-chk-hirelings.tsv:4 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: q-chk-hirelings.tsv:5 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: q-chk-hirelings.tsv:6 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1393
+- Rows whose state disagrees with their checks: 1390
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `net.c2s.0x26`: EQUAL but checks say PARTIAL
@@ -3991,7 +4187,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.minion`: EQUAL but checks say PARTIAL
   - `monster.ai.minionspawner`: EQUAL but checks say PARTIAL
   - `monster.ai.mosquito`: EQUAL but checks say PARTIAL
-  - … and 1333 more (rerun with the tsv to list them)
+  - … and 1330 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -5455,72 +5651,36 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.succubuswitch7` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-637: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
 | `monster.succubuswitch8` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-638: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
 | `monster.succubuswitch9` | entity | DIVERGED | M | DIVERGED@56 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-720: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 665, field lvl: 1.14d 3 vs d2rs 1 |
-| `monster.superunique.ancient-barbarian-1` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-44: first divergence: frame 30 game, field seed: 1.14d [1483255534, 419929858] vs d2rs [2793620638, 1943] |
-| `monster.superunique.ancient-barbarian-2` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-45: first divergence: frame 30 game, field seed: 1.14d [1483255534, 419929858] vs d2rs [2793620638, 1943] |
+| `monster.superunique.ancient-barbarian-2` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-45 state: frame 30 monster 1:8 class 542, field hp: 1.14d 1100800 vs d2rs 1091584 |
 | `monster.superunique.ancient-barbarian-3` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-46: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.superunique.ancient-kaa-the-soulless` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-19: first divergence: frame 51 monster 1:8 class 103, field m: 1.14d 14 vs d2rs 1 |
-| `monster.superunique.anodized-elite` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-55: first divergence: frame 51 monster 1:8 class 475, field m: 1.14d 2 vs d2rs 1 |
-| `monster.superunique.axe-dweller` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-47: first divergence: frame 31 monster 1:9 class 437, field tx: 1.14d 5143 vs d2rs 5148 |
-| `monster.superunique.baal-subject-1` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-62: first divergence: frame 31 monster 1:9 class 105, field m: 1.14d 14 vs d2rs 1 |
 | `monster.superunique.baal-subject-2` | entity | DIVERGED | M | DIVERGED@64 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-63: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 64 monster 1:12 class 557, field s: 1.14d [889902715, 1077741001] vs d2rs [2606285151, 1758904380] |
-| `monster.superunique.baal-subject-3` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-64: first divergence: frame 31 monster 1:15 class 558, field tx: 1.14d 5142 vs d2rs 5143 |
-| `monster.superunique.baal-subject-4` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-65: first divergence: frame 38 player 0:1 class 0, field m: 1.14d 0 vs d2rs 4 |
+| `monster.superunique.baal-subject-4` | entity | DIVERGED | M | DIVERGED@38 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-65 state: frame 38 player 0:1 class 0, field m: 1.14d 0 vs d2rs 4 |
 | `monster.superunique.beetleburst` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-beetleburst: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
-| `monster.superunique.bishibosh` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-0: first divergence: frame 51 monster 1:8 class 58, field s: 1.14d [3130581281, 215233938] vs d2rs [516034227, 1787617634] |
-| `monster.superunique.blaze-ripper` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-59: first divergence: frame 31 monster 1:13 class 449, field m: 1.14d 2 vs d2rs 1 |
-| `monster.superunique.bloodwitch-the-wild` | entity | DIVERGED | M | DIVERGED@132 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-11: first divergence: frame 132 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.boneash` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-9: first divergence: frame 51 monster 1:8 class 276, field m: 1.14d 4 vs d2rs 1 |
-| `monster.superunique.bonesaw-breaker` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-48: first divergence: frame 31 monster 1:9 class 494, field m: 1.14d 4 vs d2rs 2 |
 | `monster.superunique.bremm-sparkfist` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-28: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 51 monster 1:8 class 347, field m: 1.14d 2 vs d2rs 8 |
-| `monster.superunique.coldcrow` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-2: first divergence: frame 31 monster 1:9 class 160, field m: 1.14d 2 vs d2rs 1 |
 | `monster.superunique.coldworm-the-burrower` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-coldworm: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
-| `monster.superunique.dac-farren` | entity | DIVERGED | M | DIVERGED@84 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-49: first divergence: frame 84 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
 | `monster.superunique.dark-elder` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-darkelder: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
-| `monster.superunique.eyeback-unleashed` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-51: first divergence: frame 51 monster 1:8 class 443, field tx: 1.14d 5146 vs d2rs 5145 |
 | `monster.superunique.fangskin` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-fangskin: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
 | `monster.superunique.fire-eye` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-fireeye: packets: frame 4 stream s2c #0 id: 1.14d 0a vs d2rs 07 (id 0x0a) (1/1 of its a* checks diverge) |
-| `monster.superunique.flamespike-the-crawler` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-8: first divergence: frame 31 monster 1:11 class 66, field tx: 1.14d 5157 vs d2rs 5156 |
-| `monster.superunique.frozenstein` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-60: first divergence: frame 51 monster 1:8 class 526, field s: 1.14d [4285903474, 480484601] vs d2rs [3163442939, 446165621] |
+| `monster.superunique.flamespike-the-crawler` | entity | DIVERGED | M | DIVERGED@80 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-8 state: frame 80 player 0:1 class 0, field s: 1.14d [3653834354, 811237371] vs d2rs [1944982531, 35] |
+| `monster.superunique.frozenstein` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-60 state: frame 51 monster 1:8 class 526, field s: 1.14d [4285903474, 480484601] vs d2rs [3163442939, 446165621] |
 | `monster.superunique.geleb-flamefinger` | entity | DIVERGED | M | DIVERGED@63 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-27: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 63 monster 1:8 class 346, field m: 1.14d 8 vs d2rs 2 |
 | `monster.superunique.grand-vizier-of-chaos` | entity | DIVERGED | M | DIVERGED@56 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-38: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 56 missile 3:1 class 177, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.superunique.icehawk-riftwing` | entity | DIVERGED | M | DIVERGED@123 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-25: first divergence: frame 123 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.infector-of-souls` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-36: first divergence: frame 31 monster 1:11 class 362, field tx: 1.14d 5156 vs d2rs 5143 |
 | `monster.superunique.ismail-vilehand` | entity | DIVERGED | M | DIVERGED@67 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-26: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 67 missile 3:1 class 247, field tx: 1.14d 5143 vs d2rs 5153 |
 | `monster.superunique.leatherarm` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-1 a2-super-leatherarm: packets: frame 4 stream s2c #0 id: 1.14d 5d vs d2rs 07 (id 0x5d) (1/1 of its a* checks diverge) |
-| `monster.superunique.lord-de-seis` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-37: first divergence: frame 30 monster 1:8 class 312, field sp: 1.14d 314 vs d2rs 256 |
+| `monster.superunique.lord-de-seis` | entity | DIVERGED | M | DIVERGED@66 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-37 state: frame 66 game, field seed: 1.14d [1996604610, 653070085] vs d2rs [1565768481, 650785885] |
 | `monster.superunique.maffer-dragonhand` | entity | DIVERGED | M | DIVERGED@86 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-31: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 86 missile 3:1 class 247, field tx: 1.14d 5143 vs d2rs 5159 |
-| `monster.superunique.magma-torquer` | entity | DIVERGED | M | DIVERGED@45 | yes | 0 | n | claude/q-fix-join-items | specs/monsters/population.md,specs/monsters/init.md | gen-su-58: first divergence: frame 45 missile 3:1 class 502, field lvl: 1.14d 5 vs d2rs 1 |
-| `monster.superunique.megaflow-rectifier` | entity | DIVERGED | M | DIVERGED@107 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-50: first divergence: frame 107 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.nihlathak-boss` | entity | DIVERGED | M | DIVERGED@72 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-61: first divergence: frame 72 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.pindleskin` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-53: first divergence: frame 31 monster 1:12 class 501, field m: 1.14d 4 vs d2rs 1 |
-| `monster.superunique.pitspawn-fouldog` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-7: first divergence: frame 31 monster 1:11 class 11, field s: 1.14d [941344728, 246668416] vs d2rs [591399973, 1516216159] |
-| `monster.superunique.radament` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-10: first divergence: frame 30 monster 1:8 class 229, field s: 1.14d [3163442939, 446165621] vs d2rs [1151986076, 1319447910] |
-| `monster.superunique.rakanishu` | entity | DIVERGED | M | DIVERGED@107 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-3: first divergence: frame 107 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.riftwraith-the-cannibal` | entity | DIVERGED | M | DIVERGED@100 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-35: first divergence: frame 100 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.sarina-the-battlemaid` | entity | DIVERGED | M | DIVERGED@47 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-24: first divergence: frame 47 monster 1:16 class 47, field m: 1.14d 2 vs d2rs 1 |
-| `monster.superunique.sharp-tooth-sayer` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-57: first divergence: frame 31 monster 1:9 class 496, field m: 1.14d 4 vs d2rs 2 |
-| `monster.superunique.siege-boss` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-43: first divergence: frame 30 game, field seed: 1.14d [1483255534, 419929858] vs d2rs [2793620638, 1943] |
+| `monster.superunique.radament` | entity | DIVERGED | M | DIVERGED@30 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-10 state: frame 30 monster 1:8 class 229, field s: 1.14d [3163442939, 446165621] vs d2rs [1151986076, 1319447910] |
 | `monster.superunique.snapchip-shatter` | entity | DIVERGED | M | DIVERGED@41 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-54: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 41 monster 1:12 class 472, field m: 1.14d 4 vs d2rs 9 |
-| `monster.superunique.stormtree` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-23: first divergence: frame 51 monster 1:10 class 129, field m: 1.14d 2 vs d2rs 1 |
-| `monster.superunique.taintbreeder` | entity | DIVERGED | M | DIVERGED@40 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-34: first divergence: frame 40 monster 1:10 class 299, field m: 1.14d 14 vs d2rs 1 |
-| `monster.superunique.the-countess` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-6: first divergence: frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] |
-| `monster.superunique.the-cow-king` | entity | DIVERGED | M | DIVERGED@96 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-39: first divergence: frame 96 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.the-feature-creep` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-41: first divergence: frame 51 monster 1:8 class 409, field s: 1.14d [3163442939, 446165621] vs d2rs [1069704589, 1707661690] |
+| `monster.superunique.taintbreeder` | entity | DIVERGED | M | DIVERGED@73 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-34 state: frame 73 monster 1:10 class 299, field m: 1.14d 2 vs d2rs 1 |
+| `monster.superunique.the-countess` | entity | DIVERGED | M | DIVERGED@51 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-6 state: frame 51 monster 1:8 class 45, field s: 1.14d [3028736796, 1473904243] vs d2rs [3533759791, 1701973489] |
 | `monster.superunique.the-summoner` | entity | DIVERGED | M | DIVERGED@59 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-18: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 59 missile 3:1 class 130, field lvl: 1.14d 7 vs d2rs 1 |
-| `monster.superunique.the-tormentor` | entity | DIVERGED | M | DIVERGED@87 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-33: first divergence: frame 87 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
-| `monster.superunique.threash-socket` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-52: first divergence: frame 31 monster 1:9 class 440, field tx: 1.14d 5143 vs d2rs 5148 |
 | `monster.superunique.toorc-icefist` | entity | DIVERGED | M | DIVERGED@91 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-29: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 91 missile 3:1 class 247, field tx: 1.14d 5143 vs d2rs 5153 |
-| `monster.superunique.treehead-woodfist` | entity | DIVERGED | M | DIVERGED@149 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | gen-su-4: first divergence: frame 149 player 0:2 class 0, field fc: 1.14d 256 vs d2rs 0 |
 | `monster.superunique.vinvear-molech` | entity | DIVERGED | M | DIVERGED@103 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-56: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 103 monster 1:10 class 463/455, field cl: 1.14d 463 vs d2rs 455 |
-| `monster.superunique.winged-death` | entity | DIVERGED | M | DIVERGED@31 | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | gen-su-32: first divergence: frame 31 monster 1:15 class 362, field s: 1.14d [4081739556, 40278635] vs d2rs [96570061, 1790527331] |
-| `monster.superunique.witch-doctor-endugu` | entity | DIVERGED | M | DIVERGED@49 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | gen-su-22: first divergence: frame 49 monster 1:12 class 144, field tx: 1.14d 5144 vs d2rs 5143 |
 | `monster.superunique.wyand-voidfinger` | entity | DIVERGED | M | DIVERGED@105 | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-mon-fr 2026-10-10 gen-su-30: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 105 missile 3:1 class 247, field tx: 1.14d 5143 vs d2rs 5155 |
 | `monster.thornhulk2` | entity | DIVERGED | M | DIVERGED@98 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-128: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
 | `monster.thornhulk3` | entity | DIVERGED | M | DIVERGED@98 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-129: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
 | `monster.thornhulk5` | entity | DIVERGED | M | DIVERGED@85 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-609: plain frame advance 0x00623E00 (REC-2065); first divergence now: - |
-| `monster.umod.23-poisonhit` | content | DIVERGED | M | DIVERGED@52 | yes | 0 | n | claude/coord-resume-3 | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-23: first divergence: frame 52 missile 3:1 class 321, field yf: 1.14d 32768 vs d2rs 8192 |
-| `monster.umod.27-spectralhit` | content | DIVERGED | M | DIVERGED@149 | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-27: first divergence: frame 149 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
-| `monster.umod.30-aura` | content | DIVERGED | M | DIVERGED@85 | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-30: first divergence: frame 85 player 0:1 class 0, field m: 1.14d 4 vs d2rs 5 |
+| `monster.umod.27-spectralhit` | content | DIVERGED | M | DIVERGED@149 | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | rc-run-4 2026-10-10: gen-umod-27 state: frame 149 player 0:1 class 0, field sp: 1.14d 128 vs d2rs 64 |
 | `monster.vampire3` | entity | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-133: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 36 missile 3:1 class 277, field lvl: 1.14d 4 vs d2rs 1 |
 | `monster.vampire4` | entity | DIVERGED | M | DIVERGED@36 | yes | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-134: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 36 missile 3:1 class 277, field lvl: 1.14d 5 vs d2rs 1 |
 | `monster.vampire5` | entity | DIVERGED | M | DIVERGED@45 | no | 0 | n | claude/coord-resume-3 | - | rc-mon-fr 2026-10-10 gen-mon-135: plain frame advance 0x00623E00 (REC-2065); first divergence now: frame 45 monster 1:8 class 135, field hp: 1.14d 16128 vs d2rs 0 |
@@ -5904,16 +6064,50 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.snowyeti1` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.snowyeti2` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.snowyeti4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
-| `monster.succubus-634` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH |
-| `monster.succubus-635` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH |
-| `monster.succubus-719` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH |
+| `monster.succubus-634` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-634 EQUAL (REC-2055/2056) |
+| `monster.succubus-635` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-635 EQUAL (REC-2055/2056) |
+| `monster.succubus-719` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/rc-succubus-m | specs/monsters/ai.md | rc-run-4 2026-10-10: gen-mon-719 EQUAL (REC-2055/2056) |
 | `monster.suicideminion6` | entity | EQUAL | - | MATCH | no | 0 | n | claude/rc-damage-draws | - | rc-damage-draws 2026-10-10: spawn + 150 ticks incl. the monster hits: state and rng channels equal on all frames (fields q, seed ignored: harness level) |
+| `monster.superunique.ancient-barbarian-1` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-44 EQUAL (REC-2055/2056) |
+| `monster.superunique.ancient-kaa-the-soulless` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-19 EQUAL (REC-2055/2056) |
+| `monster.superunique.anodized-elite` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-55 EQUAL (REC-2055/2056) |
+| `monster.superunique.axe-dweller` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-47 EQUAL (REC-2055/2056) |
+| `monster.superunique.baal-subject-1` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-62 EQUAL (REC-2055/2056) |
+| `monster.superunique.baal-subject-3` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-64 EQUAL (REC-2055/2056) |
 | `monster.superunique.baal-subject-5` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-66: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.bishibosh` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-0 EQUAL (REC-2055/2056) |
+| `monster.superunique.blaze-ripper` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-59 EQUAL (REC-2055/2056) |
+| `monster.superunique.bloodwitch-the-wild` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-11 EQUAL (REC-2055/2056) |
+| `monster.superunique.boneash` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-9 EQUAL (REC-2055/2056) |
 | `monster.superunique.bonebreak` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-1: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.bonesaw-breaker` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-48 EQUAL (REC-2055/2056) |
+| `monster.superunique.coldcrow` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-2 EQUAL (REC-2055/2056) |
 | `monster.superunique.corpsefire` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-40: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.dac-farren` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-49 EQUAL (REC-2055/2056) |
+| `monster.superunique.eyeback-unleashed` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-51 EQUAL (REC-2055/2056) |
 | `monster.superunique.griswold` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-5: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.icehawk-riftwing` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-25 EQUAL (REC-2055/2056) |
+| `monster.superunique.infector-of-souls` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-36 EQUAL (REC-2055/2056) |
+| `monster.superunique.magma-torquer` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-join-items | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-58 EQUAL (REC-2055/2056) |
+| `monster.superunique.megaflow-rectifier` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-50 EQUAL (REC-2055/2056) |
+| `monster.superunique.nihlathak-boss` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-61 EQUAL (REC-2055/2056) |
+| `monster.superunique.pindleskin` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-53 EQUAL (REC-2055/2056) |
+| `monster.superunique.pitspawn-fouldog` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-7 EQUAL (REC-2055/2056) |
+| `monster.superunique.rakanishu` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-3 EQUAL (REC-2055/2056) |
+| `monster.superunique.riftwraith-the-cannibal` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-35 EQUAL (REC-2055/2056) |
+| `monster.superunique.sarina-the-battlemaid` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-24 EQUAL (REC-2055/2056) |
+| `monster.superunique.sharp-tooth-sayer` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-57 EQUAL (REC-2055/2056) |
+| `monster.superunique.siege-boss` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-43 EQUAL (REC-2055/2056) |
+| `monster.superunique.stormtree` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-23 EQUAL (REC-2055/2056) |
+| `monster.superunique.the-cow-king` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-39 EQUAL (REC-2055/2056) |
+| `monster.superunique.the-feature-creep` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-41 EQUAL (REC-2055/2056) |
 | `monster.superunique.the-smith` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-20: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.the-tormentor` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-33 EQUAL (REC-2055/2056) |
+| `monster.superunique.threash-socket` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-52 EQUAL (REC-2055/2056) |
+| `monster.superunique.treehead-woodfist` | entity | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-4 EQUAL (REC-2055/2056) |
 | `monster.superunique.web-mage-the-burning` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-real-unit-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-link-checks (2026-10-10, 1.14d recorded, link rule note): gen-su-21: every channel equal on every frame, nothing ignored; state reads PARTIAL only for the d2rs client gap (RUN_GAPS) (PROVISIONAL REC-2055/2056) |
+| `monster.superunique.winged-death` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-seed-order | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-32 EQUAL (REC-2055/2056) |
+| `monster.superunique.witch-doctor-endugu` | entity | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/population.md,specs/monsters/init.md | rc-run-4 2026-10-10: gen-su-22 EQUAL (REC-2055/2056) |
 | `monster.swarm2` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.swarm4` | entity | EQUAL | - | PARTIAL | yes | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
 | `monster.swarm5` | entity | EQUAL | - | PARTIAL | no | 0 | n | - | - | rc-gen-mon-triage 2026-10-10 (r16): state PARTIAL, rng MATCH |
@@ -5933,12 +6127,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `monster.umod.20-scarab` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-20 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.21-killself` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-21 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.22-questcomplete` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-22 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
+| `monster.umod.23-poisonhit` | content | EQUAL | - | MATCH | yes | 0 | n | claude/coord-resume-3 | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | rc-run-4 2026-10-10: gen-umod-23 EQUAL (REC-2055/2056) |
 | `monster.umod.24-thief` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-24 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.25-manahit` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-25 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.26-teleport` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-26 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.28-stoneskin` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-28 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.29-multishot` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-29 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.3-light` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-3 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
+| `monster.umod.30-aura` | content | EQUAL | - | MATCH | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | rc-run-4 2026-10-10: gen-umod-30 EQUAL (REC-2055/2056) |
 | `monster.umod.31-goboom` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-31 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.32-firespike-explode` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-32 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
 | `monster.umod.33-suicideminion-explode` | content | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/monsters/umods.tsv,specs/monsters/umod-callbacks.md,specs/monsters/umod-init-bodies.md | gen-umod-33 (rc-partial-promote, 2026-10-10, 1.14d re-recorded): every channel equal on every frame with every state field of both sides compared (own and q included, no ignore line); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS), which the pokes-only checks do not exercise (PROVISIONAL REC-2055) |
@@ -6060,7 +6256,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `monster.ai.succubus-curse-gate` | system | DIVERGED | M | DIVERGED | yes | 0 | n | rc-vile-crow | specs/monsters/ai-bodies-5.md#4 | curse-list test and max mana were host stubs; first difference frame 41 -> 68 (fr/seed layer next) |
+| `monster.ai.succubus-curse-gate` | system | EQUAL | - | MATCH | yes | 0 | n | rc-vile-crow | specs/monsters/ai-bodies-5.md#4 | rc-run-4 2026-10-10: gen-su-54 EQUAL (REC-2055/2056) |
 
 ## render-effects
 
