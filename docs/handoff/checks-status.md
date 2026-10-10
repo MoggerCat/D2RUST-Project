@@ -730,9 +730,9 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-ui-1-0x5d-quest-status-0x0045e540-0x004a2cb0 | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-10-0x91-npc-intros-0x0045e580-0x004b3510 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-11-0x78-trade-partner-0x0045e810-0x004b9010 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-12-0x29-game-quest-flags-0x0045d3a0-0x004b2620 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-12-0x29-game-quest-flags-0x0045d3a0-0x004b2620 | rng | MATCH | 33/33 | - | - |
@@ -743,13 +743,13 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | rng | MATCH | 33/33 | - | - |
 | gen-sysc-client-msg-ui-14-0x5e-game-quest-availability-0x0045e570-0x0 | state | PARTIAL | 60/60 | - | - |
-| gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-16-0x28-npc-dialog-start-and-quest-flags-0x004 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-17-0x62-npc-dialog-end-0x0045d390-0x004b5320 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-18-0x2a-npc-transaction-0x0045e0d0-0x004b6390 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | DIVERGED | 28/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | packets | MATCH | 30/30 | - | q-fix-join-items |
 | gen-sysc-client-msg-ui-2-0x63-waypoint-menu-0x0045e670-0x0049cf90 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | packets | DIVERGED | 99/100 | frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) | q-fix-join-items |
 | gen-sysc-client-msg-ui-20-0x61-act-video-0x0045e660 | state | DIVERGED | 9/100 | frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] | q-fix-npc-interact |
@@ -761,11 +761,11 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-sysc-client-msg-ui-22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0 | state | PARTIAL | 60/60 | - | - |
 | gen-sysc-client-msg-ui-3-0x77-ui-action-0x0045e800-0x004b8cf0 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-3-0x77-ui-action-0x0045e800-0x004b8cf0 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-5-0x27-npc-text-0x0045e0a0-0x004a1600 | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-ui-8-0x58-ui-open-0x0045e490-0x004c0550 | packets | MATCH | 30/30 | - | - |
 | gen-sysc-client-msg-ui-8-0x58-ui-open-0x0045e490-0x004c0550 | state | PARTIAL | 30/30 | - | - |
-| gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | packets | DIVERGED | 25/30 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | packets | DIVERGED | 29/30 | frame 16 stream s2c #9 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | gen-sysc-client-msg-ui-9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b | state | PARTIAL | 30/30 | - | - |
 | gen-sysc-client-msg-units-1-unit-add | packets | MATCH | 60/60 | - | - |
 | gen-sysc-client-msg-units-1-unit-add | rng | MATCH | 33/33 | - | - |
@@ -1040,7 +1040,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | items-load-mixed | state | PARTIAL | 60/60 | - | - |
 | items-pickup-ama | packets | MATCH | 60/60 | - | - |
 | items-pickup-ama | state | PARTIAL | 60/60 | - | - |
-| items-vendor-akara-buy | packets | DIVERGED | 35/40 | frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) | q-fix-join-items |
+| items-vendor-akara-buy | packets | DIVERGED | 39/40 | frame 20 stream s2c #7 bytes[37]: 1.14d 161 vs d2rs 160 (id 0x9c) | q-fix-join-items |
 | items-vendor-akara-buy | state | PARTIAL | 40/40 | - | - |
 | items-vendor-akara-stock | items | MATCH | 41/41 | - | - |
 | items-vendor-akara-stock | packets | MATCH | 140/140 | - | - |

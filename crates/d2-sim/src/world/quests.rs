@@ -1806,6 +1806,23 @@ impl QuestControl {
         self.dispatch_list(w, event::CHANGED_LEVEL, args, false, None);
     }
 
+    /// The quest part of the town-leave refresh `0x00537340(game, player,
+    /// from, to)` (`world/quests.md` §6.7, §8.1): the NPC intro list of
+    /// the town's act (`0x00545100`, acts 0, 1, 2, 4), and for Lut
+    /// Gholein (level 40) the act change `0x00597310` (chain 4).
+    pub fn town_leave<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, to: u32) {
+        match to {
+            1 => npc_gossip(w, player, 0),
+            40 => {
+                npc_gossip(w, player, 1);
+                act1::q4::act_change(self, w, player);
+            }
+            75 => npc_gossip(w, player, 2),
+            109 => npc_gossip(w, player, 4),
+            _ => {}
+        }
+    }
+
     /// `0x00543D50`: NPC chat end (event 2, (1, 1)).
     pub fn npc_deactivate<W: QuestWorld>(&mut self, w: &mut W, player: UnitId, npc: UnitId) {
         let args = EventArgs {
@@ -2151,7 +2168,8 @@ impl QuestControl {
                         act1::callback(self, w, i, args, None, false);
                     }
                 }
-                act1::q4::act_change(self, w, player);
+                // Chain 4's act change `0x00597310` runs inside the travel's
+                // town-leave refresh `0x00537340` ([`Self::town_leave`]).
             }
             npc::MESHIF1 => {
                 let Some(f) = flags_of(w, player) else {
