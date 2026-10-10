@@ -17,6 +17,8 @@ Families (one check per table row, written under traces/checks/gen/):
   shrine one shrine operated per reachable shrines.txt row
   ui    one UI scenario (a panel opened by key, a hover tip, the control panel) per group of
         system.ui ledger rows: draws channel, input script, compared at a fixed tick
+  sysc  one scenario per client / sim / seam / flow spec section the ledger lists
+        (system.client|sim|seams|flows.*) that a poke or input reaches
   obj   one object created and operated per objects.txt row (interact-operate-*)
   itemq the same items at each quality (low .. crafted) over three game seeds
   aud   one audio-diff scenario per reachable system.audio ledger row group (channel
@@ -45,7 +47,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -1102,8 +1104,157 @@ def fam_qkill(ctx):
     return out
 
 
+# system.client / system.sim / system.seams / system.flows rows: the
+# sections are behaviour of the client model, the message handlers and the
+# server pass, which a scenario reaches through its inputs: the S->C bytes
+# (packets), the unit state (state), the RNG draws, the items and the save.
+# Each scenario template is a form an existing recorded check already runs
+# on both sides; the row decides which template carries it.
+SYSC_T = {
+    "login": (60, "ScnAma --class ama --expansion", "packets state rng", []),
+    "walk": (100, "ScnAma --class ama --expansion", "packets state",
+             ["at 6 send Walk x=@x+6 y=@y", "at 20 send Run x=@x y=@y+5",
+              "at 36 send Walk x=@x-3 y=@y-3"]),
+    "talk": (30, "ScnAma --class ama --expansion", "state packets",
+             ["at 4 poke pos @player 4888 4228", "at 7 poke pos @player 4903 4224",
+              "at 10 poke pos @player 4918 4216", "at 13 poke pos @player 4928 4210",
+              "at 16 poke talk @1:148 trade"]),
+    "waypoint": (30, "ScnAma --class ama --expansion", "state packets",
+                 ["at 4 poke pos @player 4888 4220", "at 7 poke pos @player 4896 4213",
+                  "at 10 poke operate @2:119"]),
+    "stash": (30, "ScnAma --class ama --expansion", "state packets",
+              ["at 10 poke object 267 @x @y", "at 20 poke operate @2:267"]),
+    "act": (100, "ScnAma --class ama --expansion", "packets state",
+            ["at 10 poke warp 40"]),
+    "warp": (60, "ScnAma --class ama --expansion", "packets state", ["at 4 poke warp 2"]),
+    "skill": (80, "ScnAma --class ama --expansion --level 12 --stat 4=3 --stat 5=2",
+              "packets state rng",
+              ["at 10 send SelectSkill skill=36 left=0 item=0xFFFFFFFF",
+               "at 20 send RightSkill x=@x+4 y=@y+4"]),
+    "item": (60, "SavAma --class ama --expansion", "items packets state",
+             ["at 4 poke seed-game 0x00001234 666", "at 4 poke item hp1 @x+2 @y",
+              "at 4 poke item gld @x+2 @y+3", "at 10 send PickItem type=4 id=@4 cursor=0"]),
+    "state": (50, "ScnAma --class ama --expansion", "state packets",
+              ["at 6 poke state @player 2 on", "at 30 poke state @player 2 off"]),
+    "stat": (40, "ScnAma --class ama --expansion", "state packets",
+             ["at 6 poke stat @player 0 0 50"]),
+    "mon": (80, "ScnAma --class ama --expansion", "state rng packets",
+            ["at 10 poke spawn 19 @x+5 @y-4 normal"]),
+    "save": (20, "SavAma --class ama --expansion", "save", []),
+    "draw": (80, "ScnAma --class ama --expansion", "draws", ["draws-at 73"]),
+}
+
+# (area regex, template or None, reason when None); first match wins
+SYSC_RULES = [
+    (r"system\.client\.assets\.a-|system\.client\.audio\.|system\.client\.render-pipeline\.a-|system\.client\.ui\.a-", None,
+     "design of d2rs (ours, section A) or audio: no 1.14d behaviour or recorder to compare"),
+    (r"system\.client\.(assets|render-pipeline|ui)\.b-", "draw", None),
+    (r"system\.client\.bridge\.(1|3|7|8|9|10)-", None,
+     "d2rs-internal seam (bridge boundary, link, Bevy mirror, pacing, versioning, outputs): no 1.14d counterpart"),
+    (r"system\.client\.bridge\.(2|5|6)-", "login", None),
+    (r"system\.client\.bridge\.4-", "walk", None),
+    (r"system\.client\.model\.(1|2|3|4|5|7|9|10|11|13)-", "login", None),
+    (r"system\.client\.model\.(6|8)-", "walk", None),
+    (r"system\.client\.model\.12-", "warp", None),
+    (r"system\.client\.model\.15-", "stash", None),
+    (r"system\.client\.model\.19-", "mon", None),
+    (r"system\.client\.model\.(14|16|17|18)-", None,
+     "needs a hireling / a teleport with a hireling / UI writes / audio inputs: no poke or input reaches it"),
+    (r"system\.client\.msg-skills\.(1|2|3|4|5|6|9)-", "login", None),
+    (r"system\.client\.msg-skills\.(7)-", "state", None),
+    (r"system\.client\.msg-skills\.(8|10)-", "skill", None),
+    (r"system\.client\.msg-stats-items\.1-", "stat", None),
+    (r"system\.client\.msg-stats-items\.(2|3|5)-", "item", None),
+    (r"system\.client\.msg-stats-items\.4-", None, "hireling stats: no hireling in the scenario saves"),
+    (r"system\.client\.msg-ui\.(1|12|13|14|21|22)-", "login", None),
+    (r"system\.client\.msg-ui\.2-", "waypoint", None),
+    (r"system\.client\.msg-ui\.(3|8)-", "stash", None),
+    (r"system\.client\.msg-ui\.(5|9|10|11|16|17|18)-", "talk", None),
+    (r"system\.client\.msg-ui\.20-", "act", None),
+    (r"system\.client\.msg-ui\.(4|6|7|15|19)-", None,
+     "chat text, hire offers, quest special and event text: no input or poke triggers the S->C message"),
+    (r"system\.client\.msg-units\.(1|8)-", "login", None),
+    (r"system\.client\.msg-units\.2-", "mon", None),
+    (r"system\.client\.msg-units\.(4|7)-", "walk", None),
+    (r"system\.client\.msg-units\.5-", "stat", None),
+    (r"system\.client\.msg-units\.6-", "state", None),
+    (r"system\.client\.msg-units\.3-", None, "0x15 ReassignPlayer needs a second player"),
+    (r"system\.client\.stat-lists\.(1|4)-", "stat", None),
+    (r"system\.client\.stat-lists\.2-", "item", None),
+    (r"system\.client\.stat-lists\.3-", "state", None),
+    (r"system\.flows\.act-change\.(1|3)-", "act", None),
+    (r"system\.flows\.act-change\.2-", "warp", None),
+    (r"system\.flows\.client-frame\.(1|2)-", "walk", None),
+    (r"system\.flows\.client-frame\.3-", None, "d2rs mapping of one Bevy frame: no 1.14d counterpart"),
+    (r"system\.flows\.save-exit\.5-", "save", None),
+    (r"system\.flows\.save-exit\.(1|2|3|4)-", None,
+     "save-and-exit leaves the game / periodic save: the scenario runner has no exit input and the save channel reads the file at the end"),
+    (r"system\.flows\.server-tick\.(1|2|3)-", "login", None),
+    (r"system\.flows\.server-tick\.4-", "mon", None),
+    (r"system\.seams\.(bridge-app|messages|sim-server)\.", "login", None),
+    (r"system\.seams\.drlg-coords\.", "warp", None),
+    (r"system\.seams\.item-grids", "item", None),
+    (r"system\.seams\.world-screen\.", "draw", None),
+    (r"system\.sim\.intents-events\.(1|3|8)-", "login", None),
+    (r"system\.sim\.intents-events\.(2|7|9)-", "walk", None),
+    (r"system\.sim\.intents-events\.(4|5|6)-", None,
+     "mapping, machine-readable tables and the comparison rule itself: not behaviour a run compares"),
+    (r"system\.sim\.pathing\.4-", "walk", None),
+    (r"system\.sim\.pathing\.9-", "warp", None),
+    (r"system\.sim\.pets\.", None, "needs a summoned pet: the scenario saves have no summon skill and no poke creates a pet"),
+    (r"system\.sim\.stat-lists\.(1|2|3|4|5|6|7|11)-", "stat", None),
+    (r"system\.sim\.stat-lists\.(8|9|10)-", "state", None),
+    (r"system\.sim\.stats\.", "stat", None),
+    (r"system\.sim\.tick\.8-", None, "wall clock and host-only parts: no tick-number comparison"),
+    (r"system\.sim\.tick\.", "login", None),
+    (r"system\.sim\.units\.7-", None, "scheduler inventory table, not a run behaviour"),
+    (r"system\.sim\.units\.8-", "skill", None),
+    (r"system\.sim\.units\.", "mon", None),
+]
+
+
+def sysc_rows(ctx):
+    """(area, source) of the ledger snapshot that the rules carry or skip."""
+    return [(a, s) for a, s in load_ledger(ctx.ledger)
+            if re.match(r"system\.(client|sim|seams|flows)\.", a)]
+
+
+def sysc_rule(area):
+    for rx, tpl, why in SYSC_RULES:
+        if re.match(rx, area):
+            return tpl, why
+    return None, "no rule"
+
+
+def fam_sysc(ctx):
+    """One check per ledger row system.client|sim|seams|flows.* whose rule
+    names a scenario template (SYSC_T); the rows with no reachable
+    behaviour are not generated (SYSC_RULES gives the reason, the ledger
+    note carries it). Rows with an existing check (EQUAL / DIVERGED) are
+    not in the snapshot."""
+    out = []
+    for area, src in sysc_rows(ctx):
+        tpl, _ = sysc_rule(area)
+        if tpl is None:
+            continue
+        ticks, save, chans, lines = SYSC_T[tpl]
+        short = slug(area[len("system."):])[:60].strip("-")
+        c = Check(
+            f"gen-sysc-{short}", "sysc", area, f"{area}: scenario {tpl}",
+            save, ticks, 300, chans, list(lines),
+            comment=[f"Ledger row {area} ({src}): carried by the {tpl} scenario "
+                     f"(inputs {', '.join(l.split(' ', 2)[2].split(' ')[0] for l in lines if l.startswith('at ')) or 'none: the login and tick stream'}); "
+                     "the channels compare what the section specifies on both sides "
+                     "(S->C bytes, unit state, RNG draws, items, save, draws). "
+                     "The check is the template's reach into the section, not a proof of "
+                     "every rule in it (PROVISIONAL REC-2550)."])
+        c.extra = {"area": area}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1169,6 +1320,8 @@ def resolve_area(c, areas):
         pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
     elif f == "qkill":
         pick = [x["area"]] if x["area"] in {a for a, _ in areas} else []
+    elif f == "sysc":
+        pick = [x["area"]]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":
