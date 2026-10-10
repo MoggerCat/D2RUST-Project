@@ -29,14 +29,14 @@
 |   1. Writer | 80–96 |
 |   2. Header (`0x006312B0`) | 97–125 |
 |   3. Compact record (`0x0062AF80`) | 126–157 |
-|   4. Full record (`0x0062FFF0`) | 158–317 |
-|   5. Save-format extras (never on the wire) | 318–335 |
-| Constants & data dependencies | 336–359 |
-| Randomness | 360–363 |
-| Edge cases & original bugs | 364–400 |
-| Test vectors | 401–423 |
-| Provenance | 424–448 |
-| Open questions | 449–520 |
+|   4. Full record (`0x0062FFF0`) | 158–318 |
+|   5. Save-format extras (never on the wire) | 319–336 |
+| Constants & data dependencies | 337–360 |
+| Randomness | 361–364 |
+| Edge cases & original bugs | 365–401 |
+| Test vectors | 402–424 |
+| Provenance | 425–449 |
+| Open questions | 450–521 |
 <!-- /index -->
 
 ## Summary
@@ -263,6 +263,7 @@ In this order; "base" = the item's own value (`0x006253B0`), "total"
 5. Item flag 0x800 (socketed), read from the item's own flags, **not** F: the §2 rule 2 clearing applies to the header word only (recorded 2026-10-09: `gen-item-05` `9cl`, `gen-item-10` `7yw`, unidentified magic, 1.14d writes the 4-bit count 2 with 0x800 absent from the header):
    base 194 (`item_numsockets`) clamped to `Save Bits`(194), **no**
    `Save Add`.
+   Reader side (`0x0062CBE0`, at the test after the quantity: the item's stored flags, i.e. the header word as read by `0x0062E430`, tested for 0x800): the count is read only when the **wire** header has 0x800. For an unidentified socketed item (header 0x800 cleared, §2 rule 2) the reader therefore does not read the 4 bits 1.14d's writer sent, jumps to its end (the `0x10` test) and ignores the rest of the packet. d2rs `item_bits::decode` does the same for the record (`sockets` stays `None`) and only skips those bits when checking that nothing but zero padding follows (full, non-save, unidentified record without 0x800).
 6. Not shown (network, not identified): the record **ends** here.
 
 #### 4.6 Property lists
