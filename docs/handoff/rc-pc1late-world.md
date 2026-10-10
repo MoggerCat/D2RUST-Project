@@ -23,3 +23,7 @@ Changed (vision token, `ai.md` §5.2 steps 2/7, 0x005DD9B6, 0x005DDBE6):
 Open: `build-queue.tsv` is sync-owned; rows q-fix-pc1late-vision-token,
 -orb-spawn, -larzuk-map-ai can be dropped by the integrator. Narrower
 checks (frame 45 token, frame 26/34 Larzuk steps) not isolated.
+
+Ledger: the recorded suite statuses (DIVERGED@2 / @26) predate this run
+and still win in `ledger.py`; my scenario_diff runs show 0 state
+differences. A suite re-record of the three checks will clear them.
