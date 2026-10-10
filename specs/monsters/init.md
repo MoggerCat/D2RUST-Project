@@ -44,24 +44,24 @@
 |   16. Boss spawns | 616–651 |
 |   17. Choosing umods (`0x005A0760`) | 652–695 |
 |   18. Boss minions and umod init (`0x005A2120`) | 696–713 |
-|   19. Umod init functions | 714–800 |
-|   20. Superuniques (`0x005A49B0`) | 801–849 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 850–864 |
-|   22. Umod callbacks and the type-7 event | 865–916 |
-|   23. Unique names (client) | 917–926 |
-|   24. Monster assign message | 927–978 |
-|   25. Calling the spawn functions outside population (tools) | 979–1069 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1070–1129 |
-|   27. Class reinit (`0x00574370`) | 1130–1175 |
-| Constants & data dependencies | 1176–1197 |
-| Randomness | 1198–1242 |
-| Edge cases & original bugs | 1243–1274 |
-| Test vectors | 1275–1276 |
-|   Synthetic (CI-safe) | 1277–1299 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1300–1330 |
-|   Recorded checks (monster assign 0xAC) | 1331–1343 |
-| Provenance | 1344–1433 |
-| Open questions | 1434–1514 |
+|   19. Umod init functions | 714–806 |
+|   20. Superuniques (`0x005A49B0`) | 807–855 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 856–870 |
+|   22. Umod callbacks and the type-7 event | 871–922 |
+|   23. Unique names (client) | 923–932 |
+|   24. Monster assign message | 933–984 |
+|   25. Calling the spawn functions outside population (tools) | 985–1075 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1076–1135 |
+|   27. Class reinit (`0x00574370`) | 1136–1181 |
+| Constants & data dependencies | 1182–1203 |
+| Randomness | 1204–1248 |
+| Edge cases & original bugs | 1249–1280 |
+| Test vectors | 1281–1282 |
+|   Synthetic (CI-safe) | 1283–1305 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1306–1336 |
+|   Recorded checks (monster assign 0xAC) | 1337–1349 |
+| Provenance | 1350–1439 |
+| Open questions | 1440–1520 |
 <!-- /index -->
 
 ## Summary
@@ -779,7 +779,13 @@ seed 0x1506 without monster data) gives `roll(n)`; the unit seed is not
 touched. Superunique row 37 (Lord De Seis) forces index 5. Class 704
 instead gets conviction level 20. Skill level = clamp((lvl + offset) ×
 multiplier / divisor, 1, 99); the skill is given and assigned
-(`0x0056DEB0`, `0x005701B0`, skills spec).
+(`0x0056DEB0`, `0x005701B0`, skills spec). The assignment is the right-hand
+aura select of `skills/use.md` §7: the aura state or immediate do, and
+the type-8 aura timer at the next frame ≡ 1 (mod `perdelay`), whose do
+rolls the aura's damage on the monster's own seed (Holy Freeze, Holy
+Shock: `0x0056E0C0`). 1.14d: Bremm Sparkfist (gen-lvl-102) and a unique
+Frozen Horror (gen-lvl-118) draw at frames 51, 101, 151 after a warp at
+frame 20 (rc-rng-level-pop).
 
 #### 19.6 Champion types and others
 

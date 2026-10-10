@@ -39,15 +39,15 @@
 |   11. Vulture (23) `0x005F3170` | 317–382 |
 |   12. BatDemon (29) `0x005F5040`, alternate `0x005F4FD0` | 383–425 |
 |   13. SandMaggotQueen (66) `0x005F9CF0` | 426–494 |
-|   14. Duriel (44) `0x005F67B0` | 495–513 |
-|   15. Summoner (53) `0x005F85C0` | 514–546 |
-|   16. Special-state thinks 10/17, 11, 12 | 547–601 |
-| Constants & data dependencies | 602–619 |
-| Randomness | 620–629 |
-| Edge cases & original bugs | 630–644 |
-| Test vectors | 645–662 |
-| Provenance | 663–690 |
-| Open questions | 691–716 |
+|   14. Duriel (44) `0x005F67B0` | 495–516 |
+|   15. Summoner (53) `0x005F85C0` | 517–549 |
+|   16. Special-state thinks 10/17, 11, 12 | 550–604 |
+| Constants & data dependencies | 605–622 |
+| Randomness | 623–632 |
+| Edge cases & original bugs | 633–647 |
+| Test vectors | 648–665 |
+| Provenance | 666–693 |
+| Open questions | 694–719 |
 <!-- /index -->
 
 ## Summary
@@ -500,7 +500,10 @@ Brackets: duriel [5, 33, 50, 0, 0]; `Skill1` Charge, `Skill2` Jab,
 1. `Skill4` ≥ 0 and the unit has no right skill (`0x006201D0`): add
    `Skill4` at level aip1 [5] (`0x0056DEB0(unit, Skill4, aip1, 1)`) and
    make it the right skill (`0x005701B0`, EDX = 0, skill, owner −1)
-   (skills spec). The aura.
+   (skills spec). The aura. "No right skill" reads the unit's skill
+   list, so the add runs once; the aura timer's Holy Freeze do then
+   rolls `0x0056E0C0` on Duriel's seed every 50 frames (1.14d
+   gen-lvl-73: frames 51, 101, 151; rc-rng-level-pop).
 2. Not C: `Skill1` ≥ 0 and P(aip5) [0] → `Skill1` in `Sk1mode` at T,
    end. Else velocity request (method 13, 0, 0); walk to T with flags
    7. End.

@@ -153,6 +153,42 @@ fn the_loaded_right_aura_schedules_the_aura_form_and_a_plain_skill_does_not() {
     plain.assert_clean();
 }
 
+fn monster_right_aura(fx: &mut Fx, m: UnitId, skill: i32, level: i32) {
+    let s = &mut fx.sim.sys;
+    let mut sim = crate::units::hooks::Sim {
+        game: &mut fx.game,
+        units: &mut s.units,
+        stats: &mut s.stats,
+        data: &s.data,
+    };
+    crate::wiring::action::Pending::monster_right_aura(&mut s.hooks, &mut sim, m, skill, level);
+}
+
+// Covers: specs/monsters/init.md §19.5; specs/monsters/ai-bodies-2.md §14
+// (a monster's aura: the skill given at the level, the right hand
+// assigned, the aura form scheduled; a plain skill and a player do nothing)
+#[test]
+fn a_monster_aura_gives_the_skill_and_schedules_the_aura_form() {
+    let (mut fx, _) = fx();
+    let m = fx.spawn(UnitType::Monster, 12, 12);
+    monster_right_aura(&mut fx, m, AURA, 3);
+    assert_eq!(timers(&fx, m, event::PERIODIC_SKILLS), [(1, u32::MAX, 0)]);
+    let h = &fx.sim.sys.hooks;
+    assert_eq!(h.monster_skills[&m].get(&AURA), Some(&3));
+    let l = &h.skill_lists[&m];
+    let right = l.right.and_then(|i| l.view().get(i).copied()).unwrap();
+    assert_eq!((right.skill, right.base), (AURA, 3));
+    fx.assert_clean();
+    let (mut plain, p) = self::fx();
+    let q = plain.spawn(UnitType::Monster, 12, 12);
+    monster_right_aura(&mut plain, q, 0, 3);
+    monster_right_aura(&mut plain, p, AURA, 3);
+    assert!(timers(&plain, q, event::PERIODIC_SKILLS).is_empty());
+    assert!(timers(&plain, p, event::PERIODIC_SKILLS).is_empty());
+    assert!(!plain.sim.sys.hooks.skill_lists.contains_key(&q));
+    plain.assert_clean();
+}
+
 // Covers: specs/sim/stat-lists.md §10.3; specs/skills/use.md §7
 #[test]
 fn item_aura_event_reads_stat_151_and_runs_the_do_core() {
