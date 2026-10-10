@@ -638,10 +638,14 @@ fn text_rows(c: &Control) -> Vec<DrawItem> {
 /// e.g. an 800 × 600 background is 4 × 3 frames, left to right, top to
 /// bottom): one draw per tile. PROVISIONAL (§F1.1 r3 gives the control's
 /// bottom edge only): tile row r is drawn at cel Y = (y − h + 1) + the
-/// heights of rows 0..=r, so the art covers rows y − h + 2 … y + 1, one row
-/// below the control box; every 1.14d screenshot (main menu, character
-/// select, create) has screen row 0 black and the background one row lower
-/// than a y − h + 1 top, while the buttons (drawn at their y) match.
+/// heights of rows 0..=r; the last row of a multi-row image is clamped to
+/// the control's bottom edge y. A full
+/// row therefore covers rows y − h + 2 … (one below the control box top:
+/// every 1.14d screenshot has screen row 0 black), and the last, partial
+/// row (800 × 600: 88 rows) ends on row y = 599, one row above the
+/// unclamped formula (REC-3760: measured on the main menu, credits and
+/// cinematics screens, rows 512 … 599 differed by exactly that shift).
+/// The buttons (drawn at their y) match.
 fn image_tiles(file: &'static str, x: i32, y: i32, w: u16, h: u16) -> Vec<DrawItem> {
     let (w, h) = (i32::from(w.max(1)), i32::from(h.max(1)));
     let cols = (w + 255) / 256;
@@ -650,7 +654,11 @@ fn image_tiles(file: &'static str, x: i32, y: i32, w: u16, h: u16) -> Vec<DrawIt
     let mut out = Vec::with_capacity((cols * rows) as usize);
     for r in 0..rows {
         let row_h = (h - 256 * r).min(256);
-        let bottom = top + 256 * r + row_h;
+        let mut bottom = top + 256 * r + row_h;
+        if rows > 1 && r == rows - 1 {
+            // PROVISIONAL (REC-3760): measured for 800 x 600 only.
+            bottom = bottom.min(y);
+        }
         for c in 0..cols {
             out.push(DrawItem::Art {
                 file,
