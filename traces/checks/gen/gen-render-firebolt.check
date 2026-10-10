@@ -13,3 +13,5 @@ at 4 poke warp 2
 at 8 poke spawn 179 @x+6 @y normal
 at 12 poke missile 58 @x @y @x+6 @y skill 36 1
 draws-at 22
+skip-weather
+input frame 20; move 790 10

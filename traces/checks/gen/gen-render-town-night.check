@@ -11,3 +11,5 @@ seconds 600
 channels draws
 at 4 poke time 3 600
 draws-at 38
+skip-weather
+input frame 36; move 790 10

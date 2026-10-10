@@ -58,7 +58,8 @@ def parse(text):
     """A check file -> dict. Strict: unknown keywords, repeats, missing
     required lines are errors naming the line."""
     c = {"input": {}, "ignore": [], "poke": [], "send": [], "difficulty": "normal", "seconds": 300,
-         "channels": ["state"], "save_args": [], "draws_at": None}
+         "channels": ["state"], "save_args": [], "draws_at": None,
+         "skip_weather": False}
     seen = set()
     lines = [(n, ln.split("#", 1)[0].strip() if not ln.lstrip().startswith("input ")
               else ln.strip()) for n, ln in enumerate(text.splitlines(), 1)]
@@ -119,6 +120,13 @@ def parse(text):
             if not toks or bad or len(set(toks)) != len(toks):
                 raise CheckError(f"line {n}: channels from {' '.join(CHANNELS)}, each once")
             c["channels"] = toks
+        elif kw == "skip-weather":
+            # draws only: facts-compare --skip-weather (facts-render.md §6 r5, REC-510): pass 9's
+            # rain/snow rows are left out on both sides (1.14d draws other particles per run)
+            once(kw)
+            if toks:
+                raise CheckError(f"line {n}: skip-weather takes no argument")
+            c["skip_weather"] = True
         elif kw == "draws-at":
             once(kw)
             c["draws_at"] = num(toks[0] if len(toks) == 1 else "x", 1, 1_000_000)
@@ -468,11 +476,12 @@ class Runner:
                     print(f"[draws] warning: d2rs play exited {code} after writing the dump")
         if sides != {"orig", "d2rs"}:
             return None
-        code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d,
-                        "--ignore", "tick"], check=False, timeout=300)
+        cmp_args = ["--ignore", "tick"] + (["--skip-weather"] if c["skip_weather"] else [])
+        code = self.sh([exe, "facts-compare", os.path.join(scene_o, "scenes", "s"), scene_d]
+                       + cmp_args, check=False, timeout=300)
         if not self.dry:
             sm = draws_summary(os.path.join(scene_o, "scenes", "s", "draws.tsv"),
-                               os.path.join(scene_d, "draws.tsv"), code, at)
+                               os.path.join(scene_d, "draws.tsv"), code, at, c["skip_weather"])
             with open(self.path("draws.summary.json"), "w", encoding="utf-8") as f:
                 json.dump(sm, f, indent=1)
         return code
@@ -585,7 +594,21 @@ def read_draws(path):
     return lines[0].split("\t"), [ln.split("\t") for ln in lines[1:]]
 
 
-def draws_summary(orig_tsv, d2rs_tsv, code, tick):
+def is_weather_row(cols, row, orig):
+    """Pass 9's particle row (facts-render.md §6 r5): the 1.14d call site in
+    [0x00473470, 0x00473F50), or `pass9` on the d2rs side."""
+    if "at" not in cols or cols.index("at") >= len(row):
+        return False
+    at = row[cols.index("at")]
+    if not orig:
+        return at == "pass9"
+    try:
+        return 0x00473470 <= int(at, 16) < 0x00473F50
+    except ValueError:
+        return False
+
+
+def draws_summary(orig_tsv, d2rs_tsv, code, tick, skip_weather=False):
     """The draws channel's summary (scenario-diff.md §4): rows aligned by
     position, a row equal when every compared column is (a '?' cell counts
     as equal, as facts-compare's unmeasured cells); one compared frame.
@@ -601,6 +624,9 @@ def draws_summary(orig_tsv, d2rs_tsv, code, tick):
     except OSError as e:
         out.update(rows_compared=0, rows_equal=0, first=None, error=str(e))
         return out
+    if skip_weather:
+        ra = [r for r in ra if not is_weather_row(ca, r, True)]
+        rb = [r for r in rb if not is_weather_row(cb, r, False)]
     cols = [c for c in ca if c in cb and c not in DRAWS_INFO]
     ia, ib = [ca.index(c) for c in cols], [cb.index(c) for c in cols]
     equal, first = 0, None

@@ -11,3 +11,5 @@ seconds 600
 channels draws
 at 4 poke warp 75
 draws-at 58
+skip-weather
+input frame 56; move 790 10
