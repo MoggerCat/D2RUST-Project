@@ -136,6 +136,23 @@ pub trait MonsterWorld<X> {
         let _ = (sim, h, room, x, y, class, mode, spread, flags);
         None
     }
+    /// The creation `0x005B23C0(unit, class, mode, spread, flags)` near a
+    /// unit (`monsters/population.md` §9 around the unit's position in its
+    /// room) on the lent world. `None`: the world cannot run it;
+    /// `Some(None)`: nothing placed.
+    fn spawn_near(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, unit, class, mode, spread, flags);
+        None
+    }
     /// The preset spawn `0x0054E600(room, class, x, y, mode)` on the lent
     /// world (`monsters/population.md` §11.2: a class past the monstats
     /// rows is superunique `class - rows`, §11.4, with its init, minions

@@ -143,6 +143,28 @@ impl<X: WorldPending> MonsterWorld<X> for WorldState {
         Some(placed.unit())
     }
 
+    /// `0x005B23C0` through population's placement around the unit
+    /// ([`placement::place_near`], `population.md` §9).
+    fn spawn_near(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        if self.pop_lent {
+            return None;
+        }
+        let placed = h.as_world_holder(|h| {
+            let mut wh = host(sim, h, self);
+            wh.population(|cx| placement::place_near(cx, None, unit, class, mode, spread, flags))
+        });
+        Some(placed.unit())
+    }
+
     /// `0x005A43E0` through population's random boss
     /// ([`spawn::random_boss`], champion allowed, warp check).
     fn spawn_random_boss(
