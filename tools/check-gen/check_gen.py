@@ -1060,8 +1060,7 @@ def fam_fmt(ctx):
         "gen-fmt-anim-walk", "fmt", "formats: animation data in movement",
         "Walk and Run in the Rogue Encampment: movement ticks come from AnimData",
         "ScnAma --class ama --expansion --level 12", 80, 300, "state packets",
-        ["ignore q",
-         "at 6 send Walk x=@x+6 y=@y",
+        ["at 6 send Walk x=@x+6 y=@y",
          "at 36 send Run x=@x y=@y+5"],
         comment=["Frame counts and speed of the walk/run modes come from the animation data "
                  "(specs/formats/animdata.md sections 4-6); the player's position per tick shows them."])

@@ -9,6 +9,5 @@ seed 1234
 ticks 80
 seconds 300
 channels state packets
-ignore q
 at 6 send Walk x=@x+6 y=@y
 at 36 send Run x=@x y=@y+5
