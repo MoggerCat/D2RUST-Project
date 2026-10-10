@@ -108,7 +108,10 @@ pub fn split_tick_end(entries: Vec<Entry>) -> (Vec<Entry>, Vec<Entry>) {
         matches!(
             e.op,
             PokeOp::Directive(
-                Directive::Operate { .. } | Directive::Talk { .. } | Directive::Goto(_)
+                Directive::Operate { .. }
+                    | Directive::Talk { .. }
+                    | Directive::Goto(_)
+                    | Directive::Warp { .. }
             )
         )
     };
