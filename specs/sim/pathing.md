@@ -28,25 +28,25 @@
 | Inputs | 68–77 |
 | Outputs / state changes | 78–84 |
 | Rules | 85–86 |
-|   1. Walk and run requests | 87–234 |
-|   2. Path types | 235–274 |
-|   3. Path compute (`0x00649970(path, unit, town access)`) | 275–341 |
-|   4. Target preparation (flag 0x1000, `0x00648120`) | 342–384 |
-|   5. Toward (type 2, `0x00679C80`) | 385–452 |
-|   6. Straight (type 7, `0x00679ED0`) | 453–462 |
-|   7. A* (type 1, `0x0067B850`) | 463–500 |
-|   8. Velocity, direction vector, facing | 501–623 |
-|   9. Per-tick movement | 624–825 |
-|   10. Messages | 826–888 |
-|   11. Missile paths (`0x00649760`) | 889–941 |
-|   12. Other path types (1.14d-read 2026-10-08) | 942–1155 |
-|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1156–1305 |
-| Constants & data dependencies | 1306–1342 |
-| Randomness | 1343–1353 |
-| Edge cases & original bugs | 1354–1411 |
-| Test vectors | 1412–1450 |
-| Provenance | 1451–1506 |
-| Open questions | 1507–1580 |
+|   1. Walk and run requests | 87–238 |
+|   2. Path types | 239–278 |
+|   3. Path compute (`0x00649970(path, unit, town access)`) | 279–345 |
+|   4. Target preparation (flag 0x1000, `0x00648120`) | 346–388 |
+|   5. Toward (type 2, `0x00679C80`) | 389–456 |
+|   6. Straight (type 7, `0x00679ED0`) | 457–466 |
+|   7. A* (type 1, `0x0067B850`) | 467–504 |
+|   8. Velocity, direction vector, facing | 505–627 |
+|   9. Per-tick movement | 628–829 |
+|   10. Messages | 830–892 |
+|   11. Missile paths (`0x00649760`) | 893–945 |
+|   12. Other path types (1.14d-read 2026-10-08) | 946–1159 |
+|   13. Path accessors and the cell line test (1.14d-read 2026-10-08) | 1160–1309 |
+| Constants & data dependencies | 1310–1346 |
+| Randomness | 1347–1357 |
+| Edge cases & original bugs | 1358–1415 |
+| Test vectors | 1416–1454 |
+| Provenance | 1455–1510 |
+| Open questions | 1511–1584 |
 <!-- /index -->
 
 ## Summary
