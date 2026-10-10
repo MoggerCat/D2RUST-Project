@@ -1962,16 +1962,18 @@ fn check_stream(
     }
     // §6.1 rule 2: a pass that sent item messages ends with 0x47, 0x48,
     // then at most the player's S→C 0x2C (`world/cube.md` §8 rule 3: the
-    // sound slot after the item messages).
-    if ticked.iter().any(|m| m[0] == 0x9C || m[0] == 0x9D) {
-        let n = ticked.len() - usize::from(ticked.last().is_some_and(|m| m[0] == 0x2C));
-        let tail: Vec<u8> = ticked[n.saturating_sub(2)..n]
-            .iter()
-            .map(|m| m[0])
-            .collect();
+    // sound slot after the item messages). A trade open's store records
+    // (0x9C action 11, `world/vendors.md` §4 step 3) are not the player's
+    // pass: 1.14d sends them in the client pass with no 0x47 / 0x48 after
+    // (`items-vendor-akara-buy` frame 20, 41 records).
+    let store = |m: &Vec<u8>| m[0] == 0x9C && m.get(1) == Some(&0x0B);
+    let pass: Vec<Vec<u8>> = ticked.iter().filter(|m| !store(m)).cloned().collect();
+    if pass.iter().any(|m| m[0] == 0x9C || m[0] == 0x9D) {
+        let n = pass.len() - usize::from(pass.last().is_some_and(|m| m[0] == 0x2C));
+        let tail: Vec<u8> = pass[n.saturating_sub(2)..n].iter().map(|m| m[0]).collect();
         if tail != [0x47, 0x48] {
             return Err(format!(
-                "update pass without 0x47, 0x48 at its end: {ticked:02X?}"
+                "update pass without 0x47, 0x48 at its end: {pass:02X?}"
             ));
         }
     }

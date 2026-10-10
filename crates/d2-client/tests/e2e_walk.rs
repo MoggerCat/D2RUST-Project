@@ -621,14 +621,17 @@ fn run() -> Transcript {
     assert_eq!(fx.room(), Some(a));
     walks.push(w);
 
-    // 3. Walk to the waypoint object (unit form): it stops on the
-    // object's position (objects have no footprint).
+    // 3. Walk to the waypoint object (unit form): the arrival check
+    // (`pathing.md` §9.5 rule 3) stops the player at unit distance 0,
+    // which the waypoint's size (`objects.txt` `SizeX` 5, `path-placement.md`
+    // §3) reaches on (22, 20), short of its cell (as 1.14d's run to stash
+    // 267, `world/objects.md` §7.3).
     let og = fx.guid(wp);
     let w = fx.walk(&bytes(&WalkToUnit { type_: 2, id: og }), 0x02, 30);
-    assert_eq!(w.len(), 11);
+    assert_eq!(w.len(), 6);
     assert_eq!(
-        (w[10].0, w[10].1, w[10].2),
-        (centre(WP_AT.0), centre(WP_AT.1), 1)
+        (w[5].0, w[5].1, w[5].2),
+        (centre(WP_AT.0 + 2), centre(WP_AT.1), 1)
     );
     assert!(w.iter().all(|f| f.3.is_empty()));
     walks.push(w);

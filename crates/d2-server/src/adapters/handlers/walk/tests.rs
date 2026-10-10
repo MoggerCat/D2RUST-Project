@@ -508,6 +508,25 @@ fn assert_m2(ticks: &[Frame], mode: u32) {
     );
 }
 
+/// A walk (`base`, `step` as [`assert_m1`]) or run ([`assert_m2`]) to the
+/// object at (31, 10): `n` moving ticks, then the arrival lands on the
+/// centre of (29, 10) and stops (mode 1). The arrival check stops the
+/// player at unit distance 0 (`pathing.md` §9.5 rule 3), which the
+/// object's size (`objects.txt` `SizeX`, `path-placement.md` §3) reaches
+/// two sub-tiles short of its cell, as 1.14d's run to stash 267 stops at
+/// (4868, 4229) for the stash at (4866, 4229) (`world/objects.md` §7.3).
+fn assert_to_object(ticks: &[Frame], mode: u32, base: u32, step: u32, n: usize) {
+    assert_eq!(ticks.len(), n + 1);
+    for (k, t) in ticks.iter().take(n).enumerate() {
+        assert_eq!(t.0, base + k as u32 * step, "tick {}", k + 1);
+        assert_eq!((t.1, t.2), (centre(10), mode), "tick {}", k + 1);
+    }
+    assert_eq!(
+        (ticks[n].0, ticks[n].1, ticks[n].2),
+        (centre(29), centre(10), 1)
+    );
+}
+
 /// Two players in room A: `p` at (26, 10) for client 0, `q` at (26, 14)
 /// for client 1, and an object at (31, 10).
 fn two_players() -> (Fx, UnitId, UnitId, UnitId) {
@@ -611,9 +630,9 @@ fn walk_and_run_to_a_unit_send_0x10() {
         assert_eq!((t.unit, t.ty, t.guid), (o, UnitType::Object, og));
         let ticks = fx.run(p, mode, 20);
         if mode == 3 {
-            assert_m2(&ticks, mode);
+            assert_to_object(&ticks, mode, 0x1B1000, 0x9000, 5);
         } else {
-            assert_m1(&ticks, mode);
+            assert_to_object(&ticks, mode, 0x1AE000, 0x6000, 7);
         }
         let want = PlayerToTarget {
             type_: 0,

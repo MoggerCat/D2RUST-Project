@@ -709,10 +709,11 @@ impl<X: Pending> View<'_, X> {
         })
     }
 
-    /// §7.3 rules 3–5 with the path provider: unit distance `0x00641530`
-    /// > 50 → too far; not in interact range ([`View::object_in_reach`])
-    /// or the line test `0x00622B50(P, O, 0x804)` blocked → walk; else
-    /// P's path is stopped (`0x00648730`) and the operate runs.
+    /// §7.3 rules 3–5 with the path provider: a unit distance
+    /// `0x00641530` above 50 is too far; out of interact range
+    /// ([`View::object_in_reach`]) or behind the line test
+    /// `0x00622B50(P, O, 0x804)` is a walk; else P's path is stopped
+    /// (`0x00648730`) and the operate runs.
     fn object_reach(&mut self, game: &Game, player: UnitId, object: UnitId) -> ObjectReach {
         if self.object_unit_distance(player, object) > 50 {
             return ObjectReach::TooFar;
