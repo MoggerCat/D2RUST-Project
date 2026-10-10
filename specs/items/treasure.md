@@ -33,19 +33,19 @@
 | Rules | 86–87 |
 |   1. TC runtime form (load step 46) | 88–216 |
 |   2. TC by id and level (`0x00654E00`) | 217–223 |
-|   3. Monster drop | 224–344 |
-|   4. Chest drop (`0x00585B90`) | 345–371 |
-|   5. The TC walk (`0x0055A6D0`) | 372–478 |
-|   6. Drop quality (`0x00558640`) | 479–510 |
-|   7. Creation inputs and placement (`0x0055A550`) | 511–547 |
-|   8. Gold amount | 548–563 |
-|   9. Quest drop helper (`0x00559A30`) | 564–649 |
-| Constants & data dependencies | 650–679 |
-| Randomness | 680–701 |
-| Edge cases & original bugs | 702–725 |
-| Test vectors | 726–755 |
-| Provenance | 756–780 |
-| Open questions | 781–958 |
+|   3. Monster drop | 224–355 |
+|   4. Chest drop (`0x00585B90`) | 356–382 |
+|   5. The TC walk (`0x0055A6D0`) | 383–489 |
+|   6. Drop quality (`0x00558640`) | 490–521 |
+|   7. Creation inputs and placement (`0x0055A550`) | 522–558 |
+|   8. Gold amount | 559–574 |
+|   9. Quest drop helper (`0x00559A30`) | 575–660 |
+| Constants & data dependencies | 661–690 |
+| Randomness | 691–712 |
+| Edge cases & original bugs | 713–736 |
+| Test vectors | 737–766 |
+| Provenance | 767–791 |
+| Open questions | 792–969 |
 <!-- /index -->
 
 ## Summary
@@ -323,6 +323,17 @@ Recorded (`traces/orig-cache/combat-kill-fallen`, state channel,
 and its gold is in mode 3 in the frame-36 snapshot too. The S→C 0x9C
 of the `items-drop-monster-kill` check is at frame 36 (ledger
 `q-tool-items-channel`).
+
+Settled 2026-10-10 (rc-drop-content, REC-1985): the `items-drops-nor-*`
+differences are not all the death lag. `items-drops-nor-11` (Griswold,
+three drops) and `-09` differed in drop content because the monster's
+unit seed had been advanced before its death by AI think draws at the
+wrong frames: Griswold is a `boss`, whose first think is the boss-sound
+idle 20 (`ai.md` §2.4 step 1), and d2rs answered "not a boss" for every
+monster. With the monstats flag read, the walk (§5, negative picks and
+nested slots included) gives the 1.14d items unchanged. The rng channel
+(`rng_diff.py`) names such a cause directly: the same draw values at
+different frames.
 
 d2rs (read 2026-10-09): the same path runs in one call
 (`reaction::kill` → `monster_set_mode(DT)` → `Pending::monster_death_start`

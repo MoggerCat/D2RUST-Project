@@ -154,7 +154,7 @@ impl<X: Pending> AiUnits for View<'_, X> {
         self.h.monster_flag(unit, 4)
     }
     fn is_boss(&self, unit: UnitId) -> bool {
-        self.h.x.is_boss(unit)
+        self.h.is_boss(unit)
     }
     /// Monster data +0x50 (the coordinate record of `population.md`
     /// §9.6 step 3) and its +0x24 word: a monster of the lent monster

@@ -419,3 +419,41 @@ fn registered_good_npcs_join_target_list_8_newest_first() {
     fx.game.remove_unit(b).unwrap();
     assert_eq!(lists(&mut fx)[8], vec![a]);
 }
+
+/// `0x0063E9F0` / `0x0063E940` / `0x0063E990` / `0x0063EDC0` read the
+/// monstats flags of the monster's class (`ai.md` §2.4 step 1): a boss
+/// such as Griswold gets the boss-sound idle, which defers its first
+/// think by 20 frames (rc-drop-content, `items-drops-nor-11`). A unit
+/// without monster data keeps the `Pending` answer (false here).
+// Covers: specs/monsters/ai.md §2.4
+#[test]
+fn monstats_flags_answer_boss_demon_undead_prime_evil() {
+    let mut fx = Fx::new();
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
+    let flags = |fx: &mut Fx| {
+        let h = fx.sim.hooks();
+        (
+            h.is_boss(m),
+            h.is_demon(m),
+            h.is_undead(m),
+            h.is_prime_evil(m),
+        )
+    };
+    let data = crate::monsters::init::MonsterData::default();
+    fx.sim.sys.hooks.monster_world = Some(Box::new(super::sound::DataOnly(
+        [(m, data)].into_iter().collect(),
+    )));
+    assert_eq!(flags(&mut fx), (false, false, false, false));
+    let mut tables = (*fx.sim.sys.hooks.tables).clone();
+    let row = &mut tables.combat;
+    row.monstats[0].boss = true;
+    row.monstats[0].hundead = true;
+    fx.sim.sys.hooks.tables = std::sync::Arc::new(tables);
+    assert_eq!(flags(&mut fx), (true, false, true, false));
+    let mut tables = (*fx.sim.sys.hooks.tables).clone();
+    let row = &mut tables.combat;
+    row.monstats[0].demon = true;
+    row.monstats[0].primeevil = true;
+    fx.sim.sys.hooks.tables = std::sync::Arc::new(tables);
+    assert_eq!(flags(&mut fx), (true, true, true, true));
+}

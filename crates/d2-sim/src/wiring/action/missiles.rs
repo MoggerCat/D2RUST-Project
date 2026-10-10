@@ -435,10 +435,10 @@ impl<X: Pending> MissileCombat for View<'_, X> {
     /// the missile.
     fn target_damage_bonus(&self, missile: UnitId, unit: UnitId) -> i32 {
         let mut p = 0i32;
-        if self.h.x.is_demon(unit) {
+        if self.h.is_demon(unit) {
             p = p.wrapping_add(View::stat(self, missile, 121));
         }
-        if self.h.x.is_undead(unit) {
+        if self.h.is_undead(unit) {
             p = p.wrapping_add(View::stat(self, missile, 122));
         }
         let class = self.units.get(unit).map_or(0, |r| r.class as i32);
@@ -747,10 +747,10 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         self.units.is_dead(unit)
     }
     fn is_demon(&self, unit: UnitId) -> bool {
-        self.h.x.is_demon(unit)
+        self.h.is_demon(unit)
     }
     fn is_undead(&self, unit: UnitId) -> bool {
-        self.h.x.is_undead(unit)
+        self.h.is_undead(unit)
     }
     fn area_units(
         &mut self,

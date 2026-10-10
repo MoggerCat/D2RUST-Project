@@ -29,20 +29,20 @@
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
 |   1. Think scheduling | 97–293 |
-|   2. Think dispatch `0x005B1740` | 294–433 |
-|   3. AI control and AI tables | 434–605 |
-|   4. AI parameters | 606–624 |
-|   5. Target selection | 625–961 |
-|   6. Distances and line tests | 962–977 |
-|   7. Tactics helpers | 978–1217 |
-|   8. AI commands and minions | 1218–1244 |
-|   10. The catalogue `ai-functions.tsv` | 1245–1265 |
-| Constants & data dependencies | 1266–1289 |
-| Randomness | 1290–1319 |
-| Edge cases & original bugs | 1320–1361 |
-| Test vectors | 1362–1450 |
-| Provenance | 1451–1512 |
-| Open questions | 1513–1619 |
+|   2. Think dispatch `0x005B1740` | 294–440 |
+|   3. AI control and AI tables | 441–612 |
+|   4. AI parameters | 613–631 |
+|   5. Target selection | 632–968 |
+|   6. Distances and line tests | 969–984 |
+|   7. Tactics helpers | 985–1224 |
+|   8. AI commands and minions | 1225–1251 |
+|   10. The catalogue `ai-functions.tsv` | 1252–1272 |
+| Constants & data dependencies | 1273–1296 |
+| Randomness | 1297–1326 |
+| Edge cases & original bugs | 1327–1368 |
+| Test vectors | 1369–1457 |
+| Provenance | 1458–1519 |
+| Open questions | 1520–1626 |
 <!-- /index -->
 
 ## Summary
@@ -410,6 +410,13 @@ Only when a target was found:
    target distance is < 20, the target is a player, and control flag 0x10
    is clear: play sound 16, set flag 0x10, idle 20, stop. Once per
    monster.
+   Recorded (rc-drop-content, `items-drops-nor-11` with the rng channel,
+   2026-10-10): Griswold (class 365, monstats `boss`) spawned at frame 30
+   with a player < 20 away makes its first think at frame 31 and idles
+   20 (no draw); its Griswold body (`0x005E5AC0`) first draws at frame 51,
+   then 61 and 66. The boss, demon, undead and prime-evil tests read the
+   monstats flags of the unit's class (monster units only); d2rs answered
+   false for all four until the action hooks read the row.
 2. **Teleport** (`0x005B11F0`, monsters given control flag 0x20 by a
    monumod; `monsters/init.md`). Not if dead or flag 0x20 clear. Draws:
    1. `lo' % 100` ≥ 40 → continue with 3.
