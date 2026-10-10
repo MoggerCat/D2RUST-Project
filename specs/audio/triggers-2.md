@@ -25,25 +25,26 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 49–58 |
-| Inputs | 59–68 |
-| Outputs / state changes | 69–74 |
-| Rules | 75–76 |
-|   13. Remaining fixed-request conditions (`audio/triggers.md` open question 10) | 77–174 |
-|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 175–241 |
-|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 242–269 |
-|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 270–287 |
-|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 288–296 |
-|   18. Sound identity of a unit and its `monsounds` record | 297–345 |
-|   19. A unit's request list (U +0x78) | 346–392 |
-|   20. When object units make their mode sounds | 393–431 |
-|   21. What the driver needs per rule (inputs and owners) | 432–460 |
-| Constants & data dependencies | 461–470 |
-| Randomness | 471–476 |
-| Edge cases & original bugs | 477–486 |
-| Test vectors | 487–516 |
-| Provenance | 517–545 |
-| Open questions | 546–549 |
+| Summary | 50–59 |
+| Inputs | 60–69 |
+| Outputs / state changes | 70–75 |
+| Rules | 76–77 |
+|   13. Remaining fixed-request conditions (`audio/triggers.md` open question 10) | 78–175 |
+|   14. Server senders of S→C 0x2C (`audio/triggers.md` open question 2) | 176–242 |
+|   15. Animation event 3 ("sound") (`audio/triggers.md` open question 13) | 243–270 |
+|   16. `ProgSound` conditions (`audio/triggers.md` open question 6) | 271–288 |
+|   17. Options-menu UI sounds (`audio/triggers.md` open question 12, part) | 289–297 |
+|   18. Sound identity of a unit and its `monsounds` record | 298–346 |
+|   19. A unit's request list (U +0x78) | 347–393 |
+|   20. When object units make their mode sounds | 394–432 |
+|   21. What the driver needs per rule (inputs and owners) | 433–461 |
+| Constants & data dependencies | 462–471 |
+| Randomness | 472–477 |
+| Edge cases & original bugs | 478–487 |
+| Test vectors | 488–517 |
+| Provenance | 518–546 |
+| Open questions | 547–550 |
+|   14a. Monster greeting reaches the client (rc-packets-s2c) | 551–559 |
 <!-- /index -->
 
 ## Summary
@@ -546,3 +547,12 @@ by `Id`; the `Expansion` row skipped), `monstats.txt` (by `hcIdx`),
 ## Open questions
 
 Kept in `audio/triggers.md` (numbers there).
+
+### 14a. Monster greeting reaches the client (rc-packets-s2c)
+
+The NPC interaction handler `0x005E68F0` (`monsters/ai-bodies.md` §9.9
+step 6) queues event 18 through `0x00553380`; the monster update
+(`0x00598220` step 6, `0x00571740`) then sends S→C 0x2C in the same
+frame, between the monster's mode message and the next unit's. d2rs: the
+`Pending::play_sound` default queues the slot (check `sys-intents-moves`,
+frame 68).
