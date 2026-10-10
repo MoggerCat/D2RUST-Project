@@ -419,3 +419,33 @@ fn registered_good_npcs_join_target_list_8_newest_first() {
     fx.game.remove_unit(b).unwrap();
     assert_eq!(lists(&mut fx)[8], vec![a]);
 }
+
+#[test]
+fn natural_skill_level_is_read_by_the_ai() {
+    // `init.md` §6 step 14 gives the monster its entry; the AI's
+    // `0x006442A0` read is that base level, 1-fallback is the body's.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    fx.sim.with(&mut fx.game, |_, v| {
+        assert_eq!(
+            crate::monsters::ai::AiActs::skill_level(&*v, m, 352, false),
+            None
+        );
+        v.h.natural_skills.entry(m).or_default().insert(352, 4);
+        assert_eq!(
+            crate::monsters::ai::AiActs::skill_level(&*v, m, 352, false),
+            Some(4)
+        );
+        assert_eq!(
+            crate::monsters::ai::AiActs::skill_level(&*v, m, 300, false),
+            None
+        );
+        // A summon's entry (`monster_skills`) wins.
+        v.h.monster_skills.entry(m).or_default().insert(352, 9);
+        assert_eq!(
+            crate::monsters::ai::AiActs::skill_level(&*v, m, 352, false),
+            Some(9)
+        );
+    });
+    fx.assert_clean();
+}

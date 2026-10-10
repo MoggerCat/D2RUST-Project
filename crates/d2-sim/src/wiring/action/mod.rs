@@ -363,6 +363,11 @@ pub struct ActionHooks<X> {
     /// entry and level); a monster without one asks
     /// [`Pending::ai_skill_entry`].
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// The entries monster init step 14 gives a monster (`Skill<i>` at
+    /// `Sk<i>lvl` + the monster skill bonus, `monsters/init.md` §6):
+    /// skill id → base level. Read for the level only
+    /// ([`Pending::ai_skill_level`] is asked for a unit without one).
+    pub natural_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// A monster's equipped items by body location (its inventory's
     /// body slots, `monsters/init.md` §12): d2rs-own record of the
     /// holdings `has_item_at` reads (no monster inventory model here).
@@ -465,6 +470,7 @@ impl<X> ActionHooks<X> {
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
+            natural_skills: BTreeMap::new(),
             monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),

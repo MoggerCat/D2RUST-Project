@@ -531,6 +531,14 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
     fn ai_use_skill(&mut self, unit: UnitId, mode: u32, skill: u16) {
         self.v.h.x.ai_use_skill(unit, mode, skill);
     }
+    fn give_skill(&mut self, unit: UnitId, skill: u16, level: i32, _mode: Option<u8>) {
+        self.v
+            .h
+            .natural_skills
+            .entry(unit)
+            .or_default()
+            .insert(i32::from(skill), level);
+    }
     fn skill_level(&mut self, unit: UnitId, skill: u16) -> Option<i32> {
         self.v.h.x.skill_level(unit, skill)
     }

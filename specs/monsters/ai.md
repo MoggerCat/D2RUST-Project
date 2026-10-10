@@ -34,15 +34,15 @@
 |   4. AI parameters | 606–624 |
 |   5. Target selection | 625–961 |
 |   6. Distances and line tests | 962–977 |
-|   7. Tactics helpers | 978–1217 |
-|   8. AI commands and minions | 1218–1244 |
-|   10. The catalogue `ai-functions.tsv` | 1245–1265 |
-| Constants & data dependencies | 1266–1289 |
-| Randomness | 1290–1319 |
-| Edge cases & original bugs | 1320–1361 |
-| Test vectors | 1362–1450 |
-| Provenance | 1451–1512 |
-| Open questions | 1513–1619 |
+|   7. Tactics helpers | 978–1223 |
+|   8. AI commands and minions | 1224–1250 |
+|   10. The catalogue `ai-functions.tsv` | 1251–1271 |
+| Constants & data dependencies | 1272–1295 |
+| Randomness | 1296–1325 |
+| Edge cases & original bugs | 1326–1367 |
+| Test vectors | 1368–1456 |
+| Provenance | 1457–1518 |
+| Open questions | 1519–1625 |
 <!-- /index -->
 
 ## Summary
@@ -1095,6 +1095,12 @@ the unit (`0x00649180`), 0x3C01)` = 0; "line clear" =
 9. Any other skill → 1.
 
 1.14d-confirmed (`0x005FD470`, register use in the disassembly).
+Implemented (rc-mon-frame31, REC-1996): `View::skill_check` runs the rules
+above on the DRLG rooms once the path provider is on (rule 5, DiabPrison,
+stays false). Before this the host stub answered 0, so a ClawViper never
+cast SerpentCharge (srvdofunc 67, rule 7). gen-mon-77: first divergence
+31 → 34 (the Charge hit).
+
 
 #### 7.5 Path target and re-path budget on a mode request
 
