@@ -1395,6 +1395,10 @@ pub struct StateRow {
     /// the state is in the state-mask group 0x26 that `range(P, skill)`
     /// tests (`skills/use.md` §3 r6).
     pub meleeonly: bool,
+    /// `restrict` (`states.txt` flag bit 17, `data/fields.tsv`): the
+    /// state-mask group `0x0063A510` tests, the shapeshift forms
+    /// (`skills/use.md` §2 test 7).
+    pub restrict: bool,
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1534,6 +1538,11 @@ pub struct SkillRow {
     /// `cltstfunc` (+0xF2): the client start of `client/model.md` §8 r7
     /// step 5.
     pub cltstfunc: u16,
+    /// `restrict` (+0x228): 0 human form only, 1 any form, 2 only with
+    /// one of `State1`…`State3` (`skills/use.md` §2 test 7).
+    pub restrict: u8,
+    /// `State1`…`State3` (+0x22A, i16; a negative id ends the list).
+    pub shape_states: [i16; 3],
 }
 
 /// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):
