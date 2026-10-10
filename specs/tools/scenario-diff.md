@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–589 |
-|   4. Suite | 590–717 |
-| Constants & data dependencies | 718–721 |
-| Randomness | 722–725 |
-| Edge cases & original bugs | 726–761 |
-| Test vectors | 762–784 |
-| Provenance | 785–788 |
-| Open questions | 789–851 |
+|   3. Run | 145–596 |
+|   4. Suite | 597–724 |
+| Constants & data dependencies | 725–728 |
+| Randomness | 729–732 |
+| Edge cases & original bugs | 733–768 |
+| Test vectors | 769–791 |
+| Provenance | 792–795 |
+| Open questions | 796–858 |
 <!-- /index -->
 
 ## Summary
@@ -586,6 +586,13 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **frontend screens** (REC-3760): a frontend check named `ui-frontend-screens*`
+    runs `frontend_sbs.py --script screens` and `screens_check.py` instead of the
+    paper dolls: every screen of the menu walk, per-pixel median over the shots of
+    each side, compared where stable on both sides at tolerance 0, the animated pixels
+    counted (specs/ui/frontend-menus.md §F2.11). d2rs starts its script 6 s after
+    launch (`FE_WAIT_OURS`) so the trademark screen is still up like 1.14d's.
 
 ### 4. Suite
 
