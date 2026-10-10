@@ -67,9 +67,6 @@ impl QuestRest for Rest {
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
     }
-    fn attach_sound(&mut self, _: UnitId, sound: u16) {
-        self.log.push(format!("sound {sound}"));
-    }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.log.push(format!("send {:02x}", msg[0]));
         self.sent.push((player, msg.to_vec()));
@@ -277,8 +274,10 @@ fn malus_level_gate_reads_real_stats() {
         act1::malus_operate(&mut ctl, &mut qw, malus, p);
     }
     // Level 7: sound event 19, nothing drops.
-    assert_eq!(rest.log, ["sound 19"]);
-    rest.log.clear();
+    assert!(rest.log.is_empty());
+    let slot = w.game.sounds.get(p).expect("the sound event is queued");
+    assert_eq!((slot.event, slot.target), (19, Some(p)));
+    w.game.sounds.clear(p);
     w.set_stat(p, 12, 8);
     {
         let mut e = w.econ();

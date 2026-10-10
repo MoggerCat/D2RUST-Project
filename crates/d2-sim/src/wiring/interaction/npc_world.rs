@@ -54,8 +54,6 @@ pub trait NpcRest: super::HirelingRest {
     fn npc_ai_param(&mut self, npc: UnitId, param: u32);
     // ---- messages and sounds (transport; `send` and `attach_sound` are
     // the quests' [`QuestRest`] ones)
-    /// The SetStat message part of `0x00548520` (after the stat is set).
-    fn stat_sent(&mut self, player: UnitId, stat: u16, value: u32);
     fn respec_sound(&mut self, player: UnitId);
     /// `0x00661480` (not specified).
     fn encode_text_list(&self, list: &TextList) -> [u8; 34];
@@ -263,10 +261,14 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .stats
             .unit_set(&mut *self.econ.hooks, unit, stat, value as i32, 0);
     }
-    /// `0x00548520`: the stat set, then its message.
+    /// `0x00548520`: the stat set, then its message (`0x0053BE40`: S→C
+    /// 0x1D / 0x1E / 0x1F by the value's size; none for a stat above
+    /// 0xFE).
     fn set_stat_send(&mut self, player: UnitId, stat: u16, value: u32) {
         NpcWorld::set_stat(self, player, stat, value);
-        self.rest.stat_sent(player, stat, value);
+        if let Some(m) = crate::wiring::action::vitals_sync::stat_message(stat, value as i32) {
+            QuestRest::send(&mut *self.rest, player, &m);
+        }
     }
     fn max_life(&self, unit: UnitId) -> u32 {
         self.econ.stats.max_life(unit) as u32
@@ -304,7 +306,9 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
             .free_state_list(&mut *self.econ.hooks, unit, u32::from(state));
     }
     fn attach_sound(&mut self, unit: UnitId, sound: u16) {
-        QuestRest::attach_sound(&mut *self.rest, unit, sound);
+        // `0x00553380(npc, 10, 0)` (asm `0x00578E4F`–`0x00578E59`): no
+        // target, every client.
+        let _ = crate::units::sound::queue_sound(&mut *self.econ.game, unit, sound, None);
     }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {
