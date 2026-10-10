@@ -21,18 +21,18 @@
 | Inputs | 49–59 |
 | Outputs / state changes | 60–65 |
 | Rules | 66–67 |
-|   11. Weather (passes 4 and 9; water floors) | 68–349 |
-|   12. Level backgrounds (pass 1) | 350–403 |
-|   13. Pass 8 (`0x00475B20`) | 404–412 |
-|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 413–438 |
-|   15. Sight test (`draw-order.md` §5 r3) | 439–485 |
-|   16. Line test (`0x0064E260`) | 486–515 |
-| Constants & data dependencies | 516–526 |
-| Randomness | 527–538 |
-| Edge cases & original bugs | 539–555 |
-| Test vectors | 556–577 |
-| Provenance | 578–610 |
-| Open questions | 611–686 |
+|   11. Weather (passes 4 and 9; water floors) | 68–362 |
+|   12. Level backgrounds (pass 1) | 363–416 |
+|   13. Pass 8 (`0x00475B20`) | 417–425 |
+|   14. Edge floors (`0x004DE6C0`, `0x004DE630`) | 426–451 |
+|   15. Sight test (`draw-order.md` §5 r3) | 452–498 |
+|   16. Line test (`0x0064E260`) | 499–528 |
+| Constants & data dependencies | 529–539 |
+| Randomness | 540–551 |
+| Edge cases & original bugs | 552–568 |
+| Test vectors | 569–590 |
+| Provenance | 591–623 |
+| Open questions | 624–699 |
 <!-- /index -->
 
 ## Summary
@@ -308,6 +308,19 @@ on the player's seed:
    lock := lock; lock set → `0x00473D00(2)`; snow mode := 1
    (`0x00472590`: lightning off; the particle pool is cleared when the
    mode changes or `arg` ≠ 0).
+
+Act load also runs a **one-time** `0x00472610` after `0x004726F0(1)`
+(`0x00472890`: flag `[0x007A8A30]` = 0 → three raw steps on the player's
+seed, then the flag is set; `.bss`, never cleared, so only the first act
+load of the client process does it). `0x004726F0` returns at once, with no
+step, while the local player has no room. A placement of the local player
+(`0x004654C0`, S→C 0x15 at the join) ends in `0x00472C20(flag)`, which
+clears two grids and, for flag ≠ 0, runs `0x004726F0(flag)` (outside act V:
+snow off and `0x00472610`, three steps); the join's 0x15 carries flag 1, so
+the player's seed takes 3 (0x15) + 3 (act load) + 3 (one-time) raw steps
+before the first rain update (verified: the rain ramp of
+`facts/client/weather/a1-town-rain-start.tsv`, target 1 at C 3, 2 at C 5,
+3 at C 7, follows from these draws; d2rs: REC-1900, REC-1901).
 
 `0x00472400` (phase 2, per level): 109–112 snow goal (42, 170), peak :=
 `roll_range(32, 56)`; 117 goal (170, 56), peak := `roll_range(40, 112)`;

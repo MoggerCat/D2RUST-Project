@@ -282,6 +282,23 @@ fn direct_sends_overtake_buffered_messages() {
     assert_eq!(got, [0xB0, 0x06, 0x0C]);
 }
 
+// Covers: specs/tools/poke.md §5 r5
+#[test]
+fn a_tick_end_queue_leaves_in_the_same_frames_flush() {
+    let mut h = host();
+    h.frame().unwrap();
+    h.receive(0);
+    h.game.tick_out = vec![(0, vec![0x01; 8])];
+    h.clock.0 = 1040;
+    // The tick's message first, then the one queued at the tick end.
+    let r = h
+        .frame_with(|h| h.queue_now(0, &[0x07, 0, 4, 0xF0, 3, 0x28]).unwrap())
+        .unwrap();
+    assert!(r.ticked);
+    let got: Vec<u8> = h.receive(0).iter().map(|m| m[0]).collect();
+    assert_eq!(got, [0x01, 0x07]);
+}
+
 // Covers: specs/sim/intents-events.md §3.2 r3, §3.2 r4, §3.3 r4
 #[test]
 fn flush_throttle_unless_forced() {

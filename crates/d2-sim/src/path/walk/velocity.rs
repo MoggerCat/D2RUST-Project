@@ -115,10 +115,9 @@ pub fn mode_velocity<U: WalkUnits + ?Sized>(
         return Some(KNOCKBACK_VELOCITY);
     }
     let p = velocity_percent(t, &facts(t, u, unit), mode)?;
-    let base = match ty {
-        UnitType::Player => u.charstats_velocity(unit).0 * 256,
-        _ => u.monstats_velocity(unit).0 * 256,
-    };
+    // `0x00621360` on the draw identity (`0x00623F50` passes the type and
+    // class `0x00645270` gave).
+    let base = u.velocity_base(unit) * 256;
     Some(base.wrapping_mul(p) / 100)
 }
 

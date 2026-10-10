@@ -386,7 +386,7 @@ pub trait Pending {
     fn vision_seen(&self, unit: UnitId) -> Option<u32> {
         None
     }
-    fn mark_seen(&mut self, unit: UnitId) {}
+    fn mark_seen(&mut self, unit: UnitId, value: u32) {}
     /// Type-10 handler `0x00573120`: monster data +0x34, +0x38 := 0.
     fn ai_reset(&mut self, unit: UnitId) {}
     /// `0x00572DC0`.
@@ -753,12 +753,15 @@ pub trait Pending {
         false
     }
     /// The Npc class cases (`ai-bodies.md` §9.9 step 2); defaults: no quest
-    /// state (jerhyn's palace inactive, nothing brought or found).
+    /// state. Jerhyn without a palace spawn (chain 11 extra +0x0D = 0: a
+    /// fresh or act-1-done character) gives `0x0059F570` = 1 and (a, b) =
+    /// (1, 0), so his think goes on to the interaction step (`quests-act2.md`
+    /// §10). PROVISIONAL REC-1855: the palace-Jerhyn states are not read.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
-        false
+        true
     }
     fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
-        (0, 0)
+        (1, 0)
     }
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
         false
@@ -897,8 +900,8 @@ pub trait Pending {
         false
     }
 
-    /// Reaction `0x0057CEE0` (`damage.md` §7.1) steps 1–2 (the town rule
-    /// and the hit class store); steps 3–5 run in
+    /// Reaction `0x0057CEE0` (`damage.md` §7.1) step 1 (the town rule);
+    /// steps 2–5 run in
     /// [`super::reaction::reaction`].
     fn reaction(&mut self, a: UnitId, d: UnitId, record: &mut crate::combat::DamageRecord) {}
     /// AI state setter `0x005734C0(unit, v)` (monster data `dwAiState`,
@@ -1231,14 +1234,6 @@ pub trait Pending {
 
     // ---- the monster mode message and the death end (`intents-events.md` §7.4, §7.7)
 
-    /// Unit +0xB0, read as e of a mode-0 and mode-3 message and f of a
-    /// mode-13 message (§7.4 rule 5). Its writers are not specified
-    /// (`stat-lists.md` §10: the regeneration kill sets it to 0;
-    /// `audio/triggers.md` OQ3 reads the client copy as the hit class of
-    /// the last hit). Default: 0.
-    fn unit_b0(&self, unit: UnitId) -> u8 {
-        0
-    }
     /// `0x005A0180(unit, 0x100)`, which sets bit 0x80 of a mode-3
     /// message's d (§7.4 rule 5; not specified). Default: false.
     fn monster_flag_100(&self, unit: UnitId) -> bool {
@@ -1642,12 +1637,86 @@ pub trait Pending {
     {
         false
     }
+    /// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33
+    /// step 4, `0x0056E620`): routed to
+    /// [`crate::wiring::interaction::skill_events::missile_summon_class`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default: none.
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32)
+    where
+        Self: Sized,
+    {
+        (-1, 0)
+    }
+    /// The Bone Wall maker's summon spawn (§33 step 7, flags 0xD).
+    /// Default: none.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId>
+    where
+        Self: Sized,
+    {
+        None
+    }
+    /// The Bone Wall maker's piece binding (§33 step 8). Default: nothing.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
+    /// The save load's right-skill aura start (`formats/d2s.md` §2.4
+    /// rule 6.3): routed to
+    /// [`crate::wiring::interaction::skill_events::right_aura_select`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The save load's passive states (`formats/d2s-load.md` §2
     /// "skills", the assign's passive part): routed to
     /// [`crate::wiring::interaction::skill_events::passive_refresh_all`]
     /// by a [`crate::wiring::interaction::UseRest`] value. Default:
     /// nothing.
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The pet follow `0x005754B0` of the summoned pet types
+    /// (`hirelings.md` §6 rule 1): routed to
+    /// [`crate::wiring::interaction::summon::summon_follow`] by a
+    /// [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn summon_follow(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The save load's right-skill aura (`use.md` §7 "0x3C SelectSkill",
+    /// the assign `0x005701B0`): routed to
+    /// [`crate::wiring::interaction::skill_events::assign_right_aura`] by a
+    /// [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn assign_right_aura(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
     where
         Self: Sized,
     {
@@ -1789,6 +1858,10 @@ pub trait Pending {
     /// `quests.md` §8.2: leaving the summit for 118 or 128), published by
     /// the quest control once per tick. Default: nothing.
     fn set_summit_open(&mut self, open: bool) {}
+    /// The Ancients' gate `0x0058CF90` (`quests-act5-2.md` §7.9) answer
+    /// source: the fight's armed byte (+0x11), published by the quest
+    /// control once per tick. Default: nothing.
+    fn set_ancients_armed(&mut self, armed: bool) {}
     /// The not-intro test `0x005444B0(game, chain)` (`quests.md` §2.3:
     /// no record with the chain → true, else its not-intro byte +0x09):
     /// the quest control publishes its records' answers once per tick.

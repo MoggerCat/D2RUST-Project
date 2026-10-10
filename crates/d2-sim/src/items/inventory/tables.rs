@@ -59,6 +59,9 @@ pub struct InvItemRec {
     /// `world/vendors.md` §7.1.1).
     pub wclass: [u8; 4],
     pub wclass2: [u8; 4],
+    /// `rangeadder` (weapons +0x104): the melee reach `0x00622870` adds
+    /// for a player (`combat/hit.md` §7.3).
+    pub rangeadder: u8,
     /// The use fields of `items/use.md` §3.1 (items record +0x98…+0xB0):
     /// `state` (i16), `stat1`–`stat3` (i16, −1 = none), `calc1`–`calc3`
     /// and `len` (offsets into [`ItemUseTables::code`]).
@@ -95,6 +98,7 @@ macro_rules! inv_item_rec {
                     maxdam: r.maxdam,
                     wclass: r.wclass,
                     wclass2: r.f_2handedwclass,
+                    rangeadder: r.rangeadder,
                     use_state: r.state as i16,
                     use_stat: [r.stat1 as i16, r.stat2 as i16, r.stat3 as i16],
                     use_calc: [r.calc1, r.calc2, r.calc3],

@@ -505,9 +505,14 @@ pub fn reanimated_horde<W: AiHost + ?Sized>(
         }
         return;
     }
-    // 3.
+    // 3. The draw is the `roll(100)` helper (`0x005E161A`).
     let direct = t.is_some_and(|tt| cx.world.can_reach_directly(game, u, tt));
-    if cx.skill(p, 2).0 >= 0 && direct && 5 < d && d < cx.aip(p, 3) && pct(cx, u) < cx.aip(p, 4) {
+    if cx.skill(p, 2).0 >= 0
+        && direct
+        && d < cx.aip(p, 3)
+        && 5 < d
+        && roll(cx, u, 100) < cx.aip(p, 4)
+    {
         skill_k(game, cx, u, p, 2, t);
         return;
     }

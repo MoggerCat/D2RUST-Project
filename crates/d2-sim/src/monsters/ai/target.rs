@@ -104,6 +104,9 @@ pub fn main_search_with<W: AiHost + ?Sized>(
     };
     // 2. Line-of-sight flag T.
     let flags = cx.store.control(ctl).map_or(0, |c| c.flags);
+    // `vis`: the vision record's +0x24 as step 2 read it (S, 0 when the
+    // record was loaded but not read); `None` = no record loaded.
+    let mut vis: Option<u32> = None;
     let los = if flags & flag::FORCE_LOS != 0 {
         if let Some(c) = cx.store.control_mut(ctl) {
             c.flags &= !flag::FORCE_LOS;
@@ -112,8 +115,15 @@ pub fn main_search_with<W: AiHost + ?Sized>(
     } else if !cx.world.los_draw(game, room) {
         let t = flags & flag::TARGET_SEEN == 0;
         match cx.world.vision_seen(unit) {
-            Some(v) if t => v == 0,
-            _ => t,
+            Some(v) if t => {
+                vis = Some(v);
+                v == 0
+            }
+            Some(_) => {
+                vis = Some(0);
+                t
+            }
+            None => t,
         }
     } else {
         false
@@ -121,12 +131,12 @@ pub fn main_search_with<W: AiHost + ?Sized>(
     // 3. Forced target: it takes step 7 like any target (§5.1 end).
     let align = cx.world.alignment(unit);
     if let Some((t, d)) = cx.world.forced_target(game, unit) {
-        return finish(game, cx, unit, ctl, align, t, d);
+        return finish(game, cx, unit, ctl, align, vis, t, d);
     }
     // 4. Not evil.
     if align != 0 {
         return match cx.world.good_target_search(game, unit, los) {
-            Some((t, d)) => finish(game, cx, unit, ctl, align, t, d),
+            Some((t, d)) => finish(game, cx, unit, ctl, align, vis, t, d),
             None => Search {
                 target: None,
                 distance: NO_DISTANCE,
@@ -219,15 +229,17 @@ pub fn main_search_with<W: AiHost + ?Sized>(
         };
     };
     // 7.
-    finish(game, cx, unit, ctl, align, t, best)
+    finish(game, cx, unit, ctl, align, vis, t, best)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn finish<W: AiHost + ?Sized>(
     game: &mut Game,
     cx: &mut Ctx<'_, W>,
     unit: UnitId,
     ctl: UnitId,
     align: u8,
+    vis: Option<u32>,
     t: UnitId,
     d: i32,
 ) -> Search {
@@ -235,7 +247,10 @@ fn finish<W: AiHost + ?Sized>(
         if let Some(c) = cx.store.control_mut(ctl) {
             c.flags |= flag::TARGET_SEEN;
         }
-        cx.world.mark_seen(unit);
+        // Step 7: +0x24 := (S == 0), only when step 2 loaded the record.
+        if let Some(seen) = vis {
+            cx.world.mark_seen(unit, u32::from(seen == 0));
+        }
     }
     let combat = cx.world.in_melee_range(game, unit, t);
     Search {

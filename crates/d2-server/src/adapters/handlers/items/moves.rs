@@ -133,6 +133,13 @@ pub trait MoveRest: InvRest {
         Vec::new()
     }
 
+    /// The ground items the call picked up, (player, item) in order
+    /// (`MovePending::quest_item_picked`, hook ITEMPICKEDUP
+    /// `0x00543D80`). Default: none.
+    fn take_picked_items(&mut self) -> Vec<(Owner, d2_sim::items::moves::Guid)> {
+        Vec::new()
+    }
+
     /// The players' skill lists, lent for one move call (the ranged-throw
     /// test reads `tables`' item type equivalence).
     fn stage_skills(&mut self, _stage: preview_skills::SkillStage, _tables: &InvTables) {}

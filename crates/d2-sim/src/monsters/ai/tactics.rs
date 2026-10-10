@@ -487,21 +487,22 @@ pub fn walk_in_radius<W: AiHost + ?Sized>(
     ok
 }
 
-/// The point `0x005DE4E0` walks to (§7.2): d is the full-size distance
-/// `0x005DC380` from the unit (its `size`) to t; s = −1 when d < b, else
-/// +1; k = min(|d − b|, a); with ax, ay = |t − u| and n = max(ax + ay, k),
-/// kx = ax·k/n and ky = ay·k/n (truncated), raised together by one each
-/// while kx + ky < k; the point is u + sign(t − u)·(kx, ky)·s. There is no
-/// early exit: k = 0 gives the unit's own cell.
-/// Spec: specs/monsters/ai.md §7.2 (1.14d `0x005DE4E0`, REC-1945).
+/// The point `0x005DE4E0` walks to (`ai.md` §7.2, 1.14d-confirmed, settles
+/// REC-501): d := full-size distance from the unit (size `size`) to `t`;
+/// s := −1 when d < b, else +1; k := min(|d − b|, a); with ax, ay the
+/// absolute axis distances and n := max(ax + ay, k), n > 0: kx := ax·k / n,
+/// ky := ay·k / n (truncated), then while kx + ky < k both grow by 1. The
+/// point is the unit's position plus sign(Δ)·kx·s and sign(Δ)·ky·s per
+/// axis. No early exit: k = 0, or `t` on the unit, gives its own position.
+/// Checked against Warriv's three recorded arrival walks (`-seed 1234`,
+/// player at (4873, 4228)) and Jerhyn's (`gen-shrine-*`, frame 50).
 pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> (i32, i32) {
     let d = distance_full_size(u, size, t);
     let s = if d < b { -1 } else { 1 };
     let k = (d - b).abs().min(a);
-    let (dx, dy) = (t.0 - u.0, t.1 - u.1);
-    let (ax, ay) = (dx.abs(), dy.abs());
+    let (ax, ay) = ((t.0 - u.0).abs(), (t.1 - u.1).abs());
     let n = (ax + ay).max(k);
-    if n == 0 {
+    if n <= 0 {
         return u;
     }
     let (mut kx, mut ky) = (ax * k / n, ay * k / n);
@@ -509,7 +510,10 @@ pub fn radius_point(u: (i32, i32), size: i32, t: (i32, i32), a: i32, b: i32) -> 
         kx += 1;
         ky += 1;
     }
-    (u.0 + dx.signum() * kx * s, u.1 + dy.signum() * ky * s)
+    (
+        u.0 + (t.0 - u.0).signum() * kx * s,
+        u.1 + (t.1 - u.1).signum() * ky * s,
+    )
 }
 
 /// `0x005DEF30` `WalkToTargetCoordinatesNoSteps` ("walk step 0", §7.2):

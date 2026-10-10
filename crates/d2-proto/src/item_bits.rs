@@ -374,9 +374,26 @@ fn read_code(r: &mut BitReader<'_>) -> Result<[u8; 4], ItemBitsError> {
 /// padding (§1 rule 1); anything else is an error.
 pub fn decode(stream: &[u8], t: &dyn ItemLookup) -> Result<ItemBits, ItemBitsError> {
     let mut r = BitReader::new(stream);
-    let it = decode_record(&mut r, t)?;
-    let used = r.pos();
+    let mut it = decode_record(&mut r, t)?;
+    let mut used = r.pos();
     let total = stream.len() * 8;
+    // `bitstream.md` §4.5 rule 5: 1.14d's writer sends the socket count of
+    // an unidentified full record although its header lacks 0x800, and the
+    // reader (`0x0062CBE0`) stops before it; those bits are not read, only
+    // skipped here so the padding check sees what follows.
+    if !it.failed
+        && !it.save
+        && it.flags & (hflag::IDENTIFIED | hflag::COMPACT | hflag::ALT_CODE | hflag::SOCKETED) == 0
+        && (total - used >= 8 || (used..total).any(|at| (stream[at / 8] >> (at % 8)) & 1 != 0))
+    {
+        if let Some(c) = t.isc(194) {
+            let n = usize::from(c.save_bits);
+            if total - used >= n {
+                used += n;
+                it.bits = used;
+            }
+        }
+    }
     // A failed record stopped inside its data (§4 rule 1): what follows
     // is not checked.
     if it.failed {

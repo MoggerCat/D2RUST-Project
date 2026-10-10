@@ -25,6 +25,9 @@ use crate::world::npc::{ImbueMods, ItemFacts};
 pub trait NpcInventory<H> {
     /// The player's cursor item (`inventory.md` §1.4 rule 3).
     fn cursor_item(&self, player: UnitId) -> Option<UnitId>;
+    /// The player's item list (`inventory.md` §1.4), for the quests'
+    /// held-item tests of the NPC chat.
+    fn items_of(&self, player: UnitId) -> Vec<UnitId>;
     /// The item owns socketed items (its own inventory is not empty).
     fn has_fillers(&self, item: UnitId) -> bool;
     /// Takes `item` off the player's cursor (`0x0055EEA0`); false when it
@@ -96,6 +99,9 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> NpcInventory<H> for NpcInv<'_, R> {
     }
     fn cursor_item(&self, player: UnitId) -> Option<UnitId> {
         self.state.cursor_of(player)
+    }
+    fn items_of(&self, player: UnitId) -> Vec<UnitId> {
+        self.state.items_of(player)
     }
     fn has_fillers(&self, item: UnitId) -> bool {
         !self.state.fillers(item).is_empty()

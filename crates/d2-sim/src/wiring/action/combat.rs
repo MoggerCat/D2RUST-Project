@@ -237,7 +237,21 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
     fn weapon_class(&self, u: UnitId) -> i32 {
         self.v.h.x.weapon_class(u)
     }
+    /// `0x00623C20` (`damage.md` §5.1 step 4.4): a monster's is its
+    /// monstats2 `HitClass` (+0x14, through monstats `MonStatsEx`; no
+    /// row → 0); a player's (its weapon's item hit class, 1 without one)
+    /// and other types: [`Pending::weapon_hit_class`].
     fn weapon_hit_class(&self, u: UnitId) -> u32 {
+        if self.ty(u) == UnitType::Monster {
+            let t = &self.v.h.tables.combat;
+            return self
+                .v
+                .units
+                .get(u)
+                .and_then(|r| t.monstats.get(r.class as usize))
+                .and_then(|m| t.monstats2.get(usize::from(m.monstatsex)))
+                .map_or(0, |m2| u32::from(m2.hitclass));
+        }
         self.v.h.x.weapon_hit_class(u)
     }
     fn montype_matches(&self, layer: u16, montype: i32) -> bool {
