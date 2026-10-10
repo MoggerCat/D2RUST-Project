@@ -34,17 +34,17 @@
 | Inputs | 62–73 |
 | Outputs / state changes | 74–81 |
 | Rules | 82–83 |
-|   25. Client object function dispatch | 84–239 |
-|   26. The client object functions | 240–438 |
-|   27. Client latches of the zoo and the preloads | 439–449 |
-|   28. What d2rs must model for §25–§27 | 450–462 |
-|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 463–541 |
-| Constants & data dependencies | 542–563 |
-| Randomness | 564–577 |
-| Edge cases & original bugs | 578–595 |
-| Test vectors | 596–630 |
-| Provenance | 631–664 |
-| Open questions | 665–680 |
+|   25. Client object function dispatch | 84–249 |
+|   26. The client object functions | 250–448 |
+|   27. Client latches of the zoo and the preloads | 449–459 |
+|   28. What d2rs must model for §25–§27 | 460–472 |
+|   29. Object mouse-over label (`0x00454F30`, unit type 2; REC-239) | 473–551 |
+| Constants & data dependencies | 552–573 |
+| Randomness | 574–587 |
+| Edge cases & original bugs | 588–605 |
+| Test vectors | 606–640 |
+| Provenance | 641–674 |
+| Open questions | 675–690 |
 <!-- /index -->
 
 ## Summary

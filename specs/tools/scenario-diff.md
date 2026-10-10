@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–549 |
-|   4. Suite | 550–677 |
-| Constants & data dependencies | 678–681 |
-| Randomness | 682–685 |
-| Edge cases & original bugs | 686–721 |
-| Test vectors | 722–744 |
-| Provenance | 745–748 |
-| Open questions | 749–811 |
+|   3. Run | 145–567 |
+|   4. Suite | 568–695 |
+| Constants & data dependencies | 696–699 |
+| Randomness | 700–703 |
+| Edge cases & original bugs | 704–739 |
+| Test vectors | 740–762 |
+| Provenance | 763–766 |
+| Open questions | 767–829 |
 <!-- /index -->
 
 ## Summary
