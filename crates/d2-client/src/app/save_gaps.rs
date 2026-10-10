@@ -194,9 +194,8 @@ pub fn join_gaps(s: &mut Sim, player: UnitId, save: &D2s) {
         }
     }
     select_mouse_skills(s, player, &save.header.mouse[..2]);
-    // §2.4 rule 6.3: the right hand's selection runs the new right
-    // skill's aura start (`0x0056FF10`).
-    s.events.action.right_aura_select(&mut s.game, player);
+    // §2.4 rule 6.3's right-hand aura start (`0x0056FF10`) runs after the
+    // join's 0xAA, in `enter_game`.
     select_swap_skills(
         s,
         player,

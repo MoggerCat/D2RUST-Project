@@ -384,6 +384,11 @@ pub fn enter_game<D: ActionEvents, W>(
         .x
         .send(player, &assign_player(guid, class as u8, &entry.name, 0, 0));
     a.with(&mut s.game, |g, v| v.player_part_b(g, player, player));
+    // The loaded right skill's aura starts only now: 1.14d's 0xAA above
+    // does not list its state (the 0xA8 follows with the first update;
+    // `use.md` §7 "0x3C SelectSkill", `formats/d2s.md` §2.4 rule 6.3).
+    a.right_aura_select(&mut s.game, player);
+    a.assign_right_aura(&mut s.game, player);
     // Rule 3.1 (b): the skills section's 0x94, from the player's list.
     if entry.base_skills {
         let m = a
