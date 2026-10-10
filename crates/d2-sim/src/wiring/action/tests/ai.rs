@@ -478,6 +478,33 @@ fn natural_skill_level_is_read_by_the_ai() {
     fx.assert_clean();
 }
 
+#[test]
+fn used_skill_takes_the_monster_entry_level() {
+    // A monster without a skill list casts with its init entry's base
+    // level (doomknight2 DoomKnightMissile at `Sk1lvl` 3: the missile's
+    // level in `milestone-hellforge`), a summon's entry winning; a skill
+    // with no entry keeps the seam's answer.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let entry = |skill| crate::skills::SkillEntry {
+        skill,
+        base: 1,
+        owner_guid: -1,
+        ..Default::default()
+    };
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.h.x.used.insert(m, entry(335));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
+        v.h.natural_skills.entry(m).or_default().insert(335, 3);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(3));
+        v.h.monster_skills.entry(m).or_default().insert(335, 7);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(7));
+        v.h.x.used.insert(m, entry(300));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
+    });
+    fx.assert_clean();
+}
+
 /// `0x0063E9F0` / `0x0063E940` / `0x0063E990` / `0x0063EDC0` read the
 /// monstats flags of the monster's class (`ai.md` §2.4 step 1): a boss
 /// such as Griswold gets the boss-sound idle, which defers its first

@@ -765,8 +765,13 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn portal_guid(&self, player: UnitId) -> Option<u32> {
         self.h.x.ai_portal_guid(player)
     }
+    /// Monster data `nComponent[i]` from the lent monster world;
+    /// [`Pending::ai_component`] without one.
     fn component(&self, unit: UnitId, i: usize) -> u8 {
-        self.h.x.ai_component(unit, i)
+        match self.h.monster_data(unit) {
+            Some(d) => d.components.get(i).copied().unwrap_or(0),
+            None => self.h.x.ai_component(unit, i),
+        }
     }
     fn target_unit(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
         self.h.x.ai_target_unit(game, unit)

@@ -1902,9 +1902,13 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             }
         }
     }
-    /// [`Pending::ai_component`].
+    /// Monster data `nComponent[k]` (`0x005CDFB0` reads +0x0E, S3) from
+    /// the lent monster world; [`Pending::ai_component`] without one.
     fn component(&self, u: UnitId, k: usize) -> i32 {
-        i32::from(self.x().ai_component(u, k))
+        match self.cv.v.h.monster_data(u) {
+            Some(d) => i32::from(d.components.get(k).copied().unwrap_or(0)),
+            None => i32::from(self.x().ai_component(u, k)),
+        }
     }
 }
 
