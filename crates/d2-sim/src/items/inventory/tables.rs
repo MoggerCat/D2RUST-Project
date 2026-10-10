@@ -62,6 +62,15 @@ pub struct InvItemRec {
     /// `rangeadder` (weapons +0x104): the melee reach `0x00622870` adds
     /// for a player (`combat/hit.md` §7.3).
     pub rangeadder: u8,
+    /// `StrBonus` / `DexBonus` (+0x106 / +0x108 of the weapon row's
+    /// layout): the percent of the wielder's stat added to the weapon's
+    /// damage (`combat/damage.md` §3.2).
+    pub strbonus: u16,
+    pub dexbonus: u16,
+    /// `durability` / `nodurability`: the breakable test
+    /// (`skills/bodies.md` "Break zero-durability weapons", `0x00629930`).
+    pub durability: u8,
+    pub nodurability: u8,
     /// The use fields of `items/use.md` §3.1 (items record +0x98…+0xB0):
     /// `state` (i16), `stat1`–`stat3` (i16, −1 = none), `calc1`–`calc3`
     /// and `len` (offsets into [`ItemUseTables::code`]).
@@ -99,6 +108,10 @@ macro_rules! inv_item_rec {
                     wclass: r.wclass,
                     wclass2: r.f_2handedwclass,
                     rangeadder: r.rangeadder,
+                    strbonus: r.strbonus,
+                    dexbonus: r.dexbonus,
+                    durability: r.durability,
+                    nodurability: r.nodurability,
                     use_state: r.state as i16,
                     use_stat: [r.stat1 as i16, r.stat2 as i16, r.stat3 as i16],
                     use_calc: [r.calc1, r.calc2, r.calc3],

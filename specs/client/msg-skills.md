@@ -20,26 +20,27 @@
 <!-- index -->
 | Section | Lines |
 |---|---|
-| Summary | 47–56 |
-| Inputs | 57–64 |
-| Outputs / state changes | 65–73 |
-| Rules | 74–75 |
-|   1. The client skill list (unit +0xA8) | 76–117 |
-|   2. Shared skill-list operations | 118–253 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 254–263 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 264–273 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 274–283 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 284–290 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 291–334 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 335–348 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 349–386 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 387–401 |
-| Constants & data dependencies | 402–413 |
-| Randomness | 414–417 |
-| Edge cases & original bugs | 418–427 |
-| Test vectors | 428–453 |
-| Provenance | 454–479 |
-| Open questions | 480–514 |
+| Summary | 48–57 |
+| Inputs | 58–65 |
+| Outputs / state changes | 66–74 |
+| Rules | 75–76 |
+|   1. The client skill list (unit +0xA8) | 77–118 |
+|   2. Shared skill-list operations | 119–254 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 255–264 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 265–274 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 275–284 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 285–291 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 292–335 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 336–355 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 356–393 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 394–408 |
+|   11. The client do (`0x004C68F0` → `0x004C6680`) | 409–467 |
+| Constants & data dependencies | 468–479 |
+| Randomness | 480–483 |
+| Edge cases & original bugs | 484–493 |
+| Test vectors | 494–519 |
+| Provenance | 520–545 |
+| Open questions | 546–580 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
@@ -345,6 +346,12 @@ level on a unit, toward a unit (0x99, the 16-byte form) or a point
    (client do / target, `audio/triggers.md` §8 r2).
 3. Model state written: none. One `SkillDo` output {unit key, target
    key or none, skill, level, x, y, v} for the client effect layer.
+4. **Client nova do**: `cltdofunc` 25 (`0x004E34E0`), rule §11 r4. It is
+   reached through the player update's do (§11), not through this
+   handler: 1.14d's Frost Nova row has no `ClientSend`, so the 64 client
+   missiles of §11 r4 (units 3/208…, each requesting its `TravelSound`
+   novaice.wav through `0x004CD540`; audio-cast-frost-nova-sor T 25 and
+   T 65) are the only Frost Nova missiles the client has (REC-2185).
 
 ### 9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`)
 
@@ -398,6 +405,65 @@ level on a unit, toward a unit (0x99, the 16-byte form) or a point
 4. Then, for every skill in range, state 18 off on U
    (`0x00639DB0(U, 18, 0)`, `client/stat-lists.md` §3). Model: U's
    states.
+
+### 11. The client do (`0x004C68F0` → `0x004C6680`)
+
+Read in the 1.14d export, 2026-10-10 (REC-2205). Callers: the player
+update `0x00463390` (`client/model.md` §19 r2 step 2: a mode of
+movement kind 2, a used skill, flag +0xC4 bit 0x40 clear and +0x4E ∈
+{1, 2, 3}), the skill end `0x004611F0` (§19 r3: a unit other than the
+local player with bit 0x40 clear), the monster update `0x004AF4C0`
+(`audio/triggers-2.md` §15 r2) and the skill event §7 r4.4 (w ≠ 0).
+
+1. **`0x004C68F0(U)`**: the used skill E (`0x00620250`) none →
+   nothing; else `0x004C6680(U, E's skill, 0x006442A0(U, E, 1), 0)`
+   (the level with bonuses, §2).
+2. **`0x004C6680(U, skill, level, w)`**: skill outside 0 … count − 1,
+   or `cltdofunc` (+0xF4, i16) outside 0 … 129 (`[0x00727DB0]` = 130)
+   → 0. `cltmissile` (+0xE8) > 0 → a client missile create (`0x004C57B0`,
+   or `0x004CDC30` for `progressive`) and bit 0x40 on U; a non-zero
+   create counts as ran. The function f := `cltdofunc`, or the row's
+   `ItemTgtDo` replacement +0x16C when w ≠ 0 and it is > 1.
+3. Table `0x00727BA8`[f] null (f = 0 and 97…129) → bit 0x40 on U, ran;
+   else ran := its result (the function gets U, skill, level).
+4. **Function 25 `0x004E34E0(U, skill, level)`** (Nova, Frost Nova,
+   skills 44, 48, 92, 130, 138, 146, 149, 154, 155, 190, 195, 316, 346,
+   353): m := `0x004F21B0(U, skill)`: for a `progressive` row with
+   `aurastate` (+0x80) and `aurastat1` (+0x54) in range, the value n of
+   that stat (param 0) in U's state list of that state → n = 2:
+   `cltmissileb` (+0xEC), n ≥ 3: `cltmissilec` (+0xEE); otherwise (or
+   no list) `cltmissilea` (+0xEA). m outside the missile table → 0.
+   Else bit 0x40 on U; v := `Vel` + `VelLev` · level / 8 of row m
+   (`0x00663270`: bytes +0x9A, +0x9B, signed division) + the
+   `cltcalc1` (+0x114) value (`0x00646CA0`; 0 when the column is empty,
+   `0xFFFFFFFF`); the ring `0x004C70D0(U, U, m, −1, skill, level, v)`;
+   returns 1. Ring: a 0x5C-byte record, flags 3 (position + relative
+   target; | 4 when v ≠ 0, velocity v), owner U, class m, position U's
+   (path) position, skill, level; for i = 0 … 63 the target offset
+   (`[0x006DACC0 + 4i]`, `[0x006DABC0 + 4i]`) = the server ring's
+   (`skills/bodies-2.md` §6.7, all 64 equal in the image), class 176 →
+   flags ^= 0x4000 before each create; the client create `0x004CD540`
+   (`missiles/client.md` §C2–§C4).
+5. After the function (ran or not): U's cast light is detached and
+   removed (`0x00643A00(U, 0)` → `0x004743D0`). Not ran → 0. Ran:
+   `dosound` (+0x100) > 0 → request on U; `tgtsound` (+0x10A) > 0 and U
+   has a target → request; `ItemCastOverlay`-like +0x108 > 0 with a
+   target → overlay on the target (`0x00470390(T, o, 2, …)`); then, for
+   the local player, a positive `0x00646CA0(U, +0x190, skill, level)`
+   (the delay calc) → the skill-delay UI (`0x0044DA90`, `0x0044CE40`)
+   unless the row's `anim` is 0x12 with a running sequence frame;
+   returns 1.
+6. Bit 0x40 is cleared by every client mode set (`0x00480E70`,
+   `0x00480E30`, `0x00480EC0`), so the do runs at most once per mode
+   unless a function leaves the bit clear.
+
+d2rs (`bridge::client_do`, REC-2205): rules 1–4 for players; function
+25 only (others: no effect, PROVISIONAL REC-2207); rule 2's
+`cltmissile` create, a non-empty `cltcalc1`, the sounds / overlay /
+delay UI of rule 5 and the monster update's do are not modelled (no row
+the recorded checks cast reaches them). Movement kinds of
+`0x00711E00` (read from the image, entry +0): modes 0, 1, 4, 5, 9, 13,
+17 → 0; 2, 3, 6, 19 → 1; 7, 8, 10–12, 14–16, 18 → 2.
 
 ## Constants & data dependencies
 

@@ -13,6 +13,8 @@
   "ScnAm5",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -22,8 +24,8 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "0fcacc19377321c0b92b67ae2976854ced2021895807a8d82fdf5828a8ca49c0",
-   "size": 1305471
+   "sha256": "829fb3204bf2751a0d4d1b7e2d4d574671e34b6b2bbed5a66cbfb52d2c1269b7",
+   "size": 1305612
   }
  },
  "format": "orig-cache-1",
@@ -32,7 +34,7 @@
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "recorder": "df69ba64e12f7b8afcc32432f067e74fccc4a8061357c49dcf15c6e251137f65",
   "save": "d23175f2aceb2008d501aad1650e98e224e4167e7c96f470d3d84e48fd074a3c"
  }
 }

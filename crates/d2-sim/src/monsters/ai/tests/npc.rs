@@ -722,3 +722,79 @@ fn quill_rat_attack_two_is_the_quill() {
     assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK2, w.player)]);
     assert_eq!(steps_since(&w, 1), 0);
 }
+
+// ---- §9.33 SpecialState06 ---------------------------------------------
+
+fn state6(w: &mut World, combat: bool) {
+    let p = TickParam {
+        target: None,
+        distance: 0,
+        combat,
+        class: 0,
+        class2: 0,
+    };
+    let mon = w.mon;
+    w.with(|g, cx| run_function(g, cx, 0x005E_7C10, mon, &p));
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.33 r1
+#[test]
+fn special_state_06_not_neutral_idles_5() {
+    let mut w = ranged_world();
+    w.fake.anim.insert(w.mon, mode::WALK);
+    w.seed(4_014_346_870);
+    state6(&mut w, false);
+    assert_eq!(w.fake.modes(), [unit_mode(mode::NEUTRAL, w.mon)]);
+    assert_eq!(w.thinks(), [5]);
+    assert_eq!(steps_since(&w, 4_014_346_870), 0);
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.33 r2, §9.33 r3
+#[test]
+fn special_state_06_town_or_no_target_takes_the_wander_draw() {
+    // Draws `lo' % 100` 51, 87, 53, 0: only the last one is below 20.
+    for (i, s) in SEEDS.iter().enumerate() {
+        let mut w = ranged_world();
+        w.fake.town.insert(w.room);
+        w.seed(*s);
+        state6(&mut w, false);
+        if i == 3 {
+            assert_eq!(w.fake.modes().len(), 1, "wander");
+        } else {
+            assert!(w.fake.modes().is_empty(), "seed {s}");
+            assert_eq!(w.thinks(), [10]);
+            assert_eq!(steps_since(&w, *s), 1, "seed {s}");
+        }
+    }
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.33 r2
+#[test]
+fn special_state_06_acts_on_the_main_search_target() {
+    // Out of town with a player in range: no contact → roll < 30 walks
+    // to it with flags 7, else idles 10; contact → roll < 80 is A1.
+    let rolls: [(bool, [bool; 4]); 2] = [
+        (false, [false, false, false, true]),
+        (true, [true, false, true, true]),
+    ];
+    for (combat, acts) in rolls {
+        for (s, acts) in SEEDS.iter().zip(acts) {
+            let mut w = ranged_world();
+            w.fake.nodes = vec![vec![w.player]];
+            w.fake.pos.insert(w.player, (105, 100));
+            if combat {
+                w.fake.melee.insert(w.player);
+            }
+            w.seed(*s);
+            state6(&mut w, combat);
+            assert_eq!(acts, !w.fake.modes().is_empty(), "{combat} seed {s}");
+            if acts && combat {
+                assert_eq!(w.fake.modes(), [unit_mode(mode::ATTACK1, w.player)]);
+            }
+            if !acts {
+                assert_eq!(w.thinks(), [10]);
+            }
+            assert_eq!(steps_since(&w, *s), 1, "{combat} seed {s}");
+        }
+    }
+}

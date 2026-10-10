@@ -246,6 +246,19 @@ impl<X: Pending + UseRest> UseView<'_, X> {
             }
             return Some(e);
         }
+        if let BodyEffect::SourceFields { m, owner } = e {
+            // `0x00621C30`: +0x94 / +0x98 := the owner's type and GUID
+            // (0 / 0 for none).
+            let link = owner.and_then(|o| {
+                let ty = self.cv.v.units.get(o)?.ty;
+                let guid = self.cv.game.lists.unit(o)?.guid;
+                Some((ty.index() as u32, guid))
+            });
+            if let Some(r) = self.cv.v.units.get_mut(m) {
+                r.source = link.unwrap_or((0, 0));
+            }
+            return None;
+        }
         if let BodyEffect::SelectSkill {
             u: m,
             side: 0,
@@ -303,7 +316,7 @@ impl<X: Pending + UseRest> UseView<'_, X> {
     /// done) for a unit that is not a monster or a skill that is not an
     /// aura; the seam takes those. 1.14d: dru-oak-sage's druid has the
     /// aura's life the frame after the summon.
-    fn monster_aura_select(&mut self, m: UnitId, skill: i32) -> bool {
+    pub(super) fn monster_aura_select(&mut self, m: UnitId, skill: i32) -> bool {
         use crate::skills::list::ListOwner;
         let Some(r) = self.cv.v.units.get(m) else {
             return false;

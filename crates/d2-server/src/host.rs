@@ -340,6 +340,10 @@ where
             let drain_us = crate::perf::us_since(t0);
             let t1 = Instant::now();
             if self.packets.is_some() {
+                // Sends made before the tick (the harness pokes run before
+                // the host frame) belong to the previous frame, as the
+                // 1.14d recorder logs a send where it happens.
+                self.note_tap();
                 let frame = self.game.frame().wrapping_add(1);
                 self.note(PacketEvent::Tick { frame });
             }
@@ -351,6 +355,9 @@ where
             // at the 0x0052FD1E stop after the pokes run there.
             at_tick_end(self);
             if self.packets.is_some() {
+                // What the pokes queued is the tick's (1.14d records the send
+                // where it happens, before the `tick_end` record).
+                self.note_tap();
                 let frame = self.game.frame();
                 self.note(PacketEvent::TickEnd { frame });
             }
@@ -470,6 +477,9 @@ where
             }
         }
         self.last_flush = Some(now);
+        // The vitals sync ends the tick's batch (`combat/vitals.md` §5.1
+        // rule 1): queued inside the flush, before any buffer is sent.
+        self.game.flush_sync(&mut self.buffers);
         let (mut sent, mut discarded) = (0, 0);
         for client in self.game.clients() {
             while let Some(buf) = self.buffers.pop(client) {

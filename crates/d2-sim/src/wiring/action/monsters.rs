@@ -136,6 +136,24 @@ pub trait MonsterWorld<X> {
         let _ = (sim, h, room, x, y, class, mode, spread, flags);
         None
     }
+    /// The creation `0x005B23C0(unit, class, mode, spread, flags)` near a
+    /// unit (`monsters/population.md` §9 around the unit's position in its
+    /// room) on the lent world. `None`: the world cannot run it;
+    /// `Some(None)`: nothing placed.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_near(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        unit: UnitId,
+        class: i32,
+        mode: u8,
+        spread: i32,
+        flags: u16,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, unit, class, mode, spread, flags);
+        None
+    }
     /// The preset spawn `0x0054E600(room, class, x, y, mode)` on the lent
     /// world (`monsters/population.md` §11.2: a class past the monstats
     /// rows is superunique `class - rows`, §11.4, with its init, minions
@@ -297,6 +315,49 @@ impl<X: Pending> ActionHooks<X> {
         match self.monster_data(unit) {
             Some(m) => u32::from(m.type_flags) & mask != 0,
             None => self.x.monster_flag(unit, mask),
+        }
+    }
+
+    /// The monstats row of a monster with monster data in the lent world.
+    fn monstats_of(&self, unit: UnitId) -> Option<&d2_data::tables::Monstats> {
+        let class = self.monster_data(unit)?.class;
+        self.tables
+            .combat
+            .monstats
+            .get(usize::try_from(class).ok()?)
+    }
+
+    /// `0x0063E9F0`: the unit is a monster whose monstats row has the
+    /// `boss` flag (`ai.md` §2.4 step 1). A unit without monster data asks
+    /// [`Pending::is_boss`].
+    pub fn is_boss(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.boss,
+            None => self.x.is_boss(unit),
+        }
+    }
+
+    /// `0x0063E940`: monstats `demon`.
+    pub fn is_demon(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.demon,
+            None => self.x.is_demon(unit),
+        }
+    }
+
+    /// `0x0063E990`: monstats `lUndead` or `hUndead`.
+    pub fn is_undead(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.lundead || m.hundead,
+            None => self.x.is_undead(unit),
+        }
+    }
+
+    /// `0x0063EDC0`: monstats `primeevil`.
+    pub fn is_prime_evil(&self, unit: UnitId) -> bool {
+        match self.monstats_of(unit) {
+            Some(m) => m.primeevil,
+            None => self.x.is_prime_evil(unit),
         }
     }
 }

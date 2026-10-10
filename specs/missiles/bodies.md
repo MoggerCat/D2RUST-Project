@@ -54,13 +54,13 @@
 |   27. Server-hit 15 spider goo lay `0x005AAD40` | 722–731 |
 |   28. Server-hit 17 Howl `0x005AAFB0` | 732–748 |
 |   29. Server-do 11 finger mage spider `0x005AEB60` | 749–768 |
-|   30. Server-hit 19 finger mage spider `0x005AB110` | 769–778 |
-| Constants & data dependencies | 779–823 |
-| Randomness | 824–842 |
-| Edge cases & original bugs | 843–872 |
-| Test vectors | 873–901 |
-| Provenance | 902–932 |
-| Open questions | 933–953 |
+|   30. Server-hit 19 finger mage spider `0x005AB110` | 769–779 |
+| Constants & data dependencies | 780–824 |
+| Randomness | 825–843 |
+| Edge cases & original bugs | 844–873 |
+| Test vectors | 874–902 |
+| Provenance | 903–933 |
+| Open questions | 934–954 |
 <!-- /index -->
 
 ## Summary
@@ -774,7 +774,8 @@ As §12 (server-hit 16) with these differences: no unit → return 1 (not
 0); len = max(`eval(O, k.auralencalc (+0x60), k, L)`, 5); the result is
 3 (damage, die). The checks run in the order k valid, owner, unit,
 `auratargetstate` valid (each failing → 1). The fresh-list quirk of §12
-step 6 is the same.
+step 6 is the same. Measured (`gen-mon-304` f98): result 3 → the hit's
+rolls `0x005A89F8`, `0x005A898E` on the missile, then the owner's crit.
 
 ## Constants & data dependencies
 

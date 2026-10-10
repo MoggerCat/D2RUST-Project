@@ -960,3 +960,18 @@ fn esc_opens_the_game_menu_only_when_nothing_is_closable() {
         before.into_iter().filter(|&u| u != 34).collect::<Vec<_>>()
     );
 }
+
+// Covers: specs/sim/pathing.md §6
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn the_walk_from_the_docks_arrival_reaches_cain() {
+    let mut p = Play::start("");
+    let guid = app_support::approach(&mut p.app, &p.server, &p.ms, 1, &[u32::from(npc::CAIN3)]);
+    let at = app_support::server_pos(&p.server);
+    eprintln!("Cain {guid} reached at {at:?}");
+    assert!(
+        at.1 < 5080,
+        "the player walked north past the Docks wall: {at:?}"
+    );
+    p.assert_clean("walk to Cain");
+}

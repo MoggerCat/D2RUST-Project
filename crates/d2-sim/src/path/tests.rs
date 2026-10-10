@@ -1067,6 +1067,45 @@ fn mask_change_after_pattern_change_clears_the_new_shape() {
     }
 }
 
+// Covers: specs/sim/path-placement.md §5.3 r5
+#[test]
+fn path_reset_gives_a_wraith_its_size_pattern() {
+    let t = tables();
+    let (mut w, a) = one_room();
+    let wraith = MonsterShape {
+        size_x: 2,
+        base_id: 38,
+        ..MonsterShape::default()
+    };
+    let mut p = alloc_dynamic_path(
+        &t,
+        &mut w,
+        DynamicKind::Monster(wraith),
+        UnitId(1),
+        Some(a),
+        10,
+        10,
+        false,
+    )
+    .unwrap();
+    assert_eq!(p.pattern, 5);
+    reset_pattern(&mut w, &t, &mut p, &UnitShape::Monster(wraith));
+    // Size 2 → pattern 1: the plus with mask 0x100 and the NO_PATH marker.
+    assert_eq!(p.pattern, 1);
+    for (x, y) in plus_at(10, 10) {
+        let marker = if (x, y) == (10, 10) { bits::NO_PATH } else { 0 };
+        assert_eq!(w.at(x, y), 0x100 | marker, "({x}, {y})");
+    }
+    // Without a room only the pattern changes.
+    let mut q = DynamicPath {
+        pattern: 5,
+        unit_size: 2,
+        ..DynamicPath::default()
+    };
+    reset_pattern(&mut w, &t, &mut q, &UnitShape::Monster(wraith));
+    assert_eq!(q.pattern, 1);
+}
+
 // Covers: specs/sim/path-placement.md §5.3 r3, §5.3 r4
 #[test]
 fn dead_body_footprint() {

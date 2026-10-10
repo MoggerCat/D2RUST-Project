@@ -51,6 +51,13 @@ pub struct ClickView {
     /// anchor's): the pick inverts the shaken camera
     /// (`seams/world-screen.md` §2.6). `(0, 0)` when no shake runs.
     pub shake: (i32, i32),
+    /// The hover target the previous pass's draw left (`Some(None)`: no
+    /// unit): 1.14d reads the hovered unit while it draws (`0x00467A10`), so
+    /// a press sees the cursor of the pass before it, and a press posted in
+    /// the same pass as its move is a point click (`specs/tools/
+    /// scenario-diff.md` §2 r5). `None`: the pick reads the click's own
+    /// position (strict tests, d2rs-own).
+    pub prev_hover: Option<Option<UnitKey>>,
 }
 
 /// The client model as the dispatcher reads it.
@@ -214,6 +221,9 @@ impl ClickWorld for ModelClick<'_> {
         // TODO(spec: client/model.md hover `0x00467A10`): no hover model;
         // The preview's pick (any unit under the cursor, screen space) and,
         // without it, the monster hover; both d2rs-own, unverified.
+        if let Some(h) = self.view.prev_hover {
+            return h;
+        }
         if self.view.pick {
             if let Some(k) = super::hover::pick(self.world, &self.camera()?, self.view.mouse) {
                 return Some(k);
@@ -691,6 +701,7 @@ mod tests {
             game_menu_open: false,
             pick: false,
             shake: (0, 0),
+            prev_hover: None,
         }
     }
 
@@ -944,6 +955,7 @@ mod tests {
                 frames: 4,
                 speed: 256,
                 weapon: 0,
+                events: None,
             })
         }
     }

@@ -1,0 +1,10 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+monster.succubus1	entity	monsters	monstats.txt succubus1 (hcIdx 469)	specs/monsters/ai.md	draft	gen-mon-469	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus2	entity	monsters	monstats.txt succubus2 (hcIdx 470)	specs/monsters/ai.md	draft	gen-mon-470	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus3	entity	monsters	monstats.txt succubus3 (hcIdx 471)	specs/monsters/ai.md	draft	gen-mon-471	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus4	entity	monsters	monstats.txt succubus4 (hcIdx 472)	specs/monsters/ai.md	draft	gen-mon-472	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus5	entity	monsters	monstats.txt succubus5 (hcIdx 473)	specs/monsters/ai.md	draft	gen-mon-473	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus-634	entity	monsters	monstats.txt class 634	specs/monsters/ai.md	draft	gen-mon-634	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus-635	entity	monsters	monstats.txt class 635	specs/monsters/ai.md	draft	gen-mon-635	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH
+monster.succubus-719	entity	monsters	monstats.txt class 719	specs/monsters/ai.md	draft	gen-mon-719	PARTIAL	yes	0	n	claude/rc-succubus-m	EQUAL	-	rc-succubus-m 2026-10-10: plain A1 clears the used skill (REC-2325); state 150/150, rng MATCH

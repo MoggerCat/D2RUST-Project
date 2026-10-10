@@ -344,7 +344,7 @@ pub fn assign_monster(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Hand
 /// (`monsters/init.md` §13) in a classic game with d > 0 and `Align` ≠ 1
 /// gives level += 25·d (maxhp, armor and experience are not in the
 /// model; rule 3 overwrites 6 and 7).
-fn setup_stats(u: &mut ClientUnit, s: &MonsterSetup, difficulty: u8, expansion: bool) {
+pub(crate) fn setup_stats(u: &mut ClientUnit, s: &MonsterSetup, difficulty: u8, expansion: bool) {
     let d = usize::from(difficulty.min(2));
     let mut level = i32::from(s.level[d]);
     if !expansion && d > 0 && s.align != 1 {
@@ -364,7 +364,7 @@ fn setup_stats(u: &mut ClientUnit, s: &MonsterSetup, difficulty: u8, expansion: 
 /// Rule 6.6: the unit flags from `monstats2`: 0x2 := `isSel`, 0x20 :=
 /// not `shadow` (no model field: the shadow is render state), 0x8 set
 /// (render), 0x4 := `isAtt`.
-fn setup_flags(u: &mut ClientUnit, s: &MonsterSetup) {
+pub(crate) fn setup_flags(u: &mut ClientUnit, s: &MonsterSetup) {
     u.flag_2 = Some(s.is_sel);
     u.flag_4 = s.is_att;
 }

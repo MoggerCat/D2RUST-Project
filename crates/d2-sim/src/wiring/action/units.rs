@@ -1068,6 +1068,7 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
         self.natural_skills.remove(&unit);
+        self.unit_source.remove(&unit);
         // A summon's skill list (the aura assignment of
         // `interaction::summon`); players keep theirs (the save).
         if ty == Some(UnitType::Monster) {
@@ -1184,22 +1185,49 @@ impl<X: Pending> View<'_, X> {
     /// and the unit queued for update. The game's allied mark follows a
     /// good (2) alignment. `a` > 2 is the original's fatal assertion:
     /// nothing here.
+    ///
+    /// Gate (`combat/hit.md`): all of it runs only for classes 351–353,
+    /// or `a` ≠ 0, or unit flag bit 31 clear. The tail `0x00554340`: for a
+    /// monster whose old alignment (the cleared stat 172, or 4 when the
+    /// list is new) differs from `a`, standing in a room and not in mode
+    /// 0 (DT) or 12 (DD), the path reset `0x00649CA0`
+    /// (`path-placement.md` §5.3 rule 5). A new monster's first set
+    /// therefore resets its pattern (a wraith's 5 becomes its size
+    /// pattern).
     pub fn set_alignment(&mut self, game: &mut Game, u: UnitId, a: u8) {
         const STATE: u16 = crate::combat::range::STATE_ALIGNMENT;
-        if a > 2 || self.units.get(u).is_none() {
+        const STAT: u16 = crate::combat::range::STAT_ALIGNMENT;
+        if a > 2 {
             return;
         }
-        let Some(l) = self
-            .state_list(u, STATE)
-            .or_else(|| self.create_state_list(u, STATE, None, 0))
-        else {
+        let Some(r) = self.units.get(u) else {
             return;
         };
-        self.set_list_stat(l, crate::combat::range::STAT_ALIGNMENT, i32::from(a));
+        let (ty, mode) = (r.ty, r.mode);
+        if !((351..=353).contains(&r.class) || a != 0 || r.flags & 0x8000_0000 == 0) {
+            return;
+        }
+        let (l, old) = match self.state_list(u, STATE) {
+            Some(l) => (l, self.stats.base(l, STAT, 0)),
+            None => match self.create_state_list(u, STATE, None, 0) {
+                Some(l) => (l, 4),
+                None => return,
+            },
+        };
+        self.set_list_stat(l, STAT, i32::from(a));
         self.set_state(u, STATE, true);
         self.stats.set_state_changed(u, u32::from(STATE), true);
         game.lists.set_allied(u, a == 2);
         let _ = game.lists.queue_update(u);
+        let in_room = self
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(u))
+            .is_some_and(|d| d.room.is_some());
+        if ty == UnitType::Monster && old != i32::from(a) && in_room && mode != 0 && mode != 12 {
+            self.path_reset(u);
+        }
     }
 
     /// Hireling test `0x0063EE90`: a monster of a hireling class

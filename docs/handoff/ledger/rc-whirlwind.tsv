@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-skill.bar.whirlwind	entity	skills	skills.txt Whirlwind (151) charclass=bar	specs/skills/bodies-2.md	draft	bar-whirlwind	PARTIAL	?	0	n	claude/rc-whirlwind	PARTIAL	S	bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players)
+skill.bar.whirlwind	entity	skills	skills.txt Whirlwind (151) charclass=bar	specs/skills/bodies-2.md	draft	bar-whirlwind	DIVERGED@20	?	0	n	claude/rc-whirlwind	DIVERGED	S	bar-whirlwind: state channel equal over 70 frames after rc-whirlwind (rate 0x00623F50 read the used entry's flags from the wrong store; velocity half now also for players)

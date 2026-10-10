@@ -39,6 +39,7 @@ import time
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import orig_cache  # noqa: E402
 import scenario_diff as sd  # noqa: E402
 
 REPO = sd.REPO
@@ -46,14 +47,15 @@ CHECKS_DIR = os.path.join(REPO, "traces", "checks")
 PLAY_DIR = os.path.join(REPO, "traces", "playthrough")
 PLAYTHROUGH = os.path.join(REPO, "tools", "playthrough", "playthrough.py")
 SUITE_DIR = os.path.join(REPO, "traces", "raw", "suite")
-KEY_FORMAT = "suite-key-1"
+KEY_FORMAT = "suite-key-2"
 RESULT_FORMAT = "suite-result-1"
 # the 1.14d outputs of each channel (scenario-diff.md §3), removed for a fresh run
 ORIG_OUTPUTS = {"state": ["orig.state.jsonl", "run-record_state"],
                 "draws": ["orig.frames.jsonl", "run-record_frames", "draws-orig"],
                 "rng": ["orig.rng.jsonl", "run-record_rng"],
                 "packets": ["orig.packets.jsonl", "run-record_packets"],
-                "items": ["orig.packets.jsonl", "run-record_packets"]}  # packets' recording
+                "items": ["orig.packets.jsonl", "run-record_packets"],
+                "frontend": ["frontend/orig/d00.png", "frontend/orig"]}  # packets' recording
 # measured 2026-10-09 under Wine (scenario-diff.md §4): the menu is left as soon
 # as it is up (autostart waits for launcher mode 4), 0 s passed 6 runs in a row
 AUTO_AFTER = "0"
@@ -182,9 +184,24 @@ def key_save_args(c, out):
     return args + ["-o", out]
 
 
-def cache_key(check_text, save_bytes, game_sha):
+def recorders_version(channels, rec_dir=None):
+    """Version of the 1.14d recorder scripts (and the modules they import) behind
+    these channels, plus the autostart script that drives the run: sha256 as
+    orig_cache.recorder_version. A changed recorder invalidates the raw outputs."""
+    rec_dir = rec_dir or sd.REC
+    by_channel = {ch: script for script, (ch, _) in orig_cache.RECORDERS.items()}
+    by_channel["items"] = by_channel["packets"]  # items reuse packets' recording
+    scripts = sorted({by_channel[ch] for ch in channels if ch in by_channel} | {"autostart.py"})
+    h = hashlib.sha256()
+    for s in scripts:
+        h.update(s.encode() + b"\0" + orig_cache.recorder_version(rec_dir, s).encode() + b"\n")
+    return h.hexdigest()
+
+
+def cache_key(check_text, save_bytes, game_sha, recorders=""):
     return {"format": KEY_FORMAT, "check": hashlib.sha256(check_text.encode()).hexdigest(),
-            "save": hashlib.sha256(save_bytes).hexdigest(), "game_exe": game_sha}
+            "save": hashlib.sha256(save_bytes).hexdigest(), "game_exe": game_sha,
+            "recorders": recorders}
 
 
 def read_key(work):
@@ -196,7 +213,7 @@ def read_key(work):
 
 
 def key_matches(old, new):
-    return bool(old) and all(old.get(k) == new[k] for k in ("format", "check", "save", "game_exe"))
+    return bool(old) and all(old.get(k) == new[k] for k in ("format", "check", "save", "game_exe", "recorders"))
 
 
 def clear_orig(work):
@@ -255,7 +272,7 @@ def run_check(job, k, opts, game_sha, log):
             if r.returncode != 0:
                 raise SuiteError(f"d2s-tool (key save) failed: {r.stderr.strip()[:200]}")
             with open(ks, "rb") as f:
-                key = cache_key(text, f.read(), game_sha)
+                key = cache_key(text, f.read(), game_sha, recorders_version(c["channels"]))
         reuse = (not opts.fresh and key is not None and key_matches(read_key(work), key))
         if not reuse and not opts.dry_run:
             clear_orig(work)
@@ -653,6 +670,20 @@ def selftest():
         for other in (cache_key("check 1 ", b"save", "abc"), cache_key("check 1", b"sav", "abc"),
                       cache_key("check 1", b"save", "abd"), None, {}):
             assert not key_matches(other, k)
+        # a changed recorder script (or an imported module) misses; so does autostart.py
+        rd = os.path.join(td, "rec")
+        os.makedirs(rd)
+        for n, body in (("record_state.py", "import helper\n"), ("helper.py", "X = 1\n"),
+                        ("record_rng.py", ""), ("autostart.py", "")):
+            with open(os.path.join(rd, n), "w") as f:
+                f.write(body)
+        v0 = recorders_version(["state"], rd)
+        assert v0 == recorders_version(["state"], rd) != recorders_version(["rng"], rd)
+        with open(os.path.join(rd, "helper.py"), "w") as f:
+            f.write("X = 2\n")
+        assert recorders_version(["state"], rd) != v0
+        assert not key_matches(cache_key("c", b"s", "g", v0), cache_key("c", b"s", "g", "other"))
+        ok += 1
         c = jobs[0][2]
         assert key_save_args(c, "/k.d2s") == ["new", "--name", "C", "--time", "1", "-o", "/k.d2s"]
         ok += 2

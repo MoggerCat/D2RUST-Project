@@ -32,16 +32,16 @@
 |   6. Level position, size, act number | 210–226 |
 |   7. Vis and warp records | 227–250 |
 |   8. Coordinates to rooms | 251–264 |
-|   9. Level lifecycle: activity and freeing | 265–313 |
-|   10. Spawn room in a level (`0x0066B2B0`) | 314–376 |
-|   11. Logical rooms (coordinate lists) and population queries | 377–656 |
-|   12. Level connections: Act I, Act III, Act V | 657–1009 |
-| Constants & data dependencies | 1010–1030 |
-| Randomness | 1031–1049 |
-| Edge cases & original bugs | 1050–1074 |
-| Test vectors | 1075–1154 |
-| Provenance | 1155–1216 |
-| Open questions | 1217–1305 |
+|   9. Level lifecycle: activity and freeing | 265–320 |
+|   10. Spawn room in a level (`0x0066B2B0`) | 321–383 |
+|   11. Logical rooms (coordinate lists) and population queries | 384–663 |
+|   12. Level connections: Act I, Act III, Act V | 664–1016 |
+| Constants & data dependencies | 1017–1037 |
+| Randomness | 1038–1056 |
+| Edge cases & original bugs | 1057–1081 |
+| Test vectors | 1082–1161 |
+| Provenance | 1162–1223 |
+| Open questions | 1224–1312 |
 <!-- /index -->
 
 ## Summary
@@ -309,6 +309,13 @@ status lists; 1.14d moved it to step 5. No outcome differs (no draws).
    spawn-tile records and count, warp-room centres and count, free the
    build list (+0x1CC). The level stays in the list with its seed field;
    the next generation re-seeds it (§5.1) and restores bit 0 (§5.3).
+   The outdoor reset `0x006754C0` clears outdoor flags 0x20 (cliffs) and
+   0x40 (cave placed), frees the four grids, the polygon and the six path
+   lists, zeroes the path end-points and the path count (+0x260), and
+   keeps the other flags and the neighbour list (+0x264). A regenerated
+   outdoor level (a waypoint trip back to a freed field) therefore places
+   cliffs and the cave entrance again and draws as the first generation
+   did (gen-wp-2, gen-wp-37: the Stony Field layout after a regeneration).
 5. Freeing never draws. Whole-DRLG free at game end: `0x00642190`.
 
 ### 10. Spawn room in a level (`0x0066B2B0`)

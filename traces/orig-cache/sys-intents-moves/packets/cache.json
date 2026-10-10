@@ -13,6 +13,8 @@
   "ScnAma",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.packets.jsonl",
   "--send",
@@ -34,8 +36,8 @@
  ],
  "files": {
   "orig.packets.jsonl": {
-   "sha256": "75b7990ec75c25a859fb1e6cc9eb07d32f97278f70b3cab0d24f7c4edc0b46ad",
-   "size": 88816
+   "sha256": "4b50396def6004b388f0d2544375ccfba6a2b004a16671a10e36345d471a015e",
+   "size": 94458
   }
  },
  "format": "orig-cache-1",
@@ -44,7 +46,7 @@
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "recorder": "890e1d10983891572c923cd4a25dd5dbaeb22e6940d455ea36c91b02eafaacd6",
   "save": "cc42acbbea0f6d82e307becac4c6fe9e4c9d312a57f68878fc79272078293a6b"
  }
 }

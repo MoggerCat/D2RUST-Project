@@ -234,6 +234,23 @@ fn logged(fx: &Fx, p: &str, m: UnitId) -> Vec<String> {
 
 /// Type-0 events of `m` with frame codes `codes`, one per frame from 1.
 fn frame_events(fx: &mut Fx, m: UnitId, codes: &[u32]) {
+    {
+        let r = fx.sim.sys.units.get_mut(m).unwrap();
+        // The frame advance `0x00623E00` reads the code from the
+        // animation record: one frame per event, the codes at frames 1…
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        for (i, &c) in codes.iter().enumerate() {
+            events[1 + i] = c as u8;
+        }
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 1 << 8,
+            byte_0f: 0,
+            events,
+        });
+        r.anim.speed = 256;
+        r.anim.frame = 0;
+        r.anim.frame_count = 1 << 16;
+    }
     for (i, &c) in codes.iter().enumerate() {
         fx.game
             .schedule_event(m, u32::from(event::MODE_CHANGE), 1 + i as i32, None, c, 0)
@@ -250,7 +267,7 @@ fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
     // `use.md` §5.2 "Monsters" `0x005A7670`: no used skill and a mode that
     // does not move (A2: class 0's monstats2 mv bits are A1 only) → the
     // strike (mode missile, else melee on the path target) on every event
-    // 0, whatever its frame code. +0x4E keeps the timer's code.
+    // 0, whatever its frame code. +0x4E is the frame advance's.
     let mut fx = Fx::new();
     let m = monster(&mut fx);
     fx.sim.sys.units.get_mut(m).unwrap().mode = u32::from(mode::ATTACK2);
@@ -259,7 +276,8 @@ fn attack_event0_without_a_used_skill_strikes_once_per_frame_code_event() {
     assert_eq!(logged(&fx, "attack strike", m), want);
     assert!(logged(&fx, "attack skill", m).is_empty());
     assert!(logged(&fx, "sequence frame", m).is_empty());
-    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 4);
+    // A non-moving mode strikes with no frame advance: +0x4E is untouched.
+    assert_eq!(fx.sim.sys.units.get(m).unwrap().anim.action_frame, 0);
 }
 
 // Covers: specs/skills/use.md §5.2
@@ -273,6 +291,16 @@ fn attack_event0_of_a_moving_mode_strikes_only_at_its_trigger_frame() {
         let r = fx.sim.sys.units.get_mut(m).unwrap();
         r.mode = u32::from(mode::ATTACK1);
         r.anim.frame_count = 1 << 16;
+        // The frame advance `0x00623E00` writes +0x4E from the record's
+        // event bytes (units.md §4.2): frames 1, 2, 3 carry 2, 1, 3.
+        r.anim.speed = 256;
+        let mut events = [0u8; crate::units::record::ANIM_EVENTS];
+        events[1..4].copy_from_slice(&[2, 1, 3]);
+        r.anim.record = Some(crate::units::record::AnimRecord {
+            frames: 256,
+            byte_0f: 0,
+            events,
+        });
     }
     let x0 = fx.sim.sys.hooks.x.position(m).0;
     frame_events(&mut fx, m, &[2, 1, 3]);
@@ -448,4 +476,69 @@ fn natural_skill_level_is_read_by_the_ai() {
         );
     });
     fx.assert_clean();
+}
+
+#[test]
+fn used_skill_takes_the_monster_entry_level() {
+    // A monster without a skill list casts with its init entry's base
+    // level (doomknight2 DoomKnightMissile at `Sk1lvl` 3: the missile's
+    // level in `milestone-hellforge`), a summon's entry winning; a skill
+    // with no entry keeps the seam's answer.
+    let mut fx = Fx::new();
+    let m = monster(&mut fx);
+    let entry = |skill| crate::skills::SkillEntry {
+        skill,
+        base: 1,
+        owner_guid: -1,
+        ..Default::default()
+    };
+    fx.sim.with(&mut fx.game, |_, v| {
+        v.h.x.used.insert(m, entry(335));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
+        v.h.natural_skills.entry(m).or_default().insert(335, 3);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(3));
+        v.h.monster_skills.entry(m).or_default().insert(335, 7);
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(7));
+        v.h.x.used.insert(m, entry(300));
+        assert_eq!(v.h.used_skill_of(m).map(|e| e.base), Some(1));
+    });
+    fx.assert_clean();
+}
+
+/// `0x0063E9F0` / `0x0063E940` / `0x0063E990` / `0x0063EDC0` read the
+/// monstats flags of the monster's class (`ai.md` §2.4 step 1): a boss
+/// such as Griswold gets the boss-sound idle, which defers its first
+/// think by 20 frames (rc-drop-content, `items-drops-nor-11`). A unit
+/// without monster data keeps the `Pending` answer (false here).
+// Covers: specs/monsters/ai.md §2.4
+#[test]
+fn monstats_flags_answer_boss_demon_undead_prime_evil() {
+    let mut fx = Fx::new();
+    let m = fx.spawn(UnitType::Monster, 0, fx.a, 10, 10);
+    let flags = |fx: &mut Fx| {
+        let h = fx.sim.hooks();
+        (
+            h.is_boss(m),
+            h.is_demon(m),
+            h.is_undead(m),
+            h.is_prime_evil(m),
+        )
+    };
+    let data = crate::monsters::init::MonsterData::default();
+    fx.sim.sys.hooks.monster_world = Some(Box::new(super::sound::DataOnly(
+        [(m, data)].into_iter().collect(),
+    )));
+    assert_eq!(flags(&mut fx), (false, false, false, false));
+    let mut tables = (*fx.sim.sys.hooks.tables).clone();
+    let row = &mut tables.combat;
+    row.monstats[0].boss = true;
+    row.monstats[0].hundead = true;
+    fx.sim.sys.hooks.tables = std::sync::Arc::new(tables);
+    assert_eq!(flags(&mut fx), (true, false, true, false));
+    let mut tables = (*fx.sim.sys.hooks.tables).clone();
+    let row = &mut tables.combat;
+    row.monstats[0].demon = true;
+    row.monstats[0].primeevil = true;
+    fx.sim.sys.hooks.tables = std::sync::Arc::new(tables);
+    assert_eq!(flags(&mut fx), (true, true, true, true));
 }

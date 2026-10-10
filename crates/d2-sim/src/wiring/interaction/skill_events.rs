@@ -33,7 +33,7 @@ use crate::skills::use_::{
 };
 use crate::skills::SkillUnits;
 use crate::units::hooks::Sim;
-use crate::units::UnitId;
+use crate::units::{UnitId, UnitType};
 use crate::wiring::action::combat::CombatView;
 use crate::wiring::action::{ActionHooks, Pending, SkillEvent, View};
 
@@ -114,6 +114,37 @@ pub fn monster_skill_start<X: Pending + UseRest>(
         },
     };
     start(&mut w, &t.skills, unit)
+}
+
+/// A monster's aura as its right skill (`monsters/init.md` §19.5 umod 30
+/// `0x005A1650`, `monsters/ai-bodies-2.md` §14 Duriel `0x005F67B0`):
+/// `0x0056DEB0` gives the skill at `level` (the entry's base level), then
+/// `0x005701B0(m, 0, skill, −1)` assigns it to the right hand: the aura
+/// state or the immediate do, and the type-8 aura timer whose do rolls
+/// the aura's damage on the monster's seed every `perdelay` frames
+/// (1.14d: Duriel's Holy Freeze `0x0056E0C0` at frames 51, 101, 151 of
+/// gen-lvl-73).
+pub fn monster_right_aura<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+    skill: i32,
+    level: i32,
+) {
+    if sim.units.get(unit).map(|r| r.ty) != Some(UnitType::Monster) {
+        return;
+    }
+    h.monster_skills
+        .entry(unit)
+        .or_default()
+        .insert(skill, level);
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    w.monster_aura_select(unit, skill);
 }
 
 /// The right skill's aura part of the save load's assign (`0x005701B0`,
@@ -348,7 +379,7 @@ pub fn golem_resummon<X: Pending + UseRest>(
 /// `0x0056A710` → `0x0056DEB0` → assign `0x00647280`,
 /// `client/msg-skills.md` §2 rules 1–2, 4): every loaded entry whose
 /// skill has a `passivestate` p > 0 gets state p on and its passive
-/// stat list refreshed (`0x00646D60`), in list order (the masteries,
+/// stat list refreshed (`0x00646D60`; the state-changed bit only), in list order (the masteries,
 /// Increased Stamina, Iron Skin, ... count from the join on).
 pub fn passive_refresh_all<X: Pending + UseRest>(
     h: &mut ActionHooks<X>,
@@ -373,8 +404,51 @@ pub fn passive_refresh_all<X: Pending + UseRest>(
             .skill(e.skill)
             .map_or(-1, |r| i32::from(r.passivestate as i16));
         if let Ok(p @ 1..) = u16::try_from(p) {
-            w.cv.v.set_state(unit, p, true);
+            // `0x00646D60` ends with `0x00639E30(unit, state, 1)`: only the
+            // state-changed bit is set, not the unit's state bit (that is
+            // `0x00639DB0`), so the join's 0xAA does not list the state and
+            // the first player update sends it as 0xA8 (1.14d `gen-missile-149`,
+            // frame 2).
+            w.cv.v.stats.set_state_changed(unit, u32::from(p), true);
+            let _ = w.cv.game.lists.queue_update(unit);
             crate::skills::use_::bodies::BodyWorld::passive_state_apply(&mut w, unit, &e);
+        }
+    }
+}
+
+/// The passive states' unit bits (`0x00639DB0(unit, p, 1)`) for every
+/// skill entry with a `passivestate` p > 0, at the end of the join: the
+/// load's `0x00646D60` sets only the state-changed bit, so the join's 0xAA
+/// omits the states and the first player update sends them as 0xA8 with
+/// their lists (1.14d `gen-missile-149`, frame 2).
+// PROVISIONAL (REC-2105): the 1.14d site that turns the bits on between
+// the join and the first update is not identified; the end of the join is
+// d2rs' choice. Settled by reading the writer (`0x00639DB0` callers
+// `0x005701B0`, `0x0056F1F0`, `0x005544B0`).
+pub fn passive_states_on<X: Pending + UseRest>(
+    h: &mut ActionHooks<X>,
+    sim: &mut Sim<'_>,
+    unit: UnitId,
+) {
+    let t = h.tables.clone();
+    let entries = h
+        .skill_lists
+        .get(&unit)
+        .map(|l| l.view())
+        .unwrap_or_default();
+    let mut w = UseView {
+        cv: CombatView {
+            game: sim.game,
+            v: View::of(sim.units, sim.stats, sim.data, h),
+        },
+    };
+    for e in entries {
+        let p = t
+            .skills
+            .skill(e.skill)
+            .map_or(-1, |r| i32::from(r.passivestate as i16));
+        if let Ok(p @ 1..) = u16::try_from(p) {
+            w.cv.v.set_state(unit, p, true);
         }
     }
 }

@@ -368,6 +368,10 @@ pub struct ActionHooks<X> {
     /// skill id → base level. Read for the level only
     /// ([`Pending::ai_skill_level`] is asked for a unit without one).
     pub natural_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
+    /// A unit's source unit (+0x94 / +0x98, set by `link_source`
+    /// `0x00621C30`, `skills/bodies-4.md` §1); read by `0x00552FD0` when
+    /// unit +0xC8 has bit 0x400.
+    pub unit_source: BTreeMap<UnitId, UnitId>,
     /// A monster's equipped items by body location (its inventory's
     /// body slots, `monsters/init.md` §12): d2rs-own record of the
     /// holdings `has_item_at` reads (no monster inventory model here).
@@ -408,11 +412,25 @@ impl<X: Pending> ActionHooks<X> {
 
     /// The unit's current skill entry (`use.md` §1 rule 2, +0x10): its
     /// list's current entry when it has a list, else
-    /// [`Pending::used_skill`].
+    /// [`Pending::used_skill`] with the base level of the monster's entry
+    /// for that skill: its summon entry ([`ActionHooks::monster_skills`]),
+    /// else its init entry ([`ActionHooks::natural_skills`]: `Sk<i>lvl`
+    /// plus the bonus, `monsters/init.md` §6), as the AI's `skill_level`
+    /// reads them.
     pub fn used_skill_of(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
         match self.skill_lists.get(&unit) {
             Some(l) => l.current.and_then(|i| l.view().get(i).copied()),
-            None => self.x.used_skill(unit),
+            None => {
+                let mut e = self.x.used_skill(unit)?;
+                let levels = self
+                    .monster_skills
+                    .get(&unit)
+                    .or_else(|| self.natural_skills.get(&unit));
+                if let Some(&base) = levels.and_then(|m| m.get(&e.skill)) {
+                    e.base = base;
+                }
+                Some(e)
+            }
         }
     }
 
@@ -485,6 +503,7 @@ impl<X> ActionHooks<X> {
             pet_lists: BTreeMap::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
+            unit_source: BTreeMap::new(),
             monster_equip: BTreeMap::new(),
             inactive: None,
             fallback_tiles: crate::units::inactive::InactiveStore::default(),

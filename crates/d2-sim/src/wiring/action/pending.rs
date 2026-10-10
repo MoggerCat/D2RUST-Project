@@ -427,14 +427,6 @@ pub trait Pending {
     // ---- the Act II–V AI bodies (`monsters/ai-bodies-2.md`..`-5.md`;
     // [`crate::monsters::ai::AiActs`]) -------------------------------------
 
-    /// Max mana `0x00625D60`.
-    fn ai_max_mana(&self, unit: UnitId) -> i32 {
-        0
-    }
-    /// `0x00625760(unit, flags)`: an active stat list with the flags.
-    fn ai_has_list_flag(&self, unit: UnitId, flags: u32) -> bool {
-        false
-    }
     /// `0x00554200(game, a, b)`: b hostile to a (`combat/hit.md`).
     fn ai_hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         false
@@ -788,6 +780,8 @@ pub trait Pending {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         false
     }
+    /// The used skill := none (`0x00620210(unit, 0)`).
+    fn clear_current_skill(&mut self, unit: UnitId) {}
     /// A missile parameter record's init callback with an id no spec
     /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
     /// 21).
@@ -922,8 +916,12 @@ pub trait Pending {
     fn overlay(&mut self, unit: UnitId, id: i32) {}
     /// `0x00623F50` animation rate refresh.
     fn refresh_anim_rate(&mut self, unit: UnitId) {}
-    /// Monster sound.
-    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {}
+    /// Monster sound: `0x00553380(unit, event, target)` queues the unit's
+    /// sound slot (flag 0x400); the unit update sends it as S→C 0x2C
+    /// (`audio/triggers-2.md` §14; the NPC greeting is event 18).
+    fn play_sound(&mut self, game: &mut Game, unit: UnitId, sound: u32, to: Option<UnitId>) {
+        let _ = crate::units::sound::queue_sound(game, unit, sound as u16, to);
+    }
     /// Operate a door (`0x00584540`, objects spec) in a game without an
     /// object state (with one: [`super::objects`]).
     fn operate_door(&mut self, game: &mut Game, unit: UnitId, door: UnitId) {}
@@ -1637,6 +1635,21 @@ pub trait Pending {
     {
         false
     }
+    /// A monster's aura as its right skill: `0x0056DEB0(m, skill, level)`
+    /// then `0x005701B0(m, 0, skill, −1)` (`monsters/init.md` §19.5 umod
+    /// 30 `0x005A1650`; `monsters/ai-bodies-2.md` §14 Duriel). Routed to
+    /// [`crate::wiring::interaction::skill_events::monster_right_aura`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn monster_right_aura(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        unit: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
     /// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33
     /// step 4, `0x0056E620`): routed to
     /// [`crate::wiring::interaction::skill_events::missile_summon_class`]
@@ -1699,6 +1712,15 @@ pub trait Pending {
     /// by a [`crate::wiring::interaction::UseRest`] value. Default:
     /// nothing.
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
+    /// The passive states' unit bits, turned on at the end of the join
+    /// (PROVISIONAL REC-2105; routed to
+    /// [`crate::wiring::interaction::skill_events::passive_states_on`]).
+    /// Default: nothing.
+    fn passive_states_on(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
     where
         Self: Sized,
     {

@@ -291,6 +291,17 @@ pub struct ClientUnit {
     /// +0xB0: the last hit class (§18 rule 1), written by the player
     /// mode machine (§8 rule 4: `+0xB0` := r2); 0 at creation.
     pub hit_class: u32,
+    /// Unit flag +0xC4 bit 0x40: the client do ran in this mode
+    /// (`client/msg-skills.md` §11); cleared by the client mode set
+    /// `0x00480E70` (§19 r2), set by the do.
+    pub flag_40: bool,
+    /// +0x4E: the event byte (1–4) of the frames the latest frame
+    /// advance crossed, else 0 (`sim/units.md` §4.2 "Frame advance");
+    /// written by a player's client update ([`super::player_anim`]).
+    pub action_frame: u8,
+    /// The AnimData event bytes of a player's current mode, set by its
+    /// mode set ([`super::player_anim::mode_set`]); `None`: no record.
+    pub anim_events: Option<[u8; d2_formats::animdata::EVENTS]>,
 }
 
 /// The reserved `outgoing` slot of 0x28's dialog branch (`msg-ui.md`
@@ -334,6 +345,9 @@ impl ClientUnit {
             flag_ex: 0,
             flag_4: false,
             hit_class: 0,
+            flag_40: false,
+            action_frame: 0,
+            anim_events: None,
         }
     }
 
@@ -1194,6 +1208,16 @@ impl ClientWorld {
         Some(std::borrow::Cow::Owned(u))
     }
 
+    /// The path direction (+0x64) a view unit draws with, when the model
+    /// holds its path: the C monsters' ([`super::critter_path`]).
+    pub fn view_direction(&self, key: &UnitKey) -> Option<u8> {
+        if key.guid & VIEW_CLIENT_BIT == 0 {
+            return None;
+        }
+        let real = UnitKey::new(key.unit_type, key.guid & !VIEW_CLIENT_BIT);
+        super::critter_path::direction(self, real)
+    }
+
     /// Every unit the view draws: set S in key order, then the
     /// client-made monsters of set C ([`Self::view_unit`]).
     pub fn view_units(&self) -> Vec<std::borrow::Cow<'_, ClientUnit>> {
@@ -1332,6 +1356,12 @@ pub struct MonsterClass {
     /// group size (`monsters/population.md` §11.7 r2).
     pub min_grp: u8,
     pub max_grp: u8,
+    /// `monstats2` mode bits (+0xF0, bit m = the class has mode m;
+    /// `0x0046C140(class, m)`, `mDT`…).
+    pub modes: u16,
+    /// `monstats2` +0x0E: the creator's path byte (`0x00649070`, the stop
+    /// distance; `msg-units.md` §1.2 r2).
+    pub path_byte: u8,
 }
 
 /// The `monstats` / `monstats2` columns of the monster set-up
@@ -1395,6 +1425,10 @@ pub struct StateRow {
     /// the state is in the state-mask group 0x26 that `range(P, skill)`
     /// tests (`skills/use.md` §3 r6).
     pub meleeonly: bool,
+    /// `restrict` (`states.txt` flag bit 17, `data/fields.tsv`): the
+    /// state-mask group `0x0063A510` tests, the shapeshift forms
+    /// (`skills/use.md` §2 test 7).
+    pub restrict: bool,
 }
 
 /// One `skilldesc` row as 0x93 reads it (`msg-skills.md` §9 r3).
@@ -1445,6 +1479,8 @@ impl MonsterClass {
             npc,
             interact,
             size_x: *monstats2.get(0x08)? as i8,
+            modes: u16::from_le_bytes([*monstats2.get(0xF0)?, *monstats2.get(0xF1)?]),
+            path_byte: *monstats2.get(0x0E)?,
             setup: None,
             ..MonsterClass::default()
         })
@@ -1534,6 +1570,27 @@ pub struct SkillRow {
     /// `cltstfunc` (+0xF2): the client start of `client/model.md` §8 r7
     /// step 5.
     pub cltstfunc: u16,
+    /// `restrict` (+0x228): 0 human form only, 1 any form, 2 only with
+    /// one of `State1`…`State3` (`skills/use.md` §2 test 7).
+    pub restrict: u8,
+    /// `State1`…`State3` (+0x22A, i16; a negative id ends the list).
+    pub shape_states: [i16; 3],
+    /// `cltdofunc` (+0xF4, read signed): the client do of
+    /// `client/msg-skills.md` §11 ([`super::client_do`]).
+    pub cltdofunc: i16,
+    /// `cltmissile` (+0xE8) and `cltmissilea`…`c` (+0xEA…+0xEE), read
+    /// signed (−1 = none; §11 r2, r4).
+    pub cltmissile: i16,
+    pub cltmissile_abc: [i16; 3],
+    /// `cltcalc1` (+0x114): the calc offset of the nova do's velocity
+    /// bonus (§11 r4); `u32::MAX` = none.
+    pub cltcalc1: u32,
+    /// `progressive` (bit 2) with `progstate`… : the charge-indexed
+    /// missile pick `0x004F21B0` (§11 r4): `aurastate` (+0x80) and
+    /// `aurastat1` (+0x54), read signed.
+    pub progressive: bool,
+    pub aurastate: i16,
+    pub aurastat1: i16,
 }
 
 /// The `Levels.txt` critter columns (`monsters/population.md` §11.7 r1):

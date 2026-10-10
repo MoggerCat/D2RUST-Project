@@ -332,3 +332,102 @@ pub fn advance_sequence(anim: &mut Anim) -> bool {
     };
     true
 }
+
+/// The sequence-less branch of the frame advance `0x00623E00`
+/// (`sim/units.md` §4.2 "Frame advance"): +0x4E := 0; j = cur >> 8 (+ 1
+/// when the speed is above 255); cur += speed; while cur ≥ the frame
+/// count, the action bytes of the frames j .. (count >> 8) − 1 are noted,
+/// cur −= count, j := 0 and cur += 256 · `bonus` (the frame bonus
+/// `0x00623B10`); then those of the frames j ..= cur >> 8. The last byte
+/// in 1..=4 noted wins. A frame count of zero or less never wraps (the
+/// original's loop would not end).
+pub fn advance_frame(anim: &mut Anim, bonus: i32) {
+    anim.action_frame = 0;
+    let mut j = anim.frame >> 8;
+    if anim.speed > 255 {
+        j += 1;
+    }
+    anim.frame = anim.frame.wrapping_add(i32::from(anim.speed));
+    let events = anim.record.as_ref().map(|r| r.events);
+    let note = |from: i32, to: i32, action: &mut u8| {
+        let Some(e) = events.as_ref() else {
+            return;
+        };
+        for i in from..to {
+            if let Some(&b) = usize::try_from(i).ok().and_then(|i| e.get(i)) {
+                if (1..=4).contains(&b) {
+                    *action = b;
+                }
+            }
+        }
+    };
+    while anim.frame_count > 0 && anim.frame_count <= anim.frame {
+        note(j, anim.frame_count >> 8, &mut anim.action_frame);
+        anim.frame = anim.frame.wrapping_sub(anim.frame_count);
+        j = 0;
+        anim.frame = anim.frame.wrapping_add(bonus.wrapping_mul(256));
+    }
+    note(j, (anim.frame >> 8) + 1, &mut anim.action_frame);
+}
+
+#[cfg(test)]
+mod advance_frame_tests {
+    use super::*;
+    use crate::units::record::{Anim, AnimRecord, ANIM_EVENTS};
+
+    // Covers: specs/sim/units.md §4.2
+    #[test]
+    fn baal_s2_frame_wraps_by_the_frame_count() {
+        // Recorded (`gen-lvl-132` frame 97): +0x44 18688 → 1184 with the
+        // speed 160 and the frame count 5888.
+        let mut a = Anim {
+            frame: 18688,
+            frame_count: 5888,
+            speed: 160,
+            ..Anim::default()
+        };
+        advance_frame(&mut a, 0);
+        assert_eq!(a.frame, 1184);
+        assert_eq!(a.action_frame, 0);
+    }
+
+    // Covers: specs/sim/units.md §4.2
+    #[test]
+    fn the_last_action_byte_crossed_wins() {
+        let mut events = [0u8; ANIM_EVENTS];
+        events[1] = 2;
+        events[2] = 4;
+        let mut a = Anim {
+            frame: 256,
+            frame_count: 10 << 8,
+            speed: 512,
+            record: Some(AnimRecord {
+                frames: 10,
+                byte_0f: 0,
+                events,
+            }),
+            ..Anim::default()
+        };
+        // Speed ≥ 256 starts one frame later: frames 2 ..= 3 are noted.
+        advance_frame(&mut a, 0);
+        assert_eq!((a.frame, a.action_frame), (768, 4));
+        // A wrap adds the bonus and notes the tail frames first.
+        a.frame = 9 << 8;
+        a.action_frame = 9;
+        advance_frame(&mut a, 1);
+        assert_eq!(a.frame, (9 << 8) + 512 - (10 << 8) + 256);
+    }
+
+    // Covers: specs/sim/units.md §4.2
+    #[test]
+    fn a_zero_frame_count_never_wraps() {
+        let mut a = Anim {
+            frame: 0,
+            frame_count: 0,
+            speed: 256,
+            ..Anim::default()
+        };
+        advance_frame(&mut a, 3);
+        assert_eq!(a.frame, 256);
+    }
+}

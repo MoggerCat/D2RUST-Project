@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–298 |
-|   2. Think dispatch `0x005B1740` | 299–438 |
-|   3. AI control and AI tables | 439–610 |
-|   4. AI parameters | 611–629 |
-|   5. Target selection | 630–966 |
-|   6. Distances and line tests | 967–982 |
-|   7. Tactics helpers | 983–1228 |
-|   8. AI commands and minions | 1229–1255 |
-|   10. The catalogue `ai-functions.tsv` | 1256–1276 |
-| Constants & data dependencies | 1277–1300 |
-| Randomness | 1301–1330 |
-| Edge cases & original bugs | 1331–1372 |
-| Test vectors | 1373–1461 |
-| Provenance | 1462–1523 |
-| Open questions | 1524–1630 |
+|   1. Think scheduling | 97–304 |
+|   2. Think dispatch `0x005B1740` | 305–451 |
+|   3. AI control and AI tables | 452–640 |
+|   4. AI parameters | 641–659 |
+|   5. Target selection | 660–996 |
+|   6. Distances and line tests | 997–1012 |
+|   7. Tactics helpers | 1013–1261 |
+|   8. AI commands and minions | 1262–1288 |
+|   10. The catalogue `ai-functions.tsv` | 1289–1309 |
+| Constants & data dependencies | 1310–1333 |
+| Randomness | 1334–1363 |
+| Edge cases & original bugs | 1364–1405 |
+| Test vectors | 1406–1494 |
+| Provenance | 1495–1556 |
+| Open questions | 1557–1663 |
 <!-- /index -->
 
 ## Summary
@@ -207,8 +207,14 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   (`0x00553540`: none when it is the unit itself), so a unit without one
   (the Hydras, whose path never had a target unit) makes the request
   point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
-  `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
+  `sor-hydra`, frame 42; a town NPC after a self-targeted S1/S2, e.g.
+  Malah in `gen-wp-30` frame 430: `0x00553540` returns 0 when the looked-up
+  target is the unit itself, read 2026-10-10). 1.14d-confirmed (`0x005A8030` at
   `0x005A8100`–`0x005A8140`).
+  Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
+  a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
+  also: Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107
+  (path target (0, 0)).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
@@ -415,6 +421,13 @@ Only when a target was found:
    target distance is < 20, the target is a player, and control flag 0x10
    is clear: play sound 16, set flag 0x10, idle 20, stop. Once per
    monster.
+   Recorded (rc-drop-content, `items-drops-nor-11` with the rng channel,
+   2026-10-10): Griswold (class 365, monstats `boss`) spawned at frame 30
+   with a player < 20 away makes its first think at frame 31 and idles
+   20 (no draw); its Griswold body (`0x005E5AC0`) first draws at frame 51,
+   then 61 and 66. The boss, demon, undead and prime-evil tests read the
+   monstats flags of the unit's class (monster units only); d2rs answered
+   false for all four until the action hooks read the row.
 2. **Teleport** (`0x005B11F0`, monsters given control flag 0x20 by a
    monumod; `monsters/init.md`). Not if dead or flag 0x20 clear. Draws:
    1. `lo' % 100` ≥ 40 → continue with 3.
@@ -518,7 +531,7 @@ name):
 | 3 | SpecialState03 | 1 | `0x005E5730` | `0x005E5870` | – |
 | 4 | Hireable | 0 | – | `0x005E52D0` | `0x005E5280` |
 | 5 | GoodNpcRanged | 0 | – | `0x005E7AC0` | – |
-| 6 | SpecialState06 | 0 | – | `0x005E7C10` | – |
+| 6 | SpecialState06 | 0 | – | `0x005E7C10` (`ai-bodies.md` §9.33) | – |
 | 7 | NecroPet | 0 | – | `0x005E4CF0` | – |
 | 8 | TownRogue | 1 | – | `0x005E7DC0` | – |
 | 9 | SpecialState09 | 1 | – | `0x005E7F80` | – |
@@ -573,6 +586,23 @@ think. Installers that reach a running monster: curse AI `0x005C34B0`
 own switch back to 0. Monster creation, the class reinit
 (`0x00574250`) and the inactive restore (`0x005424F0`) install on a
 fresh control (function 0), so never step 3.
+
+**Special state 16 (possessed imp), 1.14d-confirmed.** Init `0x005E2CD0`:
+one raw step of the unit seed; its low bit b picks the first slot
+index (b + 1) mod 2 of the table `0x006E34E0` (pairs {2, 0}, {4, 0}); the
+slot is the unit's monstats `Skill<slot + 1>`; the first slot whose skill
+the unit has an entry of (owner −1, `0x006439B0`) is stored: AI param 1
+:= slot, param 2 := the second dword (0); neither: both 0. Think
+`0x005E2D80` (target mode 1): no source unit (`0x00552FD0`) or no state
+143 → AI state 0, idle 1. Distance > 24, source dead, source alignment
+≠ 0 (`0x006259B0`) or param 1 = 0 → teleport in range imp1's `aip2`
+(`+0x5C`; `aip1` is `+0x56`) with imp1's `Skill1` / `Sk1mode` (`0x005DF850`), param 0 := −1. Else when
+distance < imp2's (monstats 493) `aip2` and `roll(100)` < imp2's `aip3`:
+param 2 ≠ 0 → two `roll(2 · imp2.aip4)` (`+0x68`, `all.asm` `0x5E2EAC`); imp1's `Skill<slot + 1>` in its
+mode at the target (`0x005DEAD0`), idle 20 when the skill is < 0.
+Otherwise `roll(100)` < 50 → mode 8 at the target (`0x005DDF90`), else
+idle 20. Imp Teleport's exact placement `0x00554EA0(…, exact 1)` skips
+the free-point search (`sim/path-placement.md` §10 rule 3).
 
 **Installed special states in 1.14d.** Literal states pushed: 0, 5, 6
 (Hireable `0x005E52D0`), 10 (`0x005D6520`), 11 (`0x005DDD00`), 13
@@ -987,6 +1017,9 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | 1.14d | D2MOO | Effect |
 |---|---|---|
 | `0x005DDF90(mode, target)` | `AITACTICS_ChangeModeAndTargetUnit` | mode change with a target unit; request flag 1; the path step count is not set; no skill is set, so the builder's clear leaves the used skill entry (`0x00620250`) **none** for the whole mode (a plain A1 / A2 has no skill entry: every reader of the used entry takes its "none" branch, e.g. `skills/bodies.md` §-rules "no used skill entry → 0", `sim/units.md` attack weapon → D; Attack (skill 0) is **not** substituted; 2026-10-09 read of `0x005DDF90` → `0x005A7E60` → `0x00620210(U, 0)` → `0x00643990`: list +0x10 := 0) |
+
+Recorded 2026-10-10 (`gen-mon-469` f122, 1.14d `0x005A7670` read): after a skill mode (a curse, S2) the next plain A1 through `0x005DDF90` must find **no** used skill, else event 0 takes its used-skill branch (refresh, no strike) and the melee to-hit draw `0x0057D9B0` (site `0x57DB38`) never happens. d2rs clears the monster's current skill in `mode_at` (REC-2325).
+
 | `0x005DDFC0(mode, x, y)` | `…ChangeModeAndTargetCoordinates` | mode change at coordinates; request flag 1; the path step count is not set (like `0x005DE490`) |
 | `0x005DE000(skill, target, x, y)` | `AITACTICS_UseSequenceSkill` | skill id in range: mode 14 (sequence), current skill := skill, path step 1, no fallback |
 | `0x005DEAD0(mode, skill, target, x, y)` | `AITACTICS_UseSkill` | mode < 16: current skill := the unit's skill entry with that id and owner −1 (`0x006439B0`, 0 when none; `0x00620210`), unit flag 0x40, path step 1; request with target unit, point (x, y) and flag 0; returns 1 when the mode change succeeds; else idle 10 and returns 0. Mode ≥ 16: nothing, returns 0 |

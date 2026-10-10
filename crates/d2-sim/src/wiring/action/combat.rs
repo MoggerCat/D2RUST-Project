@@ -199,19 +199,19 @@ impl<X: Pending> CombatWorld for CombatView<'_, X> {
         self.v.h.monster_flag(u, mask)
     }
     fn is_boss(&self, u: UnitId) -> bool {
-        self.v.h.x.is_boss(u)
+        self.v.h.is_boss(u)
     }
     fn is_hireling(&self, u: UnitId) -> bool {
         self.v.is_hireling(self.game, u)
     }
     fn is_demon(&self, u: UnitId) -> bool {
-        self.v.h.x.is_demon(u)
+        self.v.h.is_demon(u)
     }
     fn is_undead(&self, u: UnitId) -> bool {
-        self.v.h.x.is_undead(u)
+        self.v.h.is_undead(u)
     }
     fn is_prime_evil(&self, u: UnitId) -> bool {
-        self.v.h.x.is_prime_evil(u)
+        self.v.h.is_prime_evil(u)
     }
     fn is_revived(&self, u: UnitId) -> bool {
         self.v.h.x.is_revived(u)
