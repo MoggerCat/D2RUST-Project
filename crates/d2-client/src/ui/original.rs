@@ -1599,6 +1599,9 @@ impl Panel for SkillTreeUi {
         let consumed = match left(e) {
             Some((true, at)) => {
                 let d = self.panel.mouse_down_ctx(&env, &view, at, input(at));
+                if d.cursor_press {
+                    cursor_ui::cursor_press(&sh, ctx.world, at);
+                }
                 sh.outputs.extend(d.out);
                 d.consumed
             }
@@ -1982,7 +1985,11 @@ impl Panel for CharacterUi {
             _ => 0,
         };
         match left(e) {
-            Some((true, at)) => self.panel.press(&sh.tables, &s, at, statpts),
+            Some((true, at)) => {
+                if self.panel.press(&sh.tables, &s, at, statpts) {
+                    cursor_ui::cursor_press(&sh, ctx.world, at);
+                }
+            }
             Some((false, at)) => {
                 // Shift is the host's per-frame flag (`set_shift`): all points.
                 let shift = sh.items.shift;

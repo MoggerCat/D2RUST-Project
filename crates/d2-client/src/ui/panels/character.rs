@@ -383,14 +383,18 @@ impl CharacterPanel {
 
     /// Mouse down (`0x004A7720`, §8.3, §8.5): sets the pressed field of the
     /// close button or of the add button under `at` (the add buttons only
-    /// while stat points are left).
-    pub fn press(&mut self, t: &PanelTables, s: &Screen, at: Point, statpts: i32) {
+    /// while stat points are left). Returns whether an add button was
+    /// pressed: then the cursor press `0x00467F20` runs (`0x004A787C`,
+    /// `panels-3.md` §23 r14; the close button does not press it).
+    pub fn press(&mut self, t: &PanelTables, s: &Screen, at: Point, statpts: i32) -> bool {
         if close_rect(t, s).is_some_and(|r| r.contains(at)) {
             self.close_pressed = true;
         }
         if let Some(i) = add_button_at(t, s, at, statpts) {
             self.stat_pressed[i] = true;
+            return true;
         }
+        false
     }
 
     /// Mouse up (`0x004A78C0`, §8.3, §8.5, `panels-2.md` §17 r1–r2): the

@@ -22,7 +22,7 @@ use crate::bridge::world::ClientWorld;
 use crate::ui::cursor::{CursorDraw, TYPES};
 use crate::ui::draw::{CelLook, ImageRef, ImageRequest, UiDraw, UiDrawSink};
 use crate::ui::geom::Point;
-use crate::ui::panel::{UiCtx, UiEvent};
+use crate::ui::panel::{PointerButton, UiCtx, UiEvent};
 
 use super::OriginalUi;
 
@@ -42,6 +42,15 @@ fn now(sh: &Shared, world: &ClientWorld) -> u32 {
     sh.host_now
         .get()
         .unwrap_or_else(|| (world.frames as u32).wrapping_mul(40))
+}
+
+/// The cursor press `0x00467F20` (§23 r5) as the panels call it: only the
+/// character panel's add buttons, the control panel's new-stats /
+/// new-skills buttons and the skill tree's icons press the cursor (§23
+/// r14); no window message does.
+pub(super) fn cursor_press(sh: &Shared, world: &ClientWorld, at: Point) {
+    let t = now(sh, world);
+    sh.cursor.borrow_mut().button_down(at.x, at.y, t);
 }
 
 impl OriginalUi {
@@ -93,8 +102,9 @@ impl OriginalUi {
     }
 
     /// The pointer events the cursor's window handlers see (§23 r14): the
-    /// move, the button down and up (none is consumed), and the pointer
-    /// leaving the window (`WM_NCMOUSEMOVE`: not drawn).
+    /// move, the left button up (neither is consumed) and the pointer
+    /// leaving the window (`WM_NCMOUSEMOVE`: not drawn). The button down is
+    /// not one of them: only some panel presses run it ([`cursor_press`]).
     pub(super) fn cursor_event(&mut self, e: UiEvent, world: &ClientWorld) {
         let sh = self.shared.borrow();
         let (w, h) = (sh.config.screen.w, sh.config.screen.h);
@@ -104,8 +114,10 @@ impl OriginalUi {
             UiEvent::CursorMoved(p) => {
                 c.mouse_move(p.x, p.y, t, w, h, false);
             }
-            UiEvent::Press { at, .. } => c.button_down(at.x, at.y, t),
-            UiEvent::Release { at, .. } => c.button_up(at.x, at.y, t),
+            UiEvent::Release {
+                button: PointerButton::Left,
+                at,
+            } => c.button_up(at.x, at.y, t),
             UiEvent::CursorLeft => {
                 c.nc_mouse_move(0);
             }
@@ -244,8 +256,10 @@ mod tests {
             ("cursor\\protate".into(), 0, 400, 300)
         );
         let button = PointerButton::Left;
+        // §23 r14: a world press is not a cursor press (only some panel
+        // buttons run r5), so the type stays protate.
         send(&mut ui, &mut root, &w, UiEvent::Press { button, at });
-        assert_eq!(last(&ui, &root, &w).0, "cursor\\ppress");
+        assert_eq!(last(&ui, &root, &w).0, "cursor\\protate");
         send(&mut ui, &mut root, &w, UiEvent::Release { button, at });
         assert_eq!(last(&ui, &root, &w).0, "cursor\\protate");
         // r8: in s = 1 past idle + 5000 ms the step starts ohand.

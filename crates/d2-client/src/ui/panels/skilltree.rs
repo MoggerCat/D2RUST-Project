@@ -525,6 +525,7 @@ impl SkillTreePanel {
                     .map(|(e, _)| e.skill);
                 if let Some(skill) = hit {
                     self.pressed = Some(skill);
+                    d.cursor_press = true;
                     // Id 5 (`client/ui.md` §B8.1, `0x004ABBF1`).
                     d.out.push(PanelOutput::Sound(5));
                 }
@@ -644,6 +645,9 @@ impl InputCtx {
 pub struct Down {
     pub consumed: bool,
     pub out: Vec<PanelOutput>,
+    /// An icon was pressed: the cursor press `0x00467F20` runs
+    /// (`0x004ABBD7`, `panels-3.md` §23 r14).
+    pub cursor_press: bool,
 }
 
 /// A tab tool tip (§19 r4): the region top `T`, the string id and the
