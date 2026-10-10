@@ -675,6 +675,9 @@ pub struct ClientWorld {
     /// The item tables the streams are decoded with
     /// (`bridge::item_lists`).
     pub item_tables: super::item_lists::ItemTablesRef,
+    /// The animation lookup the item tips' speed line queries
+    /// (`ui/item-tips.md` §3.2 r1); a handle like `item_tables`.
+    pub tip_anims: super::player_anim::PlayerAnimsRef,
     /// d2rs-own, unverified: S→C 0x9C action 0x0B records received (the
     /// store items a trade open shows, `world/vendors.md` §4 step 3).
     pub store_serial: u32,
@@ -1567,6 +1570,11 @@ pub struct SkillRow {
     /// The flag columns `ui/controls.md` §6 r8 reads, by `skills.txt`
     /// bit (`controls::click::skill_flag`).
     pub flags: u32,
+    /// `itypea1..3`, `itypeb1..3` (i16, <= 0 = none): the item type sets
+    /// of `skills/use.md` §2 "Item type test".
+    pub itypes: [[i16; 3]; 2],
+    /// `etypea1..2`, `etypeb1..2` (i16, <= 0 = none).
+    pub etypes: [[i16; 2]; 2],
     /// `InGame` (`skills/use.md` §2 use state test 1).
     pub ingame: bool,
     /// `aura` (use state test 3).

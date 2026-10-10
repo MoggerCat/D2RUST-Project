@@ -8,7 +8,7 @@ save ScnHrF --class bar --expansion --level 30 --gold 100000
 seed 1234
 ticks 200
 seconds 500
-channels state
+channels state packets
 variant blood-moor-empty
 at 4 poke goto unit 1:150
 at 8 send InteractWithEntity type=1 id=@1:150

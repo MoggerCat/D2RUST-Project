@@ -29,6 +29,7 @@ use crate::path::coords::Point;
 use crate::path::walk::request::WalkTarget;
 use crate::units::hooks::Sim;
 
+use super::arena::ArenaRow;
 use super::combat::CombatView;
 use super::monsters::umod_mode;
 use super::units::STATE_DEATH_DELAY;
@@ -455,6 +456,16 @@ pub fn kill_by<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: Option<Unit
         if flags & UNIT_FLAG_NO_EXPERIENCE == 0 {
             if let Some(t) = cv.v.h.vitals.clone() {
                 distribute(cv, &t, a, d);
+            }
+        }
+        // The arena kill event `0x0053F720`.
+        if let (Some(row), Some(ka), Some(kd)) = (
+            cv.v.h.tables.arena.first().map(ArenaRow::from),
+            cv.v.units.get(a).map(|r| r.ty),
+            cv.v.units.get(d).map(|r| r.ty),
+        ) {
+            if let Some(st) = cv.v.h.arena.as_mut() {
+                st.kill_event(&row, &mut *cv.game, (a, ka), (d, kd));
             }
         }
         let game = &mut *cv.game;

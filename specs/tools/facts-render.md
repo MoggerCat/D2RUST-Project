@@ -27,14 +27,14 @@
 |   3. `frame.tsv` | 137–169 |
 |   4. `sprites.tsv` | 170–189 |
 |   5. d2rs export | 190–355 |
-|   6. Comparison | 356–412 |
-|   7. Requests | 413–424 |
-| Constants & data dependencies | 425–428 |
-| Randomness | 429–432 |
-| Edge cases & original bugs | 433–440 |
-| Test vectors | 441–449 |
-| Provenance | 450–454 |
-| Open questions | 455–469 |
+|   6. Comparison | 356–419 |
+|   7. Requests | 420–431 |
+| Constants & data dependencies | 432–435 |
+| Randomness | 436–439 |
+| Edge cases & original bugs | 440–447 |
+| Test vectors | 448–456 |
+| Provenance | 457–461 |
+| Open questions | 462–476 |
 <!-- /index -->
 
 ## Summary
@@ -379,7 +379,14 @@ The original's `sprites.tsv` is `<original dir>/sprites.tsv`, else
 5. `--skip-weather` (REC-510): pass 9's rows are left out on both
    sides before r2, for scenes whose 1.14d rain is not reproducible
    (`docs/handoff/q-facts-scenes.md`: two runs of the same tick draw
-   other particles). A pass-9 row is a `DrawLine` or `DrawBox` row
+   other particles).
+   *Revision (2026-10-10, rc-draw-row173; REC-510 settled):* the rain is
+   reproducible. Its seed is the client player seed, which the idle
+   cursor steps once per drawn frame for 5,000 ms of host time and the
+   weather update once per drawn frame, so two runs differ only by their
+   host clock and frame schedule. A check run replays both from the
+   recording (`tools/scenario-diff.md` §3 r7 step 5) and compares pass 9
+   in full; `--skip-weather` stays a tool option and no check uses it. A pass-9 row is a `DrawLine` or `DrawBox` row
    whose `at` is in [`0x00473470`, `0x00473F50`) on the 1.14d side (the
    particle draw `0x00473470` and pass 9 `0x00473910`,
    `draw-order-2.md` §11.7), and a row whose `at` is `pass9` on the d2rs

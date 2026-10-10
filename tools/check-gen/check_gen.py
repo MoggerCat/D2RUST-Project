@@ -408,7 +408,7 @@ def fam_shrine(ctx):
         c = Check(
             f"gen-shrine-{n}", "shrine", f"shrines.txt row {n}",
             f"shrine {name} ({t.get(r, 'Shrine Type')})",
-            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state",
+            "ScnAm2 --class ama --expansion --level 30 --act 1 --quests acts=1", 120, 300, "state packets",
             [f"at 30 poke object {cls} @x+3 @y",
              f"at 40 send InteractWithEntity type=2 id=@2:{cls}"],
             seed=seed,
@@ -417,7 +417,7 @@ def fam_shrine(ctx):
                      f"shrines.txt) at frame 30, operated by C->S 0x13 at frame 40. With -seed "
                      f"{seed} the shrine pick of the object control (world/objects.md section "
                      f"5.1) gives row {n} ({how}; PROVISIONAL REC-1330: the seed is d2rs's pick, settled by the first 1.14d run); the check compares the shrine's effect, the "
-                     "player's stats and states and the draws."])
+                     "player's stats and states and the draws, and the packets of the window (the 0x13 send needs a MATCHing packets channel, REC-2055/2056)."])
         c.extra = {"shrine": n}
         out.append(c)
     return out

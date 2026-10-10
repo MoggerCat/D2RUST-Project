@@ -7,8 +7,7 @@ save ScnAma --class ama --expansion --gold 500
 seed 1234
 ticks 120
 seconds 300
-channels state rng items
-ignore q
+channels state rng items packets
 at 4 poke seed-game 0x00001234 666
 at 4 poke item gld @x+3 @y
 at 4 poke item gld @x-3 @y ilvl 30

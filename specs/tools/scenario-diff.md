@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–549 |
-|   4. Suite | 550–677 |
-| Constants & data dependencies | 678–681 |
-| Randomness | 682–685 |
-| Edge cases & original bugs | 686–721 |
-| Test vectors | 722–744 |
-| Provenance | 745–748 |
-| Open questions | 749–811 |
+|   3. Run | 145–580 |
+|   4. Suite | 581–708 |
+| Constants & data dependencies | 709–712 |
+| Randomness | 713–716 |
+| Edge cases & original bugs | 717–752 |
+| Test vectors | 753–775 |
+| Provenance | 776–779 |
+| Open questions | 780–842 |
 <!-- /index -->
 
 ## Summary
@@ -186,7 +186,8 @@ state first. It is the default way to compare a behaviour with 1.14d.
       draws-orig` [`draws-orig/scenes/s/`, `draws-orig/sprites.tsv`].
    3. d2rs: `cargo build --release -p d2-client` once, then the binary
       `play --save --seed --difficulty [--poke …] --dump-draws draws-d2rs
-      --at-tick <the compared tick> [--input <input d2rs>]` (a stale
+      --at-tick <the compared tick> [--input <input d2rs>] --frame-schedule
+      frame-schedule.tsv` (step 5; a stale
       `draws-d2rs` is removed first; `--reuse` keeps one only if its
       `frame.tsv` tick is the compared tick; time limit 900 s).
       Windows: as is. Linux: an X display (the current `DISPLAY` if it answers and
@@ -202,6 +203,36 @@ state first. It is the default way to compare a behaviour with 1.14d.
    4. `d2-client facts-compare draws-orig/scenes/s draws-d2rs --ignore
       tick`: its verdict and first difference are the channel's report
       (exit 0 match, 1 diverged, 2 partial).
+   5. **The recorded frame schedule and host clock** (decided
+      2026-10-10, coordinator; settles REC-510). The host clock
+      (`GetTickCount()`) and which client updates draw a frame are inputs
+      of the recording, not game behaviour: the idle cursor steps the
+      client seed once per drawn frame for 5,000 ms of host time
+      (`ui/panels-3.md` §23 r8, `client/model.md` Randomness r4), and the
+      weather update runs only in drawn frames (`render/draw-order-2.md`
+      §11.2), so both feed the seed every later rain particle, sound
+      variant and cursor frame draws on. The debugger slows 1.14d (one
+      frame per update, 125 ms apart, instead of 40 ms), so a d2rs clock of
+      its own can never meet a recording. d2rs therefore replays them:
+      `[frame-schedule.tsv]` (format `frame-schedule 1`, written from the
+      capture by `scenario_diff.py`: `# cursor_last`, `# cursor_idle` = the
+      first frame's `cursor.last_step`, `cursor.idle_since`; one row `tick
+      now` per captured frame, `tick` = `f`, `now` = the next frame's
+      `cursor.last_step` (the capture reads the cursor at frame start,
+      `render/capture.md` §3.3), `-` for the last frame). With it, `play`
+      draws exactly the listed ticks, one frame each, and no frame, no
+      weather update and no cursor step on any other tick; the cursor
+      reads `now` of the drawn tick as its clock and starts from the
+      recorded timers. A capture without a server tick or the cursor
+      clock on any frame, or a schedule in which a frame other than the
+      last lacks `now`, fails the check; d2rs never falls back to a clock
+      of its own in a check run. Live play keeps the host clock.
+      Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
+      the client seed matches the capture's `seed_start` of every frame
+      through tick 25 and the rain lines (endpoints and colors) are equal
+      on every tick 4–24; tick 25 on differs by one extra footstep
+      variant roll in d2rs (sound 2768 at T 22, 1.14d T 27: the audio
+      owner's cause).
 9. **packets** (`tools/packets-trace.md`; work dir files in brackets):
    1.14d `record_packets.py` with the rule 2 start
    [`orig.packets.jsonl`]; d2rs `d2-client state-dump --save --seed

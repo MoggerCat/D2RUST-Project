@@ -246,6 +246,7 @@ impl Fight {
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         });
         h.anim_data = Some(Arc::new(anim_data()));
         h.vitals = Some(Arc::new(vitals()));
