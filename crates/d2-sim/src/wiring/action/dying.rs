@@ -221,12 +221,18 @@ impl<X: Pending> ActionSim<X> {
             }
             s.hooks.death.announced.insert(p, code);
             changed.push(p);
+            // With the path provider the 0x0D of the DT / DD row goes out
+            // with the unit's update in the client pass, in queue order
+            // (`pathing.md` §10 rule 2; recorded: a monster's 0x6D queued
+            // after the death precedes it, `items-drops-nor-06` frame 50).
+            // A host without it announces here.
+            if s.hooks.paths.is_some() {
+                continue;
+            }
             let Some(guid) = s.units.get(p).map(|r| r.guid) else {
                 continue;
             };
             let (x, y) = s.hooks.path_position(p);
-            // b = unit byte +0xB0 (`pathing.md` §10 rule 2: the DT / DD
-            // rows); recorded 3 after a hit (`items-drops-cha-00`).
             let b = s.units.get(p).map_or(0, |r| r.hit_class as u8);
             let msg = crate::path::walk::messages::player_stop(
                 UnitType::Player as u8,
@@ -292,7 +298,7 @@ impl<X: Pending> ActionHooks<X> {
         let (Some(kr), Some(vr)) = (sim.units.get(k), sim.units.get(victim)) else {
             return;
         };
-        let (kty, kguid, vty) = (kr.ty, kr.guid, vr.ty);
+        let (kty, kclass, vty) = (kr.ty, kr.class, vr.ty);
         let name_of = |h: &Self, u: UnitId| h.session.names.get(&u).copied().unwrap_or([0; 16]);
         let boss = (kty == UnitType::Monster)
             .then(|| self.monster_data(k))
@@ -303,7 +309,7 @@ impl<X: Pending> ActionHooks<X> {
             killer_name = name_of(self, k);
         }
         let m = crate::units::messages::death_notice(
-            kguid,
+            kclass,
             kty as u8,
             &name_of(self, victim),
             &killer_name,

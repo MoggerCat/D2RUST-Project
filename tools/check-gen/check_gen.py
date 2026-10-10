@@ -864,7 +864,9 @@ AUD_SCEN = [
     dict(id="town-idle", ticks=250, save=AUD_TOWN, lines=[],
          areas=["sound-table.3-file-path", "sound-table.4-groups-and-variants", "sound-table.5-requests",
                 "sound-table.7-starting-on-a-channel", "sound-table.9-settings", "sound-table.10-sample-cache",
-                "sound-table.11-live-data-1-14d", "sound-table.12-edge-cases-kept", "triggers.1-conventions-and-shared-state"],
+                "sound-table.11-live-data-1-14d", "sound-table.12-edge-cases-kept", "triggers.1-conventions-and-shared-state",
+                "system.formats.wav.1-header", "system.formats.wav.2-chunk-walk-no-pad-bytes", "system.formats.wav.3-samples",
+                "system.formats.wav.4-format-checks-by-the-game"],
          what="the Rogue Encampment idle for 250 ticks: town music, ambience bed, NPC voices; every voice's sample file, "
               "group, variant, channel start, settings-driven volume and the sound tick / client update counters"),
     dict(id="warp-levels", ticks=260, save=AUD_TOWN,
@@ -930,6 +932,11 @@ AUD_NOCHECK = {
 }
 
 
+def _aud_area(a):
+    """An audio scenario's ledger area: `system.audio.` + a, or a full `system.` area."""
+    return a if a.startswith("system.") else "system.audio." + a
+
+
 def fam_aud(ctx):
     out = []
     for sc in AUD_SCEN:
@@ -941,8 +948,8 @@ def fam_aud(ctx):
             comment=[f"Audio scenario {sc['id']}: {sc['what']}.",
                      "Compared by tools/audio-diff (decoded samples, start ticks, device "
                      "volume and pan per voice, and the mixed output).",
-                     "Ledger rows: " + ", ".join("system.audio." + a for a in sc["areas"]) + "."])
-        c.extra = {"areas": ["system.audio." + a for a in sc["areas"]], "input": sc.get("input")}
+                     "Ledger rows: " + ", ".join(_aud_area(a) for a in sc["areas"]) + "."])
+        c.extra = {"areas": [_aud_area(a) for a in sc["areas"]], "input": sc.get("input")}
         out.append(c)
     return out
 

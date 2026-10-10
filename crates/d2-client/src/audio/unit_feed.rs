@@ -695,7 +695,7 @@ impl UnitFeed {
             // update advances f before its idle voice and footstep; a
             // player's footstep (`0x004CAF60` from `0x00463390`) reads f
             // before that update's advance.
-            for &c in updates {
+            for (n, &c) in updates.iter().enumerate() {
                 cx.c = c;
                 let t = self.tracks.entry(p.key).or_default();
                 let before = t.frame;
@@ -719,7 +719,13 @@ impl UnitFeed {
                 // audio-town-ambience-ama, the NPC footsteps came one
                 // update early after the sound tick base moved to T 0).
                 u.frame = before;
-                if footstep_called(p.key.unit_type, cu.class as i32, mode)
+                // PROVISIONAL (REC-3000): a monster's first update in a new
+                // mode makes no footstep call (measured: the NPC walkers of
+                // audio-town-ambience-ama start at their second frame
+                // crossing, with the reduced first volume).
+                let fresh = p.key.unit_type == MONSTER && p.mode_changed && n == 0;
+                if !fresh
+                    && footstep_called(p.key.unit_type, cu.class as i32, mode)
                     && !(p.key.unit_type == PLAYER && cu.class >= 7)
                 {
                     // REC-431.
