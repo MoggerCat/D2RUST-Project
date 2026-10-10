@@ -23,14 +23,14 @@
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
 |   2. Shared helpers, batch 4 (continued) | 68–198 |
-|   3. Bodies used by one monster skill (continued) | 199–515 |
-|   4. Bodies used by no monster skill row | 516–644 |
-| Constants & data dependencies | 645–656 |
-| Randomness | 657–672 |
-| Edge cases & original bugs | 673–705 |
-| Test vectors | 706–716 |
-| Provenance | 717–727 |
-| Open questions | 728–749 |
+|   3. Bodies used by one monster skill (continued) | 199–519 |
+|   4. Bodies used by no monster skill row | 520–648 |
+| Constants & data dependencies | 649–660 |
+| Randomness | 661–676 |
+| Edge cases & original bugs | 677–709 |
+| Test vectors | 710–720 |
+| Provenance | 721–731 |
+| Open questions | 732–753 |
 <!-- /index -->
 
 ## Summary
@@ -495,6 +495,10 @@ Each eaten corpse adds one more list of the state (Edge case 6).
    `0x00554EA0(game, unit, room none, x, y, 0, 0)` (result not read);
    release (§2.3) with (unit, O, skill, L). Return 1.
 4. No O, no T → return srvdo 98 (`bodies-3.md` §4.3).
+   The "no O, no T" target point is the unit's path record target
+   (u16 +0x10, +0x12; a monster's S1 mode request writes it, so the
+   teleport lands there at the action event `0x005A7670`, 7 ticks into
+   the imp's S1 on the 1.14d check `gen-mon-492`..`714`). REC-2090.
 5. No O, T: T has a source → 0; T dead → 0;
    `0x00554EA0(game, unit, T's room, Tx, Ty, 1, 0)` = 0 → 0; possess (§2.3)
    with (unit, T, skill, L). Return 1.
