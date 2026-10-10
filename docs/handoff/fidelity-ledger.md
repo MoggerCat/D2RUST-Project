@@ -716,7 +716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2528
 - Rows set exercised = yes from the coverage reports' seen lists: 64
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 2084
+- Duplicate areas between parts: 2085
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -1334,6 +1334,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.vilemother1`: rc-gen-mon-triage.tsv:77 kept, rc-mon-frame31.tsv:7 dropped
   - `monster.vilemother2`: rc-gen-mon-triage.tsv:78 kept, rc-mon-frame31.tsv:8 dropped
   - `monster.clawviper5`: rc-damage-draws.tsv:23 kept, rc-mon-frame31.tsv:9 dropped
+  - `monster.fetishshaman2`: rc-extra-missile.tsv:3 kept, rc-mon-missile144.tsv:3 dropped
   - `monster.boss.diabloclone`: rc-mon-fr.tsv:11 kept, rc-mon-modes.tsv:3 dropped
   - `monster.succubus1`: rc-mon-fr.tsv:32 kept, rc-mon-s.tsv:3 dropped
   - `monster.succubus2`: rc-mon-fr.tsv:33 kept, rc-mon-s.tsv:4 dropped
