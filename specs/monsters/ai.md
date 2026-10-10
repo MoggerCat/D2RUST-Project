@@ -939,6 +939,11 @@ started {0, 0x7FFFFFFF, 0, 0x7FFFFFFF}. For each candidate C:
 4. Line test `0x00622AA0(C, scanner, 4)` (a = C: C's room, C's end
    pulled first, `render/draw-order-2.md` §15.1) blocked → skip; else
    the slot := (C, d). The callback always returns 0 (whole scan).
+   Implemented with a = C (rc-c008-monmode, 2026-10-10): d2rs had the two
+   ends swapped; the swap made `milestone-baal-throne` and
+   `milestone-worldstone-portal` equal (SuccubusWitch 1:52, frame 82: the
+   line from the player to the witch is blocked, so no secondary target,
+   and the AI walks instead of casting `Skill5`).
 
 Against the q-fix-ass-traps recordings (Lightning Sentry, `ai-bodies-6.md`
 §14): the hp-0 poked `cow` 6 away was never a candidate (no `isAtt` →
