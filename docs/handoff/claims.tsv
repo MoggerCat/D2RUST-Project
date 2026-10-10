@@ -2,3 +2,6 @@ C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	open
 C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	open
 C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	open
 C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	open
+C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
+C-skilldelay-a7	rc-skill-div-b	16:59	s2c 0xa7 state 121 missing in d2rs at cast (gen-skill-sor-51/56/59/62/64, dru-225/229/234)	open
+C-summon-0xac	rc-skill-div-b	16:59	0xAC AssignMonster of skill summons shorter than 1.14d (gen-skill-ama-28, dru-221, nec-78)	open
