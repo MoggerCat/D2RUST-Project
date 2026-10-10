@@ -140,7 +140,7 @@ Rows so far: 23 `q-fix-pc1today-*`.
   (six glyph rows). All key-only draws checks now pin the cursor (`frame 38;
   move 790 10`), the skill-pick checks use `hold X Y 2`; 1.14d sides
   re-recorded twice: equal UI rows (`specs/tools/scenario-diff.md` Edge case 2).
-  Only `ui-draws-character-ama` still varies by 6 glyph rows.
+  (`ui-draws-character-ama` re-checked later: three runs, 282 UI rows each.)
 - With the pin, the belt key and the party key add no UI row on 1.14d (empty
   belt; single player).
 - `pc1-data.md` Step 4: the audit item is marked (214 of 217).
