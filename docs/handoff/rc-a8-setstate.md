@@ -2,7 +2,6 @@
 Cause 1 (0xA8 byte 9): EQUAL 2759 -> 2801 on its base. Cause 2 (right aura at join): EQUAL 3195 -> 3213 on integ-r23.
 Cause 3 (0xA7 skill delay): EQUAL 3270 -> 3294 on integ-r23 (incl. ledger.py --fix of stale rows in 11 parts).
 Cause 4 (item stream regression): EQUAL 3328 -> 3353 on integ-r23. gen-skill packets MATCH 91 -> 187 of 210.
-
 ## Cause 1: S->C 0xA8 byte 9 at frame 2 (assassin masteries, ~60 checks)
 - 1.14d `0x00646D60` sets `passivestat1-5` on layer `passiveitype` (`0x00627150(list, s, v, layer)`), sent as the
   0xA8 entry's param (`0x005711D0`); d2rs used layer 0. Fix: `BodyWorld::list_set_layer` in `passive::refresh`
