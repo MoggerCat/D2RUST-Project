@@ -1,0 +1,9 @@
+cause	checks	examples	likely_crate_spec	size
+state: player field m	13	gen-boss-250,gen-boss-544,gen-mon-436	d2-sim wiring/action (player mode vs monster attack/AI); specs/monsters/ai.md	M
+state: monster field hp	4	gen-mon-132,gen-mon-133,gen-mon-134	d2-sim monster spawn hp roll; specs/monsters/	S
+state: player field sp	3	gen-mon-295,gen-mon-576,gen-mon-578	d2-sim player/monster speed field (128 vs 64); specs/monsters/	S
+state: frame N game, field seed: N.Nd [N, N] vs dNrs [N, N]	2	gen-boss-333,gen-boss-707	d2-sim game seed advance (RNG draw count); specs/sim/rng.md	M
+state: monster field s	1	gen-boss-242	d2-sim monsters (field s); not investigated	S
+state: player field s	1	gen-boss-267	d2-sim monsters (field s); not investigated	S
+state: monster field tx	1	gen-boss-526	d2-sim monsters (field tx); not investigated	S
+state: monster field fr	1	gen-mon-117	d2-sim monsters (field fr); not investigated	S
