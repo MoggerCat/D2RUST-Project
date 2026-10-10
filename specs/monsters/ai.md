@@ -697,15 +697,15 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    none, V +0x24 := (S = 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
-PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
-coordinate record of `population.md` §9.6 step 3 (the caller's record,
-else the one at the creation point, `0x0061AD30`), shared by identity
-(act, clipped rect, index) between the monsters that hold it; step 7
-writes 1 to its +0x24 and nothing clears it; a monster created without
-that call (no population placement) has none. Settled by: PC 1 item
-"[q-fix-seed-game] Monster "vision" record" and
-`a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
-the player once minion 1:12 has seen it).
+Implemented (`monsters/ai/target.rs`, `wiring/action/ai.rs`): the
+record is loaded on the LOS-draw-false path whatever T is; S is its
++0x24 only when flag 0x08 is clear, else 0. Step 7 writes +0x24 :=
+(S = 0) only when the record was loaded, so a find with the token at 1
+consumes it. Settled by `a1-warp-tower-cellar-ama` (frame 45, fallen3
+leader 1:10) and the unit test `vision_token_toggles_only_when_loaded`
+(the token write). PROVISIONAL (REC-1698), unchanged: the record
+is kept by identity (act, rect, index) in
+`wiring/worldgen/population_init.rs`.
 ##### 5.2.1 The vision record (monster data +0x50)
 
 V is a DRLG coordinate record (`D2RoomCoordListStrc`, the record r of
