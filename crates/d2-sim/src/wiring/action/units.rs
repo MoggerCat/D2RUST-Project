@@ -412,6 +412,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_penalties(sim, unit);
         sim.game.lists.set_player_status(unit, STATUS_DEAD);
+        // Dead clean-up `0x0057F330` (`vitals.md` §4.6 rule 1.5): the
+        // dead-body footprint `0x00649F70(P, 1)` replaces the player's
+        // 0x80 footprint, so missiles no longer see the body.
+        View::of(sim.units, sim.stats, sim.data, self).dead_body_footprint(unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
     /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
