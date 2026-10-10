@@ -9,7 +9,7 @@ save ScnBuy --class ama --expansion --gold 5000
 seed 1234
 ticks 30
 seconds 300
-channels items
+channels items packets
 at 4 poke pos @player 4860 4236
 at 7 poke pos @player 4848 4250
 at 10 poke pos @player 4842 4262
