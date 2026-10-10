@@ -1,0 +1,180 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 29,
+  "d2rs": 24,
+  "matched": 12,
+  "differences": 29,
+  "first": {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  "by_kind": {
+   "dev_vol": 8,
+   "voice": 7,
+   "variant": 6,
+   "tick": 5,
+   "dev_pan": 3
+  },
+  "partial": [
+   "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: partial: the capture holds 655360 of 21805636 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\ambient\\scene\\wilderness day 2.wav at T 0: partial: the capture holds 655360 of 671432 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 119,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "gen-aud-item-drop",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  {
+   "tick": 8,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 21683 bytes before the zero tail, sha256 7bd46a9c876eae32) at T 8 (buffer 17); d2rs starts nothing like it"
+  },
+  {
+   "tick": 12,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 21683 bytes before the zero tail, sha256 7bd46a9c876eae32) at T 12 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 16,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 21683 bytes before the zero tail, sha256 7bd46a9c876eae32) at T 16 (buffer 20); d2rs starts nothing like it"
+  },
+  {
+   "tick": 22,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 20320 bytes before the zero tail, sha256 20df615b84eb07d3) at T 22 (buffer 21); d2rs starts nothing like it"
+  },
+  {
+   "tick": 24,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 10755 bytes before the zero tail, sha256 406250e896c024f2) at T 24 (buffer 17); d2rs starts nothing like it"
+  },
+  {
+   "tick": 28,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 23525 bytes before the zero tail, sha256 215255ccfdc01ab5) at T 28 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 30,
+   "what": "variant",
+   "text": "T 30: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 35,
+   "what": "variant",
+   "text": "T 35: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 46,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 46: dev_vol 1.14d -1286, d2rs -1187"
+  },
+  {
+   "tick": 46,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 57, d2rs at T 46"
+  },
+  {
+   "tick": 46,
+   "what": "variant",
+   "text": "T 46: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 51,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav: 1.14d starts it at T 51, d2rs at T 54"
+  },
+  {
+   "tick": 54,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 54: dev_pan 1.14d -348, d2rs -328"
+  },
+  {
+   "tick": 54,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 54: dev_vol 1.14d -754, d2rs -336"
+  },
+  {
+   "tick": 57,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 57: dev_vol 1.14d -1630, d2rs -1286"
+  },
+  {
+   "tick": 57,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 83, d2rs at T 57"
+  },
+  {
+   "tick": 62,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 62: dev_pan 1.14d 1377, d2rs -252"
+  },
+  {
+   "tick": 62,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 62: dev_pan 1.14d -252, d2rs 1377"
+  },
+  {
+   "tick": 62,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 62: dev_vol 1.14d -1332, d2rs -288"
+  },
+  {
+   "tick": 62,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 62: dev_vol 1.14d -288, d2rs -1332"
+  },
+  {
+   "tick": 67,
+   "what": "variant",
+   "text": "T 67: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 73,
+   "what": "variant",
+   "text": "T 73: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 78,
+   "what": "variant",
+   "text": "T 78: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 83,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 83: dev_vol 1.14d -1776, d2rs -1630"
+  },
+  {
+   "tick": 83,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 94, d2rs at T 83"
+  },
+  {
+   "tick": 94,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 94: dev_vol 1.14d -1888, d2rs -1776"
+  },
+  {
+   "tick": 94,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav: 1.14d starts it at T 99, d2rs at T 94"
+  },
+  {
+   "tick": 99,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 99; 1.14d starts no voice with these samples"
+  }
+ ]
+}

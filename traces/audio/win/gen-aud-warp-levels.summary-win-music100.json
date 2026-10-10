@@ -1,0 +1,547 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 60,
+  "d2rs": 52,
+  "matched": 15,
+  "differences": 102,
+  "first": {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  "by_kind": {
+   "dev_vol": 27,
+   "voice": 20,
+   "dev_pan": 24,
+   "variant": 7,
+   "tick": 24
+  },
+  "partial": [
+   "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: partial: the capture holds 983040 of 21805636 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\object\\fire4.wav at T 0: partial: the capture holds 131072 of 222494 bytes (equal so far)",
+   "DATA\\GLOBAL\\MUSIC\\act1\\wild.wav at T 77: partial: the capture holds 884736 of 42270464 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\object\\fire4.wav at T 199: partial: the capture holds 196608 of 222494 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 259,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "gen-aud-warp-levels",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  {
+   "tick": 75,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 109821 bytes before the zero tail, sha256 7571d9150d4ce473) at T 75 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 100,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\event\\birdie08.wav at T 100; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 130,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 130: dev_pan 1.14d -10000, d2rs -93"
+  },
+  {
+   "tick": 130,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 130: dev_vol 1.14d -3122, d2rs -1506"
+  },
+  {
+   "tick": 130,
+   "what": "variant",
+   "text": "T 130: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 138,
+   "what": "variant",
+   "text": "T 138: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 140,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 140: dev_pan 1.14d -124, d2rs -63"
+  },
+  {
+   "tick": 140,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 140: dev_vol 1.14d -1256, d2rs -885"
+  },
+  {
+   "tick": 140,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 140: dev_vol 1.14d -1630, d2rs -2520"
+  },
+  {
+   "tick": 140,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 146, d2rs at T 140"
+  },
+  {
+   "tick": 140,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 154, d2rs at T 140"
+  },
+  {
+   "tick": 146,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav: 1.14d starts it at T 146, d2rs at T 184"
+  },
+  {
+   "tick": 148,
+   "what": "variant",
+   "text": "T 148: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 149,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 149: dev_pan 1.14d -10000, d2rs -156"
+  },
+  {
+   "tick": 149,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 149: dev_vol 1.14d -1587, d2rs -839"
+  },
+  {
+   "tick": 149,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 149: dev_vol 1.14d -2404, d2rs -2352"
+  },
+  {
+   "tick": 149,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 154, d2rs at T 149"
+  },
+  {
+   "tick": 149,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 156, d2rs at T 149"
+  },
+  {
+   "tick": 151,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 151: dev_pan 1.14d -109, d2rs -10000"
+  },
+  {
+   "tick": 151,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 151: dev_vol 1.14d -954, d2rs -1286"
+  },
+  {
+   "tick": 151,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav: 1.14d starts it at T 158, d2rs at T 151"
+  },
+  {
+   "tick": 154,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 154: dev_pan 1.14d -2809, d2rs -10000"
+  },
+  {
+   "tick": 154,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 154: dev_vol 1.14d -1098, d2rs -1587"
+  },
+  {
+   "tick": 154,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 160, d2rs at T 154"
+  },
+  {
+   "tick": 156,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav: 1.14d starts it at T 156, d2rs at T 158"
+  },
+  {
+   "tick": 158,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 158: dev_pan 1.14d -10000, d2rs -109"
+  },
+  {
+   "tick": 158,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 158: dev_pan 1.14d -234, d2rs -261"
+  },
+  {
+   "tick": 158,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 158: dev_pan 1.14d -71, d2rs -3605"
+  },
+  {
+   "tick": 158,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 158: dev_pan 1.14d -49, d2rs -10000"
+  },
+  {
+   "tick": 158,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 158: dev_vol 1.14d -1286, d2rs -954"
+  },
+  {
+   "tick": 158,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 158: dev_vol 1.14d -472, d2rs -1135"
+  },
+  {
+   "tick": 158,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 158: dev_vol 1.14d -327, d2rs -2352"
+  },
+  {
+   "tick": 158,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 168, d2rs at T 158"
+  },
+  {
+   "tick": 158,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav: 1.14d starts it at T 164, d2rs at T 158"
+  },
+  {
+   "tick": 158,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 178, d2rs at T 158"
+  },
+  {
+   "tick": 161,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 161: dev_vol 1.14d -1415, d2rs -1381"
+  },
+  {
+   "tick": 163,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 30516 bytes before the zero tail, sha256 dab43fa6ce5258fe) at T 163 (buffer 21); d2rs starts nothing like it"
+  },
+  {
+   "tick": 164,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 164: dev_pan 1.14d -1799, d2rs -71"
+  },
+  {
+   "tick": 164,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 164: dev_pan 1.14d -3605, d2rs -2124"
+  },
+  {
+   "tick": 164,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 164: dev_vol 1.14d -964, d2rs -472"
+  },
+  {
+   "tick": 164,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 167, d2rs at T 164"
+  },
+  {
+   "tick": 164,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 181, d2rs at T 164"
+  },
+  {
+   "tick": 167,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 8575 bytes before the zero tail, sha256 08506c223bb863da) at T 167 (buffer 22); d2rs starts nothing like it"
+  },
+  {
+   "tick": 168,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 168: dev_pan 1.14d -1344, d2rs -10000"
+  },
+  {
+   "tick": 168,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 168: dev_vol 1.14d -1148, d2rs -1228"
+  },
+  {
+   "tick": 168,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 168: dev_vol 1.14d -848, d2rs -2520"
+  },
+  {
+   "tick": 168,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav: 1.14d starts it at T 174, d2rs at T 168"
+  },
+  {
+   "tick": 168,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 174, d2rs at T 168"
+  },
+  {
+   "tick": 168,
+   "what": "variant",
+   "text": "T 168: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 171,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 171: dev_pan 1.14d -1915, d2rs -56"
+  },
+  {
+   "tick": 171,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 171: dev_pan 1.14d -1095, d2rs -1522"
+  },
+  {
+   "tick": 171,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 171: dev_vol 1.14d -885, d2rs -399"
+  },
+  {
+   "tick": 171,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 171: dev_vol 1.14d -754, d2rs -885"
+  },
+  {
+   "tick": 171,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 188, d2rs at T 171"
+  },
+  {
+   "tick": 171,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav: 1.14d starts it at T 180, d2rs at T 171"
+  },
+  {
+   "tick": 172,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav: 1.14d starts it at T 172, d2rs at T 174"
+  },
+  {
+   "tick": 173,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 131072 bytes before the zero tail, sha256 ecfbe1ba9a324633) at T 173 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 174,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 174: dev_pan 1.14d -56, d2rs -10000"
+  },
+  {
+   "tick": 174,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 174: dev_vol 1.14d -388, d2rs -1098"
+  },
+  {
+   "tick": 177,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 177: dev_pan 1.14d -1799, d2rs -270"
+  },
+  {
+   "tick": 177,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 177: dev_pan 1.14d -759, d2rs -10000"
+  },
+  {
+   "tick": 177,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 177: dev_vol 1.14d -866, d2rs -876"
+  },
+  {
+   "tick": 177,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 177: dev_vol 1.14d -578, d2rs -2654"
+  },
+  {
+   "tick": 177,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav: 1.14d starts it at T 197, d2rs at T 177"
+  },
+  {
+   "tick": 177,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav: 1.14d starts it at T 194, d2rs at T 177"
+  },
+  {
+   "tick": 178,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 178: dev_pan 1.14d -10000, d2rs -42"
+  },
+  {
+   "tick": 178,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 178: dev_vol 1.14d -2654, d2rs -331"
+  },
+  {
+   "tick": 178,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 178; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 181,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 181: dev_pan 1.14d -901, d2rs -2517"
+  },
+  {
+   "tick": 181,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 181: dev_vol 1.14d -661, d2rs -954"
+  },
+  {
+   "tick": 181,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav: 1.14d starts it at T 187, d2rs at T 181"
+  },
+  {
+   "tick": 184,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 184: dev_pan 1.14d -42, d2rs -27"
+  },
+  {
+   "tick": 184,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 184: dev_pan 1.14d -10000, d2rs -961"
+  },
+  {
+   "tick": 184,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 184: dev_vol 1.14d -269, d2rs -274"
+  },
+  {
+   "tick": 184,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 184: dev_vol 1.14d -3006, d2rs -691"
+  },
+  {
+   "tick": 184,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav: 1.14d starts it at T 185, d2rs at T 184"
+  },
+  {
+   "tick": 186,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt2.wav at T 186; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 188,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 188; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 191,
+   "what": "variant",
+   "text": "T 191: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 191,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 21313 bytes before the zero tail, sha256 82e5c866665c3499) at T 191 (buffer 22); d2rs starts nothing like it"
+  },
+  {
+   "tick": 194,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt4.wav at T 194; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 196,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav at T 196: dev_pan 1.14d -34, d2rs -20"
+  },
+  {
+   "tick": 196,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav at T 196: dev_vol 1.14d -585, d2rs -598"
+  },
+  {
+   "tick": 196,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt1.wav at T 196; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 204,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 63779 bytes before the zero tail, sha256 d6c0276ba13090ae) at T 204 (buffer 20); d2rs starts nothing like it"
+  },
+  {
+   "tick": 208,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 208 (buffer 17); d2rs starts nothing like it"
+  },
+  {
+   "tick": 216,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 216 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 222,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 222 (buffer 17); d2rs starts nothing like it"
+  },
+  {
+   "tick": 228,
+   "what": "variant",
+   "text": "T 228: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 229,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 229 (buffer 21); d2rs starts nothing like it"
+  },
+  {
+   "tick": 233,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 233 (buffer 17); d2rs starts nothing like it"
+  },
+  {
+   "tick": 236,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 236: dev_pan 1.14d 2517, d2rs -492"
+  },
+  {
+   "tick": 236,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 236: dev_vol 1.14d -1487, d2rs -415"
+  },
+  {
+   "tick": 236,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav: 1.14d starts it at T 249, d2rs at T 236"
+  },
+  {
+   "tick": 238,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 238 (buffer 22); d2rs starts nothing like it"
+  },
+  {
+   "tick": 240,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav: 1.14d starts it at T 240, d2rs at T 252"
+  },
+  {
+   "tick": 243,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 32639 bytes before the zero tail, sha256 a799152a954e2557) at T 243 (buffer 19); d2rs starts nothing like it"
+  },
+  {
+   "tick": 244,
+   "what": "variant",
+   "text": "T 244: 1.14d plays DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav, d2rs DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 252,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 252: dev_pan 1.14d -252, d2rs -328"
+  },
+  {
+   "tick": 252,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 252: dev_vol 1.14d -288, d2rs -336"
+  },
+  {
+   "tick": 254,
+   "what": "voice",
+   "text": "1.14d starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 254 (buffer 17); d2rs starts nothing like it"
+  }
+ ]
+}

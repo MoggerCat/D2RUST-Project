@@ -1,0 +1,247 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 47,
+  "d2rs": 47,
+  "matched": 14,
+  "differences": 42,
+  "first": {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  "by_kind": {
+   "dev_vol": 6,
+   "variant": 22,
+   "samples": 3,
+   "tick": 6,
+   "voice": 4,
+   "dev_pan": 1
+  },
+  "partial": [
+   "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: partial: the capture holds 950272 of 21805636 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\object\\fire4.wav at T 0: partial: the capture holds 131072 of 222494 bytes (equal so far)",
+   "DATA\\GLOBAL\\MUSIC\\act1\\wild.wav at T 77: partial: the capture holds 884736 of 42270464 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 259,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "gen-aud-monster-attack",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  {
+   "tick": 29,
+   "what": "variant",
+   "text": "T 29: 1.14d plays DATA\\GLOBAL\\SFX\\monster\\fallen\\warcry4.wav, d2rs DATA\\GLOBAL\\SFX\\monster\\fallen\\warcry2.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 36,
+   "what": "samples",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\footstep\\LightDirt3.wav at T 36: samples differ from sample 0 (frame 0)"
+  },
+  {
+   "tick": 40,
+   "what": "variant",
+   "text": "T 40: 1.14d plays DATA\\GLOBAL\\SFX\\monster\\fallen\\warcry2.wav, d2rs DATA\\GLOBAL\\SFX\\monster\\fallen\\warcry4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 68,
+   "what": "variant",
+   "text": "T 68: 1.14d plays DATA\\GLOBAL\\SFX\\monster\\fallen\\roar6.wav, d2rs DATA\\GLOBAL\\SFX\\monster\\fallen\\roar7.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 73,
+   "what": "variant",
+   "text": "T 73: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 75,
+   "what": "variant",
+   "text": "T 75: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\impact\\sword4.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\impact\\sword6.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 94,
+   "what": "variant",
+   "text": "T 94: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 96,
+   "what": "variant",
+   "text": "T 96: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\impact\\sword2.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\impact\\sword4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 98,
+   "what": "variant",
+   "text": "T 98: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 100,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\event\\birdie11.wav at T 100: dev_vol 1.14d -3858, d2rs -3006"
+  },
+  {
+   "tick": 100,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\event\\birdie11.wav: 1.14d starts it at T 125, d2rs at T 100"
+  },
+  {
+   "tick": 114,
+   "what": "variant",
+   "text": "T 114: 1.14d plays DATA\\GLOBAL\\SFX\\monster\\fallen\\roar5.wav, d2rs DATA\\GLOBAL\\SFX\\monster\\fallen\\roar6.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 119,
+   "what": "variant",
+   "text": "T 119: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 122,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\impact\\sword5.wav at T 122: dev_vol 1.14d -527, d2rs -619"
+  },
+  {
+   "tick": 122,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\impact\\sword5.wav: 1.14d starts it at T 135, d2rs at T 122"
+  },
+  {
+   "tick": 122,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 22270 bytes before the zero tail, sha256 5ea41e2625e2fb69) at T 122 (buffer 21); d2rs starts nothing like it"
+  },
+  {
+   "tick": 132,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav at T 132: dev_vol 1.14d -876, d2rs -804"
+  },
+  {
+   "tick": 133,
+   "what": "variant",
+   "text": "T 133: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 135,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\impact\\sword3.wav at T 135: dev_vol 1.14d -302, d2rs -455"
+  },
+  {
+   "tick": 135,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\impact\\sword3.wav: 1.14d starts it at T 230, d2rs at T 135"
+  },
+  {
+   "tick": 137,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\player\\amazon\\hard2.wav at T 137: dev_vol 1.14d -172, d2rs -112"
+  },
+  {
+   "tick": 162,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\monster\\fallen\\roar5.wav at T 162; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 163,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\monster\\fallen\\roar3.wav: 1.14d starts it at T 163, d2rs at T 257"
+  },
+  {
+   "tick": 167,
+   "what": "variant",
+   "text": "T 167: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 168,
+   "what": "variant",
+   "text": "T 168: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 171,
+   "what": "variant",
+   "text": "T 171: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\impact\\sword6.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\impact\\sword4.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 173,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\player\\amazon\\hard6.wav: 1.14d starts it at T 202, d2rs at T 173"
+  },
+  {
+   "tick": 173,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\player\\amazon\\soft4.wav: 1.14d starts it at T 173, d2rs at T 202"
+  },
+  {
+   "tick": 189,
+   "what": "variant",
+   "text": "T 189: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 197,
+   "what": "variant",
+   "text": "T 197: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 200,
+   "what": "samples",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\impact\\sword6.wav at T 200: samples differ from sample 0 (frame 0)"
+  },
+  {
+   "tick": 208,
+   "what": "variant",
+   "text": "T 208: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 219,
+   "what": "variant",
+   "text": "T 219: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 222,
+   "what": "variant",
+   "text": "T 222: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\impact\\sword5.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\impact\\sword2.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 224,
+   "what": "samples",
+   "text": "DATA\\GLOBAL\\SFX\\combat\\player\\amazon\\hard2.wav at T 224: samples differ from sample 0 (frame 0)"
+  },
+  {
+   "tick": 227,
+   "what": "variant",
+   "text": "T 227: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust01.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 230,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\combat\\impact\\sword3.wav at T 230; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 238,
+   "what": "variant",
+   "text": "T 238: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust06.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 249,
+   "what": "variant",
+   "text": "T 249: 1.14d plays DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust05.wav, d2rs DATA\\GLOBAL\\SFX\\combat\\weapon\\one hand thrust03.wav (variant pick, client/audio.md \u00a7A3 seeded choices)"
+  },
+  {
+   "tick": 257,
+   "what": "dev_pan",
+   "text": "DATA\\GLOBAL\\SFX\\monster\\fallen\\roar3.wav at T 257: dev_pan 1.14d -71, d2rs 71"
+  },
+  {
+   "tick": 257,
+   "what": "voice",
+   "text": "1.14d starts an unknown sound (1 ch, 19394 bytes before the zero tail, sha256 b79c3d2e6f2bafdd) at T 257 (buffer 19); d2rs starts nothing like it"
+  }
+ ]
+}

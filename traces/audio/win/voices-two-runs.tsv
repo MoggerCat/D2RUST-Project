@@ -1,0 +1,17 @@
+# pc1-audio-two-runs 1
+# tool: tools/audio-diff/audio_diff.py run <check> (run 1, its orig.voices.jsonl is committed as <check>.orig-win.voices.jsonl) and a second capture with `run --orig-only` + `voices`; real Windows 10 DirectSound, Music Volume 100 for the runs, 2026-10-10. Compared per voice in order: tick, channels, sha256, dev_vol, dev_pan, stop, params. same_tick_and_samples = voices of run 1 with a run-2 voice of the same tick and samples.
+check	voices_run1	voices_run2	result	first_difference	same_tick_and_samples
+audio-cast-frost-nova-sor	13	13	differ from voice 5	tick 4 / 3: tick,params	12
+audio-monster-hit-ama	35	36	differ from voice 0	tick 0 / 0: params	17
+audio-town-ambience-ama	23	23	differ from voice 0	tick 0 / 0: sha256	15
+audio-walk-town-ama	32	32	differ from voice 0	tick 0 / 0: sha256	9
+gen-aud-hit-sequence	65	64	differ from voice 0	tick 0 / 0: params	24
+gen-aud-item-drop	29	29	differ from voice 2	tick 0 / 0: stop	17
+gen-aud-monster-attack	47	45	differ from voice 0	tick 0 / 0: params	20
+gen-aud-monster-idle	153	151	differ from voice 2	tick 0 / 0: stop	40
+gen-aud-npc-talk-akara	7	7	equal	-	7
+gen-aud-object-chest	25	25	differ from voice 0	tick 0 / 0: params	10
+gen-aud-player-chat-event	20	20	differ from voice 5	tick 8 / 8: stop	13
+gen-aud-town-idle	23	23	differ from voice 2	tick 0 / 0: stop	17
+gen-aud-ui-panels	23	23	differ from voice 5	tick 30 / 30: sha256,stop	14
+gen-aud-warp-levels	60	59	differ from voice 0	tick 0 / 0: params	21

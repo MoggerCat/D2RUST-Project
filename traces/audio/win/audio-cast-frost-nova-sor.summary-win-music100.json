@@ -3,8 +3,8 @@
  "voices": {
   "orig": 13,
   "d2rs": 12,
-  "matched": 12,
-  "differences": 2,
+  "matched": 11,
+  "differences": 3,
   "first": {
    "tick": 0,
    "what": "dev_vol",
@@ -12,6 +12,7 @@
   },
   "by_kind": {
    "dev_vol": 1,
+   "tick": 1,
    "voice": 1
   },
   "partial": [
@@ -36,9 +37,14 @@
    "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
   },
   {
+   "tick": 3,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\ambient\\scene\\rain2.wav: 1.14d starts it at T 4, d2rs at T 3"
+  },
+  {
    "tick": 75,
    "what": "voice",
-   "text": "1.14d starts an unknown sound (1 ch, 17102 bytes before the zero tail, sha256 539dc85afefcdab1) at T 75 (buffer 21); d2rs starts nothing like it"
+   "text": "1.14d starts an unknown sound (1 ch, 31742 bytes before the zero tail, sha256 b44f80fcb2df47a6) at T 75 (buffer 21); d2rs starts nothing like it"
   }
  ]
 }

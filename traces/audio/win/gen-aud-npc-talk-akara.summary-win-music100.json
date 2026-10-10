@@ -1,0 +1,89 @@
+{
+ "format": "audio-diff-summary-1",
+ "voices": {
+  "orig": 7,
+  "d2rs": 15,
+  "matched": 5,
+  "differences": 11,
+  "first": {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  "by_kind": {
+   "dev_vol": 1,
+   "tick": 2,
+   "voice": 8
+  },
+  "partial": [
+   "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: partial: the capture holds 655360 of 21805636 bytes (equal so far)",
+   "DATA\\GLOBAL\\SFX\\ambient\\scene\\wilderness day 2.wav at T 0: partial: the capture holds 655360 of 671432 bytes (equal so far)",
+   "DATA\\LOCAL\\SFX\\act1\\akara\\aka_act1_intro.wav at T 19: partial: the capture holds 294912 of 2596656 bytes (equal so far)"
+  ]
+ },
+ "mixed": {
+  "ticks": 119,
+  "equal": 0,
+  "first_tick": 0
+ },
+ "verdict": "DIVERGED",
+ "check": "gen-aud-npc-talk-akara",
+ "capture_problems": [],
+ "differences": [
+  {
+   "tick": 0,
+   "what": "dev_vol",
+   "text": "DATA\\GLOBAL\\MUSIC\\act1\\town1.wav at T 0: dev_vol 1.14d -730, d2rs -1348"
+  },
+  {
+   "tick": 10,
+   "what": "tick",
+   "text": "DATA\\GLOBAL\\SFX\\object\\riverloop.wav: 1.14d starts it at T 10, d2rs at T 74"
+  },
+  {
+   "tick": 18,
+   "what": "tick",
+   "text": "DATA\\LOCAL\\SFX\\act1\\akara\\aka_act1_intro.wav: 1.14d starts it at T 18, d2rs at T 19"
+  },
+  {
+   "tick": 35,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 35; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 41,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 41; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 46,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt1.wav at T 46; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 51,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 51; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 57,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 57; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 62,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt4.wav at T 62; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 67,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt3.wav at T 67; 1.14d starts no voice with these samples"
+  },
+  {
+   "tick": 73,
+   "what": "voice",
+   "text": "d2rs starts DATA\\GLOBAL\\SFX\\ambient\\footstep\\MedDirt2.wav at T 73; 1.14d starts no voice with these samples"
+  }
+ ]
+}

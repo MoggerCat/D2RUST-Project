@@ -366,3 +366,26 @@ commit times.)
   out of scope); item creation R1 not done.
 
 Open in Step 4: nothing else.
+
+## Push 16 (20:05) — merge d4f79226f; Step 4 [rc-audio-fmt-div] answered
+
+Merged `claude/integ-r23` d4f79226f. Ledger: EQUAL 3283 of 4479, check 0
+errors.
+
+- **Windows voice lists** for all 14 audio checks:
+  `traces/audio/win/<name>.orig-win.voices.jsonl` (digests only), with the
+  d2rs comparison of each in `<name>.summary-win-music100.json`. Captured at
+  Music Volume 100 (set for the batch, back to 0 after).
+- **1.14d audio does not repeat run to run on Windows either**: each check
+  captured twice, 1 of 14 equal (`traces/audio/win/voices-two-runs.tsv`).
+  What moves: stream digests, fade ramps, stop ticks, a start tick by one,
+  variant picks. So one capture, Wine or Windows, cannot be the reference;
+  row `q-fix-pc1today-audio-repeat` (compare streams by prefix, pin the
+  cursor, log the client seed and drawn frames per sound tick).
+- **Draws checks on c3e9ddc24** (`traces/pc1/draws-first-diff.tsv`): all 38
+  DIVERGED; 5 moved forward a long way (char-skill row 9 → 375, inv-char-l5
+  22 → 324, quest-skill 28 → 148, inv-char 243 → 286, inv-char-tip 249 →
+  292). Not yet re-run on d4f79226f.
+
+Open in Step 4: nothing. Waiting on the owner / coordinator: whether to
+refresh the 2,045 stale cache entries (about 50 hours).
