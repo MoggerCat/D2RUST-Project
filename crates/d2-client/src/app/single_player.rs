@@ -2513,6 +2513,8 @@ pub fn build_with(
     // recording `--auto StubAma`, q-fix-real-start-cube).
     let mut s: Sim = SimGame::with_world(game, sim, world);
     s.announce_ground = true;
+    s.events.action.hooks().item_marks = true;
+    s.events.action.hooks().arena = Some(Default::default());
     s.set_host_sync(sync_seams);
     s.set_world_sync(super::weapons::sync);
     // The session sequence (`intents-events.md` §8) runs on the client's

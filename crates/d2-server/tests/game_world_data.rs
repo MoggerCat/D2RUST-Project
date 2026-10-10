@@ -356,6 +356,7 @@ fn wired_game_on_live_tables_runs_100_ticks() {
         skill_modes: skill_modes(table("monstats")),
         overlay_count: i32::try_from(table("overlay").count).unwrap_or(i32::MAX),
         monequip: Vec::new(),
+        arena: Vec::new(),
     };
     let vitals = Arc::new(VitalsTables::from_bin(&l.bin).expect("vitals tables"));
     let mut hooks = ActionHooks::new(
