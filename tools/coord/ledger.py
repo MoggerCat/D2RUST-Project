@@ -364,6 +364,8 @@ def part_rank(path):
     b = os.path.basename(path)
     if b in BASE_PARTS:
         return 0
+    if b == "rc-promote.tsv":
+        return 3   # fresh-run promotion of PARTIAL rows (tools/coord/promote.py) wins over older rc-* states
     return 2 if b.startswith("rc-") else 1
 
 
@@ -406,7 +408,14 @@ def merge(parts, repo, status, coverage=(set(), set())):
             by_area[r["area"]] = r
             out.append(r)
         elif tgt["group"] == "coverage":
-            if rank[r["exercised"]] > rank[tgt["exercised"]]:
+            if part_rank(r["_file"]) > part_rank(tgt["_file"]) and r["area"] == tgt["area"]:
+                # a re-measurement (rc-* part) of a coverage row supersedes the plain coverage row
+                keep = max(r["exercised"], tgt["exercised"], key=lambda x: rank[x])
+                out[out.index(tgt)] = r
+                by_area[r["area"]] = r
+                by_canon[canon(r["area"])] = r
+                r["exercised"] = keep
+            elif rank[r["exercised"]] > rank[tgt["exercised"]]:
                 tgt["exercised"] = r["exercised"]
         else:
             if rank[r["exercised"]] > rank[tgt["exercised"]]:

@@ -1,7 +1,10 @@
 cause	checks	examples	likely	size
+PARTIAL: input-no-packets	27	gen-skill-ama-10,gen-skill-ama-12,gen-skill-ama-13	?	M
 unit U, draw #N, field extra: N.14d site None vs d2rs site crates/d2-sim/src/monsters/ai/mod.rs:N	2	gen-lvl-110,gen-lvl-94	d2-sim monsters/init	M
 unit U, draw #N, field n: N.14d site NxH vs d2rs site crates/d2-sim/src/monsters/init/create.rs:N	1	gen-lvl-55	d2-sim monsters/init	M
+unit U, draw #N, field extra: N.14d site None vs d2rs site crates/d2-sim/src/combat/damage.rs:N	1	gen-lvl-99	d2-sim	M
 unit U, draw #N, field n: N.14d site NxH vs d2rs site crates/d2-sim/src/combat/damage.rs:N	1	gen-lvl-61	d2-sim	M
+command failed (N): cargo run --release -q -p data-tool -- variant build traces/	1	gen-skill-ama-11	?	M
 game, draw #N, field extra: N.14d site None vs d2rs site crates/d2-sim/src/monsters/population/room.rs:N	1	gen-lvl-104	d2-sim monsters/init	M
 unit U, draw #N, field before: N.14d site NxH vs d2rs site crates/d2-sim/src/monsters/init/create.rs:N	1	gen-lvl-69	d2-sim monsters/init	M
 game, draw #N, field missing: N.14d site NxH vs d2rs site None	1	gen-lvl-106	?	M

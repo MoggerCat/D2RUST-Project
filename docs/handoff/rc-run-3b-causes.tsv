@@ -1,0 +1,3 @@
+cause	checks	examples	likely_crate_spec	size
+items PARTIAL: recordings end at different frames (0 items both sides, 6 checks; 1 item each side, 3 checks)	9	gen-obj-374, gen-obj-375, gen-obj-400	scenario-diff items channel end frame / d2-sim item timing	S
+player 0:1 field m (mode): 1.14d 5 vs d2rs 3 (frame 37 in gen-obj-39, frame 33 in gen-obj-78); gen-obj-39 also rng draw #0 frame 44 extra site units/lifecycle.rs:180 not in 1.14d	2	gen-obj-39, gen-obj-78	d2-sim player mode (specs/sim state-snapshot), units/lifecycle.rs	M
