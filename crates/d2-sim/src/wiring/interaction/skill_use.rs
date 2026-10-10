@@ -886,6 +886,11 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             self.cv.v.set_list_stat(l, s, v);
         }
     }
+    fn list_set_layer(&mut self, l: ListId, s: i32, v: i32, layer: u16) {
+        if let Ok(s) = u16::try_from(s) {
+            self.cv.v.set_list_stat_layer(l, s, v, layer);
+        }
+    }
     fn attach(&mut self, u: UnitId, l: ListId) {
         let v = &mut self.cv.v;
         v.stats.attach(&mut *v.h, u, l, true);

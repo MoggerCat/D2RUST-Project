@@ -6,8 +6,9 @@
 //! 351 (level).
 //!
 //! Layered stats (`passiveitype` > 0, the weapon masteries) are set on
-//! layer 0 here: the body world's list setter has no layer.
-//! PROVISIONAL (REC-150), `// d2rs-own, unverified`.
+//! the layer `passiveitype` (the itemtypes row), as `0x00646D60` passes
+//! it to `0x00627150` (1.14d `gen-skill-bar-126`: the 0xA8 mastery lists
+//! carry the item type as the stat's param).
 
 use super::helpers::{eval, rec, s16, stat_ok, state_ok};
 use super::BodyWorld;
@@ -55,6 +56,8 @@ pub fn refresh<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32)
     if w.list_get(l, PASSIVE_LEVEL) == level {
         return;
     }
+    // The layer is `passiveitype` when it is > 0, else 0.
+    let layer = u16::try_from(s16(r.passiveitype)).unwrap_or(0);
     let pairs = [
         (r.passivestat1, r.passivecalc1),
         (r.passivestat2, r.passivecalc2),
@@ -68,7 +71,7 @@ pub fn refresh<W: BodyWorld>(w: &mut W, t: &SkillTables, u: W::Unit, skill: i32)
             break;
         }
         let v = eval(w, t, u, calc, skill, level);
-        w.list_set(l, s, v);
+        w.list_set_layer(l, s, v, layer);
     }
     w.list_set(l, PASSIVE_SKILL, skill);
     w.list_set(l, PASSIVE_LEVEL, level);

@@ -1143,6 +1143,11 @@ impl<X: Pending> View<'_, X> {
         self.stats.set(&mut *self.h, l, s, value, 0, None);
     }
 
+    /// Set a stat of a list on `layer` (`0x00627150(list, s, v, layer)`).
+    pub fn set_list_stat_layer(&mut self, l: ListId, s: u16, value: i32, layer: u16) {
+        self.stats.set(&mut *self.h, l, s, value, layer, None);
+    }
+
     /// State toggle `0x00625A70` (`stat-lists.md` §9.2) with the disguise
     /// bit of unit +0xC8.
     pub fn set_state(&mut self, u: UnitId, s: u16, on: bool) {
