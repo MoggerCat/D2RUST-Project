@@ -43,7 +43,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -959,8 +959,51 @@ def fam_render(ctx):
     return out
 
 
+def fam_monskill(ctx):
+    """One check per monster skill row (skills.txt, charclass blank) that has a ledger row
+    `skill.monster.<slug>`: a monster class that lists the skill in monstats Skill1..8 (first
+    enabled non-boss class, else the lowest enabled) is spawned next to the player in the Blood
+    Moor; its AI picks and casts the skill on its own (specs/skills/monster-skills.md)."""
+    sk = excel(ctx.excel, "skills.txt", ["skill", "Id", "charclass"])
+    ms = excel(ctx.excel, "monstats.txt", ["Id", "hcIdx", "enabled", "boss"] +
+               [f"Skill{k}" for k in range(1, 9)])
+    wanted = {a[len("skill.monster."):] for a, _ in load_ledger(ctx.ledger)
+              if a.startswith("skill.monster.") and a != "skill.monster.table"}
+    users = {}
+    for r in ms.rows:
+        hc = ms.get(r, "hcIdx")
+        if not hc.isdigit():
+            continue
+        key = (ms.get(r, "enabled") != "1", ms.get(r, "boss") == "1", int(hc))
+        for k in range(1, 9):
+            n = ms.get(r, f"Skill{k}")
+            if n:
+                users.setdefault(n, []).append((key, int(hc), ms.get(r, "Id"), k))
+    out = []
+    for r in sk.rows:
+        name = sk.get(r, "skill")
+        if sk.get(r, "charclass") or not name or slug(name) not in wanted:
+            continue
+        sid = int(sk.get(r, "Id"))
+        if name not in users:
+            raise GenError(f"monster skill {name} ({sid}) is used by no monstats row")
+        _, hc, ident, slot = min(users[name])
+        c = spawn_check(f"gen-monskill-{sid}", "monskill", f"skills.txt Id {sid}",
+                        f"monster skill {name} ({sid}), class {hc} {ident}",
+                        f"spawn {hc} @x+3 @y-2 normal",
+                        [f"Monster skill {name} (skill {sid}): class {hc} ({ident}, monstats "
+                         f"Skill{slot}) spawned normal next to the player; its AI casts the "
+                         "skill on its own (the cast is compared, not forced)."], ticks=500)
+        c.save = "ScnAma --class ama --expansion --level 70"
+        c.comment.append("Expansion character, level 70: it outlives the first seconds, so the AI "
+                         "gets many think frames to pick the skill.")
+        c.extra = {"skill": sid, "slug": slug(name), "class": hc}
+        out.append(c)
+    return out
+
+
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1022,6 +1065,8 @@ def resolve_area(c, areas):
     elif f == "mon":
         pick = [a for a, s in areas if a.startswith("monster.")
                 and s.endswith(f"(hcIdx {x['class']})")]
+    elif f == "monskill":
+        pick = [a for a, _ in areas if a == f"skill.monster.{x['slug']}"]
     elif f == "obj":
         pick = [a for a, _ in areas if re.fullmatch(rf"object\.{x['object']}-.*", a)]
     elif f == "ui":
