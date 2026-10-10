@@ -599,7 +599,14 @@ fn npc_interact_sounds_overlay_and_the_interact_npc_test() {
     let mut u = ui();
     u.apply_output(&mk(k, true, 148, Some(-1), false), &w)
         .unwrap();
-    assert_eq!(u.more().overlays, [(k, 72)]);
+    assert_eq!(
+        u.more().overlays,
+        [OverlayCall {
+            unit: k,
+            id: 72,
+            on: true
+        }]
+    );
     u.more_mut().interact_active = true;
     u.more_mut().interact_npc = 7;
     u.apply_output(&mk(k, true, 148, Some(-1), false), &w)

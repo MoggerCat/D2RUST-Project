@@ -52,11 +52,13 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use d2_data::tables::{Missiles as MissileTable, Overlay, Skills, States};
+use d2_data::tables::{Missiles as MissileTable, Monstats, Monstats2, Overlay, Skills, States};
 
 use crate::assets::path::{CanonicalPath, FileSource};
 use crate::bridge::predict::{cell_centre, facing};
-use crate::bridge::world::{ClientUnit, ClientWorld, ModeRequest, UnitKey, MISSILE, MONSTER};
+use crate::bridge::world::{
+    ClientUnit, ClientWorld, ModeRequest, UnitKey, MISSILE, MONSTER, PLAYER,
+};
 use crate::frames::{FramePart, FrameSet, FrameSetKey};
 use crate::rules::blend::{cel_ops, missile_mode, overlay_mode, MODE_OPAQUE};
 use crate::rules::camera::{moving_to_client, Camera, ClientPos, FrameSize, UnitPosition};
@@ -65,6 +67,11 @@ use crate::rules::placement::place;
 use crate::rules::unit_composite::{file_direction, unit_offset, TableOffset};
 use crate::scene::order::pass;
 use crate::scene::{BlendOp, DrawItem, DrawKey, ItemTag, Rect, ShadeChain};
+use crate::ui::original::msg_ui::OverlayCall;
+
+use super::overlay::{
+    kind6_clock_ms, overlay_draws, HeightUnit, OverlayEnv, OverlayList, OverlayRow as OverlayRules,
+};
 
 use super::feed::ViewFeed;
 use super::{ViewAssets, WorldFrame};
@@ -128,6 +135,14 @@ pub struct EffectRows {
     pub overlays: Vec<OverlayRow>,
     /// `overlay1` by state id.
     pub state_overlay: BTreeMap<u8, u16>,
+    /// The `overlay.txt` columns of the create and update rules
+    /// (`render/overlay.md` §2, §3), by id.
+    pub overlay_rules: Vec<OverlayRules>,
+    /// By `monstats` class: the `monstats2` row's `noOvly` and
+    /// `overlayHeight` (`None`: no `monstats2` row; `overlay.md` §2 r3, r8).
+    pub monster_overlay: Vec<(bool, Option<u8>)>,
+    /// `0x00408F20` = 0 (no `d2exp.mpq`; `overlay.md` §2 r2).
+    pub classic_install: bool,
 }
 
 fn text(bytes: &[u8]) -> String {
@@ -177,7 +192,37 @@ impl EffectRows {
                 .filter(|s| s.overlay1 != 0)
                 .filter_map(|s| Some((u8::try_from(s.state).ok()?, s.overlay1)))
                 .collect(),
+            overlay_rules: overlays
+                .iter()
+                .map(|o| OverlayRules {
+                    version: o.version as i16,
+                    pre_draw: o.predraw != 0,
+                    xoffset: o.xoffset as i32,
+                    yoffset: o.yoffset as i32,
+                    height: [o.height1, o.height2, o.height3, o.height4].map(|h| h as i32),
+                    anim_rate: o.animrate as i32,
+                    init_radius: o.initradius as i32,
+                    radius: o.radius as i32,
+                    loop_wait_time: o.loopwaittime as i32,
+                })
+                .collect(),
+            monster_overlay: Vec::new(),
+            classic_install: false,
         }
+    }
+
+    /// The rows with the monsters' `monstats2` overlay columns: a class's
+    /// `monstats2` row is its `monstats` `MonStatsEx` (+0x18) index.
+    pub fn with_monsters(mut self, monstats: &[Monstats], monstats2: &[Monstats2]) -> Self {
+        self.monster_overlay = monstats
+            .iter()
+            .map(|m| {
+                monstats2
+                    .get(usize::from(m.monstatsex))
+                    .map_or((false, None), |r| (r.noovly, Some(r.overlayheight)))
+            })
+            .collect();
+        self
     }
 
     fn is_empty(&self) -> bool {
@@ -262,6 +307,9 @@ struct Placing<'a> {
     /// `u64::MAX`: loops for as long as it is drawn.
     life: u64,
     tag: u32,
+    /// A record's own frame (`f = +0x18 >> 8`) instead of the age's;
+    /// not drawn when the file has no such frame.
+    frame: Option<usize>,
 }
 
 /// One drawn effect.
@@ -301,6 +349,11 @@ pub struct Missiles {
     now: u64,
     next_id: u32,
     last: Vec<MissileDraw>,
+    /// The overlay records of the UI's calls by host (`render/overlay.md`
+    /// §1–§3; the unit's graphics-record list).
+    unit_overlays: BTreeMap<UnitKey, OverlayList>,
+    /// The UI's overlay calls not run yet, in call order.
+    overlay_calls: Vec<OverlayCall>,
 }
 
 impl std::fmt::Debug for Missiles {
@@ -335,6 +388,21 @@ impl Missiles {
             source: Some(source),
             ..Missiles::default()
         }
+    }
+
+    /// Queues the UI's overlay calls of one delivery, in call order; the
+    /// next [`Self::add_to_frame`] runs them before the update advance
+    /// (`render/overlay.md` §3 r2: a record created before the walk runs
+    /// in the same update).
+    pub fn overlay_calls(&mut self, calls: impl IntoIterator<Item = OverlayCall>) {
+        self.overlay_calls.extend(calls);
+    }
+
+    /// The overlay records on `unit`, list head first.
+    pub fn unit_overlays(&self, unit: UnitKey) -> &[super::overlay::Overlay] {
+        self.unit_overlays
+            .get(&unit)
+            .map_or(&[], |l| l.records.as_slice())
     }
 
     /// The last drawn frame's effects, in draw order.
@@ -531,6 +599,17 @@ impl Missiles {
 
     fn step(&mut self, world: &ClientWorld) {
         let now = self.now;
+        // `render/overlay.md` §3 r1–r5: once per unit per update; a list
+        // whose host left the model goes with it.
+        let rows = &self.rows;
+        self.unit_overlays.retain(|key, list| {
+            let Some(unit) = world.units.get(key) else {
+                return false;
+            };
+            let mut env = HostEnv::new(rows, unit, None);
+            list.advance(&mut env, now as u32, kind6_clock_ms(now as u32));
+            true
+        });
         let mut ended = Vec::new();
         for fx in &mut self.live {
             if fx.step != (0, 0) {
@@ -581,6 +660,59 @@ impl Missiles {
         }
     }
 
+    /// Makes one file resident (once per file; a failure is logged once
+    /// and stays `None`).
+    fn resident(
+        &mut self,
+        files: &[String; 2],
+        assets: &mut ViewAssets,
+        log: &mut Vec<String>,
+    ) -> Option<&Resident> {
+        if !self.files.contains_key(&files[0]) {
+            let source = self.source.clone()?;
+            let loaded = load(source.as_ref(), files, assets);
+            if let Err(e) = &loaded {
+                log.push(format!("effect art: {}: {e}", files[0]));
+            }
+            self.files.insert(files[0].clone(), loaded.ok());
+        }
+        self.files.get(&files[0])?.as_ref()
+    }
+
+    /// Runs the queued UI overlay calls in order (`render/overlay.md` §2,
+    /// §3 r9) on the model's units; a call on a unit the model no longer
+    /// has does nothing. The create's frame count is the overlay file's
+    /// (§2 r6: the file loaded here; one that does not load gives 1).
+    fn run_overlay_calls(&mut self, world: &ClientWorld, assets: &mut ViewAssets) -> Vec<String> {
+        let mut log = Vec::new();
+        for call in std::mem::take(&mut self.overlay_calls) {
+            let Some(unit) = world.units.get(&call.unit) else {
+                continue;
+            };
+            let id = i32::from(call.id);
+            if call.on {
+                let frames = match self.overlay_art(call.id, true) {
+                    Some((art, _)) => self
+                        .resident(&art.files, assets, &mut log)
+                        .and_then(|r| i32::try_from(r.frames).ok()),
+                    None => None,
+                };
+                let mut env = HostEnv::new(&self.rows, unit, frames);
+                // The UI's creates: kind 3, a = b = 0 (no seed draw, §4).
+                self.unit_overlays
+                    .entry(call.unit)
+                    .or_default()
+                    .create(&mut env, id, 3, 0, 0, 0, 0, 0);
+            } else if let Some(list) = self.unit_overlays.get_mut(&call.unit) {
+                let mut env = HostEnv::new(&self.rows, unit, None);
+                if let Err(e) = list.remove_by_id(&mut env, id) {
+                    log.push(format!("overlay remove {id}: {e:?}"));
+                }
+            }
+        }
+        log
+    }
+
     /// Makes the art of the live effects and of the units' state overlays
     /// resident, once per file. One log line per new failure.
     fn ensure(&mut self, world: &ClientWorld, assets: &mut ViewAssets) -> Vec<String> {
@@ -619,16 +751,18 @@ impl Missiles {
             age,
             life,
             tag,
+            frame: fixed,
         } = p;
         let offset = art.offset;
         let Some(Some(res)) = self.files.get(&art.files[0]) else {
             return None;
         };
         let frame = (age.saturating_mul(u64::from(art.rate)) >> 8) as usize;
-        let frame = if art.loops || life == u64::MAX {
-            frame % res.frames.max(1)
-        } else {
-            frame.min(res.frames.saturating_sub(1))
+        let frame = match fixed {
+            Some(f) if f < res.frames => f,
+            Some(_) => return None,
+            None if art.loops || life == u64::MAX => frame % res.frames.max(1),
+            None => frame.min(res.frames.saturating_sub(1)),
         };
         let dir = if res.directions > 1 {
             file_direction(res.directions, dir64).unwrap_or(0)
@@ -691,6 +825,7 @@ impl Missiles {
                 age,
                 life: fx.life,
                 tag: fx.id,
+                frame: None,
             };
             let join = match (fx.art.pre_draw, fx.follow) {
                 (Some(back), Some(host)) => Join::Host { host, back },
@@ -726,6 +861,7 @@ impl Missiles {
                     age: world.server_ticks,
                     life: u64::MAX,
                     tag,
+                    frame: None,
                 };
                 if let Some(d) = self.draw_one(camera, assets, p) {
                     let join = Join::Host {
@@ -733,6 +869,45 @@ impl Missiles {
                         back,
                     };
                     found.push((tag, d, join));
+                }
+            }
+        }
+        // `unit-composite.md` §5 r3–r4: the records of the UI's overlay
+        // calls, in list order (newest first), each in its host's back or
+        // front call. The item carries the host's tag: the overlay draw
+        // runs inside the host's unit draw `0x00471EC0`. The cel direction
+        // is file direction 0 (the UI's overlay, `npcalert`, has one).
+        for (key, list) in &self.unit_overlays {
+            let Some(unit) = world.units.get(key) else {
+                continue;
+            };
+            let Some(unit_at) = at(unit) else { continue };
+            for (i, rec) in list.records.iter().enumerate() {
+                let back = rec.pre_draw;
+                if !overlay_draws(rec, back) {
+                    continue;
+                }
+                let (Ok(oid), Ok(f)) = (u16::try_from(rec.id), usize::try_from(rec.frame_index()))
+                else {
+                    continue;
+                };
+                let Some((mut art, _)) = self.overlay_art(oid, true) else {
+                    continue;
+                };
+                // §2 r8: `Xoffset`, `Yoffset` plus the host's height.
+                art.offset = (rec.x, rec.y);
+                let p = Placing {
+                    art: &art,
+                    at: unit_at,
+                    dir64: 0,
+                    age: 0,
+                    life: u64::MAX,
+                    tag: key.guid,
+                    frame: Some(f),
+                };
+                if let Some(d) = self.draw_one(camera, assets, p) {
+                    let id = TAG_BASE | 0x0040_0000 | (key.guid & 0xFFFF) << 4 | (i as u32 & 0xF);
+                    found.push((id, d, Join::Host { host: *key, back }));
                 }
             }
         }
@@ -834,12 +1009,14 @@ impl Missiles {
     ) -> Vec<String> {
         self.last.clear();
         if self.rows.is_empty() {
+            self.overlay_calls.clear();
             return Vec::new();
         }
         let at = |u: &ClientUnit| unit_at(feed, u);
         self.observe(world, &at);
+        let mut log = self.run_overlay_calls(world, assets);
         self.advance(world);
-        let mut log = self.ensure(world, assets);
+        log.extend(self.ensure(world, assets));
         let camera = match (feed.player(world), feed.open_mode(world)) {
             // The frame's one camera, shake included
             // (`seams/world-screen.md` §2.6); a frame built without one:
@@ -888,6 +1065,82 @@ impl Missiles {
 /// The 16.16 position `feed` draws `unit` at (`camera.md` §2): moving
 /// units as stated (the local player at its predicted position), static
 /// units and unresolved ones at their model sub-tile centre.
+/// What the overlay rules read from a host unit (`render/overlay.md` §2,
+/// §3): the rows, the unit, and the frame count of the file being created.
+struct HostEnv<'a> {
+    rows: &'a EffectRows,
+    unit: &'a ClientUnit,
+    frames: Option<i32>,
+}
+
+impl<'a> HostEnv<'a> {
+    fn new(rows: &'a EffectRows, unit: &'a ClientUnit, frames: Option<i32>) -> Self {
+        HostEnv { rows, unit, frames }
+    }
+
+    fn monster(&self) -> Option<(bool, Option<u8>)> {
+        if self.unit.key.unit_type != MONSTER {
+            return None;
+        }
+        let class = usize::try_from(self.unit.class).ok()?;
+        Some(
+            self.rows
+                .monster_overlay
+                .get(class)
+                .copied()
+                .unwrap_or((false, None)),
+        )
+    }
+}
+
+impl OverlayEnv for HostEnv<'_> {
+    fn expansion(&self) -> bool {
+        !self.rows.classic_install
+    }
+    fn row_count(&self) -> i32 {
+        i32::try_from(self.rows.overlay_rules.len()).unwrap_or(i32::MAX)
+    }
+    fn row(&self, id: i32) -> Option<OverlayRules> {
+        self.rows
+            .overlay_rules
+            .get(usize::try_from(id).ok()?)
+            .copied()
+    }
+    fn unit_blocks_overlays(&self) -> bool {
+        self.unit.flag_ex & 0x40000 != 0
+    }
+    fn unit_no_ovly(&self) -> bool {
+        self.monster().is_some_and(|m| m.0)
+    }
+    fn height_unit(&self) -> HeightUnit {
+        match (self.unit.key.unit_type, self.monster()) {
+            (PLAYER, _) => HeightUnit::Player,
+            (_, Some((_, overlay_height))) => HeightUnit::Monster { overlay_height },
+            _ => HeightUnit::Other,
+        }
+    }
+    fn frame_count(&self, _id: i32) -> Option<i32> {
+        self.frames
+    }
+    /// Never reached: the UI's creates (kind 3, a = b = 0) make no seed
+    /// draw (§4).
+    fn roll(&mut self, _n: i32) -> i32 {
+        0
+    }
+    fn mode(&self) -> i32 {
+        self.unit.mode as i32
+    }
+    fn has_state(&self, s: i32) -> bool {
+        u8::try_from(s).is_ok_and(|s| self.unit.states.contains(&s))
+    }
+    /// Kind 8 only (§3 r6), which the UI's calls never create.
+    fn set_state(&mut self, _s: i32, _on: bool) {}
+    /// Kind 8 only (§3 r6), as above.
+    fn has_aura(&self) -> bool {
+        false
+    }
+}
+
 fn unit_at<F: ViewFeed + ?Sized>(feed: &F, unit: &ClientUnit) -> Option<(u32, u32)> {
     match feed.unit_position(unit) {
         Ok(UnitPosition::Moving { x16, y16 }) => Some((x16, y16)),
