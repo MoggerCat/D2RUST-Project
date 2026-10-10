@@ -2507,7 +2507,7 @@ fn auto_pickup_with_auto_equip_equips_the_item() {
     assert_eq!(ids[0], (0x9D, 0x06), "{t:02X?}");
     assert_eq!(
         ids[1..].iter().map(|m| m.0).collect::<Vec<_>>(),
-        [0x47, 0x48]
+        [0x47, 0x48, 0x2C]
     );
     let places = check_state(&mut h, None).unwrap();
     assert_eq!(places[&cap], Place::Body(h.player));

@@ -121,6 +121,12 @@ pub fn skill_row(s: &Skills) -> SkillRow {
         seqinput: s.seqinput,
         range: s.range,
         flags: crate::bridge::combat::skill_flags(s),
+        ingame: s.ingame,
+        aura: s.aura,
+        mana: s.mana,
+        lvlmana: s.lvlmana,
+        manashift: s.manashift,
+        cltstfunc: s.cltstfunc,
     }
 }
 

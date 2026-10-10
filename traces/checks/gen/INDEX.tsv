@@ -684,3 +684,1490 @@ gen-shrine-19	shrine	shrines.txt row 19	shrine.19.storm-shrine	shrine Storm Shri
 gen-shrine-20	shrine	shrines.txt row 20	shrine.20.warping-shrine	shrine Warping Shrine (Magic)
 gen-shrine-21	shrine	shrines.txt row 21	shrine.21.exploding-shrine	shrine Exploding Shrine (Magic)
 gen-shrine-22	shrine	shrines.txt row 22	shrine.22.poison-shrine	shrine Poison Shrine (Magic)
+gen-item-00	item	items 0-19 (combined index)	item.0-hax,item.2-2ax,item.4-wax,item.5-lax,item.6-bax,item.8-gax,item.9-gix,item.11-ywn,item.12-bwn,item.13-gwn,item.16-gsc,item.17-wsp,item.18-spc	base items hax .. mac (20 items)
+gen-item-01	item	items 20-39 (combined index)	item.20-mst,item.21-fla,item.22-whm,item.23-mau,item.24-gma,item.25-ssd,item.26-scm,item.28-flc,item.29-crs,item.30-bsd,item.31-lsd,item.32-wsd,item.33-2hs,item.34-clm,item.35-gis,item.36-bsw,item.37-flb,item.38-gsd	base items mst .. dgr (20 items)
+gen-item-02	item	items 40-59 (combined index)	item.40-dir,item.41-kri,item.42-bld,item.43-tkf,item.44-tax,item.45-bkf,item.46-bal,item.47-jav,item.48-pil,item.49-ssp,item.50-glv,item.51-tsp,item.52-spr,item.53-tri,item.54-brn,item.55-spt,item.56-pik,item.57-bar,item.58-vou,item.59-scy	base items dir .. scy (20 items)
+gen-item-03	item	items 60-79 (combined index)	item.60-pax,item.61-hal,item.62-wsc,item.63-sst,item.65-cst,item.66-bst,item.67-wst,item.68-sbw,item.69-hbw,item.71-cbw,item.72-sbb,item.73-lbb,item.74-swb,item.75-lwb,item.77-mxb,item.78-hxb,item.79-rxb	base items pax .. rxb (20 items)
+gen-item-04	item	items 80-99 (combined index)	item.80-gps,item.81-ops,item.82-gpm,item.83-opm,item.84-gpl,item.85-opl,item.86-d33,item.87-g33,item.88-leg,item.89-hdm,item.90-hfh,item.91-hst,item.92-msf,item.93-9ha,item.94-9ax,item.95-92a,item.96-9mp,item.97-9wa,item.98-9la,item.99-9ba	base items gps .. 9ba (20 items)
+gen-item-05	item	items 100-119 (combined index)	item.100-9bt,item.101-9ga,item.102-9gi,item.103-9wn,item.104-9yw,item.105-9bw,item.106-9gw,item.107-9cl,item.108-9sc,item.109-9qs,item.110-9ws,item.111-9sp,item.112-9ma,item.113-9mt,item.114-9fl,item.115-9wh,item.116-9m9,item.117-9gm,item.118-9ss,item.119-9sm	base items 9bt .. 9sm (20 items)
+gen-item-06	item	items 120-139 (combined index)	item.120-9sb,item.121-9fc,item.122-9cr,item.123-9bs,item.124-9ls,item.125-9wd,item.126-92h,item.127-9cm,item.128-9gs,item.129-9b9,item.130-9fb,item.131-9gd,item.132-9dg,item.133-9di,item.134-9kr,item.135-9bl,item.136-9tk,item.137-9ta,item.138-9bk,item.139-9b8	base items 9sb .. 9b8 (20 items)
+gen-item-07	item	items 140-159 (combined index)	item.140-9ja,item.141-9pi,item.142-9s9,item.143-9gl,item.144-9ts,item.145-9sr,item.146-9tr,item.147-9br,item.148-9st,item.149-9p9,item.150-9b7,item.151-9vo,item.152-9s8,item.153-9pa,item.154-9h9,item.155-9wc,item.156-8ss,item.157-8ls,item.158-8cs,item.159-8bs	base items 9ja .. 8bs (20 items)
+gen-item-08	item	items 160-179 (combined index)	item.160-8ws,item.161-8sb,item.162-8hb,item.163-8lb,item.164-8cb,item.165-8s8,item.166-8l8,item.167-8sw,item.168-8lw,item.169-8lx,item.170-8mx,item.171-8hx,item.172-8rx,item.173-qf1,item.174-qf2,item.176-wrb,item.177-axf,item.178-ces,item.179-clw	base items 8ws .. clw (20 items)
+gen-item-09	item	items 180-199 (combined index)	item.180-btl,item.181-skr,item.182-9ar,item.183-9wb,item.184-9xf,item.185-9cs,item.186-9lw,item.187-9tw,item.188-9qr,item.189-7ar,item.190-7wb,item.191-7xf,item.192-7cs,item.193-7lw,item.194-7tw,item.195-7qr,item.196-7ha,item.197-7ax,item.198-72a,item.199-7mp	base items btl .. 7mp (20 items)
+gen-item-10	item	items 200-219 (combined index)	item.200-7wa,item.201-7la,item.202-7ba,item.203-7bt,item.204-7ga,item.205-7gi,item.206-7wn,item.207-7yw,item.208-7bw,item.209-7gw,item.210-7cl,item.211-7sc,item.212-7qs,item.213-7ws,item.214-7sp,item.215-7ma,item.216-7mt,item.217-7fl,item.218-7wh,item.219-7m7	base items 7wa .. 7m7 (20 items)
+gen-item-11	item	items 220-239 (combined index)	item.220-7gm,item.221-7ss,item.222-7sm,item.223-7sb,item.224-7fc,item.225-7cr,item.226-7bs,item.227-7ls,item.228-7wd,item.229-72h,item.230-7cm,item.231-7gs,item.232-7b7,item.233-7fb,item.234-7gd,item.235-7dg,item.236-7di,item.237-7kr,item.238-7bl,item.239-7tk	base items 7gm .. 7tk (20 items)
+gen-item-12	item	items 240-259 (combined index)	item.240-7ta,item.241-7bk,item.242-7b8,item.243-7ja,item.244-7pi,item.245-7s7,item.246-7gl,item.247-7ts,item.248-7sr,item.249-7tr,item.250-7br,item.251-7st,item.252-7p7,item.253-7o7,item.254-7vo,item.255-7s8,item.256-7pa,item.257-7h7,item.258-7wc,item.259-6ss	base items 7ta .. 6ss (20 items)
+gen-item-13	item	items 260-279 (combined index)	item.260-6ls,item.261-6cs,item.262-6bs,item.263-6ws,item.264-6sb,item.265-6hb,item.266-6lb,item.267-6cb,item.268-6s7,item.269-6l7,item.270-6sw,item.271-6lw,item.272-6lx,item.273-6mx,item.274-6hx,item.275-6rx,item.276-ob1,item.277-ob2,item.278-ob3,item.279-ob4	base items 6ls .. ob4 (20 items)
+gen-item-14	item	items 280-299 (combined index)	item.280-ob5,item.281-am1,item.282-am2,item.283-am3,item.284-am4,item.285-am5,item.286-ob6,item.287-ob7,item.288-ob8,item.289-ob9,item.290-oba,item.291-am6,item.292-am7,item.293-am8,item.294-am9,item.295-ama,item.296-obb,item.297-obc,item.298-obd,item.299-obe	base items ob5 .. obe (20 items)
+gen-item-15	item	items 300-319 (combined index)	item.300-obf,item.301-amb,item.302-amc,item.303-amd,item.304-ame,item.305-amf,item.306-cap,item.307-skp,item.308-hlm,item.309-fhl,item.310-ghm,item.311-crn,item.312-msk,item.314-lea,item.315-hla,item.316-stu,item.317-rng,item.318-scl	base items obf .. chn (20 items)
+gen-item-16	item	items 320-339 (combined index)	item.320-brs,item.321-spl,item.322-plt,item.323-fld,item.324-gth,item.325-ful,item.326-aar,item.327-ltp,item.328-buc,item.329-sml,item.330-lrg,item.332-tow,item.333-gts,item.334-lgl,item.335-vgl,item.336-mgl,item.337-tgl,item.338-hgl,item.339-lbt	base items brs .. lbt (20 items)
+gen-item-17	item	items 340-359 (combined index)	item.340-vbt,item.341-mbt,item.342-tbt,item.343-hbt,item.344-lbl,item.345-vbl,item.346-mbl,item.347-tbl,item.348-hbl,item.349-bhm,item.350-bsh,item.351-spk,item.352-xap,item.353-xkp,item.354-xlm,item.355-xhl,item.356-xhm,item.357-xrn,item.358-xsk,item.359-xui	base items vbt .. xui (20 items)
+gen-item-18	item	items 360-379 (combined index)	item.360-xea,item.361-xla,item.362-xtu,item.363-xng,item.364-xcl,item.365-xhn,item.366-xrs,item.367-xpl,item.368-xlt,item.369-xld,item.370-xth,item.371-xul,item.372-xar,item.373-xtp,item.374-xuc,item.375-xml,item.376-xrg,item.377-xit,item.378-xow,item.379-xts	base items xea .. xts (20 items)
+gen-item-19	item	items 380-399 (combined index)	item.380-xlg,item.381-xvg,item.382-xmg,item.383-xtg,item.384-xhg,item.385-xlb,item.386-xvb,item.387-xmb,item.388-xtb,item.389-xhb,item.390-zlb,item.391-zvb,item.392-zmb,item.393-ztb,item.394-zhb,item.395-xh9,item.396-xsh,item.397-xpk,item.399-dr2	base items xlg .. dr2 (20 items)
+gen-item-20	item	items 400-419 (combined index)	item.400-dr3,item.401-dr4,item.402-dr5,item.404-ba2,item.405-ba3,item.406-ba4,item.407-ba5,item.408-pa1,item.409-pa2,item.410-pa3,item.411-pa4,item.412-pa5,item.414-ne2,item.415-ne3,item.416-ne4,item.417-ne5,item.418-ci0,item.419-ci1	base items dr3 .. ci1 (20 items)
+gen-item-21	item	items 420-439 (combined index)	item.420-ci2,item.421-ci3,item.422-uap,item.423-ukp,item.424-ulm,item.425-uhl,item.426-uhm,item.427-urn,item.428-usk,item.429-uui,item.430-uea,item.431-ula,item.432-utu,item.433-ung,item.434-ucl,item.435-uhn,item.436-urs,item.437-upl,item.438-ult,item.439-uld	base items ci2 .. uld (20 items)
+gen-item-22	item	items 440-459 (combined index)	item.440-uth,item.441-uul,item.442-uar,item.443-utp,item.444-uuc,item.445-uml,item.446-urg,item.447-uit,item.448-uow,item.449-uts,item.450-ulg,item.451-uvg,item.452-umg,item.453-utg,item.454-uhg,item.455-ulb,item.456-uvb,item.457-umb,item.458-utb,item.459-uhb	base items uth .. uhb (20 items)
+gen-item-23	item	items 460-479 (combined index)	item.460-ulc,item.461-uvc,item.462-umc,item.463-utc,item.464-uhc,item.465-uh9,item.466-ush,item.467-upk,item.468-dr6,item.469-dr7,item.470-dr8,item.471-dr9,item.472-dra,item.473-ba6,item.474-ba7,item.475-ba8,item.476-ba9,item.477-baa,item.478-pa6,item.479-pa7	base items ulc .. pa7 (20 items)
+gen-item-24	item	items 480-499 (combined index)	item.480-pa8,item.481-pa9,item.482-paa,item.483-ne6,item.484-ne7,item.485-ne8,item.486-ne9,item.487-nea,item.488-drb,item.489-drc,item.490-drd,item.491-dre,item.492-drf,item.493-bab,item.494-bac,item.495-bad,item.496-bae,item.497-baf,item.498-pab,item.499-pac	base items pa8 .. pac (20 items)
+gen-item-25	item	items 500-519 (combined index)	item.500-pad,item.501-pae,item.502-paf,item.503-neb,item.504-neg,item.505-ned,item.506-nee,item.507-nef,item.508-elx,item.513-vps,item.514-yps,item.517-wms,item.518-tbk,item.519-ibk	base items pad .. ibk (20 items)
+gen-item-26	item	items 520-539 (combined index)	item.520-amu,item.522-rin,item.530-isc	base items amu .. qll (20 items)
+gen-item-27	item	items 540-559 (combined index)	item.543-key,item.557-gcv,item.558-gfv,item.559-gsv	base items sol .. gsv (20 items)
+gen-item-28	item	items 560-579 (combined index)	item.560-gzv,item.561-gpv,item.562-gcy,item.563-gfy,item.564-gsy,item.565-gly,item.566-gpy,item.567-gcb,item.568-gfb,item.569-gsb,item.570-glb,item.571-gpb,item.572-gcg,item.573-gfg,item.574-gsg,item.575-glg,item.576-gpg,item.578-gfr,item.579-gsr	base items gzv .. gsr (20 items)
+gen-item-29	item	items 580-599 (combined index)	item.580-glr,item.581-gpr,item.582-gcw,item.583-gfw,item.584-gsw,item.585-glw,item.586-gpw,item.587-hp1,item.588-hp2,item.589-hp3,item.590-hp4,item.591-hp5,item.592-mp1,item.593-mp2,item.594-mp3,item.595-mp4,item.596-mp5,item.597-skc,item.598-skf,item.599-sku	base items glr .. sku (20 items)
+gen-item-30	item	items 600-619 (combined index)	item.600-skl,item.601-skz,item.603-cm1,item.604-cm2,item.605-cm3,item.610-r01,item.611-r02,item.612-r03,item.613-r04,item.615-r06,item.616-r07,item.617-r08,item.618-r09,item.619-r10	base items skl .. r10 (20 items)
+gen-item-31	item	items 620-639 (combined index)	item.620-r11,item.621-r12,item.622-r13,item.623-r14,item.624-r15,item.625-r16,item.626-r17,item.627-r18,item.628-r19,item.629-r20,item.630-r21,item.631-r22,item.632-r23,item.633-r24,item.634-r25,item.635-r26,item.636-r27,item.637-r28,item.638-r29,item.639-r30	base items r11 .. r30 (20 items)
+gen-item-32	item	items 640-658 (combined index)	item.640-r31,item.641-r32,item.642-r33,item.643-jew,item.645-0sc,item.658-std	base items r31 .. std (19 items)
+gen-itemq-low-0	itemq	quality 1 low, seed set 0	-	20 items at quality low (game seed 0x1234 666)
+gen-itemq-low-1	itemq	quality 1 low, seed set 1	-	20 items at quality low (game seed 0x2222 77)
+gen-itemq-low-2	itemq	quality 1 low, seed set 2	-	20 items at quality low (game seed 0x5A5A 4242)
+gen-itemq-normal-0	itemq	quality 2 normal, seed set 0	-	20 items at quality normal (game seed 0x1234 666)
+gen-itemq-normal-1	itemq	quality 2 normal, seed set 1	-	20 items at quality normal (game seed 0x2222 77)
+gen-itemq-normal-2	itemq	quality 2 normal, seed set 2	-	20 items at quality normal (game seed 0x5A5A 4242)
+gen-itemq-superior-0	itemq	quality 3 superior, seed set 0	-	20 items at quality superior (game seed 0x1234 666)
+gen-itemq-superior-1	itemq	quality 3 superior, seed set 1	-	20 items at quality superior (game seed 0x2222 77)
+gen-itemq-superior-2	itemq	quality 3 superior, seed set 2	-	20 items at quality superior (game seed 0x5A5A 4242)
+gen-itemq-magic-0	itemq	quality 4 magic, seed set 0	-	20 items at quality magic (game seed 0x1234 666)
+gen-itemq-magic-1	itemq	quality 4 magic, seed set 1	-	20 items at quality magic (game seed 0x2222 77)
+gen-itemq-magic-2	itemq	quality 4 magic, seed set 2	-	20 items at quality magic (game seed 0x5A5A 4242)
+gen-itemq-set-0	itemq	quality 5 set, seed set 0	-	20 items at quality set (game seed 0x1234 666)
+gen-itemq-set-1	itemq	quality 5 set, seed set 1	-	20 items at quality set (game seed 0x2222 77)
+gen-itemq-set-2	itemq	quality 5 set, seed set 2	-	20 items at quality set (game seed 0x5A5A 4242)
+gen-itemq-rare-0	itemq	quality 6 rare, seed set 0	-	20 items at quality rare (game seed 0x1234 666)
+gen-itemq-rare-1	itemq	quality 6 rare, seed set 1	-	20 items at quality rare (game seed 0x2222 77)
+gen-itemq-rare-2	itemq	quality 6 rare, seed set 2	-	20 items at quality rare (game seed 0x5A5A 4242)
+gen-itemq-unique-0	itemq	quality 7 unique, seed set 0	-	20 items at quality unique (game seed 0x1234 666)
+gen-itemq-unique-1	itemq	quality 7 unique, seed set 1	-	20 items at quality unique (game seed 0x2222 77)
+gen-itemq-unique-2	itemq	quality 7 unique, seed set 2	-	20 items at quality unique (game seed 0x5A5A 4242)
+gen-itemq-crafted-0	itemq	quality 8 crafted, seed set 0	-	20 items at quality crafted (game seed 0x1234 666)
+gen-itemq-crafted-1	itemq	quality 8 crafted, seed set 1	-	20 items at quality crafted (game seed 0x2222 77)
+gen-itemq-crafted-2	itemq	quality 8 crafted, seed set 2	-	20 items at quality crafted (game seed 0x5A5A 4242)
+gen-netc2s-02	netc2s	client-messages.tsv 0x02 WalkToUnit	-	C->S 0x02 WalkToUnit
+gen-netc2s-04	netc2s	client-messages.tsv 0x04 RunToUnit	-	C->S 0x04 RunToUnit
+gen-netc2s-05	netc2s	client-messages.tsv 0x05 ShiftLeftSkill	-	C->S 0x05 ShiftLeftSkill
+gen-netc2s-07	netc2s	client-messages.tsv 0x07 ShiftLeftSkillOnUnit	-	C->S 0x07 ShiftLeftSkillOnUnit
+gen-netc2s-08	netc2s	client-messages.tsv 0x08 ShiftLeftSkillHold	-	C->S 0x08 ShiftLeftSkillHold
+gen-netc2s-09	netc2s	client-messages.tsv 0x09 LeftSkillOnUnitHold	-	C->S 0x09 LeftSkillOnUnitHold
+gen-netc2s-0a	netc2s	client-messages.tsv 0x0A ShiftLeftSkillOnUnitHold	-	C->S 0x0A ShiftLeftSkillOnUnitHold
+gen-netc2s-0b	netc2s	client-messages.tsv 0x0B Unused0B	-	C->S 0x0B Unused0B
+gen-netc2s-0d	netc2s	client-messages.tsv 0x0D RightSkillOnUnit	-	C->S 0x0D RightSkillOnUnit
+gen-netc2s-0e	netc2s	client-messages.tsv 0x0E ShiftRightSkillOnUnit	-	C->S 0x0E ShiftRightSkillOnUnit
+gen-netc2s-0f	netc2s	client-messages.tsv 0x0F RightSkillHold	-	C->S 0x0F RightSkillHold
+gen-netc2s-10	netc2s	client-messages.tsv 0x10 RightSkillOnUnitHold	-	C->S 0x10 RightSkillOnUnitHold
+gen-netc2s-11	netc2s	client-messages.tsv 0x11 ShiftRightSkillOnUnitHold	-	C->S 0x11 ShiftRightSkillOnUnitHold
+gen-netc2s-12	netc2s	client-messages.tsv 0x12 EndInferno	-	C->S 0x12 EndInferno
+gen-netc2s-16	netc2s	client-messages.tsv 0x16 PickItem	-	C->S 0x16 PickItem
+gen-netc2s-17	netc2s	client-messages.tsv 0x17 DropItem	-	C->S 0x17 DropItem
+gen-netc2s-18	netc2s	client-messages.tsv 0x18 InsertItemInBuffer	-	C->S 0x18 InsertItemInBuffer
+gen-netc2s-19	netc2s	client-messages.tsv 0x19 RemoveItemFromBuffer	-	C->S 0x19 RemoveItemFromBuffer
+gen-netc2s-1a	netc2s	client-messages.tsv 0x1A EquipItem	-	C->S 0x1A EquipItem
+gen-netc2s-1b	netc2s	client-messages.tsv 0x1B Swap2HandedItem	-	C->S 0x1B Swap2HandedItem
+gen-netc2s-1c	netc2s	client-messages.tsv 0x1C RemoveBodyItem	-	C->S 0x1C RemoveBodyItem
+gen-netc2s-1d	netc2s	client-messages.tsv 0x1D SwapCursorWithBody	-	C->S 0x1D SwapCursorWithBody
+gen-netc2s-1e	netc2s	client-messages.tsv 0x1E Swap1HWith2H	-	C->S 0x1E Swap1HWith2H
+gen-netc2s-1f	netc2s	client-messages.tsv 0x1F SwapCursorBufferItem	-	C->S 0x1F SwapCursorBufferItem
+gen-netc2s-20	netc2s	client-messages.tsv 0x20 UseGridItem	-	C->S 0x20 UseGridItem
+gen-netc2s-21	netc2s	client-messages.tsv 0x21 StackItems	-	C->S 0x21 StackItems
+gen-netc2s-22	netc2s	client-messages.tsv 0x22 UnstackItems	-	C->S 0x22 UnstackItems
+gen-netc2s-23	netc2s	client-messages.tsv 0x23 ItemToBelt	-	C->S 0x23 ItemToBelt
+gen-netc2s-24	netc2s	client-messages.tsv 0x24 ItemFromBelt	-	C->S 0x24 ItemFromBelt
+gen-netc2s-25	netc2s	client-messages.tsv 0x25 SwitchBeltItem	-	C->S 0x25 SwitchBeltItem
+gen-netc2s-27	netc2s	client-messages.tsv 0x27 UseItemAction	-	C->S 0x27 UseItemAction
+gen-netc2s-28	netc2s	client-messages.tsv 0x28 SocketItem	-	C->S 0x28 SocketItem
+gen-netc2s-29	netc2s	client-messages.tsv 0x29 ScrollToBook	-	C->S 0x29 ScrollToBook
+gen-netc2s-2a	netc2s	client-messages.tsv 0x2A ItemToCube	-	C->S 0x2A ItemToCube
+gen-netc2s-2d	netc2s	client-messages.tsv 0x2D Unused2D	-	C->S 0x2D Unused2D
+gen-netc2s-2e	netc2s	client-messages.tsv 0x2E Unused2E	-	C->S 0x2E Unused2E
+gen-netc2s-30	netc2s	client-messages.tsv 0x30 TerminateEntityChat	-	C->S 0x30 TerminateEntityChat
+gen-netc2s-33	netc2s	client-messages.tsv 0x33 SellItem	-	C->S 0x33 SellItem
+gen-netc2s-34	netc2s	client-messages.tsv 0x34 IdentifyWithNpc	-	C->S 0x34 IdentifyWithNpc
+gen-netc2s-35	netc2s	client-messages.tsv 0x35 Repair	-	C->S 0x35 Repair
+gen-netc2s-36	netc2s	client-messages.tsv 0x36 HireMerc	-	C->S 0x36 HireMerc
+gen-netc2s-37	netc2s	client-messages.tsv 0x37 IdentifyGamble	-	C->S 0x37 IdentifyGamble
+gen-netc2s-39	netc2s	client-messages.tsv 0x39 PurchaseLife	-	C->S 0x39 PurchaseLife
+gen-netc2s-3a	netc2s	client-messages.tsv 0x3A AddStatPoint	-	C->S 0x3A AddStatPoint
+gen-netc2s-3b	netc2s	client-messages.tsv 0x3B AddSkillPoint	-	C->S 0x3B AddSkillPoint
+gen-netc2s-3c	netc2s	client-messages.tsv 0x3C SelectSkill	-	C->S 0x3C SelectSkill
+gen-netc2s-3d	netc2s	client-messages.tsv 0x3D HighlightDoor	-	C->S 0x3D HighlightDoor
+gen-netc2s-3e	netc2s	client-messages.tsv 0x3E ActivateInifussScroll	-	C->S 0x3E ActivateInifussScroll
+gen-netc2s-3f	netc2s	client-messages.tsv 0x3F PlayAudio	-	C->S 0x3F PlayAudio
+gen-netc2s-40	netc2s	client-messages.tsv 0x40 RequestQuestData	-	C->S 0x40 RequestQuestData
+gen-netc2s-41	netc2s	client-messages.tsv 0x41 Resurrect	-	C->S 0x41 Resurrect
+gen-netc2s-42	netc2s	client-messages.tsv 0x42 Unused42	-	C->S 0x42 Unused42
+gen-netc2s-43	netc2s	client-messages.tsv 0x43 Unused43	-	C->S 0x43 Unused43
+gen-netc2s-44	netc2s	client-messages.tsv 0x44 StaffInOrifice	-	C->S 0x44 StaffInOrifice
+gen-netc2s-45	netc2s	client-messages.tsv 0x45 ChangeTpLocation	-	C->S 0x45 ChangeTpLocation
+gen-netc2s-46	netc2s	client-messages.tsv 0x46 MercInteract	-	C->S 0x46 MercInteract
+gen-netc2s-47	netc2s	client-messages.tsv 0x47 MoveMerc	-	C->S 0x47 MoveMerc
+gen-netc2s-48	netc2s	client-messages.tsv 0x48 TurnOffBusyState	-	C->S 0x48 TurnOffBusyState
+gen-netc2s-4c	netc2s	client-messages.tsv 0x4C Transmogrify	-	C->S 0x4C Transmogrify
+gen-netc2s-4d	netc2s	client-messages.tsv 0x4D PlayNpcMessage	-	C->S 0x4D PlayNpcMessage
+gen-netc2s-4f	netc2s	client-messages.tsv 0x4F ClickButton	-	C->S 0x4F ClickButton
+gen-netc2s-50	netc2s	client-messages.tsv 0x50 DropGold	-	C->S 0x50 DropGold
+gen-netc2s-51	netc2s	client-messages.tsv 0x51 BindHotkey	-	C->S 0x51 BindHotkey
+gen-netc2s-52	netc2s	client-messages.tsv 0x52 Unused52	-	C->S 0x52 Unused52
+gen-netc2s-53	netc2s	client-messages.tsv 0x53 StaminaOn	-	C->S 0x53 StaminaOn
+gen-netc2s-54	netc2s	client-messages.tsv 0x54 StaminaOff	-	C->S 0x54 StaminaOff
+gen-netc2s-58	netc2s	client-messages.tsv 0x58 QuestCompleted	-	C->S 0x58 QuestCompleted
+gen-netc2s-59	netc2s	client-messages.tsv 0x59 MakeEntityMove	-	C->S 0x59 MakeEntityMove
+gen-netc2s-5d	netc2s	client-messages.tsv 0x5D SquelchHostile	-	C->S 0x5D SquelchHostile
+gen-netc2s-5e	netc2s	client-messages.tsv 0x5E PartyAction	-	C->S 0x5E PartyAction
+gen-netc2s-5f	netc2s	client-messages.tsv 0x5F UpdatePlayerPos	-	C->S 0x5F UpdatePlayerPos
+gen-netc2s-60	netc2s	client-messages.tsv 0x60 SwapWeapons	-	C->S 0x60 SwapWeapons
+gen-netc2s-61	netc2s	client-messages.tsv 0x61 MercItem	-	C->S 0x61 MercItem
+gen-netc2s-62	netc2s	client-messages.tsv 0x62 ResurrectMerc	-	C->S 0x62 ResurrectMerc
+gen-netc2s-63	netc2s	client-messages.tsv 0x63 ItemToBeltShift	-	C->S 0x63 ItemToBeltShift
+gen-missile-2	missile	missiles.txt Id 2	missile.bighead1	missile bighead1 (2)
+gen-missile-3	missile	missiles.txt Id 3	missile.bighead2	missile bighead2 (3)
+gen-missile-4	missile	missiles.txt Id 4	missile.bighead3	missile bighead3 (4)
+gen-missile-5	missile	missiles.txt Id 5	missile.bighead4	missile bighead4 (5)
+gen-missile-6	missile	missiles.txt Id 6	missile.bighead5	missile bighead5 (6)
+gen-missile-8	missile	missiles.txt Id 8	missile.spike2	missile spike2 (8)
+gen-missile-9	missile	missiles.txt Id 9	missile.spike3	missile spike3 (9)
+gen-missile-10	missile	missiles.txt Id 10	missile.spike4	missile spike4 (10)
+gen-missile-12	missile	missiles.txt Id 12	missile.fire-arrow	missile firearrow (12)
+gen-missile-13	missile	missiles.txt Id 13	missile.cr-arrow1	missile cr_arrow1 (13)
+gen-missile-14	missile	missiles.txt Id 14	missile.cr-arrow2	missile cr_arrow2 (14)
+gen-missile-15	missile	missiles.txt Id 15	missile.cr-arrow3	missile cr_arrow3 (15)
+gen-missile-16	missile	missiles.txt Id 16	missile.cr-arrow4	missile cr_arrow4 (16)
+gen-missile-17	missile	missiles.txt Id 17	missile.cr-arrow5	missile cr_arrow5 (17)
+gen-missile-18	missile	missiles.txt Id 18	missile.sacrifice	missile blood1 (18)
+gen-missile-20	missile	missiles.txt Id 20	missile.regurgitatoreat	missile bigblood1 (20)
+gen-missile-22	missile	missiles.txt Id 22	missile.shamanfire	missile shafire1 (22)
+gen-missile-24	missile	missiles.txt Id 24	missile.gargoyletrap	missile shafire3 (24)
+gen-missile-27	missile	missiles.txt Id 27	missile.magic-arrow	missile magicarrow (27)
+gen-missile-28	missile	missiles.txt Id 28	missile.ice-arrow	missile icearrow (28)
+gen-missile-32	missile	missiles.txt Id 32	missile.andrialspray	missile andarielspray (32)
+gen-missile-38	missile	missiles.txt Id 38	missile.poison-javelin	missile poisonjav (38)
+gen-missile-40	missile	missiles.txt Id 40	missile.cold-arrow	missile coldarrow (40)
+gen-missile-41	missile	missiles.txt Id 41	missile.exploding-arrow	missile explodingarrow (41)
+gen-missile-42	missile	missiles.txt Id 42	missile.corpse-explosion	missile explodingarrowexp (42)
+gen-missile-43	missile	missiles.txt Id 43	missile.plague-javelin	missile plaguejavelin (43)
+gen-missile-55	missile	missiles.txt Id 55	missile.holy-bolt	missile holybolt (55)
+gen-missile-56	missile	missiles.txt Id 56	missile.charged-bolt	missile chargedbolt (56)
+gen-missile-57	missile	missiles.txt Id 57	missile.sanctuary	missile sanctuarybolt (57)
+gen-missile-58	missile	missiles.txt Id 58	missile.fire-bolt	missile firebolt (58)
+gen-missile-59	missile	missiles.txt Id 59	missile.ice-bolt	missile icebolt (59)
+gen-missile-60	missile	missiles.txt Id 60	missile.inferno	missile infernoflame1 (60)
+gen-missile-61	missile	missiles.txt Id 61	missile.inferno	missile infernoflame2 (61)
+gen-missile-62	missile	missiles.txt Id 62	missile.fire-ball	missile fireball (62)
+gen-missile-63	missile	missiles.txt Id 63	missile.mummy1	missile mummy1 (63)
+gen-missile-64	missile	missiles.txt Id 64	missile.mummy2	missile mummy2 (64)
+gen-missile-65	missile	missiles.txt Id 65	missile.mummy3	missile mummy3 (65)
+gen-missile-66	missile	missiles.txt Id 66	missile.mummy4	missile mummy4 (66)
+gen-missile-67	missile	missiles.txt Id 67	missile.blaze	missile blaze (67)
+gen-missile-68	missile	missiles.txt Id 68	missile.fire-wall	missile firewallmaker (68)
+gen-missile-69	missile	missiles.txt Id 69	missile.blaze	missile firewall (69)
+gen-missile-70	missile	missiles.txt Id 70	missile.goospit1	missile goospit1 (70)
+gen-missile-71	missile	missiles.txt Id 71	missile.goospit2	missile goospit2 (71)
+gen-missile-72	missile	missiles.txt Id 72	missile.goospit3	missile goospit3 (72)
+gen-missile-73	missile	missiles.txt Id 73	missile.goospit4	missile goospit4 (73)
+gen-missile-74	missile	missiles.txt Id 74	missile.goospit5	missile goospit5 (74)
+gen-missile-76	missile	missiles.txt Id 76	missile.magottup	missile sand pile (76)
+gen-missile-77	missile	missiles.txt Id 77	missile.unholybolt	missile unholybolt1 (77)
+gen-missile-85	missile	missiles.txt Id 85	missile.immolation-arrow	missile immolationarrow (85)
+gen-missile-86	missile	missiles.txt Id 86	missile.guided-arrow	missile guidedarrow (86)
+gen-missile-87	missile	missiles.txt Id 87	missile.freezing-arrow	missile freezingarrow (87)
+gen-missile-90	missile	missiles.txt Id 90	missile.nova	missile nova (90)
+gen-missile-91	missile	missiles.txt Id 91	missile.ice-blast	missile iceblast (91)
+gen-missile-92	missile	missiles.txt Id 92	missile.blessed-hammer	missile blessedhammer (92)
+gen-missile-93	missile	missiles.txt Id 93	missile.chain-lightning	missile chainlightning (93)
+gen-missile-96	missile	missiles.txt Id 96	missile.glacial-spike	missile glacialspike (96)
+gen-missile-98	missile	missiles.txt Id 98	missile.lightning	missile lightningbolt (98)
+gen-missile-101	missile	missiles.txt Id 101	missile.meteor	missile meteorcenter (101)
+gen-missile-104	missile	missiles.txt Id 104	missile.blaze	missile firesmall (104)
+gen-missile-105	missile	missiles.txt Id 105	missile.blaze	missile firemedium (105)
+gen-missile-106	missile	missiles.txt Id 106	missile.monblizcenter	missile monblizcenter (106)
+gen-missile-114	missile	missiles.txt Id 114	missile.teeth	missile teeth (114)
+gen-missile-115	missile	missiles.txt Id 115	missile.corpse-explosion	missile corpseexplosion (115)
+gen-missile-116	missile	missiles.txt Id 116	missile.poison-explosion	missile poisoncorpseexplosion (116)
+gen-missile-118	missile	missiles.txt Id 118	missile.poison-nova	missile poisonnova (118)
+gen-missile-119	missile	missiles.txt Id 119	missile.frost-nova	missile frostnova (119)
+gen-missile-120	missile	missiles.txt Id 120	missile.roguemissile	missile rogue1 (120)
+gen-missile-125	missile	missiles.txt Id 125	missile.skmage1	missile skmage1 (125)
+gen-missile-126	missile	missiles.txt Id 126	missile.skmage2	missile skmage2 (126)
+gen-missile-127	missile	missiles.txt Id 127	missile.skmage3	missile skmage3 (127)
+gen-missile-128	missile	missiles.txt Id 128	missile.skmage4	missile skmage4 (128)
+gen-missile-129	missile	missiles.txt Id 129	missile.vampirefireball	missile vampirefireball (129)
+gen-missile-130	missile	missiles.txt Id 130	missile.primefirewall	missile vampirefirewallmaker (130)
+gen-missile-131	missile	missiles.txt Id 131	missile.primefirewall	missile vampirefirewall (131)
+gen-missile-133	missile	missiles.txt Id 133	missile.vampiremeteor	missile vampiremeteorcenter (133)
+gen-missile-135	missile	missiles.txt Id 135	missile.quick-strike	missile raven1 (135)
+gen-missile-142	missile	missiles.txt Id 142	missile.blood-mana	missile curseeffectred (142)
+gen-missile-144	missile	missiles.txt Id 144	missile.fetishinferno	missile fetishinferno1 (144)
+gen-missile-145	missile	missiles.txt Id 145	missile.fetishinferno	missile fetishinferno2 (145)
+gen-missile-147	missile	missiles.txt Id 147	missile.amplify-damage	missile cursecast (147)
+gen-missile-148	missile	missiles.txt Id 148	missile.howl	missile howl (148)
+gen-missile-149	missile	missiles.txt Id 149	missile.shout	missile shout (149)
+gen-missile-151	missile	missiles.txt Id 151	missile.corpse-explosion	missile redlightmissile (151)
+gen-missile-152	missile	missiles.txt Id 152	missile.poison-explosion	missile greenlightmissile (152)
+gen-missile-158	missile	missiles.txt Id 158	missile.blizzard	missile blizzardcenter (158)
+gen-missile-166	missile	missiles.txt Id 166	missile.thunder-storm	missile thunderstorm1 (166)
+gen-missile-170	missile	missiles.txt Id 170	missile.monsterlight	missile monsterlight (170)
+gen-missile-171	missile	missiles.txt Id 171	missile.primepoisonball	missile poisonball (171)
+gen-missile-172	missile	missiles.txt Id 172	missile.diablight	missile diablight (172)
+gen-missile-173	missile	missiles.txt Id 173	missile.redemption	missile redemption (173)
+gen-missile-176	missile	missiles.txt Id 176	missile.diabfire	missile diabfire (176)
+gen-missile-177	missile	missiles.txt Id 177	missile.fingermagespider	missile fingermagespider (177)
+gen-missile-179	missile	missiles.txt Id 179	missile.diabwall	missile diabwallmaker (179)
+gen-missile-181	missile	missiles.txt Id 181	missile.amplify-damage	missile curseamplifydamage (181)
+gen-missile-182	missile	missiles.txt Id 182	missile.dim-vision	missile cursedimvision (182)
+gen-missile-183	missile	missiles.txt Id 183	missile.weaken	missile curseweaken (183)
+gen-missile-184	missile	missiles.txt Id 184	missile.iron-maiden	missile curseironmaiden (184)
+gen-missile-185	missile	missiles.txt Id 185	missile.terror	missile curseterror (185)
+gen-missile-186	missile	missiles.txt Id 186	missile.attract	missile curseattract (186)
+gen-missile-187	missile	missiles.txt Id 187	missile.life-tap	missile cursereversevampire (187)
+gen-missile-188	missile	missiles.txt Id 188	missile.confuse	missile curseconfuse (188)
+gen-missile-189	missile	missiles.txt Id 189	missile.decrepify	missile cursedecrepify (189)
+gen-missile-190	missile	missiles.txt Id 190	missile.lower-resist	missile curselowerresist (190)
+gen-missile-192	missile	missiles.txt Id 192	missile.bone-spear	missile bonespear (192)
+gen-missile-193	missile	missiles.txt Id 193	missile.bone-spirit	missile bonespirit (193)
+gen-missile-196	missile	missiles.txt Id 196	missile.skbowarrow1	missile skbowarrow1 (196)
+gen-missile-197	missile	missiles.txt Id 197	missile.skbowarrow2	missile skbowarrow2 (197)
+gen-missile-198	missile	missiles.txt Id 198	missile.skbowarrow3	missile skbowarrow3 (198)
+gen-missile-199	missile	missiles.txt Id 199	missile.skbowarrow4	missile skbowarrow4 (199)
+gen-missile-200	missile	missiles.txt Id 200	missile.skbowarrow5	missile skbowarrow5 (200)
+gen-missile-203	missile	missiles.txt Id 203	missile.andypoisonbolt	missile andypoisonbolt (203)
+gen-missile-205	missile	missiles.txt Id 205	missile.lightning-bolt	missile lightningjavelin (205)
+gen-missile-206	missile	missiles.txt Id 206	missile.lightning-fury	missile lightningfury (206)
+gen-missile-207	missile	missiles.txt Id 207	missile.bone-wall	missile bonewallmaker (207)
+gen-missile-208	missile	missiles.txt Id 208	missile.necromagemissile	missile necromage1 (208)
+gen-missile-212	missile	missiles.txt Id 212	missile.shiver-armor	missile sparkle (212)
+gen-missile-213	missile	missiles.txt Id 213	missile.multiple-shot	missile multipleshotarrow (213)
+gen-missile-214	missile	missiles.txt Id 214	missile.multiple-shot	missile multipleshotbolt (214)
+gen-missile-215	missile	missiles.txt Id 215	missile.charged-strike	missile chargedstrikebolt (215)
+gen-missile-217	missile	missiles.txt Id 217	missile.poison-explosion	missile poisonexplosioncloud (217)
+gen-missile-218	missile	missiles.txt Id 218	missile.bone-spear	missile bonecast (218)
+gen-missile-219	missile	missiles.txt Id 219	missile.battle-cry	missile battlecry (219)
+gen-missile-220	missile	missiles.txt Id 220	missile.primepoisonnova	missile primepoisoncloud (220)
+gen-missile-226	missile	missiles.txt Id 226	missile.pantherjav1	missile pantherjav1 (226)
+gen-missile-227	missile	missiles.txt Id 227	missile.pantherjav2	missile pantherjav2 (227)
+gen-missile-229	missile	missiles.txt Id 229	missile.pantherjav4	missile pantherjav4 (229)
+gen-missile-232	missile	missiles.txt Id 232	missile.lightning-strike	missile lightningstrike (232)
+gen-missile-233	missile	missiles.txt Id 233	missile.fist-of-the-heavens	missile fistoftheheavensdelay (233)
+gen-missile-235	missile	missiles.txt Id 235	missile.war-cry	missile warcry (235)
+gen-missile-236	missile	missiles.txt Id 236	missile.battle-command	missile battlecommand (236)
+gen-missile-237	missile	missiles.txt Id 237	missile.battle-orders	missile battleorders (237)
+gen-missile-238	missile	missiles.txt Id 238	missile.pantherpotorange	missile pantherpotorange (238)
+gen-missile-239	missile	missiles.txt Id 239	missile.pantherpotgreen	missile pantherpotgreen (239)
+gen-missile-243	missile	missiles.txt Id 243	missile.cursedballtrapright	missile trap cursed skull right (243)
+gen-missile-244	missile	missiles.txt Id 244	missile.cursedballtrapleft	missile trap cursed skull left (244)
+gen-missile-246	missile	missiles.txt Id 246	missile.poisonballtrap	missile trap poison ball left (246)
+gen-missile-247	missile	missiles.txt Id 247	missile.hydramissile	missile hydra (247)
+gen-missile-249	missile	missiles.txt Id 249	missile.grim-ward	missile grimwardsmallstart (249)
+gen-missile-252	missile	missiles.txt Id 252	missile.grim-ward	missile grimwardmediumstart (252)
+gen-missile-255	missile	missiles.txt Id 255	missile.grim-ward	missile grimwardlargestart (255)
+gen-missile-260	missile	missiles.txt Id 260	missile.frozen-orb	missile frozenorb (260)
+gen-missile-264	missile	missiles.txt Id 264	missile.chilling-armor	missile chillingarmorbolt (264)
+gen-missile-266	missile	missiles.txt Id 266	missile.blowgun	missile blowgun (266)
+gen-missile-268	missile	missiles.txt Id 268	missile.revive	missile revivesmall (268)
+gen-missile-269	missile	missiles.txt Id 269	missile.revive	missile revivemedium (269)
+gen-missile-270	missile	missiles.txt Id 270	missile.revive	missile revivelarge (270)
+gen-missile-271	missile	missiles.txt Id 271	missile.primespike	missile monglacialspike (271)
+gen-missile-276	missile	missiles.txt Id 276	missile.mephistomissile	missile mephisto (276)
+gen-missile-277	missile	missiles.txt Id 277	missile.firehead	missile firehead (277)
+gen-missile-280	missile	missiles.txt Id 280	missile.frogfire	missile frogfire (280)
+gen-missile-282	missile	missiles.txt Id 282	missile.frogpois	missile frogpois (282)
+gen-missile-283	missile	missiles.txt Id 283	missile.desertturret	missile desertfireball (283)
+gen-missile-320	missile	missiles.txt Id 320	missile.willowisplightningbolt	missile willowisplightningbolt (320)
+gen-missile-322	missile	missiles.txt Id 322	missile.magottup	missile dirt pile (322)
+gen-missile-323	missile	missiles.txt Id 323	missile.doomknightmissile	missile undeadmissile1 (323)
+gen-missile-329	missile	missiles.txt Id 329	missile.monbonespirit	missile monbonespirit (329)
+gen-missile-331	missile	missiles.txt Id 331	missile.countessfirewall	missile countessfirewall (331)
+gen-missile-336	missile	missiles.txt Id 336	missile.hellmeteor	missile hellmeteordown (336)
+gen-missile-341	missile	missiles.txt Id 341	missile.regurgitatorcorpse	missile regurgitatorcorpse (341)
+gen-missile-346	missile	missiles.txt Id 346	missile.leap	missile leapknockback (346)
+gen-missile-385	missile	missiles.txt Id 385	missile.bomb-in-air	missile bomb in air (385)
+gen-missile-388	missile	missiles.txt Id 388	missile.shock-field	missile shock field in air (388)
+gen-missile-392	missile	missiles.txt Id 392	missile.blade-creeper	missile blade creeper (392)
+gen-missile-398	missile	missiles.txt Id 398	missile.imp-inferno	missile impinfernoflame1 (398)
+gen-missile-399	missile	missiles.txt Id 399	missile.imp-inferno	missile impinfernoflame2 (399)
+gen-missile-404	missile	missiles.txt Id 404	missile.imp-fireball	missile impfireball (404)
+gen-missile-407	missile	missiles.txt Id 407	missile.catapult-charged-ball	missile catapultchargedball (407)
+gen-missile-411	missile	missiles.txt Id 411	missile.catapult-spike-ball	missile catapult spike ball (411)
+gen-missile-416	missile	missiles.txt Id 416	missile.catapultblizzard	missile catapult cold ball (416)
+gen-missile-419	missile	missiles.txt Id 419	missile.catapultplague	missile catapult plague ball (419)
+gen-missile-422	missile	missiles.txt Id 422	missile.catapultmeteor	missile catapult meteor ball (422)
+gen-missile-425	missile	missiles.txt Id 425	missile.healing-vortex	missile healing vortex (425)
+gen-missile-450	missile	missiles.txt Id 450	missile.imp-charged-bolt	missile imp charged bolt (450)
+gen-missile-451	missile	missiles.txt Id 451	missile.imp-teleport	missile imp teleport (451)
+gen-missile-453	missile	missiles.txt Id 453	missile.molten-boulder	missile moltenboulderemerge (453)
+gen-missile-458	missile	missiles.txt Id 458	missile.firestorm	missile firestormmaker (458)
+gen-missile-459	missile	missiles.txt Id 459	missile.arctic-blast	missile arcticblast1 (459)
+gen-missile-460	missile	missiles.txt Id 460	missile.arctic-blast	missile arcticblast2 (460)
+gen-missile-461	missile	missiles.txt Id 461	missile.erruption-center	missile erruption center (461)
+gen-missile-466	missile	missiles.txt Id 466	missile.vine-attack	missile vine beast walk 1 (466)
+gen-missile-468	missile	missiles.txt Id 468	missile.vine-attack	missile vine beast neutral (468)
+gen-missile-469	missile	missiles.txt Id 469	missile.corpsecycler	missile vine beast attack (469)
+gen-missile-471	missile	missiles.txt Id 471	missile.vine-attack	missile vines (471)
+gen-missile-474	missile	missiles.txt Id 474	missile.vine-attack	missile plague vines (474)
+gen-missile-477	missile	missiles.txt Id 477	missile.twister	missile twister (477)
+gen-missile-478	missile	missiles.txt Id 478	missile.tornado	missile tornado (478)
+gen-missile-479	missile	missiles.txt Id 479	missile.volcano	missile volcano (479)
+gen-missile-480	missile	missiles.txt Id 480	missile.volcano	missile volcano overlay fire (480)
+gen-missile-493	missile	missiles.txt Id 493	missile.frozenhorror-arcticblast1	missile frozenhorror arcticblast1 (493)
+gen-missile-495	missile	missiles.txt Id 495	missile.boltsentry	missile sentrychargedbolt (495)
+gen-missile-498	missile	missiles.txt Id 498	missile.corpsecycler	missile recycler delay (498)
+gen-missile-502	missile	missiles.txt Id 502	missile.death-mauler	missile death mauler (502)
+gen-missile-503	missile	missiles.txt Id 503	missile.deathmaul	missile death mauler trail (503)
+gen-missile-506	missile	missiles.txt Id 506	missile.blade-fury	missile bladefragment1 (506)
+gen-missile-508	missile	missiles.txt Id 508	missile.blade-fury	missile bladefragment2 (508)
+gen-missile-511	missile	missiles.txt Id 511	missile.shock-wave	missile shockwave (511)
+gen-missile-515	missile	missiles.txt Id 515	missile.rabies	missile rabiesplague (515)
+gen-missile-517	missile	missiles.txt Id 517	missile.wake-of-destruction-sentry	missile wake of destruction maker (517)
+gen-missile-519	missile	missiles.txt Id 519	missile.mon-death-sentry	missile deathsentryexplode (519)
+gen-missile-523	missile	missiles.txt Id 523	missile.mon-inferno-sentry	missile inferno sentry 1 (523)
+gen-missile-524	missile	missiles.txt Id 524	missile.mon-inferno-sentry	missile inferno sentry 2 (524)
+gen-missile-525	missile	missiles.txt Id 525	missile.ancient-throwing-axe	missile ancient throwing axe (525)
+gen-missile-526	missile	missiles.txt Id 526	missile.sentry-lightning	missile sentrylightningbolt (526)
+gen-missile-533	missile	missiles.txt Id 533	missile.dragon-tail	missile dragontail missile (533)
+gen-missile-540	missile	missiles.txt Id 540	missile.vinecycler	missile vine recycler delay (540)
+gen-missile-546	missile	missiles.txt Id 546	missile.baal-taunt	missile baal taunt control (546)
+gen-missile-550	missile	missiles.txt Id 550	missile.baal-monster-spawn	missile baal spawn monsters (550)
+gen-missile-551	missile	missiles.txt Id 551	missile.mind-blast	missile mindblast hit (551)
+gen-missile-553	missile	missiles.txt Id 553	missile.blade-shield	missile blade shield attachment (553)
+gen-missile-554	missile	missiles.txt Id 554	missile.baal-inferno	missile baal inferno (554)
+gen-missile-555	missile	missiles.txt Id 555	missile.baal-nova	missile baal nova (555)
+gen-missile-556	missile	missiles.txt Id 556	missile.fists-of-fire	missile fistsoffireexplode (556)
+gen-missile-557	missile	missiles.txt Id 557	missile.fists-of-fire	missile fistsoffirefirewall (557)
+gen-missile-558	missile	missiles.txt Id 558	missile.claws-of-thunder	missile clawsofthunderbolt (558)
+gen-missile-559	missile	missiles.txt Id 559	missile.claws-of-thunder	missile clawsofthundernova (559)
+gen-missile-560	missile	missiles.txt Id 560	missile.blades-of-ice	missile bladesoficeexplode (560)
+gen-missile-561	missile	missiles.txt Id 561	missile.blades-of-ice	missile bladesoficecubes (561)
+gen-missile-564	missile	missiles.txt Id 564	missile.royal-strike	missile royalstrikemeteorcenter (564)
+gen-missile-568	missile	missiles.txt Id 568	missile.royal-strike	missile royalstrikechainlightning (568)
+gen-missile-569	missile	missiles.txt Id 569	missile.royal-strike	missile royalstrikechaosice (569)
+gen-missile-576	missile	missiles.txt Id 576	missile.mind-blast	missile mindblast center (576)
+gen-missile-577	missile	missiles.txt Id 577	missile.armageddon	missile armageddoncontrol (577)
+gen-missile-578	missile	missiles.txt Id 578	missile.armageddon	missile armageddonrock (578)
+gen-missile-579	missile	missiles.txt Id 579	missile.armageddon	missile armageddontail (579)
+gen-missile-581	missile	missiles.txt Id 581	missile.hurricane	missile hurricaneswoosh (581)
+gen-missile-583	missile	missiles.txt Id 583	missile.hurricane	missile hurricanerock (583)
+gen-missile-585	missile	missiles.txt Id 585	missile.hurricane	missile hurricanetree (585)
+gen-missile-589	missile	missiles.txt Id 589	missile.baal-cold-missiles	missile baal cold maker (589)
+gen-missile-592	missile	missiles.txt Id 592	missile.imp-fire-missile	missile impmiss21 (592)
+gen-missile-593	missile	missiles.txt Id 593	missile.impmiss22	missile impmiss22 (593)
+gen-missile-594	missile	missiles.txt Id 594	missile.impmiss23	missile impmiss23 (594)
+gen-missile-595	missile	missiles.txt Id 595	missile.impmiss24	missile impmiss24 (595)
+gen-missile-596	missile	missiles.txt Id 596	missile.impmiss25	missile impmiss25 (596)
+gen-missile-613	missile	missiles.txt Id 613	missile.baal-clone-teleport	missile baalteleport (613)
+gen-missile-614	missile	missiles.txt Id 614	missile.baal-clone-teleport	missile baalclonedeath (614)
+gen-missile-641	missile	missiles.txt Id 641	missile.death-sentry-ltng	missile sentrylightningbolt2 (641)
+gen-missile-643	missile	missiles.txt Id 643	missile.arcanetower	missile lightningtowernova (643)
+gen-missile-644	missile	missiles.txt Id 644	missile.skbowarrow6	missile skbowarrow6 (644)
+gen-missile-645	missile	missiles.txt Id 645	missile.skbowarrow7	missile skbowarrow7 (645)
+gen-missile-646	missile	missiles.txt Id 646	missile.skbowarrow8	missile skbowarrow8 (646)
+gen-missile-647	missile	missiles.txt Id 647	missile.bighead6	missile bighead6 (647)
+gen-missile-648	missile	missiles.txt Id 648	missile.viper-poisjav	missile viper_poisjav (648)
+gen-missile-650	missile	missiles.txt Id 650	missile.viper-fire	missile viper_fire (650)
+gen-missile-652	missile	missiles.txt Id 652	missile.viper-bonespear	missile viper_bonespear (652)
+gen-missile-653	missile	missiles.txt Id 653	missile.countessfirewall	missile countessfirewallmaker (653)
+gen-missile-658	missile	missiles.txt Id 658	missile.pantherjav5	missile pantherjav5 (658)
+gen-missile-659	missile	missiles.txt Id 659	missile.spike6	missile spike6 (659)
+gen-missile-660	missile	missiles.txt Id 660	missile.cr-arrow6	missile cr_arrow6 (660)
+gen-missile-661	missile	missiles.txt Id 661	missile.skmagepois	missile skmagepois (661)
+gen-missile-662	missile	missiles.txt Id 662	missile.skmagecold	missile skmagecold (662)
+gen-missile-663	missile	missiles.txt Id 663	missile.skmagefire	missile skmagefire (663)
+gen-missile-664	missile	missiles.txt Id 664	missile.skmageltng	missile skmageltng (664)
+gen-missile-665	missile	missiles.txt Id 665	missile.succubusbolt	missile succubusmiss (665)
+gen-missile-666	missile	missiles.txt Id 666	missile.willowisplightningbolt2	missile willowisplightningbolt2 (666)
+gen-missile-667	missile	missiles.txt Id 667	missile.mummyex	missile mummyex (667)
+gen-missile-668	missile	missiles.txt Id 668	missile.goospitex	missile goospitex (668)
+gen-missile-669	missile	missiles.txt Id 669	missile.impmissex	missile impmissex (669)
+gen-missile-670	missile	missiles.txt Id 670	missile.diablogeddon	missile diablogeddoncontrol (670)
+gen-missile-671	missile	missiles.txt Id 671	missile.diablogeddon	missile diablogeddonrock (671)
+gen-missile-672	missile	missiles.txt Id 672	missile.diablogeddon	missile diablogeddontail (672)
+gen-missile-675	missile	missiles.txt Id 675	missile.megademoninferno	missile megademoninferno (675)
+gen-missile-678	missile	missiles.txt Id 678	missile.trap-nova	missile trapnova (678)
+gen-missile-679	missile	missiles.txt Id 679	missile.mephfrostnova	missile mephfrostnova (679)
+gen-missile-682	missile	missiles.txt Id 682	missile.strafe	missile strafearrow (682)
+gen-missile-683	missile	missiles.txt Id 683	missile.strafe	missile strafebolt (683)
+gen-state-1	state	states.txt id 1	state.freeze	state freeze (1)
+gen-state-2	state	states.txt id 2	state.poison	state poison (2)
+gen-state-3	state	states.txt id 3	state.resistfire	state resistfire (3)
+gen-state-4	state	states.txt id 4	state.resistcold	state resistcold (4)
+gen-state-5	state	states.txt id 5	state.resistlight	state resistlight (5)
+gen-state-6	state	states.txt id 6	state.resistmagic	state resistmagic (6)
+gen-state-7	state	states.txt id 7	state.playerbody	state playerbody (7)
+gen-state-8	state	states.txt id 8	state.resistall	state resistall (8)
+gen-state-9	state	states.txt id 9	state.amplifydamage	state amplifydamage (9)
+gen-state-10	state	states.txt id 10	state.frozenarmor	state frozenarmor (10)
+gen-state-11	state	states.txt id 11	state.cold	state cold (11)
+gen-state-12	state	states.txt id 12	state.inferno	state inferno (12)
+gen-state-13	state	states.txt id 13	state.blaze	state blaze (13)
+gen-state-14	state	states.txt id 14	state.bonearmor	state bonearmor (14)
+gen-state-15	state	states.txt id 15	state.concentrate	state concentrate (15)
+gen-state-16	state	states.txt id 16	state.enchant	state enchant (16)
+gen-state-17	state	states.txt id 17	state.innersight	state innersight (17)
+gen-state-18	state	states.txt id 18	state.skill-move	state skill_move (18)
+gen-state-19	state	states.txt id 19	state.weaken	state weaken (19)
+gen-state-20	state	states.txt id 20	state.chillingarmor	state chillingarmor (20)
+gen-state-21	state	states.txt id 21	state.stunned	state stunned (21)
+gen-state-22	state	states.txt id 22	state.spiderlay	state spiderlay (22)
+gen-state-23	state	states.txt id 23	state.dimvision	state dimvision (23)
+gen-state-24	state	states.txt id 24	state.slowed	state slowed (24)
+gen-state-25	state	states.txt id 25	state.fetishaura	state fetishaura (25)
+gen-state-26	state	states.txt id 26	state.shout	state shout (26)
+gen-state-27	state	states.txt id 27	state.taunt	state taunt (27)
+gen-state-28	state	states.txt id 28	state.conviction	state conviction (28)
+gen-state-29	state	states.txt id 29	state.convicted	state convicted (29)
+gen-state-30	state	states.txt id 30	state.energyshield	state energyshield (30)
+gen-state-31	state	states.txt id 31	state.venomclaws	state venomclaws (31)
+gen-state-32	state	states.txt id 32	state.battleorders	state battleorders (32)
+gen-state-33	state	states.txt id 33	state.might	state might (33)
+gen-state-34	state	states.txt id 34	state.prayer	state prayer (34)
+gen-state-35	state	states.txt id 35	state.holyfire	state holyfire (35)
+gen-state-36	state	states.txt id 36	state.thorns	state thorns (36)
+gen-state-37	state	states.txt id 37	state.defiance	state defiance (37)
+gen-state-38	state	states.txt id 38	state.thunderstorm	state thunderstorm (38)
+gen-state-39	state	states.txt id 39	state.lightningbolt	state lightningbolt (39)
+gen-state-40	state	states.txt id 40	state.blessedaim	state blessedaim (40)
+gen-state-41	state	states.txt id 41	state.stamina	state stamina (41)
+gen-state-42	state	states.txt id 42	state.concentration	state concentration (42)
+gen-state-43	state	states.txt id 43	state.holywind	state holywind (43)
+gen-state-44	state	states.txt id 44	state.holywindcold	state holywindcold (44)
+gen-state-45	state	states.txt id 45	state.cleansing	state cleansing (45)
+gen-state-46	state	states.txt id 46	state.holyshock	state holyshock (46)
+gen-state-47	state	states.txt id 47	state.sanctuary	state sanctuary (47)
+gen-state-48	state	states.txt id 48	state.meditation	state meditation (48)
+gen-state-49	state	states.txt id 49	state.fanaticism	state fanaticism (49)
+gen-state-50	state	states.txt id 50	state.redemption	state redemption (50)
+gen-state-51	state	states.txt id 51	state.battlecommand	state battlecommand (51)
+gen-state-52	state	states.txt id 52	state.preventheal	state preventheal (52)
+gen-state-53	state	states.txt id 53	state.conversion	state conversion (53)
+gen-state-54	state	states.txt id 54	state.uninterruptable	state uninterruptable (54)
+gen-state-55	state	states.txt id 55	state.ironmaiden	state ironmaiden (55)
+gen-state-56	state	states.txt id 56	state.terror	state terror (56)
+gen-state-57	state	states.txt id 57	state.attract	state attract (57)
+gen-state-58	state	states.txt id 58	state.lifetap	state lifetap (58)
+gen-state-59	state	states.txt id 59	state.confuse	state confuse (59)
+gen-state-60	state	states.txt id 60	state.decrepify	state decrepify (60)
+gen-state-61	state	states.txt id 61	state.lowerresist	state lowerresist (61)
+gen-state-62	state	states.txt id 62	state.openwounds	state openwounds (62)
+gen-state-63	state	states.txt id 63	state.dopplezon	state dopplezon (63)
+gen-state-64	state	states.txt id 64	state.criticalstrike	state criticalstrike (64)
+gen-state-65	state	states.txt id 65	state.dodge	state dodge (65)
+gen-state-66	state	states.txt id 66	state.avoid	state avoid (66)
+gen-state-67	state	states.txt id 67	state.penetrate	state penetrate (67)
+gen-state-68	state	states.txt id 68	state.evade	state evade (68)
+gen-state-69	state	states.txt id 69	state.pierce	state pierce (69)
+gen-state-70	state	states.txt id 70	state.warmth	state warmth (70)
+gen-state-71	state	states.txt id 71	state.firemastery	state firemastery (71)
+gen-state-72	state	states.txt id 72	state.lightningmastery	state lightningmastery (72)
+gen-state-73	state	states.txt id 73	state.coldmastery	state coldmastery (73)
+gen-state-74	state	states.txt id 74	state.swordmastery	state swordmastery (74)
+gen-state-75	state	states.txt id 75	state.axemastery	state axemastery (75)
+gen-state-76	state	states.txt id 76	state.macemastery	state macemastery (76)
+gen-state-77	state	states.txt id 77	state.polearmmastery	state polearmmastery (77)
+gen-state-78	state	states.txt id 78	state.throwingmastery	state throwingmastery (78)
+gen-state-79	state	states.txt id 79	state.spearmastery	state spearmastery (79)
+gen-state-80	state	states.txt id 80	state.increasedstamina	state increasedstamina (80)
+gen-state-81	state	states.txt id 81	state.ironskin	state ironskin (81)
+gen-state-82	state	states.txt id 82	state.increasedspeed	state increasedspeed (82)
+gen-state-83	state	states.txt id 83	state.naturalresistance	state naturalresistance (83)
+gen-state-84	state	states.txt id 84	state.fingermagecurse	state fingermagecurse (84)
+gen-state-85	state	states.txt id 85	state.nomanaregen	state nomanaregen (85)
+gen-state-86	state	states.txt id 86	state.justhit	state justhit (86)
+gen-state-87	state	states.txt id 87	state.slowmissiles	state slowmissiles (87)
+gen-state-88	state	states.txt id 88	state.shiverarmor	state shiverarmor (88)
+gen-state-89	state	states.txt id 89	state.battlecry	state battlecry (89)
+gen-state-90	state	states.txt id 90	state.blue	state blue (90)
+gen-state-91	state	states.txt id 91	state.red	state red (91)
+gen-state-92	state	states.txt id 92	state.death-delay	state death_delay (92)
+gen-state-93	state	states.txt id 93	state.valkyrie	state valkyrie (93)
+gen-state-94	state	states.txt id 94	state.frenzy	state frenzy (94)
+gen-state-95	state	states.txt id 95	state.berserk	state berserk (95)
+gen-state-96	state	states.txt id 96	state.revive	state revive (96)
+gen-state-97	state	states.txt id 97	state.skel-mastery	state skel_mastery (97)
+gen-state-98	state	states.txt id 98	state.sourceunit	state sourceunit (98)
+gen-state-99	state	states.txt id 99	state.redeemed	state redeemed (99)
+gen-state-100	state	states.txt id 100	state.healthpot	state healthpot (100)
+gen-state-101	state	states.txt id 101	state.holyshield	state holyshield (101)
+gen-state-102	state	states.txt id 102	state.just-portaled	state just_portaled (102)
+gen-state-103	state	states.txt id 103	state.monfrenzy	state monfrenzy (103)
+gen-state-104	state	states.txt id 104	state.corpse-nodraw	state corpse_nodraw (104)
+gen-state-105	state	states.txt id 105	state.alignment	state alignment (105)
+gen-state-106	state	states.txt id 106	state.manapot	state manapot (106)
+gen-state-107	state	states.txt id 107	state.shatter	state shatter (107)
+gen-state-108	state	states.txt id 108	state.sync-warped	state sync_warped (108)
+gen-state-109	state	states.txt id 109	state.conversion-save	state conversion_save (109)
+gen-state-110	state	states.txt id 110	state.pregnant	state pregnant (110)
+gen-state-111	state	states.txt id 111	state.golem-mastery	state golem_mastery (111)
+gen-state-112	state	states.txt id 112	state.rabies	state rabies (112)
+gen-state-113	state	states.txt id 113	state.defense-curse	state defense_curse (113)
+gen-state-114	state	states.txt id 114	state.blood-mana	state blood_mana (114)
+gen-state-115	state	states.txt id 115	state.burning	state burning (115)
+gen-state-116	state	states.txt id 116	state.dragonflight	state dragonflight (116)
+gen-state-117	state	states.txt id 117	state.maul	state maul (117)
+gen-state-118	state	states.txt id 118	state.corpse-noselect	state corpse_noselect (118)
+gen-state-119	state	states.txt id 119	state.shadowwarrior	state shadowwarrior (119)
+gen-state-120	state	states.txt id 120	state.feralrage	state feralrage (120)
+gen-state-121	state	states.txt id 121	state.skilldelay	state skilldelay (121)
+gen-state-122	state	states.txt id 122	state.progressive-damage	state progressive_damage (122)
+gen-state-123	state	states.txt id 123	state.progressive-steal	state progressive_steal (123)
+gen-state-124	state	states.txt id 124	state.progressive-other	state progressive_other (124)
+gen-state-125	state	states.txt id 125	state.progressive-fire	state progressive_fire (125)
+gen-state-126	state	states.txt id 126	state.progressive-cold	state progressive_cold (126)
+gen-state-127	state	states.txt id 127	state.progressive-lightning	state progressive_lightning (127)
+gen-state-128	state	states.txt id 128	state.shrine-armor	state shrine_armor (128)
+gen-state-129	state	states.txt id 129	state.shrine-combat	state shrine_combat (129)
+gen-state-130	state	states.txt id 130	state.shrine-resist-lightning	state shrine_resist_lightning (130)
+gen-state-131	state	states.txt id 131	state.shrine-resist-fire	state shrine_resist_fire (131)
+gen-state-132	state	states.txt id 132	state.shrine-resist-cold	state shrine_resist_cold (132)
+gen-state-133	state	states.txt id 133	state.shrine-resist-poison	state shrine_resist_poison (133)
+gen-state-134	state	states.txt id 134	state.shrine-skill	state shrine_skill (134)
+gen-state-135	state	states.txt id 135	state.shrine-mana-regen	state shrine_mana_regen (135)
+gen-state-136	state	states.txt id 136	state.shrine-stamina	state shrine_stamina (136)
+gen-state-137	state	states.txt id 137	state.shrine-experience	state shrine_experience (137)
+gen-state-138	state	states.txt id 138	state.fenris-rage	state fenris_rage (138)
+gen-state-139	state	states.txt id 139	state.wolf	state wolf (139)
+gen-state-140	state	states.txt id 140	state.bear	state bear (140)
+gen-state-141	state	states.txt id 141	state.bloodlust	state bloodlust (141)
+gen-state-142	state	states.txt id 142	state.changeclass	state changeclass (142)
+gen-state-143	state	states.txt id 143	state.attached	state attached (143)
+gen-state-144	state	states.txt id 144	state.hurricane	state hurricane (144)
+gen-state-145	state	states.txt id 145	state.armageddon	state armageddon (145)
+gen-state-146	state	states.txt id 146	state.invis	state invis (146)
+gen-state-147	state	states.txt id 147	state.barbs	state barbs (147)
+gen-state-148	state	states.txt id 148	state.wolverine	state wolverine (148)
+gen-state-149	state	states.txt id 149	state.oaksage	state oaksage (149)
+gen-state-150	state	states.txt id 150	state.vine-beast	state vine_beast (150)
+gen-state-151	state	states.txt id 151	state.cyclonearmor	state cyclonearmor (151)
+gen-state-152	state	states.txt id 152	state.clawmastery	state clawmastery (152)
+gen-state-153	state	states.txt id 153	state.cloak-of-shadows	state cloak_of_shadows (153)
+gen-state-154	state	states.txt id 154	state.recycled	state recycled (154)
+gen-state-155	state	states.txt id 155	state.weaponblock	state weaponblock (155)
+gen-state-156	state	states.txt id 156	state.cloaked	state cloaked (156)
+gen-state-157	state	states.txt id 157	state.quickness	state quickness (157)
+gen-state-158	state	states.txt id 158	state.bladeshield	state bladeshield (158)
+gen-state-159	state	states.txt id 159	state.fade	state fade (159)
+gen-state-160	state	states.txt id 160	state.summonresist	state summonresist (160)
+gen-state-161	state	states.txt id 161	state.oaksagecontrol	state oaksagecontrol (161)
+gen-state-162	state	states.txt id 162	state.wolverinecontrol	state wolverinecontrol (162)
+gen-state-163	state	states.txt id 163	state.barbscontrol	state barbscontrol (163)
+gen-state-164	state	states.txt id 164	state.debugcontrol	state debugcontrol (164)
+gen-state-165	state	states.txt id 165	state.itemset1	state itemset1 (165)
+gen-state-166	state	states.txt id 166	state.itemset2	state itemset2 (166)
+gen-state-167	state	states.txt id 167	state.itemset3	state itemset3 (167)
+gen-state-168	state	states.txt id 168	state.itemset4	state itemset4 (168)
+gen-state-169	state	states.txt id 169	state.itemset5	state itemset5 (169)
+gen-state-170	state	states.txt id 170	state.itemset6	state itemset6 (170)
+gen-state-171	state	states.txt id 171	state.runeword	state runeword (171)
+gen-state-172	state	states.txt id 172	state.restinpeace	state restinpeace (172)
+gen-state-173	state	states.txt id 173	state.corpseexp	state corpseexp (173)
+gen-state-174	state	states.txt id 174	state.whirlwind	state whirlwind (174)
+gen-state-175	state	states.txt id 175	state.fullsetgeneric	state fullsetgeneric (175)
+gen-state-176	state	states.txt id 176	state.monsterset	state monsterset (176)
+gen-state-177	state	states.txt id 177	state.delerium	state delerium (177)
+gen-state-178	state	states.txt id 178	state.antidote	state antidote (178)
+gen-state-179	state	states.txt id 179	state.thawing	state thawing (179)
+gen-state-180	state	states.txt id 180	state.staminapot	state staminapot (180)
+gen-state-181	state	states.txt id 181	state.passive-resistfire	state passive_resistfire (181)
+gen-state-182	state	states.txt id 182	state.passive-resistcold	state passive_resistcold (182)
+gen-state-183	state	states.txt id 183	state.passive-resistltng	state passive_resistltng (183)
+gen-state-184	state	states.txt id 184	state.uberminion	state uberminion (184)
+gen-mon-2	mon	monstats.txt row 2	monster.skeleton3	monster class 2 skeleton3 (AI Skeleton)
+gen-mon-8	mon	monstats.txt row 8	monster.zombie4	monster class 8 zombie4 (AI Zombie)
+gen-mon-9	mon	monstats.txt row 9	monster.zombie5	monster class 9 zombie5 (AI Zombie)
+gen-mon-11	mon	monstats.txt row 11	monster.bighead2	monster class 11 bighead2 (AI Bighead)
+gen-mon-12	mon	monstats.txt row 12	monster.bighead3	monster class 12 bighead3 (AI Bighead)
+gen-mon-13	mon	monstats.txt row 13	monster.bighead4	monster class 13 bighead4 (AI Bighead)
+gen-mon-14	mon	monstats.txt row 14	monster.bighead5	monster class 14 bighead5 (AI Bighead)
+gen-mon-15	mon	monstats.txt row 15	monster.foulcrow1	monster class 15 foulcrow1 (AI BloodHawk)
+gen-mon-16	mon	monstats.txt row 16	monster.foulcrow2	monster class 16 foulcrow2 (AI BloodHawk)
+gen-mon-18	mon	monstats.txt row 18	monster.foulcrow4	monster class 18 foulcrow4 (AI BloodHawk)
+gen-mon-21	mon	monstats.txt row 21	monster.fallen3	monster class 21 fallen3 (AI Fallen)
+gen-mon-24	mon	monstats.txt row 24	monster.brute2	monster class 24 brute2 (AI Brute)
+gen-mon-25	mon	monstats.txt row 25	monster.brute3	monster class 25 brute3 (AI Brute)
+gen-mon-26	mon	monstats.txt row 26	monster.brute4	monster class 26 brute4 (AI Brute)
+gen-mon-27	mon	monstats.txt row 27	monster.brute5	monster class 27 brute5 (AI Brute)
+gen-mon-29	mon	monstats.txt row 29	monster.sandraider1	monster class 29 sandraider1 (AI SandRaider)
+gen-mon-30	mon	monstats.txt row 30	monster.sandraider2	monster class 30 sandraider2 (AI SandRaider)
+gen-mon-31	mon	monstats.txt row 31	monster.sandraider3	monster class 31 sandraider3 (AI SandRaider)
+gen-mon-32	mon	monstats.txt row 32	monster.sandraider4	monster class 32 sandraider4 (AI SandRaider)
+gen-mon-39	mon	monstats.txt row 39	monster.wraith2	monster class 39 wraith2 (AI Wraith)
+gen-mon-41	mon	monstats.txt row 41	monster.wraith4	monster class 41 wraith4 (AI Wraith)
+gen-mon-42	mon	monstats.txt row 42	monster.wraith5	monster class 42 wraith5 (AI Wraith)
+gen-mon-43	mon	monstats.txt row 43	monster.corruptrogue1	monster class 43 corruptrogue1 (AI CorruptRogue)
+gen-mon-44	mon	monstats.txt row 44	monster.corruptrogue2	monster class 44 corruptrogue2 (AI CorruptRogue)
+gen-mon-46	mon	monstats.txt row 46	monster.corruptrogue4	monster class 46 corruptrogue4 (AI CorruptRogue)
+gen-mon-47	mon	monstats.txt row 47	monster.corruptrogue5	monster class 47 corruptrogue5 (AI CorruptRogue)
+gen-mon-48	mon	monstats.txt row 48	monster.baboon1	monster class 48 baboon1 (AI Baboon)
+gen-mon-50	mon	monstats.txt row 50	monster.baboon3	monster class 50 baboon3 (AI Baboon)
+gen-mon-51	mon	monstats.txt row 51	monster.baboon4	monster class 51 baboon4 (AI Baboon)
+gen-mon-52	mon	monstats.txt row 52	monster.baboon5	monster class 52 baboon5 (AI Baboon)
+gen-mon-57	mon	monstats.txt row 57	monster.goatman5	monster class 57 goatman5 (AI Goatman)
+gen-mon-60	mon	monstats.txt row 60	monster.fallenshaman3	monster class 60 fallenshaman3 (AI FallenShaman)
+gen-mon-64	mon	monstats.txt row 64	monster.quillrat2	monster class 64 quillrat2 (AI QuillRat)
+gen-mon-65	mon	monstats.txt row 65	monster.quillrat3	monster class 65 quillrat3 (AI QuillRat)
+gen-mon-66	mon	monstats.txt row 66	monster.quillrat4	monster class 66 quillrat4 (AI QuillRat)
+gen-mon-69	mon	monstats.txt row 69	monster.sandmaggot2	monster class 69 sandmaggot2 (AI SandMaggot)
+gen-mon-70	mon	monstats.txt row 70	monster.sandmaggot3	monster class 70 sandmaggot3 (AI SandMaggot)
+gen-mon-71	mon	monstats.txt row 71	monster.sandmaggot4	monster class 71 sandmaggot4 (AI SandMaggot)
+gen-mon-72	mon	monstats.txt row 72	monster.sandmaggot5	monster class 72 sandmaggot5 (AI SandMaggot)
+gen-mon-77	mon	monstats.txt row 77	monster.clawviper5	monster class 77 clawviper5 (AI ClawViper)
+gen-mon-80	mon	monstats.txt row 80	monster.sandleaper3	monster class 80 sandleaper3 (AI SandLeaper)
+gen-mon-81	mon	monstats.txt row 81	monster.sandleaper4	monster class 81 sandleaper4 (AI SandLeaper)
+gen-mon-82	mon	monstats.txt row 82	monster.sandleaper5	monster class 82 sandleaper5 (AI SandLeaper)
+gen-mon-85	mon	monstats.txt row 85	monster.pantherwoman3	monster class 85 pantherwoman3 (AI PantherWoman)
+gen-mon-86	mon	monstats.txt row 86	monster.pantherwoman4	monster class 86 pantherwoman4 (AI PantherWoman)
+gen-mon-88	mon	monstats.txt row 88	monster.swarm2	monster class 88 swarm2 (AI Swarm)
+gen-mon-90	mon	monstats.txt row 90	monster.swarm4	monster class 90 swarm4 (AI Swarm)
+gen-mon-93	mon	monstats.txt row 93	monster.scarab3	monster class 93 scarab3 (AI Scarab)
+gen-mon-95	mon	monstats.txt row 95	monster.scarab5	monster class 95 scarab5 (AI Scarab)
+gen-mon-97	mon	monstats.txt row 97	monster.mummy2	monster class 97 mummy2 (AI Mummy)
+gen-mon-99	mon	monstats.txt row 99	monster.mummy4	monster class 99 mummy4 (AI Mummy)
+gen-mon-100	mon	monstats.txt row 100	monster.mummy5	monster class 100 mummy5 (AI Mummy)
+gen-mon-102	mon	monstats.txt row 102	monster.unraveler2	monster class 102 unraveler2 (AI GreaterMummy)
+gen-mon-104	mon	monstats.txt row 104	monster.unraveler4	monster class 104 unraveler4 (AI GreaterMummy)
+gen-mon-110	mon	monstats.txt row 110	monster.vulture1	monster class 110 vulture1 (AI Vulture)
+gen-mon-112	mon	monstats.txt row 112	monster.vulture3	monster class 112 vulture3 (AI Vulture)
+gen-mon-113	mon	monstats.txt row 113	monster.vulture4	monster class 113 vulture4 (AI Vulture)
+gen-mon-114	mon	monstats.txt row 114	monster.mosquito1	monster class 114 mosquito1 (AI Mosquito)
+gen-mon-115	mon	monstats.txt row 115	monster.mosquito2	monster class 115 mosquito2 (AI Mosquito)
+gen-mon-117	mon	monstats.txt row 117	monster.mosquito4	monster class 117 mosquito4 (AI Mosquito)
+gen-mon-118	mon	monstats.txt row 118	monster.willowisp1	monster class 118 willowisp1 (AI WillOWisp)
+gen-mon-120	mon	monstats.txt row 120	monster.willowisp3	monster class 120 willowisp3 (AI WillOWisp)
+gen-mon-122	mon	monstats.txt row 122	monster.arach1	monster class 122 arach1 (AI Arach)
+gen-mon-124	mon	monstats.txt row 124	monster.arach3	monster class 124 arach3 (AI Arach)
+gen-mon-125	mon	monstats.txt row 125	monster.arach4	monster class 125 arach4 (AI Arach)
+gen-mon-126	mon	monstats.txt row 126	monster.arach5	monster class 126 arach5 (AI Arach)
+gen-mon-127	mon	monstats.txt row 127	monster.thornhulk1	monster class 127 thornhulk1 (AI ThornHulk)
+gen-mon-128	mon	monstats.txt row 128	monster.thornhulk2	monster class 128 thornhulk2 (AI ThornHulk)
+gen-mon-129	mon	monstats.txt row 129	monster.thornhulk3	monster class 129 thornhulk3 (AI ThornHulk)
+gen-mon-132	mon	monstats.txt row 132	monster.vampire2	monster class 132 vampire2 (AI Vampire)
+gen-mon-133	mon	monstats.txt row 133	monster.vampire3	monster class 133 vampire3 (AI Vampire)
+gen-mon-134	mon	monstats.txt row 134	monster.vampire4	monster class 134 vampire4 (AI Vampire)
+gen-mon-135	mon	monstats.txt row 135	monster.vampire5	monster class 135 vampire5 (AI Vampire)
+gen-mon-136	mon	monstats.txt row 136	monster.batdemon1	monster class 136 batdemon1 (AI BatDemon)
+gen-mon-137	mon	monstats.txt row 137	monster.batdemon2	monster class 137 batdemon2 (AI BatDemon)
+gen-mon-138	mon	monstats.txt row 138	monster.batdemon3	monster class 138 batdemon3 (AI BatDemon)
+gen-mon-139	mon	monstats.txt row 139	monster.batdemon4	monster class 139 batdemon4 (AI BatDemon)
+gen-mon-140	mon	monstats.txt row 140	monster.batdemon5	monster class 140 batdemon5 (AI BatDemon)
+gen-mon-141	mon	monstats.txt row 141	monster.fetish1	monster class 141 fetish1 (AI Fetish)
+gen-mon-142	mon	monstats.txt row 142	monster.fetish2	monster class 142 fetish2 (AI Fetish)
+gen-mon-143	mon	monstats.txt row 143	monster.fetish3	monster class 143 fetish3 (AI Fetish)
+gen-mon-144	mon	monstats.txt row 144	monster.fetish4	monster class 144 fetish4 (AI Fetish)
+gen-mon-161	mon	monstats.txt row 161	monster.cr-archer2	monster class 161 cr_archer2 (AI CorruptArcher)
+gen-mon-163	mon	monstats.txt row 163	monster.cr-archer4	monster class 163 cr_archer4 (AI CorruptArcher)
+gen-mon-164	mon	monstats.txt row 164	monster.cr-archer5	monster class 164 cr_archer5 (AI CorruptArcher)
+gen-mon-166	mon	monstats.txt row 166	monster.cr-lancer2	monster class 166 cr_lancer2 (AI CorruptLancer)
+gen-mon-167	mon	monstats.txt row 167	monster.cr-lancer3	monster class 167 cr_lancer3 (AI CorruptLancer)
+gen-mon-171	mon	monstats.txt row 171	monster.sk-archer2	monster class 171 sk_archer2 (AI SkeletonBow)
+gen-mon-173	mon	monstats.txt row 173	monster.sk-archer4	monster class 173 sk_archer4 (AI SkeletonBow)
+gen-mon-174	mon	monstats.txt row 174	monster.sk-archer5	monster class 174 sk_archer5 (AI SkeletonBow)
+gen-mon-180	mon	monstats.txt row 180	monster.maggotbaby1	monster class 180 maggotbaby1 (AI MaggotLarva)
+gen-mon-181	mon	monstats.txt row 181	monster.maggotbaby2	monster class 181 maggotbaby2 (AI MaggotLarva)
+gen-mon-182	mon	monstats.txt row 182	monster.maggotbaby3	monster class 182 maggotbaby3 (AI MaggotLarva)
+gen-mon-183	mon	monstats.txt row 183	monster.maggotbaby4	monster class 183 maggotbaby4 (AI MaggotLarva)
+gen-mon-184	mon	monstats.txt row 184	monster.maggotbaby5	monster class 184 maggotbaby5 (AI MaggotLarva)
+gen-mon-186	mon	monstats.txt row 186	monster.blunderbore1	monster class 186 blunderbore1 (AI PinHead)
+gen-mon-188	mon	monstats.txt row 188	monster.blunderbore3	monster class 188 blunderbore3 (AI PinHead)
+gen-mon-189	mon	monstats.txt row 189	monster.blunderbore4	monster class 189 blunderbore4 (AI PinHead)
+gen-mon-190	mon	monstats.txt row 190	monster.maggotegg1	monster class 190 maggotegg1 (AI MaggotEgg)
+gen-mon-191	mon	monstats.txt row 191	monster.maggotegg2	monster class 191 maggotegg2 (AI MaggotEgg)
+gen-mon-192	mon	monstats.txt row 192	monster.maggotegg3	monster class 192 maggotegg3 (AI MaggotEgg)
+gen-mon-193	mon	monstats.txt row 193	monster.maggotegg4	monster class 193 maggotegg4 (AI MaggotEgg)
+gen-mon-194	mon	monstats.txt row 194	monster.maggotegg5	monster class 194 maggotegg5 (AI MaggotEgg)
+gen-mon-206	mon	monstats.txt row 206	monster.crownest1	monster class 206 crownest1 (AI FoulCrowNest)
+gen-mon-207	mon	monstats.txt row 207	monster.crownest2	monster class 207 crownest2 (AI FoulCrowNest)
+gen-mon-214	mon	monstats.txt row 214	monster.bonefetish3	monster class 214 bonefetish3 (AI Fetish)
+gen-mon-215	mon	monstats.txt row 215	monster.bonefetish4	monster class 215 bonefetish4 (AI Fetish)
+gen-mon-216	mon	monstats.txt row 216	monster.bonefetish5	monster class 216 bonefetish5 (AI Fetish)
+gen-mon-235	mon	monstats.txt row 235	monster.zealot1	monster class 235 zealot1 (AI ZakarumZealot)
+gen-mon-236	mon	monstats.txt row 236	monster.zealot2	monster class 236 zealot2 (AI ZakarumZealot)
+gen-mon-237	mon	monstats.txt row 237	monster.zealot3	monster class 237 zealot3 (AI ZakarumZealot)
+gen-mon-238	mon	monstats.txt row 238	monster.cantor1	monster class 238 cantor1 (AI ZakarumPriest)
+gen-mon-239	mon	monstats.txt row 239	monster.cantor2	monster class 239 cantor2 (AI ZakarumPriest)
+gen-mon-240	mon	monstats.txt row 240	monster.cantor3	monster class 240 cantor3 (AI ZakarumPriest)
+gen-mon-247	mon	monstats.txt row 247	monster.frogdemon1	monster class 247 frogdemon1 (AI FrogDemon)
+gen-mon-248	mon	monstats.txt row 248	monster.frogdemon2	monster class 248 frogdemon2 (AI FrogDemon)
+gen-mon-249	mon	monstats.txt row 249	monster.frogdemon3	monster class 249 frogdemon3 (AI FrogDemon)
+gen-mon-277	mon	monstats.txt row 277	monster.skmage-pois4	monster class 277 skmage_pois4 (AI SkeletonMage)
+gen-mon-279	mon	monstats.txt row 279	monster.fetishshaman2	monster class 279 fetishshaman2 (AI FetishShaman)
+gen-mon-280	mon	monstats.txt row 280	monster.fetishshaman3	monster class 280 fetishshaman3 (AI FetishShaman)
+gen-mon-281	mon	monstats.txt row 281	monster.fetishshaman4	monster class 281 fetishshaman4 (AI FetishShaman)
+gen-mon-295	mon	monstats.txt row 295	monster.baboon6	monster class 295 baboon6 (AI Baboon)
+gen-mon-298	mon	monstats.txt row 298	monster.vilemother1	monster class 298 vilemother1 (AI VileMother)
+gen-mon-299	mon	monstats.txt row 299	monster.vilemother2	monster class 299 vilemother2 (AI VileMother)
+gen-mon-300	mon	monstats.txt row 300	monster.vilemother3	monster class 300 vilemother3 (AI VileMother)
+gen-mon-301	mon	monstats.txt row 301	monster.vilechild1	monster class 301 vilechild1 (AI VileDog)
+gen-mon-302	mon	monstats.txt row 302	monster.vilechild2	monster class 302 vilechild2 (AI VileDog)
+gen-mon-303	mon	monstats.txt row 303	monster.vilechild3	monster class 303 vilechild3 (AI VileDog)
+gen-mon-304	mon	monstats.txt row 304	monster.fingermage1	monster class 304 fingermage1 (AI FingerMage)
+gen-mon-305	mon	monstats.txt row 305	monster.fingermage2	monster class 305 fingermage2 (AI FingerMage)
+gen-mon-306	mon	monstats.txt row 306	monster.fingermage3	monster class 306 fingermage3 (AI FingerMage)
+gen-mon-307	mon	monstats.txt row 307	monster.regurgitator1	monster class 307 regurgitator1 (AI Regurgitator)
+gen-mon-308	mon	monstats.txt row 308	monster.regurgitator2	monster class 308 regurgitator2 (AI Regurgitator)
+gen-mon-309	mon	monstats.txt row 309	monster.regurgitator3	monster class 309 regurgitator3 (AI Regurgitator)
+gen-mon-310	mon	monstats.txt row 310	monster.doomknight1	monster class 310 doomknight1 (AI DoomKnight)
+gen-mon-311	mon	monstats.txt row 311	monster.doomknight2	monster class 311 doomknight2 (AI AbyssKnight)
+gen-mon-312	mon	monstats.txt row 312	monster.doomknight3	monster class 312 doomknight3 (AI OblivionKnight)
+gen-mon-360	mon	monstats.txt row 360	monster.megademon1	monster class 360 megademon1 (AI Megademon)
+gen-mon-361	mon	monstats.txt row 361	monster.megademon2	monster class 361 megademon2 (AI Megademon)
+gen-mon-362	mon	monstats.txt row 362	monster.megademon3	monster class 362 megademon3 (AI Megademon)
+gen-mon-376	mon	monstats.txt row 376	monster.slinger4	monster class 376 slinger4 (AI PantherJavelin)
+gen-mon-383	mon	monstats.txt row 383	monster.skmage-fire1	monster class 383 skmage_fire1 (AI SkeletonMage)
+gen-mon-386	mon	monstats.txt row 386	monster.skmage-fire4	monster class 386 skmage_fire4 (AI SkeletonMage)
+gen-mon-387	mon	monstats.txt row 387	monster.skmage-ltng1	monster class 387 skmage_ltng1 (AI SkeletonMage)
+gen-mon-388	mon	monstats.txt row 388	monster.skmage-ltng2	monster class 388 skmage_ltng2 (AI SkeletonMage)
+gen-mon-390	mon	monstats.txt row 390	monster.skmage-ltng4	monster class 390 skmage_ltng4 (AI SkeletonMage)
+gen-mon-391	mon	monstats.txt row 391	monster.hellbovine	monster class 391 hellbovine (AI Skeleton)
+gen-mon-395	mon	monstats.txt row 395	monster.slinger6	monster class 395 slinger6 (AI PantherJavelin)
+gen-mon-397	mon	monstats.txt row 397	monster.fetishblow2	monster class 397 fetishblow2 (AI FetishBlowgun)
+gen-mon-398	mon	monstats.txt row 398	monster.fetishblow3	monster class 398 fetishblow3 (AI FetishBlowgun)
+gen-mon-399	mon	monstats.txt row 399	monster.fetishblow4	monster class 399 fetishblow4 (AI FetishBlowgun)
+gen-mon-436	mon	monstats.txt row 436	monster.reanimatedhorde1	monster class 436 reanimatedhorde1 (AI ReanimatedHorde)
+gen-mon-437	mon	monstats.txt row 437	monster.reanimatedhorde2	monster class 437 reanimatedhorde2 (AI ReanimatedHorde)
+gen-mon-438	mon	monstats.txt row 438	monster.reanimatedhorde3	monster class 438 reanimatedhorde3 (AI ReanimatedHorde)
+gen-mon-439	mon	monstats.txt row 439	monster.reanimatedhorde4	monster class 439 reanimatedhorde4 (AI ReanimatedHorde)
+gen-mon-440	mon	monstats.txt row 440	monster.reanimatedhorde5	monster class 440 reanimatedhorde5 (AI ReanimatedHorde)
+gen-mon-441	mon	monstats.txt row 441	monster.siegebeast1	monster class 441 siegebeast1 (AI SiegeBeast)
+gen-mon-442	mon	monstats.txt row 442	monster.siegebeast2	monster class 442 siegebeast2 (AI SiegeBeast)
+gen-mon-443	mon	monstats.txt row 443	monster.siegebeast3	monster class 443 siegebeast3 (AI SiegeBeast)
+gen-mon-446	mon	monstats.txt row 446	monster.snowyeti1	monster class 446 snowyeti1 (AI Brute)
+gen-mon-447	mon	monstats.txt row 447	monster.snowyeti2	monster class 447 snowyeti2 (AI Brute)
+gen-mon-449	mon	monstats.txt row 449	monster.snowyeti4	monster class 449 snowyeti4 (AI Brute)
+gen-mon-453	mon	monstats.txt row 453	monster.minion1	monster class 453 minion1 (AI Minion)
+gen-mon-454	mon	monstats.txt row 454	monster.minion2	monster class 454 minion2 (AI Minion)
+gen-mon-455	mon	monstats.txt row 455	monster.minion3	monster class 455 minion3 (AI Minion)
+gen-mon-456	mon	monstats.txt row 456	monster.minion4	monster class 456 minion4 (AI Minion)
+gen-mon-457	mon	monstats.txt row 457	monster.minion5	monster class 457 minion5 (AI Minion)
+gen-mon-458	mon	monstats.txt row 458	monster.minion6	monster class 458 minion6 (AI Minion)
+gen-mon-459	mon	monstats.txt row 459	monster.minion7	monster class 459 minion7 (AI Minion)
+gen-mon-466	mon	monstats.txt row 466	monster.suicideminion6	monster class 466 suicideminion6 (AI SuicideMinion)
+gen-mon-469	mon	monstats.txt row 469	monster.succubus1	monster class 469 succubus1 (AI Succubus)
+gen-mon-470	mon	monstats.txt row 470	monster.succubus2	monster class 470 succubus2 (AI Succubus)
+gen-mon-471	mon	monstats.txt row 471	monster.succubus3	monster class 471 succubus3 (AI Succubus)
+gen-mon-472	mon	monstats.txt row 472	monster.succubus4	monster class 472 succubus4 (AI Succubus)
+gen-mon-473	mon	monstats.txt row 473	monster.succubus5	monster class 473 succubus5 (AI Succubus)
+gen-mon-475	mon	monstats.txt row 475	monster.succubuswitch2	monster class 475 succubuswitch2 (AI SuccubusWitch)
+gen-mon-476	mon	monstats.txt row 476	monster.succubuswitch3	monster class 476 succubuswitch3 (AI SuccubusWitch)
+gen-mon-478	mon	monstats.txt row 478	monster.succubuswitch5	monster class 478 succubuswitch5 (AI SuccubusWitch)
+gen-mon-479	mon	monstats.txt row 479	monster.overseer1	monster class 479 overseer1 (AI Overseer)
+gen-mon-480	mon	monstats.txt row 480	monster.overseer2	monster class 480 overseer2 (AI Overseer)
+gen-mon-481	mon	monstats.txt row 481	monster.overseer3	monster class 481 overseer3 (AI Overseer)
+gen-mon-482	mon	monstats.txt row 482	monster.overseer4	monster class 482 overseer4 (AI Overseer)
+gen-mon-483	mon	monstats.txt row 483	monster.overseer5	monster class 483 overseer5 (AI Overseer)
+gen-mon-492	mon	monstats.txt row 492	monster.imp1	monster class 492 imp1 (AI Imp)
+gen-mon-493	mon	monstats.txt row 493	monster.imp2	monster class 493 imp2 (AI Imp)
+gen-mon-494	mon	monstats.txt row 494	monster.imp3	monster class 494 imp3 (AI Imp)
+gen-mon-495	mon	monstats.txt row 495	monster.imp4	monster class 495 imp4 (AI Imp)
+gen-mon-496	mon	monstats.txt row 496	monster.imp5	monster class 496 imp5 (AI Imp)
+gen-mon-501	mon	monstats.txt row 501	monster.frozenhorror1	monster class 501 frozenhorror1 (AI FrozenHorror)
+gen-mon-502	mon	monstats.txt row 502	monster.frozenhorror2	monster class 502 frozenhorror2 (AI FrozenHorror)
+gen-mon-503	mon	monstats.txt row 503	monster.frozenhorror3	monster class 503 frozenhorror3 (AI FrozenHorror)
+gen-mon-506	mon	monstats.txt row 506	monster.bloodlord1	monster class 506 bloodlord1 (AI BloodLord)
+gen-mon-507	mon	monstats.txt row 507	monster.bloodlord2	monster class 507 bloodlord2 (AI BloodLord)
+gen-mon-508	mon	monstats.txt row 508	monster.bloodlord3	monster class 508 bloodlord3 (AI BloodLord)
+gen-mon-509	mon	monstats.txt row 509	monster.bloodlord4	monster class 509 bloodlord4 (AI BloodLord)
+gen-mon-510	mon	monstats.txt row 510	monster.bloodlord5	monster class 510 bloodlord5 (AI BloodLord)
+gen-mon-529	mon	monstats.txt row 529	monster.deathmauler1	monster class 529 deathmauler1 (AI DeathMauler)
+gen-mon-530	mon	monstats.txt row 530	monster.deathmauler2	monster class 530 deathmauler2 (AI DeathMauler)
+gen-mon-531	mon	monstats.txt row 531	monster.deathmauler3	monster class 531 deathmauler3 (AI DeathMauler)
+gen-mon-532	mon	monstats.txt row 532	monster.deathmauler4	monster class 532 deathmauler4 (AI DeathMauler)
+gen-mon-533	mon	monstats.txt row 533	monster.deathmauler5	monster class 533 deathmauler5 (AI DeathMauler)
+gen-mon-540	mon	monstats.txt row 540	monster.ancientbarb1	monster class 540 ancientbarb1 (AI Ancient)
+gen-mon-541	mon	monstats.txt row 541	monster.ancientbarb2	monster class 541 ancientbarb2 (AI Ancient)
+gen-mon-542	mon	monstats.txt row 542	monster.ancientbarb3	monster class 542 ancientbarb3 (AI Ancient)
+gen-mon-545	mon	monstats.txt row 545	monster.baaltaunt	monster class 545 baaltaunt (AI BaalTaunt)
+gen-mon-546	mon	monstats.txt row 546	monster.putriddefiler1	monster class 546 putriddefiler1 (AI PutridDefiler)
+gen-mon-547	mon	monstats.txt row 547	monster.putriddefiler2	monster class 547 putriddefiler2 (AI PutridDefiler)
+gen-mon-548	mon	monstats.txt row 548	monster.putriddefiler3	monster class 548 putriddefiler3 (AI PutridDefiler)
+gen-mon-549	mon	monstats.txt row 549	monster.putriddefiler4	monster class 549 putriddefiler4 (AI PutridDefiler)
+gen-mon-575	mon	monstats.txt row 575	monster.sk-archer6	monster class 575 sk_archer6 (AI SkeletonBow)
+gen-mon-576	mon	monstats.txt row 576	monster.sk-archer7	monster class 576 sk_archer7 (AI SkeletonBow)
+gen-mon-578	mon	monstats.txt row 578	monster.sk-archer9	monster class 578 sk_archer9 (AI SkeletonBow)
+gen-mon-579	mon	monstats.txt row 579	monster.sk-archer10	monster class 579 sk_archer10 (AI SkeletonBow)
+gen-mon-580	mon	monstats.txt row 580	monster.bighead6	monster class 580 bighead6 (AI Bighead)
+gen-mon-586	mon	monstats.txt row 586	monster.goatman7	monster class 586 goatman7 (AI Goatman)
+gen-mon-587	mon	monstats.txt row 587	monster.goatman8	monster class 587 goatman8 (AI Goatman)
+gen-mon-588	mon	monstats.txt row 588	monster.goatman9	monster class 588 goatman9 (AI Goatman)
+gen-mon-589	mon	monstats.txt row 589	monster.goatman10	monster class 589 goatman10 (AI Goatman)
+gen-mon-590	mon	monstats.txt row 590	monster.foulcrow5	monster class 590 foulcrow5 (AI BloodHawk)
+gen-mon-594	mon	monstats.txt row 594	monster.clawviper6	monster class 594 clawviper6 (AI ClawViperEx)
+gen-mon-595	mon	monstats.txt row 595	monster.clawviper7	monster class 595 clawviper7 (AI ClawViperEx)
+gen-mon-596	mon	monstats.txt row 596	monster.clawviper8	monster class 596 clawviper8 (AI ClawViperEx)
+gen-mon-597	mon	monstats.txt row 597	monster.clawviper9	monster class 597 clawviper9 (AI ClawViperEx)
+gen-mon-598	mon	monstats.txt row 598	monster.clawviper10	monster class 598 clawviper10 (AI ClawViperEx)
+gen-mon-600	mon	monstats.txt row 600	monster.sandraider7	monster class 600 sandraider7 (AI SandRaider)
+gen-mon-602	mon	monstats.txt row 602	monster.sandraider9	monster class 602 sandraider9 (AI SandRaider)
+gen-mon-603	mon	monstats.txt row 603	monster.sandraider10	monster class 603 sandraider10 (AI SandRaider)
+gen-mon-605	mon	monstats.txt row 605	monster.quillrat6	monster class 605 quillrat6 (AI QuillRat)
+gen-mon-606	mon	monstats.txt row 606	monster.quillrat7	monster class 606 quillrat7 (AI QuillRat)
+gen-mon-607	mon	monstats.txt row 607	monster.quillrat8	monster class 607 quillrat8 (AI QuillRat)
+gen-mon-608	mon	monstats.txt row 608	monster.vulture5	monster class 608 vulture5 (AI Vulture)
+gen-mon-609	mon	monstats.txt row 609	monster.thornhulk5	monster class 609 thornhulk5 (AI ThornHulk)
+gen-mon-610	mon	monstats.txt row 610	monster.slinger7	monster class 610 slinger7 (AI PantherJavelin)
+gen-mon-611	mon	monstats.txt row 611	monster.slinger8	monster class 611 slinger8 (AI PantherJavelin)
+gen-mon-612	mon	monstats.txt row 612	monster.slinger9	monster class 612 slinger9 (AI PantherJavelin)
+gen-mon-613	mon	monstats.txt row 613	monster.cr-archer6	monster class 613 cr_archer6 (AI CorruptArcher)
+gen-mon-614	mon	monstats.txt row 614	monster.cr-archer7	monster class 614 cr_archer7 (AI CorruptArcher)
+gen-mon-615	mon	monstats.txt row 615	monster.cr-lancer6	monster class 615 cr_lancer6 (AI CorruptLancer)
+gen-mon-616	mon	monstats.txt row 616	monster.cr-lancer7	monster class 616 cr_lancer7 (AI CorruptLancer)
+gen-mon-618	mon	monstats.txt row 618	monster.blunderbore5	monster class 618 blunderbore5 (AI PinHead)
+gen-mon-619	mon	monstats.txt row 619	monster.blunderbore6	monster class 619 blunderbore6 (AI PinHead)
+gen-mon-620	mon	monstats.txt row 620	monster.skmage-fire5	monster class 620 skmage_fire5 (AI SkeletonMage)
+gen-mon-621	mon	monstats.txt row 621	monster.skmage-fire6	monster class 621 skmage_fire6 (AI SkeletonMage)
+gen-mon-622	mon	monstats.txt row 622	monster.skmage-ltng5	monster class 622 skmage_ltng5 (AI SkeletonMage)
+gen-mon-623	mon	monstats.txt row 623	monster.skmage-ltng6	monster class 623 skmage_ltng6 (AI SkeletonMage)
+gen-mon-624	mon	monstats.txt row 624	monster.skmage-cold5	monster class 624 skmage_cold5 (AI SkeletonMage)
+gen-mon-625	mon	monstats.txt row 625	monster.skmage-pois5	monster class 625 skmage_pois5 (AI SkeletonMage)
+gen-mon-626	mon	monstats.txt row 626	monster.skmage-pois6	monster class 626 skmage_pois6 (AI SkeletonMage)
+gen-mon-628	mon	monstats.txt row 628	monster.pantherwoman6	monster class 628 pantherwoman6 (AI PantherWoman)
+gen-mon-629	mon	monstats.txt row 629	monster.sandleaper6	monster class 629 sandleaper6 (AI SandLeaper)
+gen-mon-630	mon	monstats.txt row 630	monster.sandleaper7	monster class 630 sandleaper7 (AI SandLeaper)
+gen-mon-631	mon	monstats.txt row 631	monster.wraith6	monster class 631 wraith6 (AI Wraith)
+gen-mon-632	mon	monstats.txt row 632	monster.wraith7	monster class 632 wraith7 (AI Wraith)
+gen-mon-633	mon	monstats.txt row 633	monster.wraith8	monster class 633 wraith8 (AI Wraith)
+gen-mon-634	mon	monstats.txt row 634	monster.succubus6	monster class 634 succubus6 (AI Succubus)
+gen-mon-635	mon	monstats.txt row 635	monster.succubus7	monster class 635 succubus7 (AI Succubus)
+gen-mon-636	mon	monstats.txt row 636	monster.succubuswitch6	monster class 636 succubuswitch6 (AI SuccubusWitch)
+gen-mon-637	mon	monstats.txt row 637	monster.succubuswitch7	monster class 637 succubuswitch7 (AI SuccubusWitch)
+gen-mon-638	mon	monstats.txt row 638	monster.succubuswitch8	monster class 638 succubuswitch8 (AI SuccubusWitch)
+gen-mon-639	mon	monstats.txt row 639	monster.willowisp5	monster class 639 willowisp5 (AI WillOWisp)
+gen-mon-640	mon	monstats.txt row 640	monster.willowisp6	monster class 640 willowisp6 (AI WillOWisp)
+gen-mon-641	mon	monstats.txt row 641	monster.willowisp7	monster class 641 willowisp7 (AI WillOWisp)
+gen-mon-642	mon	monstats.txt row 642	monster.fallen6	monster class 642 fallen6 (AI Fallen)
+gen-mon-643	mon	monstats.txt row 643	monster.fallen7	monster class 643 fallen7 (AI Fallen)
+gen-mon-644	mon	monstats.txt row 644	monster.fallen8	monster class 644 fallen8 (AI Fallen)
+gen-mon-645	mon	monstats.txt row 645	monster.fallenshaman6	monster class 645 fallenshaman6 (AI FallenShaman)
+gen-mon-646	mon	monstats.txt row 646	monster.fallenshaman7	monster class 646 fallenshaman7 (AI FallenShaman)
+gen-mon-647	mon	monstats.txt row 647	monster.fallenshaman8	monster class 647 fallenshaman8 (AI FallenShaman)
+gen-mon-648	mon	monstats.txt row 648	monster.skeleton6	monster class 648 skeleton6 (AI Skeleton)
+gen-mon-649	mon	monstats.txt row 649	monster.skeleton7	monster class 649 skeleton7 (AI Skeleton)
+gen-mon-650	mon	monstats.txt row 650	monster.batdemon6	monster class 650 batdemon6 (AI BatDemon)
+gen-mon-651	mon	monstats.txt row 651	monster.batdemon7	monster class 651 batdemon7 (AI BatDemon)
+gen-mon-652	mon	monstats.txt row 652	monster.bloodlord6	monster class 652 bloodlord6 (AI BloodLord)
+gen-mon-653	mon	monstats.txt row 653	monster.bloodlord7	monster class 653 bloodlord7 (AI BloodLord)
+gen-mon-654	mon	monstats.txt row 654	monster.scarab6	monster class 654 scarab6 (AI Scarab)
+gen-mon-655	mon	monstats.txt row 655	monster.scarab7	monster class 655 scarab7 (AI Scarab)
+gen-mon-656	mon	monstats.txt row 656	monster.fetish6	monster class 656 fetish6 (AI Fetish)
+gen-mon-658	mon	monstats.txt row 658	monster.fetish8	monster class 658 fetish8 (AI Fetish)
+gen-mon-659	mon	monstats.txt row 659	monster.fetishblow6	monster class 659 fetishblow6 (AI FetishBlowgun)
+gen-mon-660	mon	monstats.txt row 660	monster.fetishblow7	monster class 660 fetishblow7 (AI FetishBlowgun)
+gen-mon-661	mon	monstats.txt row 661	monster.fetishblow8	monster class 661 fetishblow8 (AI FetishBlowgun)
+gen-mon-662	mon	monstats.txt row 662	monster.fetishshaman6	monster class 662 fetishshaman6 (AI FetishShaman)
+gen-mon-664	mon	monstats.txt row 664	monster.fetishshaman8	monster class 664 fetishshaman8 (AI FetishShaman)
+gen-mon-665	mon	monstats.txt row 665	monster.baboon7	monster class 665 baboon7 (AI Baboon)
+gen-mon-666	mon	monstats.txt row 666	monster.baboon8	monster class 666 baboon8 (AI Baboon)
+gen-mon-667	mon	monstats.txt row 667	monster.unraveler6	monster class 667 unraveler6 (AI GreaterMummy)
+gen-mon-668	mon	monstats.txt row 668	monster.unraveler7	monster class 668 unraveler7 (AI GreaterMummy)
+gen-mon-669	mon	monstats.txt row 669	monster.unraveler8	monster class 669 unraveler8 (AI GreaterMummy)
+gen-mon-670	mon	monstats.txt row 670	monster.unraveler9	monster class 670 unraveler9 (AI GreaterMummy)
+gen-mon-671	mon	monstats.txt row 671	monster.zealot4	monster class 671 zealot4 (AI ZakarumZealot)
+gen-mon-672	mon	monstats.txt row 672	monster.zealot5	monster class 672 zealot5 (AI ZakarumZealot)
+gen-mon-673	mon	monstats.txt row 673	monster.cantor5	monster class 673 cantor5 (AI ZakarumPriest)
+gen-mon-674	mon	monstats.txt row 674	monster.cantor6	monster class 674 cantor6 (AI ZakarumPriest)
+gen-mon-675	mon	monstats.txt row 675	monster.vilemother4	monster class 675 vilemother4 (AI VileMother)
+gen-mon-676	mon	monstats.txt row 676	monster.vilemother5	monster class 676 vilemother5 (AI VileMother)
+gen-mon-677	mon	monstats.txt row 677	monster.vilechild4	monster class 677 vilechild4 (AI VileDog)
+gen-mon-678	mon	monstats.txt row 678	monster.vilechild5	monster class 678 vilechild5 (AI VileDog)
+gen-mon-679	mon	monstats.txt row 679	monster.sandmaggot6	monster class 679 sandmaggot6 (AI SandMaggot)
+gen-mon-680	mon	monstats.txt row 680	monster.maggotbaby6	monster class 680 maggotbaby6 (AI MaggotLarva)
+gen-mon-681	mon	monstats.txt row 681	monster.maggotegg6	monster class 681 maggotegg6 (AI MaggotEgg)
+gen-mon-682	mon	monstats.txt row 682	monster.minion9	monster class 682 minion9 (AI Minion)
+gen-mon-683	mon	monstats.txt row 683	monster.minion10	monster class 683 minion10 (AI Minion)
+gen-mon-684	mon	monstats.txt row 684	monster.minion11	monster class 684 minion11 (AI Minion)
+gen-mon-685	mon	monstats.txt row 685	monster.arach6	monster class 685 arach6 (AI Arach)
+gen-mon-686	mon	monstats.txt row 686	monster.megademon4	monster class 686 megademon4 (AI Megademon)
+gen-mon-687	mon	monstats.txt row 687	monster.megademon5	monster class 687 megademon5 (AI Megademon)
+gen-mon-688	mon	monstats.txt row 688	monster.imp6	monster class 688 imp6 (AI Imp)
+gen-mon-689	mon	monstats.txt row 689	monster.imp7	monster class 689 imp7 (AI Imp)
+gen-mon-690	mon	monstats.txt row 690	monster.bonefetish6	monster class 690 bonefetish6 (AI Fetish)
+gen-mon-691	mon	monstats.txt row 691	monster.bonefetish7	monster class 691 bonefetish7 (AI Fetish)
+gen-mon-692	mon	monstats.txt row 692	monster.fingermage4	monster class 692 fingermage4 (AI FingerMage)
+gen-mon-693	mon	monstats.txt row 693	monster.fingermage5	monster class 693 fingermage5 (AI FingerMage)
+gen-mon-694	mon	monstats.txt row 694	monster.regurgitator4	monster class 694 regurgitator4 (AI Regurgitator)
+gen-mon-695	mon	monstats.txt row 695	monster.vampire6	monster class 695 vampire6 (AI Vampire)
+gen-mon-696	mon	monstats.txt row 696	monster.vampire7	monster class 696 vampire7 (AI Vampire)
+gen-mon-697	mon	monstats.txt row 697	monster.vampire8	monster class 697 vampire8 (AI Vampire)
+gen-mon-698	mon	monstats.txt row 698	monster.reanimatedhorde6	monster class 698 reanimatedhorde6 (AI ReanimatedHorde)
+gen-mon-699	mon	monstats.txt row 699	monster.dkfig1	monster class 699 dkfig1 (AI DoomKnight)
+gen-mon-700	mon	monstats.txt row 700	monster.dkfig2	monster class 700 dkfig2 (AI DoomKnight)
+gen-mon-701	mon	monstats.txt row 701	monster.dkmag1	monster class 701 dkmag1 (AI OblivionKnight)
+gen-mon-702	mon	monstats.txt row 702	monster.dkmag2	monster class 702 dkmag2 (AI OblivionKnight)
+gen-mon-703	mon	monstats.txt row 703	monster.mummy6	monster class 703 mummy6 (AI Mummy)
+gen-mon-712	mon	monstats.txt row 712	monster.megademon6	monster class 712 megademon6 (AI Megademon)
+gen-mon-713	mon	monstats.txt row 713	monster.dkmag3	monster class 713 dkmag3 (AI OblivionKnight)
+gen-mon-714	mon	monstats.txt row 714	monster.imp8	monster class 714 imp8 (AI Imp)
+gen-mon-715	mon	monstats.txt row 715	monster.swarm5	monster class 715 swarm5 (AI Swarm)
+gen-mon-716	mon	monstats.txt row 716	monster.sandmaggot7	monster class 716 sandmaggot7 (AI SandMaggot)
+gen-mon-717	mon	monstats.txt row 717	monster.arach7	monster class 717 arach7 (AI Arach)
+gen-mon-718	mon	monstats.txt row 718	monster.scarab8	monster class 718 scarab8 (AI Scarab)
+gen-mon-719	mon	monstats.txt row 719	monster.succubus8	monster class 719 succubus8 (AI Succubus)
+gen-mon-720	mon	monstats.txt row 720	monster.succubuswitch9	monster class 720 succubuswitch9 (AI SuccubusWitch)
+gen-mon-721	mon	monstats.txt row 721	monster.corruptrogue6	monster class 721 corruptrogue6 (AI CorruptRogue)
+gen-mon-722	mon	monstats.txt row 722	monster.cr-archer8	monster class 722 cr_archer8 (AI CorruptArcher)
+gen-mon-723	mon	monstats.txt row 723	monster.cr-lancer8	monster class 723 cr_lancer8 (AI CorruptLancer)
+gen-mon-724	mon	monstats.txt row 724	monster.overseer6	monster class 724 overseer6 (AI Overseer)
+gen-obj-0	obj	objects.txt Id 0	-	object Dummy (0) created and operated
+gen-obj-1	obj	objects.txt Id 1	object.1-casket	object Casket (1) created and operated
+gen-obj-2	obj	objects.txt Id 2	object.2-shrine	object Shrine (2) created and operated
+gen-obj-3	obj	objects.txt Id 3	object.3-casket	object Casket (3) created and operated
+gen-obj-4	obj	objects.txt Id 4	object.4-largeurn	object LargeUrn (4) created and operated
+gen-obj-5	obj	objects.txt Id 5	object.5-chest	object chest (5) created and operated
+gen-obj-6	obj	objects.txt Id 6	object.6-chest	object chest (6) created and operated
+gen-obj-7	obj	objects.txt Id 7	object.7-barrel	object Barrel (7) created and operated
+gen-obj-8	obj	objects.txt Id 8	object.8-towertome	object TowerTome (8) created and operated
+gen-obj-9	obj	objects.txt Id 9	object.9-urn	object Urn (9) created and operated
+gen-obj-10	obj	objects.txt Id 10	-	object Dummy (10) created and operated
+gen-obj-11	obj	objects.txt Id 11	object.11-barrel	object Barrel (11) created and operated
+gen-obj-12	obj	objects.txt Id 12	-	object Dummy (12) created and operated
+gen-obj-13	obj	objects.txt Id 13	object.13-door	object Door (13) created and operated
+gen-obj-14	obj	objects.txt Id 14	object.14-door	object Door (14) created and operated
+gen-obj-15	obj	objects.txt Id 15	object.15-door	object Door (15) created and operated
+gen-obj-16	obj	objects.txt Id 16	object.16-door	object Door (16) created and operated
+gen-obj-17	obj	objects.txt Id 17	object.17-stonealpha	object StoneAlpha (17) created and operated
+gen-obj-18	obj	objects.txt Id 18	object.18-stonebeta	object StoneBeta (18) created and operated
+gen-obj-19	obj	objects.txt Id 19	object.19-stonegamma	object StoneGamma (19) created and operated
+gen-obj-20	obj	objects.txt Id 20	object.20-stonedelta	object StoneDelta (20) created and operated
+gen-obj-21	obj	objects.txt Id 21	object.21-stonelambda	object StoneLambda (21) created and operated
+gen-obj-22	obj	objects.txt Id 22	-	object StoneTheta (22) created and operated
+gen-obj-23	obj	objects.txt Id 23	object.23-door	object Door (23) created and operated
+gen-obj-24	obj	objects.txt Id 24	object.24-door	object Door (24) created and operated
+gen-obj-25	obj	objects.txt Id 25	object.25-door	object Door (25) created and operated
+gen-obj-26	obj	objects.txt Id 26	object.26-gibbet	object Gibbet (26) created and operated
+gen-obj-27	obj	objects.txt Id 27	object.27-door	object Door (27) created and operated
+gen-obj-28	obj	objects.txt Id 28	object.28-holeanim	object HoleAnim (28) created and operated
+gen-obj-29	obj	objects.txt Id 29	object.29-dummy	object Dummy (29) created and operated
+gen-obj-30	obj	objects.txt Id 30	object.30-inifuss	object Inifuss (30) created and operated
+gen-obj-31	obj	objects.txt Id 31	-	object Dummy (31) created and operated
+gen-obj-32	obj	objects.txt Id 32	-	object Dummy (32) created and operated
+gen-obj-33	obj	objects.txt Id 33	-	object Dummy (33) created and operated
+gen-obj-34	obj	objects.txt Id 34	-	object Dummy (34) created and operated
+gen-obj-35	obj	objects.txt Id 35	-	object Dummy (35) created and operated
+gen-obj-36	obj	objects.txt Id 36	-	object Dummy (36) created and operated
+gen-obj-37	obj	objects.txt Id 37	object.37-dummy	object Dummy (37) created and operated
+gen-obj-38	obj	objects.txt Id 38	object.38-dummy	object Dummy (38) created and operated
+gen-obj-39	obj	objects.txt Id 39	-	object fire (39) created and operated
+gen-obj-40	obj	objects.txt Id 40	-	object Dummy (40) created and operated
+gen-obj-41	obj	objects.txt Id 41	-	object Dummy (41) created and operated
+gen-obj-42	obj	objects.txt Id 42	-	object Dummy (42) created and operated
+gen-obj-43	obj	objects.txt Id 43	-	object Dummy (43) created and operated
+gen-obj-44	obj	objects.txt Id 44	-	object Dummy (44) created and operated
+gen-obj-45	obj	objects.txt Id 45	-	object AmbientSound (45) created and operated
+gen-obj-46	obj	objects.txt Id 46	object.46-crate	object Crate (46) created and operated
+gen-obj-47	obj	objects.txt Id 47	object.47-door	object Door (47) created and operated
+gen-obj-48	obj	objects.txt Id 48	-	object Dummy (48) created and operated
+gen-obj-49	obj	objects.txt Id 49	-	object Dummy (49) created and operated
+gen-obj-50	obj	objects.txt Id 50	object.50-casket	object Casket (50) created and operated
+gen-obj-51	obj	objects.txt Id 51	object.51-casket	object Casket (51) created and operated
+gen-obj-52	obj	objects.txt Id 52	object.52-urn	object Urn (52) created and operated
+gen-obj-53	obj	objects.txt Id 53	object.53-casket	object Casket (53) created and operated
+gen-obj-54	obj	objects.txt Id 54	object.54-roguecorpse	object RogueCorpse (54) created and operated
+gen-obj-55	obj	objects.txt Id 55	object.55-roguecorpse	object RogueCorpse (55) created and operated
+gen-obj-56	obj	objects.txt Id 56	object.56-roguecorpse	object RogueCorpse (56) created and operated
+gen-obj-57	obj	objects.txt Id 57	object.57-corpseonstick	object CorpseOnStick (57) created and operated
+gen-obj-58	obj	objects.txt Id 58	object.58-corpseonstick	object CorpseOnStick (58) created and operated
+gen-obj-59	obj	objects.txt Id 59	object.59-portal	object Portal (59) created and operated
+gen-obj-60	obj	objects.txt Id 60	object.60-portal	object Portal (60) created and operated
+gen-obj-61	obj	objects.txt Id 61	-	object Dummy (61) created and operated
+gen-obj-62	obj	objects.txt Id 62	object.62-door	object Door (62) created and operated
+gen-obj-63	obj	objects.txt Id 63	object.63-door	object Door (63) created and operated
+gen-obj-64	obj	objects.txt Id 64	object.64-door	object Door (64) created and operated
+gen-obj-65	obj	objects.txt Id 65	-	object Dummy (65) created and operated
+gen-obj-66	obj	objects.txt Id 66	-	object Dummy (66) created and operated
+gen-obj-67	obj	objects.txt Id 67	-	object Dummy (67) created and operated
+gen-obj-68	obj	objects.txt Id 68	-	object Dummy (68) created and operated
+gen-obj-69	obj	objects.txt Id 69	-	object Dummy (69) created and operated
+gen-obj-70	obj	objects.txt Id 70	-	object Dummy (70) created and operated
+gen-obj-71	obj	objects.txt Id 71	-	object Dummy (71) created and operated
+gen-obj-72	obj	objects.txt Id 72	-	object Dummy (72) created and operated
+gen-obj-73	obj	objects.txt Id 73	-	object Dummy (73) created and operated
+gen-obj-74	obj	objects.txt Id 74	object.74-trappdoor	object TrappDoor (74) created and operated
+gen-obj-75	obj	objects.txt Id 75	object.75-door	object Door (75) created and operated
+gen-obj-76	obj	objects.txt Id 76	-	object Dummy (76) created and operated
+gen-obj-77	obj	objects.txt Id 77	object.77-shrine	object Shrine (77) created and operated
+gen-obj-78	obj	objects.txt Id 78	-	object Dummy (78) created and operated
+gen-obj-79	obj	objects.txt Id 79	object.79-casket	object Casket (79) created and operated
+gen-obj-80	obj	objects.txt Id 80	object.80-obelisk	object Obelisk (80) created and operated
+gen-obj-81	obj	objects.txt Id 81	object.81-shrine	object Shrine (81) created and operated
+gen-obj-82	obj	objects.txt Id 82	-	object Dummy (82) created and operated
+gen-obj-83	obj	objects.txt Id 83	object.83-shrine	object Shrine (83) created and operated
+gen-obj-84	obj	objects.txt Id 84	object.84-shrine	object Shrine (84) created and operated
+gen-obj-85	obj	objects.txt Id 85	object.85-shrine	object Shrine (85) created and operated
+gen-obj-86	obj	objects.txt Id 86	object.86-dummy	object Dummy (86) created and operated
+gen-obj-87	obj	objects.txt Id 87	object.87-chest3	object Chest3 (87) created and operated
+gen-obj-88	obj	objects.txt Id 88	object.88-chest3	object Chest3 (88) created and operated
+gen-obj-89	obj	objects.txt Id 89	object.89-sarcophagus	object Sarcophagus (89) created and operated
+gen-obj-90	obj	objects.txt Id 90	object.90-obelisk	object Obelisk (90) created and operated
+gen-obj-91	obj	objects.txt Id 91	object.91-door	object Door (91) created and operated
+gen-obj-92	obj	objects.txt Id 92	object.92-door	object Door (92) created and operated
+gen-obj-93	obj	objects.txt Id 93	object.93-shrine	object Shrine (93) created and operated
+gen-obj-94	obj	objects.txt Id 94	object.94-largeurn	object LargeUrn (94) created and operated
+gen-obj-95	obj	objects.txt Id 95	object.95-largeurn	object LargeUrn (95) created and operated
+gen-obj-96	obj	objects.txt Id 96	object.96-shrine	object Shrine (96) created and operated
+gen-obj-97	obj	objects.txt Id 97	object.97-shrine	object Shrine (97) created and operated
+gen-obj-98	obj	objects.txt Id 98	object.98-door	object Door (98) created and operated
+gen-obj-99	obj	objects.txt Id 99	object.99-door	object Door (99) created and operated
+gen-obj-100	obj	objects.txt Id 100	object.100-duriel-s-lair	object Duriel's Lair (100) created and operated
+gen-obj-101	obj	objects.txt Id 101	object.101-dummy	object Dummy (101) created and operated
+gen-obj-102	obj	objects.txt Id 102	object.102-dummy	object Dummy (102) created and operated
+gen-obj-103	obj	objects.txt Id 103	-	object Dummy (103) created and operated
+gen-obj-104	obj	objects.txt Id 104	object.104-armorstand	object ArmorStand (104) created and operated
+gen-obj-105	obj	objects.txt Id 105	object.105-armorstand	object ArmorStand (105) created and operated
+gen-obj-106	obj	objects.txt Id 106	object.106-weaponrack	object WeaponRack (106) created and operated
+gen-obj-107	obj	objects.txt Id 107	object.107-weaponrack	object WeaponRack (107) created and operated
+gen-obj-108	obj	objects.txt Id 108	object.108-malus	object Malus (108) created and operated
+gen-obj-109	obj	objects.txt Id 109	object.109-shrine	object Shrine (109) created and operated
+gen-obj-110	obj	objects.txt Id 110	-	object not used (110) created and operated
+gen-obj-111	obj	objects.txt Id 111	object.111-well	object well (111) created and operated
+gen-obj-112	obj	objects.txt Id 112	-	object not used (112) created and operated
+gen-obj-113	obj	objects.txt Id 113	object.113-well	object well (113) created and operated
+gen-obj-114	obj	objects.txt Id 114	-	object not used (114) created and operated
+gen-obj-115	obj	objects.txt Id 115	object.115-well	object well (115) created and operated
+gen-obj-116	obj	objects.txt Id 116	object.116-shrine	object Shrine (116) created and operated
+gen-obj-117	obj	objects.txt Id 117	object.117-dummy	object Dummy (117) created and operated
+gen-obj-118	obj	objects.txt Id 118	object.118-well	object Well (118) created and operated
+gen-obj-119	obj	objects.txt Id 119	object.119-waypoint	object Waypoint (119) created and operated
+gen-obj-120	obj	objects.txt Id 120	object.120-dummy	object Dummy (120) created and operated
+gen-obj-121	obj	objects.txt Id 121	-	object jerhyn (121) created and operated
+gen-obj-122	obj	objects.txt Id 122	-	object jerhyn (122) created and operated
+gen-obj-123	obj	objects.txt Id 123	object.123-shrine	object Shrine (123) created and operated
+gen-obj-124	obj	objects.txt Id 124	object.124-shrine	object Shrine (124) created and operated
+gen-obj-125	obj	objects.txt Id 125	object.125-hidden-stash	object hidden stash (125) created and operated
+gen-obj-126	obj	objects.txt Id 126	object.126-skull-pile	object skull pile (126) created and operated
+gen-obj-127	obj	objects.txt Id 127	object.127-hidden-stash	object hidden stash (127) created and operated
+gen-obj-128	obj	objects.txt Id 128	object.128-hidden-stash	object hidden stash (128) created and operated
+gen-obj-129	obj	objects.txt Id 129	object.129-door	object Door (129) created and operated
+gen-obj-130	obj	objects.txt Id 130	object.130-well	object Well (130) created and operated
+gen-obj-131	obj	objects.txt Id 131	-	object Dummy (131) created and operated
+gen-obj-132	obj	objects.txt Id 132	object.132-well	object Well (132) created and operated
+gen-obj-133	obj	objects.txt Id 133	object.133-shrine	object shrine (133) created and operated
+gen-obj-134	obj	objects.txt Id 134	object.134-shrine	object shrine (134) created and operated
+gen-obj-135	obj	objects.txt Id 135	object.135-shrine	object shrine (135) created and operated
+gen-obj-136	obj	objects.txt Id 136	object.136-shrine	object shrine (136) created and operated
+gen-obj-137	obj	objects.txt Id 137	object.137-well	object Well (137) created and operated
+gen-obj-138	obj	objects.txt Id 138	object.138-well	object Well (138) created and operated
+gen-obj-139	obj	objects.txt Id 139	object.139-chest	object chest (139) created and operated
+gen-obj-140	obj	objects.txt Id 140	object.140-chest	object chest (140) created and operated
+gen-obj-141	obj	objects.txt Id 141	object.141-chest	object chest (141) created and operated
+gen-obj-142	obj	objects.txt Id 142	object.142-jug	object jug (142) created and operated
+gen-obj-143	obj	objects.txt Id 143	object.143-jug	object jug (143) created and operated
+gen-obj-144	obj	objects.txt Id 144	object.144-chest	object chest (144) created and operated
+gen-obj-145	obj	objects.txt Id 145	object.145-waypoint	object Waypoint (145) created and operated
+gen-obj-146	obj	objects.txt Id 146	object.146-chest	object chest (146) created and operated
+gen-obj-147	obj	objects.txt Id 147	object.147-chest	object chest (147) created and operated
+gen-obj-148	obj	objects.txt Id 148	object.148-chest	object chest (148) created and operated
+gen-obj-149	obj	objects.txt Id 149	object.149-taintedsunaltar	object taintedsunaltar (149) created and operated
+gen-obj-150	obj	objects.txt Id 150	object.150-shrine	object shrine (150) created and operated
+gen-obj-151	obj	objects.txt Id 151	object.151-shrine	object shrine (151) created and operated
+gen-obj-152	obj	objects.txt Id 152	object.152-orifice	object orifice (152) created and operated
+gen-obj-153	obj	objects.txt Id 153	-	object Door (153) created and operated
+gen-obj-154	obj	objects.txt Id 154	object.154-corpse	object corpse (154) created and operated
+gen-obj-155	obj	objects.txt Id 155	object.155-hidden-stash	object hidden stash (155) created and operated
+gen-obj-156	obj	objects.txt Id 156	object.156-waypoint	object Waypoint (156) created and operated
+gen-obj-157	obj	objects.txt Id 157	object.157-waypoint	object Waypoint (157) created and operated
+gen-obj-158	obj	objects.txt Id 158	object.158-skeleton	object skeleton (158) created and operated
+gen-obj-159	obj	objects.txt Id 159	object.159-hidden-stash	object hidden stash (159) created and operated
+gen-obj-160	obj	objects.txt Id 160	object.160-fire	object fire (160) created and operated
+gen-obj-161	obj	objects.txt Id 161	object.161-fire	object fire (161) created and operated
+gen-obj-162	obj	objects.txt Id 162	object.162-fire	object fire (162) created and operated
+gen-obj-163	obj	objects.txt Id 163	object.163-hiding-spot	object hiding spot (163) created and operated
+gen-obj-164	obj	objects.txt Id 164	object.164-shrine	object Shrine (164) created and operated
+gen-obj-165	obj	objects.txt Id 165	object.165-shrine	object Shrine (165) created and operated
+gen-obj-166	obj	objects.txt Id 166	object.166-shrine	object Shrine (166) created and operated
+gen-obj-167	obj	objects.txt Id 167	object.167-shrine	object Shrine (167) created and operated
+gen-obj-168	obj	objects.txt Id 168	object.168-shrine	object Shrine (168) created and operated
+gen-obj-169	obj	objects.txt Id 169	object.169-hollow-log	object hollow log (169) created and operated
+gen-obj-170	obj	objects.txt Id 170	object.170-shrine	object Shrine (170) created and operated
+gen-obj-171	obj	objects.txt Id 171	object.171-skeleton	object skeleton (171) created and operated
+gen-obj-172	obj	objects.txt Id 172	object.172-shrine	object Shrine (172) created and operated
+gen-obj-173	obj	objects.txt Id 173	object.173-shrine	object Shrine (173) created and operated
+gen-obj-174	obj	objects.txt Id 174	object.174-loose-rock	object loose rock (174) created and operated
+gen-obj-175	obj	objects.txt Id 175	object.175-loose-boulder	object loose boulder (175) created and operated
+gen-obj-176	obj	objects.txt Id 176	object.176-chest	object chest (176) created and operated
+gen-obj-177	obj	objects.txt Id 177	object.177-chest	object chest (177) created and operated
+gen-obj-178	obj	objects.txt Id 178	object.178-guardcorpse	object GuardCorpse (178) created and operated
+gen-obj-179	obj	objects.txt Id 179	object.179-bookshelf	object bookshelf (179) created and operated
+gen-obj-180	obj	objects.txt Id 180	object.180-bookshelf	object bookshelf (180) created and operated
+gen-obj-181	obj	objects.txt Id 181	object.181-chest	object chest (181) created and operated
+gen-obj-182	obj	objects.txt Id 182	object.182-coffin	object coffin (182) created and operated
+gen-obj-183	obj	objects.txt Id 183	object.183-chest	object chest (183) created and operated
+gen-obj-184	obj	objects.txt Id 184	object.184-shrine	object Shrine (184) created and operated
+gen-obj-185	obj	objects.txt Id 185	object.185-stash	object stash (185) created and operated
+gen-obj-186	obj	objects.txt Id 186	object.186-stash	object stash (186) created and operated
+gen-obj-187	obj	objects.txt Id 187	object.187-stash	object stash (187) created and operated
+gen-obj-188	obj	objects.txt Id 188	object.188-stash	object stash (188) created and operated
+gen-obj-189	obj	objects.txt Id 189	-	object Dummy (189) created and operated
+gen-obj-190	obj	objects.txt Id 190	object.190-shrine	object Shrine (190) created and operated
+gen-obj-191	obj	objects.txt Id 191	object.191-shrine	object Shrine (191) created and operated
+gen-obj-192	obj	objects.txt Id 192	object.192-teleport-pad	object teleport pad (192) created and operated
+gen-obj-193	obj	objects.txt Id 193	object.193-lamtome	object LamTome (193) created and operated
+gen-obj-194	obj	objects.txt Id 194	object.194-stair	object stair (194) created and operated
+gen-obj-195	obj	objects.txt Id 195	object.195-stair	object stair (195) created and operated
+gen-obj-196	obj	objects.txt Id 196	object.196-a-trap	object a trap (196) created and operated
+gen-obj-197	obj	objects.txt Id 197	object.197-shrine	object Shrine (197) created and operated
+gen-obj-198	obj	objects.txt Id 198	object.198-chest	object chest (198) created and operated
+gen-obj-199	obj	objects.txt Id 199	object.199-shrine	object Shrine (199) created and operated
+gen-obj-200	obj	objects.txt Id 200	object.200-shrine	object Shrine (200) created and operated
+gen-obj-201	obj	objects.txt Id 201	object.201-shrine	object Shrine (201) created and operated
+gen-obj-202	obj	objects.txt Id 202	object.202-shrine	object Shrine (202) created and operated
+gen-obj-203	obj	objects.txt Id 203	object.203-stash	object stash (203) created and operated
+gen-obj-204	obj	objects.txt Id 204	object.204-stash	object stash (204) created and operated
+gen-obj-205	obj	objects.txt Id 205	object.205-stash	object stash (205) created and operated
+gen-obj-206	obj	objects.txt Id 206	object.206-shrine	object Shrine (206) created and operated
+gen-obj-207	obj	objects.txt Id 207	object.207-dummy	object dummy (207) created and operated
+gen-obj-208	obj	objects.txt Id 208	object.208-basket	object Basket (208) created and operated
+gen-obj-209	obj	objects.txt Id 209	object.209-basket	object Basket (209) created and operated
+gen-obj-210	obj	objects.txt Id 210	object.210-dummy	object Dummy (210) created and operated
+gen-obj-211	obj	objects.txt Id 211	object.211-dummy	object Dummy (211) created and operated
+gen-obj-212	obj	objects.txt Id 212	object.212-dummy	object Dummy (212) created and operated
+gen-obj-213	obj	objects.txt Id 213	object.213-dummy	object Dummy (213) created and operated
+gen-obj-214	obj	objects.txt Id 214	object.214-dummy	object Dummy (214) created and operated
+gen-obj-215	obj	objects.txt Id 215	object.215-dummy	object Dummy (215) created and operated
+gen-obj-216	obj	objects.txt Id 216	object.216-dummy	object Dummy (216) created and operated
+gen-obj-217	obj	objects.txt Id 217	object.217-dummy	object Dummy (217) created and operated
+gen-obj-218	obj	objects.txt Id 218	-	object Dummy (218) created and operated
+gen-obj-219	obj	objects.txt Id 219	-	object Dummy (219) created and operated
+gen-obj-220	obj	objects.txt Id 220	-	object Dummy (220) created and operated
+gen-obj-221	obj	objects.txt Id 221	-	object Dummy (221) created and operated
+gen-obj-222	obj	objects.txt Id 222	object.222-pillar	object pillar (222) created and operated
+gen-obj-223	obj	objects.txt Id 223	object.223-cocoon	object cocoon (223) created and operated
+gen-obj-224	obj	objects.txt Id 224	object.224-cocoon	object cocoon (224) created and operated
+gen-obj-225	obj	objects.txt Id 225	object.225-skullpile	object skullpile (225) created and operated
+gen-obj-226	obj	objects.txt Id 226	object.226-shrine	object Shrine (226) created and operated
+gen-obj-227	obj	objects.txt Id 227	-	object dummy (227) created and operated
+gen-obj-228	obj	objects.txt Id 228	-	object dummy (228) created and operated
+gen-obj-229	obj	objects.txt Id 229	object.229-door	object door (229) created and operated
+gen-obj-230	obj	objects.txt Id 230	object.230-door	object door (230) created and operated
+gen-obj-231	obj	objects.txt Id 231	object.231-shrine	object Shrine (231) created and operated
+gen-obj-232	obj	objects.txt Id 232	object.232-shrine	object Shrine (232) created and operated
+gen-obj-233	obj	objects.txt Id 233	object.233-pillar	object pillar (233) created and operated
+gen-obj-234	obj	objects.txt Id 234	-	object dummy (234) created and operated
+gen-obj-235	obj	objects.txt Id 235	-	object dummy (235) created and operated
+gen-obj-236	obj	objects.txt Id 236	object.236-shrine	object Shrine (236) created and operated
+gen-obj-237	obj	objects.txt Id 237	object.237-waypoint	object Waypoint (237) created and operated
+gen-obj-238	obj	objects.txt Id 238	object.238-waypoint	object Waypoint (238) created and operated
+gen-obj-239	obj	objects.txt Id 239	object.239-body	object body (239) created and operated
+gen-obj-240	obj	objects.txt Id 240	object.240-chest	object chest (240) created and operated
+gen-obj-241	obj	objects.txt Id 241	object.241-chest	object chest (241) created and operated
+gen-obj-242	obj	objects.txt Id 242	object.242-chest	object chest (242) created and operated
+gen-obj-243	obj	objects.txt Id 243	object.243-chest	object chest (243) created and operated
+gen-obj-244	obj	objects.txt Id 244	object.244-ratnest	object ratnest (244) created and operated
+gen-obj-245	obj	objects.txt Id 245	-	object body (245) created and operated
+gen-obj-246	obj	objects.txt Id 246	object.246-ratnest	object ratnest (246) created and operated
+gen-obj-247	obj	objects.txt Id 247	object.247-bed	object bed (247) created and operated
+gen-obj-248	obj	objects.txt Id 248	object.248-bed	object bed (248) created and operated
+gen-obj-249	obj	objects.txt Id 249	object.249-manashrine	object manashrine (249) created and operated
+gen-obj-250	obj	objects.txt Id 250	object.250-a-trap	object a trap (250) created and operated
+gen-obj-251	obj	objects.txt Id 251	-	object gidbinn altar (251) created and operated
+gen-obj-252	obj	objects.txt Id 252	object.252-gidbinn	object gidbinn (252) created and operated
+gen-obj-253	obj	objects.txt Id 253	-	object Dummy (253) created and operated
+gen-obj-254	obj	objects.txt Id 254	-	object Dummy (254) created and operated
+gen-obj-255	obj	objects.txt Id 255	-	object Dummy (255) created and operated
+gen-obj-256	obj	objects.txt Id 256	object.256-dummy	object Dummy (256) created and operated
+gen-obj-257	obj	objects.txt Id 257	object.257-dummy	object Dummy (257) created and operated
+gen-obj-258	obj	objects.txt Id 258	object.258-dummy	object Dummy (258) created and operated
+gen-obj-259	obj	objects.txt Id 259	object.259-dummy	object Dummy (259) created and operated
+gen-obj-260	obj	objects.txt Id 260	object.260-shrine	object Shrine (260) created and operated
+gen-obj-261	obj	objects.txt Id 261	object.261-a-trap	object a trap (261) created and operated
+gen-obj-262	obj	objects.txt Id 262	object.262-shrine	object Shrine (262) created and operated
+gen-obj-263	obj	objects.txt Id 263	object.263-shrine	object Shrine (263) created and operated
+gen-obj-264	obj	objects.txt Id 264	object.264-shrine	object Shrine (264) created and operated
+gen-obj-265	obj	objects.txt Id 265	object.265-shrine	object Shrine (265) created and operated
+gen-obj-266	obj	objects.txt Id 266	object.266-goo-pile	object goo pile (266) created and operated
+gen-obj-267	obj	objects.txt Id 267	object.267-bank	object bank (267) created and operated
+gen-obj-268	obj	objects.txt Id 268	object.268-wirt-s-body	object wirt's body (268) created and operated
+gen-obj-269	obj	objects.txt Id 269	object.269-dummy	object dummy (269) created and operated
+gen-obj-270	obj	objects.txt Id 270	object.270-corpse	object corpse (270) created and operated
+gen-obj-271	obj	objects.txt Id 271	object.271-corpse	object corpse (271) created and operated
+gen-obj-272	obj	objects.txt Id 272	object.272-corpse	object corpse (272) created and operated
+gen-obj-273	obj	objects.txt Id 273	object.273-dummy	object Dummy (273) created and operated
+gen-obj-274	obj	objects.txt Id 274	object.274-hidden-stash	object hidden stash (274) created and operated
+gen-obj-275	obj	objects.txt Id 275	object.275-shrine	object Shrine (275) created and operated
+gen-obj-276	obj	objects.txt Id 276	object.276-shrine	object Shrine (276) created and operated
+gen-obj-277	obj	objects.txt Id 277	object.277-shrine	object Shrine (277) created and operated
+gen-obj-278	obj	objects.txt Id 278	object.278-shrine	object Shrine (278) created and operated
+gen-obj-279	obj	objects.txt Id 279	object.279-shrine	object Shrine (279) created and operated
+gen-obj-280	obj	objects.txt Id 280	object.280-shrine	object Shrine (280) created and operated
+gen-obj-281	obj	objects.txt Id 281	object.281-shrine	object Shrine (281) created and operated
+gen-obj-282	obj	objects.txt Id 282	object.282-shrine	object Shrine (282) created and operated
+gen-obj-283	obj	objects.txt Id 283	object.283-dummy	object dummy (283) created and operated
+gen-obj-284	obj	objects.txt Id 284	object.284-sarcophagus	object sarcophagus (284) created and operated
+gen-obj-285	obj	objects.txt Id 285	object.285-dummy	object dummy (285) created and operated
+gen-obj-286	obj	objects.txt Id 286	object.286-dummy	object Dummy (286) created and operated
+gen-obj-287	obj	objects.txt Id 287	object.287-dummy	object Dummy (287) created and operated
+gen-obj-288	obj	objects.txt Id 288	object.288-waypoint	object Waypoint (288) created and operated
+gen-obj-289	obj	objects.txt Id 289	object.289-bed	object bed (289) created and operated
+gen-obj-290	obj	objects.txt Id 290	object.290-door	object door (290) created and operated
+gen-obj-291	obj	objects.txt Id 291	object.291-door	object door (291) created and operated
+gen-obj-292	obj	objects.txt Id 292	object.292-door	object door (292) created and operated
+gen-obj-293	obj	objects.txt Id 293	object.293-door	object door (293) created and operated
+gen-obj-294	obj	objects.txt Id 294	object.294-door	object door (294) created and operated
+gen-obj-295	obj	objects.txt Id 295	object.295-door	object door (295) created and operated
+gen-obj-296	obj	objects.txt Id 296	object.296-dummy	object Dummy (296) created and operated
+gen-obj-297	obj	objects.txt Id 297	object.297-dummy	object Dummy (297) created and operated
+gen-obj-298	obj	objects.txt Id 298	object.298-portal	object portal (298) created and operated
+gen-obj-299	obj	objects.txt Id 299	object.299-magic-shrine	object magic shrine (299) created and operated
+gen-obj-300	obj	objects.txt Id 300	object.300-magic-shrine	object magic shrine (300) created and operated
+gen-obj-301	obj	objects.txt Id 301	object.301-dummy	object Dummy (301) created and operated
+gen-obj-302	obj	objects.txt Id 302	object.302-manashrine	object manashrine (302) created and operated
+gen-obj-303	obj	objects.txt Id 303	object.303-magic-shrine	object magic shrine (303) created and operated
+gen-obj-304	obj	objects.txt Id 304	object.304-teleportation-pad	object teleportation pad (304) created and operated
+gen-obj-305	obj	objects.txt Id 305	object.305-teleportation-pad	object teleportation pad (305) created and operated
+gen-obj-306	obj	objects.txt Id 306	object.306-teleportation-pad	object teleportation pad (306) created and operated
+gen-obj-307	obj	objects.txt Id 307	-	object Dummy (307) created and operated
+gen-obj-308	obj	objects.txt Id 308	-	object Dummy (308) created and operated
+gen-obj-309	obj	objects.txt Id 309	-	object Dummy (309) created and operated
+gen-obj-310	obj	objects.txt Id 310	-	object Dummy (310) created and operated
+gen-obj-311	obj	objects.txt Id 311	-	object Dummy (311) created and operated
+gen-obj-312	obj	objects.txt Id 312	-	object Dummy (312) created and operated
+gen-obj-313	obj	objects.txt Id 313	-	object Dummy (313) created and operated
+gen-obj-314	obj	objects.txt Id 314	object.314-dead-guard	object dead guard (314) created and operated
+gen-obj-315	obj	objects.txt Id 315	object.315-dead-guard	object dead guard (315) created and operated
+gen-obj-316	obj	objects.txt Id 316	object.316-dead-guard	object dead guard (316) created and operated
+gen-obj-317	obj	objects.txt Id 317	object.317-dead-guard	object dead guard (317) created and operated
+gen-obj-318	obj	objects.txt Id 318	-	object eunuch (318) created and operated
+gen-obj-319	obj	objects.txt Id 319	object.319-dummy	object Dummy (319) created and operated
+gen-obj-320	obj	objects.txt Id 320	object.320-manashrine	object manashrine (320) created and operated
+gen-obj-321	obj	objects.txt Id 321	object.321-dummy	object Dummy (321) created and operated
+gen-obj-322	obj	objects.txt Id 322	object.322-well	object Well (322) created and operated
+gen-obj-323	obj	objects.txt Id 323	object.323-waypoint	object Waypoint (323) created and operated
+gen-obj-324	obj	objects.txt Id 324	object.324-waypoint	object Waypoint (324) created and operated
+gen-obj-325	obj	objects.txt Id 325	object.325-magic-shrine	object magic shrine (325) created and operated
+gen-obj-326	obj	objects.txt Id 326	object.326-dead-body	object dead body (326) created and operated
+gen-obj-327	obj	objects.txt Id 327	-	object dummy (327) created and operated
+gen-obj-328	obj	objects.txt Id 328	-	object dummy (328) created and operated
+gen-obj-329	obj	objects.txt Id 329	object.329-chest	object chest (329) created and operated
+gen-obj-330	obj	objects.txt Id 330	object.330-chest	object chest (330) created and operated
+gen-obj-331	obj	objects.txt Id 331	object.331-chest	object chest (331) created and operated
+gen-obj-332	obj	objects.txt Id 332	object.332-chest	object chest (332) created and operated
+gen-obj-333	obj	objects.txt Id 333	object.333-chest	object chest (333) created and operated
+gen-obj-334	obj	objects.txt Id 334	object.334-chest	object chest (334) created and operated
+gen-obj-335	obj	objects.txt Id 335	object.335-chest	object chest (335) created and operated
+gen-obj-336	obj	objects.txt Id 336	object.336-chest	object chest (336) created and operated
+gen-obj-337	obj	objects.txt Id 337	object.337-steeg-stone	object Steeg Stone (337) created and operated
+gen-obj-338	obj	objects.txt Id 338	object.338-guild-vault	object Guild Vault (338) created and operated
+gen-obj-339	obj	objects.txt Id 339	object.339-trophy-case	object Trophy Case (339) created and operated
+gen-obj-340	obj	objects.txt Id 340	object.340-message-board	object Message Board (340) created and operated
+gen-obj-341	obj	objects.txt Id 341	object.341-dummy	object Dummy (341) created and operated
+gen-obj-342	obj	objects.txt Id 342	object.342-portal	object portal (342) created and operated
+gen-obj-343	obj	objects.txt Id 343	object.343-shrine	object Shrine (343) created and operated
+gen-obj-344	obj	objects.txt Id 344	object.344-shrine	object Shrine (344) created and operated
+gen-obj-345	obj	objects.txt Id 345	-	object Dummy (345) created and operated
+gen-obj-346	obj	objects.txt Id 346	-	object Dummy (346) created and operated
+gen-obj-347	obj	objects.txt Id 347	-	object Dummy (347) created and operated
+gen-obj-348	obj	objects.txt Id 348	-	object Dummy (348) created and operated
+gen-obj-349	obj	objects.txt Id 349	-	object Dummy (349) created and operated
+gen-obj-350	obj	objects.txt Id 350	-	object Dummy (350) created and operated
+gen-obj-351	obj	objects.txt Id 351	-	object Dummy (351) created and operated
+gen-obj-352	obj	objects.txt Id 352	-	object Dummy (352) created and operated
+gen-obj-353	obj	objects.txt Id 353	-	object Dummy (353) created and operated
+gen-obj-354	obj	objects.txt Id 354	object.354-chest	object chest (354) created and operated
+gen-obj-355	obj	objects.txt Id 355	object.355-chest	object chest (355) created and operated
+gen-obj-356	obj	objects.txt Id 356	object.356-chest	object chest (356) created and operated
+gen-obj-357	obj	objects.txt Id 357	object.357-tome	object Tome (357) created and operated
+gen-obj-358	obj	objects.txt Id 358	object.358-fire	object fire (358) created and operated
+gen-obj-359	obj	objects.txt Id 359	object.359-fire	object fire (359) created and operated
+gen-obj-360	obj	objects.txt Id 360	object.360-rockpile	object RockPIle (360) created and operated
+gen-obj-361	obj	objects.txt Id 361	object.361-magic-shrine	object magic shrine (361) created and operated
+gen-obj-362	obj	objects.txt Id 362	object.362-basket	object basket (362) created and operated
+gen-obj-363	obj	objects.txt Id 363	object.363-hungskeleton	object HungSkeleton (363) created and operated
+gen-obj-364	obj	objects.txt Id 364	object.364-dummy	object Dummy (364) created and operated
+gen-obj-365	obj	objects.txt Id 365	object.365-casket	object casket (365) created and operated
+gen-obj-366	obj	objects.txt Id 366	object.366-sewer-stairs	object sewer stairs (366) created and operated
+gen-obj-367	obj	objects.txt Id 367	object.367-sewer-lever	object sewer lever (367) created and operated
+gen-obj-368	obj	objects.txt Id 368	-	object darkwanderer (368) created and operated
+gen-obj-369	obj	objects.txt Id 369	-	object dummy (369) created and operated
+gen-obj-370	obj	objects.txt Id 370	-	object Dummy (370) created and operated
+gen-obj-371	obj	objects.txt Id 371	-	object chest (371) created and operated
+gen-obj-372	obj	objects.txt Id 372	object.372-bonechest	object BoneChest (372) created and operated
+gen-obj-373	obj	objects.txt Id 373	object.373-dummy	object Dummy (373) created and operated
+gen-obj-374	obj	objects.txt Id 374	object.374-dummy	object Dummy (374) created and operated
+gen-obj-375	obj	objects.txt Id 375	-	object Dummy (375) created and operated
+gen-obj-376	obj	objects.txt Id 376	object.376-hellforge	object Hellforge (376) created and operated
+gen-obj-377	obj	objects.txt Id 377	object.377-guild-portal	object Guild Portal (377) created and operated
+gen-obj-378	obj	objects.txt Id 378	-	object Dummy (378) created and operated
+gen-obj-379	obj	objects.txt Id 379	-	object Dummy (379) created and operated
+gen-obj-380	obj	objects.txt Id 380	object.380-trappedsoul	object TrappedSoul (380) created and operated
+gen-obj-381	obj	objects.txt Id 381	object.381-trappedsoul	object TrappedSoul (381) created and operated
+gen-obj-382	obj	objects.txt Id 382	-	object Dummy (382) created and operated
+gen-obj-383	obj	objects.txt Id 383	object.383-trappedsoul	object TrappedSoul (383) created and operated
+gen-obj-384	obj	objects.txt Id 384	object.384-trappedsoul	object TrappedSoul (384) created and operated
+gen-obj-385	obj	objects.txt Id 385	object.385-dummy	object Dummy (385) created and operated
+gen-obj-386	obj	objects.txt Id 386	object.386-dummy	object Dummy (386) created and operated
+gen-obj-387	obj	objects.txt Id 387	object.387-chest	object chest (387) created and operated
+gen-obj-388	obj	objects.txt Id 388	object.388-casket	object casket (388) created and operated
+gen-obj-389	obj	objects.txt Id 389	object.389-chest	object chest (389) created and operated
+gen-obj-390	obj	objects.txt Id 390	object.390-chest	object chest (390) created and operated
+gen-obj-391	obj	objects.txt Id 391	object.391-chest	object chest (391) created and operated
+gen-obj-392	obj	objects.txt Id 392	object.392-seal	object Seal (392) created and operated
+gen-obj-393	obj	objects.txt Id 393	object.393-seal	object Seal (393) created and operated
+gen-obj-394	obj	objects.txt Id 394	object.394-seal	object Seal (394) created and operated
+gen-obj-395	obj	objects.txt Id 395	object.395-seal	object Seal (395) created and operated
+gen-obj-396	obj	objects.txt Id 396	object.396-seal	object Seal (396) created and operated
+gen-obj-397	obj	objects.txt Id 397	object.397-chest	object chest (397) created and operated
+gen-obj-398	obj	objects.txt Id 398	object.398-waypoint	object Waypoint (398) created and operated
+gen-obj-399	obj	objects.txt Id 399	-	object fissure (399) created and operated
+gen-obj-400	obj	objects.txt Id 400	object.400-dummy	object Dummy (400) created and operated
+gen-obj-401	obj	objects.txt Id 401	-	object Dummy (401) created and operated
+gen-obj-402	obj	objects.txt Id 402	object.402-waypoint	object Waypoint (402) created and operated
+gen-obj-403	obj	objects.txt Id 403	object.403-fire	object fire (403) created and operated
+gen-obj-404	obj	objects.txt Id 404	object.404-compellingorb	object compellingorb (404) created and operated
+gen-obj-405	obj	objects.txt Id 405	object.405-chest	object chest (405) created and operated
+gen-obj-406	obj	objects.txt Id 406	object.406-chest	object chest (406) created and operated
+gen-obj-407	obj	objects.txt Id 407	object.407-chest	object chest (407) created and operated
+gen-obj-408	obj	objects.txt Id 408	object.408-siege-control	object Dummy (408) created and operated
+gen-obj-409	obj	objects.txt Id 409	-	object Dummy (409) created and operated
+gen-obj-410	obj	objects.txt Id 410	-	object pyox (410) created and operated
+gen-obj-413	obj	objects.txt Id 413	object.413-chestr	object chestR (413) created and operated
+gen-obj-414	obj	objects.txt Id 414	object.414-shrine3wilderness	object Shrine3wilderness (414) created and operated
+gen-obj-415	obj	objects.txt Id 415	object.415-shrine2wilderness	object Shrine2wilderness (415) created and operated
+gen-obj-416	obj	objects.txt Id 416	object.416-hiddenstash	object hiddenstash (416) created and operated
+gen-obj-417	obj	objects.txt Id 417	-	object flag wilderness (417) created and operated
+gen-obj-418	obj	objects.txt Id 418	object.418-barrel-wilderness	object barrel wilderness (418) created and operated
+gen-obj-419	obj	objects.txt Id 419	object.419-barrel-wilderness	object barrel wilderness (419) created and operated
+gen-obj-420	obj	objects.txt Id 420	object.420-woodchestl	object woodchestL (420) created and operated
+gen-obj-421	obj	objects.txt Id 421	object.421-shrine3wilderness	object Shrine3wilderness (421) created and operated
+gen-obj-422	obj	objects.txt Id 422	object.422-manashrine	object manashrine (422) created and operated
+gen-obj-423	obj	objects.txt Id 423	object.423-healthshrine	object healthshrine (423) created and operated
+gen-obj-424	obj	objects.txt Id 424	object.424-burialchestl	object burialchestL (424) created and operated
+gen-obj-425	obj	objects.txt Id 425	object.425-burialchestr	object burialchestR (425) created and operated
+gen-obj-426	obj	objects.txt Id 426	object.426-well	object well (426) created and operated
+gen-obj-427	obj	objects.txt Id 427	object.427-shrine2wilderness	object Shrine2wilderness (427) created and operated
+gen-obj-428	obj	objects.txt Id 428	object.428-shrine2wilderness	object Shrine2wilderness (428) created and operated
+gen-obj-429	obj	objects.txt Id 429	object.429-waypoint	object Waypoint (429) created and operated
+gen-obj-430	obj	objects.txt Id 430	object.430-chestl	object ChestL (430) created and operated
+gen-obj-431	obj	objects.txt Id 431	object.431-woodchestr	object woodchestR (431) created and operated
+gen-obj-432	obj	objects.txt Id 432	object.432-chestsl	object ChestSL (432) created and operated
+gen-obj-433	obj	objects.txt Id 433	object.433-chestsr	object ChestSR (433) created and operated
+gen-obj-434	obj	objects.txt Id 434	-	object etorch1 (434) created and operated
+gen-obj-435	obj	objects.txt Id 435	-	object ecfra (435) created and operated
+gen-obj-436	obj	objects.txt Id 436	-	object ettr (436) created and operated
+gen-obj-437	obj	objects.txt Id 437	-	object etorch2 (437) created and operated
+gen-obj-438	obj	objects.txt Id 438	-	object burningbodies (438) created and operated
+gen-obj-439	obj	objects.txt Id 439	-	object burningpit (439) created and operated
+gen-obj-440	obj	objects.txt Id 440	-	object tribal flag (440) created and operated
+gen-obj-441	obj	objects.txt Id 441	-	object eflg (441) created and operated
+gen-obj-442	obj	objects.txt Id 442	-	object chan (442) created and operated
+gen-obj-443	obj	objects.txt Id 443	object.443-jar1	object jar1 (443) created and operated
+gen-obj-444	obj	objects.txt Id 444	object.444-jar2	object jar2 (444) created and operated
+gen-obj-445	obj	objects.txt Id 445	object.445-jar3	object jar3 (445) created and operated
+gen-obj-446	obj	objects.txt Id 446	-	object swingingheads (446) created and operated
+gen-obj-447	obj	objects.txt Id 447	-	object pole (447) created and operated
+gen-obj-448	obj	objects.txt Id 448	object.448-animated-skulland-rockpile	object animated skulland rockpile (448) created and operated
+gen-obj-449	obj	objects.txt Id 449	object.449-gate	object gate (449) created and operated
+gen-obj-450	obj	objects.txt Id 450	object.450-pileofskullsandrocks	object pileofskullsandrocks (450) created and operated
+gen-obj-451	obj	objects.txt Id 451	-	object hellgate (451) created and operated
+gen-obj-452	obj	objects.txt Id 452	-	object banner 1 (452) created and operated
+gen-obj-453	obj	objects.txt Id 453	-	object banner 2 (453) created and operated
+gen-obj-454	obj	objects.txt Id 454	object.454-explodingchest	object explodingchest (454) created and operated
+gen-obj-455	obj	objects.txt Id 455	object.455-chest	object chest (455) created and operated
+gen-obj-456	obj	objects.txt Id 456	-	object deathpole (456) created and operated
+gen-obj-457	obj	objects.txt Id 457	-	object Ldeathpole (457) created and operated
+gen-obj-458	obj	objects.txt Id 458	-	object Altar (458) created and operated
+gen-obj-459	obj	objects.txt Id 459	-	object dummy (459) created and operated
+gen-obj-460	obj	objects.txt Id 460	-	object dummy (460) created and operated
+gen-obj-461	obj	objects.txt Id 461	-	object dummy (461) created and operated
+gen-obj-462	obj	objects.txt Id 462	-	object dummy (462) created and operated
+gen-obj-463	obj	objects.txt Id 463	object.463-hidden-stash	object hidden stash (463) created and operated
+gen-obj-464	obj	objects.txt Id 464	object.464-healthshrine	object healthshrine (464) created and operated
+gen-obj-465	obj	objects.txt Id 465	object.465-manashrine	object manashrine (465) created and operated
+gen-obj-466	obj	objects.txt Id 466	object.466-evilurn	object evilurn (466) created and operated
+gen-obj-467	obj	objects.txt Id 467	object.467-icecavejar1	object icecavejar1 (467) created and operated
+gen-obj-468	obj	objects.txt Id 468	object.468-icecavejar2	object icecavejar2 (468) created and operated
+gen-obj-469	obj	objects.txt Id 469	object.469-icecavejar3	object icecavejar3 (469) created and operated
+gen-obj-470	obj	objects.txt Id 470	object.470-icecavejar4	object icecavejar4 (470) created and operated
+gen-obj-471	obj	objects.txt Id 471	object.471-icecavejar4	object icecavejar4 (471) created and operated
+gen-obj-472	obj	objects.txt Id 472	object.472-icecaveshrine2	object icecaveshrine2 (472) created and operated
+gen-obj-473	obj	objects.txt Id 473	-	object cagedwussie1 (473) created and operated
+gen-obj-474	obj	objects.txt Id 474	object.474-ancient-statue-3	object Ancient Statue 3 (474) created and operated
+gen-obj-475	obj	objects.txt Id 475	object.475-ancient-statue-1	object Ancient Statue 1 (475) created and operated
+gen-obj-476	obj	objects.txt Id 476	object.476-ancient-statue-2	object Ancient Statue 2 (476) created and operated
+gen-obj-477	obj	objects.txt Id 477	object.477-deadbarbarian	object deadbarbarian (477) created and operated
+gen-obj-478	obj	objects.txt Id 478	-	object clientsmoke (478) created and operated
+gen-obj-479	obj	objects.txt Id 479	object.479-icecaveshrine2	object icecaveshrine2 (479) created and operated
+gen-obj-480	obj	objects.txt Id 480	-	object icecave_torch1 (480) created and operated
+gen-obj-481	obj	objects.txt Id 481	-	object icecave_torch2 (481) created and operated
+gen-obj-482	obj	objects.txt Id 482	-	object ttor (482) created and operated
+gen-obj-483	obj	objects.txt Id 483	object.483-manashrine	object manashrine (483) created and operated
+gen-obj-484	obj	objects.txt Id 484	object.484-healthshrine	object healthshrine (484) created and operated
+gen-obj-485	obj	objects.txt Id 485	object.485-tomb1	object tomb1 (485) created and operated
+gen-obj-486	obj	objects.txt Id 486	object.486-tomb2	object tomb2 (486) created and operated
+gen-obj-487	obj	objects.txt Id 487	object.487-tomb3	object tomb3 (487) created and operated
+gen-obj-488	obj	objects.txt Id 488	object.488-magic-shrine	object magic shrine (488) created and operated
+gen-obj-489	obj	objects.txt Id 489	-	object torch1 (489) created and operated
+gen-obj-490	obj	objects.txt Id 490	-	object torch2 (490) created and operated
+gen-obj-491	obj	objects.txt Id 491	object.491-manashrine	object manashrine (491) created and operated
+gen-obj-492	obj	objects.txt Id 492	object.492-healthshrine	object healthshrine (492) created and operated
+gen-obj-493	obj	objects.txt Id 493	object.493-well	object well (493) created and operated
+gen-obj-494	obj	objects.txt Id 494	object.494-waypoint	object Waypoint (494) created and operated
+gen-obj-495	obj	objects.txt Id 495	object.495-magic-shrine	object magic shrine (495) created and operated
+gen-obj-496	obj	objects.txt Id 496	object.496-waypoint	object Waypoint (496) created and operated
+gen-obj-497	obj	objects.txt Id 497	object.497-magic-shrine	object magic shrine (497) created and operated
+gen-obj-498	obj	objects.txt Id 498	object.498-well	object well (498) created and operated
+gen-obj-499	obj	objects.txt Id 499	object.499-magic-shrine2	object magic shrine2 (499) created and operated
+gen-obj-500	obj	objects.txt Id 500	object.500-object1	object object1 (500) created and operated
+gen-obj-501	obj	objects.txt Id 501	object.501-woodchestl	object woodchestL (501) created and operated
+gen-obj-502	obj	objects.txt Id 502	object.502-woodchestr	object woodchestR (502) created and operated
+gen-obj-503	obj	objects.txt Id 503	object.503-magic-shrine	object magic shrine (503) created and operated
+gen-obj-504	obj	objects.txt Id 504	object.504-woodchest2l	object woodchest2L (504) created and operated
+gen-obj-505	obj	objects.txt Id 505	object.505-woodchest2r	object woodchest2R (505) created and operated
+gen-obj-506	obj	objects.txt Id 506	-	object swingingheads (506) created and operated
+gen-obj-507	obj	objects.txt Id 507	-	object debris (507) created and operated
+gen-obj-508	obj	objects.txt Id 508	object.508-pene	object pene (508) created and operated
+gen-obj-509	obj	objects.txt Id 509	object.509-magic-shrine	object magic shrine (509) created and operated
+gen-obj-510	obj	objects.txt Id 510	-	object mrpole (510) created and operated
+gen-obj-511	obj	objects.txt Id 511	object.511-waypoint	object Waypoint (511) created and operated
+gen-obj-512	obj	objects.txt Id 512	object.512-magic-shrine	object magic shrine (512) created and operated
+gen-obj-513	obj	objects.txt Id 513	object.513-well	object well (513) created and operated
+gen-obj-514	obj	objects.txt Id 514	-	object torch1 (514) created and operated
+gen-obj-515	obj	objects.txt Id 515	-	object torch1 (515) created and operated
+gen-obj-516	obj	objects.txt Id 516	object.516-object1	object object1 (516) created and operated
+gen-obj-517	obj	objects.txt Id 517	object.517-object2	object object2 (517) created and operated
+gen-obj-518	obj	objects.txt Id 518	object.518-mrbox	object mrbox (518) created and operated
+gen-obj-519	obj	objects.txt Id 519	object.519-well	object well (519) created and operated
+gen-obj-520	obj	objects.txt Id 520	object.520-magic-shrine	object magic shrine (520) created and operated
+gen-obj-521	obj	objects.txt Id 521	object.521-healthshrine	object healthshrine (521) created and operated
+gen-obj-522	obj	objects.txt Id 522	object.522-manashrine	object manashrine (522) created and operated
+gen-obj-523	obj	objects.txt Id 523	-	object red light (523) created and operated
+gen-obj-524	obj	objects.txt Id 524	object.524-tomb1l	object tomb1L (524) created and operated
+gen-obj-525	obj	objects.txt Id 525	object.525-tomb2l	object tomb2L (525) created and operated
+gen-obj-526	obj	objects.txt Id 526	object.526-tomb3l	object tomb3L (526) created and operated
+gen-obj-527	obj	objects.txt Id 527	-	object ubub (527) created and operated
+gen-obj-528	obj	objects.txt Id 528	-	object sbub (528) created and operated
+gen-obj-529	obj	objects.txt Id 529	object.529-tomb1	object tomb1 (529) created and operated
+gen-obj-530	obj	objects.txt Id 530	object.530-tomb1l	object tomb1L (530) created and operated
+gen-obj-531	obj	objects.txt Id 531	object.531-tomb2	object tomb2 (531) created and operated
+gen-obj-532	obj	objects.txt Id 532	object.532-tomb2l	object tomb2L (532) created and operated
+gen-obj-533	obj	objects.txt Id 533	object.533-tomb3	object tomb3 (533) created and operated
+gen-obj-534	obj	objects.txt Id 534	object.534-tomb3l	object tomb3L (534) created and operated
+gen-obj-535	obj	objects.txt Id 535	object.535-mrbox	object mrbox (535) created and operated
+gen-obj-536	obj	objects.txt Id 536	-	object torch1 (536) created and operated
+gen-obj-537	obj	objects.txt Id 537	-	object torch2 (537) created and operated
+gen-obj-538	obj	objects.txt Id 538	-	object candles (538) created and operated
+gen-obj-539	obj	objects.txt Id 539	object.539-waypoint	object Waypoint (539) created and operated
+gen-obj-540	obj	objects.txt Id 540	object.540-deadperson	object deadperson (540) created and operated
+gen-obj-541	obj	objects.txt Id 541	object.541-groundtomb	object groundtomb (541) created and operated
+gen-obj-542	obj	objects.txt Id 542	-	object Dummy (542) created and operated
+gen-obj-543	obj	objects.txt Id 543	-	object Dummy (543) created and operated
+gen-obj-544	obj	objects.txt Id 544	object.544-groundtombl	object groundtombL (544) created and operated
+gen-obj-545	obj	objects.txt Id 545	object.545-deadperson2	object deadperson2 (545) created and operated
+gen-obj-546	obj	objects.txt Id 546	object.546-ancientsaltar	object ancientsaltar (546) created and operated
+gen-obj-547	obj	objects.txt Id 547	object.547-to-the-worldstone-keep-level-1	object To The Worldstone Keep Level 1 (547) created and operated
+gen-obj-548	obj	objects.txt Id 548	object.548-eweaponrackr	object eweaponrackR (548) created and operated
+gen-obj-549	obj	objects.txt Id 549	object.549-eweaponrackl	object eweaponrackL (549) created and operated
+gen-obj-550	obj	objects.txt Id 550	object.550-earmorstandr	object earmorstandR (550) created and operated
+gen-obj-551	obj	objects.txt Id 551	object.551-earmorstandl	object earmorstandL (551) created and operated
+gen-obj-552	obj	objects.txt Id 552	-	object torch2 (552) created and operated
+gen-obj-553	obj	objects.txt Id 553	-	object funeralpire (553) created and operated
+gen-obj-554	obj	objects.txt Id 554	-	object burninglogs (554) created and operated
+gen-obj-555	obj	objects.txt Id 555	-	object stma (555) created and operated
+gen-obj-556	obj	objects.txt Id 556	object.556-deadperson2	object deadperson2 (556) created and operated
+gen-obj-557	obj	objects.txt Id 557	-	object Dummy (557) created and operated
+gen-obj-558	obj	objects.txt Id 558	object.558-fana	object fana (558) created and operated
+gen-obj-559	obj	objects.txt Id 559	-	object BBQB (559) created and operated
+gen-obj-560	obj	objects.txt Id 560	-	object btor (560) created and operated
+gen-obj-561	obj	objects.txt Id 561	object.561-dummy	object Dummy (561) created and operated
+gen-obj-562	obj	objects.txt Id 562	-	object Dummy (562) created and operated
+gen-obj-563	obj	objects.txt Id 563	object.563-the-worldstone-chamber	object The Worldstone Chamber (563) created and operated
+gen-obj-564	obj	objects.txt Id 564	object.564-glacial-caves-level-1	object Glacial Caves Level 1 (564) created and operated
+gen-obj-565	obj	objects.txt Id 565	object.565-strlastcinematic	object strlastcinematic (565) created and operated
+gen-obj-566	obj	objects.txt Id 566	object.566-harrogath	object Harrogath (566) created and operated
+gen-obj-567	obj	objects.txt Id 567	-	object Zoo (567) created and operated
+gen-obj-568	obj	objects.txt Id 568	-	object Keeper (568) created and operated
+gen-obj-569	obj	objects.txt Id 569	object.569-throne-of-destruction	object Throne of Destruction (569) created and operated
+gen-obj-570	obj	objects.txt Id 570	-	object Dummy (570) created and operated
+gen-obj-571	obj	objects.txt Id 571	-	object Dummy (571) created and operated
+gen-obj-572	obj	objects.txt Id 572	-	object Dummy (572) created and operated

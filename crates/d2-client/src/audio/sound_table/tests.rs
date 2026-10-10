@@ -94,6 +94,7 @@ const MONSTER2: UnitKey = UnitKey::new(1, 8);
 
 struct World {
     positions: BTreeMap<UnitKey, (i32, i32)>,
+    client_only: BTreeMap<UnitKey, (i32, i32)>,
     blocked: BTreeSet<UnitKey>,
     indoors: bool,
     duck: bool,
@@ -104,6 +105,7 @@ impl World {
     fn new() -> Self {
         World {
             positions: [(PLAYER, (1000, 1000)), (MONSTER, (1000, 1000))].into(),
+            client_only: BTreeMap::new(),
             blocked: BTreeSet::new(),
             indoors: false,
             duck: false,
@@ -118,6 +120,9 @@ impl SoundWorld for World {
     }
     fn position(&self, unit: UnitKey) -> Option<(i32, i32)> {
         self.positions.get(&unit).copied()
+    }
+    fn client_only_position(&self, unit: UnitKey) -> Option<(i32, i32)> {
+        self.client_only.get(&unit).copied()
     }
     fn blocked(&self, unit: UnitKey) -> bool {
         self.blocked.contains(&unit)
@@ -1910,6 +1915,28 @@ fn river_projection() {
     let h = sys.request(&mut w, 2599, Some(MONSTER), 0, 0, 0);
     // x = 4 − 0, y = 2 × (8 − 0).
     assert_eq!(sys.request_by_handle(h).unwrap().pos, [4.0, 16.0, 640.0]);
+}
+
+// Covers: specs/audio/sound-table.md §8.1 r1
+#[test]
+fn river_reads_the_client_only_unit_first() {
+    // REC-1680: a set-C river object shares its GUID with a server object;
+    // 2599 asks set C first, any other sound the unit table.
+    let mut r = rows(2600);
+    r[2599].looped = 1;
+    r[1].looped = 1;
+    let mut sys = system(r);
+    let mut w = World::new();
+    w.positions.insert(PLAYER, (0, 0));
+    w.positions.insert(MONSTER, (500, 500));
+    w.client_only.insert(MONSTER, (10, 5));
+    let h = sys.request(&mut w, 2599, Some(MONSTER), 0, 0, 0);
+    assert_eq!(sys.request_by_handle(h).unwrap().pos, [4.0, 16.0, 640.0]);
+    let h = sys.request(&mut w, 1, Some(MONSTER), 0, 0, 0);
+    assert_eq!(
+        sys.request_by_handle(h).unwrap().pos,
+        [500.0, 1000.0, 640.0]
+    );
 }
 
 // Covers: specs/audio/sound-table.md §6.4 r1

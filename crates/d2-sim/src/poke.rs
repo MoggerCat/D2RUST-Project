@@ -120,10 +120,13 @@ pub enum Directive {
         period: u32,
         ticks: u32,
     },
+    /// `free`: land on the nearest free, missile-passable cell
+    /// (`poke.md` §1 `pos`, [`LAND_MASK`]) instead of the raw point.
     Pos {
         unit: UnitArg,
         x: Coord,
         y: Coord,
+        free: bool,
     },
     /// d2rs-own test aid (`poke.md` §1 `hop`): one move of at most
     /// [`HOP`] sub-tiles per axis toward (x, y), the first free spot of
@@ -409,6 +412,17 @@ fn signed(t: &str) -> Result<i32, String> {
     }
 }
 
+/// d2rs-own: a poked position reaches the client like a placement does
+/// (queued for update with flag-ex 0x10000: the S→C 0x15 at its next update,
+/// `sim/path-placement.md` §6 rule 4), so a client model and its pick
+/// see the unit where the poke put it.
+fn mark_reassign<X: WorldPending>(game: &mut Game, sim: &mut WorldSim<X>, u: UnitId) {
+    let _ = game.lists.queue_update(u);
+    if let Some(r) = sim.action.sys.units.get_mut(u) {
+        r.flags2 |= 0x1_0000;
+    }
+}
+
 fn coord(t: &str) -> Result<Coord, String> {
     let Some(body) = t.strip_prefix('@') else {
         return signed(t).map(Coord::Num);
@@ -648,11 +662,18 @@ pub fn parse_directive(toks: &[&str]) -> Result<Directive, String> {
             }
         }
         "pos" => {
-            let a = exact(3, "<ref> <x> <y>")?;
+            let usage = "<ref> <x> <y> [free]";
+            let (a, rest) = fixed(3, usage)?;
+            let free = match rest {
+                [] => false,
+                ["free"] => true,
+                _ => return Err(format!("`pos {usage}`")),
+            };
             Directive::Pos {
                 unit: unit_arg(a[0])?,
                 x: coord(a[1])?,
                 y: coord(a[2])?,
+                free,
             }
         }
         "hop" => {
@@ -834,7 +855,13 @@ impl fmt::Display for Directive {
             Self::SeedGame { lo, hi } => write!(f, " {lo} {hi}")?,
             Self::SeedUnit { unit, lo, hi } => write!(f, " {unit} {lo} {hi}")?,
             Self::Time { period, ticks } => write!(f, " {period} {ticks}")?,
-            Self::Pos { unit, x, y } | Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
+            Self::Pos { unit, x, y, free } => {
+                write!(f, " {unit} {x} {y}")?;
+                if *free {
+                    write!(f, " free")?;
+                }
+            }
+            Self::Hop { unit, x, y } => write!(f, " {unit} {x} {y}")?,
             Self::Warp { level, tile } => {
                 write!(f, " {level}")?;
                 if let Some(t) = tile {
@@ -1157,6 +1184,41 @@ pub fn resolve_unit<X: WorldPending>(
 /// unit's room and its neighbours (`poke.md` §1 `hop`).
 pub const HOP: i32 = 16;
 
+/// The mask a landing cell of `pos … free`, `hop` and `goto` must not
+/// have (`poke.md` §1 `pos`): the player's move bits 0x1C09 and the
+/// missile-blocking bit 0x4.
+pub const LAND_MASK: u16 = crate::path::collision::masks::PLAYER_MOVE | 0x4;
+
+/// The cell of an active room with no `LAND_MASK` bit nearest (tx, ty)
+/// (squared distance; row by row from the top-left of the room's
+/// sub-tile rectangle, the first found on a tie).
+fn nearest_free(a: &crate::drlg::ActiveRoom, tx: i32, ty: i32) -> Option<(i32, i32)> {
+    let r = a.subtiles;
+    let mut best: Option<(i64, i32, i32)> = None;
+    for y in r.y..r.y + r.h {
+        for x in r.x..r.x + r.w {
+            let free = a.collision.get(x, y).is_some_and(|m| m & LAND_MASK == 0);
+            let d2 = i64::from(x - tx).pow(2) + i64::from(y - ty).pow(2);
+            if free && best.is_none_or(|(b, _, _)| d2 < b) {
+                best = Some((d2, x, y));
+            }
+        }
+    }
+    best.map(|(_, x, y)| (x, y))
+}
+
+/// [`nearest_free`] in the active room `room`.
+fn room_free_cell<X: WorldPending>(
+    game: &Game,
+    sim: &WorldSim<X>,
+    room: RoomId,
+    tx: i32,
+    ty: i32,
+) -> Option<(i32, i32)> {
+    let (d, r) = sim.action.sys.hooks.drlg.drlg_room(game, room)?;
+    nearest_free(d.room(r).active()?, tx, ty)
+}
+
 /// The spots a `hop` from `from` by `step` tries, best first: rings of
 /// radius 0, 2, 4, 7 around the full step, then around the half step, then
 /// a sidestep of 8 to either side across the step.
@@ -1478,16 +1540,24 @@ fn run<X: WorldPending>(
                 None => PokeResult::Failed,
             }
         }
-        Directive::Pos { unit, x, y } => {
+        Directive::Pos { unit, x, y, free } => {
             let u = resolve_unit(*unit, game, sim, env)?;
-            let (x, y) = (c(*x, sim)?, c(*y, sim)?);
+            let (mut x, mut y) = (c(*x, sim)?, c(*y, sim)?);
             if !sim.action.sys.hooks.path_has(u) {
                 return Ok(PokeResult::Failed);
             }
             let Some(room) = room_near(game, sim, u, x, y) else {
                 return Ok(PokeResult::Failed);
             };
+            if *free {
+                // The nearest free, missile-passable cell of that room.
+                match room_free_cell(game, sim, room, x, y) {
+                    Some(cell) => (x, y) = cell,
+                    None => return Ok(PokeResult::Failed),
+                }
+            }
             sim.lend(|a| a.with(game, |g, v| PathCtx::of(v, g).teleport(u, Some(room), x, y)));
+            mark_reassign(game, sim, u);
             PokeResult::Ok(None)
         }
         Directive::Hop { unit, x, y } => {
@@ -1506,6 +1576,17 @@ fn run<X: WorldPending>(
                 let Some(room) = room_near(game, sim, u, cx, cy) else {
                     continue;
                 };
+                // Only a free, missile-passable cell (`LAND_MASK`).
+                if sim
+                    .action
+                    .sys
+                    .hooks
+                    .drlg
+                    .collision(game, room, cx, cy)
+                    .is_none_or(|m| m & LAND_MASK != 0)
+                {
+                    continue;
+                }
                 let errors = sim.action.sys.hooks.errors.len();
                 sim.lend(|a| {
                     a.with(game, |g, v| {
@@ -1513,6 +1594,7 @@ fn run<X: WorldPending>(
                     })
                 });
                 if sim.action.sys.hooks.path_position(u) != from {
+                    mark_reassign(game, sim, u);
                     return Ok(PokeResult::Ok(None));
                 }
                 // a refused spot (blocked): try the next; the refusal is the probe's
@@ -1618,6 +1700,32 @@ fn unit_level<X: WorldPending>(game: &Game, sim: &WorldSim<X>, u: UnitId) -> Opt
 /// found and the player placed next to it (`Ok` with the target's GUID)
 /// or the walk ends `Failed`. `walk` is the state the runner keeps
 /// between steps (a fresh one for a new `goto`).
+/// After a placement: when the player's cell has a `LAND_MASK` bit,
+/// place again, exact, on the nearest cell of its room without one.
+fn settle_landing<X: WorldPending>(game: &mut Game, sim: &mut WorldSim<X>, player: UnitId) {
+    let Some(room) = game.lists.unit(player).and_then(|e| e.room()) else {
+        return;
+    };
+    let (x, y) = sim.action.sys.hooks.path_position(player);
+    if sim
+        .action
+        .sys
+        .hooks
+        .drlg
+        .collision(game, room, x, y)
+        .is_none_or(|m| m & LAND_MASK == 0)
+    {
+        return;
+    }
+    if let Some((nx, ny)) = room_free_cell(game, sim, room, x, y) {
+        sim.lend(|a| {
+            a.with(game, |g, v| {
+                place_unit(PathCtx::of(v, g), player, Some(room), nx, ny, true, false)
+            })
+        });
+    }
+}
+
 pub fn goto_step<X: WorldPending>(
     game: &mut Game,
     sim: &mut WorldSim<X>,
@@ -1673,6 +1781,10 @@ pub fn goto_step<X: WorldPending>(
                 place_unit(PathCtx::of(v, g), player, Some(room), x, y, false, false)
             })
         });
+        // Settle on a missile-passable cell (`poke.md` §6 rule 3.2).
+        if placed {
+            settle_landing(game, sim, player);
+        }
         return if placed {
             PokeResult::Ok(Some(guid))
         } else {
@@ -1729,23 +1841,10 @@ pub fn goto_step<X: WorldPending>(
         let Some(a) = d.room(h).active() else {
             return PokeResult::Failed;
         };
-        // The free cell of H nearest its centre (first found on a tie).
+        // The free, missile-passable cell of H nearest its centre.
         let r = a.subtiles;
-        let (cx, cy) = (r.x + r.w / 2, r.y + r.h / 2);
-        let mut best: Option<(i64, i32, i32)> = None;
-        for y in r.y..r.y + r.h {
-            for x in r.x..r.x + r.w {
-                let free = a
-                    .collision
-                    .get(x, y)
-                    .is_some_and(|m| m & crate::path::collision::masks::PLAYER_MOVE == 0);
-                let d2 = i64::from(x - cx).pow(2) + i64::from(y - cy).pow(2);
-                if free && best.is_none_or(|(b, _, _)| d2 < b) {
-                    best = Some((d2, x, y));
-                }
-            }
-        }
-        (key(h), a.id, best.map(|(_, x, y)| (x, y)))
+        let cell = nearest_free(a, r.x + r.w / 2, r.y + r.h / 2);
+        (key(h), a.id, cell)
     };
     let (hkey, hroom, cell) = hop;
     let Some((x, y)) = cell else {
@@ -1913,6 +2012,7 @@ mod tests {
         "seed-unit @wp#1 1 2",
         "time 5 1024",
         "pos @player @x+3 @y",
+        "pos @player 100 200 free",
         "hop @player 5100 @y-40",
         "warp 3",
         "warp 3 tile 2",

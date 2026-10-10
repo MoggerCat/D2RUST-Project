@@ -99,7 +99,9 @@ use d2_server::host::Host;
 use d2_server::host::SystemClock;
 use d2_server::seams::{ClientId, Clock, PlayerGate};
 use d2_server::world_data::game::GameTables;
-use d2_server::world_data::tables::{drop_tables, hireling_tables, LevelTables, SaveData};
+use d2_server::world_data::tables::{
+    class_picks, drop_tables, hireling_tables, LevelTables, SaveData,
+};
 use d2_server::world_data::{self, WorldFiles};
 use d2_sim::combat::vitals::VitalsTables;
 use d2_sim::drlg::maze::Maze;
@@ -510,6 +512,11 @@ pub struct LocalSeams {
     /// The players and monsters of [`Self::sides`] that are dying or dead
     /// (player modes 0 / 17, monster modes 0 / 12), for the target search.
     pub down: std::collections::BTreeSet<UnitId>,
+    /// The players and monsters of [`Self::sides`] without unit flag 0x4
+    /// (+0xC4: monstats2 `isAtt` for a monster, `monsters/init.md` "Outputs";
+    /// set for every player, `sim/units.md` §1), which the scan 6 filter
+    /// `0x005DC970` skips (`ai.md` §5.3 scan 6 rule 1).
+    pub not_att: std::collections::BTreeSet<UnitId>,
     /// The unit size (`0x00620510`, the path record's) of the units of
     /// [`Self::sides`], for the full-size distance of the target search.
     pub sizes: BTreeMap<UnitId, i32>,
@@ -582,10 +589,26 @@ impl LocalSeams {
     ///
     /// PROVISIONAL (REC-279 part 2; d2rs-own, unverified): the ranges are
     /// settled (`ai.md` §5.2 step 4: 35; §5.3 scan 6: full-size < 49), but
-    /// the scan 6 filter `0x005DC970`, the `nThreat` main / alternative
-    /// classes, the line test (mask 4) and `0x005DD510` are not applied
-    /// here, nor the scan 5 callback `0x005DCA70`.
+    /// of the scan 6 filter `0x005DC970` only the dead test and unit flag
+    /// 0x4 are applied, and the `nThreat` main / alternative classes, the
+    /// line test (mask 4) and `0x005DD510` are not, nor the rest of the
+    /// scan 5 callback `0x005DCA70`. PROVISIONAL (REC-1642): scan 5 skips
+    /// a monster without unit flag 0x4 like scan 6 (1.14d, q-fix-skills-4cls
+    /// checks: a Clay Golem, Valkyrie or skeleton never targets the poked
+    /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
+    /// scan 5 callback's reading.
     fn nearest_foe(&self, unit: UnitId, range: i32, full_size: bool) -> Option<(UnitId, i32)> {
+        self.nearest_foe_where(unit, range, full_size, |u| !self.not_att.contains(&u))
+    }
+
+    /// [`Self::nearest_foe`] among the candidates `keep` accepts.
+    fn nearest_foe_where(
+        &self,
+        unit: UnitId,
+        range: i32,
+        full_size: bool,
+        keep: impl Fn(UnitId) -> bool,
+    ) -> Option<(UnitId, i32)> {
         let &(_, _, at) = self.sides.get(&unit)?;
         let side = self.player_side(unit)?;
         let size = self.sizes.get(&unit).copied().unwrap_or(0);
@@ -596,6 +619,7 @@ impl LocalSeams {
                     && ty == UnitType::Monster
                     && self.player_side(u) != Some(side)
                     && !self.down.contains(&u)
+                    && keep(u)
             })
             .map(|(&u, &(_, _, p))| {
                 let d = if full_size {
@@ -644,8 +668,20 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             })
         })
         .collect();
+    let not_att = classes
+        .keys()
+        .copied()
+        .filter(|&u| {
+            sim.action
+                .sys
+                .units
+                .get(u)
+                .is_some_and(|r| r.flags & d2_sim::monsters::init::unit_flag::IS_ATT == 0)
+        })
+        .collect();
     let hooks = &mut sim.action.sys.hooks;
     hooks.x.down = down;
+    hooks.x.not_att = not_att;
     // d2rs-own, unverified (q-assassin-gaps, REC-233): a listed pet is on the
     // player side (the summon's alignment effect, `0x005543B0`, is not wired).
     let pets: std::collections::BTreeSet<u32> = hooks
@@ -670,6 +706,8 @@ pub fn sync_seams(game: &Game, sim: &mut WorldSim<LocalSeams>) {
             }
         }
     }
+    let levels = hooks.monster_skills.clone();
+    hooks.x.monsters.set_levels(levels);
     hooks.x.sides = sides;
     hooks.x.sizes = sizes;
     let mut units = BTreeMap::new();
@@ -956,6 +994,40 @@ impl Pending for LocalSeams {
     fn golem_resummon(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) -> bool {
         skill_events::golem_resummon(h, sim, player)
     }
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32) {
+        skill_events::missile_summon_class(h, sim, owner, skill, level)
+    }
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        skill_events::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+    }
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level);
+    }
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, player: UnitId) {
+        skill_events::right_aura_select(h, sim, player);
+    }
     fn passive_refresh_all(h: &mut ActionHooks<Self>, sim: &mut USim<'_>, unit: UnitId) {
         skill_events::passive_refresh_all(h, sim, unit);
     }
@@ -1004,6 +1076,9 @@ impl Pending for LocalSeams {
     }
     fn wield_type(&self, item: UnitId) -> i32 {
         self.weapons.facts(item).grip
+    }
+    fn item_type_class(&self, item: UnitId) -> u32 {
+        self.weapons.type_class(item)
     }
     fn item_shoots(&self, item: UnitId) -> bool {
         self.weapons.facts(item).shoots
@@ -1084,13 +1159,37 @@ impl Pending for LocalSeams {
         self.nearest_foe(unit, GOOD_SEARCH_RANGE, false)
     }
     /// `0x005DDC30`: [`LocalSeams::nearest_foe`] at full-size distance
-    /// < 49 (`ai.md` §5.3 scan 6), with the preview's melee flag; none:
-    /// distance 0x7FFFFFFF.
+    /// < 49 (`ai.md` §5.3 scan 6), skipping candidates without unit flag
+    /// 0x4 (scan 6 rule 1, `0x00451F30(C, 4)`), with the preview's melee
+    /// flag; none: distance 0x7FFFFFFF.
     fn secondary_target(&mut self, _: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        match self.nearest_foe(unit, SECONDARY_SEARCH_RANGE, true) {
+        let found = self.nearest_foe_where(unit, SECONDARY_SEARCH_RANGE, true, |u| {
+            !self.not_att.contains(&u)
+        });
+        match found {
             Some((t, d)) => (Some(t), d, self.in_melee_range(unit, t, 0)),
             None => (None, 0x7FFF_FFFF, false),
         }
+    }
+    /// The live foes of `unit` with unit flag 0x4 in unit-key order (the
+    /// scan 6 candidates, filter `0x005DC970`'s `0x00451F30(C, 4)`,
+    /// `ai.md` §5.3 scan 6 rule 1; the distance, threat class and line
+    /// gates run in the sim's `secondary_target`).
+    fn secondary_candidates(&mut self, _: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        let side = self.player_side(unit)?;
+        Some(
+            self.sides
+                .iter()
+                .filter(|&(&u, &(ty, ..))| {
+                    u != unit
+                        && ty == UnitType::Monster
+                        && self.player_side(u) != Some(side)
+                        && !self.down.contains(&u)
+                        && !self.not_att.contains(&u)
+                })
+                .map(|(&u, _)| u)
+                .collect(),
+        )
     }
     /// d2rs-own, unverified (preview, D1; `0x00622870`).
     fn melee_range(&self, _: UnitId) -> i32 {
@@ -1302,6 +1401,8 @@ pub struct LiveData {
     pub tables: GameTables,
     /// The chest drop's tables (`ActionHooks::object_drops`).
     pub drops: Arc<DropTables>,
+    /// The item class picks of the drop helpers (`DeathDrops::with_picks`).
+    pub picks: Arc<d2_sim::treasure::class_pick::ClassPicks>,
     /// `InteractionState::hireling_tables`.
     pub hirelings: HirelingTables,
     /// The `.d2s` reader's tables (`--save`), for the app's expansion game.
@@ -1339,6 +1440,7 @@ impl LiveData {
             levels,
             files,
             drops: Arc::new(drop_tables(&tables.fixed)?),
+            picks: Arc::new(class_picks(&tables.fixed)?),
             hirelings: hireling_tables(&tables.fixed)?,
             save: SaveData::from_fixed(&tables.fixed, GAME_SETUP.expansion)?,
             tables,
@@ -2021,6 +2123,8 @@ struct GameParts {
     bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
+    /// The drop helpers' class picks (`DeathDrops::with_picks`).
+    picks: Option<Arc<d2_sim::treasure::class_pick::ClassPicks>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
     /// The inventory tables of the wired host's inventory model (the new
@@ -2052,6 +2156,7 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
+            picks: Some(d.picks.clone()),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
@@ -2189,11 +2294,13 @@ pub fn build_with(
     })?;
     // The chest drop's state (`treasure.md` §4): its seed, creation
     // fields and unique bits are the action wiring's.
+    let picks = parts.picks;
     sim.action.hooks().object_drops = parts.drops.map(|t| {
-        Box::new(DeathDrops::new(
-            t,
-            GameFields::new(Seed::init_low(0), false),
-        ))
+        let d = DeathDrops::new(t, GameFields::new(Seed::init_low(0), false));
+        Box::new(match picks {
+            Some(p) => d.with_picks(p),
+            None => d,
+        })
     });
     let mut game = Game::new();
     let start_levels = [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
@@ -2735,6 +2842,27 @@ mod target_search_tests {
             Some(UnitId(2))
         );
         assert_eq!(seams(152, 3).secondary_target(&mut g, UnitId(1)).0, None);
+    }
+
+    // Covers: specs/monsters/ai.md §5.3 r1
+    #[test]
+    fn the_secondary_search_skips_a_unit_without_flag_4() {
+        // 1.14d `merc-rogue-cow`: the cow (monstats2 `isAtt` 0) is never
+        // the hireling's target; the window and the other unit stay.
+        let mut g = Game::default();
+        let mut s = seams(110, 0);
+        s.not_att.insert(UnitId(2));
+        assert_eq!(
+            s.secondary_target(&mut g, UnitId(1)),
+            (None, 0x7FFF_FFFF, false)
+        );
+        s.sides
+            .insert(UnitId(3), (UnitType::Monster, false, (120, 100)));
+        assert_eq!(s.secondary_target(&mut g, UnitId(1)).0, Some(UnitId(3)));
+        assert_eq!(
+            s.secondary_candidates(&mut g, UnitId(1)),
+            Some(vec![UnitId(3)])
+        );
     }
 
     // Covers: specs/monsters/ai.md §5.2 r4

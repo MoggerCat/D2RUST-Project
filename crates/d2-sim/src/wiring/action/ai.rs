@@ -157,11 +157,30 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn is_boss(&self, unit: UnitId) -> bool {
         self.h.x.is_boss(unit)
     }
+    /// Monster data +0x50 (the coordinate record of `population.md`
+    /// §9.6 step 3) and its +0x24 word: a monster of the lent monster
+    /// world reads [`super::ActionHooks::vision_seen`]; other units ask
+    /// [`Pending`].
     fn vision_seen(&self, unit: UnitId) -> Option<u32> {
-        self.h.x.vision_seen(unit)
+        match self.h.monster_data(unit) {
+            Some(m) => m
+                .vision
+                .map(|r| self.h.vision_seen.get(&r).copied().unwrap_or(0)),
+            None => self.h.x.vision_seen(unit),
+        }
     }
+    /// §5.2 step 7 on the record: +0x24 := 1.
+    ///
+    /// PROVISIONAL (`ai.md` §5.2 step 7 "vision +0x24 := (it was 0)";
+    /// REC-1698): the word is set to 1 and never cleared.
     fn mark_seen(&mut self, unit: UnitId) {
-        self.h.x.mark_seen(unit);
+        match self.h.monster_data(unit).map(|m| m.vision) {
+            Some(Some(r)) => {
+                self.h.vision_seen.insert(r, 1);
+            }
+            Some(None) => {}
+            None => self.h.x.mark_seen(unit),
+        }
     }
     fn ai_reset(&mut self, unit: UnitId) {
         self.h.x.ai_reset(unit);
@@ -451,8 +470,14 @@ impl<X: Pending> AiWorld for View<'_, X> {
 }
 
 impl<X: Pending> AiTargets for View<'_, X> {
+    /// The host's lists (slot heads) followed by the nodes inserted
+    /// through `0x005B1990` / `0x005B1900` ([`Game::target_nodes`]).
     fn target_nodes(&self, game: &Game) -> [Vec<UnitId>; 10] {
-        self.h.x.target_nodes(game)
+        let mut nodes = self.h.x.target_nodes(game);
+        for (slot, list) in nodes.iter_mut().enumerate() {
+            list.extend(game.target_nodes.slot(slot).iter().copied());
+        }
+        nodes
     }
     fn forced_target(&mut self, game: &mut Game, unit: UnitId) -> Option<(UnitId, i32)> {
         self.h.x.forced_target(game, unit)
@@ -474,8 +499,9 @@ impl<X: Pending> AiTargets for View<'_, X> {
     ) -> bool {
         self.h.x.choose_alternative(game, unit, main, alt)
     }
+    /// `0x005DDC30` on the wired units ([`super::ai_scan`]).
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
-        self.h.x.secondary_target(game, unit)
+        self.secondary_search(game, unit)
     }
     /// `0x005DDF20` (`ai.md` §5.3): scan 2 (mode 1, §5.4: the client
     /// players of the unit's room's near-room list, own room included, in
@@ -924,6 +950,37 @@ impl<X: Pending> AiActs for View<'_, X> {
 /// and the target-node slot (+0xD0) are real (`units.md` §2); everything
 /// else keeps the narrow default of [`AiSummons`] until its owner wires it.
 impl<X: Pending> AiSummons for View<'_, X> {
+    /// Path +0x18 / +0x1A of the unit's dynamic path (`0x00648A20` /
+    /// `0x00648A30`); no dynamic path: (0, 0).
+    fn path_final_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let f = d.final_target();
+            (f.x, f.y)
+        })
+    }
+    /// Path +0x10 / +0x12 of the unit's dynamic path; none: (0, 0).
+    fn path_target_point(&self, unit: UnitId) -> (i32, i32) {
+        let p = self.h.paths.as_ref().and_then(|p| p.dynamic(unit));
+        p.map_or((0, 0), |d| {
+            let t = d.target();
+            (t.x, t.y)
+        })
+    }
+    /// `0x0061B130` → `0x0066CE30` (`drlg/levels.md` §11.4), as the
+    /// population view's: the room holding the point among `room` and its
+    /// adjacency array; none (or no room) → 0; that room's record at the
+    /// point → its index; no record → −1.
+    fn coord_index(&self, game: &Game, room: Option<RoomId>, x: i32, y: i32) -> i32 {
+        let Some(at) = room.and_then(|r| self.h.drlg.find_room(game, r, x, y)) else {
+            return 0;
+        };
+        self.h
+            .drlg
+            .drlg_room(game, at)
+            .and_then(|(d, r)| d.coord_at(r, x, y))
+            .map_or(-1, |c| c.index as i32)
+    }
     /// The palace guard's door hooks from the lent quest control. The Act
     /// V prisoner AI's hooks (`quests-act5.md` §4.10): the reads from the
     /// quest control's published states
@@ -1028,6 +1085,18 @@ impl<X: Pending> AiSummons for View<'_, X> {
     }
     fn target_slot(&self, unit: UnitId) -> i32 {
         self.units.get(unit).map_or(11, |r| r.node_index as i32)
+    }
+    /// `0x005B1990(game, unit, 0, slot)`: the node at the head of list
+    /// `slot`; unit +0xD0 := slot (`ai.md` §5.2).
+    fn register_target_node(&mut self, game: &mut Game, unit: UnitId, slot: i32) {
+        let Some(r) = self.units.get_mut(unit) else {
+            return;
+        };
+        let Ok(index) = u8::try_from(slot) else {
+            return;
+        };
+        r.node_index = index.into();
+        game.target_nodes.push_front(slot, unit);
     }
     /// `0x00574BD0` from the published hireling facts: the `Id` of the
     /// unit's node when `owner` holds it.

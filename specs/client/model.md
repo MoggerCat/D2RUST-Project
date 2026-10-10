@@ -32,28 +32,28 @@
 |   2. Unit table | 140–189 |
 |   3. Local player | 190–212 |
 |   4. Receive and the unit message queue | 213–250 |
-|   5. Client update pass | 251–480 |
-|   6. Position check (`0x004804E0`) | 481–524 |
-|   7. Session messages | 525–722 |
-|   8. Mode requests | 723–808 |
-|   9. Room-in-sight messages | 809–843 |
-|   10. Bit reader | 844–858 |
-|   11. Current act and level (join and later) | 859–904 |
-|   12. Client DRLG and the room of a point | 905–946 |
-|   13. Visibility predicate (`0x004DBF20`) | 947–998 |
-|   14. Pet list and the hireling GUID | 999–1063 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1064–1153 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1154–1188 |
-|   17. Model writes made by 1.14d UI code | 1189–1394 |
-|   18. Audio driver inputs and the client object functions | 1395–1425 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1426–1655 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1656–1816 |
-| Constants & data dependencies | 1817–1829 |
-| Randomness | 1830–1845 |
-| Edge cases & original bugs | 1846–1870 |
-| Test vectors | 1871–1928 |
-| Provenance | 1929–2034 |
-| Open questions | 2035–2240 |
+|   5. Client update pass | 251–494 |
+|   6. Position check (`0x004804E0`) | 495–538 |
+|   7. Session messages | 539–736 |
+|   8. Mode requests | 737–829 |
+|   9. Room-in-sight messages | 830–864 |
+|   10. Bit reader | 865–879 |
+|   11. Current act and level (join and later) | 880–925 |
+|   12. Client DRLG and the room of a point | 926–967 |
+|   13. Visibility predicate (`0x004DBF20`) | 968–1019 |
+|   14. Pet list and the hireling GUID | 1020–1084 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1085–1174 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1175–1209 |
+|   17. Model writes made by 1.14d UI code | 1210–1415 |
+|   18. Audio driver inputs and the client object functions | 1416–1446 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1447–1696 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1697–1857 |
+| Constants & data dependencies | 1858–1870 |
+| Randomness | 1871–1886 |
+| Edge cases & original bugs | 1887–1911 |
+| Test vectors | 1912–1969 |
+| Provenance | 1970–2075 |
+| Open questions | 2076–2281 |
 <!-- /index -->
 
 ## Summary
@@ -478,6 +478,20 @@ position check of the local player.
       (target, one point, compute that can fail or stop on collision),
       and d2rs's "keep the unit in its cell" matches only the idle ones.
 
+      Drawing (q-fix-d5-draws, REC-1395, PROVISIONAL): the critters
+      draw like any monster, filed in their room's unit list
+      (`render/draw-order.md` §3 r4), so a `ck` shadow and cel row
+      appear in `a1-town-arrival-ama` (rows 113, 115, 181, 186). The two
+      sets number their GUIDs apart (set C from 2, server monsters from
+      1), so d2rs keys a set C monster in the room lists and the view by
+      GUID | 0x8000_0000 (`ClientWorld::view_key`); the model's own set
+      C keys are unchanged. Checked 2026-10-09 against the committed
+      scene at tick 73: rows 1–110 equal; the chickens' position and
+      cel frame are not (1.14d: walk frame 40 at (80, 416), neutral
+      frame 32 at (48, 516); d2rs: frame 0 at the creation cell), which
+      is REC-742's open point: no 1.14d per-tick track of a critter
+      exists.
+
 ### 6. Position check (`0x004804E0`)
 
 `check(U, x, y, kind, tx, ty)`, called by the message rules of
@@ -765,6 +779,13 @@ position check of the local player.
 
    A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
    neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.
+   PROVISIONAL: on the local player, every code but the walks 0x00,
+   0x01, 0x17, 0x18 and the interact sender 0x02 ends the walk the
+   client predicts (open question 2): the player stands from that
+   request on (because the client steps its path only in a walking mode
+   and the server stops its player's walk on the same mode change; a hit
+   or death while walking otherwise walks the client on alone); settled
+   by REC-1250.
 5. **Object** (`0x004BD6D0`): code 3 → `0x004BCF60(U, record)` (object
    mode change: lights `render/lighting.md` §8), then `0x004BD650` when
    `0x00621B00(U)`; code 0x15 → `0x004BD5C0(record)`; any other code is
@@ -1575,6 +1596,26 @@ record pointer, `ret 4`: the §8 r1 flag is not passed).
    it (a monster with monstats `Code` `PB`, the turrets and
    `firetower`: then direction := (direction + 0x38) & 0x3F), clears
    the target, then starts.
+
+   PROVISIONAL: the `cltstfunc` bodies are read from their effect on
+   the local player's click (q-fix-skills-4cls; 1.14d under Wine,
+   2026-10-09, checks `traces/checks/{nec,ass}-*.check`: a right click
+   on open ground beside a live cow sends **no** C→S for functions 20
+   (Raise Skeleton, Skeletal Mage), 21 (Corpse / Poison Explosion), 23
+   (Iron Golem), 24 (Revive) and 5 (Psychic Hammer, Dragon Flight), and
+   sends 0x0C for 22 (Bone Prison), 18 (curses), 19 (Teeth) and the
+   rest): 5 (`0x004F2010`, read from the 1.14d export 2026-10-09)
+   returns 1 only with a target T that is a player or monster (T type
+   < 2), with neither U's nor T's room in town (`0x0061AB00`) and T
+   hostile (`0x00465C60`, `ui/controls.md` §6 r9.7); 20 (`0x004F3870`
+   reads T: a monster, then `0x004638A0`, `0x00645510(T, 0)`,
+   `0x004B11F0`, `0x00451FE0`), 21 and 24 are read as "a dead monster
+   target"; 23 as "an item target"; every other function returns
+   non-zero (because a click sends only when the request
+   returned non-zero, `skills/sequences.md` local player rule 2, and
+   the use check r9.1 passes for all of these); settled by REC-1641
+   (the table bodies at `0x00727A90` read in a spec-writing session,
+   and a 1.14d check of each function on its target kind).
 8. **Client mode steps** (monster update `0x004B13A0`, §5 r2; a monster
    with state 1 `freeze` runs only while dead; mode ≥ 16 nothing):
    1. Mode record `0x004AF400` {path kind, anim kind, end kind}: class

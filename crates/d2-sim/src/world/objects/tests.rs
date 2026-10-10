@@ -703,13 +703,19 @@ fn preset_bounds_and_580() {
         create_preset(&mut ctl, &t, &mut f, RoomId(1), 2, 576, 0, 0, 0),
         Ok(Preset::Object(None))
     );
-    // 580 off level 25 goes through 581's path (open question 6).
-    for class in [580, 581, 582] {
+    // 582's class is the quest spec's (`0x0059D830`): the host's.
+    assert_eq!(
+        create_preset(&mut ctl, &t, &mut f, RoomId(1), 2, 582, 0, 0, 0),
+        Ok(Preset::NotCovered(582))
+    );
+    // 580 and 581 draw the chest class first; no allocation → none.
+    for class in [580, 581] {
         assert_eq!(
             create_preset(&mut ctl, &t, &mut f, RoomId(1), 2, class, 0, 0, 0),
-            Ok(Preset::NotCovered(class))
+            Ok(Preset::Object(None))
         );
     }
+    let mut ctl = control(&t, Seed::init());
     // 580 on level 25: class 371, spark, InteractType 3, flag 0x80, mode 0.
     let mut f = Fake {
         next_alloc: Some(100),
@@ -731,11 +737,57 @@ fn preset_bounds_and_580() {
     assert_eq!((d.spark, d.interact), (1, 3));
     assert_ne!(f.flags[&u] & oflags::KEEP_MODE, 0);
     assert_eq!(f.modes[&u], 0);
-    assert_eq!(ctl.seed, Seed::init());
+    // 581's class draw happens at level 25 too (one control-seed step).
+    let mut want = Seed::init();
+    want.step();
+    assert_eq!(ctl.seed, want);
     // objects-2 §24 r1: the final mode set (mode 0 → 0) runs no setup and
     // draws nothing, but queues the object and sets flag 0x1.
     assert!(f.calls.contains(&Call::Mode(u, 0, true)));
     assert_ne!(f.flags[&u] & oflags::CHANGED, 0);
+}
+
+/// The class 581 allocates at `level` with a control seed whose next
+/// step gives `lo'`, and the control seed after it.
+fn preset_chest_class(level: u32, lo: u32) -> (u16, Seed) {
+    let t = tables();
+    let mut ctl = control(&t, Seed::new(0, lo));
+    let mut f = Fake {
+        next_alloc: Some(100),
+        ..Fake::default()
+    };
+    let u = UnitId(100);
+    ctl.data.insert(u, ObjectData::default());
+    let r = create_preset(&mut ctl, &t, &mut f, RoomId(1), level, 581, 3, 4, 1).unwrap();
+    assert_eq!(r, Preset::Object(Some(u)));
+    let Call::Allocate(room, class, x, y, mode) = f.calls[0].clone() else {
+        panic!("{:?}", f.calls);
+    };
+    // The preset mode (1) is ignored: mode 0 (§6).
+    assert_eq!((room, x, y, mode), (RoomId(1), 3, 4, 0));
+    (class, ctl.seed)
+}
+
+// Covers: specs/world/objects.md §6
+#[test]
+fn preset_chest_581_picks_by_act_on_one_control_step() {
+    // Act III: level 83 {329, 330, 331, 332}[lo' & 3], else {181, 183}[lo' & 1]
+    // (the Durance of Hate chests of `a3-warp-durance-ama`).
+    assert_eq!(preset_chest_class(100, 6).0, 181);
+    assert_eq!(preset_chest_class(100, 7).0, 183);
+    assert_eq!(preset_chest_class(83, 6).0, 331);
+    assert_eq!(preset_chest_class(83, 3).0, 332);
+    // Act II: level 74 {387, 389, 390, 391}, else {87, 88}.
+    assert_eq!(preset_chest_class(74, 1).0, 389);
+    assert_eq!(preset_chest_class(50, 9).0, 88);
+    // Acts I, IV, V: lo' mod 13.
+    assert_eq!(preset_chest_class(2, 13 + 4).0, 141);
+    assert_eq!(preset_chest_class(110, 12).0, 243);
+    assert_eq!(preset_chest_class(105, 0).0, 5);
+    // One step of the control seed.
+    let mut want = Seed::new(0, 6);
+    want.step();
+    assert_eq!(preset_chest_class(100, 6).1, want);
 }
 
 // ------------------------------------------------------------------ §7

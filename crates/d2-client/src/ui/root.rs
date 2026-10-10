@@ -170,6 +170,10 @@ impl UiRoot {
     /// Draws the open panels, bottom-most first (§A2).
     pub fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         let open: Vec<&Slot> = self.slots.iter().filter(|s| s.open).collect();
+        for s in open.iter().filter(|s| s.panel.draw_first()) {
+            s.panel.draw(ctx, out);
+        }
+        let open: Vec<&Slot> = open.into_iter().filter(|s| !s.panel.draw_first()).collect();
         let moved = |s: &Slot| {
             s.panel
                 .draw_before()

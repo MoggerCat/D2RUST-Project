@@ -1,0 +1,9 @@
+check 1
+# Chat 0x15 (hex: unread 0, lang 0, msg 'hi', empty target) at frame 20: packets compares the C->S bytes and the S->C 0x26 echo (q-run-net, PROVISIONAL REC-1751: layout of client-messages.tsv).
+name net-s2c-chat
+save ScnAma --class ama --expansion
+seed 1234
+ticks 40
+seconds 240
+channels packets
+at 20 send hex 15 00 00 68 69 00 00 00

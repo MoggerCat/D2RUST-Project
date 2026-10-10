@@ -35,17 +35,17 @@
 |   4. A3Q2 Khalim's Will (chain 16, slot 18) | 273–390 |
 |   5. A3Q3 Blade of the Old Religion (chain 17, slot 19) | 391–497 |
 |   6. A3Q4 The Golden Bird (chain 18, slot 20) | 498–586 |
-|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–683 |
-|   8. A3Q6 The Guardian (chain 20, slot 22) | 684–781 |
-|   9. Act III gossip and intro records | 782–843 |
-|   10. Hooks called from other systems | 844–864 |
-|   11. Clarifications (QC-1 … QC-7) | 865–871 |
-| Constants & data dependencies | 872–888 |
-| Randomness | 889–902 |
-| Edge cases & original bugs | 903–950 |
-| Test vectors | 951–968 |
-| Provenance | 969–995 |
-| Open questions | 996–1023 |
+|   7. A3Q5 The Blackened Temple (chain 19, slot 21) | 587–700 |
+|   8. A3Q6 The Guardian (chain 20, slot 22) | 701–798 |
+|   9. Act III gossip and intro records | 799–860 |
+|   10. Hooks called from other systems | 861–881 |
+|   11. Clarifications (QC-1 … QC-7) | 882–888 |
+| Constants & data dependencies | 889–905 |
+| Randomness | 906–919 |
+| Edge cases & original bugs | 920–967 |
+| Test vectors | 968–985 |
+| Provenance | 986–1012 |
+| Open questions | 1013–1040 |
 <!-- /index -->
 
 ## Summary
@@ -667,6 +667,23 @@ Other victims:
 - Init 60 (`0x005BBBA0`): orb smashed → mode 2. +0x28 = 0 → spawn
   monster 366 `compellingorb` at the object (`0x005B3090`, mode 1);
   created → unit flags |= 0x20000, +0x2C := GUID, +0x28 := 1.
+  `0x005B3090(game, room, x, y, class, mode, flags)` is `0x005B2F20`
+  with spread −1 (`monsters/init.md` §1) at the object's room and
+  position. PROVISIONAL (REC-1696): flags 0, as the palace Kaelan call
+  of the same wrapper (`quests-act2-2.md` init 19). Settled by: PC 1
+  item "[q-fix-seed-game] The Compelling Orb's monster spawn" and
+  `a3-warp-durance-ama` frame 21 (monster 366 at the orb).
+  monster 366 `compellingorb` at the object: `0x005B3090(game, init
+  room +0x08, init x +0x14, init y +0x18, class 366, mode 1, flags 0)`,
+  which is `monsters/population.md` §9 with no cl, r = −1 (one test at
+  exactly the orb's point, no ring, no retry), GUID 0 and flags 0. So
+  the bounds are the room box, the collision test uses class 366's
+  spawnCol mask and SizeX, a blocked point means no monster, party
+  minions §10 run, the monster counts in its region's spawned count
+  (§13), and its vision record is the room's record at the point
+  (§9.6). Created → unit flags |= 0x20000, +0x2C := GUID, +0x28 := 1.
+  1.14d-confirmed (`0x005BBBCA`–`0x005BBBF9`, `0x005B3090`–`0x005B30CF`,
+  read 2026-10-09, PC 1 late).
 - Operate 53 (`0x005BB980`): object mode 0. The player's weapon
   (`0x0063BEF0` on the inventory) must be `qf2 `, else sound 19. +0x38
   += 1; below 2 → return 0 (the first valid hit does nothing). Then:

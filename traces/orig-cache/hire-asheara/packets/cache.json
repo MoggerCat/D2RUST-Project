@@ -1,0 +1,42 @@
+{
+ "channel": "packets",
+ "check": "hire-asheara",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "400",
+  "--ticks",
+  "90",
+  "--auto",
+  "ScnHi3",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 goto unit 1:252",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:252",
+  "--send",
+  "16 InitEntityChat id=@1:252",
+  "--send",
+  "20 HireMerc npc=@1:252 merc=1040"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "5ced8a5dbdd2382a0c4bfc7cefbbbf7508069ff637a4d1afbdff97d5c897231d",
+   "size": 154388
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "5ef77097fbc68bda9bf455b0fb1e1a0d3563020c8d0968325c8c272b04bd75b5",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "ea2eb2a70588fca7179a9a302bc978d0d0be7bc937bdfd6b32c284f030910186"
+ }
+}

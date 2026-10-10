@@ -287,7 +287,7 @@ impl MissileRooms for Fake {
     fn clear_footprint(&mut self, _: &mut Game, unit: UnitId) {
         self.log.push(format!("clear {}", unit.0));
     }
-    fn units_at(&self, _: &Game, _: RoomId, x: i32, y: i32) -> Vec<UnitId> {
+    fn units_at(&self, _: &Game, _: RoomId, x: i32, y: i32, _: i32) -> Vec<UnitId> {
         self.units.get(&(x, y)).cloned().unwrap_or_default()
     }
 }
@@ -323,6 +323,7 @@ impl MissileCombat for Fake {
         _: UnitId,
         unit: UnitId,
         d: &mut Damage,
+        _: Option<&MissileData>,
     ) {
         self.log.push(format!("damage {} {}", unit.0, d.phys));
         self.log.push(format!(

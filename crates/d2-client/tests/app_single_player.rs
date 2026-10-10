@@ -951,3 +951,88 @@ fn the_start_items_messages_follow_the_recorded_join() {
         }
     }
 }
+
+/// A saved character's items reach the client as the join's item
+/// messages (`intents-events.md` §8.2 rule 3.5, the update-list pass
+/// `0x00597890`): after the first stat messages and before the 0x23 pair,
+/// in the save's order, and not again after the join sequence (rule 3.10
+/// resets the list). Bytes and order as 1.14d's join of the same save
+/// (`traces/checks/combat-potion-midfight.check`, packets channel, frame
+/// 2: the equipped short sword's 0x9D, the two belt potions' 0x9C).
+// Covers: specs/sim/intents-events.md §8.2 r3; specs/flows/game-join.md §2 r3
+#[test]
+#[ignore = "real data: needs D2_GAME_DIR (tools/realdata-gate.sh)"]
+fn a_saved_characters_items_are_the_joins_item_messages() {
+    use d2_client::bridge::link::SendQueue;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let dir = std::env::temp_dir().join(format!("d2rs-join-items-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("CmbPot.d2s");
+    let args: Vec<String> = [
+        "new",
+        "--name",
+        "CmbPot",
+        "--class",
+        "bar",
+        "--expansion",
+        "--level",
+        "3",
+        "--item",
+        "ssd/body=4",
+        "--item",
+        "hp1/belt=0",
+        "--item",
+        "hp1/belt=4",
+        "-o",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .chain([path.display().to_string()])
+    .collect();
+    assert_eq!(d2s_tool::cli::run(&args, &mut std::io::sink()).unwrap(), 0);
+    let data = app_support::game_data();
+    let character = single_player::load_character(&data, &path, 0).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let ms = std::sync::Arc::new(AtomicU32::new(1000));
+    let (mut link, _) =
+        single_player::start_with(data, DEFAULT_SEED, character.clone(), StepClock(ms.clone()))
+            .unwrap();
+    let req = single_player::create_request_for(&character);
+    link.send(SendQueue::System, &req.encode()).unwrap();
+    link.pump().unwrap();
+    ms.fetch_add(40, Ordering::SeqCst);
+    link.pump().unwrap();
+    link.receive();
+    link.send(SendQueue::System, &[0x6B]).unwrap();
+    let mut got = Vec::new();
+    for _ in 0..3 {
+        ms.fetch_add(40, Ordering::SeqCst);
+        link.pump().unwrap();
+        got.extend(link.receive());
+    }
+    let hex = |s: &str| -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    };
+    let want: Vec<Vec<u8>> = [
+        "9d061e05010000000001000000110080006584083037470682818081e13f",
+        "9c0e1410020000001000a0006508008006170302",
+        "9c0e1410030000001000a0006508088006170302",
+    ]
+    .iter()
+    .map(|s| hex(s))
+    .collect();
+    let items: Vec<&Vec<u8>> = got.iter().filter(|m| matches!(m[0], 0x9C | 0x9D)).collect();
+    assert_eq!(items.len(), want.len(), "item messages: {items:02x?}");
+    for (g, w) in items.iter().zip(&want) {
+        assert_eq!(&g[..], &w[..]);
+    }
+    let at = |id: u8| got.iter().position(|m| m[0] == id).unwrap();
+    let first_item = got.iter().position(|m| m[0] == 0x9D).unwrap();
+    assert!(at(0x5F) < first_item, "after 0x5F and the stats");
+    assert!(first_item < at(0x23), "before the 0x23 pair");
+    assert!(at(0x23) < at(0x04), "the join's own, before 0x04");
+}

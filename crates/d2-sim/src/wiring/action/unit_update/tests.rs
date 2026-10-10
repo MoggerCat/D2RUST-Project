@@ -208,6 +208,7 @@ fn anim_complete_reads_frame_speed_and_count() {
         speed: 0,
         pos: 0,
         events: Vec::new(),
+        drawn: Vec::new(),
     });
     a.frame_count = 0;
     assert!(anim_complete(&a));
@@ -570,15 +571,21 @@ fn monster_hit_life_byte() {
 }
 
 /// PROVISIONAL (pathing.md §10 r2; REC-95): a player entering a skill
-/// mode (A1) with a used skill sends 0x4C on its path's target unit, to
-/// its own client too; a walk mode still sends nothing to it.
-/// Block sends the 0x0D stop row.
+/// mode (A1) with a used skill sends its own client nothing
+/// (`skills/sequences.md` local player rule 3); with E flags bit 0x4
+/// (dodge / avoid) it sends 0x4C on its path's target unit, else 0x4D
+/// at the path target; a walk mode still sends nothing to it. Block
+/// sends the 0x0D stop row.
 // Covers: specs/sim/pathing.md §10 r2; specs/sim/intents-events.md §3.5 r5
 #[test]
 fn a_player_attacking_a_monster_sends_0x4c() {
     let (mut fx, p, m) = setup();
     use_skill(&mut fx, p, 0, 1);
     target(&mut fx, p, m, UnitType::Monster);
+    changed(&mut fx, p, 7);
+    fx.tick();
+    assert_eq!(sent(&mut fx), vec![], "no E flag 0x4");
+    fx.sim.hooks().x.entry_flags.insert(p, 0x4);
     changed(&mut fx, p, 7);
     fx.tick();
     let want = skill_message::skill_on_unit(0, guid(&fx, p), 0, 2, 1, guid(&fx, m), 0);

@@ -73,6 +73,8 @@ pub struct CharTables {
 const STR_DAMAGE: u16 = 4061;
 /// `strchratr`: "%s\nAttack Rating".
 const STR_ATTACK: u16 = 4063;
+/// `strchratr` without a skills record: "%s\nRating".
+const STR_ATTACK_NO_RECORD: u16 = 4065;
 /// The skill name without a skilldesc row (`panels-2.md` §17 r5).
 const STR_NO_NAME: u16 = 5382;
 /// `holyshield` (`panels-3.md` §24 r3).
@@ -254,7 +256,7 @@ fn lossy(s: &[u16]) -> String {
 }
 
 /// The block of one hand (`0x004ED570`) from the unit's stats.
-fn hand(
+pub(super) fn hand(
     skill: u16,
     row: &DescRow,
     strings: &dyn StringLookup,
@@ -266,7 +268,6 @@ fn hand(
         .or_else(|| strings.get_id(STR_NO_NAME))
         .map(lossy)
         .unwrap_or_default();
-    let _ = skill;
     let mut h = HandBlock {
         name: name.clone(),
         damage_label: strings.get_id(STR_DAMAGE).map(lossy).unwrap_or_default(),
@@ -279,9 +280,20 @@ fn hand(
         // `item_tohit_percent(119)` (§2.11 / §4 entry 2).
         let ar = stat(TOHIT) + 5 * (stat(DEX) - 7) + tohit_factor;
         h.v1 = ar_value(ar, stat(119));
+        // The label is formatted with the upper-cased name (`panels-2.md`
+        // §17 r5; `a1-panel-character`: 1.14d draws "ATTACK" / "Rating" for
+        // the right-hand Attack skill). PROVISIONAL (REC-1436): the skills
+        // record `0x00643CE0` is taken as null for the Attack skill (id 0,
+        // never in the player's skill list), so 4065 is used for it; settled
+        // by a character panel scene with another descatt skill on a hand.
+        let id = if skill == 0 {
+            STR_ATTACK_NO_RECORD
+        } else {
+            STR_ATTACK
+        };
         h.attack_label = strings
-            .get_id(STR_ATTACK)
-            .map(|s| lossy(s).replace("%s", &name))
+            .get_id(id)
+            .map(|s| lossy(s).replace("%s", &super::panels::char_details::upper_name(&name)))
             .unwrap_or_default();
     }
     h

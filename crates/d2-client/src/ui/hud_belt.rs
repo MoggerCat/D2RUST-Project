@@ -57,6 +57,10 @@ pub struct HudBelt {
     /// The key name of each belt slot's action: `None` = not set yet
     /// (the default label), `Some(None)` = unbound.
     pub keys: Option<[Option<String>; 4]>,
+    /// UI state 0x1F (belt rows) is open (set by the HUD before the draw).
+    pub state_1f_open: bool,
+    /// UI state 9 (game menu) is open.
+    pub state_9_open: bool,
 }
 
 fn belt_view(world: &ClientWorld) -> BTreeMap<u16, crate::bridge::items::ItemView> {
@@ -160,6 +164,10 @@ impl HudBelt {
         alive: bool,
     ) -> Vec<BeltDraw> {
         self.update_type(world);
+        // §5 r2: the belt draw clears the pop-up flag with state 0x1F closed
+        // (or state 9 open); the state 0x1F draw (step 8) sets it again.
+        self.state
+            .clear_popped(self.state_1f_open, self.state_9_open);
         let Some(rec) = self.record(res2).cloned() else {
             return Vec::new();
         };
@@ -170,12 +178,15 @@ impl HudBelt {
             input_blocked: false,
             alive,
             x44bfe0: false,
-            state_1f_open: false,
-            state_9_open: false,
+            state_1f_open: self.state_1f_open,
+            state_9_open: self.state_9_open,
         };
         self.state
             .mouse_move(&rec, w, h, mouse.0, mouse.1, &gates, &cursor, &slot_item);
         let mut draws = self.state.popup_draws(w, h);
+        if self.state_1f_open {
+            self.state.state_1f_draw();
+        }
         let slots: Vec<SlotInfo> = (0..rec.boxes.len())
             .map(|i| SlotInfo {
                 item: slot_item(i),

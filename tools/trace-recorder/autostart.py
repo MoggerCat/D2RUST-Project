@@ -60,7 +60,10 @@ screen point of every client unit of type T), `clickunit T C[,C..]|*
 [DX DY]` / `rclickunit ...` (click the unit of type T and one of the
 classes C, `*` = any class but not in mode 0 or 12, whose drawn point is
 nearest the window centre, at that point + (DX, DY), default (0, -8); no
-walking), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
+walking; a point outside the window is refused with an `ERROR` log line and nothing is
+clicked), `end` (stop the recording; the game is killed). X, Y are client pixels (800x600 window).
+Note: `key ESC` with no panel open opens the single-player menu, which pauses 1.14d (no game
+tick after it); close a panel with it only when one is open.
 Frame-anchored steps (specs/tools/scenario-diff.md §2 rule 4): `frame F`
 waits for the tick-return stop 0x0052FD1E of game frame F - 1 (game
 +0xA8); the steps after it are posted while the game is stopped there, so
@@ -87,15 +90,33 @@ if os.name == "nt":
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-TOOL = "trace-recorder autostart 0.3.0"
+TOOL = "trace-recorder autostart 0.4.0"
 GAME_MODE = 0x74C704      # launcher mode: 4 menu, 1 client
 MENU_LOOP = 0x72DDD4      # menu message-loop flag
 NEXT_MODE = 0x7795E8      # mode the menu routine returns
+CONFIG_PTR = 0x7A0438     # start-up configuration, stored by the client entry 0x0044B8A0
+CFG_DIFFICULTY = 0x210    # config byte read into the 0x67 game creation message (+0x14)
+DIFFICULTIES = ("normal", "nightmare", "hell")
 PLAYER = 0x7A6A70         # client player unit
 U_PATH = 0x2C
 # seconds before leaving the menu (the main menu must be up); D2_AUTO_AFTER
 # overrides the default (scenario-diff.md §4: suite.py sets the measured minimum)
 DEFAULT_AFTER = float(os.environ.get("D2_AUTO_AFTER") or 6.0)
+
+
+def parse_difficulty(d):
+    """None (leave the game's default, Normal), a name or 0..2 -> None or 0..2."""
+    if d is None or d == "":
+        return None
+    if isinstance(d, str) and d.lower() in DIFFICULTIES:
+        return DIFFICULTIES.index(d.lower())
+    try:
+        v = int(d, 0) if isinstance(d, str) else int(d)
+    except ValueError:
+        v = -1
+    if not 0 <= v <= 2:
+        raise ValueError(f"difficulty {d!r}: normal|nightmare|hell or 0..2")
+    return v
 
 
 def game_args(char, seed=None, extra=("-w", "-ns")):
@@ -172,6 +193,7 @@ SCRIPT_OPS = {"wait": (1, 1), "move": (2, 2), "click": (2, 2), "rclick": (2, 2),
               "end": (0, 0), "frame": (1, 1)}
 TICK_RET = 0x0052FD1E            # tick return, ESI = game (poke.py, original-hooks-spawn.md §5 r2)
 TICK_RET_BYTES = bytes.fromhex("8B7618")
+G_DIFFICULTY = 0x6D              # game difficulty (original-hooks.md §5.2)
 G_FRAME = 0xA8                   # game frame (tick.md §2)
 
 
@@ -378,8 +400,14 @@ class AutoStart:
     poll returns True when the script has ended the recording."""
 
     def __init__(self, after=DEFAULT_AFTER, script="", shot_dir=None, log=None, clock=None,
-                 menu=""):
+                 menu="", difficulty=None):
         self.after = after
+        # specs/tools/original-hooks.md §5.4 rule 3: config +0x210 := difficulty. The recorders'
+        # menu-less start has no difficulty switch (§5.1 rule 4), so once the client entry has
+        # stored the config pointer (before the tables load and 0x67 is built), poll writes it.
+        self.difficulty = parse_difficulty(difficulty)
+        self.difficulty_set = None
+        self.game_difficulty = None
         self.script = parse_script(script)
         self.menu = parse_script(menu)    # --menu: played from launch, no forced start
         for op, _ in self.menu:
@@ -433,11 +461,21 @@ class AutoStart:
             r = orig(addr, ctx)
             if addr == TICK_RET and getattr(rec, "game", None) in (None, ctx.Esi):
                 frame = struct.unpack("<i", rec.read(ctx.Esi + G_FRAME, 4))[0]
+                auto.note_difficulty(rec, ctx.Esi)
                 auto.on_tick_return(rec, frame)
             return r
 
         rec.handle = handle
         self.attached = True
+
+    def note_difficulty(self, mem, game):
+        """Once, at the first tick-return stop: game +0x6D (copied from the 0x67 message byte
+        +0x14, original-hooks.md §5.2), so a recording shows the difficulty it ran in."""
+        if self.difficulty is None or self.game_difficulty is not None:
+            return
+        self.game_difficulty = mem.read(game + G_DIFFICULTY, 1)[0]
+        self.log(f"autostart: game difficulty byte +{G_DIFFICULTY:#x} = {self.game_difficulty} "
+                 f"({DIFFICULTIES[self.game_difficulty] if self.game_difficulty < 3 else '?'})")
 
     def on_tick_return(self, mem, frame):
         """The game is stopped at the tick return of `frame` (game +0xA8):
@@ -519,6 +557,7 @@ class AutoStart:
                     self.log(f"autostart: menu left for client mode at {el:.1f}s")
             return False
         if self.arrived_at is None:
+            self.apply_difficulty(mem)
             lv = player_level(mem)
             if lv is None:
                 return False
@@ -537,6 +576,21 @@ class AutoStart:
                 self.runner = iter(())
                 self.wake = float("inf")
         return self.done
+
+    def apply_difficulty(self, mem):
+        """Write config +0x210 once the client entry has stored the config pointer."""
+        if self.difficulty is None or self.difficulty_set is not None:
+            return
+        try:
+            cfg = mem.read_u32(CONFIG_PTR)
+        except OSError:
+            return
+        if not cfg:
+            return
+        mem.write(cfg + CFG_DIFFICULTY, bytes([self.difficulty]))
+        self.difficulty_set = self.difficulty
+        self.log(f"autostart: difficulty {DIFFICULTIES[self.difficulty]} written to config "
+                 f"{cfg:#x}+{CFG_DIFFICULTY:#x}")
 
     def window(self, mem):
         if not self.hwnd:
@@ -668,6 +722,13 @@ class AutoStart:
                     dx, dy = (a[2], a[3]) if len(a) == 4 else (0, -8)
                     x, y = x + dx, y + dy
                     self.log(f"autostart: {op} {a[0]}:{a[1]} clicks ({x}, {y})")
+                    if not (0 <= x < VIEW_W and 0 <= y < VIEW_H):
+                        # scenario-diff.md §2 r4.5: a point outside the frame clicks nothing
+                        # (1.14d would still act on a post outside the client area)
+                        self.log(f"autostart: ERROR {op} {a[0]}:{a[1]} refused: the unit is off "
+                                 f"screen at ({x}, {y}), outside the {VIEW_W}x{VIEW_H} window; "
+                                 f"nothing is clicked")
+                        continue
                     if framed:
                         # scenario-diff.md §2 rule 4.5: the hover frame. The cursor is posted at
                         # the stop of frame F - 1, the press and release at the stop of frame F
@@ -767,6 +828,9 @@ def add_options(ap):
                    help="start a single-player game with this expansion character unattended "
                         "(adds -nosave -name CHAR to the game arguments)")
     g.add_argument("--seed", type=int, default=None, help="with --auto: map / game seed (-seed N)")
+    g.add_argument("--difficulty", default=None, choices=DIFFICULTIES,
+                   help="with --auto: game difficulty (default normal); the save must have it "
+                        "unlocked (config +0x210, original-hooks.md §5.4)")
     g.add_argument("--auto-after", type=float, default=DEFAULT_AFTER,
                    help=f"seconds in the menu before leaving it (default {DEFAULT_AFTER})")
     g.add_argument("--input", default="", help="with --auto / --menu: input script (autostart.py doc)")
@@ -786,10 +850,11 @@ def setup(a, game_args_list):
             args += ["-seed", str(int(a.seed))]
         return args, AutoStart(None, a.input, a.shots, menu=a.menu)
     if not a.auto:
-        if a.seed is not None or a.input:
-            raise SystemExit("--seed / --input need --auto CHAR or --menu SCRIPT")
+        if a.seed is not None or a.input or getattr(a, "difficulty", None):
+            raise SystemExit("--seed / --input / --difficulty need --auto CHAR or --menu SCRIPT")
         return game_args_list, None
-    return game_args(a.auto, a.seed, game_args_list), AutoStart(a.auto_after, a.input, a.shots)
+    return game_args(a.auto, a.seed, game_args_list), AutoStart(
+        a.auto_after, a.input, a.shots, difficulty=getattr(a, "difficulty", None))
 
 
 # --- Win32 window, input and screenshots ------------------------------------
@@ -1005,6 +1070,45 @@ def selftest():
             s.poll(m)
             clk.t = round(clk.t + 0.01, 2)
 
+    # difficulty: parsed, written to config +0x210 only after the client entry stored the config
+    assert [parse_difficulty(x) for x in (None, "", "normal", "Hell", "1", 2)] == [None, None, 0, 2, 1, 2]
+    for bad in ("easy", "3", -1):
+        try:
+            parse_difficulty(bad)
+            raise AssertionError(f"accepted difficulty {bad!r}")
+        except ValueError:
+            pass
+
+    class DMem(Mem):
+        def write(self, a, data):
+            self.m[a] = int.from_bytes(data, "little")
+
+    for want, name in ((None, None), (0, "normal"), (1, "nightmare"), (2, "hell")):
+        clk, dm = Clock(), DMem()
+        d = AutoStart(after=0.1, log=lambda x: None, clock=clk, difficulty=name)
+        drive(d, dm, clk, 0.5)                                # forced, config pointer not stored yet
+        assert d.forced_at is not None and (0x5550 + CFG_DIFFICULTY) not in dm.m
+        dm.m[CONFIG_PTR] = 0x5550
+        drive(d, dm, clk, 1.0)
+        assert dm.m.get(0x5550 + CFG_DIFFICULTY) == want, (name, dm.m)
+        assert d.difficulty_set == want
+    clk, dm = Clock(), DMem()
+    d = AutoStart(after=0.1, log=lambda x: None, clock=clk, difficulty="hell")
+    dm.m[CONFIG_PTR] = 0x5550
+    drive(d, dm, clk, 0.09)
+    assert (0x5550 + CFG_DIFFICULTY) not in dm.m              # never before the menu is left
+
+    class GMem(DMem):
+        def read(self, a, n):
+            return bytes([self.m[a]])
+
+    clk, gm, notes = Clock(), GMem(), []
+    d = AutoStart(after=0.1, log=notes.append, clock=clk, difficulty="hell")
+    gm.m[0x9000 + G_DIFFICULTY] = 2
+    d.note_difficulty(gm, 0x9000)
+    d.note_difficulty(gm, 0x9000)                             # once
+    assert d.game_difficulty == 2 and len(notes) == 1 and notes[0].endswith("= 2 (hell)"), notes
+
     sent = []
     clk = Clock()
     m = Mem()
@@ -1058,6 +1162,18 @@ def selftest():
         (WM_MOUSEMOVE, 0), (WM_MOUSEMOVE, 0), (WM_LBUTTONDOWN, MK_LBUTTON), (WM_LBUTTONUP, 0)], sent
     assert s4.wait_frame == 4                                  # the click waited for frame 4
     assert sent[0][2] == lparam(400 + 2 * 16, 292 + 4 * 8 - 8)
+    # off-screen unit: refused, nothing posted, the error is logged
+    sent.clear()
+    logs = []
+    keep = (m.m[0x9004], m.m[0x9008])
+    m.m.update({0x9004: keep[0] + 2000, 0x9008: keep[1]})      # the unit far right of the window
+    s5 = AutoStart(after=0, script="frame 3; clickunit 2 119", log=logs.append, clock=Clock())
+    s5.send = lambda mem, msg, wp, lp: sent.append((msg, wp, lp))
+    s5.anchor, s5.stop_frame = 3, 2
+    assert not (0 <= screen_of(m, obj)[0] < VIEW_W), screen_of(m, obj)
+    list(s5.run(m, [("clickunit", [2, "119"])]))
+    assert not sent and any("refused" in l and "ERROR" in l for l in logs), (sent, logs)
+    m.m.update({0x9004: keep[0], 0x9008: keep[1]})
     m.m[obj + U_CLASS] = 120                                   # perturbation: wrong class is not found
     assert nearest(m, 2, (119,)) is None
     m.m[GAME_MODE] = 1                                         # not in the menu: never forced
@@ -1137,7 +1253,7 @@ def selftest():
         s6.clock.t += 0.1
         s6.poll(m)
     assert any(n == "autostart: mark m1 ticks=13" for n in notes) and s6.done, notes
-    print("selftest ok: arguments, script parsing, menu force only in mode 4 and after the delay, "
+    print("selftest ok: arguments, difficulty (config +0x210), script parsing, menu force only in mode 4 and after the delay, "
           "arrival from the player chain, click / text timing, waitlevel, goto projection "
           "(camera.md), wrong class not found, end; frame steps posted at the tick-return stop "
           "of frame F - 1 (click, framed hold, key, move), late stop noted")
@@ -1150,6 +1266,7 @@ def main():
     ap.add_argument("--game", default=os.path.join(repo, "game", "Game.exe"))
     ap.add_argument("--try", dest="char", help="start this character unattended, report, kill")
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--difficulty", default=None, choices=DIFFICULTIES)
     ap.add_argument("--seeds", default=None,
                     help="comma-separated seeds: one game per seed, one after the other")
     ap.add_argument("--after", type=float, default=DEFAULT_AFTER)
@@ -1171,7 +1288,7 @@ def main():
     seeds = [int(x, 0) for x in a.seeds.split(",")] if a.seeds else [a.seed]
     ok = True
     for seed in seeds:
-        auto = AutoStart(a.after, a.input, a.shots)
+        auto = AutoStart(a.after, a.input, a.shots, difficulty=a.difficulty)
         notes = probe(exe, game_args(a.char, seed), auto, a.seconds)
         for n in notes:
             if not n.startswith("autostart:"):     # already printed by the log

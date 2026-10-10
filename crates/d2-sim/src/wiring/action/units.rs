@@ -34,6 +34,9 @@ use super::{ActionHooks, Pending, SkillEvent, View, WiringError};
 
 /// The client status word's dead bit (`formats/d2s.md` §2.3).
 pub const STATUS_DEAD: u16 = 0x08;
+/// The spread of the mercenary's creation `0x005B23C0(…, 4, 0)`
+/// (`npc.md` §7.3 step 7).
+const HIRE_SPREAD: i32 = 4;
 
 /// Stat-list state of `justhit` (`missiles.md` §R5 step 6.1).
 pub const STATE_JUSTHIT: u16 = 86;
@@ -42,8 +45,11 @@ pub const STATE_DEATH_DELAY: u16 = 92;
 
 impl<X: Pending> StatHost for ActionHooks<X> {
     /// §8.2 rule 6: queue the callbacks this wiring runs after the expiry
-    /// walk ([`UnitHooks::lists_expired`]): the default one and the shrine
-    /// ones. The others are run by their skill bodies.
+    /// walk ([`UnitHooks::lists_expired`]): the default one, the shrine
+    /// ones, and Inferno's / Blade Fury's (`skills/bodies.md` §6.16,
+    /// `bodies-2b.md` §6.16: state off, unit flags |= 0x40; the timer 12
+    /// expiry is what ends a player's Inferno / Arctic Blast channel). The
+    /// others are run by their skill bodies.
     fn list_removed(
         &mut self,
         _lists: &mut StatLists,
@@ -52,8 +58,12 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
-        if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
+        if matches!(
+            callback.0,
+            DEFAULT | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+        ) {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
@@ -92,16 +102,26 @@ impl<X: Pending> ActionHooks<X> {
         sim: &Sim<'_>,
         unit: UnitId,
     ) -> Option<(UnitType, u32, u32)> {
-        let r = sim.units.get(unit)?;
+        self.draw_identity_in(sim.units, sim.stats, unit)
+    }
+
+    /// [`Self::draw_identity`] on the unit records and stat lists.
+    pub(crate) fn draw_identity_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> Option<(UnitType, u32, u32)> {
+        let r = units.get(unit)?;
         let own = (r.ty, r.class, r.mode);
         if r.flags2 & flags2::DISGUISE == 0 {
             return Some(own);
         }
-        let states = &sim.stats.data().states;
+        let states = &stats.data().states;
         let Some(&(_, gfx, class)) = states
             .gfx_states()
             .iter()
-            .find(|&&(s, ..)| sim.stats.has_state(unit, s))
+            .find(|&&(s, ..)| stats.has_state(unit, s))
         else {
             return Some(own);
         };
@@ -141,6 +161,33 @@ impl<X: Pending> ActionHooks<X> {
             }
             _ => (UnitType::Player, class, r.mode),
         })
+    }
+
+    /// The frame bonus `0x00623B10` (`units.md` §4.7 "Frame bonus",
+    /// through [`crate::units::anim_rate::frame_bonus`]): the draw
+    /// identity (T, C, M), dual-wield capability `0x006235A0` (player
+    /// class 4 or 6, monster class 417 or 418), the attack weapon
+    /// `0x00623990(U, 1)` and its type class `0x00629FE0`
+    /// ([`Pending::item_type_class`]).
+    pub(crate) fn frame_bonus_in(
+        &self,
+        units: &super::Units,
+        stats: &StatLists,
+        unit: UnitId,
+    ) -> i32 {
+        let Some((t, c, m)) = self.draw_identity_in(units, stats, unit) else {
+            return 0;
+        };
+        let dual = match t {
+            UnitType::Player => matches!(c, 4 | 6),
+            UnitType::Monster => matches!(c, 417 | 418),
+            _ => false,
+        };
+        let tc = self
+            .x
+            .attack_weapon(unit)
+            .map(|w| self.x.item_type_class(w));
+        crate::units::anim_rate::frame_bonus(t as u8, c, m, dual, tc)
     }
 
     /// Steps 3–5 and 8–10 of `0x00623F50` (`units.md` §4.7, through
@@ -294,6 +341,24 @@ pub fn anim_record(r: &d2_formats::animdata::AnimRecord) -> AnimRecord {
 }
 
 impl<X: Pending> UnitHooks for ActionHooks<X> {
+    /// Monster death by regeneration (`stat-lists.md` §10.1 step 6): the
+    /// kill `0x0057CCB0` with the poison / open-wounds owner, then the
+    /// death events `0x005C0C30`.
+    // PROVISIONAL (stat-lists.md §10.1 step 6, REC-1260): "the death
+    // events" read as `damage.md` §5.2 step 15's pair, killed (10) on the
+    // unit then kill (9) on the killer, with no damage record; settled by
+    // a 1.14d trace of a poison kill with an item kill event.
+    fn monster_death(&mut self, sim: &mut Sim<'_>, unit: UnitId, killer: Option<UnitId>) {
+        use crate::combat::{EV_KILL, EV_KILLED};
+        let mut v = View::of(sim.units, sim.stats, sim.data, self);
+        let mut cv = v.combat(sim.game);
+        super::reaction::kill_by(&mut cv, unit, killer);
+        cv.fire_unit_event(EV_KILLED, Some(unit), killer, None);
+        if let Some(k) = killer {
+            cv.fire_unit_event(EV_KILL, Some(k), Some(unit), None);
+        }
+    }
+
     /// Runs the queued remove callbacks of the lists the expiry walk
     /// freed (`stat-lists.md` §8.2 rule 6, `skills/bodies.md` §2.8).
     // PROVISIONAL (REC-263; d2rs-own, unverified): the bodies of the shrine
@@ -302,6 +367,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     // maximum (the shrine set stamina to 2v on the list); the skill one's
     // skill refresh has nothing to refresh here (levels read the stat).
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, INFERNO};
+        use crate::skills::use_::bodies::helpers::FLAG_40;
         use crate::world::objects::shrines::STAMINA_REMOVE;
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
@@ -326,6 +393,14 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             }
             if cb == STAMINA_REMOVE {
                 sim.stats.clamp_to_max(self, u);
+            }
+            // `0x005C8BF0` / `0x005D69B0`: unit flags (+0xC4) |= 0x40, so
+            // the sequence's later do events do not run (`use.md` §5.2
+            // rule 3).
+            if matches!(cb, INFERNO | BLADE_FURY) {
+                if let Some(r) = sim.units.get_mut(u) {
+                    r.flags |= FLAG_40;
+                }
             }
         }
         let _ = unit;
@@ -382,6 +457,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
                 speed: 256,
                 pos: 0,
                 events: frames.iter().map(|f| f.event).collect(),
+                drawn: frames.iter().map(|f| f.frame).collect(),
             });
         }
         if rec.ty != UnitType::Player {
@@ -400,6 +476,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             speed: 256,
             pos: 0,
             events: frames.iter().map(|f| f.event).collect(),
+            drawn: frames.iter().map(|f| f.frame).collect(),
         })
     }
 
@@ -429,7 +506,7 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .path_has(unit)
             .then(|| UnitHooks::anim_rate(self, sim, unit));
         let record = UnitHooks::anim_record(self, sim, unit);
-        let bonus = self.x.frame_bonus(unit);
+        let bonus = self.frame_bonus_in(sim.units, sim.stats, unit);
         let Some(r) = sim.units.get_mut(unit) else {
             return;
         };
@@ -488,8 +565,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     }
 
     /// `0x00623B10` (`units.md` §4.3).
-    fn frame_bonus(&mut self, _: &Sim<'_>, unit: UnitId) -> i32 {
-        self.x.frame_bonus(unit)
+    fn frame_bonus(&mut self, sim: &Sim<'_>, unit: UnitId) -> i32 {
+        self.frame_bonus_in(sim.units, sim.stats, unit)
     }
 
     fn has_path(&mut self, _: &Sim<'_>, unit: UnitId) -> bool {
@@ -811,30 +888,53 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
     }
 
-    /// The mercenary's creation (`npc.md` §7.3 step 7): a monster of
-    /// `class` in the room of `near`, a few subtiles beside it.
-    // d2rs-own, unverified: the offset (+2, +2) stands in for the
-    // placement `hirelings.md` §3.1 leaves to the path code's free-spot
-    // search; the allocation's path part validates the spot.
+    /// The mercenary's creation (`npc.md` §7.3 step 7, `hirelings.md`
+    /// §3.1): `0x005B23C0(game, near, class, mode, 4, 0)`, the placement
+    /// and creation of `population.md` §9 around `near`'s path position
+    /// in its room (spread 4: rings 3 … 12 on the active-room seed),
+    /// with the call's game seed lent to the hooks for the allocation's
+    /// unit-seed step (`rng.md` §5.3). `None` when nothing was placed.
+    /// Without the lent monster world: a plain allocation at (+2, +2)
+    /// from the point (d2rs-own, unverified: hosts with no population
+    /// state).
     fn spawn_near(
         &mut self,
         sim: &mut Sim<'_>,
+        seed: &mut Seed,
         near: UnitId,
         class: u32,
         mode: u8,
     ) -> Option<UnitId> {
         let room = sim.game.lists.unit(near)?.room()?;
         let (x, y) = self.path_position(near);
-        let req = AllocRequest {
-            ty: UnitType::Monster,
-            class,
-            room: Some(room),
-            add: true,
-            fixed_guid: None,
-            mode: u32::from(mode),
-            allied: false,
+        self.game_seed = *seed;
+        let placed = self
+            .with_monster_world(|w, h| {
+                w.spawn_at(sim, h, room, x, y, class as i32, mode, HIRE_SPREAD, 0)
+            })
+            .flatten();
+        let u = match placed {
+            Some(placed) => placed,
+            None => {
+                let req = AllocRequest {
+                    ty: UnitType::Monster,
+                    class,
+                    room: Some(room),
+                    add: true,
+                    fixed_guid: None,
+                    mode: u32::from(mode),
+                    allied: false,
+                };
+                View::of(sim.units, sim.stats, sim.data, self).allocate(
+                    sim.game,
+                    &req,
+                    x + 2,
+                    y + 2,
+                )
+            }
         };
-        View::of(sim.units, sim.stats, sim.data, self).allocate(sim.game, &req, x + 2, y + 2)
+        *seed = self.game_seed;
+        u
     }
 
     /// The minion owner of the unit's AI control record (owner data
@@ -949,6 +1049,11 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
         self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
+        // A summon's skill list (the aura assignment of
+        // `interaction::summon`); players keep theirs (the save).
+        if ty == Some(UnitType::Monster) {
+            self.skill_lists.remove(&unit);
+        }
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
         }
@@ -1295,9 +1400,9 @@ impl<X: Pending> View<'_, X> {
             stats: self.stats,
             data: self.data,
         };
-        let r = crate::units::modes::monster_set_mode(&mut sim, &mut *self.h, u, mode);
+        let r = crate::units::modes::monster_set_mode_started(&mut sim, &mut *self.h, u, mode);
         match r {
-            Ok(()) => true,
+            Ok(started) => started,
             Err(e) => {
                 self.unit_error(e);
                 false

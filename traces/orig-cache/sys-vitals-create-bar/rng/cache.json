@@ -1,0 +1,43 @@
+{
+ "channel": "rng",
+ "check": "sys-vitals-create-bar",
+ "command": [
+  "tools/trace-recorder/record_rng.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "220",
+  "--auto",
+  "ScnBar",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.rng.jsonl",
+  "--frames",
+  "--skip-inline",
+  "drlg",
+  "--poke",
+  "10 stat @player 6 0 2560",
+  "--poke",
+  "10 stat @player 8 0 1024",
+  "--poke",
+  "10 stat @player 10 0 5120"
+ ],
+ "files": {
+  "orig.rng.jsonl": {
+   "sha256": "c1694a5b6ed4a14e848311404b4b942ea4c44c0d5bcbd0cfc2c7e20d7b3bcd8d",
+   "size": 1901351
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "b509d26cfc905ea29d4d09502582d4bc8d0bf5f2e4648a65c2002bd51aee3bb6",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "163279ff197d8ac1c0fb5ea9daedfb396a382280151c03826e560666747f2efd",
+  "save": "0c75f656c9fe7adb2b58ec2ad55b1720c688f104a7f0997df6ddc8a3ef16de0e"
+ }
+}

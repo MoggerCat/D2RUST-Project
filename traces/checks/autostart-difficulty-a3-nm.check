@@ -1,0 +1,11 @@
+check 1
+# Act III Nightmare start (town byte act III of Nightmare), idle: proves the 1.14d recorder
+# starts the game in the check's difficulty (autostart.py config +0x210, original-hooks.md §5.4).
+# Spec: specs/tools/scenario-diff.md.
+name autostart-difficulty-a3-nm
+save NoQA3Nm --class sor --expansion --difficulty-unlocked nightmare --act 2 --difficulty nightmare
+seed 1234
+ticks 30
+seconds 240
+difficulty nightmare
+channels state

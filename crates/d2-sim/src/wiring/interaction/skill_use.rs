@@ -702,12 +702,13 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
             self.error(WiringError::Unit(e.into()));
         }
     }
-    /// `tick.md` §5.4: the unit's timers of `kind` with that arg1.
+    /// `0x00540E60` (`tick.md` §5.4): the unit's timers of `kind` with
+    /// that arg1; argument 0 = any argument (`sim/stat-lists.md` monster
+    /// regeneration step 3; `monsters/ai.md`: `0x00540E60(2, 0)` cancels
+    /// every think).
     fn delete_timers(&mut self, u: UnitId, kind: u8, arg1: i32) {
-        self.cv
-            .game
-            .timers
-            .cancel_unit_events(u, kind, Some(arg1 as u32));
+        let arg = (arg1 != 0).then_some(arg1 as u32);
+        self.cv.game.timers.cancel_unit_events(u, kind, arg);
     }
 
     fn has_state_list(&self, u: UnitId, state: u16) -> bool {
@@ -950,8 +951,26 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
                 .collect(),
         )
     }
+    /// `0x00554DE0` (`bodies.md` §2.12 filter 0x10000): a monster
+    /// stands for its minion owner (`0x0058F0D0`, the AI control's owner
+    /// link looked up by GUID; none: the monster itself); the same unit
+    /// after that → allies (an Oak Sage's aura reaches its druid). Two
+    /// different players (the party test) and the rest: the seam's.
     fn allied(&self, a: UnitId, b: UnitId) -> bool {
-        self.x().allied(a, b)
+        let owner = |u: UnitId| {
+            let link = self
+                .cv
+                .v
+                .h
+                .ai
+                .as_ref()
+                .and_then(|s| s.control(u))
+                .and_then(|c| c.minion_owner);
+            link.and_then(|r| self.cv.game.lists.find_unit(r.ty, r.guid))
+                .unwrap_or(u)
+        };
+        let (ra, rb) = (owner(a), owner(b));
+        ra == rb || self.x().allied(ra, rb)
     }
     /// The missile store's owner (`0x00552FD0`).
     fn missile_owner(&self, u: UnitId) -> Option<UnitId> {
@@ -966,7 +985,10 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     }
 
     fn frame_bonus(&self, u: UnitId) -> i32 {
-        self.x().frame_bonus(u)
+        self.cv
+            .v
+            .h
+            .frame_bonus_in(self.cv.v.units, self.cv.v.stats, u)
     }
     fn set_anim_frame(&mut self, u: UnitId, v: i32) {
         if let Some(r) = self.cv.v.units.get_mut(u) {
@@ -1100,8 +1122,47 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         bodies::passive::refresh(self, &t.skills, u, e.skill);
         self.xm().passive_state_apply(u, e);
     }
+    /// `0x005B0E00(game, m, m's AI control, k)` (`bodies.md` §6.2 step
+    /// 8, `monsters/ai.md` §3.3) through the AI module on the wiring's
+    /// store, for a unit with an AI control: the summon's AI is installed
+    /// again after its creation installed it, so its init runs twice
+    /// (1.14d: dru-raven's raven draws its orbit side twice, site
+    /// `0x005ECB9C`). Without the store or a control: the seam's.
     fn set_ai_state(&mut self, u: UnitId, k: i32) {
-        self.xm().set_ai_state(u, k);
+        use crate::monsters::ai;
+        let has_control = self
+            .cv
+            .v
+            .h
+            .ai
+            .as_ref()
+            .is_some_and(|s| s.control(u).is_some());
+        if !has_control {
+            self.xm().set_ai_state(u, k);
+            return;
+        }
+        let Some(mut store) = self.cv.v.h.ai.take() else {
+            return;
+        };
+        let t = self.cv.v.h.tables.clone();
+        let info = self.cv.v.h.ai_info;
+        {
+            let mut cx = ai::Ctx {
+                tables: ai::AiTables {
+                    monstats: &t.combat.monstats,
+                    monstats2: &t.combat.monstats2,
+                    levels: &t.levels,
+                    skill_modes: &t.skill_modes,
+                    skills: &t.skills.skills,
+                    missiles: &t.skills.missiles,
+                },
+                info,
+                store: &mut store,
+                world: &mut self.cv.v,
+            };
+            ai::install(&mut *self.cv.game, &mut cx, u, k as u32);
+        }
+        self.cv.v.h.ai = Some(store);
     }
     fn blood_mana(&mut self, u: UnitId, cost: i32) {
         self.xm().blood_mana(u, cost);
@@ -1137,6 +1198,25 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
     fn effect(&mut self, e: bodies::BodyEffect<UnitId, UnitId, RoomId>) {
         if let bodies::BodyEffect::EndlessProgressive { unit, skill, step } = e {
             self.error(WiringError::EndlessProgressive { unit, skill, step });
+            return;
+        }
+        // "wait N" `0x005DE0F0(game, m, N)` (`monsters/ai-bodies-2.md`):
+        // delete the thinks and schedule one at frame + N; the mode is
+        // not changed. A fresh spawn has no uninterruptable state to clear.
+        if let bodies::BodyEffect::WaitThink { m, frames } = e {
+            let game = &mut *self.cv.game;
+            crate::monsters::ai::delete_thinks(game, m);
+            let at = game
+                .frame
+                .wrapping_add(if frames == 0 { 1 } else { frames });
+            let _ = game.schedule_event(
+                m,
+                u32::from(crate::monsters::ai::EVENT_THINK),
+                at,
+                None,
+                0,
+                0,
+            );
             return;
         }
         // Find Item `0x005A8000` (`treasure.md` §3.6) on the game's drop
@@ -1197,6 +1277,28 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         }
         // `0x00571B70` (`bodies-2.md` §2.13): the 0xA5 record on the unit,
         // the unit queued for update (`intents-events.md` §7.9 rule 2).
+        // Missile data +0x28 / +0x2C (`0x0064A710` / `0x0064A760`) on the
+        // missile store: the seed word Volcano's server-do 28 re-seeds
+        // from (`skills/bodies-2b.md` §7.18 step 6, `missiles/bodies.md`
+        // §2 step 4).
+        if let bodies::BodyEffect::MissileData28 { missile, v }
+        | bodies::BodyEffect::MissileData2C { missile, v } = e
+        {
+            let d28 = matches!(e, bodies::BodyEffect::MissileData28 { .. });
+            match self.cv.v.h.missiles.as_mut() {
+                Some(store) => {
+                    if let Some(d) = store.get_mut(missile) {
+                        if d28 {
+                            d.target.0 = v;
+                        } else {
+                            d.target.1 = v;
+                        }
+                    }
+                }
+                None => self.error(WiringError::Reentrant("missiles")),
+            }
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {
@@ -1453,8 +1555,32 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         mode: i32,
         spread: i32,
     ) -> Option<UnitId> {
-        match self.xm().create_monster(r, at, class, mode, spread) {
-            Some(m) => Some(m),
+        if let Some(m) = self.xm().create_monster(r, at, class, mode, spread) {
+            return Some(m);
+        }
+        // `0x005B2F20(…, spread, 0x42)` through population's placement
+        // search and creation (`population.md` §9) on the monster world;
+        // `Some(None)` = nothing placed (no fallback). Without the world:
+        // the plain allocation at the point (module docs of `summon`).
+        let game = &mut *self.cv.game;
+        let v = &mut self.cv.v;
+        let mut sim = crate::units::hooks::Sim {
+            game,
+            units: &mut *v.units,
+            stats: &mut *v.stats,
+            data: v.data,
+        };
+        let mode8 = u8::try_from(mode).unwrap_or(1);
+        let placed = if v.h.monster_world.is_some() {
+            v.h.with_monster_world(|w, h| {
+                w.spawn_at(&mut sim, h, r, at.0, at.1, class, mode8, spread, 0x42)
+            })
+            .flatten()
+        } else {
+            None
+        };
+        match placed {
+            Some(m) => m,
             None => self.alloc_monster(r, at, class, mode),
         }
     }
@@ -1623,9 +1749,51 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
         self.x().body_unit_find(room, at, r, f)
     }
     fn point_collides(&self, room: RoomId, at: (i32, i32), mask: u32) -> bool {
-        self.x().body_point_collides(room, at, mask)
+        self.rooms_point_collides(room, at, mask)
+            .unwrap_or_else(|| self.x().body_point_collides(room, at, mask))
     }
     fn spawn_monster(&mut self, q: bodies::MonsterSpawn<UnitId, RoomId>) -> Option<UnitId> {
+        // `0x005B2F20` through the lent monster world (`MonsterWorld::
+        // spawn_at`, `monsters/population.md` §9): the placement and the
+        // allocation draw on the game seed as the original's creation
+        // does. Without a lent world, the host's answer.
+        if let bodies::MonsterSpawn::At {
+            room,
+            x,
+            y,
+            class,
+            mode,
+            spread,
+            flags,
+        } = q
+        {
+            let game = &mut *self.cv.game;
+            let v = &mut self.cv.v;
+            let mut sim = crate::units::hooks::Sim {
+                game,
+                units: &mut *v.units,
+                stats: &mut *v.stats,
+                data: v.data,
+            };
+            let placed =
+                v.h.with_monster_world(|w, h| {
+                    w.spawn_at(
+                        &mut sim,
+                        h,
+                        room,
+                        x,
+                        y,
+                        class,
+                        u8::try_from(mode).unwrap_or(0),
+                        spread,
+                        flags as u16,
+                    )
+                })
+                .flatten();
+            if let Some(placed) = placed {
+                return placed;
+            }
+        }
         self.xm().body_spawn_monster(q)
     }
     /// a = 0: [`BodyWorld::place_unit`]'s provider.

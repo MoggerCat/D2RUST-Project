@@ -873,7 +873,8 @@ pub fn start<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit) -> i32 {
     let player = w.unit_type(u) == UnitType::Player;
     if !target_checks(w, r, u) {
         if player {
-            w.set_mode(u, mode::TN);
+            let n = player_neutral(w, u);
+            w.set_mode(u, n);
         }
         return 0;
     }
@@ -895,9 +896,23 @@ pub fn start<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit) -> i32 {
     }
     let res = start_core(w, t, u, &e, l);
     if player && res == 0 {
-        w.set_mode(u, mode::TN);
+        let n = player_neutral(w, u);
+        w.set_mode(u, n);
     }
     res
+}
+
+/// The player's neutral mode of a failed start (§5.3 steps 2 and 6).
+// PROVISIONAL (skills/use.md §5.3, REC-1644): TN (5) only in a town room,
+// else NU (1), as the client's mode end (`client/model.md` §20); 1.14d
+// `sor-telekinesis` / `nec-bone-prison` checks (Wine 2026-10-09): a start
+// that fails in the Blood Moor leaves the player in mode 1 at once.
+fn player_neutral<W: UseWorld>(w: &W, u: W::Unit) -> u32 {
+    if w.room(u) == RoomKind::Town {
+        mode::TN
+    } else {
+        mode::NU
+    }
 }
 
 /// Target checks `0x0056CC60` (§5.3 step 2); false = fail.
@@ -1307,6 +1322,21 @@ pub fn select_skill<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, m: &[u8
         }
     }
     w.set_right_skill(u, e);
+    right_aura_start(w, t, u, &e, l);
+    0
+}
+
+/// The new right skill's aura start of `0x005701B0` (§7, `0x0056FF10`):
+/// an `aura` skill runs its do core once when `immediate`, else switches
+/// its aura state on; then the aura-form schedule. Also run by the save
+/// load's mouse-skill selection (`formats/d2s.md` §2.4 rule 6.3).
+pub fn right_aura_start<W: UseWorld>(
+    w: &mut W,
+    t: &SkillTables,
+    u: W::Unit,
+    e: &SkillEntry,
+    l: i32,
+) {
     if let Some(r) = rec(t, e.skill).filter(|r| r.aura) {
         if r.immediate {
             do_core(w, t, u, e.skill, l, true, false, false);
@@ -1315,5 +1345,4 @@ pub fn select_skill<W: UseWorld>(w: &mut W, t: &SkillTables, u: W::Unit, m: &[u8
         }
         schedule_periodic(w, t, u, e.skill, l, true);
     }
-    0
 }

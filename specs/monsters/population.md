@@ -37,18 +37,18 @@
 |   6. Random boss (champion or unique) | 359–441 |
 |   7. Packs (`0x0054DF80(game, room, cl, min, max)`, class in EBX) | 442–468 |
 |   8. Spawn point in a coordinate rectangle (`0x0054DC40`) | 469–504 |
-|   9. Placement search and creation call (`0x005B2A00`) | 505–619 |
-|   10. Party minions (monstats minion columns, `0x005B2830`) | 620–671 |
-|   11. Preset monsters (DS1 presets) | 672–931 |
-|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 932–956 |
-|   13. Region bookkeeping | 957–989 |
-|   14. Other table-driven and AI spawns | 990–1014 |
-| Constants & data dependencies | 1015–1085 |
-| Randomness | 1086–1129 |
-| Edge cases & original bugs | 1130–1170 |
-| Test vectors | 1171–1242 |
-| Provenance | 1243–1271 |
-| Open questions | 1272–1330 |
+|   9. Placement search and creation call (`0x005B2A00`) | 505–633 |
+|   10. Party minions (monstats minion columns, `0x005B2830`) | 634–685 |
+|   11. Preset monsters (DS1 presets) | 686–945 |
+|   12. Ambient (wandering) spawns (`0x0054F060(game, room)`) | 946–970 |
+|   13. Region bookkeeping | 971–1003 |
+|   14. Other table-driven and AI spawns | 1004–1028 |
+| Constants & data dependencies | 1029–1099 |
+| Randomness | 1100–1143 |
+| Edge cases & original bugs | 1144–1184 |
+| Test vectors | 1185–1256 |
+| Provenance | 1257–1285 |
+| Open questions | 1286–1344 |
 <!-- /index -->
 
 ## Summary
@@ -508,7 +508,9 @@ All monster creation by class goes through `0x005B2A00(spawn record)`.
 The callers fill a 0x28-byte record (D2MOO `D2UnkMonCreateStrc`): game
 +0x00, room +0x04, cl +0x08, class +0x0C, mode +0x10, GUID +0x14, x
 +0x18, y +0x1C, radius r +0x20, flags u16 +0x24. Wrappers: `0x005B2F20`
-(room, x, y; no cl), `0x005B3040` (room, cl, x, y), `0x005B30E0` (with
+(room, x, y; no cl), `0x005B3090(game, room, x, y, class, mode, flags)`
+(the same with r fixed at −1 and GUID 0; `0x005B30C1`; callers
+`0x00582420`, `0x0059F440`, object init `0x005BBBA0`), `0x005B3040` (room, cl, x, y), `0x005B30E0` (with
 GUID), `0x005B2F70` (cl, near a unit), `0x005B23C0` (near a unit, no cl).
 "Near a unit" means the unit's room (`0x00620BB0`) and its current
 subtile position (monsters and players: path x/y `0x006488C0` /
@@ -611,6 +613,18 @@ point:
    flags & 8, or 1 when the monstats `neverCount` flag is set (§13).
 3. Without cl: the monster's coordinate record is set from
    `0x0061AD30(room, x, y)`. With cl: from cl. Done by `0x00552D60`.
+   This is the AI vision record of `monsters/ai.md` §5.2.1 (monster
+   data +0x50), and §9 is its only setter (`0x005B2E76`–`0x005B2E8F`).
+   By caller: pack leader (`0x005B3040`) and pack members, champion
+   minions and unique minions with cl (`0x005B2F70`) get cl, the
+   rectangle r of §3.2. Party minions §10 (`0x005B23C0`, no cl) and
+   unique minions without cl get the record at their own point in the
+   leader's room. Presets §11.3 (`0x005B2F20`), quest and object spawns
+   (`0x005B3090`, `0x005B2F20`) and boss restores without cl get the
+   record at the point in the room they pass. A one-record room gives
+   every one of them the room's single record. 1.14d-confirmed
+   (wrapper cl fields `0x005B2F47`, `0x005B23FE`, `0x005B2FB2`,
+   `0x005B3068`, `0x005B30B1`; read 2026-10-09, PC 1 late).
 4. Alignment from monstats `Align` (+0x4C): 1 → alignment 2 and unit flag
    0x20000 (unit +0xC4); 2 → 1; else 0 (`0x005543B0`; `monsters/init.md`).
 5. Unless flags & 2: `0x005B21B0`. Then `0x005B1CF0` (monster init,

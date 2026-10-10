@@ -972,8 +972,8 @@ pub enum Preset {
     None,
     /// The object allocated (or `None` when the allocation failed).
     Object(Option<UnitId>),
-    /// A handler whose behavior is not specified yet (581, 582, and 580
-    /// outside level 25: open question 6).
+    /// A handler run by the host: 582 (class from the quest spec's
+    /// `0x0059D830`).
     NotCovered(u32),
 }
 
@@ -1017,24 +1017,74 @@ pub fn create_preset<W: ObjectHost>(
             }
             Ok(Preset::Object(Some(obj)))
         }
-        580 if level == 25 => {
-            // Edge case 22 / §22: 580 runs 581's handler, which allocates in
-            // mode 0 whatever the preset mode is.
-            let Some(obj) = allocate(ctl, t, w, room, 371, x, y, 0)? else {
+        580 => {
+            // 580 runs 581's handler with 371 at level 25, else with its
+            // own class (the class draw happens at every level).
+            let c = if level == 25 { PRESET_CHEST_371 } else { 580 };
+            let Some(obj) = preset_chest(ctl, t, w, room, level, c, x, y)? else {
                 return Ok(Preset::Object(None));
             };
-            if let Some(d) = ctl.data.get_mut(&obj) {
-                d.spark = 1;
-                d.interact = 3;
+            let spark = if (62..=64).contains(&level) {
+                ctl.seed.roll(100) <= 50
+            } else {
+                true
+            };
+            if spark {
+                if let Some(d) = ctl.data.get_mut(&obj) {
+                    d.spark = 1;
+                    if level == 25 {
+                        d.interact = 3;
+                    }
+                }
             }
             set_flag(w, obj, oflags::KEEP_MODE, true);
             // `objects-2.md` §24 rule 1: the ordinary mode set (already in
             // mode 0: no setup, no draw; queued, flag 0x1).
-            set_mode(t, w, obj, 371, 0, true)?;
+            let oc = ctl.get(obj)?.class;
+            set_mode(t, w, obj, oc, 0, true)?;
             Ok(Preset::Object(Some(obj)))
         }
+        581 => Ok(Preset::Object(preset_chest(
+            ctl, t, w, room, level, class, x, y,
+        )?)),
         _ => Ok(Preset::NotCovered(class)),
     }
+}
+
+/// The class argument that replaces 581's pick (580 at level 25, §6).
+const PRESET_CHEST_371: u32 = 371;
+
+/// 581's picks for Acts I, IV and V (`lo' mod 13`, §6).
+const PRESET_CHESTS_OTHER: [u16; 13] =
+    [5, 6, 139, 140, 141, 144, 176, 177, 198, 240, 241, 242, 243];
+
+/// Preset chest 581 `0x0054F180(game, room, class, x, y, mode)` (§6): one
+/// control-seed step picks the chest class by the act of the room's
+/// level (`0x006427F0`); a class argument of 371 replaces the pick. The
+/// object is allocated in mode 0 whatever the preset mode; its own init
+/// runs inside the allocation.
+#[allow(clippy::too_many_arguments)]
+fn preset_chest<W: ObjectHost>(
+    ctl: &mut ObjectControl,
+    t: &ObjectTables,
+    w: &mut W,
+    room: RoomId,
+    level: u32,
+    class: u32,
+    x: i32,
+    y: i32,
+) -> Result<Option<UnitId>, ObjectError> {
+    let act = t.level(level).map_or(0, |l| l.act);
+    let lo = ctl.seed.step();
+    let pick = match act {
+        1 if level == 74 => [387, 389, 390, 391][(lo & 3) as usize],
+        1 => [87, 88][(lo & 1) as usize],
+        2 if level == 83 => [329, 330, 331, 332][(lo & 3) as usize],
+        2 => [181, 183][(lo & 1) as usize],
+        _ => PRESET_CHESTS_OTHER[(lo % 13) as usize],
+    };
+    let c = if class == PRESET_CHEST_371 { 371 } else { pick };
+    allocate(ctl, t, w, room, c, x, y, 0)
 }
 
 // ------------------------------------------------------------------ §7

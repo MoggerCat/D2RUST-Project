@@ -91,9 +91,13 @@ impl Act {
                 .parse::<u32>()
                 .map_err(|_| format!("`{text}`: argument {i} is not a number"))
         };
+        // Screen points: a unit click's jitter can leave the frame
+        // (`gen.rs`, x − 4), so they are signed.
         let i = |k: usize| -> Result<i32, String> {
-            let v = n(k)?;
-            i32::try_from(v).map_err(|_| format!("`{text}`: argument {k} too large"))
+            w.get(k)
+                .ok_or_else(|| format!("`{text}`: missing argument {k}"))?
+                .parse::<i32>()
+                .map_err(|_| format!("`{text}`: argument {k} is not a number"))
         };
         let want = |k: usize| -> Result<(), String> {
             if w.len() == k {
@@ -342,6 +346,11 @@ mod tests {
                 right: true,
                 x: 10,
                 y: 599,
+            },
+            Act::Click {
+                right: false,
+                x: -1,
+                y: 101,
             },
             Act::Move { x: 1, y: 2 },
             Act::Key(Key::BeltSlot3),

@@ -41,7 +41,10 @@ impl QuestCall for Probe {
     type Out = Out;
     fn call<W: QuestWorld>(self, _: &mut QuestControl, w: &mut W) -> Out {
         let (x, y) = self.at;
-        let cain = w.spawn_monster(self.room, x, y, class::CAIN5, 1, 0);
+        // Spread 5, the first try of the quest's own spawn
+        // (`quests-act1-rest.md` §2.3 step 3): spread 0 fails the ring
+        // search with no draws (`population.md` §9.3).
+        let cain = w.spawn_monster(self.room, x, y, class::CAIN5, 1, 5);
         let cain_class = cain.and_then(|c| w.monster_class(c));
         let portal = w.open_portal(None, self.room, x + 6, y, TRISTRAM, PORTAL_CLASS, false);
         let found = cain.and_then(|c| w.find_object_near(c, PORTAL_CLASS));
@@ -127,11 +130,13 @@ fn run(s: &mut d2_client::app::single_player::Sim) {
     let portal = out.portal.expect("the portal object");
     assert_eq!(out.found, Some(portal));
     assert!(out.removed_gone, "{out:?}");
-    // The portal object keeps its destination (`interact` = level).
+    // Class 59's init sets `InteractType` to the town level of the
+    // room's act (`world/objects.md` §5.5 init 11), here the Rogue
+    // Encampment; the far end's destination is the requested level.
     let st = s.events.action.hooks().objects.as_ref().unwrap();
     assert_eq!(
         st.control.data.get(&portal).map(|d| u32::from(d.interact)),
-        Some(TRISTRAM)
+        Some(single_player::ACT1_TOWN)
     );
     // Nothing fell through to the rest's log.
     assert!(

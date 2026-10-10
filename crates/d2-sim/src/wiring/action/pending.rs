@@ -150,9 +150,10 @@ pub trait Pending {
     fn anim_rate(&self, unit: UnitId, speed: Option<u32>) -> i16 {
         0
     }
-    /// The frame bonus `0x00623B10` (table `0x006E8E60` by class and
-    /// weapon type, `units.md` §4.3; animation-rate spec, not written).
-    fn frame_bonus(&self, unit: UnitId) -> i32 {
+    /// The type class `0x00629FE0` of an item (`units.md` §4.7 "Frame
+    /// bonus"; `render/unit-composite.md` §2.1: its `wclass` in table
+    /// `0x007446A0`, else 0). Default: 0.
+    fn item_type_class(&self, item: UnitId) -> u32 {
         0
     }
 
@@ -695,6 +696,13 @@ pub trait Pending {
     fn secondary_target(&mut self, game: &mut Game, unit: UnitId) -> (Option<UnitId>, i32, bool) {
         (None, 0x7FFF_FFFF, false)
     }
+    /// The scan 6 candidates of `0x005DDC30` before the callback's
+    /// filter (`ai.md` §5.3): the live units hostile to `unit`, in scan
+    /// order; `None` = the host runs the whole search itself
+    /// ([`Self::secondary_target`]).
+    fn secondary_candidates(&mut self, game: &mut Game, unit: UnitId) -> Option<Vec<UnitId>> {
+        None
+    }
     /// `0x005DDF20`: the NPC itself when none.
     fn nearest_player(&mut self, game: &mut Game, unit: UnitId) -> (UnitId, bool) {
         (unit, false)
@@ -745,12 +753,15 @@ pub trait Pending {
         false
     }
     /// The Npc class cases (`ai-bodies.md` §9.9 step 2); defaults: no quest
-    /// state (jerhyn's palace inactive, nothing brought or found).
+    /// state. Jerhyn without a palace spawn (chain 11 extra +0x0D = 0: a
+    /// fresh or act-1-done character) gives `0x0059F570` = 1 and (a, b) =
+    /// (1, 0), so his think goes on to the interaction step (`quests-act2.md`
+    /// §10). PROVISIONAL REC-1855: the palace-Jerhyn states are not read.
     fn jerhyn_palace_active(&mut self, game: &mut Game) -> bool {
-        false
+        true
     }
     fn jerhyn_npc_state(&mut self, game: &mut Game, unit: UnitId) -> (i32, i32) {
-        (0, 0)
+        (1, 0)
     }
     fn guard_moving(&mut self, game: &mut Game, unit: UnitId) -> bool {
         false
@@ -1633,6 +1644,62 @@ pub trait Pending {
         Self: Sized,
     {
         false
+    }
+    /// The Bone Wall maker's `summon_class` (`missiles/bodies-2.md` §33
+    /// step 4, `0x0056E620`): routed to
+    /// [`crate::wiring::interaction::skill_events::missile_summon_class`]
+    /// by a [`crate::wiring::interaction::UseRest`] value. Default: none.
+    fn missile_summon_class(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> (i32, i32)
+    where
+        Self: Sized,
+    {
+        (-1, 0)
+    }
+    /// The Bone Wall maker's summon spawn (§33 step 7, flags 0xD).
+    /// Default: none.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_summon_spawn(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId>
+    where
+        Self: Sized,
+    {
+        None
+    }
+    /// The Bone Wall maker's piece binding (§33 step 8). Default: nothing.
+    #[allow(clippy::too_many_arguments)]
+    fn missile_bone_wall_piece(
+        h: &mut ActionHooks<Self>,
+        sim: &mut Sim<'_>,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) where
+        Self: Sized,
+    {
+    }
+    /// The save load's right-skill aura start (`formats/d2s.md` §2.4
+    /// rule 6.3): routed to
+    /// [`crate::wiring::interaction::skill_events::right_aura_select`] by
+    /// a [`crate::wiring::interaction::UseRest`] value. Default: nothing.
+    fn right_aura_select(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, player: UnitId)
+    where
+        Self: Sized,
+    {
     }
     /// The save load's passive states (`formats/d2s-load.md` §2
     /// "skills", the assign's passive part): routed to

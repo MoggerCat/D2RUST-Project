@@ -667,6 +667,33 @@ fn apply_map_ai<W: QuestWorld>(
     }
 }
 
+/// The map-AI stores `0x0058AD80` (Anya, dummy 459) and `0x0058AE10`
+/// (Nihlathak, dummy 461) over `0x00545C90` (§5.8): keep the path's
+/// handle (+0x104 / +0x108), then, if that NPC is in town and its unit
+/// exists, apply it once.
+pub fn map_ai_store<W: QuestWorld>(
+    ctl: &mut QuestControl,
+    w: &mut W,
+    map_ai: u32,
+    nihlathak: bool,
+) {
+    let Some(i) = ctl.find(CHAIN) else { return };
+    let e = x(ctl, i);
+    let (in_town, guid) = if nihlathak {
+        e.nihlathak_map_ai = map_ai;
+        (e.nihlathak_in_town, e.nihlathak_guid)
+    } else {
+        e.anya_map_ai = map_ai;
+        (e.anya_in_town, e.anya_guid)
+    };
+    if !in_town {
+        return;
+    }
+    if let Some((unit, _)) = w.monster_by_guid(guid) {
+        apply_map_ai(ctl, w, i, unit, nihlathak);
+    }
+}
+
 /// The thaw timer `0x0058AAB0` (§5.6; edge case 5).
 fn thaw<W: QuestWorld>(ctl: &mut QuestControl, w: &mut W, i: usize) -> bool {
     if x(ctl, i).thawed_spawned {

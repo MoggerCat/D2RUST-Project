@@ -11,7 +11,8 @@
 use crate::combat::{self, result, DamageRecord};
 use crate::game::Game;
 use crate::missiles::{
-    result_flag, stat, Damage, MissileCombat, MissileHooks, MissilePath, MissileRooms, MissileUnits,
+    result_flag, stat, Damage, MissileCombat, MissileData, MissileHooks, MissilePath, MissileRooms,
+    MissileUnits,
 };
 use crate::rng::Seed;
 use crate::tick::events::event;
@@ -173,9 +174,21 @@ impl<X: Pending> MissilePath for View<'_, X> {
     fn set_acceleration(&mut self, unit: UnitId, accel: i32, max_velocity: i32) {
         self.h.path_set_acceleration(unit, accel, max_velocity);
     }
-    /// `0x006417F0`: not specified (stays [`Pending`]).
+    /// `0x006417F0(missile, target point)` (`missiles.md` §R2.3 step 19,
+    /// `skills/bodies.md` §4): max(|dx|, |dy|) + ⌊min(|dx|, |dy|) / 2⌋
+    /// from the path position to the path target point, with the path
+    /// provider; [`Pending`] without it.
     fn target_distance(&self, unit: UnitId) -> i32 {
-        self.h.x.target_distance(unit)
+        match self.path_target_xy(unit) {
+            Some((tx, ty)) => {
+                let (x, y) = self.h.path_position(unit);
+                crate::path::walk::resync::resync_distance(
+                    crate::path::Point::new(x, y),
+                    crate::path::Point::new(tx, ty),
+                )
+            }
+            None => self.h.x.target_distance(unit),
+        }
     }
     /// Unit step `0x00554CA0` (`pathing.md` §9.3): false when it returns 2.
     fn step(&mut self, game: &mut Game, unit: UnitId) -> bool {
@@ -275,12 +288,17 @@ impl<X: Pending> MissileRooms for View<'_, X> {
             }
         }
     }
-    /// The units on (x, y), searched in `room` and its adjacency array.
-    ///
-    /// TODO(missiles.md §R4 step 9): the search order of `0x00641CB0` is
-    /// not specified; rooms in adjacency order (the room first), units in
-    /// room-list order.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId> {
+    /// `0x00641CB0(room, x, y, accept, arg, r)` without the accept call
+    /// (`sim/path-placement.md` §4 rule 6): `r` outside 1..3 finds none;
+    /// the room and its adjacency array (the room first), units in
+    /// room-list order; players in mode 0 / 17 and monsters in mode 0 /
+    /// 12 are skipped, objects, items and tiles never found; a unit of
+    /// size `s` (> 3 counts 3, ≤ 0 skipped) is found when the query
+    /// shape of size `r` overlaps its shape (rule 5's table).
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId> {
+        if !(1..=3).contains(&r) {
+            return Vec::new();
+        }
         let adjacent = game
             .lists
             .room(room)
@@ -289,7 +307,31 @@ impl<X: Pending> MissileRooms for View<'_, X> {
         std::iter::once(room)
             .chain(adjacent.into_iter().filter(|&r| r != room))
             .flat_map(|r| game.lists.room_units(r))
-            .filter(|&u| self.h.path_position(u) == (x, y))
+            .filter(|&u| {
+                let Some(rec) = self.units.get(u) else {
+                    return false;
+                };
+                match rec.ty {
+                    UnitType::Player if matches!(rec.mode, 0 | 17) => return false,
+                    UnitType::Monster if matches!(rec.mode, 0 | 12) => return false,
+                    UnitType::Player | UnitType::Monster | UnitType::Missile => {}
+                    _ => return false,
+                }
+                let s = self.path_size(u).min(3);
+                if s <= 0 {
+                    return false;
+                }
+                let (ux, uy) = self.h.path_position(u);
+                let (dx, dy) = ((x - ux).abs(), (y - uy).abs());
+                match (r, s) {
+                    (1, 1) => dx == 0 && dy == 0,
+                    (1, 2) | (2, 1) => dx + dy <= 1,
+                    (1, 3) | (3, 1) => dx <= 1 && dy <= 1,
+                    (2, 2) => dx + dy <= 2,
+                    (2, 3) | (3, 2) => (dx <= 2 && dy <= 1) || (dx <= 1 && dy <= 2),
+                    _ => dx <= 2 && dy <= 2,
+                }
+            })
             .collect()
     }
 }
@@ -367,7 +409,6 @@ impl<X: Pending> MissileCombat for View<'_, X> {
     /// missile's hit class (`HitClass`) and pierce percent (stat 327),
     /// then `apply(game, owner, unit, missile = 1, record)` (`damage.md`
     /// §5.2) and the reaction (§7.1). No owner: nothing (`0x005AD730`).
-    ///
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -375,12 +416,13 @@ impl<X: Pending> MissileCombat for View<'_, X> {
         missile: UnitId,
         unit: UnitId,
         damage: &mut Damage,
+        data: Option<&MissileData>,
     ) {
         let Some(owner) = owner else {
             return;
         };
         let mut rec = damage_record(damage);
-        self.apply_missile_record(game, owner, missile, unit, &mut rec);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec, data);
         damage.result = rec.result.into();
     }
     /// Unit event 0 (`0x005C0C30`), also with no unit.
@@ -425,8 +467,8 @@ impl<X: Pending> MissileCombat for View<'_, X> {
 
 impl<X: Pending> View<'_, X> {
     /// The damage part of `0x005ADCD0` (`missiles.md` §R6.1) on a
-    /// record: the missile's hit class (`HitClass`) and pierce percent
-    /// (stat 327), then `apply(game, owner, unit, missile = 1, record)`
+    /// record: the missile's hit class (`HitClass`), the hit flags from
+    /// its data flags 1, 2 and pierce percent (stat 327), then `apply(game, owner, unit, missile = 1, record)`
     /// (`damage.md` §5.2) and the reaction (§7.1).
     fn apply_missile_record(
         &mut self,
@@ -435,24 +477,14 @@ impl<X: Pending> View<'_, X> {
         missile: UnitId,
         unit: UnitId,
         rec: &mut DamageRecord,
+        data: Option<&MissileData>,
     ) {
-        let class = self
-            .h
-            .missiles
-            .as_ref()
-            .and_then(|s| s.get(missile))
-            .map(|d| d.class);
+        let (class, data_flags) = data.map_or((None, 0), |d| (Some(d.class), d.flags));
         let t = self.h.tables.clone();
         if let Some(row) = class.and_then(|c| t.missiles.get(usize::from(c))) {
             merge_hit_class(rec, u32::from(row.hitclass));
         }
         rec.pierce_pct = View::stat(self, missile, PIERCE_PERCENT_STAT);
-        let data_flags = self
-            .h
-            .missiles
-            .as_ref()
-            .and_then(|s| s.get(missile))
-            .map_or(0, |d| d.flags);
         let mut w = self.combat(game);
         // `0x005AD730` order (`missiles.md` §R6.1): block/dodge on the
         // unit's seed (avoid 1, block = physical != 0), the hit-class
@@ -470,12 +502,13 @@ impl<X: Pending> View<'_, X> {
             rec.result &= !result::HIT;
         }
         combat::monster_crit(&mut w, &t.combat, owner, unit, rec);
-        // Step 5: missile data flags 1, 2 → hit flags 0x20, 0x80.
+        // Step 5: missile data flags (+0x14) 1 → hit flag 0x20 ("rolled",
+        // so `domissiledamage` fires), 2 → 0x80 (no `domissiledamage`).
         if data_flags & 1 != 0 {
-            rec.hit_flags |= 0x20;
+            rec.hit_flags |= combat::hitflag::ROLLED;
         }
         if data_flags & 2 != 0 {
-            rec.hit_flags |= 0x80;
+            rec.hit_flags |= combat::hitflag::NO_MISSILE_EVENT;
         }
         if rec.result & result::HIT != 0 {
             combat::apply(&mut w, &t.combat, owner, unit, true, rec);
@@ -510,9 +543,10 @@ impl<X: Pending> View<'_, X> {
             };
             crate::missiles::result_flags(game, &mut cx, missile, unit)
         };
+        let data = store.get(missile).cloned();
         self.h.missiles = Some(store);
         rec.result |= result_bits(flags);
-        self.apply_missile_record(game, owner, missile, unit, &mut rec);
+        self.apply_missile_record(game, owner, missile, unit, &mut rec, data.as_ref());
     }
 }
 
@@ -546,6 +580,52 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan has no provider here ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
+    /// The `pettype.txt` row count (data tables +0xBF0).
+    fn pet_type_count(&self) -> i32 {
+        self.h.bodies.as_ref().map_or(0, |b| b.pettype_count)
+    }
+    /// `0x0056E620` on the skill pipeline ([`Pending::missile_summon_class`]).
+    fn summon_class(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) -> crate::missiles::SummonClass {
+        let (class, mode) = with_sim(self, game, |h, sim| {
+            X::missile_summon_class(h, sim, owner, skill, level)
+        });
+        crate::missiles::SummonClass { class, mode }
+    }
+    /// `0x0056D940` flags 0xD on the skill pipeline
+    /// ([`Pending::missile_summon_spawn`]).
+    fn summon_spawn(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        class: i32,
+        mode: i32,
+        at: (i32, i32),
+        pet_type: i32,
+    ) -> Option<UnitId> {
+        with_sim(self, game, |h, sim| {
+            X::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
+        })
+    }
+    /// `missiles/bodies-2.md` §33 step 8 ([`Pending::missile_bone_wall_piece`]).
+    fn bind_bone_wall_piece(
+        &mut self,
+        game: &mut Game,
+        owner: UnitId,
+        anchor: UnitId,
+        piece: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        with_sim(self, game, |h, sim| {
+            X::missile_bone_wall_piece(h, sim, owner, anchor, piece, skill, level)
+        });
+    }
     /// `0x005444B0(game, id)`: the quest control's published answer
     /// ([`Pending::quest_not_intro`]).
     fn quest_test(&self, _game: &Game, id: i32) -> bool {
@@ -759,4 +839,20 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
         use crate::path::CollisionRooms;
         self.h.drlg.subtile_rect(room).map(|t| (t.x, t.y, t.w, t.h))
     }
+}
+
+/// Runs `f` on the hooks and a [`crate::units::hooks::Sim`] over the
+/// view's parts and `game`.
+fn with_sim<X: Pending, R>(
+    v: &mut View<'_, X>,
+    game: &mut Game,
+    f: impl FnOnce(&mut super::ActionHooks<X>, &mut crate::units::hooks::Sim<'_>) -> R,
+) -> R {
+    let mut sim = crate::units::hooks::Sim {
+        game,
+        units: &mut *v.units,
+        stats: &mut *v.stats,
+        data: v.data,
+    };
+    f(&mut *v.h, &mut sim)
 }

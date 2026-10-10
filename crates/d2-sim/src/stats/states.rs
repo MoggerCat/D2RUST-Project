@@ -265,4 +265,10 @@ impl StateTable {
     pub(crate) fn set_srvactivefunc(&mut self, s: u32, f: u16) {
         self.srvactivefunc[s as usize] = f;
     }
+
+    /// Sets the draw-identity list (state, `gfxtype`, `gfxclass`)
+    /// (test-only).
+    pub(crate) fn set_gfx(&mut self, gfx: Vec<(u32, u8, u16)>) {
+        self.gfx = gfx;
+    }
 }

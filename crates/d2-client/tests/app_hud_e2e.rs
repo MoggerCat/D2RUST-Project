@@ -224,6 +224,19 @@ fn images(app: &App) -> Vec<(String, u32, i32, i32, u16)> {
         .collect()
 }
 
+/// The UI rectangle draws of the last frame.
+fn rect_draws(app: &App) -> Vec<d2_client::ui::draw::RectRequest> {
+    let state = app.world().resource::<WorldViewState>();
+    state
+        .last_ui
+        .iter()
+        .filter_map(|d| match d {
+            UiDraw::Rect(r) => Some(*r),
+            _ => None,
+        })
+        .collect()
+}
+
 fn click(app: &mut App, ms: &AtomicU32, x: i32, y: i32) {
     let at = Point::new(x, y);
     for e in [
@@ -371,11 +384,16 @@ fn the_play_hud_draws_model_values_and_takes_clicks() {
         "mana full: {img:?}"
     );
     assert!(has("panel\\overlap", 0, 28, 595, 600), "{img:?}");
-    // Stamina 40 / 80: 51 pixels wide, gold (fill frame 1).
+    // Stamina 40 / 80: 51 pixels wide, gold. The bar is the rectangle
+    // `0x0046EFD0(x, y, w, 18, colour, mode 2)` (`control-panel.md` §4 r2,
+    // `a4-town-pandemonium-fortress` row 254; q-scenes-compare), not a
+    // `hudfill` tile: the old expectation predates that change.
+    let rects = rect_draws(&app);
     assert!(
-        img.iter()
-            .any(|d| d.0 == "d2rs\\hudfill" && d.1 == 1 && (d.2, d.3, d.4) == (273, 573, 18)),
-        "stamina bar: {img:?}"
+        rects
+            .iter()
+            .any(|r| (r.x0, r.y0, r.x1, r.y1, r.mode) == (273, 573, 273 + 51, 573 + 18, 2)),
+        "stamina bar: {rects:?}"
     );
     assert!(
         has("panel\\runbutton", 0, 255, 590, 600),

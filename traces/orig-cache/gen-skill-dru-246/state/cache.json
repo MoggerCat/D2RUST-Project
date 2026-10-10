@@ -1,0 +1,40 @@
+{
+ "channel": "state",
+ "check": "gen-skill-dru-246",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnDru",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--input",
+  "frame 20; rclick 330 300"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "fbc5d88578ecb18fd367642d385cb5000fedb35f2c8a50342b8309da19b55389",
+   "size": 353839
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f66f6487a30fda3e538ab998f750cc4227c45315d6cc7f7d9fee6c829d4a0f52",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "66f2ac9c9dba9d3e1ac8390a6073a253203c8317c48daccc33087d24b6644288"
+ }
+}

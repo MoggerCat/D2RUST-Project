@@ -58,15 +58,15 @@
 |   1. Directives | 103–142 |
 |   2. Poke files | 143–165 |
 |   3. In scenarios | 166–180 |
-|   4. The 1.14d side (`poke.py`) | 181–346 |
-|   5. The d2rs side (`d2-sim::poke`) | 347–404 |
-|   6. `goto`: walking to a target | 405–479 |
-| Constants & data dependencies | 480–495 |
-| Randomness | 496–502 |
-| Edge cases & original bugs | 503–530 |
-| Test vectors | 531–557 |
-| Provenance | 558–568 |
-| Open questions | 569–576 |
+|   4. The 1.14d side (`poke.py`) | 181–354 |
+|   5. The d2rs side (`d2-sim::poke`) | 355–412 |
+|   6. `goto`: walking to a target | 413–492 |
+| Constants & data dependencies | 493–508 |
+| Randomness | 509–515 |
+| Edge cases & original bugs | 516–543 |
+| Test vectors | 544–571 |
+| Provenance | 572–582 |
+| Open questions | 583–590 |
 <!-- /index -->
 
 ## Summary
@@ -120,8 +120,8 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
 | `seed-game` | `<lo> <hi>` | set the game seed | write u32 lo, hi at game +0xD0 (`rng.md` §5.2; `original-hooks-spawn.md` Constants) | `ActionHooks.game_seed.set(lo, hi)` |
 | `seed-unit` | `<ref> <lo> <hi>` | set a unit's seed | write u32 lo, hi at unit +0x20, +0x24 (`rng.md` §5.3; `original-hooks.md` §4) | the unit record's `seed.set(lo, hi)` |
 | `time` | `<period 0..5> <ticks>` | set the time of day of the player's act | write the environment record (act +0x04; acts at game +0xBC + 4·act): +0x00 period, +0x08 ticks (`render/lighting.md` §9.1) | `ActEntry.environment` `period`, `ticks` |
-| `pos` | `<ref> <x> <y>` | teleport a unit | `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0; `path-placement.md` §6 r4), else `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0; §10); room by entry 6 from the unit's room | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path) |
-| `hop` | `<ref> <x> <y>` | d2rs-own test aid (playthrough sweeps): move the unit at most 16 sub-tiles per axis toward (x, y) from where it stands, to the first spot of a fixed candidate list where a `pos` moves it: rings of radius 0, 2, 4, 7 (8 directions) around the full step, then around the half step, then a sidestep of 8 to either side across the step; `ok` when the unit moved (or is within 1 of the point), `failed` when no candidate did | each candidate as `pos`; moved = the path's sub-tile position changed (`poke.py` `hop_candidates`) | `poke::hop_candidates` and `WalkCtx::teleport` per candidate; a refused candidate's path error is dropped |
+| `pos` | `<ref> <x> <y> [free]` | teleport a unit; `free` (REC-1080): land on the nearest free, missile-passable cell instead of the raw point: the cell of the room holding (x, y) whose collision mask has none of the bits 0x1C0D (the player's move bits 0x1C09 and the missile-blocking bit 0x4), nearest (x, y) by squared distance, row by row from the top-left of the room's sub-tile rectangle, the first found on a tie; none → `failed`. Plain `pos` stays a raw teleport | `0x00650BE0` (stack: unit path, unit, room, x, y; `ret 0x14`; 1/0; `path-placement.md` §6 r4), else `0x00554EA0` (ECX game, EDX unit; room, x, y, exact 1, alt 0; `ret 0x14`; 1/0; §10); room by entry 6 from the unit's room; with `free` the cell is read from the room's collision record (§6 data: `poke.py` `free_cell`) before the call | `WalkCtx::teleport` (`path-placement.md` §6 r4 teleport path); with `free` the cell from the active room's grid (`poke::nearest_free`) |
+| `hop` | `<ref> <x> <y>` | d2rs-own test aid (playthrough sweeps): move the unit at most 16 sub-tiles per axis toward (x, y) from where it stands, to the first spot of a fixed candidate list where a `pos` moves it: rings of radius 0, 2, 4, 7 (8 directions) around the full step, then around the half step, then a sidestep of 8 to either side across the step; a candidate whose cell has any bit of 0x1C0D in its room's collision mask (or no room or grid) is skipped without a `pos` (REC-1080: the unit never ends on a cell that stops missiles); `ok` when the unit moved (or is within 1 of the point), `failed` when no candidate did | each candidate as `pos`; moved = the path's sub-tile position changed (`poke.py` `hop_candidates`) | `poke::hop_candidates` and `WalkCtx::teleport` per candidate; a refused candidate's path error is dropped |
 | `warp` | `<level> [tile <n>]` | move the player to a level (tile index default 0) | `0x0053AEC0` (ECX game, EDX player; level, tile; `ret 8`; EAX not a status: `ok`; `world/waypoints.md` §7 r5) | `wiring::path::place::level_warp` (`path-placement.md` §11); another act: the act change `wiring::path::act_change::run` (`world/waypoints.md` §11 steps 1–19, `flows/act-change.md` §1; step 3 builds the act's DRLG when missing), as waypoint travel to another act; the client's 0x04 follows on the next tick's client pass |
 | `item` | `<code> <x> <y> [quality <q>] [ilvl <n>]` | create an item on the ground | `0x00558D90` (ECX game, EDX request; use seed 0; `ret 4`; EAX the item; `items/generation.md` §3) with request spawn mode 3, x, y, room (entry 6), item = the combined index of the code (§4 rule 8) | `ItemUnits::create_item` (spawn mode ground) then `items::moves::ground::ground_place` |
 | `stat` | `<ref> <stat> <layer> <i32>` | set a base stat | `0x00627260` (stack: unit, s, value, layer; `ret 0x10`; `sim/stat-lists.md` §5 r2) | `StatLists::unit_set` (`stat-lists.md` §5 r2) |
@@ -268,10 +268,18 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
     message entry `0x0053F3D0` (ECX = buffer with the client id first,
     EDX = size) is not proposed: it takes the game's lock itself and
     drops the handler's code (`sim/intents-events.md` §2.2).
-    PROVISIONAL: a handler called at the tick-return stop has the same
-    effect as the same message drained by the server at the start of
-    the next frame (`msg`), apart from the frame number its events are
-    scheduled from (game +0xA8 at the stop); settled by REC-1150.
+    A handler called at the tick-return stop has the same effect as the
+    same message injected for that frame (REC-1150, settled 2026-10-09 by
+    recording): ScnHi1, `-seed 1234`, Act I town, chest class 5 spawned
+    next to the player (`object 5 @x+2 @y`, GUID 23) at frame 6, then at
+    frame 12 either `send InteractWithEntity type=2` (C→S 0x13, drained
+    after the frame-11 stop) or the direct operate `0x00584420(type 2,
+    GUID 23)` at the frame-11 stop. Every field of every unit and the game
+    seed are equal in all 40 snapshots of the two runs; the chest is in
+    mode 2 from snapshot 12 in both, so the events are scheduled from the
+    same frame (no off-by-one from game +0xA8). Probe: `probe_operate2.py`
+    (scratch; a `stat @player 65535 0 <GUID>` poke rerouted to the call)
+    until `operate` is in `CALL_FORMS`.
 
     Proposed `CALL_FORMS` entries (same `Fn` / `Form` shapes as the
     table in `poke.py`; `code` is a proposed fourth `RESULTS` kind:
@@ -434,7 +442,11 @@ records both sides keep.
       picks the cell, so a blocked cell (an object, lava) moves the
       player to the nearest free cell around it. Placed → `ok`, with
       the target's GUID as the result's GUID (a later `g @pI` names it);
-      not placed → `failed`.
+      not placed → `failed`. Then (REC-1080), when the cell the player
+      stands on has any bit of 0x1C0D (the free-point search excludes
+      only 0x1C09, so bit 0x4 can remain), place the player again in the
+      same room with exact 1 on the cell the `pos … free` rule (§1)
+      picks around that cell; no such cell → the first placement stands.
    3. **Not found:** add to the seen set the player's DRLG room and
       every room of its near array that has an active room (their
       units exist now). Then a breadth-first search over near arrays
@@ -445,7 +457,8 @@ records both sides keep.
       it (a member of the player's room's near array): H without an
       active room → `failed`. The hop's cell: among H's cells (its
       collision grid, row by row from the top-left) whose mask has none
-      of the player's move bits 0x1C09, the one nearest the centre of
+      of the bits 0x1C0D (the move bits 0x1C09 and the missile-blocking
+      0x4, REC-1080), the one nearest the centre of
       H's sub-tile rectangle (cx = x + w / 2, cy = y + h / 2, integer
       division; squared distance; the first found on a tie). Such a
       cell, not the centre, is the target because a centre on lava
@@ -537,6 +550,7 @@ same on both sides.
 | `goto unit 5` / `goto preset 2 2:119` / `goto preset 107 376` parsed and written | canonical `goto unit 1:5`, `goto preset 2 2:119`, `goto preset 107 1:376`; `goto unit 3:5`, `goto preset 2`, `goto here 5` errors | synthetic (`d2-sim::poke` tests, `poke.py --selftest`) |
 | `goto` on a synthetic walk: target in the player's near rooms; target two rooms away; no target | `ok` with the target's GUID in 1 step; `pending`, `pending`, `ok`; `failed` "explored" | synthetic (`d2-sim::poke` tests; `poke.py --selftest` on a fake game) |
 | checkpoint `a4-hellforge` (`traces/checkpoints/`), seed 1: `5 warp 107`, `20 goto preset 107 2:376` | lands next to the Hellforge | 2026-10-09: d2rs (`state-dump`) and 1.14d under Wine (`record_state.py`): `ok` after 50 steps at f69 on both, the player at (7779, 6133), the forge at (7781, 6135), Hephasto at (7810, 6143) on both (GUIDs differ: forge 94 / 96) |
+| `pos @player X Y free` and `hop @player X Y` with bit 0x4 set on the target cell (full step); `goto unit` whose landing cell has 0x4 | the unit ends on a cell with none of 0x1C0D, within 3 sub-tiles of the point; `goto` places again with exact 1 | REC-1080: `test-fixtures` `poke_goto.rs` (d2rs); `poke.py --selftest` (1.14d side, fake DRLG); the 1.14d run unverified |
 | `traces/scenarios/poke-spawn-town.scenario` twice on the synthetic install | byte-identical traces | synthetic |
 | `traces/checks/poke-fallen-town.check` (ScnAma, seed 1234; frame 4: `spawn 19 @x+3 @y+3 normal`, `seed-unit @1:19 0x12345678 666`), 1.14d against d2rs, 54 frames | both pokes `ok`; the same party (GUIDs 8–11, same class, positions, mode 1 for all 50 ticks) and the poked seed equal | REC-590, run 2026-10-09 (cloud, Wine): equal as stated; differs: minion seeds and every creation hp, because d2rs's game seed is one step behind 1.14d from frame 2 (the joining player's unit seed: 1.14d {lo of one game-seed step, 666}, d2rs {1, 666}), a join finding outside this spec |
 | same check with the seeds pinned first (`seed-game 0x1234 666`, `seed-unit @player 0x55 666`, then the spawn) | the party and the game seed equal for 50 ticks | REC-590, 2026-10-09: equal (the party's every compared field and the game seed, frames 4–54); left: fields d2rs's snapshot does not fill (monster `tx`/`ty`, player `fc`/`sp`), outside this spec |

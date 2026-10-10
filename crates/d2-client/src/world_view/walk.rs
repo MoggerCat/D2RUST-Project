@@ -89,15 +89,19 @@ pub fn preview_walk_frame(
     // `msg-units.md` §3 r2: the living monsters' footprints for the
     // client path (REC-706: at their model positions).
     let others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
-    walk.predict.set_others(others);
+    let objects = other_objects(bridge.0.world(), &bridge.0.inputs().objclient.rows);
+    walk.predict.set_others(others, objects);
     walk.frame(bridge.0.world());
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
         let mut art = art.write().unwrap_or_else(|e| e.into_inner());
-        art.pose_mode = walk
-            .predict
-            .player()
-            .and_then(|k| Some((k, walk.predict.mode()?)));
+        art.pose_mode = walk.predict.player().and_then(|k| {
+            let mode = walk
+                .predict
+                .mode()
+                .or_else(|| walk.predict.stood_mode(bridge.0.world()))?;
+            Some((k, mode))
+        });
         art.pose_dir = walk
             .predict
             .player()
@@ -134,6 +138,31 @@ pub fn other_units(
                 in_town: c.in_town,
                 interact: c.interact,
             })
+        })
+        .collect()
+}
+
+/// The model's objects whose mode has collision (`HasCollision[mode]`
+/// ≠ 0, `sim/path-placement.md` §2.5) with an `objects` row: their
+/// footprint inputs (PROVISIONAL REC-1251, `bridge::client_path`).
+pub fn other_objects(
+    world: &ClientWorld,
+    rows: &[crate::bridge::objects::ObjClientRow],
+) -> Vec<crate::bridge::client_path::OtherObject> {
+    world
+        .units
+        .values()
+        .filter(|u| u.key.unit_type == crate::bridge::world::OBJECT)
+        .filter_map(|u| {
+            let (x, y) = u.position?;
+            let r = rows.get(u.class as usize)?;
+            r.shape
+                .collides_in(u.mode)
+                .then_some(crate::bridge::client_path::OtherObject {
+                    x,
+                    y,
+                    shape: r.shape,
+                })
         })
         .collect()
 }

@@ -40,6 +40,8 @@ pub fn request_quest_data() -> ClientIntent {
 const BACKGROUND: &str = "menu\\questbackground";
 const SOCKETS: &str = "menu\\questsockets";
 const DONE: &str = "menu\\questdone";
+const TABS: &str = "menu\\expquesttabs";
+const LAST: &str = "menu\\questlast";
 
 /// The files the log draws, for [`UiFiles::extend`].
 pub fn quest_files() -> Vec<String> {
@@ -47,6 +49,8 @@ pub fn quest_files() -> Vec<String> {
         BACKGROUND.to_string(),
         SOCKETS.to_string(),
         DONE.to_string(),
+        TABS.to_string(),
+        LAST.to_string(),
     ];
     v.extend(ICON_NAMES.iter().map(|n| format!("menu\\{n}")));
     v
@@ -107,16 +111,22 @@ pub fn rows(log: &mut QuestLog, inputs: &QuestInputs, tab: u8, multiplayer: bool
     )
 }
 
-/// The log's slot position (cel draw point), d2rs-own, unverified.
-pub fn slot_at(slot: u8, screen_h: i32) -> Point {
+/// The log's slot position (cel draw point), measured on 1.14d at 800 × 600
+/// (`a1-panel-quest-log`, 2026-10-09): the panel art sits in 640 × 480
+/// coordinates shifted by (`sx`, `H + sy − 480`); icon (col, row) at (26 +
+/// 97 col, 121 + 97 row), its socket 4 left and 5 down of it. `sx`, `base`:
+/// the shifts (`ui/panels.md` §1.1).
+pub fn slot_at(slot: u8, sx: i32, base: i32) -> Point {
     let (col, row) = (i32::from(slot % 3), i32::from(slot / 3));
-    Point::new(40 + col * 90, screen_h - 48 - 270 + row * 100)
+    Point::new(sx + 26 + col * 97, base + 121 + row * 97)
 }
 
 /// The quest log adapter (ui 0x0F).
 pub(super) struct QuestLogUi {
     pub(super) sh: SharedRef,
     pub(super) log: RefCell<QuestLog>,
+    /// The act tab last opened (`0x004A3220` runs when it changes).
+    pub(super) shown: std::cell::Cell<Option<u8>>,
 }
 
 /// Frame of an icon cel for a row state (`quests-status.md` §5): 24
@@ -166,8 +176,17 @@ impl Panel for QuestLogUi {
         let (Some(back), Some(sockets)) = (files.id(BACKGROUND), files.id(SOCKETS)) else {
             return;
         };
-        let h = sh.config.screen.h;
-        out.push(cel(back, 0, 0, h - 48));
+        let scr = sh.config.screen;
+        let (sx, base) = (scr.sx(), scr.h + scr.sy() - 480);
+        let h = scr.h;
+        // The four background frames (2 × 2, 256 apart), the tab strip, the
+        // close button and the replay button, as 1.14d draws them.
+        for (f, (x, y)) in [(0, 256), (256, 256), (0, 432), (256, 432)]
+            .into_iter()
+            .enumerate()
+        {
+            out.push(cel(back, f as u32, sx + x, base + y));
+        }
         let tab = ctx.world.act.map_or(0, |a| a.act).min(4);
         let rows = rows(
             &mut self.log.borrow_mut(),
@@ -175,26 +194,54 @@ impl Panel for QuestLogUi {
             tab,
             ctx.world.expansion == 0,
         );
+        // PROVISIONAL (REC-1437): the tab strip frame is the shown act; 1.14d
+        // shows frame 0 for Act I (`a1-panel-quest-log`). The close button
+        // is `panel\buysellbtn` frame 10 at (278, 422), the replay button
+        // `questlast` frame 0 at (226, 422).
+        if let Some(t) = files.id(TABS) {
+            out.push(cel(t, u32::from(tab), sx + 5, base + 33));
+        }
+        let shown = self.shown.get();
+        if shown != Some(tab) {
+            self.shown.set(Some(tab));
+            let gate = TabGate {
+                expansion_installed: false,
+                expansion_game: false,
+                cel_loaded: &|_| true,
+            };
+            let _ = self.log.borrow_mut().open_tab(
+                tab,
+                true,
+                &sh.quest.player,
+                sh.quest.game.as_ref(),
+                ctx.world.expansion == 0,
+                &gate,
+            );
+        }
         let selected = self.log.borrow().selected;
         for r in &rows {
-            let at = slot_at(r.slot, h);
-            out.push(cel(
-                sockets,
-                u32::from(Some(r.slot) == selected),
-                at.x,
-                at.y,
-            ));
+            let at = slot_at(r.slot, sx, base);
+            // The icon, then its selection socket (1.14d draw order).
             let name = format!("menu\\{}", ICON_NAMES[usize::from(r.icon)]);
             if let Some(icon) = files.id(&name) {
                 out.push(cel(icon, icon_frame(r.row.icon), at.x, at.y));
             }
+            out.push(cel(
+                sockets,
+                u32::from(Some(r.slot) == selected),
+                at.x - 4,
+                at.y + 5,
+            ));
+        }
+        if let Some(b) = files.id("panel\\buysellbtn") {
+            out.push(cel(b, 10, sx + 278, base + 422));
+        }
+        if let Some(l) = files.id(LAST) {
+            out.push(cel(l, 0, sx + 226, base + 422));
         }
         // The selected row: title, then the text (`quests-status.md` §3
         // rule 4; no wrap).
-        let pick = rows
-            .iter()
-            .find(|r| Some(r.slot) == selected)
-            .or(rows.first());
+        let pick = rows.iter().find(|r| Some(r.slot) == selected);
         let Some(r) = pick else {
             return;
         };
@@ -224,7 +271,8 @@ impl Panel for QuestLogUi {
             return UiResponse::Ignored;
         };
         let sh = self.sh.borrow();
-        let h = sh.config.screen.h;
+        let scr = sh.config.screen;
+        let (sx, base) = (scr.sx(), scr.h + scr.sy() - 480);
         let tab = ctx.world.act.map_or(0, |a| a.act).min(4);
         let rows = rows(
             &mut self.log.borrow_mut(),
@@ -233,7 +281,7 @@ impl Panel for QuestLogUi {
             ctx.world.expansion == 0,
         );
         for r in rows {
-            let p = slot_at(r.slot, h);
+            let p = slot_at(r.slot, sx, base);
             // The icon cels are about 70 × 70 (unmeasured).
             if (p.x..p.x + 70).contains(&at.x) && (p.y - 70..p.y).contains(&at.y) {
                 self.log.borrow_mut().selected = Some(r.slot);

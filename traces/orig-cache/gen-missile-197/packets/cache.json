@@ -1,0 +1,40 @@
+{
+ "channel": "packets",
+ "check": "gen-missile-197",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnSor",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "8 spawn 179 @x+6 @y normal",
+  "--poke",
+  "12 missile 197 @x @y @x+6 @y"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "2b3501818ea6a238123061cd3bbcbb6f282d39cbf4431a0dbd4ad9b58165b152",
+   "size": 111483
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "39599d7676998821828ead332bf50076845ffbc1f09ffa1bd8f8a3c9ca3acca8",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "58d80df5bf2c4c82ebcb500135829c6c12fb55c13a30b8de9e0a35697ab2f95f"
+ }
+}

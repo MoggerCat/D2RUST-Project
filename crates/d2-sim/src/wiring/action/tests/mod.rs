@@ -7,6 +7,8 @@
 #[cfg(test)]
 mod ai;
 #[cfg(test)]
+mod ai_scan;
+#[cfg(test)]
 mod combat;
 #[cfg(test)]
 mod death;
@@ -80,6 +82,8 @@ pub struct TestPending {
     pub missing_modes: Vec<u8>,
     /// Used skills (`0x00620250`) by unit.
     pub used: BTreeMap<UnitId, crate::skills::SkillEntry>,
+    /// Used-skill entry flags +0x0C (`0x006446A0`) by unit (default 0).
+    pub entry_flags: BTreeMap<UnitId, u32>,
     /// What the monster skill start `0x0056FAF0` answers (logged).
     pub skill_start: i32,
     /// What `object_approach` answers (default: operate).
@@ -88,6 +92,8 @@ pub struct TestPending {
     pub peaceful: Vec<UnitId>,
     /// What `object_quest_record` answers (the portal's quest gate).
     pub quest_record: bool,
+    /// Unit sizes `0x00620510` (default 1).
+    pub sizes: BTreeMap<UnitId, i32>,
 }
 
 impl Pending for TestPending {
@@ -134,8 +140,8 @@ impl Pending for TestPending {
     fn place(&mut self, unit: UnitId, x: i32, y: i32) {
         self.pos.insert(unit, (x, y));
     }
-    fn size(&self, _: UnitId) -> i32 {
-        1
+    fn size(&self, u: UnitId) -> i32 {
+        self.sizes.get(&u).copied().unwrap_or(1)
     }
     fn has_path(&self, _: UnitId) -> bool {
         true
@@ -172,6 +178,9 @@ impl Pending for TestPending {
     }
     fn used_skill(&self, unit: UnitId) -> Option<crate::skills::SkillEntry> {
         self.used.get(&unit).copied()
+    }
+    fn entry_flags(&self, unit: UnitId, _: &crate::skills::SkillEntry) -> u32 {
+        self.entry_flags.get(&unit).copied().unwrap_or(0)
     }
     fn monster_skill_start(
         h: &mut ActionHooks<Self>,

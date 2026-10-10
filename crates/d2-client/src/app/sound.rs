@@ -336,6 +336,7 @@ impl SoundLog {
 /// One audio frame: pool frame, the sound layer's ticks (when it runs:
 /// the UI's sound requests first), cues, present the tick (the sound
 /// tick with the sound layer, else the frame's server tick).
+#[allow(clippy::too_many_arguments)] // Bevy system parameters
 fn audio_frame(
     bridge: Res<BridgeResource>,
     mut audio: ResMut<GameAudio>,
@@ -344,6 +345,8 @@ fn audio_frame(
     config: Option<Res<ConfigRes>>,
     link: Option<Res<SoundLink>>,
     mut log: Option<ResMut<SoundLog>>,
+    mut dump: Option<ResMut<super::audio_dump::AudioDump>>,
+    mut exit: MessageWriter<AppExit>,
 ) -> std::result::Result<(), BevyError> {
     let audio = &mut *audio;
     let weather = link.as_deref().map(|l| {
@@ -423,14 +426,40 @@ fn audio_frame(
         let presented = match driver.as_deref_mut() {
             Some(d) => {
                 engine.pump(d);
-                d.tick()
+                // The last sound tick that ran: the driver's counter is
+                // the next T (`sound-table.md` §6.1, REC-1684). None ran
+                // yet: the first server tick has no sound tick.
+                match d.tick().checked_sub(1) {
+                    Some(t) => t,
+                    None => return Ok(()),
+                }
             }
             None => {
                 engine.pump(audio.cues.as_mut());
                 tick
             }
         };
-        engine.present(presented).map_err(AudioFrameError::from)?;
+        match dump.as_deref_mut() {
+            // `specs/tools/audio-diff.md` §3: the dump presents each tick
+            // and mixes its frames (no device).
+            Some(d) => {
+                let records = d
+                    .stepper
+                    .advance(&mut engine, presented)
+                    .map_err(AudioFrameError::from)?;
+                if let Err(e) = d.write(&records, world.server_ticks) {
+                    warn!("audio dump: {e}");
+                }
+                if d.until.is_some_and(|n| world.server_ticks >= n) {
+                    info!(
+                        "play: audio dump reached server tick {}",
+                        world.server_ticks
+                    );
+                    exit.write(AppExit::Success);
+                }
+            }
+            None => engine.present(presented).map_err(AudioFrameError::from)?,
+        }
         (presented, engine.take_errors())
     };
     drop(driver);

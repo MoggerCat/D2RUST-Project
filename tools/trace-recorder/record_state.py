@@ -73,6 +73,10 @@ MIS_OWNED = 0x400         # unit +0xC8 bit: the missile has an owner at +0x98
 MD_CONTROL, CTL_GAME, CTL_OWNER = 0x28, 0x28, 0x2C   # monster data -> AI control
 ID_INV, INV_OWNER = 0x5C, 0x08                       # item data -> inventory -> owner unit
 NO_OWNER = 0xFFFFFFFF
+# `q` (state-snapshot.md §2; world/quests.md §1.1, §1.4): unit +0x14 = player data, +0x10 + 4*d =
+# the bit-buffer header of difficulty d (game +0x6D, u8); header +0x00 = the buffer of 42 u16 words
+# (header +0x04 = bit count 0x300; reading the header itself gives a pointer and 0x300, PC 1 late C)
+G_DIFFICULTY, PD_QUESTS, Q_SLOTS = 0x6D, 0x10, 42
 # item data (items/bitstream.md Inputs: quality +0x00, item seed +0x04, start seed +0x10, flags
 # +0x18, file index +0x28, item level +0x2C, auto affix +0x36, magic prefixes +0x38, suffixes
 # +0x3E; rare prefix / suffix +0x32 / +0x34: D2MOO's D2ItemDataStrc, unconfirmed until a
@@ -100,7 +104,7 @@ BASE_STATS = (("str", 0), ("ene", 1), ("dex", 2), ("vit", 3), ("lvl", 12))
 # state-snapshot.md §2 table order
 FIELDS = ["ut", "g", "cl", "m", "x", "y", "xf", "yf", "tx", "ty", "d", "fr", "fc", "sp", "s",
           "act", "lv", "hp", "hpx", "mp", "mpx", "st", "stx", "str", "ene", "dex", "vit", "lvl",
-          "own", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is"]
+          "own", "q", "iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is"]
 ITEM_KEYS = ("iq", "if", "fi", "il", "aa", "pf", "sf", "rp", "rs", "ik", "ss", "is")
 GAPS = []
 
@@ -117,6 +121,7 @@ class StateReader:
         self.track = track
         self.src = {}
         self.notes = {}     # note text -> count (footer)
+        self.game = None
         self.levels = {}    # active room -> level id or None (per snapshot cache)
 
     def note(self, text):
@@ -199,6 +204,8 @@ class StateReader:
             if lv is not None:
                 self.put(rec, ua, "lv", lv[0], *lv[1])
         self.owner(rec, ua, ut, g32)
+        if ut == 0 and self.game is not None:
+            self.quests(rec, ua, g32)
         if ut == 4:
             self.item(rec, ua, g32)
         sl = g32(U_LIST)
@@ -253,6 +260,27 @@ class StateReader:
         self.put(rec, ua, "ik", [u32(ID_SEED), u32(ID_SEED + 4)], a, (data + ID_SEED, 8))
         self.put(rec, ua, "ss", u32(ID_START), a, (data + ID_START, 4))
 
+    def quests(self, rec, ua, g32):
+        """`q` (state-snapshot.md §2): the player's quest flag record of the game's
+        difficulty as [slot, word] for every non-zero word; absent when a link is 0."""
+        try:
+            data = g32(U_DATA)
+            d = self.read(self.game + G_DIFFICULTY, 1)[0]
+            if not data or d > 2:
+                return
+            pa = (data + PD_QUESTS + 4 * d, 4)
+            hdr = self.u32(pa[0])
+            if not hdr:
+                return
+            recp = self.u32(hdr)
+            if not recp:
+                return
+            words = struct.unpack("<%dH" % Q_SLOTS, self.read(recp, 2 * Q_SLOTS))
+            self.put(rec, ua, "q", [[i, w] for i, w in enumerate(words) if w],
+                     (ua + U_DATA, 4), (self.game + G_DIFFICULTY, 1), pa, (hdr, 4), (recp, 2 * Q_SLOTS))
+        except OSError:
+            self.note("q absent: unreadable quest record link")
+
     def owner(self, rec, ua, ut, g32):
         """`own` (state-snapshot.md §2): a monster's AI-control owner, a
         missile's owner, an item's inventory owner; absent otherwise."""
@@ -299,6 +327,7 @@ class StateReader:
     def snapshot(self, game):
         """{"seed": [lo, hi], "units": [...] sorted by (ut, g)}, and the unit addresses."""
         self.levels = {}
+        self.game = game
         seed = list(struct.unpack("<II", self.read(game + G_SEED, 8)))
         recs = []
         for t, ua in self.units_of(game):
@@ -502,6 +531,19 @@ def build_world():
          [(6, 0, 50 << 8), (7, 0, 50 << 8), (8, 0, 15 << 8), (9, 0, 15 << 8), (10, 0, 84 << 8),
           (11, 0, 84 << 8), (6, 1, 7), (12, 0, 1)])
     link(hb(0, 1), P)
+    # quest records: player data -> three difficulty records (differ), game difficulty 1
+    m.put(P + U_DATA, "<I", 0x3A0000)
+    m.put(game + G_DIFFICULTY, "<B", 1)
+    for dd in range(3):
+        m.put(0x3A0000 + PD_QUESTS + 4 * dd, "<I", 0x3A8000 + 0x20 * dd)  # header
+        m.put(0x3A8000 + 0x20 * dd, "<II", 0x3B0000 + 0x100 * dd, 0x300)  # buffer, bit count
+        for i in range(Q_SLOTS):
+            m.put(0x3B0000 + 0x100 * dd + 2 * i, "<H", 0)
+    m.put(0x3B0100, "<H", 0x2001)
+    m.put(0x3B0100 + 2 * 7, "<H", 1)
+    m.put(0x3B0100 + 2 * 41, "<H", 0x8000)
+    m.put(0x3B0000 + 2 * 3, "<H", 5)
+    m.put(0x3B0200 + 2 * 9, "<H", 6)
     # monsters: bucket 3 holds GUID 9 then GUID 4 (walk order != sort order)
     M1, M2 = 0x330000, 0x340000
     unit(M1, 1, 9, 5, 2, 0, (3, 4), (0, 13 * 256, 0x100))
@@ -564,7 +606,8 @@ def build_world():
 EXPECTED = [
     {"ut": 0, "g": 1, "cl": 1, "m": 1, "x": 5800, "y": 5600, "xf": 0x8000, "yf": 0x4000, "tx": 5810,
      "ty": 5605, "d": 33, "fr": 1280, "fc": 2048, "sp": 256, "s": [0x11111111, 0x22222222], "act": 0,
-     "lv": 1, "str": 20, "ene": 25, "dex": 20, "vit": 25, "lvl": 1, "hp": 12800, "hpx": 12800,
+     "lv": 1, "q": [[0, 0x2001], [7, 1], [41, 0x8000]], "str": 20, "ene": 25, "dex": 20, "vit": 25,
+     "lvl": 1, "hp": 12800, "hpx": 12800,
      "mp": 3840, "mpx": 3840, "st": 21504, "stx": 21504},
     {"ut": 1, "g": 4, "cl": 5, "m": 12, "x": 5901, "y": 5701, "xf": 1, "yf": 2, "tx": 3, "ty": 4,
      "d": 60, "fr": -1, "fc": 0, "sp": -3, "s": [5, 6], "act": 0},
@@ -621,6 +664,8 @@ def selftest():
             want = want | {(tu[0], k) for k in POS_KEYS if k in base[tu[0]]}
         if tu and "own" in base[tu[0]]:  # the owner link read depends on the unit type
             want = want | {(tu[0], "own")}
+        if tu and "q" in base[tu[0]]:  # q exists only for unit type 0
+            want = want | {(tu[0], "q")}
         if tu:  # the item keys exist only for unit type 4
             want = want | {(tu[0], k) for k in ITEM_KEYS if k in base[tu[0]]}
         if tu and a == tu[0] + U_TYPE and flip == 4 and struct.unpack(

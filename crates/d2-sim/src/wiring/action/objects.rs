@@ -163,6 +163,19 @@ pub trait QuestObjectHost<X> {
     fn palace_guard_aside(&mut self) -> bool {
         false
     }
+    /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8), called from
+    /// the preset object placement after the object of `class` (459, 461
+    /// or 543) is created with the preset's path: (action, x, y) points.
+    /// Default: nothing.
+    fn map_ai_store(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        class: u16,
+        path: Vec<(u32, i32, i32)>,
+    ) {
+        let _ = (game, v, class, path);
+    }
     /// For the host taking its parts back.
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
 }

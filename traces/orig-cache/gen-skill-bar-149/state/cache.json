@@ -1,0 +1,40 @@
+{
+ "channel": "state",
+ "check": "gen-skill-bar-149",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "70",
+  "--auto",
+  "ScnBar",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--input",
+  "frame 20; rclick 330 300"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "5e6f11d036cfc005188436f6095f2365fd39c4df9613718e573b9422512e43f2",
+   "size": 567450
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f59e5d0ff7f7597c3b698fef1f388a8ff07ad5bee3a3f3bf9ad8e9a97eed5ac2",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "2fbf417df56238e2e931477289d71c957de4d5b489017077cd0c5ce9939f5aca"
+ }
+}

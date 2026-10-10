@@ -218,7 +218,6 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
     /// One step `0x00650660` (§9.6 rules 1–7): the new precise position Q.
     fn one_step(&mut self, unit: UnitId, path: &mut DynamicPath) -> Result<(u32, u32), WalkError> {
         let ty = self.c.unit_type(unit);
-        let missile = ty == UnitType::Missile;
         // Rule 1.
         path.collided_mask = 0;
         let monster_repath = ty == UnitType::Monster && path.flags & flags::KEEP_TARGET != 0;
@@ -230,19 +229,29 @@ impl<C: PathWorld + WalkUnits + ?Sized> Walk<'_, C> {
             return Ok(centre_of(path));
         }
         // Rule 3.
+        // PROVISIONAL (pathing.md §9.6 r3, REC-1391): the snap to the
+        // current point runs for missiles too. The spec reads "not a
+        // missile"; the 1.14d recording `dru-tornado` shows the tornado
+        // (path type 10, point 0 = its start cell) not moving on its first
+        // tick while its facing turns to point 1, then flying straight to
+        // it (frames 30–31), which only the snap gives (Δ = (0, 0), index
+        // 1, §9.4 rule 2.5 aim). Settled by a read of `0x00650660`.
         let (mut dx, mut dy) = (path.vel_vec_x, path.vel_vec_y);
         let mut reaches = false;
-        if !missile {
-            let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
-            let p = path.point(i);
-            let rx = to_fp16_center(p.x).wrapping_sub(path.precise_x) as i32;
-            let ry = to_fp16_center(p.y).wrapping_sub(path.precise_y) as i32;
-            let m = dx.abs().max(dy.abs());
-            if rx.abs() <= m && ry.abs() <= m {
-                dx = rx;
-                dy = ry;
-                reaches = true;
-            }
+        let i = index(path).clamp(0, PATH_POINTS as i32 - 1) as usize;
+        let p = path.point(i);
+        let rx = to_fp16_center(p.x).wrapping_sub(path.precise_x) as i32;
+        let ry = to_fp16_center(p.y).wrapping_sub(path.precise_y) as i32;
+        let m = dx.abs().max(dy.abs());
+        // Path type 4 (every missile aimed at a point, `missiles.md` §R4.3
+        // step 5) never snaps: it keeps its direction past the target until
+        // its frames run out or it hits (check `diff-a4-nm-unique`, the
+        // Gloam's bolt, class 320: 1.14d flies on past the aim point).
+        let snaps = !(ty == UnitType::Missile && path.path_type == path_types::MISSILE);
+        if snaps && rx.abs() <= m && ry.abs() <= m {
+            dx = rx;
+            dy = ry;
+            reaches = true;
         }
         // Rule 4.
         let nx = path.precise_x.wrapping_add_signed(dx);

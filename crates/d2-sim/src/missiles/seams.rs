@@ -8,6 +8,7 @@ use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 
 use super::hit::Damage;
+use super::MissileData;
 
 /// Units, stats and states. Provider: the units/stats session
 /// (`sim/units.md`, `sim/stats.md`, `sim/stat-lists.md`).
@@ -109,10 +110,11 @@ pub trait MissileRooms {
     fn collision_at(&self, game: &Game, room: RoomId, x: i32, y: i32, mask: u16) -> u16;
     /// `0x0064EBA0`: clear collision bit 0x40 under the unit with its size.
     fn clear_footprint(&mut self, game: &mut Game, unit: UnitId);
-    /// The units on subtile (x, y) in the search order of `0x00641CB0`
-    /// (D2MOO `D2Common_10407`); the missile code applies the collide
-    /// callback to each.
-    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32) -> Vec<UnitId>;
+    /// The units hit by a query of size `r` (the missile's size) at
+    /// subtile (x, y), in the search order of `0x00641CB0` (D2MOO
+    /// `D2Common_10407`, `sim/path-placement.md` §4 rule 6); the missile
+    /// code applies the collide callback to each.
+    fn units_at(&self, game: &Game, room: RoomId, x: i32, y: i32, r: i32) -> Vec<UnitId>;
 }
 
 /// Damage and skill code. Provider: the combat/skills session.
@@ -136,7 +138,8 @@ pub trait MissileCombat {
     fn hit_test(&mut self, game: &mut Game, owner: UnitId, defender: UnitId, tohit: i32) -> bool;
     /// The rest of `0x005ADCD0` after the missile's result flags: block /
     /// dodge, hit class, hit flags, pierce percent, events and damage
-    /// execution (§R6.1).
+    /// execution (§R6.1). `data` is the missile's data (class, data
+    /// flags), passed because the store is lent out during the hit.
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -144,6 +147,7 @@ pub trait MissileCombat {
         missile: UnitId,
         unit: UnitId,
         damage: &mut Damage,
+        data: Option<&MissileData>,
     );
     /// Unit event 0 (hit by missile, `0x005C0C30`), also with no unit.
     fn hit_by_missile_event(&mut self, game: &mut Game, missile: UnitId, unit: Option<UnitId>);
