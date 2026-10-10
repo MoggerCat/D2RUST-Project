@@ -478,3 +478,66 @@ fn flat_missiles_file_in_their_cells_shadow_list() {
         )]
     );
 }
+
+// Covers: specs/render/overlay.md §2 r5, §2 r8, §3 r2, §3 r9
+#[test]
+fn a_ui_overlay_call_creates_advances_draws_on_its_host_and_removes() {
+    let mut w = world();
+    let mut r = Run::new();
+    r.m.rows.overlay_rules = vec![
+        OverlayRules::default(),
+        OverlayRules {
+            xoffset: -5,
+            yoffset: -7,
+            height: [-30, 0, 0, -50],
+            anim_rate: 9,
+            ..OverlayRules::default()
+        },
+    ];
+    // Class 3's `monstats2` row: `overlayHeight` 4 → `Height4`.
+    r.m.rows.monster_overlay = vec![(false, None); 3];
+    r.m.rows.monster_overlay.push((false, Some(4)));
+    let k = UnitKey::new(MONSTER, 7);
+    let mut npc = ClientUnit::new(k);
+    npc.position = Some((102, 100));
+    npc.class = 3;
+    w.units.insert(k, npc);
+    r.frame(&mut w, 1);
+    let on = OverlayCall {
+        unit: k,
+        id: 1,
+        on: true,
+    };
+    r.m.overlay_calls([on]);
+    // Created before the update's walk: advanced once in the same update.
+    assert_eq!(r.frame(&mut w, 2).len(), 1);
+    let rec = r.m.unit_overlays(k)[0];
+    assert_eq!(
+        (rec.kind, rec.rate, rec.frame, rec.frames),
+        (3, 144, 144, 512)
+    );
+    assert_eq!((rec.x, rec.y), (-5, -57));
+    let d = r.m.last()[0];
+    assert_eq!(d.item.tag, ItemTag::Unit(7), "drawn in its host's unit run");
+    assert_eq!(
+        d.join,
+        Join::Host {
+            host: k,
+            back: false
+        }
+    );
+    // Two more updates: +0x18 = 432, frame 1; kind 3 wraps at the end.
+    r.frame(&mut w, 4);
+    assert_eq!(r.m.unit_overlays(k)[0].frame_index(), 1);
+    r.frame(&mut w, 6);
+    assert_eq!(r.m.unit_overlays(k)[0].frame, 5 * 144 - 512);
+    // A second create of the same id replaces the record (§2 r5).
+    r.m.overlay_calls([on]);
+    r.frame(&mut w, 7);
+    assert_eq!(r.m.unit_overlays(k).len(), 1);
+    assert_eq!(r.m.unit_overlays(k)[0].frame, 144);
+    // Remove by id; then nothing draws.
+    r.m.overlay_calls([OverlayCall { on: false, ..on }]);
+    assert!(r.frame(&mut w, 8).is_empty());
+    assert!(r.m.unit_overlays(k).is_empty());
+}

@@ -21,6 +21,17 @@ pub const CLASS_ACT2GUARD2: u32 = 331;
 /// Overlay shown on an NPC that wants to talk (§9 r3).
 pub const OVERLAY_NPC_WANTS: u16 = 72;
 
+/// One overlay call of the UI on a unit, in call order: `on` = the kind-3
+/// create `0x00470390(unit, id, 3, 0, 0, 0, 0, 0)` (§9 r3), else the remove
+/// by id `0x0046F0C0(unit, id)` (§16 r4.1); `render/overlay.md` §2, §3 r9.
+/// The world view's effect layer runs them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverlayCall {
+    pub unit: UnitKey,
+    pub id: u16,
+    pub on: bool,
+}
+
 /// Parts the dispatches of this module skip, named.
 pub mod skip {
     pub const QUEST_LOG_TAIL: &str =
@@ -110,8 +121,9 @@ pub struct MsgUiMore {
     pub f4b1620: bool,
     /// UI sounds played on a unit (`0x004B9A00(id, unit, 0, 0, 0)`).
     pub unit_sounds: Vec<(i32, UnitKey)>,
-    /// Overlays created on a unit (`0x00470390(unit, overlay, 3, …)`).
-    pub overlays: Vec<(UnitKey, u16)>,
+    /// The overlay calls on units since the last [`OverlayCall`] take,
+    /// in call order.
+    pub overlays: Vec<OverlayCall>,
     /// The overhead text records by unit key (§4 r4).
     pub overhead: std::collections::BTreeMap<UnitKey, OverheadText>,
     /// `[0x007BF20E]`: steps once per overhead draw.
@@ -307,7 +319,11 @@ impl OriginalUi {
             && unit.unit_type == MONSTER
             && unit.guid == self.more.interact_npc;
         if !is_interact_npc {
-            self.more.overlays.push((unit, OVERLAY_NPC_WANTS));
+            self.more.overlays.push(OverlayCall {
+                unit,
+                id: OVERLAY_NPC_WANTS,
+                on: true,
+            });
         }
         let q = &self.more.client_quest;
         let quest_clear = !crate::bridge::objects::quest_bit(q, 12, 8)
