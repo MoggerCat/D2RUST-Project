@@ -28,7 +28,6 @@ took staging's version where it overlapped.
 - Tests: SpecialState06 x3, frame advance x3; all gates pass (5158 tests).
 
 ## Open
-
 - gen-wp-18 frame 434: class 254 `tx` 0 vs 5085 (path target, M).
 - gen-wp-1..17, 19..38 frame 400: game seed after waypoint travel (shared
   cause named in the q-run brief, M).
