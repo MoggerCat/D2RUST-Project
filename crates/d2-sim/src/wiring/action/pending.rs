@@ -1714,6 +1714,15 @@ pub trait Pending {
         Self: Sized,
     {
     }
+    /// The passive states' unit bits, turned on at the end of the join
+    /// (PROVISIONAL REC-2105; routed to
+    /// [`crate::wiring::interaction::skill_events::passive_states_on`]).
+    /// Default: nothing.
+    fn passive_states_on(h: &mut ActionHooks<Self>, sim: &mut Sim<'_>, unit: UnitId)
+    where
+        Self: Sized,
+    {
+    }
     /// The pet follow `0x005754B0` of the summoned pet types
     /// (`hirelings.md` §6 rule 1): routed to
     /// [`crate::wiring::interaction::summon::summon_follow`] by a

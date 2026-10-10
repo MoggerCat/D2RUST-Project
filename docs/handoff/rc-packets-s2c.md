@@ -12,6 +12,10 @@ Check `sys-intents-moves` (packets): 136/140 equal -> 140/140 equal; state 140/1
 - The packets channel replays each recorded C->S 0x6D (system queue) at its recorded frame + 1 (`packets_channel.recorded_pings`); `PendingSession` answers 0x6D with S->C 0x8F (33 bytes, `0x0053E020`). The ping bytes are data from the recording; no clock in d2-sim.
 - sys-intents-moves packets: 140/140 (MATCH), state 140/140.
 
+## Join burst (gen-missile-149 and the other gen checks)
+- 1.14d `0x00646D60` ends with `0x00639E30` (state-changed bit only), so the join's 0xAA lists only state 105 and the first player update sends the passive states as 0xA8 (with lists). d2rs set the unit bits at load, so its 0xAA was 39 bytes. Now: the load sets the changed bit; the unit bits go on at the end of the join (`skill_events::passive_states_on`, PROVISIONAL REC-2105: the 1.14d site that turns them on is not identified).
+- gen-missile-149 frame 2 is equal; first divergence is frame 3 (below). gen-missile-101/104/105/106 show the same frame-3 divergence.
+
 ## Open
-- gen-missile-149 is not a regression of this branch (same on base 97f27b87 and on integ-r17): frame 2, the player AddUnit 0xAA is 39 bytes in d2rs vs 12 in 1.14d (ScnSor level 30, all skills 20). The 1.14d startup ping before frame 1 (frame null) is not replayed. Size M.
-- net.c2s.0x06 (combat-melee-fallen): packets 147/150, first divergence frame 3 stream s2c #0 missing 0x07; state diverges at frame 46 (seed). Not touched.
+- Frame 3 (all gen checks with `poke warp`, and combat-melee-fallen): 1.14d logs the warp's first S->C 0x07 at frame 3 (the poke runs at tick_end of frame 3, its sends are flushed in frame 3). d2rs runs pokes before host frame 4 (`send.rs` `set_before_pump`) and its sends reach the buffers only at the end of tick 4, so the whole warp lands in frame 4. Fix: run the pokes in the host's tick-end hook (`Host::frame_with`) of frame f-1, or drain `take_sent` right after the pokes. Needs care for the state snapshot order (state-dump snapshots f-1 before pokes). Size M, owner: harness/`send.rs`.
+- net.c2s.0x06 (combat-melee-fallen): packets 147/150 (same frame-3 0x07); state diverges at frame 46 (seed). Not touched.
