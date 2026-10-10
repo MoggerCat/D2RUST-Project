@@ -186,3 +186,13 @@ lines).
   sound on (`-- -w`) for the Cinematics menu; `wait 9` after opening character
   select.
 - Every `ui-draws-*` check is stable on the 1.14d side now (cursor pinned).
+
+## Push 10 (16:16)
+
+Four more front-end scenes, each recorded twice (0 UI rows differing but the
+heroes' animation phases): `frontend-character-select-classic` (a classic
+character selected), `frontend-create-name` (name typed, check boxes),
+`frontend-create-hardcore`, `frontend-hardcore-warning`. Not captured: Other
+Multiplayer and the Convert prompt (their buttons did not react to posted or
+held clicks in three tries). Test saves left in the save folder: `Doll*`,
+`FeClassic`.
