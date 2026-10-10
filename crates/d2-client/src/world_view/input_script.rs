@@ -171,9 +171,7 @@ pub const HEADLESS_KEY_ACTIONS: [Action; 24] = [
     Action::Say5,
     Action::Say6,
     Action::Say7X,
-    // The panel toggles: no client-to-server message but the quest log's
-    // 0x40 on every open (`apply`; PROVISIONAL, REC-2960: the headless run
-    // has no panel tree, so only that message is modelled).
+    // The panel toggles: taken by the headless UI (`apply_with`).
     Action::ToggleCharacter,
     Action::ToggleInventory,
     Action::ToggleParty,
@@ -558,9 +556,6 @@ pub struct Headless {
     bindings: Bindings,
     /// The run lock and modifier word of the world click (command 35).
     run: crate::bridge::click::RunMods,
-    /// The quest screen is open (its toggle key was pressed an odd number
-    /// of times; every open asks for the quest data, C→S 0x40).
-    quests_open: bool,
     /// The pending interaction of a click on a unit out of reach
     /// ([`PreviewInteract`], as `play`'s preview).
     interact: PreviewInteract,
@@ -605,7 +600,6 @@ impl Headless {
             click: ClickState::default(),
             bindings,
             run: Default::default(),
-            quests_open: false,
             interact: PreviewInteract::default(),
             prev_pick: None,
             walk: None,
@@ -849,6 +843,20 @@ impl Headless {
         bridge: &mut Bridge<L>,
         last: i32,
     ) -> Result<Vec<String>, BridgeError> {
+        self.apply_with(bridge, last, &mut |_, e| Ok(e))
+    }
+
+    /// [`Headless::apply`] with the UI between the events and the world:
+    /// `ui` routes the due events through the panels (as `play`'s
+    /// `run_ui_with`: a panel key or a click on a panel is taken there and
+    /// sends its own messages, e.g. the quest log's 0x40) and returns the
+    /// events no panel took, which go on to the world handlers.
+    pub fn apply_with<L: ServerLink>(
+        &mut self,
+        bridge: &mut Bridge<L>,
+        last: i32,
+        ui: &mut dyn FnMut(&mut Bridge<L>, Vec<UiEvent>) -> Result<Vec<UiEvent>, BridgeError>,
+    ) -> Result<Vec<String>, BridgeError> {
         let local_at = self.walk.as_ref().and_then(|(p, _, _)| p.position());
         let cam = script_camera(bridge.world(), local_at);
         let world = bridge.world();
@@ -864,6 +872,11 @@ impl Headless {
             self.prev_pick = next_pick;
             return Ok(log);
         }
+        let events = if events.is_empty() {
+            events
+        } else {
+            ui(bridge, events)?
+        };
         let toggle = UiEvent::Action(ActionId(Action::ToggleRun.index() as u16));
         for _ in events.iter().filter(|e| **e == toggle) {
             self.run.toggle_run();
@@ -883,13 +896,6 @@ impl Headless {
         self.prev_pick = next_pick;
         super::swap_key::send_swaps(&events, bridge)?;
         super::swap_key::send_says(&events, bridge)?;
-        let quests = UiEvent::Action(ActionId(Action::ToggleQuests.index() as u16));
-        for _ in events.iter().filter(|e| **e == quests) {
-            self.quests_open = !self.quests_open;
-            if self.quests_open {
-                bridge.send_bytes(&[0x40])?;
-            }
-        }
         Ok(log)
     }
 }
@@ -1313,13 +1319,33 @@ mod tests {
         // every open, nothing on the close; other panel keys send nothing.
         #[test]
         fn the_quest_key_asks_for_quest_data_on_each_open() {
+            use crate::ui::original::{OriginalUi, UiConfig};
+            use crate::ui::panel::NoStrings;
+            use crate::ui::NoPanelRules;
+            use crate::world_view::ui_bind::{run_ui_with, UiQueue};
             let (mut br, link) = scene();
+            let mut ui = OriginalUi::new(
+                UiConfig {
+                    screen: crate::ui::layout::Screen::play(),
+                    expansion_installed: true,
+                },
+                None,
+            )
+            .unwrap();
+            let mut root = crate::ui::root::UiRoot::new(Box::new(NoPanelRules));
+            ui.install(&mut root).unwrap();
             let mut h = Headless::new(
                 parse("frame 1; key q; key i; frame 2; key q; frame 3; key q").unwrap(),
             )
             .unwrap();
             for last in 0..3 {
-                h.apply(&mut br, last).unwrap();
+                h.apply_with(&mut br, last, &mut |b, ev| {
+                    let mut q = UiQueue(ev);
+                    Ok(run_ui_with(&mut root, &mut q, b, &NoStrings, Some(&mut ui))
+                        .unwrap()
+                        .unhandled)
+                })
+                .unwrap();
             }
             br.send_outgoing().unwrap();
             let n = link
