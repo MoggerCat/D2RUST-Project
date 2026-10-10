@@ -18,7 +18,7 @@ questions 6-7): a check qualifies when
   * the check file has no `ignore` line, and
   * it is pokes-only (no `input`, no `at .. send`) or its packets channel is MATCH.
 A ledger row (checks column: comma list) with last_verdict PARTIAL and state
-DIVERGED becomes EQUAL when every one of its checks qualifies; otherwise its
+DIVERGED (or NO-CHECK) becomes EQUAL when every one of its checks qualifies; otherwise its
 state follows the fresh verdict of its checks: DIVERGED if any check diverged
 (or errored), else NO-CHECK with the reason in the note. Rows with a check not
 in the suite json are left out of the part. Python 3 stdlib only. Our own code.
@@ -142,8 +142,11 @@ def promote(rows, cols, results, part, today):
     out, stats = [], {"EQUAL": 0, "DIVERGED": 0, "NO-CHECK": 0, "skipped": 0}
     for r in rows:
         d = dict(zip(cols, r))
-        if d["last_verdict"] != "PARTIAL" or d["state"] != "DIVERGED":
+        if d["last_verdict"] != "PARTIAL" or d["state"] not in ("DIVERGED", "NO-CHECK"):
             continue
+        was = d["state"]
+        if d.get("group") == "coverage":
+            d["group"] = "cov-promoted"   # ledger.py merges group "coverage" rows as exercised only
         names = [c for c in d["checks"].split(",") if c and c != "-"]
         if not names or any(n not in results for n in names):
             stats["skipped"] += 1
@@ -161,6 +164,9 @@ def promote(rows, cols, results, part, today):
             d["state"] = "DIVERGED"
             d["note"] = f"{part} {today} fresh run: " + "; ".join(bad)
             stats["DIVERGED"] += 1
+        elif was == "NO-CHECK":
+            stats["skipped"] += 1   # NO-CHECK stays as its part wrote it
+            continue
         else:
             why = [f"{n}: {w}" for n, (v, w) in zip(names, rs) if v == "PARTIAL"]
             d["state"] = "NO-CHECK"
