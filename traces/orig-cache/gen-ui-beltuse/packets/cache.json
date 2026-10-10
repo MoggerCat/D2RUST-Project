@@ -1,0 +1,46 @@
+{
+ "channel": "packets",
+ "check": "gen-ui-beltuse",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "900",
+  "--ticks",
+  "50",
+  "--auto",
+  "SceSor",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 seed-game 0x00001234 666",
+  "--poke",
+  "4 item hp1 @x+1 @y",
+  "--send",
+  "8 PickItem type=4 id=@4 cursor=0",
+  "--send",
+  "12 ItemToBelt item=@4 slot=0",
+  "--input",
+  "frame 30; key 1"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "5aab35b42ad62d755c582522fa8e5d1d9f521671830c983240bfb44017396814",
+   "size": 49337
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "4fd2823dc6902de313facc8d3b53d8a0c0fb798d84a7418d280e76b80692ff43",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
+  "save": "cb5f2fe008b5f6b3b491c0a2ecd823cc1777b99422dd066ed3021ea94643caac"
+ }
+}

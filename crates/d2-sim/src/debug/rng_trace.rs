@@ -257,6 +257,7 @@ impl Owners {
         };
         // forward from the previous values
         let mut cur: Vec<(Owner, Seed)> = self.prev.iter().map(|k| (k.owner, k.seed)).collect();
+        let mut linked: Vec<Owner> = Vec::new();
         for r in out.iter_mut() {
             let d = r.draw;
             if d.before == d.after || is_drlg(&d) {
@@ -267,11 +268,21 @@ impl Owners {
                 .filter(|(_, s)| *s == d.before)
                 .map(|(o, _)| *o)
                 .collect();
-            if let Some(o) = pick(cands, d.addr) {
+            // A unit freed in this drain (a missile that expired) is not in
+            // `end`; its seed, set in place before the draws, is found by
+            // the address it had at the previous drain.
+            let gone = || {
+                self.prev
+                    .iter()
+                    .find(|k| k.addr == d.addr && end.iter().all(|e| e.owner != k.owner))
+                    .map(|k| k.owner)
+            };
+            if let Some(o) = pick(cands, d.addr).or_else(gone) {
                 r.owner = Some(o);
                 if let Some(c) = cur.iter_mut().find(|(x, _)| *x == o) {
                     c.1 = d.after;
                 }
+                linked.push(o);
             }
         }
         let fwd = cur;
@@ -279,7 +290,11 @@ impl Owners {
         // reached its value now takes no more draws (rule 3)
         let mut cur: Vec<(Owner, Seed)> = end
             .iter()
-            .filter(|k| fwd.iter().all(|(o, s)| *o != k.owner || *s != k.seed))
+            .filter(|k| {
+                // a seed set in place (init_low before the roll) has no
+                // forward link; only a chain that moved is finished
+                !linked.contains(&k.owner) || fwd.iter().all(|(o, s)| *o != k.owner || *s != k.seed)
+            })
             .map(|k| (k.owner, k.seed))
             .collect();
         for r in out.iter_mut().rev() {

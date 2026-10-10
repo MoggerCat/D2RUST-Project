@@ -1063,16 +1063,6 @@ impl Pending for LocalSeams {
     ) {
         skill_events::skill_stat_refresh(h, sim, unit, stat, layer);
     }
-    fn missile_shout_state(
-        h: &mut ActionHooks<Self>,
-        sim: &mut USim<'_>,
-        unit: UnitId,
-        owner: UnitId,
-        skill: i32,
-        level: i32,
-    ) {
-        skill_events::missile_shout_state(h, sim, unit, owner, skill, level);
-    }
     fn missile_area_units(
         h: &mut ActionHooks<Self>,
         sim: &mut USim<'_>,
@@ -1082,6 +1072,24 @@ impl Pending for LocalSeams {
         f: u32,
     ) -> Vec<UnitId> {
         skill_events::missile_area_units(h, sim, owner, at, r, f)
+    }
+    fn missile_ally_test(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        a: UnitId,
+        b: UnitId,
+    ) -> bool {
+        skill_events::missile_ally_test(h, sim, a, b)
+    }
+    fn missile_shout_state(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_shout_state(h, sim, unit, owner, skill, level)
     }
     fn missile_summon_spawn(
         h: &mut ActionHooks<Self>,

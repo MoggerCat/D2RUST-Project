@@ -591,24 +591,6 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan runs on the skill pipeline ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
-    /// `0x00554DE0(game, owner, unit)` (`skills/bodies.md` §2.11 flag
-    /// 0x10000): a monster stands for its minion owner (`0x0058F0D0`, the
-    /// AI control's owner link by GUID; none: itself); the same unit after
-    /// that, or the host's party test, are allies.
-    fn ally_test(&self, game: &Game, owner: UnitId, unit: UnitId) -> bool {
-        let stand_for = |u: UnitId| {
-            let link = self
-                .h
-                .ai
-                .as_ref()
-                .and_then(|s| s.control(u))
-                .and_then(|c| c.minion_owner);
-            link.and_then(|r| game.lists.find_unit(r.ty, r.guid))
-                .unwrap_or(u)
-        };
-        let (a, b) = (stand_for(owner), stand_for(unit));
-        a == b || self.h.x.allied(a, b)
-    }
     /// Max life `0x00625D10` (the heal of server-hit 31 reads it).
     fn max_life(&self, unit: UnitId) -> i32 {
         self.stats.max_life(unit)
@@ -649,7 +631,12 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
             X::missile_summon_spawn(h, sim, owner, class, mode, at, pet_type)
         })
     }
-    /// `0x005D8290` on the skill pipeline ([`Pending::missile_shout_state`]).
+    /// `0x00554DE0` ([`Pending::missile_ally_test`]).
+    fn ally_test(&mut self, game: &mut Game, a: UnitId, b: UnitId) -> bool {
+        with_sim(self, game, |h, sim| X::missile_ally_test(h, sim, a, b))
+    }
+    /// `shout_state` (`0x005D8290`) on the skill use view
+    /// ([`Pending::missile_shout_state`]).
     fn shout_state(
         &mut self,
         game: &mut Game,
@@ -660,7 +647,7 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     ) {
         with_sim(self, game, |h, sim| {
             X::missile_shout_state(h, sim, unit, owner, skill, level)
-        })
+        });
     }
     /// `missiles/bodies-2.md` §33 step 8 ([`Pending::missile_bone_wall_piece`]).
     fn bind_bone_wall_piece(
