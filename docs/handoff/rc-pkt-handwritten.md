@@ -1,5 +1,5 @@
 # rc-pkt-handwritten hand-back
-EQUAL 2759 -> 2778 (merged ledger, this branch; +19 of 25 rows in my part, 6 lose to higher-ranked parts).
+EQUAL 2866 -> 2886 (merged ledger vs origin/claude/integ-r23; 25 rows in my part, some lose to higher-ranked parts).
 Changes:
 - `packets` added to 66 hand-written input checks (b*..w*) in traces/checks. 17 UI checks with a `key` input
   (ui-draws-*, panel/hotkey keys) did NOT get it: `d2-client state-dump --input` cannot apply panel keys
