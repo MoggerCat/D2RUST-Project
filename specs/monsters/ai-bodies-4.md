@@ -27,22 +27,22 @@
 | Outputs / state changes | 74–79 |
 | Rules | 80–81 |
 |   1. Scope and order | 82–107 |
-|   2. VileMother (68) `0x005FA010` | 108–145 |
-|   3. VileDog (69) `0x005FA280` | 146–155 |
-|   4. FingerMage (70) `0x005FA380` | 156–179 |
-|   5. Regurgitator (71) `0x005FA710` | 180–215 |
-|   6. Megademon (89) `0x005E0C80` | 216–232 |
-|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 233–371 |
-|   8. Izual (55) `0x005F89B0` | 372–392 |
-|   9. DoomKnight (72) `0x005FAA90` | 393–402 |
-|   10. AbyssKnight (73) `0x005FAB80` | 403–424 |
-|   11. OblivionKnight (74) `0x005FAF00` | 425–458 |
-| Constants & data dependencies | 459–471 |
-| Randomness | 472–480 |
-| Edge cases & original bugs | 481–497 |
-| Test vectors | 498–513 |
-| Provenance | 514–538 |
-| Open questions | 539–564 |
+|   2. VileMother (68) `0x005FA010` | 108–155 |
+|   3. VileDog (69) `0x005FA280` | 156–165 |
+|   4. FingerMage (70) `0x005FA380` | 166–189 |
+|   5. Regurgitator (71) `0x005FA710` | 190–225 |
+|   6. Megademon (89) `0x005E0C80` | 226–242 |
+|   7. Diablo (51) `0x005E9170`, alternate `0x005E8480` | 243–381 |
+|   8. Izual (55) `0x005F89B0` | 382–402 |
+|   9. DoomKnight (72) `0x005FAA90` | 403–412 |
+|   10. AbyssKnight (73) `0x005FAB80` | 413–434 |
+|   11. OblivionKnight (74) `0x005FAF00` | 435–468 |
+| Constants & data dependencies | 469–481 |
+| Randomness | 482–490 |
+| Edge cases & original bugs | 491–507 |
+| Test vectors | 508–523 |
+| Provenance | 524–548 |
+| Open questions | 549–574 |
 <!-- /index -->
 
 ## Summary
@@ -142,6 +142,16 @@ class and fifth argument 0: the room at P, `0x00463740`, exists and
 failures return 0. No draws.
 
 1.14d-confirmed.
+
+**Implemented (rc-mon-frame31, REC-1995):** the footprint test with flag 0
+(`0x005FD350`, read 2026-10-10): by the class's `BaseId` — 206 tests
+(x, y+3), 228 (x, y+2), 298 (x, y), 334 (x−2, y−2) with mask 0x1C0, 528
+(x+2, y+4); mask 0x3C01 unless noted; other classes pass. The tested
+point's room is `0x00463740` from the unit's room; it fails when that room
+is missing or `0x0064D9B0(room, x', y', 2, mask)` ≠ 0. Only flag 1
+(population) lets 298 pass without the test. The direction `0x00621DC0` is
+the path direction from the unit to the target's position
+(`wiring::path::missiles::path_dir64`). gen-mon-298/299: EQUAL.
 
 ### 3. VileDog (69) `0x005FA280`
 

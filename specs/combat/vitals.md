@@ -31,13 +31,13 @@
 |   2. Spending stat points (message 0x3A) | 104–156 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
 |   4. Experience | 179–485 |
-|   5. Client vitals sync (`0x00548760`) | 486–624 |
-| Constants & data dependencies | 625–641 |
-| Randomness | 642–645 |
-| Edge cases & original bugs | 646–657 |
-| Test vectors | 658–678 |
-| Provenance | 679–714 |
-| Open questions | 715–751 |
+|   5. Client vitals sync (`0x00548760`) | 486–626 |
+| Constants & data dependencies | 627–643 |
+| Randomness | 644–647 |
+| Edge cases & original bugs | 648–659 |
+| Test vectors | 660–680 |
+| Provenance | 681–716 |
+| Open questions | 717–753 |
 <!-- /index -->
 
 ## Summary
@@ -498,6 +498,8 @@ link here.
    player: once after each tick that ran, `sim/intents-events.md` §1
    rule 1), before the client's buffers are sent, so these messages end
    the tick's batch. The leave flush `0x005303D0` passes 0 (no sync).
+   Recorded (`a2-npc-fara-heal` frame 15): the 0x95 is queued after the
+   recorder's `flush` record (caller `0x0053C3D3`), not in the tick.
 2. force := 1 when client +0x1B0 ≥ 20, or when client +0x1B0 ≥ 10 and
    the client has a queued buffer (head, client +0x1B8 ≠ 0); else 0.
    Client +0x1B0 counts per-client updates (`sim/tick.md` §6 rule 5,

@@ -171,9 +171,6 @@ impl NpcRest for Rest {
     fn npc_ai_param(&mut self, npc: UnitId, p: u32) {
         self.log.push(format!("ai param {} {p:#x}", npc.0));
     }
-    fn stat_sent(&mut self, _: UnitId, stat: u16, value: u32) {
-        self.log.push(format!("setstat {stat} {value}"));
-    }
     fn respec_sound(&mut self, _: UnitId) {}
     fn encode_text_list(&self, _: &TextList) -> [u8; 34] {
         [0; 34]
@@ -218,7 +215,6 @@ impl HirelingRest for Rest {
     fn set_mode(&mut self, u: UnitId, mode: u8) {
         self.log.push(format!("mode {} {mode}", u.0));
     }
-    fn set_state_stat(&mut self, _: UnitId, _: u16, _: u16, _: i32) {}
     fn skill_count(&self) -> u32 {
         0
     }
@@ -230,8 +226,6 @@ impl HirelingRest for Rest {
     fn owner(&self, merc: UnitId) -> Option<(u32, u8)> {
         self.owners.get(&merc).copied()
     }
-    fn join_team(&mut self, _: UnitId, _: UnitId) {}
-    fn hireling_ai(&mut self, _: UnitId) {}
     fn free_unit(&mut self, _: UnitId) {}
     fn queue_room_removal(&mut self, _: UnitId) {}
     fn death_event(&mut self, _: UnitId) {}
@@ -384,9 +378,6 @@ impl QuestRest for Rest {
     }
     fn party_members(&self, p: UnitId) -> Option<Vec<UnitId>> {
         self.party.get(&p).cloned()
-    }
-    fn attach_sound(&mut self, u: UnitId, sound: u16) {
-        self.log.push(format!("sound {} {sound}", u.0));
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));
@@ -735,8 +726,21 @@ impl Fx {
         e
     }
 
+    /// The rest's log, led by the sound events the quests queued on the
+    /// game (`0x00553380`; they are not the rest's), which are cleared.
     pub fn take_log(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.world().rest.log)
+        let g = &mut self.h.game.game;
+        let mut log: Vec<String> = g
+            .sounds
+            .queued()
+            .map(|(u, s)| format!("sound {} {}", u.0, s.event))
+            .collect();
+        let units: Vec<_> = g.sounds.queued().map(|(u, _)| u).collect();
+        for u in units {
+            g.sounds.clear(u);
+        }
+        log.extend(std::mem::take(&mut self.world().rest.log));
+        log
     }
 }
 

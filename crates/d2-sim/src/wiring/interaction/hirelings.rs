@@ -28,15 +28,10 @@ const STATE_BROADCAST_SKIP: u32 = 7;
 /// The hireling calls no written spec provides yet, each with its owner.
 /// Umod 19 `hireable` (`umod-callbacks.md` §12).
 const UMOD_HIREABLE: u8 = 19;
-/// Stat 172 `alignment`: good (`ai.md` §5.2 step 7).
-const ALIGNMENT_GOOD: i32 = 2;
 
 pub trait HirelingRest {
     /// `0x00624690` / `0x00553570`: a mode change (monster modes spec).
     fn set_mode(&mut self, unit: UnitId, mode: u8);
-    /// `0x005543B0` stat part: `stat` := `value` in the stat list of
-    /// `state`, creating the list (state spec).
-    fn set_state_stat(&mut self, unit: UnitId, state: u16, stat: u16, value: i32);
     /// `skills` count and `reqlevel` (+0x174) (skill tables).
     fn skill_count(&self) -> u32;
     fn skill_reqlevel(&self, skill: u32) -> Option<i16>;
@@ -54,11 +49,6 @@ pub trait HirelingRest {
     /// `0x0058F030` / `0x0058F0D0` (monsters/ai.md control block).
     fn set_owner(&mut self, merc: UnitId, guid: u32, unit_type: u8);
     fn owner(&self, merc: UnitId) -> Option<(u32, u8)>;
-    /// `0x005B1900` (team lists).
-    fn join_team(&mut self, merc: UnitId, player: UnitId);
-    /// `0x005A4850(game, merc, 0x13, 0)` and the monster data bytes
-    /// (AI spec).
-    fn hireling_ai(&mut self, merc: UnitId);
     /// `0x0061A270` + `0x00555600` (rooms, unit removal).
     fn free_unit(&mut self, unit: UnitId);
     /// `0x0061A270` alone.
@@ -198,19 +188,24 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn max_life(&self, unit: UnitId) -> i32 {
         self.desk.econ.stats.max_life(unit)
     }
-    /// The rest's state list; an `alignment` (172) of 2 also marks the
-    /// unit allied in the game's unit lists (`UnitEntry::allied`, the
-    /// good alignment the wiring's hostility reads; `hirelings.md` §3.2
-    /// rule 2).
+    /// `0x005543B0(unit, value, 0)` (`hirelings.md` §3.2 rule 2): the
+    /// alignment stat (172) in the state 105 list, with the allied mark
+    /// of a good alignment (`UnitEntry::allied`, `hirelings.md` §3.2
+    /// rule 2). Only this pair is written through here (the init's one
+    /// call); another state or stat has no caller.
     fn set_state_stat(&mut self, unit: UnitId, state: u16, stat: u16, value: i32) {
-        if stat == crate::world::hirelings::stat::ALIGNMENT {
-            self.desk
-                .econ
-                .game
-                .lists
-                .set_allied(unit, value == ALIGNMENT_GOOD);
+        debug_assert!(state == crate::combat::range::STATE_ALIGNMENT);
+        debug_assert!(stat == crate::world::hirelings::stat::ALIGNMENT);
+        let e = &mut *self.desk.econ;
+        let mut sim = crate::units::hooks::Sim {
+            game: &mut *e.game,
+            units: &mut *e.units,
+            stats: &mut *e.stats,
+            data: e.data,
+        };
+        if let Ok(a) = u8::try_from(value) {
+            e.hooks.set_alignment(&mut sim, unit, a);
         }
-        self.desk.rest.set_state_stat(unit, state, stat, value);
     }
     /// The state's stat list freed (`stat-lists.md` §9).
     fn remove_state(&mut self, unit: UnitId, state: u16) {
@@ -239,12 +234,30 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
     fn owner(&self, merc: UnitId) -> Option<(u32, u8)> {
         self.desk.rest.owner(merc)
     }
+    /// `0x005B1900(game, merc, 0, player +0xD0)` (`hirelings.md` §3.2
+    /// rule 3; `skills/bodies.md` §6.3): only a player or monster whose
+    /// +0xD0 is 11 (no list) joins, and only a group below 8; the node
+    /// goes right after the group's head, the merc's +0xD0 := group. The
+    /// head is the player's (`0x005B1880`, the host's); without it the
+    /// original adds nothing, which the host's own list head answers.
     fn join_team(&mut self, merc: UnitId, player: UnitId) {
-        self.desk.rest.join_team(merc, player);
+        let e = &mut *self.desk.econ;
+        let Some(group) = e.units.get(player).map(|r| r.node_index) else {
+            return;
+        };
+        let Some(m) = e.units.get_mut(merc) else {
+            return;
+        };
+        if group >= 8 || m.node_index != 11 || !matches!(m.ty, UnitType::Player | UnitType::Monster)
+        {
+            return;
+        }
+        m.node_index = group;
+        e.game.target_nodes.push_front(group as i32, merc);
     }
     /// `0x005A4850(game, merc, 19, 0)` (`hirelings.md` §3.2 rule 10:
-    /// umod 19 `hireable`, `umod-callbacks.md` §12), then the rest's
-    /// part (monster data bytes, rule 11).
+    /// umod 19 `hireable`, `umod-callbacks.md` §12), then the monster data
+    /// bytes of rule 11.
     fn hireling_ai(&mut self, merc: UnitId) {
         let e = &mut *self.desk.econ;
         let mut sim = crate::units::hooks::Sim {
@@ -254,7 +267,7 @@ impl<H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> HirelingWorld
             data: e.data,
         };
         e.hooks.assign_umod(&mut sim, merc, UMOD_HIREABLE);
-        self.desk.rest.hireling_ai(merc);
+        e.hooks.clear_hireling_components(merc);
     }
     fn free_unit(&mut self, unit: UnitId) {
         self.desk.rest.free_unit(unit);

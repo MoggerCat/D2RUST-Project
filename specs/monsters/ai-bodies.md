@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–1004 |
+|   9. Per-AI behaviours | 29–1029 |
 <!-- /index -->
 
 ## Summary
@@ -294,7 +294,7 @@ unsigned. "Walk to (x, y)" = `0x005DED90`; "walk step 0" = `0x005DEF30`
 
    | Class | Rule |
    |---|---|
-   | 201 jerhyn | `0x0059F570(game)` [`ACT2Q4_IsJerhynPalaceActivated`] = 0 → idle 40, end. Else `0x0059F580(game, unit, &a, &b)` [`ACT2Q4_GetAndUpdatePalaceNpcState`]: b ≠ 0 → idle 20 (no end); a = 0 → end. `0x0059B6E0(game, unit)` [`ACT2Q4_IsGuardMoving`] ≠ 0 and H found or created → H := (own x + 9, own y), idle 50, end. Otherwise step 3. Bodies of the three quest calls: `world/quests-act2.md` §10 (2026-10-09). For a fresh or act-1-done character (no palace Jerhyn, chain 11 extra +0x0D = 0; the start Jerhyn of `quests-act2-2.md` §2 item 1) they give `0x0059F570` = 1, (a, b) = (1, 0) and `0x0059B6E0` = 0 (+0x0F = 0), with no draw, so the think goes to step 3. This explains the recorded first think after the home think (`act-travel-lut-ama.check`, `join-act2-quests-ama.check`, frame 24: mode 2 to own + (2, 2), no unit-seed draw): the interaction's step 7 walk in radius of the player with (3, 2) (`0x005DE6D0`, `ai.md` §7.2: k = 3, the "while kx + ky < k" fix-up turns (1, 1) into (2, 2) for a player at d ≥ 5 diagonally down-right with neither axis under a third of the sum), which draws nothing; the map AI (the only draw) is not reached. d2rs's seam defaults (false, (0, 0), false) take the idle-40 branch instead (REC-734). |
+   | 201 jerhyn | `0x0059F570(game)` [`ACT2Q4_IsJerhynPalaceActivated`] = 0 → idle 40, end. Else `0x0059F580(game, unit, &a, &b)` [`ACT2Q4_GetAndUpdatePalaceNpcState`]: b ≠ 0 → idle 20 (no end); a = 0 → end. `0x0059B6E0(game, unit)` [`ACT2Q4_IsGuardMoving`] ≠ 0 and H found or created → H := (own x + 9, own y), idle 50, end. Otherwise step 3. Bodies of the three quest calls: `world/quests-act2.md` §10 (2026-10-09). For a fresh or act-1-done character (no palace Jerhyn, chain 11 extra +0x0D = 0; the start Jerhyn of `quests-act2-2.md` §2 item 1) they give `0x0059F570` = 1, (a, b) = (1, 0) and `0x0059B6E0` = 0 (+0x0F = 0), with no draw, so the think goes to step 3. This explains the recorded first think after the home think (`act-travel-lut-ama.check`, `join-act2-quests-ama.check`, frame 24: mode 2 to own + (2, 2), no unit-seed draw): the interaction's step 7 walk in radius of the player with (3, 2) (`0x005DE6D0`, `ai.md` §7.2: k = 3, the "while kx + ky < k" fix-up turns (1, 1) into (2, 2) for a player at d ≥ 5 diagonally down-right with neither axis under a third of the sum), which draws nothing; the map AI (the only draw) is not reached. d2rs takes the three hooks from the game's quest control (q-fix-npc-interact, settles REC-734; `a2-npc-jerhyn-talk` equal to 1.14d: the interaction's 0x8A at frame 14, 0x6D at 29 and 44). |
    | 254 alkor | `0x005BAD20(game)` [`ACT3Q4_GoldenBirdBroughtToAlkor`] ≠ 0 → mode 8 at (0, 0) (`0x005DDFC0`), `0x005BAD40(game)` [`ACT3Q4_ResetAlkor`], end. |
    | 255 ormus | `0x005B9CA0(game, &x, &y)` [`ACT3Q3_GetAltarCoordinates`] ≠ 0: path distance to (x, y) > 3 → walk to (x, y), end; else mode 8 at (0, 0), `0x005B9CD0(game)` [`ACT3Q3_SetAltarMode`], end. |
    | 265 cain5 | `0x00594360(game, unit, &x, &y)` [`ACT1Q4_GetCainPortalInTownCoordinates`] ≠ 0: path distance > 2 → walk to (x, y), end; else `0x005945F0(game, unit)` [`ACT1Q4_OnCainInTownActivated`], step 3. |
@@ -321,7 +321,8 @@ unsigned. "Walk to (x, y)" = `0x005DED90`; "walk step 0" = `0x005DEF30`
    also when nothing was scheduled.
 5. P = 0 or P = the NPC → return 0.
 6. d < 3 or d > 23: stop the path. If param 1 = 0: param 1 := 60; if P
-   is a player, sound 18 on the NPC toward P (`0x00553380(NPC, 18, P)`),
+   is a player, sound 18 on the NPC toward P (`0x00553380(NPC, 18, P)`;
+   recorded `a2-npc-warriv-talk` frame 41, Jerhyn `2c 01 01000000 1200`),
    idle 20, return 1. If param 1 ≠ 0: negative → 0, positive → minus 1.
    Idle 20, return 1.
 7. 3 ≤ d ≤ 23: home check `0x005E6860(16)`: H = `0x0058EEF0(10, 0)`;
@@ -952,6 +953,30 @@ happen only when S exists with E < 20. In town, with no S, or with E ≥
 0. 1.14d-confirmed (`0x005E7AC0`, `0x0061AB00`).
 
 1.14d-confirmed.
+
+#### 9.33 SpecialState06 `0x005E7C10`
+
+The think of AI special state 6 (`ai.md` §3.2), installed on a hireling
+whose owner is gone (`ai-bodies-6.md` §7 step 1; class 359 act3hire is the
+one the town checks meet, `gen-wp-18` frame 37). It is GoodNpcRanged
+(§9.31) with the attack choice taken from the main search.
+
+1. Anim mode (unit +0x10) not neutral (1), or no unit → idle 5. End.
+2. Unless the unit's room is in town (`0x0061AB00`; a unit with no room
+   counts as out of town): T, D, C := the main search (`0x005DD7F0`,
+   `ai.md` §5.2). If T exists:
+   - C = 0 (no melee contact): `roll(100)` < 30 → walk to T with flags 7
+     (`0x005DEC80(T, 7)`); else idle 10. End.
+   - C ≠ 0: `roll(100)` < 80 → mode request 4 (A1) at T (`0x005DDF90`);
+     else idle 10. End.
+   The roll is one step of the unit's own seed, drawn only when T exists;
+   no T, or in town, goes on to step 3 with no draw before it.
+3. Draw `lo' % 100` < 20 → wander 5 (`0x005DE200(5)`); else idle 10.
+
+1.14d-confirmed (`0x005E7C10`, asm read 2026-10-10: the search is called
+with the unit's seed pointer at unit +0x20, `0x0045C390` is `roll`).
+Measured: with it `gen-wp-18` leaves frame 37 (class 359 seed) and first
+differs at frame 153 (class 245 `tx`, another cause).
 
 #### 9.32 NpcOutOfTown (31) `0x005E7880`
 

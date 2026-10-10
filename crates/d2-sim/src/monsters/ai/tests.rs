@@ -489,8 +489,16 @@ impl AiQuests for Fake {
     fn jerhyn_palace_active(&mut self, _: &mut Game) -> bool {
         self.jerhyn.is_some()
     }
-    fn jerhyn_npc_state(&mut self, _: &mut Game, _: UnitId) -> (i32, i32) {
-        self.jerhyn.map_or((0, 0), |(a, b, _)| (a, b))
+    fn jerhyn_npc_state(
+        &mut self,
+        _: &mut Game,
+        _: UnitId,
+    ) -> crate::world::quests::act2::q4::JerhynStep {
+        let (a, b) = self.jerhyn.map_or((0, 0), |(a, b, _)| (a, b));
+        crate::world::quests::act2::q4::JerhynStep::Out(a, b)
+    }
+    fn jerhyn_placed(&mut self, _: &mut Game) {
+        self.log.push("quest jerhyn placed".into());
     }
     fn guard_moving(&mut self, _: &mut Game, _: UnitId) -> bool {
         self.jerhyn.is_some_and(|j| j.2)
@@ -1712,7 +1720,7 @@ fn special_states_10_to_12_need_switchai() {
 #[test]
 fn stub_ai_logged() {
     // Every AI table think has a body now; a special-state think without
-    // one (state 6 `0x005E7C10`) is a logged stub.
+    // one (an address outside the table) is a logged stub.
     let mut w = World::new(monstats(41, [0; 5], 15));
     let mon = w.mon;
     let p = TickParam {
@@ -1722,11 +1730,11 @@ fn stub_ai_logged() {
         class: 0,
         class2: 0,
     };
-    w.with(|g, cx| run_function(g, cx, 0x005E_7C10, mon, &p));
+    w.with(|g, cx| run_function(g, cx, 0x005E_7C11, mon, &p));
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7C10,
+            addr: 0x005E_7C11,
             unit: mon
         }]
     );
@@ -1876,18 +1884,25 @@ mod skill_check;
 #[test]
 fn walk_in_radius_points_follow_the_recorded_walks() {
     // Warriv's three walks at the Rogue Encampment arrival (1.14d under
-    // Wine, `-seed 1234`, player at (4873, 4228)), REC-501.
+    // Wine, `-seed 1234`, player at (4873, 4228)), size 2.
     let p = (4873, 4228);
     assert_eq!(radius_point((4866, 4235), 2, p, 3, 2), (4868, 4233));
     assert_eq!(radius_point((4868, 4233), 2, p, 2, 2), (4869, 4232));
     assert_eq!(radius_point((4869, 4232), 2, p, 1, 2), (4870, 4231));
+    // Jerhyn at (5146, 5192), player at (5145, 5199), (3, 2): ax 1, ay 7,
+    // k 3, n 8 → (0, 2), fixed up to (1, 3) (`a2-npc-warriv-talk`
+    // frame 24, 1.14d target (5145, 5195)).
+    assert_eq!(
+        radius_point((5146, 5192), 2, (5145, 5199), 3, 2),
+        (5145, 5195)
+    );
     // Jerhyn's second walk (`gen-shrine-*`, frame 50): the fix-up grows both.
     assert_eq!(
         radius_point((5149, 5196), 2, (5153, 5203), 3, 2),
         (5151, 5198)
     );
-    // Closer than b: away from the target (s = −1). On the target with
-    // k = 0: the unit's own position.
+    // Within b: s = −1, the unit steps away (d 0, k 2, (1, 1)).
     assert_eq!(radius_point((4872, 4229), 2, p, 3, 2), (4871, 4230));
+    // On the target: k = 0, the unit's own cell.
     assert_eq!(radius_point(p, 2, p, 3, 0), p);
 }

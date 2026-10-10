@@ -155,9 +155,6 @@ impl NpcRest for AppRest {
     fn npc_ai_param(&mut self, n: UnitId, param: u32) {
         self.note(format!("ai param {} {param:#x}", n.0));
     }
-    fn stat_sent(&mut self, p: UnitId, stat: u16, value: u32) {
-        self.note(format!("stat sent {} {stat} {value}", p.0));
-    }
     fn respec_sound(&mut self, p: UnitId) {
         self.note(format!("respec sound {}", p.0));
     }
@@ -226,9 +223,6 @@ impl HirelingRest for AppRest {
     fn set_mode(&mut self, u: UnitId, mode: u8) {
         self.note(format!("mode {} {mode}", u.0));
     }
-    fn set_state_stat(&mut self, u: UnitId, state: u16, stat: u16, value: i32) {
-        self.note(format!("state stat {} {state} {stat} {value}", u.0));
-    }
     fn skill_count(&self) -> u32 {
         0
     }
@@ -243,12 +237,6 @@ impl HirelingRest for AppRest {
     }
     fn owner(&self, u: UnitId) -> Option<(u32, u8)> {
         self.owners.get(&u).copied()
-    }
-    fn join_team(&mut self, m: UnitId, p: UnitId) {
-        self.note(format!("join team {} {}", m.0, p.0));
-    }
-    fn hireling_ai(&mut self, m: UnitId) {
-        self.note(format!("hireling ai {}", m.0));
     }
     fn free_unit(&mut self, u: UnitId) {
         self.note(format!("free unit {}", u.0));
@@ -464,9 +452,6 @@ impl QuestRest for AppRest {
     }
     fn party_members(&self, _: UnitId) -> Option<Vec<UnitId>> {
         None
-    }
-    fn attach_sound(&mut self, u: UnitId, sound: u16) {
-        self.note(format!("sound {} {sound}", u.0));
     }
     fn send(&mut self, player: UnitId, msg: &[u8]) {
         self.sent.push((player, msg.to_vec()));

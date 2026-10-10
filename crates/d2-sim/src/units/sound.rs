@@ -53,6 +53,11 @@ impl SoundEvents {
         self.slots.remove(&unit);
     }
 
+    /// Every queued slot in unit order (the sound-flag units).
+    pub fn queued(&self) -> impl Iterator<Item = (UnitId, SoundSlot)> + '_ {
+        self.slots.iter().map(|(&u, &s)| (u, s))
+    }
+
     /// No unit has a queued event.
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()

@@ -710,7 +710,7 @@ impl<X: Pending> WalkUnits for PathCtx<'_, X> {
             seq_input: i32::from(row.seqinput),
             srvdofunc: i32::from(row.srvdofunc),
             interrupt: row.interrupt,
-            skill_flags: self.v.h.x.entry_flags(unit, &e),
+            skill_flags: self.v.h.entry_flags_of(unit, &e),
         })
     }
     /// Mode set `0x00553570` (`units.md` §4.1) through the unit system.

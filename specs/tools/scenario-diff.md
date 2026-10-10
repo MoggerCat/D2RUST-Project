@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–529 |
-|   4. Suite | 530–645 |
-| Constants & data dependencies | 646–649 |
-| Randomness | 650–653 |
-| Edge cases & original bugs | 654–677 |
-| Test vectors | 678–700 |
-| Provenance | 701–704 |
-| Open questions | 705–753 |
+|   3. Run | 145–531 |
+|   4. Suite | 532–647 |
+| Constants & data dependencies | 648–651 |
+| Randomness | 652–655 |
+| Edge cases & original bugs | 656–679 |
+| Test vectors | 680–702 |
+| Provenance | 703–706 |
+| Open questions | 707–755 |
 <!-- /index -->
 
 ## Summary
@@ -386,7 +386,9 @@ state first. It is the default way to compare a behaviour with 1.14d.
        1.14d after the 0x13 (`world/npc.md` §2 rule 2 clears her path)
        and her position on d2rs; frame 16, S→C 0x27's text entries in
        another order; frame 17, the 1.14d client itself answers the 0x27
-       with C→S 0x31 (the bridge does not); frame 20, store items have
+       with C→S 0x31 (the bridge did not; since q-fix-npc-interact the
+       headless state-dump answers 0x28's dialog branch as the UI does,
+       `client/msg-ui.md` §16 r4.3); frame 20, store items have
        no `x` / `y` / `d` in d2rs' snapshot; frame 24 (the 0x32): 1.14d
        answers 0x2A kind 4, code 0, GUID 42, gold 3744 (the copy, which
        appears in the inventory; store item 1 is removed), d2rs 0x2A
