@@ -45,23 +45,23 @@
 |   17. Choosing umods (`0x005A0760`) | 675–718 |
 |   18. Boss minions and umod init (`0x005A2120`) | 719–736 |
 |   19. Umod init functions | 737–829 |
-|   20. Superuniques (`0x005A49B0`) | 830–878 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 879–893 |
-|   22. Umod callbacks and the type-7 event | 894–945 |
-|   23. Unique names (client) | 946–955 |
-|   24. Monster assign message | 956–1012 |
-|   25. Calling the spawn functions outside population (tools) | 1013–1103 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1104–1163 |
-|   27. Class reinit (`0x00574370`) | 1164–1209 |
-| Constants & data dependencies | 1210–1231 |
-| Randomness | 1232–1276 |
-| Edge cases & original bugs | 1277–1308 |
-| Test vectors | 1309–1310 |
-|   Synthetic (CI-safe) | 1311–1333 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1334–1364 |
-|   Recorded checks (monster assign 0xAC) | 1365–1377 |
-| Provenance | 1378–1467 |
-| Open questions | 1468–1548 |
+|   20. Superuniques (`0x005A49B0`) | 830–884 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 885–899 |
+|   22. Umod callbacks and the type-7 event | 900–951 |
+|   23. Unique names (client) | 952–961 |
+|   24. Monster assign message | 962–1018 |
+|   25. Calling the spawn functions outside population (tools) | 1019–1109 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1110–1169 |
+|   27. Class reinit (`0x00574370`) | 1170–1215 |
+| Constants & data dependencies | 1216–1237 |
+| Randomness | 1238–1282 |
+| Edge cases & original bugs | 1283–1314 |
+| Test vectors | 1315–1316 |
+|   Synthetic (CI-safe) | 1317–1339 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1340–1370 |
+|   Recorded checks (monster assign 0xAC) | 1371–1383 |
+| Provenance | 1384–1473 |
+| Open questions | 1474–1554 |
 <!-- /index -->
 
 ## Summary
@@ -875,6 +875,12 @@ quest preset-boss hook (`world/quests-act3.md`, `world/quests-act5.md`).
 
 Draws: only Radament's `roll(5)` (unit seed) and the creations of the
 spawned monsters (their own §4 draws).
+
+The switch runs once. Population's preset path (`population.md` §11.4
+step 6) and this table describe the same code: wiring runs the extra
+spawns and Radament's `roll(5)` in population and only the quest records
+here (`superunique_finish_with(.., extra_spawns = false)`), else the boss
+seed is one step ahead of 1.14d (a2-quest-radament, REC-3800).
 
 ### 21. Restore paths (`0x005A4440`, `0x005A46E0`)
 

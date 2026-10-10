@@ -146,6 +146,8 @@ impl Screen for Cinematics {
         let _ = panel;
         let mut title = Control::new(ControlKind::Text, 262, title_y, 272, 35).with_string(5114);
         title.font = 7; // Font24 (0x007089BC); id per REC-186
+        title.flags = 2; // centred in the 272-wide box (r8 c; measured, REC-3760)
+        title.color = 4; // 0x004FD060 adds with k = 4 (r8 a)
         v.push(title);
         for (i, (&s, &y)) in labels.iter().zip(ys).enumerate() {
             let mut b = Control::new(ControlKind::Button, 262, y, 272, 35)

@@ -1,0 +1,7 @@
+id	name	transport_size	layout	kind
+0x01	Walk	5	x:u16@1 y:u16@3	handler
+0x02	WalkToUnit	9	type:u32@1 id:u32@5	handler
+0x2C	Unused2C	0		stub3
+0x3A	AddStatPoint	3	stat:u8@1 repeat:u8@2	handler
+0x45	ChangeTpLocation	9		stub3
+0x6D	Ping	13	tick:u32@1 value:u32@5	system
