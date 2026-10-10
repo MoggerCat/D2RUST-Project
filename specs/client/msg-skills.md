@@ -153,7 +153,9 @@ handlers (the server specs link here for the steps).
    §4 r3) is updated only when its stat
    351 ≠ L: for i = 1…5 while `passivestat_i` is a valid stat: set
    (`0x00627150`) stat `passivestat_i` with layer `passiveitype` (0 when
-   ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`); then stat 350
+   ≤ 0) to `eval(passivecalc_i, skill, L)` (`0x00646CA0`; the layer is
+   the param S→C 0xA8 sends with the entry, `sim/intents-events.md` §3.5
+   rule 6: 1.14d `gen-skill-ass-*` frame 2, the masteries); then stat 350
    := skill, stat 351 := L (layer 0); mark state p for update
    (`0x00639E30`). Otherwise (no E, or the aura state is on) the state
    list of p, if any, is detached and freed (`0x006277E0`,
