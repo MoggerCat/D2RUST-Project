@@ -145,6 +145,12 @@ pub trait ViewFeed: ViewSource {
     /// a tick already updated changes nothing. The default has no weather.
     fn weather_update(&mut self, _world: &ClientWorld, _assets: &mut ViewAssets) {}
 
+    /// A check run follows the recorded frame schedule
+    /// (`tools/scenario-diff.md`): the weather runs only in drawn frames,
+    /// with no replay of client updates without one. The default has no
+    /// weather.
+    fn follow_frame_schedule(&mut self) {}
+
     /// The drawn frame's light pass (`render/lighting.md` §6.4, once per
     /// drawn frame after [`Self::prepare`]): `lights` is the client's
     /// kept light list (`ClientWorld::lights`, §6.3), handed out of the

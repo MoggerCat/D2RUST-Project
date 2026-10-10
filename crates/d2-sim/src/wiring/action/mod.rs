@@ -261,6 +261,15 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// The host runs the item update pass after the tick and wants a
+    /// player's own state / stat sends after it (`intents-events.md` §7.3
+    /// rule 1: the item messages of step 2 precede step 5 and step 7). On,
+    /// [`View::player_tail`] holds them until [`ActionSim::flush_player_tail`].
+    pub defer_player_tail: bool,
+    /// Set around a player's step 5 / 7 sends while [`Self::defer_player_tail`].
+    pub capture_tail: bool,
+    /// The held sends: (receiving player, bytes).
+    pub player_tail: Vec<(UnitId, Vec<u8>)>,
     /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
     /// creation), for the host that holds the hireling lists:
     /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
@@ -373,6 +382,10 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
+    /// Mercenaries linked to their player ([`LifecycleHooks::set_ai_owner`]
+    /// with a player owner, called only by the hireling init): the units whose
+    /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
+    pub hireling_units: std::collections::BTreeSet<UnitId>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -382,8 +395,9 @@ pub struct ActionHooks<X> {
     pub monster_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// The entries monster init step 14 gives a monster (`Skill<i>` at
     /// `Sk<i>lvl` + the monster skill bonus, `monsters/init.md` §6):
-    /// skill id → base level. Read for the level only
-    /// ([`Pending::ai_skill_level`] is asked for a unit without one).
+    /// skill id → base level. Read for the level
+    /// ([`Pending::ai_skill_level`] is asked for a unit without one) and
+    /// by the entry lookup [`ActionHooks::monster_entry_of`].
     pub natural_skills: BTreeMap<UnitId, BTreeMap<i32, i32>>,
     /// A unit's source unit (+0x94 / +0x98, set by `link_source`
     /// `0x00621C30`, `skills/bodies-4.md` §1); read by `0x00552FD0` when
@@ -451,6 +465,27 @@ impl<X: Pending> ActionHooks<X> {
         }
     }
 
+    /// `0x006439F0(unit, skill)` for a unit without a skill list: the
+    /// monster's entry of `skill` (owner −1) from its summon entries
+    /// ([`ActionHooks::monster_skills`]), else its init entries
+    /// ([`ActionHooks::natural_skills`], `monsters/init.md` §14); none
+    /// when it has no such entry.
+    pub fn monster_entry_of(&self, unit: UnitId, skill: i32) -> Option<crate::skills::SkillEntry> {
+        let base = self
+            .monster_skills
+            .get(&unit)
+            .and_then(|m| m.get(&skill))
+            .or_else(|| self.natural_skills.get(&unit).and_then(|m| m.get(&skill)))?;
+        Some(crate::skills::SkillEntry {
+            skill,
+            base: *base,
+            level_bonus: 0,
+            owner_guid: -1,
+            charges: 0,
+            has_charges: false,
+        })
+    }
+
     /// The E-flags word (`0x006446A0`, entry +0x0C) of entry `e`: the
     /// unit's skill list owns it when it has one (a skill start's
     /// `0x00644660` writes there), else the host seam.
@@ -493,6 +528,9 @@ impl<X> ActionHooks<X> {
             pet_follows: None,
             hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
+            defer_player_tail: false,
+            capture_tail: false,
+            player_tail: Vec::new(),
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
@@ -520,6 +558,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
+            hireling_units: std::collections::BTreeSet::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),

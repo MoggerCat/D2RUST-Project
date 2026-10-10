@@ -75,20 +75,14 @@ pub fn assign_player(guid: u32, class: u8, name: &[u8; 16], x: u16, y: u16) -> [
 
 /// S→C 0x74 PlayerCorpseAssign (10 bytes: flag u8@1, player u32@2,
 /// corpse u32@6) of §7.2 part B for the corpse `guid`.
-// PROVISIONAL (REC-279; d2rs-own, unverified): the fields of the part-B
-// call `0x0053DA40` are not in any spec. Read as flag 1 with the corpse
-// in both GUID fields: the client's 0x74 (`client/msg-units.md` §7 r7)
-// then sets the corpse unit (P, not dead after its 0x59) to mode 0 and
-// does not touch the local player; with the owner as P it would kill
-// a living local player on its client. Settled by a 1.14d capture of a
-// player's own corpse coming back into view (the 0x59 … 0x74 of the
-// room join).
-pub fn corpse_assign(guid: u32) -> [u8; 10] {
+// Recorded (`items-drops-cha-00` frame 96, 1.14d): `74 01 <owner GUID>
+// <corpse GUID>`, flag 1 (settles REC-279).
+pub fn corpse_assign(owner: u32, corpse: u32) -> [u8; 10] {
     let mut b = [0u8; 10];
     b[0] = 0x74;
     b[1] = 1;
-    b[2..6].copy_from_slice(&guid.to_le_bytes());
-    b[6..10].copy_from_slice(&guid.to_le_bytes());
+    b[2..6].copy_from_slice(&owner.to_le_bytes());
+    b[6..10].copy_from_slice(&corpse.to_le_bytes());
     b
 }
 
@@ -251,9 +245,29 @@ impl<X: Pending> View<'_, X> {
         let (x, y) = self.h.path_position(unit);
         match ty {
             UnitType::Player => {
-                let name = self.h.session.names.get(&unit).copied().unwrap_or_default();
+                // A corpse carries its owner's name (recorded 0x59 of the
+                // corpse, `items-drops-cha-00` frame 96).
+                let named = self
+                    .h
+                    .death
+                    .owners
+                    .get(&unit)
+                    .and_then(|&o| game.lists.find_unit(UnitType::Player, o))
+                    .unwrap_or(unit);
+                let name = self
+                    .h
+                    .session
+                    .names
+                    .get(&named)
+                    .copied()
+                    .unwrap_or_default();
                 let m = assign_player(guid, class as u8, &name, x as u16, y as u16);
                 self.h.x.send(receiver, &m);
+                // `0x0053E8F0` ends with the party info `0x0053DA90`.
+                let level = self.stats.unit_total(unit, 12, 0) as u16;
+                self.h
+                    .x
+                    .send(receiver, &messages::player_party_info(guid, level));
                 self.player_part_b(game, receiver, unit);
             }
             UnitType::Object => {
@@ -335,10 +349,20 @@ impl<X: Pending> View<'_, X> {
             }
         }
         if self.is_player_corpse(unit) {
-            self.h.x.send(receiver, &corpse_assign(guid));
+            let owner = self
+                .h
+                .death
+                .owners
+                .get(&unit)
+                .copied()
+                .or_else(|| self.h.x.corpse_owner_guid(unit))
+                .unwrap_or(guid);
+            self.h.x.send(receiver, &corpse_assign(owner, guid));
         }
         let states = self.unit_states_message(ty, guid, unit);
         self.h.x.send(receiver, &states);
+        // `0x005484B0`: the mode's update function (`pathing.md` §10).
+        crate::wiring::path::walk::mode_update_messages(self, game, receiver, unit);
         self.send_event_records(game, receiver, unit);
         self.overhead_message(receiver, unit, ty, guid);
     }
@@ -540,8 +564,8 @@ mod corpse_tests {
     #[test]
     fn corpse_assign_bytes() {
         assert_eq!(
-            super::corpse_assign(0x0102_0304),
-            [0x74, 1, 4, 3, 2, 1, 4, 3, 2, 1]
+            super::corpse_assign(0x0102_0304, 0x0506_0708),
+            [0x74, 1, 4, 3, 2, 1, 8, 7, 6, 5]
         );
     }
 }

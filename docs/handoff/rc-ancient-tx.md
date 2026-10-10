@@ -26,3 +26,12 @@ spec note in specs/monsters/ai.md §5.4. The unit test was updated but not run
 Open: scan 5 `threat` main/alt split and walk-order tie-break; barb melee hit
 at frame 36; the frame-16 seed cause. Fix lives in d2-client (preview seams),
 not d2-sim: LocalSeams is the Pending impl the state-dump uses.
+
+## Update (causes 1-2 done)
+- Tie in the scan-5 walk keeps the newest unit (frame 36 hit target).
+- Missile justhit list (state 86) had no remove callback; 1.14d 0x005ADAF0
+  = state off + update queue (specs/missiles/missiles.md R5 6.1). Frame 37 hit.
+- Now: 14 a5-su-* checks state 90/90, 0 differences (PARTIAL = run gaps only);
+  a5-warp-l110-siege-1-ama state 160/160 + rng 158/158 MATCH.
+- Open: 6 checks (anodized-elite, bonesaw-breaker, dac-farren, magma-torquer,
+  pindleskin, vinvear-molech) differ at frame 16 on the game seed.

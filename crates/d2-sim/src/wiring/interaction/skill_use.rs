@@ -485,7 +485,10 @@ impl<X: Pending + UseRest> UseWorld for UseView<'_, X> {
     fn find_entry(&self, u: UnitId, skill: i32) -> Option<SkillEntry> {
         match self.list(u) {
             Some(l) => l.view().into_iter().find(|e| e.skill == skill),
-            None => self.x().find_entry(u, skill),
+            None => self
+                .x()
+                .find_entry(u, skill)
+                .or_else(|| self.cv.v.h.monster_entry_of(u, skill)),
         }
     }
     fn find_entry_owned(&self, u: UnitId, skill: i32, owner: i32) -> Option<SkillEntry> {

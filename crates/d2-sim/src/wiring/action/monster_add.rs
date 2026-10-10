@@ -294,7 +294,22 @@ impl<X: Pending> View<'_, X> {
                 .unit_total(unit, crate::stats::stat::HITPOINTS, 0),
             crate::combat::vitals::VitalsUnits::max_life(self, unit),
         ) as u8;
-        let hireling_owner = self.h.x.hireling_owner_guid(unit);
+        let hireling_owner = self.h.x.hireling_owner_guid(unit).or_else(|| {
+            // Spec: specs/monsters/init.md §24 rule 4: a hireling's owner GUID.
+            self.h
+                .hireling_units
+                .contains(&unit)
+                .then(|| {
+                    self.h
+                        .ai
+                        .as_ref()
+                        .and_then(|s| s.control(unit))
+                        .and_then(|c| c.minion_owner)
+                        .filter(|o| o.ty == UnitType::Player)
+                        .map(|o| o.guid)
+                })
+                .flatten()
+        });
         let data = self.h.monster_data(unit);
         let components = data.map_or([0; 16], |d| d.components);
         let type_block = data.and_then(|d| type_block(d, unit_flags, hireling_owner));

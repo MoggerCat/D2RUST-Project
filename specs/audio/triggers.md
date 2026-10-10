@@ -32,21 +32,21 @@
 |   2. Server sound events (S→C 0x2C) | 165–213 |
 |   3. Player event sounds (`0x004CB9C0(U, event e)`) | 214–277 |
 |   4. Mode sounds | 278–383 |
-|   5. Footsteps (`0x004CAF60(U)`) | 384–435 |
-|   6. Monster idle voices | 436–462 |
-|   7. Object mode sounds (`0x004CB460`, objects) | 463–504 |
-|   8. Skills, missiles, states | 505–547 |
-|   9. Items | 548–571 |
-|   10. NPC speech | 572–641 |
-|   11. UI sounds | 642–671 |
-|   12. Other fixed requests | 672–735 |
-| Constants & data dependencies | 736–752 |
-| Randomness | 753–776 |
-| Edge cases & original bugs | 777–793 |
-| Test vectors | 794–825 |
-|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 826–839 |
-| Provenance | 840–876 |
-| Open questions | 877–988 |
+|   5. Footsteps (`0x004CAF60(U)`) | 384–436 |
+|   6. Monster idle voices | 437–463 |
+|   7. Object mode sounds (`0x004CB460`, objects) | 464–505 |
+|   8. Skills, missiles, states | 506–548 |
+|   9. Items | 549–572 |
+|   10. NPC speech | 573–642 |
+|   11. UI sounds | 643–672 |
+|   12. Other fixed requests | 673–736 |
+| Constants & data dependencies | 737–753 |
+| Randomness | 754–777 |
+| Edge cases & original bugs | 778–794 |
+| Test vectors | 795–826 |
+|   Checks (hook addresses for `record_sound.py`, `client/audio.md` §B7) | 827–840 |
+| Provenance | 841–877 |
+| Open questions | 878–989 |
 <!-- /index -->
 
 ## Summary
@@ -405,6 +405,7 @@ id = `Skill1..4` for m = 8..11. id 0 → nothing. id 2,692
 6. request(id, U); if a handle: v = 255 for P, else 200; if elapsed >
    ⌊3·period / 2⌋: v := trunc(v × 160 / 255) (255 → 160, 200 → 125);
    volume v.
+6a. **First update in a mode** (PROVISIONAL, REC-3000): a monster's first update after a mode change makes no footstep call; the next frame crossing is its first step and has the reduced volume (U+0x84 is still 0). Measured on `audio-town-ambience-ama` (volumes 92 and 45 on ticks 30 and 35).
 7. If layer ≠ 0: draw roll(100); < p → request(layer, U). Then U+0x84
    := C (also when the request returned 0).
 8. **Material** (`0x004CADB0`): default k = `soundenviron.Material 1`

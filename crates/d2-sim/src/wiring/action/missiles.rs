@@ -131,7 +131,18 @@ impl<X: Pending> MissileUnits for View<'_, X> {
     fn apply_justhit(&mut self, game: &mut Game, unit: UnitId, expire: i32) {
         // TODO(missiles.md §R5 step 6.1): the list's owner is not stated;
         // the hit unit's own type and GUID are used.
-        self.create_state_list(unit, STATE_JUSTHIT, None, expire);
+        let list = self.create_state_list(unit, STATE_JUSTHIT, None, expire);
+        // The list's remove callback `0x005ADAF0` (`push 0; call
+        // 0x00639DB0(unit, 86, 0)`): state off and the update queue, so
+        // the next missile can hit the unit once the delay has passed.
+        if let Some(l) = list {
+            self.stats.set_remove_callback(
+                l,
+                Some(crate::stats::lists::RemoveCallback(
+                    crate::skills::use_::bodies::callback::JUSTHIT,
+                )),
+            );
+        }
         self.set_state(unit, STATE_JUSTHIT, true);
         if let Err(e) =
             game.schedule_event(unit, u32::from(event::REMOVE_STATE), expire, None, 0, 0)
