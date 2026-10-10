@@ -550,6 +550,9 @@ def main(argv=None):
     ap.add_argument("--checks-dir", "--dir", dest="checks_dir", default=CHECKS_DIR, metavar="DIR",
                     help="directory of .check files (default traces/checks; e.g. traces/checks/gen)")
     ap.add_argument("--area", default=None, help="areas (first dash token of the name), comma list")
+    ap.add_argument("--checks-dir", default=CHECKS_DIR,
+                    help="directory of the .check files (default traces/checks; the generated "
+                         "ones are in traces/checks/gen)")
     ap.add_argument("--workers", type=int, default=max(1, min((os.cpu_count() or 2) - 1, 3)))
     ap.add_argument("--orig-cache", nargs="?", const=sd.DEFAULT_CACHE, default=None, metavar="DIR",
                     help="use the shared 1.14d cache (default traces/orig-cache; a miss records "
