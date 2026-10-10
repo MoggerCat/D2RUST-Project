@@ -726,6 +726,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .is_some()
     }
 
+    /// `0x0058EC00(unit, index + 1, v)` on the unit's AI control.
+    fn set_ai_param(&mut self, unit: UnitId, index: usize, v: i32) -> bool {
+        self.ai
+            .as_mut()
+            .and_then(|a| a.control_mut(unit))
+            .and_then(|c| c.params.get_mut(index))
+            .map(|p| *p = v)
+            .is_some()
+    }
+
     /// `0x0061AB00` on the unit's room.
     fn room_flag(&mut self, sim: &Sim<'_>, unit: UnitId) -> bool {
         sim.game
