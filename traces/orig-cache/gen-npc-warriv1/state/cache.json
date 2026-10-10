@@ -1,0 +1,46 @@
+{
+ "channel": "state",
+ "check": "gen-npc-warriv1",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "50",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto unit 1:155",
+  "--send",
+  "14 InteractWithEntity type=1 id=@1:155",
+  "--send",
+  "16 InitEntityChat id=@1:155",
+  "--send",
+  "18 TerminateEntityChat id=@1:155"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "5b7535b8447171c9b1dca2cc256ee57a032265e5544189ffe2bee1d9e7a112a5",
+   "size": 201560
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "fbe286d39e9622a2e0870805dde098eed144cdae8cfc4f387f7cec4fbfca528f",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
