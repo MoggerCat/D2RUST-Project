@@ -1,0 +1,12 @@
+cause	checks	examples	likely_crate_spec	size
+items: item stream differs after the head, bit offset 105	3	gen-itemq-rare-0,gen-itemq-rare-1,gen-itemq-unique-0	d2-sim items, specs/items/	S
+rng: frame N, unit N:N, draw #N, field missing: N.Nd site N vs dNrs site None	2	gen-missile-411,gen-missile-546	d2-sim missiles, specs/missiles/missiles.md	S
+items: item stream differs after the head, bit offset 44	2	gen-itemq-set-0,gen-itemq-set-2	d2-sim items, specs/items/	S
+items: item stream differs after the head, bit offset 34	2	gen-item-05,gen-item-10	d2-sim items, specs/items/generation.md	S
+items: item stream differs after the head, bit offset n/a	1	gen-itemq-crafted-1	d2-sim items, specs/items/	S
+items: item stream differs after the head, bit offset 45	1	gen-itemq-set-1	d2-sim items, specs/items/	S
+state: frame N monster N:N class N/N, field cl: N.Nd N vs dNrs N	1	gen-wp-28	d2-sim, specs/skills/	S
+packets: frame N stream sNc #N missing in dNrs (id N)	1	gen-missile-149	d2-sim missiles, specs/missiles/missiles.md	S
+items: item stream differs after the head, bit offset 33	1	gen-itemq-magic-1	d2-sim items, specs/items/	S
+items: item stream differs after the head, bit offset 95	1	gen-itemq-crafted-0	d2-sim items, specs/items/	S
+rng: frame N, unit N:N, draw #N, field extra: N.Nd site None vs dNrs site SITE	1	gen-missile-407	d2-sim missiles, specs/missiles/missiles.md	S

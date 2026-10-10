@@ -1,0 +1,17 @@
+check 1
+# World draw list in action (PC 1 2026-10-10, local-pc1-today): a Sorceress casting Frost Nova next to a spawned cow (class 179) in the empty Blood Moor: the list of tick 27 (the nova missiles, cast overlay).
+# Seed 1234. Under the debugger 1.14d does not draw every tick: the run compares its
+# last drawn tick at or before draws-at on both sides.
+# Spec: specs/tools/scenario-diff.md §3 rule 7; specs/render/unit-composite.md,
+# specs/render/sprite-placement.md, specs/missiles/client.md.
+name draws-frost-nova-sor
+save ScnSor --class sor --expansion --level 30 --all-skills 20 --right-skill 44
+seed 1234
+ticks 34
+seconds 600
+channels draws
+draws-at 27
+variant blood-moor-empty
+at 4 poke warp 2
+at 10 poke spawn 179 @x+4 @y normal
+input frame 18; move 790 10; frame 20; rclick 544 336

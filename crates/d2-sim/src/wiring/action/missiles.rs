@@ -578,7 +578,7 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// §R9.6) on the wired units: formulas on the skill tables, the path
 /// provider's new-step flag and target, collision writes on the DRLG
 /// grids, unit records, and the area hit on the combat view. The area
-/// scan has no provider here ([`Pending::missile_area_units`]).
+/// scan runs on the skill pipeline ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     /// Max life `0x00625D10` (the heal of server-hit 31 reads it).
     fn max_life(&self, unit: UnitId) -> i32 {
@@ -762,13 +762,15 @@ impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
     }
     fn area_units(
         &mut self,
-        game: &Game,
+        game: &mut Game,
         owner: UnitId,
         at: (i32, i32),
         r: i32,
         f: u32,
     ) -> Vec<UnitId> {
-        self.h.x.missile_area_units(game, owner, at, r, f)
+        with_sim(self, game, |h, sim| {
+            X::missile_area_units(h, sim, owner, at, r, f)
+        })
     }
     /// `0x0056B9C0` on the combat view.
     fn area_hit(&mut self, game: &mut Game, owner: UnitId, unit: UnitId, record: &DamageRecord) {

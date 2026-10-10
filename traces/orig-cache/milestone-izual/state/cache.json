@@ -13,6 +13,8 @@
   "MilA5",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -42,8 +44,8 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "c031742a76ca2f474c39391c53caf8407ce9fd3582c65043a1ca35becb0c8b90",
-   "size": 1023476
+   "sha256": "10f3efded1ce3ce749274b5be9bebdc56b5ed87238814838b17eaab1b925100a",
+   "size": 1024173
   }
  },
  "format": "orig-cache-1",
@@ -51,8 +53,8 @@
   "check": "ea18c4bac28424966922812656dab0d359f59cbd7d33a28a99498caae853610a",
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
-  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "7979928cb53e3f211b88719d929df45eddb589ca197afbc87f67cbef5ac51dc4",
   "save": "d8a2b2868b11f00f1354a28b534fcd2bbc77e0d2471510d7bc46390df1074c31"
  }
 }

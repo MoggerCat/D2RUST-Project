@@ -8,7 +8,12 @@
 //! PROVISIONAL (REC-1930, d2rs-own, unverified): the arrival is read from
 //! the player's mode leaving walk / run / town walk at the end of tick
 //! step 4 (1.14d: the step result 2 of `0x00580C20`, `objects.md` §7.3
-//! rule 4.4); a new walk request drops the queued operate.
+//! rule 4.4); a new walk request drops the queued operate. The retry runs
+//! inside the stop frame of `0x00580C20` in 1.14d; a run it starts there
+//! is ended at once by the ENDANIM neutral start of the step result 2
+//! (`units.md` §4.5) and +0x150 is cleared: recorded `gen-obj-78` /
+//! `gen-obj-39` (the player stops at the blocked step, the retry's run is
+//! computed, the mode is neutral that frame and stays).
 
 use d2_sim::game::Game;
 use d2_sim::units::UnitId;
@@ -23,11 +28,14 @@ const MOVING: [u8; 3] = [2, 3, 6];
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
     /// Starts the run of `player` to `object` and queues the operate.
+    /// `retry`: called from the stop-frame retry (no new queue; the run is
+    /// ended by the neutral start that follows the step result 2).
     pub(super) fn start_object_walk<D: ActionEvents>(
         &mut self,
         game: &mut Game,
         events: &mut D,
         (player, object): (UnitId, UnitId),
+        retry: bool,
     ) {
         let Some(guid) = game.lists.unit(object).map(|e| e.guid) else {
             return;
@@ -38,7 +46,11 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                     .approach_unit(player, object)
                     .is_some()
         });
-        if started {
+        if started && retry {
+            events.action().with(game, |g, v| {
+                d2_sim::wiring::path::PathCtx::of(v, g).neutral_start(player);
+            });
+        } else if started {
             self.drop_queued(player);
             self.item_queued.retain(|q| q.0 != player);
             self.object_queued.retain(|q| q.0 != player);
@@ -62,9 +74,10 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 continue;
             }
             match WorldHost::<D>::objects(self, game, events, player, guid) {
-                // Still out of range: a new run and a new queued operate.
+                // Still out of range: a new run (+0x150 cleared after it),
+                // ended by the ENDANIM neutral start (module doc).
                 Some(ObjectCase::Walk(object)) => {
-                    self.start_object_walk(game, events, (player, object));
+                    self.start_object_walk(game, events, (player, object), true);
                 }
                 Some(ObjectCase::Waypoint(_)) => {
                     let _ = WorldHost::<D>::waypoints(

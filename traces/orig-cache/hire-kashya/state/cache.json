@@ -1,0 +1,46 @@
+{
+ "channel": "state",
+ "check": "hire-kashya",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "400",
+  "--ticks",
+  "90",
+  "--auto",
+  "ScnHi1",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 goto unit 1:150",
+  "--send",
+  "8 InteractWithEntity type=1 id=@1:150",
+  "--send",
+  "10 InitEntityChat id=@1:150",
+  "--send",
+  "14 HireMerc npc=@1:150 merc=3411"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "a11c94aa69a22f51f1122bcdde7172ab995ab5c9fdc5ac13185c6ff2bcf07298",
+   "size": 546244
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "0e0e9e517b4b38cef75cd6d748cdc63c7ef1110d5c70887a1f22948eb1ffef02",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "7979928cb53e3f211b88719d929df45eddb589ca197afbc87f67cbef5ac51dc4",
+  "save": "f3c4616c87bf4e04586803ad5b43f8c1fa93736f0f07b9ae895eae16e0198c1f"
+ }
+}

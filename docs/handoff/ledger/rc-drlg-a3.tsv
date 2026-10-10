@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-drlg.act3-jungle1-gold-placeholder	system	drlg	level 76 gold placeholder objects (init 28, 0x0054F8C0 / gold drop 0x00559300)	specs/world/objects-2.md	done	a3-warp-l76-jungle-1-ama,a3-warp-l77-jungle-2-ama	MATCH	yes	0	n	rc-drlg-a3	EQUAL	-	client drop state lacked ClassPicks, no ground gold at level load; seed equal since
+drlg.act3-jungle1-gold-placeholder	system	drlg	level 76 gold placeholder objects (init 28, 0x0054F8C0 / gold drop 0x00559300)	specs/world/objects-2.md	done	a3-warp-l76-jungle-1-ama,a3-warp-l77-jungle-2-ama	PARTIAL	yes	0	n	rc-drlg-a3	EQUAL	-	client drop state lacked ClassPicks, no ground gold at level load; seed equal since
