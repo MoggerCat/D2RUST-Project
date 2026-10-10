@@ -1062,8 +1062,11 @@ impl<X: Pending, R: QuestRest> QuestWorld for HostQuests<'_, '_, X, R> {
     fn end_tainted_sun(&mut self) {
         self.inner.end_tainted_sun()
     }
-    fn quest_chest_gate(&mut self, object: UnitId, player: UnitId) -> bool {
-        self.inner.quest_chest_gate(object, player)
+    /// `0x00545850` over this host's own object view: the gate reads
+    /// `Mode1` and the animation length of objects with object data,
+    /// which the inner economy world cannot see.
+    fn quest_chest_gate(&mut self, object: UnitId, _player: UnitId) -> bool {
+        crate::world::quests::helpers::quest_chest_gate(self, object)
     }
     fn quest_drop(
         &mut self,
