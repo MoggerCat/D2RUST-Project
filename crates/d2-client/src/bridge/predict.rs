@@ -618,6 +618,13 @@ impl Predict {
         }
         self.path.stamp_others(t, drlg, &self.others, &self.objects);
         let moving = self.path.tick(t, drlg, speeds, own, Some(to));
+        if std::env::var_os("SMOKE_TRACE").is_some() && matches!(walk.to, WalkTo::Unit(_)) {
+            eprintln!(
+                "DBG tick moving {moving} pos {:?} stamina {stamina} target {target:?} others {}",
+                self.path.position(),
+                self.others.len()
+            );
+        }
         if let Some((x, y)) = self.path.position() {
             let now = (i64::from(x), i64::from(y));
             if let Some(d) = facing((at.0 as u32, at.1 as u32), (x, y)) {
