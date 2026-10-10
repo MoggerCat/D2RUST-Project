@@ -50,12 +50,15 @@ pub const NO_PARTY: u16 = 0xFFFF;
 /// u16@11 (`0x0055B350`, `0x0055B3F0`: 0 for a player in no party). Sent
 /// right after every 0x59 (`0x0053E8F0`; recorded `75 02000000 ffff 0000
 /// 0000 0000`, `items-drops-cha-00` frame 96).
-pub fn player_party_info(guid: u32, level: u16) -> [u8; 13] {
+pub fn player_party_info(guid: u32, level: u16, own: bool) -> [u8; 13] {
     let mut m = [0u8; 13];
     m[0] = 0x75;
     m[1..5].copy_from_slice(&guid.to_le_bytes());
     m[5..7].copy_from_slice(&NO_PARTY.to_le_bytes());
     m[7..9].copy_from_slice(&level.to_le_bytes());
+    // u16@11 `0x0055B3F0`: 1 for the receiver's own player, else its relation
+    // entry (0 with none).
+    m[11] = u8::from(own);
     m
 }
 
