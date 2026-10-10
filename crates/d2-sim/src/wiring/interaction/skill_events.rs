@@ -317,10 +317,14 @@ pub fn monster_attack_strike<X: Pending + UseRest>(
     if monster_mode_missile(&mut w, &ct, unit, moving) != 0 {
         return;
     }
+    // `0x005A5490` reads the path target unit (`0x00553540`) itself and does
+    // nothing without one: no hit test, no draw (REC-3181, `gen-su-56`: a
+    // class-changed minion whose mode request cleared the path target).
+    let Some(tg) = crate::wiring::path::monsters::path_target(&*w.cv.v.h, unit) else {
+        return;
+    };
     melee_setup(&mut w, &t.skills, &ct, unit);
-    if let Some(tg) = crate::wiring::path::monsters::path_target(&*w.cv.v.h, unit) {
-        apply_melee(w.combat(), &ct, unit, tg);
-    }
+    apply_melee(w.combat(), &ct, unit, tg);
 }
 
 /// The monster mode damage `0x005A4F50(unit, mode)` of the mode set

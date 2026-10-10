@@ -695,13 +695,19 @@ pub fn leap_clamp<W: BodyWorld>(
 /// `melee_result(game, unit, T', 0, 0)`, then `start_combat(game, unit,
 /// T', record, 128)`. Also the monster attack event's melee
 /// (`skills/use.md` §5.2 "Monsters").
+///
+/// No target unit (`0x00553540` gives 0): nothing happens, no record and no
+/// draw (1.14d `0x005A5490` tests T' first; REC-3181, `gen-su-56`: a
+/// transformed suicide minion's event 0 in mode 8 without a target).
 pub fn melee_setup<W: BodyWorld>(w: &mut W, t: &SkillTables, ct: &CombatTables, u: W::Unit) {
-    let t2 = target(w, u);
+    let Some(t2) = target(w, u) else {
+        return;
+    };
     let mut record = DamageRecord {
-        result: melee_result(w.combat(), t, ct, Some(u), t2, 0, 0),
+        result: melee_result(w.combat(), t, ct, Some(u), Some(t2), 0, 0),
         ..DamageRecord::default()
     };
-    start_combat(w.combat(), t, ct, Some(u), t2, &mut record, 128);
+    start_combat(w.combat(), t, ct, Some(u), Some(t2), &mut record, 128);
 }
 
 /// Monster pre-hit `0x005D9C80(game)` (§2.13).
