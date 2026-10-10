@@ -352,4 +352,4 @@ REC-1683	6766		Skill start sounds from the unit's mode request (PROVISIONAL, `au
 REC-1684	6767		The first server tick has no client update (q-fix-audio; `audio/sound-table.md` §6.1, `aud	recording	no		0	
 REC-1695	6760		`0x005DDC30` composition in the sim (PROVISIONAL, `d2-sim` `wiring/action/ai_scan.rs` `sec	unstated	no		4	
 REC-1696	6761		The Compelling Orb's spawn flags (PROVISIONAL, `d2-sim` `world/quests.rs` `QuestWorld::spa	unstated	no		2	
-REC-1698	6762		The vision record (PROVISIONAL, `d2-sim` `monsters/init/mod.rs` `MonsterData::vision`, `wi	unstated	no		3	
+REC-1698	6762		The vision record (PROVISIONAL, `d2-sim` `monsters/init/mod.rs` `MonsterData::vision`, `wi	unstated	no		2	
