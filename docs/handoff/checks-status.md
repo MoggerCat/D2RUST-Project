@@ -1493,7 +1493,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | interact-talk-akara | state | PARTIAL | 30/30 | - | - |
 | items-vendor-drehya-stock | packets | DIVERGED | 137/140 | frame 3 stream s2c #17 id: 1.14d 0a vs d2rs fe (id 0x0a) | unrouted |
 | nec-bone-wall | packets | DIVERGED | 65/70 | frame 27 stream s2c #0 size: 1.14d 19 vs d2rs 14 (id 0xac) | unrouted |
-| nec-clay-golem | packets | DIVERGED | 69/70 | frame 27 stream s2c #1 id: 1.14d 7f vs d2rs ac (id 0x7f) | unrouted |
+| nec-clay-golem | packets | MATCH | 70/70 | - | rc-c028-skillmsgs |
 | save-fresh-ama | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | save-merc-bar | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
 | ui-draws-char-skill-ama | draws | PARTIAL | 0/1 | - | - |
