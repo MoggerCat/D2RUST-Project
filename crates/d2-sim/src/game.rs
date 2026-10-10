@@ -36,6 +36,11 @@ pub struct Game {
     pub character_save_due: bool,
     /// The target-node lists' inserted nodes (game +0x10F8, `ai.md` §5.2).
     pub target_nodes: TargetNodes,
+    /// Level 134 preset-object counter (game +0x1DE4, 0 at creation
+    /// `0x00530930`): `0x005559A0` counts the level's object presets and
+    /// skips the one that brings it to `init seed % 3 + 3`
+    /// (`monsters/population.md` §11.1).
+    pub sands_preset_objects: u32,
 }
 
 /// The nodes of the game's 10 target-node lists (game +0x10F8, `ai.md`

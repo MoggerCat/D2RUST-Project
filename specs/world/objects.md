@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–492 |
-|   8. Chests and breakables | 493–628 |
-|   9. Shrines | 629–744 |
-|   10. Doors, operate 8 (`0x00581D40`) | 745–768 |
-|   11. Wells, operate 22 (`0x005858A0`) | 769–800 |
-|   12. Portals, operate 15 (`0x00584870`) | 801–871 |
-|   13. Torch, operate 11 (`0x005843D0`) | 872–876 |
-|   14. Client messages | 877–904 |
-|   15. Not covered yet | 905–919 |
-|   16.–18. Moved | 920–926 |
-| Constants & data dependencies | 927–973 |
-| Randomness | 974–1020 |
-| Edge cases & original bugs | 1021–1087 |
-| Test vectors | 1088–1126 |
-| Provenance | 1127–1193 |
-| Open questions | 1194–1247 |
+|   7. Operate dispatch | 324–511 |
+|   8. Chests and breakables | 512–647 |
+|   9. Shrines | 648–763 |
+|   10. Doors, operate 8 (`0x00581D40`) | 764–787 |
+|   11. Wells, operate 22 (`0x005858A0`) | 788–819 |
+|   12. Portals, operate 15 (`0x00584870`) | 820–890 |
+|   13. Torch, operate 11 (`0x005843D0`) | 891–895 |
+|   14. Client messages | 896–923 |
+|   15. Not covered yet | 924–938 |
+|   16.–18. Moved | 939–945 |
+| Constants & data dependencies | 946–992 |
+| Randomness | 993–1039 |
+| Edge cases & original bugs | 1040–1106 |
+| Test vectors | 1107–1145 |
+| Provenance | 1146–1212 |
+| Open questions | 1213–1266 |
 <!-- /index -->
 
 ## Summary
@@ -442,6 +442,25 @@ The handler's result (`sim/intents-events.md`), in order:
       (or the line blocked) → rule 4 again: a new run and a new queued
       interaction. Distance > 50 or mode ≥ 8 by then → its code, no
       operate. The client sends nothing more.
+   **Range test `0x00623660(P, O)`** (read in 1.14d 2026-10-10; REC-1930):
+   O not an object → 0; unit distance (`0x00641530`) 0 → 1. Else, with P's
+   position (px, py), O's position minus half its size (`SizeX`, `SizeY`
+   = `0x00620510`, `0x006205A0`, integer halves; call it (ox, oy), w, h):
+   - w < 1 or h < 1: in range iff \|px − ox\| ≤ 1 and \|py − oy\| ≤ 1.
+   - else: out unless ox − 2 ≤ px ≤ ox + w + 2 and oy − 2 ≤ py ≤ oy + h + 2;
+     a P of size > 2 is then in range; else the rows py < oy − 1 and
+     py > oy + h + 1 additionally need ox − 1 ≤ px ≤ ox + w + 1 (the four
+     outer corner cells are cut), the rows between are in range.
+   The line test `0x00622B50(P, O, 0x804)` takes both units' sizes
+   (`0x00620510`: object `SizeX`) and rooms; in the recorded stash walk it
+   is clear. Recorded (gen-obj-267, `poke operate @2:267` = the town stash,
+   GUID 17, from (4873, 4228)): the run starts at once (mode 3 toward
+   (4866, 4229), frame 20), one sub-tile per two frames, and stops at
+   (4868, 4229) in frame 30 (mode 5, unit distance 0); d2rs equals every
+   frame. Unit distance, table branch: a **negative** `dist8_unit` entry
+   returns 0 with no `+1` for a size below 2 (the stash, size 1, stops the
+   run at Δ = (2, 0); `sim/pathing.md` §9.5).
+
 5. Else stop P's path (`0x00648730`) and run §7.1 (`0x00584540(game,
    P, 2, GUID)`): its result 0 (object gone) → 3, else → 0.
 

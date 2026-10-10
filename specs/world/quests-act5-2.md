@@ -29,16 +29,16 @@
 | Rules | 74–75 |
 |   6. A5Q4 Betrayal of Harrogath (chain 34, slot 38) | 76–178 |
 |   7. A5Q5 Rite of Passage (chain 35, slot 39) | 179–370 |
-|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–500 |
-|   9. Act V intro (chain 40, slot 42) | 501–527 |
-|   10. Hooks called from other systems | 528–550 |
-|   11. NPC services and game completion | 551–564 |
-| Constants & data dependencies | 565–584 |
-| Randomness | 585–596 |
-| Edge cases & original bugs | 597–632 |
-| Test vectors | 633–647 |
-| Provenance | 648–670 |
-| Open questions | 671–751 |
+|   8. A5Q6 Eve of Destruction (chain 36, slot 40) | 371–504 |
+|   9. Act V intro (chain 40, slot 42) | 505–531 |
+|   10. Hooks called from other systems | 532–554 |
+|   11. NPC services and game completion | 555–568 |
+| Constants & data dependencies | 569–588 |
+| Randomness | 589–600 |
+| Edge cases & original bugs | 601–636 |
+| Test vectors | 637–651 |
+| Provenance | 652–674 |
+| Open questions | 675–755 |
 <!-- /index -->
 
 ## Summary
@@ -416,6 +416,10 @@ tyrael3 40.7 clear; cain6 with 40.10 clear and 40.5 clear.
   found → object 565 (type 2, flags 1, 1, 0) there; it returns 1 for the
   first player in level 132 whether or not a spot or object was made, so
   +0x98 is set and nothing retries.
+  d2rs wiring (not a 1.14d fact): the server queues the chat-close quest
+  call (`Desk::quest_chat_end`) and runs it after the NPC call on the full
+  quest world (player room, DRLG free spot, object creation); on the plain
+  economy the player has no room and the portal was never made.
 
 #### 8.5 Baal's death (event 8, `0x0058DF20`)
 

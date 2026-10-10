@@ -1,13 +1,14 @@
-// Spec: specs/world/objects.md §7.3 (rule 4: walk to the object); specs/world/npc.md §2 rule 3 (the queued interaction); specs/sim/pathing.md §1.2
-//! The walk to an object of the wired host (C→S 0x13 type 2 out of
-//! interact range or behind the line test): the run request to the
-//! object (`0x00548A50`, player mode 3 toward (type 2, GUID)), then the
-//! 0x13 object case again when the run ends, as the NPC approach
-//! ([`super::npc_approach`]) and the item walk ([`super::item_approach`]):
-//! the arrival is read from the player's mode leaving walk / run / town
-//! walk at the end of tick step 4; a new walk request drops the queue
-//! (`clear_queued_action`, `pathing.md` §1.2 step 4). The arrival's own
-//! case does not walk again.
+// Spec: specs/world/objects.md §7.3 rule 4 (walk to the object, operate on arrival); specs/sim/pathing.md §1.2
+//! The walk to an object of the wired host (C→S 0x13, object not in
+//! interact range or the line blocked): the run request to the object
+//! (`0x00548A50`, player mode 3 toward (type 2, GUID)), then the 0x13
+//! object case again when the run ends. Same shape as the NPC and item
+//! approaches ([`super::npc_approach`], [`super::item_approach`]).
+//!
+//! PROVISIONAL (REC-1930, d2rs-own, unverified): the arrival is read from
+//! the player's mode leaving walk / run / town walk at the end of tick
+//! step 4 (1.14d: the step result 2 of `0x00580C20`, `objects.md` §7.3
+//! rule 4.4); a new walk request drops the queued operate.
 
 use d2_sim::game::Game;
 use d2_sim::units::UnitId;
@@ -21,16 +22,14 @@ use super::{ActionEvents, WaypointOperate, WorldHost};
 const MOVING: [u8; 3] = [2, 3, 6];
 
 impl<R: TradeRest, S> WiredWorld<R, S> {
-    /// Starts the run of `player` to the object with `guid` and queues
-    /// the 0x13 object case for its end.
+    /// Starts the run of `player` to `object` and queues the operate.
     pub(super) fn start_object_walk<D: ActionEvents>(
         &mut self,
         game: &mut Game,
         events: &mut D,
-        player: UnitId,
-        guid: u32,
+        (player, object): (UnitId, UnitId),
     ) {
-        let Some(object) = game.lists.find_unit(d2_sim::units::UnitType::Object, guid) else {
+        let Some(guid) = game.lists.unit(object).map(|e| e.guid) else {
             return;
         };
         let started = events.action().with(game, |g, v| {
@@ -47,9 +46,8 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
         }
     }
 
-    /// The queued object cases whose run has ended run again (end of
-    /// tick step 4, `WiredWorld::timer_step_work`); an operate 23 runs
-    /// the waypoint operate as the handler does.
+    /// The queued operates whose run has ended run the 0x13 object case
+    /// again (end of tick step 4).
     pub(super) fn object_arrivals<D: ActionEvents>(&mut self, game: &mut Game, events: &mut D)
     where
         Self: WorldHost<D>,
@@ -63,11 +61,20 @@ impl<R: TradeRest, S> WiredWorld<R, S> {
                 self.object_queued.push((player, guid));
                 continue;
             }
-            self.object_arriving = true;
-            let case = WorldHost::<D>::objects(self, game, events, player, guid);
-            self.object_arriving = false;
-            if let Some(ObjectCase::Waypoint(_)) = case {
-                WorldHost::<D>::waypoints(self, game, events, WaypointOperate { player, guid });
+            match WorldHost::<D>::objects(self, game, events, player, guid) {
+                // Still out of range: a new run and a new queued operate.
+                Some(ObjectCase::Walk(object)) => {
+                    self.start_object_walk(game, events, (player, object));
+                }
+                Some(ObjectCase::Waypoint(_)) => {
+                    let _ = WorldHost::<D>::waypoints(
+                        self,
+                        game,
+                        events,
+                        WaypointOperate { player, guid },
+                    );
+                }
+                Some(ObjectCase::Code(_)) | None => {}
             }
         }
     }

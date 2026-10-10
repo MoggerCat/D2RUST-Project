@@ -464,8 +464,8 @@ where
         self.desk.rest.place_in_gamble(npc_class, player, item)
     }
     fn remove_gamble_item(&mut self, npc_class: u16, player: u32, item: UnitId) {
-        if let Some(inv) = self.desk.inv.as_deref_mut() {
-            inv.gamble_unlink(&mut *self.desk.econ, item);
+        if let (Some(npc), Some(inv)) = (self.record_npc(npc_class), self.desk.inv.as_deref_mut()) {
+            inv.gamble_unlink(&mut *self.desk.econ, npc, player, item);
         }
         self.desk.rest.remove_gamble_item(npc_class, player, item);
     }

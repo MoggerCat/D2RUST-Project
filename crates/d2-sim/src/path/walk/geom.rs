@@ -72,6 +72,9 @@ pub fn unit_distance(t: &PathTables, a: Point, size_a: i32, b: Point, size_b: i3
     let dy = (a.y - b.y).abs();
     if dx < 8 && dy < 8 && size_a < 4 && size_b < 4 {
         let mut d = t.dist8_unit[(dx + 8 * dy) as usize];
+        // A negative entry returns 0 at once, with no size adjustment
+        // (`0x00641634`; recorded: the stash, SizeX 1, stops the run 2
+        // sub-tiles away).
         if d < 0 {
             return 0;
         }

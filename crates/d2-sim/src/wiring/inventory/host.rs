@@ -113,59 +113,47 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         self.place(npc, item, (0, 0), true, false)
     }
 
-    /// The placement of a gamble-list item (`world/vendors.md` §5.1
-    /// step 7): the node's inventory for (`npc`, `player` GUID), owned by
-    /// the NPC and made on first use (`0x0063ABD0`), takes the item at the
-    /// first free position of its page (`0x00560200`, no send: the list
-    /// reaches the client by the gamble open's 0x9C action 11). False when
-    /// the page has no room. Recorded: `a2-npc-elzix-gamble` frame 18, the
-    /// 14 items in mode 0 at grid positions (ring at (9, 0)).
-    pub fn gamble_place(&mut self, npc: UnitId, player: u32, item: UnitId) -> bool {
-        let (Some(kind), Some(guid)) =
-            (self.kind_of(npc), self.econ.units.get(npc).map(|r| r.guid))
-        else {
-            return false;
+    /// Runs `f` with the (NPC, player) gamble node's inventory standing in
+    /// for the NPC's own (made on first use), then puts both back.
+    fn with_gamble<T>(&mut self, npc: UnitId, player: u32, f: impl FnOnce(&mut Self) -> T) -> T {
+        if let (Some(kind), Some(r)) = (self.kind_of(npc), self.econ.units.get(npc)) {
+            self.state.add_inventory(npc, kind, r.guid);
+        }
+        let node = match self.state.gamble.remove(&(npc, player)) {
+            Some(n) => n,
+            None => {
+                let own = self.state.inventories.get(&npc);
+                crate::items::inventory::Inventory::new(
+                    npc,
+                    own.map(|i| i.owner_kind)
+                        .unwrap_or(crate::items::inventory::UnitKind::Other),
+                    self.guid_of(npc),
+                )
+            }
         };
-        let mut inv = self
-            .state
-            .gambles
-            .remove(&(npc, player))
-            .unwrap_or_else(|| Inventory::new(npc, kind, guid));
-        let t = self.tables;
-        let item = self.state.items.contains_key(&item).then_some(item);
-        let placed = place_in_page(&mut inv, self, t, item, 0, 0, true, false);
-        self.state.gambles.insert((npc, player), inv);
-        self.sync_out();
-        self.flush_equip();
-        placed
+        let real = self.state.inventories.insert(npc, node);
+        let out = f(self);
+        if let Some(node) = self.state.inventories.remove(&npc) {
+            self.state.gamble.insert((npc, player), node);
+        }
+        if let Some(real) = real {
+            self.state.inventories.insert(npc, real);
+        }
+        out
     }
 
-    /// Unlinks a gamble-list item from the gamble inventory that holds it
-    /// (`0x0063AAF0`), as [`Self::store_unlink`] does for a store item:
-    /// the unlinked item is in mode 4. False when no gamble inventory
-    /// holds it.
-    pub fn gamble_unlink(&mut self, item: UnitId) -> bool {
-        let Some(key) = self
-            .state
-            .gambles
-            .iter()
-            .find(|(_, i)| i.items().contains(&item))
-            .map(|(&k, _)| k)
-        else {
+    /// `0x00560200` into the (NPC, player) gamble node's inventory
+    /// (`vendors.md` §5.1 step 7): mode 0 on its page-0 grid.
+    pub fn gamble_place(&mut self, npc: UnitId, player: u32, item: UnitId) -> bool {
+        self.with_gamble(npc, player, |d| d.place(npc, item, (0, 0), true, false))
+    }
+
+    /// Unlinks a gamble item from its node's inventory.
+    pub fn gamble_unlink(&mut self, npc: UnitId, player: u32, item: UnitId) -> bool {
+        if !self.state.gamble.contains_key(&(npc, player)) {
             return false;
-        };
-        let Some(mut inv) = self.state.gambles.remove(&key) else {
-            return false;
-        };
-        let removed = inv.unlink(self, item);
-        self.state.gambles.insert(key, inv);
-        self.sync_out();
-        self.flush_equip();
-        if removed {
-            let g = self.guid_of(item);
-            self.set_mode(g, mode::CURSOR);
         }
-        removed
+        self.with_gamble(npc, player, |d| d.store_unlink(item))
     }
 
     /// Unlinks a store item from the NPC inventory that holds it (a

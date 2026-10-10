@@ -621,11 +621,10 @@ fn run() -> Transcript {
     assert_eq!(fx.room(), Some(a));
     walks.push(w);
 
-    // 3. Walk to the waypoint object (unit form): the arrival check
-    // (`pathing.md` §9.5 rule 3) stops the player at unit distance 0,
-    // which the waypoint's size (`objects.txt` `SizeX` 5, `path-placement.md`
-    // §3) reaches on (22, 20), short of its cell (as 1.14d's run to stash
-    // 267, `world/objects.md` §7.3).
+    // 3. Walk to the waypoint object (unit form): it stops beside the
+    // object, 2 sub-tiles short (`unit_distance`, `pathing.md` §9.5: a
+    // negative `dist8_unit` entry returns 0 at once; recorded, the stash
+    // run stops at Δ=(2,0); rc-object-approach, gen-obj-267/385).
     let og = fx.guid(wp);
     let w = fx.walk(&bytes(&WalkToUnit { type_: 2, id: og }), 0x02, 30);
     assert_eq!(w.len(), 6);

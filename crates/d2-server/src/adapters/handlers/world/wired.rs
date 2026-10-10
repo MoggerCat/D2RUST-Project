@@ -136,12 +136,9 @@ pub struct WiredWorld<R, S = NoSkills> {
     /// Pick-ups waiting for the player's run to the item to end
     /// (player, item GUID, cursor flag; [`Self::item_arrivals`], REC-281).
     pub(super) item_queued: Vec<(UnitId, u32, bool)>,
-    /// Object cases waiting for the player's run to the object to end
-    /// (player, object GUID; [`Self::object_arrivals`], `objects.md` §7.3
-    /// rule 4).
+    /// The 0x13 object walks waiting for the run to end (player, object
+    /// GUID; [`Self::object_arrivals`], REC-1930).
     pub(super) object_queued: Vec<(UnitId, u32)>,
-    /// An object arrival's 0x13 is running (it walks no further).
-    pub(super) object_arriving: bool,
     /// Ground items picked up by a move call (player, item), whose quest
     /// hook ITEMPICKEDUP (event 4) runs after the tick
     /// ([`Self::run_quest_events`]; PROVISIONAL, REC-1556: the original
@@ -224,7 +221,6 @@ impl<R, S> WiredWorld<R, S> {
             outbox: Vec::new(),
             item_queued: Vec::new(),
             object_queued: Vec::new(),
-            object_arriving: false,
             item_picks: Vec::new(),
             arriving: false,
             start_extra: Vec::new(),
@@ -956,7 +952,24 @@ where
         });
         // The call runs with the inventory lent to the desk (the item
         // services: imbue, `Desk::inv`).
-        let out = self.desk_with(game, events, true, |desk, ctl, _| call.call(ctl, desk));
+        let out = self.desk_with(game, events, true, |desk, ctl, _| {
+            desk.state.defer_chat_end = true;
+            let out = call.call(ctl, desk);
+            desk.state.defer_chat_end = false;
+            out
+        });
+        // The chat-close quest calls ran queued: now on the full quest
+        // world (a quest's chat end may place an object, e.g. Tyrael's
+        // last portal).
+        let (_, sent) = self.desk(game, events, |desk, ctl, inv| {
+            let ends = std::mem::take(&mut desk.state.chat_ends);
+            quest_call(desk, ctl, inv, |q, w| {
+                for (p, n) in ends {
+                    q.npc_deactivate(w, p, n);
+                }
+            })
+        });
+        self.inv_sent.extend(sent);
         let (_, sent) = self.desk(game, events, |desk, _, mut inv| {
             let players = desk.econ.game.lists.units_of_type(UnitType::Player);
             // Cain's identify (C→S 0x34) on the inventory model.
@@ -1040,21 +1053,13 @@ where
         player: UnitId,
         guid: u32,
     ) -> Option<ObjectCase> {
-        let mut out = self.lend_quests(events, |a, ev| {
+        let out = self.lend_quests(events, |a, ev| {
             WorldHost::<D>::objects(a, game, ev, player, guid)
         });
         let sent = self.desk(game, events, quest_objects);
         self.inv_sent.extend(sent);
         let sent = self.take_inventory_sent(game, events);
         self.inv_sent.extend(sent);
-        // §7.3 rule 4: the walk, then result 0 (an arrival walks no
-        // further).
-        if out == Some(ObjectCase::Walk) {
-            if !self.object_arriving {
-                self.start_object_walk(game, events, player, guid);
-            }
-            out = Some(ObjectCase::Code(0));
-        }
         out
     }
 
@@ -1072,6 +1077,9 @@ where
     /// The run to a ground item (§7.1 step 2, REC-281).
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {
         self.start_item_walk(game, events, walk);
+    }
+    fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {
+        self.start_object_walk(game, events, walk);
     }
 
     /// The tick with this world's quest parts lent to the action hooks

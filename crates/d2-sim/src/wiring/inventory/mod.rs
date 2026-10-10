@@ -104,6 +104,10 @@ pub enum InvError {
 #[derive(Debug, Default)]
 pub struct InvState {
     pub inventories: BTreeMap<UnitId, Inventory>,
+    /// The gamble lists' own inventories, one per (NPC, player GUID) node
+    /// (`world/vendors.md` §5.1 step 7: the node's inventory, not the
+    /// NPC's store grid).
+    pub gamble: BTreeMap<(UnitId, u32), Inventory>,
     /// Item data per item unit (§1.1). Mode, item flags, page, GUID and
     /// record are copies of the unit record's and the item store's.
     pub items: BTreeMap<UnitId, InvItem>,
@@ -160,9 +164,6 @@ pub struct InvState {
     /// owner test and swap, [`merc`]); read only here. `None` (the
     /// default): those seams stay the rest's.
     pub hirelings: Option<crate::world::hirelings::HirelingState>,
-    /// The gamble lists' inventories (`world/vendors.md` §5.1 step 7: the
-    /// node's own inventory, owned by the NPC), by (NPC, player GUID).
-    pub gambles: BTreeMap<(UnitId, u32), Inventory>,
 }
 
 impl InvState {

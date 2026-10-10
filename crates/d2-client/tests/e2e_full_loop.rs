@@ -2286,6 +2286,8 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let n = w.len();
     assert!(w[..n - 1].iter().all(|f| f.2 == 3));
+    // The run now stops at distance 0 beside her (Δ=(1,1)), not on her
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
     let stop = (NPC_AT.0 + 1, NPC_AT.1 + 1);
     assert_eq!(w[n - 1], (centre(stop.0), centre(stop.1), 1));
     assert_eq!(fx.pos(player), stop);
@@ -2423,10 +2425,9 @@ fn run_with(game_seed: u32) -> Transcript {
     assert_eq!(fx.stat(player, GOLD), gold_now);
     assert_eq!(fx.inventory(), [fx.buckler, fx.cap, bought]);
 
-    // 14. Walk to the waypoint object (C→S 0x02, type 2): the arrival
-    // check stops the walk at unit distance 0 (`pathing.md` §9.5 rule 3)
-    // with the object's size (`path-placement.md` §3), one sub-tile short
-    // of its cell here (as 1.14d's run to stash 267, `objects.md` §7.3).
+    // 14. Walk to the waypoint object (C→S 0x02, type 2): the walk ends
+    // beside the object at distance 0 (Δ=(0,1) here), not on its
+    // sub-tile (`unit_distance`, `pathing.md` §9.5; rc-object-approach).
     let og = fx.guid(fx.wp_unit);
     let w = walk(
         &mut fx,
@@ -2669,9 +2670,10 @@ fn run_with(game_seed: u32) -> Transcript {
 fn full_single_player_loop() {
     let t = run();
     // Frames per walk / run: 20, 33 and 14 (the runs move at the run
-    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 6 (the
-    // runs to Akara and to the waypoint stop at unit distance 0, short of
-    // the unit's cell, steps 9 and 14); 94 recorded frames, one tick each.
+    // velocity: the run list's stat 67 +50, `pathing.md` §8.2), 6; the
+    // run to Akara and the walk to the waypoint each stop 2 frames short
+    // of the target's sub-tile (rc-object-approach); 94 recorded frames,
+    // one tick each.
     let lens: Vec<usize> = t.walks.iter().map(Vec::len).collect();
     assert_eq!(lens, [20, 33, 14, 6]);
     assert_eq!(t.frames.len(), 94);

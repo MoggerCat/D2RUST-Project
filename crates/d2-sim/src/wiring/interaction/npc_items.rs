@@ -46,9 +46,8 @@ pub trait NpcInventory<H> {
     fn store_place(&mut self, econ: &mut Economy<'_, H>, npc: UnitId, item: UnitId) -> bool;
     /// Unlinks a store item from the NPC grid that holds it.
     fn store_unlink(&mut self, econ: &mut Economy<'_, H>, item: UnitId) -> bool;
-    /// Places a gamble-list item in the (NPC, player GUID) node's
-    /// inventory (`0x00560200`, `vendors.md` §5.1 step 7); false when its
-    /// page has no room.
+    /// Places a gamble list item in the (NPC, player) node's inventory
+    /// (`vendors.md` §5.1 step 7).
     fn gamble_place(
         &mut self,
         econ: &mut Economy<'_, H>,
@@ -56,8 +55,14 @@ pub trait NpcInventory<H> {
         player: u32,
         item: UnitId,
     ) -> bool;
-    /// Unlinks a gamble-list item from the node inventory that holds it.
-    fn gamble_unlink(&mut self, econ: &mut Economy<'_, H>, item: UnitId) -> bool;
+    /// Unlinks a gamble list item from its node's inventory.
+    fn gamble_unlink(
+        &mut self,
+        econ: &mut Economy<'_, H>,
+        npc: UnitId,
+        player: u32,
+        item: UnitId,
+    ) -> bool;
 }
 
 /// [`NpcInventory`] on an [`InvDesk`] for each call.
@@ -83,8 +88,14 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> NpcInventory<H> for NpcInv<'_, R> {
     ) -> bool {
         InvDesk::new(econ, self.tables, self.state, self.rest).gamble_place(npc, player, item)
     }
-    fn gamble_unlink(&mut self, econ: &mut Economy<'_, H>, item: UnitId) -> bool {
-        InvDesk::new(econ, self.tables, self.state, self.rest).gamble_unlink(item)
+    fn gamble_unlink(
+        &mut self,
+        econ: &mut Economy<'_, H>,
+        npc: UnitId,
+        player: u32,
+        item: UnitId,
+    ) -> bool {
+        InvDesk::new(econ, self.tables, self.state, self.rest).gamble_unlink(npc, player, item)
     }
     fn cursor_item(&self, player: UnitId) -> Option<UnitId> {
         self.state.cursor_of(player)
