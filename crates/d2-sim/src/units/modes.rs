@@ -478,15 +478,55 @@ pub const MONSTER_MOVES: [Moves; 16] = [
     Moves::Always,
 ];
 
+/// Event 1 of the trapped soul's per-class A1/A2 record (`0x006E2380`).
+pub const TRAPPED_SOUL_END_A: u32 = 0x005A_8330;
+
+/// Event 1 of the trapped soul's per-class S1/S2 record (`0x006E2390`).
+pub const TRAPPED_SOUL_END_S: u32 = 0x005A_83E0;
+
+/// The per-class records of `0x005A78A0` (§4.6) for a class whose
+/// `SplGetModeChart` is set: `None` → the table's record.
+pub fn class_mode_record(class: u32, mode: u32) -> Option<MonsterModeRecord> {
+    // `0x006E22D0`, `0x006E2360`, `0x006E2370`, `0x006E23A0`: the
+    // A-family record.
+    let attack = MONSTER_MODES[4];
+    match (class, mode) {
+        // diablo, diabloclone, uberdiablo: S4 and S3.
+        (243 | 333 | 705, 10 | 11) => Some(attack),
+        // trappedsoul1: own mode ends.
+        (403, 4 | 5) => Some(MonsterModeRecord {
+            event1: TRAPPED_SOUL_END_A,
+            ..attack
+        }),
+        (403, 8 | 9) => Some(MonsterModeRecord {
+            event1: TRAPPED_SOUL_END_S,
+            ..attack
+        }),
+        // shadowwarrior, shadowmaster: S4.
+        (417 | 418, 11) => Some(attack),
+        // baalthrone, baalcrab, baalclone, uberbaal: S3.
+        (543 | 544 | 570 | 709, 10) => Some(attack),
+        _ => None,
+    }
+}
+
 fn monster_record<H: UnitHooks>(
     sim: &Sim<'_>,
     hooks: &mut H,
     unit: UnitId,
     mode: u32,
 ) -> Option<MonsterModeRecord> {
-    hooks
-        .monster_class_record(sim, unit, mode)
-        .or_else(|| MONSTER_MODES.get(mode as usize).copied())
+    if mode as usize >= MONSTER_MODES.len() {
+        return None;
+    }
+    hooks.monster_class_record(sim, unit, mode).or_else(|| {
+        let class = sim.units.get(unit)?.class;
+        sim.data
+            .monster(class)
+            .filter(|m| m.mode_chart)
+            .and_then(|_| class_mode_record(class, mode))
+            .or(Some(MONSTER_MODES[mode as usize]))
+    })
 }
 
 /// `0x005A6B10`: the mode moves.

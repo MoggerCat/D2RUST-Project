@@ -430,6 +430,7 @@ fn unit_data() -> UnitData {
             enabled: true,
             aidel: [15, 15, 15],
             moves: 1 << 4,
+            mode_chart: false,
         }],
         ..UnitData::default()
     }

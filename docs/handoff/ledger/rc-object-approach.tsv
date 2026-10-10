@@ -1,0 +1,5 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+object.194-stair	entity	world	objects.txt stair (194)	-	none	-	PARTIAL	yes	0	n	-	NO-CHECK	S	gen-obj-194 (traces/checks/gen), OperateFn 47 InitFn 0: state, items and rng equal where compared (state PARTIAL: fields one side does not write; q ignored, REC-1625); fixed by rc-object-approach (REC-1930..1932)
+object.267-bank	entity	world	objects.txt bank (267)	-	none	-	PARTIAL	yes	0	n	-	NO-CHECK	S	gen-obj-267 (traces/checks/gen), OperateFn 32 InitFn 0: state, items and rng equal where compared (state PARTIAL: fields one side does not write; q ignored, REC-1625); fixed by rc-object-approach (REC-1930..1932)
+object.385-dummy	entity	world	objects.txt Dummy (385)	-	none	-	PARTIAL	yes	0	n	-	NO-CHECK	S	gen-obj-385 (traces/checks/gen), OperateFn 3 InitFn 54: state, items and rng equal where compared (state PARTIAL: fields one side does not write; q ignored, REC-1625); fixed by rc-object-approach (REC-1930..1932)

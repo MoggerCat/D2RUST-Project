@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–293 |
-|   2. Think dispatch `0x005B1740` | 294–433 |
-|   3. AI control and AI tables | 434–605 |
-|   4. AI parameters | 606–624 |
-|   5. Target selection | 625–961 |
-|   6. Distances and line tests | 962–977 |
-|   7. Tactics helpers | 978–1223 |
-|   8. AI commands and minions | 1224–1250 |
-|   10. The catalogue `ai-functions.tsv` | 1251–1271 |
-| Constants & data dependencies | 1272–1295 |
-| Randomness | 1296–1325 |
-| Edge cases & original bugs | 1326–1367 |
-| Test vectors | 1368–1456 |
-| Provenance | 1457–1518 |
-| Open questions | 1519–1625 |
+|   1. Think scheduling | 97–298 |
+|   2. Think dispatch `0x005B1740` | 299–438 |
+|   3. AI control and AI tables | 439–610 |
+|   4. AI parameters | 611–629 |
+|   5. Target selection | 630–966 |
+|   6. Distances and line tests | 967–982 |
+|   7. Tactics helpers | 983–1228 |
+|   8. AI commands and minions | 1229–1255 |
+|   10. The catalogue `ai-functions.tsv` | 1256–1276 |
+| Constants & data dependencies | 1277–1300 |
+| Randomness | 1301–1330 |
+| Edge cases & original bugs | 1331–1372 |
+| Test vectors | 1373–1461 |
+| Provenance | 1462–1523 |
+| Open questions | 1524–1630 |
 <!-- /index -->
 
 ## Summary
@@ -203,7 +203,12 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   1)`); same freeze gate, then the think (`0x005A80C5`–`0x005A80F5`); a
   matching class whose mode does not match falls to the table test;
 - every other case requests a mode change to neutral (which schedules
-  through §1.3).
+  through §1.3). The request's target is the path's current target unit
+  (`0x00553540`: none when it is the unit itself), so a unit without one
+  (the Hydras, whose path never had a target unit) makes the request
+  point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
+  `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
+  `0x005A8100`–`0x005A8140`).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).

@@ -155,6 +155,20 @@ pub trait MonsterWorld<X> {
         let _ = (sim, h, room, x, y, class, mode);
         None
     }
+    /// The random boss `0x005A43E0(room, 0, class, champion allowed, 0,
+    /// 0, warp check)` (`monsters/population.md` §6.2) on the lent
+    /// world: the boss with its modifiers and minions. `None`: the world
+    /// cannot run it; `Some(None)`: nothing made.
+    fn spawn_random_boss(
+        &mut self,
+        sim: &mut Sim<'_>,
+        h: &mut ActionHooks<X>,
+        room: RoomId,
+        class: i32,
+    ) -> Option<Option<UnitId>> {
+        let _ = (sim, h, room, class);
+        None
+    }
     /// The concrete state back (the lender downcasts it).
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }

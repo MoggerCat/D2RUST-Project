@@ -189,6 +189,10 @@ pub enum ObjectCase {
     /// Operate 23: the caller runs `waypoints.md` §5.2 (the waypoint
     /// tables live with the host); then result 0.
     Waypoint(Operate),
+    /// Not in interact range or the line blocked (`objects.md` §7.3 rule
+    /// 4): the caller runs the player to this object (`0x00548A50`) and
+    /// repeats the case on arrival; result 0.
+    Walk(UnitId),
 }
 
 /// The object code's view of a game.
@@ -615,6 +619,58 @@ impl<X: Pending> View<'_, X> {
         log(self, r)
     }
 
+    /// The reach steps of the C→S 0x13 object case (`objects.md` §7.3
+    /// rules 3–4, `0x00548B00` case 2): the unit distance
+    /// (`0x00641530`) > 50 → too far; the interact range
+    /// ([`View::object_in_reach`], `0x00623660`) false or the line test
+    /// `0x00622B50(P, O, 0x804)` blocked → walk; else operate. `None`
+    /// without the path provider (the host's seams decide).
+    fn object_reach(&self, game: &Game, player: UnitId, object: UnitId) -> Option<ObjectReach> {
+        let paths = self.h.paths.as_ref()?;
+        let pt = |u: UnitId| {
+            let (x, y) = self.h.path_position(u);
+            crate::path::Point { x, y }
+        };
+        let dist = crate::path::walk::geom::unit_distance(
+            &paths.tables,
+            pt(player),
+            self.path_size(player),
+            pt(object),
+            self.path_size(object),
+        );
+        if dist > 50 {
+            return Some(ObjectReach::TooFar);
+        }
+        if !self.object_in_reach(player, object, dist) {
+            return Some(ObjectReach::Walk);
+        }
+        let blocked = self.units_line_blocked(game, player, object, 0x804)?;
+        Some(if blocked {
+            ObjectReach::Walk
+        } else {
+            ObjectReach::Operate
+        })
+    }
+
+    /// `0x00623660(P, O)` (`objects.md` §7.3 rule 4): `dist` is the unit
+    /// distance. Distance 0 → in range. Else P's position against O's
+    /// box, the position minus half the sizes (`SizeX` × `SizeY`, integer
+    /// halves): an empty box (a size < 1) takes ±1 around the point; else
+    /// the box plus 2 on every side, with the four corner cells of that
+    /// ring cut off (P's size is then 2, never above it).
+    fn object_in_reach(&self, player: UnitId, object: UnitId, dist: i32) -> bool {
+        if dist == 0 {
+            return true;
+        }
+        let (px, py) = self.h.path_position(player);
+        let (ox, oy) = self.h.path_position(object);
+        let (w, h) = match self.path_shape(object) {
+            Some(crate::path::record::UnitShape::Object(o)) => (o.size_x as i32, o.size_y as i32),
+            _ => (0, 0),
+        };
+        in_reach_box((px, py), (ox, oy), (w, h), self.path_size(player))
+    }
+
     /// The C→S 0x13 object case `0x00548B00` (`waypoints.md` §5.2) for
     /// `player` and the object with `guid`: object missing → 1; mode ≥ 8
     /// → 3; [`Pending::object_approach`] (distance > 50 → 1; walk); in
@@ -637,27 +693,30 @@ impl<X: Pending> View<'_, X> {
         if self.units.get(object).map_or(0, |r| r.mode) >= u32::from(objects::MODE_BOUND) {
             return Some(ObjectCase::Code(3));
         }
-        let reach = match self.h.x.object_preview_range() {
-            Some(r) => {
-                // d2rs-own, unverified: the preview's reach test.
-                let d = {
-                    let (px, py) = self.h.path_position(player);
-                    let (ox, oy) = self.h.path_position(object);
-                    (px - ox).abs().max((py - oy).abs())
-                };
-                if d > 50 {
-                    ObjectReach::TooFar
-                } else if d > r {
-                    ObjectReach::Walk
-                } else {
-                    ObjectReach::Operate
+        let reach = match self.object_reach(game, player, object) {
+            Some(r) => r,
+            None => match self.h.x.object_preview_range() {
+                Some(r) => {
+                    // d2rs-own, unverified: the preview's reach test.
+                    let d = {
+                        let (px, py) = self.h.path_position(player);
+                        let (ox, oy) = self.h.path_position(object);
+                        (px - ox).abs().max((py - oy).abs())
+                    };
+                    if d > 50 {
+                        ObjectReach::TooFar
+                    } else if d > r {
+                        ObjectReach::Walk
+                    } else {
+                        ObjectReach::Operate
+                    }
                 }
-            }
-            None => self.h.x.object_approach(game, player, object),
+                None => self.h.x.object_approach(game, player, object),
+            },
         };
         match reach {
             ObjectReach::TooFar => return Some(ObjectCase::Code(1)),
-            ObjectReach::Walk => return Some(ObjectCase::Code(0)),
+            ObjectReach::Walk => return Some(ObjectCase::Walk(object)),
             ObjectReach::Operate => {}
         }
         let (result, d) = self.operate_object(game, Some(player), guid)?;
@@ -724,6 +783,33 @@ impl<X: Pending> View<'_, X> {
         let st = self.h.objects.as_ref()?;
         let class = st.control.data.get(&door)?.class;
         st.tables.object(class).ok().map(|o| o.monsterok != 0)
+    }
+}
+
+/// The box test of `0x00623660` (`objects.md` §7.3 rule 4) for a player at
+/// `p` (size `psize`) and an object at `o` of size `w` × `h`, the unit
+/// distance being nonzero. The box corner is `o` minus half the size
+/// (integer halves). An empty box (w or h < 1) takes ±1 around the corner
+/// point; else the box plus 2 on every side, and a player of size ≤ 2
+/// loses the four corner cells of that ring (the rows above and below the
+/// box keep x within ±1 of it).
+pub fn in_reach_box(p: (i32, i32), o: (i32, i32), size: (i32, i32), psize: i32) -> bool {
+    let (w, h) = size;
+    let (ox, oy) = (o.0 - w / 2, o.1 - h / 2);
+    let (px, py) = p;
+    if w < 1 || h < 1 {
+        return px >= ox - 1 && px <= ox + 1 && py >= oy - 1 && py <= oy + 1;
+    }
+    if px < ox - 2 || px > ox + w + 2 || py < oy - 2 || py > oy + h + 2 {
+        return false;
+    }
+    if psize > 2 {
+        return true;
+    }
+    if py < oy - 1 || py > oy + h + 1 {
+        px >= ox - 1 && px <= ox + w + 1
+    } else {
+        true
     }
 }
 
