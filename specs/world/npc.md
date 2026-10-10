@@ -33,21 +33,21 @@
 | Outputs / state changes | 78–85 |
 | Rules | 86–87 |
 |   1. NPC control and records | 88–142 |
-|   2. Starting an interaction (C→S 0x13) | 143–245 |
-|   3. Chat open and close (C→S 0x2F, 0x30) | 246–284 |
-|   4. Menu actions (C→S 0x38) | 285–343 |
-|   5. Healing on chat open | 344–379 |
-|   6. Cain identify (C→S 0x34) | 380–408 |
-|   7. Mercenaries | 409–532 |
-|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 533–612 |
-|   9. S→C 0x2A NPC transaction (15 bytes) | 613–646 |
-|   10. Dead code in 1.14d (no caller, no pointer reference) | 647–658 |
-| Constants & data dependencies | 659–671 |
-| Randomness | 672–684 |
-| Edge cases & original bugs | 685–760 |
-| Test vectors | 761–784 |
-| Provenance | 785–835 |
-| Open questions | 836–894 |
+|   2. Starting an interaction (C→S 0x13) | 143–259 |
+|   3. Chat open and close (C→S 0x2F, 0x30) | 260–298 |
+|   4. Menu actions (C→S 0x38) | 299–357 |
+|   5. Healing on chat open | 358–393 |
+|   6. Cain identify (C→S 0x34) | 394–422 |
+|   7. Mercenaries | 423–546 |
+|   8. NPC services (C→S 0x38, action ∉ {1, 2, 3}) | 547–626 |
+|   9. S→C 0x2A NPC transaction (15 bytes) | 627–660 |
+|   10. Dead code in 1.14d (no caller, no pointer reference) | 661–672 |
+| Constants & data dependencies | 673–685 |
+| Randomness | 686–698 |
+| Edge cases & original bugs | 699–774 |
+| Test vectors | 775–798 |
+| Provenance | 799–849 |
+| Open questions | 850–908 |
 <!-- /index -->
 
 ## Summary
@@ -217,12 +217,26 @@ Recorded order in one frame: 0x27, 0x29, 0x28 (frames 746, 798, 1464,
 
 Entry order of the 0x27 list (recorded 2026-10-09,
 `items-vendor-akara-buy` frame 15, Akara): `(0, 64), (0, 11)` where the
-quest dispatch adds 11, then 64, i.e. newest first. d2rs reads the add
-`0x006612F0` as a prepend (as the client's build `0x00661510`,
-`client/msg-ui.md` §16 r9) and the writer `0x00661480` as a walk from
-the head. PROVISIONAL (REC-1401): one recording with two entries from
-two records; a list with two entries of one table would tell a prepend
-from a reversed dispatch.
+quest dispatch adds 11, then 64, i.e. newest first. Settled from the
+binary (REC-1401; 1.14d-confirmed `0x006612F0`, `0x00661480`, read
+2026-10-10, PC 1 today):
+
+- Text list: u16 count at +0x04, head pointer at +0x08. Node (file
+  `Text.cpp` line 90): u16 string id at +0x00, u32 kind at +0x04, next
+  at +0x08.
+- Add `0x006612F0(list, u16 string, u32 kind)`: new node, next := the
+  old head, head := node, count + 1. A **prepend**; no draw, no sort,
+  no duplicate test.
+- Writer `0x00661480(list, out)`: zero 34 bytes; byte 0 := the low byte
+  of the count; walk from the **head** along next, entry k (from 0):
+  byte 2 + 4k := low byte of kind, u16 at 4 + 4k := string id. Bytes 1
+  and 3 + 4k stay 0. Entries 0..7 fit (the last u16 ends at byte 33); a
+  ninth node is fatal (assert line 248), so 8 entries are written
+  without error and the count byte is not clamped. A null list or out
+  is fatal (lines 237, 238).
+
+So the 0x27 list is always newest-added first, whichever records or
+table rows added the entries; the dispatch order is `quests.md` §7.1.
 
 **Call forms** (2026-10-09, static asm; used by `tools/poke.md` §4
 rule 10). All run on the game thread and return with the stack popped

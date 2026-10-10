@@ -1,0 +1,3 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+monster.baboon6	entity	monsters	monstats.txt baboon6 (hcIdx 295)	-	none	gen-mon-295	PARTIAL	yes	0	n	claude/rc-mon-hit-after	EQUAL	-	rc-mon-hit-after: state 150/150, rng MATCH 133/133 (PARTIAL only for run gaps); cold list remove callback 0x0057AD80 refreshes the anim rate

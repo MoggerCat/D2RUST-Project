@@ -31,37 +31,37 @@
 | Outputs / state changes | 90–96 |
 | Rules | 97–98 |
 |   1. Scope and order | 99–134 |
-|   2. Shared pet helpers | 135–243 |
-|   3. NecroPet (67) `0x005E4CF0` | 244–292 |
-|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 293–312 |
-|   5. Towner (41) `0x005E7540` | 313–326 |
-|   6. EvilHole (76) `0x005FB410` | 327–354 |
-|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 355–475 |
-|   8. QuillMother (75) `0x005FB2A0` | 476–490 |
-|   9. BaalTentacle (139) `0x005EF820` | 491–514 |
-|   10. ElementalBeast (46) `0x005F6B70` | 515–533 |
-|   11. NpcStationary (54) `0x005E73A0` | 534–561 |
-|   12. MosquitoNest (83) `0x005E0260` | 562–579 |
-|   13. DesertTurret (94) `0x005E0980` | 580–620 |
-|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 621–655 |
-|   15. Catapult (123) `0x005E34C0` | 656–660 |
-|   16. CatapultSpotter (126) `0x005EE040` | 661–699 |
-|   17. Tentacle (56) `0x005F8F80` | 700–724 |
-|   18. TentacleHead (57) `0x005F9270` | 725–742 |
-|   19. Hydra (86) `0x005E9E60` | 743–753 |
-|   20. Totem (109) `0x005ED9E0` | 754–774 |
-|   21. Vendor (42) `0x005E9E00` | 775–780 |
-|   22. Trap-Missile (77) `0x005FB5B0` | 781–793 |
-|   23. TrappedSoul (99) `0x005E9F10` | 794–810 |
-|   24. DruidWolf (108) `0x005ED710` | 811–893 |
-|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 894–924 |
-|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 925–945 |
-| Constants & data dependencies | 946–970 |
-| Randomness | 971–979 |
-| Edge cases & original bugs | 980–997 |
-| Test vectors | 998–1022 |
-| Provenance | 1023–1049 |
-| Open questions | 1050–1058 |
+|   2. Shared pet helpers | 135–246 |
+|   3. NecroPet (67) `0x005E4CF0` | 247–295 |
+|   4. MinionSpawner (121) `0x005E2BD0`, init `0x005F6630` | 296–315 |
+|   5. Towner (41) `0x005E7540` | 316–329 |
+|   6. EvilHole (76) `0x005FB410` | 330–357 |
+|   7. Hireable (61) `0x005E52D0`, alternate `0x005E5280` | 358–478 |
+|   8. QuillMother (75) `0x005FB2A0` | 479–493 |
+|   9. BaalTentacle (139) `0x005EF820` | 494–517 |
+|   10. ElementalBeast (46) `0x005F6B70` | 518–536 |
+|   11. NpcStationary (54) `0x005E73A0` | 537–564 |
+|   12. MosquitoNest (83) `0x005E0260` | 565–582 |
+|   13. DesertTurret (94) `0x005E0980` | 583–623 |
+|   14. AssassinSentry (101) `0x005EA3D0`, init `0x005EA290` | 624–658 |
+|   15. Catapult (123) `0x005E34C0` | 659–663 |
+|   16. CatapultSpotter (126) `0x005EE040` | 664–702 |
+|   17. Tentacle (56) `0x005F8F80` | 703–727 |
+|   18. TentacleHead (57) `0x005F9270` | 728–745 |
+|   19. Hydra (86) `0x005E9E60` | 746–756 |
+|   20. Totem (109) `0x005ED9E0` | 757–777 |
+|   21. Vendor (42) `0x005E9E00` | 778–783 |
+|   22. Trap-Missile (77) `0x005FB5B0` | 784–796 |
+|   23. TrappedSoul (99) `0x005E9F10` | 797–813 |
+|   24. DruidWolf (108) `0x005ED710` | 814–896 |
+|   25. CycleOfLife (111) `0x005EC8C0`, init `0x005EC6A0` | 897–927 |
+|   26. NpcBarb (127) `0x005EDC50`, init `0x005EDC40` | 928–948 |
+| Constants & data dependencies | 949–973 |
+| Randomness | 974–982 |
+| Edge cases & original bugs | 983–1000 |
+| Test vectors | 1001–1025 |
+| Provenance | 1026–1052 |
+| Open questions | 1053–1061 |
 <!-- /index -->
 
 ## Summary
@@ -233,7 +233,10 @@ search has its own (`ai.md` open question 4).
    k := 0. The coordinate index at O's position ≠ the one at U's → k
    := 1. D > R → k := 1. D > 50 → k := 3. Path distance from **U** to
    O's last placed point (player data +0x148, +0x14C; unsigned) < 28:
-   k = 1 and D < 30 → k := 4; k = 2 → k := 4.
+   k = 1 and D < 30 → k := 4; k = 2 → k := 4. The point is set only
+   for 50 frames after a placement of O and is (0, 0) otherwise
+   (`sim/path-placement.md` §10 rule 6), so outside that window this
+   test never holds on a real map.
 5. quiet ≠ 0 and k = 2 → return 0. Else pet move k (run 0, speed 0, n
    := R).
 

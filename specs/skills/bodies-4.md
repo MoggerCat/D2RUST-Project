@@ -23,14 +23,14 @@
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
 |   2. Shared helpers, batch 4 (continued) | 68–198 |
-|   3. Bodies used by one monster skill (continued) | 199–526 |
-|   4. Bodies used by no monster skill row | 527–655 |
-| Constants & data dependencies | 656–667 |
-| Randomness | 668–683 |
-| Edge cases & original bugs | 684–716 |
-| Test vectors | 717–727 |
-| Provenance | 728–738 |
-| Open questions | 739–760 |
+|   3. Bodies used by one monster skill (continued) | 199–531 |
+|   4. Bodies used by no monster skill row | 532–660 |
+| Constants & data dependencies | 661–672 |
+| Randomness | 673–688 |
+| Edge cases & original bugs | 689–721 |
+| Test vectors | 722–732 |
+| Provenance | 733–743 |
+| Open questions | 744–765 |
 <!-- /index -->
 
 ## Summary
@@ -230,6 +230,11 @@ The bite count depends only on the two GUIDs and the formulas.
    reaction `0x0057CEE0(game, unit, K, record)`.
 8. n − 1 > 0: E param 1 := n − 1; frame event index := `Param1`; frame
    count := (count & ~0xFF) + 0x100 (the bite repeats). Return 1.
+   For a monster in a sequence (`mode 14`, Mosquito) unit +0x38 is the
+   sequence position (`sim/units.md` §4.2 rule 3), so storing the event index
+   (`0x006212C0`: +0x38 := (+0x38 & 0xFF) + `Param1` · 0x100) rewinds the
+   sequence to frame `Param1`; the next advance shows frame `Param1` + 1
+   (1.14d: frame 17 → 13 with `Param1` 12, `gen-monskill-206`).
 
 #### 3.3 srvdo 112 MonCurseCast `0x005CE2B0`
 

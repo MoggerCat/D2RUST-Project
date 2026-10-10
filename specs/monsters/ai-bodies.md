@@ -14,7 +14,7 @@
 |---|---|
 | Summary | 20–26 |
 | Rules | 27–28 |
-|   9. Per-AI behaviours | 29–1029 |
+|   9. Per-AI behaviours | 29–1039 |
 <!-- /index -->
 
 ## Summary
@@ -977,6 +977,16 @@ one the town checks meet, `gen-wp-18` frame 37). It is GoodNpcRanged
 with the unit's seed pointer at unit +0x20, `0x0045C390` is `roll`).
 Measured: with it `gen-wp-18` leaves frame 37 (class 359 seed) and first
 differs at frame 153 (class 245 `tx`, another cause).
+
+Re-read 2026-10-10 (PC 1 today, asm `0x005E7C10`–`0x005E7D25`): no
+difference from steps 1–3 (`0x005E7C24` mode test, `0x005E7C47` town
+jump to the step-3 draw at `0x005E7CCD`, `0x005E7C7D` `cmp 0x50`,
+`0x005E7C9E` `cmp 0x1E`, `0x005E7CFD` `cmp 0x14`). Recorded vector
+(`traces/orig-cache/gen-wp-18`, act3hire g 6 at (5146, 5060) in Kurast
+Docks, so step 2 is skipped): frame 37 one draw `lo' % 100` = 34 → idle
+10; frame 47 one draw = 20 (not < 20) → idle 10; frame 57 draw = 13 →
+wander 5 with its four draws (`ai.md` §7.2), mode 2 toward (5142,
+5058); frame 71 the walk-end think draws 91 → idle 10.
 
 #### 9.32 NpcOutOfTown (31) `0x005E7880`
 

@@ -78,9 +78,13 @@ milestone nihlathak-killed
   deadline 1000
   poke 5 warp 124
   poke 20 goto preset 124 1:526
-  poke 100 pos @1:526 @x+3 @y
-  poke 100 stat @1:526 6 0 256
-  poke 110 missile 58 @x @y @x+3 @y skill 36 1
+  # The goto preset drops the 109-hp player inside Nihlathak's 30-monster
+  # group, which kills them at about frame 75 (the d2rs run; a 109-hp player among 30 attackers), so he is
+  # moved to open ground south of the group (absolute level 124 sub-tiles)
+  # and the bolt starts 8 sub-tiles beyond him, before the group strikes.
+  poke 50 pos @1:526 12705 5032
+  poke 50 stat @1:526 6 0 256
+  poke 52 missile 58 12705 5040 12705 5032 skill 36 1
   need ever unit ut 1 cl 526 killed
 
 milestone arreat-summit
