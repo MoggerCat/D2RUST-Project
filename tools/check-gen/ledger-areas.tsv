@@ -2636,6 +2636,80 @@ object.preset.579.presetshrine	objects.txt preset fn 579 @0x0054F0D0 (- rows)
 object.preset.580.specialchest	objects.txt preset fn 580 @0x0054F370 (- rows)
 object.preset.581.presetchest	objects.txt preset fn 581 @0x0054F180 (- rows)
 object.preset.582.arcanesymbol	objects.txt preset fn 582 @0x0054F430 (- rows)
+system.formats.d2s.2-header-335-bytes	specs/formats/d2s.md §2. Header (335 bytes)
+system.formats.d2s.3-checksum-0x00411130	specs/formats/d2s.md §3. Checksum (`0x00411130`)
+system.formats.d2s.4-quest-section-298-bytes-at-0x14f	specs/formats/d2s.md §4. Quest section (298 bytes at 0x14F)
+system.formats.d2s.5-waypoint-section-80-bytes-at-0x279	specs/formats/d2s.md §5. Waypoint section (80 bytes at 0x279)
+system.formats.d2s.6-npc-flag-section-52-bytes-at-0x2c9	specs/formats/d2s.md §6. NPC flag section (52 bytes at 0x2C9)
+system.formats.d2s.7-stats-and-skills	specs/formats/d2s.md §7. Stats and skills
+system.formats.d2s.8-item-sections	specs/formats/d2s.md §8. Item sections
+system.formats.animdata.1-source-file	specs/formats/animdata.md §1. Source file
+system.formats.animdata.2-layout	specs/formats/animdata.md §2. Layout
+system.formats.animdata.3-default-record	specs/formats/animdata.md §3. Default record
+system.formats.animdata.4-name-lookup-0x0066a8f0	specs/formats/animdata.md §4. Name lookup (`0x0066A8F0`)
+system.formats.animdata.5-record-by-unit-class-and-mode-0x0066a9b0	specs/formats/animdata.md §5. Record by unit, class and mode (`0x0066A9B0`)
+system.formats.animdata.6-info-query-0x0066aa80	specs/formats/animdata.md §6. Info query (`0x0066AA80`)
+system.formats.animdata.7-speed-setter-debug	specs/formats/animdata.md §7. Speed setter (debug)
+system.formats.cof.frame-events-and-draw-order	specs/formats/cof.md §Frame events and draw order
+system.formats.cof.header-28-bytes	specs/formats/cof.md §Header (28 bytes)
+system.formats.cof.layer-records-l-9-bytes	specs/formats/cof.md §Layer records (`L` × 9 bytes)
+system.formats.d2s-appearance.1-the-token-table-0x0063d710-built-on-first-use	specs/formats/d2s-appearance.md §1. The token table (`0x0063D710`, built on first use)
+system.formats.d2s-appearance.2-token-lookup-0x0063d900	specs/formats/d2s-appearance.md §2. Token lookup (`0x0063D900`)
+system.formats.d2s-appearance.3-the-fill-0x0063e510-player-components-colours	specs/formats/d2s-appearance.md §3. The fill (`0x0063E510`(player, components, colours))
+system.formats.d2s-appearance.4-helm-and-hand-items-0x0063da70	specs/formats/d2s-appearance.md §4. Helm and hand items (`0x0063DA70`)
+system.formats.d2s-appearance.5-body-armour-composite-branch-of-0x0063e510	specs/formats/d2s-appearance.md §5. Body armour (composite branch of `0x0063E510`)
+system.formats.d2s-appearance.6-colour-byte-0x0062c100-player-item-byte-0	specs/formats/d2s-appearance.md §6. Colour byte (`0x0062C100`(player, item, &byte, 0))
+system.formats.d2s-legacy.1-dispatch-and-order-0x00534330-0x00534020	specs/formats/d2s-legacy.md §1. Dispatch and order (`0x00534330`, `0x00534020`)
+system.formats.d2s-legacy.10-hireling-0x00533c70	specs/formats/d2s-legacy.md §10. Hireling (`0x00533C70`)
+system.formats.d2s-legacy.11-trailing-block-0x00533f70	specs/formats/d2s-legacy.md §11. Trailing block (`0x00533F70`)
+system.formats.d2s-legacy.12-post-load-0x00534020-tail	specs/formats/d2s-legacy.md §12. Post-load (`0x00534020` tail)
+system.formats.d2s-legacy.2-header-130-bytes-0x00532690	specs/formats/d2s-legacy.md §2. Header (130 bytes, `0x00532690`)
+system.formats.d2s-legacy.3-quests-0x00532be0	specs/formats/d2s-legacy.md §3. Quests (`0x00532BE0`)
+system.formats.d2s-legacy.4-waypoints-0x00532c70	specs/formats/d2s-legacy.md §4. Waypoints (`0x00532C70`)
+system.formats.d2s-legacy.5-npc-flags-0x00532d00	specs/formats/d2s-legacy.md §5. NPC flags (`0x00532D00`)
+system.formats.d2s-legacy.6-stats-0x00532da0	specs/formats/d2s-legacy.md §6. Stats (`0x00532DA0`)
+system.formats.d2s-legacy.7-skills-0x00532e90	specs/formats/d2s-legacy.md §7. Skills (`0x00532E90`)
+system.formats.d2s-legacy.8-player-items-0x005337f0	specs/formats/d2s-legacy.md §8. Player items (`0x005337F0`)
+system.formats.d2s-legacy.9-corpses-0x005339a0	specs/formats/d2s-legacy.md §9. Corpses (`0x005339A0`)
+system.formats.d2s-load.1-new-character-start-0x00569f80	specs/formats/d2s-load.md §1. New-character start (`0x00569F80`)
+system.formats.d2s-load.2-load-effects-0x0056b180	specs/formats/d2s-load.md §2. Load effects (`0x0056B180`)
+system.formats.d2s-load.3-join-after-the-load-iron-golem-re-summon-0x005	specs/formats/d2s-load.md §3. Join after the load: Iron Golem re-summon (`0x005394A0`)
+system.formats.d2s-load.4-hotkey-and-mouse-skill-item-indices-after-a-re	specs/formats/d2s-load.md §4. Hotkey and mouse-skill item indices after a reload
+system.formats.d2s-load.5-load-failure-result-codes-and-the-message-show	specs/formats/d2s-load.md §5. Load failure: result codes and the message shown
+system.formats.d2s-load.6-runeword-items-that-no-longer-match-0x00563470	specs/formats/d2s-load.md §6. Runeword items that no longer match (`0x00563470`)
+system.formats.d2s-load.7-map-seed-restore-in-single-player	specs/formats/d2s-load.md §7. Map seed restore in single player
+system.formats.d2s-load.8-player-record-values-sent-at-the-join-sim-inte	specs/formats/d2s-load.md §8. Player-record values sent at the join (`sim/intents-events.md` §8.2 rule 3)
+system.formats.d2s.1-file-layout-and-framing	specs/formats/d2s.md §1. File layout and framing
+system.formats.d2s.10-errors	specs/formats/d2s.md §10. Errors
+system.formats.d2s.9-load-sequence-0x0056b180	specs/formats/d2s.md §9. Load sequence (`0x0056B180`)
+system.formats.dc6.file-header-24-bytes	specs/formats/dc6.md §File header (24 bytes)
+system.formats.dc6.frame	specs/formats/dc6.md §Frame
+system.formats.dc6.pixel-decoding	specs/formats/dc6.md §Pixel decoding
+system.formats.dc6.placement-informational	specs/formats/dc6.md §Placement (informational)
+system.formats.dcc.bit-reading	specs/formats/dcc.md §Bit reading
+system.formats.dcc.boxes	specs/formats/dcc.md §Boxes
+system.formats.dcc.cells	specs/formats/dcc.md §Cells
+system.formats.dcc.coded-bytes	specs/formats/dcc.md §Coded bytes
+system.formats.dcc.direction-header-bits	specs/formats/dcc.md §Direction header (bits)
+system.formats.dcc.end-checks	specs/formats/dcc.md §End checks
+system.formats.dcc.file-header-little-endian-bytes	specs/formats/dcc.md §File header (little-endian bytes)
+system.formats.dcc.frame-size-limit	specs/formats/dcc.md §Frame size limit
+system.formats.dcc.stage-1-cell-colors-all-frames-in-order	specs/formats/dcc.md §Stage 1: cell colors (all frames, in order)
+system.formats.dcc.stage-2-building-frames-all-frames-in-order-afte	specs/formats/dcc.md §Stage 2: building frames (all frames, in order, after stage 1)
+system.formats.dt1.block-header-20-bytes-each-at-the-tile-s-block-h	specs/formats/dt1.md §Block header (20 bytes each, at the tile's block headers offset)
+system.formats.dt1.block-pixels	specs/formats/dt1.md §Block pixels
+system.formats.dt1.file-header-276-bytes	specs/formats/dt1.md §File header (276 bytes)
+system.formats.dt1.tile-header-96-bytes-each-consecutive	specs/formats/dt1.md §Tile header (96 bytes each, consecutive)
+system.formats.dt1.unknown-and-runtime-fields	specs/formats/dt1.md §Unknown and runtime fields
+system.formats.font-tbl.glyph-records-14-bytes-each	specs/formats/font-tbl.md §Glyph records (14 bytes each)
+system.formats.font-tbl.header-12-bytes	specs/formats/font-tbl.md §Header (12 bytes)
+system.formats.palette.dat-palette	specs/formats/palette.md §.dat palette
+system.formats.palette.pl2-palette-transform	specs/formats/palette.md §.pl2 palette transform
+system.formats.wav.1-header	specs/formats/wav.md §1. Header
+system.formats.wav.2-chunk-walk-no-pad-bytes	specs/formats/wav.md §2. Chunk walk (no pad bytes)
+system.formats.wav.3-samples	specs/formats/wav.md §3. Samples
+system.formats.wav.4-format-checks-by-the-game	specs/formats/wav.md §4. Format checks by the game
+system.formats.wav.5-decoder-hook-d2rs	specs/formats/wav.md §5. Decoder hook (d2rs)
 skill.monster.baal-taunt	skills.txt Baal Taunt (284) monster
 skill.monster.bestow	skills.txt Bestow (182) monster
 skill.monster.blood-mana	skills.txt Blood Mana (310) monster

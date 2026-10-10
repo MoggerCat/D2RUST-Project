@@ -14,6 +14,7 @@ behaviors the engine reproduces exactly.
 
 | Decision | Choice | Notes |
 |---|---|---|
+| Coverage rows (`cov.*`) | Checked against the 1.14d data tables, no written spec needed (owner decision, 2026-10-10) | The value d2rs uses (the record `d2-data` compiles from the table's `.txt`) is compared with the shipped `.bin` record for the same table row, every byte; EQUAL only when the whole record is identical (`tools/coord/cov_tables.py`, `data-tool cov-records`). Rows with no data table (quest flags/slots) and rows a behaviour check already marks DIVERGED are left to their own checks. |
 | Target version | 1.14d | Changed from 1.10f on 2026-10-05: 1.14d is the version owned. D2MOO (1.10f) is used as a guide; every behavior is confirmed against 1.14d. |
 | RE tooling | Ghidra 12.1.4 on Temurin JDK 21, run headless | Scripts in `tools/ghidra/` (ours, committed); project and exports in `re/` (gitignored). Ghidra 12.1.x doesn't work on JDK 25. |
 | Format parsers are strict | Odd files are investigated, not tolerated | A failing file is checked against the level tables. Unused leftovers go in the survey's documented `KNOWN_UNUSED` list (with spec notes). Live data quirks become spec rules (e.g. DS1 truncated groups). |

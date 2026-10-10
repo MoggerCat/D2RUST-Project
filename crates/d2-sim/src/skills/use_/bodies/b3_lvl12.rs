@@ -287,7 +287,9 @@ pub fn charge<W: BodyWorld>(
             convert(w, t, u, &mut record, skill, lvl);
             roll_elemental(w, t, u, &mut record, skill, lvl);
             if monster {
-                let m = match base_id(w, ct, u) {
+                // The class itself (`0x00463900`), not its `BaseId`: a clawviper6
+                // charges with A1 (REC-2358).
+                let m = match w.class_id(u) {
                     73 => 8,
                     211 | 436 => 5,
                     _ => 4,

@@ -580,7 +580,7 @@ impl<X: Pending> MissileHooks for View<'_, X> {
 /// grids, unit records, and the area hit on the combat view. The area
 /// scan has no provider here ([`Pending::missile_area_units`]).
 impl<X: Pending> crate::missiles::MissileBodies for View<'_, X> {
-    /// Max life `0x00625D10` (`missiles/bodies-2.md` §41 heals up to it).
+    /// Max life `0x00625D10` (the heal of server-hit 31 reads it).
     fn max_life(&self, unit: UnitId) -> i32 {
         self.stats.max_life(unit)
     }

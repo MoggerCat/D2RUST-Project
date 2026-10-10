@@ -28,13 +28,13 @@
 |   2. Shared helpers, batch 3 | 75–733 |
 |   3. Bodies, required level 1 | 734–918 |
 |   4. Bodies, required level 6 | 919–1130 |
-|   5. Bodies, required level 12 | 1131–1306 |
-| Constants & data dependencies | 1307–1341 |
-| Randomness | 1342–1380 |
-| Edge cases & original bugs | 1381–1450 |
-| Test vectors | 1451–1488 |
-| Provenance | 1489–1508 |
-| Open questions | 1509–1547 |
+|   5. Bodies, required level 12 | 1131–1309 |
+| Constants & data dependencies | 1310–1344 |
+| Randomness | 1345–1383 |
+| Edge cases & original bugs | 1384–1453 |
+| Test vectors | 1454–1491 |
+| Provenance | 1492–1511 |
+| Open questions | 1512–1550 |
 <!-- /index -->
 
 ## Summary
@@ -1227,6 +1227,9 @@ sight and carry the first segment's GUID and the remaining count
       or 436, else 4. Hit class := 0x70; `start_combat(game, unit, K,
       record, SrcDam)` (raw); `apply_melee(game, unit, K)`; overlay 147
       on K (`0x00621E40(K, 147, 0)`).
+      The test is on the unit's **class** (`0x00463900` clamp of the
+      class, `0x005CFCA2`–`0x005CFCB3`), not its `BaseId`: clawviper6
+      (class 595) uses m = 4 (1.14d-read 2026-10-10, REC-2358).
    5. Return 1.
 5. **E flags & 1** (moving): r = 3 for a monster whose E flags have
    0x2 (path finished, `use.md` §5.2), else 0.
