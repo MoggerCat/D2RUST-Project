@@ -58,11 +58,20 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
-        use crate::skills::use_::bodies::callback::{BLADE_FURY, COLD, DEFAULT, INFERNO, JUSTHIT};
+        use crate::skills::use_::bodies::callback::{
+            BLADE_FURY, CHARGE, COLD, DEFAULT, INFERNO, JUSTHIT,
+        };
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
         if matches!(
             callback.0,
-            JUSTHIT | DEFAULT | COLD | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+            JUSTHIT
+                | CHARGE
+                | DEFAULT
+                | COLD
+                | SKILL_REMOVE
+                | STAMINA_REMOVE
+                | INFERNO
+                | BLADE_FURY
         ) {
             self.removed_lists.push((unit, state, callback.0));
         }
@@ -994,6 +1003,10 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
                 guid: owner_guid,
             });
         }
+    }
+
+    fn queue_removal_notice(&mut self, unit_type: u8, guid: u32) {
+        self.removal_notices.push((unit_type, guid));
     }
 
     fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {

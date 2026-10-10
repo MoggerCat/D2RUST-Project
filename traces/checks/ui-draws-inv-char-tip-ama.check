@@ -11,4 +11,4 @@ ticks 76
 seconds 600
 channels draws packets
 draws-at 73
-input frame 40; key I; frame 44; key A; frame 48; move 430 330
+input frame 38; move 790 10; frame 40; key I; frame 44; key A; frame 48; move 430 330
