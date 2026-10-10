@@ -261,6 +261,15 @@ pub struct ActionHooks<X> {
     /// hireling lists: `hirelings.md` §8 rule 1 (`0x005751A0` when the
     /// owner is a player). `None` (the default): nothing is recorded.
     pub pet_deaths: Option<Vec<UnitId>>,
+    /// The host runs the item update pass after the tick and wants a
+    /// player's own state / stat sends after it (`intents-events.md` §7.3
+    /// rule 1: the item messages of step 2 precede step 5 and step 7). On,
+    /// [`View::player_tail`] holds them until [`ActionSim::flush_player_tail`].
+    pub defer_player_tail: bool,
+    /// Set around a player's step 5 / 7 sends while [`Self::defer_player_tail`].
+    pub capture_tail: bool,
+    /// The held sends: (receiving player, bytes).
+    pub player_tail: Vec<(UnitId, Vec<u8>)>,
     /// Players whose mode-17 start `0x0057FCA0` ran (after the corpse
     /// creation), for the host that holds the hireling lists:
     /// `hirelings-2.md` §15 (`0x00575BC0`, the hireling dies with its
@@ -373,6 +382,10 @@ pub struct ActionHooks<X> {
     /// The players' pet lists (player data +0x44, `sim/pets.md` §1),
     /// created on a player's first summon ([`crate::wiring::interaction::summon`]).
     pub pet_lists: BTreeMap<UnitId, crate::player::pets::PetLists>,
+    /// Mercenaries linked to their player ([`LifecycleHooks::set_ai_owner`]
+    /// with a player owner, called only by the hireling init): the units whose
+    /// pet type is 7, for the 0xAC owner GUID (`monsters/init.md` §24 rule 4).
+    pub hireling_units: std::collections::BTreeSet<UnitId>,
     /// The skill entries a summon's `set_skill` (`skills/bodies.md` §6.5
     /// step 6, `0x0056DEB0`: the entry of the skill with owner −1, added
     /// when missing, base level := v) gives a monster: skill id → base
@@ -515,6 +528,9 @@ impl<X> ActionHooks<X> {
             pet_follows: None,
             hireling_ai: HirelingAiFacts::default(),
             pet_deaths: None,
+            defer_player_tail: false,
+            capture_tail: false,
+            player_tail: Vec::new(),
             owner_deaths: None,
             hireling_calls: None,
             act_changes: Vec::new(),
@@ -542,6 +558,7 @@ impl<X> ActionHooks<X> {
             session: switch::SessionState::default(),
             skill_lists: BTreeMap::new(),
             pet_lists: BTreeMap::new(),
+            hireling_units: std::collections::BTreeSet::new(),
             monster_skills: BTreeMap::new(),
             natural_skills: BTreeMap::new(),
             unit_source: BTreeMap::new(),

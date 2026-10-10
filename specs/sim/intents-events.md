@@ -44,15 +44,15 @@
 |   4. d2rs mapping and scope | 637–668 |
 |   5. Machine-readable tables | 669–705 |
 |   6. Exact-match comparison | 706–814 |
-|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1356 |
-|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1357–1701 |
-|   9. C→S handlers: owners, and the small handlers owned here | 1702–1874 |
-| Constants & data dependencies | 1875–1893 |
-| Randomness | 1894–1899 |
-| Edge cases & original bugs | 1900–1945 |
-| Test vectors | 1946–2032 |
-| Provenance | 2033–2159 |
-| Open questions | 2160–2312 |
+|   7. Unit update messages (`0x0053A500`) and room clean-up (`0x00553220`) | 815–1368 |
+|   8. Single-player session sequence (C→S 0x67 → 0x6B → first tick) | 1369–1713 |
+|   9. C→S handlers: owners, and the small handlers owned here | 1714–1886 |
+| Constants & data dependencies | 1887–1905 |
+| Randomness | 1906–1911 |
+| Edge cases & original bugs | 1912–1957 |
+| Test vectors | 1958–2044 |
+| Provenance | 2045–2171 |
+| Open questions | 2172–2324 |
 <!-- /index -->
 
 ## Summary
@@ -1106,6 +1106,18 @@ that drops gold:
    `MonsterKill` 1: the recorded counts 1, then 2. The join's 0x65
    (`0x0053FC70`, §8.3) is the other path; `0x00538860`, its second
    caller, has no reference in `Game.exe` (dead code).
+   Recorded again 2026-10-10 (REC-2821, `combat-melee-fallen`): the
+   killing blow's tick sends `69 15000000 08 …` (the monster update) and
+   then `65 01000000 0100` (GUID 1, count 1), both in frame 46's tick
+   phase, in that order.
+
+**Player update order** (REC-2822, `combat-potion-midfight` frame 70,
+2026-10-10): within one player update the item messages of step 2 (the
+0x9D list pass, 0x47, 0x48) precede the step 5 state messages (0xA8) and
+the step 7 stat sends; a unit still new to the client keeps the join
+order. d2rs runs the item pass after the tick, so the action wiring holds
+a player's step 5 / 7 sends (`ActionHooks::player_tail`) until the host's
+item pass has run.
 
 #### 7.7 Monster messages 0x67–0x6D (senders, triggers, layouts)
 
