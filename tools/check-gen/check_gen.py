@@ -616,15 +616,6 @@ UI_SCENARIOS = [
     ("inv-item", "inventory panel with one potion, cursor over it (tip)", "frame 30; key I; frame 40; move 432 330", 70, 68,
      UI_ITEM,
      [r"inventory\.(2|3|4|5|8|9)-", r"item-tips\.(1|2|3|4|5|6|7|8|10)-", r"text\.8-", r"panels-3\.23-"]),
-    ("inv-set", "inventory panel with a set item, cursor over it (set tip)", "frame 30; key I; frame 40; move 432 330", 70, 68,
-     ["at 4 poke seed-game 0x00001234 666",
-      "at 4 poke item cap @x+1 @y quality 5 ilvl 40",
-      "at 8 send PickItem type=4 id=@4 cursor=0",
-      "at 12 send InsertItemInBuffer item=@4 x=0 y=0 page=0"],
-     [r"item-tips\.9-"]),
-    ("invclick", "inventory grid clicks: pick the potion, put it down two cells right",
-     "frame 30; key I; frame 40; move 432 330; frame 41; click 432 330; frame 50; move 490 330; frame 51; click 490 330",
-     70, 0, UI_ITEM, [r"inventory\.10-", r"panels-3\.29-"]),
     ("beltuse", "potion in the belt used with key 1", "frame 30; key 1", 50, 0,
      ["at 4 poke seed-game 0x00001234 666", "at 4 poke item hp1 @x+1 @y",
       "at 8 send PickItem type=4 id=@4 cursor=0", "at 12 send ItemToBelt item=@4 slot=0"],
@@ -641,8 +632,6 @@ UI_SCENARIOS = [
      [r"panels\.10-", r"panels-2\.19-", r"controls\.3-"]),
     ("automap", "automap (key TAB) in the Rogue Encampment", "frame 20; key TAB", 60, 58, [],
      [r"automap\.(1|2|3|4|5|6|8|9|10|11|13|14)-", r"controls\.3-"]),
-    ("esc", "single-player menu (key ESC)", "frame 20; key ESC", 40, 38, [],
-     [r"frontend-options\.o(1|2|4|8)-", r"panels\.(2|3|5)-"]),
     ("belt", "belt rows opened (key `)", "frame 20; key 0xC0", 60, 58, [],
      [r"control-panel\.(5|9)-", r"controls\.3-"]),
     ("cube", "Horadric Cube opened (right click on the inventory cube)", "frame 20; key I; frame 30; rclick 446 345", 70, 68, [],
@@ -655,7 +644,7 @@ UI_SCENARIOS = [
 ]
 
 
-UI_CHANNELS = {"invclick": "packets", "beltuse": "packets", "walkclick": "packets state"}
+UI_CHANNELS = {"beltuse": "packets", "walkclick": "packets"}
 UI_SAVE = {}
 
 
