@@ -1,7 +1,7 @@
 # rc-partial-promote hand-back
 
-Branch claude/rc-partial-promote = specs-staging-7 + integ-r16. Ledger EQUAL 887 -> 1242
-(`ledger.py`, merged); part `docs/handoff/ledger/rc-partial-promote.tsv` (371 EQUAL, 184 DIVERGED).
+Branch claude/rc-partial-promote = specs-staging-7 + integ-r16. Ledger EQUAL 1131 -> 1486
+(`ledger.py`, merged on staging 94926ae0; 355 of the part's rows win, 16 are overridden); part `docs/handoff/ledger/rc-partial-promote.tsv` (371 EQUAL, 184 DIVERGED).
 
 ## Checks (1.14d re-recorded under Wine: integ-r16's record_state change missed every state cache entry)
 | family | rows PARTIAL -> EQUAL | other |
