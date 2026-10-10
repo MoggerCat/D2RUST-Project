@@ -554,6 +554,38 @@ fn good_alignment_does_not_mark_seen() {
     }
 }
 
+// Covers: specs/monsters/ai.md §5.2 r7
+#[test]
+fn vision_token_toggles_only_when_loaded() {
+    // (record's +0x24, flag 0x08 already set) -> value written by step 7.
+    // Record absent: no write. Token 0 with flag clear: writes 1.
+    // Token 1 with flag clear (read, T = 0): writes 0. Flag set: S = 0
+    // (not read), writes 1.
+    for (vision, seen_flag, expect) in [
+        (None, false, None),
+        (Some(0), false, Some(1)),
+        (Some(1), false, Some(0)),
+        (Some(1), true, Some(1)),
+    ] {
+        let mut w = World::new(monstats(3, [0; 5], 15));
+        w.fake.no_los_draw = true;
+        w.fake.vision = vision;
+        w.fake.nodes = vec![vec![w.player]];
+        if seen_flag {
+            let mon = w.mon;
+            w.store.control_mut(mon).unwrap().flags |= flag::TARGET_SEEN;
+        }
+        let mon = w.mon;
+        let s = w.with(|g, cx| main_search(g, cx, mon));
+        assert_eq!(s.target, Some(w.player), "{vision:?} {seen_flag}");
+        assert_eq!(
+            w.fake.marks.last().copied(),
+            expect,
+            "{vision:?} {seen_flag}"
+        );
+    }
+}
+
 // ---- §7.2: movement requests ---------------------------------------------
 
 // Covers: specs/monsters/ai.md §7.2

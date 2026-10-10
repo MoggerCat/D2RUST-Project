@@ -8,7 +8,8 @@ use super::super::receive::ReceiveLog;
 use super::super::skills::{SkillEntry, SkillList};
 use super::super::update::update_pass;
 use super::super::world::{
-    ActLoad, ClientUnit, ClientWorld, ModelInputs, UnitKey, INIT_SEED, MONSTER, OBJECT, PLAYER,
+    ActLoad, ClientUnit, ClientWorld, KindData, ModelInputs, ObjectData, UnitKey, INIT_SEED,
+    MONSTER, OBJECT, PLAYER,
 };
 use super::fns::{CHICKEN, KEEPER_SOUND, OVERLAY_KIND_LOOP, OVERLAY_NPCALERT};
 use super::interact::{self, interact_bytes};
@@ -749,6 +750,10 @@ fn generic_step_mode_1_turns_into_mode_2_after_the_clamp() {
     r.rgb = (1, 2, 3);
     r.has_collision = [0, 1, 0, 0, 0, 0, 0, 0];
     obj_mut(&mut w).mode = 1;
+    obj_mut(&mut w).kind = KindData::Object(ObjectData {
+        footprint: true,
+        ..ObjectData::default()
+    });
     let mut out = Vec::new();
     // 0 → 256: the advance (256 < 512 − 256 + 1 is the last-frame test of
     // the NEXT update); no turn yet.
@@ -776,6 +781,8 @@ fn generic_step_mode_1_turns_into_mode_2_after_the_clamp() {
         rgb: (1, 2, 3)
     })));
     assert!(out.contains(&Output::ObjectFx(ObjFx::Collision { unit })));
+    // `0x00623830` freed the footprint (`msg-units.md` §1.3 r2).
+    assert!(matches!(&obj(&w).kind, KindData::Object(d) if !d.footprint));
 }
 
 // Covers: specs/world/objects-client.md §25 r9, §25 r9

@@ -232,6 +232,20 @@ fn monster_after(i: &ModelInputs, mode: u32, code: u8, r: [i32; 7]) -> u32 {
     w.units[&k].mode
 }
 
+/// §19 r4: +0xB0 := r6 for 0x06 and 0x14, r0 for 0x13 (no mode change).
+// Covers: specs/client/model.md §19 r4
+#[test]
+fn monster_hit_codes_store_the_hit_class() {
+    let i = monster_inputs();
+    let k = UnitKey::new(MONSTER, 5);
+    for (code, want) in [(0x06, 6), (0x13, 1), (0x14, 6)] {
+        let mut w = world_with(k, 1);
+        req(&mut w, &i, k, code, [1, 2, 3, 4, 5, 0, 6]).unwrap();
+        assert_eq!(w.units[&k].hit_class, want, "code {code:#x}");
+    }
+    assert_eq!(monster_after(&i, 1, 0x13, [1, 2, 3, 4, 5, 0, 6]), 1);
+}
+
 // Covers: specs/client/model.md §19 r4, §19 r3
 #[test]
 fn monster_mode_follows_the_dispatch_table() {

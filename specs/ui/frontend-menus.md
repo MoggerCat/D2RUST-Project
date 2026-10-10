@@ -23,30 +23,30 @@
 |   F1.3 Screen flow (single player) | 208–239 |
 |   F1.4 Main menu (`0x004336C0`) | 240–268 |
 |   F1.5 Title animation (logo fire) | 269–300 |
-|   F1.6 Palette and sounds | 301–323 |
-|   F2.1 Save folder (`0x00407050`) | 324–348 |
-|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 349–375 |
-|   F2.3 Sort order (`0x00438AD0`) | 376–381 |
-|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 382–407 |
-|   F2.5 Selection, scrolling and keys | 408–452 |
-|   F2.6 OK / Enter (`0x00439840`) | 453–465 |
-|   F2.7 Other buttons | 466–490 |
-|   F2.8 Difficulty box (`0x00439780`) | 491–510 |
-|   F2.9 Control records and art | 511–547 |
-|   F3.1 Character-create screen build (`0x00435580`) | 548–583 |
-|   F3.2 Class line-up (positions, creation order) | 584–599 |
-|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 600–660 |
-|   F3.4 Name entry (edit box, descriptor 204) | 661–675 |
-|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 676–699 |
-|   F3.6 OK / Cancel behaviour and the new save | 700–734 |
-|   F3.7 Sounds (deferred) | 735–739 |
-|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 740–770 |
-| Constants & data dependencies | 771–807 |
-| Randomness | 808–811 |
-| Edge cases & original bugs | 812–843 |
-| Test vectors | 844–877 |
-| Provenance | 878–923 |
-| Open questions | 924–968 |
+|   F1.6 Palette and sounds | 301–328 |
+|   F2.1 Save folder (`0x00407050`) | 329–353 |
+|   F2.2 Scan and entry filter (`0x00438F70`, `0x0043C8A0`, `0x00438AD0`) | 354–380 |
+|   F2.3 Sort order (`0x00438AD0`) | 381–386 |
+|   F2.4 Layout (`0x0043AE30`, draw `0x004380F0`) | 387–412 |
+|   F2.5 Selection, scrolling and keys | 413–457 |
+|   F2.6 OK / Enter (`0x00439840`) | 458–470 |
+|   F2.7 Other buttons | 471–495 |
+|   F2.8 Difficulty box (`0x00439780`) | 496–515 |
+|   F2.9 Control records and art | 516–552 |
+|   F3.1 Character-create screen build (`0x00435580`) | 553–588 |
+|   F3.2 Class line-up (positions, creation order) | 589–604 |
+|   F3.3 Class animation state machine (D2Win anim control `0x00500850`) | 605–665 |
+|   F3.4 Name entry (edit box, descriptor 204) | 666–680 |
+|   F3.5 Check boxes (hardcore, expansion; ladder named only) | 681–704 |
+|   F3.6 OK / Cancel behaviour and the new save | 705–739 |
+|   F3.7 Sounds (deferred) | 740–744 |
+|   F3.8 Art (`0x004326F0`, all `data\global\ui\FrontEnd\…`; frames from the 1.14d MPQs, 1 direction) | 745–775 |
+| Constants & data dependencies | 776–812 |
+| Randomness | 813–816 |
+| Edge cases & original bugs | 817–848 |
+| Test vectors | 849–882 |
+| Provenance | 883–928 |
+| Open questions | 929–973 |
 <!-- /index -->
 
 ## Summary
@@ -251,7 +251,7 @@ backgrounds. Re-entering the main menu rebuilds all its controls.
 |---|---|---|---|---|---|---|---|
 | 16 | Single Player | 5106 SINGLE PLAYER | 264, 324 | 272×35 | WideButtonBlank `0x00779738` | — | `0x00435CD0` |
 | 17 | Battle.net | 5107 BATTLE.NET | 264, 366 | 272×35 | WideButtonBlank02 `0x00779754` | — | `0x00435D30` (out of scope) |
-| 18 | Open Battle.net (gateway) | 0 (label set by `0x00431AF0`) | 264, 391 | 272×25 | NarrowButtonBlank `0x00779758` | — | `0x00434600` (out of scope) |
+| 18 | Open Battle.net (gateway) | label set by `0x00431AF0`: string 11049 "GATEWAY: %s" with the current gateway's name (default list `gateways.txt`: first zone closest to the time-zone bias; bias 0 → Europe; PROVISIONAL REC-1905) | 264, 391 | 272×25 | NarrowButtonBlank `0x00779758` | — | `0x00434600` (out of scope) |
 | 19 | Other Multiplayer | 5108 OTHER MULTIPLAYER | 264, 433 | 272×35 | WideButtonBlank | — | `0x00430C50` (out of scope: opens 0xFF–0x101, Open Battle.net 5115 / TCP/IP 5116) |
 | 13 | Credits | 5110 CREDITS | 264, 528 | 135×25 | ShortButtonBlank | — | `0x004312C0` |
 | 14 | Cinematics | 5111 CINEMATICS | 402, 528 | 135×25 | ShortButtonBlank | — | `0x00431600` |
@@ -299,6 +299,11 @@ backgrounds. Re-entering the main menu rebuilds all its controls.
    builder found here adds it.
 
 ### F1.6 Palette and sounds
+
+0. Palette loader `0x0042F2E0(dat, pl2)`: called by the sky screens (`0x0043C4F0`), the character
+   select builders `0x0043AE30` / `0x0043B080` (sky paths `[0x006D3A08]` / `[0x006D3A0C]`) and the
+   create builder `0x00435580` with `fechar` (`[0x006D39E8]` / `[0x006D39D0]`). So returning from the
+   create screen to character select restores the sky palette (REC-1906).
 
 1. Palette: every screen built through `0x0043C4F0` loads
    `data\global\palette\sky\pal.dat` and `pal.pl2` (paths at

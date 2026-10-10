@@ -35,25 +35,25 @@
 |   5. Client update pass | 251–494 |
 |   6. Position check (`0x004804E0`) | 495–538 |
 |   7. Session messages | 539–736 |
-|   8. Mode requests | 737–829 |
-|   9. Room-in-sight messages | 830–864 |
-|   10. Bit reader | 865–879 |
-|   11. Current act and level (join and later) | 880–925 |
-|   12. Client DRLG and the room of a point | 926–967 |
-|   13. Visibility predicate (`0x004DBF20`) | 968–1019 |
-|   14. Pet list and the hireling GUID | 1020–1084 |
-|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1085–1174 |
-|   16. C→S 0x4B after a teleport (the hireling case) | 1175–1209 |
-|   17. Model writes made by 1.14d UI code | 1210–1415 |
-|   18. Audio driver inputs and the client object functions | 1416–1446 |
-|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1447–1696 |
-|   20. Player mode steps (`0x00463390`) and the local player's next action | 1697–1857 |
-| Constants & data dependencies | 1858–1870 |
-| Randomness | 1871–1886 |
-| Edge cases & original bugs | 1887–1911 |
-| Test vectors | 1912–1969 |
-| Provenance | 1970–2075 |
-| Open questions | 2076–2281 |
+|   8. Mode requests | 737–837 |
+|   9. Room-in-sight messages | 838–872 |
+|   10. Bit reader | 873–887 |
+|   11. Current act and level (join and later) | 888–933 |
+|   12. Client DRLG and the room of a point | 934–975 |
+|   13. Visibility predicate (`0x004DBF20`) | 976–1027 |
+|   14. Pet list and the hireling GUID | 1028–1092 |
+|   15. Object mode requests in detail (codes 3 and 0x15; shrines) | 1093–1182 |
+|   16. C→S 0x4B after a teleport (the hireling case) | 1183–1217 |
+|   17. Model writes made by 1.14d UI code | 1218–1423 |
+|   18. Audio driver inputs and the client object functions | 1424–1454 |
+|   19. Monster mode machine (`0x004AFF60`) and client mode steps | 1455–1704 |
+|   20. Player mode steps (`0x00463390`) and the local player's next action | 1705–1865 |
+| Constants & data dependencies | 1866–1878 |
+| Randomness | 1879–1894 |
+| Edge cases & original bugs | 1895–1919 |
+| Test vectors | 1920–1977 |
+| Provenance | 1978–2083 |
+| Open questions | 2084–2298 |
 <!-- /index -->
 
 ## Summary
@@ -776,6 +776,14 @@ position check of the local player.
    | 0x18 | `0x00480780(U, r0, r1)`; mode := 3 |
    | 0x19 | mode := 0xD; `check(U, r0, r1, 0, 0, 0)` |
    | 3–5, 0x0A–0x11, > 0x19 | fatal 0x432 |
+
+   PROVISIONAL (REC-1835): d2rs runs the explicit mode sound of code
+   0x13 (player m = 0x13, monster 0xD, §19 r4) from the audio feed when
+   it sees a new request count with code 0x13 (because the model keeps
+   only the last request of a frame and holds no shapeshift flag +0xC8
+   bit 0x8: a player's m is always 0x13, and a 0x13 followed by another
+   request in the same audio frame makes no sound); settled by
+   `traces/audio/audio-monster-hit-ama.check` with a were-form variant.
 
    A helper of codes 0, 1, 0x15–0x18 returning 0 sends the unit to the
    neutral mode (`0x00460830(U, neutral, 1)`) and the request returns 0.
@@ -2146,6 +2154,15 @@ its only caller `0x0044F360` (`0x0044F43E`–`0x0044F45E`),
    the monster's own client path, which d2rs's model positions only
    sample); settled by REC-706 (a recording of the 1.14d client grid
    under a walking NPC).
+   *Revision (2026-10-10, q-fix-rd-misc, REC-1251 and REC-1565 settled
+   by a read of `0x004BC720`):* the private grids also carry each model
+   object's footprint while the client holds it (stamped by the 0x51 object init
+   when `HasCollision[mode]` is set, freed by `0x00623830`,
+   `client/msg-units.md` §1.3 r2), as its `SizeX` × `SizeY` box with the
+   objects footprint mask (`sim/path-placement.md` §3; 0x400 for a
+   torch), re-stamped with the monsters. Without them d2rs drew the
+   player through the Rogue Encampment torches (class 37) while the
+   server stopped short.
    *Recorded, REC-706* (2026-10-09, PC 1, Windows; scratch poll probe
    with no breakpoints, ScnAma `-seed 1234`, 46 distinct samples 30–50
    ms apart while Warriv (class 155) walks (4866, 4235) → (4870, 4231),

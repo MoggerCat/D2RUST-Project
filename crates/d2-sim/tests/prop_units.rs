@@ -314,6 +314,7 @@ impl World {
                     enabled: true,
                     aidel: [3, 4, 5],
                     moves: 0,
+                    mode_chart: false,
                 },
             ],
             ..Default::default()

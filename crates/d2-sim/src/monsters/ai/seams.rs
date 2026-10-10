@@ -62,7 +62,7 @@ pub trait AiUnits {
     /// `None` without a record.
     fn vision_seen(&self, unit: UnitId) -> Option<u32>;
     /// §5.2 step 7: the target-seen update of the vision record.
-    fn mark_seen(&mut self, unit: UnitId);
+    fn mark_seen(&mut self, unit: UnitId, value: u32);
     /// Type-10 handler `0x00573120`: clears monster data +0x34, +0x38.
     fn ai_reset(&mut self, unit: UnitId);
     /// Interacting with a player (`0x00572DC0`).

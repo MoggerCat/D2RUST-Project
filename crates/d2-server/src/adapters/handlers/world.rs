@@ -1036,6 +1036,8 @@ pub struct PreviewMoveRest {
     /// writes made since ([`MoveRest::stage_quest_flags`]).
     quest_flags: BTreeMap<Owner, d2_sim::world::quests::QuestFlags>,
     quest_writes: Vec<(Owner, u8, u8, bool)>,
+    /// The pick-ups of the call (player, item), for the quest hook.
+    picked: Vec<(Owner, d2_sim::items::moves::Guid)>,
     /// The skill seams over the players' lists (REC-266).
     skills: super::items::moves::preview_skills::PreviewSkills,
 }
@@ -1062,6 +1064,11 @@ impl MovePending for PreviewMoveRest {
             let m = d2_sim::units::messages::remove_unit(4, item);
             self.sent.push((p, m.to_vec()));
         }
+    }
+    /// Hook ITEMPICKEDUP (`0x00543D80`): recorded, run on the quest
+    /// control after the call (`WiredWorld::moves`).
+    fn quest_item_picked(&mut self, player: Owner, item: d2_sim::items::moves::Guid) {
+        self.picked.push((player, item));
     }
     /// The staged quest record (`0x0065C310`).
     fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
@@ -1243,6 +1250,9 @@ impl MoveRest for PreviewMoveRest {
     }
     fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
         std::mem::take(&mut self.quest_writes)
+    }
+    fn take_picked_items(&mut self) -> Vec<(Owner, d2_sim::items::moves::Guid)> {
+        std::mem::take(&mut self.picked)
     }
 }
 
