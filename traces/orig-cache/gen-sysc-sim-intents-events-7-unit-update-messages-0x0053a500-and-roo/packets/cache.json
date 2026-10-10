@@ -1,0 +1,42 @@
+{
+ "channel": "packets",
+ "check": "gen-sysc-sim-intents-events-7-unit-update-messages-0x0053a500-and-roo",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "100",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "6 Walk x=@x+6 y=@y",
+  "--send",
+  "20 Run x=@x y=@y+5",
+  "--send",
+  "36 Walk x=@x-3 y=@y-3"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "f9704a437f127a4802dda3e41db02984421a1b8f389e2f903633ea41fecaca47",
+   "size": 87154
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "3541c088379cbe6bf623f299599b7c3a33ffe2dc9294af5ca9aadc3553dafeb0",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

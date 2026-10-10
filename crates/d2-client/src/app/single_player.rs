@@ -614,7 +614,7 @@ impl LocalSeams {
     /// cow, monstats2 `isAtt` 0, four sub-tiles away); settled by the
     /// scan 5 callback's reading.
     ///
-    /// Among the candidates `keep` accepts.
+    /// Only the candidates `keep` accepts are considered.
     fn nearest_foe_where(
         &self,
         unit: UnitId,
@@ -1120,6 +1120,11 @@ impl Pending for LocalSeams {
     }
     fn weapon(&self, unit: UnitId) -> Option<UnitId> {
         self.weapons.weapon(unit)
+    }
+    // `0x00623C20` for a player (damage.md §5.1 step 4.4): the weapon's
+    // item hit class, 1 without one.
+    fn weapon_hit_class(&self, unit: UnitId) -> u32 {
+        self.weapons.weapon_hit_class(unit)
     }
     fn item_at(&self, unit: UnitId, loc: u8) -> Option<UnitId> {
         self.weapons.item_at(unit, loc)

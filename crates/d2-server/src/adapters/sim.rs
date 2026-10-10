@@ -669,6 +669,15 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             }
         }
         handlers::items::moves::update_pass(self, out);
+        // The player's step 5 / 7 sends follow its item messages.
+        self.world.flush_player_tail(&mut self.events);
+        for (unit, bytes) in self.world.take_sent(&mut self.events) {
+            if let Some(c) = self.client_of(unit) {
+                if let Err(e) = out.queue(c, &bytes) {
+                    self.tick_faults.push((c, WorldError::from(e)));
+                }
+            }
+        }
     }
 
     /// The client vitals sync ([`SimGame::vitals_sync`]) of the flush.
