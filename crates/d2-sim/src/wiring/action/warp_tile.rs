@@ -189,6 +189,7 @@ impl<X: Pending> View<'_, X> {
         let found = self.h.drlg.with_act(act, &mut game.lists, |d, svc| {
             let r = d.drlg_room_of(room)?;
             let origin = d.active_room(r)?.subtiles;
+            let init_seed = d.init_seed;
             let units = svc.types.preset_units(d, r);
             let paths: Vec<_> = units
                 .iter()
@@ -201,13 +202,19 @@ impl<X: Pending> View<'_, X> {
                     }
                 })
                 .collect();
-            Some((units, paths, origin))
+            Some((units, paths, origin, init_seed))
         });
-        let Some(Some((units, paths, origin))) = found else {
+        let Some(Some((units, paths, origin, init_seed))) = found else {
             return 0;
         };
+        let level = self.h.drlg.level_id(game, room).unwrap_or(0);
         let mut n = 0;
         for (p, path) in units.iter().zip(paths) {
+            if p.unit_type == OBJECT_PRESET
+                && preset_object_skipped(game, level, p.class, init_seed)
+            {
+                continue;
+            }
             let at = (origin.x + p.x, origin.y + p.y);
             let made = match p.unit_type {
                 OBJECT_PRESET => {
@@ -389,5 +396,56 @@ impl<X: Pending> View<'_, X> {
         Some(u32::from(
             r != Some(crate::path::warp::WarpOutcome::Arrived),
         ))
+    }
+}
+
+/// The first walk's per-level object skips of `0x005559A0`
+/// (`monsters/population.md` §11.1): levels 133 and 135 never place
+/// object 397, level 134 never places the waypoint 402 and drops the
+/// object preset that brings the game's count ([`Game::sands_preset_objects`])
+/// to `init seed % 3 + 3`, level 136 never places objects 26, 268 and 269.
+fn preset_object_skipped(game: &mut Game, level: u32, class: u32, init_seed: u32) -> bool {
+    match level {
+        133 | 135 => class == 397,
+        134 => {
+            if class == 402 {
+                return true;
+            }
+            game.sands_preset_objects = game.sands_preset_objects.wrapping_add(1);
+            game.sands_preset_objects == init_seed % 3 + 3
+        }
+        136 => matches!(class, 26 | 268 | 269),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod preset_skip_tests {
+    use super::*;
+
+    #[test]
+    fn levels_133_135_136_skip_their_objects() {
+        let mut g = Game::default();
+        assert!(preset_object_skipped(&mut g, 133, 397, 0));
+        assert!(preset_object_skipped(&mut g, 135, 397, 0));
+        assert!(!preset_object_skipped(&mut g, 133, 398, 0));
+        for c in [26, 268, 269] {
+            assert!(preset_object_skipped(&mut g, 136, c, 0));
+        }
+        assert!(!preset_object_skipped(&mut g, 136, 397, 0));
+        assert!(!preset_object_skipped(&mut g, 37, 397, 0));
+        assert_eq!(g.sands_preset_objects, 0);
+    }
+
+    #[test]
+    fn level_134_skips_the_waypoint_and_the_counted_object() {
+        // init seed 7: 7 % 3 + 3 = 4, so the fourth counted object goes.
+        let mut g = Game::default();
+        assert!(preset_object_skipped(&mut g, 134, 402, 7));
+        let skipped: Vec<bool> = (0..6)
+            .map(|i| preset_object_skipped(&mut g, 134, 100 + i, 7))
+            .collect();
+        assert_eq!(skipped, [false, false, false, true, false, false]);
+        assert_eq!(g.sands_preset_objects, 6);
     }
 }

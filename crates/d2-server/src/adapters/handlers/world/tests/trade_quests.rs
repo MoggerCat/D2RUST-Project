@@ -615,10 +615,10 @@ impl Fx {
         let data = UnitData {
             monsters: vec![
                 MonsterInfo {
+                    mode_chart: false,
                     enabled: true,
                     aidel: [15; 3],
                     moves: 0,
-                    mode_chart: false,
                 };
                 N_MONSTATS
             ],

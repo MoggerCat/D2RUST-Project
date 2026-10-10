@@ -45,8 +45,11 @@ pub const STATE_DEATH_DELAY: u16 = 92;
 
 impl<X: Pending> StatHost for ActionHooks<X> {
     /// §8.2 rule 6: queue the callbacks this wiring runs after the expiry
-    /// walk ([`UnitHooks::lists_expired`]): the default one and the shrine
-    /// ones. The others are run by their skill bodies.
+    /// walk ([`UnitHooks::lists_expired`]): the default one, the shrine
+    /// ones, and Inferno's / Blade Fury's (`skills/bodies.md` §6.16,
+    /// `bodies-2b.md` §6.16: state off, unit flags |= 0x40; the timer 12
+    /// expiry is what ends a player's Inferno / Arctic Blast channel). The
+    /// others are run by their skill bodies.
     fn list_removed(
         &mut self,
         _lists: &mut StatLists,
@@ -55,8 +58,12 @@ impl<X: Pending> StatHost for ActionHooks<X> {
         _list: ListId,
         callback: RemoveCallback,
     ) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, DEFAULT, INFERNO};
         use crate::world::objects::shrines::{SKILL_REMOVE, STAMINA_REMOVE};
-        if matches!(callback.0, 0x0056_E900 | SKILL_REMOVE | STAMINA_REMOVE) {
+        if matches!(
+            callback.0,
+            DEFAULT | SKILL_REMOVE | STAMINA_REMOVE | INFERNO | BLADE_FURY
+        ) {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
@@ -360,6 +367,8 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     // maximum (the shrine set stamina to 2v on the list); the skill one's
     // skill refresh has nothing to refresh here (levels read the stat).
     fn lists_expired(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
+        use crate::skills::use_::bodies::callback::{BLADE_FURY, INFERNO};
+        use crate::skills::use_::bodies::helpers::FLAG_40;
         use crate::world::objects::shrines::STAMINA_REMOVE;
         for (u, state, cb) in std::mem::take(&mut self.removed_lists) {
             let t = sim.stats.toggle_state(u, state, false);
@@ -385,6 +394,14 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             if cb == STAMINA_REMOVE {
                 sim.stats.clamp_to_max(self, u);
             }
+            // `0x005C8BF0` / `0x005D69B0`: unit flags (+0xC4) |= 0x40, so
+            // the sequence's later do events do not run (`use.md` §5.2
+            // rule 3).
+            if matches!(cb, INFERNO | BLADE_FURY) {
+                if let Some(r) = sim.units.get_mut(u) {
+                    r.flags |= FLAG_40;
+                }
+            }
         }
         let _ = unit;
     }
@@ -395,6 +412,10 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     fn player_death(&mut self, sim: &mut Sim<'_>, unit: UnitId) {
         self.death_penalties(sim, unit);
         sim.game.lists.set_player_status(unit, STATUS_DEAD);
+        // Dead clean-up `0x0057F330` (`vitals.md` §4.6 rule 1.5): the
+        // dead-body footprint `0x00649F70(P, 1)` replaces the player's
+        // 0x80 footprint, so missiles no longer see the body.
+        View::of(sim.units, sim.stats, sim.data, self).dead_body_footprint(unit);
     }
     /// `0x0057FCA0`: the corpse creation `0x0057F700` at `0x0057FD1C`
     /// (`vitals.md` §4.7 rule 1, [`super::death`]), then `0x00575BC0`
@@ -581,37 +602,6 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
     /// `units.md` §4.5), through [`Pending::action_frame`].
     fn player_action_frame(&mut self, sim: &mut Sim<'_>, unit: UnitId, a1: u32, a2: u32) -> u32 {
         X::action_frame(self, sim, unit, a1, a2)
-    }
-
-    /// The per-class mode records of `0x005A78A0` (`units.md` §4.6): a
-    /// class with `SplGetModeChart` set takes the attack-family record
-    /// `{0x005A75C0, 0x005A7670, 0x005A8030, schedules}` for S3 (mode 10)
-    /// when it is 543, 544, 570 or 709, for S3 and S4 (modes 10, 11) when
-    /// it is 243, 333 or 705, and for S4 when it is 417 or 418. Class
-    /// 403's records (modes 4, 5, 8, 9; event-1 functions `0x005A8330`,
-    /// `0x005A83E0`) are not specified and keep the table's.
-    fn monster_class_record(
-        &mut self,
-        sim: &Sim<'_>,
-        unit: UnitId,
-        mode: u32,
-    ) -> Option<crate::units::modes::MonsterModeRecord> {
-        let class = sim.units.get(unit)?.class;
-        if !sim.data.monster(class).is_some_and(|m| m.mode_chart) {
-            return None;
-        }
-        let hit = match class {
-            543 | 544 | 570 | 709 => mode == 10,
-            243 | 333 | 705 => mode == 10 || mode == 11,
-            417 | 418 => mode == 11,
-            _ => false,
-        };
-        hit.then_some(crate::units::modes::MonsterModeRecord {
-            start: MONSTER_MODES[4].start,
-            event0: MONSTER_MODES[4].event0,
-            event1: MONSTER_MODES[4].event1,
-            schedules: true,
-        })
     }
 
     /// Monster mode functions (`units.md` §4.6): the start and event
@@ -1063,6 +1053,11 @@ impl<X: Pending> LifecycleHooks for ActionHooks<X> {
         }
         self.path_free(unit, ty, class, mode);
         self.monster_skills.remove(&unit);
+        // A summon's skill list (the aura assignment of
+        // `interaction::summon`); players keep theirs (the save).
+        if ty == Some(UnitType::Monster) {
+            self.skill_lists.remove(&unit);
+        }
         if let Some(ai) = self.ai.as_mut() {
             ai.remove(unit);
         }
@@ -1438,6 +1433,58 @@ const SPEED_MAX: u32 = 0x7FFF;
 const RUN_BASE_ROWS: usize = 410;
 
 impl<X: Pending> ActionHooks<X> {
+    /// Pet follow `0x005754B0(game, player, x, y)` (`hirelings.md` §6,
+    /// rule one) for the summoned pet types of [`ActionHooks::pet_lists`]
+    /// (types one up to count − 1 but 7, the hireling's, which has its own
+    /// list): by the `pettype` flag byte, `warp` (bit 0) → every living pet is
+    /// moved to the player ([`LifecycleHooks::warp_pet`]); else `range`
+    /// (bit 1) → the GUIDs of the living pets farther than 1600 (squared
+    /// distance, `0x006492A0`) are returned for the caller's remove with
+    /// kill. TODO(hirelings.md §6 r1): a type with neither flag frees its
+    /// nodes (`0x00574C60`); 1.14d has no such summon row.
+    pub(crate) fn summon_follow(&mut self, sim: &mut Sim<'_>, player: UnitId) -> Vec<i32> {
+        use crate::units::modes::monster_mode;
+        const HIRELING_TYPE: usize = 7;
+        const RANGE_LIMIT: i32 = 1600;
+        let Some(b) = self.bodies.clone() else {
+            return Vec::new();
+        };
+        let Some(lists) = self.pet_lists.get(&player).cloned() else {
+            return Vec::new();
+        };
+        let (px, py) = self.path_position(player);
+        let mut far = Vec::new();
+        for (t, e) in lists.entries.iter().enumerate().skip(1) {
+            if t == HIRELING_TYPE {
+                continue;
+            }
+            let flags = b.pettype_flags.get(t).copied().unwrap_or(0);
+            for n in &e.nodes {
+                let Some(unit) = sim.game.lists.find_unit(UnitType::Monster, n.guid as u32) else {
+                    continue;
+                };
+                let alive = sim
+                    .units
+                    .get(unit)
+                    .is_some_and(|r| r.mode != monster_mode::DT && r.mode != monster_mode::DD);
+                if !alive {
+                    continue;
+                }
+                if flags & 1 != 0 {
+                    self.warp_pet(sim, unit, player);
+                } else if flags & 2 != 0 {
+                    let (x, y) = self.path_position(unit);
+                    let (dx, dy) = (x.wrapping_sub(px), y.wrapping_sub(py));
+                    let d = dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy));
+                    if d > RANGE_LIMIT {
+                        far.push(n.guid);
+                    }
+                }
+            }
+        }
+        far
+    }
+
     /// `0x00623F50` steps 6 and 7 (`units.md` §4.7): knockback (player
     /// mode 19, monster mode 13) → w clamped to 0..0x7FFF; a mode with the
     /// velocity modifier (`pathing.md` §8.1 rule 2) → w · p / 100 (i32,

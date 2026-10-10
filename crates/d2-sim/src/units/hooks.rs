@@ -26,8 +26,8 @@ pub struct MonsterInfo {
     /// The monstats2 move bits (+0x104, bit = mode) of the class's
     /// `MonStatsEx` row.
     pub moves: u32,
-    /// `SplGetModeChart` (+0x1A5): the class may use the per-class mode
-    /// records of `0x005A78A0` (`sim/units.md` §4.6).
+    /// `SplGetModeChart` (+0x1A5): the class may use a per-class mode
+    /// record (`units.md` §4.6, `0x005A78A0`).
     pub mode_chart: bool,
 }
 

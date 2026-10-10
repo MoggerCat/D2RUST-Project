@@ -209,6 +209,9 @@ pub struct BodyTables {
     pub pettype_group: Vec<i16>,
     /// `pettype.txt` `basemax` (+0x0A, i16) by row (`sim/pets.md` §10).
     pub pettype_basemax: Vec<i16>,
+    /// `pettype.txt` flag byte (+0x04) by row: bit 0 `warp`, bit 1 `range`
+    /// (`world/hirelings.md` §6 r1).
+    pub pettype_flags: Vec<u8>,
     /// The item-event layer split (data +0xC6C shift, +0xC70 mask;
     /// `data/runtime-maps.md` §3): `stuff` of itemstatcost record 0
     /// (+0x140) when in 1..8, else 6; mask (1 << stuff) − 1. `None`
@@ -239,6 +242,10 @@ impl BodyTables {
         b.pettype_basemax = decode_all::<d2_data::tables::Pettype>(table("pettype")?)?
             .iter()
             .map(|r| r.basemax as i16)
+            .collect();
+        b.pettype_flags = decode_all::<d2_data::tables::Pettype>(table("pettype")?)?
+            .iter()
+            .map(|r| u8::from(r.warp) | u8::from(r.range) << 1)
             .collect();
         Ok(b)
     }
@@ -277,6 +284,7 @@ impl BodyTables {
             pettype_count: 0,
             pettype_group: Vec::new(),
             pettype_basemax: Vec::new(),
+            pettype_flags: Vec::new(),
             layer_split: isc.first().map(|r| layer_split(r.stuff)),
         })
     }

@@ -425,10 +425,10 @@ impl Fx {
             // enabled and stand.
             monsters: (0..N_MONSTATS)
                 .map(|c| MonsterInfo {
+                    mode_chart: false,
                     enabled: true,
                     aidel: [15; 3],
                     moves: if c == 0 { 1 << 4 } else { 0 },
-                    mode_chart: false,
                 })
                 .collect(),
             ..UnitData::default()

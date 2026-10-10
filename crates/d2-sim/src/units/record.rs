@@ -179,6 +179,9 @@ pub struct UnitRecord {
     pub node_index: u32,
     /// +0x64 / +0x68 / +0x6C ([`InteractInfo`]).
     pub interact: InteractInfo,
+    /// +0xB0: the hit class of the last hit taken (`combat/damage.md`
+    /// §7.1 step 2), read by the hit and mode messages.
+    pub hit_class: u32,
 }
 
 impl UnitRecord {
@@ -203,6 +206,7 @@ impl UnitRecord {
             // sim/units.md §2: the zeroed allocation (`0x00620290`) leaves
             // GUID 0, type 0, inactive; nothing in `0x00555230` writes them.
             interact: InteractInfo::default(),
+            hit_class: 0,
         }
     }
 

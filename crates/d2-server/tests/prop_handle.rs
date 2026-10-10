@@ -634,10 +634,10 @@ fn action_host(class: u32) -> (ActionGame, Vec<u32>) {
     hooks.vitals = Some(Arc::new(vitals()));
     let data = UnitData {
         monsters: vec![MonsterInfo {
+            mode_chart: false,
             enabled: true,
             aidel: [15; 3],
             moves: 0,
-            mode_chart: false,
         }],
         ..UnitData::default()
     };
@@ -1552,10 +1552,10 @@ mod trade {
         let data = UnitData {
             monsters: vec![
                 MonsterInfo {
+                    mode_chart: false,
                     enabled: true,
                     aidel: [15; 3],
                     moves: 0,
-                    mode_chart: false,
                 };
                 N_MONSTATS
             ],

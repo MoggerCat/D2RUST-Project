@@ -28,17 +28,17 @@
 |   1. Unit kinds | 77–96 |
 |   2. Unit record | 97–155 |
 |   3. Lifecycle | 156–453 |
-|   4. Modes and mode schedules | 454–1032 |
-|   5. Event dispatch | 1033–1047 |
-|   6. Events per kind | 1048–1170 |
-|   7. Scheduler inventory (`unit-events.tsv`) | 1171–1192 |
-|   8. Collision line between two units | 1193–1197 |
-| Constants & data dependencies | 1198–1214 |
-| Randomness | 1215–1222 |
-| Edge cases & original bugs | 1223–1243 |
-| Test vectors | 1244–1303 |
-| Provenance | 1304–1390 |
-| Open questions | 1391–1470 |
+|   4. Modes and mode schedules | 454–1042 |
+|   5. Event dispatch | 1043–1057 |
+|   6. Events per kind | 1058–1180 |
+|   7. Scheduler inventory (`unit-events.tsv`) | 1181–1202 |
+|   8. Collision line between two units | 1203–1207 |
+| Constants & data dependencies | 1208–1224 |
+| Randomness | 1225–1232 |
+| Edge cases & original bugs | 1233–1253 |
+| Test vectors | 1254–1313 |
+| Provenance | 1314–1405 |
+| Open questions | 1406–1485 |
 <!-- /index -->
 
 ## Summary
@@ -484,6 +484,13 @@ start run: REC-590 `poke-fallen-town` state diff); settled by REC-592
 animated start: join in town, walk start, a monster's NU after a
 think).
 
+Death corpse (`0x0057F700`, 2026-10-10, rc-player-fc): a player-type
+allocation leaves mode 0 (§3.1 step 7), so the corpse's `0x00624690(C, 17)`
+is a new mode and runs the re-init `0x00624390`: the corpse reads
+fc = 256, sp = 256 (recorded `gen-boss-708`, frame 83, with the player
+dead). It also holds an all-zero quest record (`q: []`); PROVISIONAL
+(REC-1960): the record's allocator is not read.
+
 #### 4.2 Animation schedule (events 0 and 1)
 
 Inputs: frame f; speed s and frame count F (+0x3C/+0x34 with a
@@ -614,32 +621,35 @@ sub-tile away followed, with no draw between, by the escape of
 `0x005A7C20`'s return path (REC-1390).
 
 Mode table (`0x005A78A0`): 16-byte records {start, event-0 function,
-event-1 function, schedule flag} at `0x006E2260` + 16·mode; classes
-243–418, 543 and 544–709 with a set byte +0x1A5 in their monstats row
-use per-class records (`0x006E22D0`–`0x006E23A0`; monster spec). Null
+event-1 function, schedule flag} at `0x006E2260` + 16·mode. Null
 record or function: fallback `0x005A7B30`.
 
-**Per-class records** (`0x005A78A0`, read 2026-10-10). A class whose
-monstats `SplGetModeChart` (+0x1A5) is nonzero takes, for the listed
-(class, mode) pairs, a record other than the table's; every other pair
-takes `0x006E2260 + 16·mode`. All of these are the attack-family record
-{`0x005A75C0`, `0x005A7670`, `0x005A8030`, schedules = 1} (the same
-addresses as modes 4, 5, 7, 8, 9 above):
+**Per-class records** (`0x005A78A0(unit, mode)`, read 2026-10-10):
+no record for a non-monster, a class outside monstats or a mode > 15.
+A class whose monstats byte +0x1A5 (`SplGetModeChart`) is 0 takes the
+table's record. Otherwise the class id (not `BaseId`) picks a record
+for some modes; every other mode takes the table's:
 
-| Classes | Modes |
-|---|---|
-| 543 (`0x21F`), 544 (`0x220`, Baal), 570 (`0x23A`), 709 (`0x2C5`) | 10 (S3) |
-| 243 (`0xF3`), 333 (`0x14D`), 705 (`0x2C1`) | 10 (S3), 11 (S4) |
-| 417, 418 (`0x1A1`, `0x1A2`) | 11 (S4) |
-| 403 (`0x193`) | 4, 5: `0x006E2380` and 8, 9: `0x006E2390`, event 1 `0x005A8330` / `0x005A83E0` (not read here) |
+| Class | Modes | Record | Contents |
+|---|---|---|---|
+| 243 diablo, 333 diabloclone, 705 uberdiablo | 11 S4 | `0x006E2360` | A-family |
+| same | 10 S3 | `0x006E2370` | A-family |
+| 403 trappedsoul1 | 4 A1, 5 A2 | `0x006E2380` | A-family, event 1 `0x005A8330` |
+| 403 | 8 S1, 9 S2 | `0x006E2390` | A-family, event 1 `0x005A83E0` |
+| 417 shadowwarrior, 418 shadowmaster | 11 S4 | `0x006E23A0` | A-family |
+| 543 baalthrone, 544 baalcrab, 570 baalclone, 709 uberbaal | 10 S3 | `0x006E22D0` (the table's mode-7 record) | A-family |
 
-So Baal's S3 (mode 10, the second step of its tentacle cast) schedules
-its animation: +0x44 := frame·256 at the mode start and the action events
-of its AnimData, with the attack-family event 0 (the frame advance runs
-only with a used skill or a moving mode, §4.2). Recorded: Baal 1:8 in
-`gen-lvl-132` enters S3 at frame 98 with +0x44 = 25088 = 98·256 and
-leaves it at frame 111 (event 0 of the 13th frame). d2rs implements the
-rows without class 403.
+"A-family" = {`0x005A75C0`, `0x005A7670`, `0x005A8030`, schedules}, the
+record of modes 4, 5, 7, 8, 9: such a mode starts, animates and ends
+(event 1 = the mode end of `monsters/ai.md` §1.4) like an attack, where
+the table's S3 / S4 records never schedule an end. Other classes with
+the byte set (404, 546–550, 559, 571–573 in 1.14d's monstats) have no
+case and take the table. The trapped soul's two ends `0x005A8330` /
+`0x005A83E0` are the same: a mode request (`0x005A7C20`, flag 1;
+`monsters/ai.md` §7.1 record) to mode 8 targeting the unit itself, path
+byte 101 when mode 8 moves for the class (monstats2 bit, as the request
+builder), else 100; then, unless the unit has state 1 and is alive, the
+AI think `0x005B1740` runs inline (the pointer at `0x006E2498`).
 
 | Mode | Start | Event 0 | Event 1 | Schedules | Moves (`0x006E23D0`) |
 |---|---|---|---|---|---|
@@ -1303,6 +1313,11 @@ AI from AI functions, everything in "not yet observed" (open question 1).
 
 ## Provenance
 
+- §4.6 "Per-class records" (2026-10-10, rc-mon-modes): read from the
+  1.14d export of `0x005A78A0` (both byte-indexed switches decoded from
+  Game.exe at `0x005A79C4` / `0x005A7A80`), the 16-byte records
+  `0x006E2260`–`0x006E23AF` read from Game.exe, and `0x005A8330` /
+  `0x005A83E0` / `0x005A8030` (pointer `0x006E2498` = `0x005B1740`).
 - §3.1 r4.1 (2026-10-09, revision, q-fix-real-unit-seed-order): added
   from two Wine recordings of 1.14d (`tools/cloud-game/run.sh --python
   -- tools/trace-recorder/record_rng.py --auto ScnAma --seed 1234

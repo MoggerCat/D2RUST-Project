@@ -129,6 +129,13 @@ pub struct InteractionState {
     /// Queued interactions (player data +0x150..+0x15C, `npc.md` §2 rule
     /// 3.2): (player, NPC GUID), run again when the player's run ends.
     pub queued: Vec<(UnitId, u32)>,
+    /// d2rs-own plumbing (not a 1.14d field): when `defer_chat_end` is set
+    /// the chat-close quest call (`0x0058D870` and the other quests'
+    /// chat-end callbacks, `npc.md` §3) is queued here as (player, NPC)
+    /// instead of running on the plain economy, so the host can run it on
+    /// its full quest world (object, room and free-spot calls).
+    pub defer_chat_end: bool,
+    pub chat_ends: Vec<(UnitId, UnitId)>,
 }
 
 impl InteractionState {
@@ -154,6 +161,8 @@ impl InteractionState {
             taken: Vec::new(),
             approaches: Vec::new(),
             queued: Vec::new(),
+            defer_chat_end: false,
+            chat_ends: Vec::new(),
         }
     }
 

@@ -29,16 +29,16 @@
 |   2. `use_at_point(game, unit, skill, x, y)` = `0x00549AD0` | 109–191 |
 |   3. `use_on_unit(game, unit, skill, type, guid, run)` = `0x00549BA0` | 192–218 |
 |   4. Mode change gates | 219–276 |
-|   5. Start and do | 277–467 |
-|   6. Cooldown | 468–481 |
-|   7. Periodic skills and auras | 482–531 |
-|   8. Function tables | 532–551 |
-| Constants & data dependencies | 552–572 |
-| Randomness | 573–582 |
-| Edge cases & original bugs | 583–604 |
-| Test vectors | 605–625 |
-| Provenance | 626–645 |
-| Open questions | 646–698 |
+|   5. Start and do | 277–471 |
+|   6. Cooldown | 472–485 |
+|   7. Periodic skills and auras | 486–535 |
+|   8. Function tables | 536–555 |
+| Constants & data dependencies | 556–576 |
+| Randomness | 577–586 |
+| Edge cases & original bugs | 587–608 |
+| Test vectors | 609–629 |
+| Provenance | 630–649 |
+| Open questions | 650–702 |
 <!-- /index -->
 
 ## Summary
@@ -380,7 +380,11 @@ here.
    dropped; **any other target** (players in mode 0 or 17 included) is
    dropped when the skill has `TargetCorpse`. Dropping clears the unit's
    target (`0x00620C10`) and passes. Failure: player → mode 5
-   (neutral), return 0. Skill id invalid after step 3 → return 0.
+   (neutral), return 0. PROVISIONAL (here and in step 6's failure): the
+   neutral is mode 5 only in a town room, else 1 (because 1.14d under
+   Wine, `sor-telekinesis.check` / `nec-bone-prison.check` frame 20,
+   puts a Blood Moor player whose start fails in mode 1); settled by
+   REC-1644 (read the neutral set of `0x0056FAF0`). Skill id invalid after step 3 → return 0.
 3. `L = skill_level(unit, entry, 1)`. Item skill with 0 charges → return
    0 (no neutral reset; Edge case 3).
 4. Target is an ally and the skill lacks `TargetAlly` → return 0 (no

@@ -285,6 +285,34 @@ impl Run {
                 .map(|(k, _)| *k)
                 .expect("the waypoint in the model")
         };
+        // Legs toward it first, as for an NPC (`approach`): a run to the
+        // unit from afar stops at the first wall, the straight path's
+        // A* covers 18 sub-tiles only (`pathing.md` §6 rule 3).
+        let at = {
+            let w = self.app.world().resource::<BridgeResource>().0.world();
+            let (x, y) = w.units[&wp].position.expect("the waypoint's position");
+            (i32::from(x), i32::from(y))
+        };
+        // The torches east of the waypoint (objects class 37, 1 × 1 with
+        // collision, on its row) stop a straight leg along it: the toward
+        // walk finds no free step around one for the size-2 pattern
+        // (§5.2 rule 4) and A* is out of reach. Go round them 5 rows
+        // south, then the legs toward it.
+        let p = self.pos();
+        let row = at.1 + 5;
+        self.leg((p.0, row));
+        while (self.pos().0 - at.0).abs() > 10 {
+            let x = self.pos().0;
+            let to = x + (at.0 - x).clamp(-test_fixtures::host::LEG, test_fixtures::host::LEG);
+            self.leg((to, row));
+            assert!(
+                (self.pos().0 - x).abs() > 2,
+                "the leg along y {row} stopped at {:?}",
+                self.pos()
+            );
+        }
+        let near = move |r: &mut Run| test_fixtures::host::cheb(r.pos(), at) <= 10;
+        assert!(self.run_to(at, near), "the waypoint not reached");
         self.run_to_unit(wp);
         self.bridge().interact(wp).unwrap();
         self.until("the waypoint menu", 400, |r| r.ui_open(0x14));
@@ -995,7 +1023,11 @@ fn the_live_run() {
         .map(|i| (i.key.guid, i.code))
         .collect();
     assert!(left.is_empty(), "everything picked up: {left:?}");
-    assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    // The gold check holds for a drop with gold (a kill may drop items
+    // only, e.g. a lone scroll).
+    if ground.iter().any(|i| i.code == Some(*b"gld ")) {
+        assert!(run.player_stat(14) > gold0, "the gold reached the player");
+    }
     let mine = run.local_items();
     for it in ground.iter().filter(|i| i.code != Some(*b"gld ")) {
         assert!(
@@ -2033,10 +2065,10 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
     );
 }
 
-// `sim/path-placement.md` §2.5 (PROVISIONAL REC-1251): the client path
-// sees the model's objects whose mode has collision as their footprint
-// boxes, so a walk onto such an object's sub-tile stops short of it, as
-// the server's walk does (`cold-plains-2` soak: the server player stood
+// `client/msg-units.md` §1.3 r2 (read of `0x004BC720`, REC-1251): the
+// client path sees the footprint boxes the 0x51 object init stamped, so
+// a walk onto such an object's sub-tile stops short of it, as the
+// server's walk does (`cold-plains-2` soak: the server player stood
 // at an object the client walked through).
 #[test]
 #[ignore = "needs the D2 install (D2_GAME_DIR)"]

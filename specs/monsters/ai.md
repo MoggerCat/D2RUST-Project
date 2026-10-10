@@ -28,21 +28,21 @@
 | Inputs | 72–83 |
 | Outputs / state changes | 84–94 |
 | Rules | 95–96 |
-|   1. Think scheduling | 97–289 |
-|   2. Think dispatch `0x005B1740` | 290–429 |
-|   3. AI control and AI tables | 430–601 |
-|   4. AI parameters | 602–620 |
-|   5. Target selection | 621–932 |
-|   6. Distances and line tests | 933–947 |
-|   7. Tactics helpers | 948–1187 |
-|   8. AI commands and minions | 1188–1214 |
-|   10. The catalogue `ai-functions.tsv` | 1215–1235 |
-| Constants & data dependencies | 1236–1259 |
-| Randomness | 1260–1289 |
-| Edge cases & original bugs | 1290–1331 |
-| Test vectors | 1332–1420 |
-| Provenance | 1421–1481 |
-| Open questions | 1482–1588 |
+|   1. Think scheduling | 97–302 |
+|   2. Think dispatch `0x005B1740` | 303–442 |
+|   3. AI control and AI tables | 443–614 |
+|   4. AI parameters | 615–633 |
+|   5. Target selection | 634–970 |
+|   6. Distances and line tests | 971–986 |
+|   7. Tactics helpers | 987–1226 |
+|   8. AI commands and minions | 1227–1253 |
+|   10. The catalogue `ai-functions.tsv` | 1254–1274 |
+| Constants & data dependencies | 1275–1298 |
+| Randomness | 1299–1328 |
+| Edge cases & original bugs | 1329–1370 |
+| Test vectors | 1371–1459 |
+| Provenance | 1460–1521 |
+| Open questions | 1522–1628 |
 <!-- /index -->
 
 ## Summary
@@ -202,18 +202,31 @@ class handler, no type-2 event): `0x005A8030`, the end function of modes
   set the anim mode (only the table-1 branch calls `0x00624690(unit,
   1)`); same freeze gate, then the think (`0x005A80C5`–`0x005A80F5`); a
   matching class whose mode does not match falls to the table test;
-- every other case (`0x005A8030` at `0x005A80E0`–`0x005A8150`, read
-  2026-10-10) first, for a unit with state 54, runs `0x005544B0(unit, 0)`
-  and stops when the unit is dead (`0x005541B0`); then clears the current
-  skill (`0x00620210(unit, 0)`) and requests a mode change to neutral
-  whose target unit is the unit's path target unit (`0x00553540`; none
-  when that is the unit itself) and whose point is (0, 0) (§7.5 rule 6),
-  so a monster with no target unit gets path target (0, 0) (recorded:
-  Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107). The
-  request schedules through §1.3.
+- every other case requests a mode change to neutral (which schedules
+  through §1.3). The request's target is the path's current target unit
+  (`0x00553540`: none when it is the unit itself), so a unit without one
+  (the Hydras, whose path never had a target unit) makes the request
+  point (0, 0) and its path target becomes (0, 0) (§7.5 rule 2;
+  `sor-hydra`, frame 42). 1.14d-confirmed (`0x005A8030` at
+  `0x005A8100`–`0x005A8140`).
+  Before that request a unit with state 54 runs `0x005544B0(unit, 0)` and
+  a dead one stops (`0x005A80E0`–`0x005A80F5`, read 2026-10-10); recorded
+  also: Baal tentacle 1:9 at the end of its A1, `gen-lvl-132` frame 107
+  (path target (0, 0)).
 
 So a monster that walks or runs re-thinks the frame its path ends.
 1.14d-confirmed (`0x005A8030`, table `0x0073C6D0` = 00 00 01 00 … 00 01).
+
+The neutral request of the last case (`0x005A8030`, read 2026-10-09)
+first, when the unit has state 54, runs `0x005544B0` and stops if the
+unit is then dead (`0x005541B0`); it clears the used skill (`0x00620210(unit, 0)`), then builds the
+mode-change record {unit, target unit := the path target unit
+(`0x00553540`: none when there is none or it is the unit itself), point
+(0, 0), mode 1} and calls `0x005A7C20(game, record, 1)`. So a monster
+without a path target unit ends with path target point (0, 0) (§7.5
+rule 2): the summons that end S1 at the animation end (raven, plague
+poppy, vines, cycle of life) show it in 1.14d (REC-1651, settled by this
+read).
 
 #### 1.5 First think and player arrival
 
@@ -704,15 +717,15 @@ D2MOO `sub_6FCF2110`. Returns target, distance, combat:
    none, V +0x24 := (S = 0). Combat := melee-range test `0x00622C40(unit,
    target, 0)` (`sim/units.md`). Distance := B.
 
-PROVISIONAL (REC-1698): the vision record (monster data +0x50) is the
-coordinate record of `population.md` §9.6 step 3 (the caller's record,
-else the one at the creation point, `0x0061AD30`), shared by identity
-(act, clipped rect, index) between the monsters that hold it; step 7
-writes 1 to its +0x24 and nothing clears it; a monster created without
-that call (no population placement) has none. Settled by: PC 1 item
-"[q-fix-seed-game] Monster "vision" record" and
-`a1-warp-tower-cellar-ama` frame 45 (the fallen3 leader 1:10 acquires
-the player once minion 1:12 has seen it).
+Implemented (`monsters/ai/target.rs`, `wiring/action/ai.rs`): the
+record is loaded on the LOS-draw-false path whatever T is; S is its
++0x24 only when flag 0x08 is clear, else 0. Step 7 writes +0x24 :=
+(S = 0) only when the record was loaded, so a find with the token at 1
+consumes it. Settled by `a1-warp-tower-cellar-ama` (frame 45, fallen3
+leader 1:10) and the unit test `vision_token_toggles_only_when_loaded`
+(the token write). PROVISIONAL (REC-1698), unchanged: the record
+is kept by identity (act, rect, index) in
+`wiring/worldgen/population_init.rs`.
 ##### 5.2.1 The vision record (monster data +0x50)
 
 V is a DRLG coordinate record (`D2RoomCoordListStrc`, the record r of
@@ -881,6 +894,31 @@ collision bit 4, or the refusal lies after the scan (the think's
 `0x005DEAD0` / the skill), needs the recorded dx, dy and the collision
 grid at both points (open, REC-1270 follow-up).
 
+PROVISIONAL (REC-1270): rule 1's "monster C in melee range → skip" holds
+for every monster C, not only one with state 146 (as d2rs reads it: C in
+the scanner's melee range, `0x00622C40` step 3 without the line, d ≤ 0 or
+d ≤ `MeleeRng` + 1, is skipped). 1.14d measured (`ass-lightning-sentry-kill`
+and its probes, Fallen packs, Lightning Sentry `MeleeRng` 0): of three
+Fallen the one at distance 1 (dx 1, dy 0) is never the trap's target
+while one at distance 2–3 is, in three placements; the trap fires at it
+once the nearer one has moved off. Settled by: a run that puts a monster
+of another class on the trap (a state-146 test) or reads `0x005DC970`
+(PC 1 item "[q-fix-ass-traps] 0x005DC970 melee-range rule").
+PROVISIONAL (REC-1271): a main-less scan (only `nThreat` < 2 candidates,
+e.g. a cow) takes the alternative at once in d2rs; the spec's
+`0x005DD510` row also refuses an alternative farther than 5, and the
+order of those two rules is unread (an idle cow poked next to a trap was
+not shot by 1.14d in a one-off run on 2026-10-09, check file not kept; the cow
+had hp 0, so the dead test may be the cause instead). Not applied.
+PROVISIONAL (REC-1642): the scan 5 callback `0x005DCA70` (§5.2 step 4,
+the not-evil search) skips a candidate without unit flag 4 (+0xC4,
+monstats2 `isAtt`, `monsters/init.md`) like rule 1 here (because
+1.14d's pets never take the poked cow, class 179, `isAtt` 0, neutral
+alignment, four sub-tiles away: a Clay Golem and a Valkyrie in
+`nec-clay-golem.check` / `ama-valkyrie.check` follow and wander for
+50 frames, q-fix-skills-4cls 2026-10-09); settled by reading
+`0x005DCA70`.
+
 PROVISIONAL (REC-1695): `0x005DDC30` as d2rs runs it (`d2-sim`
 `wiring/action/ai_scan.rs`): the forced target (§5.1 with a = 0, s = 1)
 first, else scan 6 over every unit of the scanner's near-room list (own
@@ -941,7 +979,8 @@ All distances are in tiles (subtile coordinates of `sim/units.md`):
 | `0x005DC5C0` | `AIUTIL_GetDistanceToCoordinates` | same formula on the path position |
 | `0x00621F20(u)`, wrapper `0x005DD280` | `UNITS_GetCurrentLifePercentage` | life percent: (stat 6 life >> 8) × 100 / (max life (`0x00625D10`) >> 8), signed, truncating; 0 when max life >> 8 is 0 |
 | `0x005DC480(u, x, y)` | `…_HalfUnitSize` | dx = \|ux − x\|, dy = \|uy − y\| (u's position), each minus (size(u) / 2 + 1) (`0x00620510`, unsigned halving) and clamped at 0; then (2·max + min) / 2 |
-| `0x005DC640` | `sub_6FCF14D0` | "can reach directly": offset k = table by distance (2 ×3, 3 ×8, 4 ×14, else 3); tests three points (target, and target ± the perpendicular offset) for collision mask 0x1/0x4/0x400 (D2MOO wall, missile barrier, door); fails only if all three collide |
+| `0x005DC640(a, b)` | `sub_6FCF14D0` | "can reach directly": d = the full-size distance `0x005DC380(a, b)`; offset k = table by d (d 0–2: 2, 3–10: 3, 11–24: 4, ≥ 25: 3); sx = sign(a.x − b.x)·k, sy = sign(a.y − b.y)·k (0 on an equal axis), positions as `0x006488C0` / `0x00648900` (static path +0x0C / +0x10 for missiles, items, tiles). Probes, in order, stopping at the first clear one: the line from a to (b.x, b.y), to (b.x − sy, b.y + sx), to (b.x + sy, b.y − sx), each `0x006229F0(a, x, y, 0x805)`. Returns 1 when a probe is clear, 0 when all three are blocked. No draws |
+| `0x006229F0(a, x, y, mask)` | - | a without an active room (`0x00620BB0`): 0 (clear); else `0x00622920` (the end pull and line test of `render/draw-order-2.md` §15.1 rules 2–6) from a's position and size to the point (x, y) read as an end of size 2, in a's room; nonzero = blocked |
 | `0x00622AA0(a, b, 4)` | `UNITS_TestCollisionWithUnit` | blocked line between a and b with mask 4 (`render/draw-order-2.md` §15–16) |
 | `0x00622C40(a, b, 0)` | `UNITS_IsInMeleeRange` | combat flag (`sim/units.md`) |
 
@@ -1420,6 +1459,7 @@ Other recorded checks:
 
 ## Provenance
 
+- 2026-10-10 (rc-mon-spawn-think, Ghidra exports read in the cloud): `0x005DC640`, `0x006229F0`, `0x00622920` (register arguments from `all.asm`: ECX a.x, EDX 2 = the point's size, EAX x; stack a.y, size(a), y, room, mask); §6 rows. Recorded: `traces/checks/gen/gen-mon-436.check` frame 31 (ReanimatedHorde's step-3 roll needs the direct line clear).
 - 1.14d `Game.exe` (SHA-256 631066c1…adaaf): functions read from the
   Ghidra exports (`re/exports`, decompile and `all.asm` with register
   arguments checked in the assembly): `0x005B1740`, `0x005B10E0`,

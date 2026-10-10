@@ -16,8 +16,9 @@ hours) | M (2-8) | L (>8), `-` exactly for EQUAL. Fixed by the coordinator
 Merge: rows of the coverage parts (group `coverage`) whose area is also in an
 entity part only set that row's `exercised` (yes wins over no over ?); the
 other coverage rows are added as rows. A duplicate area between entity parts
-keeps the session part over a base inventory part (BASE_PARTS); between two
-session parts it keeps the first (name order) and lists a conflict.
+keeps the higher part_rank (rc-* re-measurements > other session parts >
+the base inventory, BASE_PARTS); equal ranks keep the first (name order) and
+list a conflict.
 Completeness: every spec file under specs/, every traces/checks/*.check and
 every message id of specs/sim/client-messages.tsv / server-messages.tsv must
 be named by some row (specs / checks columns; area net.c2s.0xNN /
@@ -357,6 +358,15 @@ def apply_seen(rows, seen, zero):
 BASE_PARTS = {"items.tsv", "monsters.tsv", "skills.tsv", "systems.tsv", "world.tsv"}
 
 
+def part_rank(path):
+    """Which part wins a duplicate area: a root-cause re-measurement (rc-*)
+    over a check run or fix session, which wins over the base inventory."""
+    b = os.path.basename(path)
+    if b in BASE_PARTS:
+        return 0
+    return 2 if b.startswith("rc-") else 1
+
+
 def merge(parts, repo, status, coverage=(set(), set())):
     """parts: [(name, rows)] in name order. Returns (rows, notes dict)."""
     rank = {"yes": 2, "no": 1, "?": 0}
@@ -369,8 +379,7 @@ def merge(parts, repo, status, coverage=(set(), set())):
                 continue
             if r["area"] in by_area:
                 first = by_area[r["area"]]
-                if os.path.basename(first["_file"]) in BASE_PARTS and \
-                        os.path.basename(r["_file"]) not in BASE_PARTS:
+                if part_rank(r["_file"]) > part_rank(first["_file"]):
                     # a session's part (a check run) supersedes the base inventory row
                     out[out.index(first)] = r
                     by_area[r["area"]] = r

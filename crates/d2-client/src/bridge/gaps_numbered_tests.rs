@@ -189,6 +189,8 @@ fn client_world_holds_only_stated_fields() {
         session_total,
         session_log,
         server_ticks,
+        // `msg-units.md` §3 rule 4.6 (REC-1901): 0x15 flags of the local player.
+        local_places: _,
         units,
         local_player,
         difficulty,

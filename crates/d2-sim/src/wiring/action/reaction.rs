@@ -22,6 +22,7 @@ use crate::stats::states::state;
 use crate::units::modes::{monster_mode, player_mode};
 use crate::units::{UnitId, UnitType};
 
+use crate::combat::damage::element_hit_class;
 use crate::combat::CombatWorld;
 use crate::monsters::ai::{AiModes, ModeTarget};
 use crate::path::coords::Point;
@@ -40,8 +41,8 @@ pub const EV_LEVELUP: u8 = 12;
 pub const RESULT_WILL_DIE: u32 = 2;
 
 /// The reaction `0x0057CEE0` (`damage.md` §7.1) of `d` to `a`'s hit:
-/// [`Pending::reaction`] (steps 1–2: the town rule and the hit class
-/// store), then step 3 (state 54), the monster branch (step 4) and the
+/// [`Pending::reaction`] (step 1: the town rule), then step 2 (the hit
+/// class store), step 3 (state 54), the monster branch (step 4) and the
 /// player branch (step 5).
 ///
 /// TODO(damage.md §7.1 step 1): the town rule's early return is the
@@ -53,6 +54,18 @@ pub fn reaction<X: Pending>(
     rec: &mut DamageRecord,
 ) {
     cv.v.h.x.reaction(a, d, rec);
+    // Step 2: an unfixed class without an element nibble takes the
+    // element hit class (§6.1, steps the process-wide counter); then
+    // D +0xB0 := R +0x60.
+    if rec.result & result::HIT != 0 {
+        if rec.hit_class_fixed == 0 && rec.hit_class & 0xF0 == 0 {
+            let base = rec.hit_class;
+            rec.hit_class = element_hit_class(cv.hit_class_counter(), rec, base);
+        }
+        if let Some(r) = cv.v.units.get_mut(d) {
+            r.hit_class = rec.hit_class;
+        }
+    }
     let will_die = u32::from(rec.result) & RESULT_WILL_DIE != 0;
     // Step 3.
     if cv.v.stats.has_state(d, state::UNINTERRUPTABLE) {

@@ -32,6 +32,7 @@ mod hireling_host;
 mod item_approach;
 mod item_save;
 mod npc_approach;
+mod object_approach;
 mod wired;
 
 #[cfg(test)]
@@ -359,6 +360,10 @@ pub trait WorldHost<D> {
     /// for (`inventory-moves.md` §7.1 step 2, `0x00548A50`; cursor flag
     /// `walk.2`), with the pick-up on arrival. Default: nothing.
     fn item_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId, bool)) {}
+    /// The run of `walk.0` to the object `walk.1` a 0x13 asked for
+    /// (`objects.md` §7.3 rule 4, `0x00548A50`), with the 0x13 case again
+    /// on arrival. Default: nothing.
+    fn object_walk(&mut self, game: &mut Game, events: &mut D, walk: (UnitId, UnitId)) {}
     /// The cube (`handlers::items`) on the host's economy.
     fn cube<C: CubeCall>(&mut self, game: &mut Game, events: &mut D, call: C) -> Option<C::Out> {
         None
@@ -532,6 +537,12 @@ pub fn handle<D: EventDispatch, W: WorldHost<D>>(
             let guid = u32::from_le_bytes([msg[5], msg[6], msg[7], msg[8]]);
             match sim.world.objects(game, events, player, guid)? {
                 ObjectCase::Code(c) => Some(Ok(Some(c))),
+                // Not in range / line blocked (`objects.md` §7.3 rule
+                // 4): the run to the object; result 0.
+                ObjectCase::Walk(object) => {
+                    sim.world.object_walk(game, events, (player, object));
+                    Some(Ok(Some(0)))
+                }
                 // Operate 23 (`waypoints.md` §5.2) on the host's
                 // waypoints; without them the id stays a stub.
                 ObjectCase::Waypoint(_) => {
@@ -1027,6 +1038,8 @@ pub struct PreviewMoveRest {
     /// writes made since ([`MoveRest::stage_quest_flags`]).
     quest_flags: BTreeMap<Owner, d2_sim::world::quests::QuestFlags>,
     quest_writes: Vec<(Owner, u8, u8, bool)>,
+    /// The pick-ups of the call (player, item), for the quest hook.
+    picked: Vec<(Owner, d2_sim::items::moves::Guid)>,
     /// The skill seams over the players' lists (REC-266).
     skills: super::items::moves::preview_skills::PreviewSkills,
 }
@@ -1053,6 +1066,11 @@ impl MovePending for PreviewMoveRest {
             let m = d2_sim::units::messages::remove_unit(4, item);
             self.sent.push((p, m.to_vec()));
         }
+    }
+    /// Hook ITEMPICKEDUP (`0x00543D80`): recorded, run on the quest
+    /// control after the call (`WiredWorld::moves`).
+    fn quest_item_picked(&mut self, player: Owner, item: d2_sim::items::moves::Guid) {
+        self.picked.push((player, item));
     }
     /// The staged quest record (`0x0065C310`).
     fn quest_flag(&self, player: Owner, quest: u8, flag: u8) -> bool {
@@ -1234,6 +1252,9 @@ impl MoveRest for PreviewMoveRest {
     }
     fn take_quest_flag_writes(&mut self) -> Vec<(Owner, u8, u8, bool)> {
         std::mem::take(&mut self.quest_writes)
+    }
+    fn take_picked_items(&mut self) -> Vec<(Owner, d2_sim::items::moves::Guid)> {
+        std::mem::take(&mut self.picked)
     }
 }
 

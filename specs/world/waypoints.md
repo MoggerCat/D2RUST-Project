@@ -33,19 +33,19 @@
 |   2. Waypoint record ("history") | 116–147 |
 |   3. Save field layout (owner of the save format: the character-save spec) | 148–170 |
 |   4. Which waypoints are known without operating one | 171–190 |
-|   5. Waypoint objects | 191–280 |
-|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 281–330 |
-|   7. Travel (`0x00584F60`) | 331–389 |
-|   8. Timing and message order | 390–411 |
-|   9. Town portals | 412–417 |
-|   10. Object mode change (consequence used above) | 418–425 |
-|   11. Act change (`0x0053ACC0`) | 426–514 |
-| Constants & data dependencies | 515–542 |
-| Randomness | 543–566 |
-| Edge cases & original bugs | 567–618 |
-| Test vectors | 619–663 |
-| Provenance | 664–709 |
-| Open questions | 710–795 |
+|   5. Waypoint objects | 191–286 |
+|   6. C→S 0x49 TakeOrCloseWp (`0x0054C5D0`) | 287–336 |
+|   7. Travel (`0x00584F60`) | 337–395 |
+|   8. Timing and message order | 396–417 |
+|   9. Town portals | 418–423 |
+|   10. Object mode change (consequence used above) | 424–431 |
+|   11. Act change (`0x0053ACC0`) | 432–520 |
+| Constants & data dependencies | 521–548 |
+| Randomness | 549–572 |
+| Edge cases & original bugs | 573–624 |
+| Test vectors | 625–669 |
+| Provenance | 670–715 |
+| Open questions | 716–801 |
 <!-- /index -->
 
 ## Summary
@@ -216,6 +216,12 @@ The waypoint section is 80 bytes (writer `0x005693E0`; readers
    + (`FrameCnt1` >> 8) via `0x005417D0` (= frame + 15 or + 20; never ≤
    frame). Then free **that node** and set the list head to null
    (edge case 3). Return.
+   Measured (2026-10-10, `gen-wp-*`, REC-1970): the mode-1 window after
+   a waypoint arrival lasts 15 frames (20 for 494, 496, 511, 539), then
+   ENDANIM sets mode 2. The delay is the record value (`FrameCnt1` × 256,
+   `data/fixups.md` §13) shifted right by 8, so an implementation must
+   feed this rule the fixed table; raw cell 15 >> 8 = 0 ends the mode
+   one frame after arrival (the divergence the 17 `gen-wp` checks showed).
 3. No match: if the object's room is in a town level → set mode 2
    (`0x00624690(object, 2)`). Otherwise the object stays in mode 0.
 
