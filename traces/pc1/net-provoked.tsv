@@ -1,0 +1,31 @@
+# pc1-net-provoked 1
+# tool: tools/trace-recorder/record_packets.py (through scenario_diff.py --orig-only for the named checks; the last scenario: record_state.py --write-save with the bind input and `--send "75 hex 69"`, then record_packets.py --auto on the saved character); 1.14d Game.exe on real Windows, ScnAma -seed 1234, 2026-10-10
+# type: client_out = the client's send, send = the recorder's injection, c2s / c2s_sys = the server's dispatch of a game / system message, s2c = server to client. frame '-' = before the first server tick (join). The ping's 4 bytes after the id are the client's millisecond clock.
+scenario	type	frame	phase	bytes
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	client_out	43	flush	1400006869000000
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	c2s	43	input	1400006869000000
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	s2c	44	tick	26050000010000007b4700686900
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	client_out	73	flush	150100796f000000
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	c2s	73	input	150100796f000000
+typed chat: Enter, '!hi', Enter (frame 30-44); Enter, 'yo', Enter (60-74)	s2c	73	input	2601000200000000000153636e416d6100796f00
+join: the client's own ping and the server's answer	client_out	-	start	6ded1b68010000000000000000
+join: the client's own ping and the server's answer	c2s_sys	-	input	6ded1b68010000000000000000
+join: the client's own ping and the server's answer	s2c	-	input	8f0000000000000000000000000000000000000000000000000000000000000000
+injected ping at frame 10 (gen-nets2c-ping)	client_out	9	flush	6d010000000000000000000000
+injected ping at frame 10 (gen-nets2c-ping)	send	9	-	6d010000000000000000000000
+injected ping at frame 10 (gen-nets2c-ping)	c2s_sys	9	input	6d010000000000000000000000
+injected ping at frame 10 (gen-nets2c-ping)	s2c	9	input	8f0000000000000000000000000000000000000000000000000000000000000000
+injected 8-byte overhead chat at frame 10 (net-overhead-inject-ama)	client_out	9	flush	1400006869000000
+injected 8-byte overhead chat at frame 10 (net-overhead-inject-ama)	send	9	-	1400006869000000
+injected 8-byte overhead chat at frame 10 (net-overhead-inject-ama)	c2s	9	input	1400006869000000
+injected 8-byte overhead chat at frame 10 (net-overhead-inject-ama)	s2c	10	tick	2605000001000000110000686900
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	client_out	55	flush	5102000000ffffffff
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	c2s	55	input	5102000000ffffffff
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	client_out	63	flush	51ffff0000ffffffff
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	client_out	63	flush	5102000000ffffffff
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	c2s	63	input	51ffff0000ffffffff
+hotkey bind: skill list open, pointer on Throw, F1 at frame 56 and again at 64	c2s	63	input	5102000000ffffffff
+injected BindHotkey at frame 10 (gen-nets2c-hotkey)	client_out	9	flush	5100800000ffffffff
+injected BindHotkey at frame 10 (gen-nets2c-hotkey)	send	9	-	5100800000ffffffff
+injected BindHotkey at frame 10 (gen-nets2c-hotkey)	c2s	9	input	5100800000ffffffff
+join of a character saved by 1.14d with F1 = Throw	s2c	1	input	7b000200ffffffff

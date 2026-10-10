@@ -197,7 +197,7 @@ Multiplayer and the Convert prompt (their buttons did not react to posted or
 held clicks in three tries). Test saves left in the save folder: `Doll*`,
 `FeClassic`.
 
-## Push 11 (17:05) — new goal (99 %); rain lines
+## Push 11 (16:59) — new goal (99 %); rain lines
 
 Merged `claude/integ-r23` 174dbce3d (ledger: EQUAL 2866 of 4479, check 0
 errors). `pc1-data.md` Step 4: no new open item at this merge. REC used:
@@ -236,7 +236,7 @@ names the groups of equal runs.
 Open: re-run of the 35 scenes and the draws checks on this merge (next
 round); music-stream pairing; the 117 rows still marked needs_pc1.
 
-## Push 12 (17:30) — music pairing solved; draws checks re-run
+## Push 12 (17:27) — music pairing solved; draws checks re-run
 
 REC used: 2446.
 
@@ -272,7 +272,7 @@ REC used: 2446.
 Running: pixel comparison of the 35 scenes on this merge. Open: the other
 three audio checks at Music Volume 100; the 117 needs_pc1 rows.
 
-## Push 13 (18:50) — merge 02516cee1; pixels round 2; rain is now the blocker
+## Push 13 (17:59) — merge 02516cee1; pixels round 2; rain is now the blocker
 
 Merged `claude/integ-r23` 02516cee1 (ledger: EQUAL 3116 of 4479, check 0
 errors). Step 4: no new item. Recorders unchanged, so every 1.14d side in
@@ -299,7 +299,7 @@ Running: a sample of cloud (Wine) 1.14d recordings re-recorded on Windows
 and compared line by line. Next: the rain colour tables read from the live
 game; the other three audio checks at Music Volume 100.
 
-## Push 14 (20:05) — 9 waypoint rows EQUAL; rain colours; Wine = Windows
+## Push 14 (18:28) — 9 waypoint rows EQUAL; rain colours; Wine = Windows
 
 REC used: 2447. Ledger: EQUAL 3125 of 4479 (+9), check 0 errors.
 
@@ -334,3 +334,35 @@ REC used: 2447. Ledger: EQUAL 3125 of 4479 (+9), check 0 errors.
 
 Open: nothing in Step 4. Still DIVERGED on Windows: all 38 draws checks
 (16 at the first rain line), the four audio checks.
+
+## Push 15 (19:00) — merge c3e9ddc24; Step 4 [rc-link-2] answered
+
+Merged `claude/integ-r23` c3e9ddc24. Ledger: EQUAL 3217 of 4479 (13 of
+them from this push), check 0 errors. Messages recorded for this item:
+`traces/pc1/net-provoked.tsv`. (Push times above were corrected to the
+commit times.)
+
+- **13 client-message ids without a handler → EQUAL**: 13 injected checks
+  `net-c2s-unused-XX-ama`, packets MATCH on both sides (1.14d neither
+  dispatches nor answers; the game runs on).
+- **Overhead chat (c2s 0x14) → DIVERGED with the cause.** The real client's
+  message for `!hi` is 8 bytes; the cloud's injected one had 7, and 1.14d
+  drops that before dispatch. With 8 bytes 1.14d answers S→C 0x26 (type 5)
+  one frame later; d2rs sends none. Typed chat works with posted input on
+  Windows (`net-chat-typed-ama`: 0x14, 0x15, both 0x26 forms). Row
+  `q-fix-pc1today-overhead-chat`.
+- **Pong (s2c 0x8F)**: 1.14d sends it, at the join (answer to the client's
+  own ping, before tick 1) and again for the injected ping at frame 9.
+  d2rs has no join ping, and handles the injected ping twice. The packets
+  comparison still says MATCH: it leaves system messages and the pre-tick
+  join records out. Row `join-ping-pong`.
+- **Hotkey (s2c 0x7B)**: sent only at the join, one per hotkey in the save
+  (recorded: `7b 00 02 00 ff ff ff ff` for F1 = Throw on a save written by
+  1.14d; the save is in the private repo). A bind in game sends C→S 0x51
+  and no 0x7B (`net-hotkey-bind-ama`; d2rs has no headless skill hotkey).
+  Row `hotkey-join`.
+- The 37 s2c ids on the stub handler `0x0045C900` cannot be provoked by any
+  session; party / trade / PvP ids need two clients (Other Multiplayer is
+  out of scope); item creation R1 not done.
+
+Open in Step 4: nothing else.

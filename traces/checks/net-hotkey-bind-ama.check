@@ -1,0 +1,13 @@
+check 1
+# Binding a skill hotkey with real input: the right skill list is opened (held click on the
+# button), the pointer goes onto the Throw icon, F1 is pressed twice. The 1.14d client sends
+# C->S 0x51 (bind; then clear and bind again); the server sends no S->C 0x7B for it
+# (0x7B comes only at the join of a save that holds hotkeys). pc1-data.md Step 4 [rc-link-2].
+# Spec: specs/tools/scenario-diff.md §3 (input).
+name net-hotkey-bind-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 80
+seconds 300
+channels packets
+input orig frame 40; hold 660 570 2; frame 50; move 660 500; frame 56; key 112; frame 64; key 112

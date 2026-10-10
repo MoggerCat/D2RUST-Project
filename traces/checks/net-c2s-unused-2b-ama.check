@@ -1,0 +1,12 @@
+check 1
+# C->S id 0x2b: an id with no handler in 1.14d's client-message table. The one-byte message is
+# injected at frame 10 on both sides; the packets channel compares every message of the window.
+# 1.14d: no dispatch, no answer, the game runs on. Answers pc1-data.md Step 4 [rc-link-2].
+# Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
+name net-c2s-unused-2b-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 300
+channels packets
+at 10 send hex 2b

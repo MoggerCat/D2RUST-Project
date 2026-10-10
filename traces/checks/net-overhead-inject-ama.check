@@ -1,0 +1,13 @@
+check 1
+# C->S 0x14 overhead chat, injected with the layout the 1.14d client itself sends for '!hi'
+# (recorded in net-chat-typed-ama): 14, u16 0, the text and its NUL, two more NULs: 8 bytes. The 7-byte
+# form of gen-nets2c-overhead is dropped by 1.14d before dispatch. 1.14d answers S->C 0x26 (type 5) one
+# frame later. Answers pc1-data.md Step 4 [rc-link-2].
+# Spec: specs/tools/scenario-diff.md, specs/tools/poke.md.
+name net-overhead-inject-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 30
+seconds 300
+channels packets
+at 10 send hex 14 00 00 68 69 00 00 00

@@ -1,0 +1,15 @@
+check 1
+# Typed chat in a single-player game: the 1.14d client itself sends C->S 0x14
+# (overhead, a line that starts with '!') and 0x15 (chat): Enter opens the
+# chat line, the text is typed, Enter sends. The injected form
+# (gen-nets2c-overhead, `send hex 14 ...`) never shows 0x14 on the 1.14d
+# packets channel, because an injected message does not pass the client's
+# send hook. Answers pc1-data.md Step 4 [rc-link-2] (net.c2s 0x14).
+# Spec: specs/tools/scenario-diff.md §3 (input), specs/ui/messages.md.
+name net-chat-typed-ama
+save ScnAma --class ama --expansion
+seed 1234
+ticks 110
+seconds 300
+channels packets
+input orig frame 30; key ENTER; frame 36; text !hi; frame 44; key ENTER; frame 60; key ENTER; frame 66; text yo; frame 74; key ENTER

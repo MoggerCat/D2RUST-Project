@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "net-c2s-unused-5a-ama",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "30",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--difficulty",
+  "normal",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "10 hex 5a"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "087c03d05da930a86ed58054f2049a78a35875eb573d083cbbc492fde423ab36",
+   "size": 131733
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "30f8fbe5b75904168d0fd4617be2e038588128efc050ae67b61d6a97b7badcf7",
+  "format": "orig-cache-key-2",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "game-exe:631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "recorder": "6343090c278ffba3d71a48416f0b616117c721a1509d8e1ac24b37b3a244d1ed",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}
