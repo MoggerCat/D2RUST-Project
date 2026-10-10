@@ -1460,3 +1460,28 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | pal-cleansing | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
 | pal-concentration | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 24 (id 0xaa) | unrouted |
 | pal-conviction | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-defiance | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 22 (id 0xaa) | unrouted |
+| pal-fanaticism | packets | DIVERGED | 68/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 29 (id 0xaa) | unrouted |
+| pal-holy-fire | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-meditation | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-might | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 21 (id 0xaa) | unrouted |
+| pal-prayer | packets | DIVERGED | 65/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-redemption | packets | DIVERGED | 68/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-resist-cold | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| pal-resist-fire | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| pal-resist-lightning | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) | unrouted |
+| pal-salvation | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 25 (id 0xaa) | unrouted |
+| pal-thorns | packets | DIVERGED | 69/70 | frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) | unrouted |
+| pal-vigor | packets | DIVERGED | 69/70 | frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 27 (id 0xaa) | unrouted |
+| save-fresh-ama | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
+| save-merc-bar | save | ERROR | 0/0 | channel without ORIG_OUTPUTS entry: save | unrouted |
+| sor-blizzard | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-fire-wall | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-frozen-orb | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| sor-hydra | packets | DIVERGED | 69/70 | frame 26 stream s2c #3 id: 1.14d a7 vs d2rs ac (id 0xa7) | unrouted |
+| sor-meteor | packets | DIVERGED | 69/70 | frame 26 stream s2c #0 missing in d2rs (id 0xa7) | unrouted |
+| ui-draws-char-skill-ama | draws | DIVERGED | 0/1 | tick 72 draw row 9 (CelDrawColor) column op: 1.14d CelDrawColor vs d2rs CelDraw | unrouted |
+| ui-draws-inv-char-l5-ama | draws | DIVERGED | 0/1 | tick 72 draw row 22 (CelDraw) column op: 1.14d CelDraw vs d2rs CelDrawColor | unrouted |
+| ui-draws-inv-char-tip-ama | draws | DIVERGED | 0/1 | tick 72 draw row 249 (CelDrawColor) column frame: 1.14d 54 vs d2rs 48 | unrouted |
+| ui-draws-quest-inv-ama | draws | DIVERGED | 0/1 | tick 72 draw row 59 (CelDraw) column frame: 1.14d 0 vs d2rs 2 | unrouted |
+| ui-draws-quest-skill-ama | draws | DIVERGED | 0/1 | tick 72 draw row 28 (CelDrawColor) column op: 1.14d CelDrawColor vs d2rs CelDraw | unrouted |

@@ -717,7 +717,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2661
 - Rows set exercised = yes from the coverage reports' seen lists: 19
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6215
+- Duplicate areas between parts: 6232
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -747,17 +747,34 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.superunique.dark-elder`: q-chk-act2.tsv:34 kept, q-run-gen-bosses.tsv:37 dropped
   - `skill.ama.dopplezon`: q-chk-skills-4cls.tsv:21 kept, q-run-gen-skills.tsv:25 dropped
   - `skill.ama.valkyrie`: q-chk-skills-4cls.tsv:24 kept, q-run-gen-skills.tsv:29 dropped
+  - `skill.sor.fire-wall`: q-chk-skills-4cls.tsv:41 kept, q-run-gen-skills.tsv:48 dropped
+  - `skill.sor.meteor`: q-chk-skills-4cls.tsv:46 kept, q-run-gen-skills.tsv:53 dropped
+  - `skill.sor.blizzard`: q-chk-skills-4cls.tsv:49 kept, q-run-gen-skills.tsv:56 dropped
   - `skill.sor.hydra`: q-chk-skills-4cls.tsv:51 kept, q-run-gen-skills.tsv:59 dropped
+  - `skill.sor.frozen-orb`: q-chk-skills-4cls.tsv:52 kept, q-run-gen-skills.tsv:61 dropped
   - `skill.nec.clay-golem`: q-chk-skills-4cls.tsv:61 kept, q-run-gen-skills.tsv:72 dropped
   - `skill.nec.bone-wall`: q-chk-skills-4cls.tsv:64 kept, q-run-gen-skills.tsv:75 dropped
+  - `skill.pal.might`: q-chk-skills-4cls.tsv:82 kept, q-run-gen-skills.tsv:95 dropped
+  - `skill.pal.prayer`: q-chk-skills-4cls.tsv:83 kept, q-run-gen-skills.tsv:96 dropped
+  - `skill.pal.resist-fire`: q-chk-skills-4cls.tsv:84 kept, q-run-gen-skills.tsv:97 dropped
+  - `skill.pal.holy-fire`: q-chk-skills-4cls.tsv:86 kept, q-run-gen-skills.tsv:99 dropped
+  - `skill.pal.thorns`: q-chk-skills-4cls.tsv:87 kept, q-run-gen-skills.tsv:100 dropped
+  - `skill.pal.defiance`: q-chk-skills-4cls.tsv:88 kept, q-run-gen-skills.tsv:101 dropped
+  - `skill.pal.resist-cold`: q-chk-skills-4cls.tsv:89 kept, q-run-gen-skills.tsv:102 dropped
   - `skill.pal.charge`: q-chk-skills-4cls.tsv:91 kept, q-run-gen-skills.tsv:104 dropped
   - `skill.pal.blessed-aim`: q-chk-skills-4cls.tsv:92 kept, q-run-gen-skills.tsv:105 dropped
   - `skill.pal.cleansing`: q-chk-skills-4cls.tsv:93 kept, q-run-gen-skills.tsv:106 dropped
+  - `skill.pal.resist-lightning`: q-chk-skills-4cls.tsv:94 kept, q-run-gen-skills.tsv:107 dropped
   - `skill.pal.concentration`: q-chk-skills-4cls.tsv:97 kept, q-run-gen-skills.tsv:110 dropped
   - `skill.pal.holy-freeze`: q-chk-skills-4cls.tsv:98 kept, q-run-gen-skills.tsv:111 dropped
+  - `skill.pal.vigor`: q-chk-skills-4cls.tsv:99 kept, q-run-gen-skills.tsv:112 dropped
   - `skill.pal.holy-shock`: q-chk-skills-4cls.tsv:102 kept, q-run-gen-skills.tsv:115 dropped
   - `skill.pal.sanctuary`: q-chk-skills-4cls.tsv:103 kept, q-run-gen-skills.tsv:116 dropped
+  - `skill.pal.meditation`: q-chk-skills-4cls.tsv:104 kept, q-run-gen-skills.tsv:117 dropped
+  - `skill.pal.fanaticism`: q-chk-skills-4cls.tsv:106 kept, q-run-gen-skills.tsv:119 dropped
   - `skill.pal.conviction`: q-chk-skills-4cls.tsv:107 kept, q-run-gen-skills.tsv:120 dropped
+  - `skill.pal.redemption`: q-chk-skills-4cls.tsv:108 kept, q-run-gen-skills.tsv:121 dropped
+  - `skill.pal.salvation`: q-chk-skills-4cls.tsv:109 kept, q-run-gen-skills.tsv:122 dropped
   - `skill.bar.leap`: q-chk-skills-bda.tsv:9 kept, q-run-gen-skills.tsv:129 dropped
   - `skill.bar.shout`: q-chk-skills-bda.tsv:15 kept, q-run-gen-skills.tsv:135 dropped
   - `skill.bar.leap-attack`: q-chk-skills-bda.tsv:20 kept, q-run-gen-skills.tsv:140 dropped
@@ -9266,27 +9283,27 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.pal.cleansing` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-cleansing packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
 | `skill.pal.concentration` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-113 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 24 (id 0xaa) |
 | `skill.pal.conviction` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-conviction packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
-| `skill.pal.defiance` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-104 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 22 (id 0xaa) |
-| `skill.pal.fanaticism` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-122 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 29 (id 0xaa) |
-| `skill.pal.holy-fire` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-holy-fire packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
+| `skill.pal.defiance` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-104 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 22 (id 0xaa) |
+| `skill.pal.fanaticism` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-122 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 29 (id 0xaa) |
+| `skill.pal.holy-fire` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-holy-fire packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
 | `skill.pal.holy-freeze` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-run-2b: PARTIAL pal-holy-freeze (not EQUAL under REC-2055/2056) |
 | `skill.pal.holy-shock` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-2b: PARTIAL pal-holy-shock (not EQUAL under REC-2055/2056) |
-| `skill.pal.meditation` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-meditation packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
-| `skill.pal.might` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-98 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 21 (id 0xaa) |
-| `skill.pal.prayer` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-prayer packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
-| `skill.pal.redemption` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: pal-redemption packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
-| `skill.pal.resist-cold` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-105 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
-| `skill.pal.resist-fire` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-100 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
-| `skill.pal.resist-lightning` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-110 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
-| `skill.pal.salvation` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-125 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 25 (id 0xaa) |
+| `skill.pal.meditation` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-meditation packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
+| `skill.pal.might` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-98 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 21 (id 0xaa) |
+| `skill.pal.prayer` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-prayer packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
+| `skill.pal.redemption` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: pal-redemption packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
+| `skill.pal.resist-cold` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-105 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
+| `skill.pal.resist-fire` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-100 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
+| `skill.pal.resist-lightning` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-110 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 23 (id 0xaa) |
+| `skill.pal.salvation` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-125 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 25 (id 0xaa) |
 | `skill.pal.sanctuary` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-class-rows | specs/skills/functions.tsv,specs/skills/bodies.md | rc-run-2b: PARTIAL pal-sanctuary (not EQUAL under REC-2055/2056) |
-| `skill.pal.thorns` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-thorns packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
-| `skill.pal.vigor` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-115 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 27 (id 0xaa) |
-| `skill.sor.blizzard` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-59 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.fire-wall` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-51 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.frozen-orb` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate: gen-skill-sor-64 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
-| `skill.sor.hydra` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-62 packets: frame 26 stream s2c #3 id: 1.14d a7 vs d2rs ac (id 0xa7) |
-| `skill.sor.meteor` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-56 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
+| `skill.pal.thorns` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: pal-thorns packets: frame 2 stream s2c #72 size: 1.14d 14 vs d2rs 17 (id 0xa8) |
+| `skill.pal.vigor` | entity | DIVERGED | M | DIVERGED@2 | yes | 0 | n | claude/q-fix-skills-4cls | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-pal-115 packets: frame 2 stream s2c #1 size: 1.14d 12 vs d2rs 27 (id 0xaa) |
+| `skill.sor.blizzard` | entity | DIVERGED | M | DIVERGED@26 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-59 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
+| `skill.sor.fire-wall` | entity | DIVERGED | M | DIVERGED@26 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-51 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
+| `skill.sor.frozen-orb` | entity | DIVERGED | M | DIVERGED@26 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate: gen-skill-sor-64 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
+| `skill.sor.hydra` | entity | DIVERGED | M | DIVERGED@26 | yes | 0 | n | claude/rc-skill-hydra-valk | specs/skills/bodies-2.md | rc-a8-setstate: gen-skill-sor-62 packets: frame 26 stream s2c #3 id: 1.14d a7 vs d2rs ac (id 0xa7) |
+| `skill.sor.meteor` | entity | DIVERGED | M | DIVERGED@26 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: gen-skill-sor-56 packets: frame 26 stream s2c #0 missing in d2rs (id 0xa7) |
 | `state.item.own.monster-equip` | content | DIVERGED | S | DIVERGED@30 | yes | 1 | n | claude/rc-gen-skill | specs/tools/state-snapshot.md | gen-skill-ama-32 packets: frame 30 stream s2c #1 id: 1.14d a7 vs d2rs ac (id 0xa7) |
 | `hireling.skills.barbarian` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
 | `hireling.skills.eastern-sorceror` | entity | NO-CHECK | M | - | ? | 5 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/world/hirelings.md,specs/world/hirelings-2.md,specs/world/hirelings-ai.md,specs/skills/use.md | hireling skill set from hireling.txt; the merc-* checks cover movement/fight of the merc, not each skill; grouped per hireling type, one code path (use.md) |
