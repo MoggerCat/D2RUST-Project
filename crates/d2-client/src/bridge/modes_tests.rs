@@ -246,7 +246,7 @@ fn monster_hit_codes_store_the_hit_class() {
     assert_eq!(monster_after(&i, 1, 0x13, [1, 2, 3, 4, 5, 0, 6]), 1);
 }
 
-// Covers: specs/client/model.md §19 r4 (F: path stop `0x00650590`)
+// Covers: specs/client/model.md §19 r4
 #[test]
 fn the_neutral_fallback_stops_the_path_at_the_cell_centre() {
     let i = monster_inputs();
