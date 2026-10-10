@@ -139,6 +139,13 @@ impl Panel for EscMenuUi {
         self.sh.borrow().config.screen.rect()
     }
 
+    /// UI pass step 1 (`ui/panels.md` §5 r1): `[9]` → `0x0047E3D0`, before
+    /// the inventory family and the control panel (`a1-panel-esc-menu`,
+    /// 1.14d draws `options` … `pentspin` ahead of `800ctrlpnl7`).
+    fn draw_first(&self) -> bool {
+        true
+    }
+
     fn draw(&self, ctx: &UiCtx, out: &mut dyn UiDrawSink) {
         {
             let mut sh = self.sh.borrow_mut();

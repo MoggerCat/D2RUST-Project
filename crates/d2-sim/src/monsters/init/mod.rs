@@ -193,6 +193,20 @@ pub struct MonsterData {
     /// +0x54 dwAiState (`monsters/ai.md` §3 "AI state"): 0 at creation;
     /// set by `0x005734C0` and the mode set's `0x005A68E0`.
     pub ai_state: u32,
+    /// +0x50: the coordinate record ("vision" record, `monsters/ai.md`
+    /// §5.2 steps 2 and 7) set at creation by `0x00552D60`
+    /// (`population.md` §9.6 step 3); `None` = null.
+    pub vision: Option<VisionRecord>,
+}
+
+/// A DRLG coordinate record (`drlg/levels.md` §11) by identity: its act,
+/// clipped rectangle (tiles) and index. Monsters holding the same record
+/// share its +0x24 word (`monsters/ai.md` §5.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VisionRecord {
+    pub act: u8,
+    pub rect: [i32; 4],
+    pub index: i32,
 }
 
 impl MonsterData {

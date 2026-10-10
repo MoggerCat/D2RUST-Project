@@ -55,7 +55,8 @@ PART_COLS = ["area", "kind", "group", "source_1.14d", "specs", "spec_status", "c
 
 
 def check_names(pattern=None):
-    names = sorted(os.path.basename(p)[:-6] for p in glob.glob(os.path.join(CHECKS, "*.check")))
+    names = sorted(os.path.basename(p)[:-6] for p in glob.glob(os.path.join(CHECKS, "*.check")) +
+                   glob.glob(os.path.join(CHECKS, "gen", "gen-*.check")))
     return [n for n in names if not pattern or fnmatch.fnmatch(n, pattern)]
 
 
@@ -66,8 +67,13 @@ def cmd_run(args, run=subprocess.run):
     bad = []
     for n in check_names(args.filter):
         work = os.path.join(args.dir, n)
-        cmd = [sys.executable, SCENARIO, os.path.join(CHECKS, n + ".check"),
+        path = os.path.join(CHECKS, n + ".check")
+        if not os.path.exists(path):
+            path = os.path.join(CHECKS, "gen", n + ".check")
+        cmd = [sys.executable, SCENARIO, path,
                "--channels", "packets", "--work", work]
+        if getattr(args, "orig_cache", False):
+            cmd += ["--orig-cache", "--fill-cache"]
         if args.reuse_orig:
             cmd.append("--reuse-orig")
         print("census:", n, flush=True)
@@ -306,9 +312,37 @@ def write_part(rows, path):
             f.write("\t".join(r[c] for c in PART_COLS) + "\n")
 
 
+def merge_seed(table, path):
+    """Fold an earlier census TSV (tsv_lines format) into `table`: its counts
+    add to the rows built from the work dirs, its first equal / first
+    diverged stay when the new data has none (checks lists are the TSV's
+    first three names, enough for the ledger rows)."""
+    with open(path, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f, delimiter="\t"))
+    for o in rows:
+        if o["state"] == "NOT-CARRIED":
+            continue
+        r = table.setdefault((o["stream"], int(o["id"], 16)), new_row())
+        r["checks"] |= {c for c in o["carried_by"].replace("…", "").split(",") if c and c != "-"}
+        r["records"] += int(o["records"])
+        r["equal"] += int(o["equal"])
+        r["diverged"] += int(o["diverged"])
+        if r["first_equal"] is None and o["first_equal"] != "-":
+            n, w = o["first_equal"].rsplit("@", 1)
+            r["first_equal"] = (n, int(w))
+        if r["first_diverged"] is None and o["first_diverged"] != "-":
+            head, _, rest = o["first_diverged"].partition(" 1.14d ")
+            n, _, wh = head.partition("@")
+            w, _, where = wh.partition(":")
+            x, _, y = rest.partition(" vs d2rs ")
+            r["first_diverged"] = (n, int(w), where, x or None, y or None)
+
+
 def cmd_report(args):
     dirs = [args.dir, SUITE_DIR] if args.dir != SUITE_DIR else [SUITE_DIR]
     table, status = build(dirs, args.filter)
+    for seed in args.seed_tsv or []:
+        merge_seed(table, seed)
     tool_cmd = "python3 tools/packet-census/packet_census.py report " + " ".join(sys.argv[2:])
     if args.md:
         with open(args.md, "w", encoding="utf-8") as f:
@@ -380,6 +414,8 @@ def main(argv=None):
     r.add_argument("--filter", default=None)
     r.add_argument("--dir", default=DEFAULT_DIR)
     r.add_argument("--reuse-orig", action="store_true")
+    r.add_argument("--orig-cache", action="store_true",
+                   help="1.14d side through traces/orig-cache (filled on a miss)")
     p = sub.add_parser("report")
     p.add_argument("--filter", default=None)
     p.add_argument("--dir", default=DEFAULT_DIR)
@@ -387,6 +423,7 @@ def main(argv=None):
     p.add_argument("--tsv", default=None)
     p.add_argument("--ledger", default=None, help="fidelity-ledger.tsv (the net.* rows to settle)")
     p.add_argument("--part", default=None, help="part file to write")
+    p.add_argument("--seed-tsv", action="append", help="earlier census TSV whose rows are added")
     a = ap.parse_args(argv)
     if a.selftest:
         return selftest()

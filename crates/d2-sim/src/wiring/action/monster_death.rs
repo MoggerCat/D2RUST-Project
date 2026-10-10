@@ -17,8 +17,9 @@
 //! a host that does not, the wiring runs it after the host's start
 //! ([`ActionHooks::monster_death`]).
 //!
-//! Seams: the target-node lists are the host's
-//! ([`Pending::target_nodes`]): only unit +0xD0 is written here; the
+//! Seams: the slot heads of the target-node lists are the host's
+//! ([`Pending::target_nodes`]); the node leaves [`Game::target_nodes`]
+//! and unit +0xD0 is reset here; the
 //! pack handover acts on the AI store's controls and is skipped while
 //! the store is lent (a kill inside a think).
 
@@ -104,6 +105,7 @@ pub fn death_cleanup<X: Pending>(h: &mut ActionHooks<X>, sim: &mut Sim<'_>, unit
         pack_handover(store, sim.game, unit);
     }
     // `0x005B1A90`: the target-node list leave.
+    sim.game.target_nodes.remove(unit);
     if let Some(r) = sim.units.get_mut(unit) {
         r.node_index = INITIAL_NODE_INDEX;
         r.flags &= !CLEARED_FLAGS;

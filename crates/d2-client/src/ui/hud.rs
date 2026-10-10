@@ -544,6 +544,8 @@ impl Panel for HudUi {
         out.extend_one(cel(files, "panel\\menubutton", menu));
         // §5 the belt (before the skill buttons, §1 r3).
         let (res2, items_ui) = (sh.config.screen.res2(), &sh.items);
+        hud.belt.state_1f_open = sh.states.is_open(0x1F);
+        hud.belt.state_9_open = sh.states.is_open(9);
         hud.belt
             .draw(world, items_ui, files, (w, h), res2, mouse, living, out);
         // §7 r2 skill buttons.

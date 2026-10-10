@@ -71,6 +71,19 @@ impl<X: WorldPending> MonsterInit for WorldHost<'_, X> {
         x: i32,
         y: i32,
     ) {
+        // PROVISIONAL (`monsters/ai.md` §5.2, `population.md` §9.6 step 3;
+        // REC-1698): the record is kept by identity (act, rect, index);
+        // a given record `rect` is the caller's, else the one at (x, y).
+        let act = self.game.lists.room(room).map(|r| r.act);
+        let rec =
+            rect.or_else(|| crate::monsters::population::PopWorld::coord_at(self, room, x, y));
+        if let (Some(act), Some(m)) = (act, self.w.monsters.get_mut(unit)) {
+            m.vision = rec.map(|c| crate::monsters::init::VisionRecord {
+                act,
+                rect: c.rect,
+                index: c.index,
+            });
+        }
         self.v.h.x.set_coord_record(unit, rect, room, x, y);
     }
 

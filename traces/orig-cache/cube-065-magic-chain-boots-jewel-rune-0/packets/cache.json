@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-065-magic-chain-boots-jewel-rune-0",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "4e054fb493bb2e33555e2e976bc9c254625df819f60b64d67b45a6a29bf38f2c",
+   "size": 49590
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "d385859319d9b172ea59d9c893b23dbdb80180ee2246c08cc32e4fc778a58616",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "b7edb00d381e5b0e1b8b9e5aa6ba7c4cc0d5bd2fdc77ed1f65647df1d79046ec"
+ }
+}

@@ -125,6 +125,19 @@ def d2rs_script(steps, scene_tick, mark_index, mode):
 
 # --- 1.14d ---------------------------------------------------------------------------
 
+def reset_game_settings():
+    """1.14d writes `Mini Panel` at exit (control-panel.md §9 r9: 1 = closed next game), so a
+    second run in one Wine prefix starts with the mini panel closed. d2rs has no registry and
+    opens it, as a first game does: the recording starts from the same settings (no value)."""
+    reg = os.path.join(os.environ.get("WINEPREFIX", os.path.expanduser("~/.wine-d2")), "user.reg")
+    if not os.path.exists(reg):
+        return
+    lines = open(reg, encoding="utf-8", errors="surrogateescape", newline="").read().split("\n")
+    keep = [l for l in lines if not l.startswith(('"Mini Panel"=', '"Help Menu"='))]
+    if len(keep) != len(lines):
+        open(reg, "w", encoding="utf-8", errors="surrogateescape", newline="").write("\n".join(keep))
+
+
 def record_orig(name, g, out, reuse):
     cap, img = os.path.join(out, "cap.jsonl"), os.path.join(out, "img")
     if reuse and os.path.exists(cap):
@@ -133,6 +146,7 @@ def record_orig(name, g, out, reuse):
     if os.path.isdir(out):
         shutil.rmtree(out)
     os.makedirs(img)
+    reset_game_settings()
     # Wine runs about 1.1 server ticks per second with a PNG per frame: a long group (an outdoor
     # level by the town waypoint, ~500 ticks) needs more than the fixed 420 s (q-chk-render-world)
     total = sum(int(m) for m in re.findall(r"waitticks (\d+)", g["script"]))

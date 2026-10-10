@@ -689,11 +689,17 @@ pub trait QuestWorld {
         self.unhandled(0xFF, 0x005A_43E0);
         None
     }
-    /// `0x005B3090`: spawn a monster at a unit in `mode`.
+    /// `0x005B3090(game, room, x, y, class, mode, flags)` at a unit's
+    /// room and position: `0x005B2F20` with spread −1 (`monsters/init.md`
+    /// §1) through [`Self::spawn_monster_flags`]. A unit without a room:
+    /// nothing.
+    ///
+    /// PROVISIONAL (`quests-act3.md` §7.7; REC-1696): the flags argument
+    /// is 0, as the same wrapper's palace Kaelan call (`quests-act2-2.md`
+    /// init 19); the orb's own flags are a PC 1 question.
     fn spawn_monster_at_unit(&mut self, unit: UnitId, class: u16, mode: u8) -> Option<UnitId> {
-        let _ = (unit, class, mode);
-        self.unhandled(0xFF, 0x005B_3090);
-        None
+        let (x, y, room) = self.unit_position(unit)?;
+        self.spawn_monster_flags(room, x, y, class, mode, -1, 0)
     }
     /// `0x005DDFC0(game, monster, mode, x, y)`: the AI mode request at a
     /// point (`monsters/ai.md` §7.1; the orb kill of `quests-act3.md` §6

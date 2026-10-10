@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "merc-desert-cow",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "330",
+  "--ticks",
+  "120",
+  "--auto",
+  "ScnBar",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+6 @y normal"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "85749752841e015f73169deebb675a56b6bee15afb096d45b62440b95e3ef2ba",
+   "size": 224153
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "513222e23c585a03c81fb22cd797cc3fa37daec220ebdd18652c311a535d64e1",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "852e267279d0d5801815cfb6f12e9aec69deb8fdc0b8710335717144944359ce"
+ }
+}

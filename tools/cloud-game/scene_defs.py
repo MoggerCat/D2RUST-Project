@@ -2,13 +2,13 @@
 GROUPS = {
     "panels": {
         "char": "SceSor", "seed": 1234,
-        "script": "waitticks 20; mark idle; key I; waitticks 30; mark inv; click 678 330; waitticks 10; "
+        "script": "waitticks 20; mark idle; key I; waitticks 28; mark inv; waitticks 2; click 678 330; waitticks 10; "
                   "click 563 250; waitticks 15; mark invbelt; key I; waitticks 20; "
-                  "key 0xC0; waitticks 30; mark belt; key 0xC0; waitticks 15; "
-                  "key C; waitticks 30; mark char; key C; waitticks 20; "
-                  "key T; waitticks 30; mark skill; key T; waitticks 20; "
-                  "key TAB; waitticks 30; mark automap; key TAB; waitticks 20; "
-                  "key I; waitticks 10; rclick 446 345; waitticks 30; mark cube; key ESC; waitticks 20; "
+                  "key 0xC0; waitticks 28; mark belt; waitticks 2; key 0xC0; waitticks 15; "
+                  "key C; waitticks 28; mark char; waitticks 2; key C; waitticks 20; "
+                  "key T; waitticks 28; mark skill; waitticks 2; key T; waitticks 20; "
+                  "key TAB; waitticks 28; mark automap; waitticks 2; key TAB; waitticks 20; "
+                  "key I; waitticks 10; rclick 446 345; waitticks 28; mark cube; waitticks 2; key ESC; waitticks 20; "
                   "key ESC; wait 4; mark esc; key ESC; wait 2; end",
         "scenes": {"a1-panel-inventory": ("inv", 0), "a1-panel-character": ("char", 0),
                    "a1-panel-skilltree": ("skill", 0), "a1-panel-automap": ("automap", 0),
@@ -34,6 +34,21 @@ GROUPS["npc"] = {
     "script": "goto 2 267; waitticks 70; mark s0; waitticks 30; mark s1; "
               "goto 1 150; waitticks 70; mark n0; waitticks 30; mark n1; waitticks 10; end",
     "scenes": {"s0": ("s0", 0), "s1": ("s1", 0), "n0": ("n0", 0), "n1": ("n1", 0)},
+}
+
+# quest log (Q), then the Act I waypoint menu (walk to it, open it): fixed clicks like `fight`
+GROUPS["panels2"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": "waitticks 20; key Q; waitticks 30; mark quest; key Q; waitticks 20; "
+              "click 700 300; waitticks 60; click 650 300; waitticks 40; mark wp; waitticks 6; end",
+    "scenes": {"a1-panel-quest-log": ("quest", 0), "a1-panel-waypoint": ("wp", 0)},
+}
+
+# the stash: click the chest next to the barrel (screen 268, 226 from the start), wait for the walk
+GROUPS["panels3"] = {
+    "char": "SceSor", "seed": 1234,
+    "script": "waitticks 20; click 268 226; waitticks 90; mark stash; waitticks 6; end",
+    "scenes": {"a1-panel-stash": ("stash", 0)},
 }
 
 # walking and running in the 8 screen directions (SceSor, Rogue Encampment): click a point 200 px

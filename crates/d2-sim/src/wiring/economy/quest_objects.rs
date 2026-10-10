@@ -128,6 +128,17 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         self.on_world(game, v, call) == LoanOut::Active(true)
     }
 
+    fn map_ai_store(
+        &mut self,
+        game: &mut Game,
+        v: &mut View<'_, X>,
+        class: u16,
+        path: Vec<(u32, i32, i32)>,
+    ) {
+        let call = LoanCall::MapAiStore { class, path: &path };
+        self.on_world(game, v, call);
+    }
+
     fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
         self
     }
@@ -180,6 +191,11 @@ impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R
 enum LoanCall<'c> {
     /// One queued object route.
     Route(&'c QuestObjectCall),
+    /// The map-AI store `0x00545C90` (`quests-act5.md` §5.8).
+    MapAiStore {
+        class: u16,
+        path: &'c [(u32, i32, i32)],
+    },
     /// Quest event 3 CHANGEDLEVEL (`world/quests.md` §4.1).
     ChangedLevel { player: UnitId, from: u32, to: u32 },
     /// The quest active test (`world/quests.md` §6.4).
@@ -213,6 +229,26 @@ fn on_host<'e, X: Pending, R: QuestRest>(
     w.inventory = inv;
     match call {
         LoanCall::Route(c) => LoanOut::Run(run(quests, &mut w, c)),
+        LoanCall::MapAiStore { class, path } => {
+            let nodes: Vec<_> = path
+                .iter()
+                .map(|&(action, x, y)| crate::monsters::ai::MapNode {
+                    action: action as i32,
+                    x,
+                    y,
+                })
+                .collect();
+            // The copy's handle: index + 1 (0: none).
+            w.inner.econ.hooks.map_ai_paths.push(nodes);
+            let h = w.inner.econ.hooks.map_ai_paths.len() as u32;
+            match class {
+                543 => act5::q1::larzuk_map_ai(quests, &mut w, h),
+                459 => act5::q3::map_ai_store(quests, &mut w, h, false),
+                461 => act5::q3::map_ai_store(quests, &mut w, h, true),
+                _ => {}
+            }
+            LoanOut::Run(QuestObjectRun::Ran)
+        }
         LoanCall::ChangedLevel { player, from, to } => {
             quests.changed_level(&mut w, player, from, to);
             LoanOut::Run(QuestObjectRun::Ran)

@@ -1,0 +1,12 @@
+d2patch 1
+# Blood Moor (levels #2), all three difficulties: monster density 0 (no room
+# population, specs/monsters/population.md section 3) and MonWndr 0. The
+# Normal variant `blood-moor-empty` leaves MonDen(N) and MonDen(H) alone, so
+# Nightmare / Hell checks there still populate the level. Old values: the
+# 1.14d install (data-tool excel-dir, 2026-10-09).
+
+table levels
+set #2 [Act 1 - Wilderness 1] MonDen 520 -> 0
+set #2 [Act 1 - Wilderness 1] MonDen(N) 520 -> 0
+set #2 [Act 1 - Wilderness 1] MonDen(H) 520 -> 0
+set #2 [Act 1 - Wilderness 1] MonWndr 1 -> 0
