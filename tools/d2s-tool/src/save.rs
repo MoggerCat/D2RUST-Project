@@ -209,6 +209,9 @@ pub struct Edits {
     /// Town act (0–4) and difficulty of the town byte (+0xA8).
     pub act: Option<u8>,
     pub difficulty: Option<u8>,
+    /// Write a town byte of a difficulty the character has not unlocked (the file 1.14d
+    /// refuses at load, `formats/d2s.md` §10: internal 13/14 → result 17/18).
+    pub allow_locked: bool,
     /// Hireling block (+0xAF, d2s.md §2.5): row `Id`, name index, seed,
     /// experience.
     pub merc: Option<(u16, u16, u32, u32)>,
@@ -566,7 +569,7 @@ pub fn apply(save: &mut D2s, e: &Edits, t: &Tables) -> Result<()> {
             (_, true) => 10,
             (_, false) => 8,
         };
-        if p < need {
+        if p < need && !e.allow_locked {
             bail!("difficulty {d} is not unlocked (progression {p} < {need}, d2s.md §2.2 rule 5.4): add --difficulty-unlocked");
         }
         h.towns = [0; 3];

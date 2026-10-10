@@ -16,3 +16,8 @@ Also: object.populate/preset rows are level-generation rows (gen-lvl), not opera
 
 ## Update after merging integ-r23
 Rerun of the 9 cause-1 checks: 8 now packets MATCH (rows 26, 39, 40, 41, 57, 58, 59 EQUAL). EQUAL now 0 -> 13 of 17. Left: gen-obj-149 (row 24), the player's PlaySound 0x2C ahead of the object's 0x0E (cause 1, size M, row in causes tsv). Cause 2 is rc-run-3b's (REC-3160).
+
+## Player mark (REC-3450)
+Player update placed in the room update walk: `PLAYER_ITEMS_MARK` (after the 0x15) and `PLAYER_SOUND_MARK` (after the mode messages) are host marks like GROUND_ITEM_MARK; the update pass skips what went out there. gen-obj-149 packets MATCH. object.operate rows EQUAL 13 -> 14 of 17 (3 left: urn and corpse by rc-run-3b's early-exit cause; row 60 has no objects.txt row, null table entry, nothing to check).
+Re-run after the change (cached 1.14d where possible): 181 operate checks + gen-item*, gen-itemq*, gen-npc*, gen-wp*, gen-shrine*, gen-netc2s* (320 checks): 22 DIVERGED runs, none new: gen-wp-28 (state, level seed), gen-shrine-7/17 (packets: 0xA8 size; player 0x2C event 0x18 missing and 0x26 content), gen-npc-drehya/natalya/tyrael1/tyrael3 (known), 12 gen-item/gen-itemq items checks (stream byte after the head; the same two checked on the baseline build without this change diverge identically, so they are not caused by it).
+New open items: gen-shrine-17 d2rs sends no player 0x2C (1.14d event 0x18) at frame 40; gen-item-05/10, gen-itemq-* item bit-stream byte difference after the head (ledger had them MATCH; not investigated).

@@ -113,6 +113,11 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
 
     fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
         self.on_world(game, v, LoanCall::TownLeave { player, to });
+        // `0x00537340` queues the quest messages at once (`0x0053D710`), so
+        // they precede the act change's (`flows/act-change.md` §1).
+        for (unit, bytes) in self.rest.drain_sent() {
+            v.h.x.send(unit, &bytes);
+        }
     }
 
     fn npc_wants_interact(
