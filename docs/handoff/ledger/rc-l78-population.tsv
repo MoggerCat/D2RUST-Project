@@ -1,3 +1,3 @@
 #ledger 1
 area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
-monster.population.frogdemon-water	system	monsters	water point 0x005B2700 (material flag via 0x00604BC0); classes 247-249	specs/monsters/population.md	draft	a3-warp-l78-jungle-3-ama,gen-lvl-78	MATCH	?	0	n	claude/rc-l78-population	EQUAL	-	L78 class-249 monsters and objects 251/252 now match: rng 133/133, state 160/160 frames equal
+monster.population.frogdemon-water	system	monsters	water point 0x005B2700 (material flag via 0x00604BC0); classes 247-249	specs/monsters/population.md	draft	a3-warp-l78-jungle-3-ama,gen-lvl-78	PARTIAL	?	0	n	claude/rc-l78-population	EQUAL	-	L78 class-249 monsters and objects 251/252 now match: rng 133/133, state 160/160 frames equal
