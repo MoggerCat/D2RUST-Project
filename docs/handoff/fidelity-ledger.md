@@ -32,9 +32,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 68 | 0 | 10 | 0 | 577 | 10 | 68 | 0 | 141–564 | 6 | 551 / 93 / 11 |
-| systems | 918 | 329 | 46 | 249 | 0 | 294 | 235 | 387 | 2 | 907.5–3566+ | 39 | 576 / 0 / 342 |
+| systems | 918 | 328 | 46 | 249 | 0 | 295 | 233 | 388 | 2 | 908.5–3570+ | 39 | 576 / 0 / 342 |
 | world | 826 | 38 | 0 | 55 | 0 | 733 | 11 | 77 | 5 | 199.5–638+ | 171 | 742 / 20 / 64 |
-| **all** | 4479 | 752 | 46 | 411 | 0 | 3270 | 406 | 791 | 12 | 1881–7140+ | 286 | 3566 / 375 / 538 |
+| **all** | 4479 | 751 | 46 | 411 | 0 | 3271 | 404 | 792 | 12 | 1882–7144+ | 286 | 3566 / 375 / 538 |
 
 ## By family
 
@@ -660,8 +660,8 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `missile` | 299 | 5 | 0 | 2 | 0 | 292 | 0 | 1 | 6 | 0 | 0 | 2 |
 | `mon` | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | 0 |
 | `monster` | 669 | 137 | 0 | 12 | 0 | 520 | 0 | 14 | 134 | 1 | 4 | 241 |
-| `net.c2s` | 113 | 10 | 9 | 14 | 0 | 80 | 0 | 27 | 6 | 0 | 26 | 0 |
-| `net.s2c` | 183 | 38 | 21 | 67 | 0 | 57 | 0 | 116 | 10 | 0 | 1 | 0 |
+| `net.c2s` | 113 | 9 | 9 | 14 | 0 | 81 | 0 | 26 | 6 | 0 | 26 | 0 |
+| `net.s2c` | 183 | 38 | 21 | 67 | 0 | 57 | 0 | 115 | 11 | 0 | 1 | 0 |
 | `npc` | 48 | 11 | 0 | 6 | 0 | 31 | 0 | 6 | 11 | 0 | 1 | 10 |
 | `object` | 524 | 0 | 0 | 16 | 0 | 508 | 5 | 6 | 10 | 0 | 10 | 0 |
 | `quest` | 53 | 11 | 0 | 32 | 0 | 10 | 0 | 4 | 34 | 5 | 27 | 13 |
@@ -718,7 +718,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2970
 - Rows set exercised = yes from the coverage reports' seen lists: 18
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 6238
+- Duplicate areas between parts: 6241
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -2375,6 +2375,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `skill.ass.wake-of-fire-sentry`: rc-promote.tsv:73 kept, rc-run-1.tsv:178 dropped
   - `skill.ass.weapon-block`: rc-a8-setstate.tsv:28 kept, rc-run-1.tsv:179 dropped
   - `net.c2s.0x0c`: rc-link-2-override.tsv:58 kept, rc-run-1.tsv:180 dropped
+  - `net.c2s.0x5f`: rc-link-2-override.tsv:76 kept, rc-run-1.tsv:186 dropped
   - `net.s2c.0x04`: rc-link-2.tsv:37 kept, rc-run-1.tsv:193 dropped
   - `net.s2c.0x05`: rc-gen-nets2c.tsv:3 kept, rc-run-1.tsv:194 dropped
   - `net.s2c.0x07`: rc-goto-settle.tsv:3 kept, rc-run-1.tsv:195 dropped
@@ -4632,7 +4633,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `state.wolf`: rc-join-burst.tsv:184 kept, rc-run-6.tsv:201 dropped
   - `state.wolverine`: rc-join-burst.tsv:185 kept, rc-run-6.tsv:202 dropped
   - `state.wolverinecontrol`: rc-join-burst.tsv:186 kept, rc-run-6.tsv:203 dropped
+  - `net.c2s.0x60`: rc-link-2-override.tsv:77 kept, rc-run-6.tsv:230 dropped
   - `net.s2c.0x2a`: rc-run-1.tsv:208 kept, rc-run-6.tsv:231 dropped
+  - `net.s2c.0x97`: rc-link-2-override.tsv:78 kept, rc-run-6.tsv:233 dropped
   - `tools.poke.tick-end`: rc-promote.tsv:75 kept, rc-run-6.tsv:234 dropped
   - `monster.population.frogdemon-water`: rc-l78-population.tsv:3 kept, rc-run-7.tsv:3 dropped
   - `skill.ama.avoid`: rc-a8-setstate.tsv:3 kept, rc-run-7.tsv:4 dropped
@@ -5791,8 +5794,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x5c`: q-run-net.tsv:97 kept, systems.tsv:95 dropped
   - `net.c2s.0x5d`: q-run-net.tsv:98 kept, systems.tsv:96 dropped
   - `net.c2s.0x5e`: q-run-net.tsv:99 kept, systems.tsv:97 dropped
-  - `net.c2s.0x5f`: rc-run-1.tsv:186 kept, systems.tsv:98 dropped
-  - `net.c2s.0x60`: rc-run-6.tsv:230 kept, systems.tsv:99 dropped
+  - `net.c2s.0x5f`: rc-link-2-override.tsv:76 kept, systems.tsv:98 dropped
+  - `net.c2s.0x60`: rc-link-2-override.tsv:77 kept, systems.tsv:99 dropped
   - `net.c2s.0x61`: rc-pc1-audit.tsv:7 kept, systems.tsv:100 dropped
   - `net.c2s.0x62`: q-chk-hirelings.tsv:14 kept, systems.tsv:101 dropped
   - `net.c2s.0x63`: rc-run-6.tsv:19 kept, systems.tsv:102 dropped
@@ -5960,7 +5963,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x94`: rc-run-1.tsv:235 kept, systems.tsv:264 dropped
   - `net.s2c.0x95`: rc-run-1.tsv:236 kept, systems.tsv:265 dropped
   - `net.s2c.0x96`: rc-run-1.tsv:237 kept, systems.tsv:266 dropped
-  - `net.s2c.0x97`: rc-run-6.tsv:233 kept, systems.tsv:267 dropped
+  - `net.s2c.0x97`: rc-link-2-override.tsv:78 kept, systems.tsv:267 dropped
   - `net.s2c.0x98`: q-run-net.tsv:268 kept, systems.tsv:268 dropped
   - `net.s2c.0x99`: q-run-net.tsv:269 kept, systems.tsv:269 dropped
   - `net.s2c.0x9a`: q-run-net.tsv:270 kept, systems.tsv:270 dropped
@@ -9884,8 +9887,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x06` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/rc-unit-guid-order | specs/sim/client-messages.tsv | rc-promote 2026-10-10 fresh run: combat-melee-fallen: channel packets DIVERGED |
 | `net.c2s.0x15` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED@20 net-s2c-chat: packets: frame 20 stream s2c #0 missing in d2rs (id 0x26) |
 | `net.c2s.0x4b` | message | DIVERGED | S | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-2b: DIVERGED hire-follow-warp-kashya: None |
-| `net.c2s.0x5f` | message | DIVERGED | M | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
-| `net.c2s.0x60` | message | DIVERGED | S | DIVERGED@20 | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-60 packets DIVERGED at frame 20: first difference stream s2c #1 id: 1.14d 0x23 vs d2rs 0x47 (c2s bytes equal) |
+| `net.c2s.0x60` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-link-2 C009 (2026-10-10): gen-netc2s-60 packets DIVERGED frame 20 s2c #1 id 1.14d 0x23 vs d2rs 0x47 (c2s bytes equal) |
 | `net.c2s.0x62` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-2 | specs/sim/client-messages.tsv | hire-resurrect-* diverge first at the hire (frame 14/20); 0x62 not reached |
 | `net.s2c.0x0c` | message | DIVERGED | S | DIVERGED@184 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-nor-08@184 id (1.14d 0c vs d2rs 4d); 0 equal pair(s) |
 | `net.s2c.0x0d` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drop-monster-kill@121 missing in d2rs; 0 equal pair(s) |
@@ -9912,7 +9914,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x7f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-follow-waypoint-kashya@251 missing in d2rs; 0 equal pair(s) |
 | `net.s2c.0x8a` | message | DIVERGED | S | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/6 of its a* checks diverge) |
 | `net.s2c.0x8e` | message | DIVERGED | S | DIVERGED@96 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged items-drops-cha-00@96 missing in d2rs; 0 equal pair(s) |
-| `net.s2c.0x97` | message | DIVERGED | S | DIVERGED@20 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-6: gen-netc2s-60 packets DIVERGED at frame 20: first difference stream s2c #1 id: 1.14d 0x23 vs d2rs 0x47 (c2s bytes equal) |
+| `net.s2c.0x97` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 C009 (2026-10-10): gen-netc2s-60 packets DIVERGED frame 20 s2c #1 id 1.14d 0x23 vs d2rs 0x47 |
 | `net.s2c.0x9b` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): hire-resurrect-asheara state DIVERGED (checks-status.md) |
 | `net.s2c.0x9d` | message | DIVERGED | S | DIVERGED@70 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/1 of its a* checks diverge) |
 | `net.s2c.0x9e` | message | DIVERGED | M | PARTIAL | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): hire-asheara state DIVERGED (checks-status.md) |
@@ -10556,6 +10558,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.c2s.0x59` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-6: gen-netc2s-59 MATCH |
 | `net.c2s.0x5d` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: 1 equal pair(s), first gen-netc2s-5d@20; no diverged pair in any check; gen checks (traces/checks/gen): gen-netc2s-5d |
 | `net.c2s.0x5e` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | packet-census: 1 equal pair(s), first gen-netc2s-5e@20; no diverged pair in any check; gen checks (traces/checks/gen): gen-netc2s-5e |
+| `net.c2s.0x5f` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-link-2 C009 (2026-10-10): gen-netc2s-5f packets MATCH 40/40 (C->S 0x5f and every S->C message of the window equal, no ignore line, packets only) |
 | `net.c2s.0x67` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.c2s.0x6b` | message | EQUAL | - | MATCH | yes | 0 | n | - | specs/sim/client-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x00` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
