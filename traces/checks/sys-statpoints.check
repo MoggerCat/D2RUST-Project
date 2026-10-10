@@ -8,7 +8,7 @@ save ScnAma --class ama --expansion --level 10 --stat 4=25
 seed 1234
 ticks 70
 seconds 300
-channels state rng
+channels state rng packets
 ignore q
 at 10 send AddStatPoint stat=0 repeat=1
 at 14 send AddStatPoint stat=1 repeat=1
