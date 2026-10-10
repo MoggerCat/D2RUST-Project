@@ -274,40 +274,6 @@ impl<X: Pending> crate::monsters::init::InitHost for SummonEquip<'_, '_, X> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn row(code: &[u8; 4], uber: &[u8; 4], ultra: &[u8; 4]) -> ItemData {
-        ItemData {
-            code: *code,
-            ubercode: *uber,
-            ultracode: *ultra,
-            version: 0,
-            level: 0,
-            type_: 0,
-            type2: 0,
-            unique: 0,
-            quest: 0,
-            spawnable: 0,
-        }
-    }
-
-    // Covers: specs/monsters/init.md §14.3
-    #[test]
-    fn tier_code_reads_the_first_row_of_the_code() {
-        let items = [
-            row(b"bsd ", b"9bs ", b"7bs "),
-            row(b"bsd ", b"xxx ", b"yyy "),
-        ];
-        assert_eq!(tier_code(&items, *b"bsd ", 0), *b"bsd ");
-        assert_eq!(tier_code(&items, *b"bsd ", 1), *b"9bs ");
-        assert_eq!(tier_code(&items, *b"bsd ", 2), *b"7bs ");
-        // No row: the code stays on every difficulty.
-        assert_eq!(tier_code(&items, *b"zzz ", 2), *b"zzz ");
-    }
-}
-
 /// The monprop property assignment on a monster (`init.md` §11, the
 /// dispatcher `0x0065FD70`): the record `{prop, par, min, max}` writes the
 /// stat list with state 0 and flags 0x40 of `unit` (created on demand,
@@ -368,4 +334,38 @@ pub fn monster_property<X: Pending>(
     }
     h.items = items;
     h.uniques = std::mem::take(&mut fields.uniques);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(code: &[u8; 4], uber: &[u8; 4], ultra: &[u8; 4]) -> ItemData {
+        ItemData {
+            code: *code,
+            ubercode: *uber,
+            ultracode: *ultra,
+            version: 0,
+            level: 0,
+            type_: 0,
+            type2: 0,
+            unique: 0,
+            quest: 0,
+            spawnable: 0,
+        }
+    }
+
+    // Covers: specs/monsters/init.md §14.3
+    #[test]
+    fn tier_code_reads_the_first_row_of_the_code() {
+        let items = [
+            row(b"bsd ", b"9bs ", b"7bs "),
+            row(b"bsd ", b"xxx ", b"yyy "),
+        ];
+        assert_eq!(tier_code(&items, *b"bsd ", 0), *b"bsd ");
+        assert_eq!(tier_code(&items, *b"bsd ", 1), *b"9bs ");
+        assert_eq!(tier_code(&items, *b"bsd ", 2), *b"7bs ");
+        // No row: the code stays on every difficulty.
+        assert_eq!(tier_code(&items, *b"zzz ", 2), *b"zzz ");
+    }
 }
