@@ -22,24 +22,24 @@
 | Outputs / state changes | 59–63 |
 | Rules | 64–65 |
 |   16. Operate functions, part 2 | 66–193 |
-|   17. Small init functions | 194–227 |
-|   18. Object events 0, 3, 8, 9, 10 | 228–295 |
-|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 296–343 |
-|   20. Item drop helpers (open question 13) | 344–463 |
-|   21. Curable-state removal (`0x00578C20`, open question 15) | 464–476 |
-|   22. Object allocation modes (open question 8) | 477–525 |
-|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 526–543 |
-|   24. Guards and corner cases of part 1 (read 2026-10-07) | 544–585 |
-|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 586–682 |
-|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 683–776 |
-|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 777–910 |
-|   28. A chest opened in play (REC-260, read 2026-10-08) | 911–988 |
-| Constants & data dependencies | 989–992 |
-| Randomness | 993–1015 |
-| Edge cases & original bugs | 1016–1053 |
-| Test vectors | 1054–1100 |
-| Provenance | 1101–1159 |
-| Open questions | 1160–1163 |
+|   17. Small init functions | 194–240 |
+|   18. Object events 0, 3, 8, 9, 10 | 241–308 |
+|   19. Obelisk completion (C→S 0x44, `0x00585240`) | 309–356 |
+|   20. Item drop helpers (open question 13) | 357–476 |
+|   21. Curable-state removal (`0x00578C20`, open question 15) | 477–489 |
+|   22. Object allocation modes (open question 8) | 490–538 |
+|   23. Client side of S→C 0x0E and 0x4D (open question 4) | 539–556 |
+|   24. Guards and corner cases of part 1 (read 2026-10-07) | 557–598 |
+|   25. Portal pair creation (`0x0056D130`, `0x0056CF40`) | 599–695 |
+|   26. Shrine state lists and shrine texts (REC-239, read 2026-10-08) | 696–789 |
+|   27. Town Portal cast and the life of the pair (`0x005BE290`; REC-117, REC-243, read 2026-10-08) | 790–923 |
+|   28. A chest opened in play (REC-260, read 2026-10-08) | 924–1001 |
+| Constants & data dependencies | 1002–1005 |
+| Randomness | 1006–1028 |
+| Edge cases & original bugs | 1029–1066 |
+| Test vectors | 1067–1113 |
+| Provenance | 1114–1172 |
+| Open questions | 1173–1176 |
 <!-- /index -->
 
 ## Summary

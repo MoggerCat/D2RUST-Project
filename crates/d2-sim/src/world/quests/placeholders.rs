@@ -156,7 +156,7 @@ mod tests {
         })
     }
 
-    // Covers: specs/world/objects-2.md §17 (init 46)
+    // Covers: specs/world/objects-2.md §17
     #[test]
     fn spawns_souls_in_mode_0_first_at_the_object() {
         let mut f = fake(0);
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(f.objects[&OBJ].2, 2);
     }
 
-    // Covers: specs/world/objects-2.md §17 (init 46)
+    // Covers: specs/world/objects-2.md §17
     #[test]
     fn draws_nothing_outside_mode_0_or_without_a_room() {
         let mut f = fake(2);
