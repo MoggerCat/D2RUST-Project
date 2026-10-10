@@ -28,16 +28,16 @@
 | Outputs / state changes | 67–70 |
 | Rules | 71–72 |
 |   1. Creation values | 73–103 |
-|   2. Spending stat points (message 0x3A) | 104–156 |
-|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 157–178 |
-|   4. Experience | 179–485 |
-|   5. Client vitals sync (`0x00548760`) | 486–624 |
-| Constants & data dependencies | 625–641 |
-| Randomness | 642–645 |
-| Edge cases & original bugs | 646–657 |
-| Test vectors | 658–678 |
-| Provenance | 679–714 |
-| Open questions | 715–751 |
+|   2. Spending stat points (message 0x3A) | 104–159 |
+|   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 160–181 |
+|   4. Experience | 182–488 |
+|   5. Client vitals sync (`0x00548760`) | 489–630 |
+| Constants & data dependencies | 631–647 |
+| Randomness | 648–651 |
+| Edge cases & original bugs | 652–663 |
+| Test vectors | 664–684 |
+| Provenance | 685–720 |
+| Open questions | 721–757 |
 <!-- /index -->
 
 ## Summary
@@ -113,7 +113,10 @@ splits it, `0x0054BD29`.)
 `spend(unit, s)`: `statpts(4)` (unit getter) = 0 → fail. By `s`:
 
 - 0 strength, 2 dexterity: `statpts −= 1`, stat `+= 1` (add), then the
-  refresh `0x0064C040(unit)`.
+  refresh `0x0064C040(unit)` (queues the unit for the tick's update pass,
+  so its type update sends the single stats 0 / 2 of `intents-events.md`
+  §7.3 rule 1 step 7, ahead of the per-client mod flush; recorded
+  `sys-intents-moves`: `1d 02 1b` twice, then `1d 04 01`).
 - 1 energy: `gain_energy(unit, 1)` (`0x00570A80`).
 - 3 vitality: `gain_vitality(unit, 1)` (`0x00570B60`).
 - any other id (4…15): fail.
@@ -498,6 +501,9 @@ link here.
    player: once after each tick that ran, `sim/intents-events.md` §1
    rule 1), before the client's buffers are sent, so these messages end
    the tick's batch. The leave flush `0x005303D0` passes 0 (no sync).
+   d2rs runs it inside the host flush (`Tick::flush_sync`, after the flush
+   is announced), so the recorder tags its messages with the flush phase
+   like 1.14d's (`sys-intents-moves`: `96` at frame 68, phase flush).
 2. force := 1 when client +0x1B0 ≥ 20, or when client +0x1B0 ≥ 10 and
    the client has a queued buffer (head, client +0x1B8 ≠ 0); else 0.
    Client +0x1B0 counts per-client updates (`sim/tick.md` §6 rule 5,

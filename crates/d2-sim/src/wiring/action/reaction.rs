@@ -556,7 +556,11 @@ impl<X: Pending> VitalsUnits for CombatView<'_, X> {
     fn max_stamina(&self, u: UnitId) -> i32 {
         VitalsUnits::max_stamina(&self.v, u)
     }
+    /// `0x0064C040`: the unit is queued for the next update pass
+    /// (`combat/vitals.md` §2; `units/sound.rs` `queue_sound`); a unit
+    /// outside the lists keeps the hook's own refresh only.
     fn refresh(&mut self, u: UnitId) {
+        let _ = self.game.lists.queue_update(u);
         VitalsUnits::refresh(&mut self.v, u);
     }
     fn level_up_notify(&mut self, u: UnitId) {

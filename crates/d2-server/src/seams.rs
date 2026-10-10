@@ -232,6 +232,13 @@ pub trait Intents {
 pub trait Tick {
     /// Runs one tick; events go to `out` in production order.
     fn tick(&mut self, out: &mut dyn MessageSink);
+
+    /// The per-client work of the flush routine `0x0052E320` that runs
+    /// before a client's buffers are sent (`combat/vitals.md` §5.1 rule
+    /// 1: the vitals sync, from `0x0052D980`). Called once per flush that
+    /// is not throttled away, after the flush is announced and before any
+    /// buffer is sent. Default: nothing.
+    fn flush_sync(&mut self, _out: &mut dyn MessageSink) {}
 }
 
 /// System messages 0x67..=0x70 (spec §2.5). Provider: `d2-server`'s

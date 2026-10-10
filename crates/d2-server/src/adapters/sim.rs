@@ -650,6 +650,9 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             }
         }
         handlers::items::moves::update_pass(self, out);
+    }
+
+    fn flush_sync(&mut self, out: &mut dyn MessageSink) {
         self.vitals_sync(out);
     }
 }
