@@ -43,7 +43,8 @@ use crate::scene::ShadeChain;
 pub const STAT_LIGHT_RADIUS: u16 = 89;
 pub const STAT_LIGHT_COLOR: u16 = 90;
 
-/// Light quality used by the preview: not 0, so no radius caps (§7.2).
+/// Light quality `q` of a frame without a recorded one (§5: the high
+/// option at a draw rate of 16 or more): not 0, so no radius caps (§7.2).
 const QUALITY: u8 = 2;
 
 /// The collision mask of the blocks-light test (§4: bits 0x02 and 0x20).
@@ -130,6 +131,10 @@ pub struct PreviewLight {
     pub sources: Option<std::sync::Arc<super::light_sources::LightRows>>,
     /// The last refresh's failure ([`Self::error`]).
     error: Option<String>,
+    /// The frame's light quality `q` (§5) when a check run replays the
+    /// recorded one (`q` follows the host's wall clock and draw rate);
+    /// `None`: [`QUALITY`].
+    quality: Option<u8>,
 }
 
 /// The ambient of a level (§3.1 r2): its `Levels.txt` `Intensity`, `Red`,
@@ -426,6 +431,12 @@ impl PreviewLight {
         self.frame.as_ref()
     }
 
+    /// The light quality `q` of the next refreshes (§5), `None` for
+    /// [`QUALITY`].
+    pub fn set_quality(&mut self, q: Option<u8>) {
+        self.quality = q;
+    }
+
     /// The unit under the cursor this frame.
     pub fn set_hover(&mut self, unit: Option<UnitKey>) {
         self.look.hover = unit;
@@ -519,7 +530,7 @@ impl PreviewLight {
         // A fatal case of 1.14d (§6.4, §7.4) stops the list walk; the map
         // keeps what the records before it gave.
         self.error = lights
-            .frame(&mut map, QUALITY, &owners)
+            .frame(&mut map, self.quality.unwrap_or(QUALITY), &owners)
             .err()
             .map(|e| e.to_string());
         self.frame = Some(FrameLight {

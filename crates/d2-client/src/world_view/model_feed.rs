@@ -489,6 +489,13 @@ impl<F: ViewFeed> ViewFeed for ModelFeed<F> {
             .refresh(world, lights, local_at, tables.as_ref());
     }
 
+    fn set_light_quality(&mut self, q: Option<u8>) {
+        match self.preview.as_mut() {
+            Some(preview) => preview.light.set_quality(q),
+            None => self.inner.set_light_quality(q),
+        }
+    }
+
     fn take_unit_orders(&mut self) -> Vec<(DrlgRoomId, Vec<UnitKey>)> {
         match self.map.as_mut() {
             Some(m) => m.take_unit_orders(),
