@@ -1112,6 +1112,7 @@ fn world_view_frame(
     let anchor = state.anchor;
     // The frame's one camera, once the UI has set this frame's open mode.
     let mut placed = None;
+    let mut hover_mouse: Option<(i32, i32)> = None;
     let ui_frame = match ui.as_mut() {
         Some(ui) => {
             let ui = &mut **ui;
@@ -1236,6 +1237,7 @@ fn world_view_frame(
                 .and_then(|c| crate::bridge::hover::pick(bridge.0.world(), c, mouse));
             state.feed.set_hover(hover);
             state.prev_hover = hover;
+            hover_mouse = over.then_some(mouse);
             // d2rs-own, unverified (REC-239): the hovered object's name.
             if let Some(label) = cam.as_ref().and_then(|c| {
                 state
@@ -1511,6 +1513,20 @@ fn world_view_frame(
         let world = bridge.0.world();
         let near = state.feed.near_rooms(world)?;
         a.frame(world, near)?;
+    }
+    // `specs/tools/scenario-diff.md` §3 r8.2: the hover the next press sees
+    // is the unit whose drawn frame rectangle (+-16 px) holds the cursor in
+    // this pass's frame (`0x00467AC0`); the click block above reads it.
+    if state.preview {
+        let mouse = hover_mouse;
+        let empty = std::collections::BTreeMap::new();
+        let rects = crate::bridge::hover::unit_rects(
+            &frame.items,
+            &state.assets.frames,
+            frame.slots.as_ref().unwrap_or(&empty),
+        );
+        state.prev_hover =
+            mouse.and_then(|m| crate::bridge::hover::pick_rects(bridge.0.world(), &rects, m));
     }
     let blank_screen = state.feed.blank_screen(bridge.0.world())?;
     let loads = bridge.0.world().act_loads;

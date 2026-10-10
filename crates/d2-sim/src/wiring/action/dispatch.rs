@@ -513,6 +513,10 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {
+                // Step 4 (`0x00571CD0`, §7.9 rule 2): the pending event
+                // records, e.g. the 0xA5 landing message of a failed
+                // Whirlwind start (`bodies-2b.md` §8.10).
+                v.send_event_records(game, p, unit);
                 // A unit still new to the client keeps its join order; so
                 // does one without item messages pending (update bit 0).
                 v.h.capture_tail =
