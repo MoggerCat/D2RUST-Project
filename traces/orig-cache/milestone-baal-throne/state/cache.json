@@ -13,6 +13,8 @@
   "MilBaal",
   "--seed",
   "1234",
+  "--difficulty",
+  "normal",
   "--out",
   "orig.state.jsonl",
   "--snap-every",
@@ -52,8 +54,8 @@
  ],
  "files": {
   "orig.state.jsonl": {
-   "sha256": "27a3bf55e3d23450fa609f6b972162198494e625e390ae0a81b2e142e5f07903",
-   "size": 1719032
+   "sha256": "72a5cc374a41898f49652d6fef3660fd618383c6a66ac16ea05f58b2561b60f9",
+   "size": 1719722
   }
  },
  "format": "orig-cache-1",
@@ -62,7 +64,7 @@
   "format": "orig-cache-key-2",
   "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
   "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
-  "recorder": "d17b28e1be3895583ff39a43aac26b3c4208f0b03c10fcfa86e86bc21d5a1790",
+  "recorder": "43ea998e3cf569a1698663c456609fa8ffa1a6a89479e89e0b53041ade64a2eb",
   "save": "6c60286e3e6ea798acbfd231bd1dca3c92fb114e6d3ed44a3aa8af25ac3047ac"
  }
 }

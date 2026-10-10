@@ -425,8 +425,16 @@ impl<H: CubeHooks> CubeWorld for ServerCube<'_, '_, '_, H> {
     fn quest_item_hook(&mut self, player: UnitId, item: UnitId, code: [u8; 4]) {
         self.pending.quest_item_hook(player, item, code)
     }
+    /// A refusal takes the exit `0x0059424B` of `0x00594140` (`cube.md`
+    /// §9): sound event 20 on the player. The pending's `false` is
+    /// always a refusal here (the portal itself is not built by this
+    /// host: PROVISIONAL, REC-3860).
     fn cow_portal(&mut self, player: UnitId) -> bool {
-        self.pending.cow_portal(player)
+        let made = self.pending.cow_portal(player);
+        if !made {
+            CubeWorld::attach_sound(self, player, d2_sim::world::cube::SOUND_COW_REFUSED);
+        }
+        made
     }
 }
 
