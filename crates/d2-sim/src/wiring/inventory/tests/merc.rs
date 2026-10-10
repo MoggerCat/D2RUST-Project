@@ -19,6 +19,7 @@ fn add_merc(w: &mut World, room: RoomId) -> Owner {
             enabled: true,
             aidel: [15; 3],
             moves: 0,
+            mode_chart: false,
         });
     }
     let m = w.alloc(UnitType::Monster, 0);
