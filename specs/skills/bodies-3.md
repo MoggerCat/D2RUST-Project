@@ -29,13 +29,13 @@
 |   2. Implementation questions answered | 94–190 |
 |   3. Shared helpers, batch 4 | 191–355 |
 |   4. Bodies used by several monster skills | 356–544 |
-|   5. Bodies used by one monster skill | 545–999 |
-| Constants & data dependencies | 1000–1035 |
-| Randomness | 1036–1052 |
-| Edge cases & original bugs | 1053–1092 |
-| Test vectors | 1093–1107 |
-| Provenance | 1108–1130 |
-| Open questions | 1131–1160 |
+|   5. Bodies used by one monster skill | 545–1003 |
+| Constants & data dependencies | 1004–1039 |
+| Randomness | 1040–1056 |
+| Edge cases & original bugs | 1057–1096 |
+| Test vectors | 1097–1111 |
+| Provenance | 1112–1134 |
+| Open questions | 1135–1164 |
 <!-- /index -->
 
 ## Summary
@@ -647,6 +647,10 @@ The heal is p % of the **current** life.
    (dx[e], dy[e]): k 0 (−2, −2), 1 (0, −2), 2 (2, −2), 3 (2, 0), 4 (2,
    2), 5 (0, 2), 6 (−2, 2), 7 (−2, 0).
 5. Unit action frame (+0x4E) := 0.
+   (rc-sandmaggot: `dir64` here is the real direction vector of
+   `0x00621DC0` -> `0x0064FDC0` -> `0x0064FC60` from the unit to T; the
+   host default 0 put every egg at k = 0, 4 sub-tiles off in x in
+   `gen-mon-72`/`679`/`716`.)
 6. m = `0x005B2F20(game, the unit's room, x, y, c, mode, spread −1,
    flags 0)`; none → 0. m flags |= 0x4000000. Return 1.
 
