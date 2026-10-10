@@ -1150,7 +1150,8 @@ fn hireable_missile<H: InitHost + ?Sized>(h: &mut H, m: UnitId) {
 
 /// §14 umod 21, mode 2.
 fn kill_self<H: InitHost + ?Sized>(h: &mut H, u: UnitId) {
-    eprintln!("DBG kill_self {:?} dead={} f={} st={} owner={:?}", u, h.units().is_dead(u), h.game().frame, h.has_state(u, state::UNINTERRUPTABLE), h.minion_owner(u));
+    let (d, f, st, ow) = (h.units().is_dead(u), h.game().frame, h.has_state(u, state::UNINTERRUPTABLE), h.minion_owner(u));
+    eprintln!("DBG kill_self {:?} dead={} f={} st={} owner={:?}", u, d, f, st, ow);
     if h.units().is_dead(u) {
         return;
     }
