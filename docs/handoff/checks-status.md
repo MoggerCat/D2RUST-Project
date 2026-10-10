@@ -468,8 +468,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-venom | packets | MATCH | 70/70 | - | - |
 | ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
 | autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
-| bar-battle-command | packets | DIVERGED | 68/70 | frame 28 stream s2c #1 missing in d2rs (id 0xa8) | unrouted |
-| bar-battle-command | state | DIVERGED | 27/70 | frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 | unrouted |
+| bar-battle-command | packets | MATCH | 70/70 | - | - |
+| bar-battle-command | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | packets | MATCH | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |
@@ -1469,7 +1469,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | bar-leap | state | PARTIAL | 70/70 | - | - |
 | bar-leap | packets | DIVERGED | 69/70 | frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) | unrouted |
 | bar-shout | state | PARTIAL | 70/70 | - | - |
-| bar-shout | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | unrouted |
+| bar-shout | packets | MATCH | 70/70 | - | - |
 | cube-007-1-ring-1-perfect-ruby-1-explod | items | MATCH | 5/5 | - | - |
 | cube-007-1-ring-1-perfect-ruby-1-explod | packets | DIVERGED | 23/24 | frame 4 stream s2c #1 id: 1.14d 3f vs d2rs 47 (id 0x3f) | unrouted |
 | cube-007-1-ring-1-perfect-ruby-1-explod | state | PARTIAL | 24/24 | - | - |
@@ -1748,7 +1748,7 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | gen-skill-bar-132 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-132 | packets | MATCH | 70/70 | - | - |
 | gen-skill-bar-138 | state | PARTIAL | 70/70 | - | - |
-| gen-skill-bar-138 | packets | DIVERGED | 69/70 | frame 29 stream s2c #0 missing in d2rs (id 0xa8) | q-fix-join-items |
+| gen-skill-bar-138 | packets | MATCH | 70/70 | - | - |
 | gen-skill-bar-140 | state | PARTIAL | 70/70 | - | - |
 | gen-skill-bar-140 | packets | MATCH | 70/70 | - | - |
 | gen-skill-bar-143 | state | PARTIAL | 70/70 | - | - |

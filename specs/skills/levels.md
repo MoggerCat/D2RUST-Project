@@ -29,13 +29,13 @@
 |   4. Mana cost | 307–346 |
 |   5. To-hit | 347–354 |
 |   6. Learning a skill | 355–416 |
-|   7. Skill stat callbacks | 417–610 |
-| Constants & data dependencies | 611–633 |
-| Randomness | 634–645 |
-| Edge cases & original bugs | 646–668 |
-| Test vectors | 669–730 |
-| Provenance | 731–771 |
-| Open questions | 772–803 |
+|   7. Skill stat callbacks | 417–619 |
+| Constants & data dependencies | 620–642 |
+| Randomness | 643–654 |
+| Edge cases & original bugs | 655–677 |
+| Test vectors | 678–739 |
+| Provenance | 740–780 |
+| Open questions | 781–812 |
 <!-- /index -->
 
 ## Summary

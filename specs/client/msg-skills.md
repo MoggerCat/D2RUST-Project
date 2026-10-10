@@ -25,22 +25,22 @@
 | Outputs / state changes | 66–74 |
 | Rules | 75–76 |
 |   1. The client skill list (unit +0xA8) | 77–118 |
-|   2. Shared skill-list operations | 119–256 |
-|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 257–266 |
-|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 267–276 |
-|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 277–286 |
-|   6. 0x23 SetSkill (`0x0045DE10`) | 287–293 |
-|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 294–337 |
-|   8. 0xA3 skill do (`0x0045D5E0`) | 338–357 |
-|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 358–395 |
-|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 396–410 |
-|   11. The client do (`0x004C68F0` → `0x004C6680`) | 411–469 |
-| Constants & data dependencies | 470–481 |
-| Randomness | 482–485 |
-| Edge cases & original bugs | 486–495 |
-| Test vectors | 496–521 |
-| Provenance | 522–547 |
-| Open questions | 548–582 |
+|   2. Shared skill-list operations | 119–258 |
+|   3. 0x94 BaseSkillLevels (`0x0045DD60`) | 259–268 |
+|   4. 0x21 UpdateItemOSkill (`0x0045DCD0`) | 269–278 |
+|   5. 0x22 UpdateItemSkill (`0x0045DDB0`) | 279–288 |
+|   6. 0x23 SetSkill (`0x0045DE10`) | 289–295 |
+|   7. 0x99 / 0x9A skill events (`0x0045DE80` / `0x0045DEC0` → `0x004CA060`) | 296–339 |
+|   8. 0xA3 skill do (`0x0045D5E0`) | 340–359 |
+|   9. 0x93 skill bonus by element and page (`0x0045DD10` → `0x004C7990`) | 360–397 |
+|   10. 0xA5 skill end on a unit (`0x0045D6A0`) | 398–412 |
+|   11. The client do (`0x004C68F0` → `0x004C6680`) | 413–471 |
+| Constants & data dependencies | 472–483 |
+| Randomness | 484–487 |
+| Edge cases & original bugs | 488–497 |
+| Test vectors | 498–523 |
+| Provenance | 524–549 |
+| Open questions | 550–584 |
 <!-- /index -->
 
 Owned ids: 0x21, 0x22, 0x23, 0x94, 0x99, 0x9A, 0xA3; §9–§10: 0x93, 0xA5.
