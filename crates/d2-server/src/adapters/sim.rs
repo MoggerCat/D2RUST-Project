@@ -595,7 +595,8 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
     /// client receives nothing); a queueing failure is recorded in
     /// [`SimGame::tick_faults`]. Then the deferred item messages
     /// (`handlers::items::moves::update_pass`, `inventory-moves.md` §6.1), then
-    /// the client vitals sync ([`SimGame::vitals_sync`]).
+    /// the client vitals sync ([`SimGame::vitals_sync`]) runs in
+    /// [`Tick::pre_flush`], inside the flush.
     fn tick(&mut self, out: &mut dyn MessageSink) {
         self.run_host_sync();
         self.world.run_tick(&mut self.game, &mut self.events);
@@ -650,6 +651,9 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             }
         }
         handlers::items::moves::update_pass(self, out);
+    }
+
+    fn pre_flush(&mut self, out: &mut dyn MessageSink) {
         self.vitals_sync(out);
     }
 }

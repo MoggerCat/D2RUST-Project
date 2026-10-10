@@ -421,6 +421,7 @@ impl Fx {
     /// One game tick; what was queued during it.
     fn tick(&mut self) -> Vec<(ClientId, Vec<u8>)> {
         self.sim.tick(&mut self.out);
+        self.sim.pre_flush(&mut self.out);
         std::mem::take(&mut self.out.0)
     }
 

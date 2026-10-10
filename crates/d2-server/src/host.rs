@@ -456,6 +456,12 @@ where
     /// timeout belongs to the session code.
     pub fn flush(&mut self, force: bool, now: u32) -> Result<(usize, usize), HostError> {
         self.note(PacketEvent::Flush);
+        if force {
+            // `0x0052FD90` with argument 1: the vitals sync runs for each
+            // client before its buffers are sent, so its messages belong
+            // to the flush phase of the frame.
+            self.game.pre_flush(&mut self.buffers);
+        }
         let r = self.flush_inner(force, now);
         self.note_tap();
         r
