@@ -54,8 +54,6 @@ pub trait NpcRest: super::HirelingRest {
     fn npc_ai_param(&mut self, npc: UnitId, param: u32);
     // ---- messages and sounds (transport; `send` and `attach_sound` are
     // the quests' [`QuestRest`] ones)
-    /// The SetStat message part of `0x00548520` (after the stat is set).
-    fn stat_sent(&mut self, player: UnitId, stat: u16, value: u32);
     fn respec_sound(&mut self, player: UnitId);
     /// `0x00661480` (not specified).
     fn encode_text_list(&self, list: &TextList) -> [u8; 34];
@@ -273,7 +271,6 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
         if let Some(m) = crate::wiring::action::vitals_sync::stat_message(stat, value as i32) {
             QuestRest::send(&mut *self.rest, player, &m);
         }
-        self.rest.stat_sent(player, stat, value);
     }
     fn max_life(&self, unit: UnitId) -> u32 {
         self.econ.stats.max_life(unit) as u32
@@ -314,10 +311,9 @@ impl<'a, H: LifecycleHooks, R: NpcRest + QuestRest + PlayerQuestsRef> NpcWorld
     /// 0x2C by the client pass of the tick (`units::sound`). Recorded:
     /// `a2-npc-fara-heal` frame 15, `2c 01 0a000000 0a00` (§5 step 6).
     fn attach_sound(&mut self, unit: UnitId, sound: u16) {
-        // The only error is a unit missing from the lists; the NPC the
-        // heal runs on is listed.
-        let _ = crate::units::sound::queue_sound(self.econ.game, unit, sound, None);
-        QuestRest::attach_sound(&mut *self.rest, unit, sound);
+        // `0x00553380(npc, 10, 0)` (asm `0x00578E4F`–`0x00578E59`): no
+        // target, every client.
+        let _ = crate::units::sound::queue_sound(&mut *self.econ.game, unit, sound, None);
     }
 
     fn send(&mut self, player: UnitId, msg: &[u8]) {

@@ -105,7 +105,7 @@ record (set `0x00544720`, test `0x00544760`, slot in EDX, bit pushed);
 list (record +0x1C; `0x00545200` / `0x005452C0`); event 10 removes the
 player from it (`0x00545530`); "quick remove" = `0x00545310` (leaving
 Kurast Docks, level 75); "FX b" = `quests.md` §6.5 (`0x00545760`);
-"sound n" = `0x00553380` on the player; "completion flag" = for each
+"sound n" = `0x00553380(player, n, target = player)` (asm `0x005B95A9`–`0x005B95BA`; flushed as S→C 0x2C to that player); "completion flag" = for each
 player lacking the listed bits: set s.14 and `0x00545920(player, chain,
 0)` (`5D <chain> 00 0C 0000`, `quests.md` §6.3). "Holds `code`" =
 `0x00558110` finds the item on the player. "Lam Esen done" = game 17.13.

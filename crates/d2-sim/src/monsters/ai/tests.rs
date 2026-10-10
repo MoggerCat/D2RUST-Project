@@ -1720,7 +1720,7 @@ fn special_states_10_to_12_need_switchai() {
 #[test]
 fn stub_ai_logged() {
     // Every AI table think has a body now; a special-state think without
-    // one (state 6 `0x005E7C10`) is a logged stub.
+    // one (an address outside the table) is a logged stub.
     let mut w = World::new(monstats(41, [0; 5], 15));
     let mon = w.mon;
     let p = TickParam {
@@ -1730,11 +1730,11 @@ fn stub_ai_logged() {
         class: 0,
         class2: 0,
     };
-    w.with(|g, cx| run_function(g, cx, 0x005E_7C10, mon, &p));
+    w.with(|g, cx| run_function(g, cx, 0x005E_7C11, mon, &p));
     assert_eq!(
         w.store.unhandled,
         [Unhandled::Function {
-            addr: 0x005E_7C10,
+            addr: 0x005E_7C11,
             unit: mon
         }]
     );

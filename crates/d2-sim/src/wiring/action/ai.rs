@@ -154,8 +154,17 @@ impl<X: Pending> AiUnits for View<'_, X> {
     fn is_champion(&self, unit: UnitId) -> bool {
         self.h.monster_flag(unit, 4)
     }
+    /// `0x0063E9F0(0, unit)`: a monster whose monstats byte +0x0C has
+    /// the `boss` bit (0x40; the global at `0x006CE280`).
     fn is_boss(&self, unit: UnitId) -> bool {
-        self.h.x.is_boss(unit)
+        let Some(r) = self.units.get(unit) else {
+            return false;
+        };
+        r.ty == UnitType::Monster
+            && usize::try_from(r.class)
+                .ok()
+                .and_then(|c| self.h.tables.combat.monstats.get(c))
+                .is_some_and(|m| m.boss)
     }
     /// Monster data +0x50 (the coordinate record of `population.md`
     /// §9.6 step 3) and its +0x24 word: a monster of the lent monster
@@ -478,8 +487,32 @@ impl<X: Pending> AiWorld for View<'_, X> {
                 .map(|g| game.lists.find_unit(crate::units::UnitType::Monster, g))
         })
     }
+    /// `0x005FD350(class, room, x, y, 0)` (`ai-bodies-4.md` §2 birth; the
+    /// population's flag-1 form is `population.md` §9.3): by the class's
+    /// `BaseId` the point tested and its mask; the room holding it
+    /// (`0x00463740` from the unit's room) must exist and have no
+    /// collision with a size-2 box (`0x0064D9B0`). Other classes pass.
+    /// Without the path provider the host's answer.
     fn footprint_ok(&self, game: &Game, class: i32, room: Option<RoomId>, x: i32, y: i32) -> bool {
-        self.h.x.footprint_ok(game, class, room, x, y)
+        if self.h.paths.is_none() {
+            return self.h.x.footprint_ok(game, class, room, x, y);
+        }
+        let base = usize::try_from(class)
+            .ok()
+            .and_then(|c| self.h.tables.combat.monstats.get(c))
+            .map(|m| i32::from(m.baseid as i16));
+        let (px, py, mask) = match base {
+            Some(206) => (x, y + 3, 0x3C01),
+            Some(228) => (x, y + 2, 0x3C01),
+            Some(298) => (x, y, 0x3C01),
+            Some(334) => (x - 2, y - 2, 0x1C0),
+            Some(528) => (x + 2, y + 4, 0x3C01),
+            _ => return true,
+        };
+        let Some(r) = room.and_then(|r| self.h.drlg.find_room(game, r, px, py)) else {
+            return false;
+        };
+        crate::path::collision::size_value(&self.h.drlg, Some(r), px, py, 2, mask) == 0
     }
 }
 
@@ -703,7 +736,18 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn hostile(&self, game: &Game, a: UnitId, b: UnitId) -> bool {
         self.h.x.ai_hostile(game, a, b)
     }
+    /// `0x00552FD0`: the source-unit link (+0xC8 bit 0x400: the unit of
+    /// type +0x94 and GUID +0x98), else the host's.
     fn owner(&self, game: &Game, unit: UnitId) -> Option<UnitId> {
+        if let Some((ty, guid)) = self
+            .units
+            .get(unit)
+            .filter(|r| r.flags2 & 0x400 != 0)
+            .map(|r| r.source)
+        {
+            let ty = *crate::units::UnitType::ALL.get(ty as usize)?;
+            return game.lists.find_unit(ty, guid);
+        }
         self.h.x.ai_owner(game, unit)
     }
     fn owner_record(&self, unit: UnitId) -> Option<(i32, u32)> {
@@ -735,7 +779,10 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn skill_level(&self, unit: UnitId, skill: i32, highest: bool) -> Option<i32> {
         match self.h.monster_skills.get(&unit) {
             Some(m) => m.get(&skill).copied(),
-            None => self.h.x.ai_skill_level(unit, skill, highest),
+            None => match self.h.natural_skills.get(&unit) {
+                Some(m) => m.get(&skill).copied(),
+                None => self.h.x.ai_skill_level(unit, skill, highest),
+            },
         }
     }
     /// A summoned monster's entry: the id and its mode, fixed when the
@@ -771,7 +818,19 @@ impl<X: Pending> AiActs for View<'_, X> {
         x: i32,
         y: i32,
     ) -> bool {
-        self.h.x.ai_skill_check(game, unit, skill, target, x, y)
+        if self.h.paths.is_none() {
+            return self.h.x.ai_skill_check(game, unit, skill, target, x, y);
+        }
+        let world = SkillRooms { v: self, game };
+        crate::monsters::ai::skill_check::skill_check(
+            &world,
+            &self.h.tables.skills.skills,
+            unit,
+            skill,
+            target,
+            x,
+            y,
+        )
     }
     fn corpse_search(
         &mut self,
@@ -862,8 +921,12 @@ impl<X: Pending> AiActs for View<'_, X> {
     fn path_has_points(&mut self, game: &mut Game, unit: UnitId, target: UnitId) -> bool {
         self.h.x.ai_path_has_points(game, unit, target)
     }
+    /// `0x00621DC0(unit, target x, target y)` → `0x0064FDC0` through the
+    /// path provider ([`View::path_dir64`]); else the host's.
     fn direction64(&self, unit: UnitId, target: UnitId) -> i32 {
-        self.h.x.ai_direction64(unit, target)
+        let at = self.h.path_position(target);
+        self.path_dir64(unit, at)
+            .unwrap_or_else(|| self.h.x.ai_direction64(unit, target))
     }
     fn stop_unit_path(&mut self, unit: UnitId) {
         AiModes::stop_path(self, unit);
@@ -1185,5 +1248,80 @@ impl<X: Pending> View<'_, X> {
             return Some(false);
         }
         Some(!self.units_line_blocked(game, a, b, 0x804).unwrap_or(false))
+    }
+}
+
+/// `0x005FD470`'s world (`ai.md` §7.4) on the DRLG rooms and the path
+/// records; used once the host has turned the path provider on.
+struct SkillRooms<'a, 'v, X: Pending> {
+    v: &'a View<'v, X>,
+    game: &'a Game,
+}
+
+impl<X: Pending> crate::monsters::ai::skill_check::SkillCheckWorld for SkillRooms<'_, '_, X> {
+    fn position(&self, unit: UnitId) -> (i32, i32) {
+        self.v.h.path_position(unit)
+    }
+    fn room(&self, unit: UnitId) -> Option<RoomId> {
+        self.game.lists.unit(unit).and_then(|e| e.room())
+    }
+    fn has_unit_flag(&self, unit: UnitId, bit: u32) -> bool {
+        self.v.units.get(unit).is_some_and(|r| r.flags & bit != 0)
+    }
+    fn dead_or_dying(&self, unit: UnitId) -> bool {
+        self.v
+            .units
+            .get(unit)
+            .is_some_and(|r| r.mode == 0 || r.mode == 12)
+    }
+    fn in_town(&self, room: RoomId) -> bool {
+        self.v.h.drlg.in_town(self.game, room)
+    }
+    fn pattern_free(&self, room: Option<RoomId>, unit: UnitId, x: i32, y: i32, mask: u16) -> bool {
+        let pattern = self
+            .v
+            .h
+            .paths
+            .as_ref()
+            .and_then(|p| p.dynamic(unit))
+            .map_or(0, |d| d.pattern);
+        !crate::path::collision::pattern_collides(&self.v.h.drlg, room, x, y, pattern, mask)
+    }
+    fn free_point_room(
+        &self,
+        room: Option<RoomId>,
+        unit: UnitId,
+        p: (i32, i32),
+        mask: u16,
+    ) -> Option<RoomId> {
+        let mut pt = crate::path::Point::new(p.0, p.1);
+        crate::path::search::free_point(
+            &crate::wiring::path::place::Rooms(&self.v.h.drlg),
+            room,
+            &mut pt,
+            self.v.path_size(unit),
+            u32::from(mask),
+            false,
+        )
+        .ok()
+        .flatten()
+    }
+    fn line_clear(&self, from: (i32, i32), to: (i32, i32), room: RoomId, mask: u16) -> bool {
+        !crate::path::line::line_test(
+            &self.v.h.drlg,
+            Some(room),
+            crate::path::Point::new(from.0, from.1),
+            crate::path::Point::new(to.0, to.1),
+            mask,
+        )
+        .blocked()
+    }
+    fn room_at(&self, unit: UnitId, x: i32, y: i32) -> Option<RoomId> {
+        let from = self.room(unit)?;
+        self.v.h.drlg.find_room(self.game, from, x, y)
+    }
+    fn diab_prison_ok(&self, _: Option<RoomId>, _: Option<UnitId>) -> bool {
+        // Skill 199 (DiabPrison): the placement test is not wired.
+        false
     }
 }
