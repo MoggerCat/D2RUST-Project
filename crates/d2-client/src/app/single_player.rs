@@ -2080,6 +2080,9 @@ struct GameParts {
     bodies: Option<Arc<d2_sim::skills::use_::bodies::BodyTables>>,
     /// The chest drop's tables; `None`: no drop (synthetic).
     drops: Option<Arc<DropTables>>,
+    /// The object and quest drop helpers' pick rows (`world/objects-2.md`
+    /// §20.5, `DeathDrops::with_picks`); `None`: none (synthetic).
+    picks: Option<Arc<d2_sim::treasure::class_pick::ClassPicks>>,
     /// `None`: the mercenary calls report no tables (synthetic).
     hirelings: Option<HirelingTables>,
     /// The inventory tables of the wired host's inventory model (the new
@@ -2111,6 +2114,7 @@ impl GameParts {
             vitals: Some(Arc::new(t.vitals()?)),
             bodies: Some(Arc::new(t.body_tables()?)),
             drops: Some(d.drops.clone()),
+            picks: Some(Arc::new(t.class_picks()?)),
             hirelings: Some(d.hirelings.clone()),
             inventory: Some(
                 InvTables::from_fixed(&t.fixed)
@@ -2248,11 +2252,15 @@ pub fn build_with(
     })?;
     // The chest drop's state (`treasure.md` §4): its seed, creation
     // fields and unique bits are the action wiring's.
+    // With the pick rows: the object drops (`objects-2.md` §20: the gold
+    // placeholder, armor stands, racks, ...) find their item by code there.
+    let picks = parts.picks;
     sim.action.hooks().object_drops = parts.drops.map(|t| {
-        Box::new(DeathDrops::new(
-            t,
-            GameFields::new(Seed::init_low(0), false),
-        ))
+        let d = DeathDrops::new(t, GameFields::new(Seed::init_low(0), false));
+        Box::new(match picks {
+            Some(p) => d.with_picks(p),
+            None => d,
+        })
     });
     let mut game = Game::new();
     let start_levels = [(0u8, ACT1_TOWN), (0, COLD_PLAINS), (1, ACT2_TOWN)];
