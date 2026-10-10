@@ -7,7 +7,7 @@ save ScnAma --class ama --expansion
 seed 1234
 ticks 180
 seconds 400
-channels state rng
+channels state rng packets
 variant blood-moor-empty
 at 4 poke warp 2
 at 30 poke object 59 @x+3 @y

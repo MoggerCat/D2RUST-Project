@@ -261,6 +261,7 @@ impl Fx {
             skill_modes: Vec::new(),
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         };
         let drlg = DrlgWorld {
             dungeon: Dungeon::default(),
