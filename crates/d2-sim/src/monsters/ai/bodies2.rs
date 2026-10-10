@@ -1122,18 +1122,19 @@ pub fn possessed_imp<W: AiHost + ?Sized>(
     let out =
         p.distance > 0x18 || cx.world.is_dead(src) || cx.world.alignment(src) != 0 || slot == 0;
     if out {
-        // 2. Out of reach: a teleport in range of imp1's first AIP, then
+        // 2. Out of reach: a teleport in range of imp1's second AIP, then
         // the first parameter is reset.
-        let r = cx.class_aip(IMP1, 1);
+        let r = cx.class_aip(IMP1, 2);
         let (s, m) = cx.class_skill(IMP1, 1);
         teleport_in_range(game, cx, u, r, s, m);
         set_param(cx, u, 0, -1);
         return;
     }
-    // 3. Within imp2's first AIP: act with chance imp2's second AIP.
-    if p.distance < cx.class_aip(IMP2, 1) && roll(cx, u, 100) < cx.class_aip(IMP2, 2) {
+    // 3. Within imp2's second AIP: act with chance imp2's third AIP
+    // (`+0x5C` / `+0x62` of the row; aip1 is `+0x56`).
+    if p.distance < cx.class_aip(IMP2, 2) && roll(cx, u, 100) < cx.class_aip(IMP2, 3) {
         if second != 0 {
-            let n = cx.class_aip(IMP2, 3).wrapping_mul(2);
+            let n = cx.class_aip(IMP2, 4).wrapping_mul(2);
             roll(cx, u, n);
             roll(cx, u, n);
         }
