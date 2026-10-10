@@ -88,8 +88,6 @@ state first. It is the default way to compare a behaviour with 1.14d.
 | `difficulty normal\|nightmare\|hell` | no (normal) | d2rs `--difficulty` |
 | `channels <ch>...` | no (`state`) | from `state`, `draws`, `rng`, `packets`, `items`, `save`, `frontend` |
 | `draws-at <tick>` | with `draws` | the server tick whose frame is compared (≤ `ticks`; 1.14d's last drawn tick at or before it, §3 rule 7.2) |
-| `skip-weather` | no, once, draws only | `facts-compare --skip-weather` (`facts-render.md` §6 r5, REC-510): pass 9's rain/snow rows and pass 4's pool cels are left out on both sides (1.14d draws other particles per run, §edge case 2); the frame's `index_sha256` is then not compared (the presented frame holds them) |
-| `skip-cursor` | no, once, draws only | `facts-compare --skip-cursor` (`facts-render.md` §6 r6, PROVISIONAL REC-2980): the cursor cels are left out on both sides (1.14d's cursor follows the wall clock) |
 | `input <script>` | no | the shared input script of rule 4, given to both sides (excludes the two lines below) |
 | `input orig <script>` | no | `autostart.py` input script (seconds, client pixels) |
 | `input d2rs <script>` | no | `d2-client play --input` script (server ticks; `state-dump` takes it only in rule 4's form) |

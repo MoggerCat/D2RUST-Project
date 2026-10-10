@@ -752,28 +752,6 @@ fn skip_weather_drops_pass9_rows_only() {
     assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(d) if d.row == 1));
 }
 
-// Covers: specs/tools/facts-render.md §6 r6
-/// `--skip-cursor`: the cursor cels drop out on both sides, other cels stay.
-#[test]
-fn skip_cursor_drops_the_cursor_cels_only() {
-    use super::compare::is_cursor_row;
-    let row = |file: &str| -> Vec<String> {
-        let mut r = vec!["-".to_owned(); DRAW_COLUMNS.len()];
-        r[1] = "CelDraw".into();
-        r[2] = file.into();
-        r
-    };
-    assert!(is_cursor_row(&row("data/global/ui/cursor/ohand.dc6")));
-    assert!(!is_cursor_row(&row("data/global/ui/panel/level.dc6")));
-    let hand = "9 CelDraw data/global/ui/cursor/ohand.dc6 0 6 - 790 10 32 28 -2 24 5 0xffffffff 0 - 0x46844b";
-    let ours = "9 CelDraw data/global/ui/cursor/protate.dc6 0 2 - 790 10 31 26 -1 24 ? ? ? - -";
-    let a = set(&[ROW0, hand, ROW1], &[], Some(&[SPRITE]));
-    let b = set(&[ROW0, ours, ROW1], &[], Some(&[SPRITE]));
-    assert!(matches!(compare(&a, &b, &[]), Outcome::Diverged(_)));
-    let (a, b) = (a.without_cursor(), b.without_cursor());
-    assert_eq!(compare(&a, &b, &[]), Outcome::Match);
-}
-
 // Covers: specs/tools/facts-render.md §6 r5
 /// §6 r5 revision: pass 4's pool cels (1.14d `CelDraw` from the pool
 /// draw, d2rs `at` = `pools`) drop out with the weather; other cels and

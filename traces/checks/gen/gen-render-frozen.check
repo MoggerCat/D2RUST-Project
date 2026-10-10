@@ -12,6 +12,3 @@ channels draws
 at 6 poke spawn 179 @x+3 @y normal
 at 8 poke state @player 1 on
 draws-at 28
-skip-weather
-skip-cursor
-input frame 26; move 790 10

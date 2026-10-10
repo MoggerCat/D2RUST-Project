@@ -848,7 +848,6 @@ fn facts_compare(args: &[String]) -> i32 {
     let mut dirs = Vec::new();
     let mut ignore = Vec::new();
     let mut skip_weather = false;
-    let mut skip_cursor = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -860,23 +859,16 @@ fn facts_compare(args: &[String]) -> i32 {
                 }
             },
             "--skip-weather" => skip_weather = true,
-            "--skip-cursor" => skip_cursor = true,
             _ => dirs.push(PathBuf::from(a)),
         }
     }
     let [original, d2rs] = &dirs[..] else {
         eprintln!(
-            "usage: d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...] [--skip-weather] [--skip-cursor]"
+            "usage: d2-client facts-compare ORIGINAL_DIR D2RS_DIR [--ignore COL,...] [--skip-weather]"
         );
         return 3;
     };
-    match d2_client::facts::compare::compare_dirs_with(
-        original,
-        d2rs,
-        &ignore,
-        skip_weather,
-        skip_cursor,
-    ) {
+    match d2_client::facts::compare::compare_dirs(original, d2rs, &ignore, skip_weather) {
         Ok(outcome) => {
             println!("{outcome}");
             outcome.exit_code()
