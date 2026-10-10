@@ -36,32 +36,32 @@
 |   8. Base values from monlvl | 428–462 |
 |   9. Player-count bonus (`0x00573930`) | 463–474 |
 |   10. Components (`0x005739D0`) | 475–485 |
-|   11. monprop (`monprop.txt`) | 486–494 |
-|   12. monequip (`0x005D6B60`) | 495–511 |
-|   13. Classic scaling (`0x0063EEF0`) | 512–519 |
-|   14. Normal mods and boss mods | 520–621 |
-|   15. Party minions | 622–626 |
-|   16. Boss spawns | 627–662 |
-|   17. Choosing umods (`0x005A0760`) | 663–706 |
-|   18. Boss minions and umod init (`0x005A2120`) | 707–724 |
-|   19. Umod init functions | 725–817 |
-|   20. Superuniques (`0x005A49B0`) | 818–866 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 867–881 |
-|   22. Umod callbacks and the type-7 event | 882–933 |
-|   23. Unique names (client) | 934–943 |
-|   24. Monster assign message | 944–1000 |
-|   25. Calling the spawn functions outside population (tools) | 1001–1091 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1092–1151 |
-|   27. Class reinit (`0x00574370`) | 1152–1197 |
-| Constants & data dependencies | 1198–1219 |
-| Randomness | 1220–1264 |
-| Edge cases & original bugs | 1265–1296 |
-| Test vectors | 1297–1298 |
-|   Synthetic (CI-safe) | 1299–1321 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1322–1352 |
-|   Recorded checks (monster assign 0xAC) | 1353–1365 |
-| Provenance | 1366–1455 |
-| Open questions | 1456–1536 |
+|   11. monprop (`monprop.txt`) | 486–503 |
+|   12. monequip (`0x005D6B60`) | 504–520 |
+|   13. Classic scaling (`0x0063EEF0`) | 521–528 |
+|   14. Normal mods and boss mods | 529–630 |
+|   15. Party minions | 631–635 |
+|   16. Boss spawns | 636–671 |
+|   17. Choosing umods (`0x005A0760`) | 672–715 |
+|   18. Boss minions and umod init (`0x005A2120`) | 716–733 |
+|   19. Umod init functions | 734–826 |
+|   20. Superuniques (`0x005A49B0`) | 827–875 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 876–890 |
+|   22. Umod callbacks and the type-7 event | 891–942 |
+|   23. Unique names (client) | 943–952 |
+|   24. Monster assign message | 953–1009 |
+|   25. Calling the spawn functions outside population (tools) | 1010–1100 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1101–1160 |
+|   27. Class reinit (`0x00574370`) | 1161–1206 |
+| Constants & data dependencies | 1207–1228 |
+| Randomness | 1229–1273 |
+| Edge cases & original bugs | 1274–1305 |
+| Test vectors | 1306–1307 |
+|   Synthetic (CI-safe) | 1308–1330 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1331–1361 |
+|   Recorded checks (monster assign 0xAC) | 1362–1374 |
+| Provenance | 1375–1464 |
+| Open questions | 1465–1545 |
 <!-- /index -->
 
 ## Summary

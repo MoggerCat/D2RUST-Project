@@ -21,3 +21,9 @@ First divergence frame 37 -> 73 (then 73: killer GUID, 1.14d 10 vs d2rs 26, an A
 - Who kills the player differs (guid 10 vs 26 in cha-00): monster AI/target choice (owner: AI).
 - Ledger part `ledger/rc-census-missing.tsv`: only net.s2c.0x65 (NO-CHECK -> DIVERGED). 0x15/0x1b/0xac read DIVERGED in this subset only through cascades; left as in the base.
 - Census output is not committed; `traces/orig-cache` was refilled locally and left uncommitted.
+
+## Round 2: 0x8E CorpseAssign vs 0x0D (REC-2812)
+- DD start broadcasts 0x8E first; the corpse then goes through the normal new-unit add (0x59 with the owner's name, 0x75 after every 0x59, 0x74 flag 1 owner+corpse, 0xAA with states 7 and 105, the mode function 0x0D, 0x76) instead of the `dying.rs` 0x59 + 0x0D special case. The player's DT/DD 0x0D carries unit byte +0xB0. Corpse fill sends no 0x47/0x48 when nothing moved (PROVISIONAL, with items moved the d2rs refresh stays).
+- Result: items-drops-cha-00 matches 1.14d through frame 96 (only the 0x5A killer GUID differs, frame 73). Over the 60 drops checks the `8e vs 0d` group (~47) is gone.
+- Next first divergences (60 drops checks): `0c vs 67` MonsterHit before MonsterMove (10), `a9 vs 65` EndState before the kill count (6), `69 vs 4d` (4), then scattered "missing in d2rs" (killer attribution, AI).
+- No ledger row flipped (subset only).
