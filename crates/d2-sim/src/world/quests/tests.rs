@@ -1854,10 +1854,13 @@ fn act_transitions() {
     ctl.act_completion(&mut f, P1, npc::WARRIV1).unwrap();
     let fl = f.flags(P1);
     assert!(fl.get(7, 0) && fl.get(7, 13));
-    // 0x28, `61 02`, then A1Q4's act-change hook (§10.6 r16): Cain was
-    // never freed, so status 5 goes out and the quest moves to state 7.
-    assert_eq!(f.sent_ids(), [0x28, 0x61, 0x5D]);
+    assert_eq!(f.sent_ids(), [0x28, 0x61]);
     assert_eq!(f.sent[1].1, [0x61, 2]);
+    // The travel's town-leave refresh `0x00537340` for Lut Gholein runs
+    // A1Q4's act-change hook (§10.6 r16): Cain was never freed, so status
+    // 5 goes out and the quest moves to state 7.
+    ctl.town_leave(&mut f, P1, 40);
+    assert_eq!(f.sent_ids(), [0x28, 0x61, 0x5D]);
     assert_eq!(ctl.record(4).unwrap().state, 7);
     assert_eq!(f.players[&P1].byte4c, 1);
     assert!(f.players[&P1].quests.intro[0].contains(&148));

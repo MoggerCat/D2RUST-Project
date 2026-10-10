@@ -331,6 +331,13 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
         self.v.set_state(unit, state, true);
     }
 
+    /// §14.3 bloodraven: state 118 corpse_noselect on
+    /// (`0x00639DB0(unit, 118, 1)`; recorded in the 0xAA of
+    /// `items-drops-hel-10`).
+    fn set_corpse_noselect(&mut self, unit: UnitId) {
+        self.v.set_state(unit, 118, true);
+    }
+
     // ---- umod callbacks (`umod-callbacks.md`; bodies in `umod_host.rs`)
 
     fn stat_total(&self, unit: UnitId, stat: u16) -> i32 {
@@ -531,6 +538,33 @@ impl<X: WorldPending> InitHost for WorldHost<'_, X> {
                 loc,
                 modifier,
                 level,
+            );
+        }
+        self.v.h.object_drops = Some(d);
+    }
+    /// `init.md` §11: the monprop property assignment `0x0065FD70` on the
+    /// unit ([`crate::wiring::economy::monster_property`]); without the
+    /// drop state (no item tables) nothing is written.
+    fn apply_property(&mut self, unit: UnitId, prop: i32, par: i32, min: i32, max: i32) {
+        let Some(d) = self.v.h.object_drops.take() else {
+            return;
+        };
+        {
+            let mut sim = Sim {
+                game: &mut *self.game,
+                units: &mut *self.v.units,
+                stats: &mut *self.v.stats,
+                data: self.v.data,
+            };
+            crate::wiring::economy::monster_property(
+                &mut *self.v.h,
+                &mut sim,
+                &d,
+                unit,
+                prop,
+                par,
+                min,
+                max,
             );
         }
         self.v.h.object_drops = Some(d);

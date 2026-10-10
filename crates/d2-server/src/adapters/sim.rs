@@ -132,6 +132,11 @@ pub struct SimGame<D = Unspecified, W = NoWorld> {
     /// The ground items announced inside this tick's queue walk
     /// (`handlers::items::moves::announce_marked`), for the pass's clean-up.
     pub(crate) walk_announced: Vec<(ClientId, UnitId)>,
+    /// The (client, player) pairs whose item messages / sound went out at
+    /// their place in this tick's queue walk
+    /// (`handlers::items::moves::player_marked`); the pass skips them.
+    pub(crate) walk_player_items: Vec<(ClientId, UnitId)>,
+    pub(crate) walk_player_sound: Vec<(ClientId, UnitId)>,
     /// The host calls the quest rules raised (`quests-helpers.md` §6:
     /// game end `0x00530590`, save pass `0x0052E2A0`), drained from the
     /// world after each tick's steps, in call order. Running them is the
@@ -195,6 +200,8 @@ impl<D: EventDispatch, W> SimGame<D, W> {
             tick_faults: Vec::new(),
             announce_ground: false,
             walk_announced: Vec::new(),
+            walk_player_items: Vec::new(),
+            walk_player_sound: Vec::new(),
             announced_ground: std::collections::BTreeSet::new(),
             host_requests: Vec::new(),
             hotkeys: BTreeMap::new(),
@@ -651,6 +658,20 @@ impl<D: EventDispatch + TickHooks, W: WorldHost<D>> Tick for SimGame<D, W> {
             if bytes.len() == 5 && bytes[0] == d2_sim::wiring::action::GROUND_ITEM_MARK {
                 let guid = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]);
                 handlers::items::moves::announce_marked(self, out, unit, guid);
+                continue;
+            }
+            // A player-update mark of the queue walk: the player's item
+            // messages or sound here.
+            if bytes.len() == 5
+                && matches!(
+                    bytes[0],
+                    d2_sim::wiring::action::PLAYER_ITEMS_MARK
+                        | d2_sim::wiring::action::PLAYER_SOUND_MARK
+                )
+            {
+                let guid = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]);
+                let sound = bytes[0] == d2_sim::wiring::action::PLAYER_SOUND_MARK;
+                handlers::items::moves::player_marked(self, out, unit, guid, sound);
                 continue;
             }
             if let Some(c) = self.client_of(unit) {

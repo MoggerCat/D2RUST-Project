@@ -1064,6 +1064,24 @@ impl Pending for LocalSeams {
     ) -> Vec<UnitId> {
         skill_events::missile_area_units(h, sim, owner, at, r, f)
     }
+    fn missile_ally_test(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        a: UnitId,
+        b: UnitId,
+    ) -> bool {
+        skill_events::missile_ally_test(h, sim, a, b)
+    }
+    fn missile_shout_state(
+        h: &mut ActionHooks<Self>,
+        sim: &mut USim<'_>,
+        unit: UnitId,
+        owner: UnitId,
+        skill: i32,
+        level: i32,
+    ) {
+        skill_events::missile_shout_state(h, sim, unit, owner, skill, level)
+    }
     fn missile_summon_spawn(
         h: &mut ActionHooks<Self>,
         sim: &mut USim<'_>,
@@ -2692,9 +2710,6 @@ fn loader(
                     let (game, world) = (&mut s.game, &mut s.world);
                     s.events.lend_world(|a| world.hireling_calls(game, a));
                     super::save_gaps::join_gaps(s, player, save);
-                    // `use.md` §7 "0x3C SelectSkill": the selected right skill, an aura,
-                    // starts (q-fix-pt-right-aura).
-                    s.events.action.assign_right_aura(&mut s.game, player);
                     // `d2s.md` §2.4 rules 4–6: the hot keys, their item
                     // indices resolved over the loaded inventory list.
                     entry.hotkeys = super::save_gaps::loaded_hotkeys(

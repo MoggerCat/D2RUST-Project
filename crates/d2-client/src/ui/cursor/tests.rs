@@ -334,3 +334,21 @@ fn messages_that_reach_the_cursor() {
     c.button_up(0, 0, 3);
     assert_eq!((c.s, c.t), (1, 5));
 }
+
+// Covers: specs/ui/panels-3.md §23 r8
+#[test]
+fn place_owes_the_step_that_draw_runs() {
+    let mut a = fresh();
+    let mut b = a.clone();
+    let (d, owed) = a.place(640, 480, None);
+    assert!(owed, "a type-cel draw is followed by the step");
+    let mut seed = 0x0000_029A_0000_0001u64;
+    let drawn = b.draw(640, 480, None, 100, true, &mut seed).unwrap();
+    assert_eq!(d, drawn);
+    let mut seed2 = 0x0000_029A_0000_0001u64;
+    a.step(100, true, &mut seed2).unwrap();
+    assert_eq!((a, seed2), (b, seed));
+    // An item on the cursor: no step owed.
+    let c = fresh();
+    assert!(!c.place(640, 480, Some((28, 28))).1);
+}

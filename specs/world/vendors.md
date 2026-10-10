@@ -35,16 +35,16 @@
 |   3. Store generation (`0x00576980(npc, player, record)`) | 148–262 |
 |   4. Opening trade or gamble (`0x00579430(npc, single, gamble)`) | 263–303 |
 |   5. Gambling | 304–405 |
-|   6. Refresh | 406–447 |
-|   7. Buying and selling | 448–641 |
-|   8. Repair | 642–696 |
-|   9. Prices | 697–896 |
-| Constants & data dependencies | 897–916 |
-| Randomness | 917–935 |
-| Edge cases & original bugs | 936–975 |
-| Test vectors | 976–998 |
-| Provenance | 999–1037 |
-| Open questions | 1038–1121 |
+|   6. Refresh | 406–437 |
+|   7. Buying and selling | 438–631 |
+|   8. Repair | 632–686 |
+|   9. Prices | 687–886 |
+| Constants & data dependencies | 887–906 |
+| Randomness | 907–925 |
+| Edge cases & original bugs | 926–965 |
+| Test vectors | 966–988 |
+| Provenance | 989–1027 |
+| Open questions | 1028–1111 |
 <!-- /index -->
 
 ## Summary

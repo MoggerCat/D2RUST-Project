@@ -265,14 +265,18 @@ impl CharacterPanel {
         let statpts = view.stat(STAT_STATPTS);
         let shown = super::char_details::points_block_drawn(view.base(STAT_STATPTS));
         let extra = move |c: Cond| c == Cond::StatPts && shown;
-        let phase = |item: &str| match item {
+        // Measured `ui-draws-inv-char-l5-ama`: the points box (art, its two
+        // label lines, the number, the add buttons) follows the art and
+        // precedes the 15 labels.
+        let phase = |r: &LayoutRow| match r.item.as_str() {
             i if i.starts_with("art") => 0,
-            i if i.starts_with("label") => 1,
-            "close" => 2,
-            _ => 3,
+            _ if r.has(Cond::StatPts) => 1,
+            i if i.starts_with("label") => 2,
+            "close" => 3,
+            _ => 4,
         };
-        for ph in 0..4 {
-            for r in t.rows(PANEL).filter(|r| phase(&r.item) == ph) {
+        for ph in 0..5 {
+            for r in t.rows(PANEL).filter(|r| phase(r) == ph) {
                 let cenv = env.cond(self.row_pressed(r), &extra);
                 if !r.applies(&cenv) {
                     continue;
@@ -293,8 +297,8 @@ impl CharacterPanel {
                 }
             }
             match ph {
-                1 => hook(Stage::Labels, out),
-                2 => hook(Stage::Close, out),
+                2 => hook(Stage::Labels, out),
+                3 => hook(Stage::Close, out),
                 _ => {}
             }
         }

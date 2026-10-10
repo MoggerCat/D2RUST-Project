@@ -31,37 +31,37 @@
 |   3. Placement | 165–173 |
 |   4. Creation sequence after placement (`0x005B2A00`) | 174–329 |
 |   5. Monster type init (`0x00574250`) | 330–347 |
-|   6. Stats and skills (`0x00573CB0`) | 348–411 |
-|   7. Monster level | 412–427 |
-|   8. Base values from monlvl | 428–462 |
-|   9. Player-count bonus (`0x00573930`) | 463–474 |
-|   10. Components (`0x005739D0`) | 475–485 |
-|   11. monprop (`monprop.txt`) | 486–503 |
-|   12. monequip (`0x005D6B60`) | 504–520 |
-|   13. Classic scaling (`0x0063EEF0`) | 521–528 |
-|   14. Normal mods and boss mods | 529–630 |
-|   15. Party minions | 631–635 |
-|   16. Boss spawns | 636–671 |
-|   17. Choosing umods (`0x005A0760`) | 672–715 |
-|   18. Boss minions and umod init (`0x005A2120`) | 716–733 |
-|   19. Umod init functions | 734–826 |
-|   20. Superuniques (`0x005A49B0`) | 827–875 |
-|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 876–890 |
-|   22. Umod callbacks and the type-7 event | 891–942 |
-|   23. Unique names (client) | 943–952 |
-|   24. Monster assign message | 953–1009 |
-|   25. Calling the spawn functions outside population (tools) | 1010–1100 |
-|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1101–1160 |
-|   27. Class reinit (`0x00574370`) | 1161–1206 |
-| Constants & data dependencies | 1207–1228 |
-| Randomness | 1229–1273 |
-| Edge cases & original bugs | 1274–1305 |
-| Test vectors | 1306–1307 |
-|   Synthetic (CI-safe) | 1308–1330 |
-|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1331–1361 |
-|   Recorded checks (monster assign 0xAC) | 1362–1374 |
-| Provenance | 1375–1464 |
-| Open questions | 1465–1545 |
+|   6. Stats and skills (`0x00573CB0`) | 348–414 |
+|   7. Monster level | 415–430 |
+|   8. Base values from monlvl | 431–465 |
+|   9. Player-count bonus (`0x00573930`) | 466–477 |
+|   10. Components (`0x005739D0`) | 478–488 |
+|   11. monprop (`monprop.txt`) | 489–506 |
+|   12. monequip (`0x005D6B60`) | 507–523 |
+|   13. Classic scaling (`0x0063EEF0`) | 524–531 |
+|   14. Normal mods and boss mods | 532–633 |
+|   15. Party minions | 634–638 |
+|   16. Boss spawns | 639–674 |
+|   17. Choosing umods (`0x005A0760`) | 675–718 |
+|   18. Boss minions and umod init (`0x005A2120`) | 719–736 |
+|   19. Umod init functions | 737–829 |
+|   20. Superuniques (`0x005A49B0`) | 830–878 |
+|   21. Restore paths (`0x005A4440`, `0x005A46E0`) | 879–893 |
+|   22. Umod callbacks and the type-7 event | 894–945 |
+|   23. Unique names (client) | 946–955 |
+|   24. Monster assign message | 956–1012 |
+|   25. Calling the spawn functions outside population (tools) | 1013–1103 |
+|   26. Making an existing monster unique (`0x005A4940`) and the warping shrine's pick | 1104–1163 |
+|   27. Class reinit (`0x00574370`) | 1164–1209 |
+| Constants & data dependencies | 1210–1231 |
+| Randomness | 1232–1276 |
+| Edge cases & original bugs | 1277–1308 |
+| Test vectors | 1309–1310 |
+|   Synthetic (CI-safe) | 1311–1333 |
+|   Real 1.14d values (live tables; `#[ignore]`, `D2_GAME_DIR`) | 1334–1364 |
+|   Recorded checks (monster assign 0xAC) | 1365–1377 |
+| Provenance | 1378–1467 |
+| Open questions | 1468–1548 |
 <!-- /index -->
 
 ## Summary
@@ -397,6 +397,9 @@ In order (each "draw" uses the new monster's **unit seed**, unit +0x20):
     (`0x006439B0` + `0x006442A0`, owner −1 adds no bonus on a monster):
     `ActionHooks::natural_skills` keeps skill → level per unit, Megademon's
     range (`Skill1` level) needs it. A monster without an entry reads 1.
+    The entry lookup `0x006439F0` finds these entries too (rc-c011-gameseed:
+    Armageddon's state function, `skills/bodies-4.md` §4.9, reads the
+    entry's param 1 every period; Diablo clone 333 fires it).
     The used skill entry (`0x00620250`, list +0x10) is one of these
     entries, so a skill the monster casts runs at this level, and so does
     the missile it creates (stat 12, `missiles/damage.md` §4): vampire2
