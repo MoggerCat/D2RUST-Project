@@ -426,7 +426,13 @@ fn audio_frame(
         let presented = match driver.as_deref_mut() {
             Some(d) => {
                 engine.pump(d);
-                d.tick()
+                // The last sound tick that ran: the driver's counter is
+                // the next T (`sound-table.md` §6.1, REC-1684). None ran
+                // yet: the first server tick has no sound tick.
+                match d.tick().checked_sub(1) {
+                    Some(t) => t,
+                    None => return Ok(()),
+                }
             }
             None => {
                 engine.pump(audio.cues.as_mut());
