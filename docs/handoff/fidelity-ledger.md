@@ -31,9 +31,9 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | save-channel | 10 | 7 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
 | skills | 655 | 98 | 0 | 11 | 0 | 546 | 17 | 92 | 0 | 192.5–770 | 6 | 545 / 99 / 11 |
-| systems | 918 | 332 | 46 | 251 | 0 | 289 | 240 | 387 | 2 | 910–3576+ | 39 | 554 / 0 / 364 |
+| systems | 918 | 324 | 46 | 251 | 0 | 297 | 240 | 379 | 2 | 894–3512+ | 39 | 554 / 0 / 364 |
 | world | 826 | 50 | 0 | 55 | 0 | 721 | 11 | 89 | 5 | 223.5–734+ | 171 | 731 / 21 / 74 |
-| **all** | 4479 | 830 | 46 | 458 | 0 | 3145 | 464 | 858 | 12 | 2044–7792+ | 286 | 3523 / 382 / 574 |
+| **all** | 4479 | 822 | 46 | 458 | 0 | 3153 | 464 | 850 | 12 | 2028–7728+ | 286 | 3523 / 382 / 574 |
 
 ## By family
 
@@ -682,7 +682,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `state` | 185 | 1 | 0 | 0 | 0 | 184 | 0 | 1 | 0 | 0 | 0 | 11 |
 | `system.act` | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
 | `system.audio` | 47 | 39 | 0 | 8 | 0 | 0 | 0 | 4 | 43 | 0 | 0 | 0 |
-| `system.client` | 86 | 12 | 0 | 52 | 0 | 22 | 0 | 0 | 64 | 0 | 0 | 0 |
+| `system.client` | 86 | 4 | 0 | 52 | 0 | 30 | 0 | 0 | 56 | 0 | 0 | 0 |
 | `system.combat` | 26 | 0 | 0 | 0 | 0 | 26 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.death` | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `system.difficulty` | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -1239,18 +1239,18 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.client.msg-stats-items.3-other-item-messages`: rc-00-local-pc1-today.tsv:201 kept, rc-gen-client.tsv:48 dropped
   - `system.client.msg-stats-items.4-hireling-stats-0x9e-0xa2-0x0045d540`: rc-00-local-pc1-today.tsv:202 kept, rc-gen-client.tsv:49 dropped
   - `system.client.msg-stats-items.5-item-state-messages-0x3e-0x40-0x7c-0x7d-0x92-0`: rc-00-local-pc1-today.tsv:203 kept, rc-gen-client.tsv:50 dropped
-  - `system.client.msg-units.1-unit-add`: rc-00-local-pc1-today.tsv:204 kept, rc-gen-client.tsv:73 dropped
-  - `system.client.msg-units.2-0x0a-removeunit-0x0045cc10`: rc-00-local-pc1-today.tsv:205 kept, rc-gen-client.tsv:74 dropped
-  - `system.client.msg-units.3-0x15-reassignplayer-0x0045d160`: rc-00-local-pc1-today.tsv:206 kept, rc-gen-client.tsv:75 dropped
-  - `system.client.msg-units.4-queued-movement-and-action-messages`: rc-00-local-pc1-today.tsv:207 kept, rc-gen-client.tsv:76 dropped
-  - `system.client.msg-units.5-local-player-vitals-0x18-0x95-0x96`: rc-00-local-pc1-today.tsv:208 kept, rc-gen-client.tsv:77 dropped
-  - `system.client.msg-units.6-unit-states-0xa7-0xa8-0xa9-0xaa`: rc-00-local-pc1-today.tsv:209 kept, rc-gen-client.tsv:78 dropped
-  - `system.client.msg-units.7-other-unit-messages-general-handlers-act-at-re`: rc-00-local-pc1-today.tsv:210 kept, rc-gen-client.tsv:79 dropped
-  - `system.client.msg-units.8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x8e-li`: rc-00-local-pc1-today.tsv:211 kept, rc-gen-client.tsv:80 dropped
-  - `system.client.stat-lists.1-the-list-of-a-client-unit`: rc-00-local-pc1-today.tsv:212 kept, rc-gen-client.tsv:83 dropped
-  - `system.client.stat-lists.2-items`: rc-00-local-pc1-today.tsv:213 kept, rc-gen-client.tsv:84 dropped
-  - `system.client.stat-lists.3-states-s-c-0xa7-0xa8-0xa9`: rc-00-local-pc1-today.tsv:214 kept, rc-gen-client.tsv:85 dropped
-  - `system.client.stat-lists.4-skills`: rc-00-local-pc1-today.tsv:215 kept, rc-gen-client.tsv:86 dropped
+  - `system.client.msg-units.1-unit-add`: rc-00-local-pc1-today.tsv:204 kept, rc-gen-client.tsv:65 dropped
+  - `system.client.msg-units.2-0x0a-removeunit-0x0045cc10`: rc-00-local-pc1-today.tsv:205 kept, rc-gen-client.tsv:66 dropped
+  - `system.client.msg-units.3-0x15-reassignplayer-0x0045d160`: rc-00-local-pc1-today.tsv:206 kept, rc-gen-client.tsv:67 dropped
+  - `system.client.msg-units.4-queued-movement-and-action-messages`: rc-00-local-pc1-today.tsv:207 kept, rc-gen-client.tsv:68 dropped
+  - `system.client.msg-units.5-local-player-vitals-0x18-0x95-0x96`: rc-00-local-pc1-today.tsv:208 kept, rc-gen-client.tsv:69 dropped
+  - `system.client.msg-units.6-unit-states-0xa7-0xa8-0xa9-0xaa`: rc-00-local-pc1-today.tsv:209 kept, rc-gen-client.tsv:70 dropped
+  - `system.client.msg-units.7-other-unit-messages-general-handlers-act-at-re`: rc-00-local-pc1-today.tsv:210 kept, rc-gen-client.tsv:71 dropped
+  - `system.client.msg-units.8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x8e-li`: rc-00-local-pc1-today.tsv:211 kept, rc-gen-client.tsv:72 dropped
+  - `system.client.stat-lists.1-the-list-of-a-client-unit`: rc-00-local-pc1-today.tsv:212 kept, rc-gen-client.tsv:75 dropped
+  - `system.client.stat-lists.2-items`: rc-00-local-pc1-today.tsv:213 kept, rc-gen-client.tsv:76 dropped
+  - `system.client.stat-lists.3-states-s-c-0xa7-0xa8-0xa9`: rc-00-local-pc1-today.tsv:214 kept, rc-gen-client.tsv:77 dropped
+  - `system.client.stat-lists.4-skills`: rc-00-local-pc1-today.tsv:215 kept, rc-gen-client.tsv:78 dropped
   - `system.formats.animdata.1-source-file`: rc-draw-row173.tsv:3 kept, rc-gen-formats.tsv:3 dropped
   - `system.formats.animdata.2-layout`: rc-draw-row173.tsv:4 kept, rc-gen-formats.tsv:4 dropped
   - `system.formats.animdata.3-default-record`: rc-draw-row173.tsv:5 kept, rc-gen-formats.tsv:5 dropped
@@ -2298,9 +2298,9 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x65`: rc-census-missing.tsv:3 kept, rc-run-1.tsv:224 dropped
   - `net.s2c.0x8d`: rc-link-2.tsv:41 kept, rc-run-1.tsv:234 dropped
   - `net.s2c.0xac`: rc-goto-settle.tsv:6 kept, rc-run-1.tsv:243 dropped
-  - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:89 kept, rc-run-1.tsv:244 dropped
+  - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:81 kept, rc-run-1.tsv:244 dropped
   - `system.flows.act-change.2-same-act-travel`: rc-link-2.tsv:73 kept, rc-run-1.tsv:245 dropped
-  - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:91 kept, rc-run-1.tsv:246 dropped
+  - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:83 kept, rc-run-1.tsv:246 dropped
   - `system.sim.monster.warp-placement-y`: rc-mon-y-warp.tsv:3 kept, rc-run-1.tsv:247 dropped
   - `tools.poke.tick-end`: rc-promote.tsv:75 kept, rc-run-1.tsv:249 dropped
   - `drlg.maze.lvlmaze`: rc-promote.tsv:8 kept, rc-run-1.tsv:250 dropped
@@ -6014,12 +6014,12 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.combat.vitals.3-level-up-0x00570880-d2moo-playerstats-levelup`: rc-gen-misc.tsv:61 kept, systems.tsv:418 dropped
   - `system.combat.vitals.4-experience`: rc-gen-misc.tsv:62 kept, systems.tsv:419 dropped
   - `system.combat.vitals.5-client-vitals-sync-0x00548760`: rc-gen-misc.tsv:63 kept, systems.tsv:420 dropped
-  - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:89 kept, systems.tsv:421 dropped
+  - `system.flows.act-change.1-act-change-0x0053acc0`: rc-gen-client.tsv:81 kept, systems.tsv:421 dropped
   - `system.flows.act-change.2-same-act-travel`: rc-link-2.tsv:73 kept, systems.tsv:422 dropped
-  - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:91 kept, systems.tsv:423 dropped
+  - `system.flows.act-change.3-client-side`: rc-gen-client.tsv:83 kept, systems.tsv:423 dropped
   - `system.flows.client-frame.1-loop-pass-order-1-14d`: rc-link-2.tsv:74 kept, systems.tsv:424 dropped
   - `system.flows.client-frame.2-prediction-correction-interpolation`: rc-link-2.tsv:75 kept, systems.tsv:425 dropped
-  - `system.flows.client-frame.3-d2rs-mapping-one-bevy-frame`: rc-gen-client.tsv:94 kept, systems.tsv:426 dropped
+  - `system.flows.client-frame.3-d2rs-mapping-one-bevy-frame`: rc-gen-client.tsv:86 kept, systems.tsv:426 dropped
   - `system.flows.save-exit.1-client-save-and-exit-game`: rc-run-2b.tsv:195 kept, systems.tsv:431 dropped
   - `system.flows.save-exit.2-server-leave-c-s-0x69-in-the-drain`: rc-run-2b.tsv:196 kept, systems.tsv:432 dropped
   - `system.flows.save-exit.3-server-periodic-save`: rc-run-2b.tsv:197 kept, systems.tsv:433 dropped
@@ -6037,8 +6037,8 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.seams.movement-prediction.1-units-and-spaces-used-below`: rc-partial-promote.tsv:226 kept, systems.tsv:445 dropped
   - `system.seams.movement-prediction.2-contract`: rc-partial-promote.tsv:227 kept, systems.tsv:446 dropped
   - `system.seams.sim-server.1-what-crosses`: rc-link-2.tsv:90 kept, systems.tsv:447 dropped
-  - `system.seams.world-screen.1-units-and-spaces`: rc-gen-client.tsv:105 kept, systems.tsv:448 dropped
-  - `system.seams.world-screen.2-contract`: rc-gen-client.tsv:106 kept, systems.tsv:449 dropped
+  - `system.seams.world-screen.1-units-and-spaces`: rc-gen-client.tsv:97 kept, systems.tsv:448 dropped
+  - `system.seams.world-screen.2-contract`: rc-gen-client.tsv:98 kept, systems.tsv:449 dropped
   - `system.client.assets.a-d2rs-design-ours`: rc-gen-client.tsv:3 kept, systems.tsv:450 dropped
   - `system.client.assets.b-original-behavior-to-reproduce-not-specified-h`: rc-gen-client.tsv:4 kept, systems.tsv:451 dropped
   - `system.client.audio.a-d2rs-design-ours`: rc-gen-client.tsv:5 kept, systems.tsv:452 dropped
@@ -6088,25 +6088,25 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.client.msg-stats-items.4-hireling-stats-0x9e-0xa2-0x0045d540`: rc-00-local-pc1-today.tsv:202 kept, systems.tsv:496 dropped
   - `system.client.msg-stats-items.5-item-state-messages-0x3e-0x40-0x7c-0x7d-0x92-0`: rc-00-local-pc1-today.tsv:203 kept, systems.tsv:497 dropped
   - `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0`: rc-link-2.tsv:65 kept, systems.tsv:498 dropped
-  - `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90`: rc-gen-client.tsv:62 kept, systems.tsv:499 dropped
+  - `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90`: rc-sim-combat-div.tsv:55 kept, systems.tsv:499 dropped
   - `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0`: rc-link-2.tsv:71 kept, systems.tsv:500 dropped
-  - `system.client.msg-ui.4-0x26-chat-and-overhead-text-0x0045dfc0-0x0049f`: rc-gen-client.tsv:67 kept, systems.tsv:501 dropped
-  - `system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600`: rc-gen-client.tsv:68 kept, systems.tsv:502 dropped
-  - `system.client.msg-ui.6-0x4e-hire-offer-and-0x4f-hire-list-reset`: rc-gen-client.tsv:69 kept, systems.tsv:503 dropped
-  - `system.client.msg-ui.7-0x50-quest-special-0x0045e370-0x004b9210`: rc-gen-client.tsv:70 kept, systems.tsv:504 dropped
+  - `system.client.msg-ui.4-0x26-chat-and-overhead-text-0x0045dfc0-0x0049f`: rc-gen-client.tsv:61 kept, systems.tsv:501 dropped
+  - `system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600`: rc-sim-combat-div.tsv:56 kept, systems.tsv:502 dropped
+  - `system.client.msg-ui.6-0x4e-hire-offer-and-0x4f-hire-list-reset`: rc-gen-client.tsv:62 kept, systems.tsv:503 dropped
+  - `system.client.msg-ui.7-0x50-quest-special-0x0045e370-0x004b9210`: rc-gen-client.tsv:63 kept, systems.tsv:504 dropped
   - `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550`: rc-link-2.tsv:72 kept, systems.tsv:505 dropped
-  - `system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33`: rc-gen-client.tsv:72 kept, systems.tsv:506 dropped
-  - `system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510`: rc-gen-client.tsv:52 kept, systems.tsv:507 dropped
-  - `system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010`: rc-gen-client.tsv:53 kept, systems.tsv:508 dropped
+  - `system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33`: rc-sim-combat-div.tsv:57 kept, systems.tsv:506 dropped
+  - `system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510`: rc-sim-combat-div.tsv:50 kept, systems.tsv:507 dropped
+  - `system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010`: rc-sim-combat-div.tsv:51 kept, systems.tsv:508 dropped
   - `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620`: rc-link-2.tsv:66 kept, systems.tsv:509 dropped
   - `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0`: rc-link-2.tsv:67 kept, systems.tsv:510 dropped
   - `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004`: rc-link-2.tsv:68 kept, systems.tsv:511 dropped
-  - `system.client.msg-ui.15-0x9b-hireling-revive-state-0x0045eac0-0x004b6`: rc-gen-client.tsv:57 kept, systems.tsv:512 dropped
-  - `system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d`: rc-gen-client.tsv:58 kept, systems.tsv:513 dropped
-  - `system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320`: rc-gen-client.tsv:59 kept, systems.tsv:514 dropped
-  - `system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390`: rc-gen-client.tsv:60 kept, systems.tsv:515 dropped
-  - `system.client.msg-ui.19-0x5a-event-text-0x0045e070-0x0049eb10`: rc-gen-client.tsv:61 kept, systems.tsv:516 dropped
-  - `system.client.msg-ui.20-0x61-act-video-0x0045e660`: rc-gen-client.tsv:63 kept, systems.tsv:517 dropped
+  - `system.client.msg-ui.15-0x9b-hireling-revive-state-0x0045eac0-0x004b6`: rc-gen-client.tsv:55 kept, systems.tsv:512 dropped
+  - `system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d`: rc-sim-combat-div.tsv:52 kept, systems.tsv:513 dropped
+  - `system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320`: rc-sim-combat-div.tsv:53 kept, systems.tsv:514 dropped
+  - `system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390`: rc-sim-combat-div.tsv:54 kept, systems.tsv:515 dropped
+  - `system.client.msg-ui.19-0x5a-event-text-0x0045e070-0x0049eb10`: rc-gen-client.tsv:56 kept, systems.tsv:516 dropped
+  - `system.client.msg-ui.20-0x61-act-video-0x0045e660`: rc-gen-client.tsv:57 kept, systems.tsv:517 dropped
   - `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0`: rc-link-2.tsv:69 kept, systems.tsv:518 dropped
   - `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0`: rc-link-2.tsv:70 kept, systems.tsv:519 dropped
   - `system.client.msg-units.1-unit-add`: rc-00-local-pc1-today.tsv:204 kept, systems.tsv:520 dropped
@@ -6117,14 +6117,14 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `system.client.msg-units.6-unit-states-0xa7-0xa8-0xa9-0xaa`: rc-00-local-pc1-today.tsv:209 kept, systems.tsv:525 dropped
   - `system.client.msg-units.7-other-unit-messages-general-handlers-act-at-re`: rc-00-local-pc1-today.tsv:210 kept, systems.tsv:526 dropped
   - `system.client.msg-units.8-player-roster-0x5b-0x5c-0x65-0x75-0x82-0x8e-li`: rc-00-local-pc1-today.tsv:211 kept, systems.tsv:527 dropped
-  - `system.client.render-pipeline.a-d2rs-design-ours`: rc-gen-client.tsv:81 kept, systems.tsv:528 dropped
-  - `system.client.render-pipeline.b-original-behavior-to-reproduce-not-specified-h`: rc-gen-client.tsv:82 kept, systems.tsv:529 dropped
+  - `system.client.render-pipeline.a-d2rs-design-ours`: rc-gen-client.tsv:73 kept, systems.tsv:528 dropped
+  - `system.client.render-pipeline.b-original-behavior-to-reproduce-not-specified-h`: rc-gen-client.tsv:74 kept, systems.tsv:529 dropped
   - `system.client.stat-lists.1-the-list-of-a-client-unit`: rc-00-local-pc1-today.tsv:212 kept, systems.tsv:530 dropped
   - `system.client.stat-lists.2-items`: rc-00-local-pc1-today.tsv:213 kept, systems.tsv:531 dropped
   - `system.client.stat-lists.3-states-s-c-0xa7-0xa8-0xa9`: rc-00-local-pc1-today.tsv:214 kept, systems.tsv:532 dropped
   - `system.client.stat-lists.4-skills`: rc-00-local-pc1-today.tsv:215 kept, systems.tsv:533 dropped
-  - `system.client.ui.a-d2rs-design-ours`: rc-gen-client.tsv:87 kept, systems.tsv:534 dropped
-  - `system.client.ui.b-original-behavior-to-reproduce-owned-by-the-sp`: rc-gen-client.tsv:88 kept, systems.tsv:535 dropped
+  - `system.client.ui.a-d2rs-design-ours`: rc-gen-client.tsv:79 kept, systems.tsv:534 dropped
+  - `system.client.ui.b-original-behavior-to-reproduce-owned-by-the-sp`: rc-gen-client.tsv:80 kept, systems.tsv:535 dropped
   - `system.render.blend-modes.1-draw-modes`: rc-draw-row173.tsv:34 kept, systems.tsv:536 dropped
   - `system.render.blend-modes.2-blend-table-orientation-per-drawer`: rc-draw-row173.tsv:35 kept, systems.tsv:537 dropped
   - `system.render.blend-modes.3-draw-mode-of-a-composite-unit-component`: rc-draw-row173.tsv:36 kept, systems.tsv:538 dropped
@@ -6857,7 +6857,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-run-2b.tsv:263 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 1886
+- Rows whose state disagrees with their checks: 1894
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -6918,7 +6918,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.frogdemon`: EQUAL but checks say PARTIAL
   - `monster.ai.frozenhorror`: EQUAL but checks say PARTIAL
   - `monster.ai.goatman`: EQUAL but checks say PARTIAL
-  - … and 1826 more (rerun with the tsv to list them)
+  - … and 1834 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -7301,7 +7301,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.missile.479` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 1; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.missile.481` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 19; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.missile.483` | system | DIVERGED | M | DIVERGED@29 | yes | 0 | n | - | - | exercised by checks; count 18; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
-| `cov.monster.148` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | rc-run-2: a check of this row diverges (see checks-status.md); exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
+| `cov.monster.148` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-run-2: a check of this row diverges (see checks-status.md); exercised by checks+soak; count 15; state UNKNOWN: coverage != equality, the verdict is per check (checks-status.md) [integrator: size M set, part left it -] [ledger.py: UNKNOWN -> DIVERGED from its checks] |
 | `cov.monster.175` | system | DIVERGED | M | DIVERGED@10 | yes | 0 | n | - | - | rc-run-1 act-travel-lut-ama: state: frame 10 player 0:1 class 0, field q: 1.14d [[4, 16384]] vs d2rs [] (1/5 of its a* checks diverge) |
 | `cov.monster.179` | system | DIVERGED | M | DIVERGED@2 | yes | 0 | n | - | - | rc-run-1 ass-fire-blast: state PARTIAL, input/send without a MATCHing packets channel (2/2 of its a* checks diverge) |
 | `cov.monster.19` | system | DIVERGED | M | DIVERGED@46 | yes | 0 | n | rc-melee-fallen | - | state 100% on 6 checks (REC-2140); combat-melee-fallen packets still DIVERGED (s2c 0x07 MapReveal frame 3) |
@@ -7322,7 +7322,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `cov.monster.476` | system | DIVERGED | M | DIVERGED@82 | yes | 0 | n | - | - | rc-coverage-warps: re-run on integ-r16 + component/level fix: milestone-baal-throne DIVERGED@82, milestone-worldstone-portal DIVERGED@82 |
 | `cov.monster.510` | system | DIVERGED | M | DIVERGED@82 | yes | 0 | n | - | - | rc-coverage-warps: re-run on integ-r16 + component/level fix: milestone-baal-throne DIVERGED@82, milestone-worldstone-portal DIVERGED@82 |
 | `cov.monster.543` | system | DIVERGED | M | DIVERGED@82 | yes | 0 | n | - | - | rc-coverage-warps: re-run on integ-r16 + component/level fix: milestone-baal-throne DIVERGED@82, milestone-worldstone-portal DIVERGED@82 |
-| `cov.npc-topic.148` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | - | - | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
+| `cov.npc-topic.148` | system | DIVERGED | M | PARTIAL | yes | 0 | n | - | - | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `quest.done12-arcane-sanctuary` | entity | DIVERGED | M | DIVERGED@84 | yes | 0 | n | q-fix-join-items | - | rc-link-2 (2026-10-10): a2-quest-arcane state 114/114 equal, packets DIVERGED frame 84 s2c id 0x67 (1.14d vs d2rs byte 6); routed q-fix-join-items |
 | `quest.done13-the-summoner` | entity | DIVERGED | M | DIVERGED@16 | yes | 0 | n | q-fix-seed-order | - | rc-link-2 (2026-10-10): a2-quest-summoner state DIVERGED frame 20 (game seed), packets DIVERGED frame 16 s2c 0xaa size; routed q-fix-seed-order / q-fix-join-items |
 | `quest.done14-the-seven-tombs` | entity | DIVERGED | M | DIVERGED@32 | yes | 0 | n | q-fix-join-items | - | rc-link-2 (2026-10-10): a2-quest-tombs state 150/150 equal, packets DIVERGED frame 32 s2c id 0x0a vs 0x07; routed q-fix-join-items |
@@ -7574,15 +7574,15 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `item.set-item` | content | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/quality.md,specs/items/properties.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@4 3 over gen-itemq-set-0,gen-itemq-set-1,gen-itemq-set-2; PARTIAL never counts as equal. 128 set items share one path (quality §9); grouped by set; size M: needs a recording of the original plus a compare check |
 | `item.unique` | content | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-server-store-fill | specs/items/quality.md,specs/items/properties.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@4 1, MATCH 2 over gen-itemq-unique-0,gen-itemq-unique-1,gen-itemq-unique-2; PARTIAL never counts as equal. 403 uniques share one path (quality §8 + properties mode 3); not one row each; rarity read as 32 bits; no per-row comparison; size M: needs a recording of the original plus a compare check |
 | `net.c2s.0x16` | message | DIVERGED | M | DIVERGED | yes | 0 | y | claude/q-fix-server-store-fill | specs/items/inventory-moves.md | rc-run-2b: DIVERGED save-items-ama: suite.py crashes on channel save (no ORIG_OUTPUTS entry) |
-| `net.c2s.0x32` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/world/vendors.md | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
+| `net.c2s.0x32` | message | DIVERGED | M | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/world/vendors.md | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `net.c2s.0x61` | message | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-2 | specs/items/inventory-moves.md | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-items-kashya=DIVERGED \| hire-items-kashya diverges first at the hire; 0x61 not reached |
-| `vendor.akara` | entity | DIVERGED | S | DIVERGED@4 | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: a check of this row diverges (see checks-status.md); store contents: items-vendor-akara-stock 39/41 equal (charges of 2 wands differ); buy flow still diverges at frame 16 (items-vendor-akara-buy) |
-| `vendor.drehya` | entity | DIVERGED | S | PARTIAL | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | items-vendor-drehya-stock packets: frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) |
+| `vendor.akara` | entity | DIVERGED | S | PARTIAL | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: a check of this row diverges (see checks-status.md); store contents: items-vendor-akara-stock 39/41 equal (charges of 2 wands differ); buy flow still diverges at frame 16 (items-vendor-akara-buy) |
+| `vendor.drehya` | entity | DIVERGED | S | DIVERGED@15 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | items-vendor-drehya-stock packets: frame 15 stream s2c #49 extra (d2rs only) (id 0x5d) |
 | `vendor.gamble` | system | DIVERGED | M | DIVERGED@3 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md | rc-run-2b: all checks MATCH [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `vendor.halbu` | entity | DIVERGED | M | DIVERGED@66 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-halbu-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `vendor.jamella` | entity | DIVERGED | M | DIVERGED@139 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-jamella-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `vendor.nihlathak` | entity | DIVERGED | M | DIVERGED@15 | ? | 1 | n | claude/q-fix-server-store-fill | specs/world/vendors.md,specs/world/vendors-2.md | rc-run-2: items-vendor-nihlathak-stock [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `vendor.store-gen` | system | DIVERGED | S | DIVERGED@4 | ? | 4 | y | claude/rc-items-ground | specs/world/vendors.md | items-vendor-akara-buy state 40/40 equal after the store-item own fix (vendors.md §3.1/§4 note); packets diverge at frame 4 (player startup framing, not store); rc-items-ground 2026-10-10 |
+| `vendor.store-gen` | system | DIVERGED | S | PARTIAL | ? | 4 | y | claude/rc-items-ground | specs/world/vendors.md | items-vendor-akara-buy state 40/40 equal after the store-item own fix (vendors.md §3.1/§4 note); packets diverge at frame 4 (player startup framing, not store); rc-items-ground 2026-10-10 |
 | `cube.ops` | system | NO-CHECK | M | - | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/cube.md | recipe op eligibility (day-of-month etc.); gap tests 46/49 only; size M: needs a recording of the original plus a compare check |
 | `cube.portals` | system | NO-CHECK | M | - | ? | 0 | y | claude/q-fix-server-store-fill | specs/world/cube.md | cow-level and other portal outputs; size M: needs a recording of the original plus a compare check |
 | `cube.put-in` | message | NO-CHECK | S | - | yes | 0 | n | claude/q-fix-server-store-fill | specs/world/cube.md | checks seed the cube page in the save; 0x2A (item to cube) is not sent |
@@ -8967,7 +8967,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 
 | Area | Kind | State | Size | Verdict | Exercised | Prov. | PC 1 | Owner | Specs | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `item.gamble.place-mode0` | entity | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-pc1late-npc | specs/world/vendors.md | gamble list items in mode 0 on a per-(NPC, player) node inventory; stream bytes 00 12 (REC-1946) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
+| `item.gamble.place-mode0` | entity | DIVERGED | M | MATCH | yes | 0 | n | rc-pc1late-npc | specs/world/vendors.md | gamble list items in mode 0 on a per-(NPC, player) node inventory; stream bytes 00 12 (REC-1946) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `monster.ai.walk-in-radius` | entity | EQUAL | - | MATCH | yes | 0 | n | rc-pc1late-npc | specs/monsters/ai.md | town-ama-10k replay-diff frames 270-300: Warriv frame 287 ty 4228 equal; radius_point takes the unit size, always returns a point (REC-1945) |
 
 ## rc-pc1late-world
@@ -9795,7 +9795,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x1f` | message | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-asheara@22 missing in d2rs; 10 equal pair(s) |
 | `net.s2c.0x20` | message | DIVERGED | M | DIVERGED@0 | yes | 0 | n | - | specs/sim/server-messages.tsv | rc-link-2 batch 2 (2026-10-10): items-drops-cha-01 items DIVERGED (checks-status.md) |
 | `net.s2c.0x22` | message | DIVERGED | M | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-2b: all checks MATCH or PARTIAL under DECIDED REC-2055/2056 [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `net.s2c.0x27` | message | DIVERGED | M | PARTIAL | ? | 1 | n | claude/q-fix-d7d8-items-net | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
+| `net.s2c.0x27` | message | DIVERGED | M | MATCH | ? | 1 | n | claude/q-fix-d7d8-items-net | specs/sim/server-messages.tsv | rc-run-2b: DIVERGED@4 items-vendor-akara-buy: packets: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `net.s2c.0x3f` | message | DIVERGED | S | DIVERGED@4 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged cube-000-staff-of-kings-viper-amulet-ho@4 id (1.14d 3f vs d2rs 47); 2 equal pair(s) |
 | `net.s2c.0x42` | message | DIVERGED | S | DIVERGED@34 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | packet-census: first diverged hire-items-kashya@34 missing in d2rs; 0 equal pair(s) |
 | `net.s2c.0x4d` | message | DIVERGED | S | DIVERGED@48 | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1 ass-shadow-master: state: frame 48 monster 1:8 class 418, field m: 1.14d 7 vs d2rs 1 (1/2 of its a* checks diverge) |
@@ -9862,15 +9862,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.audio.triggers.8-skills-missiles-states` | system | DIVERGED | M | - | ? | 0 | n | - | specs/audio/triggers.md | audio-diff audio-cast-frost-nova-sor: 1.14d plays skill\sorceress\coldcast.wav at T 18 and T 58 and novaice.wav at T 25 and T 65; d2rs plays none of them [checks: traces/audio/audio-cast-frost-nova-sor.check; DIVERGED@18] |
 | `system.audio.triggers.9-items` | system | DIVERGED | M | DIVERGED@1 | yes | 0 | n | - | specs/audio/triggers.md | audio-diff (traces/audio/gen/gen-aud-item-drop.check) gen-aud-item-drop (rc-gen-audio):   ... 23 more; [audio] mixed: 6/119 ticks equal, first difference at T 1; [audio] DIVERGED; causes: see docs/handoff/rc-gen-audio.md |
 | `system.client.assets.b-original-behavior-to-reproduce-not-specified-h` | system | DIVERGED | M | DIVERGED@72 | yes | 0 | n | rc-gen-client | specs/client/assets.md | scenario draw; draws DIVERGED; first: tick 73 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit |
-| `system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario waypoint; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `system.client.msg-ui.20-0x61-act-video-0x0045e660` | system | DIVERGED | M | DIVERGED@9 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario act; packets DIVERGED, state DIVERGED; first: frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) |
-| `system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
-| `system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33` | system | DIVERGED | M | DIVERGED@4 | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | scenario talk; state PARTIAL, packets DIVERGED; first: frame 4 stream s2c #0 id: 1.14d 07 vs d2rs 15 (id 0x07) |
 | `system.client.render-pipeline.b-original-behavior-to-reproduce-not-specified-h` | system | DIVERGED | M | DIVERGED@73 | yes | 0 | n | rc-gen-client | specs/client/render-pipeline.md | scenario draw; draws DIVERGED; first: tick 73 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit |
 | `system.client.ui.b-original-behavior-to-reproduce-owned-by-the-sp` | system | DIVERGED | M | DIVERGED@72 | yes | 0 | n | rc-gen-client | specs/client/ui.md | scenario draw; draws DIVERGED; first: tick 72 draw row 173 (CelDraw) column op: 1.14d CelDraw vs d2rs unit |
 | `system.flows.act-change.1-act-change-0x0053acc0` | system | DIVERGED | M | DIVERGED@9 | yes | 0 | n | rc-gen-client | specs/flows/act-change.md | scenario act; packets DIVERGED, state DIVERGED; first: frame 9 stream s2c #0 id: 1.14d 5d vs d2rs 08 (id 0x5d) |
@@ -10527,13 +10519,21 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `system.client.msg-skills.8-0xa3-skill-do-0x0045d5e0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-skills.9-0x93-skill-bonus-by-element-and-page-0x0045dd1` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-skills.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-ui.1-0x5d-quest-status-0x0045e540-0x004a2cb0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.10-0x91-npc-intros-0x0045e580-0x004b3510` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.client.msg-ui.11-0x78-trade-partner-0x0045e810-0x004b9010` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
 | `system.client.msg-ui.12-0x29-game-quest-flags-0x0045d3a0-0x004b2620` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-ui.13-0x52-quest-log-status-0x0045cc00-0x004a40d0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-ui.14-0x5e-game-quest-availability-0x0045e570-0x004` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.16-0x28-npc-dialog-start-and-quest-flags-0x0045d` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.client.msg-ui.17-0x62-npc-dialog-end-0x0045d390-0x004b5320` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.client.msg-ui.18-0x2a-npc-transaction-0x0045e0d0-0x004b6390` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
+| `system.client.msg-ui.2-0x63-waypoint-menu-0x0045e670-0x0049cf90` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
 | `system.client.msg-ui.21-0x76-overhead-clear-0x0045e050-0x0049f8c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-ui.22-0x7b-skill-hotkey-0x0045e8d0-0x004aa0c0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
 | `system.client.msg-ui.3-0x77-ui-action-0x0045e800-0x004b8cf0` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.5-0x27-npc-text-0x0045e0a0-0x004a1600` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
 | `system.client.msg-ui.8-0x58-ui-open-0x0045e490-0x004c0550` | system | EQUAL | - | PARTIAL | yes | 0 | n | rc-gen-client | specs/client/msg-ui.md | rc-link-2 batch 2 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap |
+| `system.client.msg-ui.9-0x8a-npc-wants-to-interact-0x0045ea40-0x004b33` | system | EQUAL | - | PARTIAL | yes | 0 | n | - | specs/client/msg-ui.md | rc-sim-combat-div: packets MATCH after pos-poke 0x15 (comparison run) and vendor recharge (VendorDesk::recharge: store wand charges = max); state only the client-gap PARTIAL (REC-2055/2056) |
 | `system.combat.damage.0-shared-integer-helpers` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
 | `system.combat.damage.1-damage-record` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
 | `system.combat.damage.10-monster-melee-on-a-player-end-to-end` | system | EQUAL | - | PARTIAL | yes | 1 | n | - | specs/combat/damage.md | rc-combat-seed (2026-10-10, 1.14d re-recorded, Wine): combat-melee-fallen, combat-kill-fallen, combat-fallen-hits-player, combat-elements: every channel equal on every frame, every state field of both sides compared (no ignore line); the game seed now equals from frame 5 (seed-order fixes); state reads PARTIAL only for the d2rs header's client gap (RUN_GAPS, PROVISIONAL REC-2055/2056); combat-melee-fallen packets MATCH 150/150 (REC-2820: player weapon hit class 0x00623C20 -> 0x69 e byte; REC-2821: 0x69 path end 0x00648A40/A60, arena kill count 0x65; REC-2822: player update order items before states, combat-potion-midfight MATCH) |
@@ -10708,7 +10708,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `level.a4.104.act-4-mesa-1` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-104; PARTIAL never counts as equal. gen-lvl-104 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [3965398309, 792411527] vs d2rs [1235504095, 1059482100]; rng DIVERGED frame 21, game, draw #1370, field extra: 1.14d site None vs d2rs site crates/d2-sim/src/m… |
 | `level.a4.106.act-4-mesa-3` | entity | DIVERGED | M | DIVERGED@21 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@21 1 over gen-lvl-106; PARTIAL never counts as equal. gen-lvl-106 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 21 game, field seed: 1.14d [268807636, 1446976384] vs d2rs [3343186878, 1210264819]; rng DIVERGED frame 21, game, draw #1313, field missing: 1.14d site 0x54ed96 vs d2rs site None |
 | `level.a5.110.act-5-siege-1` | entity | DIVERGED | M | DIVERGED@23 | yes | 13 | n | - | specs/drlg/levels.md,specs/drlg/outdoor.md,specs/drlg/rooms.md | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@23 1 over gen-lvl-110; PARTIAL never counts as equal. gen-lvl-110 (traces/checks/gen), rc-level-pop-2 re-run on integ-r17: state DIVERGED frame 23 monster 1:15 class 522, field tx: 1.14d 4324 vs d2rs 4321; rng DIVERGED frame 29, unit 1:18, draw #0, field extra: 1.14d site None vs d2rs site crates/d2-sim/src… |
-| `npc.akara` | entity | DIVERGED | M | DIVERGED@4 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: items-vendor-akara-buy=DIVERGED,interact-talk-akara=DIVERGED \| talk @1:148 trade (interact-talk-akara): codes 0,0,0 on both, state no difference; packets: S->C 0x27 text list bytes 10/14 swapped at frame 15 (1.14d 40..0b, d2rs 0b..40; world/quests.md §7.1), then the store messages: 1.14d frame 16, d2rs frame 15 with the chat open; menu, dialogue, store also items-vendor-akara-buy |
+| `npc.akara` | entity | DIVERGED | M | PARTIAL | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: items-vendor-akara-buy=DIVERGED,interact-talk-akara=DIVERGED \| talk @1:148 trade (interact-talk-akara): codes 0,0,0 on both, state no difference; packets: S->C 0x27 text list bytes 10/14 swapped at frame 15 (1.14d 40..0b, d2rs 0b..40; world/quests.md §7.1), then the store messages: 1.14d frame 16, d2rs frame 15 with the chat open; menu, dialogue, store also items-vendor-akara-buy |
 | `npc.asheara` | entity | DIVERGED | M | DIVERGED@24 | yes | 4 | n | claude/q-diff-skills-2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: hire-asheara=PARTIAL,hire-resurrect-asheara=DIVERGED \| hire flow: hire divergence at frame 20 (game seed, spawn tile) |
 | `npc.atma` | entity | DIVERGED | M | DIVERGED@61 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-pc1-audit] Wine-recorded 1.14d, suite 2026-10-10: a2-npc-atma-talk=PARTIAL,a2-quest-radament=DIVERGED \| talk: state PARTIAL; d2rs sends 0x8a NpcWantsInteract at f34 and f49 that 1.14d never sends; 1.14d 0x27 NpcInfo at f15 (answer to the client 0x31) absent in d2rs; join stream: s2c frame 3 MapReveal 0x07 missing in d2rs (shared by every check, unrouted) |
 | `npc.drehya` | entity | DIVERGED | M | DIVERGED@7 | yes | 4 | n | claude/q-fix-pc1-day3-a-r2 | specs/world/npc.md,specs/world/vendors.md,specs/world/vendors-2.md,specs/ui/npc-menus.tsv | [rc-gen-wine168] Wine-recorded 1.14d, suite 2026-10-10: DIVERGED@7 1 over gen-npc-drehya; PARTIAL never counts as equal. menu, dialogue, store (items-vendor-akara-buy covers only Akara buy), hire/resurrect; size M: spec draft, needs a check recorded/compared against 1.14d and any divergence fixed |

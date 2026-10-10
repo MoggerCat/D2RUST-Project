@@ -402,8 +402,37 @@ where
                 .collect(),
         })
     }
+    /// Recharge `0x0055FE80` (`items/generation.md` §12.2) on a store or
+    /// gamble item: each stat-204 entry below its maximum is set to the
+    /// maximum on the item's own lists (`0x0065C940`). The items of its own
+    /// inventory (socket fillers) are not tried: a vendor's items have none.
     fn recharge(&mut self, item: UnitId) {
-        self.desk.rest.recharge(item);
+        use crate::items::recharge::{recharge, set_charges, CHARGED_SKILL};
+        let stats = &self.desk.econ.stats;
+        let entries: Vec<(u16, i32)> = stats
+            .unit_list(item)
+            .filter(|&l| stats.is_extended(l))
+            .map(|l| {
+                stats
+                    .full_entries(l)
+                    .into_iter()
+                    .filter(|&(k, _)| key_stat(k) == CHARGED_SKILL)
+                    .map(|(k, v)| (key_layer(k), v))
+                    .take(64)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut sets = Vec::new();
+        recharge(&entries, |k, m| sets.push((k, m)));
+        for (k, m) in sets {
+            if let Err(e) = self
+                .desk
+                .econ
+                .with_item(item, |s| set_charges(&mut s.item.stats, k, m))
+            {
+                self.desk.state.errors.push(InteractionError::Economy(e));
+            }
+        }
     }
     fn repair_broken(&mut self, item: UnitId) {
         self.desk.rest.repair_broken(item);
