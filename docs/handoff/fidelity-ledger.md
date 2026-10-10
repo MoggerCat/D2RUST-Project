@@ -716,7 +716,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 - Coverage rows applied to entity rows (exercised): 2631
 - Rows set exercised = yes from the coverage reports' seen lists: 20
 - Coverage categories that read 0 in every report (may be uninstrumented): none; rows set from no to ?: 0
-- Duplicate areas between parts: 4799
+- Duplicate areas between parts: 4803
   - `npc.greiz`: q-chk-act2.tsv:8 kept, q-chk-hirelings.tsv:8 dropped
   - `npc.qual-kehk`: q-chk-act5.tsv:7 kept, q-chk-hirelings.tsv:10 dropped
   - `vendor.drognan`: q-chk-act2.tsv:13 kept, q-chk-items-drops.tsv:12 dropped
@@ -3037,228 +3037,232 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `item.97-9wa`: rc-items.tsv:88 kept, rc-run-5.tsv:581 dropped
   - `item.98-9la`: rc-items.tsv:89 kept, rc-run-5.tsv:582 dropped
   - `item.99-9ba`: rc-items.tsv:90 kept, rc-run-5.tsv:583 dropped
-  - `item.affix.crafted`: rc-gen-wine168.tsv:4 kept, rc-run-5.tsv:584 dropped
-  - `item.affix.magic`: rc-gen-wine168.tsv:7 kept, rc-run-5.tsv:585 dropped
-  - `item.affix.rare`: rc-gen-wine168.tsv:9 kept, rc-run-5.tsv:586 dropped
-  - `item.gen.normal-quality`: rc-items.tsv:591 kept, rc-run-5.tsv:587 dropped
-  - `item.quality.low`: rc-gen-wine168.tsv:16 kept, rc-run-5.tsv:588 dropped
-  - `item.quality.set`: rc-gen-wine168.tsv:17 kept, rc-run-5.tsv:589 dropped
-  - `item.quality.superior`: rc-gen-wine168.tsv:18 kept, rc-run-5.tsv:590 dropped
-  - `item.quality.unique`: rc-gen-wine168.tsv:19 kept, rc-run-5.tsv:591 dropped
-  - `missile.amplify-damage`: rc-link-checks.tsv:3 kept, rc-run-5.tsv:593 dropped
-  - `missile.andrialspray`: rc-link-checks.tsv:5 kept, rc-run-5.tsv:594 dropped
-  - `missile.andypoisonbolt`: rc-link-checks.tsv:6 kept, rc-run-5.tsv:595 dropped
-  - `missile.arcanetower`: rc-link-checks.tsv:7 kept, rc-run-5.tsv:596 dropped
-  - `missile.arctic-blast`: rc-link-checks.tsv:8 kept, rc-run-5.tsv:597 dropped
-  - `missile.armageddon`: rc-link-checks.tsv:9 kept, rc-run-5.tsv:598 dropped
-  - `missile.attract`: rc-link-checks.tsv:10 kept, rc-run-5.tsv:599 dropped
-  - `missile.baal-clone-teleport`: rc-link-checks.tsv:11 kept, rc-run-5.tsv:600 dropped
-  - `missile.baal-cold-missiles`: rc-link-checks.tsv:12 kept, rc-run-5.tsv:601 dropped
-  - `missile.baal-inferno`: rc-link-checks.tsv:13 kept, rc-run-5.tsv:602 dropped
-  - `missile.baal-monster-spawn`: rc-link-checks.tsv:14 kept, rc-run-5.tsv:603 dropped
-  - `missile.baal-nova`: rc-link-checks.tsv:15 kept, rc-run-5.tsv:604 dropped
-  - `missile.baal-teleport`: rc-link-checks.tsv:16 kept, rc-run-5.tsv:606 dropped
-  - `missile.battle-command`: rc-link-checks.tsv:17 kept, rc-run-5.tsv:607 dropped
-  - `missile.battle-cry`: rc-link-checks.tsv:18 kept, rc-run-5.tsv:608 dropped
-  - `missile.battle-orders`: rc-link-checks.tsv:19 kept, rc-run-5.tsv:609 dropped
-  - `missile.blade-fury`: rc-link-checks.tsv:27 kept, rc-run-5.tsv:610 dropped
-  - `missile.blade-sentinel`: rc-link-checks.tsv:28 kept, rc-run-5.tsv:611 dropped
-  - `missile.blade-shield`: rc-link-checks.tsv:29 kept, rc-run-5.tsv:612 dropped
-  - `missile.blades-of-ice`: rc-link-checks.tsv:30 kept, rc-run-5.tsv:613 dropped
-  - `missile.blaze`: rc-link-checks.tsv:31 kept, rc-run-5.tsv:614 dropped
-  - `missile.blessed-hammer`: rc-link-checks.tsv:32 kept, rc-run-5.tsv:615 dropped
-  - `missile.blizzard`: rc-link-checks.tsv:33 kept, rc-run-5.tsv:616 dropped
-  - `missile.blood-mana`: rc-link-checks.tsv:34 kept, rc-run-5.tsv:617 dropped
-  - `missile.boltsentry`: rc-link-checks.tsv:36 kept, rc-run-5.tsv:618 dropped
-  - `missile.bone-spear`: rc-link-checks.tsv:38 kept, rc-run-5.tsv:619 dropped
-  - `missile.bone-spirit`: rc-link-checks.tsv:39 kept, rc-run-5.tsv:620 dropped
-  - `missile.bone-wall`: rc-link-checks.tsv:40 kept, rc-run-5.tsv:621 dropped
-  - `missile.catapultblizzard`: rc-link-checks.tsv:41 kept, rc-run-5.tsv:624 dropped
-  - `missile.catapultmeteor`: rc-link-checks.tsv:42 kept, rc-run-5.tsv:625 dropped
-  - `missile.catapultplague`: rc-link-checks.tsv:43 kept, rc-run-5.tsv:626 dropped
-  - `missile.chain-lightning`: rc-link-checks.tsv:44 kept, rc-run-5.tsv:627 dropped
-  - `missile.charged-bolt`: rc-link-checks.tsv:45 kept, rc-run-5.tsv:628 dropped
-  - `missile.charged-strike`: rc-link-checks.tsv:46 kept, rc-run-5.tsv:629 dropped
-  - `missile.chilling-armor`: rc-link-checks.tsv:47 kept, rc-run-5.tsv:630 dropped
-  - `missile.claws-of-thunder`: rc-link-checks.tsv:48 kept, rc-run-5.tsv:631 dropped
-  - `missile.cold-arrow`: rc-link-checks.tsv:49 kept, rc-run-5.tsv:632 dropped
-  - `missile.confuse`: rc-link-checks.tsv:50 kept, rc-run-5.tsv:633 dropped
-  - `missile.corpse-explosion`: rc-link-checks.tsv:51 kept, rc-run-5.tsv:634 dropped
-  - `missile.corpsecycler`: rc-link-checks.tsv:52 kept, rc-run-5.tsv:635 dropped
-  - `missile.countessfirewall`: rc-link-checks.tsv:53 kept, rc-run-5.tsv:636 dropped
-  - `missile.cursedballtrapleft`: rc-link-checks.tsv:60 kept, rc-run-5.tsv:637 dropped
-  - `missile.cursedballtrapright`: rc-link-checks.tsv:61 kept, rc-run-5.tsv:638 dropped
-  - `missile.death-sentry-ltng`: rc-link-checks.tsv:63 kept, rc-run-5.tsv:639 dropped
-  - `missile.deathmaul`: rc-link-checks.tsv:64 kept, rc-run-5.tsv:640 dropped
-  - `missile.decrepify`: rc-link-checks.tsv:65 kept, rc-run-5.tsv:641 dropped
-  - `missile.defense-curse`: rc-link-checks.tsv:66 kept, rc-run-5.tsv:642 dropped
-  - `missile.desertturret`: rc-link-checks.tsv:67 kept, rc-run-5.tsv:643 dropped
-  - `missile.diabfire`: rc-link-checks.tsv:68 kept, rc-run-5.tsv:644 dropped
-  - `missile.diablight`: rc-missile-missing.tsv:3 kept, rc-run-5.tsv:645 dropped
-  - `missile.diablogeddon`: rc-link-checks.tsv:69 kept, rc-run-5.tsv:646 dropped
-  - `missile.diabwall`: rc-link-checks.tsv:70 kept, rc-run-5.tsv:647 dropped
-  - `missile.dim-vision`: rc-link-checks.tsv:71 kept, rc-run-5.tsv:648 dropped
-  - `missile.doomknightmissile`: rc-link-checks.tsv:72 kept, rc-run-5.tsv:649 dropped
-  - `missile.dragon-tail`: rc-link-checks.tsv:73 kept, rc-run-5.tsv:650 dropped
-  - `missile.eruption`: rc-link-checks.tsv:75 kept, rc-run-5.tsv:651 dropped
-  - `missile.exploding-arrow`: rc-link-checks.tsv:76 kept, rc-run-5.tsv:652 dropped
-  - `missile.fenris-rage`: rc-link-checks.tsv:77 kept, rc-run-5.tsv:653 dropped
-  - `missile.fetishaura`: rc-link-checks.tsv:78 kept, rc-run-5.tsv:654 dropped
-  - `missile.fetishinferno`: rc-link-checks.tsv:79 kept, rc-run-5.tsv:655 dropped
-  - `missile.fingermagespider`: rc-link-checks.tsv:80 kept, rc-run-5.tsv:656 dropped
-  - `missile.fire-arrow`: rc-link-checks.tsv:81 kept, rc-run-5.tsv:657 dropped
-  - `missile.fire-ball`: rc-link-checks.tsv:82 kept, rc-run-5.tsv:658 dropped
-  - `missile.fire-bolt`: rc-link-checks.tsv:83 kept, rc-run-5.tsv:659 dropped
-  - `missile.fire-trauma`: rc-link-checks.tsv:84 kept, rc-run-5.tsv:660 dropped
-  - `missile.fire-wall`: rc-link-checks.tsv:85 kept, rc-run-5.tsv:661 dropped
-  - `missile.firestorm`: rc-link-checks.tsv:87 kept, rc-run-5.tsv:662 dropped
-  - `missile.fist-of-the-heavens`: rc-link-checks.tsv:88 kept, rc-run-5.tsv:663 dropped
-  - `missile.fists-of-fire`: rc-link-checks.tsv:89 kept, rc-run-5.tsv:664 dropped
-  - `missile.freezing-arrow`: rc-link-checks.tsv:90 kept, rc-run-5.tsv:665 dropped
-  - `missile.frost-nova`: rc-link-checks.tsv:93 kept, rc-run-5.tsv:666 dropped
-  - `missile.frozen-orb`: rc-link-checks.tsv:94 kept, rc-run-5.tsv:667 dropped
-  - `missile.gargoyletrap`: rc-link-checks.tsv:96 kept, rc-run-5.tsv:668 dropped
-  - `missile.glacial-spike`: rc-link-checks.tsv:97 kept, rc-run-5.tsv:669 dropped
-  - `missile.grim-ward`: rc-link-checks.tsv:104 kept, rc-run-5.tsv:670 dropped
-  - `missile.guided-arrow`: rc-link-checks.tsv:105 kept, rc-run-5.tsv:671 dropped
-  - `missile.healing-vortex`: rc-link-checks.tsv:106 kept, rc-run-5.tsv:672 dropped
-  - `missile.hellmeteor`: rc-link-checks.tsv:107 kept, rc-run-5.tsv:673 dropped
-  - `missile.holy-bolt`: rc-link-checks.tsv:108 kept, rc-run-5.tsv:674 dropped
-  - `missile.horror-arctic-blast`: rc-link-checks.tsv:109 kept, rc-run-5.tsv:675 dropped
-  - `missile.howl`: rc-link-checks.tsv:110 kept, rc-run-5.tsv:676 dropped
-  - `missile.hurricane`: rc-link-checks.tsv:111 kept, rc-run-5.tsv:677 dropped
-  - `missile.hydramissile`: rc-link-checks.tsv:112 kept, rc-run-5.tsv:678 dropped
-  - `missile.ice-arrow`: rc-link-checks.tsv:113 kept, rc-run-5.tsv:679 dropped
-  - `missile.ice-blast`: rc-link-checks.tsv:114 kept, rc-run-5.tsv:680 dropped
-  - `missile.ice-bolt`: rc-link-checks.tsv:115 kept, rc-run-5.tsv:681 dropped
-  - `missile.immolation-arrow`: rc-link-checks.tsv:116 kept, rc-run-5.tsv:682 dropped
-  - `missile.imp-fire-missile`: rc-link-checks.tsv:118 kept, rc-run-5.tsv:683 dropped
-  - `missile.imp-fire-missile-ex`: rc-link-checks.tsv:119 kept, rc-run-5.tsv:684 dropped
-  - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, rc-run-5.tsv:685 dropped
-  - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, rc-run-5.tsv:686 dropped
-  - `missile.imp-teleport`: rc-link-checks.tsv:122 kept, rc-run-5.tsv:687 dropped
-  - `missile.impbolt`: rc-link-checks.tsv:123 kept, rc-run-5.tsv:688 dropped
-  - `missile.inferno`: rc-link-checks.tsv:129 kept, rc-run-5.tsv:689 dropped
-  - `missile.iron-maiden`: rc-link-checks.tsv:130 kept, rc-run-5.tsv:690 dropped
-  - `missile.leap`: rc-link-checks.tsv:131 kept, rc-run-5.tsv:691 dropped
-  - `missile.life-tap`: rc-link-checks.tsv:132 kept, rc-run-5.tsv:692 dropped
-  - `missile.lightning`: rc-link-checks.tsv:133 kept, rc-run-5.tsv:693 dropped
-  - `missile.lightning-bolt`: rc-link-checks.tsv:134 kept, rc-run-5.tsv:694 dropped
-  - `missile.lightning-fury`: rc-link-checks.tsv:135 kept, rc-run-5.tsv:695 dropped
-  - `missile.lightning-strike`: rc-link-checks.tsv:136 kept, rc-run-5.tsv:696 dropped
-  - `missile.lower-resist`: rc-link-checks.tsv:137 kept, rc-run-5.tsv:697 dropped
-  - `missile.magic-arrow`: rc-link-checks.tsv:138 kept, rc-run-5.tsv:698 dropped
-  - `missile.magottup`: rc-link-checks.tsv:139 kept, rc-run-5.tsv:699 dropped
-  - `missile.megademoninferno`: rc-missile-missing.tsv:4 kept, rc-run-5.tsv:700 dropped
-  - `missile.mephfrostnova`: rc-link-checks.tsv:140 kept, rc-run-5.tsv:701 dropped
-  - `missile.mephistomissile`: rc-link-checks.tsv:141 kept, rc-run-5.tsv:702 dropped
-  - `missile.meteor`: rc-link-checks.tsv:142 kept, rc-run-5.tsv:703 dropped
-  - `missile.mind-blast`: rc-link-checks.tsv:143 kept, rc-run-5.tsv:704 dropped
-  - `missile.molten-boulder`: rc-link-checks.tsv:144 kept, rc-run-5.tsv:705 dropped
-  - `missile.mon-death-sentry`: rc-link-checks.tsv:145 kept, rc-run-5.tsv:706 dropped
-  - `missile.mon-inferno-sentry`: rc-link-checks.tsv:146 kept, rc-run-5.tsv:707 dropped
-  - `missile.monblizzard`: rc-link-checks.tsv:148 kept, rc-run-5.tsv:708 dropped
-  - `missile.monbonespirit`: rc-link-checks.tsv:149 kept, rc-run-5.tsv:709 dropped
-  - `missile.monbow`: rc-link-checks.tsv:150 kept, rc-run-5.tsv:710 dropped
-  - `missile.moncoldarrow`: rc-link-checks.tsv:151 kept, rc-run-5.tsv:711 dropped
-  - `missile.moncursecast`: rc-link-checks.tsv:152 kept, rc-run-5.tsv:712 dropped
-  - `missile.monexplodingarrow`: rc-link-checks.tsv:153 kept, rc-run-5.tsv:713 dropped
-  - `missile.monfirearrow`: rc-link-checks.tsv:154 kept, rc-run-5.tsv:714 dropped
-  - `missile.monfreezingarrow`: rc-link-checks.tsv:155 kept, rc-run-5.tsv:715 dropped
-  - `missile.multiple-shot`: rc-link-checks.tsv:157 kept, rc-run-5.tsv:716 dropped
-  - `missile.necromagemissile`: rc-link-checks.tsv:163 kept, rc-run-5.tsv:717 dropped
-  - `missile.nihlathakcorpseexplosion`: rc-link-checks.tsv:164 kept, rc-run-5.tsv:718 dropped
-  - `missile.nova`: rc-link-checks.tsv:165 kept, rc-run-5.tsv:719 dropped
-  - `missile.plague-javelin`: rc-link-checks.tsv:172 kept, rc-run-5.tsv:720 dropped
-  - `missile.poison-explosion`: rc-link-checks.tsv:173 kept, rc-run-5.tsv:721 dropped
-  - `missile.poison-javelin`: rc-link-checks.tsv:174 kept, rc-run-5.tsv:722 dropped
-  - `missile.poison-nova`: rc-link-checks.tsv:175 kept, rc-run-5.tsv:723 dropped
-  - `missile.poisonballtrap`: rc-link-checks.tsv:176 kept, rc-run-5.tsv:724 dropped
-  - `missile.primeblaze`: rc-link-checks.tsv:177 kept, rc-run-5.tsv:725 dropped
-  - `missile.primebolt`: rc-link-checks.tsv:178 kept, rc-run-5.tsv:726 dropped
-  - `missile.primefirewall`: rc-link-checks.tsv:179 kept, rc-run-5.tsv:727 dropped
-  - `missile.primeicenova`: rc-link-checks.tsv:180 kept, rc-run-5.tsv:728 dropped
-  - `missile.primelightning`: rc-link-checks.tsv:181 kept, rc-run-5.tsv:729 dropped
-  - `missile.primepoisonball`: rc-link-checks.tsv:182 kept, rc-run-5.tsv:730 dropped
-  - `missile.primepoisonnova`: rc-link-checks.tsv:183 kept, rc-run-5.tsv:731 dropped
-  - `missile.primespike`: rc-link-checks.tsv:184 kept, rc-run-5.tsv:732 dropped
-  - `missile.quick-strike`: rc-link-checks.tsv:185 kept, rc-run-5.tsv:733 dropped
-  - `missile.rabies`: rc-link-checks.tsv:186 kept, rc-run-5.tsv:734 dropped
-  - `missile.raise-skeletal-mage`: rc-link-checks.tsv:187 kept, rc-run-5.tsv:735 dropped
-  - `missile.raise-skeleton`: rc-link-checks.tsv:188 kept, rc-run-5.tsv:736 dropped
-  - `missile.redemption`: rc-link-checks.tsv:189 kept, rc-run-5.tsv:737 dropped
-  - `missile.regurgitatoreat`: rc-link-checks.tsv:191 kept, rc-run-5.tsv:738 dropped
-  - `missile.revive`: rc-link-checks.tsv:192 kept, rc-run-5.tsv:739 dropped
-  - `missile.roguemissile`: rc-link-checks.tsv:193 kept, rc-run-5.tsv:740 dropped
-  - `missile.royal-strike`: rc-link-checks.tsv:194 kept, rc-run-5.tsv:741 dropped
-  - `missile.sacrifice`: rc-link-checks.tsv:195 kept, rc-run-5.tsv:742 dropped
-  - `missile.sanctuary`: rc-link-checks.tsv:196 kept, rc-run-5.tsv:743 dropped
-  - `missile.sentry-lightning`: rc-link-checks.tsv:197 kept, rc-run-5.tsv:744 dropped
-  - `missile.shamanfire`: rc-link-checks.tsv:198 kept, rc-run-5.tsv:745 dropped
-  - `missile.shamanfireex`: rc-link-checks.tsv:199 kept, rc-run-5.tsv:746 dropped
-  - `missile.shamanice`: rc-link-checks.tsv:200 kept, rc-run-5.tsv:747 dropped
-  - `missile.shiver-armor`: rc-link-checks.tsv:201 kept, rc-run-5.tsv:748 dropped
-  - `missile.shock-field`: rc-link-checks.tsv:202 kept, rc-run-5.tsv:749 dropped
-  - `missile.shock-wave`: rc-link-checks.tsv:203 kept, rc-run-5.tsv:750 dropped
-  - `missile.strafe`: rc-link-checks.tsv:224 kept, rc-run-5.tsv:752 dropped
-  - `missile.succubusbolt`: rc-link-checks.tsv:225 kept, rc-run-5.tsv:753 dropped
-  - `missile.teeth`: rc-link-checks.tsv:226 kept, rc-run-5.tsv:754 dropped
-  - `missile.terror`: rc-link-checks.tsv:227 kept, rc-run-5.tsv:755 dropped
-  - `missile.thunder-storm`: rc-link-checks.tsv:228 kept, rc-run-5.tsv:756 dropped
-  - `missile.trap-nova`: rc-link-checks.tsv:229 kept, rc-run-5.tsv:757 dropped
-  - `missile.twister`: rc-link-checks.tsv:230 kept, rc-run-5.tsv:758 dropped
-  - `missile.unholybolt`: rc-link-checks.tsv:231 kept, rc-run-5.tsv:759 dropped
-  - `missile.unholyboltex`: rc-link-checks.tsv:232 kept, rc-run-5.tsv:760 dropped
-  - `missile.vampirefireball`: rc-link-checks.tsv:233 kept, rc-run-5.tsv:761 dropped
-  - `missile.vampirefirewall`: rc-link-checks.tsv:234 kept, rc-run-5.tsv:762 dropped
-  - `missile.vampiremeteor`: rc-link-checks.tsv:235 kept, rc-run-5.tsv:763 dropped
-  - `missile.vampiremissile`: rc-link-checks.tsv:236 kept, rc-run-5.tsv:764 dropped
-  - `missile.vine-attack`: rc-link-checks.tsv:237 kept, rc-run-5.tsv:765 dropped
-  - `missile.vinecycler`: rc-link-checks.tsv:238 kept, rc-run-5.tsv:766 dropped
-  - `missile.volcano`: rc-link-checks.tsv:242 kept, rc-run-5.tsv:767 dropped
-  - `missile.wake-of-destruction-sentry`: rc-link-checks.tsv:243 kept, rc-run-5.tsv:768 dropped
-  - `missile.war-cry`: rc-link-checks.tsv:244 kept, rc-run-5.tsv:769 dropped
-  - `missile.weaken`: rc-link-checks.tsv:245 kept, rc-run-5.tsv:770 dropped
-  - `missile.zakarumlightning`: rc-link-checks.tsv:248 kept, rc-run-5.tsv:771 dropped
-  - `net.s2c.0x0e`: rc-run-1.tsv:200 kept, rc-run-5.tsv:773 dropped
-  - `net.s2c.0x1c`: rc-run-1.tsv:202 kept, rc-run-5.tsv:774 dropped
-  - `net.s2c.0x47`: rc-run-1.tsv:210 kept, rc-run-5.tsv:776 dropped
-  - `net.s2c.0x4d`: rc-run-1.tsv:212 kept, rc-run-5.tsv:778 dropped
-  - `net.s2c.0x68`: rc-run-1.tsv:226 kept, rc-run-5.tsv:779 dropped
-  - `net.s2c.0x6b`: rc-run-1.tsv:228 kept, rc-run-5.tsv:780 dropped
-  - `net.s2c.0xa7`: rc-run-1.tsv:240 kept, rc-run-5.tsv:781 dropped
-  - `net.s2c.0xa8`: rc-run-1.tsv:241 kept, rc-run-5.tsv:782 dropped
-  - `tools.poke.tick-end`: rc-packets-join-order.tsv:3 kept, rc-run-5.tsv:783 dropped
-  - `shrine.1.refill`: rc-pc1-audit.tsv:111 kept, rc-run-5.tsv:784 dropped
-  - `shrine.10.resist-lightning-boost`: rc-pc1-audit.tsv:112 kept, rc-run-5.tsv:785 dropped
-  - `shrine.11.resist-poison-boost`: rc-pc1-audit.tsv:113 kept, rc-run-5.tsv:786 dropped
-  - `shrine.12.skill-boost`: rc-pc1-audit.tsv:114 kept, rc-run-5.tsv:787 dropped
-  - `shrine.13.recharge-boost`: rc-pc1-audit.tsv:115 kept, rc-run-5.tsv:788 dropped
-  - `shrine.14.stamina-boost`: rc-pc1-audit.tsv:116 kept, rc-run-5.tsv:789 dropped
-  - `shrine.15.experience-boost`: rc-pc1-audit.tsv:117 kept, rc-run-5.tsv:790 dropped
-  - `shrine.17.portal-to-unknown`: rc-pc1-audit.tsv:118 kept, rc-run-5.tsv:791 dropped
-  - `shrine.2.health-boost`: rc-pc1-audit.tsv:119 kept, rc-run-5.tsv:794 dropped
-  - `shrine.20.warping-shrine`: rc-pc1-audit.tsv:120 kept, rc-run-5.tsv:795 dropped
-  - `shrine.3.mana-boost`: rc-pc1-audit.tsv:121 kept, rc-run-5.tsv:798 dropped
-  - `shrine.6.armor-boost`: rc-pc1-audit.tsv:122 kept, rc-run-5.tsv:799 dropped
-  - `shrine.7.combat-boost`: rc-pc1-audit.tsv:123 kept, rc-run-5.tsv:800 dropped
-  - `shrine.8.resist-fire-boost`: rc-pc1-audit.tsv:124 kept, rc-run-5.tsv:801 dropped
-  - `shrine.9.resist-cold-boost`: rc-pc1-audit.tsv:125 kept, rc-run-5.tsv:802 dropped
-  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-run-5.tsv:813 dropped
-  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-run-5.tsv:814 dropped
-  - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-run-5.tsv:815 dropped
-  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, rc-run-5.tsv:816 dropped
-  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-run-5.tsv:817 dropped
-  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, rc-run-5.tsv:818 dropped
-  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, rc-run-5.tsv:819 dropped
-  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-run-5.tsv:820 dropped
-  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-run-5.tsv:821 dropped
-  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-run-5.tsv:822 dropped
-  - `waypoint.27.the-pandemonium-fortress`: rc-pc1-audit.tsv:136 kept, rc-run-5.tsv:823 dropped
-  - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-5.tsv:824 dropped
-  - `waypoint.29.river-of-flame`: rc-pc1-audit.tsv:138 kept, rc-run-5.tsv:825 dropped
-  - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-run-5.tsv:827 dropped
-  - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-run-5.tsv:828 dropped
+  - `item.affix.alvl`: rc-gen-wine168.tsv:3 kept, rc-run-5.tsv:584 dropped
+  - `item.affix.crafted`: rc-gen-wine168.tsv:4 kept, rc-run-5.tsv:585 dropped
+  - `item.affix.fit-tests`: rc-gen-wine168.tsv:5 kept, rc-run-5.tsv:586 dropped
+  - `item.affix.ids-slots`: rc-gen-wine168.tsv:6 kept, rc-run-5.tsv:587 dropped
+  - `item.affix.magic`: rc-gen-wine168.tsv:7 kept, rc-run-5.tsv:588 dropped
+  - `item.affix.magic-roller`: rc-gen-wine168.tsv:8 kept, rc-run-5.tsv:589 dropped
+  - `item.affix.rare`: rc-gen-wine168.tsv:9 kept, rc-run-5.tsv:590 dropped
+  - `item.affix.rare-name`: rc-gen-wine168.tsv:10 kept, rc-run-5.tsv:591 dropped
+  - `item.gen.create-wrapper`: rc-gen-wine168.tsv:11 kept, rc-run-5.tsv:592 dropped
+  - `item.gen.ethereal`: rc-gen-wine168.tsv:12 kept, rc-run-5.tsv:593 dropped
+  - `item.gen.normal-quality`: rc-items.tsv:591 kept, rc-run-5.tsv:594 dropped
+  - `item.gen.sockets`: rc-gen-wine168.tsv:13 kept, rc-run-5.tsv:595 dropped
+  - `item.props.craft`: rc-gen-wine168.tsv:14 kept, rc-run-5.tsv:596 dropped
+  - `item.quality.dispatch`: rc-gen-wine168.tsv:15 kept, rc-run-5.tsv:597 dropped
+  - `item.quality.low`: rc-gen-wine168.tsv:16 kept, rc-run-5.tsv:598 dropped
+  - `item.quality.set`: rc-gen-wine168.tsv:17 kept, rc-run-5.tsv:599 dropped
+  - `item.quality.superior`: rc-gen-wine168.tsv:18 kept, rc-run-5.tsv:600 dropped
+  - `item.quality.unique`: rc-gen-wine168.tsv:19 kept, rc-run-5.tsv:601 dropped
+  - `item.set-item`: rc-gen-wine168.tsv:20 kept, rc-run-5.tsv:602 dropped
+  - `item.unique`: rc-gen-wine168.tsv:21 kept, rc-run-5.tsv:603 dropped
+  - `missile.amplify-damage`: rc-link-checks.tsv:3 kept, rc-run-5.tsv:605 dropped
+  - `missile.andrialspray`: rc-link-checks.tsv:5 kept, rc-run-5.tsv:606 dropped
+  - `missile.andypoisonbolt`: rc-link-checks.tsv:6 kept, rc-run-5.tsv:607 dropped
+  - `missile.arcanetower`: rc-link-checks.tsv:7 kept, rc-run-5.tsv:608 dropped
+  - `missile.arctic-blast`: rc-link-checks.tsv:8 kept, rc-run-5.tsv:609 dropped
+  - `missile.armageddon`: rc-link-checks.tsv:9 kept, rc-run-5.tsv:610 dropped
+  - `missile.attract`: rc-link-checks.tsv:10 kept, rc-run-5.tsv:611 dropped
+  - `missile.baal-clone-teleport`: rc-link-checks.tsv:11 kept, rc-run-5.tsv:612 dropped
+  - `missile.baal-cold-missiles`: rc-link-checks.tsv:12 kept, rc-run-5.tsv:613 dropped
+  - `missile.baal-inferno`: rc-link-checks.tsv:13 kept, rc-run-5.tsv:614 dropped
+  - `missile.baal-monster-spawn`: rc-link-checks.tsv:14 kept, rc-run-5.tsv:615 dropped
+  - `missile.baal-nova`: rc-link-checks.tsv:15 kept, rc-run-5.tsv:616 dropped
+  - `missile.baal-teleport`: rc-link-checks.tsv:16 kept, rc-run-5.tsv:618 dropped
+  - `missile.battle-command`: rc-link-checks.tsv:17 kept, rc-run-5.tsv:619 dropped
+  - `missile.battle-cry`: rc-link-checks.tsv:18 kept, rc-run-5.tsv:620 dropped
+  - `missile.battle-orders`: rc-link-checks.tsv:19 kept, rc-run-5.tsv:621 dropped
+  - `missile.blade-fury`: rc-link-checks.tsv:27 kept, rc-run-5.tsv:622 dropped
+  - `missile.blade-sentinel`: rc-link-checks.tsv:28 kept, rc-run-5.tsv:623 dropped
+  - `missile.blade-shield`: rc-link-checks.tsv:29 kept, rc-run-5.tsv:624 dropped
+  - `missile.blades-of-ice`: rc-link-checks.tsv:30 kept, rc-run-5.tsv:625 dropped
+  - `missile.blaze`: rc-link-checks.tsv:31 kept, rc-run-5.tsv:626 dropped
+  - `missile.blessed-hammer`: rc-link-checks.tsv:32 kept, rc-run-5.tsv:627 dropped
+  - `missile.blizzard`: rc-link-checks.tsv:33 kept, rc-run-5.tsv:628 dropped
+  - `missile.blood-mana`: rc-link-checks.tsv:34 kept, rc-run-5.tsv:629 dropped
+  - `missile.boltsentry`: rc-link-checks.tsv:36 kept, rc-run-5.tsv:630 dropped
+  - `missile.bone-spear`: rc-link-checks.tsv:38 kept, rc-run-5.tsv:631 dropped
+  - `missile.bone-spirit`: rc-link-checks.tsv:39 kept, rc-run-5.tsv:632 dropped
+  - `missile.bone-wall`: rc-link-checks.tsv:40 kept, rc-run-5.tsv:633 dropped
+  - `missile.catapultblizzard`: rc-link-checks.tsv:41 kept, rc-run-5.tsv:636 dropped
+  - `missile.catapultmeteor`: rc-link-checks.tsv:42 kept, rc-run-5.tsv:637 dropped
+  - `missile.catapultplague`: rc-link-checks.tsv:43 kept, rc-run-5.tsv:638 dropped
+  - `missile.chain-lightning`: rc-link-checks.tsv:44 kept, rc-run-5.tsv:639 dropped
+  - `missile.charged-bolt`: rc-link-checks.tsv:45 kept, rc-run-5.tsv:640 dropped
+  - `missile.charged-strike`: rc-link-checks.tsv:46 kept, rc-run-5.tsv:641 dropped
+  - `missile.chilling-armor`: rc-link-checks.tsv:47 kept, rc-run-5.tsv:642 dropped
+  - `missile.claws-of-thunder`: rc-link-checks.tsv:48 kept, rc-run-5.tsv:643 dropped
+  - `missile.cold-arrow`: rc-link-checks.tsv:49 kept, rc-run-5.tsv:644 dropped
+  - `missile.confuse`: rc-link-checks.tsv:50 kept, rc-run-5.tsv:645 dropped
+  - `missile.corpse-explosion`: rc-link-checks.tsv:51 kept, rc-run-5.tsv:646 dropped
+  - `missile.corpsecycler`: rc-link-checks.tsv:52 kept, rc-run-5.tsv:647 dropped
+  - `missile.countessfirewall`: rc-link-checks.tsv:53 kept, rc-run-5.tsv:648 dropped
+  - `missile.cursedballtrapleft`: rc-link-checks.tsv:60 kept, rc-run-5.tsv:649 dropped
+  - `missile.cursedballtrapright`: rc-link-checks.tsv:61 kept, rc-run-5.tsv:650 dropped
+  - `missile.death-sentry-ltng`: rc-link-checks.tsv:63 kept, rc-run-5.tsv:651 dropped
+  - `missile.deathmaul`: rc-link-checks.tsv:64 kept, rc-run-5.tsv:652 dropped
+  - `missile.decrepify`: rc-link-checks.tsv:65 kept, rc-run-5.tsv:653 dropped
+  - `missile.defense-curse`: rc-link-checks.tsv:66 kept, rc-run-5.tsv:654 dropped
+  - `missile.desertturret`: rc-link-checks.tsv:67 kept, rc-run-5.tsv:655 dropped
+  - `missile.diabfire`: rc-link-checks.tsv:68 kept, rc-run-5.tsv:656 dropped
+  - `missile.diablight`: rc-missile-missing.tsv:3 kept, rc-run-5.tsv:657 dropped
+  - `missile.diablogeddon`: rc-link-checks.tsv:69 kept, rc-run-5.tsv:658 dropped
+  - `missile.diabwall`: rc-link-checks.tsv:70 kept, rc-run-5.tsv:659 dropped
+  - `missile.dim-vision`: rc-link-checks.tsv:71 kept, rc-run-5.tsv:660 dropped
+  - `missile.doomknightmissile`: rc-link-checks.tsv:72 kept, rc-run-5.tsv:661 dropped
+  - `missile.dragon-tail`: rc-link-checks.tsv:73 kept, rc-run-5.tsv:662 dropped
+  - `missile.eruption`: rc-link-checks.tsv:75 kept, rc-run-5.tsv:663 dropped
+  - `missile.exploding-arrow`: rc-link-checks.tsv:76 kept, rc-run-5.tsv:664 dropped
+  - `missile.fenris-rage`: rc-link-checks.tsv:77 kept, rc-run-5.tsv:665 dropped
+  - `missile.fetishaura`: rc-link-checks.tsv:78 kept, rc-run-5.tsv:666 dropped
+  - `missile.fetishinferno`: rc-link-checks.tsv:79 kept, rc-run-5.tsv:667 dropped
+  - `missile.fingermagespider`: rc-link-checks.tsv:80 kept, rc-run-5.tsv:668 dropped
+  - `missile.fire-arrow`: rc-link-checks.tsv:81 kept, rc-run-5.tsv:669 dropped
+  - `missile.fire-ball`: rc-link-checks.tsv:82 kept, rc-run-5.tsv:670 dropped
+  - `missile.fire-bolt`: rc-link-checks.tsv:83 kept, rc-run-5.tsv:671 dropped
+  - `missile.fire-trauma`: rc-link-checks.tsv:84 kept, rc-run-5.tsv:672 dropped
+  - `missile.fire-wall`: rc-link-checks.tsv:85 kept, rc-run-5.tsv:673 dropped
+  - `missile.firestorm`: rc-link-checks.tsv:87 kept, rc-run-5.tsv:674 dropped
+  - `missile.fist-of-the-heavens`: rc-link-checks.tsv:88 kept, rc-run-5.tsv:675 dropped
+  - `missile.fists-of-fire`: rc-link-checks.tsv:89 kept, rc-run-5.tsv:676 dropped
+  - `missile.freezing-arrow`: rc-link-checks.tsv:90 kept, rc-run-5.tsv:677 dropped
+  - `missile.frost-nova`: rc-link-checks.tsv:93 kept, rc-run-5.tsv:678 dropped
+  - `missile.frozen-orb`: rc-link-checks.tsv:94 kept, rc-run-5.tsv:679 dropped
+  - `missile.gargoyletrap`: rc-link-checks.tsv:96 kept, rc-run-5.tsv:680 dropped
+  - `missile.glacial-spike`: rc-link-checks.tsv:97 kept, rc-run-5.tsv:681 dropped
+  - `missile.grim-ward`: rc-link-checks.tsv:104 kept, rc-run-5.tsv:682 dropped
+  - `missile.guided-arrow`: rc-link-checks.tsv:105 kept, rc-run-5.tsv:683 dropped
+  - `missile.healing-vortex`: rc-link-checks.tsv:106 kept, rc-run-5.tsv:684 dropped
+  - `missile.hellmeteor`: rc-link-checks.tsv:107 kept, rc-run-5.tsv:685 dropped
+  - `missile.holy-bolt`: rc-link-checks.tsv:108 kept, rc-run-5.tsv:686 dropped
+  - `missile.horror-arctic-blast`: rc-link-checks.tsv:109 kept, rc-run-5.tsv:687 dropped
+  - `missile.howl`: rc-link-checks.tsv:110 kept, rc-run-5.tsv:688 dropped
+  - `missile.hurricane`: rc-link-checks.tsv:111 kept, rc-run-5.tsv:689 dropped
+  - `missile.hydramissile`: rc-link-checks.tsv:112 kept, rc-run-5.tsv:690 dropped
+  - `missile.ice-arrow`: rc-link-checks.tsv:113 kept, rc-run-5.tsv:691 dropped
+  - `missile.ice-blast`: rc-link-checks.tsv:114 kept, rc-run-5.tsv:692 dropped
+  - `missile.ice-bolt`: rc-link-checks.tsv:115 kept, rc-run-5.tsv:693 dropped
+  - `missile.immolation-arrow`: rc-link-checks.tsv:116 kept, rc-run-5.tsv:694 dropped
+  - `missile.imp-fire-missile`: rc-link-checks.tsv:118 kept, rc-run-5.tsv:695 dropped
+  - `missile.imp-fire-missile-ex`: rc-link-checks.tsv:119 kept, rc-run-5.tsv:696 dropped
+  - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, rc-run-5.tsv:697 dropped
+  - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, rc-run-5.tsv:698 dropped
+  - `missile.imp-teleport`: rc-link-checks.tsv:122 kept, rc-run-5.tsv:699 dropped
+  - `missile.impbolt`: rc-link-checks.tsv:123 kept, rc-run-5.tsv:700 dropped
+  - `missile.inferno`: rc-link-checks.tsv:129 kept, rc-run-5.tsv:701 dropped
+  - `missile.iron-maiden`: rc-link-checks.tsv:130 kept, rc-run-5.tsv:702 dropped
+  - `missile.leap`: rc-link-checks.tsv:131 kept, rc-run-5.tsv:703 dropped
+  - `missile.life-tap`: rc-link-checks.tsv:132 kept, rc-run-5.tsv:704 dropped
+  - `missile.lightning`: rc-link-checks.tsv:133 kept, rc-run-5.tsv:705 dropped
+  - `missile.lightning-bolt`: rc-link-checks.tsv:134 kept, rc-run-5.tsv:706 dropped
+  - `missile.lightning-fury`: rc-link-checks.tsv:135 kept, rc-run-5.tsv:707 dropped
+  - `missile.lightning-strike`: rc-link-checks.tsv:136 kept, rc-run-5.tsv:708 dropped
+  - `missile.lower-resist`: rc-link-checks.tsv:137 kept, rc-run-5.tsv:709 dropped
+  - `missile.magic-arrow`: rc-link-checks.tsv:138 kept, rc-run-5.tsv:710 dropped
+  - `missile.magottup`: rc-link-checks.tsv:139 kept, rc-run-5.tsv:711 dropped
+  - `missile.megademoninferno`: rc-missile-missing.tsv:4 kept, rc-run-5.tsv:712 dropped
+  - `missile.mephfrostnova`: rc-link-checks.tsv:140 kept, rc-run-5.tsv:713 dropped
+  - `missile.mephistomissile`: rc-link-checks.tsv:141 kept, rc-run-5.tsv:714 dropped
+  - `missile.meteor`: rc-link-checks.tsv:142 kept, rc-run-5.tsv:715 dropped
+  - `missile.mind-blast`: rc-link-checks.tsv:143 kept, rc-run-5.tsv:716 dropped
+  - `missile.molten-boulder`: rc-link-checks.tsv:144 kept, rc-run-5.tsv:717 dropped
+  - `missile.mon-death-sentry`: rc-link-checks.tsv:145 kept, rc-run-5.tsv:718 dropped
+  - `missile.mon-inferno-sentry`: rc-link-checks.tsv:146 kept, rc-run-5.tsv:719 dropped
+  - `missile.monblizzard`: rc-link-checks.tsv:148 kept, rc-run-5.tsv:720 dropped
+  - `missile.monbonespirit`: rc-link-checks.tsv:149 kept, rc-run-5.tsv:721 dropped
+  - `missile.monbow`: rc-link-checks.tsv:150 kept, rc-run-5.tsv:722 dropped
+  - `missile.moncoldarrow`: rc-link-checks.tsv:151 kept, rc-run-5.tsv:723 dropped
+  - `missile.moncursecast`: rc-link-checks.tsv:152 kept, rc-run-5.tsv:724 dropped
+  - `missile.monexplodingarrow`: rc-link-checks.tsv:153 kept, rc-run-5.tsv:725 dropped
+  - `missile.monfirearrow`: rc-link-checks.tsv:154 kept, rc-run-5.tsv:726 dropped
+  - `missile.monfreezingarrow`: rc-link-checks.tsv:155 kept, rc-run-5.tsv:727 dropped
+  - `missile.multiple-shot`: rc-link-checks.tsv:157 kept, rc-run-5.tsv:728 dropped
+  - `missile.necromagemissile`: rc-link-checks.tsv:163 kept, rc-run-5.tsv:729 dropped
+  - `missile.nihlathakcorpseexplosion`: rc-link-checks.tsv:164 kept, rc-run-5.tsv:730 dropped
+  - `missile.nova`: rc-link-checks.tsv:165 kept, rc-run-5.tsv:731 dropped
+  - `missile.plague-javelin`: rc-link-checks.tsv:172 kept, rc-run-5.tsv:732 dropped
+  - `missile.poison-explosion`: rc-link-checks.tsv:173 kept, rc-run-5.tsv:733 dropped
+  - `missile.poison-javelin`: rc-link-checks.tsv:174 kept, rc-run-5.tsv:734 dropped
+  - `missile.poison-nova`: rc-link-checks.tsv:175 kept, rc-run-5.tsv:735 dropped
+  - `missile.poisonballtrap`: rc-link-checks.tsv:176 kept, rc-run-5.tsv:736 dropped
+  - `missile.primeblaze`: rc-link-checks.tsv:177 kept, rc-run-5.tsv:737 dropped
+  - `missile.primebolt`: rc-link-checks.tsv:178 kept, rc-run-5.tsv:738 dropped
+  - `missile.primefirewall`: rc-link-checks.tsv:179 kept, rc-run-5.tsv:739 dropped
+  - `missile.primeicenova`: rc-link-checks.tsv:180 kept, rc-run-5.tsv:740 dropped
+  - `missile.primelightning`: rc-link-checks.tsv:181 kept, rc-run-5.tsv:741 dropped
+  - `missile.primepoisonball`: rc-link-checks.tsv:182 kept, rc-run-5.tsv:742 dropped
+  - `missile.primepoisonnova`: rc-link-checks.tsv:183 kept, rc-run-5.tsv:743 dropped
+  - `missile.primespike`: rc-link-checks.tsv:184 kept, rc-run-5.tsv:744 dropped
+  - `missile.quick-strike`: rc-link-checks.tsv:185 kept, rc-run-5.tsv:745 dropped
+  - `missile.rabies`: rc-link-checks.tsv:186 kept, rc-run-5.tsv:746 dropped
+  - `missile.raise-skeletal-mage`: rc-link-checks.tsv:187 kept, rc-run-5.tsv:747 dropped
+  - `missile.raise-skeleton`: rc-link-checks.tsv:188 kept, rc-run-5.tsv:748 dropped
+  - `missile.redemption`: rc-link-checks.tsv:189 kept, rc-run-5.tsv:749 dropped
+  - `missile.regurgitatoreat`: rc-link-checks.tsv:191 kept, rc-run-5.tsv:750 dropped
+  - `missile.revive`: rc-link-checks.tsv:192 kept, rc-run-5.tsv:751 dropped
+  - `missile.roguemissile`: rc-link-checks.tsv:193 kept, rc-run-5.tsv:752 dropped
+  - `missile.royal-strike`: rc-link-checks.tsv:194 kept, rc-run-5.tsv:753 dropped
+  - `missile.sacrifice`: rc-link-checks.tsv:195 kept, rc-run-5.tsv:754 dropped
+  - `missile.sanctuary`: rc-link-checks.tsv:196 kept, rc-run-5.tsv:755 dropped
+  - `missile.sentry-lightning`: rc-link-checks.tsv:197 kept, rc-run-5.tsv:756 dropped
+  - `missile.shamanfire`: rc-link-checks.tsv:198 kept, rc-run-5.tsv:757 dropped
+  - `missile.shamanfireex`: rc-link-checks.tsv:199 kept, rc-run-5.tsv:758 dropped
+  - `missile.shamanice`: rc-link-checks.tsv:200 kept, rc-run-5.tsv:759 dropped
+  - `missile.shiver-armor`: rc-link-checks.tsv:201 kept, rc-run-5.tsv:760 dropped
+  - `missile.shock-field`: rc-link-checks.tsv:202 kept, rc-run-5.tsv:761 dropped
+  - `missile.shock-wave`: rc-link-checks.tsv:203 kept, rc-run-5.tsv:762 dropped
+  - `missile.strafe`: rc-link-checks.tsv:224 kept, rc-run-5.tsv:764 dropped
+  - `missile.succubusbolt`: rc-link-checks.tsv:225 kept, rc-run-5.tsv:765 dropped
+  - `missile.teeth`: rc-link-checks.tsv:226 kept, rc-run-5.tsv:766 dropped
+  - `missile.terror`: rc-link-checks.tsv:227 kept, rc-run-5.tsv:767 dropped
+  - `missile.thunder-storm`: rc-link-checks.tsv:228 kept, rc-run-5.tsv:768 dropped
+  - `missile.trap-nova`: rc-link-checks.tsv:229 kept, rc-run-5.tsv:769 dropped
+  - `missile.twister`: rc-link-checks.tsv:230 kept, rc-run-5.tsv:770 dropped
+  - `missile.unholybolt`: rc-link-checks.tsv:231 kept, rc-run-5.tsv:771 dropped
+  - `missile.unholyboltex`: rc-link-checks.tsv:232 kept, rc-run-5.tsv:772 dropped
+  - `missile.vampirefireball`: rc-link-checks.tsv:233 kept, rc-run-5.tsv:773 dropped
+  - `missile.vampirefirewall`: rc-link-checks.tsv:234 kept, rc-run-5.tsv:774 dropped
+  - `missile.vampiremeteor`: rc-link-checks.tsv:235 kept, rc-run-5.tsv:775 dropped
+  - `missile.vampiremissile`: rc-link-checks.tsv:236 kept, rc-run-5.tsv:776 dropped
+  - `missile.vine-attack`: rc-link-checks.tsv:237 kept, rc-run-5.tsv:777 dropped
+  - `missile.vinecycler`: rc-link-checks.tsv:238 kept, rc-run-5.tsv:778 dropped
+  - `missile.volcano`: rc-link-checks.tsv:242 kept, rc-run-5.tsv:779 dropped
+  - `missile.wake-of-destruction-sentry`: rc-link-checks.tsv:243 kept, rc-run-5.tsv:780 dropped
+  - `missile.war-cry`: rc-link-checks.tsv:244 kept, rc-run-5.tsv:781 dropped
+  - `missile.weaken`: rc-link-checks.tsv:245 kept, rc-run-5.tsv:782 dropped
+  - `missile.zakarumlightning`: rc-link-checks.tsv:248 kept, rc-run-5.tsv:783 dropped
+  - `tools.poke.tick-end`: rc-packets-join-order.tsv:3 kept, rc-run-5.tsv:787 dropped
+  - `shrine.1.refill`: rc-pc1-audit.tsv:111 kept, rc-run-5.tsv:788 dropped
+  - `shrine.10.resist-lightning-boost`: rc-pc1-audit.tsv:112 kept, rc-run-5.tsv:789 dropped
+  - `shrine.11.resist-poison-boost`: rc-pc1-audit.tsv:113 kept, rc-run-5.tsv:790 dropped
+  - `shrine.12.skill-boost`: rc-pc1-audit.tsv:114 kept, rc-run-5.tsv:791 dropped
+  - `shrine.13.recharge-boost`: rc-pc1-audit.tsv:115 kept, rc-run-5.tsv:792 dropped
+  - `shrine.14.stamina-boost`: rc-pc1-audit.tsv:116 kept, rc-run-5.tsv:793 dropped
+  - `shrine.15.experience-boost`: rc-pc1-audit.tsv:117 kept, rc-run-5.tsv:794 dropped
+  - `shrine.17.portal-to-unknown`: rc-pc1-audit.tsv:118 kept, rc-run-5.tsv:795 dropped
+  - `shrine.2.health-boost`: rc-pc1-audit.tsv:119 kept, rc-run-5.tsv:798 dropped
+  - `shrine.20.warping-shrine`: rc-pc1-audit.tsv:120 kept, rc-run-5.tsv:799 dropped
+  - `shrine.3.mana-boost`: rc-pc1-audit.tsv:121 kept, rc-run-5.tsv:802 dropped
+  - `shrine.6.armor-boost`: rc-pc1-audit.tsv:122 kept, rc-run-5.tsv:803 dropped
+  - `shrine.7.combat-boost`: rc-pc1-audit.tsv:123 kept, rc-run-5.tsv:804 dropped
+  - `shrine.8.resist-fire-boost`: rc-pc1-audit.tsv:124 kept, rc-run-5.tsv:805 dropped
+  - `shrine.9.resist-cold-boost`: rc-pc1-audit.tsv:125 kept, rc-run-5.tsv:806 dropped
+  - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, rc-run-5.tsv:817 dropped
+  - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, rc-run-5.tsv:818 dropped
+  - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-run-5.tsv:819 dropped
+  - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, rc-run-5.tsv:820 dropped
+  - `waypoint.21.flayer-jungle`: rc-ai-special.tsv:7 kept, rc-run-5.tsv:821 dropped
+  - `waypoint.22.lower-kurast`: rc-ai-special.tsv:8 kept, rc-run-5.tsv:822 dropped
+  - `waypoint.23.kurast-bazaar`: rc-ai-special.tsv:9 kept, rc-run-5.tsv:823 dropped
+  - `waypoint.24.upper-kurast`: rc-ai-special.tsv:10 kept, rc-run-5.tsv:824 dropped
+  - `waypoint.25.travincal`: rc-ai-special.tsv:11 kept, rc-run-5.tsv:825 dropped
+  - `waypoint.26.durance-of-hate-level-2`: rc-ai-special.tsv:12 kept, rc-run-5.tsv:826 dropped
+  - `waypoint.27.the-pandemonium-fortress`: rc-pc1-audit.tsv:136 kept, rc-run-5.tsv:827 dropped
+  - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-run-5.tsv:828 dropped
+  - `waypoint.29.river-of-flame`: rc-pc1-audit.tsv:138 kept, rc-run-5.tsv:829 dropped
+  - `waypoint.30.harrogath`: rc-gen-misc.tsv:29 kept, rc-run-5.tsv:831 dropped
+  - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-run-5.tsv:832 dropped
   - `state.alignment`: rc-join-burst.tsv:3 kept, rc-run-6.tsv:20 dropped
   - `state.amplifydamage`: rc-join-burst.tsv:4 kept, rc-run-6.tsv:21 dropped
   - `state.antidote`: rc-join-burst.tsv:5 kept, rc-run-6.tsv:22 dropped
@@ -3716,11 +3720,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ancientbarb2`: rc-damage-draws.tsv:12 kept, rc-seed-order.tsv:4 dropped
   - `monster.ancientbarb3`: rc-damage-draws.tsv:13 kept, rc-seed-order.tsv:5 dropped
   - `monster.bighead2`: rc-gen-mon-triage.tsv:6 kept, rc-seed-order.tsv:6 dropped
-  - `shrine.18.gem-upgrade`: rc-run-5.tsv:792 kept, rc-shrine-m.tsv:3 dropped
-  - `shrine.missile-create`: rc-run-5.tsv:592 kept, rc-shrine-missile.tsv:3 dropped
-  - `shrine.19.storm-shrine`: rc-run-5.tsv:793 kept, rc-shrine-rest.tsv:3 dropped
-  - `shrine.21.exploding-shrine`: rc-run-5.tsv:796 kept, rc-shrine-rest.tsv:4 dropped
-  - `shrine.22.poison-shrine`: rc-run-5.tsv:797 kept, rc-shrine-rest.tsv:5 dropped
+  - `shrine.18.gem-upgrade`: rc-run-5.tsv:796 kept, rc-shrine-m.tsv:3 dropped
+  - `shrine.missile-create`: rc-run-5.tsv:604 kept, rc-shrine-missile.tsv:3 dropped
+  - `shrine.19.storm-shrine`: rc-run-5.tsv:797 kept, rc-shrine-rest.tsv:3 dropped
+  - `shrine.21.exploding-shrine`: rc-run-5.tsv:800 kept, rc-shrine-rest.tsv:4 dropped
+  - `shrine.22.poison-shrine`: rc-run-5.tsv:801 kept, rc-shrine-rest.tsv:5 dropped
   - `monster.siegebeast1`: rc-gen-mon-triage.tsv:108 kept, rc-siegebeast.tsv:3 dropped
   - `monster.siegebeast2`: rc-gen-mon-triage.tsv:109 kept, rc-siegebeast.tsv:4 dropped
   - `monster.siegebeast3`: rc-gen-mon-triage.tsv:110 kept, rc-siegebeast.tsv:5 dropped
@@ -3741,23 +3745,23 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `client.c-monsters.draw`: rc-pc1-audit.tsv:49 kept, rc-town-arrival.tsv:3 dropped
   - `monster.ai.succubus-curse-gate`: rc-run-4.tsv:480 kept, rc-vile-crow.tsv:3 dropped
   - `system.sim.pathing.click-walk-player-y`: rc-run-1.tsv:248 kept, rc-walk-y1.tsv:3 dropped
-  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:803 kept, rc-wp-arrival-mode.tsv:3 dropped
-  - `waypoint.1.cold-plains`: rc-run-5.tsv:804 kept, rc-wp-arrival-mode.tsv:4 dropped
-  - `waypoint.3.dark-wood`: rc-run-5.tsv:826 kept, rc-wp-arrival-mode.tsv:5 dropped
-  - `waypoint.4.black-marsh`: rc-run-5.tsv:829 kept, rc-wp-arrival-mode.tsv:6 dropped
-  - `waypoint.5.outer-cloister`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:7 dropped
-  - `waypoint.6.jail-level-1`: rc-run-5.tsv:831 kept, rc-wp-arrival-mode.tsv:8 dropped
-  - `waypoint.7.inner-cloister`: rc-run-5.tsv:832 kept, rc-wp-arrival-mode.tsv:9 dropped
-  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:833 kept, rc-wp-arrival-mode.tsv:10 dropped
-  - `waypoint.9.lut-gholein`: rc-run-5.tsv:834 kept, rc-wp-arrival-mode.tsv:11 dropped
-  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:805 kept, rc-wp-arrival-mode.tsv:12 dropped
-  - `waypoint.11.dry-hills`: rc-run-5.tsv:806 kept, rc-wp-arrival-mode.tsv:13 dropped
-  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:14 dropped
-  - `waypoint.13.far-oasis`: rc-run-5.tsv:808 kept, rc-wp-arrival-mode.tsv:15 dropped
-  - `waypoint.14.lost-city`: rc-run-5.tsv:809 kept, rc-wp-arrival-mode.tsv:16 dropped
-  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:810 kept, rc-wp-arrival-mode.tsv:17 dropped
-  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:811 kept, rc-wp-arrival-mode.tsv:18 dropped
-  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:812 kept, rc-wp-arrival-mode.tsv:19 dropped
+  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, rc-wp-arrival-mode.tsv:3 dropped
+  - `waypoint.1.cold-plains`: rc-run-5.tsv:808 kept, rc-wp-arrival-mode.tsv:4 dropped
+  - `waypoint.3.dark-wood`: rc-run-5.tsv:830 kept, rc-wp-arrival-mode.tsv:5 dropped
+  - `waypoint.4.black-marsh`: rc-run-5.tsv:833 kept, rc-wp-arrival-mode.tsv:6 dropped
+  - `waypoint.5.outer-cloister`: rc-run-5.tsv:834 kept, rc-wp-arrival-mode.tsv:7 dropped
+  - `waypoint.6.jail-level-1`: rc-run-5.tsv:835 kept, rc-wp-arrival-mode.tsv:8 dropped
+  - `waypoint.7.inner-cloister`: rc-run-5.tsv:836 kept, rc-wp-arrival-mode.tsv:9 dropped
+  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:837 kept, rc-wp-arrival-mode.tsv:10 dropped
+  - `waypoint.9.lut-gholein`: rc-run-5.tsv:838 kept, rc-wp-arrival-mode.tsv:11 dropped
+  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:809 kept, rc-wp-arrival-mode.tsv:12 dropped
+  - `waypoint.11.dry-hills`: rc-run-5.tsv:810 kept, rc-wp-arrival-mode.tsv:13 dropped
+  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:811 kept, rc-wp-arrival-mode.tsv:14 dropped
+  - `waypoint.13.far-oasis`: rc-run-5.tsv:812 kept, rc-wp-arrival-mode.tsv:15 dropped
+  - `waypoint.14.lost-city`: rc-run-5.tsv:813 kept, rc-wp-arrival-mode.tsv:16 dropped
+  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:814 kept, rc-wp-arrival-mode.tsv:17 dropped
+  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:815 kept, rc-wp-arrival-mode.tsv:18 dropped
+  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:816 kept, rc-wp-arrival-mode.tsv:19 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, rc-wp-last3.tsv:3 dropped
   - `waypoint.37.glacial-caves-level-1`: rc-gen-misc.tsv:30 kept, rc-wp-last3.tsv:4 dropped
   - `waypoint.28.city-of-the-damned`: rc-pc1-audit.tsv:137 kept, rc-wp-last3.tsv:5 dropped
@@ -4224,7 +4228,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `missile.redemption`: rc-link-checks.tsv:189 kept, skills.tsv:466 dropped
   - `missile.howl`: rc-link-checks.tsv:110 kept, skills.tsv:467 dropped
   - `missile.leap`: rc-link-checks.tsv:131 kept, skills.tsv:468 dropped
-  - `missile.shout`: rc-run-5.tsv:751 kept, skills.tsv:469 dropped
+  - `missile.shout`: rc-run-5.tsv:763 kept, skills.tsv:469 dropped
   - `missile.battle-cry`: rc-link-checks.tsv:18 kept, skills.tsv:470 dropped
   - `missile.battle-orders`: rc-link-checks.tsv:19 kept, skills.tsv:471 dropped
   - `missile.grim-ward`: rc-link-checks.tsv:104 kept, skills.tsv:472 dropped
@@ -4289,10 +4293,10 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `missile.wake-of-destruction-sentry`: rc-link-checks.tsv:243 kept, skills.tsv:531 dropped
   - `missile.imp-inferno`: rc-link-checks.tsv:121 kept, skills.tsv:532 dropped
   - `missile.imp-fireball`: rc-link-checks.tsv:120 kept, skills.tsv:533 dropped
-  - `missile.baal-taunt`: rc-run-5.tsv:605 kept, skills.tsv:534 dropped
+  - `missile.baal-taunt`: rc-run-5.tsv:617 kept, skills.tsv:534 dropped
   - `missile.baal-monster-spawn`: rc-link-checks.tsv:14 kept, skills.tsv:535 dropped
-  - `missile.catapult-charged-ball`: rc-run-5.tsv:622 kept, skills.tsv:536 dropped
-  - `missile.catapult-spike-ball`: rc-run-5.tsv:623 kept, skills.tsv:537 dropped
+  - `missile.catapult-charged-ball`: rc-run-5.tsv:634 kept, skills.tsv:536 dropped
+  - `missile.catapult-spike-ball`: rc-run-5.tsv:635 kept, skills.tsv:537 dropped
   - `missile.healing-vortex`: rc-link-checks.tsv:106 kept, skills.tsv:538 dropped
   - `missile.vine-attack`: rc-link-checks.tsv:237 kept, skills.tsv:539 dropped
   - `missile.imp-fire-missile`: rc-link-checks.tsv:118 kept, skills.tsv:540 dropped
@@ -4414,7 +4418,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.c2s.0x46`: rc-run-6.tsv:221 kept, systems.tsv:73 dropped
   - `net.c2s.0x47`: rc-run-6.tsv:222 kept, systems.tsv:74 dropped
   - `net.c2s.0x48`: rc-run-6.tsv:223 kept, systems.tsv:75 dropped
-  - `net.c2s.0x49`: rc-run-5.tsv:772 kept, systems.tsv:76 dropped
+  - `net.c2s.0x49`: rc-run-5.tsv:784 kept, systems.tsv:76 dropped
   - `net.c2s.0x4a`: q-run-net.tsv:81 kept, systems.tsv:77 dropped
   - `net.c2s.0x4b`: q-run-net.tsv:82 kept, systems.tsv:78 dropped
   - `net.c2s.0x4c`: q-run-net.tsv:83 kept, systems.tsv:79 dropped
@@ -4492,7 +4496,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x23`: rc-run-1.tsv:205 kept, systems.tsv:151 dropped
   - `net.s2c.0x24`: q-run-net.tsv:152 kept, systems.tsv:152 dropped
   - `net.s2c.0x25`: q-run-net.tsv:153 kept, systems.tsv:153 dropped
-  - `net.s2c.0x26`: rc-run-5.tsv:775 kept, systems.tsv:154 dropped
+  - `net.s2c.0x26`: rc-run-5.tsv:785 kept, systems.tsv:154 dropped
   - `net.s2c.0x27`: q-fix-d7d8-items-net.tsv:4 kept, systems.tsv:155 dropped
   - `net.s2c.0x28`: rc-run-1.tsv:206 kept, systems.tsv:156 dropped
   - `net.s2c.0x29`: rc-run-1.tsv:207 kept, systems.tsv:157 dropped
@@ -4530,7 +4534,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `net.s2c.0x49`: q-run-net.tsv:189 kept, systems.tsv:189 dropped
   - `net.s2c.0x4a`: q-run-net.tsv:190 kept, systems.tsv:190 dropped
   - `net.s2c.0x4b`: q-run-net.tsv:191 kept, systems.tsv:191 dropped
-  - `net.s2c.0x4c`: rc-run-5.tsv:777 kept, systems.tsv:192 dropped
+  - `net.s2c.0x4c`: rc-run-5.tsv:786 kept, systems.tsv:192 dropped
   - `net.s2c.0x4d`: rc-run-1.tsv:212 kept, systems.tsv:193 dropped
   - `net.s2c.0x4e`: rc-run-1.tsv:213 kept, systems.tsv:194 dropped
   - `net.s2c.0x4f`: rc-run-1.tsv:214 kept, systems.tsv:195 dropped
@@ -5310,24 +5314,24 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `drlg.outdoor.tilesub`: rc-pc1-audit.tsv:52 kept, world.tsv:137 dropped
   - `drlg.level-seed`: rc-pc1-audit.tsv:50 kept, world.tsv:139 dropped
   - `drlg.warps.vis-lvlwarp`: rc-pc1-audit.tsv:53 kept, world.tsv:140 dropped
-  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:803 kept, world.tsv:141 dropped
-  - `waypoint.1.cold-plains`: rc-run-5.tsv:804 kept, world.tsv:142 dropped
+  - `waypoint.0.rogue-encampment`: rc-run-5.tsv:807 kept, world.tsv:141 dropped
+  - `waypoint.1.cold-plains`: rc-run-5.tsv:808 kept, world.tsv:142 dropped
   - `waypoint.2.stony-field`: rc-gen-misc.tsv:28 kept, world.tsv:143 dropped
-  - `waypoint.3.dark-wood`: rc-run-5.tsv:826 kept, world.tsv:144 dropped
-  - `waypoint.4.black-marsh`: rc-run-5.tsv:829 kept, world.tsv:145 dropped
-  - `waypoint.5.outer-cloister`: rc-run-5.tsv:830 kept, world.tsv:146 dropped
-  - `waypoint.6.jail-level-1`: rc-run-5.tsv:831 kept, world.tsv:147 dropped
-  - `waypoint.7.inner-cloister`: rc-run-5.tsv:832 kept, world.tsv:148 dropped
-  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:833 kept, world.tsv:149 dropped
-  - `waypoint.9.lut-gholein`: rc-run-5.tsv:834 kept, world.tsv:150 dropped
-  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:805 kept, world.tsv:151 dropped
-  - `waypoint.11.dry-hills`: rc-run-5.tsv:806 kept, world.tsv:152 dropped
-  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:807 kept, world.tsv:153 dropped
-  - `waypoint.13.far-oasis`: rc-run-5.tsv:808 kept, world.tsv:154 dropped
-  - `waypoint.14.lost-city`: rc-run-5.tsv:809 kept, world.tsv:155 dropped
-  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:810 kept, world.tsv:156 dropped
-  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:811 kept, world.tsv:157 dropped
-  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:812 kept, world.tsv:158 dropped
+  - `waypoint.3.dark-wood`: rc-run-5.tsv:830 kept, world.tsv:144 dropped
+  - `waypoint.4.black-marsh`: rc-run-5.tsv:833 kept, world.tsv:145 dropped
+  - `waypoint.5.outer-cloister`: rc-run-5.tsv:834 kept, world.tsv:146 dropped
+  - `waypoint.6.jail-level-1`: rc-run-5.tsv:835 kept, world.tsv:147 dropped
+  - `waypoint.7.inner-cloister`: rc-run-5.tsv:836 kept, world.tsv:148 dropped
+  - `waypoint.8.catacombs-level-2`: rc-run-5.tsv:837 kept, world.tsv:149 dropped
+  - `waypoint.9.lut-gholein`: rc-run-5.tsv:838 kept, world.tsv:150 dropped
+  - `waypoint.10.sewers-level-2`: rc-run-5.tsv:809 kept, world.tsv:151 dropped
+  - `waypoint.11.dry-hills`: rc-run-5.tsv:810 kept, world.tsv:152 dropped
+  - `waypoint.12.halls-of-the-dead-level-2`: rc-run-5.tsv:811 kept, world.tsv:153 dropped
+  - `waypoint.13.far-oasis`: rc-run-5.tsv:812 kept, world.tsv:154 dropped
+  - `waypoint.14.lost-city`: rc-run-5.tsv:813 kept, world.tsv:155 dropped
+  - `waypoint.15.palace-cellar-level-1`: rc-run-5.tsv:814 kept, world.tsv:156 dropped
+  - `waypoint.16.arcane-sanctuary`: rc-run-5.tsv:815 kept, world.tsv:157 dropped
+  - `waypoint.17.canyon-of-the-magi`: rc-run-5.tsv:816 kept, world.tsv:158 dropped
   - `waypoint.18.kurast-docktown`: rc-ai-special.tsv:4 kept, world.tsv:159 dropped
   - `waypoint.19.spider-forest`: rc-ai-special.tsv:5 kept, world.tsv:160 dropped
   - `waypoint.20.great-marsh`: rc-ai-special.tsv:6 kept, world.tsv:161 dropped
@@ -5449,11 +5453,11 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `shrine.15.experience-boost`: rc-pc1-audit.tsv:117 kept, world.tsv:287 dropped
   - `shrine.16.shrine-of-enirhs`: q-run-gen-wp-shrine.tsv:28 kept, world.tsv:288 dropped
   - `shrine.17.portal-to-unknown`: rc-pc1-audit.tsv:118 kept, world.tsv:289 dropped
-  - `shrine.18.gem-upgrade`: rc-run-5.tsv:792 kept, world.tsv:290 dropped
-  - `shrine.19.storm-shrine`: rc-run-5.tsv:793 kept, world.tsv:291 dropped
+  - `shrine.18.gem-upgrade`: rc-run-5.tsv:796 kept, world.tsv:290 dropped
+  - `shrine.19.storm-shrine`: rc-run-5.tsv:797 kept, world.tsv:291 dropped
   - `shrine.20.warping-shrine`: rc-pc1-audit.tsv:120 kept, world.tsv:292 dropped
-  - `shrine.21.exploding-shrine`: rc-run-5.tsv:796 kept, world.tsv:293 dropped
-  - `shrine.22.poison-shrine`: rc-run-5.tsv:797 kept, world.tsv:294 dropped
+  - `shrine.21.exploding-shrine`: rc-run-5.tsv:800 kept, world.tsv:293 dropped
+  - `shrine.22.poison-shrine`: rc-run-5.tsv:801 kept, world.tsv:294 dropped
   - `npc.cain1`: rc-gen-wine168.tsv:36 kept, world.tsv:295 dropped
   - `npc.gheed`: rc-gen-wine168.tsv:42 kept, world.tsv:296 dropped
   - `npc.akara`: rc-pc1-audit.tsv:82 kept, world.tsv:297 dropped
@@ -9213,7 +9217,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `net.s2c.0x1d` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x1e` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 7 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x23` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
-| `net.s2c.0x26` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-5: 6 checks EQUAL (gen-shrine-1..) |
+| `net.s2c.0x26` | message | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-5: 1 checks EQUAL (gen-shrine-1..) |
 | `net.s2c.0x28` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x29` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 6 a* check(s) EQUAL (REC-2055/2056 rules) |
 | `net.s2c.0x2a` | message | EQUAL | - | MATCH | yes | 0 | n | claude/q-fix-pc1-proto-items | specs/sim/server-messages.tsv | rc-run-1: 1 a* check(s) EQUAL (REC-2055/2056 rules) |
