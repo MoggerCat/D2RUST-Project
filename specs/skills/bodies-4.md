@@ -23,14 +23,14 @@
 | Rules | 57–58 |
 |   1. Conventions | 59–67 |
 |   2. Shared helpers, batch 4 (continued) | 68–198 |
-|   3. Bodies used by one monster skill (continued) | 199–515 |
-|   4. Bodies used by no monster skill row | 516–644 |
-| Constants & data dependencies | 645–656 |
-| Randomness | 657–672 |
-| Edge cases & original bugs | 673–705 |
-| Test vectors | 706–716 |
-| Provenance | 717–727 |
-| Open questions | 728–749 |
+|   3. Bodies used by one monster skill (continued) | 199–526 |
+|   4. Bodies used by no monster skill row | 527–655 |
+| Constants & data dependencies | 656–667 |
+| Randomness | 668–683 |
+| Edge cases & original bugs | 684–716 |
+| Test vectors | 717–727 |
+| Provenance | 728–738 |
+| Open questions | 739–760 |
 <!-- /index -->
 
 ## Summary
@@ -495,6 +495,10 @@ Each eaten corpse adds one more list of the state (Edge case 6).
    `0x00554EA0(game, unit, room none, x, y, 0, 0)` (result not read);
    release (§2.3) with (unit, O, skill, L). Return 1.
 4. No O, no T → return srvdo 98 (`bodies-3.md` §4.3).
+   The "no O, no T" target point is the unit's path record target
+   (u16 +0x10, +0x12; a monster's S1 mode request writes it, so the
+   teleport lands there at the action event `0x005A7670`, 7 ticks into
+   the imp's S1 on the 1.14d check `gen-mon-492`..`714`). REC-2090.
 5. No O, T: T has a source → 0; T dead → 0;
    `0x00554EA0(game, unit, T's room, Tx, Ty, 1, 0)` = 0 → 0; possess (§2.3)
    with (unit, T, skill, L). Return 1.
@@ -508,6 +512,13 @@ Each eaten corpse adds one more list of the state (Edge case 6).
 3. Unit flags |= 0x40.
 4. R `lob` → lob `skill_missile`, else straight, with (m, unit, skill,
    L, 0, 0, 0, 0, quant 0). Return 1.
+
+S3 is the byte monster init wrote (§10 variant, then doomknight2/3's
+own roll of 4), read live from the monster data, never a default 0;
+L is the used entry's level, for a monster its init entry's base
+(`Sk<i>lvl` plus the bonus, `monsters/init.md` §6), not 1. Measured:
+`milestone-hellforge` frame 83, three doomknight2 (`Sk1lvl` 3) fire
+missiles 324, 323, 324 at missile level 3 (rc-coverage-warps).
 
 #### 3.26 srvdo 149 NecromageMissile `0x005CE0B0`
 
