@@ -1,5 +1,5 @@
-C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	open
-C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	open
+C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	done EQUAL +13 rows (C028,C026,C064,C065)
+C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	done ui.frontend rows linked to ui-frontend-screens; stable-px diff main 26500->918 (EQUAL 0->0)
 C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	open
 C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	done EQUAL +3 (superunique beetleburst, dark-elder, fire-eye); coldworm+wp-42 packets MATCH
 C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
@@ -21,3 +21,8 @@ C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/ge
 C018	rc-c018-monstate	17:43	su hcIdx extra-spawn double roll(5) (a2-quest-radament s)	done gen-su radament,ismail,geleb,toorc,wyand,bremm,maffer,baal2 EQUAL
 C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	released: footstep-variant client seed (rc-audio-fmt-div, Windows)
 C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	open
+C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35 C008 checks state 100% (11 rows EQUAL)
+C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
+C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
+C008b	rc-c008-monmode	17:00	milestone-nihlathak frame 30 LOS draw room test	done nihlathak 29->75/75, deseis-seal-early 45->125/200, 40 checks improved, 0 regressed
+C038b	rc-c008-monmode	18:27	ass-shadow-master frame 62 field sp 194 vs 154 (pet buff speed after cast)	open

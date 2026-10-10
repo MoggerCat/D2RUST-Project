@@ -1451,6 +1451,59 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             crate::wiring::action::reaction::kill_by(&mut self.cv, u, killer);
             return;
         }
+        // `0x00571AA0` as the bodies call it (`bodies-2.md` §2.21): the
+        // 0xA3 record {v, skill, lvl, unit, T, x, y}, the unit queued.
+        if let bodies::BodyEffect::MsgA3 {
+            u,
+            target,
+            skill,
+            lvl,
+            x,
+            y,
+            v,
+        } = e
+        {
+            use crate::wiring::action::event_records::EventRecord;
+            let units = &self.cv.v.units;
+            let of = |id: Option<UnitId>| {
+                id.and_then(|id| units.get(id))
+                    .map_or((0, u32::MAX), |r| (r.ty.index() as u8, r.guid))
+            };
+            let r = EventRecord::Progressive {
+                charges: v as u8,
+                skill: skill as u16,
+                level: lvl as u16,
+                unit: of(Some(u)),
+                target: of(target),
+                x: x as u32,
+                y: y as u32,
+            };
+            self.cv.v.h.event_records.push(u, r);
+            let _ = self.cv.game.lists.queue_update(u);
+            return;
+        }
+        // `0x0053CDF0(client, m)` (`bodies.md` §8.9 step 7): 0x7F about
+        // the pet m, sent at once to the caster's client.
+        if let bodies::BodyEffect::AllyInfo { u, m } = e {
+            let life = bodies::b4_helpers::life_percent(self, m).clamp(0, 0xFFFF) as u16;
+            let game = &*self.cv.game;
+            let level = game
+                .lists
+                .unit(m)
+                .and_then(|e| e.room())
+                .and_then(|r| self.cv.v.h.drlg.level_id(game, r))
+                .unwrap_or(0) as u16;
+            if let Some(r) = self.cv.v.units.get(m) {
+                let mut msg = [0u8; 10];
+                msg[0] = 0x7F;
+                msg[1] = u8::from(r.ty == UnitType::Player);
+                msg[2..4].copy_from_slice(&life.to_le_bytes());
+                msg[4..8].copy_from_slice(&r.guid.to_le_bytes());
+                msg[8..10].copy_from_slice(&level.to_le_bytes());
+                Pending::send(self.xm(), u, &msg);
+            }
+            return;
+        }
         if let bodies::BodyEffect::MsgA5 { u, skill } = e {
             use crate::wiring::action::event_records::EventRecord;
             let r = EventRecord::Landing {
