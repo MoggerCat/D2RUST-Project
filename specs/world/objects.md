@@ -44,22 +44,22 @@
 |   4. Object animation at a mode change | 180–211 |
 |   5. Init functions | 212–286 |
 |   6. Preset object classes 574–582 (`0x0054F490`) | 287–323 |
-|   7. Operate dispatch | 324–448 |
-|   8. Chests and breakables | 449–584 |
-|   9. Shrines | 585–700 |
-|   10. Doors, operate 8 (`0x00581D40`) | 701–724 |
-|   11. Wells, operate 22 (`0x005858A0`) | 725–756 |
-|   12. Portals, operate 15 (`0x00584870`) | 757–827 |
-|   13. Torch, operate 11 (`0x005843D0`) | 828–832 |
-|   14. Client messages | 833–860 |
-|   15. Not covered yet | 861–875 |
-|   16.–18. Moved | 876–882 |
-| Constants & data dependencies | 883–929 |
-| Randomness | 930–976 |
-| Edge cases & original bugs | 977–1043 |
-| Test vectors | 1044–1082 |
-| Provenance | 1083–1149 |
-| Open questions | 1150–1203 |
+|   7. Operate dispatch | 324–484 |
+|   8. Chests and breakables | 485–620 |
+|   9. Shrines | 621–736 |
+|   10. Doors, operate 8 (`0x00581D40`) | 737–760 |
+|   11. Wells, operate 22 (`0x005858A0`) | 761–792 |
+|   12. Portals, operate 15 (`0x00584870`) | 793–863 |
+|   13. Torch, operate 11 (`0x005843D0`) | 864–868 |
+|   14. Client messages | 869–896 |
+|   15. Not covered yet | 897–911 |
+|   16.–18. Moved | 912–918 |
+| Constants & data dependencies | 919–965 |
+| Randomness | 966–1012 |
+| Edge cases & original bugs | 1013–1079 |
+| Test vectors | 1080–1118 |
+| Provenance | 1119–1185 |
+| Open questions | 1186–1239 |
 <!-- /index -->
 
 ## Summary
@@ -414,9 +414,45 @@ The handler's result (`sim/intents-events.md`), in order:
 4. Not in interact range (`0x00623660` = 0), or the line test
    `0x00622B50(P, O, 0x804)` ≠ 0 → walk to the object (`0x00548A50`,
    argument −2 when the message's u32 @9 is nonzero, else −1;
-   `sim/pathing.md`) → 0.
+   `sim/pathing.md`) → 0. The walk is the NPC approach of `world/npc.md`
+   §2 rule 3 with unit type 2 (answered 2026-10-09, PC 1 night D2;
+   asm `0x00548A50`–`0x00548A6F`, recorded below):
+   1. Run request `0x00580A70(P, no skill, mode 3, type 2, GUID, 0)`
+      (`sim/pathing.md` §1.2: a run toward the object; it clears player
+      data +0x150 / +0x154; without stamina it becomes a walk, §1.5).
+      Its result is not read. Nothing else happens in this frame: no
+      operate, no message to the client.
+   2. Queued interaction (`0x00641F20` → `0x00460780`): player data
+      +0x150 := 1, +0x154 := −1 (or −2 per the argument), +0x158 := 2,
+      +0x15C := the object's GUID.
+   3. The run ends by the arrival check (`sim/pathing.md` §9.5 rule 3)
+      at the first step where the unit distance `0x00641530(P, O)` is
+      ≤ the player path's stop distance 0. Sizes: player 2, object
+      `objects.txt` `SizeX` (`0x00620510`; jump table `0x0062057C`:
+      type 0 → 2, 1 → monstats2 `SizeX`, 2 → objects record +0xD0, 3 →
+      missile `Size`, 4 → 1, 5 → 0). For Δ < 8 on both axes and sizes <
+      4 the `dist8_unit` entry decides; its entries 0–2 (Δ = (0,0),
+      (1,0), (2,0)) are −1, which returns distance 0 at once, so a 1×1
+      object stops the player 2 sub-tiles away on its axis.
+   4. On that stop (step result 2 in `0x00580C20`, `sim/pathing.md`
+      §9.2 step 6): neutral start (`0x0057F020`), then this handler's
+      `0x00548B00(P, type 2, GUID, flag = (+0x154 = −2), game)` again,
+      then +0x150 := 0. With the player now in interact range and the
+      line clear, rule 5 runs **in the stop frame**. Still out of range
+      (or the line blocked) → rule 4 again: a new run and a new queued
+      interaction. Distance > 50 or mode ≥ 8 by then → its code, no
+      operate. The client sends nothing more.
 5. Else stop P's path (`0x00648730`) and run §7.1 (`0x00584540(game,
    P, 2, GUID)`): its result 0 (object gone) → 3, else → 0.
+
+Recorded (1.14d, ScnAma, `-seed 1234`, Act I town, C→S 0x13 {2, stash
+GUID 17} injected for frame 4, `record_state.py`; stash 267 `bank`,
+SizeX 1, at (4866, 4229)): player at (4873, 4228) in mode 5; frame 4
+mode 3 (run), target (4866, 4229), (4872, 4228); one sub-tile every two
+frames: f6 4871, f8 4870, f10 (4869, 4229), f12 (4868, 4229); frame 13
+mode 5 at (4868, 4229) (Δ = (2, 0): unit distance 0) and the stash opens
+in that frame (S→C 0x77 at frame 13, q-tool-interact-pokes Wine run of
+`interact-operate-stash`, the same flow from `poke operate`).
 
 #### 7.4 Call forms (2026-10-09, static asm; `tools/poke.md` §4 rule 10)
 

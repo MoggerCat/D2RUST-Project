@@ -4,8 +4,8 @@
 # 19:55 UTC: rows whose session had ended moved to the live session for that area; rows with no live owner go to the coordinator, which routes them.
 area	paths	session	branch
 act1-town, seed order, client critters, NPC tracks	specs/sim/rng.md,specs/sim/unit-order.md,specs/monsters/population.md,crates/d2-sim/src/rng	session_01JhQc4nNShp9YNmxNXpqAdx	claude/q-fix-seed-order
-act1-combat, monster death, dead units	specs/combat/vitals.md,specs/combat/events.md	session_01KcnkwCTXbuv5ZbToEUpBSj	claude/coord-resume-3
-monster melee/AI combat	specs/monsters/,specs/combat/	session_01KcnkwCTXbuv5ZbToEUpBSj	claude/coord-resume-3
+act1-combat, monster death, dead units	specs/combat/vitals.md,specs/combat/events.md	session_01LASMZmABMy5PBwvU9dr5gV	claude/q-fix-monster-ai-2
+monster melee/AI combat	specs/monsters/,specs/combat/	session_01LASMZmABMy5PBwvU9dr5gV	claude/q-fix-monster-ai-2
 skills (whirl, leap, golem, local skill start)	specs/skills/	session_01K7kwGzzDHZVb9C2agmAiRA	claude/q-fix-skills-bda
 skills cast/right-click, client missiles, hireling	specs/skills/use.md,specs/missiles/,specs/world/hirelings,specs/client/msg-skills.md,specs/sim/client-messages.tsv#0x01,specs/sim/client-messages.tsv#0x05,specs/sim/client-messages.tsv#0x06,specs/sim/client-messages.tsv#0x07,specs/sim/client-messages.tsv#0x08,specs/sim/client-messages.tsv#0x09,specs/sim/client-messages.tsv#0x0A,specs/sim/client-messages.tsv#0x0B,specs/sim/client-messages.tsv#0x0C,specs/sim/client-messages.tsv#0x0D,specs/sim/client-messages.tsv#0x0E,specs/sim/client-messages.tsv#0x0F,specs/sim/client-messages.tsv#0x10,specs/sim/client-messages.tsv#0x11,specs/sim/client-messages.tsv#0x12	session_01Vrxth48MdTGAeXMm3pbrVN	claude/q-fix-skills-4cls
 act2, front-end menus	specs/world/quests-act2,specs/ui/frontend-,specs/ui/menus.md	session_01KcnkwCTXbuv5ZbToEUpBSj	claude/coord-resume-3
@@ -29,3 +29,4 @@ Den of Evil flag, Cold Plains waypoint	specs/world/quests-act1,specs/world/waypo
 class rows (whirlwind, right aura, pet warp follow, blessed hammer)	specs/skills/	session_017Zjk6EsU1ooMqhtmpz54ih	claude/q-fix-class-rows
 depcheck, rng_trace feature	crates/d2-sim/src/debug,tools/depcheck	session_01Bw9umZerDFScSEkXWhvchg	claude/q-fix-depcheck
 playthrough sweep, goto cells, class x difficulty matrix	tools/playthrough/,specs/tools/playthrough.md	session_01BU2ZCAxsiRDowTgb9cTSki	claude/q-fix-pt-sweep
+client audio (sound tick base, skill start, river, footsteps), audio-diff fixes	crates/d2-client/src/audio,crates/d2-client/src/app/sound.rs,crates/d2-client/src/app/audio_dump.rs,specs/audio/,specs/client/audio.md	session_011ideiPxX1mzp3W9rFHu6r6	claude/q-fix-audio

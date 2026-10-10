@@ -1,0 +1,48 @@
+{
+ "channel": "state",
+ "check": "gen-state-28",
+ "command": [
+  "tools/trace-recorder/record_state.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "40",
+  "--auto",
+  "ScnSor",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.state.jsonl",
+  "--snap-every",
+  "1",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "8 spawn 179 @x+4 @y normal",
+  "--poke",
+  "12 state @player 28 on",
+  "--poke",
+  "12 state @1:179 28 on",
+  "--poke",
+  "24 state @player 28 off",
+  "--poke",
+  "24 state @1:179 28 off"
+ ],
+ "files": {
+  "orig.state.jsonl": {
+   "sha256": "aa97d34d667fd09df5f69d9573aebac35aa2a6ccfd8ae0e9a7f701af5822b2f5",
+   "size": 202130
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "6e40523423030d8b76fdfa34efc35ba7d9ca6468d894de63b67da91317c27c53",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "013f9d66a9e517ed1b72b7084b4906fc74aa8edfba7e0c875c3705f8912a33b5",
+  "save": "58d80df5bf2c4c82ebcb500135829c6c12fb55c13a30b8de9e0a35697ab2f95f"
+ }
+}

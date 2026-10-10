@@ -194,6 +194,7 @@ fn assign_object_stamps_the_footprint_of_a_colliding_mode() {
         has_collision: [1, 1, 1, 0, 0, 0, 0, 0],
         ..ObjClientRow::default()
     };
+    torch.shape.has_collision = [true, true, true, false, false, false, false, false];
     torch.frame_cnt = [0x100; 8];
     m.inputs.objclient.rows = vec![ObjClientRow::default(); 38];
     m.inputs.objclient.rows[37] = torch;

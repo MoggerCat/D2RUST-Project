@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "merc-sorc-cow",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "330",
+  "--ticks",
+  "120",
+  "--auto",
+  "ScnBar",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 warp 2",
+  "--poke",
+  "10 spawn 179 @x+6 @y normal"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "f1978c05954212382d1b37064e8a90cef2b0d0ec460f9bfc6b75bc66ddc3bc31",
+   "size": 224019
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "f789452d3a16278fe22d03e5316e9ad4aed5a21c5c6d4b61bc408611a8b58e50",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "9dfae3bc1e5f9c2d7747254ee95976275a29130a6397143204223e355fcc9ac8"
+ }
+}

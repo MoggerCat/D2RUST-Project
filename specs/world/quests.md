@@ -36,22 +36,22 @@
 | Inputs | 76–87 |
 | Outputs / state changes | 88–94 |
 | Rules | 95–96 |
-|   1. Quest flag records | 97–297 |
-|   2. Quest control and quest records | 298–404 |
-|   3. Game entry: picking the quest set | 405–452 |
-|   4. Events and dispatch | 453–537 |
-|   5. Quest updater and timers (tick step 8) | 538–559 |
-|   6. Status reporting | 560–741 |
-|   7. NPC dialog hooks | 742–774 |
-|   8. Act transitions, warps and portals | 775–862 |
-|   9. Quest items, rewards and helpers | 863–1055 |
-|   11. Acts II–V | 1056–1072 |
-| Constants & data dependencies | 1073–1087 |
-| Randomness | 1088–1115 |
-| Edge cases & original bugs | 1116–1134 |
-| Test vectors | 1135–1166 |
-| Provenance | 1167–1195 |
-| Open questions | 1196–1268 |
+|   1. Quest flag records | 97–314 |
+|   2. Quest control and quest records | 315–421 |
+|   3. Game entry: picking the quest set | 422–469 |
+|   4. Events and dispatch | 470–554 |
+|   5. Quest updater and timers (tick step 8) | 555–576 |
+|   6. Status reporting | 577–758 |
+|   7. NPC dialog hooks | 759–791 |
+|   8. Act transitions, warps and portals | 792–879 |
+|   9. Quest items, rewards and helpers | 880–1072 |
+|   11. Acts II–V | 1073–1089 |
+| Constants & data dependencies | 1090–1104 |
+| Randomness | 1105–1132 |
+| Edge cases & original bugs | 1133–1151 |
+| Test vectors | 1152–1184 |
+| Provenance | 1185–1213 |
+| Open questions | 1214–1286 |
 <!-- /index -->
 
 ## Summary
@@ -98,8 +98,14 @@ dropped, portals created, stats added (requests to the owning specs).
 
 #### 1.1 Layout
 
-A quest flag record is a 96-byte buffer (`0x0065C430` allocates and
-zeroes 0x60 bytes) used as a bit array. Quest slot q (0..41) owns bits
+A quest flag record is a 96-byte buffer used as a bit array, reached
+through a 0x14-byte header: `0x0065C430` allocates the header (0x14) and
+the buffer (0x60, zeroed), and `0x00410E40` fills the header (+0x00
+buffer pointer, +0x04 bit count 0x300, +0x08…+0x10 zero). Every pointer
+called "record" below (player data +0x10 + 4·d, the game record) is the
+header; the bit functions read the buffer through `[header]` (read
+2026-10-09, PC 1 night D1; the recorder path: `tools/state-snapshot.md`
+field `q`). Quest slot q (0..41) owns bits
 16·q .. 16·q+15, i.e. bytes 2q and 2q+1. Bit n is byte n>>3, mask
 1<<(n&7) (LSB first; `0x00410B10` set, `0x00410B30` test, `0x00410B50`
 clear, mask table `0x006CE268` = 1,2,4,…). Read as little-endian u16,
@@ -190,6 +196,17 @@ copied with normalize = 1 (`0x0065C4D0`): for every slot q = 0..41, clear
 bit 13 and bit 14; then if bit 1 is set, set bit 15. (The loop covers 42
 slots; D2MOO 1.10f covers 41.) Bits 0, 1 and 2–12 are kept as saved.
 `0x004B6DD0` (client) also copies with normalize = 0.
+
+Recorded on 1.14d (2026-10-09, PC 1 late C; record_state `q`, frames
+2–6 of a ScnAmb join in act 2, seed 1234): save words slot 1 = 0x2003,
+slot 2 = 0x4000, slot 3 = 0x0001, slot 4 = 0x0004, slot 7 = 0x0001 →
+the player's normal record holds 0x8003, 0, 0x0001, 0x0004, 0x0001 from
+frame 2 (the first snapshot with a player) on: bits 13 and 14 cleared,
+bit 15 set from bit 1, every other bit as saved; no slot gains a bit
+from the game's quest state (§3 changes chain records and the game
+record, never the player's). So a join copies the three saved records
+as they are, normalised, and nothing more; `join-act2-quests-ama`
+(`acts=1`, save word slot 7 = 1 only) holds `[[7, 1]]` on both sides.
 
 #### 1.7 C→S 0x58 QuestCompleted
 
@@ -1140,6 +1157,7 @@ item and path-placement specs).
 | set bits 2, 3 of slot 1 | bytes 2..3 = `0c 00` | recorded 0x28 at frame 3570 (`015956`) |
 | copy_in normalize: slot 5 word 0x6002 (bits 1, 13, 14) | 0x8002 (13, 14 cleared; 15 set from bit 1) | §1.6 |
 | copy_in normalize: word 0x4001 | 0x0001 | §1.6 |
+| join with save slots 1, 2, 3, 4, 7 = 0x2003, 0x4000, 0x0001, 0x0004, 0x0001 | player record slots 1, 3, 4, 7 = 0x8003, 0x0001, 0x0004, 0x0001 (slot 2 = 0) from frame 2 | recorded 1.14d, PC 1 late C (`traces/raw/pc1late-quest-normalise`, local) |
 | timer period 8 created at tick 100 | fires at ticks 109, 118, … until it returns 1 | §5 |
 | default rule: chain 10, s ≥ n, not done, L = 4 | 4; L = 3 → 12 | §6.1 |
 | default rule: chain 1, s < n, now clear, L = 1 | 1 | §6.1 |

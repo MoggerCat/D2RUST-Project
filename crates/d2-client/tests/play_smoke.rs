@@ -2035,7 +2035,7 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
         let mut p = ClientPath::default();
         assert!(p.place(&t, drlg, me.0, me.1), "the player's room is active");
         if stamp {
-            p.stamp_others(&t, drlg, &others);
+            p.stamp_others(&t, drlg, &others, &[]);
         }
         let to = PathTo::Point(npc.x, npc.y);
         assert!(
@@ -2044,7 +2044,7 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
         );
         for _ in 0..400 {
             if stamp {
-                p.stamp_others(&t, drlg, &others);
+                p.stamp_others(&t, drlg, &others, &[]);
             }
             if !p.tick(&t, drlg, speeds, own, Some(to)) {
                 break;
@@ -2065,13 +2065,14 @@ fn the_client_path_stops_short_of_a_monster_footprint() {
     );
 }
 
-// `client/msg-units.md` §1.3 r2 (REC-1565): the client path sees the
-// footprints the 0x51 object init stamped (`HasCollision[mode]`, box and
-// mask of `sim/path-placement.md` §3), so a walk onto a town torch
-// (objects class 37) stops short of it, as the server's does.
+// `client/msg-units.md` §1.3 r2 (read of `0x004BC720`, REC-1251): the
+// client path sees the footprint boxes the 0x51 object init stamped, so
+// a walk onto such an object's sub-tile stops short of it, as the
+// server's walk does (`cold-plains-2` soak: the server player stood
+// at an object the client walked through).
 #[test]
 #[ignore = "needs the D2 install (D2_GAME_DIR)"]
-fn the_client_path_stops_short_of_an_object_footprint() {
+fn the_client_path_stops_short_of_a_colliding_object() {
     use d2_client::bridge::client_path::{ClientPath, Own, PathTo};
     use d2_client::bridge::predict::{MoveStats, Speeds};
     let mut run = Run::start();
@@ -2081,13 +2082,6 @@ fn the_client_path_stops_short_of_an_object_footprint() {
     let objects =
         d2_client::world_view::walk::other_objects(world, &bridge.inputs().objclient.rows);
     let me = world.local_cell().expect("the player's cell");
-    let torch = *objects
-        .iter()
-        .filter(|u| u.object.is_some_and(|o| (o.size_x, o.size_y) == (1, 1)))
-        .min_by_key(|u| {
-            (i32::from(u.x) - i32::from(me.0)).abs() + (i32::from(u.y) - i32::from(me.1)).abs()
-        })
-        .expect("a 1 × 1 object with collision in the model");
     let drlg = &world.drlg.as_ref().expect("the client DRLG").drlg;
     let t = d2_sim::path::tables::PathTables::spec().unwrap();
     let speeds = Speeds { walk: 6, run: 9 };
@@ -2095,35 +2089,36 @@ fn the_client_path_stops_short_of_an_object_footprint() {
         stamina: 0x6400,
         moves: MoveStats::CREATION,
     };
-    let end = |stamp: bool| {
+    let end = |stamp: bool, to: (u16, u16)| {
         let mut p = ClientPath::default();
         assert!(p.place(&t, drlg, me.0, me.1), "the player's room is active");
         if stamp {
-            p.stamp_others(&t, drlg, &objects);
+            p.stamp_others(&t, drlg, &[], &objects);
         }
-        let to = PathTo::Point(torch.x, torch.y);
+        let to = PathTo::Point(to.0, to.1);
         if !p.request(&t, drlg, speeds, own, to, false) {
-            return me;
+            return None;
         }
         for _ in 0..400 {
-            if stamp {
-                p.stamp_others(&t, drlg, &objects);
-            }
             if !p.tick(&t, drlg, speeds, own, Some(to)) {
                 break;
             }
         }
         let (x, y) = p.position().unwrap();
-        ((x >> 16) as u16, (y >> 16) as u16)
+        Some(((x >> 16) as u16, (y >> 16) as u16))
     };
-    assert_eq!(
-        end(false),
-        (torch.x, torch.y),
-        "no footprint: the walk ends on the object"
-    );
+    // The nearest colliding object the bare walk reaches.
+    let mut near: Vec<_> = objects.iter().collect();
+    near.sort_by_key(|o| {
+        (i32::from(o.x) - i32::from(me.0)).abs() + (i32::from(o.y) - i32::from(me.1)).abs()
+    });
+    let o = near
+        .into_iter()
+        .find(|o| end(false, (o.x, o.y)) == Some((o.x, o.y)))
+        .expect("a colliding object a walk without objects reaches");
     assert_ne!(
-        end(true),
-        (torch.x, torch.y),
+        end(true, (o.x, o.y)),
+        Some((o.x, o.y)),
         "the object's footprint stops the walk"
     );
 }

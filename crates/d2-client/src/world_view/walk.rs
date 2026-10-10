@@ -88,12 +88,9 @@ pub fn preview_walk_frame(
 ) {
     // `msg-units.md` §3 r2: the living monsters' footprints for the
     // client path (REC-706: at their model positions).
-    let mut others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
-    others.extend(other_objects(
-        bridge.0.world(),
-        &bridge.0.inputs().objclient.rows,
-    ));
-    walk.predict.set_others(others);
+    let others = other_units(bridge.0.world(), &bridge.0.inputs().tables.monsters);
+    let objects = other_objects(bridge.0.world(), &bridge.0.inputs().objclient.rows);
+    walk.predict.set_others(others, objects);
     walk.frame(bridge.0.world());
     state.feed.set_local_prediction(walk.local_at());
     if let Some(art) = &walk.art {
@@ -137,20 +134,20 @@ pub fn other_units(
                 npc: c.npc,
                 in_town: c.in_town,
                 interact: c.interact,
-                object: None,
             })
         })
         .collect()
 }
 
 /// The model's objects whose footprint is on the client grid (stamped by
-/// the 0x51 init, not yet freed, [`crate::bridge::world::ObjectData::footprint`])
-/// with a cell and an `objects` row: the client path's object footprints
-/// ([`crate::bridge::client_path::OtherUnit::object`]).
+/// the 0x51 object init `0x004BC720` when `HasCollision[mode]` ≠ 0, not
+/// yet freed by `0x00623830`: [`crate::bridge::world::ObjectData::footprint`],
+/// `msg-units.md` §1.3 r2) with an `objects` row: their footprint inputs
+/// (`bridge::client_path`).
 pub fn other_objects(
     world: &ClientWorld,
     rows: &[crate::bridge::objects::ObjClientRow],
-) -> Vec<crate::bridge::client_path::OtherUnit> {
+) -> Vec<crate::bridge::client_path::OtherObject> {
     world
         .units
         .values()
@@ -160,15 +157,11 @@ pub fn other_objects(
         })
         .filter_map(|u| {
             let (x, y) = u.position?;
-            let shape = rows.get(u.class as usize)?.shape();
-            Some(crate::bridge::client_path::OtherUnit {
+            let r = rows.get(u.class as usize)?;
+            Some(crate::bridge::client_path::OtherObject {
                 x,
                 y,
-                size_x: shape.size_x as i8,
-                npc: false,
-                in_town: false,
-                interact: false,
-                object: Some(shape),
+                shape: r.shape,
             })
         })
         .collect()

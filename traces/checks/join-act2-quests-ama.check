@@ -1,7 +1,7 @@
 check 1
-# Join in act 2 with act 1's quests done (world/quests.md §3, the quest entry;
-# formats/d2s-load.md §2): ScnAmb saved in Lut Gholein with every act 1 quest
-# flag of normal set, idle; state channel.
+# Join in act 2 after act 1 (world/quests.md §3, the quest entry;
+# formats/d2s-load.md §2): ScnAmb saved in Lut Gholein; `acts=1` sets only the
+# act 1 -> 2 transition (save slot 7 = 1, no act 1 quest bits), idle; state channel.
 name join-act2-quests-ama
 save ScnAmb --class ama --expansion --quests acts=1 --act 1
 seed 1234

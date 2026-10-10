@@ -271,11 +271,15 @@ fn record_outputs() {
         ]
     );
     // 0x5E's bytes are the one client copy the light rules read
-    // (`client/msg-ui.md` §14 r1, `render/lighting.md` §13); nothing else.
+    // (`client/msg-ui.md` §14 r1, `render/lighting.md` §13); the 0x29 and
+    // 0x52 records are the copies of the sound layer's level-entry check
+    // (`world/quests-status.md` §12); nothing else.
     assert_eq!(
         m.w,
         ClientWorld {
             quest_availability: Some(avail),
+            quest_game: Some(record),
+            quest_status: Some(status),
             ..ClientWorld::default()
         }
     );
@@ -299,7 +303,14 @@ fn quest_info_type_6_and_absent_npc() {
     let mut q = [0u8; 96];
     q[0] = 1;
     assert_eq!(m.out, [Output::QuestFlags { record: q }]);
-    assert_eq!(m.w, ClientWorld::default(), "model unchanged");
+    assert_eq!(
+        m.w,
+        ClientWorld {
+            quest_player: Some(q),
+            ..ClientWorld::default()
+        },
+        "only the sound layer's copy of P"
+    );
     // T 1, unit (1, 6) absent: C→S 0x30 (u32 R = u8@6, u32 G), NpcGone.
     m.out.clear();
     m.recv(&quest_info(1, 6));

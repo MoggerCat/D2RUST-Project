@@ -185,7 +185,10 @@ fn a_trap_shoots_in_range_then_dies() {
     lay(&mut r, CHARGED_BOLT_SENTRY);
     assert_eq!(traps(&mut r).len(), 1, "a trap is laid ({})", r.errors());
     let shots = shots_left(&mut r).expect("shots");
-    let m = r.spawn_monster(6);
+    // The trap stands 5 sub-tiles from the player: 4 more puts the monster
+    // 4 from the trap. At 1 it is in the trap's melee range and never its
+    // target (`monsters/ai.md` §5.3, REC-1270, 1.14d-measured).
+    let m = r.spawn_monster(9);
     tough(&mut r, m);
     let mut fewer = false;
     for _ in 0..1500 {
@@ -214,7 +217,10 @@ fn a_lightning_sentry_fires_its_missile() {
     lay(&mut r, LIGHTNING_SENTRY);
     assert_eq!(traps(&mut r).len(), 1, "a trap is laid ({})", r.errors());
     let shots = shots_left(&mut r).expect("shots");
-    let m = r.spawn_monster(6);
+    // The trap stands 5 sub-tiles from the player: 4 more puts the monster
+    // 4 from the trap. At 1 it is in the trap's melee range and never its
+    // target (`monsters/ai.md` §5.3, REC-1270, 1.14d-measured).
+    let m = r.spawn_monster(9);
     tough(&mut r, m);
     let life0 = r.life(m);
     let mut flew = 0;

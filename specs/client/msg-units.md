@@ -22,20 +22,20 @@
 | Inputs | 60–66 |
 | Outputs / state changes | 67–74 |
 | Rules | 75–76 |
-|   1. Unit add | 77–267 |
-|   2. 0x0A RemoveUnit (`0x0045CC10`) | 268–277 |
-|   3. 0x15 ReassignPlayer (`0x0045D160`) | 278–320 |
-|   4. Queued movement and action messages | 321–408 |
-|   5. Local player vitals: 0x18, 0x95, 0x96 | 409–439 |
-|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 440–470 |
-|   7. Other unit messages (general handlers, act at receive) | 471–606 |
-|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 607–757 |
-| Constants & data dependencies | 758–769 |
-| Randomness | 770–777 |
-| Edge cases & original bugs | 778–800 |
-| Test vectors | 801–851 |
-| Provenance | 852–903 |
-| Open questions | 904–949 |
+|   1. Unit add | 77–272 |
+|   2. 0x0A RemoveUnit (`0x0045CC10`) | 273–282 |
+|   3. 0x15 ReassignPlayer (`0x0045D160`) | 283–325 |
+|   4. Queued movement and action messages | 326–413 |
+|   5. Local player vitals: 0x18, 0x95, 0x96 | 414–444 |
+|   6. Unit states: 0xA7, 0xA8, 0xA9, 0xAA | 445–475 |
+|   7. Other unit messages (general handlers, act at receive) | 476–611 |
+|   8. Player roster (0x5B, 0x5C, 0x65, 0x75, 0x82, 0x8E; life from 0x0D, 0xAB) | 612–762 |
+| Constants & data dependencies | 763–774 |
+| Randomness | 775–782 |
+| Edge cases & original bugs | 783–805 |
+| Test vectors | 806–856 |
+| Provenance | 857–908 |
+| Open questions | 909–954 |
 <!-- /index -->
 
 Owned ids: 0x0A, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x15, 0x18, 0x4C, 0x4D,
@@ -239,9 +239,14 @@ The player roster (§8). Outputs (`client/bridge.md` §10): `UnitOverlay`
    +0x120 + mode (`HasCollision[mode]`) ≠ 0, stamps the footprint on the
    client grid with the server's stamp `0x00620A70(unit, room, x, y)`
    (box and mask of `sim/path-placement.md` §3; read 2026-10-10,
-   `0x004BC720`, REC-1565). The client frees it only through
-   `0x00623830` (`world/objects-client.md` §25 r9); the client path
-   (`client/model.md` open question 2) walks around it.
+   `0x004BC720`; settles REC-1251 and REC-1565). It is stamped once, in
+   the 0x51 mode: a later mode change does not re-test `HasCollision`.
+   The client frees it only through `0x00623830` (`world/objects-client.md`
+   §25 r9: the generic step's mode 1 → 2 turn when `HasCollision2` = 0
+   and `HasCollision1` ≠ 0, and the door finish without a test). The
+   client path (`client/model.md` open question 2) walks around it.
+   Model: kind data {footprint} := `HasCollision[mode]` ≠ 0 at 0x51,
+   cleared by those frees.
 3. Object data +4 := interact. If `0x00621B00(unit)` → `0x004BD6B0`:
    object data +8 := the shrines record of index interact (`0x006414B0`:
    table `[0x0096D468]`, 0xB8-byte rows, count `[0x0096D46C]`; out of

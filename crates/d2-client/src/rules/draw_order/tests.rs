@@ -1088,6 +1088,7 @@ impl ViewFeed for MapFeed {
             mud: false,
             sky: self.sky,
             thunder: None,
+            commit: None,
         }))
     }
 }

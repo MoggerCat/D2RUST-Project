@@ -296,7 +296,9 @@ pub fn damage_tail<W: MissileWorld + ?Sized>(
     let owner = cx.owner(game, m);
     // TODO(skills spec): whether the damage application runs without an
     // owner (`0x005AD730` does nothing then) is the skills spec's.
-    cx.world.apply_damage(game, owner, m, unit, dmg);
+    let data = cx.store.get(m).cloned();
+    cx.world
+        .apply_damage(game, owner, m, unit, dmg, data.as_ref());
     if game
         .lists
         .unit(unit)

@@ -461,8 +461,8 @@ pub fn assign_object(w: &mut ClientWorld, msg: &Message<'_>) -> Result<(), Handl
         crate::bridge::objects::anim_setup(u, row, u.mode)?;
         // Rule 2: the init stamps the footprint (`0x00620A70`) when
         // `HasCollision[mode]` is set (a mode past 7 reads as 0, as
-        // `d2_sim::path::ObjectShape::collides_in`).
-        let footprint = row.shape().collides_in(u.mode);
+        // `d2_sim::path::record::ObjectShape::collides_in`).
+        let footprint = row.shape.collides_in(u.mode);
         if let KindData::Object(d) = &mut u.kind {
             d.footprint = footprint;
         }

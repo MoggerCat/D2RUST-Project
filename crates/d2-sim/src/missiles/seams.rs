@@ -8,6 +8,7 @@ use crate::rng::Seed;
 use crate::units::{RoomId, UnitId};
 
 use super::hit::Damage;
+use super::MissileData;
 
 /// Units, stats and states. Provider: the units/stats session
 /// (`sim/units.md`, `sim/stats.md`, `sim/stat-lists.md`).
@@ -137,7 +138,8 @@ pub trait MissileCombat {
     fn hit_test(&mut self, game: &mut Game, owner: UnitId, defender: UnitId, tohit: i32) -> bool;
     /// The rest of `0x005ADCD0` after the missile's result flags: block /
     /// dodge, hit class, hit flags, pierce percent, events and damage
-    /// execution (§R6.1).
+    /// execution (§R6.1). `data` is the missile's data (class, data
+    /// flags), passed because the store is lent out during the hit.
     fn apply_damage(
         &mut self,
         game: &mut Game,
@@ -145,6 +147,7 @@ pub trait MissileCombat {
         missile: UnitId,
         unit: UnitId,
         damage: &mut Damage,
+        data: Option<&MissileData>,
     );
     /// Unit event 0 (hit by missile, `0x005C0C30`), also with no unit.
     fn hit_by_missile_event(&mut self, game: &mut Game, missile: UnitId, unit: Option<UnitId>);

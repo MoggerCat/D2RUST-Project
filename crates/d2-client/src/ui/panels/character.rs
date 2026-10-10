@@ -36,6 +36,15 @@ use super::{cel, centered_in, text, utf16, PanelEnv, PanelOutput, PanelTables, T
 
 /// The ui id of the character panel.
 pub const UI_CHARACTER: u8 = 2;
+/// Where [`CharacterPanel::draw_staged`] calls its hook.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    /// After the labels (before the close button).
+    Labels,
+    /// After the close button (before the values).
+    Close,
+}
+
 const PANEL: PanelKey = PanelKey::Ui(UI_CHARACTER);
 
 /// Stat ids (`itemstatcost.txt` rows) the panel reads.
@@ -229,6 +238,26 @@ impl CharacterPanel {
         strings: &dyn StringLookup,
         out: &mut dyn UiDrawSink,
     ) {
+        self.draw_staged(t, env, view, measure, strings, out, &mut |_, _| {});
+    }
+
+    /// The panel in the order 1.14d draws it (`a1-panel-character`, 2026-10-09):
+    /// the art, the 15 labels, the skill damage blocks (`hook(Stage::Labels)`),
+    /// the close button, the class and name lines (`hook(Stage::Close)`), then
+    /// the values. PROVISIONAL (REC-1438): the stat-points box and the add
+    /// buttons (open only with points to spend) are drawn with the values, in
+    /// table order; no recorded scene has points.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_staged(
+        &self,
+        t: &PanelTables,
+        env: &PanelEnv,
+        view: &dyn CharacterView,
+        measure: &dyn TextMeasure,
+        strings: &dyn StringLookup,
+        out: &mut dyn UiDrawSink,
+        hook: &mut dyn FnMut(Stage, &mut dyn UiDrawSink),
+    ) {
         let s = env.screen;
         // `panels-2.md` §17 r1: the base `statpts` gates the points box,
         // its labels, the number and the add buttons; the number is the
@@ -236,22 +265,37 @@ impl CharacterPanel {
         let statpts = view.stat(STAT_STATPTS);
         let shown = super::char_details::points_block_drawn(view.base(STAT_STATPTS));
         let extra = move |c: Cond| c == Cond::StatPts && shown;
-        for r in t.rows(PANEL) {
-            let cenv = env.cond(self.row_pressed(r), &extra);
-            if !r.applies(&cenv) {
-                continue;
-            }
-            match r.kind {
-                RowKind::Hit => {}
-                RowKind::Draw => {
-                    let FrameSpec::Index(f) = r.frame else {
-                        continue;
-                    };
-                    if let Some(file) = t.files.row_file(r, None) {
-                        out.push(cel(file, f, r.x.eval(&s), r.y.eval(&s)));
+        let phase = |item: &str| match item {
+            i if i.starts_with("art") => 0,
+            i if i.starts_with("label") => 1,
+            "close" => 2,
+            _ => 3,
+        };
+        for ph in 0..4 {
+            for r in t.rows(PANEL).filter(|r| phase(&r.item) == ph) {
+                let cenv = env.cond(self.row_pressed(r), &extra);
+                if !r.applies(&cenv) {
+                    continue;
+                }
+                match r.kind {
+                    RowKind::Hit => {}
+                    RowKind::Draw => {
+                        let FrameSpec::Index(f) = r.frame else {
+                            continue;
+                        };
+                        if let Some(file) = t.files.row_file(r, None) {
+                            out.push(cel(file, f, r.x.eval(&s), r.y.eval(&s)));
+                        }
+                    }
+                    RowKind::Text => {
+                        self.draw_text_row(r, &s, view, statpts, measure, strings, out)
                     }
                 }
-                RowKind::Text => self.draw_text_row(r, &s, view, statpts, measure, strings, out),
+            }
+            match ph {
+                1 => hook(Stage::Labels, out),
+                2 => hook(Stage::Close, out),
+                _ => {}
             }
         }
     }

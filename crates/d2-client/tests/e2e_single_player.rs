@@ -1247,8 +1247,8 @@ fn run_with(game_seed: u32) -> Transcript {
     // (§8.4: an inventory, not a quest item); the sound event on the
     // player (§8.1 step 3); gold → §10.1: limit = level 2 × 10000, g +
     // p ≤ limit, so take = p; no pile owner, no party share: stat 14 +=
-    // take; the pile leaves its room and is freed. Result 0. No message:
-    // inventory gold reaches the client through the vitals sync (§10.3,
+    // take; the pile leaves its room and is freed. Result 0. Only the
+    // pick-up sound message: inventory gold reaches the client through the vitals sync (§10.3,
     // no owner spec).
     let gold_guid = fx.guid(gold);
     let pick = bytes(&PickItem {
@@ -1259,7 +1259,12 @@ fn run_with(game_seed: u32) -> Transcript {
     record(&mut fx, &mut frames, vec![pick]);
     let done = Some(ResultCode::Done);
     assert_eq!(frames[16].1.codes, [(0x16, done)]);
-    assert_eq!(frames[16].2, none);
+    // The pick-up sound S→C 0x2C on the player is the one message
+    // (recorded 1.14d, REC-1402..1404: items-pickup-ama packets MATCH).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&fx.guid(player).to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    assert_eq!(frames[16].2, vec![sound]);
     assert!(fx.sim_ref().unhandled.is_empty());
     assert!(fx.sim_ref().game.lists.unit(gold).is_none(), "freed");
     assert!(!fx.items().contains(gold));
@@ -1402,7 +1407,14 @@ fn run_with(game_seed: u32) -> Transcript {
     let close = bytes(&TerminateEntityChat { id: ng });
     record(&mut fx, &mut frames, vec![close, pick_cap.clone()]);
     assert_eq!(frames[20].1.codes, [(0x30, done), (0x16, done)]);
-    assert_eq!(streams(&fx, &frames[20].2), pass(vec![x9c(0x01, cg)]));
+    // The pick-up also sends the sound S→C 0x2C on the player (recorded
+    // 1.14d, REC-1402..1404: items-pickup-ama packets MATCH).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&pg.to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    let mut picked = pass(vec![x9c(0x01, cg)]);
+    picked.push(sound);
+    assert_eq!(streams(&fx, &frames[20].2), picked);
     assert_eq!(fx.mode(cap), 4);
     assert_eq!(fx.sim_ref().game.lists.unit(cap).unwrap().room(), None);
 
@@ -1477,7 +1489,13 @@ fn run_with(game_seed: u32) -> Transcript {
     // inventory model, as the vendor sees it next.
     record(&mut fx, &mut frames, vec![pick_cap]);
     assert_eq!(frames[26].1.codes, [(0x16, done)]);
-    assert_eq!(streams(&fx, &frames[26].2), pass(vec![x9c(0x01, cg)]));
+    // The pick-up sound S→C 0x2C on the player follows (REC-1402..1404).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&pg.to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    let mut picked = pass(vec![x9c(0x01, cg)]);
+    picked.push(sound);
+    assert_eq!(streams(&fx, &frames[26].2), picked);
     record(&mut fx, &mut frames, vec![insert]);
     assert_eq!(frames[27].1.codes, [(0x18, done)]);
     assert_eq!(streams(&fx, &frames[27].2), pass(vec![x9c(0x04, cg)]));
@@ -1619,7 +1637,13 @@ fn run_with(game_seed: u32) -> Transcript {
     };
     assert_eq!(got[0][..2], [0x9C, 11]);
     assert_eq!(got[0][4..8], fx.guid(copy).to_le_bytes());
-    assert_eq!(got[1..], pass(vec![x9c(0x01, rg)])[..]);
+    // The pick-up sound S→C 0x2C on the player follows (REC-1402..1404).
+    let mut sound = vec![0x2C, 0];
+    sound.extend_from_slice(&pg.to_le_bytes());
+    sound.extend_from_slice(&[1, 0]);
+    let mut picked = pass(vec![x9c(0x01, rg)]);
+    picked.push(sound);
+    assert_eq!(got[1..], picked[..]);
     assert_eq!(fx.mode(ring), 4);
     // §8.2: the quest hook ITEMPICKEDUP, then the pickup sound.
     assert_eq!(
@@ -1778,8 +1802,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // action 5 (`vendors.md` §7.2 rule 9), + the join's monster adds
     // (`intents-events.md` §7.2: 0xAC ×2, 0xAA ×2), + the transmute's
     // sound 0x2C (step 25, `cube.md` §8 "Exact" item 3).
+    // + the four pick-up sounds 0x2C (gold, cap twice, ring; REC-1402..1404).
     // + the 0x9C action 11 of the store items (trade open, sold copy).
-    assert_eq!(log.handled, 54 + shown.len() as u64);
+    assert_eq!(log.handled, 58 + shown.len() as u64);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

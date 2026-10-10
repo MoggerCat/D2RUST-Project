@@ -64,11 +64,11 @@ def kinds_checks(excel, out):
 def main():
     excel = sys.argv[1]
     out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else "traces/checks"
-    # nightmare / hell are not generated: the 1.14d recorder has no difficulty
-    # selection (autostart.py), so only the d2rs side would change (2026-10-09).
+    # nightmare / hell run on 1.14d too since autostart.py writes the check's difficulty into
+    # the game config (q-tool-autostart-difficulty); `--normal-only` skips them.
     kinds_checks(excel, out)
     for diff, col in COLS.items():
-        if diff != "normal" and "--all-difficulties" not in sys.argv:
+        if diff != "normal" and "--normal-only" in sys.argv:
             continue
         rs = reps(excel, col)
         for n in range(0, len(rs), 5):

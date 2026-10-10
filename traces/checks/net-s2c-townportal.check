@@ -1,0 +1,9 @@
+check 1
+# Town portal scroll used from the inventory (0x20 UseGridItem, as the cube checks): packets compares S->C 0x60 TownPortalState, 0x82 PortalOwnership and the portal object messages (q-run-net, REC-1753).
+name net-s2c-townportal
+save ScnCube --class ama --expansion --item tbk
+seed 1234
+ticks 50
+seconds 240
+channels packets
+at 10 send UseGridItem item=@1 x=@x y=@y

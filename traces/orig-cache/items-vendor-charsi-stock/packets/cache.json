@@ -1,0 +1,48 @@
+{
+ "channel": "packets",
+ "check": "items-vendor-charsi-stock",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "30",
+  "--auto",
+  "ScnBuy",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--poke",
+  "4 pos @player 4860 4224",
+  "--poke",
+  "7 pos @player 4848 4220",
+  "--poke",
+  "10 pos @player 4840 4218",
+  "--poke",
+  "13 pos @player 4838 4218",
+  "--send",
+  "16 InteractWithEntity type=1 id=@1:154",
+  "--send",
+  "18 InitEntityChat id=@1:154",
+  "--send",
+  "20 EntityAction action=1 npc=@1:154 item=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "d664d2b19456cffc7411d2facca6f3a13a5e9787dabc15da0b1a790c277c4b38",
+   "size": 63195
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "ca3f71e35403420074d684eabab56122f4e61dca76d7b68239b0c2fd6da9ddba",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "07bef22def593cb31d444f383466ce2c28ba60d6024a315bca7735b30e2c1716"
+ }
+}

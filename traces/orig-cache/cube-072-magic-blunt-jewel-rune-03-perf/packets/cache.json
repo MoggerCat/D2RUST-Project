@@ -1,0 +1,38 @@
+{
+ "channel": "packets",
+ "check": "cube-072-magic-blunt-jewel-rune-03-perf",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "300",
+  "--ticks",
+  "24",
+  "--auto",
+  "ScnCube",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "4 UseGridItem item=@1 x=@x y=@y",
+  "--send",
+  "8 ClickButton button=24 p1=0 p2=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "d5f4acc3c9525a851c9e384185529a7db2e2e9ec44c3da7c1d9910622703b0a5",
+   "size": 49284
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "3643365795396152b8e9c2564a44f4d879e426a89ffb6705891e91e248cc9485",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "d35f73e00cb2345546b7a2b91b01bfba5788d0fb68269c5ad694ebc095675a0d"
+ }
+}

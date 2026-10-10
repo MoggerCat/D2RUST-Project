@@ -1,0 +1,36 @@
+{
+ "channel": "packets",
+ "check": "gen-netc2s-22",
+ "command": [
+  "tools/trace-recorder/record_packets.py",
+  "--game",
+  "<Game.exe>",
+  "--seconds",
+  "240",
+  "--ticks",
+  "40",
+  "--auto",
+  "ScnAma",
+  "--seed",
+  "1234",
+  "--out",
+  "orig.packets.jsonl",
+  "--send",
+  "20 UnstackItems item=0"
+ ],
+ "files": {
+  "orig.packets.jsonl": {
+   "sha256": "44252af77462ecfbc0f2def2a936158b3b91eeae3b7339ad996e83c3c8284769",
+   "size": 59296
+  }
+ },
+ "format": "orig-cache-1",
+ "key": {
+  "check": "00905dd2071c238fda454e76508f04d3757065626f4d386fbbb19425f217f91d",
+  "format": "orig-cache-key-1",
+  "game_exe": "631066c1649c4ea9ffe48bf97e24c00bca1f7a6759c21150f1a79982589adaaf",
+  "install": "1d2e868ec4f1c0679131aa0888dfcd53d3ced3304e0407f92be842118850b3bb",
+  "recorder": "e4d2a361d3f509be4fc5718fd385a99417ca552a2fc1bc106da968b08d4e7ff6",
+  "save": "c098d7905cb83f92fe70f1b392b1e08faf1dd04e1f6d9e100a0ca523eaafb1bd"
+ }
+}

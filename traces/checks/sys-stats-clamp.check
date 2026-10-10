@@ -1,0 +1,18 @@
+check 1
+# Census: stat clamps and the minimum rule (sim/stats.md §4, §9): life, mana
+# and stamina above their maxima, a negative strength, a negative maxlife,
+# zero maxmana. State and rng channels.
+name sys-stats-clamp
+save ScnAma --class ama --expansion --level 20
+seed 1234
+ticks 80
+seconds 300
+channels state rng
+ignore q
+at 10 poke stat @player 6 0 99999999
+at 12 poke stat @player 8 0 99999999
+at 14 poke stat @player 10 0 99999999
+at 18 poke stat @player 0 0 -5
+at 22 poke stat @player 7 0 -256
+at 26 poke stat @player 9 0 0
+at 30 poke stat @player 11 0 0

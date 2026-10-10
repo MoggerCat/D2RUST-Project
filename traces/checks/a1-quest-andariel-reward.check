@@ -1,0 +1,15 @@
+check 1
+# Andariel reward (quests-act1.md §10, world/quests.md §7.3): save with 6.1
+# (Andariel dead, reward pending); talk to Warriv (155), msg 183: 6.0 set,
+# 6.1 cleared. Quest flags on the state channel (q), 0x5D on packets.
+name a1-quest-andariel-reward
+save PtAndy --class sor --expansion --level 30 --waypoints all --quests 6.1
+seed 1234
+ticks 60
+seconds 300
+channels state packets
+at 4 poke goto unit 1:155
+at 14 send InteractWithEntity type=1 id=@1:155
+at 16 send InitEntityChat id=@1:155
+at 18 send QuestMessage npc=@1:155 msg=183
+at 20 send TerminateEntityChat id=@1:155

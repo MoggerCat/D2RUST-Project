@@ -323,6 +323,7 @@ impl MissileCombat for Fake {
         _: UnitId,
         unit: UnitId,
         d: &mut Damage,
+        _: Option<&MissileData>,
     ) {
         self.log.push(format!("damage {} {}", unit.0, d.phys));
         self.log.push(format!(
