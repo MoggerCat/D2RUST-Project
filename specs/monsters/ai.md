@@ -768,6 +768,16 @@ second caller, `0x00460EEA`, is the client's (`client/model.md`).
 1.14d-confirmed (`0x0061AA40`–`0x0061AA57`, `0x0066BA70`, call site
 `0x005DD9A0`–`0x005DD9B1`, read 2026-10-10, PC 1 today).
 
+Implemented (rc-c008-monmode, 2026-10-10): `DrlgWorld::los_draw`
+(`wiring/action/rooms.rs`) reads the DRLG room's kind and flag 0x80000.
+Until then the wired host answered false in every room, so an outdoor or
+`Outdoors` preset room (e.g. level 124, lvlprest 864 `Outdoors` 1) ran
+the collision test `0x00622AA0` that 1.14d skips. `milestone-nihlathak`
+frame 30: the succubus 1:28 at (12740,5323) takes the player at
+(12723,5297) across the room's north wall (collision bit 4 at row 5320);
+75/75 ticks after the change (was 29/75), `a4-deseis-seal-early` 45/200
+→ 125/200.
+
 Level 108 (Chaos Sanctum): **true in every room**. levels.txt
 `DrlgType` is 3 (outdoor), its fill rooms are type 1 and its six
 presets (lvlprest Def 857–862, Diablo Entry / Arm W, E, S, N / Heart)

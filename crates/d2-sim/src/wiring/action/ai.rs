@@ -431,7 +431,10 @@ impl<X: Pending> AiWorld for View<'_, X> {
         self.h.drlg.in_town(game, room)
     }
     fn los_draw(&self, game: &Game, room: RoomId) -> bool {
-        self.h.x.los_draw(game, room)
+        if self.h.paths.is_none() {
+            return self.h.x.los_draw(game, room);
+        }
+        self.h.drlg.los_draw(game, room)
     }
     /// `0x0064D910`: the grid at the unit's position has a `mask` bit
     /// (with the path provider: the pattern test of
