@@ -468,8 +468,8 @@ First divergences by owner branch: q-fix-real-unit-seed-order 41, unrouted 12, q
 | ass-venom | packets | MATCH | 70/70 | - | - |
 | ass-wake-of-fire-sentry | state | PARTIAL | 70/70 | - | - |
 | autostart-difficulty-a3-nm | state | PARTIAL | 30/30 | - | - |
-| bar-battle-command | packets | DIVERGED | 68/70 | frame 28 stream s2c #1 missing in d2rs (id 0xa8) | unrouted |
-| bar-battle-command | state | DIVERGED | 27/70 | frame 28 player 0:1 class 4, field st: 1.14d 133196 vs d2rs 128550 | unrouted |
+| bar-battle-command | packets | MATCH | 70/70 | - | - |
+| bar-battle-command | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | state | PARTIAL | 70/70 | - | - |
 | bar-battle-orders | packets | MATCH | 70/70 | - | - |
 | bar-leap-attack | state | PARTIAL | 70/70 | - | - |

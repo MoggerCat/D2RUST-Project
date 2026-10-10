@@ -31,10 +31,10 @@ States: EQUAL = a passing 1.14d check; DIVERGED = a check shows a difference; NO
 | render-world | 10 | 10 | 0 | 0 | 0 | 0 | 0 | 4 | 6 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | save-channel | 10 | 7 | 0 | 0 | 0 | 0 | 3 | 0 | 7 | 0 | 14–56 | 0 | 10 / 0 / 0 |
 | shrine | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0–0 | 0 | 1 / 0 / 0 |
-| skills | 655 | 46 | 0 | 10 | 0 | 0 | 599 | 7 | 49 | 0 | 101.5–406 | 6 | 557 / 87 / 11 |
+| skills | 655 | 45 | 0 | 10 | 0 | 0 | 600 | 7 | 48 | 0 | 99.5–398 | 6 | 557 / 87 / 11 |
 | systems | 918 | 347 | 16 | 134 | 0 | 99 | 322 | 147 | 349 | 1 | 779.5–3086+ | 62 | 605 / 0 / 313 |
 | world | 826 | 40 | 0 | 40 | 0 | 0 | 746 | 11 | 64 | 5 | 173.5–534+ | 171 | 772 / 16 / 38 |
-| **all** | 4480 | 653 | 16 | 258 | 0 | 99 | 3454 | 281 | 635 | 11 | 1498.5–5642+ | 309 | 3700 / 310 / 470 |
+| **all** | 4480 | 652 | 16 | 258 | 0 | 99 | 3455 | 281 | 634 | 11 | 1496.5–5634+ | 309 | 3700 / 310 / 470 |
 
 ## By family
 
@@ -671,7 +671,7 @@ NO-CHECK rows whose checks ran PARTIAL are compared in part (every compared fram
 | `sim` | 3 | 1 | 0 | 2 | 0 | 0 | 0 | 1 | 2 | 1 | 0 | 0 | 0 |
 | `skill.ama` | 30 | 2 | 0 | 0 | 0 | 0 | 28 | 0 | 0 | 2 | 0 | 0 | 0 |
 | `skill.ass` | 30 | 8 | 0 | 0 | 0 | 0 | 22 | 0 | 0 | 8 | 0 | 0 | 15 |
-| `skill.bar` | 30 | 5 | 0 | 0 | 0 | 0 | 25 | 0 | 3 | 2 | 0 | 0 | 24 |
+| `skill.bar` | 30 | 4 | 0 | 0 | 0 | 0 | 26 | 0 | 3 | 1 | 0 | 0 | 24 |
 | `skill.dru` | 31 | 14 | 0 | 0 | 0 | 0 | 17 | 0 | 1 | 13 | 0 | 0 | 21 |
 | `skill.generic` | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `skill.item` | 3 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 1 | 2 | 0 | 1 | 0 |
@@ -7402,7 +7402,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `hireling.desert-mercenary.act2`: rc-run-2.tsv:90 kept, world.tsv:385 dropped
   - `hireling.eastern-sorceror.act3`: rc-pkt-handwritten.tsv:25 kept, world.tsv:386 dropped
   - `hireling.barbarian.act5`: rc-run-2.tsv:91 kept, world.tsv:387 dropped
-- Rows whose state disagrees with their checks: 2199
+- Rows whose state disagrees with their checks: 2200
   - `check.a2-warp-arcane`: EQUAL but checks say PARTIAL
   - `check.a5-warp-wsk`: EQUAL but checks say PARTIAL
   - `monster.umod-life`: EQUAL but checks say PARTIAL
@@ -7463,7 +7463,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
   - `monster.ai.druidbear`: EQUAL but checks say PARTIAL
   - `monster.ai.druidwolf`: EQUAL but checks say PARTIAL
   - `monster.ai.duriel`: EQUAL but checks say PARTIAL
-  - … and 2139 more (rerun with the tsv to list them)
+  - … and 2140 more (rerun with the tsv to list them)
 
 ## chk-difficulty
 
@@ -9677,7 +9677,6 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ass.shadow-warrior` | entity | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.ass.shock-field` | entity | DIVERGED | M | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies-2.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.ass.wake-of-fire-sentry` | entity | DIVERGED | M | DIVERGED@27 | yes | 0 | n | claude/q-fix-ass-traps | specs/skills/functions.tsv,specs/skills/bodies.md | rc-link-2 batch 3 (2026-10-10): every check of the row ran on integ-r23: no DIVERGED channel; input/send checks have a MATCH packets channel (REC-2055/2056); PARTIAL only for the d2rs client gap [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
-| `skill.bar.battle-command` | entity | DIVERGED | M | DIVERGED@28 | yes | 0 | n | claude/rc-c012-a8bytes | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c012-a8bytes REC-2055: state PARTIAL 70/70, packets MATCH 70/70 in bar-battle-command (0x00646D60 marks changed; stat 127 refresh all) [ledger.py: EQUAL -> DIVERGED from its checks] [ledger.py: size M assumed] |
 | `skill.bar.leap` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap packets: frame 34 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.leap-attack` | entity | DIVERGED | S | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md | rc-a8-setstate: bar-leap-attack packets: frame 46 stream s2c #0 id: 1.14d a5 vs d2rs a9 (id 0xa5) |
 | `skill.bar.shout` | entity | DIVERGED | S | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate: bar-shout packets: frame 29 stream s2c #0 missing in d2rs (id 0xa8) |
@@ -9954,6 +9953,7 @@ Every area of 1.14d must be a row; these names appear in no row yet (an empty li
 | `skill.ass.weapon-block` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in ass-passives,gen-skill-ass-263 |
 | `skill.bar.axe-mastery` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-passives,gen-skill-bar-128 |
 | `skill.bar.bash` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-bash,gen-skill-bar-126 |
+| `skill.bar.battle-command` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/rc-c012-a8bytes | specs/skills/functions.tsv,specs/skills/bodies.md | rc-c012-a8bytes REC-2055: state PARTIAL 70/70, packets MATCH 70/70 in bar-battle-command (0x00646D60 marks changed; stat 127 refresh all) |
 | `skill.bar.battle-cry` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-battle-cry,gen-skill-bar-146 |
 | `skill.bar.battle-orders` | entity | EQUAL | - | PARTIAL | yes | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/functions.tsv,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-battle-orders,gen-skill-bar-149 |
 | `skill.bar.berserk` | entity | EQUAL | - | PARTIAL | no | 0 | n | claude/q-diff-skills-1,claude/q-diff-skills-2 | specs/skills/bodies-2.md,specs/skills/bodies.md | rc-a8-setstate REC-2055: all channels MATCH (packets included) in bar-berserk,gen-skill-bar-152 |
