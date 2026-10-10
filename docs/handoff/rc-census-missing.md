@@ -1,0 +1,43 @@
+# rc-census-missing: hand-back
+
+EQUAL before -> after: 2080 -> 2080 (no row flipped: the census re-run covered only the 60 `items-drops-*` checks, and a row is EQUAL only when every check carrying it is).
+
+## What was wrong
+Census first divergences over the 60 `items-drops-*` checks (packets channel, d2rs vs 1.14d):
+`1.14d 9c vs d2rs 69` (item 0x9C before the dead monster's 0x69) was the commonest; then `5a vs 0d` (27) and `8e vs 0d` (29).
+
+## Changed (REC-2810..2811)
+- Ground-item 0x9C now goes out at the item's place in the client pass's update-queue walk (newest queued first, `unit-order.md` §6), not in a pass after it. `ActionHooks::item_marks` makes the pass send a host-only mark (`GROUND_ITEM_MARK`); `d2-server` `announce_marked` replaces it with the announcement. Play host only.
+- 0x69 (a, b) of a mode message is the path END (`0x00648A40/60`: last computed point, (0,0) for none), not the target +0x10/+0x12 (REC-594, was in the spec, not in code). Two fixtures that encoded the old value were updated.
+- Arena kill event `0x0053F720` and the per-client sync `0x0053FC20` / clear `0x0053FAE0` (`wiring/action/arena.rs`): 0x65 PlayerKillCount after a kill. Row from `arena.bin` (`ActionTables::arena`). PROVISIONAL: the other-players loop `0x0053FB90`.
+- Player death sends the 0x5A death notice (code 6) and the arena event whenever a killer is present (`vitals.md` §4.8 rule 1.8 corrected: not gated by the ear test). PROVISIONAL: a minion killer is not resolved to its owner.
+- Specs: `intents-events.md` §7.6 (order confirmed by recording), arena kinds; `combat/vitals.md` rule 8.
+
+## Result on items-drops-cha-00
+First divergence frame 37 -> 73 (then 73: killer GUID, 1.14d 10 vs d2rs 26, an AI/combat difference; frame 96: corpse sequence). Over the 60 checks the `9c vs 69` and `5a vs 0d` groups are gone.
+
+## Open
+- `8e CorpseAssign vs 0d` is now the first divergence in ~47 of 60 drops checks (size L): at the player's DD start 1.14d sends 0x8E, 0x0D(9), 0x59, 0x75, 5x 0x20, 0x74, 0xAA (corpse as an added unit), 0x76, 0xA8; d2rs special-cases 0x59 + 0x0D in `dying.rs` and sends the rest never. Fix: let the corpse unit take the normal new-unit add path (`add_messages`, §7.2) in queue order.
+- Who kills the player differs (guid 10 vs 26 in cha-00): monster AI/target choice (owner: AI).
+- Ledger part `ledger/rc-census-missing.tsv`: only net.s2c.0x65 (NO-CHECK -> DIVERGED). 0x15/0x1b/0xac read DIVERGED in this subset only through cascades; left as in the base.
+- Census output is not committed; `traces/orig-cache` was refilled locally and left uncommitted.
+
+## Round 2: 0x8E CorpseAssign vs 0x0D (REC-2812)
+- DD start broadcasts 0x8E first; the corpse then goes through the normal new-unit add (0x59 with the owner's name, 0x75 after every 0x59, 0x74 flag 1 owner+corpse, 0xAA with states 7 and 105, the mode function 0x0D, 0x76) instead of the `dying.rs` 0x59 + 0x0D special case. The player's DT/DD 0x0D carries unit byte +0xB0. Corpse fill sends no 0x47/0x48 when nothing moved (PROVISIONAL, with items moved the d2rs refresh stays).
+- Result: items-drops-cha-00 matches 1.14d through frame 96 (only the 0x5A killer GUID differs, frame 73). Over the 60 drops checks the `8e vs 0d` group (~47) is gone.
+- Next first divergences (60 drops checks): `0c vs 67` MonsterHit before MonsterMove (10), `a9 vs 65` EndState before the kill count (6), `69 vs 4d` (4), then scattered "missing in d2rs" (killer attribution, AI).
+- No ledger row flipped (subset only).
+
+## Round 3 (REC-2813)
+- 0x5A death notice u32@3 is the killer's class (unit +0x04), not the GUID (that was the "killer GUID differs" group, ~35 checks).
+- monprop (`init.md` §11) is applied on monsters: `economy::monster_property` runs the property dispatcher on the unit's stat list (state 0, flags 0x40) with the unit seed; Hell Mephisto / council members now send their stats in the 0xAC.
+- The play host sets `UnitData.difficulty` and `aidel_by_difficulty` (game type 3, `ai.md` §1.3): the neutral AI delay used the base column in every difficulty (the "0x67 MonsterMove missing" group, 2-frame late first think in Hell).
+- Result over the 60 `items-drops-*` packets checks: 16 MATCH (0 at the start of the session), 44 DIVERGED.
+- Open (first divergence, 44 checks): `a9 EndState vs a8 SetState / 65` (6), `6d MonsterStop vs 0d` (6), `75 PartyInfo vs 67/69/6c` (4), AddUnit state 118 on Blood Raven in Hell/Nightmare/Normal (`knock` monprop, 4), `69 vs 4d` (3), and scattered "missing in d2rs" 0x67/0x6D (monster AI timing, ~15).
+
+## Round 4–5 (REC-2813, REC-2814)
+- Player dead clean-up `0x0057F330` (stat 6 := 0, death sweep, states but `plrstaydeath` cleared; 0xA9 on a poisoned player); the player's DT/DD 0x0D goes out in the queue walk (a hosts without the path provider keeps the old announce); the player is queued after its corpse.
+- Level-up (`vitals.md` §3 step 7): 0x75 to every client, level-up sound, +0xC8 bit 0; the rest of the client update (stat flush, 0x65) waits behind the item pass (`send_after_items`, the existing `defer_player_tail`).
+- Blood Raven's corpse_noselect state at creation (`init.md` §14.3) wired to the host (the seam was a no-op).
+- items-drops-* packets: 26 of 60 MATCH (0 at the start of the session).
+- Open (first divergences): ±1 frame in missile-hit timing on moving bosses (`nor-10`: hits at poke+14 vs +15), monster AI timing "0x67/0x6D missing" (~10), `4d/69` skill vs mode message order (3), `a8` player SetState vs 0x0D (2), 0x9C item shapes (`nor-12`, `rbo-04`: 34 vs 35 bytes), `nor-09/nor-13` 0x28/0x5D vs 0x9C.

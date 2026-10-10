@@ -111,6 +111,15 @@ impl<X: Pending, R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static>
         self.on_world(game, v, LoanCall::ChangedLevel { player, from, to });
     }
 
+    fn town_leave(&mut self, game: &mut Game, v: &mut View<'_, X>, player: UnitId, to: u32) {
+        self.on_world(game, v, LoanCall::TownLeave { player, to });
+        // `0x00537340` queues the quest messages at once (`0x0053D710`), so
+        // they precede the act change's (`flows/act-change.md` §1).
+        for (unit, bytes) in self.rest.drain_sent() {
+            v.h.x.send(unit, &bytes);
+        }
+    }
+
     fn npc_wants_interact(
         &mut self,
         game: &mut Game,
@@ -225,7 +234,7 @@ impl<R: QuestRest + NpcRest + 'static, I: LoanedInventory + 'static> QuestLoan<R
         v.h.items = items;
         v.h.game_seed = fields.seed;
         v.h.uniques = fields.uniques;
-        for (player, msg) in self.rest.drain_queued() {
+        for (player, msg) in self.rest.drain_sent() {
             v.h.x.send(player, &msg);
         }
         out
@@ -244,6 +253,8 @@ enum LoanCall<'c> {
     },
     /// Quest event 3 CHANGEDLEVEL (`world/quests.md` §4.1).
     ChangedLevel { player: UnitId, from: u32, to: u32 },
+    /// The quest part of the town-leave refresh `0x00537340`.
+    TownLeave { player: UnitId, to: u32 },
     /// The quest active test (`world/quests.md` §6.4).
     NpcWantsInteract {
         player: UnitId,
@@ -299,6 +310,10 @@ fn on_host<'e, X: Pending, R: QuestRest>(
                 461 => act5::q3::map_ai_store(quests, &mut w, h, true),
                 _ => {}
             }
+            LoanOut::Run(QuestObjectRun::Ran)
+        }
+        LoanCall::TownLeave { player, to } => {
+            quests.town_leave(&mut w, player, to);
             LoanOut::Run(QuestObjectRun::Ran)
         }
         LoanCall::ChangedLevel { player, from, to } => {

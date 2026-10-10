@@ -125,6 +125,12 @@ pub trait LifecycleHooks: UnitHooks {
     /// store; the default does nothing.
     fn set_ai_owner(&mut self, unit: UnitId, owner_type: u8, owner_guid: u32) {}
 
+    /// `0x005718C0(unit, stat, value)`: a stat record on the unit's message
+    /// list (+0xEC), flushed to each updating client by `0x00571CD0`
+    /// (`world/hirelings.md` §13 rule 4). Provider: the host with the unit
+    /// event records; the default does nothing.
+    fn queue_unit_stat(&mut self, unit: UnitId, stat: u16, value: u32) {}
+
     /// `0x005A4850(game, unit, umod, 0)`: the umod appended to the
     /// monster's list and its init run (`monsters/init.md` create
     /// `assign_umod`), as `hirelings.md` §3.2 rule 10 gives a mercenary

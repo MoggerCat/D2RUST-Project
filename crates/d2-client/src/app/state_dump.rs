@@ -483,6 +483,10 @@ pub fn dump<W: Write>(
     let mut to_send = game.sends;
     let mut send_notes = Vec::new();
     let (mut joined, mut notes_left) = (false, None::<u32>);
+    // A 1.14d fatal exit of the client model (`scenario-diff.md` §3 rule
+    // 17): the run ends after this tick's snapshot, as the recording of
+    // the original does.
+    let mut fatal = None::<String>;
     while ran < ticks {
         run_due_pokes(&mut bridge, &mut pending, last_frame, out)?;
         if let Some(h) = input.as_mut() {
@@ -497,12 +501,18 @@ pub fn dump<W: Write>(
         }
         bridge.set_now(ms.load(Ordering::SeqCst));
         let t0 = super::perf::enabled().then(std::time::Instant::now);
+        let rejected_before = bridge.log().rejected.len();
         let report = bridge.frame()?;
         if let Some(t0) = t0 {
             super::perf::record_bridge_frame(t0, report.ticked);
         }
         let outputs = bridge.take_outputs();
         ui.deliver(&mut bridge, &outputs)?;
+        if fatal.is_none() {
+            fatal = bridge.log().rejected[rejected_before..]
+                .iter()
+                .find_map(|r| r.error.fatal_exit());
+        }
         for m in bridge.take_dropped() {
             let hex: Vec<String> = m.iter().map(|b| format!("{b:02x}")).collect();
             let line = format!(
@@ -564,12 +574,20 @@ pub fn dump<W: Write>(
             writeln!(out, "{}", s.to_json_line())?;
             snaps += 1;
         }
+        if fatal.is_some() {
+            break;
+        }
     }
     let mut notes = vec![format!(
         "{ran} server ticks, clock {STEP_MS} ms per step from {START_MS} ms, every {every}"
     )];
     if let Some(n) = notes_left {
         notes.push(format!("left the game after {n} ticks (Save and Exit)"));
+    }
+    if let Some(what) = fatal {
+        notes.push(format!(
+            "1.14d fatal exit after {ran} ticks: {what} (exit code 0xffffffff)"
+        ));
     }
     notes.extend(input_notes);
     notes.extend(send_notes);
@@ -809,6 +827,7 @@ struct ClientData {
     skill_tables: d2_sim::skills::SkillTables,
     units: crate::bridge::world::UnitRows,
     player_anims: super::anim_names::ClientPlayerAnims,
+    item_tables: Arc<d2_sim::items::ItemTables>,
 }
 
 impl ClientData {
@@ -828,6 +847,8 @@ impl ClientData {
                 u
             },
             player_anims: single_player::client_player_anims(data)?,
+            // The item type test of the use state (`bridge::use_state`).
+            item_tables: Arc::new(d.tables.item_tables().map_err(|e| anyhow::anyhow!("{e}"))?),
         })
     }
 
@@ -840,6 +861,7 @@ impl ClientData {
         b.set_skill_tables(Arc::new(self.skill_tables));
         b.set_unit_rows(self.units);
         b.set_player_anims(Arc::new(self.player_anims));
+        b.set_item_tables(Arc::new(super::items::TableDecoder(self.item_tables)));
         b.set_high_light_quality(true);
     }
 }
@@ -1018,8 +1040,15 @@ mod tests {
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--every", "0"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--date", "9.10.26"])).is_err());
         assert!(parse_args(&args(&["--ticks", "1", "--out", "o", "--frames", "3"])).is_err());
-        // the shared input form only (scenario-diff.md §3 r8)
-        for bad in ["click 1 2", "frame 2; wait 3", "frame 2; key i", "frame 0"] {
+        // the shared input form only (scenario-diff.md §3 r8); `key K` is part
+        // of it (§3 r4): a bad or missing K is refused
+        for bad in [
+            "click 1 2",
+            "frame 2; wait 3",
+            "frame 2; key zz",
+            "frame 2; key",
+            "frame 0",
+        ] {
             assert!(
                 parse_args(&args(&["--ticks", "1", "--out", "o", "--input", bad])).is_err(),
                 "{bad}"

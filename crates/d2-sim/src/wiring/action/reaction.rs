@@ -29,6 +29,7 @@ use crate::path::coords::Point;
 use crate::path::walk::request::WalkTarget;
 use crate::units::hooks::Sim;
 
+use super::arena::ArenaRow;
 use super::combat::CombatView;
 use super::monsters::umod_mode;
 use super::units::STATE_DEATH_DELAY;
@@ -457,6 +458,16 @@ pub fn kill_by<X: Pending>(cv: &mut CombatView<'_, X>, d: UnitId, a: Option<Unit
                 distribute(cv, &t, a, d);
             }
         }
+        // The arena kill event `0x0053F720`.
+        if let (Some(row), Some(ka), Some(kd)) = (
+            cv.v.h.tables.arena.first().map(ArenaRow::from),
+            cv.v.units.get(a).map(|r| r.ty),
+            cv.v.units.get(d).map(|r| r.ty),
+        ) {
+            if let Some(st) = cv.v.h.arena.as_mut() {
+                st.kill_event(&row, &mut *cv.game, (a, ka), (d, kd));
+            }
+        }
         let game = &mut *cv.game;
         cv.v.h
             .x
@@ -562,8 +573,31 @@ impl<X: Pending> VitalsUnits for CombatView<'_, X> {
         VitalsUnits::refresh(&mut self.v, u);
         let _ = self.game.lists.queue_update(u);
     }
+    /// `vitals.md` §3 step 7: the party roster `0x00536850` (not sent),
+    /// the level-up sound `0x00553380(unit, 2)`, the broadcast
+    /// `0x005538D0(game, unit, 0x00570850)` (S→C 0x75 to every client),
+    /// and the inventory refresh `0x0055F500` / `0x0055FDE0` (the player's
+    /// +0xC8 bit 0, so its update sends 0x47 / 0x48).
+    // PROVISIONAL (REC-2814): the refresh read as the update bit; settled
+    // by the 0x75 / 0x47 / 0x48 / 0x2C of `items-drops-rbo-00` frame 50.
     fn level_up_notify(&mut self, u: UnitId) {
         self.v.level_up_notify(u);
+        let _ = crate::units::sound::queue_sound(&mut *self.game, u, 2, None);
+        let Some((guid, level)) = self
+            .v
+            .units
+            .get(u)
+            .map(|r| (r.guid, self.v.stats.unit_total(u, 12, 0) as u16))
+        else {
+            return;
+        };
+        for to in super::dying::client_players(self.game) {
+            let m = crate::units::messages::player_party_info(guid, level, to == u);
+            self.v.h.x.send(to, &m);
+        }
+        if let Some(r) = self.v.units.get_mut(u) {
+            r.flags2 |= 1;
+        }
     }
     /// Without the registry: [`Pending::level_up_event`].
     fn level_up_event(&mut self, u: UnitId) {

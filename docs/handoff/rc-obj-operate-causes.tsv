@@ -1,0 +1,4 @@
+cause	checks	examples	likely_crate_spec	size
+RESOLVED (REC-3450): the player's item messages and 0x2C sound sat after the tick; now at the player's place in the room update walk (PLAYER_ITEMS_MARK / PLAYER_SOUND_MARK). gen-obj-149 packets MATCH; all object.operate checks with item drops MATCH	0	gen-obj-149	d2-sim wiring/path/walk.rs + d2-server handlers/items/moves.rs player_marked; specs/sim/intents-events.md 7.3	-
+1.14d Game.exe exits (code 0xffffffff) at the operate (about frame 20-23) for these objects, so the check compares only 9-51 frames (compared frames equal): no full verdict possible	15	gen-obj-256,257,258,273,283,285,286,287,296,297,321,385,400,403,450	recorder poke operate on 1.14d for these object classes; rows object.operate.3.urn, object.operate.14.corpse	S
+no gen-obj check has OperateFn 60	0	-	tools/check-gen/check_gen.py (objects.txt rows)	S

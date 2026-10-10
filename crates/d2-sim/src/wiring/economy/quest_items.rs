@@ -19,12 +19,12 @@ use crate::world::quests::{PlayerQuests, QuestChain, QuestWorld, UnitKind};
 /// The quest calls no written spec provides yet, each with its expected
 /// provider (`docs/handoff/impl-world.md` "Seams").
 pub trait QuestRest {
-    /// The messages the quest calls sent through this rest since the last
-    /// drain, in send order. A host whose rest keeps its own outbox
-    /// hands them back here so a quest call made mid-tick forwards them
-    /// to the action wiring's stream at the point of the call (1.14d
-    /// queues each send to the client buffer at once). Default: none.
-    fn drain_queued(&mut self) -> Vec<(UnitId, Vec<u8>)> {
+    /// The messages the rest has queued for the clients but not yet handed
+    /// to the transport, taken now: the level warp's town-leave refresh
+    /// (`0x00537340`) queues its quest messages at once, before the act
+    /// change's own (`world/waypoints.md` §11, `flows/act-change.md` §1).
+    /// Default: none (a rest that sends at once).
+    fn drain_sent(&mut self) -> Vec<(UnitId, Vec<u8>)> {
         Vec::new()
     }
     /// Game +0xC0 (DRLG).

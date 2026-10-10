@@ -184,6 +184,7 @@ fn client_world_holds_only_stated_fields() {
         store_serial,
         // `client/stat-lists.md` §2 (REC-188): the decoder's tables handle.
         item_tables: _,
+        tip_anims: _,
         // d2rs-own, unverified: session messages for the loading flow
         // (`ui/frontend-loading.md` L9, L10).
         session_total,
@@ -299,6 +300,8 @@ fn client_world_holds_only_stated_fields() {
         last_mode_request,
         // d2rs bookkeeping of §8 rule 1 (no 1.14d field).
         mode_requests,
+        placements: _,
+        path_dir: _,
         // d2rs bookkeeping of the play preview's rule-8 follow (REC-277).
         follows,
         kind,

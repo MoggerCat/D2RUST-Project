@@ -30,14 +30,14 @@
 |   1. Creation values | 73–103 |
 |   2. Spending stat points (message 0x3A) | 104–164 |
 |   3. Level-up `0x00570880` (D2MOO `PLAYERSTATS_LevelUp`) | 165–186 |
-|   4. Experience | 187–493 |
-|   5. Client vitals sync (`0x00548760`) | 494–637 |
-| Constants & data dependencies | 638–654 |
-| Randomness | 655–658 |
-| Edge cases & original bugs | 659–670 |
-| Test vectors | 671–691 |
-| Provenance | 692–727 |
-| Open questions | 728–764 |
+|   4. Experience | 187–498 |
+|   5. Client vitals sync (`0x00548760`) | 499–642 |
+| Constants & data dependencies | 643–659 |
+| Randomness | 660–663 |
+| Edge cases & original bugs | 664–675 |
+| Test vectors | 676–696 |
+| Provenance | 697–732 |
+| Open questions | 733–769 |
 <!-- /index -->
 
 ## Summary
@@ -471,11 +471,16 @@ target unit K (resolved by `0x00580A70`).
    7. P lacks state 7 (`playerbody`) → P flags (+0xC4) &= ~0x2.
    8. K present: P ≠ K and (K a player, or K a monster whose owner
       `0x0058F0D0` is a player other than P) → ear drop `0x0055A200(game,
-      P)` (item code `ear `, P's level, at a free spot near P); then the
-      0x5A death notice `0x0054D8A0(game, K, P)` (type 6, killer
-      resolved to its player owner, sent to every client `0x0054AA40`;
-      `sim/intents-events.md`) and the arena kill event
-      `0x0053F720(game, K, P)`.
+      P)` (item code `ear `, P's level, at a free spot near P). **Not
+      gated by the ear test** (read 2026-10-10 from `0x00580EC0`, REC-2811;
+      the recording `items-drops-cha-00` frame 73 has a plain monster
+      killer): whenever K is present, the 0x5A death notice
+      `0x0054D8A0(game, K, P)` (killer resolved to its player owner when
+      it is a monster with one; sent to every client `0x0054AA40`) and the
+      arena kill event `0x0053F720(game, K, P)`. Notice layout: code 6,
+      u8@2 4, killer class u32@3 (unit +0x04, not the GUID; −1 none), killer unit type u8@7 (6
+      none), victim name @8, @0x18 the killer player's name, or for a
+      monster with type flag 2 its u16 `wBossHcIdx` (+0x26).
    9. End P's interaction `0x005350F0(game, P)`: unit +0x6C set and
       the partner (+0x68 type, +0x64 GUID) found: player → trade end
       `0x00568640`; monster → `0x00579130`; object → `0x005854D0`; item

@@ -42,7 +42,28 @@ MENUS += [(t, "key", "Escape"), (t + 2, "shot", "charselect-back"),
 DOLLS_O = [(0.0, "click", (400, 300)), (3.5, "click", (400, 305))] + \
           [(7 + 0.37 * k, "shot", f"d{k:02d}") for k in range(12)]
 DOLLS_U = DOLLS_O[:2] + [(7 + 0.05 * k, "shot", f"d{k:02d}") for k in range(70)]
-SCRIPTS = {"menus": MENUS, "dolls": DOLLS_O, "dolls-dense": DOLLS_U}
+# Whole-screen check (REC-3760): the `menus` walk, each shot a series (1.14d: 6 shots
+# 0.37 s apart; d2rs: 40 back-to-back shots) so every animation phase of the fire,
+# snow and credits scroll is sampled; screens_check.py matches them.
+def _series(script, n, dt):
+    out = []
+    for t, kind, a in script:
+        if kind == "shot":
+            out += [(t + dt * k, "shot", f"{a}_{k:02d}") for k in range(n)]
+        else:
+            out.append((t, kind, a))
+    return out
+
+
+SCREENS_O = _series(MENUS, 6, 0.37)
+SCREENS_U = _series(MENUS, 40, 0.05)
+# d2rs window content starts one row below the X window origin (measured: the
+# credits shot is identical to 1.14d shifted by one row, REC-3760).
+OFF_O = (112, 98)
+OFF_U = (0, 1)
+SCRIPTS = {"probe": [(0.0, "shot", "p0"), (1.0, "shot", "p1"), (2.0, "shot", "p2"), (3.0, "shot", "p3")],
+           "menus": MENUS, "dolls": DOLLS_O, "dolls-dense": DOLLS_U,
+           "screens": SCREENS_O, "screens-dense": SCREENS_U}
 
 
 def xdo(display, off, ev):
@@ -100,7 +121,7 @@ def run_ours(out, script):
     g = subprocess.Popen([CLIENT, "play", "--game-dir", GAME,
                           "--save-dir", SAVES], env=env,
                          stdout=open(outdir / "log.txt", "w"), stderr=subprocess.STDOUT)
-    time.sleep(12)  # window + art load; trademark is up
+    time.sleep(float(os.environ.get("FE_WAIT_OURS", "6")))  # window + art load; the trademark screen (9 s timer) is still up
     drive(DISP_U, (0, 0), script, outdir, time.time())
     g.kill(); xv.kill()
 
@@ -117,7 +138,7 @@ def compare(out):
         o = out / "ours" / f.name
         if not o.exists():
             res[f.stem] = {"error": "no d2rs shot"}; continue
-        a, b = crop(f, (112, 98)), crop(o, (0, 0))
+        a, b = crop(f, OFF_O), crop(o, OFF_U)
         d = ImageChops.difference(a, b).convert("L").point(lambda v: 255 if v else 0)
         n = sum(1 for v in d.getdata() if v)
         res[f.stem] = {"diff_px": n, "bbox": d.getbbox()}
@@ -138,8 +159,9 @@ if __name__ == "__main__":
     side = a[a.index("--side") + 1] if "--side" in a else "both"
     script = SCRIPTS[a[a.index("--script") + 1] if "--script" in a else "menus"]
     if side in ("orig", "both"): run_orig(out, script)
+    name = a[a.index("--script") + 1] if "--script" in a else "menus"
     if side in ("ours", "both"):
-        run_ours(out, SCRIPTS["dolls-dense"] if "--script" in a and a[a.index("--script") + 1] == "dolls" else script)
-    if "--script" in a and a[a.index("--script") + 1] == "dolls":
+        run_ours(out, SCRIPTS[name + "-dense"] if name in ("dolls", "screens") else script)
+    if name in ("dolls", "screens"):
         sys.exit()
     compare(out)

@@ -1166,6 +1166,7 @@ impl Fx {
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -2015,9 +2016,9 @@ fn run_with(game_seed: u32) -> Transcript {
     };
     // The kill's mode set (DT, unit flag 0x1) goes out in the client
     // pass of the hit's tick (`intents-events.md` §7.3 rule 2 step 2,
-    // §7.4 rule 7): S→C 0x69 code 8 at the path target (the spawn
-    // point the creation's mode request wrote, `monsters/init.md` §4.1
-    // step 1.1; PROVISIONAL, REC-594), d = the path direction, e =
+    // §7.4 rule 7): S→C 0x69 code 8 at the path END (`0x00648A40/60`:
+    // the last computed point, (0, 0) for none; REC-594, recorded
+    // `items-drops-cha-00` frame 37; rc-census-missing), d = the path direction, e =
     // unit +0xB0, the killing hit's class (`damage.md` §7.1 step 2: the
     // missile record has no class, so §6.1 gives 13 `over`). No other S→C so far
     // but the join's 0x07s (frame 2): the unit-add / ground messages of
@@ -2029,13 +2030,11 @@ fn run_with(game_seed: u32) -> Transcript {
     let mut code8 = vec![0x69];
     code8.extend(mguid.to_le_bytes());
     code8.push(8);
-    code8.extend(md.target_x.to_le_bytes());
-    code8.extend(md.target_y.to_le_bytes());
+    // No computed point: the path end is (0, 0).
+    assert_eq!(md.point_count, 0);
+    code8.extend([0, 0, 0, 0]);
     code8.extend([md.direction, 13]);
-    let (sx, sy) = (mpos.0 as u16, mpos.1 as u16);
-    let [sx0, sx1] = sx.to_le_bytes();
-    let [sy0, sy1] = sy.to_le_bytes();
-    assert_eq!(&code8[5..], [8, sx0, sx1, sy0, sy1, md.direction, 13]);
+    assert_eq!(&code8[5..], [8, 0, 0, 0, 0, md.direction, 13]);
     let (hit, before) = frames[1..].split_last().unwrap();
     // The player's own skill message (S→C 0x4D while in its attack
     // mode) is the d2rs-own echo of `pathing.md` §10 r2 (PROVISIONAL,
@@ -2044,7 +2043,27 @@ fn run_with(game_seed: u32) -> Transcript {
         let rest: Vec<_> = f.2.iter().filter(|m| m[0] != 0x4D).cloned().collect();
         assert_eq!(rest, none, "no S→C up to the hit but the 0x4D echo");
     }
-    assert_eq!(hit.2, vec![code8], "0x69 code 8 in the hit's frame");
+    // The kill's 100 experience is a level-up (`vitals.md` §3 step 7;
+    // REC-2814, rc-census-missing): S→C 0x75 to the client first, then the
+    // 0x69 code 8, and after the update the relators 0x47 / 0x48 and the
+    // level-up sound 0x2C (sound 2).
+    let pgd = fx.guid(player).to_le_bytes();
+    let mut levelup = vec![0x75];
+    levelup.extend(pgd);
+    levelup.extend([0xFF, 0xFF, 2, 0, 0, 0, 1, 0]);
+    let mut relay47 = vec![0x47, 0, 0];
+    relay47.extend(pgd);
+    relay47.extend([0; 4]);
+    let mut relay48 = relay47.clone();
+    relay48[0] = 0x48;
+    let mut sound = vec![0x2C, 0];
+    sound.extend(pgd);
+    sound.extend([2, 0]);
+    assert_eq!(
+        hit.2,
+        vec![levelup, code8, relay47, relay48, sound],
+        "0x75 level-up, 0x69 code 8, relators, level-up sound in the hit's frame"
+    );
     // The death end: event 1 of the 4-frame DT animation (f_hit + 4)
     // sets mode 12 (`0x005A72B0`, §7.7 rule 3), whose 0x69 code 9 at the
     // monster's cell with e = 0 goes out in that tick (during the run of
@@ -2591,7 +2610,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // + the picked gold pile's removal 0x0A (REC-281).
     // + the 0x2F's heal at Akara (`npc.md` §5): its sound 0x2C.
     // + the two pick-up sounds 0x2C (gold, cap; REC-1402..1404).
-    assert_eq!(log.handled, 29 + store.len() as u64);
+    // + the level-up of the kill: 0x75, 0x47, 0x48 and the sound 0x2C
+    // (REC-2814).
+    assert_eq!(log.handled, 33 + store.len() as u64);
     assert_eq!(
         log.dropped,
         // The player's own 0x4D echo (REC-95) is gone: the caster's own

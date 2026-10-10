@@ -23,14 +23,14 @@
 | Rules | 64–65 |
 |   1. Files | 66–71 |
 |   2. Syntax | 72–144 |
-|   3. Run | 145–549 |
-|   4. Suite | 550–677 |
-| Constants & data dependencies | 678–681 |
-| Randomness | 682–685 |
-| Edge cases & original bugs | 686–721 |
-| Test vectors | 722–744 |
-| Provenance | 745–748 |
-| Open questions | 749–811 |
+|   3. Run | 145–614 |
+|   4. Suite | 615–742 |
+| Constants & data dependencies | 743–746 |
+| Randomness | 747–750 |
+| Edge cases & original bugs | 751–786 |
+| Test vectors | 787–809 |
+| Provenance | 810–813 |
+| Open questions | 814–876 |
 <!-- /index -->
 
 ## Summary
@@ -184,7 +184,8 @@ state first. It is the default way to compare a behaviour with 1.14d.
       draws-orig` [`draws-orig/scenes/s/`, `draws-orig/sprites.tsv`].
    3. d2rs: `cargo build --release -p d2-client` once, then the binary
       `play --save --seed --difficulty [--poke …] --dump-draws draws-d2rs
-      --at-tick <the compared tick> [--input <input d2rs>]` (a stale
+      --at-tick <the compared tick> [--input <input d2rs>] --frame-schedule
+      frame-schedule.tsv` (step 5; a stale
       `draws-d2rs` is removed first; `--reuse` keeps one only if its
       `frame.tsv` tick is the compared tick; time limit 900 s).
       Windows: as is. Linux: an X display (the current `DISPLAY` if it answers and
@@ -200,6 +201,36 @@ state first. It is the default way to compare a behaviour with 1.14d.
    4. `d2-client facts-compare draws-orig/scenes/s draws-d2rs --ignore
       tick`: its verdict and first difference are the channel's report
       (exit 0 match, 1 diverged, 2 partial).
+   5. **The recorded frame schedule and host clock** (decided
+      2026-10-10, coordinator; settles REC-510). The host clock
+      (`GetTickCount()`) and which client updates draw a frame are inputs
+      of the recording, not game behaviour: the idle cursor steps the
+      client seed once per drawn frame for 5,000 ms of host time
+      (`ui/panels-3.md` §23 r8, `client/model.md` Randomness r4), and the
+      weather update runs only in drawn frames (`render/draw-order-2.md`
+      §11.2), so both feed the seed every later rain particle, sound
+      variant and cursor frame draws on. The debugger slows 1.14d (one
+      frame per update, 125 ms apart, instead of 40 ms), so a d2rs clock of
+      its own can never meet a recording. d2rs therefore replays them:
+      `[frame-schedule.tsv]` (format `frame-schedule 1`, written from the
+      capture by `scenario_diff.py`: `# cursor_last`, `# cursor_idle` = the
+      first frame's `cursor.last_step`, `cursor.idle_since`; one row `tick
+      now` per captured frame, `tick` = `f`, `now` = the next frame's
+      `cursor.last_step` (the capture reads the cursor at frame start,
+      `render/capture.md` §3.3), `-` for the last frame). With it, `play`
+      draws exactly the listed ticks, one frame each, and no frame, no
+      weather update and no cursor step on any other tick; the cursor
+      reads `now` of the drawn tick as its clock and starts from the
+      recorded timers. A capture without a server tick or the cursor
+      clock on any frame, or a schedule in which a frame other than the
+      last lacks `now`, fails the check; d2rs never falls back to a clock
+      of its own in a check run. Live play keeps the host clock.
+      Measured (`draws-town-arrival-ama`, 2026-10-10): with the schedule
+      the client seed matches the capture's `seed_start` of every frame
+      through tick 25 and the rain lines (endpoints and colors) are equal
+      on every tick 4–24; tick 25 on differs by one extra footstep
+      variant roll in d2rs (sound 2768 at T 22, 1.14d T 27: the audio
+      owner's cause).
 9. **packets** (`tools/packets-trace.md`; work dir files in brackets):
    1.14d `record_packets.py` with the rule 2 start
    [`orig.packets.jsonl`]; d2rs `d2-client state-dump --save --seed
@@ -248,7 +279,16 @@ state first. It is the default way to compare a behaviour with 1.14d.
       `ClickView::pick` the window sets: the unit — monster, NPC,
       object or ground item, never a player — whose feet are nearest
       the click inside a box standing on them; d2rs-own, unverified,
-      the original hit-tests the drawn sprites `0x00467A10`), so a click
+      the original hit-tests the drawn sprites `0x00467A10`; measured
+      2026-10-10 (rc-render-effect): the effect scenes' first left click after
+      the waypoint, spell on the left button, walks in 1.14d (a left click
+      on the ground without Stand Still is a walk, controls.md §6 r7) because
+      nothing is hovered at the previous cursor (207,176), where d2rs's feet
+      box (±24 wide, 96 above) picks a Fallen above its head; the hover
+      candidate loop `0x00467AC0` tests each unit of the player's rooms with
+      `0x00466870`, whose monster / object test `0x00470860` is the unit's
+      drawn frame rectangle widened by 16 px on each side, not its feet
+      box), so a click
       on a monster sends the skill on the unit (`ui/controls.md` §6 r8: C→S 0x06
       for a left click), on
       an NPC or object the walk to the unit, then on arrival the
@@ -546,6 +586,31 @@ state first. It is the default way to compare a behaviour with 1.14d.
     probe (d2rs figure shifted -2..2 rows) and the feet-band brightness
     (shadow probe). Measured 2026-10-10: slots 0/1 differ 0 px, slot 2 at
     most 0.56 %; dy 0 is the only match (0 / 1 px against 430+ for +-1).
+
+17. **1.14d fatal exit** (REC-3160): a check can drive 1.14d into a state
+    its own code treats as fatal: it shows its error dialog and calls
+    `0x00681E09(-1)`, the process ends with exit code `0xFFFFFFFF`, and
+    the recorders end the recording there with the footer note `game
+    exited, code 0xffffffff` (measured 2026-10-10, `gen-obj-374`:
+    snapshot 20 written, the client's refresh of the operated object in
+    mode 1 dies, `world/objects-client.md` §25 rule 5). The recording
+    is complete up to that point; a d2rs run that goes on is a
+    difference, not a longer run. The d2rs hosts therefore end the run at
+    the same place when the client model (or the server) raises a
+    1.14d fatal assert (`HandlerError::Fatal` / `Crash`): after the
+    snapshot of the tick in which the client update raised it (a fatal in
+    the server's tick or poke call ends the run before that tick's
+    snapshot), with the footer note `1.14d fatal exit after N ticks: <what>
+    (exit code 0xffffffff)`. All channels of one run end at that frame
+    (the rng and packets dumps share the loop), so the comparison covers
+    the same frames on both sides.
+
+18. **frontend screens** (REC-3760): a frontend check named `ui-frontend-screens*`
+    runs `frontend_sbs.py --script screens` and `screens_check.py` instead of the
+    paper dolls: every screen of the menu walk, per-pixel median over the shots of
+    each side, compared where stable on both sides at tolerance 0, the animated pixels
+    counted (specs/ui/frontend-menus.md §F2.11). d2rs starts its script 6 s after
+    launch (`FE_WAIT_OURS`) so the trademark screen is still up like 1.14d's.
 
 ### 4. Suite
 

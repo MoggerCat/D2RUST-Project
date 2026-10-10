@@ -391,6 +391,7 @@ impl Fx {
             skill_modes: vec![[0; 8]],
             overlay_count: 0,
             monequip: Vec::new(),
+            arena: Vec::new(),
         };
         let book = Book::default();
         let mut hooks = ActionHooks::new(
@@ -1208,9 +1209,30 @@ fn run_with(game_seed: u32) -> Transcript {
     );
     let amount = fx.stat(gold, 14);
     assert!((1..=6).contains(&amount), "roll(5 · 1) + 1: {amount}");
+    // The kill's experience is a level-up (`vitals.md` §3 step 7; REC-2814):
+    // one frame carries S→C 0x75, the relators 0x47 / 0x48 and the level-up
+    // sound 0x2C (sound 2); every other frame has no message.
+    let pgd = fx.guid(player).to_le_bytes();
+    let mut levelup = vec![vec![0x75]];
+    levelup[0].extend(pgd);
+    levelup[0].extend([0xFF, 0xFF, 2, 0, 0, 0, 1, 0]);
+    let mut relay47 = vec![0x47, 0, 0];
+    relay47.extend(pgd);
+    relay47.extend([0; 4]);
+    let mut relay48 = relay47.clone();
+    relay48[0] = 0x48;
+    let mut sound = vec![0x2C, 0];
+    sound.extend(pgd);
+    sound.extend([2, 0]);
+    levelup.extend([relay47, relay48, sound]);
+    let mut level_frames = 0;
     for f in &frames[2..] {
-        assert_eq!(f.2, none);
+        if f.2 != none {
+            assert_eq!(f.2, levelup);
+            level_frames += 1;
+        }
     }
+    assert_eq!(level_frames, 1, "one level-up frame");
     assert!(fx.errors().is_empty(), "{:?}", fx.errors());
 
     // Level-up (`vitals.md` §4.3 → §3): 100 experience reaches level 2
@@ -1805,7 +1827,9 @@ fn run_with(game_seed: u32) -> Transcript {
     // sound 0x2C (step 25, `cube.md` §8 "Exact" item 3).
     // + the four pick-up sounds 0x2C (gold, cap twice, ring; REC-1402..1404).
     // + the 0x9C action 11 of the store items (trade open, sold copy).
-    assert_eq!(log.handled, 58 + shown.len() as u64);
+    // + the level-up of the kill: 0x75, 0x47, 0x48 and the sound 0x2C
+    // (REC-2814).
+    assert_eq!(log.handled, 62 + shown.len() as u64);
     let rejected: Vec<(u8, String)> = log
         .rejected
         .iter()

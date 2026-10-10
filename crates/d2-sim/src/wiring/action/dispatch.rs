@@ -33,6 +33,30 @@ pub struct ActionSim<X> {
 }
 
 impl<X: Pending> ActionSim<X> {
+    /// Sends `m` to the player `p` after the host's item update pass when
+    /// the player has item messages pending (+0xC8 bit 0) and the host
+    /// defers ([`ActionHooks::defer_player_tail`]): in 1.14d the item
+    /// messages are part of the player's step 5 update, before the rest of
+    /// the client update (recorded `items-drops-rbo-00` frame 50).
+    fn send_after_items(&mut self, p: UnitId, m: &[u8]) {
+        let h = &mut self.sys.hooks;
+        let pending = self.sys.units.get(p).is_some_and(|r| r.flags2 & 1 != 0);
+        if h.defer_player_tail && pending {
+            h.player_tail.push((p, m.to_vec()));
+        } else {
+            h.x.send(p, m);
+        }
+    }
+
+    /// Sends the player step 5 / 7 messages held by
+    /// [`ActionHooks::defer_player_tail`]: the host calls it after its item
+    /// update pass.
+    pub fn flush_player_tail(&mut self) {
+        for (receiver, m) in std::mem::take(&mut self.sys.hooks.player_tail) {
+            self.sys.hooks.x.send(receiver, &m);
+        }
+    }
+
     pub fn new(stat_data: Arc<StatData>, data: UnitData, hooks: ActionHooks<X>) -> Self {
         Self {
             sys: UnitSystem::new(stat_data, data, hooks),
@@ -462,6 +486,18 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         // by its update ([`View::monster_update`], which also reads
         // "announced" for its step 8).
         let receiver = game.lists.client(client).and_then(|c| c.player);
+        // §6.3 part 1 (`inventory-moves.md`): an item in the walk is
+        // announced at its place in the queue order; the host does it
+        // from this mark.
+        if v.h.item_marks {
+            if let (Some(p), Some(r)) = (receiver, v.units.get(unit)) {
+                if r.ty == UnitType::Item {
+                    let mut m = [super::GROUND_ITEM_MARK; 5];
+                    m[1..].copy_from_slice(&r.guid.to_le_bytes());
+                    v.h.x.send(p, &m);
+                }
+            }
+        }
         let new = v
             .units
             .get(unit)
@@ -492,8 +528,17 @@ impl<X: Pending> TickHooks for ActionSim<X> {
                 crate::wiring::path::walk::soft_hit_message(&mut v, game, client, unit);
             }
             if let Some(p) = receiver {
+                // Step 4 (`0x00571CD0`, §7.9 rule 2): the pending event
+                // records, e.g. the 0xA5 landing message of a failed
+                // Whirlwind start (`bodies-2b.md` §8.10).
+                v.send_event_records(game, p, unit);
+                // A unit still new to the client keeps its join order; so
+                // does one without item messages pending (update bit 0).
+                v.h.capture_tail =
+                    new.is_none() && v.units.get(unit).is_some_and(|r| r.flags2 & 1 != 0);
                 v.state_change_messages(p, unit);
                 v.player_stat_sends(p, unit);
+                v.h.capture_tail = false;
             }
             return;
         }
@@ -547,15 +592,41 @@ impl<X: Pending> TickHooks for ActionSim<X> {
         };
         let (guid, refresh) = (r.guid, r.flags2 & INVENTORY_REFRESH_EX != 0);
         let msgs = vitals_sync::mod_stat_messages(&self.sys.stats.mod_values(p));
-        let x = &mut self.sys.hooks.x;
         for m in &msgs {
-            x.send(p, m);
+            self.send_after_items(p, m);
         }
         if refresh {
-            x.send(
+            self.sys.hooks.x.send(
                 p,
                 &crate::items::moves::layouts::relator2(UnitType::Player as u8, 0, guid),
             );
+        }
+    }
+
+    /// Per-client update (`tick.md` §6.5, `0x0053FC20`): with arena flag
+    /// 0x400 raised, S→C 0x65 for the client's player when its arena
+    /// record's flag is set (`intents-events.md` §7.6 rule 5).
+    fn arena_sync(&mut self, game: &mut Game, client: ClientId) {
+        let Some(st) = self.sys.hooks.arena.as_ref().filter(|s| s.flag_400) else {
+            return;
+        };
+        let Some(p) = game.lists.client(client).and_then(|c| c.player) else {
+            return;
+        };
+        let Some(&(score, true)) = st.records.get(&p) else {
+            return;
+        };
+        let Some(guid) = self.sys.units.get(p).map(|r| r.guid) else {
+            return;
+        };
+        let m = crate::units::messages::player_kill_count(guid, score as u16);
+        self.send_after_items(p, &m);
+    }
+
+    /// Step 6, last (`0x0053FAE0`): arena flag 0x400 := 0.
+    fn clear_arena_flag(&mut self, _: &mut Game) {
+        if let Some(st) = self.sys.hooks.arena.as_mut() {
+            st.flag_400 = false;
         }
     }
 

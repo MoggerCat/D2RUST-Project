@@ -613,7 +613,9 @@ fn full(
     if item.stackable {
         w.put(9, item.total_quantity);
     }
-    if f & hflag::SOCKETED != 0 {
+    // §4.5 rule 5: the item's own flags, not F (an unidentified item's
+    // header word has 0x800 cleared, §2 rule 2, but the count is sent).
+    if item.flags & hflag::SOCKETED != 0 {
         w.put(
             u32::from(t.isc(stat::NUMSOCKETS).save_bits),
             item.base_sockets,
