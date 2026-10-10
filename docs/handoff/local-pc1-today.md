@@ -271,3 +271,30 @@ REC used: 2446.
 
 Running: pixel comparison of the 35 scenes on this merge. Open: the other
 three audio checks at Music Volume 100; the 117 needs_pc1 rows.
+
+## Push 13 (18:50) — merge 02516cee1; pixels round 2; rain is now the blocker
+
+Merged `claude/integ-r23` 02516cee1 (ledger: EQUAL 3116 of 4479, check 0
+errors). Step 4: no new item. Recorders unchanged, so every 1.14d side in
+`traces/orig-cache` stays valid.
+
+- **Draws checks on this merge** (`traces/pc1/draws-first-diff.tsv`, column
+  `prev` = the round before): all 38 still DIVERGED, but 16 moved forward:
+  the `unit` row for object 2:5 is fixed, and those 16 (town arrival, town
+  rain, belt, the hovers, inventory, quest log, skill tree, skill bar, both
+  skill picks, mini panel, party) now stop at the **first rain line** (row
+  195 / 198, column x). Rain is what stands between them and the UI rows.
+  d2rs's rain on `draws-town-rain-ama`: 36 lines against 35, 5 start points
+  equal, no colour equal (1.14d indices 22, 25, 27, 115, 185, 188, 192, 198,
+  200, 206, 231; d2rs 19, 114, 179, 180, 183, 226, 236, 237, 242).
+- **Pixels, round 2** (`traces/pc1/pixel-compare-r2.tsv`, measured on
+  174dbce3d; frame pairs in the private repo 64a62800,
+  `recordings/pc1-2026-10-10/pixel-compare-r2`): 32 of 35 scenes moved, most
+  up by 0.1–0.8 points (town arrival 97.56 → 97.78 %, character 97.88 →
+  98.44, party 97.44 → 98.28, skill bar 96.03 → 96.86); down: Act IV town
+  98.46 → 97.80, hover-mana 98.13 → 97.67; help overlay (12 %) and message
+  log (25 %) unchanged; action scenes unchanged (84.4 %).
+
+Running: a sample of cloud (Wine) 1.14d recordings re-recorded on Windows
+and compared line by line. Next: the rain colour tables read from the live
+game; the other three audio checks at Music Volume 100.
