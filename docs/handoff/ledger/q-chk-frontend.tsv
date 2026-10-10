@@ -1,0 +1,8 @@
+#ledger 1
+area	kind	group	source_1.14d	specs	spec_status	checks	last_verdict	exercised	provisional	needs_pc1	owner	state	size	note
+ui.frontend.main	ui	systems	Main menu (expansion), 800x600, X screenshot	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	first difference: Open Battle.net button label (1.14d 'GATEWAY: <name>' from the registry, d2rs blank); whole frame also differs by a few levels per pixel (palette/blend) - q-fix-ui-blend may fix (REC-1550/1554)
+ui.frontend.charselect	ui	systems	Character select with 3 saves	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	first difference: paper dolls missing in the slot figures; text and layout match by eye (REC-1552)
+ui.frontend.charselect-return	ui	systems	Character select after Esc from create	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	d2rs shows the wrong palette (blue) on the screen after Esc from create; 1.14d normal (REC-1551)
+ui.frontend.create	ui	systems	Character create, 7 expansion classes	specs/ui/frontend-menus.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	first difference: 'EXPANSION CHARACTER' label next to the check box missing in d2rs; line-up and class text match by eye (REC-1553)
+ui.frontend.credits	ui	systems	Credits	specs/ui/frontend-credits.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	layout matches by eye; picture darker in d2rs (palette/blend) (REC-1550)
+ui.frontend.cinematics	ui	systems	Cinematics list (expansion, 1 enabled)	specs/ui/frontend-credits.md	draft	-	-	yes	1	n	claude/q-chk-frontend	DIVERGED	S	layout and one enabled entry match by eye; frame brightness differs (palette/blend) (REC-1550)
