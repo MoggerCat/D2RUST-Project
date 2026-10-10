@@ -780,6 +780,8 @@ pub trait Pending {
     fn set_current_skill(&mut self, unit: UnitId, skill: i32) -> bool {
         false
     }
+    /// Current skill := none (the mode request builder's clear, `ai.md` §7.1).
+    fn clear_current_skill(&mut self, unit: UnitId) {}
     /// A missile parameter record's init callback with an id no spec
     /// names (the specified ones run in `missiles::init_cb`, §R2.3 step
     /// 21).
