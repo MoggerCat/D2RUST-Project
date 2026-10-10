@@ -243,6 +243,12 @@ impl<H: LifecycleHooks, R: InvRest + ?Sized> InvDesk<'_, '_, H, R> {
         std::mem::take(&mut self.state.item_walks)
     }
 
+    /// Whether `unit` was placed on the ground since the last
+    /// [`Self::take_dropped`] (unit flag 0x1000), without taking.
+    pub fn was_dropped(&self, unit: UnitId) -> bool {
+        self.state.dropped.contains(&unit)
+    }
+
     /// The items placed on the ground since the last call
     /// ([`InvState::dropped`](super::InvState::dropped)).
     pub fn take_dropped(&mut self) -> std::collections::BTreeSet<UnitId> {
