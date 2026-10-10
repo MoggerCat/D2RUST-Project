@@ -47,7 +47,7 @@ import sys
 
 GEN_VERSION = 1
 GEN_NAME = "tools/check-gen/check_gen.py"
-FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc", "quest"]
+FAMILIES = ["lvl", "wp", "ai", "su", "boss", "umod", "skill", "shrine", "item", "itemq", "netc2s", "nets2c", "missile", "state", "mon", "obj", "aud", "fmt", "render", "ui", "monskill", "qkill", "npc", "sysc", "quest", "qflow"]
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CLASSES = ["ama", "sor", "nec", "pal", "bar", "dru", "ass"]
@@ -419,6 +419,58 @@ def fam_shrine(ctx):
                      f"5.1) gives row {n} ({how}; PROVISIONAL REC-1330: the seed is d2rs's pick, settled by the first 1.14d run); the check compares the shrine's effect, the "
                      "player's stats and states and the draws, and the packets of the window (the 0x13 send needs a MATCHing packets channel, REC-2055/2056)."])
         c.extra = {"shrine": n}
+        out.append(c)
+    return out
+
+
+# quest reward flows (world/quests-act1.md section 10.2): the save holds the quest with its
+# reward pending (`--quests N.1`), the player talks to the NPC and claims the reward with the
+# C->S 0x31 message of the table; the state channel compares the quest flags (q), the packets
+# channel the 0x5D quest status and every other message of the window.
+# (slug, quest areas, quest preset, NPC monstats class, reward messages, what)
+QFLOWS = [
+    ("a1q2-sisters", ["quest.a1q2-sisters-burial-grounds", "quest.done2-sisters-burial-grounds"], "2.1", 150, [92],
+     "Sisters' Burial Grounds reward: Kashya, message 92", 1),
+    ("a1q3-tools", ["quest.a1q3-tools-of-the-trade"], "3.1", 154, [163],
+     "Tools of the Trade reward: Charsi, message 163", 1),
+    ("a1q4-cain", ["quest.a1q4-the-search-for-cain", "quest.done4-search-for-cain"], "4.1", 148, [118],
+     "Search for Cain reward: Akara, message 118", 1),
+    # act III (world/quests-act3.md sections 3.3, 6, 8): the messages are not state-guarded here
+    ("a3q1-lam-esen", ["quest.a3q1-lam-esen-s-tome"], None, 254, [549, 564],
+     "Lam Esen's Tome: Alkor, messages 549 and 564 (reward, +5 stat points)", 3),
+    ("a3q4-ormus", ["quest.a3q4-the-golden-bird"], None, 255, [594],
+     "The Golden Bird: Ormus, message 594", 3),
+    ("a3q4-cain", ["quest.a3q4-the-golden-bird"], None, 245, [626],
+     "The Golden Bird: Cain, message 626", 3),
+    ("a3q5-ormus", ["quest.a3q5-the-blackened-temple"], None, 255, [628],
+     "The Blackened Temple: Ormus, message 628", 3),
+    # act V (world/quests-act5.md sections 4.4, 5.4, 5.7): town NPCs by their preset room
+    ("a5q2-qual-kehk", ["quest.a5q2-rescue-on-mount-arreat"], None, 515, [20104],
+     "Rescue on Mount Arreat: Qual-Kehk, message 20104", 5),
+    ("a5q3-malah", ["quest.a5q3-prison-of-ice"], None, 513, [20132],
+     "Prison of Ice: Malah, scroll message 20132", 5),
+    ("a5q3-drehya", ["quest.a5q3-prison-of-ice"], None, 512, [20136],
+     "Prison of Ice: Drehya, Anya's item message 20136", 5),
+]
+
+
+def fam_qflow(ctx):
+    out = []
+    for slug_, areas, preset, npc, msgs, what, act in QFLOWS:
+        goto = f"preset 109 1:{npc}" if act == 5 else f"unit 1:{npc}"
+        lines = [f"at 4 poke goto {goto}",
+                 f"at 14 send InteractWithEntity type=1 id=@1:{npc}",
+                 f"at 16 send InitEntityChat id=@1:{npc}"]
+        lines += [f"at {18 + 2 * k} send QuestMessage npc=@1:{npc} msg={m}" for k, m in enumerate(msgs)]
+        lines.append(f"at {18 + 2 * len(msgs)} send TerminateEntityChat id=@1:{npc}")
+        save = (f"PtQ{slug_[:4].upper()} --class ama --expansion --quests {preset}" if act == 1
+                else ACT_SAVE[act - 1] + (f" --quests {preset}" if preset else ""))
+        c = Check(f"gen-qflow-{slug_}", "qflow", f"quest {slug_}", f"quest message flow: {what}",
+                  save, 60 + 4 * len(msgs), 300, "state packets", lines,
+                  comment=[f"{what}. The player talks to the NPC, sends the quest message"
+                           f"{'s' if len(msgs) > 1 else ''}, closes the chat; state compares the quest flags (q), "
+                           "packets the 0x5D quest status and every other message of the window."])
+        c.extra = {"areas": areas}
         out.append(c)
     return out
 
@@ -1301,7 +1353,7 @@ def fam_sysc(ctx):
 
 
 FAMILY_FN = {"lvl": fam_lvl, "wp": fam_wp, "ai": fam_ai, "su": fam_su, "boss": fam_boss, "umod": fam_umod, "skill": fam_skill, "shrine": fam_shrine, "item": fam_item, "itemq": fam_itemq, "netc2s": fam_netc2s, "nets2c": fam_nets2c,
-             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc, "quest": fam_quest}
+             "missile": fam_missile, "state": fam_state, "mon": fam_mon, "obj": fam_obj, "aud": fam_aud, "fmt": fam_fmt, "render": fam_render, "ui": fam_ui, "monskill": fam_monskill, "qkill": fam_qkill, "npc": fam_npc, "sysc": fam_sysc, "quest": fam_quest, "qflow": fam_qflow}
 
 
 # ----------------------------------------------------------- ledger join
@@ -1376,7 +1428,7 @@ def resolve_area(c, areas):
     elif f == "ui":
         c.area = ",".join(x["rows"]) if x["rows"] else "-"
         return
-    elif f in ("aud", "npc"):
+    elif f in ("aud", "npc", "qflow"):
         c.area = ",".join(x["areas"])
         return
     elif f == "itemq":
