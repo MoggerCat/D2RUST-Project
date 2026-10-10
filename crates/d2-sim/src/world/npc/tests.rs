@@ -203,6 +203,9 @@ impl NpcWorld for Fake {
     fn npc_ai_param(&mut self, npc: UnitId, param: u32) {
         self.log.push(format!("ai {} {param:#x}", npc.0));
     }
+    fn npc_ai_point(&mut self, npc: UnitId, x: u32, y: u32) {
+        self.log.push(format!("aipt {} {x} {y}", npc.0));
+    }
     fn reschedule_ai_think(&mut self, npc: UnitId) {
         self.log.push(format!("think {}", npc.0));
     }
@@ -1948,4 +1951,47 @@ fn live_monstats_records() {
     for s in SELLERS {
         assert!(c.seller_row(s, 1).is_some(), "Normal row of {s}");
     }
+}
+
+fn msg59(ty: u32, guid: u32, x: u32, y: u32) -> Vec<u8> {
+    let mut m = vec![0x59];
+    for v in [ty, guid, x, y] {
+        m.extend_from_slice(&v.to_le_bytes());
+    }
+    m
+}
+
+// Covers: specs/monsters/ai-bodies.md §9.9
+#[test]
+fn make_entity_move_sets_the_npc_ai_params() {
+    let mut c = control(0);
+    let mut w = Fake::new();
+    w.npc(class::CHARSI, 6);
+    w.dist = 50;
+    assert_eq!(
+        c.make_entity_move(&mut w, PLAYER, &msg59(1, 6, 4865, 4241)),
+        0
+    );
+    assert_eq!(
+        w.log,
+        [
+            "path 1006",
+            "think 1006",
+            "ai 1006 0x28",
+            "aipt 1006 4865 4241"
+        ]
+        .map(String::from)
+    );
+    // 51 or farther, an unknown unit, a monster that is not npc + interact.
+    w.dist = 51;
+    w.log.clear();
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 6, 1, 2)), 1);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 99, 1, 2)), 1);
+    w.dist = 3;
+    w.npc(1, 30);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(1, 30, 1, 2)), 1);
+    assert!(w.log.is_empty());
+    // Size 17 only; unit type above 5.
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &[0x59, 1]), 3);
+    assert_eq!(c.make_entity_move(&mut w, PLAYER, &msg59(6, 6, 1, 2)), 2);
 }

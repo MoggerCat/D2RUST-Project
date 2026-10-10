@@ -83,7 +83,20 @@ pub fn rate_of(u: &ClientUnit, inputs: &ModelInputs, total: impl Fn(u16) -> i32)
 
 /// The mode set's animation part (`0x00624690` → `0x00624390`): frame
 /// := 0, count := the mode's AnimData frames << 8, speed := [`rate`].
+///
+/// A mode set to the unit's current mode only queues the unit and sets
+/// flag 0x1 (`sim/units.md` §4): the animation is not restarted
+/// ([`mode_init`] is the creation call, which always sets it up).
 pub fn mode_set(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
+    if w.units.get(&key).is_some_and(|u| u.mode == mode) {
+        return;
+    }
+    mode_init(w, inputs, key, mode);
+}
+
+/// The animation part of the mode set unconditionally (unit creation,
+/// `msg-units.md` §1.2 r6.4: the allocation stored the mode already).
+pub fn mode_init(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
     let Some(u) = w.units.get_mut(&key) else {
         return;
     };

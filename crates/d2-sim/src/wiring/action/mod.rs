@@ -445,6 +445,10 @@ pub struct ActionHooks<X> {
     /// callback id), taken by [`UnitHooks::lists_expired`] after the
     /// expiry walk (`units.rs`).
     pub removed_lists: Vec<(UnitId, u32, u32)>,
+    /// Skill stat callbacks (stats 83, 126, 127, 188: unit, stat, layer)
+    /// the stat lists raised; their "refresh all" runs at the unit's next
+    /// update ([`Pending::skill_stat_refresh`]).
+    pub skill_refresh: Vec<(UnitId, u16, u16)>,
     pub errors: Vec<WiringError>,
 }
 
@@ -588,6 +592,7 @@ impl<X> ActionHooks<X> {
             x,
             orphan_seed: Seed::init(),
             removed_lists: Vec::new(),
+            skill_refresh: Vec::new(),
             errors: Vec::new(),
         }
     }

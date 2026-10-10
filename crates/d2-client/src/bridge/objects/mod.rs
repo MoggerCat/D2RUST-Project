@@ -500,6 +500,7 @@ pub fn anim_setup(u: &mut ClientUnit, row: &ObjClientRow, m: u32) -> Result<(), 
         return Err(HandlerError::Invalid("object mode past 7"));
     }
     u.frame = i32::from(row.start[i]) << 8;
+    u.frame_count = row.frame_cnt[i] as i32;
     let d = i32::from(row.frame_delta[i] as i16);
     if row.sync != 0 {
         u.speed = Some(d);

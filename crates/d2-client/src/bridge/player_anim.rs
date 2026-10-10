@@ -157,6 +157,17 @@ pub fn mode_set(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u
     if u.mode == mode {
         return;
     }
+    mode_init(w, inputs, key, mode);
+}
+
+/// The animation part of the mode set unconditionally (player creation:
+/// the allocation stored the mode already, then the init's set-up ran;
+/// the 1.14d client state of a new player shows the mode's count and
+/// rate).
+pub fn mode_init(w: &mut ClientWorld, inputs: &ModelInputs, key: UnitKey, mode: u32) {
+    let Some(u) = w.units.get(&key) else {
+        return;
+    };
     let class = u.class;
     let anim = inputs
         .player_anims

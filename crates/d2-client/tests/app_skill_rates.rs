@@ -82,6 +82,7 @@ fn player_rates(character: Character, ticks: u32) -> Vec<(u32, String)> {
         packets: None,
         rng: None,
         save_out: None,
+        client_out: None,
         sends: Vec::new(),
         no_own_c2s: Vec::new(),
     };

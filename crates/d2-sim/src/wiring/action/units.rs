@@ -76,6 +76,30 @@ impl<X: Pending> StatHost for ActionHooks<X> {
             self.removed_lists.push((unit, state, callback.0));
         }
     }
+    /// §7.2 rule 2 (`skills/levels.md` §7): the skill handlers of stats 83,
+    /// 126, 127 and 188 refresh every passive state of the unit
+    /// (`0x0056DFA0`). Queued here, run by [`Pending::skill_stat_refresh`]
+    /// before the unit's next update sends its state changes.
+    // PROVISIONAL (REC-3780): the refresh runs at the unit's next player
+    // update, not inside the stat write; its effects (state-changed bits,
+    // passive list values) are only read by that update. Stats 97, 98,
+    // 107, 151 and 204 are run by other paths of this wiring.
+    fn skill_stat_changed(
+        &mut self,
+        _lists: &mut StatLists,
+        owner: UnitId,
+        key: i32,
+        _old: i32,
+        _new: i32,
+    ) {
+        let stat = crate::stats::key_stat(key);
+        if matches!(stat, 83 | 126 | 127 | 188) {
+            let e = (owner, stat, key as u32 as u16);
+            if !self.skill_refresh.contains(&e) {
+                self.skill_refresh.push(e);
+            }
+        }
+    }
     /// `0x0063A4A0`(unit, state) (`stat-lists.md` §8.8 rule 1): state in
     /// range and flag `monstaydeath` for a monster, `plrstaydeath` for any
     /// other unit.
@@ -699,6 +723,16 @@ impl<X: Pending> UnitHooks for ActionHooks<X> {
             .as_mut()
             .and_then(|a| a.control_mut(unit))
             .map(|c| c.params[0] = v)
+            .is_some()
+    }
+
+    /// `0x0058EC00(unit, index + 1, v)` on the unit's AI control.
+    fn set_ai_param(&mut self, unit: UnitId, index: usize, v: i32) -> bool {
+        self.ai
+            .as_mut()
+            .and_then(|a| a.control_mut(unit))
+            .and_then(|c| c.params.get_mut(index))
+            .map(|p| *p = v)
             .is_some()
     }
 
