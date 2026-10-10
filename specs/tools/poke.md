@@ -415,11 +415,12 @@ steps (§6). Results are written as `poke` records (§3 rule 3).
    `combat-melee-fallen`, `a2-wp-42` (REC-2290); `stat`: the stat update in the
    poke's frame window, `a2-npc-fara-heal` frame 7,
    `combat-potion-midfight` frame 59; rc-packets-join-order). Only a
-   poke due before the first tick keeps the between-frames point. Open:
-   after a `pos` poke (d2rs-own reassign request, §1) d2rs sends an S→C
-   0x15 in the next frame that 1.14d does not send, at either point
-   (`interact-operate-waypoint`, `interact-talk-akara`,
-   `items-vendor-akara-buy` frame 4).
+   poke due before the first tick keeps the between-frames point. Settled (rc-promote,
+   2026-10-10): a `pos` / `hop` poke queues d2rs' own S→C 0x15 (reassign
+   request, §1) only in `play`; `state-dump` (the comparison, `Env::reassign`
+   false) queues none, as 1.14d sends none (`gen-sysc-client-msg-ui-*`,
+   `interact-talk-akara`, `items-vendor-akara-buy`: the first divergence
+   moved from frame 4 to frame 16).
    `play --poke` runs every poke between frames: its
    `operate` / `talk` replies reach the client one frame later than on
    1.14d (a play aid, not a comparison).

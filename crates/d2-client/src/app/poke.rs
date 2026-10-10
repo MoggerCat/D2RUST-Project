@@ -211,6 +211,18 @@ pub(crate) fn waypoint_classes(s: &Sim) -> BTreeSet<u32> {
         .unwrap_or_default()
 }
 
+static COMPARE_RUN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A comparison run (`state-dump`): `pos` / `hop` pokes queue no S→C 0x15,
+/// as 1.14d's pokes send none (`tools/poke.md` §5 rule 5).
+pub fn set_compare_run() {
+    COMPARE_RUN.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn reassign_pokes() -> bool {
+    !COMPARE_RUN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Runs `op` on `s` now (`poke.md` §5): the local player is `@player`,
 /// `@wp` and `item` use the game's own tables. No local player yet:
 /// `unresolved @player`.
@@ -225,6 +237,7 @@ pub fn apply_now(s: &mut Sim, op: &PokeOp) -> poke::PokeResult {
         player,
         waypoint_classes: &waypoints,
         items: Some(&tables),
+        reassign: reassign_pokes(),
     };
     // The quest parts are lent as in the tick and the 0x13 / waypoint
     // handlers, so a quest object a directive creates (a `warp` that
@@ -246,7 +259,8 @@ pub fn goto_now(s: &mut Sim, t: GotoTarget, mut walk: GotoWalk) -> (poke::PokeRe
     let Some((player, _)) = local_player(s) else {
         return (poke::PokeResult::Unresolved("@player".into()), walk);
     };
-    let env = poke::Env::new(player);
+    let mut env = poke::Env::new(player);
+    env.reassign = reassign_pokes();
     let r = poke::goto_step(&mut s.game, &mut s.events, &env, &t, &mut walk);
     // As [`apply_now`]: a step's warp follows its pets now.
     s.world.handler_work(&mut s.game, &mut s.events);
@@ -309,6 +323,7 @@ pub fn apply_on_host<C: d2_server::seams::Clock>(
             player,
             waypoint_classes: &waypoints,
             items: Some(&s.world.tables),
+            reassign: reassign_pokes(),
         };
         match poke::msg_values(&s.game, &s.events, &env, args)
             .and_then(|v| msg_bytes(*id, args, &v))
@@ -343,6 +358,7 @@ pub fn interact_on_host<C: d2_server::seams::Clock>(
             player,
             waypoint_classes: &waypoints,
             items: Some(&s.world.tables),
+            reassign: reassign_pokes(),
         };
         match poke::interact_calls(&s.game, &s.events, &env, d) {
             Some(Ok(c)) => c,
