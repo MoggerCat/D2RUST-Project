@@ -28,3 +28,12 @@ written as `cov-promoted` (ledger.py merges group coverage as "exercised" only).
 - 39 checks with input/send and no packets channel: add `packets` to the check (then they qualify).
 - 1 ignore line check; 22 DIVERGED are real divergences (packets 18, draws 4).
 - orig-cache entries refreshed by --fill-cache are left uncommitted (rule).
+
+## Round 2 (after the coordinator's no-deadline note)
+- integ-r23 had added `packets` to the hand-written input checks; re-run of the 40 still PARTIAL: a5-wp (7) and
+  gen-skill (7) now show real packets DIVERGED; added `packets` to 10 ass-*, 4+15 gen-shrine-* (check_gen shrine
+  family too), 2 ass-lightning-sentry-*; removed `ignore q` from sys-intents-moves (EQUAL now).
+- Result: 25 of those checks now run packets; most diverge in C->S (the gap's condition occurred), so their rows are
+  DIVERGED by the fresh verdict, not promoted. Part regenerated against the ledger without rc-promote
+  (265 checks): 62 rows EQUAL, 23 DIVERGED. Ledger EQUAL 3073 (integ-r23 + this), 0 errors.
+- C002/C028 (causes-99): not started; need the packets C->S divergences and the one-sided field list per check.
