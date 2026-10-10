@@ -294,6 +294,9 @@ struct Shared {
     cursor_step_owed: std::cell::Cell<bool>,
     /// The host clock set by the app ([`OriginalUi::set_host_now`]).
     host_now: std::cell::Cell<Option<u32>>,
+    /// A jump move the cursor machine already took
+    /// ([`OriginalUi::cursor_jump_moved`]).
+    cursor_moved_now: std::cell::Cell<Option<Point>>,
     /// The client quest flags `[0x007C0D43]` (S→C 0x29), as the waypoint
     /// tab gates read them (`ui/menus.md` §1.4, `panels.md` §13.3).
     client_quest: [u8; 96],
@@ -420,8 +423,9 @@ impl OriginalUi {
         tables.files.extend(skill_tree_ui::icon_files());
         // `control-panel.md` §9 r9 (REC-519 settled) and §11 r1: the game
         // entry set-up `0x00456970` opens the mini panel (state 0x15) and
-        // then the help button (0x22). d2rs-own: no registry, so neither
-        // `Mini Panel` nor `Help Menu` is set at the start.
+        // then the help button (0x22). Without a registry neither `Mini
+        // Panel` nor `Help Menu` is set at the start; a check run replays
+        // the recording host's ([`OriginalUi::set_registry`]).
         let mut states = UiStates::new()?;
         states.force(UI_MINI_PANEL, true);
         states.force(crate::ui::panels::control::buttons::UI_HELP_BUTTON, true);
@@ -439,7 +443,11 @@ impl OriginalUi {
                 has_hireling: false,
                 has_belt: false,
             },
-            mouse: Point::new(0, 0),
+            // `ui/panels-3.md` §23 r3: the cursor init sets the mouse to
+            // (W / 2, H / 2) of the 640 × 480 front end, the position the
+            // cursor jump of `ui/panels.md` §4 r3 reads until the first move
+            // (measured: `ui-draws-inv-char-tip-ama`, (320, 240) → (120, 237)).
+            mouse: Point::new(320, 240),
             outputs: Vec::new(),
             input_reset: false,
             clear_automap: false,
@@ -467,6 +475,7 @@ impl OriginalUi {
             client_seed: None,
             cursor_step_owed: std::cell::Cell::new(false),
             host_now: std::cell::Cell::new(None),
+            cursor_moved_now: std::cell::Cell::new(None),
             client_quest: [0; 96],
             level_names: Vec::new(),
             horadric_start: Default::default(),
@@ -759,10 +768,24 @@ impl OriginalUi {
         self.shared.borrow().states.open_mode()
     }
 
+    /// The mouse move a cursor jump causes (`ui/panels.md` §4 r3): the
+    /// original handles the `WM_MOUSEMOVE` of its `SetCursorPos` in the same
+    /// message pump, before the pass's frame, so the cursor machine takes
+    /// it now (§23 r4); the queued [`UiEvent::CursorMoved`] that brings it
+    /// to the other handlers skips the machine.
+    pub fn cursor_jump_moved(&mut self, at: Point, world: &ClientWorld) {
+        self.cursor_event(UiEvent::CursorMoved(at), world);
+        let sh = self.shared.borrow();
+        sh.cursor_moved_now.set(Some(at));
+    }
+
     /// Reads the model facts of the next event (call before routing it).
     pub fn before_event(&mut self, e: UiEvent, world: &ClientWorld) {
         self.refresh_facts(world);
-        self.cursor_event(e, world);
+        let taken = self.shared.borrow().cursor_moved_now.take();
+        if !matches!((e, taken), (UiEvent::CursorMoved(p), Some(q)) if p == q) {
+            self.cursor_event(e, world);
+        }
         if let Some(p) = e.at() {
             self.shared.borrow_mut().mouse = p;
             // d2rs-own (PROVISIONAL, REC-707): a move or a press tracks
@@ -1094,6 +1117,21 @@ impl OriginalUi {
     /// The play bindings accepted on the Controls screen, once.
     pub fn take_accepted_bindings(&mut self) -> Option<crate::controls::Bindings> {
         self.shared.borrow_mut().esc.accepted.take()
+    }
+
+    /// The recording host's registry values (`play --registry`,
+    /// `tools/scenario-diff.md` §3 r7 step 7), before the first frame:
+    /// `Mini Panel` ≠ 0 keeps the mini panel closed at entry
+    /// (`control-panel.md` §9 r9), `Help Menu` fills the help button's
+    /// cache (§11 r2), `PopupHireling` the hire pop-up flag
+    /// (`messages.md` §9 r2). Absent values keep the d2rs start (no
+    /// registry: all absent).
+    pub fn set_registry(&mut self, r: crate::app::registry::UiRegistry) {
+        if r.mini_panel.is_some_and(|v| v != 0) {
+            self.shared.borrow_mut().states.force(UI_MINI_PANEL, false);
+        }
+        self.shared.borrow_mut().hud.help.setting = r.help_menu.unwrap_or(0);
+        self.more_mut().popup_hireling = r.popup_hireling.unwrap_or(0);
     }
 
     /// The settings the Esc menu's Options page shows (`app::config`).
@@ -1577,6 +1615,9 @@ impl Panel for SkillTreeUi {
         let consumed = match left(e) {
             Some((true, at)) => {
                 let d = self.panel.mouse_down_ctx(&env, &view, at, input(at));
+                if d.cursor_press {
+                    cursor_ui::cursor_press(&sh, ctx.world, at);
+                }
                 sh.outputs.extend(d.out);
                 d.consumed
             }
@@ -1960,7 +2001,11 @@ impl Panel for CharacterUi {
             _ => 0,
         };
         match left(e) {
-            Some((true, at)) => self.panel.press(&sh.tables, &s, at, statpts),
+            Some((true, at)) => {
+                if self.panel.press(&sh.tables, &s, at, statpts) {
+                    cursor_ui::cursor_press(&sh, ctx.world, at);
+                }
+            }
             Some((false, at)) => {
                 // Shift is the host's per-frame flag (`set_shift`): all points.
                 let shift = sh.items.shift;

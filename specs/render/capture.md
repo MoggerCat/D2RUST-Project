@@ -33,16 +33,16 @@
 |   2a. Front end (`record_frames.py --front-end`) | 99–121 |
 |   3. What is read | 122–317 |
 |   4. Tie to ticks | 318–330 |
-|   5. Raw format `frames-raw-2` (and `frames-raw-3`) | 331–366 |
-|   6. Hashes and the comparison | 367–388 |
-|   7. Stability first | 389–426 |
-|   8. Capture cases | 427–442 |
-| Constants & data dependencies | 443–447 |
-| Randomness | 448–454 |
-| Edge cases & original bugs | 455–466 |
-| Test vectors | 467–477 |
-| Provenance | 478–497 |
-| Open questions | 498–555 |
+|   5. Raw format `frames-raw-2` (and `frames-raw-3`) | 331–373 |
+|   6. Hashes and the comparison | 374–395 |
+|   7. Stability first | 396–433 |
+|   8. Capture cases | 434–449 |
+| Constants & data dependencies | 450–454 |
+| Randomness | 455–461 |
+| Edge cases & original bugs | 462–473 |
+| Test vectors | 474–484 |
+| Provenance | 485–504 |
+| Open questions | 505–562 |
 <!-- /index -->
 
 ## Summary
@@ -363,6 +363,13 @@ With `--front-end` (§2a; same format): the `capture` record gains
 `front_end`; a frame gains `present`, `ret`, `in_game`, `launcher_mode`
 and, for a shot, `scene`; `celfile` records from `0x004FA9B0` add `via`
 and `arg`; a load whose path was not found is a `celload` record.
+record_frames 0.3.2 (same format, every older field kept) adds the
+header's `registry`: `{"hkcu": rows, "hklm": rows}`, the values of
+`Software\Blizzard Entertainment\Diablo II` read before the game starts
+(32-bit view; a missing key is `[]`), each row `[name, kind, value]` in
+enumeration order: `"dword"` with the integer, `"sz"` with the text, or
+`"type<N>"` with the value's bytes in hex (`tools/scenario-diff.md` §3 r7
+step 7 reads it).
 
 ### 6. Hashes and the comparison
 

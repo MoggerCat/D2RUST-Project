@@ -870,8 +870,12 @@ impl Panel for HudUi {
                 continue;
             };
             for eff in effects {
-                if let BtnEffect::Out(o) = eff {
-                    sh.outputs.push(o);
+                match eff {
+                    BtnEffect::Out(o) => sh.outputs.push(o),
+                    // §23 r14: the new-stats / new-skills press runs the
+                    // cursor press; the up is the window handler's.
+                    BtnEffect::CursorPress => super::cursor_ui::cursor_press(sh, world, at),
+                    BtnEffect::CursorRelease => {}
                 }
             }
             if consumed {

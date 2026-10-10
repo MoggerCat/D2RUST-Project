@@ -326,6 +326,12 @@ pub struct PlayConfig {
     /// `--frame-schedule FILE` (`specs/tools/scenario-diff.md` §3 r7.5): the
     /// recorded frame schedule and host clock a check run follows.
     pub frame_schedule: Option<crate::world_view::present::FrameSchedule>,
+    /// `--no-sound`: the recording's `-ns` (no sound device).
+    pub no_sound: bool,
+    /// `--registry FILE` (`specs/tools/scenario-diff.md` §3 r7 step 7):
+    /// the recording host's `Diablo II` registry values; `None`: live play
+    /// (no registry, `settings.toml` only).
+    pub registry: Option<super::registry::HostRegistry>,
     /// `--audio-dump FILE [--audio-ticks N]` (`specs/tools/audio-diff.md`
     /// §3): the audio engine runs without a device, driven tick by tick by
     /// the dump; exit once the server tick reaches N.
@@ -648,7 +654,16 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
             .and_then(|p| p.parent().map(std::path::Path::to_path_buf))
             .unwrap_or_else(super::save::default_save_dir),
     );
-    let settings = super::config::load_settings(&cfg_dir)?;
+    let mut settings = super::config::load_settings(&cfg_dir)?;
+    // A check run: the recording host's Options values over the defaults
+    // (`ui/frontend-options.md` §O7 r4); the UI's values once it exists.
+    let ui_registry = match &config.registry {
+        Some(r) => {
+            r.apply_settings(&mut settings)?;
+            Some(r.ui_values()?)
+        }
+        None => None,
+    };
     let bindings = super::config::load_controls(&super::config::controls_dir(
         crate::ui::front_end::screens::controls::config_path().as_deref(),
         &cfg_dir,
@@ -713,6 +728,18 @@ pub fn run(config: PlayConfig) -> anyhow::Result<PlayEnd> {
     }
     if let Some(s) = config.frame_schedule {
         app.insert_resource(s);
+    }
+    // `--no-sound` (Game.exe `-ns`, `tools/scenario-diff.md` §3 r7 step
+    // 6): no sound device, so no sound init and every request returns at
+    // once (`0x004B9A00`: `[0x007C545C]` = 0): no sound tick, no draw on
+    // the client seed.
+    if let Some(r) = ui_registry {
+        ui::set_registry(&mut app, r);
+    }
+    if config.no_sound {
+        if let Some(mut a) = app.world_mut().get_resource_mut::<GameAudio>() {
+            a.driver = None;
+        }
     }
     if let Some(frames) = config.exit_after {
         app.insert_resource(ExitAfter(frames))

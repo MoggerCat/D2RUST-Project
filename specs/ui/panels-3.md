@@ -30,20 +30,20 @@
 | Inputs | 65–76 |
 | Outputs / state changes | 77–82 |
 | Rules | 83–84 |
-|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 85–194 |
-|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 195–239 |
-|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 240–275 |
-|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 276–310 |
-|   27. Scroll and other panels (`panels.md` OQ 9) | 311–384 |
-|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 385–545 |
-|   29. Inventory body-location clicks (`panels.md` §15, row "body location click") | 546–631 |
-|   30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary") | 632–718 |
-| Constants & data dependencies | 719–742 |
-| Randomness | 743–748 |
-| Edge cases & original bugs | 749–776 |
-| Test vectors | 777–818 |
-| Provenance | 819–858 |
-| Open questions | 859–875 |
+|   23. Mouse cursor (`client/ui.md` §B6; takes the rule of `render/capture.md` §3.3) | 85–200 |
+|   24. Character panel inputs (`panels.md` §8.7–§8.9; the `PENDING` character values) | 201–245 |
+|   25. Skill tree inputs (`panels.md` §10.3–§10.5; the `PENDING` icons and levels) | 246–281 |
+|   26. Waypoint rows (`panels.md` §13 r2–r7; the `PENDING` waypoint panel) | 282–316 |
+|   27. Scroll and other panels (`panels.md` OQ 9) | 317–390 |
+|   28. Gold dialog box and controls (`panels-2.md` §21 r9; answers `panels-2.md` OQ 6) | 391–551 |
+|   29. Inventory body-location clicks (`panels.md` §15, row "body location click") | 552–637 |
+|   30. Hireling item checks and clicks (`world/hirelings.md` §11 r9; `panels.md` §15, row "mercenary") | 638–724 |
+| Constants & data dependencies | 725–748 |
+| Randomness | 749–754 |
+| Edge cases & original bugs | 755–782 |
+| Test vectors | 783–824 |
+| Provenance | 825–864 |
+| Open questions | 865–881 |
 <!-- /index -->
 
 ## Summary
@@ -181,13 +181,19 @@ waypoint row table `[0x007BF03C]`.
     the hit-test code (event +8) is 2 (`HTCAPTION`) the OS cursor call
     `0x004F59F0(0)` (video-mode dependent; an app edge); the event is
     left unconsumed (+0x18, +0x1C := 0); `WM_LBUTTONUP` (0x202) → the up
-    r6. The press r5 is **not** a window handler: only three panel
-    presses call it, the character panel's button press (`0x004A7720`,
-    a stat button or the close button armed) and the control panel's
+    r6. The press r5 is **not** a window handler: only four panel
+    presses call it (its 4 callers): the character panel's press
+    `0x004A7720` on a stat add button with points left (`0x004A787C`;
+    the close button returns before it), the control panel's
     new-stats / new-skills press (`0x004A66E0`, `0x004A6790`,
-    `ui/control-panel.md` §8 r4). So a world click, a right click or any
-    other panel press leaves the cursor type unchanged; the `ppress`
-    animation shows only on those buttons. The up transition is also
+    `ui/control-panel.md` §8 r4) and the skill tree's icon press
+    (`0x004AB7E0` at `0x004ABBD7`, `panels-2.md` §19 r1 step 5). So a
+    world click, a right click or any other panel press (a mini panel
+    button included) leaves the cursor state, type and idle start
+    unchanged, and a state-1 cursor keeps stepping the client seed; the
+    `ppress` animation shows only on those buttons (measured:
+    `ui-draws-minipanel-ama`, cursor state 3 through the click at frame
+    40, client seed equal to the capture's on every frame). The up transition is also
     called directly by `0x0048B7C0`, `0x004A6840`, `0x004A6920`,
     `0x004A78C0` (a second call is harmless: s is 1 by then). No
     right-button message reaches the cursor.

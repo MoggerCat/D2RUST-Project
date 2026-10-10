@@ -34,25 +34,25 @@
 |   1. Screen layout model | 98–134 |
 |   2. UI states and the open/close call | 135–263 |
 |   3. The conflict gate (`0x00453910`) | 264–297 |
-|   4. Slots, open mode and the view shift | 298–355 |
-|   5. UI pass order (`0x00456EE0`) | 356–395 |
-|   6. 800 × 600 border and control panel art (`0x00499450`) | 396–416 |
-|   7. Shared panel parts | 417–434 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 435–541 |
-|   9. Inventory panel family (`0x0048EDF0`) | 542–609 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 610–673 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 674–709 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 710–765 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 766–823 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 824–829 |
-|   15. Event → intent summary | 830–857 |
-|   16. Machine tables | 858–892 |
-| Constants & data dependencies | 893–913 |
-| Randomness | 914–918 |
-| Edge cases & original bugs | 919–939 |
-| Test vectors | 940–980 |
-| Provenance | 981–1025 |
-| Open questions | 1026–1117 |
+|   4. Slots, open mode and the view shift | 298–370 |
+|   5. UI pass order (`0x00456EE0`) | 371–410 |
+|   6. 800 × 600 border and control panel art (`0x00499450`) | 411–431 |
+|   7. Shared panel parts | 432–449 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 450–556 |
+|   9. Inventory panel family (`0x0048EDF0`) | 557–624 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 625–688 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 689–724 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 725–780 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 781–838 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 839–844 |
+|   15. Event → intent summary | 845–872 |
+|   16. Machine tables | 873–907 |
+| Constants & data dependencies | 908–928 |
+| Randomness | 929–933 |
+| Edge cases & original bugs | 934–954 |
+| Test vectors | 955–995 |
+| Provenance | 996–1040 |
+| Open questions | 1041–1132 |
 <!-- /index -->
 
 ## Summary
@@ -345,6 +345,21 @@ skips it and passes).
    other hot key passes 0 (`ui/controls.md` §3). Clear Screen and Esc
    close panels through `0x00456300(·, jump 1)`, which moves the cursor
    by the same rule.
+   `0x00468770(x', y)` (read 2026-10-10, rc-draw-row173) writes the mouse
+   variables (x', y), then in windowed mode `SetCursorPos(window left +
+   SM_CXFIXEDFRAME + x', window top + SM_CYCAPTION + y)`: the top border
+   (SM_CYFIXEDFRAME, 3) is left out, so the `WM_MOUSEMOVE` the move causes
+   reports (x', y − 3) and runs the cursor's move rule (`ui/panels-3.md`
+   §23 r4) in the same message pump, before that pass's frame. The mouse
+   variables start at the cursor init's (320, 240) (§23 r3), so a jump
+   before any move reads (320, 240). Measured (`ui-draws-inv-char-ama`:
+   (790, 10) → (590, 7); `ui-draws-inv-char-tip-ama`: (320, 240) → (120,
+   237), cursor frames equal through tick 72). d2rs: a scripted pointer
+   (check runs) feeds that move to the cursor machine at once and to the
+   other handlers as the next event; live play moves the window cursor.
+   PROVISIONAL (REC-3470): the move's clock is the drawn frame's (the
+   original reads `GetTickCount()` at the message, a few ms earlier;
+   only the 5,000 ms idle test of §23 r8 can see it).
 4. The play area for clicks: a click inside an open panel's area is
    consumed by the panel (§8–§14); the world input path is not reached.
    The right panel's area is the inventory record's `inv` rectangle

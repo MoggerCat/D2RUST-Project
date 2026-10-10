@@ -352,6 +352,10 @@ pub struct WorldViewUi {
     /// The window lost the focus since the last pass (`ui/controls.md`
     /// §4.3 r3): the held world buttons are released.
     focus_lost: bool,
+    /// A `play --input` script drives the pointer (no window pointer): a
+    /// cursor jump then queues the mouse move the original's
+    /// `SetCursorPos` causes instead of moving the window cursor.
+    scripted: bool,
 }
 
 impl WorldViewUi {
@@ -367,6 +371,7 @@ impl WorldViewUi {
             cursor: None,
             last_at: crate::ui::Point::new(0, 0),
             focus_lost: false,
+            scripted: false,
         }
     }
 
@@ -778,6 +783,7 @@ fn ui_input(
     walk: Option<ResMut<PreviewWalk>>,
     time: Option<Res<Time>>,
     script: Option<Res<super::input_script::InputScript>>,
+    schedule: Option<Res<FrameSchedule>>,
     focus: Option<Res<Messages<bevy::window::WindowFocused>>>,
     mut focus_cursor: Local<MessageCursor<bevy::window::WindowFocused>>,
     wheel: Option<Res<Messages<bevy::input::mouse::MouseWheel>>>,
@@ -896,8 +902,11 @@ fn ui_input(
         ui.queue.0.extend(actions);
         ui.queue.0.extend(edge::key_chars(&pressed));
     }
-    // `play --input`: the script owns the pointer (`script_input`).
-    if script.is_some() {
+    // `play --input`: the script owns the pointer (`script_input`). A
+    // check run (`tools/scenario-diff.md` §3 r7 step 5) replays the
+    // recording's pointer, the script's or none: the host window's pointer
+    // (an Xvfb display's centre) is not an input of the recording.
+    if script.is_some() || schedule.is_some() {
         return Ok(());
     }
     // A window below 800×600 has no frame mapping (`ui.md` open question
@@ -936,22 +945,54 @@ fn ui_input(
     Ok(())
 }
 
+/// `GetSystemMetrics(SM_CYFIXEDFRAME)` of the windowed (`-w`) game the
+/// checks record: the border height `0x00468770` leaves out.
+const WINDOW_FRAME_Y: i32 = 3;
+
+/// The mouse move a cursor jump to `at` causes in the windowed game
+/// (`ui/panels.md` §4 r3, `0x00468770`): `SetCursorPos(window left +
+/// SM_CXFIXEDFRAME + x, window top + SM_CYCAPTION + y)` misses the top
+/// border, so the next `WM_MOUSEMOVE` reports (x, y − SM_CYFIXEDFRAME)
+/// (measured 2026-10-10: `ui-draws-inv-char-ama` (790, 10) → (590, 7),
+/// `ui-draws-inv-char-tip-ama` (320, 240) → (120, 237)).
+pub fn cursor_jump_move(at: crate::ui::Point) -> crate::ui::Point {
+    crate::ui::Point::new(at.x, at.y - WINDOW_FRAME_Y)
+}
+
+/// The tick the script's steps are timed by in the pass of server tick
+/// `tick` (`tools/scenario-diff.md` §3 r7 step 5): 1.14d posts the steps
+/// of `frame F` at the stop of tick F − 1 and its message pump takes them
+/// at the start of the next client frame, after the frame that ran tick
+/// F − 1 has drawn. A d2rs pass runs the UI events before its draw, so on
+/// a tick the schedule draws the script runs one tick behind (its `frame
+/// F` steps reach the next pass); on an undrawn tick, and without a
+/// schedule, it runs at `tick`.
+pub fn script_tick(tick: u64, schedule: Option<&FrameSchedule>) -> u64 {
+    match schedule {
+        Some(s) if s.drawn(tick) => tick - 1,
+        _ => tick,
+    }
+}
+
 /// `play --input` (`facts-render.md` §5 r11): the script's events, once
 /// per new server tick, into the UI queue in place of the window pointer.
 fn script_input(
     ui: Option<NonSendMut<WorldViewUi>>,
     bridge: Res<BridgeResource>,
     script: Option<ResMut<super::input_script::InputScript>>,
+    schedule: Option<Res<FrameSchedule>>,
     mut last: Local<u64>,
 ) {
     let (Some(mut ui), Some(mut script)) = (ui, script) else {
         return;
     };
+    ui.scripted = true;
     let tick = bridge.0.world().server_ticks;
     if tick == 0 || tick == *last {
         return;
     }
     *last = tick;
+    let tick = script_tick(tick, schedule.as_deref());
     // `clickunit` steps: the unit's screen point from the model camera
     // (open mode 0, no shake; d2rs-own, unverified: the drawn frame's
     // camera may follow the walk prediction).
@@ -1122,12 +1163,25 @@ fn world_view_frame(
                 ui.original.as_mut(),
             )?;
             if let Some(original) = ui.original.as_mut() {
-                // The cursor jump of §4.3: warp the window cursor.
+                // The cursor jump of `ui/panels.md` §4 r3 (`0x00468770`):
+                // the window cursor moves; a scripted pointer gets the
+                // mouse move that move causes at the next pass.
                 let warp = original.take_cursor_warp();
-                if let (Some(at), Ok(mut window)) = (warp, windows.single_mut()) {
-                    if let Ok(pos) = edge::frame_to_window(&window, at) {
-                        window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                match (warp, ui.scripted) {
+                    (Some(at), true) => {
+                        let moved = cursor_jump_move(at);
+                        original.cursor_jump_moved(moved, bridge.0.world());
+                        ui.queue.0.push(UiEvent::CursorMoved(moved));
+                        ui.cursor = Some(FramePos::Inside(moved));
                     }
+                    (Some(at), false) => {
+                        if let Ok(mut window) = windows.single_mut() {
+                            if let Ok(pos) = edge::frame_to_window(&window, at) {
+                                window.set_physical_cursor_position(Some(pos.as_dvec2()));
+                            }
+                        }
+                    }
+                    (None, _) => {}
                 }
                 // A check run replays the pointer the OS reported after the
                 // jump (the recorded host input) when d2rs's own jump agrees
@@ -1836,5 +1890,32 @@ mod schedule_tests {
         );
         assert!(FrameSchedule::parse(&text.replace("# frame-schedule 1\n", "")).is_err());
         assert!(FrameSchedule::parse(&text.replace("# cursor_idle 6402500\n", "")).is_err());
+    }
+
+    // Covers: specs/tools/scenario-diff.md §3 r7
+    #[test]
+    fn script_steps_reach_the_pass_after_the_draw_of_their_tick() {
+        let text = "# frame-schedule 1\n# cursor_last 0\n# cursor_idle 0\n\
+                    tick\tnow\n39\t1\n41\t2\n";
+        let s = FrameSchedule::parse(text).unwrap();
+        // `frame 40` waits for tick 39: drawn at 39, so the steps come in
+        // the pass of tick 40 and the draw of 41 is the first to see them
+        assert_eq!(super::script_tick(39, Some(&s)), 38);
+        assert_eq!(super::script_tick(40, Some(&s)), 40);
+        assert_eq!(super::script_tick(41, Some(&s)), 40);
+        assert_eq!(super::script_tick(39, None), 39);
+    }
+}
+
+#[cfg(test)]
+mod cursor_jump_tests {
+    use super::cursor_jump_move;
+    use crate::ui::Point;
+
+    // Covers: specs/ui/panels.md §4 r3
+    #[test]
+    fn the_jump_move_misses_the_top_border() {
+        assert_eq!(cursor_jump_move(Point::new(590, 10)), Point::new(590, 7));
+        assert_eq!(cursor_jump_move(Point::new(120, 240)), Point::new(120, 237));
     }
 }

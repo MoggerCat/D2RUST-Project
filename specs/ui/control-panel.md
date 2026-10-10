@@ -31,15 +31,15 @@
 |   6. Run / walk and menu buttons | 463–483 |
 |   7. Skill buttons | 484–514 |
 |   8. New-stats and new-skills buttons | 515–588 |
-|   9. Mini panel (state 0x15) | 589–702 |
-|   10. Control panel mouse input | 703–743 |
-|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 744–828 |
-| Constants & data dependencies | 829–844 |
-| Randomness | 845–848 |
-| Edge cases & original bugs | 849–861 |
-| Test vectors | 862–905 |
-| Provenance | 906–943 |
-| Open questions | 944–1001 |
+|   9. Mini panel (state 0x15) | 589–705 |
+|   10. Control panel mouse input | 706–746 |
+|   11. Help button (state 0x22, `UI_HELPBUTTON`) | 747–831 |
+| Constants & data dependencies | 832–847 |
+| Randomness | 848–851 |
+| Edge cases & original bugs | 852–864 |
+| Test vectors | 865–908 |
+| Provenance | 909–946 |
+| Open questions | 947–1004 |
 <!-- /index -->
 
 ## Summary
@@ -699,6 +699,9 @@ open at entry unless `Diablo II\Mini Panel` exists and is ≠ 0.
    at_game_exit():
      registry_write("Mini Panel", 1 if esc_saved_open[0x15] == 0 else 0)
    ```
+   d2rs: live play has no registry (the panel opens); a check run reads
+   the recording host's value (`play --registry`,
+   `tools/scenario-diff.md` §3 r7 step 7).
 
 ### 10. Control panel mouse input
 

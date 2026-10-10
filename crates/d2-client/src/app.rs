@@ -33,6 +33,7 @@ pub mod perf;
 pub mod play;
 pub mod play_start;
 pub mod poke;
+pub mod registry;
 pub mod rest;
 pub mod rng_dump;
 pub mod save;
