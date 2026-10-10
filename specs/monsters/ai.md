@@ -595,10 +595,10 @@ the unit has an entry of (owner −1, `0x006439B0`) is stored: AI param 1
 := slot, param 2 := the second dword (0); neither: both 0. Think
 `0x005E2D80` (target mode 1): no source unit (`0x00552FD0`) or no state
 143 → AI state 0, idle 1. Distance > 24, source dead, source alignment
-≠ 0 (`0x006259B0`) or param 1 = 0 → teleport in range imp1's `aip1`
-with imp1's `Skill1` / `Sk1mode` (`0x005DF850`), param 0 := −1. Else when
-distance < imp2's (monstats 493) `aip1` and `roll(100)` < imp2's `aip2`:
-param 2 ≠ 0 → two `roll(2 · imp2.aip3)`; imp1's `Skill<slot + 1>` in its
+≠ 0 (`0x006259B0`) or param 1 = 0 → teleport in range imp1's `aip2`
+(`+0x5C`; `aip1` is `+0x56`) with imp1's `Skill1` / `Sk1mode` (`0x005DF850`), param 0 := −1. Else when
+distance < imp2's (monstats 493) `aip2` and `roll(100)` < imp2's `aip3`:
+param 2 ≠ 0 → two `roll(2 · imp2.aip4)` (`+0x68`, `all.asm` `0x5E2EAC`); imp1's `Skill<slot + 1>` in its
 mode at the target (`0x005DEAD0`), idle 20 when the skill is < 0.
 Otherwise `roll(100)` < 50 → mode 8 at the target (`0x005DDF90`), else
 idle 20. Imp Teleport's exact placement `0x00554EA0(…, exact 1)` skips
