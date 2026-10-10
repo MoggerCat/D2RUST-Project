@@ -1,23 +1,24 @@
 C028	rc-c028-skillmsgs	16:43	s2c 0xa3 missing in d2rs (dru-volcano f29)	open
 C009	rc-c009-scenes	16:44	ui.frontend main/charselect/create/credits/cinematics: no scenario check (frontend channel)	open
 C-pc1-client	rc-pc1-wine	16:47	system.client 36 rows: d2rs ClientWorld cstate dump missing (q-fix-pc1today-client-state-dump)	open
-C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	open
+C022	rc-net-div	16:58	a2-quest-tombs frame 32 s2c 0a vs 07 (quest unit removal send order: outbox vs rest buffer)	done EQUAL +3 (superunique beetleburst, dark-elder, fire-eye); coldworm+wp-42 packets MATCH
 C-aura-0xaa	rc-skill-div-b	16:59	pal aura 0xAA/0xA8 join + non-immediate aura state + frame-51 resend (gen-skill-pal-*)	open
 C-skilldelay-a7	rc-skill-div-b	16:59	s2c 0xa7 state 121 missing in d2rs at cast (gen-skill-sor-51/56/59/62/64, dru-225/229/234)	open
 C-summon-0xac	rc-skill-div-b	16:59	0xAC AssignMonster of skill summons shorter than 1.14d (gen-skill-ama-28, dru-221, nec-78)	open
 C-0x5D-p2	rc-promote	16:59	0x5D chains 31-33 on same-act warp from Harrogath (a5-wp-31..38, drehya/nihlathak stock): event-3 old-level 109 branch	open
 C-ui-draws-q	rc-ui-div	16:59	ui-draws-* unmeasured ? cells (mode/light/pal/file/w/h of CelDrawColor/Ex/Clipped, glyph files)	open
 C024	rc-promote	16:59	skill.ass 6 + shrine.17/.7: packets C->S/S->C divergence after packets channel added (ass sentry 0xA7/0xAC/0x21, shrine 0xA8/0x2C)	open
-C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	open batch1 merged
+C-gen-nc-sys	rc-gen-nc-sys	16:59	NO-CHECK rows coverage.check-gen 8, system.render 27, system.ui panels/automap/item-tips/menus 12, gen-sysc PARTIAL state rows (not frontend: C009; not cstate dump: C-pc1-client)	done EQUAL +31, checked +50
 fatal-exit	rc-run-3b	16:59	1.14d fatal exit(-1): gen-obj-374/385/400/403/450 (A client Mode<m>=0, done), 375 (B gfx file), 59/60/377 (C portal partner level)	open
 obj-39-78-approach	rc-run-3b	16:59	gen-obj-39/78 player m 5 vs 3 (object walk path end)	open
 C054	rc-c022-playerstate	17:05	gen-qkill-blood-raven frame 64 player m 5 vs 4 (monster missile hit damage + hit recovery on player)	open
 C056	rc-c022-playerstate	17:05	gen-su-12 frame 54 player m 19 vs 5 (knockback/hit one frame late)	open
 C029	rc-c022-playerstate	17:05	gen-ai-bloodraven frame 94 player s (unit seed draws)	open
 C022	rc-c022-playerstate	17:05	state player q (act-travel-lut-ama frame 10 quest record) - not the packets signature of rc-net-div	done 8 rows EQUAL (act-travel/a2-warp/join/milestone/npc-talk: 18 checks state 100%); packets part stays rc-net-div
-C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	open
+C032-C043	rc-c022-playerstate	17:05	gen-su-28/gen-boss-544 now 150/150 on integ-r23 head: settle ledger only	done 7 rows EQUAL (gen-su-26/28/29/30/63, gen-boss-544, gen-ai-highpriest); deathmauler1-5 rows blocked by "ignore q seed" in gen-mon-529..533
 C039+C069	rc-ctail-packets	17:40	s2c 3f/22 vs 47 cube open; 0x28 inline; sound 20	done cube-* packets 16/16 MATCH
-C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	open
+C002	rc-gen-nc-sys	17:38	draws DrawLine column x (pass-9 rain lines, gen-ui-*/gen-render-*/gen-fmt-draws-town)	released: footstep-variant client seed (rc-audio-fmt-div, Windows)
+C023	rc-net-div	17:46	a2-wp-46/-74, a2-super-leatherarm frame 4 s2c 5d vs 0a/07 (quest rest-buffer vs sim outbox send order)	open
 C008	rc-c008-monmode	13:30	state monster m 2->1 (aidel by difficulty)	done 34/35 C008 checks state 100% (11 rows EQUAL)
 C033	rc-c008-monmode	15:40	state monster m 2->9 (scan 6 line a=C)	done baal-throne, worldstone-portal state 87/87
 C038	rc-c008-monmode	16:10	state monster m 7->1 (shadowmaster skill list)	done ass-shadow-master 47->61/70 (sp 194 vs 154 open)
