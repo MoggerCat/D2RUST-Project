@@ -216,6 +216,12 @@ The waypoint section is 80 bytes (writer `0x005693E0`; readers
    + (`FrameCnt1` >> 8) via `0x005417D0` (= frame + 15 or + 20; never ≤
    frame). Then free **that node** and set the list head to null
    (edge case 3). Return.
+   Measured (2026-10-10, `gen-wp-*`, REC-1970): the mode-1 window after
+   a waypoint arrival lasts 15 frames (20 for 494, 496, 511, 539), then
+   ENDANIM sets mode 2. The delay is the record value (`FrameCnt1` × 256,
+   `data/fixups.md` §13) shifted right by 8, so an implementation must
+   feed this rule the fixed table; raw cell 15 >> 8 = 0 ends the mode
+   one frame after arrival (the divergence the 17 `gen-wp` checks showed).
 3. No match: if the object's room is in a town level → set mode 2
    (`0x00624690(object, 2)`). Otherwise the object stays in mode 0.
 
