@@ -38,21 +38,21 @@
 |   5. UI pass order (`0x00456EE0`) | 356–395 |
 |   6. 800 × 600 border and control panel art (`0x00499450`) | 396–416 |
 |   7. Shared panel parts | 417–434 |
-|   8. Character panel (ui 2, left; `0x004A7D00`) | 435–537 |
-|   9. Inventory panel family (`0x0048EDF0`) | 538–605 |
-|   10. Skill tree (ui 4, right; `0x004AC690`) | 606–669 |
-|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 670–705 |
-|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 706–761 |
-|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 762–819 |
-|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 820–825 |
-|   15. Event → intent summary | 826–853 |
-|   16. Machine tables | 854–888 |
-| Constants & data dependencies | 889–909 |
-| Randomness | 910–914 |
-| Edge cases & original bugs | 915–935 |
-| Test vectors | 936–976 |
-| Provenance | 977–1021 |
-| Open questions | 1022–1113 |
+|   8. Character panel (ui 2, left; `0x004A7D00`) | 435–541 |
+|   9. Inventory panel family (`0x0048EDF0`) | 542–609 |
+|   10. Skill tree (ui 4, right; `0x004AC690`) | 610–673 |
+|   11. Stash (ui 0x19, full; inventory modes 0x0C / 0x0D) | 674–709 |
+|   12. Horadric Cube (ui 0x1A, full; inventory mode 0x0E) | 710–765 |
+|   13. Waypoint menu (ui 0x14, left; `0x0049C9C0`) | 766–823 |
+|   14. NPC menu (ui 8) and NPC shop (ui 0x0C) | 824–829 |
+|   15. Event → intent summary | 830–857 |
+|   16. Machine tables | 858–892 |
+| Constants & data dependencies | 893–913 |
+| Randomness | 914–918 |
+| Edge cases & original bugs | 919–939 |
+| Test vectors | 940–980 |
+| Provenance | 981–1025 |
+| Open questions | 1026–1117 |
 <!-- /index -->
 
 ## Summary
@@ -479,7 +479,11 @@ after both.
    Value = stat value of the player (`0x00625480`), base = unmodified
    value (`0x006253B0`). Stats 6–11 (life, mana, stamina, current and
    max) are shown `>> 8`; stat 6 is shown as at least 1 while the player
-   is alive. Color: 3 (blue) when value > base, 1 (red) when value <
+   is alive. **Defense (stat 31) is not the stat**: the switch case 0x1F
+   (`0x004A86BF`) shows the defense getter `0x006223F0` (`combat/hit.md` §2:
+   armorclass + dexterity/4, the armor percents, ...); an unequipped
+   level-1 Amazon (dex 25) shows 6 (`ui-draws-inv-char-ama`, REC-2960).
+   Color: 3 (blue) when value > base, 1 (red) when value <
    base, else 0, for stats 0, 2, 3, 1 (attributes), 7, 9, 11 (max
    life/mana/stamina), 12 (level), 31 (defense) and the resistances
    (§8.9); experience (13) and next-level (30) are formatted by

@@ -280,25 +280,45 @@ impl Cursor {
         player: bool,
         seed: &mut u64,
     ) -> Result<Option<CursorDraw>, CursorFatal> {
+        let (d, step) = self.place(w, h, item_gfx);
+        if step {
+            self.step(now, player, seed)?;
+        }
+        Ok(d)
+    }
+
+    /// The draw of [`Self::draw`] without its step: what is drawn, and
+    /// whether the step `0x00468310` follows it (types 0–5, no cursor
+    /// item). The caller runs [`Self::step`] after the frame's other seed
+    /// draws (`client/model.md` Randomness r4: the cursor step is the
+    /// frame's last).
+    pub fn place(
+        &self,
+        w: i32,
+        h: i32,
+        item_gfx: Option<(u32, u32)>,
+    ) -> (Option<CursorDraw>, bool) {
         if !self.drawn {
-            return Ok(None);
+            return (None, false);
         }
         if let (true, Some((gw, gh))) = (self.s < 6, item_gfx) {
             // no step runs, so the cursor frame stays where it was
-            return Ok(Some(CursorDraw::Item {
+            let d = CursorDraw::Item {
                 x: self.adj + self.mx - (gw / 2) as i32,
                 y: self.my - (gh / 2) as i32,
-            }));
+            };
+            return (Some(d), false);
         }
         if TYPES[usize::from(self.t)].shop_draw {
             // type 6: frame f (not shifted) at (adj + mx, my + 33); no
             // clamp, no step
-            return Ok(Some(CursorDraw::Cel {
+            let d = CursorDraw::Cel {
                 t: self.t,
                 frame: self.f as u32,
                 x: self.adj + self.mx,
                 y: self.my + 33,
-            }));
+            };
+            return (Some(d), false);
         }
         // types 0–5: x = clamp(mx + adj, adj, W − adj − 1), y = clamp(my,
         // 0, H − 1), frame f >> 8; then the step
@@ -308,8 +328,7 @@ impl Cursor {
             x: (self.mx + self.adj).clamp(self.adj, w - self.adj - 1),
             y: self.my.clamp(0, h - 1),
         };
-        self.step(now, player, seed)?;
-        Ok(Some(d))
+        (Some(d), true)
     }
 }
 
