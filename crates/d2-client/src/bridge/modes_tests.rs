@@ -246,6 +246,21 @@ fn monster_hit_codes_store_the_hit_class() {
     assert_eq!(monster_after(&i, 1, 0x13, [1, 2, 3, 4, 5, 0, 6]), 1);
 }
 
+// Covers: specs/client/model.md §19 r4 (F: path stop `0x00650590`)
+#[test]
+fn the_neutral_fallback_stops_the_path_at_the_cell_centre() {
+    let i = monster_inputs();
+    let k = UnitKey::new(MONSTER, 5);
+    let mut w = world_with(k, 2);
+    w.units.get_mut(&k).unwrap().precise = Some(((50 << 16) | 32392, (50 << 16) | 33144));
+    req(&mut w, &i, k, 0x07, [51, 50, 0, 0, 0, 0, 0]).unwrap();
+    assert_eq!(w.units[&k].mode, 1);
+    assert_eq!(
+        w.units[&k].precise,
+        Some(((50 << 16) | 0x8000, (50 << 16) | 0x8000))
+    );
+}
+
 // Covers: specs/client/model.md §19 r4, §19 r3
 #[test]
 fn monster_mode_follows_the_dispatch_table() {
