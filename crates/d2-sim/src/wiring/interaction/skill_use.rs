@@ -1758,11 +1758,29 @@ impl<'a, X: Pending + UseRest> BodyWorld for UseView<'a, X> {
             r.anim.speed = v as i16;
         }
     }
+    /// `0x0064A300`: the missile's +0x0E total frames from the real
+    /// missile store (0 without missile data); the host's hook only
+    /// while the store is lent out.
     fn missile_frames(&self, m: UnitId) -> i32 {
-        self.x().body_missile_frames(m)
+        match self.cv.v.h.missiles.as_ref() {
+            Some(s) => s.get(m).map_or(0, |d| i32::from(d.total)),
+            None => self.x().body_missile_frames(m),
+        }
     }
+    /// `0x0064A2B0` (+0x0E total) and `0x0064A330` (+0x10 current), each
+    /// clamped to −0x8000…0x7FFF, on the real missile store. Without this
+    /// the Inferno-type bodies left every missile at its `Range`
+    /// (`skills/bodies-3.md` §4.2).
     fn set_missile_frames(&mut self, m: UnitId, total: i32, left: i32) {
-        self.xm().body_set_missile_frames(m, total, left);
+        match self.cv.v.h.missiles.as_mut() {
+            Some(s) => {
+                if let Some(d) = s.get_mut(m) {
+                    d.total = missiles::clamp_frame(total);
+                    d.current = missiles::clamp_frame(left);
+                }
+            }
+            None => self.xm().body_set_missile_frames(m, total, left),
+        }
     }
     /// Unit +0x30 → +0x34.
     fn sequence_frames(&self, u: UnitId) -> Option<i32> {
